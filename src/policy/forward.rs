@@ -4,6 +4,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use log::debug;
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
 
@@ -129,6 +130,7 @@ impl Forward {
         table: &mut TableLruCache,
         platforms: &Vec<Arc<PlatformData>>,
     ) {
+        debug!("Platform L3:");
         for platform in platforms {
             if platform.mac == 0 {
                 continue;
@@ -157,6 +159,7 @@ impl Forward {
                     ip: ip.raw_ip,
                     mac,
                 };
+                debug!("\t{} {}", key.mac, key.ip);
                 table.push(key, value);
             }
         }
@@ -167,6 +170,7 @@ impl Forward {
         table: &mut TableLruCache,
         interfaces: &Vec<NetworkInterface>,
     ) {
+        debug!("Interface L3:");
         for interface in interfaces {
             if interface.is_loopback() || !interface.is_up() || interface.mac.is_none() {
                 continue;
@@ -188,6 +192,7 @@ impl Forward {
                     ip: ip.ip(),
                     mac,
                 };
+                debug!("\t{} {}", key.mac, key.ip);
                 table.push(key, value);
             }
         }

@@ -61,7 +61,7 @@ impl Policy {
             .query(index, key.src_mac, key.src_ip, key.l2_end_0);
         key.l3_end_1 = self
             .forward
-            .query(index, key.src_mac, key.src_ip, key.l2_end_0);
+            .query(index, key.dst_mac, key.dst_ip, key.l2_end_1);
 
         // 根据ARP和NDP添加forward表
         if packet.is_ndp_response() {
