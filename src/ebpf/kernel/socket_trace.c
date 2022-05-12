@@ -714,6 +714,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 		// 注意这里没有调整v->syscall_len和v->len我们会在用户层做。
 		v->extra_data = *(__u32 *)conn_info->prev_buf;
 		v->extra_data_count = conn_info->prev_count;
+		v->tcp_seq -= conn_info->prev_count; // 客户端和服务端的tcp_seq匹配
 	} else
 		v->extra_data_count = 0;
 
