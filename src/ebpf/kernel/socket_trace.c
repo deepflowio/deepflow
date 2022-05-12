@@ -651,7 +651,17 @@ static __inline void data_submit(struct pt_regs *ctx,
 		socket_info_map__update(&conn_key, &sk_info);
 		if (socket_info_ptr == NULL)
 			trace_stats->socket_map_count++;
-	} else { /* socket_info_ptr != NULL */
+	}
+
+	/*
+	 * 对于预先存储数据或socket l7协议类型需要再次确认(适用于长链接)
+	 * 的动作只建立socket_info_map项不会发送数据给用户态程序。
+	 */
+	if (conn_info->message_type == MSG_PRESTORE ||
+	    conn_info->message_type == MSG_RECONFIRM)
+		return;
+
+	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
 		sk_info.seq = ++socket_info_ptr->seq;
 		socket_info_ptr->update_time = time_stemp / NS_PER_SEC;
@@ -669,14 +679,6 @@ static __inline void data_submit(struct pt_regs *ctx,
 			socket_info_ptr->trace_id = 0;
 		}
 	}
-
-	/*
-	 * 对于预先存储数据或socket l7协议类型需要再次确认(适用于长链接)
-	 * 的动作只建立socket_info_map项不会发送数据给用户态程序。
-	 */
-	if (conn_info->message_type == MSG_PRESTORE ||
-	    conn_info->message_type == MSG_RECONFIRM)
-		return;
 
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
