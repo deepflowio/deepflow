@@ -17,8 +17,6 @@ verify-x64:
   script:
     - cargo check
     - cargo fmt --all -- --check
-    - cargo build --release
-    - cargo build --release --bin metaflow-agent-ctl
     - cargo test
     # - cargo clean
   # artifacts:
@@ -66,6 +64,7 @@ binary-x64:
         - src/ebpf/libebpf.a
         - src/ebpf/metaflow-ebpfctl
         - src/proto/*
+
 rpm-x64:
   stage: package
   tags:
