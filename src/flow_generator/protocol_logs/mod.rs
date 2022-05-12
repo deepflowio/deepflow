@@ -130,14 +130,16 @@ pub struct AppProtoLogsBaseInfo {
     pub req_tcp_seq: u32,
     pub resp_tcp_seq: u32,
     /* EBPF Info */
-    pub cap_seq: u64,
     pub process_id_0: u32,
     pub process_id_1: u32,
     pub process_kname_0: String,
     pub process_kname_1: String,
     pub syscall_trace_id_request: u64,
     pub syscall_trace_id_response: u64,
-    pub syscall_trace_id_thread: u32,
+    pub syscall_trace_id_thread_0: u32,
+    pub syscall_trace_id_thread_1: u32,
+    pub syscall_cap_seq_0: u64,
+    pub syscall_cap_seq_1: u64,
 
     pub protocol: IpProtocol,
     pub is_vip_interface_src: bool,
@@ -186,7 +188,10 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
             process_kname_1: f.process_kname_1,
             syscall_trace_id_request: f.syscall_trace_id_request,
             syscall_trace_id_response: f.syscall_trace_id_response,
-            syscall_trace_id_thread: f.syscall_trace_id_thread,
+            syscall_trace_id_thread_0: f.syscall_trace_id_thread_0,
+            syscall_trace_id_thread_1: f.syscall_trace_id_thread_1,
+            syscall_cap_seq_0: f.syscall_cap_seq_0 as u32,
+            syscall_cap_seq_1: f.syscall_cap_seq_1 as u32,
         }
     }
 }
@@ -221,7 +226,6 @@ impl AppProtoLogsBaseInfo {
             port_dst: packet.lookup_key.dst_port,
             protocol: packet.lookup_key.proto,
 
-            cap_seq: packet.cap_seq,
             process_id_0: if is_src { packet.process_id } else { 0 },
             process_id_1: if !is_src { packet.process_id } else { 0 },
             process_kname_0: if is_src {
@@ -255,8 +259,26 @@ impl AppProtoLogsBaseInfo {
             } else {
                 0
             },
-            syscall_trace_id_thread: packet.thread_id,
-
+            syscall_trace_id_thread_0: if packet.direction == PacketDirection::ClientToServer {
+                packet.thread_id
+            } else {
+                0
+            },
+            syscall_trace_id_thread_1: if packet.direction == PacketDirection::ServerToClient {
+                packet.thread_id
+            } else {
+                0
+            },
+            syscall_cap_seq_0: if packet.direction == PacketDirection::ClientToServer {
+                packet.cap_seq
+            } else {
+                0
+            },
+            syscall_cap_seq_1: if packet.direction == PacketDirection::ServerToClient {
+                packet.cap_seq
+            } else {
+                0
+            },
             vtap_id,
             head,
             l3_epc_id_src: if is_src { local_epc } else { remote_epc },
@@ -290,6 +312,8 @@ impl AppProtoLogsBaseInfo {
             self.process_id_1 = log.process_id_1;
             self.process_kname_1 = log.process_kname_1;
         }
+        self.syscall_trace_id_thread_1 = log.syscall_trace_id_thread_1;
+        self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
         self.end_time = log.end_time.max(self.start_time);
         self.resp_tcp_seq = log.resp_tcp_seq;
         self.syscall_trace_id_response = log.syscall_trace_id_response;
@@ -402,7 +426,10 @@ impl AppProtoLogsData {
                 | (self.base_info.head.proto as u64) << 24
                 | ((session_id as u64) & 0xffffff)
         } else {
-            let mut cap_seq = self.base_info.cap_seq;
+            let mut cap_seq = self
+                .base_info
+                .syscall_cap_seq_0
+                .max(self.base_info.syscall_cap_seq_1);
             if self.base_info.head.msg_type == LogMessageType::Request {
                 cap_seq += 1;
             };
@@ -424,7 +451,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             f,
             "Timestamp: {:?} Vtap_id: {} Flow_id: {} TapType: {} TapPort: {} TapSide: {:?}\n \
                 \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {} EPC: {} -> {}\n \
-                \tProcess: {}:{} -> {}:{} Trace-id: {} -> {} Thread: {}\n \
+                \tProcess: {}:{} -> {}:{} Trace-id: {} -> {} Thread: {} -> {} cap_seq: {} -> {}\n \
                 \tL7Protocol: {:?} MsgType: {:?} Status: {:?} Code: {} Rrt: {}",
             self.start_time,
             self.vtap_id,
@@ -451,7 +478,10 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.process_id_1,
             self.syscall_trace_id_request,
             self.syscall_trace_id_response,
-            self.syscall_trace_id_thread,
+            self.syscall_trace_id_thread_0,
+            self.syscall_trace_id_thread_1,
+            self.syscall_cap_seq_0,
+            self.syscall_cap_seq_1,
             self.head.proto,
             self.head.msg_type,
             self.head.status,
