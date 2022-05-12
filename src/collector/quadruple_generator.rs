@@ -27,6 +27,7 @@ use crate::config::handler::CollectorAccess;
 use crate::metric::meter::{
     AppAnomaly, AppLatency, AppMeter, AppTraffic, FlowMeter, Latency, Performance, Traffic,
 };
+use crate::rpc::get_timestamp;
 use crate::utils::{
     possible_host::PossibleHost,
     queue::{Error, Receiver, Sender},
@@ -305,15 +306,6 @@ impl Countable for SubQuadGen {
     }
 }
 
-// TODO 预留接口
-mod rpc {
-    pub fn get_timestamp() -> std::time::Duration {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-    }
-}
-
 impl SubQuadGen {
     // return false if flow out of window
     fn move_window(&mut self, time_in_second: Duration, possible_host: &mut PossibleHost) -> bool {
@@ -324,7 +316,7 @@ impl SubQuadGen {
             return false;
         }
 
-        let ts = rpc::get_timestamp();
+        let ts = get_timestamp();
         while time_in_second.as_secs() >= self.window_start.as_secs() + self.delay_seconds {
             let delay = ts.as_nanos() as i64 - self.window_start.as_nanos() as i64;
             self.counter
@@ -707,7 +699,7 @@ impl QuadrupleGenerator {
         let mut second_quad_gen = None;
         let mut minute_quad_gen = None;
         let window_start =
-            round_to_minute(rpc::get_timestamp()) - Duration::from_secs(2 * SECONDS_IN_MINUTE);
+            round_to_minute(get_timestamp()) - Duration::from_secs(2 * SECONDS_IN_MINUTE);
 
         if metrics_type.contains(MetricsType::SECOND) {
             second_quad_gen = Some(SubQuadGen {
@@ -1085,7 +1077,7 @@ impl QuadrupleGenerator {
                     self.handle(Some(tagged_flow.clone()), tagged_flow.flow.flow_stat_time);
                 }
                 Err(Error::Timeout) => {
-                    self.handle(None, rpc::get_timestamp());
+                    self.handle(None, get_timestamp());
                 }
                 Err(Error::Terminated(_, _)) => {
                     if let Some(g) = self.second_quad_gen.as_mut() {
@@ -1128,7 +1120,7 @@ mod test {
     #[test]
     fn second_inject_flow() {
         let window_start =
-            round_to_minute(rpc::get_timestamp()) - Duration::from_secs(2 * SECONDS_IN_MINUTE);
+            round_to_minute(get_timestamp()) - Duration::from_secs(2 * SECONDS_IN_MINUTE);
         let (s, r, _) = queue::bounded(100);
         let slots = 30u64;
         let mut quad_gen = SubQuadGen {
