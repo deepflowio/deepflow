@@ -19,7 +19,7 @@ use super::{
 };
 use crate::rpc::get_timestamp;
 use crate::utils::queue::{self, Error};
-use crate::utils::stats::{Countable, Counter, CounterType, CounterValue};
+use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 
 #[derive(Default)]
 pub struct WorkerCounter {
@@ -37,16 +37,6 @@ pub struct WorkerCounter {
     written_count: AtomicU64,
     // statsd:"written_bytes"
     written_bytes: AtomicU64,
-    running: Arc<AtomicBool>,
-}
-
-impl WorkerCounter {
-    pub fn new(running: Arc<AtomicBool>) -> Self {
-        Self {
-            running,
-            ..Default::default()
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -80,7 +70,6 @@ impl Worker {
         packet_receiver: queue::Receiver<PcapPacket>,
         interval: Duration,
     ) -> Self {
-        let running = Arc::new(AtomicBool::new(false));
         Self {
             index,
             interval,
@@ -91,16 +80,16 @@ impl Worker {
                 base_directory,
                 writer_buffer_size,
             },
-            counter: Arc::new(WorkerCounter::new(running.clone())),
+            counter: Default::default(),
             writers: Arc::new(DashMap::new()),
             packet_receiver: Arc::new(packet_receiver),
             thread: Mutex::new(None),
-            running,
+            running: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    pub fn clone_counter(&self) -> Arc<WorkerCounter> {
-        self.counter.clone()
+    pub fn counter(&self) -> &Arc<WorkerCounter> {
+        &self.counter
     }
 
     pub fn start(&self) {
@@ -331,7 +320,7 @@ impl Worker {
     }
 }
 
-impl Countable for WorkerCounter {
+impl RefCountable for WorkerCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
@@ -370,9 +359,5 @@ impl Countable for WorkerCounter {
                 CounterValue::Unsigned(self.written_bytes.load(Ordering::Relaxed)),
             ),
         ]
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
     }
 }

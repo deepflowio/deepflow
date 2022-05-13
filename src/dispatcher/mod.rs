@@ -9,7 +9,7 @@ mod mirror_mode_dispatcher;
 
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc, Mutex,
+    Arc, Mutex, Weak,
 };
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -219,7 +219,7 @@ impl PacketCounter {
     }
 }
 
-impl stats::Countable for PacketCounter {
+impl stats::RefCountable for PacketCounter {
     fn get_counters(&self) -> Vec<stats::Counter> {
         let kc = &self.kernel_counter;
         let get_token_failed = self.get_token_failed.swap(0, Ordering::Relaxed);
@@ -273,10 +273,6 @@ impl stats::Countable for PacketCounter {
                 stats::CounterValue::Unsigned(kc.kernel_freezes.swap(0, Ordering::Relaxed)),
             ),
         ]
-    }
-
-    fn closed(&self) -> bool {
-        self.terminated.load(Ordering::Relaxed)
     }
 }
 
@@ -505,7 +501,7 @@ impl DispatcherBuilder {
         };
         collector.register_countable(
             "dispatcher",
-            counter,
+            stats::Countable::Ref(Arc::downgrade(&counter) as Weak<dyn stats::RefCountable>),
             vec![stats::StatsOption::Tag("id", base.id.to_string())],
         );
         let mut dispatcher = match tap_mode {

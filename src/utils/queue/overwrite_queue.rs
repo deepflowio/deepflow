@@ -431,7 +431,7 @@ impl<T> Drop for StatsHandle<T> {
     }
 }
 
-impl<T: Send> stats::Countable for StatsHandle<T> {
+impl<T: Send> stats::OwnedCountable for StatsHandle<T> {
     fn get_counters(&self) -> Vec<stats::Counter> {
         let queue = &self.counter().queue;
         let start = queue.start.load(Ordering::Relaxed);

@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, Weak,
     },
     time::Duration,
 };
@@ -16,7 +16,9 @@ use crate::{
     error::{Error, Result},
     utils::{
         net::link_list,
-        stats::{Collector, Countable, Counter, CounterType, CounterValue, StatsOption},
+        stats::{
+            Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
+        },
     },
 };
 
@@ -59,6 +61,10 @@ impl LinkStatusBroker {
         self.running.store(false, Ordering::Relaxed);
     }
 
+    pub fn closed(&self) -> bool {
+        !self.running.load(Ordering::Relaxed)
+    }
+
     pub fn update(&self, new_metric: NetMetricArg) {
         let NetMetricArg {
             rx,
@@ -77,7 +83,7 @@ impl LinkStatusBroker {
     }
 }
 
-impl Countable for LinkStatusBroker {
+impl RefCountable for LinkStatusBroker {
     fn get_counters(&self) -> Vec<Counter> {
         if !self.running.load(Ordering::SeqCst) {
             return vec![];
@@ -128,10 +134,6 @@ impl Countable for LinkStatusBroker {
         ));
 
         metrics
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
     }
 }
 
@@ -185,7 +187,7 @@ impl SysStatusBroker {
     }
 }
 
-impl Countable for SysStatusBroker {
+impl RefCountable for SysStatusBroker {
     fn get_counters(&self) -> Vec<Counter> {
         if !self.running.load(Ordering::Relaxed) {
             return vec![];
@@ -227,10 +229,6 @@ impl Countable for SysStatusBroker {
                 vec![]
             }
         }
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
     }
 }
 
@@ -307,7 +305,11 @@ impl Monitor {
                 let mut options = vec![];
                 options.push(StatsOption::Tag("name", link.name.clone()));
                 options.push(StatsOption::Tag("mac", link.mac_addr.to_string()));
-                stats.register_countable("net", link_broker.clone(), options);
+                stats.register_countable(
+                    "net",
+                    Countable::Ref(Arc::downgrade(&link_broker) as Weak<dyn RefCountable>),
+                    options,
+                );
                 link_map_guard.insert(link.name.clone(), link_broker);
                 monitor_list.push(link.name);
             }
@@ -332,8 +334,11 @@ impl Monitor {
             }
         }));
 
-        self.stats
-            .register_countable("monitor", self.sys_monitor.clone(), vec![]);
+        self.stats.register_countable(
+            "monitor",
+            Countable::Ref(Arc::downgrade(&self.sys_monitor) as Weak<dyn RefCountable>),
+            vec![],
+        );
 
         info!("monitor started");
     }

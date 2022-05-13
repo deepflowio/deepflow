@@ -19,7 +19,7 @@ use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
 use crate::utils::{
     queue::{bounded, DebugSender, Receiver, Sender},
-    stats::{Countable, Counter, CounterType, CounterValue},
+    stats::{Counter, CounterType, CounterValue, OwnedCountable},
 };
 
 type LoggerItem = (L7Protocol, Box<dyn L7LogParse>);
@@ -287,7 +287,7 @@ impl SyncEbpfCounter {
 unsafe impl Send for SyncEbpfCounter {}
 unsafe impl Sync for SyncEbpfCounter {}
 
-impl Countable for SyncEbpfCounter {
+impl OwnedCountable for SyncEbpfCounter {
     fn get_counters(&self) -> Vec<Counter> {
         let (rx, tx, unknow) = (
             self.counter().rx,
