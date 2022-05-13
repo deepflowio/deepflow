@@ -41,11 +41,8 @@ func (c *Client) Init(query_uuid string) error {
 }
 
 func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, values []interface{}) []interface{}) (map[string][]interface{}, error) {
-	start := time.Now()
 	rows, err := c.connection.Queryx(sql)
-	queryTime := time.Since(start)
 	c.Debug.Sql = sql
-	c.Debug.QueryTime = int64(queryTime)
 	if err != nil {
 		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sql, c.Debug.QueryUUID)
 		c.Debug.Error = fmt.Sprintf("%s", err)
@@ -66,6 +63,7 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 	}
 	result["columns"] = columnNames
 	var values []interface{}
+	start := time.Now()
 	for rows.Next() {
 		row, err := rows.SliceScan()
 		if err != nil {
@@ -83,6 +81,8 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 		}
 		values = append(values, record)
 	}
+	queryTime := time.Since(start)
+	c.Debug.QueryTime = int64(queryTime)
 	for _, callback := range callbacks {
 		values = callback(columnNames, values)
 	}
