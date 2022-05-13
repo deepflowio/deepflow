@@ -50,8 +50,8 @@ type L7Base struct {
 	ProcessKName1          string
 	SyscallTraceIDRequest  uint64
 	SyscallTraceIDResponse uint64
-	SyscallTraceIDThread0  uint32
-	SyscallTraceIDThread1  uint32
+	SyscallThread0         uint32
+	SyscallThread1         uint32
 	SyscallCapSeq0         uint32
 	SyscallCapSeq1         uint32
 }
@@ -94,11 +94,10 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("process_kname_1", ckdb.String).SetComment("服务端进程名"),
 		ckdb.NewColumn("syscall_trace_id_request", ckdb.UInt64).SetComment("SyscallTraceID-请求"),
 		ckdb.NewColumn("syscall_trace_id_response", ckdb.UInt64).SetComment("SyscallTraceID-响应"),
-		// FIXME 修改名称为syscall_trace_id_thread_0
-		ckdb.NewColumn("syscall_trace_id_thread", ckdb.UInt32).SetComment("SyscallTraceID-线程"),
-		ckdb.NewColumn("syscall_trace_id_thread_1", ckdb.UInt32).SetComment("SyscallTraceID-线程1"),
-		ckdb.NewColumn("syscall_cap_seq_0", ckdb.UInt32).SetComment("Syscall-序列0"),
-		ckdb.NewColumn("syscall_cap_seq_1", ckdb.UInt32).SetComment("Syscall-序列1"),
+		ckdb.NewColumn("syscall_thread_0", ckdb.UInt32).SetComment("Syscall线程-请求"),
+		ckdb.NewColumn("syscall_thread_1", ckdb.UInt32).SetComment("Syscall线程-响应"),
+		ckdb.NewColumn("syscall_cap_seq_0", ckdb.UInt32).SetComment("Syscall序列号-请求"),
+		ckdb.NewColumn("syscall_cap_seq_1", ckdb.UInt32).SetComment("Syscall序列号-响应"),
 	)
 
 	return columns
@@ -201,10 +200,10 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt64(f.SyscallTraceIDResponse); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.SyscallTraceIDThread0); err != nil {
+	if err := block.WriteUInt32(f.SyscallThread0); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.SyscallTraceIDThread1); err != nil {
+	if err := block.WriteUInt32(f.SyscallThread1); err != nil {
 		return err
 	}
 	if err := block.WriteUInt32(f.SyscallCapSeq0); err != nil {
@@ -614,8 +613,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.ProcessKName1 = l.ProcessKname1
 	b.SyscallTraceIDRequest = l.SyscallTraceIdRequest
 	b.SyscallTraceIDResponse = l.SyscallTraceIdResponse
-	b.SyscallTraceIDThread0 = l.SyscallTraceIdThread0
-	b.SyscallTraceIDThread1 = l.SyscallTraceIdThread1
+	b.SyscallThread0 = l.SyscallTraceIdThread0
+	b.SyscallThread1 = l.SyscallTraceIdThread1
 	b.SyscallCapSeq0 = l.SyscallCapSeq0
 	b.SyscallCapSeq1 = l.SyscallCapSeq1
 }

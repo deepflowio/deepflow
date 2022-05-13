@@ -249,7 +249,7 @@ var ColumnAdd610 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"syscall_trace_id_thread_1", "syscall_cap_seq_0", "syscall_cap_seq_1"},
+		ColumnNames: []string{"syscall_thread_0", "syscall_thread_1", "syscall_cap_seq_0", "syscall_cap_seq_1"},
 		ColumnType:  ckdb.UInt32,
 	},
 }
