@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, Weak,
     },
     time::Duration,
 };
@@ -19,7 +19,7 @@ use super::{
 use crate::config::handler::PcapAccess;
 use crate::utils::{
     queue,
-    stats::{Collector, StatsOption},
+    stats::{Collector, Countable, RefCountable, StatsOption},
 };
 
 pub struct WorkerManager {
@@ -103,7 +103,7 @@ impl WorkerManager {
         for worker in self.workers.lock().unwrap().iter() {
             self.stats.register_countable(
                 "pcap",
-                worker.clone_counter(),
+                Countable::Ref(Arc::downgrade(worker.counter()) as Weak<dyn RefCountable>),
                 vec![StatsOption::Tag("index", worker.index.to_string())],
             );
             worker.start();

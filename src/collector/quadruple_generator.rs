@@ -31,7 +31,7 @@ use crate::rpc::get_timestamp;
 use crate::utils::{
     possible_host::PossibleHost,
     queue::{Error, Receiver, Sender},
-    stats::{Countable, Counter, CounterType, CounterValue},
+    stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 
 #[derive(Debug, Default)]
@@ -276,7 +276,8 @@ struct SubQuadGen {
     // traffic_setter: TrafficSetter,
 }
 
-impl Countable for SubQuadGen {
+// FIXME: counter not registed
+impl RefCountable for SubQuadGen {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
@@ -300,9 +301,6 @@ impl Countable for SubQuadGen {
                 CounterValue::Unsigned(self.counter.drop_before_window.swap(0, Ordering::Relaxed)),
             ),
         ]
-    }
-    fn closed(&self) -> bool {
-        false
     }
 }
 

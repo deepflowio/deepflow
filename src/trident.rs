@@ -3,7 +3,7 @@ use std::path::Path;
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc, Condvar, Mutex,
+    Arc, Condvar, Mutex, Weak,
 };
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -50,7 +50,7 @@ use crate::{
         },
         net::{get_route_src_ip_and_mac, links_by_name_regex},
         queue,
-        stats::{self, StatsOption},
+        stats::{self, Countable, RefCountable, StatsOption},
         LeakyBucket,
     },
 };
@@ -151,7 +151,6 @@ impl Trident {
             config_handler.static_config.kubernetes_cluster_id.clone(),
             policy_setter,
         ));
-        stats_collector.register_countable("synchronizer", synchronizer.clone(), vec![]);
         synchronizer.start();
 
         let (state, cond) = &*state;
@@ -452,7 +451,7 @@ impl Components {
                 queue::bounded(static_config.flow_sender_queue_size as usize);
             stats_collector.register_countable(
                 "3-flow-to-collector-sender",
-                Arc::new(counter),
+                Countable::Owned(Box::new(counter)),
                 vec![StatsOption::Tag("index", sender_id.to_string())],
             );
             l4_flow_aggr_sender = Some(sender);
@@ -468,7 +467,7 @@ impl Components {
             queue::bounded(static_config.collector_sender_queue_size);
         stats_collector.register_countable(
             "2-doc-to-collector-sender",
-            Arc::new(counter),
+            Countable::Owned(Box::new(counter)),
             vec![StatsOption::Tag("index", sender_id.to_string())],
         );
         let metrics_uniform_sender =
@@ -482,7 +481,7 @@ impl Components {
         );
         stats_collector.register_countable(
             "3-protolog-to-collector-sender",
-            Arc::new(counter),
+            Countable::Owned(Box::new(counter)),
             vec![],
         );
         let l7_flow_uniform_sender =
@@ -505,7 +504,7 @@ impl Components {
                 queue::bounded(static_config.flow_queue_size);
             stats_collector.register_countable(
                 "1-tagged-flow-to-quadruple-generator",
-                Arc::new(counter),
+                Countable::Owned(Box::new(counter)),
                 vec![StatsOption::Tag("index", i.to_string())],
             );
 
@@ -513,7 +512,7 @@ impl Components {
             let (log_sender, log_receiver, counter) = queue::bounded(static_config.flow_queue_size);
             stats_collector.register_countable(
                 "1-tagged-flow-to-app-protocol-logs",
-                Arc::new(counter),
+                Countable::Owned(Box::new(counter)),
                 vec![StatsOption::Tag("index", i.to_string())],
             );
 
@@ -525,7 +524,7 @@ impl Components {
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
-                counter,
+                Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
                 vec![StatsOption::Tag("index", i.to_string())],
             );
             log_parsers.push(app_proto_log_parser);
@@ -605,7 +604,7 @@ impl Components {
         if let Some(collector) = &ebpf_collector {
             stats_collector.register_countable(
                 "ebpf-collector",
-                Arc::new(collector.get_sync_counter()),
+                Countable::Owned(Box::new(collector.get_sync_counter())),
                 vec![],
             );
         }
@@ -647,14 +646,14 @@ impl Components {
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
             "2-flow-with-meter-to-second-collector",
-            Arc::new(counter),
+            Countable::Owned(Box::new(counter)),
             vec![StatsOption::Tag("index", id.to_string())],
         );
         let (minute_sender, minute_receiver, counter) =
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
             "2-flow-with-meter-to-minute-collector",
-            Arc::new(counter),
+            Countable::Owned(Box::new(counter)),
             vec![StatsOption::Tag("index", id.to_string())],
         );
 
@@ -664,7 +663,7 @@ impl Components {
                 queue::bounded(static_config.flow.aggr_queue_size as usize);
             stats_collector.register_countable(
                 "2-second-flow-to-minute-aggrer",
-                Arc::new(counter),
+                Countable::Owned(Box::new(counter)),
                 vec![StatsOption::Tag("index", id.to_string())],
             );
             l4_log_sender = Some(l4_flow_sender);

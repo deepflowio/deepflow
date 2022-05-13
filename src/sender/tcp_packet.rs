@@ -18,7 +18,7 @@ use super::{COMPRESSOR_PORT, ERR_INTERVAL, RCV_TIMEOUT, SEQUENCE_OFFSET};
 use crate::utils::{
     bytes::write_u64_be,
     queue::{Error, Receiver},
-    stats::{Countable, Counter, CounterType, CounterValue},
+    stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 
 #[derive(Default)]
@@ -29,7 +29,8 @@ pub struct TcpPacketCounter {
     running: Arc<AtomicBool>,
 }
 
-impl Countable for TcpPacketCounter {
+// FIXME: counter not registered
+impl RefCountable for TcpPacketCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
@@ -43,10 +44,6 @@ impl Countable for TcpPacketCounter {
                 CounterValue::Unsigned(self.tx_bytes.swap(0, Ordering::Relaxed)),
             ),
         ]
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
     }
 }
 

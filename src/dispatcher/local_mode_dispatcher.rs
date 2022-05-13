@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::str;
-use std::sync::{atomic::Ordering, Arc};
+use std::sync::{atomic::Ordering, Arc, Weak};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, log_enabled, warn};
@@ -9,7 +9,7 @@ use regex::Regex;
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
 
-use crate::utils::stats::StatsOption;
+use crate::utils::stats::{Countable, RefCountable, StatsOption};
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -47,7 +47,7 @@ impl LocalModeDispatcher {
 
         base.stats.register_countable(
             "flow-perf",
-            flow_counter,
+            Countable::Ref(Arc::downgrade(&flow_counter) as Weak<dyn RefCountable>),
             vec![StatsOption::Tag("id", format!("{}", base.id))],
         );
 
