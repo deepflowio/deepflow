@@ -138,7 +138,6 @@ impl RefCountable for LinkStatusBroker {
 }
 
 struct SysStatusBroker {
-    running: AtomicBool,
     system: Arc<Mutex<System>>,
     pid: Pid,
     create_time: Duration,
@@ -178,24 +177,15 @@ impl SysStatusBroker {
             pid,
             core_count,
             create_time,
-            running: AtomicBool::new(false),
         })
-    }
-
-    pub fn close(&self) {
-        self.running.store(false, Ordering::Relaxed);
     }
 }
 
 impl RefCountable for SysStatusBroker {
     fn get_counters(&self) -> Vec<Counter> {
-        if !self.running.load(Ordering::Relaxed) {
-            return vec![];
-        }
         let mut system_guard = self.system.lock().unwrap();
         // 只有在进程不存在的时候会返回false，基本不会报错
         if !system_guard.refresh_process_specifics(self.pid, ProcessRefreshKind::new().with_cpu()) {
-            self.running.store(false, Ordering::Relaxed);
             warn!("refresh process failed, system status monitor has stopped");
             return vec![];
         }
@@ -209,7 +199,7 @@ impl RefCountable for SysStatusBroker {
                 metrics.push((
                     "cpu_percent",
                     CounterType::Gauged,
-                    CounterValue::Float(cpu_usage),
+                    CounterValue::Unsigned(cpu_usage as u64),
                 ));
                 metrics.push((
                     "memory",
@@ -224,7 +214,6 @@ impl RefCountable for SysStatusBroker {
                 metrics
             }
             None => {
-                self.running.store(false, Ordering::SeqCst);
                 warn!("get process data failed, system status monitor has stopped");
                 vec![]
             }
@@ -354,7 +343,6 @@ impl Monitor {
             .unwrap()
             .drain()
             .for_each(|(_, broker)| broker.close());
-        self.sys_monitor.close();
         info!("monitor stopped");
     }
 }
