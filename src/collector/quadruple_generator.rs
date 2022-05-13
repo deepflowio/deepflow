@@ -450,7 +450,7 @@ impl SubQuadGen {
             return true;
         }
         if flow_metric.is_device {
-            return false;
+            return true;
         }
         if flow_metric.total_packet_count > 0 {
             // 有EPC无Device的场景是通过CIDR获取的，这里需要加入的PossibleHost中
