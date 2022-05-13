@@ -33,6 +33,8 @@ pub enum EthernetType {
     QinQ = 0x88a8,
     LinkLayerDiscovery = 0x88cc,
     EthernetCtp = 0x9000,
+    #[num_enum(default)]
+    Unknown = 0xFFFF,
 }
 
 impl Default for EthernetType {
