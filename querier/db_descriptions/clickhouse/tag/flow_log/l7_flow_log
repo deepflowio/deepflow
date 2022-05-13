@@ -60,9 +60,10 @@ span_id                   , span_id                   , span_id                 
 x_request_id              , x_request_id              , x_request_id              , XRequestID             , string        ,                    , 链路追踪    , 111        ,
 syscall_trace_id_request  , syscall_trace_id_request  , syscall_trace_id_request  , SyscallTraceID-请求    , int           ,                    , 链路追踪    , 111        ,
 syscall_trace_id_response , syscall_trace_id_response , syscall_trace_id_response , SyscallTraceID-响应    , int           ,                    , 链路追踪    , 111        ,
-syscall_trace_id_thread   , syscall_trace_id_thread   , syscall_trace_id_thread   , SyscallTraceID-线程    , int           ,                    , 链路追踪    , 111        ,
-syscall_trace_id_thread_1 , syscall_trace_id_thread_1 , syscall_trace_id_thread_1 , SyscallTraceID-线程1   , int           ,                    , 链路追踪    , 111        ,
-syscall_cap_seq           , syscall_cap_seq_0         , syscall_cap_seq_1         , Syscall-序号           , int           ,                    , 链路追踪    , 111        ,
+syscall_thread_0          , syscall_thread_0          , syscall_thread_0          , Syscall线程-请求       , int           ,                    , 链路追踪    , 111        ,
+syscall_thread_1          , syscall_thread_1          , syscall_thread_1          , Syscall线程-响应       , int           ,                    , 链路追踪    , 111        ,
+syscall_cap_seq_0         , syscall_cap_seq_0         , syscall_cap_seq_0         , Syscall序列号-请求     , int           ,                    , 链路追踪    , 111        ,
+syscall_cap_seq_1         , syscall_cap_seq_1         , syscall_cap_seq_1         , Syscall序列号-响应     , int           ,                    , 链路追踪    , 111        ,
 
 flow_id                   , flow_id                   , flow_id                   , 流日志ID               , int           ,                    , 流信息      , 111        ,
 tap                       , tap                       , tap                       , 采集点                 , resource      ,                    , 流信息      , 110        ,
