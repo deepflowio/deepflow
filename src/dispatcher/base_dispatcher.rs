@@ -448,7 +448,9 @@ impl BaseDispatcherListener {
 
         let mut added = Vec::new();
         for (i, key) in keys.iter().enumerate() {
-            if pipelines.contains_key(key) {
+            if pipelines.contains_key(key)
+                && pipelines.get(key).unwrap().lock().unwrap().vm_mac != vm_macs[i]
+            {
                 // vm mac already checked
                 continue;
             }
@@ -470,7 +472,7 @@ impl BaseDispatcherListener {
             );
         }
         if added.len() > 0 {
-            info!("Adding VMs: {:?}", deleted);
+            info!("Adding VMs: {:?}", added);
         }
     }
 }
