@@ -41,6 +41,9 @@ impl HttpInfo {
         if self.span_id.is_empty() {
             self.span_id = other.span_id;
         }
+        if self.x_request_id.is_empty() {
+            self.x_request_id = other.x_request_id;
+        }
     }
 }
 

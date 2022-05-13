@@ -84,6 +84,7 @@ impl SessionAggr {
         for i in 0..n as usize {
             let mut map = self.maps[i].take().unwrap();
             for (_, log) in map.drain() {
+                self.cache_count -= 1;
                 self.send(log);
             }
             self.maps[i].replace(map);
@@ -131,6 +132,7 @@ impl SessionAggr {
                     };
                     log.session_merge(item);
                     log.base_info.head.rrt = rrt.as_micros() as u64;
+                    self.cache_count -= 1;
                     self.send(log);
                 } else {
                     // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
@@ -177,6 +179,7 @@ impl SessionAggr {
                 } else {
                     item.session_merge(log);
                     item.base_info.head.rrt = rrt.as_micros() as u64;
+                    self.cache_count -= 1;
                     self.send(item);
                 }
             }
