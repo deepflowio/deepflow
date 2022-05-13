@@ -130,7 +130,7 @@ pub struct Collector {
 }
 
 impl Collector {
-    const STATS_PREFIX: &'static str = "metaflow-agent";
+    const STATS_PREFIX: &'static str = "trident";
 
     pub fn new(remotes: &Vec<String>) -> Self {
         Self::with_min_interval(remotes, TICK_CYCLE)
@@ -173,9 +173,13 @@ impl Collector {
             tags: vec![],
             skip: 0,
         };
+        let mut has_host = false;
         for option in options {
             match option {
                 StatsOption::Tag(k, v) if !source.tags.iter().any(|(key, _)| key == &k) => {
+                    if k == "host" {
+                        has_host = true;
+                    }
                     source.tags.push((k, v))
                 }
                 StatsOption::Interval(interval) if interval >= self.min_interval => {
@@ -188,6 +192,11 @@ impl Collector {
                     source.module
                 ),
             }
+        }
+        if !has_host {
+            source
+                .tags
+                .push(("host", self.hostname.clone().unwrap_or_default()));
         }
         if source.interval > TICK_CYCLE {
             source.skip = ((60
@@ -323,7 +332,8 @@ impl Collector {
                             }
                             let client = client.as_ref().unwrap();
                             for point in batch.points.iter() {
-                                let metric_name = format!("{}_{}", batch.module, point.0);
+                                let metric_name =
+                                    format!("{}_{}", batch.module, point.0).replace("-", "_");
                                 match point.1 {
                                     CounterType::Counted => {
                                         let mut b = client.count_with_tags(&metric_name, point.2);
