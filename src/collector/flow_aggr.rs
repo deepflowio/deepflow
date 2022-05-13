@@ -17,7 +17,7 @@ use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
 use crate::sender::SendItem;
 use crate::utils::{
     queue::{Error, Receiver, Sender},
-    stats::{Countable, Counter, CounterType, CounterValue},
+    stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 
 const MINUTE_SLOTS: usize = 2;
@@ -246,7 +246,8 @@ impl FlowAggr {
     }
 }
 
-impl Countable for FlowAggr {
+// FIXME: counter not registered
+impl RefCountable for FlowAggr {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
@@ -266,9 +267,10 @@ impl Countable for FlowAggr {
             ),
         ]
     }
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
-    }
+
+    // fn closed(&self) -> bool {
+    //     !self.running.load(Ordering::Relaxed)
+    // }
 }
 
 struct ThrottlingQueue {

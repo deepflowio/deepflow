@@ -36,7 +36,7 @@ use crate::{
     utils::{
         net::MacAddr,
         queue::{DebugSender, Error, Receiver},
-        stats::{Countable, Counter, CounterType, CounterValue},
+        stats::{Counter, CounterType, CounterValue, RefCountable},
     },
 };
 
@@ -149,19 +149,10 @@ pub struct SessionAggrCounter {
     merge: AtomicU64,
     cached: AtomicU64,
     throttle_drop: AtomicU64,
-    running: Arc<AtomicBool>,
 }
 
-impl SessionAggrCounter {
-    pub fn new(running: Arc<AtomicBool>) -> Self {
-        Self {
-            running,
-            ..Default::default()
-        }
-    }
-}
-
-impl Countable for SessionAggrCounter {
+// FIXME: counter not registered
+impl RefCountable for SessionAggrCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
@@ -190,10 +181,6 @@ impl Countable for SessionAggrCounter {
                 CounterValue::Unsigned(self.throttle_drop.swap(0, Ordering::Relaxed)),
             ),
         ]
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
     }
 }
 
@@ -510,14 +497,13 @@ impl AppProtoLogsParser {
         id: u32,
         config: LogParserAccess,
     ) -> (Self, Arc<SessionAggrCounter>) {
-        let running = Arc::new(AtomicBool::new(false));
-        let counter = Arc::new(SessionAggrCounter::new(running.clone()));
+        let counter: Arc<SessionAggrCounter> = Default::default();
         (
             Self {
                 input_queue: Arc::new(input_queue),
                 output_queue,
                 id,
-                running,
+                running: Default::default(),
                 thread: Mutex::new(None),
                 counter: counter.clone(),
                 l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(false)),

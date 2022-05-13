@@ -1,7 +1,7 @@
 use std::fmt;
 use std::io;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, Weak};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -50,9 +50,34 @@ impl ToGaugeValue for CounterValue {
 
 pub type Counter = (&'static str, CounterType, CounterValue);
 
-pub trait Countable: Send + Sync {
+pub trait RefCountable: Send + Sync {
+    fn get_counters(&self) -> Vec<Counter>;
+}
+
+pub trait OwnedCountable: Send + Sync {
     fn get_counters(&self) -> Vec<Counter>;
     fn closed(&self) -> bool;
+}
+
+pub enum Countable {
+    Owned(Box<dyn OwnedCountable>),
+    Ref(Weak<dyn RefCountable>),
+}
+
+impl Countable {
+    fn get_counters(&self) -> Vec<Counter> {
+        match self {
+            Countable::Owned(c) => c.get_counters(),
+            Countable::Ref(c) => c.upgrade().map(|c| c.get_counters()).unwrap_or_default(),
+        }
+    }
+
+    fn closed(&self) -> bool {
+        match self {
+            Countable::Owned(c) => c.closed(),
+            Countable::Ref(c) => c.strong_count() == 0,
+        }
+    }
 }
 
 pub enum StatsOption {
@@ -63,7 +88,7 @@ pub enum StatsOption {
 struct Source {
     module: &'static str,
     interval: Duration,
-    countable: Arc<dyn Countable>,
+    countable: Countable,
     tags: Vec<(&'static str, String)>,
     // countdown to next metrics collection
     skip: i64,
@@ -138,7 +163,7 @@ impl Collector {
     pub fn register_countable(
         &self,
         module: &'static str,
-        countable: Arc<dyn Countable>,
+        countable: Countable,
         options: Vec<StatsOption>,
     ) {
         let mut source = Source {
@@ -230,6 +255,7 @@ impl Collector {
                     let mut batches = vec![];
                     {
                         let mut sources = sources.lock().unwrap();
+                        // TODO: use Vec::retain_mut after stablize in rust 1.61.0
                         sources.retain(|s| !s.countable.closed());
                         for source in sources.iter_mut() {
                             source.skip -= 1;
@@ -237,13 +263,15 @@ impl Collector {
                                 continue;
                             }
                             source.skip = (source.interval.as_secs() / TICK_CYCLE.as_secs()) as i64;
-
-                            batches.push(Batch {
-                                module: source.module,
-                                tags: source.tags.clone(),
-                                points: source.countable.get_counters(),
-                                timestamp: now,
-                            });
+                            let points = source.countable.get_counters();
+                            if !points.is_empty() {
+                                batches.push(Batch {
+                                    module: source.module,
+                                    tags: source.tags.clone(),
+                                    points,
+                                    timestamp: now,
+                                });
+                            }
                         }
                     }
                     if batches.is_empty() {

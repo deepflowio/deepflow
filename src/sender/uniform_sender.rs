@@ -15,7 +15,7 @@ use super::{SendItem, SendMessageType};
 use crate::config::handler::SenderAccess;
 use crate::utils::{
     queue::{Error, Receiver},
-    stats::{Countable, Counter, CounterType, CounterValue},
+    stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 
 #[derive(Debug, Default)]
@@ -25,7 +25,8 @@ pub struct SenderCounter {
     pub dropped: AtomicU64,
 }
 
-impl Countable for UniformSender {
+// FIXME: counter not registered
+impl RefCountable for UniformSender {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
@@ -44,10 +45,6 @@ impl Countable for UniformSender {
                 CounterValue::Unsigned(self.counter.dropped.swap(0, Ordering::Relaxed)),
             ),
         ]
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
     }
 }
 

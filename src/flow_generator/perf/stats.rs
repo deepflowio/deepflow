@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
-use crate::utils::stats::{Countable, Counter, CounterType, CounterValue};
+use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 
 // 每次获取统计数据后此结构体都会被清零，不能在其中保存Flow级别的信息避免被清空
 #[derive(Debug, Default, PartialEq)]
@@ -28,7 +28,7 @@ pub struct FlowPerfCounter {
     pub mismatched_response: AtomicU64,
 }
 
-impl Countable for FlowPerfCounter {
+impl RefCountable for FlowPerfCounter {
     fn get_counters(&self) -> Vec<Counter> {
         let ignored = self.ignored_packet_count.swap(0, Ordering::Relaxed);
         let invalid = self.invalid_packet_count.swap(0, Ordering::Relaxed);
@@ -51,9 +51,5 @@ impl Countable for FlowPerfCounter {
                 CounterValue::Unsigned(mismatched),
             ),
         ]
-    }
-
-    fn closed(&self) -> bool {
-        self.closed.load(Ordering::Relaxed)
     }
 }

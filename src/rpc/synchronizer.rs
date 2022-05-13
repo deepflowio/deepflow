@@ -26,7 +26,6 @@ use crate::utils::{
     self,
     environment::{is_tt_pod, is_tt_process},
     net::{is_unicast_link_local, MacAddr},
-    stats::{Countable, Counter},
 };
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
@@ -786,16 +785,6 @@ impl Synchronizer {
                 let _ = t.await;
             }
         });
-    }
-}
-
-impl Countable for Synchronizer {
-    fn get_counters(&self) -> Vec<Counter> {
-        vec![]
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::SeqCst)
     }
 }
 

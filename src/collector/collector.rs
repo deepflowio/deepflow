@@ -4,7 +4,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, Weak,
     },
     thread,
     thread::JoinHandle,
@@ -34,7 +34,7 @@ use crate::{
         hasher::Jenkins64Hasher,
         net::MacAddr,
         queue::{Error, Receiver, Sender},
-        stats::{self, Countable, Counter, CounterType, CounterValue, StatsOption},
+        stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
     },
 };
 
@@ -51,7 +51,7 @@ pub struct CollectorCounter {
     running: Arc<AtomicBool>,
 }
 
-impl Countable for CollectorCounter {
+impl RefCountable for CollectorCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
@@ -85,10 +85,6 @@ impl Countable for CollectorCounter {
                 CounterValue::Unsigned(self.no_endpoint.swap(0, Ordering::Relaxed)),
             ),
         ]
-    }
-
-    fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
     }
 }
 
@@ -731,7 +727,7 @@ impl Collector {
 
         stats.register_countable(
             name,
-            counter.clone(),
+            Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
             vec![StatsOption::Tag("index", id.to_string())],
         );
 
