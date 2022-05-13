@@ -12,6 +12,8 @@ src/ebpf/data
 src/ebpf/.data_done
 src/ebpf/libebpf.a
 src/ebpf/metaflow-ebpfctl
+src/ebpf/kernel/*.elf.tmp
+src/ebpf/kernel/socket_trace.ll
 
 *.o
 *.elf
