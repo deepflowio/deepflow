@@ -9,7 +9,7 @@ use cadence::{
     ext::{MetricValue, ToCounterValue, ToGaugeValue},
     Counted, Gauged, MetricError, MetricResult, MetricSink, StatsdClient,
 };
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use crate::common::DROPLET_PORT;
 
@@ -324,7 +324,7 @@ impl Collector {
                         break;
                     }
 
-                    //info!("collected: {:?}", batches);
+                    debug!("collected: {:?}", batches);
                     for batch in batches.into_iter() {
                         for client in statsd_clients.iter() {
                             if client.is_none() {

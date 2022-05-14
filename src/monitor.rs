@@ -193,7 +193,7 @@ impl RefCountable for SysStatusBroker {
         match system_guard.process(self.pid) {
             Some(process) => {
                 let cpu_usage = process.cpu_usage() as f64 / self.core_count as f64;
-                let mem_used = process.memory() << 10;
+                let mem_used = process.memory() << 10; // 单位：bytes
 
                 let mut metrics = vec![];
                 metrics.push((
@@ -254,9 +254,6 @@ impl Monitor {
         let link_map = self.link_map.clone();
         self.stats.register_pre_hook(Box::new(move || {
             let mut link_map_guard = link_map.lock().unwrap();
-            if link_map_guard.is_empty() {
-                return;
-            }
 
             // resolve network interface update
             let links = match link_list() {
