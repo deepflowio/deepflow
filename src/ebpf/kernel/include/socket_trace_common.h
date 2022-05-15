@@ -56,8 +56,7 @@ struct __socket_data {
 struct __socket_data_buffer {
 	__u32 events_num;
 	__u32 len; // data部分长度
-	__u64 timestamp;
-	char data[32752]; // 32752 + len(4bytes) + events_num(4bytes) + timestamp(8bytes) = 2^15 = 32768
+	char data[32760]; // 32760 + len(4bytes) + events_num(4bytes) = 2^15 = 32768
 };
 
 struct trace_uid_t {
