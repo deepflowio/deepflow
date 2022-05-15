@@ -278,10 +278,21 @@ impl Default for Tagger {
 
 impl From<Tagger> for metric::MiniTag {
     fn from(t: Tagger) -> Self {
-        let (ip_vec, ip1_vec) = match (t.ip, t.ip1) {
-            (IpAddr::V4(ip4), IpAddr::V4(ip41)) => (ip4.octets().to_vec(), ip41.octets().to_vec()),
-            (IpAddr::V6(ip6), IpAddr::V6(ip61)) => (ip6.octets().to_vec(), ip61.octets().to_vec()),
-            _ => panic!("ip, ip1 type mismatch"),
+        let (ip_vec, ip1_vec) = if t.code.has_edge_tag() {
+            match (t.ip, t.ip1) {
+                (IpAddr::V4(ip4), IpAddr::V4(ip41)) => {
+                    (ip4.octets().to_vec(), ip41.octets().to_vec())
+                }
+                (IpAddr::V6(ip6), IpAddr::V6(ip61)) => {
+                    (ip6.octets().to_vec(), ip61.octets().to_vec())
+                }
+                _ => panic!("ip, ip1 type mismatch"),
+            }
+        } else {
+            match t.ip {
+                IpAddr::V4(ip4) => (ip4.octets().to_vec(), vec![]),
+                IpAddr::V6(ip6) => (ip6.octets().to_vec(), vec![]),
+            }
         };
 
         let mut code = t.code;
