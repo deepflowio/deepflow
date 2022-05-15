@@ -141,6 +141,14 @@ enum syscall_src_func {
 	SYSCALL_FUNC_SENDFILE
 };
 
+#ifdef BPF_USE_CORE
+typedef long __kernel_time_t;
+struct timespec {
+	__kernel_time_t tv_sec;
+	long tv_nsec;
+};
+#endif
+
 struct data_args_t {
 	// Represents the function from which this argument group originates.
 	enum syscall_src_func source_fn;
@@ -150,8 +158,14 @@ struct data_args_t {
 	// For sendmsg()/recvmsg()/writev()/readv().
 	const struct iovec *iov;
 	size_t iovlen;
-	// For sendmmsg()
-	unsigned int *msg_len;
+	union {
+		// For sendmmsg()
+		unsigned int *msg_len;
+		// For clock_gettime()
+		struct timespec *timestamp_ptr;
+	};
+	// Timestamp for enter syscall function.
+	__u64 enter_ts;
 };
 
 #define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F
@@ -160,8 +174,18 @@ struct syscall_comm_enter_ctx {
 	__u64 __pad_0;		/*     0     8 */
 	int __syscall_nr;	/*    offset:8     4 */
 	__u32 __pad_1;		/*    12     4 */
-	__u64 fd;		/*    offset:16    8 */
-	char *buf;		/*    24     8 */
+	union {
+		struct {
+			__u64 fd;		/*  offset:16   8  */
+			char *buf;		/*  offset:24   8  */
+		};
+
+		// For clock_gettime()
+		struct {
+			clockid_t which_clock; /*   offset:16   8  */
+			struct timespec * tp;  /*   offset:24   8  */
+		};
+	};
 	size_t count;		/*    32     8 */
 };
 
