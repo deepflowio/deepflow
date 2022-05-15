@@ -19,6 +19,7 @@
 #define MAP_PERF_SOCKET_DATA_NAME	"__socket_data"
 #define MAP_TRACE_UID_NAME		"__trace_uid_map"
 #define MAP_TRACE_STATS_NAME		"__trace_stats_map"
+#define MAP_REAL_TIME_DIFF_NAME		"__real_time_diff_map"
 
 #ifdef WORKER_PERF_TEST
 extern volatile int worker_delay;
@@ -40,7 +41,7 @@ static uint32_t conf_max_trace_entries;
 static uint32_t conf_socket_map_max_reclaim;
 
 extern int major, minor;
-extern uint64_t sys_base_time;	// 从1970.1.1开始到系统启动时的时间，精度为微妙
+static uint64_t sys_boot_time_ns; // 距离1970-01-01 00:00:00微秒数 - 距离系统启动的微秒数
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
 static bool is_adapt_success(struct bpf_tracer *t);
@@ -87,6 +88,10 @@ static void socket_tracer_set_probes(struct trace_probes_conf *tps)
 
 	// clear trace connection
 	tps_set_symbol(tps, "sys_enter_close");
+
+	// For sys_boot_time_ns
+	tps_set_symbol(tps, "sys_enter_clock_gettime");
+	tps_set_symbol(tps, "sys_exit_clock_gettime");
 	tps->tps_nr = index;
 }
 
@@ -382,8 +387,6 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	data_buf_ptr = socket_data_buff;
 
-	int64_t real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN) / 1000;
-
 	for (i = 0; i < buf->events_num; i++) {
 		sd = (struct __socket_data *)&buf->data[start];
 		len = sd->data_len;
@@ -395,7 +398,10 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data = data_buf_ptr;
 
 		submit_data->socket_id = sd->socket_id;
-		submit_data->timestamp = real_time - (buf->timestamp - sd->timestamp);
+
+		// 数据捕获时间戳，精度为微秒(us)
+		submit_data->timestamp = (sd->timestamp + sys_boot_time_ns) / 1000ULL;
+
 		submit_data->tuple = sd->tuple;
 		submit_data->direction = sd->direction;
 		submit_data->l7_protocal_hint = sd->data_type;
@@ -577,6 +583,7 @@ static int check_kern_adapt_and_state_update(void)
 		ebpf_info("Linux %d.%d adapt success.\n", major, minor);
 		set_period_event_invalid("check-kern-adapt");
 		t->adapt_success = true;
+		t->tps->tps_nr -= 2; // Remove sys_enter_clock_gettime and sys_enter_clock_gettime
 	}
 
 	return 0;
@@ -797,6 +804,26 @@ static bool is_adapt_success(struct bpf_tracer *t)
 		}
 
 		free(array);
+	}
+
+	if (is_success) {
+		uint64_t real_time_diff = 0;
+		struct timespec time_tmp = {0, 0};
+		// 确保sys_clock_gettime()系统被调用一次从而使ebpf tracepoint执行。
+		syscall(__NR_clock_gettime, CLOCK_REALTIME, &time_tmp);
+
+		if (!bpf_table_get_value(t, MAP_REAL_TIME_DIFF_NAME, 0, &real_time_diff)) {
+			ebpf_info("bpf_table_get_value() %s error\n", MAP_REAL_TIME_DIFF_NAME);
+			is_success = false;
+		}
+
+		if (real_time_diff == 0) {
+			ebpf_info("fetch real_time_diff faild, adapt kernel faild.\n");
+			is_success = false;
+		} else {
+			ebpf_info("sys_boot_time_ns : %llu\n", real_time_diff);
+			sys_boot_time_ns = real_time_diff;
+		}
 	}
 
 	return is_success;

@@ -62,6 +62,10 @@ BPF_HASH(socket_info_map, __u64, struct socket_info_t)
 // Key is {tgid, pid}. value is trace_info_t
 BPF_HASH(trace_map, __u64, struct trace_info_t)
 
+// key = 0;
+// value = (距离1970-01-01 00:00:00微秒数 - 距离系统启动的微秒数)
+MAP_ARRAY(real_time_diff_map, __u32, __u64, 1)
+
 static __inline void delete_socket_info(__u64 conn_key,
 					struct socket_info_t *socket_info_ptr)
 {
@@ -511,7 +515,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				   struct trace_uid_t *trace_uid,
 				   struct trace_stats *trace_stats,
 				   __u64 *thread_trace_id,
-				   __u64 time_stemp) {
+				   __u64 time_stamp) {
 	/*
 	 * ==========================================
 	 * Coroutine-Trace-ID (Single Redirect Trace)
@@ -545,7 +549,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			    socket_info_ptr->peer_fd != 0)
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
 		}
-		trace_info.update_time = time_stemp / NS_PER_SEC;
+		trace_info.update_time = time_stamp / NS_PER_SEC;
 		trace_map__update(&pid_tgid, &trace_info);
 		if (!trace_info_ptr)
 			trace_stats->trace_map_count++;
@@ -563,7 +567,8 @@ static __inline void data_submit(struct pt_regs *ctx,
 				 struct conn_info_t* conn_info,
 				 const char *from,
 				 __u32 syscall_len,
-				 struct member_fields_offset *offset)
+				 struct member_fields_offset *offset,
+				 __u64 time_stamp)
 {
 	if (conn_info == NULL) {
 		return;
@@ -575,7 +580,6 @@ static __inline void data_submit(struct pt_regs *ctx,
 
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
-	__u64 time_stemp = bpf_ktime_get_ns();
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
@@ -623,7 +627,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM)
 		trace_process(socket_info_ptr, conn_info, conn_key, pid_tgid, trace_info_ptr,
-			      trace_uid, trace_stats, &thread_trace_id, time_stemp);
+			      trace_uid, trace_stats, &thread_trace_id, time_stamp);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
@@ -635,7 +639,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = ROLE_UNKNOW;
-		sk_info.update_time = time_stemp / NS_PER_SEC;
+		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
 		sk_info.correlation_id = conn_info->correlation_id;
 
@@ -664,7 +668,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
 		sk_info.seq = ++socket_info_ptr->seq;
-		socket_info_ptr->update_time = time_stemp / NS_PER_SEC;
+		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
 		if (socket_info_ptr->peer_fd != 0 && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64)tgid,
 							      (__u64)socket_info_ptr->peer_fd);
@@ -701,7 +705,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
 	v->pid = (__u32) pid_tgid;
-	v->timestamp = time_stemp / NS_PER_US;
+	v->timestamp = time_stamp;
 	v->direction = conn_info->direction;
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;
@@ -753,7 +757,6 @@ static __inline void data_submit(struct pt_regs *ctx,
 	if (v_buff->events_num == EVENT_BURST_NUM) {
 		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
 				 & (sizeof(*v_buff) - 1);
-		v_buff->timestamp = bpf_ktime_get_ns() / 1000;
 		if (buf_size >= sizeof(*v_buff))
 			bpf_perf_event_output(ctx, &NAME(socket_data),
 					      BPF_F_CURRENT_CPU, v_buff,
@@ -823,7 +826,7 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 	}
 
 	if (conn_info->protocol != PROTO_UNKNOWN || conn_info->message_type != MSG_UNKNOWN) {
-		data_submit(ctx, conn_info, __data, (__u32)bytes_count, offset);
+		data_submit(ctx, conn_info, __data, (__u32)bytes_count, offset, args->enter_ts);
 	}
 }
 
@@ -852,6 +855,7 @@ TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx *ctx) {
 	write_args.source_fn = SYSCALL_FUNC_WRITE;
 	write_args.fd = fd;
 	write_args.buf = buf;
+	write_args.enter_ts = bpf_ktime_get_ns();
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
@@ -882,6 +886,7 @@ TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx *ctx) {
 	read_args.source_fn = SYSCALL_FUNC_READ;
 	read_args.fd = fd;
 	read_args.buf = buf;
+	read_args.enter_ts = bpf_ktime_get_ns();
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -913,6 +918,7 @@ TPPROG(sys_enter_sendto) (struct syscall_comm_enter_ctx *ctx) {
 	write_args.source_fn = SYSCALL_FUNC_SENDTO;
 	write_args.fd = sockfd;
 	write_args.buf = buf;
+	write_args.enter_ts = bpf_ktime_get_ns();
 	active_write_args_map__update(&id, &write_args);
 
 	return 0;
@@ -949,6 +955,7 @@ TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 	read_args.source_fn = SYSCALL_FUNC_RECVFROM;
 	read_args.fd = sockfd;
 	read_args.buf = buf;
+	read_args.enter_ts = bpf_ktime_get_ns();
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -985,6 +992,7 @@ KPROG(__sys_sendmsg) (struct pt_regs* ctx) {
 		write_args.fd = sockfd;
 		write_args.iov = msghdr->msg_iov;
 		write_args.iovlen = msghdr->msg_iovlen;
+		write_args.enter_ts = bpf_ktime_get_ns();
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -1022,6 +1030,7 @@ KPROG(__sys_sendmmsg)(struct pt_regs* ctx) {
 		write_args.iov = msgvec[0].msg_hdr.msg_iov;
 		write_args.iovlen = msgvec[0].msg_hdr.msg_iovlen;
 		write_args.msg_len = (void *)msgvec_ptr + offsetof(typeof(struct mmsghdr), msg_len); //&msgvec[0].msg_len;
+		write_args.enter_ts = bpf_ktime_get_ns();
 		active_write_args_map__update(&id, &write_args);
 	}
 
@@ -1064,6 +1073,7 @@ KPROG(__sys_recvmsg) (struct pt_regs* ctx) {
 		read_args.fd = sockfd;
 		read_args.iov = msghdr->msg_iov;
 		read_args.iovlen = msghdr->msg_iovlen;
+		read_args.enter_ts = bpf_ktime_get_ns();
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -1110,6 +1120,7 @@ KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
 		bpf_probe_read(&read_args.iovlen, sizeof(read_args.iovlen), (void *)msgvec + offset);
 
 		read_args.msg_len = (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
+		read_args.enter_ts = bpf_ktime_get_ns();
 		active_read_args_map__update(&id, &read_args);
 	}
 	
@@ -1147,6 +1158,7 @@ KPROG(do_writev) (struct pt_regs* ctx) {
 	write_args.fd = fd;
 	write_args.iov = iov;
 	write_args.iovlen = iovlen;
+	write_args.enter_ts = bpf_ktime_get_ns();
 	active_write_args_map__update(&id, &write_args);
 	return 0;
 }
@@ -1179,6 +1191,7 @@ KPROG(do_readv) (struct pt_regs* ctx) {
 	read_args.fd = fd;
 	read_args.iov = iov;
 	read_args.iovlen = iovlen;
+	read_args.enter_ts = bpf_ktime_get_ns();
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1229,7 +1242,6 @@ KPROG(read_null) (struct pt_regs* ctx) {
 				__u32 buf_size = (v_buff->len +
 						  offsetof(typeof(struct __socket_data_buffer), data))
 						 & (sizeof(*v_buff) - 1);
-				v_buff->timestamp = bpf_ktime_get_ns() / 1000;
 				if (buf_size >= sizeof(*v_buff))
 					bpf_perf_event_output(ctx, &NAME(socket_data),
 							      BPF_F_CURRENT_CPU, v_buff,
@@ -1274,6 +1286,37 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 			return 0;
 		trace_stats->socket_map_count++;
 	}
+
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_enter_clock_gettime/format
+TPPROG(sys_enter_clock_gettime) (struct syscall_comm_enter_ctx *ctx) {
+#define CLOCK_REALTIME 0
+	clockid_t which_clock = ctx->which_clock;
+	if (which_clock != CLOCK_REALTIME)
+		return 0;
+	struct timespec *tp = ctx->tp;
+	__u64 id = bpf_get_current_pid_tgid();
+	struct data_args_t read_args = {};
+	read_args.timestamp_ptr = tp;
+	active_read_args_map__update(&id, &read_args);
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/syscalls/sys_exit_clock_gettime/format
+TPPROG(sys_exit_clock_gettime) (struct syscall_comm_exit_ctx *ctx) {
+	__u64 id = bpf_get_current_pid_tgid();
+	struct data_args_t* read_args = active_read_args_map__lookup(&id);
+	if (read_args != NULL) {
+		struct timespec ts;
+		bpf_probe_read(&ts, sizeof(ts), (void *)read_args->timestamp_ptr);
+		__u64 diff = ts.tv_sec * NS_PER_SEC + ts.tv_nsec - bpf_ktime_get_ns();
+		__u32 k0 = 0;
+		real_time_diff_map__update(&k0, &diff);
+	}
+
+	active_read_args_map__delete(&id);
 
 	return 0;
 }
