@@ -358,18 +358,13 @@ impl FlowMap {
     }
 
     fn update_tcp_flow(&mut self, meta_packet: &mut MetaPacket, node: &mut FlowNode) -> bool {
+        let direction = meta_packet.direction;
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
-        if pkt_tcp_flags.is_invalid() {
-            // exception timeout
-            node.timeout = self.config.load().flow_timeout.exception;
-            node.flow_state = FlowState::Exception;
-            return false;
-        }
-        node.tagged_flow.flow.flow_metrics_peers[meta_packet.direction as usize].tcp_flags |=
-            pkt_tcp_flags;
+        node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
         self.update_flow(node, meta_packet);
 
-        if pkt_tcp_flags != TcpFlags::SYN {
+        // 有特殊包时更新ServiceTable并矫正流方向：SYN+ACK或SYN
+        if pkt_tcp_flags.bits() & TcpFlags::SYN.bits() != 0 {
             self.update_l4_direction(meta_packet, node, false);
             self.update_syn_or_syn_ack_seq(node, meta_packet);
         }
@@ -377,7 +372,14 @@ impl FlowMap {
         self.update_tcp_keepalive_seq(node, meta_packet);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
-        self.update_flow_state_machine(node, pkt_tcp_flags, meta_packet.direction)
+        if pkt_tcp_flags.is_invalid() {
+            // exception timeout
+            node.timeout = self.config.load().flow_timeout.exception;
+            node.flow_state = FlowState::Exception;
+            return false;
+        }
+
+        self.update_flow_state_machine(node, pkt_tcp_flags, direction)
     }
 
     // 协议参考：https://datatracker.ietf.org/doc/html/rfc1122#section-4.2.3.6
