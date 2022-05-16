@@ -199,7 +199,7 @@ impl RefCountable for SysStatusBroker {
                 metrics.push((
                     "cpu_percent",
                     CounterType::Gauged,
-                    CounterValue::Unsigned(cpu_usage as u64),
+                    CounterValue::Float(cpu_usage),
                 ));
                 metrics.push((
                     "memory",
