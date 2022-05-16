@@ -450,9 +450,12 @@ impl Components {
             let (sender, l4_flow_aggr_receiver, counter) =
                 queue::bounded(static_config.flow_sender_queue_size as usize);
             stats_collector.register_countable(
-                "3-flow-to-collector-sender",
+                "queue",
                 Countable::Owned(Box::new(counter)),
-                vec![StatsOption::Tag("index", sender_id.to_string())],
+                vec![
+                    StatsOption::Tag("module", "3-flow-to-collector-sender".to_string()),
+                    StatsOption::Tag("index", sender_id.to_string()),
+                ],
             );
             l4_flow_aggr_sender = Some(sender);
             l4_flow_uniform_sender = Some(UniformSenderThread::new(
@@ -466,9 +469,12 @@ impl Components {
         let (metrics_sender, metrics_receiver, counter) =
             queue::bounded(static_config.collector_sender_queue_size);
         stats_collector.register_countable(
-            "2-doc-to-collector-sender",
+            "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("index", sender_id.to_string())],
+            vec![
+                StatsOption::Tag("module", "2-doc-to-collector-sender".to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
         );
         let metrics_uniform_sender =
             UniformSenderThread::new(sender_id, metrics_receiver, config_handler.sender());
@@ -480,9 +486,12 @@ impl Components {
             &queue_debugger,
         );
         stats_collector.register_countable(
-            "3-protolog-to-collector-sender",
+            "queue",
             Countable::Owned(Box::new(counter)),
-            vec![],
+            vec![
+                StatsOption::Tag("module", "3-protolog-to-collector-sender".to_string()),
+                StatsOption::Tag("index", "0".to_string()),
+            ],
         );
         let l7_flow_uniform_sender =
             UniformSenderThread::new(sender_id, proto_log_receiver, config_handler.sender());
@@ -503,17 +512,23 @@ impl Components {
             let (flow_sender, flow_receiver, counter) =
                 queue::bounded(static_config.flow_queue_size);
             stats_collector.register_countable(
-                "1-tagged-flow-to-quadruple-generator",
+                "queue",
                 Countable::Owned(Box::new(counter)),
-                vec![StatsOption::Tag("index", i.to_string())],
+                vec![
+                    StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
+                    StatsOption::Tag("index", i.to_string()),
+                ],
             );
 
             // create and start app proto logs
             let (log_sender, log_receiver, counter) = queue::bounded(static_config.flow_queue_size);
             stats_collector.register_countable(
-                "1-tagged-flow-to-app-protocol-logs",
+                "queue",
                 Countable::Owned(Box::new(counter)),
-                vec![StatsOption::Tag("index", i.to_string())],
+                vec![
+                    StatsOption::Tag("module", "1-tagged-flow-to-app-protocol-logs".to_string()),
+                    StatsOption::Tag("index", i.to_string()),
+                ],
             );
 
             let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
@@ -645,16 +660,28 @@ impl Components {
         let (second_sender, second_receiver, counter) =
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
-            "2-flow-with-meter-to-second-collector",
+            "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("index", id.to_string())],
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-second-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
         );
         let (minute_sender, minute_receiver, counter) =
             queue::bounded(static_config.quadruple_queue_size);
         stats_collector.register_countable(
-            "2-flow-with-meter-to-minute-collector",
+            "queue",
             Countable::Owned(Box::new(counter)),
-            vec![StatsOption::Tag("index", id.to_string())],
+            vec![
+                StatsOption::Tag(
+                    "module",
+                    "2-flow-with-meter-to-minute-collector".to_string(),
+                ),
+                StatsOption::Tag("index", id.to_string()),
+            ],
         );
 
         let (mut l4_log_sender, mut l4_log_receiver) = (None, None);
@@ -662,9 +689,12 @@ impl Components {
             let (l4_flow_sender, l4_flow_receiver, counter) =
                 queue::bounded(static_config.flow.aggr_queue_size as usize);
             stats_collector.register_countable(
-                "2-second-flow-to-minute-aggrer",
+                "queue",
                 Countable::Owned(Box::new(counter)),
-                vec![StatsOption::Tag("index", id.to_string())],
+                vec![
+                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
+                    StatsOption::Tag("index", id.to_string()),
+                ],
             );
             l4_log_sender = Some(l4_flow_sender);
             l4_log_receiver = Some(l4_flow_receiver);
