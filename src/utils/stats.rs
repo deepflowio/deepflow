@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use cadence::{
     ext::{MetricValue, ToCounterValue, ToGaugeValue},
-    Counted, Gauged, MetricError, MetricResult, MetricSink, StatsdClient,
+    Counted, MetricError, MetricResult, MetricSink, StatsdClient,
 };
 use log::{debug, info, warn};
 
@@ -32,8 +32,9 @@ impl ToCounterValue for CounterValue {
     fn try_to_value(self) -> MetricResult<MetricValue> {
         Ok(match self {
             CounterValue::Signed(v) => MetricValue::Signed(v),
-            CounterValue::Unsigned(v) => MetricValue::Unsigned(v),
-            CounterValue::Float(v) => MetricValue::Float(v),
+            // convert unsigned and float to signed for compatibility
+            CounterValue::Unsigned(v) => MetricValue::Signed(v as i64),
+            CounterValue::Float(v) => MetricValue::Signed(v as i64),
         })
     }
 }
@@ -42,8 +43,9 @@ impl ToGaugeValue for CounterValue {
     fn try_to_value(self) -> MetricResult<MetricValue> {
         Ok(match self {
             CounterValue::Signed(v) => MetricValue::Signed(v),
-            CounterValue::Unsigned(v) => MetricValue::Unsigned(v),
-            CounterValue::Float(v) => MetricValue::Float(v),
+            // convert unsigned and float to signed for compatibility
+            CounterValue::Unsigned(v) => MetricValue::Signed(v as i64),
+            CounterValue::Float(v) => MetricValue::Signed(v as i64),
         })
     }
 }
@@ -334,22 +336,12 @@ impl Collector {
                             for point in batch.points.iter() {
                                 let metric_name =
                                     format!("{}_{}", batch.module, point.0).replace("-", "_");
-                                match point.1 {
-                                    CounterType::Counted => {
-                                        let mut b = client.count_with_tags(&metric_name, point.2);
-                                        for (k, v) in batch.tags.iter() {
-                                            b = b.with_tag(&k, &v);
-                                        }
-                                        b.send();
-                                    }
-                                    CounterType::Gauged => {
-                                        let mut b = client.gauge_with_tags(&metric_name, point.2);
-                                        for (k, v) in batch.tags.iter() {
-                                            b = b.with_tag(&k, &v);
-                                        }
-                                        b.send();
-                                    }
+                                // use counted for gauged fields for compatibility
+                                let mut b = client.count_with_tags(&metric_name, point.2);
+                                for (k, v) in batch.tags.iter() {
+                                    b = b.with_tag(&k, &v);
                                 }
+                                b.send();
                             }
                         }
                     }
