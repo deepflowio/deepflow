@@ -1,7 +1,7 @@
-LLC ?= /usr/local/llvm-clang/bin/llc
-CLANG ?= /usr/local/llvm-clang/bin/clang
-LLVM_STRIP ?= /usr/local/llvm-clang/bin/llvm-strip
-LLVM_OBJDUMP ?= /usr/local/llvm-clang/bin/llvm-objdump
+LLC ?= /usr/bin/llc
+CLANG ?= /usr/bin/clang
+LLVM_STRIP ?= /usr/bin/llvm-strip
+LLVM_OBJDUMP ?= /usr/bin/llvm-objdump
 CC ?= gcc
 TAEGET_KERN_SRC = socket_trace.c
 TAEGET_KERN_LL = $(TAEGET_KERN_SRC:c=ll)
