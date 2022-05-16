@@ -2,7 +2,7 @@ use std::mem;
 use std::path::Path;
 use std::process;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, Ordering},
     Arc, Condvar, Mutex, Weak,
 };
 use std::thread::{self, JoinHandle};
@@ -704,15 +704,12 @@ impl Components {
 
         let mut l4_flow_aggr = None;
         if let Some(l4_log_receiver) = l4_log_receiver {
-            let throttle = Arc::new(AtomicU64::new(
-                runtime_config.collector.l4_log_collect_nps_threshold,
-            ));
             l4_flow_aggr = Some(FlowAggrThread::new(
                 id,                                   // id
                 l4_log_receiver,                      // input
                 l4_flow_aggr_sender.unwrap().clone(), // output
                 runtime_config.collector.l4_log_store_tap_types,
-                throttle,
+                config_handler.collector(),
             ));
         }
 

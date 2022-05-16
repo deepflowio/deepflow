@@ -7,6 +7,7 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thread::JoinHandle;
 
+use arc_swap::access::Access;
 use log::{debug, info, warn};
 use rand::prelude::{Rng, SeedableRng, SmallRng};
 
@@ -14,6 +15,7 @@ use super::consts::*;
 use super::round_to_minute;
 
 use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
+use crate::config::handler::CollectorAccess;
 use crate::sender::SendItem;
 use crate::utils::{
     queue::{Error, Receiver, Sender},
@@ -37,7 +39,7 @@ pub struct FlowAggrThread {
     input: Arc<Receiver<Arc<TaggedFlow>>>,
     output: Sender<SendItem>,
     l4_log_store_tap_types: [bool; 256],
-    throttle: Arc<AtomicU64>,
+    config: CollectorAccess,
 
     thread_handle: Option<JoinHandle<()>>,
 
@@ -50,16 +52,16 @@ impl FlowAggrThread {
         input: Receiver<Arc<TaggedFlow>>,
         output: Sender<SendItem>,
         l4_log_store_tap_types: [bool; 256],
-        throttle: Arc<AtomicU64>,
+        config: CollectorAccess,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
             input: Arc::new(input),
             output: output.clone(),
-            l4_log_store_tap_types: l4_log_store_tap_types,
-            throttle: throttle.clone(),
+            l4_log_store_tap_types,
             thread_handle: None,
+            config,
             running,
         }
     }
@@ -74,8 +76,8 @@ impl FlowAggrThread {
             self.input.clone(),
             self.output.clone(),
             self.l4_log_store_tap_types,
-            self.throttle.clone(),
             self.running.clone(),
+            self.config.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || flow_aggr.run()));
         info!("l4 flow aggr id: {} started", self.id);
@@ -111,8 +113,8 @@ impl FlowAggr {
         input: Arc<Receiver<Arc<TaggedFlow>>>,
         output: Sender<SendItem>,
         l4_log_store_tap_types: [bool; 256],
-        throttle: Arc<AtomicU64>,
         running: Arc<AtomicBool>,
+        config: CollectorAccess,
     ) -> Self {
         let mut stashs = VecDeque::new();
         for _ in 0..MINUTE_SLOTS {
@@ -120,7 +122,7 @@ impl FlowAggr {
         }
         Self {
             input,
-            output: ThrottlingQueue::new(output, throttle),
+            output: ThrottlingQueue::new(output, config),
             stashs,
             slot_start_time: round_to_minute(
                 SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
@@ -274,8 +276,8 @@ impl RefCountable for FlowAggr {
 }
 
 struct ThrottlingQueue {
+    config: CollectorAccess,
     throttle: u64,
-    new_throttle: Arc<AtomicU64>,
 
     small_rng: SmallRng,
 
@@ -292,10 +294,10 @@ impl ThrottlingQueue {
     const MIN_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 100;
     const MAX_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 1000000;
 
-    pub fn new(output: Sender<SendItem>, throttle: Arc<AtomicU64>) -> Self {
-        let t: u64 = throttle.load(Ordering::Relaxed) * Self::THROTTLE_BUCKET;
+    pub fn new(output: Sender<SendItem>, config: CollectorAccess) -> Self {
+        let t: u64 = config.load().l4_log_collect_nps_threshold * Self::THROTTLE_BUCKET;
         Self {
-            new_throttle: throttle,
+            config,
             throttle: t,
 
             small_rng: SmallRng::from_entropy(),
@@ -340,11 +342,11 @@ impl ThrottlingQueue {
     }
 
     pub fn update_throttle(&mut self) {
-        let new = self.new_throttle.load(Ordering::Relaxed);
+        let new = self.config.load().l4_log_collect_nps_threshold;
         if new < Self::MIN_L4_LOG_COLLECT_NPS_THRESHOLD
             || new > Self::MAX_L4_LOG_COLLECT_NPS_THRESHOLD
         {
-            info!(
+            debug!(
                 "l4 flow throttle {} is invalid, must in range[{}, {}]",
                 new,
                 Self::MIN_L4_LOG_COLLECT_NPS_THRESHOLD,
@@ -356,6 +358,11 @@ impl ThrottlingQueue {
             return;
         }
 
+        info!(
+            "l4_log_collect_nps_threshold update from {} to  {}",
+            self.throttle / Self::THROTTLE_BUCKET,
+            new
+        );
         self.throttle = new * Self::THROTTLE_BUCKET;
     }
 }
