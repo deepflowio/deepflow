@@ -1,31 +1,43 @@
 # 编译阶段
-# 1. 声明使用rust的版本
-# 这里不使用alpine的原因：网上说alpine使用的musl c可能有bug，会影响rust程序正常工作
-# docker-hosted.nexus.yunshan.net/rust-build:0.1
+# dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.1
+# 使用 Centos 为基础镜像，安装所需依赖
 #FIXME: 暂时锁定x86_64架构，以后支持优化构建速度
-FROM amd64/rust:1.59
+FROM centos:centos7.9.2009
 
 # 2. 配置rust环境变量
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
+# 安装自定义软件
+RUN yum install make -y
 
-# 3.给cargo crates换镜像源
+# 安装基础依赖
+RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfutils-libelf-devel git  -y && \
+     curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y && \
+     curl http://nexus.yunshan.net/repository/platform/ebpf-http/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
+     yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-11.0.0-2.el7.x86_64.rpm \
+     yum clean all
+
+# 使用依赖缓存
+RUN cargo install sccache && \
+    ln -s  /usr/local/llvm-clang/bin/clang /usr/bin/clang
+
+# 给cargo crates换镜像源
 COPY config /usr/local/cargo/
 
-# 4. 将源码复制入镜像中
-# 4.增加.gitconfig，将内部库替换成http链接，可以直接下载
+# 添加能访问 gitlab 的 key
+RUN mkdir /root/.ssh/
+COPY id_rsa /root/.ssh/id_rsa
+COPY ssh_config /root/.ssh/config
+RUN chmod 600 /root/.ssh/id_rsa
+
+# 增加.gitconfig，将内部库替换成 http 链接，可以直接下载
 COPY gitconfig /etc/
 
-
-# 5. 将源码复制入镜像中
-# WORKDIR /rust/project/
-
-# COPY ./ ./
-
-# 6. 开始编译
-# 第一次编译会比较慢(因为下载额外的库之类的)，请耐心等待
 CMD bash
-# 这种方式编译出来的是debug版的可执行文件，
+
+# 编译说明
+# 也可直接在从本地 docker 启动该编译环境，将代码挂载/下载进容器即可
+# cargo build 不加参数编译出来的是 debug 版的可执行文件，
 # 如果想要编译release版的可执行文件，请执行以下操作
 # RUN cargo build --release
