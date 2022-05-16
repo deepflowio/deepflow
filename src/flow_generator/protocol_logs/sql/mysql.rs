@@ -185,6 +185,7 @@ impl MysqlLog {
                     String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
             }
             MYSQL_RESPONSE_CODE_OK => {
+                self.status = L7ResponseStatus::Ok;
                 self.info.affected_rows =
                     MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
             }
