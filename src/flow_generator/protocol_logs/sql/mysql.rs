@@ -73,6 +73,7 @@ impl MysqlLog {
 
     fn reset_logs(&mut self) {
         self.info = MysqlInfo::default();
+        self.status = L7ResponseStatus::Ok;
     }
 
     fn get_log_data_special_info(self, log_data: &mut AppProtoLogsData) {
