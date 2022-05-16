@@ -241,10 +241,10 @@ impl fmt::Display for TunnelField {
 impl From<TunnelField> for flow_log::TunnelField {
     fn from(f: TunnelField) -> Self {
         flow_log::TunnelField {
-            tx_ip0: u32::from_le_bytes(f.tx_ip0.octets()),
-            tx_ip1: u32::from_le_bytes(f.tx_ip1.octets()),
-            rx_ip0: u32::from_le_bytes(f.rx_ip0.octets()),
-            rx_ip1: u32::from_le_bytes(f.rx_ip1.octets()),
+            tx_ip0: u32::from_be_bytes(f.tx_ip0.octets()),
+            tx_ip1: u32::from_be_bytes(f.tx_ip1.octets()),
+            rx_ip0: u32::from_be_bytes(f.rx_ip0.octets()),
+            rx_ip1: u32::from_be_bytes(f.rx_ip1.octets()),
             tx_mac0: f.tx_mac0.into(),
             tx_mac1: f.tx_mac1.into(),
             rx_mac0: f.rx_mac0.into(),
