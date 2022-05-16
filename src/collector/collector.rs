@@ -20,12 +20,12 @@ use super::{
 };
 use crate::{
     common::{
-        enums::{EthernetType, IpProtocol},
+        enums::{EthernetType, IpProtocol, TapType},
         flow::{get_direction, Flow, FlowSource, L7Protocol},
     },
     config::handler::CollectorAccess,
     metric::{
-        document::{Code, Direction, Document, DocumentFlag, TagType, Tagger},
+        document::{Code, Direction, Document, DocumentFlag, TagType, Tagger, TapSide},
         meter::{FlowMeter, Meter, UsageMeter},
     },
     rpc::get_timestamp,
@@ -282,6 +282,12 @@ impl Stash {
     }
 
     fn collect(&mut self, acc_flow: AccumulatedFlow, time_in_second: u64) {
+        if time_in_second < self.start_time.as_secs() {
+            self.counter
+                .drop_before_window
+                .fetch_add(1, Ordering::Relaxed);
+            return;
+        }
         self.flush(time_in_second);
 
         // PCAP和分发策略统计
@@ -339,7 +345,7 @@ impl Stash {
         );
         let directions = [src, dst];
 
-        self.fill_stats(&acc_flow, directions, is_extra_tracing_doc);
+        self.fill_stats(&acc_flow, directions, false);
         self.fill_tracing_stats(&acc_flow, directions, is_extra_tracing_doc);
     }
 
@@ -388,6 +394,10 @@ impl Stash {
         is_extra_tracing_doc: bool,
     ) {
         for ep in 0..2 {
+            // 不统计未知direction的数据
+            if directions[ep] == Direction::None {
+                continue;
+            }
             let is_active_host = if ep == 0 {
                 acc_flow.is_active_host0
             } else {
@@ -409,6 +419,14 @@ impl Stash {
             }
             // 双端统计量：若某端direction已知，则以该direction（对应的tap-side）记录统计数据，最多记录两次
             self.fill_edge_stats(acc_flow, directions[ep], is_extra_tracing_doc);
+        }
+        let flow = &acc_flow.tagged_flow.flow;
+        // 双端统计量：若双端direction都未知，则以direction=0（对应tap-side=rest）记录一次统计数据
+        if flow.flow_key.tap_type == TapType::Tor
+            && directions[0] == Direction::None
+            && directions[1] == Direction::None
+        {
+            self.fill_edge_stats(acc_flow, Direction::None, is_extra_tracing_doc);
         }
     }
 
@@ -468,6 +486,7 @@ impl Stash {
             l3_epc_id: side.l3_epc_id as i16,
             protocol: flow_key.proto,
             direction,
+            tap_side: TapSide::from(direction),
             tap_port: flow_key.tap_port,
             tap_type: flow_key.tap_type,
             // 资源位于客户端时，忽略服务端口
@@ -581,6 +600,7 @@ impl Stash {
             l3_epc_id1: dst_ep.l3_epc_id as i16,
             protocol: flow_key.proto,
             direction,
+            tap_side: TapSide::from(direction),
             tap_port: flow_key.tap_port,
             tap_type: flow_key.tap_type,
             server_port: if Self::ignore_server_port(
@@ -637,7 +657,9 @@ impl Stash {
         // VIP场景：
         //     需要有RIP即natSrcIp和natDstIp
         // 其他场景直接返回
-        if !is_extra_tracing_doc {
+        if !is_extra_tracing_doc
+            || (acc_flow.nat_src_ip.is_unspecified() && acc_flow.nat_dst_ip.is_unspecified())
+        {
             return;
         }
         self.fill_stats(acc_flow, directions, true)
