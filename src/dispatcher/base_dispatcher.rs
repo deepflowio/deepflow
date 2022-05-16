@@ -53,7 +53,6 @@ pub(super) struct BaseDispatcher {
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
 
-    // TODO: add on config change for tunnel_type_bitmap
     pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub(super) tunnel_info: TunnelInfo,
 
@@ -227,6 +226,7 @@ impl BaseDispatcher {
             platform_poller: self.platform_poller.clone(),
             proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
             analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
+            tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
         }
     }
 
@@ -371,6 +371,7 @@ pub(super) struct BaseDispatcherListener {
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_ebpf: Arc<AtomicBool>,
     pub platform_poller: Arc<GenericPoller>,
+    pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
 
     proxy_controller_ip: IpAddr,
     analyzer_ip: IpAddr,
@@ -420,6 +421,13 @@ impl BaseDispatcherListener {
         debug!("PcapBpf: {}", bpf_syntax);
         self.bpf_options.lock().unwrap().bpf_syntax = bpf_syntax;
         self.need_update_ebpf.store(true, Ordering::Release);
+
+        let mut tunnel_types = Vec::new();
+        for decap_type in &config.decap_type {
+            tunnel_types.push(TunnelType::try_from(*decap_type as u8).unwrap());
+        }
+        let bitmaps = TunnelTypeBitmap::new(&tunnel_types);
+        *self.tunnel_type_bitmap.lock().unwrap() = bitmaps;
     }
 
     pub(super) fn on_vm_change(&self, keys: &[u32], vm_macs: &[MacAddr]) {
