@@ -1,8 +1,15 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  BUILD_IMAGE: docker-hosted.nexus.yunshan.net/rust-build:0.4
-  NEXUS_REGISTRY: docker-hosted.nexus.yunshan.net
+  BUILD_IMAGE: dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.1
+  ALIYUN_REGISTRY: dfcloud-image-registry.cn-beijing.cr.aliyuncs.com
   DEPLOY_IMAGE: docker-hosted.nexus.yunshan.net/metaflow-agent
+  KUBERNETES_POD_ANNOTATIONS_1: "k8s.aliyun.com/eci-use-specs=ecs.c6.2xlarge,ecs.c5.2xlarge,ecs.c6.3xlarge,ecs.g6.2xlarge,ecs.g5.2xlarge"
+  KUBERNETES_POD_ANNOTATIONS_2: "k8s.aliyun.com/eci-spot-duration=1"
+  KUBERNETES_POD_ANNOTATIONS_3: "k8s.aliyun.com/eci-spot-strategy=SpotAsPriceGo"
+  KUBERNETES_POD_ANNOTATIONS_4: "k8s.aliyun.com/eci-image-cache=true"
+  KUBERNETES_POD_ANNOTATIONS_5: "k8s.aliyun.com/imc-enable-reuse=true"
+  # KUBERNETES_POD_ANNOTATIONS_7: "k8s.aliyun.com/imc-retention-days=7"
+
 
 stages:
   - pre_build
@@ -12,8 +19,11 @@ stages:
 
 verify-x64:
   stage: verify
+  retry: 1
   tags:
-    - rust
+    - kubernetes-eci
+  image: $BUILD_IMAGE
+  timeout: 30 minutes
   script:
     - cargo check
     - cargo fmt --all -- --check
@@ -28,13 +38,14 @@ verify-x64:
 
 rust-build-env:
   stage: pre_build
+  timeout: 30 minutes
   tags:
     - docker
   before_script:
-    - docker login -u admin -p yunshan3302 $NEXUS_REGISTRY
+    - docker login -u acrpush@yunshan -p acrimagepush01 $ALIYUN_REGISTRY
   script:
     - cd docker
-    - docker build --pull -t $BUILD_IMAGE -f Dockerfile.build .
+    - docker build --pull -t $BUILD_IMAGE -f DockerfileToFix.build .
     - docker push $BUILD_IMAGE
     - echo "Pushed $BUILD_IMAGE"
     - docker image rm $BUILD_IMAGE
@@ -45,7 +56,9 @@ rust-build-env:
 binary-x64:
   stage: build_binary
   tags:
-    - rust
+    - kubernetes-eci
+  image: $BUILD_IMAGE
+  timeout: 30 minutes
   script:
     - cargo build --release
     - cargo build --release --bin metaflow-agent-ctl
