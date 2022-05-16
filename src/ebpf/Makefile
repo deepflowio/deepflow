@@ -17,8 +17,8 @@ define compile_socket_trace_elf
 	@cp kernel/socket_trace.elf data/linux-$(strip $1)/
 endef
 
-CLANG_VER := $(shell /usr/local/llvm-clang/bin/clang --version | grep "version" | awk '{print $$3}')
-CLANG_VER_MAIN := $(shell /usr/local/llvm-clang/bin/clang --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{print int($$0)}')
+CLANG_VER := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}')
+CLANG_VER_MAIN := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{print int($$0)}')
 LIBTRACE := libebpf.a
 OBJS := libbpf/src/bpf.o \
 	libbpf/src/btf.o \
@@ -56,9 +56,6 @@ all: build
 
 ELFFILES = ./.data_done
 $(ELFFILES):
-	@if [ ! -f "/usr/local/llvm-clang/bin/clang" ]; then \
-             curl http://nexus.yunshan.net/repository/platform/ebpf-http/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm; \
-	fi
 	$(call msg,Clang/LLVM,,$(CLANG_VER))
 	@if [ $(CLANG_VER_MAIN) -lt 10 ]; then \
                 echo "  check llvm-clang fail. expect Clang/LLVM 10+" && exit 1; \

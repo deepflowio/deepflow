@@ -14,7 +14,7 @@
 #! /bin/bash
 
 # 生成libebpf.a，ebpf kernel elf文件，命令行工具metaflow-ebpfctl
-make clean && ./remote-make 10.1.3.91 yunshan3302
+make clean && make --no-print-directory && make tools --no-print-directory
 
 # rust 样例
 make install && make rust-sample # 安装ebpf kernel elf文件，并生成rust样例

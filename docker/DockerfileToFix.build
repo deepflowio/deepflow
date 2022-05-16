@@ -20,7 +20,10 @@ RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfut
 
 # 使用依赖缓存
 RUN cargo install sccache && \
-    ln -s  /usr/local/llvm-clang/bin/clang /usr/bin/clang
+    ln -s  /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
+    ln -s /usr/local/llvm-clang/bin/llc /usr/bin/llc && \
+    ln -s /usr/local/llvm-clang/bin/llvm-strip /usr/bin/llvm-strip && \
+    ln -s /usr/local/llvm-clang/bin/llvm-objdump /usr/bin/llvm-objdump
 
 # 给cargo crates换镜像源
 COPY config /usr/local/cargo/
