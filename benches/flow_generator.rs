@@ -6,7 +6,7 @@ use criterion::*;
 
 use metaflow_agent::{
     _FlowPerfCounter as FlowPerfCounter, _TcpFlags as TcpFlags, _TcpPerf as TcpPerf,
-    _benchmark_report as benchmark_report,
+    _TridentType as TridentType, _benchmark_report as benchmark_report,
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,
     _meta_flow_perf_update as meta_flow_perf_update,
     _new_flow_map_and_receiver as new_flow_map_and_receiver, _new_meta_packet as new_meta_packet,
@@ -16,7 +16,7 @@ use metaflow_agent::{
 fn bench_flow_map(c: &mut Criterion) {
     c.bench_function("flow_map_syn_flood", |b| {
         b.iter_custom(|iters| {
-            let (mut map, _) = new_flow_map_and_receiver();
+            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess);
             let packets = (0..iters)
                 .into_iter()
                 .map(|i| {
@@ -36,7 +36,7 @@ fn bench_flow_map(c: &mut Criterion) {
 
     c.bench_function("flow_map_with_ten_packets_flow_flood", |b| {
         b.iter_custom(|iters| {
-            let (mut map, _) = new_flow_map_and_receiver();
+            let (mut map, _) = new_flow_map_and_receiver(TridentType::TtProcess);
             let iters = (iters + 9) / 10 * 10;
 
             let mut packets = vec![];

@@ -210,6 +210,24 @@ impl FlowMap {
             // 找到Flow,更新
             Some((key, mut node)) => {
                 let pkt_timestamp = meta_packet.lookup_key.timestamp;
+                // update flow meta_packet direction for flow
+                // go 版本定方向在flow_extra.Match函数做的，因为现在match使用特定的key，所以除了key要定方向之外，
+                // meta_packet也要定方向
+                let lookup_key = &meta_packet.lookup_key;
+                let node_flow_key = &node.tagged_flow.flow.flow_key;
+                if lookup_key.src_mac == node_flow_key.mac_src
+                    && lookup_key.dst_mac == node_flow_key.mac_dst
+                    && lookup_key.src_ip == node_flow_key.ip_src
+                    && lookup_key.dst_ip == node_flow_key.ip_dst
+                {
+                    meta_packet.direction = PacketDirection::ClientToServer;
+                } else if lookup_key.src_mac == node_flow_key.mac_dst
+                    && lookup_key.dst_mac == node_flow_key.mac_src
+                    && lookup_key.src_ip == node_flow_key.ip_dst
+                    && lookup_key.dst_ip == node_flow_key.ip_src
+                {
+                    meta_packet.direction = PacketDirection::ServerToClient;
+                }
 
                 // 1. 输出上一个统计周期的统计信息
                 self.node_updated_aftercare(&mut node, pkt_timestamp, Some(&mut meta_packet));
@@ -246,28 +264,10 @@ impl FlowMap {
         time_set: &mut BTreeSet<Rc<FlowMapKey>>,
         node_map: &mut HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>,
     ) {
-        let lookup_key = &meta_packet.lookup_key;
-        let node_flow_key = &node.tagged_flow.flow.flow_key;
-        let timestamp = lookup_key.timestamp;
-        // update flow meta_packet direction for flow
-        if lookup_key.src_ip == node_flow_key.ip_src
-            && lookup_key.dst_ip == node_flow_key.ip_dst
-            && lookup_key.src_port == node_flow_key.port_src
-            && lookup_key.dst_port == node_flow_key.port_dst
-        {
-            meta_packet.direction = PacketDirection::ClientToServer;
-        } else if lookup_key.src_ip == node_flow_key.ip_dst
-            && lookup_key.dst_ip == node_flow_key.ip_src
-            && lookup_key.src_port == node_flow_key.port_dst
-            && lookup_key.dst_port == node_flow_key.port_src
-        {
-            meta_packet.direction = PacketDirection::ServerToClient;
-        }
-
+        let timestamp = meta_packet.lookup_key.timestamp;
         let flow_closed = self.update_tcp_flow(&mut meta_packet, &mut node);
         if self.config.load().collector_enabled {
-            let direction = node.tagged_flow.flow.reversed
-                == (meta_packet.direction == PacketDirection::ServerToClient);
+            let direction = meta_packet.direction == PacketDirection::ServerToClient;
             self.collect_metric(&mut node, &meta_packet, direction);
         }
         if flow_closed {
@@ -285,23 +285,6 @@ impl FlowMap {
         pkt_key: Rc<FlowMapKey>,
         node_map: &mut HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>,
     ) {
-        let lookup_key = &meta_packet.lookup_key;
-        let node_flow_key = &node.tagged_flow.flow.flow_key;
-
-        // update flow meta_packet direction for flow
-        if lookup_key.src_ip == node_flow_key.ip_src
-            && lookup_key.dst_ip == node_flow_key.ip_dst
-            && lookup_key.src_port == node_flow_key.port_src
-            && lookup_key.dst_port == node_flow_key.port_dst
-        {
-            meta_packet.direction = PacketDirection::ClientToServer;
-        } else if lookup_key.src_ip == node_flow_key.ip_dst
-            && lookup_key.dst_ip == node_flow_key.ip_src
-            && lookup_key.src_port == node_flow_key.port_dst
-            && lookup_key.dst_port == node_flow_key.port_src
-        {
-            meta_packet.direction = PacketDirection::ServerToClient;
-        }
         self.update_flow(&mut node, &mut meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
         if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
@@ -324,23 +307,6 @@ impl FlowMap {
         pkt_key: Rc<FlowMapKey>,
         node_map: &mut HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>,
     ) {
-        let lookup_key = &meta_packet.lookup_key;
-        let node_flow_key = &node.tagged_flow.flow.flow_key;
-        // update flow meta_packet direction for flow
-        if lookup_key.src_mac.eq(&node_flow_key.mac_src)
-            && lookup_key.dst_mac.eq(&node_flow_key.mac_dst)
-            && lookup_key.src_ip.eq(&node_flow_key.ip_src)
-            && lookup_key.dst_ip.eq(&node_flow_key.ip_dst)
-        {
-            meta_packet.direction = PacketDirection::ClientToServer;
-        } else if lookup_key.src_mac.eq(&node_flow_key.mac_dst)
-            && lookup_key.dst_mac.eq(&node_flow_key.mac_src)
-            && lookup_key.src_ip.eq(&node_flow_key.ip_dst)
-            && lookup_key.dst_ip.eq(&node_flow_key.ip_src)
-        {
-            meta_packet.direction = PacketDirection::ServerToClient;
-        }
-
         self.update_flow(&mut node, &mut meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
         if peers[FLOW_METRICS_PEER_SRC].packet_count > 0
@@ -388,8 +354,9 @@ impl FlowMap {
     //		1.payloadLen为0/1
     //		2.非FIN、SYN、RST
     //		3.TCP保活探测报文序列号(Seq)为前一个TCP报文序列号(Seq)减一
-    fn update_tcp_keepalive_seq(&mut self, node: &mut FlowNode, meta_packet: &mut MetaPacket) {
+    fn update_tcp_keepalive_seq(&mut self, node: &mut FlowNode, meta_packet: &MetaPacket) {
         // 保存TCP Seq用于TCP Keepalive报文判断
+
         let (next_tcp_seq0, next_tcp_seq1) = (node.next_tcp_seq0, node.next_tcp_seq1);
 
         // 记录下一次TCP Seq
@@ -398,8 +365,7 @@ impl FlowMap {
             PacketDirection::ServerToClient => node.next_tcp_seq0 = meta_packet.tcp_data.ack,
         }
         // TCP Keepalive报文判断，并记录其TCP Seq
-        let payload_len = meta_packet.payload_len;
-        if payload_len > 1 {
+        if meta_packet.payload_len > 1 {
             return;
         }
 
@@ -427,7 +393,7 @@ impl FlowMap {
         let flow = &mut node.tagged_flow.flow;
         if tcp_flag == TcpFlags::SYN {
             flow.syn_seq = meta_packet.tcp_data.seq;
-        } else if tcp_flag == TcpFlags::SYN_ACK && meta_packet.packet_len == 0 {
+        } else if tcp_flag == TcpFlags::SYN_ACK && meta_packet.payload_len == 0 {
             flow.synack_seq = meta_packet.tcp_data.seq;
         }
     }
@@ -976,7 +942,7 @@ impl FlowMap {
             _ => unimplemented!(),
         };
 
-        if let PacketDirection::ServerToClient = meta_packet.direction {
+        if PacketDirection::ServerToClient == meta_packet.direction {
             mem::swap(&mut src_score, &mut dst_score);
         }
 
@@ -1109,7 +1075,7 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
     }
 }
 
-pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
+pub fn _new_flow_map_and_receiver(trident_type: TridentType) -> (FlowMap, Receiver<TaggedFlow>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
@@ -1119,7 +1085,7 @@ pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     let mut config = NewRuntimeConfig::default();
     // Any
     config.flow.l7_log_tap_types[0] = true;
-    config.flow.trident_type = TridentType::TtProcess;
+    config.flow.trident_type = trident_type;
     let current_config = Arc::new(ArcSwap::from_pointee(config));
     let (flow_map, _counter) = FlowMap::new(
         0,
@@ -1213,7 +1179,8 @@ mod tests {
 
     #[test]
     fn syn_rst() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
         let packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(packet0);
         let mut packet1 = _new_meta_packet();
@@ -1241,7 +1208,8 @@ mod tests {
 
     #[test]
     fn syn_fin() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
         let packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(packet0);
 
@@ -1273,7 +1241,8 @@ mod tests {
 
     #[test]
     fn platform_data() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.seq = 1111;
         packet1.tcp_data.ack = 112;
@@ -1295,7 +1264,8 @@ mod tests {
 
     #[test]
     fn handshake_perf() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
         let mut packet0 = _new_meta_packet();
         packet0.tcp_data.flags = TcpFlags::SYN;
         packet0.tcp_data.seq = 111;
@@ -1328,7 +1298,7 @@ mod tests {
 
     #[test]
     fn reverse_new_cycle() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver();
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
         let npb_action = NpbAction::new(0, 10, NpbTunnelType::VxLan, TapSide::SRC, 123);
         let mut policy_data0 = PolicyData::default();
         policy_data0.merge_npb_action(vec![npb_action], 10, vec![]);
@@ -1361,7 +1331,8 @@ mod tests {
 
     #[test]
     fn force_report() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
         let packet0 = _new_meta_packet();
         flow_map.inject_meta_packet(packet0);
 
@@ -1393,7 +1364,8 @@ mod tests {
 
     #[test]
     fn udp_arp_short_flow() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.proto = IpProtocol::Udp;
         let flush_timestamp = packet0.lookup_key.timestamp;
@@ -1421,13 +1393,13 @@ mod tests {
 
     #[test]
     fn port_equal_tor() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtHyperVCompute);
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.tap_type = TapType::Tor;
         flow_map.inject_meta_packet(packet0);
 
         let mut packet1 = _new_meta_packet();
-        packet1.lookup_key.dst_mac = MacAddr::from([0x21, 0x43, 0x65, 0xaa, 0xaa, 0xaa]);
         packet1.lookup_key.tap_type = TapType::Tor;
         packet1.tcp_data.flags = TcpFlags::RST;
         _reverse_meta_packet(&mut packet1);
@@ -1475,7 +1447,7 @@ mod tests {
 
     #[test]
     fn flow_state_machine() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver();
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
 
         let mut packet0 = _new_meta_packet();
         // test handshake
@@ -1534,7 +1506,8 @@ mod tests {
 
     #[test]
     fn double_fin_from_server() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
         // SYN
         let mut packet0 = _new_meta_packet();
         packet0.lookup_key.timestamp = Duration::from_nanos(
@@ -1580,7 +1553,8 @@ mod tests {
 
     #[test]
     fn l3_l4_payload() {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
 
         let capture = Capture::load_pcap("resources/test/flow_generator/ip-fragment.pcap", None);
         let packets = capture.as_meta_packets();
