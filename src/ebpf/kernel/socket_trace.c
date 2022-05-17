@@ -580,6 +580,8 @@ static __inline void data_submit(struct pt_regs *ctx,
 
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
+	if (time_stamp == 0)
+		time_stamp = bpf_ktime_get_ns(); 
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
@@ -886,7 +888,6 @@ TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx *ctx) {
 	read_args.source_fn = SYSCALL_FUNC_READ;
 	read_args.fd = fd;
 	read_args.buf = buf;
-	read_args.enter_ts = bpf_ktime_get_ns();
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -955,7 +956,6 @@ TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 	read_args.source_fn = SYSCALL_FUNC_RECVFROM;
 	read_args.fd = sockfd;
 	read_args.buf = buf;
-	read_args.enter_ts = bpf_ktime_get_ns();
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1073,7 +1073,6 @@ KPROG(__sys_recvmsg) (struct pt_regs* ctx) {
 		read_args.fd = sockfd;
 		read_args.iov = msghdr->msg_iov;
 		read_args.iovlen = msghdr->msg_iovlen;
-		read_args.enter_ts = bpf_ktime_get_ns();
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -1120,7 +1119,6 @@ KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
 		bpf_probe_read(&read_args.iovlen, sizeof(read_args.iovlen), (void *)msgvec + offset);
 
 		read_args.msg_len = (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
-		read_args.enter_ts = bpf_ktime_get_ns();
 		active_read_args_map__update(&id, &read_args);
 	}
 	
@@ -1191,7 +1189,6 @@ KPROG(do_readv) (struct pt_regs* ctx) {
 	read_args.fd = fd;
 	read_args.iov = iov;
 	read_args.iovlen = iovlen;
-	read_args.enter_ts = bpf_ktime_get_ns();
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
