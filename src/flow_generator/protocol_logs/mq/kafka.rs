@@ -59,6 +59,8 @@ impl KafkaLog {
         self.info.api_key = 0;
         self.info.client_id = String::new();
         self.info.resp_msg_size = -1;
+        self.status = L7ResponseStatus::Ok;
+        self.status_code = 0;
     }
 
     fn request(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
