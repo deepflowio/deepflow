@@ -7,6 +7,8 @@ use std::{
 
 use bitflags::bitflags;
 
+pub mod h2pack;
+
 mod error;
 pub use error::{Error, Result};
 use serde::{Deserialize, Serialize};
