@@ -51,7 +51,6 @@ impl FlowAggrThread {
         id: usize,
         input: Receiver<Arc<TaggedFlow>>,
         output: DebugSender<SendItem>,
-        l4_log_store_tap_types: [bool; 256],
         config: CollectorAccess,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
@@ -59,7 +58,7 @@ impl FlowAggrThread {
             id,
             input: Arc::new(input),
             output: output.clone(),
-            l4_log_store_tap_types,
+            l4_log_store_tap_types: config.load().l4_log_store_tap_types,
             thread_handle: None,
             config,
             running,
