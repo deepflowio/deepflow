@@ -18,7 +18,7 @@ use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
 use crate::config::handler::CollectorAccess;
 use crate::sender::SendItem;
 use crate::utils::{
-    queue::{Error, Receiver, Sender},
+    queue::{DebugSender, Error, Receiver},
     stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 
@@ -37,7 +37,7 @@ struct FlowAggrCounter {
 pub struct FlowAggrThread {
     id: usize,
     input: Arc<Receiver<Arc<TaggedFlow>>>,
-    output: Sender<SendItem>,
+    output: DebugSender<SendItem>,
     l4_log_store_tap_types: [bool; 256],
     config: CollectorAccess,
 
@@ -50,7 +50,7 @@ impl FlowAggrThread {
     pub fn new(
         id: usize,
         input: Receiver<Arc<TaggedFlow>>,
-        output: Sender<SendItem>,
+        output: DebugSender<SendItem>,
         l4_log_store_tap_types: [bool; 256],
         config: CollectorAccess,
     ) -> Self {
@@ -111,7 +111,7 @@ pub struct FlowAggr {
 impl FlowAggr {
     pub fn new(
         input: Arc<Receiver<Arc<TaggedFlow>>>,
-        output: Sender<SendItem>,
+        output: DebugSender<SendItem>,
         l4_log_store_tap_types: [bool; 256],
         running: Arc<AtomicBool>,
         config: CollectorAccess,
@@ -283,7 +283,7 @@ struct ThrottlingQueue {
 
     last_flush_time: Duration,
     period_count: usize,
-    output: Sender<SendItem>,
+    output: DebugSender<SendItem>,
 
     stashs: Vec<SendItem>,
 }
@@ -294,7 +294,7 @@ impl ThrottlingQueue {
     const MIN_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 100;
     const MAX_L4_LOG_COLLECT_NPS_THRESHOLD: u64 = 1000000;
 
-    pub fn new(output: Sender<SendItem>, config: CollectorAccess) -> Self {
+    pub fn new(output: DebugSender<SendItem>, config: CollectorAccess) -> Self {
         let t: u64 = config.load().l4_log_collect_nps_threshold * Self::THROTTLE_BUCKET;
         Self {
             config,

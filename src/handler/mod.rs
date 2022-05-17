@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::common::meta_packet::MetaPacket;
 use crate::pcap::PcapPacket;
 use crate::utils::net::MacAddr;
-use crate::utils::queue::Sender;
+use crate::utils::queue::DebugSender;
 
 pub struct IpInfo {
     pub mac: MacAddr,
@@ -25,7 +25,7 @@ pub struct LldpDuInfo {
 }
 
 pub enum PacketHandler {
-    Pcap(Sender<PcapPacket>),
+    Pcap(DebugSender<PcapPacket>),
 }
 
 impl PacketHandler {
@@ -35,7 +35,7 @@ impl PacketHandler {
 }
 
 pub enum PacketHandlerBuilder {
-    Pcap(Sender<PcapPacket>),
+    Pcap(DebugSender<PcapPacket>),
 }
 
 impl PacketHandlerBuilder {

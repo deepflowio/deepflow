@@ -36,6 +36,7 @@ pub struct Packet {
     raw_pkt: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub enum PcapPacket {
     Packet(Packet),
     Terminated,
