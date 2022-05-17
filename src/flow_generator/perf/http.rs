@@ -3,8 +3,7 @@ use std::rc::Rc;
 use std::time::Duration;
 use std::{fmt, str};
 
-use bytes::Bytes;
-use httpbis::for_test::hpack;
+use crate::utils::net::h2pack;
 
 use crate::{
     common::{
@@ -286,13 +285,11 @@ impl HttpPerfData {
             frame_payload = &payload[5..];
         }
 
-        let mut decoder = hpack::decoder::Decoder::new();
-        let header_list = decoder
-            .decode(Bytes::copy_from_slice(frame_payload.as_ref()))
-            .unwrap_or_default();
+        let mut parser = h2pack::parser::Parser::new();
+        let header_list = parser.parse(frame_payload).unwrap();
 
         for header in header_list.iter() {
-            match header.0.as_ref() {
+            match header.0.as_slice() {
                 b":method" => return Ok(0),
                 b":status" => {
                     return Ok(std::str::from_utf8(header.1.as_ref())
