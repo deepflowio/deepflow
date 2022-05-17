@@ -677,7 +677,6 @@ impl Components {
         queue_debugger: &QueueDebugger,
     ) -> CollectorThread {
         let static_config = &config_handler.static_config;
-        let runtime_config = &config_handler.candidate_config;
         let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
             static_config.quadruple_queue_size,
             "2-flow-with-meter-to-second-collector",
@@ -757,8 +756,6 @@ impl Components {
             second_quadruple_tolerable_delay,
             minute_quadruple_tolerable_delay,
             1 << 18, // possible_host_size
-            runtime_config.collector.l7_metrics_enabled,
-            runtime_config.collector.vtap_flow_1s_enabled,
             config_handler.collector(),
         );
 
@@ -768,7 +765,6 @@ impl Components {
                 id,                                   // id
                 l4_log_receiver,                      // input
                 l4_flow_aggr_sender.unwrap().clone(), // output
-                runtime_config.collector.l4_log_store_tap_types,
                 config_handler.collector(),
             ));
         }
