@@ -33,7 +33,7 @@ use crate::{
     utils::{
         hasher::Jenkins64Hasher,
         net::MacAddr,
-        queue::{Error, Receiver, Sender},
+        queue::{DebugSender, Error, Receiver},
         stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
     },
 };
@@ -252,7 +252,7 @@ impl StashKey {
 }
 
 struct Stash {
-    sender: Sender<SendItem>,
+    sender: DebugSender<SendItem>,
     counter: Arc<CollectorCounter>,
     start_time: Duration,
     slot_interval: u64,
@@ -263,7 +263,7 @@ struct Stash {
 }
 
 impl Stash {
-    fn new(ctx: Context, sender: Sender<SendItem>, counter: Arc<CollectorCounter>) -> Self {
+    fn new(ctx: Context, sender: DebugSender<SendItem>, counter: Arc<CollectorCounter>) -> Self {
         let (slot_interval, doc_flag) = match ctx.metric_type {
             MetricsType::SECOND => (1, DocumentFlag::PER_SECOND_METRICS),
             _ => (60, DocumentFlag::NONE),
@@ -715,7 +715,7 @@ pub struct Collector {
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
     receiver: Arc<Receiver<AccumulatedFlow>>,
-    sender: Sender<SendItem>,
+    sender: DebugSender<SendItem>,
 
     context: Context,
 }
@@ -724,7 +724,7 @@ impl Collector {
     pub fn new(
         id: u32,
         receiver: Receiver<AccumulatedFlow>,
-        sender: Sender<SendItem>,
+        sender: DebugSender<SendItem>,
         metric_type: MetricsType,
         delay_seconds: u32,
         stats: &Arc<stats::Collector>,

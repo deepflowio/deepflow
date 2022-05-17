@@ -14,6 +14,7 @@ use flexi_logger::{
 };
 use log::{info, warn};
 
+use crate::debug::QueueDebugger;
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
 use crate::utils::guard::Guard;
@@ -374,15 +375,6 @@ impl Components {
             libvirt_xml_extractor.clone(),
         );
 
-        let (pcap_sender, pcap_receiver, _) =
-            queue::bounded(config_handler.candidate_config.pcap.queue_size as usize);
-
-        let pcap_manager = WorkerManager::new(
-            config_handler.pcap(),
-            vec![pcap_receiver],
-            stats_collector.clone(),
-        );
-
         let api_watcher = Arc::new(ApiWatcher::new(config_handler.platform(), session.clone()));
 
         let context = ConstructDebugCtx {
@@ -394,6 +386,19 @@ impl Components {
             config: config_handler.debug(),
         };
         let debugger = Debugger::new(context);
+        let queue_debugger = debugger.clone_queue();
+
+        let (pcap_sender, pcap_receiver, _) = queue::bounded_with_debug(
+            config_handler.candidate_config.pcap.queue_size as usize,
+            "1-mini-meta-packet-to-pcap",
+            &queue_debugger,
+        );
+
+        let pcap_manager = WorkerManager::new(
+            config_handler.pcap(),
+            vec![pcap_receiver],
+            stats_collector.clone(),
+        );
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match static_config.tap_mode {
             TapMode::Analyzer => None,
@@ -431,7 +436,6 @@ impl Components {
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
         let mut log_parsers = vec![];
-        let queue_debugger = debugger.clone_queue();
 
         // Sender/Collector
         info!(
@@ -448,8 +452,11 @@ impl Components {
             .iter()
             .any(|&t| t)
         {
-            let (sender, l4_flow_aggr_receiver, counter) =
-                queue::bounded(static_config.flow_sender_queue_size as usize);
+            let (sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
+                static_config.flow_sender_queue_size as usize,
+                "3-flow-to-collector-sender",
+                &queue_debugger,
+            );
             stats_collector.register_countable(
                 "queue",
                 Countable::Owned(Box::new(counter)),
@@ -467,8 +474,11 @@ impl Components {
         }
 
         let sender_id = 1usize;
-        let (metrics_sender, metrics_receiver, counter) =
-            queue::bounded(static_config.collector_sender_queue_size);
+        let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
+            static_config.collector_sender_queue_size,
+            "2-doc-to-collector-sender",
+            &queue_debugger,
+        );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -510,8 +520,11 @@ impl Components {
 
         let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
         for i in 0..dispatcher_num {
-            let (flow_sender, flow_receiver, counter) =
-                queue::bounded(static_config.flow_queue_size);
+            let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
+                static_config.flow_queue_size,
+                "1-tagged-flow-to-quadruple-generator",
+                &queue_debugger,
+            );
             stats_collector.register_countable(
                 "queue",
                 Countable::Owned(Box::new(counter)),
@@ -522,7 +535,11 @@ impl Components {
             );
 
             // create and start app proto logs
-            let (log_sender, log_receiver, counter) = queue::bounded(static_config.flow_queue_size);
+            let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
+                static_config.flow_queue_size,
+                "1-tagged-flow-to-app-protocol-logs",
+                &queue_debugger,
+            );
             stats_collector.register_countable(
                 "queue",
                 Countable::Owned(Box::new(counter)),
@@ -602,6 +619,7 @@ impl Components {
                 metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
                 config_handler,
+                &queue_debugger,
             );
             collectors.push(collector);
         }
@@ -652,15 +670,19 @@ impl Components {
         id: usize,
         stats_collector: &Arc<stats::Collector>,
         flow_receiver: queue::Receiver<TaggedFlow>,
-        l4_flow_aggr_sender: Option<queue::Sender<SendItem>>,
-        metrics_sender: queue::Sender<SendItem>,
+        l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
+        metrics_sender: queue::DebugSender<SendItem>,
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
+        queue_debugger: &QueueDebugger,
     ) -> CollectorThread {
         let static_config = &config_handler.static_config;
         let runtime_config = &config_handler.candidate_config;
-        let (second_sender, second_receiver, counter) =
-            queue::bounded(static_config.quadruple_queue_size);
+        let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
+            static_config.quadruple_queue_size,
+            "2-flow-with-meter-to-second-collector",
+            queue_debugger,
+        );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -672,8 +694,11 @@ impl Components {
                 StatsOption::Tag("index", id.to_string()),
             ],
         );
-        let (minute_sender, minute_receiver, counter) =
-            queue::bounded(static_config.quadruple_queue_size);
+        let (minute_sender, minute_receiver, counter) = queue::bounded_with_debug(
+            static_config.quadruple_queue_size,
+            "2-flow-with-meter-to-minute-collector",
+            queue_debugger,
+        );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
@@ -688,8 +713,11 @@ impl Components {
 
         let (mut l4_log_sender, mut l4_log_receiver) = (None, None);
         if l4_flow_aggr_sender.is_some() {
-            let (l4_flow_sender, l4_flow_receiver, counter) =
-                queue::bounded(static_config.flow.aggr_queue_size as usize);
+            let (l4_flow_sender, l4_flow_receiver, counter) = queue::bounded_with_debug(
+                static_config.flow.aggr_queue_size as usize,
+                "2-second-flow-to-minute-aggrer",
+                queue_debugger,
+            );
             stats_collector.register_countable(
                 "queue",
                 Countable::Owned(Box::new(counter)),

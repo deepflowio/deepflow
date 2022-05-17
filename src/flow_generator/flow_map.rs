@@ -38,12 +38,13 @@ use crate::{
         tap_port::TapPort,
     },
     config::handler::{FlowAccess, FlowConfig, NewRuntimeConfig},
+    debug::QueueDebugger,
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
     rpc::get_timestamp,
     utils::hasher::Jenkins64Hasher,
     utils::net::MacAddr,
-    utils::queue::{self, Receiver, Sender},
+    utils::queue::{self, DebugSender, Receiver},
 };
 
 // not thread-safe
@@ -58,8 +59,8 @@ pub struct FlowMap {
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
 
-    output_queue: Sender<TaggedFlow>,
-    out_log_queue: Sender<MetaAppProto>,
+    output_queue: DebugSender<TaggedFlow>,
+    out_log_queue: DebugSender<MetaAppProto>,
     output_buffer: Vec<TaggedFlow>,
     last_queue_flush: Duration,
     config: FlowAccess,
@@ -70,9 +71,9 @@ pub struct FlowMap {
 impl FlowMap {
     pub fn new(
         id: u32,
-        output_queue: Sender<TaggedFlow>,
+        output_queue: DebugSender<TaggedFlow>,
         policy_getter: PolicyGetter,
-        app_proto_log_queue: Sender<MetaAppProto>,
+        app_proto_log_queue: DebugSender<MetaAppProto>,
         config: FlowAccess,
     ) -> (Self, Arc<FlowPerfCounter>) {
         let counter = Arc::new(FlowPerfCounter::default());
@@ -1111,8 +1112,10 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
 pub fn _new_flow_map_and_receiver() -> (FlowMap, Receiver<TaggedFlow>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
-    let (output_queue_sender, output_queue_receiver, _) = queue::bounded(256);
-    let (app_proto_log_queue, _, _) = queue::bounded(256);
+    let queue_debugger = QueueDebugger::new();
+    let (output_queue_sender, output_queue_receiver, _) =
+        queue::bounded_with_debug(256, "", &queue_debugger);
+    let (app_proto_log_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
     let mut config = NewRuntimeConfig::default();
     // Any
     config.flow.l7_log_tap_types[0] = true;

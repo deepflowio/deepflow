@@ -31,7 +31,7 @@ use crate::{
     utils::{
         bytes::read_u16_be,
         net::{self, get_route_src_ip, Link, MacAddr},
-        queue::Sender,
+        queue::DebugSender,
         stats::Collector,
         LeakyBucket,
     },
@@ -65,8 +65,8 @@ pub(super) struct BaseDispatcher {
 
     pub(super) analyzer_dedup_disabled: bool,
 
-    pub(super) flow_output_queue: Sender<TaggedFlow>,
-    pub(super) log_output_queue: Sender<MetaAppProto>,
+    pub(super) flow_output_queue: DebugSender<TaggedFlow>,
+    pub(super) log_output_queue: DebugSender<MetaAppProto>,
 
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,
