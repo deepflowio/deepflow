@@ -95,6 +95,8 @@ impl DubboLog {
         self.info.service_version = String::new();
         self.info.method_name = String::new();
         self.info.resp_msg_size = -1;
+        self.status = L7ResponseStatus::Ok;
+        self.status_code = 0;
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
