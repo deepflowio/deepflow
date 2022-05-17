@@ -119,7 +119,7 @@ struct Batch {
 }
 
 pub struct Collector {
-    hostname: Option<String>,
+    hostname: Arc<Mutex<String>>,
 
     remotes: Arc<Mutex<Option<Vec<IpAddr>>>>,
     sources: Arc<Mutex<Vec<Source>>>,
@@ -152,7 +152,12 @@ impl Collector {
             .filter_map(|x| x.parse::<IpAddr>().ok())
             .collect();
         Self {
-            hostname: hostname::get().ok().and_then(|s| s.into_string().ok()),
+            hostname: Arc::new(Mutex::new(
+                hostname::get()
+                    .ok()
+                    .and_then(|s| s.into_string().ok())
+                    .unwrap_or_default(),
+            )),
             remotes: Arc::new(Mutex::new(Some(remotes))),
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
@@ -175,13 +180,9 @@ impl Collector {
             tags: vec![],
             skip: 0,
         };
-        let mut has_host = false;
         for option in options {
             match option {
                 StatsOption::Tag(k, v) if !source.tags.iter().any(|(key, _)| key == &k) => {
-                    if k == "host" {
-                        has_host = true;
-                    }
                     source.tags.push((k, v))
                 }
                 StatsOption::Interval(interval) if interval >= self.min_interval => {
@@ -194,11 +195,6 @@ impl Collector {
                     source.module
                 ),
             }
-        }
-        if !has_host {
-            source
-                .tags
-                .push(("host", self.hostname.clone().unwrap_or_default()));
         }
         if source.interval > TICK_CYCLE {
             source.skip = ((60
@@ -232,6 +228,10 @@ impl Collector {
         self.remotes.lock().unwrap().replace(remotes);
     }
 
+    pub fn set_hostname(&self, hostname: String) {
+        *self.hostname.lock().unwrap() = hostname;
+    }
+
     fn new_statsd_client<A: ToSocketAddrs>(addr: A) -> MetricResult<StatsdClient> {
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         let sink = DropletSink::from(addr, socket)?;
@@ -252,6 +252,7 @@ impl Collector {
         let running = self.running.clone();
         let sources = self.sources.clone();
         let pre_hooks = self.pre_hooks.clone();
+        let hostname = self.hostname.clone();
         *self.thread.lock().unwrap() = Some(thread::spawn(move || {
             let mut statsd_clients = vec![];
             let mut old_remotes = vec![];
@@ -327,6 +328,7 @@ impl Collector {
                     }
 
                     debug!("collected: {:?}", batches);
+                    let host = hostname.lock().unwrap().clone();
                     for batch in batches.into_iter() {
                         for client in statsd_clients.iter() {
                             if client.is_none() {
@@ -338,8 +340,15 @@ impl Collector {
                                     format!("{}_{}", batch.module, point.0).replace("-", "_");
                                 // use counted for gauged fields for compatibility
                                 let mut b = client.count_with_tags(&metric_name, point.2);
+                                let mut has_host = false;
                                 for (k, v) in batch.tags.iter() {
+                                    if *k == "host" {
+                                        has_host = true;
+                                    }
                                     b = b.with_tag(&k, &v);
+                                }
+                                if !has_host {
+                                    b = b.with_tag("host", &host);
                                 }
                                 b.send();
                             }

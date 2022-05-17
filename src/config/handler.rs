@@ -1097,6 +1097,14 @@ impl ConfigHandler {
                     Err(e) => warn!("failed to set log_level: {}", e),
                 }
             }
+            if candidate_config.log.host != new_config.log.host {
+                fn stats_callback(handler: &ConfigHandler, components: &mut Components) {
+                    components
+                        .stats_collector
+                        .set_hostname(handler.candidate_config.log.host.clone());
+                }
+                callbacks.push(stats_callback);
+            }
             candidate_config.log = new_config.log;
             //TODO Rsyslog stuff
         }
