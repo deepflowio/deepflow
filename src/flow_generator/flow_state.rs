@@ -685,6 +685,7 @@ mod tests {
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
+    use crate::proto::common::TridentType;
     use crate::rpc::get_timestamp;
     use crate::utils::test::Capture;
 
@@ -715,7 +716,7 @@ mod tests {
 
     #[test]
     fn state_machine() {
-        let (mut flow_map, _) = _new_flow_map_and_receiver();
+        let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
         let mut flow_node = FlowNode {
             tagged_flow: TaggedFlow::default(),
             min_arrived_time: Duration::ZERO,
@@ -778,7 +779,8 @@ mod tests {
     }
 
     fn state_machine_helper<P: AsRef<Path>>(pcap_file: P, expect_close_type: CloseType) {
-        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
 
         let capture = Capture::load_pcap(pcap_file, None);
         let packets = capture.as_meta_packets();
