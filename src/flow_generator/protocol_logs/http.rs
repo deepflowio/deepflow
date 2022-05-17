@@ -1,8 +1,6 @@
 use std::str;
 
 use arc_swap::access::Access;
-use bytes::Bytes;
-use httpbis::for_test::hpack;
 use log::info;
 
 use super::LogMessageType;
@@ -14,6 +12,7 @@ use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::utils::bytes::read_u32_be;
+use crate::utils::net::h2pack;
 
 #[derive(Debug, Default, Clone)]
 pub struct HttpInfo {
@@ -295,13 +294,11 @@ impl HttpLog {
                 }
 
                 let header_frame_payload = &frame_payload[..httpv2_header.frame_length as usize];
-                let mut decoder = hpack::decoder::Decoder::new();
-                let header_list = decoder
-                    .decode(Bytes::copy_from_slice(header_frame_payload.as_ref()))
-                    .unwrap_or_default();
+                let mut parser = h2pack::parser::Parser::new();
+                let header_list = parser.parse(header_frame_payload).unwrap();
 
                 for header in header_list.iter() {
-                    match header.0.as_ref() {
+                    match header.0.as_slice() {
                         b":method" => {
                             self.msg_type = LogMessageType::Request;
                             self.info.method =
