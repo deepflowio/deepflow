@@ -179,7 +179,7 @@ impl Trident {
                         let mut comp = Components::new(
                             &config_handler,
                             &new_config, //FIXME: 旧runtime config, 以后去掉
-                            &stats_collector,
+                            stats_collector.clone(),
                             &session,
                             &synchronizer,
                             policy_getter,
@@ -198,7 +198,7 @@ impl Trident {
                     let mut comp = Components::new(
                         &config_handler,
                         &new_config,
-                        &stats_collector,
+                        stats_collector.clone(),
                         &session,
                         &synchronizer,
                         policy_getter,
@@ -288,6 +288,7 @@ pub struct Components {
     pub guard: Guard,
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
+    pub stats_collector: Arc<stats::Collector>,
 }
 
 impl Components {
@@ -330,7 +331,7 @@ impl Components {
     fn new(
         config_handler: &ConfigHandler,
         runtime_config: &RuntimeConfig,
-        stats_collector: &Arc<stats::Collector>,
+        stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         policy_getter: PolicyGetter,
@@ -595,7 +596,7 @@ impl Components {
             // create and start collector
             let collector = Self::new_collector(
                 i,
-                stats_collector,
+                &stats_collector,
                 flow_receiver,
                 l4_flow_aggr_sender.clone(),
                 metrics_sender.clone(),
@@ -642,6 +643,7 @@ impl Components {
             log_parsers,
             guard,
             ebpf_collector,
+            stats_collector,
             running: AtomicBool::new(false),
         })
     }
