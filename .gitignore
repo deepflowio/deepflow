@@ -23,3 +23,4 @@ src/ebpf/samples/rust/target/*
 src/ebpf/llvm-clang-11.0.0-2.el7.x86_64.rpm
 
 .rpmbuild/
+actual.txt
