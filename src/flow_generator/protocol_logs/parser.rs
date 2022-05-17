@@ -173,7 +173,7 @@ impl RefCountable for SessionAggrCounter {
             (
                 "cached",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.cached.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.cached.load(Ordering::Relaxed)),
             ),
             (
                 "throttle-drop",
