@@ -40,7 +40,7 @@ use crate::{
     },
     utils::{
         net::{Link, MacAddr},
-        queue::Sender,
+        queue::DebugSender,
         stats::{self, Collector},
         LeakyBucket,
     },
@@ -289,8 +289,8 @@ pub struct DispatcherBuilder {
     tap_typer: Option<Arc<TapTyper>>,
     analyzer_dedup_disabled: Option<bool>,
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
-    flow_output_queue: Option<Sender<TaggedFlow>>,
-    log_output_queue: Option<Sender<MetaAppProto>>,
+    flow_output_queue: Option<DebugSender<TaggedFlow>>,
+    log_output_queue: Option<DebugSender<MetaAppProto>>,
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
     policy_getter: Option<PolicyGetter>,
@@ -357,12 +357,12 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn flow_output_queue(mut self, v: Sender<TaggedFlow>) -> Self {
+    pub fn flow_output_queue(mut self, v: DebugSender<TaggedFlow>) -> Self {
         self.flow_output_queue = Some(v);
         self
     }
 
-    pub fn log_output_queue(mut self, v: Sender<MetaAppProto>) -> Self {
+    pub fn log_output_queue(mut self, v: DebugSender<MetaAppProto>) -> Self {
         self.log_output_queue = Some(v);
         self
     }

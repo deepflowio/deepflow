@@ -30,7 +30,7 @@ use crate::metric::meter::{
 use crate::rpc::get_timestamp;
 use crate::utils::{
     possible_host::PossibleHost,
-    queue::{Error, Receiver, Sender},
+    queue::{DebugSender, Error, Receiver},
     stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 
@@ -256,7 +256,7 @@ fn round_to_minute(t: Duration) -> Duration {
 struct SubQuadGen {
     id: usize,
 
-    output: Sender<AccumulatedFlow>,
+    output: DebugSender<AccumulatedFlow>,
 
     counter: QgCounter,
     metrics_type: MetricsType,
@@ -538,9 +538,9 @@ impl SubQuadGen {
 pub struct QuadrupleGeneratorThread {
     id: usize,
     input: Arc<Receiver<TaggedFlow>>,
-    second_output: Sender<AccumulatedFlow>,
-    minute_output: Sender<AccumulatedFlow>,
-    flow_output: Option<Sender<Arc<TaggedFlow>>>,
+    second_output: DebugSender<AccumulatedFlow>,
+    minute_output: DebugSender<AccumulatedFlow>,
+    flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
     connection_lru_capacity: usize,
     metrics_type: MetricsType,
     second_delay_seconds: u64,
@@ -559,9 +559,9 @@ impl QuadrupleGeneratorThread {
     pub fn new(
         id: usize,
         input: Receiver<TaggedFlow>,
-        second_output: Sender<AccumulatedFlow>,
-        minute_output: Sender<AccumulatedFlow>,
-        flow_output: Option<Sender<Arc<TaggedFlow>>>,
+        second_output: DebugSender<AccumulatedFlow>,
+        minute_output: DebugSender<AccumulatedFlow>,
+        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -661,7 +661,7 @@ pub struct QuadrupleGenerator {
     policy_ids: [U16Set; 2],
     flow_meter: FlowMeter,
     app_meter: Option<AppMeter>,
-    output_flow: Option<Sender<Arc<TaggedFlow>>>,
+    output_flow: Option<DebugSender<Arc<TaggedFlow>>>,
 
     l7_metrics_enabled: Arc<AtomicBool>,
     vtap_flow_1s_enabled: Arc<AtomicBool>,
@@ -673,9 +673,9 @@ impl QuadrupleGenerator {
     pub fn new(
         id: usize,
         input: Arc<Receiver<TaggedFlow>>,
-        second_output: Sender<AccumulatedFlow>,
-        minute_output: Sender<AccumulatedFlow>,
-        flow_output: Option<Sender<Arc<TaggedFlow>>>,
+        second_output: DebugSender<AccumulatedFlow>,
+        minute_output: DebugSender<AccumulatedFlow>,
+        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -1097,6 +1097,7 @@ mod test {
 
     use super::*;
 
+    use crate::debug::QueueDebugger;
     use crate::utils::queue;
 
     fn new_acc_flow(tagged_flow: Arc<TaggedFlow>) -> AccumulatedFlow {
@@ -1119,7 +1120,8 @@ mod test {
     fn second_inject_flow() {
         let window_start =
             round_to_minute(get_timestamp()) - Duration::from_secs(2 * SECONDS_IN_MINUTE);
-        let (s, r, _) = queue::bounded(100);
+        let queue_debugger = QueueDebugger::new();
+        let (s, r, _) = queue::bounded_with_debug(100, "", &queue_debugger);
         let slots = 30u64;
         let mut quad_gen = SubQuadGen {
             id: 0,

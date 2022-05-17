@@ -34,6 +34,12 @@ impl fmt::Display for AccumulatedFlow {
     }
 }
 
+impl fmt::Debug for AccumulatedFlow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
 impl AccumulatedFlow {
     pub fn merge(
         &mut self,

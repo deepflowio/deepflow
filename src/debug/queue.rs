@@ -44,7 +44,7 @@ pub struct QueueDebugger {
 }
 
 impl QueueDebugger {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             queues: Mutex::new(HashMap::new()),
             threads: Mutex::new(HashMap::new()),
