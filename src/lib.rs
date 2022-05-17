@@ -38,6 +38,7 @@ pub use {
     },
     flow_generator::perf::FlowPerfCounter as _FlowPerfCounter,
     policy::labeler::Labeler as _Labeler,
+    proto::common::TridentType as _TridentType,
     utils::net::MacAddr as _MacAddr,
     utils::{leaky_bucket::LeakyBucket as _LeakyBucket, queue::bounded as _queue_bounded},
 };
