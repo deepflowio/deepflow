@@ -520,6 +520,7 @@ fn queue_name_validator(s: &str) -> Result<(), &'static str> {
         | "2-flow-with-meter-to-minute-collector"
         | "2-second-flow-to-minute-aggrer"
         | "2-doc-to-collector-sender"
+        | "3-protolog-to-collector-sender"
         | "3-flow-to-collector-sender" => Ok(()),
         _ => Err("invalid queue name"),
     }
