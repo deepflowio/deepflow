@@ -434,9 +434,9 @@ impl Stash {
     // 非活跃的服务并且是SFlow，NetFlow的数据，忽略服务端口
     // 非TCP/UDP的流量时，忽略服务端
     fn ignore_server_port(flow: &Flow, inactive_server_port_enabled: bool) -> bool {
-        if !flow.is_active_service
-            && (!inactive_server_port_enabled || flow.flow_source != FlowSource::Normal)
-            || flow.flow_key.proto != IpProtocol::Tcp && flow.flow_key.proto != IpProtocol::Udp
+        if (!flow.is_active_service
+            && (!inactive_server_port_enabled || flow.flow_source != FlowSource::Normal))
+            || (flow.flow_key.proto != IpProtocol::Tcp && flow.flow_key.proto != IpProtocol::Udp)
         {
             return true;
         }
