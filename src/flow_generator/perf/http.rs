@@ -92,7 +92,6 @@ impl L7FlowPerf for HttpPerfData {
             return Ok(());
         }
 
-        self.session_data.l7_proto = L7Protocol::Unknown;
         Err(Error::HttpHeaderParseFailed)
     }
 
