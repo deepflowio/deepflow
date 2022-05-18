@@ -1195,6 +1195,7 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
 // 对应 flow_generator_test.go
 #[cfg(test)]
 mod tests {
+    use std::{ops::Add, time};
 
     use crate::{
         common::{
@@ -1203,7 +1204,7 @@ mod tests {
             policy::{NpbAction, NpbTunnelType, PolicyData, TapSide},
             tap_port::TapPort,
         },
-        utils::net::MacAddr,
+        utils::{net::MacAddr, test::Capture},
     };
 
     use super::*;
@@ -1575,5 +1576,40 @@ mod tests {
         if let Ok(tagged_flow) = output_queue_receiver.recv(Some(TIME_UNIT)) {
             assert_eq!(tagged_flow.flow.close_type, CloseType::ClientHalfClose);
         }
+    }
+
+    #[test]
+    fn l3_l4_payload() {
+        let (mut flow_map, output_queue_receiver) = _new_flow_map_and_receiver();
+
+        let capture = Capture::load_pcap("resources/test/flow_generator/ip-fragment.pcap", None);
+        let packets = capture.as_meta_packets();
+
+        let dst_mac = packets[0].lookup_key.dst_mac;
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .unwrap();
+        for mut packet in packets {
+            packet.lookup_key.timestamp = timestamp;
+            packet.direction = if packet.lookup_key.dst_mac == dst_mac {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            flow_map.inject_meta_packet(packet);
+        }
+
+        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(120)));
+
+        let flow_1 = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+        let flow_2 = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+
+        let l3_payload = flow_1.flow.flow_metrics_peers[0].l3_byte_count
+            + flow_2.flow.flow_metrics_peers[0].l3_byte_count;
+        let l4_payload = flow_1.flow.flow_metrics_peers[0].l4_byte_count
+            + flow_2.flow.flow_metrics_peers[0].l4_byte_count;
+
+        assert_eq!(l3_payload, 3008 * 6);
+        assert_eq!(l4_payload, 3000 * 6);
     }
 }
