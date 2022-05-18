@@ -4,6 +4,31 @@
 #include "common.h"
 #include "socket_trace.h"
 
+static __inline bool is_same_command(char *a, char *b)
+{
+	static const int KERNEL_COMM_MAX = 16;
+	for (int idx = 0; idx < KERNEL_COMM_MAX; ++idx) {
+		if (a[idx] == '\0' && a[idx] == b[idx])
+			return true;
+
+		if (a[idx] != b[idx])
+			return false;
+	}
+	// 16个字符都相同,并且没有遇到'\0',理论上不应该执行到这里
+	return true;
+}
+
+static __inline bool is_current_comm(char *comm)
+{
+	static const int KERNEL_COMM_MAX = 16;
+	char current_comm[KERNEL_COMM_MAX];
+
+	if (bpf_get_current_comm(&current_comm, sizeof(current_comm)))
+		return false;
+
+	return is_same_command(comm, current_comm);
+}
+
 static __inline bool is_socket_info_valid(struct socket_info_t *sk_info)
 {
 	return (sk_info != NULL && sk_info->uid != 0);
@@ -429,35 +454,32 @@ static __inline enum message_type infer_redis_message(const char *buf,
 
 	const char first_byte = buf[0];
 
-	if (	   // 对于简单字符串，回复的第一个字节是“+”
-		   first_byte != '+' &&
-		   // 对于错误，回复的第一个字节是“-”
-		   first_byte != '-' &&
-		   // 对于整数，回复的第一个字节是“：”
-		   first_byte != ':' &&
-		   // 对于批量字符串，回复的第一个字节是“$”
-		   first_byte != '$' &&
-		   // 对于数组，回复的第一个字节是“ *”
-		   first_byte != '*') {
+	// 第一个字节仅可能是 '+' '-' ':' '$' '*'
+	if (first_byte != '+' && first_byte != '-' && first_byte != ':' &&
+	    first_byte != '$' && first_byte != '*')
 		return MSG_UNKNOWN;
-	}
 
-	if (first_byte == '*') {
-		if (is_include_crlf(buf))
-			return MSG_REQUEST;
-	} else {
-		//-ERR unknown command 'foobar'
-		//-WRONGTYPE Operation against a key holding the wrong kind of value
-		if (first_byte == '-') {
-			if ((buf[1] != 'E' && buf[1] != 'W') || buf[2] != 'R')
-				return MSG_UNKNOWN;
-			else
-				return MSG_RESPONSE;
-		} else {
-			if (is_include_crlf(buf))
-				return MSG_RESPONSE;
-		}
+	// redis 中必须包含 crlf
+	if (!is_include_crlf(buf))
+		return MSG_UNKNOWN;
+
+	//-ERR unknown command 'foobar'
+	//-WRONGTYPE Operation against a key holding the wrong kind of value
+	if (first_byte == '-' && ((buf[1] != 'E' && buf[1] != 'W') || buf[2] != 'R'))
+		return MSG_UNKNOWN;
+
+	// 此时开始认为一定是 Redis 协议,开始判定请求响应.
+	// 请求的第一个字符一定是 '*',否则是响应
+	if (first_byte != '*') {
+		return MSG_RESPONSE;
 	}
+	// 由于 Redis 的 "多条批量回复" 类型的响应与请求类型格式一模一样,用协议无法区分请求响应
+	// 此时根据进程名和流量方向进行区分,当进程名为 "redis-server" 时入站为请求出站为响应,
+	// 非 "redis-server" 处理方式相反.
+	if (is_current_comm("redis-server")) 
+		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
+	else 
+		return conn_info->direction == T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
 
 	return MSG_UNKNOWN;
 }
@@ -768,20 +790,6 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 	// kafka长连接的形式存在，数据开始捕获从类型推断完成开始进行。
 	// 此处数据（用于确认协议类型）丢弃不要，避免发给用户产生混乱。
 	return MSG_UNKNOWN;
-}
-
-static __inline bool is_same_command(char *a, char *b)
-{
-	const int KERNEL_COMM_MAX = 16;
-	for (int idx = 0; idx < KERNEL_COMM_MAX; ++idx) {
-		if (a[idx] == '\0' && a[idx] == b[idx])
-			return true;
-
-		if (a[idx] != b[idx])
-			return false;
-	}
-	// 16个字符都相同,并且没有遇到'\0',理论上不应该执行到这里
-	return true;
 }
 
 static __inline bool drop_msg_by_comm(void)
