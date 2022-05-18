@@ -221,22 +221,40 @@ impl RefCountable for SysStatusBroker {
     }
 }
 
+struct SysLoad(Arc<Mutex<System>>);
+
+impl RefCountable for SysLoad {
+    fn get_counters(&self) -> Vec<Counter> {
+        let mut sys = self.0.lock().unwrap();
+        sys.refresh_cpu();
+        vec![(
+            "load1",
+            CounterType::Gauged,
+            CounterValue::Float(sys.load_average().one),
+        )]
+    }
+}
+
 pub struct Monitor {
     stats: Arc<Collector>,
     running: AtomicBool,
     sys_monitor: Arc<SysStatusBroker>,
+    sys_load: Arc<SysLoad>,
     link_map: Arc<Mutex<HashMap<String, Arc<LinkStatusBroker>>>>,
     system: Arc<Mutex<System>>,
 }
 
 impl Monitor {
     pub fn new(stats: Arc<Collector>) -> Result<Self> {
-        let system = Arc::new(Mutex::new(System::new()));
+        let mut system = System::new();
+        system.refresh_cpu();
+        let system = Arc::new(Mutex::new(system));
 
         Ok(Self {
             stats,
             running: AtomicBool::new(false),
             sys_monitor: Arc::new(SysStatusBroker::new(system.clone())?),
+            sys_load: Arc::new(SysLoad(system.clone())),
             link_map: Arc::new(Mutex::new(HashMap::new())),
             system,
         })
@@ -323,6 +341,12 @@ impl Monitor {
         self.stats.register_countable(
             "monitor",
             Countable::Ref(Arc::downgrade(&self.sys_monitor) as Weak<dyn RefCountable>),
+            vec![],
+        );
+
+        self.stats.register_countable(
+            "system",
+            Countable::Ref(Arc::downgrade(&self.sys_load) as Weak<dyn RefCountable>),
             vec![],
         );
 
