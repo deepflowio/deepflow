@@ -63,10 +63,6 @@ impl fmt::Debug for DnsPerfData {
 
 impl L7FlowPerf for DnsPerfData {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
-        if packet.lookup_key.proto != IpProtocol::Tcp {
-            return Err(Error::InvalidIpProtocol);
-        }
-
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
 
         match packet.lookup_key.proto {
