@@ -542,19 +542,21 @@ impl<'a> MetaPacket<'a> {
                     return Ok(());
                 }
                 self.l2_l3_opt_size = vlan_tag_size + l3_opt_size as usize;
-                self.l3_payload_len = size_checker as usize;
+                self.l3_payload_len = self.packet_len - (packet.len() - size_checker as usize);
 
-                if read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]) & 0xFFF != 0 {
-                    // fragment
-                    self.header_type = HeaderType::Ipv4;
-                    self.npb_ignore_l4 = true;
-                    return Ok(());
-                }
                 ip_protocol = IpProtocol::try_from(packet[IPV4_PROTO_OFFSET + vlan_tag_size])
                     .map_err(|e| {
                         error::Error::ParsePacketFailed(format!("parse ip_protocol failed: {}", e))
                     })?;
                 self.lookup_key.proto = ip_protocol;
+
+                if read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]) & 0xFFF != 0 {
+                    // fragment
+                    self.header_type = HeaderType::Ipv4;
+                    self.npb_ignore_l4 = true;
+                    self.l4_payload_len = self.l3_payload_len;
+                    return Ok(());
+                }
             }
             _ => return Ok(()),
         }
@@ -713,16 +715,6 @@ impl<'a> MetaPacket<'a> {
             // 的，m.PacketLen在最后使用originalLength校准，但不会修改PayloadLen，不影响
             // RTT计算。
             self.packet_len = original_length;
-        }
-        if self.l3_payload_len > 0
-            && self.l3_payload_len
-                + HeaderType::Ipv4.min_packet_size()
-                + self.l2_l3_opt_size
-                + PACKET_MAX_PADDING
-                < original_length
-        {
-            // L3PayloadLen是使用len(packet)计算的，在配置CapturePacketSize或ip.total_len不对时这里需要修正
-            self.l3_payload_len += original_length - packet.len();
         }
         Ok(())
     }
