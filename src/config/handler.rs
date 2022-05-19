@@ -1131,7 +1131,6 @@ impl ConfigHandler {
                     .set_threshold(new_config.log.log_threshold);
             }
             candidate_config.log = new_config.log;
-            //TODO Rsyslog stuff
         }
 
         if candidate_config.debug != new_config.debug {
