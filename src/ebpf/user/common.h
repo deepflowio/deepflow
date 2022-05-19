@@ -9,6 +9,7 @@
 #define TIME_TYPE_NAN   1
 #define TIME_TYPE_SEC   0
 
+#define KPROBE_EVENTS_FILE "/sys/kernel/debug/tracing/kprobe_events"
 #ifndef NELEMS
 #define NELEMS(a) (sizeof(a) / sizeof((a)[0]))
 #endif
@@ -266,12 +267,10 @@ is_power_of_2(uint32_t n)
 }
 
 bool is_core_kernel(void);
-int get_cpus_count(void);
-uint64_t fetch_sys_boot_secs(void);
+int get_cpus_count(bool **mask);
 void clear_residual_probes();
 int max_locked_memory_set_unlimited(void);
 int sysfs_write(char *file_name, char *v);
-int fetch_command_value(const char *cmd, char *buf, int buf_len);
 uint64_t gettime(clockid_t clk_id, int flag);
 uint32_t get_sys_uptime(void);
 #endif /* __COMMON_H__ */

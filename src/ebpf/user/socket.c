@@ -21,10 +21,6 @@
 #define MAP_TRACE_STATS_NAME		"__trace_stats_map"
 #define MAP_REAL_TIME_DIFF_NAME		"__real_time_diff_map"
 
-#ifdef WORKER_PERF_TEST
-extern volatile int worker_delay;
-#endif
-
 // 在socket map回收时，对每条socket信息超过10秒没有收发动作就回收掉
 #define SOCKET_RECLAIM_TIMEOUT_DEF  10
 // 在trace map回收时，对每条trace信息超过10秒没有发生匹配动作就回收掉
@@ -33,6 +29,8 @@ static uint64_t socket_map_reclaim_count; // socket map回收数量统计
 static uint64_t trace_map_reclaim_count;  // trace map回收数量统计
 
 extern int sys_cpus_count;
+extern bool *cpu_online;
+
 static int infer_socktrace_fd;
 static uint32_t conf_max_socket_entries;
 static uint32_t conf_max_trace_entries;
@@ -105,7 +103,11 @@ static int kernel_offset_infer_server(void)
 	struct sockaddr_in client_addr;
 	socklen_t addr_len = sizeof(client_addr);
 	memset(&client_addr, 0, sizeof(struct sockaddr_in));
-	int client_count = 0;
+	int client_count = 0, cpu_online_count = 0, i;
+	for (i = 0; i < sys_cpus_count; i++) {
+		if (cpu_online[i])
+			cpu_online_count++;
+	}
 
 next_cpu_client:
 	cli_fd =
@@ -140,7 +142,7 @@ next_cpu_client:
 		}
 	}
 
-	if (client_count < sys_cpus_count)
+	if (client_count < cpu_online_count)
 		goto next_cpu_client;
 
 	close(infer_socktrace_fd);
@@ -249,22 +251,6 @@ static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 	return true;
 }
 
-#ifdef WORKER_PERF_TEST
-static int get_worker_delay(void)
-{
-	int delay = -1;		// 时间单位us
-	char delay_str[64];
-	if (fetch_command_value("cat /var/run/worker-delay",
-				delay_str, sizeof(delay_str)) != 0)
-		return -1;
-
-	if (sscanf(delay_str, "%d", &delay) != 1)
-		return -1;
-
-	return delay;
-}
-#endif
-
 static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 				 void **out, size_t * outsize)
 {
@@ -299,9 +285,6 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		free(*out);
 		return -1;
 	}
-#ifdef WORKER_PERF_TEST
-	worker_delay = get_worker_delay();
-#endif
 
 	return 0;
 }
@@ -354,10 +337,10 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	 *         |                /\
 	 *         |                *
 	 * --------------------|    *
-	 *      mem_block_head |    *    
+	 *      mem_block_head |    *
 	 *      >is_last-------|    *   is_last 判断是否是内存块中最后一个socket data,
 	 *      >*free_ptr     | ****   如果是释放整个内存。
-	 *      ---------------|----> burst enqueue 
+	 *      ---------------|----> burst enqueue
 	 *                     |
 	 *      socket_data    |
 	 *                     |
@@ -634,7 +617,7 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	tracer->state = TRACER_INIT;
 	tracer->adapt_success = false;
- 
+
 	/*
 	 * config perf ring-buffer reader callbak
 	 */
@@ -796,6 +779,8 @@ static bool is_adapt_success(struct bpf_tracer *t)
 
 		offset = (struct bpf_offset_param *)(array + 1);
 		for (i = 0; i < sys_cpus_count; i++) {
+			if (!cpu_online[i])
+				continue;
 			if (offset[i].ready != 1) {
 				is_success = false;
 				break;
@@ -1107,14 +1092,14 @@ void print_mysql_info(const char *data, uint32_t len, uint8_t dir)
 #define SOCK_DIR_SND_RES	1
 #define SOCK_DIR_RCV_REQ	2
 #define SOCK_DIR_RCV_RES	3
-/*
-MySQL Protocol
-    Packet Length: 33
-    Packet Number: 0
-    Request Command Query
-  Command: Query (3)
-  Statement: select user,host from mysql.user
-*/
+	/*
+	 * MySQL Protocol
+	 *    Packet Length: 33
+	 *    Packet Number: 0
+	 *    Request Command Query
+	 *  Command: Query (3)
+	 *  Statement: select user,host from mysql.user
+	 */
 	int i;
 	for (i = 0; i < len; i++)
 		printf("%c", data[i]);
