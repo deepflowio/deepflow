@@ -267,7 +267,7 @@ impl FlowMap {
         let timestamp = meta_packet.lookup_key.timestamp;
         let flow_closed = self.update_tcp_flow(&mut meta_packet, &mut node);
         if self.config.load().collector_enabled {
-            let direction = meta_packet.direction == PacketDirection::ServerToClient;
+            let direction = meta_packet.direction == PacketDirection::ClientToServer;
             self.collect_metric(&mut node, &meta_packet, direction);
         }
         if flow_closed {
@@ -294,7 +294,11 @@ impl FlowMap {
         }
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         if self.config.load().collector_enabled {
-            self.collect_metric(&mut node, &meta_packet, false);
+            self.collect_metric(
+                &mut node,
+                &meta_packet,
+                meta_packet.direction == PacketDirection::ClientToServer,
+            );
         }
 
         node_map.insert(pkt_key, node);
@@ -663,7 +667,7 @@ impl FlowMap {
 
     fn new_tcp_node(&mut self, mut meta_packet: MetaPacket, total_flow: usize) -> FlowNode {
         let mut node = self.init_flow(&mut meta_packet, total_flow);
-        self.update_l4_direction(&mut meta_packet, &mut node, true);
+        let reverse = self.update_l4_direction(&mut meta_packet, &mut node, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
@@ -676,9 +680,7 @@ impl FlowMap {
         self.update_syn_or_syn_ack_seq(&mut node, &mut meta_packet);
 
         if self.config.load().collector_enabled {
-            let direction = node.tagged_flow.flow.reversed
-                == (meta_packet.direction == PacketDirection::ServerToClient);
-            self.collect_metric(&mut node, &meta_packet, direction);
+            self.collect_metric(&mut node, &meta_packet, !reverse);
         }
         node
     }
@@ -721,10 +723,10 @@ impl FlowMap {
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = self.config.load().flow_timeout.opening;
-        self.update_l4_direction(&mut meta_packet, &mut node, true);
+        let reverse = self.update_l4_direction(&mut meta_packet, &mut node, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         if self.config.load().collector_enabled {
-            self.collect_metric(&mut node, &meta_packet, false);
+            self.collect_metric(&mut node, &meta_packet, !reverse);
         }
         node
     }
@@ -917,7 +919,7 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
         node: &mut FlowNode,
         is_first_packet: bool,
-    ) {
+    ) -> bool {
         let lookup_key = &meta_packet.lookup_key;
         let src_key = ServiceKey::new(
             lookup_key.src_ip,
@@ -946,14 +948,17 @@ impl FlowMap {
             mem::swap(&mut src_score, &mut dst_score);
         }
 
+        let mut reverse = false;
         if !ServiceTable::is_client_to_server(src_score, dst_score) {
             mem::swap(&mut src_score, &mut dst_score);
 
             Self::reverse_flow(node);
             meta_packet.direction = meta_packet.direction.reversed();
+            reverse = true;
         }
 
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
+        return reverse;
     }
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
@@ -1585,5 +1590,35 @@ mod tests {
 
         assert_eq!(l3_payload, 3008 * 6);
         assert_eq!(l4_payload, 3000 * 6);
+    }
+
+    #[test]
+    fn tcp_perf() {
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
+
+        let capture = Capture::load_pcap("resources/test/flow_generator/http.pcap", None);
+        let packets = capture.as_meta_packets();
+
+        let dst_mac = packets[0].lookup_key.dst_mac;
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .unwrap();
+        for mut packet in packets {
+            packet.direction = if packet.lookup_key.dst_mac == dst_mac {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            flow_map.inject_meta_packet(packet);
+        }
+
+        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(120)));
+
+        let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+        let perf_stats = &tagged_flow.flow.flow_perf_stats.unwrap().tcp;
+        assert_eq!(perf_stats.rtt_client_max, 114);
+        assert_eq!(perf_stats.rtt_server_max, 44);
+        assert_eq!(perf_stats.srt_max, 12);
     }
 }
