@@ -1,3 +1,4 @@
+use std::env;
 use std::mem;
 use std::path::Path;
 use std::process;
@@ -14,6 +15,7 @@ use flexi_logger::{
 };
 use log::{info, warn};
 
+use crate::common::DropletMessageType;
 use crate::debug::QueueDebugger;
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
@@ -26,7 +28,7 @@ use crate::{
     },
     common::{
         enums::TapType, platform_data::PlatformData, tagged_flow::TaggedFlow, tap_types::TapTyper,
-        FREE_SPACE_REQUIREMENT,
+        DROPLET_PORT, FREE_SPACE_REQUIREMENT,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig},
@@ -49,6 +51,7 @@ use crate::{
             check, controller_ip_check, free_memory_checker, free_space_checker, kernel_check,
             trident_process_check,
         },
+        logger::{RemoteLogConfig, RemoteLogWriter},
         net::{get_route_src_ip_and_mac, links_by_name_regex},
         queue,
         stats::{self, Countable, RefCountable, StatsOption},
@@ -86,10 +89,25 @@ impl Trident {
         let state_thread = state.clone();
 
         let config = Config::load_from_file(config_path)?;
+        let base_name = Path::new(&env::args().next().unwrap())
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let (remote_log_writer, remote_log_config) = RemoteLogWriter::new(
+            &config.controller_ips,
+            DROPLET_PORT,
+            base_name,
+            vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
+        );
 
         let mut logger = Logger::try_with_str(config.log_level.as_str().to_lowercase())?
             .format(colored_opt_format)
-            .log_to_file(FileSpec::try_from(&config.log_file)?)
+            .log_to_file_and_writer(
+                FileSpec::try_from(&config.log_file)?,
+                Box::new(remote_log_writer),
+            )
             .rotate(Criterion::Age(Age::Day), Naming::Timestamps, Cleanup::Never)
             .create_symlink(&config.log_file)
             .append();
@@ -100,7 +118,13 @@ impl Trident {
 
         info!("static_config {:#?}", config);
         let handle = Some(thread::spawn(move || {
-            if let Err(e) = Self::run(state_thread, config, revision, logger_handle) {
+            if let Err(e) = Self::run(
+                state_thread,
+                config,
+                revision,
+                logger_handle,
+                remote_log_config,
+            ) {
                 warn!("trident exited: {}", e);
                 process::exit(1);
             }
@@ -114,6 +138,7 @@ impl Trident {
         config: Config,
         revision: String,
         logger_handle: LoggerHandle,
+        remote_log_config: RemoteLogConfig,
     ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
@@ -138,7 +163,8 @@ impl Trident {
             false,
         );
 
-        let mut config_handler = ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle);
+        let mut config_handler =
+            ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle, remote_log_config);
 
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),

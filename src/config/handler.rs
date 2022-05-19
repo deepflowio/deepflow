@@ -32,6 +32,7 @@ use crate::{
     },
     trident::Components,
     utils::environment::is_tt_pod,
+    utils::logger::RemoteLogConfig,
     utils::net::{get_route_src_ip, MacAddr},
 };
 
@@ -634,6 +635,7 @@ pub struct ConfigHandler {
     pub ctrl_ip: IpAddr,
     pub ctrl_mac: MacAddr,
     pub logger_handle: LoggerHandle,
+    pub remote_log_config: RemoteLogConfig,
     // need update
     pub candidate_config: NewRuntimeConfig,
     pub current_config: Arc<ArcSwap<NewRuntimeConfig>>,
@@ -645,6 +647,7 @@ impl ConfigHandler {
         ctrl_ip: IpAddr,
         ctrl_mac: MacAddr,
         logger_handle: LoggerHandle,
+        remote_log_config: RemoteLogConfig,
     ) -> Self {
         let candidate_config = NewRuntimeConfig::default();
 
@@ -657,6 +660,7 @@ impl ConfigHandler {
             candidate_config,
             current_config,
             logger_handle,
+            remote_log_config,
         }
     }
 
@@ -1090,6 +1094,15 @@ impl ConfigHandler {
         }
 
         if candidate_config.log != new_config.log {
+            if candidate_config.log.rsyslog_enabled != new_config.log.rsyslog_enabled {
+                if new_config.log.rsyslog_enabled {
+                    info!("Enable rsyslog");
+                } else {
+                    info!("Disable rsyslog");
+                }
+                self.remote_log_config
+                    .set_enabled(new_config.log.rsyslog_enabled);
+            }
             if candidate_config.log.log_level != new_config.log.log_level {
                 match self
                     .logger_handle
@@ -1103,12 +1116,19 @@ impl ConfigHandler {
                 }
             }
             if candidate_config.log.host != new_config.log.host {
+                self.remote_log_config
+                    .set_hostname(new_config.log.host.clone());
                 fn stats_callback(handler: &ConfigHandler, components: &mut Components) {
                     components
                         .stats_collector
                         .set_hostname(handler.candidate_config.log.host.clone());
                 }
                 callbacks.push(stats_callback);
+            }
+            if candidate_config.log.log_threshold != new_config.log.log_threshold {
+                info!("LogThreshold set to {}", new_config.log.log_threshold);
+                self.remote_log_config
+                    .set_threshold(new_config.log.log_threshold);
             }
             candidate_config.log = new_config.log;
             //TODO Rsyslog stuff
