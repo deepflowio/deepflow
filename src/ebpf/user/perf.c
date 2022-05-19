@@ -15,6 +15,7 @@
  */
 
 #include "perf.h"
+#include "log.h"
 
 extern int ioctl(int fd, unsigned long request, ...);
 
@@ -49,17 +50,12 @@ static void perf_reader_set_fd(struct perf_reader *reader, int fd)
 	reader->fd = fd;
 }
 
-//static int perf_reader_fd(struct perf_reader *reader)
-//{
-//      return reader->fd;
-//}
-
 static int perf_reader_mmap(struct perf_reader *reader)
 {
 	int mmap_size = reader->page_size * (reader->page_cnt + 1);
 
 	if (reader->fd < 0) {
-		fprintf(stderr, "%s: reader fd is not set\n", __FUNCTION__);
+		ebpf_info("%s: reader fd is not set\n", __FUNCTION__);
 		return -1;
 	}
 
@@ -104,10 +100,9 @@ void *bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
 	int pfd;
 	struct perf_event_attr attr = {};
 	struct perf_reader *reader = NULL;
-//      printf("%s cpu %d page_cnt %d pid %d\n", __func__, cpu, page_cnt, pid);
 	reader = perf_reader_new(raw_cb, lost_cb, cb_cookie, page_cnt);
 	if (!reader) {
-		printf("perf_reader_mmap error\n");
+		ebpf_info("perf_reader_mmap error\n");
 		goto error;
 	}
 
@@ -120,9 +115,7 @@ void *bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
 	    syscall(__NR_perf_event_open, &attr, pid, cpu, -1,
 		    PERF_FLAG_FD_CLOEXEC);
 	if (pfd < 0) {
-		fprintf(stderr, "perf_event_open: %s\n", strerror(errno));
-		fprintf(stderr,
-			"   (check your kernel for PERF_COUNT_SW_BPF_OUTPUT support, 4.4 or newer)\n");
+		ebpf_info("perf_event_open: %s\n", strerror(errno));
 		goto error;
 	}
 	perf_reader_set_fd(reader, pfd);
@@ -156,19 +149,19 @@ static void parse_sw(struct perf_reader *reader, void *data, int size)
 
 	ptr += sizeof(*header);
 	if (ptr > (uint8_t *) data + size) {
-		fprintf(stderr, "%s: corrupt sample header\n", __FUNCTION__);
+		ebpf_info("%s: corrupt sample header\n", __FUNCTION__);
 		return;
 	}
 
 	raw = (void *)ptr;
 	ptr += sizeof(raw->size) + raw->size;
 	if (ptr > (uint8_t *) data + size) {
-		fprintf(stderr, "%s: corrupt raw sample\n", __FUNCTION__);
+		ebpf_info("%s: corrupt raw sample\n", __FUNCTION__);
 		return;
 	}
 	// sanity check
 	if (ptr != (uint8_t *) data + size) {
-		fprintf(stderr, "%s: extra data at end of sample\n",
+		ebpf_info("%s: extra data at end of sample\n",
 			__FUNCTION__);
 		return;
 	}
@@ -237,14 +230,13 @@ static void perf_reader_event_read(struct perf_reader *reader)
 			if (reader->lost_cb) {
 				reader->lost_cb(reader->cb_cookie, lost);
 			} else {
-				fprintf(stderr,
-					"Possibly lost %" PRIu64 " samples\n",
-					lost);
+				ebpf_info("Possibly lost %" PRIu64 " samples\n",
+					  lost);
 			}
 		} else if (e->type == PERF_RECORD_SAMPLE) {
 			parse_sw(reader, ptr, e->size);
 		} else {
-			fprintf(stderr, "%s: unknown sample type %d\n",
+			ebpf_info("%s: unknown sample type %d\n",
 				__FUNCTION__, e->type);
 		}
 

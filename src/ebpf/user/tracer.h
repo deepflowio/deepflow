@@ -237,7 +237,7 @@ typedef int (*tracer_ctl_fun_t)(void);
 
 struct bpf_tracer {
 	/*
-	 * tracer info 
+	 * tracer info
 	 */
 	char name[NAME_LEN];			// tracer name
 	char bpf_file[TRACER_PATH_LEN]; 	// tracer bpf binary file path.
@@ -272,7 +272,7 @@ struct bpf_tracer {
 	perf_reader_lost_cb lost_cb;		 // 用于perf ring-buffer数据丢失回调
 
 	/*
-	 * statistics 
+	 * statistics
 	 */
 	atomic64_t lost;		     // 用户态程序来不及接收造成内核丢数据
 	atomic64_t proto_status[PROTO_NUM];  // 分协议类型统计
@@ -346,22 +346,6 @@ static inline void prefetch0(const volatile void *p)
 	asm volatile ("prefetcht0 %[p]"::[p] "m"(*(const volatile char *)p));
 }
 
-#ifdef WORKER_PERF_TEST
-extern uint64_t rdtsc(void);
-extern uint64_t tsc_ns(void);
-volatile int worker_delay;
-static inline void exec_delay(int delay)
-{
-	uint64_t start, end;
-	start = rdtsc();
-	end = start + (delay * 1000 * tsc_ns());
-	while(start < end) {
-		start = rdtsc();
-		__pause();
-	}
-}
-#endif
-
 #define CACHE_LINE_BYTES 64
 
 #define PREFETCH_READ 0
@@ -407,12 +391,8 @@ prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 				 2*CACHE_LINE_BYTES, READ);
 		sd = (struct socket_bpf_data *)datas_burst[j];
 		callback(sd);
-#ifdef WORKER_PERF_TEST
-		if (worker_delay > 0)
-			exec_delay(worker_delay);
-#endif
-        	block_head = (struct mem_block_head *)sd - 1;
-        	if (block_head->is_last == 1)
+		block_head = (struct mem_block_head *)sd - 1;
+		if (block_head->is_last == 1)
 			free(block_head->free_ptr);
 	}
 }
@@ -425,17 +405,17 @@ int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name);
 int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size);
 int check_kernel_version(int maj_limit, int min_limit);
 int register_extra_waiting_op(const char *name,
-                              extra_waiting_fun_t f,
-                              int type);
+			      extra_waiting_fun_t f,
+			      int type);
 void bpf_tracer_finish(void);
 struct bpf_tracer *create_bpf_tracer(const char *name,
-                                     char *bpf_file,
-                                     struct trace_probes_conf *tps,
-                                     int workers_nr,
-                                     void *handle,
-                                     unsigned int perf_pages_cnt);
+				     char *bpf_file,
+				     struct trace_probes_conf *tps,
+				     int workers_nr,
+				     void *handle,
+				     unsigned int perf_pages_cnt);
 int maps_config(struct bpf_tracer *tracer,
-                const char *map_name, int entries);
+		const char *map_name, int entries);
 struct bpf_tracer *find_bpf_tracer(const char *name);
 int register_period_event_op(const char *name, period_event_fun_t f);
 int set_period_event_invalid(const char *name);

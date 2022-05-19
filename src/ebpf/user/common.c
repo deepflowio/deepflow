@@ -16,82 +16,32 @@
 #include <time.h>
 #include <string.h>
 #include <inttypes.h>
-#include <linux/sysinfo.h> /* for struct sysinfo */
+#include <linux/sysinfo.h>	/* for struct sysinfo */
 #include <sys/sysinfo.h>
+#include "list_head.h"
 #include "common.h"
 #include "log.h"
-
-static void __pclose(FILE * fp, const char *tag)
-{
-	int rc;
-	rc = pclose(fp);
-	if (-1 == rc) {
-		ebpf_info("pclose error, 'uname -r', error:%s\n",
-			  strerror(errno));
-	} else {
-		if (WIFEXITED(rc))
-			ebpf_info("%s normal termination, exit status %d\n",
-				  tag, WEXITSTATUS(rc));
-		else if (WIFSIGNALED(rc))
-			ebpf_info("%s abnormal termination,signal number %d\n",
-				  tag, WTERMSIG(rc));
-		else if (WIFSTOPPED(rc))
-			ebpf_info("%s process stopped, signal number %d\n",
-				  tag, WSTOPSIG(rc));
-	}
-}
-
-static void execute_cmd(const char *cmd)
-{
-	FILE *fp;
-	fp = popen(cmd, "r");
-	if (NULL == fp) {
-		ebpf_info("%s popen error. %s", cmd, strerror(errno));
-	}
-	__pclose(fp, cmd);
-}
-
-int fetch_command_value(const char *cmd, char *buf, int buf_len)
-{
-	FILE *fp;
-	char *ret;
-
-	fp = popen(cmd, "r");
-	if (NULL == fp) {
-		ebpf_info("[%s]  popen error. %s", __func__, strerror(errno));
-		return -1;
-	}
-
-	memset(buf, 0, buf_len);
-	ret = fgets(buf, buf_len, fp);
-	if (ret == NULL) {
-		ebpf_info("[%s] \"fgets()\" error. %s",
-			  __func__, strerror(errno));
-		__pclose(fp, cmd);
-		return -1;
-	}
-
-	__pclose(fp, cmd);
-	return 0;
-}
+#include "../libbpf/src/libbpf_internal.h"
 
 bool is_core_kernel(void)
 {
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
 }
 
-int get_cpus_count(void)
+int get_cpus_count(bool **mask)
 {
-	int cpu_count = -1;
-	char cpu_count_str[64];
-	if (fetch_command_value("cat /proc/cpuinfo | grep processor | wc -l",
-				cpu_count_str, sizeof(cpu_count_str)) != 0)
-		return -1;
+	bool *online = NULL;
+	int err, n;
+	const char *online_cpus_file = "/sys/devices/system/cpu/online";
 
-	if (sscanf(cpu_count_str, "%d", &cpu_count) != 1)
+	err = parse_cpu_mask_file(online_cpus_file, &online, &n);
+	if (err) {
+		ebpf_info("failed to get online CPU mask: %d\n", err);
 		return -1;
+	}
 
-	return cpu_count;
+	*mask = online;
+	return n;
 }
 
 // 系统启动到现在的时间（以秒为单位）
@@ -104,28 +54,83 @@ uint32_t get_sys_uptime(void)
 	return (uint32_t)s_info.uptime;
 }
 
-uint64_t fetch_sys_boot_secs(void)
+void clear_residual_probes(void)
 {
-	uint64_t boot_time = 0;
-	char boot_time_str[64];
-	if (fetch_command_value
-	    ("cat /proc/stat | grep btime | awk '{print $2}'", boot_time_str,
-	     sizeof(boot_time_str)) != 0)
-		return 0;
+#define MAXLINE 1024
+	struct probe_elem {
+		struct list_head list;
+		char event[MAXLINE];
+	};
 
-	if (sscanf(boot_time_str, "%" PRIu64, &boot_time) != 1)
-		return 0;
+	FILE *fp;
+	char line[MAXLINE];
+	char *lf;		// 字符 '\n'
+	struct list_head probe_head;
+	struct probe_elem *pe;
 
-	return (uint64_t) boot_time;
-}
+	INIT_LIST_HEAD(&probe_head);
 
-void clear_residual_probes()
-{
-	char buf[1024];
-	snprintf(buf, sizeof(buf),
-		 "cat /sys/kernel/debug/tracing/kprobe_events | grep \"_metaflow_\" | grep -v %d | awk -F'/' '{print $2}' |awk '{print \"-:\" $1}' | xargs -I {} echo {} >> /sys/kernel/debug/tracing/kprobe_events",
-		 getpid());
-	execute_cmd(buf);
+	if ((fp = fopen(KPROBE_EVENTS_FILE, "r")) == NULL) {
+		ebpf_info("Open config file(\"%s\") faild.\n", KPROBE_EVENTS_FILE);
+		return;
+	}
+
+	while ((fgets(line, MAXLINE, fp)) != NULL) {
+		if ((lf = strchr(line, '\n')))
+			*lf = '\0';
+		pe = (struct probe_elem *)calloc(sizeof(*pe), 1);
+		snprintf(pe->event, sizeof(pe->event), "%s", line);
+		list_add_tail(&pe->list, &probe_head);
+	}
+
+	fclose(fp);
+
+	char *ptr;
+	struct list_head *p, *n;
+	char rm_event_cmd[MAXLINE];
+
+	int kfd = open(KPROBE_EVENTS_FILE, O_WRONLY | O_APPEND, 0);
+
+	if (kfd < 0) {
+		ebpf_info("open(%s): failed %s\n", KPROBE_EVENTS_FILE,
+			  strerror(errno));
+		return;
+	}
+
+	list_for_each_safe(p, n, &probe_head) {
+		pe = container_of(p, struct probe_elem, list);
+		// 匹配"_metaflow_"，并且不属于当前进程的probe event
+		if (strstr(pe->event, "_metaflow_")) {
+			if ((ptr = strchr(pe->event, '/'))) {
+				char *s = ++ptr;
+				if ((ptr = strchr(ptr, ' ')))
+					*ptr = '\0';
+				snprintf(rm_event_cmd, sizeof(rm_event_cmd),
+					 "-:%s", s);
+				if (write
+				    (kfd, rm_event_cmd,
+				     strlen(rm_event_cmd)) < 0) {
+					if (errno == ENOENT)
+						ebpf_info
+						    ("clear kprobe error, probe entry may not exist.(%s)\n",
+						     rm_event_cmd);
+					else
+						ebpf_info
+						    ("cannot clear kprobe, %s (%s)\n",
+						     strerror(errno),
+						     rm_event_cmd);
+					close(kfd);
+				} else
+					ebpf_info("Clear residual kprobe event \"%s\" success.\n",
+						  rm_event_cmd);
+			}
+		}
+
+		list_head_del(&pe->list);
+		free(pe);
+	}
+
+	close(kfd);
 }
 
 /* Make sure max locked memory is set to unlimited. */
