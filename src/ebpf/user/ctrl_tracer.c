@@ -71,6 +71,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "Redis";
 	case PROTO_KAFKA:
 		return "Kafka";
+	case PROTO_MQTT:
+		return "MQTT";
 	case PROTO_DUBBO:
 		return "Dubbo";
 	default:
