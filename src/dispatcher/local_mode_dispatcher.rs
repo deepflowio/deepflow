@@ -66,6 +66,7 @@ impl LocalModeDispatcher {
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
                     base.need_update_ebpf.store(true, Ordering::Relaxed);
                 }
+                base.check_and_update_ebpf();
                 continue;
             }
             let (packet, mut timestamp) = recved.unwrap();
@@ -151,6 +152,11 @@ impl LocalModeDispatcher {
                 continue;
             }
 
+            base.counter.rx.fetch_add(1, Ordering::Relaxed);
+            base.counter
+                .rx_bytes
+                .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
+
             if base.tunnel_info.tunnel_type != TunnelType::None {
                 meta_packet.tunnel = Some(&base.tunnel_info);
                 if base.tunnel_info.tunnel_type == TunnelType::TencentGre
@@ -195,6 +201,7 @@ impl LocalModeDispatcher {
                 base.need_update_ebpf.store(true, Ordering::Relaxed);
             }
             flow_map.inject_meta_packet(meta_packet);
+            base.check_and_update_ebpf();
         }
 
         base.terminate_queue();

@@ -250,6 +250,9 @@ impl Trident {
                     for callback in callbacks {
                         callback(&config_handler, components);
                     }
+                    for listener in components.dispatcher_listeners.iter_mut() {
+                        listener.on_config_change(&new_config);
+                    }
                 }
             }
             state_guard = state.lock().unwrap();
@@ -274,25 +277,28 @@ fn dispatcher_listener_callback(
     components: &Components,
     blacklist: Vec<PlatformData>,
 ) {
-    for listener in components.dispatcher_listeners.iter() {
-        if conf.tap_mode == TapMode::Local {
-            let if_mac_source = conf.if_mac_source;
-            match links_by_name_regex(&conf.tap_interface_regex) {
-                Err(e) => warn!("get interfaces by name regex failed: {}", e),
-                Ok(links) if links.is_empty() => warn!(
-                    "tap-interface-regex({}) do not match any interface, in local mode",
-                    conf.tap_interface_regex
-                ),
-                Ok(links) => listener.on_tap_interface_change(
-                    &links,
-                    if_mac_source,
-                    conf.trident_type,
-                    &blacklist,
-                ),
+    if conf.tap_mode == TapMode::Local {
+        let if_mac_source = conf.if_mac_source;
+        let links = match links_by_name_regex(&conf.tap_interface_regex) {
+            Err(e) => {
+                warn!("get interfaces by name regex failed: {}", e);
+                vec![]
             }
-        } else {
-            todo!()
+            Ok(links) => {
+                if links.is_empty() {
+                    warn!(
+                        "tap-interface-regex({}) do not match any interface, in local mode",
+                        conf.tap_interface_regex
+                    );
+                }
+                links
+            }
+        };
+        for listener in components.dispatcher_listeners.iter() {
+            listener.on_tap_interface_change(&links, if_mac_source, conf.trident_type, &blacklist);
         }
+    } else {
+        todo!()
     }
 }
 
@@ -534,15 +540,19 @@ impl Components {
             UniformSenderThread::new(sender_id, proto_log_receiver, config_handler.sender());
 
         // Dispatcher
-        let bpf_syntax = bpf::Builder {
-            is_ipv6: ctrl_ip.is_ipv6(),
-            vxlan_port: static_config.vxlan_port,
-            controller_port: static_config.controller_port,
-            controller_tls_port: static_config.controller_tls_port,
-            proxy_controller_ip: candidate_config.dispatcher.proxy_controller_ip,
-            analyzer_source_ip: candidate_config.dispatcher.source_ip,
-        }
-        .build_pcap_syntax();
+        let bpf_syntax = if runtime_config.capture_bpf != "" {
+            runtime_config.capture_bpf.clone()
+        } else {
+            bpf::Builder {
+                is_ipv6: ctrl_ip.is_ipv6(),
+                vxlan_port: static_config.vxlan_port,
+                controller_port: static_config.controller_port,
+                controller_tls_port: static_config.controller_tls_port,
+                proxy_controller_ip: candidate_config.dispatcher.proxy_controller_ip,
+                analyzer_source_ip: candidate_config.dispatcher.source_ip,
+            }
+            .build_pcap_syntax()
+        };
 
         let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
         for i in 0..dispatcher_num {
