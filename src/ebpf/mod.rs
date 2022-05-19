@@ -153,12 +153,17 @@ impl fmt::Display for SK_BPF_DATA {
                 .to_str()
                 .unwrap();
 
+            let data_slice =
+                std::slice::from_raw_parts(self.cap_data, self.cap_len.min(32) as usize);
+            let data_bytes = &*(data_slice as *const [c_char] as *const [u8]);
+
             write!(
                 f,
-                "Timestamp: {} Socket: {} Process: {}:{} Thread: {} MsgType: {} Direction: {} \n \
-                \t{}_{} -> {}_{} Seq: {} Trace-ID: {} L7: {} ",
+                "Timestamp: {} Socket: {} CapSeq: {} Process: {}:{} Thread: {} MsgType: {} Direction: {} \n \
+                \t{}_{} -> {}_{} Seq: {} Trace-ID: {} L7: {} Data {:?}",
                 self.timestamp,
                 self.socket_id,
+                self.cap_seq,
                 process_name,
                 self.process_id,
                 self.thread_id,
@@ -170,7 +175,8 @@ impl fmt::Display for SK_BPF_DATA {
                 port_dst,
                 self.tcp_seq,
                 self.syscall_trace_id_call,
-                self.l7_protocal_hint
+                self.l7_protocal_hint,
+                data_bytes
             )
         }
     }
