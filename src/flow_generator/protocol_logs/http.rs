@@ -392,8 +392,10 @@ impl HttpLog {
                 // 参考：https://github.com/grpc/grpc-go/blob/master/internal/transport/handler_server.go#L246
                 content_length = Some(httpv2_header.frame_length as u64);
                 if httpv2_header.flags & FLAG_HEADERS_PADDED != 0 {
-                    content_length =
-                        Some(content_length.unwrap_or_default() - frame_payload[0] as u64);
+                    if content_length.unwrap_or_default() > frame_payload[0] as u64 {
+                        content_length =
+                            Some(content_length.unwrap_or_default() - frame_payload[0] as u64);
+                    }
                 }
                 break;
             }
