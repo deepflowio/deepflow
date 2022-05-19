@@ -193,7 +193,9 @@ struct PacketCounter {
     terminated: Arc<AtomicBool>,
 
     rx: AtomicU64,
+    rx_all: AtomicU64,
     rx_bytes: AtomicU64,
+    rx_all_bytes: AtomicU64,
     err: AtomicU64,
 
     invalid_packets: AtomicU64,
@@ -208,7 +210,9 @@ impl PacketCounter {
             terminated,
 
             rx: AtomicU64::new(0),
+            rx_all: AtomicU64::new(0),
             rx_bytes: AtomicU64::new(0),
+            rx_all_bytes: AtomicU64::new(0),
             err: AtomicU64::new(0),
 
             invalid_packets: AtomicU64::new(0),
@@ -233,9 +237,19 @@ impl stats::RefCountable for PacketCounter {
                 stats::CounterValue::Unsigned(self.rx.swap(0, Ordering::Relaxed)),
             ),
             (
+                "rx_all",
+                stats::CounterType::Counted,
+                stats::CounterValue::Unsigned(self.rx_all.swap(0, Ordering::Relaxed)),
+            ),
+            (
                 "rx_bytes",
                 stats::CounterType::Counted,
                 stats::CounterValue::Unsigned(self.rx_bytes.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "rx_all_bytes",
+                stats::CounterType::Counted,
+                stats::CounterValue::Unsigned(self.rx_all_bytes.swap(0, Ordering::Relaxed)),
             ),
             (
                 "err",
