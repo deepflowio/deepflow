@@ -38,7 +38,6 @@ pub struct FlowAggrThread {
     id: usize,
     input: Arc<Receiver<Arc<TaggedFlow>>>,
     output: DebugSender<SendItem>,
-    l4_log_store_tap_types: [bool; 256],
     config: CollectorAccess,
 
     thread_handle: Option<JoinHandle<()>>,
@@ -58,7 +57,6 @@ impl FlowAggrThread {
             id,
             input: Arc::new(input),
             output: output.clone(),
-            l4_log_store_tap_types: config.load().l4_log_store_tap_types,
             thread_handle: None,
             config,
             running,
@@ -74,7 +72,6 @@ impl FlowAggrThread {
         let mut flow_aggr = FlowAggr::new(
             self.input.clone(),
             self.output.clone(),
-            self.l4_log_store_tap_types,
             self.running.clone(),
             self.config.clone(),
         );
@@ -100,7 +97,7 @@ pub struct FlowAggr {
     stashs: VecDeque<HashMap<u64, TaggedFlow>>,
 
     last_flush_time: Duration,
-    l4_log_store_tap_types: [bool; TAPTYPE_MAX],
+    config: CollectorAccess,
 
     running: Arc<AtomicBool>,
 
@@ -111,7 +108,6 @@ impl FlowAggr {
     pub fn new(
         input: Arc<Receiver<Arc<TaggedFlow>>>,
         output: DebugSender<SendItem>,
-        l4_log_store_tap_types: [bool; 256],
         running: Arc<AtomicBool>,
         config: CollectorAccess,
     ) -> Self {
@@ -121,14 +117,14 @@ impl FlowAggr {
         }
         Self {
             input,
-            output: ThrottlingQueue::new(output, config),
+            output: ThrottlingQueue::new(output, config.clone()),
             stashs,
             slot_start_time: round_to_minute(
                 SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
                     - Duration::from_secs(SECONDS_IN_MINUTE),
             ),
             last_flush_time: Duration::ZERO,
-            l4_log_store_tap_types,
+            config,
             running,
             counter: FlowAggrCounter::default(),
         }
@@ -226,8 +222,8 @@ impl FlowAggr {
         while self.running.load(Ordering::Relaxed) {
             match self.input.recv(Some(QUEUE_READ_TIMEOUT)) {
                 Ok(tagged_flow) => {
-                    if self.l4_log_store_tap_types[u16::from(TapType::Any) as usize]
-                        || self.l4_log_store_tap_types
+                    if self.config.load().l4_log_store_tap_types[u16::from(TapType::Any) as usize]
+                        || self.config.load().l4_log_store_tap_types
                             [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]
                     {
                         self.merge(tagged_flow);

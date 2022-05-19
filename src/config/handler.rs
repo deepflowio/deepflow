@@ -1224,6 +1224,11 @@ impl ConfigHandler {
             if candidate_config.collector.l4_log_store_tap_types
                 != new_config.collector.l4_log_store_tap_types
             {
+                info!(
+                    "collector config l4_log_store_tap_types change from {:#?} to {:#?}, will restart dispatcher",
+                    candidate_config.collector.l4_log_store_tap_types,
+                    new_config.collector.l4_log_store_tap_types
+                );
                 restart_dispatcher = true;
             }
 
