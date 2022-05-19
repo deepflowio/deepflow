@@ -1,5 +1,18 @@
 pub const DROPLET_PORT: u16 = 20033;
 
+pub enum DropletMessageType {
+    Compress = 0,
+    Syslog = 1,
+    Statsd = 2,
+
+    Metrics = 3,
+    TaggedFlow = 4,
+    ProtocolLog = 5,
+
+    DfStatsd = 6,
+    Max = 7,
+}
+
 pub const NORMAL_EXIT_WITH_RESTART: i32 = 3;
 pub const TRIDENT_MEMORY_LIMIT: u64 = 0;
 pub const TRIDENT_PROCESS_LIMIT: u32 = 10;
