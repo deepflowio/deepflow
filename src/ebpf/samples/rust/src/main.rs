@@ -138,7 +138,9 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("REDIS");
         } else if sk_proto_safe(sd) == SOCK_DATA_KAFKA {
             proto_tag.push_str("KAFKA");
-        } else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
+        } else if sk_proto_safe(sd) == SOCK_DATA_MQTT {
+		proto_tag.push_str("MQTT");
+	} else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
             proto_tag.push_str("DUBBO");
         }
 

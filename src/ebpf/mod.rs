@@ -32,6 +32,8 @@ pub const SOCK_DATA_REDIS: u16 = 80;
 #[allow(dead_code)]
 pub const SOCK_DATA_KAFKA: u16 = 100;
 #[allow(dead_code)]
+pub const SOCK_DATA_MQTT: u16 = 101;
+#[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
 
 //L7层协议是否需要重新核实
