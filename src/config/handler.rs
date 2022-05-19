@@ -596,22 +596,6 @@ impl NewRuntimeConfig {
             )));
         }
 
-        if self.collector.l4_log_store_tap_types.iter().all(|&x| !x) {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "l4-log-tap-types has tap type not in [{:?}, {:?})",
-                TapType::Any,
-                TapType::Max
-            )));
-        }
-
-        if self.flow.l7_log_tap_types.iter().all(|&x| x) {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "l7-log-store-tap-types has tap type not in [{:?}, {:?})",
-                TapType::Any,
-                TapType::Max
-            )));
-        }
-
         if self.sender.collector_socket_type == trident::SocketType::RawUdp {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "invalid collector_socket_type {:?}",
@@ -852,13 +836,13 @@ impl ConfigHandler {
                 l7_metrics_enabled: conf.l7_metrics_enabled(),
                 trident_type: conf.trident_type(),
                 vtap_id: conf.vtap_id() as u16,
-                l4_log_store_tap_types: if conf.l4_log_tap_types.is_empty() {
-                    candidate_config.collector.l4_log_store_tap_types
-                } else {
+                l4_log_store_tap_types: {
                     let mut l4_log_tap_types = [false; 256];
                     for &tap in conf.l4_log_tap_types.iter() {
                         if tap < 256 {
                             l4_log_tap_types[tap as usize] = true;
+                        } else {
+                            warn!("l4 log tap types: {} invalid", tap);
                         }
                     }
                     l4_log_tap_types
@@ -892,13 +876,13 @@ impl ConfigHandler {
             flow: {
                 let flow_config = &self.static_config.flow;
 
-                let l7_log_tap_types = if conf.l7_log_store_tap_types.is_empty() {
-                    candidate_config.flow.l7_log_tap_types
-                } else {
+                let l7_log_tap_types = {
                     let mut l7_log_tap_types = [false; 256];
                     for &tap in conf.l7_log_store_tap_types.iter() {
                         if tap < 256 {
                             l7_log_tap_types[tap as usize] = true;
+                        } else {
+                            warn!("l7 log tap types: {} invalid", tap);
                         }
                     }
                     l7_log_tap_types
@@ -1225,7 +1209,7 @@ impl ConfigHandler {
                 != new_config.collector.l4_log_store_tap_types
             {
                 info!(
-                    "collector config l4_log_store_tap_types change from {:#?} to {:#?}, will restart dispatcher",
+                    "collector config l4_log_store_tap_types change from {:?} to {:?}, will restart dispatcher",
                     candidate_config.collector.l4_log_store_tap_types,
                     new_config.collector.l4_log_store_tap_types
                 );
