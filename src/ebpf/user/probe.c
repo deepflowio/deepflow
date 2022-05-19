@@ -24,14 +24,12 @@ int bpf_get_program_fd(void *obj, const char *prog_name, void **p)
 {
 	struct bpf_program *prog;
 	int prog_fd;
-	//users to find programs by section names.
-	//printf("prog name : %s, obj :%p \n", prog_name, obj);
 	prog =
 	    bpf_object__find_program_by_title((struct bpf_object *)obj,
 					      prog_name);
 	prog_fd = bpf_program__fd(prog);
 	if (prog_fd < 0) {
-		printf("program not found: %s", strerror(prog_fd));
+		ebpf_info("program not found: %s", strerror(prog_fd));
 	}
 	*p = prog;
 	return prog_fd;
@@ -114,7 +112,7 @@ static int create_probe_event(char *buf, const char *ev_name,
 		 event_type);
 	kfd = open(buf, O_WRONLY | O_APPEND, 0);
 	if (kfd < 0) {
-		fprintf(stderr, "%s: open(%s): %s\n", __func__, buf,
+		ebpf_info("%s: open(%s): %s\n", __func__, buf,
 			strerror(errno));
 		return -1;
 	}
@@ -122,7 +120,7 @@ static int create_probe_event(char *buf, const char *ev_name,
 	    snprintf(ev_alias, sizeof(ev_alias), "%s_metaflow_%d_%d", ev_name,
 		     getpid(), attach_type);
 	if (res < 0 || res >= sizeof(ev_alias)) {
-		fprintf(stderr, "Event name (%s) is too long for buffer\n",
+		ebpf_info("Event name (%s) is too long for buffer\n",
 			ev_name);
 		close(kfd);
 		goto error;
@@ -147,9 +145,8 @@ static int create_probe_event(char *buf, const char *ev_name,
 			     (unsigned long)offset);
 
 		if (res < 0 || res >= PATH_MAX) {
-			fprintf(stderr,
-				"Event alias (%s) too long for buffer\n",
-				ev_alias);
+			ebpf_info("Event alias (%s) too long for buffer\n",
+				  ev_alias);
 			close(kfd);
 			return -1;
 		}
@@ -217,13 +214,13 @@ static int bpf_attach_tracing_event(int progfd, const char *event_path, int pid,
 		snprintf(buf, sizeof(buf), "%s/id", event_path);
 		efd = open(buf, O_RDONLY, 0);
 		if (efd < 0) {
-			fprintf(stderr, "open(%s): %s\n", buf, strerror(errno));
+			ebpf_info("open(%s): %s\n", buf, strerror(errno));
 			return -1;
 		}
 
 		bytes = read(efd, buf, sizeof(buf));
 		if (bytes <= 0 || bytes >= sizeof(buf)) {
-			fprintf(stderr, "read(%s): %s\n", buf, strerror(errno));
+			ebpf_info("read(%s): %s\n", buf, strerror(errno));
 			close(efd);
 			return -1;
 		}
@@ -282,9 +279,8 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 		    && attach_type == BPF_PROBE_RETURN) {
 			if (snprintf(fname, sizeof(fname), "%s/id", buf) >=
 			    sizeof(fname)) {
-				fprintf(stderr,
-					"filename (%s) is too long for buffer\n",
-					buf);
+				ebpf_info("filename (%s) is too long for buffer\n",
+					  buf);
 				goto error;
 			}
 			if (access(fname, F_OK) == -1) {
@@ -294,9 +290,9 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 				    ("/sys/kernel/debug/tracing/kprobe_events",
 				     O_WRONLY | O_APPEND, 0);
 				if (kfd < 0) {
-					fprintf(stderr,
-						"open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
-						strerror(errno));
+					ebpf_info(
+						  "open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
+						  strerror(errno));
 					return -1;
 				}
 				/// 向"/sys/kernel/debug/tracing/kprobe_events"中写入，"-:kprobes/p_do_exit_0"
@@ -304,12 +300,10 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 					 ev_name);
 				if (write(kfd, fname, strlen(fname)) < 0) {
 					if (errno == ENOENT)
-						fprintf(stderr,
-							"cannot detach kprobe, probe entry may not exist\n");
+						ebpf_info("cannot detach kprobe, probe entry may not exist\n");
 					else
-						fprintf(stderr,
-							"cannot detach kprobe, %s\n",
-							strerror(errno));
+						ebpf_info("cannot detach kprobe, %s\n",
+							  strerror(errno));
 					close(kfd);
 					goto error;
 				}
@@ -326,7 +320,7 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 	if (bpf_attach_tracing_event(progfd, buf, pid, &pfd) == 0)
 		return pfd;
 	else
-		printf("bpf_attach_tracing_event error!\n");
+		ebpf_info("bpf_attach_tracing_event error!\n");
 
 error:
 	bpf_close_perf_event_fd(pfd);
@@ -364,8 +358,8 @@ static int bpf_detach_probe(enum bpf_probe_attach_type attach_type,
 	if (res < 0 || res >= sizeof(buf)) {
 		ebpf_info("Event name (%s) is too long for buffer\n",
 			  ev_name);
-                goto error;
-        }
+		goto error;
+	}
 
 	while (fgets(line_buf, sizeof(line_buf), fp)) {
 		if (strstr(line_buf, buf) != NULL) {
@@ -391,7 +385,7 @@ static int bpf_detach_probe(enum bpf_probe_attach_type attach_type,
 
 	res =
 	    snprintf(buf, sizeof(buf), "-:%s_metaflow_%d_%d", ev_name,
-                     getpid(), attach_type);
+		     getpid(), attach_type);
 
 	if (res < 0 || res >= sizeof(buf)) {
 		ebpf_info("snprintf(%s): %d\n", ev_name, res);
@@ -412,7 +406,7 @@ error:
 	if (fp)
 		fclose(fp);
 
-        return -1;
+	return -1;
 }
 
 static int bpf_link__detach_perf_event(struct bpf_link *link)
@@ -511,6 +505,6 @@ int program__detach_kprobe(struct bpf_link *link,
 {
 	return program__detach_probe(link,
 				     retprobe,
-				     (const char *)ev_name, 
+				     (const char *)ev_name,
 				     "kprobe");
 }

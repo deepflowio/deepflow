@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include "libbpf/include/linux/err.h"
 #include <sched.h>
+#include <sys/utsname.h>
 #include "probe.h"
 #include "table.h"
 #include "common.h"
@@ -25,24 +26,18 @@ static pthread_t cpus_kick_pthread;
 /*
  * 用于额外事务处理, 目前利用这个机制来实现socket_trace的内核结构偏移推断。
  */
-static int ready_flag_cpus[MAX_CPU_NR];
+static volatile int ready_flag_cpus[MAX_CPU_NR];
 
 static struct list_head extra_waiting_head;	// 额外事务处理的注册
 
 #define EVENT_PERIOD_TIME	1	// 事件处理的周期时间，单位：秒
 static struct list_head period_events_head;	// 周期性事件处理的注册
 
-// 从1970.1.1开始到现在的时间，精度为微妙
-uint64_t sys_base_time;
-
 int sys_cpus_count;
+bool *cpu_online; // 用于判断CPU是否是online
 
 // 所有tracer成功完成启动，会被应用设置为1
 static volatile uint64_t all_probes_ready;
-
-#ifdef WORKER_PERF_TEST
-extern void set_tsc_freq(void);
-#endif
 
 static int tracepoint_attach(struct tracepoint *tp);
 
@@ -51,18 +46,29 @@ static int tracepoint_attach(struct tracepoint *tp);
  */
 int check_kernel_version(int maj_limit, int min_limit)
 {
-#define VAL_LEN        1024
-	char line[VAL_LEN];
-	if (fetch_command_value("uname -r", line, sizeof(line)) != 0)
+	struct utsname uts;
+	if (uname(&uts) == -1) {
+		ebpf_info("uname() error\n");
 		return -1;
+	}
 
-	if (sscanf(line, "%d.%d", &major, &minor) != 2)
+	if (!strstr(uts.machine, "x86_64")) {
+		ebpf_info("Current machine is \"%s\", not support.\n");
 		return -1;
+	}
+
+	if (sscanf(uts.release, "%d.%d", &major, &minor) != 2) {
+		ebpf_info("sscanf(%s), is error.\n", uts.release);
+		return -1;
+	}
+
+	ebpf_info("%s Linux %d.%d\n", __func__, major, minor);
 
 	if (major < maj_limit || (major == maj_limit && minor < min_limit)) {
 		ebpf_info
-		    ("Current kernel version is %s, but need > %s, check and reboot system.\n",
-		     line, "4.14");
+		    ("Current kernel version is %s, but need > %s, eBPF not support.\n",
+		     uts.release, "4.14");
+		return -1;
 	}
 
 	return 0;
@@ -256,7 +262,7 @@ static int probe_attach(struct probe *p)
 		ebpf_info("<%s> fn_name:%s, has been attached.\n",
 			  __func__, p->name);
 		return 0;
-        }
+	}
 
 	char ev_name[EV_NAME_SIZE];
 	char *fn_name;
@@ -270,7 +276,7 @@ static int probe_attach(struct probe *p)
 
 	struct bpf_link *link;
 
-	// TODO: 需要处理uprobe的场景 
+	// TODO: 需要处理uprobe的场景
 	int ret =
 	    program__attach_kprobe(p->prog, p->isret, -1, fn_name, ev_name,
 				   (void **)&link);
@@ -424,6 +430,8 @@ int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name)
 	int i;
 	int pages_cnt = tracer->perf_pages_cnt;
 	for (i = 0; i < sys_cpus_count; i++) {
+		if (!cpu_online[i])
+			continue;
 		reader =
 		    (struct perf_reader *)bpf_open_perf_buffer(tracer->raw_cb,
 							       tracer->lost_cb,
@@ -630,8 +638,10 @@ static inline void cpu_read_dev_null(int cpu_id)
 static int cpus_kick_kern(void)
 {
 	int i;
-	for (i = 0; i < sys_cpus_count; i++)
-		cpu_read_dev_null(i);
+	for (i = 0; i < sys_cpus_count; i++) {
+		if (cpu_online[i])
+			cpu_read_dev_null(i);
+	}
 
 	return 0;
 }
@@ -647,7 +657,7 @@ static void period_process_main(__unused void *arg)
 
 	ebpf_info("cpus_kick begin !!!\n");
 
-	memset(ready_flag_cpus, 1, sizeof(ready_flag_cpus));
+	memset((void *)ready_flag_cpus, 1, sizeof(ready_flag_cpus));
 
 	for (;;) {
 		period_events_process();
@@ -838,12 +848,6 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	if (sysfs_write("/proc/sys/net/core/bpf_jit_enable", "1") < 0)
 		return -1;
 
-	sys_cpus_count = get_cpus_count();
-	if (sys_cpus_count <= 0)
-		return -1;
-
-	clear_residual_probes();
-
 	INIT_LIST_HEAD(&extra_waiting_head);
 	INIT_LIST_HEAD(&period_events_head);
 
@@ -856,16 +860,11 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		}
 	}
 
-	/*
-	 * 系统从1970年1月1日00:00:00开始到现在的秒数，
-	 * 用于把bpf获得的相对时间转换成绝对时间。
-	 * 时间精度为微妙
-	 */
-	sys_base_time = fetch_sys_boot_secs() * 1e6;
+	sys_cpus_count = get_cpus_count(&cpu_online);
+	if (sys_cpus_count <= 0)
+		return -1;
 
-#ifdef WORKER_PERF_TEST
-	set_tsc_freq();		// TEST
-#endif
+	clear_residual_probes();
 
 	if (ctrl_init()) {
 		return -1;
