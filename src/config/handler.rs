@@ -87,6 +87,11 @@ impl fmt::Debug for CollectorConfig {
         f.debug_struct("CollectorConfig")
             .field("enabled", &self.enabled)
             .field(
+                "inactive_server_port_enabled",
+                &self.inactive_server_port_enabled,
+            )
+            .field("vtap_flow_1s_enabled", &self.vtap_flow_1s_enabled)
+            .field(
                 "l4_log_store_tap_types",
                 &self
                     .l4_log_store_tap_types

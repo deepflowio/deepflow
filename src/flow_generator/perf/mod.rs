@@ -129,12 +129,8 @@ impl FlowPerf {
         l4_performance_enabled: bool,
         l7_performance_enabled: bool,
     ) -> Option<FlowPerfStats> {
-        if !l4_performance_enabled {
-            return None;
-        }
-
         let mut stats = None;
-        if self.l4.data_updated() {
+        if l4_performance_enabled && self.l4.data_updated() {
             stats.replace(self.l4.copy_and_reset_data(flow_reversed));
         }
 
@@ -143,9 +139,10 @@ impl FlowPerf {
                 let FlowPerfStats {
                     l7, l7_protocol, ..
                 } = self.l7.copy_and_reset_data(l7_timeout_count);
-
                 stats.l7 = l7;
                 stats.l7_protocol = l7_protocol;
+            } else {
+                stats.replace(self.l7.copy_and_reset_data(l7_timeout_count));
             }
         }
 
