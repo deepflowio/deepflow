@@ -484,6 +484,95 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	return MSG_UNKNOWN;
 }
 
+
+
+// 伪代码参考自
+// http://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html?spm=a2c4g.11186623.0.0.76157c1cveWwvz
+//
+// multiplier = 1 
+// value = 0 
+// do 
+//   digit = 'next digit from stream' 
+//   value += (digit AND 127) * multiplier 
+//   multiplier *= 128
+// while ((digit AND 128) != 0)
+static __inline bool mqtt_decoding_length(const __u8 *buffer, int *length, int *lensize)
+{
+	int multiplier = 1;
+	__u8 digit;
+
+	// mqtt的长度从第二个字节开始,最多有四个字节
+	buffer += 1;
+	*length = 0;
+	*lensize = 0;
+	do {
+		digit = buffer[(*lensize)++];
+		*length += (digit & 127) * multiplier;
+		multiplier *= 128;
+
+		// mqtt 最多用4个字节表示长度
+		if ((*lensize) > 4)
+			return false;
+	} while ((digit & 128) != 0);
+	return true;
+}
+
+static __inline bool mqtt_decoding_message_type(const __u8 *buffer, int *message_type)
+{
+	*message_type = ((*buffer) >> 4) & 0x0F;
+
+	// 根据 type 取值范围进行过滤, 0 和 15 为保留值
+	return 1 <= *message_type && *message_type <= 14;
+}
+
+// MQTT V3.1 Protocol Specification
+// http://public.dhe.ibm.com/software/dw/webservices/ws-mqtt/mqtt-v3r1.html?spm=a2c4g.11186623.0.0.76157c1cveWwvz
+static __inline enum message_type infer_mqtt_message(const char *buf,
+						     size_t count,
+						     struct conn_info_t
+						     *conn_info)
+{
+	if (is_socket_info_valid(conn_info->socket_info_ptr))
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_MQTT)
+			return MSG_UNKNOWN;
+
+	int mqtt_type;
+	if (!mqtt_decoding_message_type((__u8 *)buf, &mqtt_type))
+		return MSG_UNKNOWN;
+
+	int length, lensize;
+	if (!mqtt_decoding_length((__u8 *)buf, &length, &lensize))
+		return MSG_UNKNOWN;
+
+	if (1 + lensize + length != count)
+		return MSG_UNKNOWN;
+
+	// 仅通过上述约束条件,会存在其他协议被误判成MQTT的情况,
+	// 于是根据MQTT消息类型与其长度之间的关系再次进行简单的过滤
+	// CONNECT PUBLISH 至少有两个字节的 Variable header 和两个字节的 Payload
+	if ((mqtt_type == 1 || mqtt_type == 3) && length < 4)
+		return MSG_UNKNOWN;
+
+	// CONNACK PUBACK PUBREC PUBREL PUBCOMP UNSUBACK 仅有两个字节的 Variable header
+	if ((mqtt_type == 2 || mqtt_type == 4 || mqtt_type == 5 || 
+	     mqtt_type == 6 || mqtt_type == 7 || mqtt_type == 11) && length != 2)
+		return MSG_UNKNOWN;
+
+	// SUBSCRIBE SUBACK UNSUBSCRIBE 至少有两个字节的 Variable header 和一个字节的 Payload
+	if ((mqtt_type == 8 || mqtt_type == 9 || mqtt_type == 10) && length < 3)
+		return MSG_UNKNOWN;
+	
+	// PINGREQ PINGRESP DISCONNECT 没有 Variable header 和 Payload
+	if ((mqtt_type == 12 || mqtt_type == 13 || mqtt_type == 14) && length != 0)
+		return MSG_UNKNOWN;
+
+	const volatile int __mqtt_type = mqtt_type;
+	if (__mqtt_type == 1 || __mqtt_type == 3 || __mqtt_type == 8 ||
+	    __mqtt_type == 10 || __mqtt_type == 12 || __mqtt_type == 14)
+		return MSG_REQUEST;
+	return MSG_RESPONSE;
+}
+
 /*
  * https://dubbo.apache.org/zh/blog/2018/10/05/dubbo-%E5%8D%8F%E8%AE%AE%E8%AF%A6%E8%A7%A3/
  * 0                                                                                       31
@@ -864,6 +953,10 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		    infer_redis_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_REDIS;
+	} else if ((inferred_message.type =
+		    infer_mqtt_message(infer_buf, count,
+				       conn_info)) != MSG_UNKNOWN) {
+		inferred_message.protocol = PROTO_MQTT;
 	} else if ((inferred_message.type =
 		    infer_dubbo_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {

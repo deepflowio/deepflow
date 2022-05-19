@@ -35,6 +35,7 @@ enum traffic_protocol {
 	PROTO_MYSQL = 60,
 	PROTO_REDIS = 80,
 	PROTO_KAFKA = 100,
+	PROTO_MQTT = 101,
 	PROTO_DNS = 120,
 	PROTO_NUM = 130
 };
