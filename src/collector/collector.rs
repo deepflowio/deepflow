@@ -357,17 +357,6 @@ impl Stash {
             return;
         }
 
-        // 这里需要修正一下timeInSecond
-        // 因为要使用doc time来推动时间窗口，所以对于doc中的timestamp不做修正
-        // 对于queue中的tick（即accFlow == nil），时间修正为timeInSecond - delaySeconds
-        // 对于分钟collector，少减去60s
-        if time_in_second >= self.context.delay_seconds {
-            match self.context.metric_type {
-                MetricsType::SECOND => time_in_second -= self.context.delay_seconds,
-                _ => time_in_second -= self.context.delay_seconds - MINUTE,
-            }
-        }
-
         time_in_second = time_in_second / self.slot_interval * self.slot_interval;
         let timestamp = get_timestamp();
 
@@ -378,8 +367,8 @@ impl Stash {
                 self.counter.window_delay.store(delay, Ordering::Relaxed);
             }
             self.flush_stats();
-            self.start_time = Duration::from_secs(time_in_second);
             debug!("collector window moved interval={:?} is_tick={} sys_ts={:?} flow_ts={} window={:?}", self.slot_interval, false, timestamp, time_in_second, self.start_time);
+            self.start_time = Duration::from_secs(time_in_second);
         }
         let delay = (timestamp - Duration::from_secs(time_in_second)).as_nanos() as u64;
         if delay > self.counter.flow_delay.load(Ordering::Relaxed) {
@@ -779,6 +768,7 @@ impl Collector {
         let receiver = self.receiver.clone();
         let sender = self.sender.clone();
         let ctx = self.context.clone();
+        let delay_seconds = self.context.delay_seconds;
 
         let thread = thread::spawn(move || {
             let mut stash = Stash::new(ctx, sender, counter);
@@ -790,7 +780,10 @@ impl Collector {
                             stash.collect(flow, time_in_second);
                         }
                     }
-                    Err(Error::Timeout) => stash.flush(get_timestamp().as_secs()),
+                    Err(Error::Timeout) => {
+                        // qg会延时delay_seconds，这再多延时2秒刷新数据
+                        stash.flush(get_timestamp().as_secs() - delay_seconds - 2)
+                    }
                     Err(Error::Terminated(..)) => break,
                 }
             }
