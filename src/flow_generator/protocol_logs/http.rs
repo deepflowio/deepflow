@@ -293,6 +293,11 @@ impl HttpLog {
                     break;
                 }
 
+                if true {
+                    // FIXME  暂时规避h2pack panic
+                    return Err(Error::HttpHeaderParseFailed);
+                }
+
                 let header_frame_payload = &frame_payload[..httpv2_header.frame_length as usize];
                 let mut parser = h2pack::parser::Parser::new();
                 let header_list = parser.parse(header_frame_payload).unwrap();

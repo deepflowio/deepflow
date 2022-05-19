@@ -427,9 +427,10 @@ impl BaseDispatcherListener {
         };
 
         debug!("PcapBpf: {}", bpf_syntax);
-        let bpf_options = self.bpf_options.lock().unwrap();
+        let mut bpf_options = self.bpf_options.lock().unwrap();
         if bpf_options.bpf_syntax != bpf_syntax {
-            self.bpf_options.lock().unwrap().bpf_syntax = bpf_syntax;
+            // FIXME  暂时规避死锁
+            bpf_options.bpf_syntax = bpf_syntax;
             self.need_update_ebpf.store(true, Ordering::Release);
         }
 
