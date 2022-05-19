@@ -511,7 +511,9 @@ impl Stash {
         {
             let key = StashKey::new(&tagger, ip, None);
             self.add(key, tagger.clone(), Meter::Flow(flow_meter));
-            if tagger.l7_protocol != L7Protocol::Unknown {
+            if tagger.l7_protocol != L7Protocol::Unknown
+                && self.context.config.load().l7_metrics_enabled
+            {
                 if let Some(app_meter) = acc_flow.app_meter.as_ref() {
                     tagger.code |= Code::L7_PROTOCOL;
                     let key = StashKey::new(&tagger, ip, None);
@@ -627,7 +629,9 @@ impl Stash {
             tagger.clone(),
             Meter::Flow(acc_flow.flow_meter.clone()),
         );
-        if tagger.l7_protocol != L7Protocol::Unknown {
+        if tagger.l7_protocol != L7Protocol::Unknown
+            && self.context.config.load().l7_metrics_enabled
+        {
             if let Some(app_meter) = acc_flow.app_meter.as_ref() {
                 tagger.code |= Code::L7_PROTOCOL;
                 let key = StashKey::new(&tagger, src_ip, Some(dst_ip));
