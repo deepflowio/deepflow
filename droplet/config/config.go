@@ -16,7 +16,7 @@ var log = logging.MustGetLogger("config")
 
 const (
 	DefaultESHostPort      = "127.0.0.1:20042"
-	DefaultSyslogDirectory = "/var/log/trident"
+	DefaultSyslogDirectory = "/var/log/metaflow-agent"
 )
 
 type ESAuth struct {
