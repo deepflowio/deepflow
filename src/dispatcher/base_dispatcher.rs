@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
+use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -270,12 +271,14 @@ impl BaseDispatcher {
         }
         let bpf_options = self.bpf_options.lock().unwrap();
         info!("bpf set to: {}", bpf_options.bpf_syntax);
+        /*
         if let Err(e) = self
             .engine
             .set_bpf(&CString::new(&*bpf_options.bpf_syntax).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
+        */
     }
 }
 
@@ -429,10 +432,10 @@ impl BaseDispatcherListener {
         debug!("PcapBpf: {}", bpf_syntax);
         let mut bpf_options = self.bpf_options.lock().unwrap();
         if bpf_options.bpf_syntax != bpf_syntax {
-            // FIXME  暂时规避死锁
             bpf_options.bpf_syntax = bpf_syntax;
             self.need_update_ebpf.store(true, Ordering::Release);
         }
+        mem::drop(bpf_options);
 
         let mut tunnel_types = Vec::new();
         for decap_type in &config.decap_type {
