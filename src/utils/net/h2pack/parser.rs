@@ -7,6 +7,7 @@ pub enum ParseError {
     NotStaticField,
     InvalidIntger,
     InvalidMaxDynamicSize(u32, u32),
+    InvalidInput,
     NotEnoughOctets,
     InvalidHuffmanCode,
 }
@@ -84,7 +85,17 @@ impl Parser<'_> {
     ) -> Result<(Option<Vec<(Vec<u8>, Vec<u8>)>>, usize), ParseError> {
         let (index, index_len) = parse_int(buf, prefix)?;
         let mut val_len = index_len;
-        if index != 0 {
+
+        if index_len > buf.len() {
+            return Err(ParseError::InvalidInput);
+        }
+
+        // RFC7541附录A(https://datatracker.ietf.org/doc/html/rfc7541#appendix-A)规定：
+        // 静态表index从1到61，共60项。如果index大于61, 意味着这是一个dynamic table的
+        // index，我们无法解出index对应的value，应该跳过对应的字节继续解析。
+        if index > 61 {
+            return Ok((None, val_len));
+        } else if index != 0 {
             // Indexed
             let (str_len, len) = parse_int(&buf[index_len..], 7)?;
             val_len = val_len + str_len + len;
@@ -92,13 +103,23 @@ impl Parser<'_> {
             // New Name
             let (name_len, len) = parse_int(&buf[1..], 7)?;
             let key_len = name_len + len;
+
+            if key_len > buf.len() {
+                return Err(ParseError::InvalidInput);
+            }
+
             let (value_len, len) = parse_int(&buf[(1 + key_len)..], 7)?;
             val_len = value_len + key_len + len + val_len;
         }
 
-        let rst = self.decoder.decode(&buf[..val_len]).unwrap();
+        if val_len > buf.len() {
+            return Err(ParseError::InvalidInput);
+        }
 
-        Ok((Some(rst), val_len))
+        match self.decoder.decode(&buf[..val_len]) {
+            Ok(rst) => Ok((Some(rst), val_len)),
+            Err(_) => Err(ParseError::InvalidHuffmanCode),
+        }
     }
 
     fn parse_indexed(
@@ -107,10 +128,15 @@ impl Parser<'_> {
     ) -> Result<(Option<Vec<(Vec<u8>, Vec<u8>)>>, usize), ParseError> {
         let (index, index_len) = parse_int(buf, 7)?;
 
-        if index < 62 && index > 0 {
-            let rst = self.decoder.decode(&buf[..index_len]).unwrap();
+        if index_len > buf.len() {
+            return Err(ParseError::InvalidInput);
+        }
 
-            Ok((Some(rst), index_len))
+        if index < 62 && index > 0 {
+            match self.decoder.decode(&buf[..index_len]) {
+                Ok(rst) => Ok((Some(rst), index_len)),
+                Err(_) => Err(ParseError::InvalidHuffmanCode),
+            }
         } else {
             Ok((None, index_len))
         }
@@ -187,10 +213,7 @@ impl Parser<'_> {
         let mut offset = 0usize;
 
         while offset < input.len() {
-            let a = self
-                .parse_one_field(input, offset, &mut header_list)
-                .unwrap();
-            offset += a;
+            offset += self.parse_one_field(input, offset, &mut header_list)?;
         }
 
         Ok(header_list)
