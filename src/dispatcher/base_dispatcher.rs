@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
+use std::process;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
@@ -383,6 +384,11 @@ pub(super) struct BaseDispatcherListener {
 
 impl BaseDispatcherListener {
     pub(super) fn on_config_change(&mut self, config: &RuntimeConfig) {
+        if self.options.af_packet_version != config.capture_socket_type.into() {
+            // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
+            info!("Afpacket version update, metaflow-agent restart...");
+            process::exit(1);
+        }
         if self.capture_bpf == config.capture_bpf
             && self.proxy_controller_ip.to_string() == config.proxy_controller_ip
             && self.analyzer_ip.to_string() == config.analyzer_ip

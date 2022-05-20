@@ -14,7 +14,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use log::warn;
+use log::{info, warn};
 
 use analyzer_mode_dispatcher::AnalyzerModeDispatcher;
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
@@ -434,6 +434,7 @@ impl DispatcherBuilder {
                 iface: self.src_interface.take().unwrap_or("".to_string()),
                 ..Default::default()
             };
+            info!("Afpacket init with {:?}", afp);
             RecvEngine::AfPacket(Tpacket::new(afp).unwrap())
         };
         let id = self.id.ok_or(Error::ConfigIncomplete("no id".into()))?;
