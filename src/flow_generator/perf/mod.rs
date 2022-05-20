@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
+use log::debug;
 
 use super::error::Result;
 use super::protocol_logs::AppProtoHead;
@@ -27,13 +28,14 @@ use {
     self::http::HttpPerfData,
     dns::{DnsPerfData, DNS_PORT},
     mq::{KafkaPerfData, KAFKA_PORT},
-    rpc::{DubboPerfData, DUBBO_PORT},
+    rpc::DubboPerfData,
     sql::{MysqlPerfData, RedisPerfData, MYSQL_PORT, REDIS_PORT},
     tcp::TcpPerf,
     udp::UdpPerf,
 };
 
 pub use l7_rrt::L7RrtCache;
+pub use rpc::DUBBO_PORT;
 pub use stats::FlowPerfCounter;
 
 const ART_MAX: Duration = Duration::from_secs(30);
@@ -72,6 +74,8 @@ pub enum L7FlowPerfTable {
 pub struct FlowPerf {
     l4: L4FlowPerfTable,
     l7: L7FlowPerfTable,
+
+    pub is_http: bool,
 }
 
 impl FlowPerf {
@@ -88,7 +92,7 @@ impl FlowPerf {
                 return None;
             }
         };
-
+        let mut is_http = false;
         let l7 = match l7_proto {
             L7Protocol::Dns => L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone())),
             L7Protocol::Dubbo => L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone())),
@@ -96,12 +100,25 @@ impl FlowPerf {
             L7Protocol::Mysql => L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone())),
             L7Protocol::Redis => L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone())),
             L7Protocol::Http1 | L7Protocol::Http2 => {
+                is_http = true;
                 L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()))
             }
             _ => return None,
         };
 
-        Some(Self { l4, l7 })
+        Some(Self { l4, l7, is_http })
+    }
+
+    pub fn parse_by_http(
+        &mut self,
+        rrt_cache: Rc<RefCell<L7RrtCache>>,
+        packet: &MetaPacket,
+        flow_id: u64,
+    ) {
+        debug!("change to http");
+        self.l7 = L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()));
+        self.is_http = true;
+        let _ = self.l7.parse(packet, flow_id);
     }
 
     pub fn parse(
