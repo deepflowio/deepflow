@@ -26,10 +26,11 @@ use crate::{
         VLAN_ID_MASK,
     },
     config::{handler::FlowAccess, RuntimeConfig},
+    exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     platform::GenericPoller,
     policy::PolicyGetter,
-    proto::trident::{IfMacSource, TapMode},
+    proto::trident::{Exception, IfMacSource, TapMode},
     utils::{
         bytes::read_u16_be,
         net::{self, get_route_src_ip, Link, MacAddr},
@@ -76,6 +77,7 @@ pub(super) struct BaseDispatcher {
     pub(super) platform_poller: Arc<GenericPoller>,
 
     pub(super) policy_getter: PolicyGetter,
+    pub(super) exception_handler: ExceptionHandler,
 }
 
 impl BaseDispatcher {
@@ -95,6 +97,7 @@ impl BaseDispatcher {
     pub(super) fn recv<'a>(
         engine: &'a mut RecvEngine,
         leaky_bucket: &LeakyBucket,
+        exception_handler: &ExceptionHandler,
         prev_timestamp: &mut Duration,
         counter: &PacketCounter,
     ) -> Option<(Packet<'a>, Duration)> {
@@ -129,7 +132,7 @@ impl BaseDispatcher {
         }
         while !leaky_bucket.acquire(1) {
             counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
-            // TODO: SetAnException
+            exception_handler.set(Exception::RxPpsThresholdExceeded);
             thread::sleep(Duration::from_millis(1));
         }
 

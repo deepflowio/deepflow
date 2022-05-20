@@ -19,6 +19,7 @@ use crate::common::{
     TRIDENT_THREAD_LIMIT,
 };
 use crate::dispatcher::BpfOptions;
+use crate::exception::ExceptionHandler;
 use crate::proto::trident::IfMacSource;
 use crate::{
     common::decapsulate::{TunnelType, TunnelTypeBitmap},
@@ -28,7 +29,7 @@ use crate::{
     proto::trident::{self, CaptureSocketType},
     proto::{
         common::TridentType,
-        trident::{SocketType, TapMode},
+        trident::{Exception, SocketType, TapMode},
     },
     trident::Components,
     utils::environment::is_tt_pod,
@@ -974,6 +975,7 @@ impl ConfigHandler {
     pub fn on_config(
         &mut self,
         mut new_config: NewRuntimeConfig,
+        exception_handler: &ExceptionHandler,
     ) -> Vec<fn(&ConfigHandler, &mut Components)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &mut self.static_config;
@@ -987,6 +989,7 @@ impl ConfigHandler {
                     "analyzer_ip({}) get route src ip failed: {}",
                     new_config.dispatcher.analyzer_ip, e
                 );
+                exception_handler.set(Exception::InvalidConfiguration);
                 candidate_config.dispatcher.source_ip
             }
         };
@@ -1387,6 +1390,7 @@ impl ConfigHandler {
         // deploy updated config
         self.current_config
             .store(Arc::new(candidate_config.clone()));
+        exception_handler.clear(Exception::InvalidConfiguration);
 
         callbacks
     }

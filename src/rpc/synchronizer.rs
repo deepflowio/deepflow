@@ -18,8 +18,9 @@ use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface};
 use crate::config::RuntimeConfig;
 use crate::dispatcher::DispatcherListener;
+use crate::exception::ExceptionHandler;
 use crate::policy::PolicySetter;
-use crate::proto::trident::{self as tp, TapMode};
+use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
 use crate::trident::{self, TridentState};
 use crate::utils::{
@@ -306,6 +307,7 @@ pub struct Synchronizer {
     dispatcher_listener: Arc<Mutex<Option<DispatcherListener>>>,
     // 策略模块和NPB带宽检测会用到
     flow_acl_listener: Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
+    exception_handler: ExceptionHandler,
 
     running: Arc<AtomicBool>,
 
@@ -328,6 +330,7 @@ impl Synchronizer {
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
         policy_setter: PolicySetter,
+        exception_handler: ExceptionHandler,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -351,6 +354,7 @@ impl Synchronizer {
             rt: Runtime::new().unwrap(),
             threads: Default::default(),
             flow_acl_listener: Arc::new(sync::Mutex::new(vec![Box::new(policy_setter)])),
+            exception_handler,
 
             max_memory: Default::default(),
         }
@@ -373,6 +377,7 @@ impl Synchronizer {
     pub fn generate_sync_request(
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
+        exception_handler: &ExceptionHandler,
     ) -> tp::SyncRequest {
         let status = status.read();
 
@@ -402,7 +407,7 @@ impl Synchronizer {
             version_groups: Some(status.version_groups),
             state: Some(tp::State::Running.into()),
             revision: Some(static_config.revision.clone()),
-            exception: None, // TBD
+            exception: Some(exception_handler.take()),
             process_name: Some("trident".into()),
             ctrl_mac: Some(static_config.ctrl_mac.clone()),
             ctrl_ip: Some(static_config.ctrl_ip.clone()),
@@ -502,6 +507,7 @@ impl Synchronizer {
         dispatcher_listener: &Arc<Mutex<Option<DispatcherListener>>>,
         flow_acl_listener: &Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
         max_memory: &Arc<AtomicU64>,
+        exception_handler: &ExceptionHandler,
     ) {
         // TODO: reset escape timer
         // TODO: 把cleaner UpdatePcapDataRetention挪到别的地方
@@ -529,6 +535,7 @@ impl Synchronizer {
                 "invalid response from {} with invalid config: {}",
                 remote, e
             );
+            exception_handler.set(Exception::InvalidConfiguration);
             return;
         }
         let mut runtime_config = runtime_config.unwrap();
@@ -562,8 +569,16 @@ impl Synchronizer {
             let last = SystemTime::now();
             info!("Grpc version ip-groups: {}, interfaces, peer-connections and cidrs: {}, flow-acls: {}",
             status.version_groups, status.version_platform_data, status.version_acls);
+            let policy_error = false;
             for listener in flow_acl_listener.lock().unwrap().iter_mut() {
+                // TODO: error handling
                 status.trigger_flow_acl(listener);
+            }
+            if policy_error {
+                warn!("OnPolicyChange error, set exception TOO_MANY_POLICIES.");
+                exception_handler.set(Exception::TooManyPolicies);
+            } else {
+                exception_handler.clear(Exception::TooManyPolicies);
             }
             let now = SystemTime::now();
             info!("Grpc finish update cost {:?} on {} listener, {} ip-groups, {} interfaces, {} peer-connections, {} cidrs, {} flow-acls",
@@ -596,6 +611,7 @@ impl Synchronizer {
         let dispatcher_listener = self.dispatcher_listener.clone();
         let max_memory = self.max_memory.clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
+        let exception_handler = self.exception_handler.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 session.update_current_server().await;
@@ -608,7 +624,11 @@ impl Synchronizer {
                 let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
                 let version = session.get_version();
                 let response = client
-                    .push(Synchronizer::generate_sync_request(&static_config, &status))
+                    .push(Synchronizer::generate_sync_request(
+                        &static_config,
+                        &status,
+                        &exception_handler,
+                    ))
                     .await;
                 if let Err(m) = response {
                     warn!("rpc error {:?}", m);
@@ -647,6 +667,7 @@ impl Synchronizer {
                         &dispatcher_listener,
                         &flow_acl_listener,
                         &max_memory,
+                        &exception_handler,
                     );
                 }
             }
@@ -664,6 +685,7 @@ impl Synchronizer {
         let dispatcher_listener = self.dispatcher_listener.clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
         let max_memory = self.max_memory.clone();
+        let exception_handler = self.exception_handler.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
             let version = session.get_version();
@@ -692,7 +714,11 @@ impl Synchronizer {
                 }
 
                 let changed = session.update_current_server().await;
-                let request = Synchronizer::generate_sync_request(&static_config, &status);
+                let request = Synchronizer::generate_sync_request(
+                    &static_config,
+                    &status,
+                    &exception_handler,
+                );
                 debug!("grpc sync request: {:?}", request);
 
                 if client.is_none() || version != session.get_version() {
@@ -739,6 +765,7 @@ impl Synchronizer {
                     &dispatcher_listener,
                     &flow_acl_listener,
                     &max_memory,
+                    &exception_handler,
                 );
                 let (new_revision, proxy_ip, new_sync_interval) = {
                     let status = status.read();

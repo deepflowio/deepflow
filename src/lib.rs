@@ -8,6 +8,7 @@ pub mod dispatcher;
 mod ebpf;
 mod ebpf_collector;
 mod error;
+mod exception;
 mod flow_generator;
 mod handler;
 mod metric;

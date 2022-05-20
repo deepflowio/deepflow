@@ -30,6 +30,7 @@ use recv_engine::{
 use crate::{
     common::{enums::TapType, PlatformData, TaggedFlow, TapTyper},
     config::{handler::FlowAccess, RuntimeConfig},
+    exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::{GenericPoller, LibvirtXmlExtractor},
@@ -309,6 +310,7 @@ pub struct DispatcherBuilder {
     flow_map_config: Option<FlowAccess>,
     policy_getter: Option<PolicyGetter>,
     platform_poller: Option<Arc<GenericPoller>>,
+    exception_handler: Option<ExceptionHandler>,
 }
 
 impl DispatcherBuilder {
@@ -398,6 +400,11 @@ impl DispatcherBuilder {
 
     pub fn platform_poller(mut self, v: Arc<GenericPoller>) -> Self {
         self.platform_poller = Some(v);
+        self
+    }
+
+    pub fn exception_handler(mut self, v: ExceptionHandler) -> Self {
+        self.exception_handler = Some(v);
         self
     }
 
@@ -513,6 +520,10 @@ impl DispatcherBuilder {
                 .platform_poller
                 .take()
                 .ok_or(Error::ConfigIncomplete("no platform poller".into()))?,
+            exception_handler: self
+                .exception_handler
+                .take()
+                .ok_or(Error::ConfigIncomplete("no exception handler".into()))?,
         };
         collector.register_countable(
             "dispatcher",
