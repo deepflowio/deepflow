@@ -58,6 +58,7 @@ impl LocalModeDispatcher {
             let recved = BaseDispatcher::recv(
                 &mut base.engine,
                 &base.leaky_bucket,
+                &base.exception_handler,
                 &mut prev_timestamp,
                 &base.counter,
             );

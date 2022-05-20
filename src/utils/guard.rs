@@ -12,6 +12,8 @@ use log::{error, info, warn};
 use super::process::{get_memory_rss, get_process_num, get_thread_num};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::config::handler::EnvironmentAccess;
+use crate::exception::ExceptionHandler;
+use crate::proto::trident::Exception;
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -19,14 +21,16 @@ pub struct Guard {
     config: EnvironmentAccess,
     thread: Mutex<Option<JoinHandle<()>>>,
     running: Arc<(Mutex<bool>, Condvar)>,
+    exception_handler: ExceptionHandler,
 }
 
 impl Guard {
-    pub fn new(config: EnvironmentAccess) -> Self {
+    pub fn new(config: EnvironmentAccess, exception_handler: ExceptionHandler) -> Self {
         Self {
             config,
             thread: Mutex::new(None),
             running: Arc::new((Mutex::new(false), Condvar::new())),
+            exception_handler,
         }
     }
 
@@ -42,6 +46,7 @@ impl Guard {
 
         let limit = self.config.clone();
         let running = self.running.clone();
+        let exception_handler = self.exception_handler.clone();
         let thread = thread::spawn(move || {
             loop {
                 let memory_limit = limit.load().max_memory;
@@ -76,6 +81,7 @@ impl Guard {
                                 thread::sleep(Duration::from_secs(1));
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }
+                            exception_handler.set(Exception::ProcessThresholdExceeded);
                         }
                     }
                     Err(e) => {
@@ -96,6 +102,7 @@ impl Guard {
                                 thread::sleep(Duration::from_secs(1));
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }
+                            exception_handler.set(Exception::ThreadThresholdExceeded);
                         }
                     }
                     Err(e) => {
