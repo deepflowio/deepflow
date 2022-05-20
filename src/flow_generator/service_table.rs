@@ -4,7 +4,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use lru::LruCache;
 
 use crate::common::enums::TcpFlags;
-use crate::utils::hasher::Jenkins64Hasher;
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ServiceKey {
@@ -64,8 +63,8 @@ impl Hash for Ipv6Key {
 }
 
 pub struct ServiceTable {
-    ipv4: LruCache<Ipv4Key, u8, Jenkins64Hasher>,
-    ipv6: LruCache<Ipv6Key, u8, Jenkins64Hasher>,
+    ipv4: LruCache<Ipv4Key, u8>,
+    ipv6: LruCache<Ipv6Key, u8>,
 }
 
 impl ServiceTable {
@@ -76,8 +75,8 @@ impl ServiceTable {
 
     pub fn new(ipv4_capacity: usize, ipv6_capacity: usize) -> Self {
         Self {
-            ipv4: LruCache::with_hasher(ipv4_capacity, Jenkins64Hasher::default()),
-            ipv6: LruCache::with_hasher(ipv6_capacity, Jenkins64Hasher::default()),
+            ipv4: LruCache::new(ipv4_capacity),
+            ipv6: LruCache::new(ipv6_capacity),
         }
     }
 
@@ -315,19 +314,13 @@ mod tests {
 
     #[test]
     fn service_key() {
-        let mut hasher = Jenkins64Hasher::default();
         let key1 = Ipv4Key::new(Ipv4Addr::new(192, 168, 1, 1), EPC_FROM_DEEPFLOW as i16, 80);
         let key2 = Ipv4Key::new(
             Ipv4Addr::new(192, 168, 1, 1),
             EPC_FROM_DEEPFLOW as i16,
             8080,
         );
-        key1.hash(&mut hasher);
-        let hash1 = hasher.finish();
-        hasher = Jenkins64Hasher::default();
-        key2.hash(&mut hasher);
-        let hash2 = hasher.finish();
-        assert_ne!(hash1, hash2);
+        assert_ne!(key1, key2);
         let key1 = Ipv6Key::new(
             Ipv6Addr::from_str("1002:1003:4421:5566:7788:99aa:bbcc:ddee").unwrap(),
             EPC_FROM_DEEPFLOW as i16,
@@ -338,12 +331,7 @@ mod tests {
             EPC_FROM_DEEPFLOW as i16,
             8080,
         );
-        key1.hash(&mut hasher);
-        let hash1 = hasher.finish();
-        hasher = Jenkins64Hasher::default();
-        key2.hash(&mut hasher);
-        let hash2 = hasher.finish();
-        assert_ne!(hash1, hash2);
+        assert_ne!(key1, key2);
     }
 
     #[test]

@@ -21,7 +21,7 @@ use super::{
     perf::{get_l7_protocol, FlowPerf, FlowPerfCounter, L7RrtCache, DUBBO_PORT},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
-    FlowMapKey, FlowNode, FlowState, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
+    FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
     FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
     SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
     THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
@@ -42,15 +42,14 @@ use crate::{
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
     rpc::get_timestamp,
-    utils::hasher::Jenkins64Hasher,
     utils::net::MacAddr,
     utils::queue::{self, DebugSender, Receiver},
 };
 
 // not thread-safe
 pub struct FlowMap {
-    node_map: Option<HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>>,
-    time_set: Option<BTreeSet<Rc<FlowMapKey>>>,
+    node_map: Option<HashMap<FlowMapKey, Vec<FlowNode>>>,
+    time_set: Option<BTreeSet<FlowTimeKey>>,
     id: u32,
     state_machine_master: StateMachine,
     state_machine_slave: StateMachine,
@@ -80,7 +79,7 @@ impl FlowMap {
 
         (
             Self {
-                node_map: Some(HashMap::with_hasher(Jenkins64Hasher::default())),
+                node_map: Some(HashMap::new()),
                 time_set: Some(BTreeSet::new()),
                 id,
                 state_machine_master: StateMachine::new_master(&config.load().flow_timeout),
@@ -130,21 +129,28 @@ impl FlowMap {
             }
         };
 
-        let start_time_key = Rc::new(FlowMapKey {
-            current_time_in_unit: self.start_time_in_unit,
+        let start_time_key = FlowTimeKey {
+            timestamp_key: self.start_time_in_unit * TIME_UNIT.as_nanos() as u64,
             ..Default::default()
-        });
-        let next_time_key = Rc::new(FlowMapKey {
-            current_time_in_unit: next_start_time_in_unit,
+        };
+        let next_time_key = FlowTimeKey {
+            timestamp_key: next_start_time_in_unit * TIME_UNIT.as_nanos() as u64,
             ..Default::default()
-        });
+        };
+        // 如果用时间确定某个范围的key，则有相同hash的但不是相同时间的问题
         let need_solve_keys = time_set
             .range(start_time_key..next_time_key)
             .map(|k| k.clone())
             .collect::<Vec<_>>();
 
         for time_key in need_solve_keys {
-            let mut node = node_map.remove(&time_key).unwrap();
+            let nodes = node_map.get_mut(&time_key.map_key).unwrap();
+            let index = nodes
+                .iter()
+                .position(|node| node.timestamp_key == time_key.timestamp_key)
+                .unwrap();
+            let mut node = nodes.swap_remove(index);
+
             let timeout = node.recent_time + node.timeout;
             if timestamp >= timeout {
                 // 超时Flow将被删除然后把统计信息发送队列下游
@@ -155,17 +161,16 @@ impl FlowMap {
             // 未超时Flow的统计信息发送到队列下游
             self.node_updated_aftercare(&mut node, timeout, None);
             // 若流统计信息已输出，将节点移动至最终超时的时间
-            let updated_time_in_unit = if timeout > timestamp + TIME_MAX_INTERVAL {
-                ((timestamp + TIME_MAX_INTERVAL).as_nanos() / TIME_UNIT.as_nanos()) as u64
+            let updated_time = if timeout > timestamp + TIME_MAX_INTERVAL {
+                (timestamp + TIME_MAX_INTERVAL).as_nanos() as u64
             } else {
-                (timeout.as_nanos() / TIME_UNIT.as_nanos()) as u64
+                timeout.as_nanos() as u64
             };
-            time_set.remove(&time_key);
-            let mut new_key = Rc::try_unwrap(time_key).unwrap();
-            new_key.current_time_in_unit = updated_time_in_unit;
-            let rc_new_key = Rc::new(new_key);
-            time_set.insert(rc_new_key.clone());
-            node_map.insert(rc_new_key, node);
+            let mut removed_key = time_set.take(&time_key).unwrap();
+            removed_key.reset_timestamp_key(updated_time);
+            node.timestamp_key = updated_time;
+            nodes.push(node);
+            time_set.insert(removed_key);
         }
 
         self.node_map.replace(node_map);
@@ -184,18 +189,7 @@ impl FlowMap {
             return;
         }
 
-        let config_ignore = (
-            self.config.load().ignore_l2_end,
-            self.config.load().ignore_tor_mac,
-        );
-        let time_in_unit =
-            (meta_packet.lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos()) as u64;
-        let pkt_key = Rc::new(FlowMapKey::new(
-            time_in_unit,
-            &meta_packet,
-            config_ignore,
-            self.config.load().trident_type,
-        ));
+        let pkt_key = FlowMapKey::new(&meta_packet.lookup_key, meta_packet.tap_port);
 
         let (mut node_map, mut time_set) = match self.node_map.take().zip(self.time_set.take()) {
             Some(pair) => pair,
@@ -204,65 +198,72 @@ impl FlowMap {
                 return;
             }
         };
-        let total_flow = node_map.len();
+        let total_flow = time_set.len();
 
-        match node_map.remove_entry(&pkt_key) {
+        let pkt_timestamp = meta_packet.lookup_key.timestamp;
+        match node_map.get_mut(&pkt_key) {
             // 找到Flow,更新
-            Some((key, mut node)) => {
-                let pkt_timestamp = meta_packet.lookup_key.timestamp;
-                // update flow meta_packet direction for flow
-                // go 版本定方向在flow_extra.Match函数做的，因为现在match使用特定的key，所以除了key要定方向之外，
-                // meta_packet也要定方向
-                let lookup_key = &meta_packet.lookup_key;
-                let node_flow_key = &node.tagged_flow.flow.flow_key;
-                if lookup_key.src_mac == node_flow_key.mac_src
-                    && lookup_key.dst_mac == node_flow_key.mac_dst
-                    && lookup_key.src_ip == node_flow_key.ip_src
-                    && lookup_key.dst_ip == node_flow_key.ip_dst
-                {
-                    meta_packet.direction = PacketDirection::ClientToServer;
-                } else if lookup_key.src_mac == node_flow_key.mac_dst
-                    && lookup_key.dst_mac == node_flow_key.mac_src
-                    && lookup_key.src_ip == node_flow_key.ip_dst
-                    && lookup_key.dst_ip == node_flow_key.ip_src
-                {
-                    meta_packet.direction = PacketDirection::ServerToClient;
+            Some(nodes) => {
+                let (config_ignore, trident_type) = {
+                    let guard = self.config.load();
+                    (
+                        (guard.ignore_l2_end, guard.ignore_tor_mac),
+                        guard.trident_type,
+                    )
+                };
+                let index = nodes.iter().position(|node| {
+                    node.match_node(&mut meta_packet, config_ignore, trident_type)
+                });
+                if index.is_none() {
+                    let node = self.new_flow_node(meta_packet, total_flow);
+                    let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
+                    time_set.insert(time_key);
+                    nodes.push(node);
+                    self.node_map.replace(node_map);
+                    self.time_set.replace(time_set);
+                    return;
                 }
 
+                let mut node = nodes.swap_remove(index.unwrap());
                 // 1. 输出上一个统计周期的统计信息
                 self.node_updated_aftercare(&mut node, pkt_timestamp, Some(&mut meta_packet));
 
                 // 2. 更新Flow状态，判断是否已结束
+                // 设置timestamp_key为流的相同，time_set根据key来删除
+                let time_key = FlowTimeKey::new(Duration::from_nanos(node.timestamp_key), pkt_key);
                 match meta_packet.lookup_key.proto {
                     IpProtocol::Tcp => {
-                        self.update_tcp_node(node, meta_packet, key, &mut time_set, &mut node_map)
+                        self.update_tcp_node(node, meta_packet, time_key, &mut time_set, nodes)
                     }
-                    IpProtocol::Udp => self.update_udp_node(node, meta_packet, key, &mut node_map),
+                    IpProtocol::Udp => self.update_udp_node(node, meta_packet, nodes),
 
-                    _ => self.update_other_node(node, meta_packet, key, &mut node_map),
+                    _ => self.update_other_node(node, meta_packet, nodes),
                 };
             }
             // 未找到Flow，需要插入新的节点
             None => {
                 let node = self.new_flow_node(meta_packet, total_flow);
-                time_set.insert(pkt_key.clone());
-                node_map.insert(pkt_key, node);
+
+                let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
+                time_set.insert(time_key);
+
+                node_map.insert(pkt_key, vec![node]);
             }
         }
 
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
-        // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 返回false,
-        // rust 版本用了std的hashmap自动处理扩容,也就没有返回false, 然后执行policy_getter
+        // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 才会执行policy_getter,
+        // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
     }
 
     fn update_tcp_node(
         &mut self,
         mut node: FlowNode,
         mut meta_packet: MetaPacket,
-        pkt_key: Rc<FlowMapKey>,
-        time_set: &mut BTreeSet<Rc<FlowMapKey>>,
-        node_map: &mut HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>,
+        time_key: FlowTimeKey,
+        time_set: &mut BTreeSet<FlowTimeKey>,
+        slot_nodes: &mut Vec<FlowNode>,
     ) {
         let timestamp = meta_packet.lookup_key.timestamp;
         let flow_closed = self.update_tcp_flow(&mut meta_packet, &mut node);
@@ -271,10 +272,10 @@ impl FlowMap {
             self.collect_metric(&mut node, &meta_packet, direction);
         }
         if flow_closed {
-            time_set.remove(&pkt_key);
+            time_set.remove(&time_key);
             self.node_removed_aftercare(node, timestamp, Some(&mut meta_packet));
         } else {
-            node_map.insert(pkt_key, node);
+            slot_nodes.push(node);
         }
     }
 
@@ -282,8 +283,7 @@ impl FlowMap {
         &mut self,
         mut node: FlowNode,
         mut meta_packet: MetaPacket,
-        pkt_key: Rc<FlowMapKey>,
-        node_map: &mut HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>,
+        slot_nodes: &mut Vec<FlowNode>,
     ) {
         self.update_flow(&mut node, &mut meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
@@ -301,15 +301,14 @@ impl FlowMap {
             );
         }
 
-        node_map.insert(pkt_key, node);
+        slot_nodes.push(node);
     }
 
     fn update_other_node(
         &mut self,
         mut node: FlowNode,
         mut meta_packet: MetaPacket,
-        pkt_key: Rc<FlowMapKey>,
-        node_map: &mut HashMap<Rc<FlowMapKey>, FlowNode, Jenkins64Hasher>,
+        slot_nodes: &mut Vec<FlowNode>,
     ) {
         self.update_flow(&mut node, &mut meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
@@ -319,7 +318,7 @@ impl FlowMap {
             node.timeout = self.config.load().flow_timeout.established_rst;
         }
 
-        node_map.insert(pkt_key, node);
+        slot_nodes.push(node);
     }
 
     fn generate_flow_id(timestamp: Duration, thread_id: u32, total_flow: usize) -> u64 {
@@ -522,6 +521,8 @@ impl FlowMap {
         policy_in_tick[meta_packet.direction as usize] = true;
 
         let mut node = FlowNode {
+            timestamp_key: lookup_key.timestamp.as_nanos() as u64,
+
             tagged_flow,
             min_arrived_time: lookup_key.timestamp,
             recent_time: lookup_key.timestamp,
