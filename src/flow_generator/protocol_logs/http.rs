@@ -293,40 +293,44 @@ impl HttpLog {
                     break;
                 }
 
-                if true {
-                    // FIXME  暂时规避h2pack panic
+                let header_frame_payload =
+                    &frame_payload[l_offset as usize..httpv2_header.frame_length as usize];
+
+                let mut parser = h2pack::parser::Parser::new();
+                let parse_rst = parser.parse(header_frame_payload);
+
+                if let Err(_) = parse_rst {
                     return Err(Error::HttpHeaderParseFailed);
                 }
-
-                let header_frame_payload = &frame_payload[..httpv2_header.frame_length as usize];
-                let mut parser = h2pack::parser::Parser::new();
-                let header_list = parser.parse(header_frame_payload).unwrap();
+                let header_list = parse_rst.unwrap();
 
                 for header in header_list.iter() {
                     match header.0.as_slice() {
                         b":method" => {
                             self.msg_type = LogMessageType::Request;
                             self.info.method =
-                                String::from_utf8_lossy(header.1.as_ref()).into_owned()
+                                String::from_utf8_lossy(header.1.as_slice()).into_owned()
                         }
                         b":status" => {
                             self.msg_type = LogMessageType::Response;
 
-                            self.status_code = str::from_utf8(header.1.as_ref())
+                            self.status_code = str::from_utf8(header.1.as_slice())
                                 .unwrap_or_default()
                                 .parse::<u16>()
                                 .unwrap_or_default();
                             self.set_status(self.status_code);
                         }
                         b"host" | b":authority" => {
-                            self.info.host = String::from_utf8_lossy(header.1.as_ref()).into_owned()
+                            self.info.host =
+                                String::from_utf8_lossy(header.1.as_slice()).into_owned()
                         }
                         b":path" => {
-                            self.info.path = String::from_utf8_lossy(header.1.as_ref()).into_owned()
+                            self.info.path =
+                                String::from_utf8_lossy(header.1.as_slice()).into_owned()
                         }
                         b"content-length" => {
                             content_length = Some(
-                                str::from_utf8(header.1.as_ref())
+                                str::from_utf8(header.1.as_slice())
                                     .unwrap_or_default()
                                     .parse::<u64>()
                                     .unwrap_or_default(),
