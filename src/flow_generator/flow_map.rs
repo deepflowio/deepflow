@@ -18,7 +18,7 @@ use log::{debug, warn};
 use super::{
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{get_l7_protocol, FlowPerf, FlowPerfCounter, L7RrtCache},
+    perf::{get_l7_protocol, FlowPerf, FlowPerfCounter, L7RrtCache, DUBBO_PORT},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -705,7 +705,17 @@ impl FlowMap {
                         .mismatched_response
                         .fetch_add(c, Ordering::Relaxed);
                 }
-                Err(e) => debug!("{}", e),
+                Err(e) => {
+                    if self.l7_metrics_enabled()
+                        && !perf.is_http
+                        && meta_packet.lookup_key.dst_port == DUBBO_PORT
+                        && meta_packet.get_l4_payload().is_some()
+                    {
+                        perf.parse_by_http(self.rrt_cache.clone(), &meta_packet, flow_id);
+                    }
+
+                    debug!("{}", e)
+                }
                 _ => (),
             }
         }
