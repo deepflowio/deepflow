@@ -10,7 +10,7 @@ mod service_table;
 pub use error::Result;
 pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout};
 pub use flow_map::FlowMap;
-use flow_node::{FlowMapKey, FlowNode};
+use flow_node::{FlowMapKey, FlowNode, FlowTimeKey};
 pub use flow_state::FlowState;
 pub use perf::L7RrtCache;
 pub use protocol_logs::{

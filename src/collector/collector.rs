@@ -31,7 +31,6 @@ use crate::{
     rpc::get_timestamp,
     sender::SendItem,
     utils::{
-        hasher::Jenkins64Hasher,
         net::MacAddr,
         queue::{DebugSender, Error, Receiver},
         stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
@@ -256,7 +255,7 @@ struct Stash {
     counter: Arc<CollectorCounter>,
     start_time: Duration,
     slot_interval: u64,
-    inner: HashMap<StashKey, Document, Jenkins64Hasher>,
+    inner: HashMap<StashKey, Document>,
     global_thread_id: u8,
     doc_flag: DocumentFlag,
     context: Context,
@@ -275,7 +274,7 @@ impl Stash {
             start_time: Duration::ZERO,
             global_thread_id: ctx.id as u8 + 1,
             slot_interval,
-            inner: HashMap::with_hasher(Jenkins64Hasher::default()),
+            inner: HashMap::new(),
             doc_flag,
             context: ctx,
         }
@@ -821,7 +820,7 @@ mod tests {
     #[test]
     fn fast_id() {
         let (l3_epc_id, port) = (0xdeadu16, 0xbeef);
-        let mut map = HashSet::with_hasher(Jenkins64Hasher::default());
+        let mut map = HashSet::new();
         let mut tagger = Tagger {
             l3_epc_id: l3_epc_id as i16,
             l3_epc_id1: l3_epc_id as i16,
