@@ -1,9 +1,4 @@
-use std::{
-    cmp::Ordering,
-    hash::{Hash, Hasher},
-    net::IpAddr,
-    time::Duration,
-};
+use std::{net::IpAddr, time::Duration};
 
 use super::{perf::FlowPerf, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
 use crate::{
@@ -11,57 +6,16 @@ use crate::{
         decapsulate::TunnelType,
         endpoint::EndpointData,
         enums::{EthernetType, PacketDirection, TapType},
-        flow::FlowKey,
+        flow::FlowMetricsPeer,
+        lookup_key::LookupKey,
         meta_packet::MetaPacket,
         policy::PolicyData,
         tagged_flow::TaggedFlow,
+        TapPort,
     },
     proto::common::TridentType,
+    utils::{hasher::jenkins64, net::MacAddr},
 };
-
-#[derive(PartialOrd, Debug, Default)]
-pub(super) struct FlowMapKey {
-    pub current_time_in_unit: u64,
-    pub flow_key: FlowKey,
-    pub eth_type: EthernetType,
-    pub tunnel_info: (TunnelType, u8),
-    // 读取Config.FlowGeneratorConfig.(ignore_l2_end, ignore_tor_mac)
-    pub config_ignore: (bool, bool),
-    // LookupKey.l2_end_0, LookupKey.l2_end_1
-    pub lookup_key_enabled: (bool, bool),
-    pub trident_type: TridentType,
-}
-
-impl Ord for FlowMapKey {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let time_unit_ordering = self.current_time_in_unit.cmp(&other.current_time_in_unit);
-        if time_unit_ordering != Ordering::Equal {
-            return time_unit_ordering;
-        }
-        let eth_ordering = self.eth_type.cmp(&other.eth_type);
-        if eth_ordering != Ordering::Equal {
-            return eth_ordering;
-        }
-
-        let flow_key_ordering = self.flow_key.cmp(&other.flow_key);
-        if flow_key_ordering != Ordering::Equal {
-            return flow_key_ordering;
-        }
-        let tunnel_ordering = self
-            .tunnel_info
-            .partial_cmp(&other.tunnel_info)
-            .unwrap_or(Ordering::Equal);
-        if tunnel_ordering != Ordering::Equal {
-            return tunnel_ordering;
-        }
-
-        let config_ignore_ordering = self.config_ignore.cmp(&other.config_ignore);
-        if config_ignore_ordering != Ordering::Equal {
-            return config_ignore_ordering;
-        }
-        self.lookup_key_enabled.cmp(&other.lookup_key_enabled)
-    }
-}
 
 #[repr(u8)]
 enum MatchMac {
@@ -71,186 +25,43 @@ enum MatchMac {
     All,
 }
 
-impl FlowMapKey {
-    pub fn new(
-        time_in_unit: u64,
-        meta_packet: &MetaPacket,
-        config_ignore: (bool, bool),
-        trident_type: TridentType,
-    ) -> Self {
-        let lookup_key = &meta_packet.lookup_key;
+/*
+    FlowTimeKey是用在时间集合流节点映射表的唯一标识。
+    timestamp_key是一个时间戳的纳秒数，是每条flow的唯一时间标识，用作时间集合的排序，会随着流创建和定时刷新而变化。
+    因为定时刷新和删除流都需要节点映射表的对应流节点,所以需要存一个FlowMapKey来找到节点对应的流slot，因为FlowMapKey用静态FlowKey，tap_port和tap_port生成,
+    在复杂的网络环境可能相同，需要通过FlowNode.match_node方法找到对应的节点。
+*/
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct FlowTimeKey {
+    // 作为时间集合的标识
+    // 超过这个时间2554-07-22 07:34:33 GMT+0800 (中国标准时间)会溢出
+    pub timestamp_key: u64,
+    pub map_key: FlowMapKey,
+}
 
+impl FlowTimeKey {
+    pub fn new(timestamp: Duration, map_key: FlowMapKey) -> Self {
         Self {
-            current_time_in_unit: time_in_unit,
-            eth_type: lookup_key.eth_type,
-            flow_key: FlowKey {
-                vtap_id: meta_packet.vlan,
-                tap_type: lookup_key.tap_type,
-                tap_port: meta_packet.tap_port,
-                mac_src: lookup_key.src_mac,
-                mac_dst: lookup_key.dst_mac,
-                ip_src: lookup_key.src_ip,
-                ip_dst: lookup_key.dst_ip,
-                port_src: lookup_key.src_port,
-                port_dst: lookup_key.dst_port,
-                proto: lookup_key.proto,
-            },
-            tunnel_info: if let Some(tunnel) = meta_packet.tunnel {
-                (tunnel.tunnel_type, tunnel.tier)
-            } else {
-                (TunnelType::default(), 0)
-            },
-            config_ignore,
-            lookup_key_enabled: (lookup_key.l2_end_0, lookup_key.l2_end_1),
-            trident_type,
+            timestamp_key: timestamp.as_nanos() as u64,
+            map_key,
         }
     }
 
-    fn is_hyper_v(&self) -> bool {
-        self.trident_type == TridentType::TtHyperVCompute
-            || self.trident_type == TridentType::TtHyperVNetwork
-    }
-
-    // 微软ACS：
-    //   HyperVNetwork网关宿主机和HyperVCompute网关流量模型中，MAC地址不对称
-    //   在浦发环境中，IP地址不存在相同的场景，所以流聚合可直接忽略MAC地址
-    //   但注意：若K8s部署正在HyperV中流量为双层隧道，内部流量为K8s虚拟机的存在相同IP，流聚合不能忽略MAC
-    // 腾讯TCE：
-    //   GRE隧道流量中的mac地址为伪造，流聚合忽略MAC地址
-    // IPIP隧道：
-    //   在IPIP隧道封装场景下，外层MAC在腾讯TCE环境中存在不对称情况
-    //   实际上IPIP没有隧道ID，因此可以肯定不存在IP冲突，忽略MAC也是合理的
-    // TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
-    fn mac_match(&self, other: &Self) -> MatchMac {
-        let ignore_mac = (self.is_hyper_v() && other.tunnel_info.1 < 2)
-            || other.tunnel_info.0 == TunnelType::TencentGre
-            || other.tunnel_info.0 == TunnelType::Ipip;
-
-        let o_flow_key = &other.flow_key;
-        let is_from_isp = o_flow_key.tap_type != TapType::Tor;
-        if is_from_isp || ignore_mac || self.config_ignore.1 {
-            return MatchMac::None;
-        }
-
-        let is_from_trident =
-            o_flow_key.tap_type == TapType::Tor && o_flow_key.tap_port.split_fields().0 > 0;
-
-        if !self.config_ignore.0 && is_from_trident {
-            if !other.lookup_key_enabled.0 && !other.lookup_key_enabled.1 {
-                return MatchMac::None;
-            } else if !other.lookup_key_enabled.0 {
-                return MatchMac::Dst;
-            } else {
-                return MatchMac::Src;
-            }
-        }
-        MatchMac::All
-    }
-
-    fn mac_match_with_direction(
-        &self,
-        other: &Self,
-        match_mac: MatchMac,
-        direction: PacketDirection,
-    ) -> bool {
-        let (src_mac, dst_mac) = match direction {
-            PacketDirection::ClientToServer => (self.flow_key.mac_src, self.flow_key.mac_dst),
-            PacketDirection::ServerToClient => (self.flow_key.mac_dst, self.flow_key.mac_src),
-        };
-
-        match match_mac {
-            MatchMac::Dst => dst_mac == other.flow_key.mac_dst,
-            MatchMac::Src => src_mac == other.flow_key.mac_src,
-            MatchMac::All => dst_mac == other.flow_key.mac_dst && src_mac == other.flow_key.mac_src,
-            _ => true,
-        }
-    }
-
-    fn endpoint_match_with_direction(&self, other: &Self, direction: PacketDirection) -> bool {
-        if other.tunnel_info.0 == TunnelType::None {
-            return true;
-        }
-        // 同一个TapPort上的流量，如果有隧道的话，当Port做发卡弯转发时，进出的内层流量完全一样
-        // 此时需要额外比较L2End确定哪股是进入的哪股是出去的
-        match direction {
-            PacketDirection::ClientToServer => {
-                other.lookup_key_enabled.0 == self.lookup_key_enabled.0
-                    && other.lookup_key_enabled.1 == self.lookup_key_enabled.1
-            }
-            PacketDirection::ServerToClient => {
-                other.lookup_key_enabled.0 == self.lookup_key_enabled.1
-                    && other.lookup_key_enabled.1 == self.lookup_key_enabled.0
-            }
-        }
+    pub fn reset_timestamp_key(&mut self, timestamp: u64) {
+        self.timestamp_key = timestamp;
     }
 }
 
-impl PartialEq for FlowMapKey {
-    fn eq(&self, other: &Self) -> bool {
-        let flow_key = &self.flow_key;
-        let o_flow_key = &other.flow_key;
-        if self.eth_type.ne(&other.eth_type)
-            || flow_key.tap_port.ne(&o_flow_key.tap_port)
-            || flow_key.tap_type.ne(&o_flow_key.tap_type)
-        {
-            return false;
-        }
-        // other ethernet type
-        if other.eth_type != EthernetType::Ipv4 && other.eth_type != EthernetType::Ipv6 {
-            // direction = ClientToServer
-            let eq = flow_key.mac_src.eq(&o_flow_key.mac_src)
-                    && flow_key.mac_dst.eq(&o_flow_key.mac_dst)
-                    && flow_key.ip_src.eq(&o_flow_key.ip_src)
-                    && flow_key.ip_dst.eq(&o_flow_key.ip_dst)
-                // direction = ServerToClient
-                    || flow_key.mac_src.eq(&o_flow_key.mac_dst)
-                        && flow_key.mac_dst.eq(&o_flow_key.mac_src)
-                        && flow_key.ip_src.eq(&o_flow_key.ip_dst)
-                        && flow_key.ip_dst.eq(&o_flow_key.ip_src);
-
-            return eq;
-        }
-
-        if flow_key.proto.ne(&o_flow_key.proto) {
-            return false;
-        }
-
-        if self.tunnel_info.0.ne(&other.tunnel_info.0) || self.tunnel_info.0.ne(&TunnelType::None) {
-            // 微软ACS存在非对称隧道流量，需要排除
-            if !self.is_hyper_v() {
-                return false;
-            }
-        }
-
-        // Ipv4/Ipv6 solve
-        let mac_match = self.mac_match(other);
-        if flow_key.ip_src == o_flow_key.ip_src
-            && flow_key.ip_dst == o_flow_key.ip_dst
-            && flow_key.port_src == o_flow_key.port_src
-            && flow_key.port_dst == o_flow_key.port_dst
-        {
-            // direction = ClientToServer
-            self.endpoint_match_with_direction(other, PacketDirection::ClientToServer)
-                && self.mac_match_with_direction(other, mac_match, PacketDirection::ClientToServer)
-        } else if flow_key.ip_src == o_flow_key.ip_dst
-            && flow_key.ip_dst == o_flow_key.ip_src
-            && flow_key.port_src == o_flow_key.port_dst
-            && flow_key.port_dst == o_flow_key.port_src
-        {
-            // direction = ServerToClient
-            self.endpoint_match_with_direction(other, PacketDirection::ServerToClient)
-                && self.mac_match_with_direction(other, mac_match, PacketDirection::ServerToClient)
-        } else {
-            false
-        }
-    }
-}
-
-impl Eq for FlowMapKey {}
+/*
+    FlowMapKey是流节点映射表的唯一标识,由Jenkins64算法哈希得到，因为FlowMap处理复杂网络环境，
+    所以有可能key对应多个流节点的情况，需要根据流节点的match_node方法在映射表唯一标识一条流。
+*/
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Default)]
+pub(super) struct FlowMapKey(pub u64);
 
 impl FlowMapKey {
-    fn l3_hash(flow_key: &FlowKey) -> Option<u64> {
-        let (src, dst) = match (flow_key.ip_src, flow_key.ip_dst) {
+    fn l3_hash(lookup_key: &LookupKey) -> u64 {
+        let (src, dst) = match (lookup_key.src_ip, lookup_key.dst_ip) {
             (IpAddr::V4(s), IpAddr::V4(d)) => (
                 u32::from_le_bytes(s.octets()),
                 u32::from_le_bytes(d.octets()),
@@ -266,60 +77,51 @@ impl FlowMapKey {
                         )
                     })
             }
-            (_, _) => {
-                return None;
-            }
+            _ => unreachable!(),
         };
 
         if src >= dst {
-            Some((src as u64) << 32 | dst as u64)
+            (src as u64) << 32 | dst as u64
         } else {
-            Some((dst as u64) << 32 | src as u64)
+            (dst as u64) << 32 | src as u64
         }
     }
 
-    fn l4_hash(flow_key: &FlowKey) -> u64 {
-        if flow_key.port_src >= flow_key.port_dst {
-            (flow_key.port_src as u64) << 16 | flow_key.port_dst as u64
+    fn l4_hash(lookup_key: &LookupKey) -> u64 {
+        if lookup_key.src_port >= lookup_key.dst_port {
+            (lookup_key.src_port as u64) << 16 | lookup_key.dst_port as u64
         } else {
-            (flow_key.port_dst as u64) << 16 | flow_key.port_src as u64
+            (lookup_key.dst_port as u64) << 16 | lookup_key.src_port as u64
         }
     }
-}
 
-impl Hash for FlowMapKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let flow_key = &self.flow_key;
-        match self.eth_type {
+    pub(super) fn new(lookup_key: &LookupKey, tap_port: TapPort) -> Self {
+        match lookup_key.eth_type {
             EthernetType::Ipv4 | EthernetType::Ipv6 => {
-                if let Some(lhs) = Self::l3_hash(flow_key) {
-                    let rhs = ((u16::from(flow_key.tap_type) as u64) << 24 | flow_key.tap_port.0)
-                        << 32
-                        | Self::l4_hash(flow_key);
-                    lhs.hash(state);
-                    rhs.hash(state);
-                }
+                let lhs = Self::l3_hash(lookup_key);
+                let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0) << 32
+                    | Self::l4_hash(lookup_key);
+                Self(jenkins64(lhs) ^ jenkins64(rhs))
             }
             EthernetType::Arp => {
-                if let Some(lhs) = Self::l3_hash(flow_key) {
-                    let rhs = ((u16::from(flow_key.tap_type) as u64) << 24 | flow_key.tap_port.0)
-                        << 32
-                        | (u64::from(flow_key.mac_src) ^ u64::from(flow_key.mac_dst));
-                    lhs.hash(state);
-                    rhs.hash(state);
-                }
+                let lhs = Self::l3_hash(lookup_key);
+                let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0 as u64) << 32
+                    | (u64::from(lookup_key.src_mac) ^ u64::from(lookup_key.dst_mac));
+                Self(jenkins64(lhs) ^ jenkins64(rhs))
             }
             _ => {
-                let lhs = (u16::from(flow_key.tap_type) as u64) << 24 | flow_key.tap_port.0;
-                let rhs = u64::from(flow_key.mac_src) ^ u64::from(flow_key.mac_dst);
-                lhs.hash(state);
-                rhs.hash(state);
+                let lhs = (u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0;
+                let rhs = u64::from(lookup_key.src_mac) ^ u64::from(lookup_key.dst_mac);
+                Self(jenkins64(lhs) ^ jenkins64(rhs))
             }
         }
     }
 }
 
 pub struct FlowNode {
+    // 用作time_set比对的标识，等于FlowTimeKey的timestamp_key, 只有创建FlowNode和刷新更新流节点的超时才会更新
+    pub timestamp_key: u64,
+
     pub tagged_flow: TaggedFlow,
     pub min_arrived_time: Duration,
     pub recent_time: Duration, // 最近一个Packet的时间戳
@@ -355,99 +157,238 @@ impl FlowNode {
         flow_metrics_peer_dst.l3_byte_count = 0;
         flow_metrics_peer_dst.l4_byte_count = 0;
     }
+
+    pub fn match_node(
+        &self,
+        meta_packet: &mut MetaPacket,
+        config_ignore: (bool, bool),
+        trident_type: TridentType,
+    ) -> bool {
+        let flow = &self.tagged_flow.flow;
+        let flow_key = &flow.flow_key;
+        let meta_lookup_key = &meta_packet.lookup_key;
+        if flow_key.tap_port != meta_packet.tap_port
+            || flow_key.tap_type != meta_lookup_key.tap_type
+        {
+            return false;
+        }
+        // other ethernet type
+        if flow.eth_type != EthernetType::Ipv4 && meta_lookup_key.eth_type != EthernetType::Ipv6 {
+            if meta_lookup_key.eth_type != flow.eth_type {
+                return false;
+            }
+            // direction = ClientToServer
+            if flow_key.mac_src == meta_lookup_key.src_mac
+                && flow_key.mac_dst == meta_lookup_key.dst_mac
+                && flow_key.ip_src == meta_lookup_key.src_ip
+                && flow_key.ip_dst == meta_lookup_key.dst_ip
+            {
+                meta_packet.direction = PacketDirection::ClientToServer;
+                return true;
+            }
+            // direction = ServerToClient
+            if flow_key.mac_src == meta_lookup_key.dst_mac
+                && flow_key.mac_dst == meta_lookup_key.src_mac
+                && flow_key.ip_src == meta_lookup_key.dst_ip
+                && flow_key.ip_dst == meta_lookup_key.src_ip
+            {
+                meta_packet.direction = PacketDirection::ServerToClient;
+                return true;
+            }
+
+            return false;
+        }
+
+        if flow.eth_type != meta_lookup_key.eth_type {
+            return false;
+        }
+
+        if flow_key.proto != meta_lookup_key.proto {
+            return false;
+        }
+
+        if (meta_packet.tunnel.is_some()
+            && flow.tunnel.tunnel_type != meta_packet.tunnel.unwrap().tunnel_type)
+            || (meta_packet.tunnel.is_none() && flow.tunnel.tunnel_type != TunnelType::None)
+        {
+            // 微软ACS存在非对称隧道流量，需要排除
+            if !Self::is_hyper_v(trident_type) {
+                return false;
+            }
+        }
+
+        // Ipv4/Ipv6 solve
+        let mac_match = Self::mac_match(meta_packet, config_ignore, trident_type);
+        if flow_key.ip_src == meta_lookup_key.src_ip
+            && flow_key.ip_dst == meta_lookup_key.dst_ip
+            && flow_key.port_src == meta_lookup_key.src_port
+            && flow_key.port_dst == meta_lookup_key.dst_port
+        {
+            meta_packet.direction = PacketDirection::ClientToServer;
+            Self::endpoint_match_with_direction(
+                &flow.flow_metrics_peers,
+                meta_packet,
+                PacketDirection::ClientToServer,
+            ) && Self::mac_match_with_direction(
+                meta_packet,
+                flow_key.mac_src,
+                flow_key.mac_dst,
+                mac_match,
+                PacketDirection::ClientToServer,
+            )
+        } else if flow_key.ip_src == meta_lookup_key.dst_ip
+            && flow_key.ip_dst == meta_lookup_key.src_ip
+            && flow_key.port_src == meta_lookup_key.dst_port
+            && flow_key.port_dst == meta_lookup_key.src_port
+        {
+            meta_packet.direction = PacketDirection::ServerToClient;
+            Self::endpoint_match_with_direction(
+                &flow.flow_metrics_peers,
+                meta_packet,
+                PacketDirection::ServerToClient,
+            ) && Self::mac_match_with_direction(
+                meta_packet,
+                flow_key.mac_src,
+                flow_key.mac_dst,
+                mac_match,
+                PacketDirection::ServerToClient,
+            )
+        } else {
+            false
+        }
+    }
+
+    fn is_hyper_v(trident_type: TridentType) -> bool {
+        trident_type == TridentType::TtHyperVCompute || trident_type == TridentType::TtHyperVNetwork
+    }
+
+    // 微软ACS：
+    //   HyperVNetwork网关宿主机和HyperVCompute网关流量模型中，MAC地址不对称
+    //   在浦发环境中，IP地址不存在相同的场景，所以流聚合可直接忽略MAC地址
+    //   但注意：若K8s部署正在HyperV中流量为双层隧道，内部流量为K8s虚拟机的存在相同IP，流聚合不能忽略MAC
+    // 腾讯TCE：
+    //   GRE隧道流量中的mac地址为伪造，流聚合忽略MAC地址
+    // IPIP隧道：
+    //   在IPIP隧道封装场景下，外层MAC在腾讯TCE环境中存在不对称情况
+    //   实际上IPIP没有隧道ID，因此可以肯定不存在IP冲突，忽略MAC也是合理的
+    fn mac_match(
+        meta_packet: &MetaPacket,
+        config_ignore: (bool, bool),
+        trident_type: TridentType,
+    ) -> MatchMac {
+        let ignore_mac = meta_packet.tunnel.is_some()
+            && ((Self::is_hyper_v(trident_type) && meta_packet.tunnel.unwrap().tier < 2)
+                || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::TencentGre
+                || meta_packet.tunnel.unwrap().tunnel_type == TunnelType::Ipip);
+
+        // return value stands different match type, defined by MAC_MATCH_*
+        // TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
+        let is_from_isp = meta_packet.lookup_key.tap_type != TapType::Tor;
+        if is_from_isp || ignore_mac || config_ignore.1 {
+            return MatchMac::None;
+        }
+
+        let is_from_trident = meta_packet.lookup_key.tap_type == TapType::Tor
+            && meta_packet.tap_port.split_fields().0 > 0;
+
+        if !config_ignore.0 && is_from_trident {
+            if !meta_packet.lookup_key.l2_end_0 && !meta_packet.lookup_key.l2_end_1 {
+                return MatchMac::None;
+            } else if !meta_packet.lookup_key.l2_end_0 {
+                return MatchMac::Dst;
+            } else {
+                return MatchMac::Src;
+            }
+        }
+        MatchMac::All
+    }
+
+    fn mac_match_with_direction(
+        meta_packet: &MetaPacket,
+        flow_mac_src: MacAddr,
+        flow_mac_dst: MacAddr,
+        match_mac: MatchMac,
+        direction: PacketDirection,
+    ) -> bool {
+        let (src_mac, dst_mac) = match direction {
+            PacketDirection::ClientToServer => (flow_mac_src, flow_mac_dst),
+            PacketDirection::ServerToClient => (flow_mac_dst, flow_mac_src),
+        };
+
+        match match_mac {
+            MatchMac::Dst => dst_mac == meta_packet.lookup_key.dst_mac,
+            MatchMac::Src => src_mac == meta_packet.lookup_key.src_mac,
+            MatchMac::All => {
+                dst_mac == meta_packet.lookup_key.dst_mac
+                    && src_mac == meta_packet.lookup_key.src_mac
+            }
+            MatchMac::None => true,
+        }
+    }
+
+    fn endpoint_match_with_direction(
+        peers: &[FlowMetricsPeer; 2],
+        meta_packet: &MetaPacket,
+        direction: PacketDirection,
+    ) -> bool {
+        if meta_packet.tunnel.is_none() {
+            return true;
+        }
+
+        // 同一个TapPort上的流量，如果有隧道的话，当Port做发卡弯转发时，进出的内层流量完全一样
+        // 此时需要额外比较L2End确定哪股是进入的哪股是出去的
+        let lookup_key = &meta_packet.lookup_key;
+        match direction {
+            PacketDirection::ClientToServer => {
+                lookup_key.l2_end_0 == peers[0].is_l2_end
+                    && lookup_key.l2_end_1 == peers[1].is_l2_end
+            }
+            PacketDirection::ServerToClient => {
+                lookup_key.l2_end_0 == peers[1].is_l2_end
+                    && lookup_key.l2_end_1 == peers[0].is_l2_end
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-    use std::mem;
     use std::net::{Ipv4Addr, Ipv6Addr};
     use std::str::FromStr;
 
     use super::*;
-    use crate::common::{enums::TapType, tap_port::TapPort};
-    use crate::utils::hasher::Jenkins64Hasher;
-    use crate::utils::net::MacAddr;
 
     // tap_type = TapType::ISP(7), tap_port = 2100, src_mac = B0-60-88-51-D7-54 dst_mac = 00-15-5D-70-01-03
     // src_ipv4addr = 192.168.66.1 dst_ipv4addr = 192.168.66.2 src_port = 19001, dst_port = 19002
     // src_ipv6addr =  fe80::88d3:f197:5843:f873 dst_ipv6addr = fe80::742a:d20d:8d45:56e6
     fn new_map_key(eth_type: EthernetType, src_addr: IpAddr, dst_addr: IpAddr) -> FlowMapKey {
-        FlowMapKey {
-            current_time_in_unit: 0,
-            flow_key: FlowKey {
-                tap_type: TapType::Isp(7),
-                tap_port: TapPort(2100),
-                mac_src: MacAddr::from([0xb0, 0x60, 0x88, 0x51, 0xd7, 0x54]),
-                mac_dst: MacAddr::from([0x00, 0x15, 0x5d, 0x70, 0x01, 0x03]),
-                ip_src: src_addr,
-                ip_dst: dst_addr,
-                port_src: 19001,
-                port_dst: 19002,
-                ..Default::default()
-            },
+        let lookup_key = LookupKey {
+            tap_type: TapType::Isp(7),
+            src_mac: MacAddr::from([0xb0, 0x60, 0x88, 0x51, 0xd7, 0x54]),
+            dst_mac: MacAddr::from([0x00, 0x15, 0x5d, 0x70, 0x01, 0x03]),
+            src_ip: src_addr,
+            dst_ip: dst_addr,
+            src_port: 19001,
+            dst_port: 19002,
             eth_type,
-            tunnel_info: (TunnelType::default(), 0),
-            config_ignore: (false, false),
-            lookup_key_enabled: (false, false),
-            trident_type: TridentType::TtHostPod,
-        }
-    }
-
-    #[test]
-    fn flow_map_key_server_to_client_eq() {
-        let key1 = new_map_key(
-            EthernetType::Ipv4,
-            Ipv4Addr::new(192, 168, 66, 1).into(),
-            Ipv4Addr::new(192, 168, 66, 2).into(),
-        );
-        let mut key2 = new_map_key(
-            EthernetType::Ipv4,
-            Ipv4Addr::new(192, 168, 66, 2).into(),
-            Ipv4Addr::new(192, 168, 66, 1).into(),
-        );
-        let flow_key = &mut key2.flow_key;
-        mem::swap(&mut flow_key.mac_dst, &mut flow_key.mac_src);
-        mem::swap(&mut flow_key.port_dst, &mut flow_key.port_src);
-        assert_eq!(key1, key2);
-    }
-
-    #[test]
-    fn flow_map_key_other_eth_eq() {
-        let key1 = new_map_key(
-            EthernetType::Arp,
-            Ipv4Addr::new(192, 168, 66, 1).into(),
-            Ipv4Addr::new(192, 168, 66, 2).into(),
-        );
-        let mut key2 = new_map_key(
-            EthernetType::Arp,
-            Ipv4Addr::new(192, 168, 66, 2).into(),
-            Ipv4Addr::new(192, 168, 66, 1).into(),
-        );
-        let flow_key = &mut key2.flow_key;
-        mem::swap(&mut flow_key.mac_dst, &mut flow_key.mac_src);
-        assert_eq!(key1, key2);
+            ..Default::default()
+        };
+        FlowMapKey::new(&lookup_key, TapPort(2100))
     }
 
     #[test]
     fn ipv4_node_hash() {
-        let mut hasher = Jenkins64Hasher::default();
         let key = new_map_key(
             EthernetType::Ipv4,
             Ipv4Addr::new(192, 168, 66, 1).into(),
             Ipv4Addr::new(192, 168, 66, 2).into(),
         );
-        let flow_key = &key.flow_key;
         // 右边是go 版本计算得出
-        assert_eq!(FlowMapKey::l3_hash(flow_key), Some(0x242a8c00142a8c0));
-        assert_eq!(FlowMapKey::l4_hash(flow_key), 0x4a3a4a39);
-        key.hash(&mut hasher);
-        assert_eq!(hasher.finish(), 0xecb912dddb15b140);
+        assert_eq!(key.0, 0xecb912dddb15b140);
     }
 
     #[test]
     fn ipv6_node_hash() {
-        let mut hasher = Jenkins64Hasher::default();
         let key = new_map_key(
             EthernetType::Ipv6,
             Ipv6Addr::from_str("fe80::88d3:f197:5843:f873")
@@ -457,17 +398,12 @@ mod tests {
                 .unwrap()
                 .into(),
         );
-        let flow_key = &key.flow_key;
         // 右边是go 版本计算得出
-        assert_eq!(FlowMapKey::l3_hash(flow_key), Some(0xeb84ef07e409102e));
-        assert_eq!(FlowMapKey::l4_hash(flow_key), 0x4a3a4a39);
-        key.hash(&mut hasher);
-        assert_eq!(hasher.finish(), 0xe7f0aea2897fd9ad);
+        assert_eq!(key.0, 0xe7f0aea2897fd9ad);
     }
 
     #[test]
     fn arp_node_hash() {
-        let mut hasher = Jenkins64Hasher::default();
         let key = new_map_key(
             EthernetType::Arp,
             Ipv6Addr::from_str("fe80::88d3:f197:5843:f873")
@@ -478,13 +414,11 @@ mod tests {
                 .into(),
         );
         // 右边是go 版本计算得出
-        key.hash(&mut hasher);
-        assert_eq!(hasher.finish(), 1098954493523811076);
+        assert_eq!(key.0, 1098954493523811076);
     }
 
     #[test]
     fn other_node_hash() {
-        let mut hasher = Jenkins64Hasher::default();
         let key = new_map_key(
             EthernetType::Dot1Q,
             Ipv6Addr::from_str("fe80::88d3:f197:5843:f873")
@@ -495,25 +429,6 @@ mod tests {
                 .into(),
         );
         // 右边是go 版本计算得出
-        key.hash(&mut hasher);
-        assert_eq!(hasher.finish(), 4948968142922745785);
-    }
-
-    #[test]
-    fn node_insert() {
-        let hasher = Jenkins64Hasher::default();
-        let mut set = HashSet::with_hasher(hasher);
-        let key = new_map_key(
-            EthernetType::Ipv4,
-            Ipv4Addr::new(192, 168, 66, 1).into(),
-            Ipv4Addr::new(192, 168, 66, 2).into(),
-        );
-        assert!(set.insert(key));
-        let key = new_map_key(
-            EthernetType::Ipv4,
-            Ipv4Addr::new(192, 168, 66, 1).into(),
-            Ipv4Addr::new(192, 168, 66, 2).into(),
-        );
-        assert!(!set.insert(key));
+        assert_eq!(key.0, 4948968142922745785);
     }
 }
