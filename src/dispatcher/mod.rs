@@ -481,7 +481,7 @@ impl DispatcherBuilder {
                 tap_mode,
             },
 
-            need_update_ebpf: Arc::new(AtomicBool::new(true)),
+            need_update_bpf: Arc::new(AtomicBool::new(true)),
             reset_whitelist: Default::default(),
             tap_interface_whitelist: Default::default(),
 
