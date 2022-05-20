@@ -12,6 +12,7 @@ use super::{chunk_string_payload, Message, Module, MAX_MESSAGE_SIZE};
 use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
 use crate::config::RuntimeConfig;
+use crate::exception::ExceptionHandler;
 use crate::proto::trident::{self, SyncResponse};
 use crate::rpc::{Session, StaticConfig, Status, Synchronizer};
 
@@ -62,7 +63,9 @@ impl RpcDebugger {
     }
 
     async fn get_rpc_response(&self) -> Result<tonic::Response<SyncResponse>, tonic::Status> {
-        let req = Synchronizer::generate_sync_request(&self.config, &self.status);
+        let exception_handler = ExceptionHandler::default();
+        let req =
+            Synchronizer::generate_sync_request(&self.config, &self.status, &exception_handler);
         self.session.update_current_server().await;
 
         let client = self

@@ -1,4 +1,4 @@
-use std::{net::IpAddr, path::Path, process::exit, thread, time::Duration};
+use std::{env, net::IpAddr, path::Path, process::exit, thread, time::Duration};
 
 use bytesize::ByteSize;
 use log::{error, warn};
@@ -6,7 +6,8 @@ use sysinfo::{DiskExt, System, SystemExt};
 
 use crate::common::TRIDENT_PROCESS_LIMIT;
 use crate::error::{Error, Result};
-use crate::proto::common::TridentType;
+use crate::exception::ExceptionHandler;
+use crate::proto::{common::TridentType, trident::Exception};
 
 use super::net::get_link_enabled_features;
 use super::process::{get_memory_rss, get_process_num_by_name};
@@ -78,7 +79,7 @@ pub fn tap_interface_check(tap_interfaces: &[String]) {
     }
 }
 
-pub fn free_memory_check(required: u64) -> Result<()> {
+pub fn free_memory_check(required: u64, exception_handler: &ExceptionHandler) -> Result<()> {
     get_memory_rss()
         .map_err(|e| Error::Environment(e.to_string()))
         .and_then(|memory_usage| {
@@ -91,8 +92,10 @@ pub fn free_memory_check(required: u64) -> Result<()> {
             system.refresh_memory();
 
             if still_need <= system.available_memory() * 1024 {
+                exception_handler.clear(Exception::MemNotEnough);
                 Ok(())
             } else {
+                exception_handler.set(Exception::MemNotEnough);
                 Err(Error::Environment(format!(
                     "need {} more memory to run",
                     ByteSize::b(still_need).to_string_as(true)
@@ -101,11 +104,15 @@ pub fn free_memory_check(required: u64) -> Result<()> {
         })
 }
 
-pub fn free_memory_checker(required: u64) -> Checker {
-    Box::new(move || free_memory_check(required))
+pub fn free_memory_checker(required: u64, exception_handler: ExceptionHandler) -> Checker {
+    Box::new(move || free_memory_check(required, &exception_handler))
 }
 
-pub fn free_space_check<P: AsRef<Path>>(path: P, required: u64) -> Result<()> {
+pub fn free_space_check<P: AsRef<Path>>(
+    path: P,
+    required: u64,
+    exception_handler: &ExceptionHandler,
+) -> Result<()> {
     let mut system = System::new();
     system.refresh_disks_list();
 
@@ -130,6 +137,7 @@ pub fn free_space_check<P: AsRef<Path>>(path: P, required: u64) -> Result<()> {
     }
 
     if required > disk_free_usage {
+        exception_handler.set(Exception::DiskNotEnough);
         return Err(Error::Environment(format!(
             "insufficient free space at {}, at least {} required",
             path.as_ref().display(),
@@ -137,12 +145,17 @@ pub fn free_space_check<P: AsRef<Path>>(path: P, required: u64) -> Result<()> {
         )));
     }
 
+    exception_handler.clear(Exception::DiskNotEnough);
     Ok(())
 }
 
-pub fn free_space_checker<P: AsRef<Path>>(path: P, required: u64) -> Checker {
+pub fn free_space_checker<P: AsRef<Path>>(
+    path: P,
+    required: u64,
+    exception_handler: ExceptionHandler,
+) -> Checker {
     let path = path.as_ref().to_owned();
-    Box::new(move || free_space_check(&path, required))
+    Box::new(move || free_space_check(&path, required, &exception_handler))
 }
 
 pub fn controller_ip_check(ips: &[String]) {
@@ -171,9 +184,15 @@ pub fn controller_ip_check(ips: &[String]) {
 
 pub fn trident_process_check() {
     let process_num = if cfg!(target_os = "windows") {
-        get_process_num_by_name("trident.exe")
+        get_process_num_by_name("metaflow-agent.exe")
     } else {
-        get_process_num_by_name("trident")
+        let base_name = Path::new(&env::args().next().unwrap())
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        get_process_num_by_name(&base_name)
     };
 
     match process_num {

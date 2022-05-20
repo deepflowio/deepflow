@@ -17,6 +17,7 @@ use log::{info, warn};
 
 use crate::common::DropletMessageType;
 use crate::debug::QueueDebugger;
+use crate::exception::ExceptionHandler;
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
 use crate::utils::guard::Guard;
@@ -165,6 +166,7 @@ impl Trident {
 
         let mut config_handler =
             ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle, remote_log_config);
+        let exception_handler = ExceptionHandler::default();
 
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
@@ -177,6 +179,7 @@ impl Trident {
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             policy_setter,
+            exception_handler.clone(),
         ));
         synchronizer.start();
 
@@ -210,6 +213,7 @@ impl Trident {
                             &session,
                             &synchronizer,
                             policy_getter,
+                            exception_handler.clone(),
                         )?;
                         comp.start();
                         components.replace(comp);
@@ -219,7 +223,7 @@ impl Trident {
                 }
             };
 
-            let callbacks = config_handler.on_config(new_conf);
+            let callbacks = config_handler.on_config(new_conf, &exception_handler);
             match components.as_mut() {
                 None => {
                     let mut comp = Components::new(
@@ -229,6 +233,7 @@ impl Trident {
                         &session,
                         &synchronizer,
                         policy_getter,
+                        exception_handler.clone(),
                     )?;
                     comp.start();
                     for callback in callbacks {
@@ -368,6 +373,7 @@ impl Components {
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
         policy_getter: PolicyGetter,
+        exception_handler: ExceptionHandler,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -379,6 +385,7 @@ impl Components {
         check(free_space_checker(
             &static_config.log_file,
             FREE_SPACE_REQUIREMENT,
+            exception_handler.clone(),
         ));
 
         match static_config.tap_mode {
@@ -386,6 +393,7 @@ impl Components {
             _ => {
                 check(free_memory_checker(
                     config_handler.candidate_config.environment.max_memory,
+                    exception_handler.clone(),
                 ));
                 info!("Complete memory check");
 
@@ -630,6 +638,7 @@ impl Components {
                 .flow_map_config(config_handler.flow())
                 .policy_getter(policy_getter)
                 .platform_poller(platform_synchronizer.clone_poller())
+                .exception_handler(exception_handler.clone())
                 .build()
                 .unwrap();
 
@@ -662,7 +671,7 @@ impl Components {
 
         let monitor = Monitor::new(stats_collector.clone())?;
 
-        let guard = Guard::new(config_handler.environment());
+        let guard = Guard::new(config_handler.environment(), exception_handler.clone());
 
         let ebpf_collector = EbpfCollector::new(
             &config_handler.candidate_config.ebpf,
