@@ -64,9 +64,9 @@ impl LocalModeDispatcher {
             if recved.is_none() {
                 flow_map.inject_flush_ticker(Duration::ZERO);
                 if base.tap_interface_whitelist.next_sync(Duration::ZERO) {
-                    base.need_update_ebpf.store(true, Ordering::Relaxed);
+                    base.need_update_bpf.store(true, Ordering::Relaxed);
                 }
-                base.check_and_update_ebpf();
+                base.check_and_update_bpf();
                 continue;
             }
             let (packet, mut timestamp) = recved.unwrap();
@@ -198,10 +198,10 @@ impl LocalModeDispatcher {
                 .tap_interface_whitelist
                 .next_sync(meta_packet.lookup_key.timestamp)
             {
-                base.need_update_ebpf.store(true, Ordering::Relaxed);
+                base.need_update_bpf.store(true, Ordering::Relaxed);
             }
             flow_map.inject_meta_packet(meta_packet);
-            base.check_and_update_ebpf();
+            base.check_and_update_bpf();
         }
 
         base.terminate_queue();

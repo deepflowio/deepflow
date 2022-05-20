@@ -59,7 +59,7 @@ pub(super) struct BaseDispatcher {
 
     pub(super) tap_type_handler: TapTypeHandler,
 
-    pub(super) need_update_ebpf: Arc<AtomicBool>,
+    pub(super) need_update_bpf: Arc<AtomicBool>,
     // 该表中的tap接口采集包长不截断
     pub(super) reset_whitelist: Arc<AtomicBool>,
     pub(super) tap_interface_whitelist: TapInterfaceWhitelist,
@@ -223,7 +223,7 @@ impl BaseDispatcher {
             bpf_options: self.bpf_options.clone(),
             pipelines: self.pipelines.clone(),
             tap_interfaces: self.tap_interfaces.clone(),
-            need_update_ebpf: self.need_update_ebpf.clone(),
+            need_update_bpf: self.need_update_bpf.clone(),
             platform_poller: self.platform_poller.clone(),
             capture_bpf: "".into(),
             proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
@@ -261,8 +261,8 @@ impl BaseDispatcher {
         }
     }
 
-    pub(super) fn check_and_update_ebpf(&mut self) {
-        if !self.need_update_ebpf.swap(false, Ordering::Relaxed) {
+    pub(super) fn check_and_update_bpf(&mut self) {
+        if !self.need_update_bpf.swap(false, Ordering::Relaxed) {
             return;
         }
         let tap_interfaces = self.tap_interfaces.lock().unwrap();
@@ -271,14 +271,12 @@ impl BaseDispatcher {
         }
         let bpf_options = self.bpf_options.lock().unwrap();
         info!("bpf set to: {}", bpf_options.bpf_syntax);
-        /*
         if let Err(e) = self
             .engine
             .set_bpf(&CString::new(&*bpf_options.bpf_syntax).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
-        */
     }
 }
 
@@ -374,7 +372,7 @@ pub(super) struct BaseDispatcherListener {
     pub bpf_options: Arc<Mutex<BpfOptions>>,
     pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
-    pub need_update_ebpf: Arc<AtomicBool>,
+    pub need_update_bpf: Arc<AtomicBool>,
     pub platform_poller: Arc<GenericPoller>,
     pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
 
@@ -433,7 +431,7 @@ impl BaseDispatcherListener {
         let mut bpf_options = self.bpf_options.lock().unwrap();
         if bpf_options.bpf_syntax != bpf_syntax {
             bpf_options.bpf_syntax = bpf_syntax;
-            self.need_update_ebpf.store(true, Ordering::Release);
+            self.need_update_bpf.store(true, Ordering::Release);
         }
         mem::drop(bpf_options);
 
@@ -517,6 +515,6 @@ impl BaseDispatcherListener {
             return;
         }
         *tap_interfaces = interfaces;
-        self.need_update_ebpf.store(true, Ordering::Release);
+        self.need_update_bpf.store(true, Ordering::Release);
     }
 }
