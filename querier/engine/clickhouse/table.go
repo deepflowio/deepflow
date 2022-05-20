@@ -1,12 +1,12 @@
 package clickhouse
 
-var TABLE_MAP = map[string][]string{
-	"flow_log": []string{"l4_flow_log"},
-}
+import (
+	"metaflow/querier/engine/clickhouse/common"
+)
 
 func GetDatabases() map[string][]interface{} {
 	var values []interface{}
-	for db := range TABLE_MAP {
+	for db := range common.DB_TABLE_MAP {
 		values = append(values, []string{db})
 	}
 	return map[string][]interface{}{
@@ -17,7 +17,7 @@ func GetDatabases() map[string][]interface{} {
 
 func GetTables(db string) map[string][]interface{} {
 	var values []interface{}
-	tables, ok := TABLE_MAP[db]
+	tables, ok := common.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
 	}

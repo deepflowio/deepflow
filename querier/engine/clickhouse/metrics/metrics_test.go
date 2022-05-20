@@ -39,6 +39,12 @@ func TestCheckDBField(t *testing.T) {
 						metrics = L7_FLOW_LOG_METRICS
 						replaceMetrics = L7_FLOW_LOG_METRICS_REPLACE
 					}
+				case "vtap_flow_port":
+					metrics = VTAP_FLOW_PORT_METRICS
+					replaceMetrics = VTAP_FLOW_PORT_METRICS_REPLACE
+				case "vtap_flow_edge_port":
+					metrics = VTAP_FLOW_EDGE_PORT_METRICS
+					replaceMetrics = VTAP_FLOW_EDGE_PORT_METRICS_REPLACE
 				}
 				if metrics == nil {
 					t.Errorf("merge metrics failed! db:%s, table:%s", db, table)
