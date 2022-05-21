@@ -188,6 +188,7 @@ impl DnsPerfData {
                 Some(self.session_data.id as u32),
                 timestamp,
             );
+            return Ok(());
         } else if qr == DNS_OPCODE_RESPONSE {
             self.session_data.msg_type = LogMessageType::Response;
 
