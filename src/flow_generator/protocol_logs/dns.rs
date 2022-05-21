@@ -17,6 +17,7 @@ use crate::{
 pub struct DnsInfo {
     pub trans_id: u16,
     pub query_type: u8,
+    pub domain_type: u16,
     pub query_name: String,
     // 根据查询类型的不同而不同，如：
     // A: ipv4/ipv6地址
@@ -35,7 +36,7 @@ impl From<DnsInfo> for flow_log::DnsInfo {
     fn from(f: DnsInfo) -> Self {
         flow_log::DnsInfo {
             trans_id: f.trans_id as u32,
-            query_type: f.query_type as u32,
+            query_type: f.domain_type as u32,
             query_name: f.query_name,
             answers: f.answers,
         }
@@ -45,8 +46,6 @@ impl From<DnsInfo> for flow_log::DnsInfo {
 #[derive(Clone, Debug, Default)]
 pub struct DnsLog {
     info: DnsInfo,
-
-    domain_type: u16,
 
     msg_type: LogMessageType,
     status: L7ResponseStatus,
@@ -120,7 +119,7 @@ impl DnsLog {
                 if index > l_offset {
                     l_offset = size;
                 } else if payload[index] == DNS_NAME_TAIL {
-                    l_offset += l_offset;
+                    l_offset += 1;
                 }
             }
         }
@@ -141,7 +140,7 @@ impl DnsLog {
         }
         self.info.query_name.push_str(&name);
         if self.info.query_type == DNS_REQUEST {
-            self.domain_type = read_u16_be(&payload[offset..]);
+            self.info.domain_type = read_u16_be(&payload[offset..]);
             self.msg_type = LogMessageType::Request;
         }
 
@@ -162,7 +161,7 @@ impl DnsLog {
             return Err(Error::DNSLogParseFailed(err_msg));
         }
 
-        self.domain_type = read_u16_be(&payload[offset..]);
+        self.info.domain_type = read_u16_be(&payload[offset..]);
         let data_length = read_u16_be(&payload[offset + RR_DATALENGTH_OFFSET..]) as usize;
         if data_length != 0 {
             self.decode_rdata(payload, offset + RR_RDATA_OFFSET, data_length)?;
@@ -179,7 +178,7 @@ impl DnsLog {
             self.info.answers.push(DOMAIN_NAME_SPLIT);
         }
 
-        match self.domain_type {
+        match self.info.domain_type {
             DNS_TYPE_A | DNS_TYPE_AAAA => match data_length {
                 IPV4_ADDR_LEN | IPV6_ADDR_LEN => {
                     if let Some(ipaddr) = parse_ip_slice(payload) {
@@ -187,13 +186,19 @@ impl DnsLog {
                     }
                 }
                 _ => {
-                    let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
+                    let err_msg = format!(
+                        "domain type {} data length {} invalid",
+                        self.info.domain_type, data_length
+                    );
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
             },
-            DNS_TYPE_NS | DNS_TYPE_DNAME => {
+            DNS_TYPE_NS | DNS_TYPE_DNAME | DNS_TYPE_SOA => {
                 if data_length > DNS_NAME_MAX_SIZE {
-                    let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
+                    let err_msg = format!(
+                        "domain type {} data length {} invalid",
+                        self.info.domain_type, data_length
+                    );
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
 
@@ -202,7 +207,10 @@ impl DnsLog {
             }
             DNS_TYPE_WKS => {
                 if data_length < DNS_TYPE_WKS_LENGTH {
-                    let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
+                    let err_msg = format!(
+                        "domain type {} data length {} invalid",
+                        self.info.domain_type, data_length
+                    );
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 if let Some(ipaddr) = parse_ip_slice(payload) {
@@ -211,12 +219,18 @@ impl DnsLog {
             }
             DNS_TYPE_PTR => {
                 if data_length != DNS_TYPE_PTR_LENGTH {
-                    let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
+                    let err_msg = format!(
+                        "domain type {} data length {} invalid",
+                        self.info.domain_type, data_length
+                    );
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
             }
             _ => {
-                let err_msg = format!("{} type invalid data {}", self.domain_type, data_length);
+                let err_msg = format!(
+                    "other domain type {} data length {} invalid",
+                    self.info.domain_type, data_length
+                );
                 return Err(Error::DNSLogParseFailed(err_msg));
             }
         }
