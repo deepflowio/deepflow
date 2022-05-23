@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::net::IpAddr;
+use std::process;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{self, Arc};
@@ -11,6 +12,7 @@ use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
 use sysinfo::{System, SystemExt};
 use tokio::runtime::Runtime;
+use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio::time;
 
@@ -508,8 +510,8 @@ impl Synchronizer {
         flow_acl_listener: &Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
         max_memory: &Arc<AtomicU64>,
         exception_handler: &ExceptionHandler,
+        escape_tx: &UnboundedSender<Duration>,
     ) {
-        // TODO: reset escape timer
         // TODO: 把cleaner UpdatePcapDataRetention挪到别的地方
         Self::parse_upgrade(&resp, static_config, status);
 
@@ -544,6 +546,8 @@ impl Synchronizer {
             runtime_config.proxy_controller_ip = static_config.controller_ip.clone();
             runtime_config.analyzer_ip = static_config.analyzer_ip.clone();
         }
+
+        let _ = escape_tx.send(runtime_config.max_escape);
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
@@ -602,7 +606,7 @@ impl Synchronizer {
         cvar.notify_one();
     }
 
-    fn run_triggered_session(&self) {
+    fn run_triggered_session(&self, escape_tx: UnboundedSender<Duration>) {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
@@ -668,13 +672,39 @@ impl Synchronizer {
                         &flow_acl_listener,
                         &max_memory,
                         &exception_handler,
+                        &escape_tx,
                     );
                 }
             }
         }));
     }
 
-    fn run(&self) {
+    fn run_escape_timer(&self) -> UnboundedSender<Duration> {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let running = self.running.clone();
+        self.rt.spawn(async move {
+            // default escape time is 1h
+            let mut escape_time = Duration::from_secs(3600);
+            while running.load(Ordering::SeqCst) {
+                match time::timeout(escape_time, rx.recv()).await {
+                    Ok(Some(t)) => escape_time = t,
+                    // channel closed
+                    Ok(None) => return,
+                    Err(_) => {
+                        warn!("metaflow-agent restart, as max escape time expired");
+                        // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
+                        // 1. 如果仅是停用系统无法回收全部的内存资源
+                        // 2. 控制器地址可能是通过域明解析的，如果域明解析发生变更需要重启来触发重新解析
+                        const NORMAL_EXIT_WITH_RESTART: i32 = 3;
+                        process::exit(NORMAL_EXIT_WITH_RESTART);
+                    }
+                }
+            }
+        });
+        tx
+    }
+
+    fn run(&self, escape_tx: UnboundedSender<Duration>) {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
@@ -766,6 +796,7 @@ impl Synchronizer {
                     &flow_acl_listener,
                     &max_memory,
                     &exception_handler,
+                    &escape_tx,
                 );
                 let (new_revision, proxy_ip, new_sync_interval) = {
                     let status = status.read();
@@ -799,8 +830,9 @@ impl Synchronizer {
         if self.running.swap(true, Ordering::SeqCst) {
             return;
         }
-        self.run_triggered_session();
-        self.run();
+        let esc_tx = self.run_escape_timer();
+        self.run_triggered_session(esc_tx.clone());
+        self.run(esc_tx);
     }
 
     pub fn stop(&self) {
