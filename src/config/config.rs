@@ -8,7 +8,8 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::common::{
-    enums::TapType, TRIDENT_MEMORY_LIMIT, TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT,
+    enums::TapType, DEFAULT_LOG_FILE_SIZE_LIMIT, DEFAULT_LOG_RETENTION, TRIDENT_MEMORY_LIMIT,
+    TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT,
 };
 use crate::proto::{common, trident};
 
@@ -439,6 +440,8 @@ pub struct RuntimeConfig {
     pub l4_performance_enabled: bool,
     pub kubernetes_api_enabled: bool,
     pub ntp_enabled: bool,
+    pub sys_free_memory_limit: u32,
+    pub log_file_size: u32,
 }
 
 impl RuntimeConfig {
@@ -605,7 +608,7 @@ impl Default for RuntimeConfig {
             decap_type: Default::default(),
             region_id: 0,
             pod_cluster_id: 0,
-            log_retention: 0,
+            log_retention: DEFAULT_LOG_RETENTION,
             capture_socket_type: trident::CaptureSocketType::Auto,
             process_threshold: TRIDENT_PROCESS_LIMIT,
             thread_threshold: TRIDENT_THREAD_LIMIT,
@@ -613,6 +616,8 @@ impl Default for RuntimeConfig {
             l4_performance_enabled: true,
             kubernetes_api_enabled: false,
             ntp_enabled: false,
+            sys_free_memory_limit: 0,
+            log_file_size: DEFAULT_LOG_FILE_SIZE_LIMIT,
         }
     }
 }
@@ -681,6 +686,8 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             l4_performance_enabled: conf.l4_performance_enabled(),
             kubernetes_api_enabled: conf.kubernetes_api_enabled(),
             ntp_enabled: conf.ntp_enabled(),
+            sys_free_memory_limit: conf.sys_free_memory_limit(),
+            log_file_size: conf.log_file_size(),
         };
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;

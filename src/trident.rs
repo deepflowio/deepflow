@@ -29,7 +29,7 @@ use crate::{
     },
     common::{
         enums::TapType, platform_data::PlatformData, tagged_flow::TaggedFlow, tap_types::TapTyper,
-        DROPLET_PORT, FREE_SPACE_REQUIREMENT,
+        DEFAULT_LOG_RETENTION, DROPLET_PORT, FREE_SPACE_REQUIREMENT,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig},
@@ -109,7 +109,11 @@ impl Trident {
                 FileSpec::try_from(&config.log_file)?,
                 Box::new(remote_log_writer),
             )
-            .rotate(Criterion::Age(Age::Day), Naming::Timestamps, Cleanup::Never)
+            .rotate(
+                Criterion::Age(Age::Day),
+                Naming::Timestamps,
+                Cleanup::KeepLogFiles(DEFAULT_LOG_RETENTION as usize),
+            )
             .create_symlink(&config.log_file)
             .append();
         if nix::unistd::getppid().as_raw() != 1 {
@@ -145,8 +149,12 @@ impl Trident {
 
         let (ctrl_ip, ctrl_mac) = get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
             .context("failed getting control ip and mac")?;
-
-        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
+        let log_dir = Path::new(config.log_file.as_str());
+        let log_dir = log_dir.parent().unwrap().to_str().unwrap();
+        let stats_collector = Arc::new(stats::Collector::new(
+            &config.controller_ips,
+            log_dir.to_string(),
+        ));
         stats_collector.start();
 
         let session = Arc::new(Session::new(
@@ -669,9 +677,14 @@ impl Components {
             collectors.push(collector);
         }
 
-        let monitor = Monitor::new(stats_collector.clone())?;
-
-        let guard = Guard::new(config_handler.environment(), exception_handler.clone());
+        let log_dir = Path::new(static_config.log_file.as_str());
+        let log_dir = log_dir.parent().unwrap().to_str().unwrap();
+        let monitor = Monitor::new(stats_collector.clone(), log_dir.to_string())?;
+        let guard = Guard::new(
+            config_handler.environment(),
+            log_dir.to_string(),
+            exception_handler.clone(),
+        );
 
         let ebpf_collector = EbpfCollector::new(
             &config_handler.candidate_config.ebpf,
