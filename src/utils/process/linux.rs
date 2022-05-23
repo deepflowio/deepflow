@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
     process,
 };
+use sysinfo::{System, SystemExt};
 
 use log::debug;
 use nix::sys::utsname::uname;
@@ -231,4 +232,10 @@ fn get_num_from_status_file(pattern: &str, value: &str) -> Result<u32> {
     }
 
     Ok(num)
+}
+
+/// 返回当前系统的空闲内存数目，单位：%
+pub fn get_current_sys_free_memory_percentage() -> u32 {
+    let s = System::new_all();
+    (s.free_memory() / (s.total_memory() / 100)) as u32
 }

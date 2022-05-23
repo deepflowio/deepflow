@@ -1,4 +1,5 @@
 use std::{mem::size_of, path::PathBuf, process};
+use sysinfo::{System, SystemExt};
 
 use log::debug;
 use windows::Win32::{
@@ -181,4 +182,10 @@ pub fn get_exec_path() -> Result<PathBuf> {
         .ok_or(Error::Windows(String::from(
             "get_exec_path failed because current process exec_path is none",
         )))
+}
+
+/// 返回当前系统的空闲内存数目，单位：%
+pub fn get_current_sys_free_memory_percentage() -> u32 {
+    let s = System::new_all();
+    (s.available_memory() / (s.total_memory() / 100)) as u32
 }

@@ -16,6 +16,7 @@ use crate::{
     error::{Error, Result},
     utils::{
         net::link_list,
+        process::{get_current_sys_free_memory_percentage, get_file_and_size_sum},
         stats::{
             Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
         },
@@ -142,10 +143,11 @@ struct SysStatusBroker {
     pid: Pid,
     create_time: Duration,
     core_count: usize,
+    log_dir: String,
 }
 
 impl SysStatusBroker {
-    pub fn new(system: Arc<Mutex<System>>) -> Result<Self> {
+    pub fn new(system: Arc<Mutex<System>>, log_dir: String) -> Result<Self> {
         let pid = get_current_pid().map_err(|e| Error::SysMonitor(String::from(e)))?;
         let core_count = system
             .lock()
@@ -177,6 +179,7 @@ impl SysStatusBroker {
             pid,
             core_count,
             create_time,
+            log_dir,
         })
     }
 }
@@ -190,12 +193,36 @@ impl RefCountable for SysStatusBroker {
             return vec![];
         }
 
+        let mut metrics = vec![];
+        let current_sys_free_memory_percentage = get_current_sys_free_memory_percentage();
+        metrics.push((
+            "sys_free_memory",
+            CounterType::Gauged,
+            CounterValue::Unsigned(current_sys_free_memory_percentage as u64),
+        ));
+
+        match get_file_and_size_sum(self.log_dir.clone()) {
+            Ok(file_and_size_sum) => {
+                metrics.push((
+                    "log_file_size_sum",
+                    CounterType::Gauged,
+                    CounterValue::Unsigned(file_and_size_sum.file_sizes_sum),
+                ));
+                metrics.push((
+                    "log_file_amount",
+                    CounterType::Gauged,
+                    CounterValue::Unsigned(file_and_size_sum.file_infos.len() as u64),
+                ));
+            }
+            Err(e) => {
+                warn!("get file and size sum failed: {:?}", e);
+            }
+        }
         match system_guard.process(self.pid) {
             Some(process) => {
                 let cpu_usage = process.cpu_usage() as f64 / self.core_count as f64;
                 let mem_used = process.memory() << 10; // 单位：bytes
 
-                let mut metrics = vec![];
                 metrics.push((
                     "cpu_percent",
                     CounterType::Gauged,
@@ -211,13 +238,12 @@ impl RefCountable for SysStatusBroker {
                     CounterType::Gauged,
                     CounterValue::Unsigned(self.create_time.as_millis() as u64),
                 ));
-                metrics
             }
             None => {
                 warn!("get process data failed, system status monitor has stopped");
-                vec![]
             }
         }
+        metrics
     }
 }
 
@@ -245,7 +271,7 @@ pub struct Monitor {
 }
 
 impl Monitor {
-    pub fn new(stats: Arc<Collector>) -> Result<Self> {
+    pub fn new(stats: Arc<Collector>, log_dir: String) -> Result<Self> {
         let mut system = System::new();
         system.refresh_cpu();
         let system = Arc::new(Mutex::new(system));
@@ -253,7 +279,7 @@ impl Monitor {
         Ok(Self {
             stats,
             running: AtomicBool::new(false),
-            sys_monitor: Arc::new(SysStatusBroker::new(system.clone())?),
+            sys_monitor: Arc::new(SysStatusBroker::new(system.clone(), log_dir)?),
             sys_load: Arc::new(SysLoad(system.clone())),
             link_map: Arc::new(Mutex::new(HashMap::new())),
             system,
