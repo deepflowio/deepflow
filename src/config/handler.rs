@@ -1105,12 +1105,6 @@ impl ConfigHandler {
             if candidate_config.log.host != new_config.log.host {
                 self.remote_log_config
                     .set_hostname(new_config.log.host.clone());
-                fn stats_callback(handler: &ConfigHandler, components: &mut Components) {
-                    components
-                        .stats_collector
-                        .set_hostname(handler.candidate_config.log.host.clone());
-                }
-                callbacks.push(stats_callback);
             }
             if candidate_config.log.log_threshold != new_config.log.log_threshold {
                 info!("LogThreshold set to {}", new_config.log.log_threshold);
@@ -1118,6 +1112,19 @@ impl ConfigHandler {
                     .set_threshold(new_config.log.log_threshold);
             }
             candidate_config.log = new_config.log;
+        }
+
+        if candidate_config.stats != new_config.stats {
+            info!(
+                "stats config change from {:#?} to {:#?}",
+                candidate_config.stats, new_config.stats
+            );
+            fn stats_callback(handler: &ConfigHandler, components: &mut Components) {
+                let c = &components.stats_collector;
+                c.set_hostname(handler.candidate_config.stats.host.clone());
+                c.set_min_interval(handler.candidate_config.stats.interval);
+            }
+            callbacks.push(stats_callback);
         }
 
         if candidate_config.debug != new_config.debug {
