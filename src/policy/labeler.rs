@@ -324,11 +324,16 @@ impl Labeler {
         &self,
         mac: u64,
         ip: IpAddr,
+        l2_end: bool,
         l3_end: bool,
         tunnel_id: u32,
     ) -> (EndpointInfo, bool) {
         let mut is_wan = false;
-        let mut info: EndpointInfo = Default::default();
+        let mut info: EndpointInfo = EndpointInfo {
+            l2_end,
+            l3_end,
+            ..Default::default()
+        };
         // 如下场景无法直接查询隧道内层的MAC地址确定EPC：
         // 1. 腾讯TCE：使用GRE做隧道封装，内层没有MAC
         // 2. 使用VXLAN隧道但内层MAC已无法识别
@@ -507,12 +512,14 @@ impl Labeler {
         let (src_info, mut is_src_wan) = self.get_endpoint_info(
             u64::from(key.src_mac),
             key.src_ip,
+            key.l2_end_0,
             key.l3_end_0,
             key.tunnel_id,
         );
         let (dst_info, mut is_dst_wan) = self.get_endpoint_info(
             u64::from(key.dst_mac),
             key.dst_ip,
+            key.l2_end_1,
             key.l3_end_1,
             key.tunnel_id,
         );
