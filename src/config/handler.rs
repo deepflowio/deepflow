@@ -8,21 +8,23 @@ use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
 use bytesize::ByteSize;
-use flexi_logger::LoggerHandle;
+use flexi_logger::writers::FileLogWriter;
+use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use hostname;
 use log::{info, warn, Level};
 
 use super::{Config, ConfigError, IngressFlavour, KubernetesPollerType};
 
 use crate::common::{
-    enums::TapType, DEFAULT_LIBVIRT_XML_PATH, TRIDENT_MEMORY_LIMIT, TRIDENT_PROCESS_LIMIT,
-    TRIDENT_THREAD_LIMIT,
+    decapsulate::{TunnelType, TunnelTypeBitmap},
+    enums::TapType,
+    DEFAULT_LIBVIRT_XML_PATH, DEFAULT_LOG_FILE_SIZE_LIMIT, TRIDENT_MEMORY_LIMIT,
+    TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT,
 };
 use crate::dispatcher::BpfOptions;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::IfMacSource;
 use crate::{
-    common::decapsulate::{TunnelType, TunnelTypeBitmap},
     dispatcher::recv_engine::{self, bpf, OptTpacketVersion},
     ebpf::CAP_LEN_MAX,
     flow_generator::{FlowTimeout, TcpTimeout},
@@ -119,6 +121,8 @@ pub struct EnvironmentConfig {
     pub max_memory: u64,
     pub process_threshold: u32,
     pub thread_threshold: u32,
+    pub sys_free_memory_limit: u32,
+    pub log_file_size: u32,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -384,6 +388,8 @@ impl Default for NewRuntimeConfig {
                 max_memory: TRIDENT_MEMORY_LIMIT,
                 process_threshold: TRIDENT_PROCESS_LIMIT,
                 thread_threshold: TRIDENT_THREAD_LIMIT,
+                sys_free_memory_limit: 0,
+                log_file_size: DEFAULT_LOG_FILE_SIZE_LIMIT,
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: MINUTE,
@@ -527,6 +533,18 @@ impl Default for NewRuntimeConfig {
 
 impl NewRuntimeConfig {
     fn validate(&self) -> Result<(), ConfigError> {
+        if self.environment.sys_free_memory_limit > 100 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "sys_free_memory_limit {:?} not in [0, 100]",
+                self.environment.sys_free_memory_limit
+            )));
+        }
+        if self.environment.log_file_size > 10000 || self.environment.log_file_size < 10 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "log file size limit {:?} not in [10, 10000] M",
+                self.environment.log_file_size
+            )));
+        }
         if self.synchronizer.sync_interval < Duration::from_secs(1)
             || self.synchronizer.sync_interval > Duration::from_secs(60 * 60)
         {
@@ -758,6 +776,8 @@ impl ConfigHandler {
                 max_memory: (conf.max_memory() as u64) << 20,
                 process_threshold: conf.process_threshold(),
                 thread_threshold: conf.thread_threshold(),
+                sys_free_memory_limit: conf.sys_free_memory_limit(),
+                log_file_size: conf.log_file_size(),
             },
             synchronizer: SynchronizerConfig {
                 sync_interval: Duration::from_secs(conf.sync_interval() as u64),
@@ -1111,6 +1131,25 @@ impl ConfigHandler {
                 self.remote_log_config
                     .set_threshold(new_config.log.log_threshold);
             }
+            if candidate_config.log.log_retention != new_config.log.log_retention {
+                match self.logger_handle.reset_flw(
+                    &FileLogWriter::builder(FileSpec::try_from(&static_config.log_file).unwrap())
+                        .rotate(
+                            Criterion::Age(Age::Day),
+                            Naming::Timestamps,
+                            Cleanup::KeepLogFiles(new_config.log.log_retention as usize),
+                        )
+                        .create_symlink(&static_config.log_file)
+                        .append(),
+                ) {
+                    Ok(_) => {
+                        info!("log_retention set to {}", new_config.log.log_retention);
+                    }
+                    Err(e) => {
+                        warn!("failed to set log_retention: {}", e);
+                    }
+                }
+            }
             candidate_config.log = new_config.log;
         }
 
@@ -1167,6 +1206,16 @@ impl ConfigHandler {
                     info!("memory set ulimit when tap_mode=analyzer");
                     candidate_config.environment.max_memory = 0;
                 }
+            }
+            if candidate_config.environment.sys_free_memory_limit
+                != new_config.environment.sys_free_memory_limit
+            {
+                info!(
+                    "sys_free_memory_limit set to {}",
+                    new_config.environment.sys_free_memory_limit
+                );
+                candidate_config.environment.sys_free_memory_limit =
+                    new_config.environment.sys_free_memory_limit;
             }
             info!(
                 "environment config change from {:#?} to {:#?}",

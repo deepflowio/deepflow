@@ -19,6 +19,9 @@ pub const TRIDENT_PROCESS_LIMIT: u32 = 10;
 pub const TRIDENT_THREAD_LIMIT: u32 = 100;
 pub const FREE_SPACE_REQUIREMENT: u64 = 100 << 20;
 
+pub const DEFAULT_LOG_RETENTION: u32 = 365;
+pub const DEFAULT_LOG_FILE_SIZE_LIMIT: u32 = 10000; // 单位：M
+
 #[cfg(target_os = "linux")]
 mod platform_consts {
     pub const DEFAULT_LOGFILE: &'static str = "/var/log/metaflow-agent/metaflow-agent.log";
