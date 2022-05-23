@@ -126,7 +126,14 @@ impl L7FlowPerf for KafkaPerfData {
                 ..Default::default()
             }
         } else {
-            FlowPerfStats::default()
+            FlowPerfStats {
+                l7_protocol: L7Protocol::Kafka,
+                l7: L7PerfStats {
+                    err_timeout: timeout_count,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
         }
     }
 

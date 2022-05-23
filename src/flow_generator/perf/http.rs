@@ -115,7 +115,14 @@ impl L7FlowPerf for HttpPerfData {
                 ..Default::default()
             }
         } else {
-            FlowPerfStats::default()
+            FlowPerfStats {
+                l7_protocol: self.session_data.l7_proto,
+                l7: L7PerfStats {
+                    err_timeout: timeout_count,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
         }
     }
 
@@ -225,7 +232,7 @@ impl HttpPerfData {
                 .get_and_remove_l7_req_time(flow_id, None)
             {
                 Some(t) => t,
-                None => return Err(Error::HttpHeaderParseFailed),
+                None => return Ok(()),
             };
 
             if timestamp < req_timestamp {
@@ -374,15 +381,17 @@ impl HttpPerfData {
             }
             perf_stats.rrt_last = Duration::ZERO;
 
-            let req_timestamp = self
+            let req_timestamp = match self
                 .session_data
                 .rrt_cache
                 .borrow_mut()
                 .get_and_remove_l7_req_time(
                     flow_id,
                     Some(self.session_data.httpv2_headers.stream_id),
-                )
-                .ok_or(Error::HttpHeaderParseFailed)?;
+                ) {
+                Some(t) => t,
+                None => return Ok(()),
+            };
 
             if timestamp < req_timestamp {
                 return Ok(());
