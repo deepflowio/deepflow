@@ -1,13 +1,16 @@
 use std::fmt;
 use std::io;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket};
-use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Condvar, Mutex, Weak,
+};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use cadence::{
     ext::{MetricValue, ToCounterValue, ToGaugeValue},
-    Counted, MetricError, MetricResult, MetricSink, StatsdClient,
+    Counted, Metric, MetricBuilder, MetricError, MetricResult, MetricSink, StatsdClient,
 };
 use log::{debug, info, warn};
 
@@ -125,7 +128,7 @@ pub struct Collector {
     sources: Arc<Mutex<Vec<Source>>>,
     pre_hooks: Arc<Mutex<Vec<Box<dyn FnMut() + Send>>>>,
 
-    min_interval: Duration,
+    min_interval: Arc<AtomicU64>,
 
     running: Arc<(Mutex<bool>, Condvar)>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -161,7 +164,7 @@ impl Collector {
             remotes: Arc::new(Mutex::new(Some(remotes))),
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
-            min_interval,
+            min_interval: Arc::new(AtomicU64::new(min_interval.as_secs())),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             thread: Mutex::new(None),
         }
@@ -175,7 +178,7 @@ impl Collector {
     ) {
         let mut source = Source {
             module,
-            interval: self.min_interval,
+            interval: Duration::from_secs(self.min_interval.load(Ordering::Relaxed)),
             countable,
             tags: vec![],
             skip: 0,
@@ -185,7 +188,9 @@ impl Collector {
                 StatsOption::Tag(k, v) if !source.tags.iter().any(|(key, _)| key == &k) => {
                     source.tags.push((k, v))
                 }
-                StatsOption::Interval(interval) if interval >= self.min_interval => {
+                StatsOption::Interval(interval)
+                    if interval.as_secs() >= self.min_interval.load(Ordering::Relaxed) =>
+                {
                     source.interval = Duration::from_secs(
                         interval.as_secs() / TICK_CYCLE.as_secs() * TICK_CYCLE.as_secs(),
                     )
@@ -232,10 +237,33 @@ impl Collector {
         *self.hostname.lock().unwrap() = hostname;
     }
 
+    pub fn set_min_interval(&self, interval: Duration) {
+        self.min_interval
+            .store(interval.as_secs(), Ordering::Relaxed);
+    }
+
     fn new_statsd_client<A: ToSocketAddrs>(addr: A) -> MetricResult<StatsdClient> {
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         let sink = DropletSink::from(addr, socket)?;
         Ok(StatsdClient::from_sink(Self::STATS_PREFIX, sink))
+    }
+
+    fn send_metrics<'a, T: Metric + From<String>>(
+        mut b: MetricBuilder<'a, '_, T>,
+        host: &'a str,
+        tags: &'a Vec<(&'static str, String)>,
+    ) {
+        let mut has_host = false;
+        for (k, v) in tags {
+            if *k == "host" {
+                has_host = true;
+            }
+            b = b.with_tag(k, v);
+        }
+        if !has_host {
+            b = b.with_tag("host", host);
+        }
+        b.send();
     }
 
     pub fn start(&self) {
@@ -253,6 +281,7 @@ impl Collector {
         let sources = self.sources.clone();
         let pre_hooks = self.pre_hooks.clone();
         let hostname = self.hostname.clone();
+        let min_interval = self.min_interval.clone();
         *self.thread.lock().unwrap() = Some(thread::spawn(move || {
             let mut statsd_clients = vec![];
             let mut old_remotes = vec![];
@@ -267,6 +296,7 @@ impl Collector {
                     let mut batches = vec![];
                     {
                         let mut sources = sources.lock().unwrap();
+                        let min_interval_loaded = min_interval.load(Ordering::Relaxed);
                         // TODO: use Vec::retain_mut after stablize in rust 1.61.0
                         sources.retain(|s| !s.countable.closed());
                         for source in sources.iter_mut() {
@@ -274,7 +304,9 @@ impl Collector {
                             if source.skip > 0 {
                                 continue;
                             }
-                            source.skip = (source.interval.as_secs() / TICK_CYCLE.as_secs()) as i64;
+                            source.skip = (source.interval.as_secs().max(min_interval_loaded)
+                                / TICK_CYCLE.as_secs())
+                                as i64;
                             let points = source.countable.get_counters();
                             if !points.is_empty() {
                                 batches.push(Batch {
@@ -339,18 +371,9 @@ impl Collector {
                                 let metric_name =
                                     format!("{}_{}", batch.module, point.0).replace("-", "_");
                                 // use counted for gauged fields for compatibility
-                                let mut b = client.count_with_tags(&metric_name, point.2);
-                                let mut has_host = false;
-                                for (k, v) in batch.tags.iter() {
-                                    if *k == "host" {
-                                        has_host = true;
-                                    }
-                                    b = b.with_tag(&k, &v);
-                                }
-                                if !has_host {
-                                    b = b.with_tag("host", &host);
-                                }
-                                b.send();
+                                // will cause problem if counted fields in buffer not reset before next point
+                                let b = client.count_with_tags(&metric_name, point.2);
+                                Self::send_metrics(b, &host, &batch.tags);
                             }
                         }
                     }
