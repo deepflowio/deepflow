@@ -539,17 +539,11 @@ impl TunnelInfo {
         // 偏移计算：overlay ip头开始位置(l2Len + underlayIpHeaderSize) - l2层长度(l2Len)
         let start = l2_len + underlay_ip_header_size - l2_len;
 
-        l3_packet.copy_within(0..l2_len, start);
+        packet.copy_within(0..l2_len, start);
         if !overlay_ipv6 {
-            bytes::write_u16_be(
-                &mut l3_packet[start + l2_len - 2..],
-                EthernetType::Ipv4 as u16,
-            );
+            bytes::write_u16_be(&mut packet[start + l2_len - 2..], EthernetType::Ipv4 as u16);
         } else {
-            bytes::write_u16_be(
-                &mut l3_packet[start + l2_len - 2..],
-                EthernetType::Ipv6 as u16,
-            );
+            bytes::write_u16_be(&mut packet[start + l2_len - 2..], EthernetType::Ipv6 as u16);
         }
         // l2已经做过解析，这个去除掉已经解析的l2长度
         start - l2_len
