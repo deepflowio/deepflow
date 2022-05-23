@@ -114,7 +114,14 @@ impl L7FlowPerf for DnsPerfData {
                 ..Default::default()
             }
         } else {
-            FlowPerfStats::default()
+            FlowPerfStats {
+                l7_protocol: L7Protocol::Dns,
+                l7: L7PerfStats {
+                    err_timeout: timeout_count,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
         }
     }
 

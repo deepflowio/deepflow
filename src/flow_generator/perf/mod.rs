@@ -151,7 +151,7 @@ impl FlowPerf {
             stats.replace(self.l4.copy_and_reset_data(flow_reversed));
         }
 
-        if l7_performance_enabled && self.l7.data_updated() {
+        if l7_performance_enabled && (self.l7.data_updated() || l7_timeout_count > 0) {
             if let Some(stats) = stats.as_mut() {
                 let FlowPerfStats {
                     l7, l7_protocol, ..
