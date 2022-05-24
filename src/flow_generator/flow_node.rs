@@ -14,7 +14,7 @@ use crate::{
         TapPort,
     },
     proto::common::TridentType,
-    utils::{hasher::jenkins64, net::MacAddr},
+    utils::net::MacAddr,
 };
 
 #[repr(u8)]
@@ -57,7 +57,10 @@ impl FlowTimeKey {
     所以有可能key对应多个流节点的情况，需要根据流节点的match_node方法在映射表唯一标识一条流。
 */
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Default)]
-pub(super) struct FlowMapKey(pub u64);
+pub(super) struct FlowMapKey {
+    lhs: u64,
+    rhs: u64,
+}
 
 impl FlowMapKey {
     fn l3_hash(lookup_key: &LookupKey) -> u64 {
@@ -101,18 +104,18 @@ impl FlowMapKey {
                 let lhs = Self::l3_hash(lookup_key);
                 let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0) << 32
                     | Self::l4_hash(lookup_key);
-                Self(jenkins64(lhs) ^ jenkins64(rhs))
+                Self { lhs, rhs }
             }
             EthernetType::Arp => {
                 let lhs = Self::l3_hash(lookup_key);
                 let rhs = ((u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0 as u64) << 32
                     | (u64::from(lookup_key.src_mac) ^ u64::from(lookup_key.dst_mac));
-                Self(jenkins64(lhs) ^ jenkins64(rhs))
+                Self { lhs, rhs }
             }
             _ => {
                 let lhs = (u16::from(lookup_key.tap_type) as u64) << 24 | tap_port.0;
                 let rhs = u64::from(lookup_key.src_mac) ^ u64::from(lookup_key.dst_mac);
-                Self(jenkins64(lhs) ^ jenkins64(rhs))
+                Self { lhs, rhs }
             }
         }
     }
@@ -348,87 +351,5 @@ impl FlowNode {
                     && lookup_key.l2_end_1 == peers[0].is_l2_end
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::net::{Ipv4Addr, Ipv6Addr};
-    use std::str::FromStr;
-
-    use super::*;
-
-    // tap_type = TapType::ISP(7), tap_port = 2100, src_mac = B0-60-88-51-D7-54 dst_mac = 00-15-5D-70-01-03
-    // src_ipv4addr = 192.168.66.1 dst_ipv4addr = 192.168.66.2 src_port = 19001, dst_port = 19002
-    // src_ipv6addr =  fe80::88d3:f197:5843:f873 dst_ipv6addr = fe80::742a:d20d:8d45:56e6
-    fn new_map_key(eth_type: EthernetType, src_addr: IpAddr, dst_addr: IpAddr) -> FlowMapKey {
-        let lookup_key = LookupKey {
-            tap_type: TapType::Isp(7),
-            src_mac: MacAddr::from([0xb0, 0x60, 0x88, 0x51, 0xd7, 0x54]),
-            dst_mac: MacAddr::from([0x00, 0x15, 0x5d, 0x70, 0x01, 0x03]),
-            src_ip: src_addr,
-            dst_ip: dst_addr,
-            src_port: 19001,
-            dst_port: 19002,
-            eth_type,
-            ..Default::default()
-        };
-        FlowMapKey::new(&lookup_key, TapPort(2100))
-    }
-
-    #[test]
-    fn ipv4_node_hash() {
-        let key = new_map_key(
-            EthernetType::Ipv4,
-            Ipv4Addr::new(192, 168, 66, 1).into(),
-            Ipv4Addr::new(192, 168, 66, 2).into(),
-        );
-        // 右边是go 版本计算得出
-        assert_eq!(key.0, 0xecb912dddb15b140);
-    }
-
-    #[test]
-    fn ipv6_node_hash() {
-        let key = new_map_key(
-            EthernetType::Ipv6,
-            Ipv6Addr::from_str("fe80::88d3:f197:5843:f873")
-                .unwrap()
-                .into(),
-            Ipv6Addr::from_str("fe80::742a:d20d:8d45:56e6")
-                .unwrap()
-                .into(),
-        );
-        // 右边是go 版本计算得出
-        assert_eq!(key.0, 0xe7f0aea2897fd9ad);
-    }
-
-    #[test]
-    fn arp_node_hash() {
-        let key = new_map_key(
-            EthernetType::Arp,
-            Ipv6Addr::from_str("fe80::88d3:f197:5843:f873")
-                .unwrap()
-                .into(),
-            Ipv6Addr::from_str("fe80::742a:d20d:8d45:56e6")
-                .unwrap()
-                .into(),
-        );
-        // 右边是go 版本计算得出
-        assert_eq!(key.0, 1098954493523811076);
-    }
-
-    #[test]
-    fn other_node_hash() {
-        let key = new_map_key(
-            EthernetType::Dot1Q,
-            Ipv6Addr::from_str("fe80::88d3:f197:5843:f873")
-                .unwrap()
-                .into(),
-            Ipv6Addr::from_str("fe80::742a:d20d:8d45:56e6")
-                .unwrap()
-                .into(),
-        );
-        // 右边是go 版本计算得出
-        assert_eq!(key.0, 4948968142922745785);
     }
 }
