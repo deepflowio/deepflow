@@ -181,7 +181,7 @@ impl DnsLog {
         match self.info.domain_type {
             DNS_TYPE_A | DNS_TYPE_AAAA => match data_length {
                 IPV4_ADDR_LEN | IPV6_ADDR_LEN => {
-                    if let Some(ipaddr) = parse_ip_slice(payload) {
+                    if let Some(ipaddr) = parse_ip_slice(&payload[..data_length]) {
                         self.info.answers.push_str(&ipaddr.to_string());
                     }
                 }
@@ -213,7 +213,7 @@ impl DnsLog {
                     );
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
-                if let Some(ipaddr) = parse_ip_slice(payload) {
+                if let Some(ipaddr) = parse_ip_slice(&payload[..data_length]) {
                     self.info.answers.push_str(&ipaddr.to_string());
                 }
             }
@@ -268,6 +268,7 @@ impl DnsLog {
 
         if self.info.query_type == DNS_RESPONSE {
             self.info.query_type = 1;
+
             for _i in 0..an_count {
                 g_offset = self.decode_resource_record(payload, g_offset)?;
             }
@@ -362,7 +363,10 @@ mod tests {
 
     #[test]
     fn check() {
-        let files = vec![("dns.pcap", "dns.result")];
+        let files = vec![
+            ("dns.pcap", "dns.result"),
+            ("a-and-ns.pcap", "a-and-ns.result"),
+        ];
 
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
