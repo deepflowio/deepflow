@@ -742,12 +742,12 @@ impl ConfigHandler {
         let candidate_config = &self.candidate_config;
         let static_config = &self.static_config;
 
-        let dest_ip = if conf.analyzer_ip().is_empty() {
-            static_config.analyzer_ip.parse::<IpAddr>().unwrap()
-        } else {
+        let dest_ip = if static_config.analyzer_ip.is_empty() {
             conf.analyzer_ip()
                 .parse::<IpAddr>()
                 .unwrap_or(Ipv4Addr::UNSPECIFIED.into())
+        } else {
+            static_config.analyzer_ip.parse::<IpAddr>().unwrap()
         };
         let config = NewRuntimeConfig {
             diagnose: DiagnoseConfig {
