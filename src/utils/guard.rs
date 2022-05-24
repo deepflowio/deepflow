@@ -142,14 +142,14 @@ impl Guard {
                 if sys_free_memory_limit != 0 {
                     if current_sys_free_memory_percentage < sys_free_memory_limit {
                         if over_memory_limit {
-                            warn!(
+                            error!(
                                     "current system free memory percentage is less than sys_free_memory_limit twice, current system free memory percentage={}%, sys_free_memory_limit={}%, metaflow-agent restart...",
                                     current_sys_free_memory_percentage, sys_free_memory_limit
                                     );
                             thread::sleep(Duration::from_secs(1));
                             exit(-1);
                         } else {
-                            error!(
+                            warn!(
                                     "current system free memory percentage is less than sys_free_memory_limit, current system free memory percentage={}%, sys_free_memory_limit={}%",
                                     current_sys_free_memory_percentage, sys_free_memory_limit
                                     );
@@ -172,6 +172,8 @@ impl Guard {
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }
                             exception_handler.set(Exception::ProcessThresholdExceeded);
+                        } else {
+                            exception_handler.clear(Exception::ProcessThresholdExceeded);
                         }
                     }
                     Err(e) => {
@@ -193,6 +195,8 @@ impl Guard {
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }
                             exception_handler.set(Exception::ThreadThresholdExceeded);
+                        } else {
+                            exception_handler.clear(Exception::ThreadThresholdExceeded);
                         }
                     }
                     Err(e) => {
@@ -214,6 +218,8 @@ impl Guard {
                                file_sizes_sum, (log_file_size << 20));
                             Self::release_log_files(file_and_size_sum, log_file_size as u64);
                             exception_handler.set(Exception::LogFileExceeded);
+                        } else {
+                            exception_handler.clear(Exception::LogFileExceeded);
                         }
                     }
                     Err(e) => {
