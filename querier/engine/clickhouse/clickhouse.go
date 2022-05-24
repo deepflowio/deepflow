@@ -139,7 +139,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			as := chCommon.ParseAlias(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
-				e.asTagMap[as] = sqlparser.String(colName)
+				e.asTagMap[as] = chCommon.ParseAlias(colName)
 			}
 			function, ok := item.Expr.(*sqlparser.FuncExpr)
 			if ok {
@@ -297,7 +297,7 @@ func (e *CHEngine) parseSelect(tag sqlparser.SelectExpr) error {
 }
 
 func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
-	as := sqlparser.String(item.As)
+	as := chCommon.ParseAlias(item.As)
 	//var args []string
 	switch expr := item.Expr.(type) {
 	// 普通字符串
@@ -309,8 +309,8 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		binFunction.SetAlias(as)
 		e.Statements = append(e.Statements, binFunction)
 		return nil
-	case *sqlparser.ColName:
-		err := e.AddTag(sqlparser.String(expr), as)
+	case *sqlparser.ColName, *sqlparser.SQLVal:
+		err := e.AddTag(chCommon.ParseAlias(expr), as)
 		if err != nil {
 			return err
 		}

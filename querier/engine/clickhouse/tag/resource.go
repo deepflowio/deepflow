@@ -465,5 +465,20 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+
+	// k8s标签
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	for _, suffix := range []string{"", "_0", "_1"} {
+		k8sLabelSuffix := "k8s_label" + suffix
+		podIDSuffix := "pod_id" + suffix
+		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(deepflow.k8s_label_map, 'value', (toUInt64("+podIDSuffix+"),'%s'))",
+				"",
+				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE value %s %s and key='%s')",
+				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE %s(value,%s) and key='%s')",
+			),
+		}
+	}
 	return tagResourceMap
 }

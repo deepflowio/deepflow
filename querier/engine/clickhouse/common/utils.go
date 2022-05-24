@@ -3,11 +3,12 @@ package common
 import (
 	"errors"
 	"fmt"
-	"github.com/xwb1989/sqlparser"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/xwb1989/sqlparser"
 )
 
 func ParseAlias(node sqlparser.SQLNode) string {
@@ -28,6 +29,10 @@ func ParseAlias(node sqlparser.SQLNode) string {
 	}
 	// 纯数字带上``
 	if _, err := strconv.ParseInt(alias, 10, 64); err == nil {
+		return fmt.Sprintf("`%s`", alias)
+	}
+	// k8s标签字带上``
+	if strings.HasPrefix(alias, "label.") {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	return alias

@@ -1,6 +1,9 @@
 package clickhouse
 
 import (
+	"fmt"
+	"strings"
+
 	"metaflow/querier/common"
 	"metaflow/querier/engine/clickhouse/metrics"
 	"metaflow/querier/engine/clickhouse/tag"
@@ -13,12 +16,26 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	if alias != "" {
 		selectTag = alias
 	}
-	tag, ok := tag.GetTag(name, db, table, "default")
+	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
-		return stmt, nil
+		name := strings.Trim(name, "`")
+		if strings.HasPrefix(name, "label.") {
+			if strings.HasSuffix(name, "_0") {
+				tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
+			} else if strings.HasSuffix(name, "_1") {
+				tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+			}
+			nameNoSuffix := strings.TrimSuffix(name, "_0")
+			nameNoSuffix = strings.TrimSuffix(nameNoSuffix, "_1")
+			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "label.")
+			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
+			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
+		}
 	} else {
-		if tag.TagTranslator != "" {
-			stmt = &SelectTag{Value: tag.TagTranslator, Alias: selectTag}
+		if tagItem.TagTranslator != "" {
+			stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
 		} else if alias != "" {
 			stmt = &SelectTag{Value: name, Alias: selectTag}
 		} else {
