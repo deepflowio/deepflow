@@ -1,4 +1,5 @@
 use std::{
+    boxed::Box,
     cell::RefCell,
     collections::{BTreeSet, HashMap},
     mem,
@@ -48,7 +49,7 @@ use crate::{
 
 // not thread-safe
 pub struct FlowMap {
-    node_map: Option<HashMap<FlowMapKey, Vec<FlowNode>>>,
+    node_map: Option<HashMap<FlowMapKey, Vec<Box<FlowNode>>>>,
     time_set: Option<BTreeSet<FlowTimeKey>>,
     id: u32,
     state_machine_master: StateMachine,
@@ -215,7 +216,7 @@ impl FlowMap {
                     node.match_node(&mut meta_packet, config_ignore, trident_type)
                 });
                 if index.is_none() {
-                    let node = self.new_flow_node(meta_packet, total_flow);
+                    let node = Box::new(self.new_flow_node(meta_packet, total_flow));
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                     time_set.insert(time_key);
                     nodes.push(node);
@@ -242,7 +243,7 @@ impl FlowMap {
             }
             // 未找到Flow，需要插入新的节点
             None => {
-                let node = self.new_flow_node(meta_packet, total_flow);
+                let node = Box::new(self.new_flow_node(meta_packet, total_flow));
 
                 let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                 time_set.insert(time_key);
@@ -259,11 +260,11 @@ impl FlowMap {
 
     fn update_tcp_node(
         &mut self,
-        mut node: FlowNode,
+        mut node: Box<FlowNode>,
         mut meta_packet: MetaPacket,
         time_key: FlowTimeKey,
         time_set: &mut BTreeSet<FlowTimeKey>,
-        slot_nodes: &mut Vec<FlowNode>,
+        slot_nodes: &mut Vec<Box<FlowNode>>,
     ) {
         let timestamp = meta_packet.lookup_key.timestamp;
         let flow_closed = self.update_tcp_flow(&mut meta_packet, &mut node);
@@ -281,9 +282,9 @@ impl FlowMap {
 
     fn update_udp_node(
         &mut self,
-        mut node: FlowNode,
+        mut node: Box<FlowNode>,
         mut meta_packet: MetaPacket,
-        slot_nodes: &mut Vec<FlowNode>,
+        slot_nodes: &mut Vec<Box<FlowNode>>,
     ) {
         self.update_flow(&mut node, &mut meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
@@ -306,9 +307,9 @@ impl FlowMap {
 
     fn update_other_node(
         &mut self,
-        mut node: FlowNode,
+        mut node: Box<FlowNode>,
         mut meta_packet: MetaPacket,
-        slot_nodes: &mut Vec<FlowNode>,
+        slot_nodes: &mut Vec<Box<FlowNode>>,
     ) {
         self.update_flow(&mut node, &mut meta_packet);
         let peers = &node.tagged_flow.flow.flow_metrics_peers;
@@ -815,7 +816,7 @@ impl FlowMap {
     // go 版本的removeAndOutput
     fn node_removed_aftercare(
         &mut self,
-        mut node: FlowNode,
+        mut node: Box<FlowNode>,
         timeout: Duration,
         meta_packet: Option<&mut MetaPacket>,
     ) {
