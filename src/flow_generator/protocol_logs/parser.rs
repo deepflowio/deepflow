@@ -389,7 +389,8 @@ impl SessionQueue {
     fn send_helper(&mut self, item: SendItem) {
         self.throttle_period_count += 1;
 
-        let throttle = self.config.load().l7_log_collect_nps_threshold as usize;
+        let throttle =
+            (self.config.load().l7_log_collect_nps_threshold as usize) << THROTTLE_BUCKET_BITS;
         if self.throttle_queue.len() < throttle {
             self.throttle_queue.push(item);
         } else {
