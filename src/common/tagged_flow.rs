@@ -18,7 +18,7 @@ impl TaggedFlow {
         self.flow.sequential_merge(&other.flow);
     }
     pub fn reverse(&mut self) {
-        self.flow.reverse();
+        self.flow.reverse(false);
         self.tag.reverse();
     }
 

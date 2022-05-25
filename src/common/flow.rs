@@ -686,8 +686,9 @@ impl Flow {
 
     // FIXME 注意：由于FlowGenerator中TcpPerfStats在Flow方向调整之后才获取到，
     // 因此这里不包含对TcpPerfStats的反向。
-    pub fn reverse(&mut self) {
-        self.reversed = !self.reversed;
+    pub fn reverse(&mut self, no_stats: bool) {
+        // 如果没有统计数据不需要标记reversed来反向数据
+        self.reversed = !self.reversed && !no_stats;
         self.tap_side = TapSide::Rest;
         self.tunnel.reverse();
         self.flow_key.reverse();
