@@ -24,12 +24,14 @@ const (
 	TAG_FUNCTION_UNIQ                       = "uniq"
 	TAG_FUNCTION_ANY                        = "any"
 	TAG_FUNCTION_TOPK                       = "topK"
+	TAG_FUNCTION_NEW_TAG                    = "newTag"
 )
 
 var TAG_FUNCTIONS = []string{
 	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
 	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK, TAG_FUNCTION_TO_UNIX_TIMESTAMP,
+	TAG_FUNCTION_NEW_TAG,
 }
 
 type Function interface {
@@ -468,6 +470,12 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 			f.Value = tagDes.TagTranslator
 			return f.getViewNode()
 		}
+	case TAG_FUNCTION_NEW_TAG:
+		f.Value = f.Args[0]
+		if f.Alias == "" {
+			f.Alias = fmt.Sprintf("new_tag_%s", f.Args[0])
+		}
+		return f.getViewNode()
 	}
 	values := make([]string, len(fields))
 	for i, field := range fields {
