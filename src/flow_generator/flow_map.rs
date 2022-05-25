@@ -336,7 +336,7 @@ impl FlowMap {
 
         // 有特殊包时更新ServiceTable并矫正流方向：SYN+ACK或SYN
         if pkt_tcp_flags.bits() & TcpFlags::SYN.bits() != 0 {
-            self.update_l4_direction(meta_packet, node, false);
+            self.update_l4_direction(meta_packet, node, false, false);
             self.update_syn_or_syn_ack_seq(node, meta_packet);
         }
 
@@ -669,7 +669,7 @@ impl FlowMap {
 
     fn new_tcp_node(&mut self, mut meta_packet: MetaPacket, total_flow: usize) -> FlowNode {
         let mut node = self.init_flow(&mut meta_packet, total_flow);
-        let reverse = self.update_l4_direction(&mut meta_packet, &mut node, true);
+        let reverse = self.update_l4_direction(&mut meta_packet, &mut node, true, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
@@ -735,7 +735,7 @@ impl FlowMap {
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = self.config.load().flow_timeout.opening;
-        let reverse = self.update_l4_direction(&mut meta_packet, &mut node, true);
+        let reverse = self.update_l4_direction(&mut meta_packet, &mut node, true, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
         if self.config.load().collector_enabled {
             self.collect_metric(&mut node, &meta_packet, !reverse);
@@ -931,6 +931,7 @@ impl FlowMap {
         meta_packet: &mut MetaPacket,
         node: &mut FlowNode,
         is_first_packet: bool,
+        no_stats: bool,
     ) -> bool {
         let lookup_key = &meta_packet.lookup_key;
         let src_key = ServiceKey::new(
@@ -964,7 +965,7 @@ impl FlowMap {
         if !ServiceTable::is_client_to_server(src_score, dst_score) {
             mem::swap(&mut src_score, &mut dst_score);
 
-            Self::reverse_flow(node);
+            Self::reverse_flow(node, no_stats);
             meta_packet.direction = meta_packet.direction.reversed();
             reverse = true;
         }
@@ -991,7 +992,7 @@ impl FlowMap {
 
         if !ServiceTable::is_client_to_server(src_score, dst_score) {
             mem::swap(&mut src_score, &mut dst_score);
-            Self::reverse_flow(node);
+            Self::reverse_flow(node, false);
             if let Some(pkt) = meta_packet {
                 pkt.direction = pkt.direction.reversed();
             }
@@ -1000,11 +1001,11 @@ impl FlowMap {
         node.tagged_flow.flow.is_active_service = ServiceTable::is_active_service(dst_score);
     }
 
-    fn reverse_flow(node: &mut FlowNode) {
+    fn reverse_flow(node: &mut FlowNode, no_stats: bool) {
         node.policy_in_tick.swap(0, 1);
         node.policy_data_cache.swap(0, 1);
         node.endpoint_data_cache = node.endpoint_data_cache.reversed();
-        node.tagged_flow.flow.reverse();
+        node.tagged_flow.flow.reverse(no_stats);
         node.tagged_flow.tag.reverse();
     }
 
@@ -1632,5 +1633,31 @@ mod tests {
         assert_eq!(perf_stats.rtt_client_max, 114);
         assert_eq!(perf_stats.rtt_server_max, 44);
         assert_eq!(perf_stats.srt_max, 12);
+    }
+
+    #[test]
+    fn tcp_syn_ack_zerowin() {
+        let (mut flow_map, output_queue_receiver) =
+            _new_flow_map_and_receiver(TridentType::TtProcess);
+
+        let capture = Capture::load_pcap(
+            "resources/test/flow_generator/tcp-syn-ack-zerowin.pcap",
+            None,
+        );
+        let packets = capture.as_meta_packets();
+
+        let timestamp = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .unwrap();
+        for mut packet in packets {
+            flow_map.inject_meta_packet(packet);
+        }
+
+        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(120)));
+
+        let tagged_flow = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+        let perf_stats = &tagged_flow.flow.flow_perf_stats.unwrap().tcp;
+        assert_eq!(perf_stats.counts_peers[0].zero_win_count, 0);
+        assert_eq!(perf_stats.counts_peers[1].zero_win_count, 1);
     }
 }
