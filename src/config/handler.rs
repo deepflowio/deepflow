@@ -1058,7 +1058,22 @@ impl ConfigHandler {
             }
 
             if candidate_config.dispatcher.enabled != new_config.dispatcher.enabled {
-                restart_dispatcher = true;
+                info!("enabled set to {}", new_config.dispatcher.enabled);
+                if new_config.dispatcher.enabled {
+                    fn start_dispatcher(_: &ConfigHandler, components: &mut Components) {
+                        for dispatcher in components.dispatchers.iter() {
+                            dispatcher.start();
+                        }
+                    }
+                    callbacks.push(start_dispatcher);
+                } else {
+                    fn stop_dispatcher(_: &ConfigHandler, components: &mut Components) {
+                        for dispatcher in components.dispatchers.iter() {
+                            dispatcher.stop();
+                        }
+                    }
+                    callbacks.push(stop_dispatcher);
+                }
             }
 
             if candidate_config.dispatcher.max_memory != new_config.dispatcher.max_memory {
@@ -1438,7 +1453,7 @@ impl ConfigHandler {
             candidate_config.stats = new_config.stats;
         }
 
-        if restart_dispatcher {
+        if restart_dispatcher && candidate_config.dispatcher.enabled {
             fn dispatcher_callback(_: &ConfigHandler, components: &mut Components) {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
