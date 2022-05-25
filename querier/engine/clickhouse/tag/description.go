@@ -178,6 +178,7 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 		},
 		"values": []interface{}{},
 	}
+
 	for _, key := range TAG_DESCRIPTION_KEYS {
 		if key.DB != db || key.Table != table {
 			continue
@@ -191,6 +192,32 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 			},
 		)
 	}
+
+	// 查询 k8s_label
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       "deepflow",
+	}
+	err := chClient.Init("")
+	if err != nil {
+		return nil, err
+	}
+	sql := "SELECT key FROM k8s_label_map GROUP BY key"
+	rst, err := chClient.DoQuery(sql, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, _key := range rst["values"] {
+		key := _key.([]interface{})[0]
+		labelKey := "label." + key.(string)
+		response["values"] = append(response["values"], []interface{}{
+			labelKey, labelKey + "_0", labelKey + "_1", labelKey, "string",
+			"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
+		})
+	}
 	return response, nil
 }
 
@@ -198,6 +225,10 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	// 获取tagEnumFile
 	sqlSplit := strings.Split(sql, " ")
 	tag := sqlSplit[2]
+	// 标签是动态的,不需要去tag_description里确认
+	if strings.HasPrefix(tag, "label.") {
+		return GetTagResourceValues(sql)
+	}
 	tagDescription, ok := TAG_DESCRIPTIONS[TagDescriptionKey{
 		DB: db, Table: table, TagName: tag,
 	}]
@@ -235,7 +266,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	if strings.Contains(rawSql, "WHERE") {
 		whereSql = strings.Split(rawSql, "WHERE")[1]
 	} else {
-		if tag == "ip" {
+		if tag == "ip" || strings.HasPrefix(tag, "label.") {
 			whereSql = "value!=''"
 		} else {
 			whereSql = "value!=0"
@@ -309,7 +340,14 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 		sql = "SELECT id AS value, name AS display_name FROM vtap_map GROUP BY value, display_name ORDER BY value ASC"
 
 	default:
-		return map[string][]interface{}{}, nil
+		if strings.HasPrefix(tag, "label.") {
+			labelTag := strings.TrimPrefix(tag, "label.")
+			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map WHERE key='%s' AND %s GROUP BY value, display_name ORDER BY value ASC", labelTag, whereSql)
+			log.Info(sql)
+		} else {
+			return map[string][]interface{}{}, nil
+		}
+
 	}
 	log.Debug(sql)
 	rst, err := chClient.DoQuery(sql, nil)
