@@ -149,12 +149,7 @@ impl Trident {
 
         let (ctrl_ip, ctrl_mac) = get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
             .context("failed getting control ip and mac")?;
-        let log_dir = Path::new(config.log_file.as_str());
-        let log_dir = log_dir.parent().unwrap().to_str().unwrap();
-        let stats_collector = Arc::new(stats::Collector::new(
-            &config.controller_ips,
-            log_dir.to_string(),
-        ));
+        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
         stats_collector.start();
 
         let session = Arc::new(Session::new(
