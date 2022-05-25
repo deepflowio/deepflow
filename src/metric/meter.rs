@@ -222,12 +222,12 @@ impl Latency {
         self.art_sum += other.art_sum;
         self.rrt_sum += other.rrt_sum;
 
-        self.rtt_count = other.rtt_count;
+        self.rtt_count += other.rtt_count;
         self.rtt_client_count += other.rtt_client_count;
         self.rtt_server_count += other.rtt_server_count;
         self.srt_count += other.srt_count;
         self.art_count += other.art_count;
-        self.rrt_count = other.rrt_count;
+        self.rrt_count += other.rrt_count;
     }
 }
 
