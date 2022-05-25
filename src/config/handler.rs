@@ -184,6 +184,7 @@ pub struct DispatcherConfig {
     pub af_packet_blocks: usize,
     pub af_packet_version: OptTpacketVersion,
     pub tap_mode: TapMode,
+    pub enabled: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -423,6 +424,7 @@ impl Default for NewRuntimeConfig {
                 af_packet_blocks: 0,
                 af_packet_version: OptTpacketVersion::default(),
                 tap_mode: TapMode::default(),
+                enabled: false,
             },
             sender: SenderConfig {
                 mtu: 1500,
@@ -834,6 +836,7 @@ impl ConfigHandler {
                 ),
                 af_packet_version: conf.capture_socket_type().into(),
                 tap_mode: static_config.tap_mode,
+                enabled: conf.enabled(),
             },
             sender: SenderConfig {
                 mtu: conf.mtu(),
@@ -1052,6 +1055,10 @@ impl ConfigHandler {
 
             if candidate_config.dispatcher.capture_bpf != new_config.dispatcher.capture_bpf {
                 reset_bpf = true;
+            }
+
+            if candidate_config.dispatcher.enabled != new_config.dispatcher.enabled {
+                restart_dispatcher = true;
             }
 
             if candidate_config.dispatcher.max_memory != new_config.dispatcher.max_memory {
