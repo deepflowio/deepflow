@@ -601,10 +601,10 @@ impl NewRuntimeConfig {
         }
 
         if self.synchronizer.max_escape < Duration::from_secs(600)
-            || self.synchronizer.max_escape > Duration::from_secs(86400)
+            || self.synchronizer.max_escape > Duration::from_secs(30 * 24 * 60 * 60)
         {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "max-escape-seconds {:?} not in [600s, 86400s]",
+                "max-escape-seconds {:?} not in [600s, 30d]",
                 self.synchronizer.max_escape
             )));
         }
