@@ -103,7 +103,8 @@ impl Guard {
         let running = self.running.clone();
         let exception_handler = self.exception_handler.clone();
         let log_dir = self.log_dir.clone();
-        let mut over_memory_limit = false;
+        let mut over_memory_limit = false; // 是否高于内存限制，高于则不符合预期
+        let mut under_sys_free_memory_limit = false; // 是否低于空闲内存限制，低于则不符合预期
         let thread = thread::spawn(move || {
             loop {
                 let memory_limit = limit.load().max_memory;
@@ -141,7 +142,7 @@ impl Guard {
                 );
                 if sys_free_memory_limit != 0 {
                     if current_sys_free_memory_percentage < sys_free_memory_limit {
-                        if over_memory_limit {
+                        if under_sys_free_memory_limit {
                             error!(
                                     "current system free memory percentage is less than sys_free_memory_limit twice, current system free memory percentage={}%, sys_free_memory_limit={}%, metaflow-agent restart...",
                                     current_sys_free_memory_percentage, sys_free_memory_limit
@@ -153,7 +154,7 @@ impl Guard {
                                     "current system free memory percentage is less than sys_free_memory_limit, current system free memory percentage={}%, sys_free_memory_limit={}%",
                                     current_sys_free_memory_percentage, sys_free_memory_limit
                                     );
-                            over_memory_limit = true;
+                            under_sys_free_memory_limit = true;
                         }
                     }
                 }

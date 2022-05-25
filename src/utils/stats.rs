@@ -128,7 +128,6 @@ pub struct Collector {
     sources: Arc<Mutex<Vec<Source>>>,
     pre_hooks: Arc<Mutex<Vec<Box<dyn FnMut() + Send>>>>,
 
-    log_dir: String,
     min_interval: Arc<AtomicU64>,
 
     running: Arc<(Mutex<bool>, Condvar)>,
@@ -138,11 +137,11 @@ pub struct Collector {
 impl Collector {
     const STATS_PREFIX: &'static str = "trident";
 
-    pub fn new(remotes: &Vec<String>, log_dir: String) -> Self {
-        Self::with_min_interval(remotes, TICK_CYCLE, log_dir)
+    pub fn new(remotes: &Vec<String>) -> Self {
+        Self::with_min_interval(remotes, TICK_CYCLE)
     }
 
-    pub fn with_min_interval(remotes: &Vec<String>, interval: Duration, log_dir: String) -> Self {
+    pub fn with_min_interval(remotes: &Vec<String>, interval: Duration) -> Self {
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
         } else {
@@ -165,7 +164,6 @@ impl Collector {
             remotes: Arc::new(Mutex::new(Some(remotes))),
             sources: Arc::new(Mutex::new(vec![])),
             pre_hooks: Arc::new(Mutex::new(vec![])),
-            log_dir,
             min_interval: Arc::new(AtomicU64::new(min_interval.as_secs())),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             thread: Mutex::new(None),
