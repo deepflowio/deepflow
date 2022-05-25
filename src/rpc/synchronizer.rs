@@ -283,7 +283,7 @@ impl Status {
                     if result.is_ok() {
                         ip_groups.push(Arc::new(result.unwrap()));
                     } else {
-                        warn!("{:?}: {}", item, result.unwrap_err());
+                        warn!("{}", result.unwrap_err());
                     }
                 }
                 self.update_ip_groups(version, ip_groups);

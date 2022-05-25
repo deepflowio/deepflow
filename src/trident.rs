@@ -312,6 +312,7 @@ fn dispatcher_listener_callback(
 
 pub struct Components {
     pub rx_leaky_bucket: Arc<LeakyBucket>,
+    pub l7_log_rate: Arc<LeakyBucket>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
     pub tap_typer: Arc<TapTyper>,
     pub dispatchers: Vec<Dispatcher>,
@@ -565,6 +566,10 @@ impl Components {
             .build_pcap_syntax()
         };
 
+        let l7_log_rate = Arc::new(LeakyBucket::new(Some(
+            runtime_config.l7_log_collect_nps_threshold,
+        )));
+
         let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
         for i in 0..dispatcher_num {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
@@ -601,6 +606,7 @@ impl Components {
                 proto_log_sender.clone(),
                 i as u32,
                 config_handler.log_parser(),
+                l7_log_rate.clone(),
             );
             stats_collector.register_countable(
                 "l7_session_aggr",
@@ -685,6 +691,7 @@ impl Components {
             &config_handler.candidate_config.ebpf,
             config_handler.log_parser(),
             policy_getter,
+            l7_log_rate.clone(),
             proto_log_sender,
         )
         .ok();
@@ -698,6 +705,7 @@ impl Components {
 
         Ok(Components {
             rx_leaky_bucket,
+            l7_log_rate,
             libvirt_xml_extractor,
             tap_typer,
             dispatchers,

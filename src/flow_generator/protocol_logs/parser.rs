@@ -13,7 +13,6 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
-use rand::prelude::{Rng, SeedableRng, SmallRng};
 
 use super::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
@@ -37,6 +36,7 @@ use crate::{
         net::MacAddr,
         queue::{DebugSender, Error, Receiver},
         stats::{Counter, CounterType, CounterValue, RefCountable},
+        LeakyBucket,
     },
 };
 
@@ -191,9 +191,7 @@ struct SessionQueue {
     window_size: usize,
     time_window: Option<Vec<HashMap<u64, AppProtoLogsData>>>,
 
-    throttle_queue: Vec<SendItem>,
-    throttle_period_count: u64,
-    rng: SmallRng,
+    log_rate: Arc<LeakyBucket>,
 
     counter: Arc<SessionAggrCounter>,
     output_queue: DebugSender<SendItem>,
@@ -205,6 +203,7 @@ impl SessionQueue {
         counter: Arc<SessionAggrCounter>,
         output_queue: DebugSender<SendItem>,
         config: LogParserAccess,
+        log_rate: Arc<LeakyBucket>,
     ) -> Self {
         //l7_log_session_timeout 20s-300s ，window_size = 2-30，所以 SessionQueue.time_window 预分配内存
         let window_size =
@@ -218,9 +217,7 @@ impl SessionQueue {
             config,
             window_size,
 
-            throttle_queue: vec![],
-            rng: SmallRng::from_entropy(),
-            throttle_period_count: 0,
+            log_rate,
 
             counter,
             output_queue,
@@ -335,7 +332,6 @@ impl SessionQueue {
     }
 
     fn clear(&mut self) {
-        self.flush_throttle_queue();
         let mut time_window = match self.time_window.take() {
             Some(t) => t,
             None => return,
@@ -386,76 +382,20 @@ impl SessionQueue {
             Duration::from_secs(self.aggregate_start_time.as_secs() + n as u64 * SLOT_WIDTH);
     }
 
-    fn send_helper(&mut self, item: SendItem) {
-        self.throttle_period_count += 1;
-
-        let throttle =
-            (self.config.load().l7_log_collect_nps_threshold as usize) << THROTTLE_BUCKET_BITS;
-        if self.throttle_queue.len() < throttle {
-            self.throttle_queue.push(item);
-        } else {
-            // throttle 是动态更改，有可能throttle往后的item还存在，需要释放
-            if self.throttle_queue.len() > throttle {
-                self.counter.throttle_drop.fetch_add(
-                    (self.throttle_queue.len() - throttle) as u64,
-                    Ordering::Relaxed,
-                );
-                self.throttle_queue.truncate(throttle);
-            }
-            let rand_index = self.rng.gen_range(0..self.throttle_period_count as usize);
-            if rand_index < throttle {
-                self.throttle_queue[rand_index] = item;
-            }
-            self.counter.throttle_drop.fetch_add(1, Ordering::Relaxed);
-        }
-    }
-
     fn send(&mut self, item: AppProtoLogsData) {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-
-        if now.as_secs() >> THROTTLE_BUCKET_BITS
-            != self.last_flush_time.as_secs() >> THROTTLE_BUCKET_BITS
-        {
-            self.throttle_period_count = 0;
-            self.last_flush_time = now;
-            self.flush_throttle_queue();
+        if !self.log_rate.acquire(1) {
+            self.counter.throttle_drop.fetch_add(1, Ordering::Relaxed);
+            return;
         }
 
-        self.send_helper(SendItem::L7FlowLog(item));
+        if let Err(Error::Terminated(..)) = self.output_queue.send(SendItem::L7FlowLog(item)) {
+            warn!("output queue terminated");
+        }
     }
 
     fn send_all(&mut self, items: Vec<AppProtoLogsData>) {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-
-        if now.as_secs() >> THROTTLE_BUCKET_BITS
-            != self.last_flush_time.as_secs() >> THROTTLE_BUCKET_BITS
-        {
-            self.last_flush_time = now;
-            self.flush_throttle_queue();
-        }
         for item in items {
-            self.send_helper(SendItem::L7FlowLog(item));
-        }
-    }
-
-    fn flush_throttle_queue(&mut self) {
-        let length = self.throttle_queue.len();
-        let mut index = 0;
-        while index + QUEUE_BATCH_SIZE < length {
-            let v = self.throttle_queue.drain(..QUEUE_BATCH_SIZE).collect();
-            if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
-                warn!("output queue terminated");
-                return;
-            }
-            index += QUEUE_BATCH_SIZE;
-        }
-        let v = self.throttle_queue.drain(..).collect();
-        if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
-            warn!("output queue terminated");
+            self.send(item);
         }
     }
 }
@@ -489,6 +429,8 @@ pub struct AppProtoLogsParser {
     counter: Arc<SessionAggrCounter>,
     l7_log_dynamic_is_updated: Arc<AtomicBool>,
     config: LogParserAccess,
+
+    log_rate: Arc<LeakyBucket>,
 }
 
 impl AppProtoLogsParser {
@@ -497,6 +439,7 @@ impl AppProtoLogsParser {
         output_queue: DebugSender<SendItem>,
         id: u32,
         config: LogParserAccess,
+        log_rate: Arc<LeakyBucket>,
     ) -> (Self, Arc<SessionAggrCounter>) {
         let counter: Arc<SessionAggrCounter> = Default::default();
         (
@@ -509,6 +452,7 @@ impl AppProtoLogsParser {
                 counter: counter.clone(),
                 l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(false)),
                 config,
+                log_rate,
             },
             counter,
         )
@@ -542,9 +486,11 @@ impl AppProtoLogsParser {
 
         let config = self.config.clone();
         let l7_log_dynamic_is_updated = self.l7_log_dynamic_is_updated.clone();
+        let log_rate = self.log_rate.clone();
 
         let thread = thread::spawn(move || {
-            let mut session_queue = SessionQueue::new(counter, output_queue, config.clone());
+            let mut session_queue =
+                SessionQueue::new(counter, output_queue, config.clone(), log_rate);
             let mut app_logs = AppLogs::new(&config);
 
             while running.load(Ordering::Relaxed) {
