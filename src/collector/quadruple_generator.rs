@@ -326,27 +326,24 @@ impl SubQuadGen {
                     / self.slot_interval
                     + 1;
             if slots_to_shift >= self.number_of_slots {
-                let mut front = self.connections.pop_front().unwrap();
                 for i in 0..self.stashs.len() {
+                    // 计算并发连接数，发送该秒/分钟的flow后, 将该秒/分钟的连接数，需并入下一秒/分钟中计算
+                    let mut front = self.connections.pop_front().unwrap();
                     self.flush_flow(i, &mut front, possible_host);
-                    if i + 1 < self.stashs.len() {
-                        // 计算并发连接数，发送该秒/分钟的flow后, 将该秒/分钟的连接数，需并入下一秒/分钟中计算
-                        front.merge(time_in_second, &self.connections[i]); // 前面pop_front后，此处位置实际是从1开始
-                        self.connections[i].clear();
-                    }
+                    self.connections[0].merge(time_in_second, &front);
+                    front.clear();
+                    self.connections.push_back(front);
                 }
-                self.connections.push_front(front);
             } else {
                 let slots_to_shift = slots_to_shift as usize;
-                let mut front = self.connections.pop_front().unwrap();
                 for i in 0..slots_to_shift {
+                    let mut front = self.connections.pop_front().unwrap();
                     self.flush_flow(i, &mut front, possible_host);
-                    front.merge(time_in_second, &self.connections[i]);
-                    self.connections[i].clear();
+                    self.connections[0].merge(time_in_second, &front);
+                    front.clear();
+                    self.connections.push_back(front);
                 }
-                self.connections.insert(slots_to_shift, front);
                 self.stashs.rotate_left(slots_to_shift);
-                self.connections.rotate_left(slots_to_shift);
             }
             self.window_start += Duration::from_secs(self.slot_interval * slots_to_shift as u64);
             debug!(
