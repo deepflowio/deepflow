@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::CString;
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -20,6 +21,7 @@ use crate::sender::SendItem;
 use crate::utils::{
     queue::{bounded, DebugSender, Receiver, Sender},
     stats::{Counter, CounterType, CounterValue, OwnedCountable},
+    LeakyBucket,
 };
 
 type LoggerItem = (L7Protocol, Box<dyn L7LogParse>);
@@ -31,6 +33,9 @@ struct SessionAggr {
     last_flush_time: u64, // 秒级时间
     slot_count: u64,
 
+    counter: SyncEbpfCounter,
+
+    log_rate: Arc<LeakyBucket>,
     output: DebugSender<SendItem>,
 }
 
@@ -39,15 +44,22 @@ impl SessionAggr {
     const SLOT_WIDTH: u64 = 60; // 每个slot存60秒
     const SLOT_CACHED_COUNT: u64 = 300000; // 每个slot平均缓存的FLOW数
 
-    pub fn new(l7_log_session_timeout: Duration, output: DebugSender<SendItem>) -> Self {
-        let solt_count = l7_log_session_timeout.as_secs() / Self::SLOT_WIDTH;
-        let slot_count = solt_count.min(16).max(1) as usize;
+    pub fn new(
+        l7_log_session_timeout: Duration,
+        counter: SyncEbpfCounter,
+        log_rate: Arc<LeakyBucket>,
+        output: DebugSender<SendItem>,
+    ) -> Self {
+        let slot_count = l7_log_session_timeout.as_secs() / Self::SLOT_WIDTH;
+        let slot_count = slot_count.min(16).max(1) as usize;
         Self {
             slot_count: slot_count as u64,
             output,
             start_time: 0,
             cache_count: 0,
             last_flush_time: 0,
+            counter,
+            log_rate,
             maps: [
                 Some(HashMap::new()),
                 Some(HashMap::new()),
@@ -71,7 +83,12 @@ impl SessionAggr {
 
     fn send(&self, log: AppProtoLogsData) {
         debug!("ebpf_collector out: {}", log);
+        if !self.log_rate.acquire(1) {
+            self.counter.counter().throttle_drop += 1;
+            return;
+        }
         let _ = self.output.send(SendItem::L7FlowLog(log));
+        self.counter.counter().tx += 1;
     }
 
     fn flush(&mut self, count: u64) -> u64 {
@@ -264,6 +281,7 @@ pub struct EbpfCounter {
     rx: u64,
     tx: u64,
     unknown_protocol: u64,
+    throttle_drop: u64,
 }
 
 impl EbpfCounter {
@@ -271,9 +289,11 @@ impl EbpfCounter {
         self.rx = 0;
         self.tx = 0;
         self.unknown_protocol = 0;
+        self.throttle_drop = 0;
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct SyncEbpfCounter {
     counter: *mut EbpfCounter,
 }
@@ -289,10 +309,11 @@ unsafe impl Sync for SyncEbpfCounter {}
 
 impl OwnedCountable for SyncEbpfCounter {
     fn get_counters(&self) -> Vec<Counter> {
-        let (rx, tx, unknow) = (
+        let (rx, tx, unknow, drop) = (
             self.counter().rx,
             self.counter().tx,
             self.counter().unknown_protocol,
+            self.counter().throttle_drop,
         );
         self.counter().reset();
 
@@ -313,6 +334,11 @@ impl OwnedCountable for SyncEbpfCounter {
                 "collector_unknown_protocol",
                 CounterType::Counted,
                 CounterValue::Unsigned(unknow),
+            ),
+            (
+                "throttle_drop",
+                CounterType::Counted,
+                CounterValue::Unsigned(drop),
             ),
             (
                 "perf_pages_count",
@@ -409,6 +435,7 @@ struct EbpfRunner {
 
     config: EbpfConfig,
 
+    log_rate: Arc<LeakyBucket>,
     output: DebugSender<SendItem>,
 }
 
@@ -446,7 +473,12 @@ impl EbpfRunner {
     }
 
     fn run(&mut self, sync_counter: SyncEbpfCounter) {
-        let mut aggr = SessionAggr::new(self.config.l7_log_session_timeout, self.output.clone());
+        let mut aggr = SessionAggr::new(
+            self.config.l7_log_session_timeout,
+            sync_counter,
+            self.log_rate.clone(),
+            self.output.clone(),
+        );
         let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
 
         while unsafe { SWITCH } {
@@ -496,7 +528,6 @@ impl EbpfRunner {
                     // 应用日志聚合
                     debug!("\n{}", data);
                     aggr.handle(data);
-                    sync_counter.counter().tx += 1;
                 }
                 Some(())
             });
@@ -610,6 +641,7 @@ impl EbpfCollector {
         config: &EbpfConfig,
         log_parser_config: LogParserAccess,
         policy_getter: PolicyGetter,
+        l7_log_rate: Arc<LeakyBucket>,
         output: DebugSender<SendItem>,
     ) -> Result<Box<Self>> {
         let (sender, receiver, _) = bounded::<MetaPacket>(1024);
@@ -623,6 +655,7 @@ impl EbpfCollector {
                 config: config.clone(),
                 log_parser_config,
                 output,
+                log_rate: l7_log_rate,
                 l7_log_dynamic_is_updated: false,
             },
             thread_handle: None,
@@ -630,6 +663,7 @@ impl EbpfCollector {
                 rx: 0,
                 tx: 0,
                 unknown_protocol: 0,
+                throttle_drop: 0,
             },
         }));
     }

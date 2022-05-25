@@ -1418,6 +1418,30 @@ impl ConfigHandler {
                 }
                 callbacks.push(l7_log_dynamic_callback);
             }
+            if candidate_config.log_parser.l7_log_collect_nps_threshold
+                != new_config.log_parser.l7_log_collect_nps_threshold
+            {
+                fn l7_log_collect_nps_threshold_callback(
+                    config: &ConfigHandler,
+                    components: &mut Components,
+                ) {
+                    info!(
+                        "l7 log collect nps threshold set to {}",
+                        config
+                            .candidate_config
+                            .log_parser
+                            .l7_log_collect_nps_threshold
+                    );
+                    components.l7_log_rate.set_rate(Some(
+                        config
+                            .candidate_config
+                            .log_parser
+                            .l7_log_collect_nps_threshold,
+                    ));
+                }
+                callbacks.push(l7_log_collect_nps_threshold_callback);
+            }
+
             candidate_config.log_parser = new_config.log_parser;
         }
 
