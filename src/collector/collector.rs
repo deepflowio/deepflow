@@ -271,7 +271,7 @@ impl Stash {
         Self {
             sender,
             counter,
-            start_time: Duration::ZERO,
+            start_time: Duration::from_secs(get_timestamp().as_secs() / MINUTE * MINUTE),
             global_thread_id: ctx.id as u8 + 1,
             slot_interval,
             inner: HashMap::new(),
@@ -280,14 +280,60 @@ impl Stash {
         }
     }
 
-    fn collect(&mut self, acc_flow: AccumulatedFlow, time_in_second: u64) {
+    fn collect(&mut self, acc_flow: Option<AccumulatedFlow>, mut time_in_second: u64) {
         if time_in_second < self.start_time.as_secs() {
             self.counter
                 .drop_before_window
                 .fetch_add(1, Ordering::Relaxed);
             return;
         }
-        self.flush(time_in_second);
+
+        // 这里需要修正一下timeInSecond
+        // 因为要使用doc time来推动时间窗口，所以对于doc中的timestamp不做修正
+        // 对于queue中的tick（即accFlow == nil），时间修正为timeInSecond - delaySeconds
+        // 对于分钟collector，少减去60s
+        if acc_flow.is_none() && time_in_second >= self.context.delay_seconds {
+            match self.context.metric_type {
+                MetricsType::SECOND => time_in_second -= self.context.delay_seconds,
+                _ => time_in_second -= self.context.delay_seconds - MINUTE,
+            }
+        }
+
+        time_in_second = time_in_second / self.slot_interval * self.slot_interval;
+        let timestamp = get_timestamp();
+
+        let start_time = self.start_time.as_secs();
+        if time_in_second > start_time {
+            let delay = (timestamp - self.start_time).as_nanos() as u64;
+            let _ =
+                self.counter
+                    .window_delay
+                    .fetch_update(Ordering::Acquire, Ordering::Relaxed, |x| {
+                        if delay > x {
+                            Some(delay)
+                        } else {
+                            None
+                        }
+                    });
+            self.flush_stats();
+            debug!("collector window moved interval={:?} is_tick={} sys_ts={:?} flow_ts={} window={:?}", self.slot_interval, false, timestamp, time_in_second, self.start_time);
+            self.start_time = Duration::from_secs(time_in_second);
+        }
+        let delay = (timestamp - Duration::from_secs(time_in_second)).as_nanos() as u64;
+        let _ = self
+            .counter
+            .flow_delay
+            .fetch_update(Ordering::Acquire, Ordering::Relaxed, |x| {
+                if delay > x {
+                    Some(delay)
+                } else {
+                    None
+                }
+            });
+        let acc_flow = match acc_flow {
+            Some(f) => f,
+            None => return,
+        };
 
         // PCAP和分发策略统计
         if self.context.metric_type == MetricsType::MINUTE {
@@ -346,33 +392,6 @@ impl Stash {
 
         self.fill_stats(&acc_flow, directions, false);
         self.fill_tracing_stats(&acc_flow, directions, is_extra_tracing_doc);
-    }
-
-    fn flush(&mut self, mut time_in_second: u64) {
-        if time_in_second < self.start_time.as_secs() {
-            self.counter
-                .drop_before_window
-                .fetch_add(1, Ordering::Relaxed);
-            return;
-        }
-
-        time_in_second = time_in_second / self.slot_interval * self.slot_interval;
-        let timestamp = get_timestamp();
-
-        let start_time = self.start_time.as_secs();
-        if time_in_second > start_time {
-            let delay = (timestamp - self.start_time).as_nanos() as u64;
-            if delay > self.counter.window_delay.load(Ordering::Relaxed) {
-                self.counter.window_delay.store(delay, Ordering::Relaxed);
-            }
-            self.flush_stats();
-            debug!("collector window moved interval={:?} is_tick={} sys_ts={:?} flow_ts={} window={:?}", self.slot_interval, false, timestamp, time_in_second, self.start_time);
-            self.start_time = Duration::from_secs(time_in_second);
-        }
-        let delay = (timestamp - Duration::from_secs(time_in_second)).as_nanos() as u64;
-        if delay > self.counter.flow_delay.load(Ordering::Relaxed) {
-            self.counter.flow_delay.store(delay, Ordering::Relaxed);
-        }
     }
 
     fn fill_stats(
@@ -779,13 +798,13 @@ impl Collector {
                 match receiver.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
                     Ok(acc_flows) => {
                         for flow in acc_flows {
-                            let time_in_second = flow.tagged_flow.flow.start_time.as_secs();
-                            stash.collect(flow, time_in_second);
+                            let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
+                            stash.collect(Some(flow), time_in_second);
                         }
                     }
                     Err(Error::Timeout) => {
                         // qg会延时delay_seconds，这再多延时2秒刷新数据
-                        stash.flush(get_timestamp().as_secs() - delay_seconds - 2)
+                        stash.collect(None, get_timestamp().as_secs() - delay_seconds - 2)
                     }
                     Err(Error::Terminated(..)) => break,
                 }
