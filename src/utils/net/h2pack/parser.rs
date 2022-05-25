@@ -1,6 +1,9 @@
 use bitflags::bitflags;
 use hpack::decoder::Decoder;
 
+const STATIC_INDEX_MIN: usize = 1;
+const STATIC_INDEX_MAX: usize = 61;
+
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum ParseError {
     HeaderIndexOutOfBounds,
@@ -93,7 +96,7 @@ impl Parser<'_> {
         // RFC7541附录A(https://datatracker.ietf.org/doc/html/rfc7541#appendix-A)规定：
         // 静态表index从1到61，共60项。如果index大于61, 意味着这是一个dynamic table的
         // index，我们无法解出index对应的value，应该跳过对应的字节继续解析。
-        if index > 61 {
+        if index > STATIC_INDEX_MAX {
             return Ok((None, val_len));
         } else if index != 0 {
             // Indexed
@@ -132,7 +135,7 @@ impl Parser<'_> {
             return Err(ParseError::InvalidInput);
         }
 
-        if index < 62 && index > 0 {
+        if index >= STATIC_INDEX_MIN && index <= STATIC_INDEX_MAX {
             match self.decoder.decode(&buf[..index_len]) {
                 Ok(rst) => Ok((Some(rst), index_len)),
                 Err(_) => Err(ParseError::InvalidHuffmanCode),
@@ -210,7 +213,7 @@ impl Parser<'_> {
 
     pub fn parse(&mut self, input: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ParseError> {
         let mut header_list = Vec::new();
-        let mut offset = 0usize;
+        let mut offset = 0;
 
         while offset < input.len() {
             offset += self.parse_one_field(input, offset, &mut header_list)?;
