@@ -181,7 +181,8 @@ impl DnsLog {
         match self.info.domain_type {
             DNS_TYPE_A | DNS_TYPE_AAAA => match data_length {
                 IPV4_ADDR_LEN | IPV6_ADDR_LEN => {
-                    if let Some(ipaddr) = parse_ip_slice(&payload[..data_length]) {
+                    if let Some(ipaddr) = parse_ip_slice(&payload[g_offset..g_offset + data_length])
+                    {
                         self.info.answers.push_str(&ipaddr.to_string());
                     }
                 }
@@ -213,7 +214,7 @@ impl DnsLog {
                     );
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
-                if let Some(ipaddr) = parse_ip_slice(&payload[..data_length]) {
+                if let Some(ipaddr) = parse_ip_slice(&payload[g_offset..g_offset + data_length]) {
                     self.info.answers.push_str(&ipaddr.to_string());
                 }
             }
