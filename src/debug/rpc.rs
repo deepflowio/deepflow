@@ -65,7 +65,7 @@ impl RpcDebugger {
     async fn get_rpc_response(&self) -> Result<tonic::Response<SyncResponse>, tonic::Status> {
         let exception_handler = ExceptionHandler::default();
         let req =
-            Synchronizer::generate_sync_request(&self.config, &self.status, &exception_handler);
+            Synchronizer::generate_sync_request(&self.config, &self.status, 0, &exception_handler);
         self.session.update_current_server().await;
 
         let client = self
