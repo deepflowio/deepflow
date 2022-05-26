@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
         Arc, Mutex, Weak,
     },
     thread,
@@ -271,7 +271,9 @@ impl Stash {
         Self {
             sender,
             counter,
-            start_time: Duration::from_secs(get_timestamp().as_secs() / MINUTE * MINUTE),
+            start_time: Duration::from_secs(
+                get_timestamp(ctx.ntp_diff.load(Ordering::Relaxed)).as_secs() / MINUTE * MINUTE,
+            ),
             global_thread_id: ctx.id as u8 + 1,
             slot_interval,
             inner: HashMap::new(),
@@ -300,7 +302,7 @@ impl Stash {
         }
 
         time_in_second = time_in_second / self.slot_interval * self.slot_interval;
-        let timestamp = get_timestamp();
+        let timestamp = get_timestamp(self.context.ntp_diff.load(Ordering::Relaxed));
 
         let start_time = self.start_time.as_secs();
         if time_in_second > start_time {
@@ -719,6 +721,7 @@ struct Context {
     delay_seconds: u64,
     metric_type: MetricsType,
     config: CollectorAccess,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 pub struct Collector {
@@ -740,6 +743,7 @@ impl Collector {
         delay_seconds: u32,
         stats: &Arc<stats::Collector>,
         config: CollectorAccess,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         let delay_seconds = delay_seconds as u64;
         let name = match metric_type {
@@ -776,6 +780,7 @@ impl Collector {
                 delay_seconds,
                 metric_type,
                 config,
+                ntp_diff,
             },
         }
     }
@@ -804,7 +809,12 @@ impl Collector {
                     }
                     Err(Error::Timeout) => {
                         // qg会延时delay_seconds，这再多延时2秒刷新数据
-                        stash.collect(None, get_timestamp().as_secs() - delay_seconds - 2)
+                        stash.collect(
+                            None,
+                            get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs()
+                                - delay_seconds
+                                - 2,
+                        )
                     }
                     Err(Error::Terminated(..)) => break,
                 }

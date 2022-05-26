@@ -718,7 +718,7 @@ mod tests {
     fn state_machine() {
         let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
         let mut flow_node = FlowNode {
-            timestamp_key: get_timestamp().as_nanos() as u64,
+            timestamp_key: get_timestamp(0).as_nanos() as u64,
 
             tagged_flow: TaggedFlow::default(),
             min_arrived_time: Duration::ZERO,
@@ -816,7 +816,7 @@ mod tests {
                 },
             }));
 
-            pkt.lookup_key.timestamp = get_timestamp() + (pkt.lookup_key.timestamp - delta);
+            pkt.lookup_key.timestamp = get_timestamp(0) + (pkt.lookup_key.timestamp - delta);
             last_timestamp = pkt.lookup_key.timestamp;
             flow_map.inject_meta_packet(pkt);
         }

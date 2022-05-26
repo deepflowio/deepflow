@@ -8,7 +8,7 @@ mod local_mode_dispatcher;
 mod mirror_mode_dispatcher;
 
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     Arc, Mutex, Weak,
 };
 use std::thread::{self, JoinHandle};
@@ -311,6 +311,7 @@ pub struct DispatcherBuilder {
     policy_getter: Option<PolicyGetter>,
     platform_poller: Option<Arc<GenericPoller>>,
     exception_handler: Option<ExceptionHandler>,
+    ntp_diff: Option<Arc<AtomicI64>>,
 }
 
 impl DispatcherBuilder {
@@ -405,6 +406,11 @@ impl DispatcherBuilder {
 
     pub fn exception_handler(mut self, v: ExceptionHandler) -> Self {
         self.exception_handler = Some(v);
+        self
+    }
+
+    pub fn ntp_diff(mut self, v: Arc<AtomicI64>) -> Self {
+        self.ntp_diff = Some(v);
         self
     }
 
@@ -524,6 +530,10 @@ impl DispatcherBuilder {
                 .exception_handler
                 .take()
                 .ok_or(Error::ConfigIncomplete("no exception handler".into()))?,
+            ntp_diff: self
+                .ntp_diff
+                .take()
+                .ok_or(Error::ConfigIncomplete("no ntp_diff".into()))?,
         };
         collector.register_countable(
             "dispatcher",

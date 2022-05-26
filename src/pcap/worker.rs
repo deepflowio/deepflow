@@ -2,7 +2,7 @@ use std::{
     fs,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
@@ -57,6 +57,7 @@ pub struct Worker {
     thread: Mutex<Option<JoinHandle<()>>>,
     interval: Duration,
     running: Arc<AtomicBool>,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl Worker {
@@ -69,6 +70,7 @@ impl Worker {
         writer_buffer_size: u32,
         packet_receiver: queue::Receiver<PcapPacket>,
         interval: Duration,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         Self {
             index,
@@ -85,6 +87,7 @@ impl Worker {
             packet_receiver: Arc::new(packet_receiver),
             thread: Mutex::new(None),
             running: Arc::new(AtomicBool::new(false)),
+            ntp_diff,
         }
     }
 
@@ -104,16 +107,17 @@ impl Worker {
         let packet_receiver = self.packet_receiver.clone();
         let interval = self.interval;
 
+        let ntp_diff = self.ntp_diff.clone();
         // 上层Sender要关闭channel，才调用worker的stop方法
         let thread = thread::spawn(move || loop {
             match packet_receiver.recv(Some(interval)) {
                 Ok(PcapPacket::Packet(pkt)) => Self::write_pkt(pkt, &writers, &config, &counter),
                 Err(Error::Timeout) => {
-                    let now = get_timestamp();
+                    let now = get_timestamp(ntp_diff.load(Ordering::Relaxed));
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                 }
                 Err(Error::Terminated(_, _)) | Ok(PcapPacket::Terminated) => {
-                    let now = get_timestamp();
+                    let now = get_timestamp(ntp_diff.load(Ordering::Relaxed));
                     Self::clean_timeout_file(now, &writers, &config, &counter);
                     break;
                 }
