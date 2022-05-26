@@ -1,11 +1,12 @@
-use std::convert::{TryFrom, TryInto};
-use std::time::{Duration, SystemTime};
+use std::convert::TryInto;
+use std::mem;
+use std::ptr;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use nom::number::streaming::be_u8;
-pub use nom::{Err, IResult};
-use nom_derive::*;
+use chrono::{DateTime, TimeZone, Utc};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, NomBE)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum NtpMode {
     Reserved,
@@ -18,38 +19,13 @@ pub enum NtpMode {
     Private,
 }
 
-impl TryFrom<u8> for NtpMode {
-    type Error = ();
-
-    fn try_from(v: u8) -> Result<Self, Self::Error> {
-        match v {
-            x if x == NtpMode::Reserved as u8 => Ok(NtpMode::Reserved),
-            x if x == NtpMode::SymmetricActive as u8 => Ok(NtpMode::SymmetricActive),
-            x if x == NtpMode::SymmetricPassive as u8 => Ok(NtpMode::SymmetricPassive),
-            x if x == NtpMode::Client as u8 => Ok(NtpMode::Client),
-            x if x == NtpMode::Server as u8 => Ok(NtpMode::Server),
-            x if x == NtpMode::Broadcast as u8 => Ok(NtpMode::Broadcast),
-            x if x == NtpMode::NtpControlMessage as u8 => Ok(NtpMode::NtpControlMessage),
-            x if x == NtpMode::Private as u8 => Ok(NtpMode::Private),
-            _ => Err(()),
-        }
-    }
-}
-
-pub type NtpTime = u64;
-
 const NSEC_IN_SEC: u32 = 1_000_000_000;
 
 /// An NTP version 3 / 4 packet
-#[derive(Debug, PartialEq, NomBE)]
+#[repr(C)]
+#[derive(Debug, Default, PartialEq)]
 pub struct NtpPacket {
-    #[nom(PreExec = "let (i, b0) = be_u8(i)?;")]
-    #[nom(Value(b0 >> 6))]
-    pub li: u8,
-    #[nom(Value((b0 >> 3) & 0b111))]
-    pub version: u8,
-    #[nom(Value((b0 & 0b111).try_into().unwrap()))]
-    pub mode: NtpMode,
+    li_vn_mode: u8,
     pub stratum: u8,
     pub poll: i8,
     pub precision: i8,
@@ -64,73 +40,125 @@ pub struct NtpPacket {
 
 impl NtpPacket {
     pub fn new() -> Self {
-        NtpPacket {
-            li: 3,
-            version: 4,
-            mode: NtpMode::Client,
-            stratum: 0,
-            poll: 0,
-            precision: 0,
-            root_delay: 0,
-            root_dispersion: 0,
-            ref_id: 0,
-            ts_ref: 0,
-            ts_orig: 0,
-            ts_recv: 0,
-            ts_xmit: 0,
-        }
-    }
-
-    pub fn set_leap(&mut self, li: u8) {
-        self.li = li;
-    }
-
-    pub fn set_version(&mut self, version: u8) {
-        self.version = version;
-    }
-
-    pub fn set_mode(&mut self, mode: NtpMode) {
-        self.mode = mode;
-    }
-
-    pub fn get_version(&self) -> u8 {
-        self.version
-    }
-
-    pub fn get_mode(&self) -> NtpMode {
-        self.mode
+        let mut p = NtpPacket::default();
+        p.set_leap(3);
+        p.set_version(4);
+        p.set_mode(NtpMode::Client);
+        p
     }
 
     pub fn get_leap(&self) -> u8 {
-        self.li
+        self.li_vn_mode >> 6
+    }
+
+    pub fn set_leap(&mut self, li: u8) {
+        self.li_vn_mode = (self.li_vn_mode & 0x3F) | (li << 6);
+    }
+
+    pub fn get_version(&self) -> u8 {
+        (self.li_vn_mode >> 3) & 0x7
+    }
+
+    pub fn set_version(&mut self, version: u8) {
+        self.li_vn_mode = (self.li_vn_mode & 0xC7) | (version << 3);
+    }
+
+    pub fn get_mode(&self) -> NtpMode {
+        (self.li_vn_mode & 0x7).try_into().unwrap()
+    }
+
+    pub fn set_mode(&mut self, mode: NtpMode) {
+        self.li_vn_mode = (self.li_vn_mode & 0xF8) | (mode as u8);
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut v = vec![];
+        v.push(self.li_vn_mode);
+        v.push(self.stratum);
+        v.push(self.poll as u8);
+        v.push(self.precision as u8);
+        v.extend_from_slice(&self.root_delay.to_be_bytes());
+        v.extend_from_slice(&self.root_dispersion.to_be_bytes());
+        v.extend_from_slice(&self.ref_id.to_be_bytes());
+        v.extend_from_slice(&self.ts_ref.to_be_bytes());
+        v.extend_from_slice(&self.ts_orig.to_be_bytes());
+        v.extend_from_slice(&self.ts_recv.to_be_bytes());
+        v.extend_from_slice(&self.ts_xmit.to_be_bytes());
+        v
+    }
+
+    pub fn offset(&self, recv_time: &SystemTime) -> i64 {
+        // local clock offset
+        //   offset = ((rec-org) + (xmt-dst)) / 2
+        let recv = SystemTime::from(&NtpTime(self.ts_recv))
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as i64;
+        let orig = SystemTime::from(&NtpTime(self.ts_orig))
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as i64;
+        let xmit = SystemTime::from(&NtpTime(self.ts_xmit))
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as i64;
+        let dest = recv_time.duration_since(UNIX_EPOCH).unwrap().as_nanos() as i64;
+
+        let a = recv - orig;
+        let b = xmit - dest;
+        a + (b - a) / 2
     }
 }
 
-/// Parse an NTP packet, version 3 or 4
-pub fn parse_ntp(i: &[u8]) -> Option<NtpPacket> {
-    match NtpPacket::parse(i) {
-        Ok((_, packet)) => Some(packet),
-        Err(_) => None,
-    }
-}
+impl TryFrom<&[u8]> for NtpPacket {
+    type Error = &'static str;
 
-/// convert `SystemTime` to `u64` seconds
-pub fn to_ntp_time(now: SystemTime) -> Option<NtpTime> {
-    match now.duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(n) => {
-            let frac = (n.as_nanos() % NSEC_IN_SEC as u128) as u64;
-            let secs = n.as_secs();
-            Some(secs << 32 | frac)
+    fn try_from(bs: &[u8]) -> Result<Self, Self::Error> {
+        if bs.len() < mem::size_of::<Self>() {
+            return Err("buffer too short");
         }
-        Err(_) => None,
+        unsafe {
+            let mut packet: Self = ptr::read(bs.as_ptr() as *const _);
+            if NtpMode::try_from(packet.li_vn_mode & 0x7).is_err() {
+                return Err("invalid ntp mode");
+            }
+            packet.root_delay = packet.root_delay.to_be();
+            packet.root_dispersion = packet.root_dispersion.to_be();
+            packet.ref_id = packet.ref_id.to_be();
+            packet.ts_ref = packet.ts_ref.to_be();
+            packet.ts_orig = packet.ts_orig.to_be();
+            packet.ts_recv = packet.ts_recv.to_be();
+            packet.ts_xmit = packet.ts_xmit.to_be();
+            Ok(packet)
+        }
     }
 }
 
-/// get local clock offset
-pub fn get_offset(packet: &NtpPacket, ts_recv: u64) -> Duration {
-    let a = packet.ts_recv - packet.ts_orig;
-    let b = packet.ts_xmit - ts_recv;
-    Duration::from_nanos((a + b) / 2)
+pub struct NtpTime(pub u64);
+
+impl From<&SystemTime> for NtpTime {
+    fn from(t: &SystemTime) -> Self {
+        let n =
+            DateTime::<Utc>::from(*t).signed_duration_since(Utc.ymd(1900, 1, 1).and_hms(0, 0, 0));
+        let secs = n.num_seconds() as u64;
+        let frac = (((n.num_nanoseconds().unwrap() as u64 - secs * NSEC_IN_SEC as u64) << 32)
+            + NSEC_IN_SEC as u64
+            - 1)
+            / NSEC_IN_SEC as u64;
+        Self(secs << 32 | frac)
+    }
+}
+
+impl From<&NtpTime> for SystemTime {
+    fn from(t: &NtpTime) -> Self {
+        let nanos =
+            (t.0 >> 32) * NSEC_IN_SEC as u64 + ((t.0 & 0xFFFFFFFF) * NSEC_IN_SEC as u64 >> 32);
+        Utc.ymd(1900, 1, 1)
+            .and_hms(0, 0, 0)
+            .checked_add_signed(chrono::Duration::nanoseconds(nanos as i64))
+            .unwrap()
+            .into()
+    }
 }
 
 #[cfg(test)]
@@ -145,12 +173,17 @@ mod tests {
     ];
 
     #[test]
+    fn time_convert() {
+        let t = SystemTime::now();
+        let nt = NtpTime::from(&t);
+        let new_t = SystemTime::from(&nt);
+        assert_eq!(t, new_t);
+    }
+
+    #[test]
     fn test_ntp_packet_simple() {
-        let bytes = NTP_REQ1;
         let mut expected = NtpPacket {
-            li: 3,
-            version: 3,
-            mode: NtpMode::SymmetricActive,
+            li_vn_mode: (3 << 6) | (3 << 3) | NtpMode::SymmetricActive as u8,
             stratum: 0,
             poll: 10,
             precision: -6,
@@ -162,9 +195,9 @@ mod tests {
             ts_recv: 0,
             ts_xmit: 14195914391047827090u64,
         };
-        let res = parse_ntp(&bytes);
-        expected.version = 4;
+        let res = NtpPacket::try_from(NTP_REQ1).unwrap();
+        expected.set_version(4);
 
-        assert_eq!(res, Some(expected));
+        assert_eq!(res, expected);
     }
 }
