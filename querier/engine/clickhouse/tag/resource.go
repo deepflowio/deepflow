@@ -223,6 +223,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				autoTypeValueStr := strconv.Itoa(autoTypeValue)
 				nodeTypeStrSuffix = nodeTypeStrSuffix + autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "',"
 			}
+			// internet IP
+			internetIPTypeStr := strconv.Itoa(VIF_DEVICE_TYPE_INTERNET)
+			nodeTypeStrSuffix = nodeTypeStrSuffix + autoTypeSuffix + "=" + internetIPTypeStr + ",'internet_ip',"
+			// IP
 			nodeTypeStrSuffix = nodeTypeStrSuffix + "'ip')"
 			switch autoStr {
 			case "resource_gl0":
