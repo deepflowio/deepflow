@@ -28,7 +28,7 @@ pub enum ConfigError {
     RuntimeConfigInvalid(String),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct Config {
     pub controller_ips: Vec<String>,
@@ -94,7 +94,11 @@ pub struct Config {
 impl Config {
     pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Config, io::Error> {
         let contents = fs::read_to_string(path)?;
-        let mut c: Config = serde_yaml::from_str(&contents)
+        Self::load(&contents)
+    }
+
+    pub fn load<C: AsRef<str>>(contents: C) -> Result<Config, io::Error> {
+        let mut c: Config = serde_yaml::from_str(contents.as_ref())
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
 
         c.controller_ips = c
@@ -233,7 +237,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(remote = "log::Level", rename_all = "kebab-case")]
 enum LevelDef {
     Error,
@@ -243,7 +247,7 @@ enum LevelDef {
     Trace,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(remote = "trident::TapMode")]
 enum TapModeDef {
     #[serde(rename = "0")]
@@ -256,7 +260,7 @@ enum TapModeDef {
     Decap,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct PcapConfig {
     pub enabled: bool,
@@ -293,7 +297,7 @@ impl Default for PcapConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct FlowGeneratorConfig {
     // tcp timeout config
@@ -338,7 +342,7 @@ impl Default for FlowGeneratorConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct XflowGeneratorConfig {
     pub sflow_ports: Vec<String>,
@@ -354,7 +358,7 @@ impl Default for XflowGeneratorConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct TripleMapConfig {
     #[serde(rename = "flow-slots-size")]

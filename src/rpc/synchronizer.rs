@@ -1,13 +1,18 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::fs;
+use std::io;
 use std::net::IpAddr;
+use std::path::PathBuf;
 use std::process;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{self, Arc};
+use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, warn};
+use md5::{Digest, Md5};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
 use rand::RngCore;
@@ -21,11 +26,13 @@ use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface};
-use crate::config::RuntimeConfig;
+use crate::common::{NORMAL_EXIT_WITH_RESTART, TEMP_STATIC_CONFIG_FILENAME};
+use crate::config::{self, RuntimeConfig};
 use crate::dispatcher::DispatcherListener;
 use crate::exception::ExceptionHandler;
 use crate::policy::PolicySetter;
-use crate::proto::trident::{self as tp, Exception, TapMode};
+use crate::proto::common::TridentType;
+use crate::proto::trident::{self as tp, Exception, LocalConfigFile, TapMode};
 use crate::rpc::session::Session;
 use crate::trident::{self, TridentState};
 use crate::utils::{
@@ -37,6 +44,7 @@ use crate::utils::{
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
+const SECOND: Duration = Duration::from_secs(1);
 
 pub struct StaticConfig {
     pub revision: String,
@@ -324,6 +332,16 @@ pub struct Synchronizer {
 
     max_memory: Arc<AtomicU64>,
     ntp_diff: Arc<AtomicI64>,
+
+    // 本地配置文件
+    pub local_config: Arc<LocalStaticConfig>,
+}
+
+pub struct LocalStaticConfig {
+    pub local_config_str: String,
+    pub revision: String,
+    pub only_revison: AtomicBool,
+    pub static_config_path: PathBuf,
 }
 
 impl Synchronizer {
@@ -339,7 +357,26 @@ impl Synchronizer {
         kubernetes_cluster_id: String,
         policy_setter: PolicySetter,
         exception_handler: ExceptionHandler,
+        static_config_path: PathBuf,
     ) -> Synchronizer {
+        let local_config_str = fs::read_to_string(static_config_path.as_path()).unwrap_or_default();
+
+        let mut static_config_md5_hasher = Md5::new();
+        static_config_md5_hasher.update(local_config_str.as_bytes());
+        let static_config_revision = static_config_md5_hasher
+            .finalize_reset()
+            .into_iter()
+            .map(|c| format!("{:02x}", c))
+            .collect::<Vec<_>>()
+            .join("");
+
+        let local_config = Arc::new(LocalStaticConfig {
+            local_config_str,
+            revision: static_config_revision,
+            only_revison: AtomicBool::new(false),
+            static_config_path,
+        });
+
         Synchronizer {
             static_config: Arc::new(StaticConfig {
                 revision,
@@ -366,6 +403,7 @@ impl Synchronizer {
 
             max_memory: Default::default(),
             ntp_diff: Default::default(),
+            local_config,
         }
     }
 
@@ -388,6 +426,7 @@ impl Synchronizer {
         status: &Arc<RwLock<Status>>,
         time_diff: i64,
         exception_handler: &ExceptionHandler,
+        local_config: LocalConfigFile,
     ) -> tp::SyncRequest {
         let status = status.read();
 
@@ -445,8 +484,7 @@ impl Synchronizer {
             // not interested
             communication_vtaps: vec![],
             tsdb_report_info: None,
-            // FIXME @xiangwang 后续增加配置文件处理业务逻辑
-            local_config_file: None,
+            local_config_file: Some(local_config),
         }
     }
 
@@ -519,6 +557,7 @@ impl Synchronizer {
         max_memory: &Arc<AtomicU64>,
         exception_handler: &ExceptionHandler,
         escape_tx: &UnboundedSender<Duration>,
+        local_config: &LocalStaticConfig,
     ) {
         // TODO: 把cleaner UpdatePcapDataRetention挪到别的地方
         Self::parse_upgrade(&resp, static_config, status);
@@ -609,6 +648,19 @@ impl Synchronizer {
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
+        if let Some(remote_local_config) = resp.local_config_file {
+            if remote_local_config.revision.is_some() {
+                if let Err(e) = Self::update_local_config(
+                    runtime_config.trident_type,
+                    local_config,
+                    remote_local_config,
+                ) {
+                    warn!("update local config file failed, {}", e);
+                    exception_handler.set(Exception::InvalidLocalConfigFile);
+                }
+            }
+        }
+
         let (trident_state, cvar) = &**trident_state;
         if !runtime_config.enabled {
             *trident_state.lock().unwrap() = trident::State::Disabled;
@@ -630,6 +682,7 @@ impl Synchronizer {
         let flow_acl_listener = self.flow_acl_listener.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let local_config = self.local_config.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 session.update_current_server().await;
@@ -641,12 +694,25 @@ impl Synchronizer {
                 }
                 let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
                 let version = session.get_version();
+
+                let current_local_config = if local_config.only_revison.load(Ordering::Relaxed) {
+                    LocalConfigFile {
+                        local_config: None,
+                        revision: Some(local_config.revision.clone()),
+                    }
+                } else {
+                    LocalConfigFile {
+                        local_config: Some(local_config.local_config_str.clone()),
+                        revision: Some(local_config.revision.clone()),
+                    }
+                };
                 let response = client
                     .push(Synchronizer::generate_sync_request(
                         &static_config,
                         &status,
                         ntp_diff.load(Ordering::Relaxed),
                         &exception_handler,
+                        current_local_config,
                     ))
                     .await;
                 if let Err(m) = response {
@@ -688,6 +754,7 @@ impl Synchronizer {
                         &max_memory,
                         &exception_handler,
                         &escape_tx,
+                        &local_config,
                     );
                 }
             }
@@ -842,6 +909,7 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
+        let local_config = self.local_config.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
             let version = session.get_version();
@@ -870,11 +938,25 @@ impl Synchronizer {
                 }
 
                 let changed = session.update_current_server().await;
+
+                let current_local_config = if local_config.only_revison.load(Ordering::Relaxed) {
+                    LocalConfigFile {
+                        local_config: None,
+                        revision: Some(local_config.revision.clone()),
+                    }
+                } else {
+                    LocalConfigFile {
+                        local_config: Some(local_config.local_config_str.clone()),
+                        revision: Some(local_config.revision.clone()),
+                    }
+                };
+
                 let request = Synchronizer::generate_sync_request(
                     &static_config,
                     &status,
                     ntp_diff.load(Ordering::Relaxed),
                     &exception_handler,
+                    current_local_config,
                 );
                 debug!("grpc sync request: {:?}", request);
 
@@ -925,6 +1007,7 @@ impl Synchronizer {
                     &max_memory,
                     &exception_handler,
                     &escape_tx,
+                    &local_config,
                 );
                 let (new_revision, proxy_ip, new_sync_interval) = {
                     let status = status.read();
@@ -952,6 +1035,71 @@ impl Synchronizer {
                 time::sleep(sync_interval).await;
             }
         }));
+    }
+
+    fn update_local_config(
+        trident_type: TridentType,
+        local_config: &LocalStaticConfig,
+        remote_local_config: LocalConfigFile,
+    ) -> Result<(), io::Error> {
+        // 容器/Exsi/Dedicate采集器只支持读取配置，不支持修改
+        match trident_type {
+            TridentType::TtHostPod
+            | TridentType::TtVmPod
+            | TridentType::TtVm
+            | TridentType::TtDedicatedPhysicalMachine => {
+                debug!(
+                    "current trident-type {:?} do not support config file update",
+                    trident_type
+                );
+                return Ok(());
+            }
+            _ => (),
+        }
+
+        if local_config.revision == remote_local_config.revision() {
+            local_config.only_revison.swap(true, Ordering::Relaxed);
+            debug!(
+                "don't need update local static config, static config revision ({}) unchanged",
+                local_config.revision
+            );
+            return Ok(());
+        }
+
+        info!("local static config revision ({}) is different from remote static config revision ({})", local_config.revision, remote_local_config.revision());
+
+        // 检查metaflow-server下发的配置，校验通过则进行写入临时文件
+        let static_config = config::Config::load(remote_local_config.local_config())?;
+        let temp_filename =
+            local_config.static_config_path
+            .parent()
+            .ok_or(io::Error::new(io::ErrorKind::Other, "can't create temporary static config file because static config path is root directory"))?
+            .join(TEMP_STATIC_CONFIG_FILENAME);
+        {
+            debug!(
+                "Create temporary static config file: {}",
+                temp_filename.display()
+            );
+            fs::write(temp_filename.as_path(), remote_local_config.local_config())?;
+        }
+        // 读取临时文件，再次进行校验，校验通过写入static_config_path
+        let temp_static_config =
+            config::Config::load(fs::read_to_string(temp_filename.as_path())?)?;
+        if static_config != temp_static_config {
+            debug!("temporary static config file has unexpected change");
+        }
+
+        fs::write(
+            local_config.static_config_path.as_path(),
+            remote_local_config.local_config(),
+        )?;
+
+        fs::remove_file(temp_filename)?;
+
+        info!("metaflow-agent local static config changed, restart metaflow-agent....");
+
+        thread::sleep(SECOND);
+        process::exit(NORMAL_EXIT_WITH_RESTART);
     }
 
     pub fn start(&self) {

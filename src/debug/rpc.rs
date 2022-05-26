@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 
 use log::warn;
 use parking_lot::RwLock;
@@ -13,13 +13,14 @@ use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::{self, SyncResponse};
-use crate::rpc::{Session, StaticConfig, Status, Synchronizer};
+use crate::proto::trident::{self, LocalConfigFile, SyncResponse};
+use crate::rpc::{LocalStaticConfig, Session, StaticConfig, Status, Synchronizer};
 
 pub struct RpcDebugger {
     session: Arc<Session>,
     status: Arc<RwLock<Status>>,
     config: Arc<StaticConfig>,
+    local_config: Arc<LocalStaticConfig>,
     rt: Runtime,
 }
 
@@ -53,19 +54,37 @@ impl RpcDebugger {
         session: Arc<Session>,
         config: Arc<StaticConfig>,
         status: Arc<RwLock<Status>>,
+        local_config: Arc<LocalStaticConfig>,
     ) -> Self {
         Self {
             session,
             status,
             config,
+            local_config,
             rt: Runtime::new().unwrap(),
         }
     }
 
     async fn get_rpc_response(&self) -> Result<tonic::Response<SyncResponse>, tonic::Status> {
         let exception_handler = ExceptionHandler::default();
-        let req =
-            Synchronizer::generate_sync_request(&self.config, &self.status, 0, &exception_handler);
+        let current_local_config = if self.local_config.only_revison.load(Ordering::Relaxed) {
+            LocalConfigFile {
+                local_config: None,
+                revision: Some(self.local_config.revision.clone()),
+            }
+        } else {
+            LocalConfigFile {
+                local_config: Some(self.local_config.local_config_str.clone()),
+                revision: Some(self.local_config.revision.clone()),
+            }
+        };
+        let req = Synchronizer::generate_sync_request(
+            &self.config,
+            &self.status,
+            0,
+            &exception_handler,
+            current_local_config,
+        );
         self.session.update_current_server().await;
 
         let client = self
