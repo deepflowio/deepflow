@@ -24,6 +24,7 @@ pub const DEFAULT_CPU_CFS_PERIOD_US: u32 = 100000; // cfs_period_us默认值
 pub const DEFAULT_LOG_RETENTION: u32 = 365;
 pub const DEFAULT_LOG_FILE_SIZE_LIMIT: u32 = 10000; // 单位：M
 
+pub const TEMP_STATIC_CONFIG_FILENAME: &str = "metaflow-agent.*.yaml";
 #[cfg(target_os = "linux")]
 mod platform_consts {
     pub const DEFAULT_LOGFILE: &'static str = "/var/log/metaflow-agent/metaflow-agent.log";

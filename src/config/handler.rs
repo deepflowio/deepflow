@@ -372,6 +372,7 @@ pub struct NewRuntimeConfig {
     pub synchronizer: SynchronizerConfig,
     pub ebpf: EbpfConfig,
     pub global_pps_threshold: u64,
+    pub trident_type: TridentType,
 }
 
 impl Default for NewRuntimeConfig {
@@ -531,6 +532,7 @@ impl Default for NewRuntimeConfig {
                 l7_log_packet_size: CAP_LEN_MAX,
                 l7_log_tap_types: [false; 256],
             },
+            trident_type: TridentType::TtProcess,
         };
         conf.collector.l4_log_store_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
         conf.flow.l7_log_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
@@ -648,12 +650,12 @@ impl NewRuntimeConfig {
 }
 
 pub struct ConfigHandler {
-    pub static_config: Config,
     pub ctrl_ip: IpAddr,
     pub ctrl_mac: MacAddr,
     pub logger_handle: LoggerHandle,
     pub remote_log_config: RemoteLogConfig,
     // need update
+    pub static_config: Config,
     pub candidate_config: NewRuntimeConfig,
     pub current_config: Arc<ArcSwap<NewRuntimeConfig>>,
 }
@@ -667,7 +669,6 @@ impl ConfigHandler {
         remote_log_config: RemoteLogConfig,
     ) -> Self {
         let candidate_config = NewRuntimeConfig::default();
-
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
 
         Self {
@@ -1005,6 +1006,7 @@ impl ConfigHandler {
                 l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size() as usize),
                 l7_log_tap_types,
             },
+            trident_type: conf.trident_type(),
         };
         config.validate()?;
         Ok(config)
@@ -1568,6 +1570,14 @@ impl ConfigHandler {
                 candidate_config.stats, new_config.stats
             );
             candidate_config.stats = new_config.stats;
+        }
+
+        if candidate_config.trident_type != new_config.trident_type {
+            info!(
+                "trident_type change from {:?} to {:?}",
+                candidate_config.trident_type, new_config.trident_type
+            );
+            candidate_config.trident_type = new_config.trident_type;
         }
 
         if restart_dispatcher && candidate_config.dispatcher.enabled {
