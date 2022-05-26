@@ -130,7 +130,7 @@ impl Trident {
                 logger_handle,
                 remote_log_config,
             ) {
-                warn!("trident exited: {}", e);
+                warn!("metaflow-agent exited: {}", e);
                 process::exit(1);
             }
         }));
@@ -207,20 +207,10 @@ impl Trident {
             let new_conf = match config_handler.new_runtime_config(new_pb_config) {
                 Ok(c) => c,
                 Err(e) => {
-                    warn!("keep using previous runtime config, {}", e);
-                    if components.is_none() {
-                        let mut comp = Components::new(
-                            &config_handler,
-                            &new_config, //FIXME: 旧runtime config, 以后去掉
-                            stats_collector.clone(),
-                            &session,
-                            &synchronizer,
-                            policy_getter,
-                            exception_handler.clone(),
-                        )?;
-                        comp.start();
-                        components.replace(comp);
-                    }
+                    warn!(
+                        "keep using previous runtime config or cannot start components, because invalid runtime config: {}",
+                        e
+                    );
                     state_guard = state.lock().unwrap();
                     continue;
                 }
