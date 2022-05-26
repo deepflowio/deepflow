@@ -1649,7 +1649,7 @@ mod tests {
         let timestamp = time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
             .unwrap();
-        for mut packet in packets {
+        for packet in packets {
             flow_map.inject_meta_packet(packet);
         }
 
