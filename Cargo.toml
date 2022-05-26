@@ -35,8 +35,6 @@ log = "0.4"
 lru = "0.7.5"
 neli = "0.5.3"
 nix = "0.23"
-nom = "7.0.0"
-nom-derive = "0.10.0"
 num_enum = "0.5.6"
 openshift-openapi = {version = "0.3.1", features = ["v4_5"] }
 page_size = "0.4.2"

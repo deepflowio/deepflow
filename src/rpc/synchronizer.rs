@@ -3,18 +3,21 @@ use std::convert::TryInto;
 use std::net::IpAddr;
 use std::process;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{self, Arc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, warn};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
+use rand::RngCore;
 use sysinfo::{System, SystemExt};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio::time;
+
+use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface};
@@ -33,6 +36,7 @@ use crate::utils::{
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
+const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
 
 pub struct StaticConfig {
     pub revision: String,
@@ -83,6 +87,7 @@ pub struct Status {
 
     pub proxy_ip: String,
     pub sync_interval: Duration,
+    pub ntp_enabled: bool,
 
     // GRPC数据
     pub version_platform_data: u64,
@@ -318,6 +323,7 @@ pub struct Synchronizer {
     threads: Mutex<Vec<JoinHandle<()>>>,
 
     max_memory: Arc<AtomicU64>,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl Synchronizer {
@@ -359,6 +365,7 @@ impl Synchronizer {
             exception_handler,
 
             max_memory: Default::default(),
+            ntp_diff: Default::default(),
         }
     }
 
@@ -379,6 +386,7 @@ impl Synchronizer {
     pub fn generate_sync_request(
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
+        time_diff: i64,
         exception_handler: &ExceptionHandler,
     ) -> tp::SyncRequest {
         let status = status.read();
@@ -388,7 +396,7 @@ impl Synchronizer {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let boot_time = (boot_time as i64 + status.time_diff) / 1_000_000_000;
+        let boot_time = (boot_time as i64 + time_diff) / 1_000_000_000;
 
         fn is_excluded_ip_addr(ip_addr: IpAddr) -> bool {
             if ip_addr.is_loopback() || ip_addr.is_unspecified() || ip_addr.is_multicast() {
@@ -562,6 +570,7 @@ impl Synchronizer {
         let mut status = status.write();
         status.proxy_ip = runtime_config.proxy_controller_ip.clone();
         status.sync_interval = runtime_config.sync_interval;
+        status.ntp_enabled = runtime_config.ntp_enabled;
         let updated_platform = status.get_platform_data(&resp);
         if updated_platform {
             blacklist = status.modify_platform(static_config.tap_mode, &macs, &runtime_config);
@@ -616,6 +625,7 @@ impl Synchronizer {
         let max_memory = self.max_memory.clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
         let exception_handler = self.exception_handler.clone();
+        let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 session.update_current_server().await;
@@ -631,6 +641,7 @@ impl Synchronizer {
                     .push(Synchronizer::generate_sync_request(
                         &static_config,
                         &status,
+                        ntp_diff.load(Ordering::Relaxed),
                         &exception_handler,
                     ))
                     .await;
@@ -704,6 +715,106 @@ impl Synchronizer {
         tx
     }
 
+    pub fn ntp_diff(&self) -> Arc<AtomicI64> {
+        self.ntp_diff.clone()
+    }
+
+    fn run_ntp_sync(&self) {
+        let static_config = self.static_config.clone();
+        let session = self.session.clone();
+        let status = self.status.clone();
+        let running = self.running.clone();
+        let ntp_diff = self.ntp_diff.clone();
+        self.rt.spawn(async move {
+            while running.load(Ordering::SeqCst) {
+                let (enabled, sync_interval) = {
+                    let reader = status.read();
+                    (reader.ntp_enabled, reader.sync_interval)
+                };
+
+                if !enabled {
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+
+                let inner_client = session.get_client();
+                if inner_client.is_none() {
+                    info!("grpc sync client not connected");
+                    time::sleep(Duration::new(1, 0)).await;
+                    continue;
+                }
+                let mut client =
+                    tp::synchronizer_client::SynchronizerClient::new(inner_client.unwrap());
+
+                let mut ntp_msg = NtpPacket::new();
+                // To ensure privacy and prevent spoofing, try to use a random 64-bit
+                // value for the TransmitTime. Keep track of when the messsage was
+                // actually transmitted.
+                ntp_msg.ts_xmit = rand::thread_rng().next_u64();
+                let send_time = SystemTime::now();
+
+                let response = client
+                    .query(tp::NtpRequest {
+                        ctrl_ip: Some(static_config.ctrl_ip.clone()),
+                        request: Some(ntp_msg.to_vec()),
+                    })
+                    .await;
+                if let Err(e) = response {
+                    warn!("ntp request failed with: {:?}", e);
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+                let response = response.unwrap().into_inner();
+
+                let resp_packet = NtpPacket::try_from(response.response.unwrap().as_ref());
+                if let Err(e) = resp_packet {
+                    warn!("parse ntp response failed: {:?}", e);
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+                let mut resp_packet = resp_packet.unwrap();
+
+                if resp_packet.get_mode() != NtpMode::Server {
+                    warn!("NTP: invalid mod in response");
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+                if resp_packet.ts_xmit == 0 {
+                    warn!("NTP: invalid transmit time in response");
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+                if resp_packet.ts_orig != ntp_msg.ts_xmit {
+                    warn!("NTP: server response mismatch");
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+                if resp_packet.ts_recv > resp_packet.ts_xmit {
+                    warn!("NTP: server clock ticked backwards");
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+                let recv_time = SystemTime::now();
+                if let Err(e) = recv_time.duration_since(send_time) {
+                    warn!("system time err: {:?}", e);
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
+
+                // Correct the received message's origin time using the actual
+                // transmit time.
+                resp_packet.ts_orig = NtpTime::from(&send_time).0;
+                let offset = resp_packet.offset(&recv_time);
+                ntp_diff.store(
+                    offset / NANOS_IN_SECOND * NANOS_IN_SECOND,
+                    Ordering::Relaxed,
+                );
+
+                time::sleep(sync_interval).await;
+            }
+        });
+    }
+
     fn run(&self, escape_tx: UnboundedSender<Duration>) {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
@@ -716,6 +827,7 @@ impl Synchronizer {
         let flow_acl_listener = self.flow_acl_listener.clone();
         let max_memory = self.max_memory.clone();
         let exception_handler = self.exception_handler.clone();
+        let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
             let version = session.get_version();
@@ -747,6 +859,7 @@ impl Synchronizer {
                 let request = Synchronizer::generate_sync_request(
                     &static_config,
                     &status,
+                    ntp_diff.load(Ordering::Relaxed),
                     &exception_handler,
                 );
                 debug!("grpc sync request: {:?}", request);
@@ -830,6 +943,7 @@ impl Synchronizer {
         if self.running.swap(true, Ordering::SeqCst) {
             return;
         }
+        self.run_ntp_sync();
         let esc_tx = self.run_escape_timer();
         self.run_triggered_session(esc_tx.clone());
         self.run(esc_tx);
