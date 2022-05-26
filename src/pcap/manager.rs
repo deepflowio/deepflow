@@ -3,7 +3,7 @@ use std::{
     io::{Error, ErrorKind, Read, Result, Seek, SeekFrom},
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicI64, Ordering},
         Arc, Mutex, Weak,
     },
     time::Duration,
@@ -35,6 +35,7 @@ impl WorkerManager {
         config: PcapAccess,
         packet_receivers: Vec<queue::Receiver<PcapPacket>>,
         stats: Arc<Collector>,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         let config_guard = config.load();
         let worker_max_concurrent_files =
@@ -52,6 +53,7 @@ impl WorkerManager {
                     config_guard.block_size_kb << 10,
                     receiver,
                     config_guard.max_file_period,
+                    ntp_diff.clone(),
                 )
             })
             .collect();

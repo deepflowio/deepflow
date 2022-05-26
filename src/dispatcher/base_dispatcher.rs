@@ -4,7 +4,7 @@ use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
 use std::process;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicI64, Ordering},
     Arc, Mutex,
 };
 use std::thread;
@@ -78,6 +78,7 @@ pub(super) struct BaseDispatcher {
 
     pub(super) policy_getter: PolicyGetter,
     pub(super) exception_handler: ExceptionHandler,
+    pub(super) ntp_diff: Arc<AtomicI64>,
 }
 
 impl BaseDispatcher {

@@ -432,6 +432,7 @@ impl Components {
             config_handler.pcap(),
             vec![pcap_receiver],
             stats_collector.clone(),
+            synchronizer.ntp_diff(),
         );
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match static_config.tap_mode {
@@ -638,6 +639,7 @@ impl Components {
                 .policy_getter(policy_getter)
                 .platform_poller(platform_synchronizer.clone_poller())
                 .exception_handler(exception_handler.clone())
+                .ntp_diff(synchronizer.ntp_diff())
                 .build()
                 .unwrap();
 
@@ -664,6 +666,7 @@ impl Components {
                 MetricsType::SECOND | MetricsType::MINUTE,
                 config_handler,
                 &queue_debugger,
+                synchronizer,
             );
             collectors.push(collector);
         }
@@ -726,6 +729,7 @@ impl Components {
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
         queue_debugger: &QueueDebugger,
+        synchronizer: &Arc<Synchronizer>,
     ) -> CollectorThread {
         let static_config = &config_handler.static_config;
         let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
@@ -808,6 +812,7 @@ impl Components {
             minute_quadruple_tolerable_delay,
             1 << 18, // possible_host_size
             config_handler.collector(),
+            synchronizer.ntp_diff(),
         );
 
         let mut l4_flow_aggr = None;
@@ -830,6 +835,7 @@ impl Components {
                 second_quadruple_tolerable_delay as u32,
                 stats_collector,
                 config_handler.collector(),
+                synchronizer.ntp_diff(),
             ));
         }
         if metrics_type.contains(MetricsType::MINUTE) {
@@ -841,6 +847,7 @@ impl Components {
                 minute_quadruple_tolerable_delay as u32,
                 stats_collector,
                 config_handler.collector(),
+                synchronizer.ntp_diff(),
             ));
         }
 
