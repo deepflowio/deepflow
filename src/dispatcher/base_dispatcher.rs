@@ -386,12 +386,31 @@ pub(super) struct BaseDispatcherListener {
 }
 
 impl BaseDispatcherListener {
-    pub(super) fn on_config_change(&mut self, config: &RuntimeConfig) {
+    fn on_afpacket_change(&mut self, config: &RuntimeConfig) {
         if self.options.af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, metaflow-agent restart...");
             process::exit(1);
         }
+    }
+
+    fn on_decap_type_change(&mut self, config: &RuntimeConfig) {
+        let tunnel_types = config
+            .decap_type
+            .iter()
+            .map(|&t| TunnelType::try_from(t as u8).unwrap())
+            .collect::<Vec<_>>();
+        let bitmaps = TunnelTypeBitmap::new(&tunnel_types);
+        if *self.tunnel_type_bitmap.lock().unwrap() != bitmaps {
+            *self.tunnel_type_bitmap.lock().unwrap() = bitmaps;
+            info!(
+                "Decap tunnel type change to {}",
+                self.tunnel_type_bitmap.lock().unwrap()
+            );
+        }
+    }
+
+    fn on_bpf_change(&mut self, config: &RuntimeConfig) {
         if self.capture_bpf == config.capture_bpf
             && self.proxy_controller_ip.to_string() == config.proxy_controller_ip
             && self.analyzer_ip.to_string() == config.analyzer_ip
@@ -443,13 +462,12 @@ impl BaseDispatcherListener {
             self.need_update_bpf.store(true, Ordering::Release);
         }
         mem::drop(bpf_options);
+    }
 
-        let mut tunnel_types = Vec::new();
-        for decap_type in &config.decap_type {
-            tunnel_types.push(TunnelType::try_from(*decap_type as u8).unwrap());
-        }
-        let bitmaps = TunnelTypeBitmap::new(&tunnel_types);
-        *self.tunnel_type_bitmap.lock().unwrap() = bitmaps;
+    pub(super) fn on_config_change(&mut self, config: &RuntimeConfig) {
+        self.on_afpacket_change(config);
+        self.on_decap_type_change(config);
+        self.on_bpf_change(config);
     }
 
     pub(super) fn on_vm_change(&self, keys: &[u32], vm_macs: &[MacAddr]) {
