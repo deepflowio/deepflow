@@ -35,6 +35,8 @@ var METRICS_FUNCTIONS = map[string]*Function{
 	view.FUNCTION_PCTL_EXACT: NewFunction(view.FUNCTION_PCTL_EXACT, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_COUNTER, METRICS_TYPE_GAUGE, METRICS_TYPE_DELAY, METRICS_TYPE_PERCENTAGE, METRICS_TYPE_QUOTIENT}, "$unit", 1),
 	view.FUNCTION_UNIQ:       NewFunction(view.FUNCTION_UNIQ, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_TAG}, "$unit", 0),
 	view.FUNCTION_UNIQ_EXACT: NewFunction(view.FUNCTION_UNIQ_EXACT, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_TAG}, "$unit", 0),
+	view.FUNCTION_PERCENTAG:  NewFunction(view.FUNCTION_PERCENTAG, FUNCTION_TYPE_MATH, nil, "%", 1),
+	view.FUNCTION_PERSECOND:  NewFunction(view.FUNCTION_PERSECOND, FUNCTION_TYPE_MATH, nil, "$unit/s", 0),
 }
 
 func GetFunctionDescriptions() (map[string][]interface{}, error) {

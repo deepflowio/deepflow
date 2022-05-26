@@ -78,6 +78,15 @@ var (
 		input:  "select Max(byte) as 'max_byte',region_0,chost_id_1 from l4_flow_log group by region_0,chost_id_1",
 		output: "SELECT region_0, chost_id_1, MAX(_sum_byte_tx_plus_byte_rx) AS max_byte FROM (SELECT dictGet(deepflow.region_map, 'name', (toUInt64(region_id_0))) AS region_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS chost_id_1, SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx FROM flow_log.l4_flow_log PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY dictGet(deepflow.region_map, 'name', (toUInt64(region_id_0))) AS region_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS chost_id_1) GROUP BY region_0, chost_id_1",
 	}, {
+		input:  "select Percentage(Max(byte)+100,100) as percentage_max_byte_100 from l4_flow_log",
+		output: "SELECT divide(plus(MAX(_sum_byte_tx_plus_byte_rx), 100), 100)*100 AS percentage_max_byte_100 FROM (SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx FROM flow_log.l4_flow_log)",
+	}, {
+		input:  "select Sum(rtt) as sum_byte from l4_flow_log having Percentage(Max(byte), 100) >= 1",
+		output: "SELECT SUMArray(arrayFilter(x -> x!=0, _grouparray_rtt)) AS sum_byte FROM (SELECT SUM(byte_tx+byte_rx) AS _sum_byte_tx_plus_byte_rx, groupArrayIf(rtt, rtt != 0) AS _grouparray_rtt FROM flow_log.l4_flow_log) HAVING divide(MAX(_sum_byte_tx_plus_byte_rx), 100)*100 >= 1",
+	}, {
+		input:  "select time(time, 60) as toi, PerSecond(Sum(byte)+100) as persecond_max_byte_100 from l4_flow_log group by toi limit 1",
+		output: "WITH toStartOfInterval(time, toIntervalSecond(60)) + toIntervalSecond(arrayJoin([0]) * 60) AS _toi SELECT toUnixTimestamp(_toi) AS toi, divide(plus(SUM(byte_tx+byte_rx), 100), 60) AS persecond_max_byte_100 FROM flow_log.l4_flow_log GROUP BY toi LIMIT 1",
+	}, {
 		input:  "select resource_gl0_0,ip_0 from l7_flow_log group by resource_gl0_0,ip_0",
 		output: "SELECT dictGet(deepflow.device_map, 'name', (toUInt64(resource_gl0_type_0),toUInt64(resource_gl0_id_0))) AS resource_gl0_0, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0, multiIf(resource_gl0_id_0=0 and is_ipv4=1,IPv4NumToString(ip4_0), resource_gl0_id_0=0 and is_ipv4=0,IPv6NumToString(ip6_0),resource_gl0_id_0!=0 and is_ipv4=1,'0.0.0.0','::') AS ip_0, if(resource_gl0_id_0=0,subnet_id_0,0) AS subnet_id_0 FROM flow_log.l7_flow_log GROUP BY dictGet(deepflow.device_map, 'name', (toUInt64(resource_gl0_type_0),toUInt64(resource_gl0_id_0))) AS resource_gl0_0, ip_0, subnet_id_0, resource_gl0_type_0, if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0",
 	}, {

@@ -308,7 +308,16 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		}
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
-
+		// 二级运算符
+		if common.IsValueInSliceString(sqlparser.String(expr.Name), view.MATH_FUNCTIONS) {
+			binFunction, err := e.parseSelectBinaryExpr(expr)
+			if err != nil {
+				return err
+			}
+			binFunction.SetAlias(as)
+			e.Statements = append(e.Statements, binFunction)
+			return nil
+		}
 		name, args, err := e.parseFunction(expr)
 		if err != nil {
 			return err
@@ -367,7 +376,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 	case *sqlparser.BinaryExpr:
 		if !common.IsValueInSliceString(expr.Operator, view.MATH_FUNCTIONS) {
 			// TODO: 报错 不支持的math
-			return nil, nil
+			return nil, errors.New(fmt.Sprintf("Operator: %s not support in binary", expr.Operator))
 		}
 		left, err := e.parseSelectBinaryExpr(expr.Left)
 		if err != nil {
@@ -379,6 +388,18 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		}
 		return GetBinaryFunc(expr.Operator, []Function{left, right})
 	case *sqlparser.FuncExpr:
+		// 嵌套算子
+		if common.IsValueInSliceString(sqlparser.String(expr.Name), view.MATH_FUNCTIONS) {
+			args := []Function{}
+			for _, argExpr := range expr.Exprs {
+				arg, err := e.parseSelectBinaryExpr(argExpr.(*sqlparser.AliasedExpr).Expr)
+				if err != nil {
+					return nil, err
+				}
+				args = append(args, arg)
+			}
+			return GetBinaryFunc(sqlparser.String(expr.Name), args)
+		}
 		name, args, err := e.parseFunction(expr)
 		if err != nil {
 			return nil, err

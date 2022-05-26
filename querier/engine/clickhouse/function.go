@@ -89,7 +89,6 @@ func GetBinaryFunc(name string, args []Function) (*BinaryFunction, error) {
 }
 
 func GetFieldFunc(name string) (FieldFunction, error) {
-
 	switch strings.ToLower(name) {
 	case "time_interval":
 		return &TimeIntervalField{}, nil
@@ -120,6 +119,8 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 	function := view.GetFunc(f.Name)
 	function.SetFields(fields)
 	function.SetFlag(view.METRICS_FLAG_OUTER)
+	function.SetTime(m.Time)
+	function.Init()
 	return function
 }
 

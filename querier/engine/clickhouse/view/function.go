@@ -3,6 +3,8 @@ package view
 import (
 	"bytes"
 	"fmt"
+	"metaflow/querier/common"
+	"strconv"
 	"strings"
 )
 
@@ -22,10 +24,11 @@ const (
 	FUNCTION_PLUS        = "+"
 	FUNCTION_MINUS       = "-"
 	FUNCTION_MULTIPLY    = "*"
-	FUNCTION_RATE        = "Rate"
 	FUNCTION_COUNT       = "Count"
 	FUNCTION_UNIQ        = "Uniq"
 	FUNCTION_UNIQ_EXACT  = "UniqExact"
+	FUNCTION_PERSECOND   = "PerSecond"
+	FUNCTION_PERCENTAG   = "Percentage"
 )
 
 // 对外提供的算子与数据库实际算子转换
@@ -47,7 +50,10 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 	FUNCTION_UNIQ_EXACT:  "uniqExact",
 }
 
-var MATH_FUNCTIONS = []string{FUNCTION_DIV, FUNCTION_PLUS, FUNCTION_MINUS, FUNCTION_MULTIPLY}
+var MATH_FUNCTIONS = []string{
+	FUNCTION_DIV, FUNCTION_PLUS, FUNCTION_MINUS, FUNCTION_MULTIPLY,
+	FUNCTION_PERCENTAG, FUNCTION_PERSECOND,
+}
 
 func GetFunc(name string) Function {
 	switch name {
@@ -61,6 +67,10 @@ func GetFunc(name string) Function {
 		return &DivFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_MIN:
 		return &MinFunction{DefaultFunction: DefaultFunction{Name: name}}
+	case FUNCTION_PERCENTAG:
+		return &PercentageFunction{DefaultFunction: DefaultFunction{Name: name}}
+	case FUNCTION_PERSECOND:
+		return &PerSecondFunction{DefaultFunction: DefaultFunction{Name: name}}
 	default:
 		return &DefaultFunction{Name: name}
 	}
@@ -82,6 +92,7 @@ type Function interface {
 	SetMath(string)
 	GetFlag() int
 	GetName() string
+	GetFields() []Node
 	Init()
 }
 
@@ -128,6 +139,10 @@ func (f *DefaultFunction) Init() {
 			function.Init()
 		}
 	}
+}
+
+func (f *DefaultFunction) GetFields() []Node {
+	return f.Fields
 }
 
 func (f *DefaultFunction) GetFlag() int {
@@ -235,7 +250,11 @@ func (f *DefaultFunction) GetDefaultAlias(inner bool) string {
 	if inner {
 		buf.WriteString("_")
 	}
-	buf.WriteString(strings.ToLower(FUNC_NAME_MAP[f.Name]))
+	if funcName, ok := FUNC_NAME_MAP[f.Name]; ok {
+		buf.WriteString(strings.ToLower(funcName))
+	} else {
+		buf.WriteString(strings.ToLower(f.Name))
+	}
 	buf.WriteString("_")
 	for i, field := range f.Fields {
 		var fieldStr string
@@ -303,7 +322,7 @@ func (f *DefaultFunction) SetMath(math string) {
 }
 
 type Field struct {
-	NodeBase
+	DefaultFunction
 	Value string
 	Withs []Node
 }
@@ -320,7 +339,7 @@ func (f *Field) ToString() string {
 	return f.Value
 }
 
-func (f *Field) GetDefaultAlias() string {
+func (f *Field) GetDefaultAlias(inner bool) string {
 	return f.Value
 }
 
@@ -411,6 +430,93 @@ func (f *RspreadFunction) WriteTo(buf *bytes.Buffer) {
 }
 
 func (f *RspreadFunction) GetWiths() []Node {
+	return f.divFunction.GetWiths()
+}
+
+type PercentageFunction struct {
+	DefaultFunction
+	divFunction *DivFunction
+}
+
+func (f *PercentageFunction) Init() {
+	f.divFunction = &DivFunction{
+		DefaultFunction: DefaultFunction{
+			Name:   FUNCTION_DIV,
+			Fields: f.Fields,
+			Math:   "*100",
+		},
+	}
+}
+
+func (f *PercentageFunction) WriteTo(buf *bytes.Buffer) {
+	f.divFunction.WriteTo(buf)
+	if f.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString(f.Alias)
+	}
+}
+
+func (f *PercentageFunction) GetWiths() []Node {
+	return f.divFunction.GetWiths()
+}
+
+type PerSecondFunction struct {
+	DefaultFunction
+	divFunction *DivFunction
+}
+
+func (f *PerSecondFunction) Init() {
+	var interval int
+	var aggFuncName string
+	argFunc := f.Fields[0].(Function)
+	// 获取聚合算子
+	for {
+		if common.IsValueInSliceString(argFunc.GetName(), MATH_FUNCTIONS) {
+			innerFunc, ok := argFunc.GetFields()[0].(Function)
+			if !ok {
+				break
+			}
+			argFunc = innerFunc
+			continue
+		} else {
+			aggFuncName = argFunc.GetName()
+			break
+		}
+	}
+	if aggFuncName == FUNCTION_SUM {
+		if f.Time.Interval > 0 {
+			if f.Time.DatasourceInterval > f.Time.Interval {
+				interval = f.Time.DatasourceInterval
+			} else {
+				interval = f.Time.Interval
+			}
+		} else {
+			interval = int(f.Time.TimeEnd - f.Time.TimeStart)
+		}
+	} else {
+		interval = f.Time.DatasourceInterval
+	}
+	if interval <= 0 {
+		interval = f.Time.DatasourceInterval
+	}
+	f.Fields = append(f.Fields, &Field{Value: strconv.Itoa(interval)})
+	f.divFunction = &DivFunction{
+		DefaultFunction: DefaultFunction{
+			Name:   FUNCTION_DIV,
+			Fields: f.Fields,
+		},
+	}
+}
+
+func (f *PerSecondFunction) WriteTo(buf *bytes.Buffer) {
+	f.divFunction.WriteTo(buf)
+	if f.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString(f.Alias)
+	}
+}
+
+func (f *PerSecondFunction) GetWiths() []Node {
 	return f.divFunction.GetWiths()
 }
 
