@@ -1,6 +1,6 @@
 use std::env;
 use std::mem;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -91,7 +91,7 @@ impl Trident {
         let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
         let state_thread = state.clone();
 
-        let config = Config::load_from_file(config_path)?;
+        let config = Config::load_from_file(config_path.as_ref())?;
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
@@ -124,6 +124,7 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         info!("static_config {:#?}", config);
+        let static_config_path = config_path.as_ref().into();
         let handle = Some(thread::spawn(move || {
             if let Err(e) = Self::run(
                 state_thread,
@@ -131,6 +132,7 @@ impl Trident {
                 revision,
                 logger_handle,
                 remote_log_config,
+                static_config_path,
             ) {
                 warn!("metaflow-agent exited: {}", e);
                 process::exit(1);
@@ -146,6 +148,7 @@ impl Trident {
         revision: String,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
+        static_config_path: PathBuf,
     ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
@@ -185,6 +188,7 @@ impl Trident {
             config_handler.static_config.kubernetes_cluster_id.clone(),
             policy_setter,
             exception_handler.clone(),
+            static_config_path,
         ));
         synchronizer.start();
 
@@ -433,6 +437,7 @@ impl Components {
             static_config: synchronizer.static_config.clone(),
             status: synchronizer.status.clone(),
             config: config_handler.debug(),
+            local_config: synchronizer.local_config.clone(),
         };
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
