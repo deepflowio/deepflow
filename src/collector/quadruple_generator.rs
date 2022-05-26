@@ -272,6 +272,7 @@ struct SubQuadGen {
     stashs: VecDeque<QuadrupleStash>, // flow_generator 不会有超过2分钟的延时
 
     connections: VecDeque<ConcurrentConnection>,
+    ntp_diff: Arc<AtomicI64>,
     // TODO: 策略统计处理
     // traffic_setter: TrafficSetter,
 }
@@ -314,7 +315,7 @@ impl SubQuadGen {
             return false;
         }
 
-        let ts = get_timestamp();
+        let ts = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         while time_in_second.as_secs() >= self.window_start.as_secs() + self.delay_seconds {
             let delay = ts.as_nanos() as i64 - self.window_start.as_nanos() as i64;
             self.counter
@@ -551,6 +552,7 @@ pub struct QuadrupleGeneratorThread {
 
     running: Arc<AtomicBool>,
     config: CollectorAccess,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl QuadrupleGeneratorThread {
@@ -566,6 +568,7 @@ impl QuadrupleGeneratorThread {
         minute_delay_seconds: u64,
         possible_host_size: usize,
         config: CollectorAccess,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -585,6 +588,7 @@ impl QuadrupleGeneratorThread {
             thread_handle: None,
             running,
             config,
+            ntp_diff,
         }
     }
 
@@ -642,6 +646,7 @@ impl QuadrupleGeneratorThread {
             self.vtap_flow_1s_enabled.clone(),
             self.collector_enabled.clone(),
             self.running.clone(),
+            self.ntp_diff.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || quadruple_generator.handler_routine()));
         info!("quadruple generator id: {} started", self.id);
@@ -681,6 +686,7 @@ pub struct QuadrupleGenerator {
     collector_enabled: Arc<AtomicBool>,
 
     running: Arc<AtomicBool>,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl QuadrupleGenerator {
@@ -700,6 +706,7 @@ impl QuadrupleGenerator {
         vtap_flow_1s_enabled: Arc<AtomicBool>,
         collector_enabled: Arc<AtomicBool>,
         running: Arc<AtomicBool>,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         info!("new quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {} collector_enabled: {}", id, second_delay_seconds, minute_delay_seconds, l7_metrics_enabled.load(Ordering::Relaxed), vtap_flow_1s_enabled.load(Ordering::Relaxed), collector_enabled.load(Ordering::Relaxed));
         if minute_delay_seconds < SECONDS_IN_MINUTE || minute_delay_seconds >= SECONDS_IN_MINUTE * 2
@@ -711,8 +718,8 @@ impl QuadrupleGenerator {
         let minute_slots = 2 as usize;
         let mut second_quad_gen = None;
         let mut minute_quad_gen = None;
-        let window_start =
-            round_to_minute(get_timestamp()) - Duration::from_secs(2 * SECONDS_IN_MINUTE);
+        let window_start = round_to_minute(get_timestamp(ntp_diff.load(Ordering::Relaxed)))
+            - Duration::from_secs(2 * SECONDS_IN_MINUTE);
 
         if metrics_type.contains(MetricsType::SECOND) {
             second_quad_gen = Some(SubQuadGen {
@@ -726,6 +733,7 @@ impl QuadrupleGenerator {
                 stashs: VecDeque::with_capacity(second_slots),
                 connections: VecDeque::with_capacity(second_slots),
                 counter: QgCounter::default(),
+                ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
             });
 
@@ -756,6 +764,7 @@ impl QuadrupleGenerator {
                 stashs: VecDeque::with_capacity(minute_slots),
                 connections: VecDeque::with_capacity(minute_slots),
                 counter: QgCounter::default(),
+                ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
             });
 
@@ -797,6 +806,7 @@ impl QuadrupleGenerator {
             vtap_flow_1s_enabled,
             collector_enabled,
             running,
+            ntp_diff,
         }
     }
 
@@ -1093,7 +1103,7 @@ impl QuadrupleGenerator {
                     }
                 }
                 Err(Error::Timeout) => {
-                    self.handle(None, get_timestamp());
+                    self.handle(None, get_timestamp(self.ntp_diff.load(Ordering::Relaxed)));
                 }
                 Err(Error::Terminated(_, _)) => {
                     if let Some(g) = self.second_quad_gen.as_mut() {
@@ -1136,8 +1146,9 @@ mod test {
 
     #[test]
     fn second_inject_flow() {
-        let window_start =
-            round_to_minute(get_timestamp()) - Duration::from_secs(2 * SECONDS_IN_MINUTE);
+        let ntp_diff = Arc::new(AtomicI64::new(0));
+        let window_start = round_to_minute(get_timestamp(ntp_diff.load(Ordering::Relaxed)))
+            - Duration::from_secs(2 * SECONDS_IN_MINUTE);
         let queue_debugger = QueueDebugger::new();
         let (s, r, _) = queue::bounded_with_debug(100, "", &queue_debugger);
         let slots = 30u64;
@@ -1152,6 +1163,7 @@ mod test {
             stashs: VecDeque::with_capacity(slots as usize),
             connections: VecDeque::with_capacity(slots as usize),
             counter: QgCounter::default(),
+            ntp_diff,
         };
         for _ in 0..slots as usize {
             quad_gen.stashs.push_back(QuadrupleStash::new());

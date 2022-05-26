@@ -6,7 +6,10 @@ use std::{
     net::Ipv4Addr,
     rc::Rc,
     str::FromStr,
-    sync::{atomic::Ordering, Arc},
+    sync::{
+        atomic::{AtomicI64, Ordering},
+        Arc,
+    },
     time::{Duration, SystemTime},
 };
 
@@ -66,6 +69,7 @@ pub struct FlowMap {
     config: FlowAccess,
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     counter: Arc<FlowPerfCounter>,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl FlowMap {
@@ -74,6 +78,7 @@ impl FlowMap {
         output_queue: DebugSender<TaggedFlow>,
         policy_getter: PolicyGetter,
         app_proto_log_queue: DebugSender<MetaAppProto>,
+        ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
     ) -> (Self, Arc<FlowPerfCounter>) {
         let counter = Arc::new(FlowPerfCounter::default());
@@ -99,6 +104,7 @@ impl FlowMap {
                 config,
                 rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
                 counter: counter.clone(),
+                ntp_diff,
             },
             counter,
         )
@@ -106,7 +112,7 @@ impl FlowMap {
 
     pub fn inject_flush_ticker(&mut self, mut timestamp: Duration) -> bool {
         if timestamp.is_zero() {
-            timestamp = get_timestamp();
+            timestamp = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         } else if timestamp < self.start_time {
             return false;
         }
@@ -1110,6 +1116,7 @@ pub fn _new_flow_map_and_receiver(trident_type: TridentType) -> (FlowMap, Receiv
         output_queue_sender,
         policy_getter,
         app_proto_log_queue,
+        Arc::new(AtomicI64::new(0)),
         Map::new(current_config.clone(), |config| -> &FlowConfig {
             &config.flow
         }),

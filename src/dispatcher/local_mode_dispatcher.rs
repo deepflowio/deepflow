@@ -42,6 +42,7 @@ impl LocalModeDispatcher {
             base.flow_output_queue.clone(),
             base.policy_getter,
             base.log_output_queue.clone(),
+            base.ntp_diff.clone(),
             base.flow_map_config.clone(),
         );
 
