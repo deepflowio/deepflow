@@ -204,6 +204,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "cgroups-rs"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdae996d9638ba03253ffa1c93345a585974a97abbdeab9176c77922f3efc1e8"
+dependencies = [
+ "libc",
+ "log 0.4.14",
+ "nix",
+ "regex",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1239,6 +1251,7 @@ dependencies = [
  "bitflags",
  "bytesize",
  "cadence",
+ "cgroups-rs",
  "chrono",
  "clap 3.1.8",
  "criterion",

@@ -1,13 +1,14 @@
 use std::cmp::{max, min};
-use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use std::{fmt, process};
 
 use arc_swap::{access::Map, ArcSwap};
 use bytesize::ByteSize;
+use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use hostname;
@@ -18,12 +19,13 @@ use super::{Config, ConfigError, IngressFlavour, KubernetesPollerType};
 use crate::common::{
     decapsulate::{TunnelType, TunnelTypeBitmap},
     enums::TapType,
-    DEFAULT_LIBVIRT_XML_PATH, DEFAULT_LOG_FILE_SIZE_LIMIT, TRIDENT_MEMORY_LIMIT,
-    TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT,
+    DEFAULT_CPU_CFS_PERIOD_US, DEFAULT_LIBVIRT_XML_PATH, DEFAULT_LOG_FILE_SIZE_LIMIT,
+    DEFAULT_MAX_CPUS, TRIDENT_MEMORY_LIMIT, TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT,
 };
 use crate::dispatcher::BpfOptions;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::IfMacSource;
+use crate::utils::cgroups::Cgroups;
 use crate::{
     dispatcher::recv_engine::{self, bpf, OptTpacketVersion},
     ebpf::CAP_LEN_MAX,
@@ -119,6 +121,7 @@ impl fmt::Debug for CollectorConfig {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EnvironmentConfig {
     pub max_memory: u64,
+    pub max_cpus: u32,
     pub process_threshold: u32,
     pub thread_threshold: u32,
     pub sys_free_memory_limit: u32,
@@ -388,6 +391,7 @@ impl Default for NewRuntimeConfig {
             },
             environment: EnvironmentConfig {
                 max_memory: TRIDENT_MEMORY_LIMIT,
+                max_cpus: DEFAULT_MAX_CPUS,
                 process_threshold: TRIDENT_PROCESS_LIMIT,
                 thread_threshold: TRIDENT_THREAD_LIMIT,
                 sys_free_memory_limit: 0,
@@ -537,6 +541,12 @@ impl Default for NewRuntimeConfig {
 
 impl NewRuntimeConfig {
     fn validate(&self) -> Result<(), ConfigError> {
+        if self.environment.max_cpus < 1 || self.environment.max_cpus > 100000 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "max-cpus {:?} not in [1, 100000]",
+                self.environment.max_cpus
+            )));
+        }
         if self.environment.sys_free_memory_limit > 100 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "sys_free_memory_limit {:?} not in [0, 100]",
@@ -790,6 +800,7 @@ impl ConfigHandler {
             },
             environment: EnvironmentConfig {
                 max_memory: (conf.max_memory() as u64) << 20,
+                max_cpus: conf.max_cpus(),
                 process_threshold: conf.process_threshold(),
                 thread_threshold: conf.thread_threshold(),
                 sys_free_memory_limit: conf.sys_free_memory_limit(),
@@ -1220,7 +1231,10 @@ impl ConfigHandler {
         }
 
         if candidate_config.environment != new_config.environment {
+            let mut max_memory_change = false;
+            let mut max_cpus_change = false;
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
+                max_memory_change = true;
                 if static_config.tap_mode != TapMode::Analyzer {
                     // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                     info!(
@@ -1231,6 +1245,81 @@ impl ConfigHandler {
                 } else {
                     info!("memory set ulimit when tap_mode=analyzer");
                     candidate_config.environment.max_memory = 0;
+                }
+            }
+            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
+                max_cpus_change = true;
+            }
+            if max_memory_change || max_cpus_change {
+                if static_config.kubernetes_cluster_id.is_empty() {
+                    // 非容器类型采集器才做资源限制
+                    fn cgroup_callback(handler: &ConfigHandler, components: &mut Components) {
+                        if components.cgroups_controller.cgroup.is_none() {
+                            match Cgroups::new() {
+                                Ok(cc) => {
+                                    if let Some(_) = &cc.cgroup {
+                                        match cc.init(process::id() as u64) {
+                                            Ok(cgroup) => {
+                                                components.cgroups_controller = Arc::new(cgroup);
+                                            }
+                                            Err(e) => {
+                                                warn!("set cgroup cpu failed: {:?}", e);
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("{:?}", e);
+                                }
+                            };
+                        }
+
+                        let mut resources = Resources {
+                            memory: Default::default(),
+                            pid: Default::default(),
+                            cpu: Default::default(),
+                            devices: Default::default(),
+                            network: Default::default(),
+                            hugepages: Default::default(),
+                            blkio: Default::default(),
+                        };
+                        if handler.candidate_config.environment.max_memory != 0 {
+                            let memory_resources = MemoryResources {
+                                kernel_memory_limit: None,
+                                memory_hard_limit: Some(
+                                    handler.candidate_config.environment.max_memory as i64,
+                                ),
+                                memory_soft_limit: None,
+                                kernel_tcp_memory_limit: None,
+                                memory_swap_limit: None,
+                                swappiness: None,
+                                attrs: Default::default(),
+                            };
+                            resources.memory = memory_resources.clone();
+                        }
+                        if handler.candidate_config.environment.max_cpus != 0 {
+                            let cpu_quota = handler.candidate_config.environment.max_cpus
+                                * DEFAULT_CPU_CFS_PERIOD_US;
+                            let cpu_resources = CpuResources {
+                                cpus: None,
+                                mems: None,
+                                shares: None,
+                                quota: Some(cpu_quota as i64),
+                                period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
+                                realtime_runtime: None,
+                                realtime_period: None,
+                                attrs: Default::default(),
+                            };
+                            resources.cpu = cpu_resources.clone();
+                        }
+                        match components.cgroups_controller.apply(&resources) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                warn!("set cgroups failed: {}", e);
+                            }
+                        }
+                    }
+                    callbacks.push(cgroup_callback);
                 }
             }
             if candidate_config.environment.sys_free_memory_limit
