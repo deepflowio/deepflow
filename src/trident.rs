@@ -20,6 +20,7 @@ use crate::debug::QueueDebugger;
 use crate::exception::ExceptionHandler;
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
+use crate::utils::cgroups::Cgroups;
 use crate::utils::guard::Guard;
 use crate::{
     collector::Collector,
@@ -66,6 +67,7 @@ pub enum State {
     Running,
     ConfigChanged((RuntimeConfig, trident::Config, Vec<PlatformData>)),
     Terminated,
+    Disabled, // 禁用状态
 }
 
 impl State {
@@ -196,7 +198,19 @@ impl Trident {
                     state_guard = cond.wait(state_guard).unwrap();
                     continue;
                 }
-                State::Terminated => return Ok(()),
+                State::Terminated => {
+                    if let Some(mut c) = components {
+                        c.stop();
+                    }
+                    return Ok(());
+                }
+                State::Disabled => {
+                    if let Some(ref mut c) = components {
+                        c.stop();
+                    }
+                    state_guard = cond.wait(state_guard).unwrap();
+                    continue;
+                }
                 _ => (),
             }
             let mut new_state = State::Running;
@@ -321,6 +335,7 @@ pub struct Components {
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
+    pub cgroups_controller: Arc<Cgroups>,
 }
 
 impl Components {
@@ -695,6 +710,7 @@ impl Components {
                 vec![],
             );
         }
+        let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
         Ok(Components {
             rx_leaky_bucket,
@@ -717,6 +733,7 @@ impl Components {
             ebpf_collector,
             stats_collector,
             running: AtomicBool::new(false),
+            cgroups_controller,
         })
     }
 
@@ -894,6 +911,14 @@ impl Components {
         self.guard.stop();
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.stop();
+        }
+        match self.cgroups_controller.stop() {
+            Ok(_) => {
+                info!("stopped cgroups_controller");
+            }
+            Err(e) => {
+                warn!("stop cgroups_controller failed: {}", e);
+            }
         }
 
         info!("Stopped components.")

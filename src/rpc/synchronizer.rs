@@ -610,8 +610,12 @@ impl Synchronizer {
         // TODO: segments
         // TODO: modify platform
         let (trident_state, cvar) = &**trident_state;
-        *trident_state.lock().unwrap() =
-            trident::State::ConfigChanged((runtime_config, new_config.unwrap(), blacklist));
+        if !runtime_config.enabled {
+            *trident_state.lock().unwrap() = trident::State::Disabled;
+        } else {
+            *trident_state.lock().unwrap() =
+                trident::State::ConfigChanged((runtime_config, new_config.unwrap(), blacklist));
+        }
         cvar.notify_one();
     }
 
