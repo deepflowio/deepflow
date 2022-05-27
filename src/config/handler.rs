@@ -300,6 +300,7 @@ pub struct EbpfConfig {
     // 静态配置
     pub l7_log_session_timeout: Duration,
     pub log_path: String,
+    pub l7_log_tap_types: [bool; 256],
 }
 
 // Span/Trace 共用一套TypeMap
@@ -524,11 +525,12 @@ impl Default for NewRuntimeConfig {
                 l7_log_session_timeout: Duration::from_secs(120),
                 log_path: "".to_string(),
                 l7_log_packet_size: CAP_LEN_MAX,
+                l7_log_tap_types: [false; 256],
             },
         };
         conf.collector.l4_log_store_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
         conf.flow.l7_log_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
-
+        conf.ebpf.l7_log_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
         conf
     }
 }
@@ -769,6 +771,18 @@ impl ConfigHandler {
         } else {
             static_config.analyzer_ip.parse::<IpAddr>().unwrap()
         };
+
+        let l7_log_tap_types = {
+            let mut l7_log_tap_types = [false; 256];
+            for &tap in conf.l7_log_store_tap_types.iter() {
+                if tap < 256 {
+                    l7_log_tap_types[tap as usize] = true;
+                } else {
+                    warn!("l7 log tap types: {} invalid", tap);
+                }
+            }
+            l7_log_tap_types
+        };
         let config = NewRuntimeConfig {
             diagnose: DiagnoseConfig {
                 enabled: conf.enabled(),
@@ -900,23 +914,12 @@ impl ConfigHandler {
             flow: {
                 let flow_config = &self.static_config.flow;
 
-                let l7_log_tap_types = {
-                    let mut l7_log_tap_types = [false; 256];
-                    for &tap in conf.l7_log_store_tap_types.iter() {
-                        if tap < 256 {
-                            l7_log_tap_types[tap as usize] = true;
-                        } else {
-                            warn!("l7 log tap types: {} invalid", tap);
-                        }
-                    }
-                    l7_log_tap_types
-                };
                 FlowConfig {
                     vtap_id: conf.vtap_id() as u16,
                     trident_type: conf.trident_type(),
                     cloud_gateway_traffic: static_config.cloud_gateway_traffic,
                     collector_enabled: conf.collector_enabled(),
-                    l7_log_tap_types,
+                    l7_log_tap_types: l7_log_tap_types.clone(),
                     packet_delay: static_config.packet_delay,
                     flush_interval: flow_config.flush_interval,
                     flow_timeout: FlowTimeout::from(TcpTimeout {
@@ -989,6 +992,7 @@ impl ConfigHandler {
                 l7_log_session_timeout: static_config.l7_log_session_aggr_timeout,
                 log_path: static_config.ebpf_log_file.clone(),
                 l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size() as usize),
+                l7_log_tap_types,
             },
         };
         config.validate()?;
