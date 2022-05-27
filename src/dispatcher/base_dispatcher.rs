@@ -31,6 +31,7 @@ use crate::{
     platform::GenericPoller,
     policy::PolicyGetter,
     proto::trident::{Exception, IfMacSource, TapMode},
+    rpc::get_timestamp,
     utils::{
         bytes::read_u16_be,
         net::{self, get_route_src_ip, Link, MacAddr},
@@ -101,6 +102,7 @@ impl BaseDispatcher {
         exception_handler: &ExceptionHandler,
         prev_timestamp: &mut Duration,
         counter: &PacketCounter,
+        ntp_diff: &AtomicI64,
     ) -> Option<(Packet<'a>, Duration)> {
         let packet = engine.recv();
         if packet.is_err() {
@@ -119,6 +121,12 @@ impl BaseDispatcher {
             return None;
         }
         let mut timestamp = packet.timestamp;
+        let time_diff = ntp_diff.load(Ordering::Relaxed);
+        if time_diff >= 0 {
+            timestamp += Duration::from_nanos(time_diff as u64);
+        } else {
+            timestamp -= Duration::from_nanos(-time_diff as u64);
+        }
         if timestamp > *prev_timestamp {
             if timestamp - *prev_timestamp > Duration::from_secs(60) {
                 // Correct invalid timestamp under some environments. Root cause unclear.
@@ -331,6 +339,7 @@ pub(super) struct TapInterfaceWhitelist {
     whitelist: HashSet<usize>,
     updated: bool,
     last_sync: Duration,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl TapInterfaceWhitelist {
@@ -356,8 +365,7 @@ impl TapInterfaceWhitelist {
             return false;
         }
         if now.is_zero() {
-            // TODO: use ntp time
-            now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         }
         if now > self.last_sync && now - self.last_sync > Self::SYNC_INTERVAL {
             self.updated = false;
