@@ -416,7 +416,9 @@ impl HttpLog {
         }
         // 流量中可能仅存在Headers帧且Headers帧中没有传输实体，“Content-Length”为0
         if header_frame_parsed && !is_httpv2 {
-            content_length = Some(0);
+            if !content_length.is_some() {
+                content_length = Some(0);
+            }
             is_httpv2 = true;
         }
 
