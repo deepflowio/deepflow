@@ -696,6 +696,7 @@ impl Synchronizer {
 
     fn run_escape_timer(&self) -> UnboundedSender<Duration> {
         let (tx, mut rx) = mpsc::unbounded_channel();
+        let trident_state = self.trident_state.clone();
         let running = self.running.clone();
         self.rt.spawn(async move {
             // default escape time is 1h
@@ -706,6 +707,9 @@ impl Synchronizer {
                     // channel closed
                     Ok(None) => return,
                     Err(_) => {
+                        let (ts, cvar) = &*trident_state;
+                        *ts.lock().unwrap() = trident::State::Disabled;
+                        cvar.notify_one();
                         warn!("metaflow-agent restart, as max escape time expired");
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
                         // 1. 如果仅是停用系统无法回收全部的内存资源
@@ -876,6 +880,7 @@ impl Synchronizer {
                 if client.is_none() || version != session.get_version() {
                     let inner_client = session.get_client();
                     if inner_client.is_none() {
+                        session.set_request_failed(true);
                         info!("grpc sync client not connected");
                         time::sleep(Duration::new(1, 0)).await;
                         continue;
