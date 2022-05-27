@@ -300,7 +300,7 @@ impl HttpPerfData {
             return Err(Error::HttpHeaderParseFailed);
         }
 
-        end_index = self.session_data.httpv2_headers.frame_length as usize + l_offset - end_index;
+        end_index = self.session_data.httpv2_headers.frame_length as usize - end_index;
 
         if end_index > payload.len().try_into().unwrap() {
             return Err(Error::HttpHeaderParseFailed);
