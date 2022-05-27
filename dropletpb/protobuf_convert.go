@@ -61,7 +61,7 @@ func newPlatformData(vifData *trident.Interface, platform *datatype.PlatformData
 	platform.PodClusterId = vifData.GetPodClusterId()
 	platform.PodNodeId = vifData.GetPodNodeId()
 	platform.DeviceType = uint8(vifData.GetDeviceType())
-	platform.SkipTapInterface = vifData.GetPodNodeId() > 0 && vifData.GetPodClusterId() > 0
+	platform.SkipTapInterface = vifData.GetSkipTapInterface()
 }
 
 // response.GetPlatformData().GetInterfaces()

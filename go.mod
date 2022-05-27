@@ -26,7 +26,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
-	gitlab.yunshan.net/yunshan/message v0.0.0-20220112123654-1fab16d92f93
+	gitlab.yunshan.net/yunshan/message v0.0.0-20220527022829-738c4c149bc1
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/sys v0.0.0-20201024232916-9f70ab9862d5
 	google.golang.org/grpc v1.19.0
