@@ -8,6 +8,7 @@ use log::{debug, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
+use crate::common::enums::TapType;
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
@@ -483,7 +484,10 @@ impl EbpfRunner {
 
         while unsafe { SWITCH } {
             let packet = self.receiver.recv(Some(Duration::from_millis(1)));
-            if packet.is_err() {
+            if packet.is_err()
+                || (!self.config.l7_log_tap_types[u16::from(TapType::Any) as usize]
+                    && !self.config.l7_log_tap_types[u16::from(TapType::Tor) as usize])
+            {
                 continue;
             }
 
