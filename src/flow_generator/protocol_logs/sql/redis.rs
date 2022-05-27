@@ -189,7 +189,7 @@ fn decode_dollor(payload: &[u8], strict: bool) -> Option<(&[u8], usize)> {
     offset += sub_offset;
     let next_data_len = next_data_len as usize;
 
-    if offset + next_data_len > payload.len()
+    if offset + next_data_len + SEPARATOR_SIZE > payload.len()
         || payload[offset + next_data_len] != b'\r'
         || payload[offset + next_data_len + 1] != b'\n'
     {
