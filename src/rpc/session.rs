@@ -7,6 +7,7 @@ use log::{info, warn};
 use tonic::transport::{Channel, Endpoint};
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
+pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 
 struct Config {
     port: u16,
@@ -49,6 +50,8 @@ impl Session {
         // TODO: 错误处理和tls
         match Endpoint::from_shared(format!("http://{}:{}", remote, self.config.port))
             .unwrap()
+            .connect_timeout(DEFAULT_TIMEOUT)
+            .timeout(SESSION_TIMEOUT)
             .connect()
             .await
         {
