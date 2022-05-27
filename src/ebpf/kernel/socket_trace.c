@@ -259,6 +259,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 	conn_info->socket_info_ptr =
 			socket_info_map__lookup(&conn_key);
+	conn_info->keep_data_seq = false;
 }
 
 static __inline bool get_socket_info(struct __socket_data *v,
@@ -335,8 +336,8 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 #endif
 
 static __inline void infer_l7_class(struct conn_info_t* conn_info,
-					  enum traffic_direction direction, const char* buf,
-					  size_t count, __u8 sk_type) {
+				    enum traffic_direction direction, const char* buf,
+				    size_t count, __u8 sk_type) {
 	if (conn_info == NULL) {
 		return;
 	}
@@ -418,19 +419,19 @@ static __inline __u32 retry_get_copied_seq(void *sk,
 }
 
 static __inline void infer_tcp_seq_offset(void *sk,
-				           struct member_fields_offset *offset)
+					  struct member_fields_offset *offset)
 {
 	// 成员 copied_seq 在 struct tcp_sock 中的偏移量
 	int copied_seq_offsets[] = {0x514, 0x51c, 0x524, 0x52c, 0x534,
-				      0x53c, 0x544, 0x54c, 0x554, 0x55c,
-				      0x564, 0x56c, 0x574, 0x57c, 0x584,
-				      0x58c, 0x594, 0x59c, 0x5dc};
+				    0x53c, 0x544, 0x54c, 0x554, 0x55c,
+				    0x564, 0x56c, 0x574, 0x57c, 0x584,
+				    0x58c, 0x594, 0x59c, 0x5dc};
 
 	// 成员 write_seq 在 struct tcp_sock 中的偏移量
 	int write_seq_offsets[] = {0x66c, 0x674, 0x67c, 0x684, 0x68c, 0x694,
-				     0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
-				     0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
-				     0x6fc, 0x704, 0x70c, 0x714, 0x71c, 0x74c};
+				   0x69c, 0x6a4, 0x6ac, 0x6b4, 0x6bc, 0x6c4,
+				   0x6cc, 0x6d4, 0x6dc, 0x6e4, 0x6ec, 0x6f4,
+				   0x6fc, 0x704, 0x70c, 0x714, 0x71c, 0x74c};
 	int i, snd_nxt_offset = 0;
 
 	if (!offset->tcp_sock__copied_seq_offset) {
@@ -521,7 +522,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				   __u64 time_stamp) {
 	/*
 	 * ==========================================
-	 * Coroutine-Trace-ID (Single Redirect Trace)
+	 * Thread-Trace-ID (Single Redirect Trace)
 	 * ==========================================
 	 *
 	 * Ingress              |                   | Egress
@@ -541,10 +542,40 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	 *                                           | ② -> trace end
 	 */
 
+	/*
+	 * 同方向多个连续请求或回应的场景：
+	 *
+	 *              Ingress |
+	 * ----------------------
+	 *                   socket-n
+	 *                ①  -> |
+	 *                ②  -> |
+	 *                ③  -> |
+	 *               ......
+	 *
+	 *
+	 *                      | Egress
+	 * -----------------------------
+	 *                   socket-m
+	 *                      | -> ①
+	 *                      | -> ②
+	 *                      | -> ③
+	 *                        ......
+	 * 采用的策略是：沿用上次trace_info保存的traceID。
+	 */
+	__u64 pre_trace_id = 0;
+	if (is_socket_info_valid(socket_info_ptr) &&
+	    conn_info->direction == socket_info_ptr->direction &&
+	    conn_info->message_type == socket_info_ptr->msg_type) {
+		if (trace_info_ptr)
+			pre_trace_id = trace_info_ptr->thread_trace_id;
+		conn_info->keep_data_seq = true; // 同时这里确保捕获数据的序列号保持不变。
+	}
+
 	if (conn_info->direction == T_INGRESS) {
 		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
-					++trace_uid->thread_trace_id;
+				(pre_trace_id == 0 ? ++trace_uid->thread_trace_id : pre_trace_id);
 		if (conn_info->message_type == MSG_REQUEST)
 			trace_info.peer_fd = conn_info->fd;
 		else if (conn_info->message_type == MSG_RESPONSE) {
@@ -584,7 +615,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
 	__u32 tgid = (__u32) (pid_tgid >> 32);
 	if (time_stamp == 0)
-		time_stamp = bpf_ktime_get_ns(); 
+		time_stamp = bpf_ktime_get_ns();
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
@@ -644,6 +675,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = ROLE_UNKNOW;
+		sk_info.msg_type = conn_info->message_type;
 		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
 		sk_info.correlation_id = conn_info->correlation_id;
@@ -672,7 +704,18 @@ static __inline void data_submit(struct pt_regs *ctx,
 
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
-		sk_info.seq = ++socket_info_ptr->seq;
+
+		/*
+		 * 同方向多个连续请求或回应的场景时，
+		 * 保持捕获数据的序列号保持不变。
+		 */
+		if (conn_info->keep_data_seq)
+			sk_info.seq = socket_info_ptr->seq;
+		else
+			sk_info.seq = ++socket_info_ptr->seq;
+
+		socket_info_ptr->direction = conn_info->direction;
+		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
 		if (socket_info_ptr->peer_fd != 0 && conn_info->direction == T_INGRESS) {
 			__u64 peer_conn_key = gen_conn_key_id((__u64)tgid,
@@ -870,7 +913,7 @@ TPPROG(sys_enter_write) (struct syscall_comm_enter_ctx *ctx) {
 TPPROG(sys_exit_write) (struct syscall_comm_exit_ctx *ctx) {
 	__u64 id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
- 	// Unstash arguments, and process syscall.
+	// Unstash arguments, and process syscall.
 	struct data_args_t* write_args = active_write_args_map__lookup(&id);
 	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
 	if (write_args != NULL && write_args->fd > 2) {
