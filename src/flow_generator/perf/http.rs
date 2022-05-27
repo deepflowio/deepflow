@@ -281,25 +281,50 @@ impl HttpPerfData {
     // |                           Padding (*)                       ...
     // +---------------------------------------------------------------+
     fn parse_headers_frame_payload(&mut self, payload: &[u8]) -> Result<u16> {
-        if payload.len() <= 5 {
-            return Err(Error::HttpHeaderParseFailed);
-        }
-        let mut frame_payload = payload;
+        let mut l_offset = 0;
+        let mut end_index = 0;
+
         if self.session_data.httpv2_headers.flags & FLAG_HEADERS_PADDED != 0 {
-            frame_payload = &payload[1..];
-        }
-        if self.session_data.httpv2_headers.flags & FLAG_HEADERS_PRIORITY != 0 {
-            frame_payload = &payload[5..];
+            if u32::from(payload[0]) > self.session_data.httpv2_headers.frame_length {
+                return Err(Error::HttpHeaderParseFailed);
+            }
+            l_offset += 1;
+            end_index = payload[0] as usize;
         }
 
+        if self.session_data.httpv2_headers.flags & FLAG_HEADERS_PRIORITY != 0 {
+            l_offset += 5;
+        }
+
+        if payload.len() <= l_offset {
+            return Err(Error::HttpHeaderParseFailed);
+        }
+
+        end_index = self.session_data.httpv2_headers.frame_length as usize + l_offset - end_index;
+
+        if end_index > payload.len().try_into().unwrap() {
+            return Err(Error::HttpHeaderParseFailed);
+        }
+
+        let frame_payload = &payload[l_offset..end_index];
+
         let mut parser = h2pack::parser::Parser::new();
-        let header_list = parser.parse(frame_payload).unwrap();
+
+        let parse_rst = parser.parse(frame_payload);
+
+        if let Err(_) = parse_rst {
+            return Err(Error::HttpHeaderParseFailed);
+        }
+
+        let header_list = parse_rst.unwrap();
 
         for header in header_list.iter() {
             match header.0.as_slice() {
-                b":method" => return Ok(0),
+                b":method" => {
+                    return Ok(0);
+                }
                 b":status" => {
-                    return Ok(std::str::from_utf8(header.1.as_ref())
+                    return Ok(std::str::from_utf8(header.1.as_slice())
                         .unwrap_or_default()
                         .parse::<u16>()
                         .unwrap_or_default())
@@ -331,6 +356,7 @@ impl HttpPerfData {
             self.session_data
                 .httpv2_headers
                 .parse_headers_frame(frame_payload)?;
+
             // 值得注意的是，关于H2存在发送端主动通过Settings帧发起WindowUpdate请求时或发送方测量最小往返时间（PING）时，
             // 接收端如果支持配置会在其发送第一个请求时携带上述帧，可能会影响H2-HEADERS帧的位置，将HEADERS帧前的其它帧跳过。
             // 参考：https://tools.ietf.org/html/rfc7540#section-6.5
@@ -338,12 +364,14 @@ impl HttpPerfData {
                 if self.session_data.httpv2_headers.stream_id == 0 {
                     return Err(Error::HttpHeaderParseFailed);
                 }
+
                 // TODO 调用第三库解析有时会导致panic, 先默认返回成功
-                return Ok(200);
-                // frame_payload = &frame_payload[H2C_HEADER_SIZE..];
-                // return self.parse_headers_frame_payload(frame_payload);
+                // return Ok(200);
+                frame_payload = &frame_payload[H2C_HEADER_SIZE..];
+                return self.parse_headers_frame_payload(frame_payload);
             }
             let offset = self.session_data.httpv2_headers.frame_length as usize + H2C_HEADER_SIZE;
+
             if frame_payload.len() <= offset {
                 return Err(Error::HttpHeaderParseFailed);
             }
@@ -434,7 +462,7 @@ mod tests {
         let rrt_cache = Rc::new(RefCell::new(L7RrtCache::new(100)));
         let mut http_perf_data = HttpPerfData::new(rrt_cache);
 
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), None);
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(pcap), Some(512));
         let mut packets = capture.as_meta_packets();
         if packets.len() < 2 {
             return http_perf_data;
