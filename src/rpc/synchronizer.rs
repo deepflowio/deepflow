@@ -765,6 +765,11 @@ impl Synchronizer {
                     continue;
                 }
                 let response = response.unwrap().into_inner();
+                if response.response.is_none() {
+                    warn!("ntp response empty");
+                    time::sleep(sync_interval).await;
+                    continue;
+                }
 
                 let resp_packet = NtpPacket::try_from(response.response.unwrap().as_ref());
                 if let Err(e) = resp_packet {
