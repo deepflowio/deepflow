@@ -1263,7 +1263,7 @@ impl ConfigHandler {
                                                 components.cgroups_controller = Arc::new(cgroup);
                                             }
                                             Err(e) => {
-                                                warn!("set cgroup cpu failed: {:?}", e);
+                                                warn!("{}", e);
                                             }
                                         }
                                     }
