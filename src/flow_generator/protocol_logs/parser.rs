@@ -236,6 +236,7 @@ impl SessionQueue {
             Some(t) => t,
             None => return,
         };
+        self.last_flush_time = now;
         // flush 1个slot的数据
         self.flush_window(1, &mut time_window);
         self.time_window.replace(time_window);
