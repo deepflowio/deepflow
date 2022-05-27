@@ -62,6 +62,7 @@ impl LocalModeDispatcher {
                 &base.exception_handler,
                 &mut prev_timestamp,
                 &base.counter,
+                &base.ntp_diff,
             );
             if recved.is_none() {
                 flow_map.inject_flush_ticker(Duration::ZERO);
@@ -140,7 +141,6 @@ impl LocalModeDispatcher {
             };
             let overlay_packet = &packet.data[decap_length..];
             let mut meta_packet = MetaPacket::empty();
-            // TODO: use ntp time
             let offset = Duration::ZERO;
             if let Err(e) = meta_packet.update(
                 overlay_packet,
