@@ -19,7 +19,6 @@
 #define MAP_PERF_SOCKET_DATA_NAME	"__socket_data"
 #define MAP_TRACE_UID_NAME		"__trace_uid_map"
 #define MAP_TRACE_STATS_NAME		"__trace_stats_map"
-#define MAP_REAL_TIME_DIFF_NAME		"__real_time_diff_map"
 
 // 在socket map回收时，对每条socket信息超过10秒没有收发动作就回收掉
 #define SOCKET_RECLAIM_TIMEOUT_DEF  10
@@ -39,7 +38,7 @@ static uint32_t conf_max_trace_entries;
 static uint32_t conf_socket_map_max_reclaim;
 
 extern int major, minor;
-static uint64_t sys_boot_time_ns; // 距离1970-01-01 00:00:00微秒数 - 距离系统启动的微秒数
+extern uint64_t sys_boot_time_ns;
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
 static bool is_adapt_success(struct bpf_tracer *t);
@@ -56,7 +55,6 @@ static void socket_tracer_set_probes(struct trace_probes_conf *tps)
 	probes_set_enter_symbol(tps, "__sys_recvmmsg");
 	probes_set_enter_symbol(tps, "do_writev");
 	probes_set_enter_symbol(tps, "do_readv");
-	probes_set_enter_symbol(tps, "read_null");
 	tps->probes_nr = index;
 
 	/* tracepoints */
@@ -84,12 +82,12 @@ static void socket_tracer_set_probes(struct trace_probes_conf *tps)
 	tps_set_symbol(tps, "sys_exit_writev");
 	tps_set_symbol(tps, "sys_exit_readv");
 
+	// 周期性触发用于缓存的数据的超时检查
+	tps_set_symbol(tps, "sys_enter_getppid");
+
 	// clear trace connection
 	tps_set_symbol(tps, "sys_enter_close");
 
-	// For sys_boot_time_ns
-	tps_set_symbol(tps, "sys_enter_clock_gettime");
-	tps_set_symbol(tps, "sys_exit_clock_gettime");
 	tps->tps_nr = index;
 }
 
@@ -383,7 +381,8 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->socket_id = sd->socket_id;
 
 		// 数据捕获时间戳，精度为微秒(us)
-		submit_data->timestamp = (sd->timestamp + sys_boot_time_ns) / 1000ULL;
+		submit_data->timestamp =
+		    (sd->timestamp + sys_boot_time_ns) / 1000ULL;
 
 		submit_data->tuple = sd->tuple;
 		submit_data->direction = sd->direction;
@@ -400,7 +399,8 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->syscall_trace_id_call = sd->thread_trace_id;
 		memcpy(submit_data->process_name,
 		       sd->comm, sizeof(submit_data->process_name));
-		submit_data->process_name[sizeof(submit_data->process_name) - 1] = '\0';
+		submit_data->process_name[sizeof(submit_data->process_name) -
+					  1] = '\0';
 		submit_data->msg_type = sd->msg_type;
 
 		// 各种协议的统计
@@ -487,7 +487,8 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 	}
 
 	trace_map_reclaim_count += reclaim_count;
-	ebpf_info("[%s] trace map reclaim_count :%u\n", __func__, reclaim_count);
+	ebpf_info("[%s] trace map reclaim_count :%u\n", __func__,
+		  reclaim_count);
 }
 
 static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
@@ -513,7 +514,8 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 	}
 
 	socket_map_reclaim_count += sockets_reclaim_count;
-	ebpf_info("[%s] sockets_reclaim_count :%u\n", __func__, sockets_reclaim_count);
+	ebpf_info("[%s] sockets_reclaim_count :%u\n", __func__,
+		  sockets_reclaim_count);
 }
 
 static int check_map_exceeded(void)
@@ -530,7 +532,6 @@ static int check_map_exceeded(void)
 		kern_socket_map_used = stats_total.socket_map_count;
 		kern_trace_map_used = stats_total.trace_map_count;
 	}
-
 	// 校准map的统计数量
 	kern_socket_map_used -= socket_map_reclaim_count;
 	kern_trace_map_used -= trace_map_reclaim_count;
@@ -543,11 +544,12 @@ static int check_map_exceeded(void)
 	}
 
 	if (kern_trace_map_used >=
-	    (uint64_t)(conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE)) {
+	    (uint64_t) (conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE)) {
 		ebpf_info("Current trace map used %u exceed"
 			  " reclaim_map_max %u,reclaim map\n",
 			  kern_trace_map_used,
-			  (uint32_t)(conf_max_trace_entries * RECLAIM_TRACE_MAP_SCALE));
+			  (uint32_t) (conf_max_trace_entries *
+				      RECLAIM_TRACE_MAP_SCALE));
 		reclaim_trace_map(t, TRACE_RECLAIM_TIMEOUT_DEF);
 	}
 
@@ -566,7 +568,6 @@ static int check_kern_adapt_and_state_update(void)
 		ebpf_info("Linux %d.%d adapt success.\n", major, minor);
 		set_period_event_invalid("check-kern-adapt");
 		t->adapt_success = true;
-		t->tps->tps_nr -= 2; // Remove sys_enter_clock_gettime and sys_enter_clock_gettime
 	}
 
 	return 0;
@@ -593,8 +594,7 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	if (is_core_kernel())
 		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s/linux-core/%s", ELF_PATH_PREFIX,
-			 bpf_file_name);
+			 "%s/linux-core/%s", ELF_PATH_PREFIX, bpf_file_name);
 	else if (major == 5 && minor == 2)
 		snprintf(bpf_path, TRACER_PATH_LEN,
 			 "%s/linux-%d.%d/%s", ELF_PATH_PREFIX,
@@ -602,8 +602,7 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	else
 		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s/linux-common/%s", ELF_PATH_PREFIX,
-			 bpf_file_name);
+			 "%s/linux-common/%s", ELF_PATH_PREFIX, bpf_file_name);
 
 	struct trace_probes_conf *tps =
 	    malloc(sizeof(struct trace_probes_conf));
@@ -706,7 +705,8 @@ static int socket_tracer_stop(void)
 		return ret;
 
 	if (t->state == TRACER_INIT) {
-		ebpf_info("socket_tracer state is TRACER_INIT, not permit stop.\n");
+		ebpf_info
+		    ("socket_tracer state is TRACER_INIT, not permit stop.\n");
 		return -1;
 	}
 
@@ -727,7 +727,8 @@ static int socket_tracer_start(void)
 		return ret;
 
 	if (t->state == TRACER_INIT) {
-		ebpf_info("socket_tracer state is TRACER_INIT, not permit start.\n");
+		ebpf_info
+		    ("socket_tracer state is TRACER_INIT, not permit start.\n");
 		return -1;
 	}
 
@@ -789,26 +790,6 @@ static bool is_adapt_success(struct bpf_tracer *t)
 		}
 
 		free(array);
-	}
-
-	if (is_success) {
-		uint64_t real_time_diff = 0;
-		struct timespec time_tmp = {0, 0};
-		// 确保sys_clock_gettime()系统被调用一次从而使ebpf tracepoint执行。
-		syscall(__NR_clock_gettime, CLOCK_REALTIME, &time_tmp);
-
-		if (!bpf_table_get_value(t, MAP_REAL_TIME_DIFF_NAME, 0, &real_time_diff)) {
-			ebpf_info("bpf_table_get_value() %s error\n", MAP_REAL_TIME_DIFF_NAME);
-			is_success = false;
-		}
-
-		if (real_time_diff == 0) {
-			ebpf_info("fetch real_time_diff faild, adapt kernel faild.\n");
-			is_success = false;
-		} else {
-			ebpf_info("sys_boot_time_ns : %llu\n", real_time_diff);
-			sys_boot_time_ns = real_time_diff;
-		}
 	}
 
 	return is_success;
@@ -1046,8 +1027,8 @@ void print_dns_info(const char *data, int len)
 					answers[i].rdata[j] = reader[j];
 
 				answers[i].rdata[ntohs
-						 (answers[i].
-						  resource->data_len)]
+						 (answers[i].resource->
+						  data_len)]
 				    = '\0';
 
 				reader =

@@ -62,10 +62,6 @@ BPF_HASH(socket_info_map, __u64, struct socket_info_t)
 // Key is {tgid, pid}. value is trace_info_t
 BPF_HASH(trace_map, __u64, struct trace_info_t)
 
-// key = 0;
-// value = (距离1970-01-01 00:00:00微秒数 - 距离系统启动的微秒数)
-MAP_ARRAY(real_time_diff_map, __u32, __u64, 1)
-
 static __inline void delete_socket_info(__u64 conn_key,
 					struct socket_info_t *socket_info_ptr)
 {
@@ -1275,7 +1271,9 @@ TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
 	return 0;
 }
 
-KPROG(read_null) (struct pt_regs* ctx) {
+// /sys/kernel/debug/tracing/events/syscalls/sys_enter_getppid
+// 此处tracepoint用于周期性的将驻留在缓存中还未发送的数据发给用户态接收程序处理。
+TPPROG(sys_enter_getppid) (struct syscall_comm_enter_ctx *ctx) {
 	int k0 = 0;
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (v_buff) {
@@ -1329,37 +1327,6 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 			return 0;
 		trace_stats->socket_map_count++;
 	}
-
-	return 0;
-}
-
-// /sys/kernel/debug/tracing/events/syscalls/sys_enter_clock_gettime/format
-TPPROG(sys_enter_clock_gettime) (struct syscall_comm_enter_ctx *ctx) {
-#define CLOCK_REALTIME 0
-	clockid_t which_clock = ctx->which_clock;
-	if (which_clock != CLOCK_REALTIME)
-		return 0;
-	struct timespec *tp = ctx->tp;
-	__u64 id = bpf_get_current_pid_tgid();
-	struct data_args_t read_args = {};
-	read_args.timestamp_ptr = tp;
-	active_read_args_map__update(&id, &read_args);
-	return 0;
-}
-
-// /sys/kernel/debug/tracing/events/syscalls/sys_exit_clock_gettime/format
-TPPROG(sys_exit_clock_gettime) (struct syscall_comm_exit_ctx *ctx) {
-	__u64 id = bpf_get_current_pid_tgid();
-	struct data_args_t* read_args = active_read_args_map__lookup(&id);
-	if (read_args != NULL) {
-		struct timespec ts;
-		bpf_probe_read(&ts, sizeof(ts), (void *)read_args->timestamp_ptr);
-		__u64 diff = ts.tv_sec * NS_PER_SEC + ts.tv_nsec - bpf_ktime_get_ns();
-		__u32 k0 = 0;
-		real_time_diff_map__update(&k0, &diff);
-	}
-
-	active_read_args_map__delete(&id);
 
 	return 0;
 }

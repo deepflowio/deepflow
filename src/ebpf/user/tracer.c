@@ -11,6 +11,8 @@
 
 int major, minor;		// Linux kernel主版本，次版本
 
+uint64_t sys_boot_time_ns;	// 系统启动时间，单位：纳秒
+
 /*
  * tracers
  */
@@ -34,7 +36,7 @@ static struct list_head extra_waiting_head;	// 额外事务处理的注册
 static struct list_head period_events_head;	// 周期性事件处理的注册
 
 int sys_cpus_count;
-bool *cpu_online; // 用于判断CPU是否是online
+bool *cpu_online;		// 用于判断CPU是否是online
 
 // 所有tracer成功完成启动，会被应用设置为1
 static volatile uint64_t all_probes_ready;
@@ -300,8 +302,9 @@ static int probe_detach(struct probe *p)
 	char *fn_name;
 	int ret;
 	if (p->link == NULL) {
-		ebpf_info("<%s> p->link == NULL, fn_name:%s, has been detached.\n",
-			  __func__, p->name);
+		ebpf_info
+		    ("<%s> p->link == NULL, fn_name:%s, has been detached.\n",
+		     __func__, p->name);
 		return 0;
 	}
 
@@ -321,7 +324,8 @@ static int probe_detach(struct probe *p)
 static int tracepoint_attach(struct tracepoint *tp)
 {
 	if (tp->link) {
-		ebpf_info("<%s> name:%s, has been attached.\n", __func__, tp->name);
+		ebpf_info("<%s> name:%s, has been attached.\n", __func__,
+			  tp->name);
 		return 0;
 	}
 
@@ -340,8 +344,9 @@ static int tracepoint_attach(struct tracepoint *tp)
 static int tracepoint_detach(struct tracepoint *tp)
 {
 	if (tp->link == NULL) {
-		ebpf_info("<%s> tp->link == NULL, name:%s, has been detached.\n",
-			  __func__, tp->name);
+		ebpf_info
+		    ("<%s> tp->link == NULL, name:%s, has been detached.\n",
+		     __func__, tp->name);
 		return 0;
 	}
 
@@ -351,10 +356,10 @@ static int tracepoint_detach(struct tracepoint *tp)
 }
 
 static int tracer_hooks_process(struct bpf_tracer *tracer,
-			       enum tracer_hook_type type)
+				enum tracer_hook_type type)
 {
-	int (*probe_fun)(struct probe *p) = NULL;
-	int (*tracepoint_fun)(struct tracepoint *p) = NULL;
+	int (*probe_fun) (struct probe * p) = NULL;
+	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
 	if (type == HOOK_ATTACH) {
 		probe_fun = probe_attach;
 		tracepoint_fun = tracepoint_attach;
@@ -363,7 +368,7 @@ static int tracer_hooks_process(struct bpf_tracer *tracer,
 		tracepoint_fun = tracepoint_detach;
 	} else
 		return -EINVAL;
-	
+
 	if (tracer->pobj == NULL) {
 		ebpf_info("fun: %s, not loaded bpf program yet.\n", __func__);
 		return -EINVAL;
@@ -380,14 +385,12 @@ static int tracer_hooks_process(struct bpf_tracer *tracer,
 		if (probe_fun(p)) {
 			ebpf_info("%s %s probe: '%s', failed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
-				  p->isret ? "exit" : "enter",
-				  p->name);
+				  p->isret ? "exit" : "enter", p->name);
 			return -EINVAL;
 		} else
 			ebpf_info("%s %s probe: '%s', succeed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
-				  p->isret ? "exit" : "enter",
-				  p->name);
+				  p->isret ? "exit" : "enter", p->name);
 	}
 
 	struct tracepoint *tp;
@@ -569,7 +572,7 @@ static void period_events_process(void)
 	}
 }
 
-static struct period_event_op *find_period_event(const char* name)
+static struct period_event_op *find_period_event(const char *name)
 {
 	struct period_event_op *peo = NULL;
 	list_for_each_entry(peo, &period_events_head, list) {
@@ -609,26 +612,20 @@ int set_period_event_invalid(const char *name)
 }
 
 /*
- * kernel采用捆绑burst发送数据到用户的形式
- * 下面的方法实现所有CPU触发超时机制
- * percpu execute read /dev/null. trigger kernel 'read_null()' function.
+ * kernel采用捆绑burst发送数据到用户的形式，
+ * 下面的方法实现所有CPU触发超时检查把驻留在eBPF buffer中数据发送上来。
  */
-static inline void cpu_read_dev_null(int cpu_id)
+static inline void cpu_ebpf_data_timeout_check(int cpu_id)
 {
 	cpu_set_t cpuset;
 	CPU_ZERO(&cpuset);
 	CPU_SET(cpu_id, &cpuset);
 	if (-1 ==
-	    pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset))
+	    pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset)) {
 		return;
+	}
 
-	int fd;
-	char buf[1];
-	fd = open("/dev/null", O_RDONLY);
-	if (fd == -1)
-		return;
-	read(fd, buf, sizeof(buf));
-	close(fd);
+	syscall(__NR_getppid);
 
 	if (all_probes_ready)
 		RUN_ONCE(ready_flag_cpus[cpu_id], extra_waiting_process,
@@ -640,7 +637,7 @@ static int cpus_kick_kern(void)
 	int i;
 	for (i = 0; i < sys_cpus_count; i++) {
 		if (cpu_online[i])
-			cpu_read_dev_null(i);
+			cpu_ebpf_data_timeout_check(i);
 	}
 
 	return 0;
@@ -863,6 +860,12 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	sys_cpus_count = get_cpus_count(&cpu_online);
 	if (sys_cpus_count <= 0)
 		return -1;
+
+	uint64_t real_time, monotonic_time;
+	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
+	monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+	sys_boot_time_ns = real_time - monotonic_time;
+	ebpf_info("sys_boot_time_ns : %llu\n", sys_boot_time_ns);
 
 	clear_residual_probes();
 
