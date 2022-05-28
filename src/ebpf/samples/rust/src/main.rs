@@ -1,12 +1,12 @@
-use std::convert::TryInto;
-use std::net::IpAddr;
 use chrono::prelude::DateTime;
-use chrono::Utc;
 use chrono::FixedOffset;
-use std::time::{UNIX_EPOCH, Duration};
+use chrono::Utc;
 use rust_sample::ebpf::*;
+use std::convert::TryInto;
 use std::fmt::Write;
+use std::net::IpAddr;
 use std::thread;
+use std::time::{Duration, UNIX_EPOCH};
 
 extern "C" {
     fn print_dns_info(data: *mut c_char, len: c_uint);
@@ -50,7 +50,9 @@ fn date_time(ts: u64) -> String {
     let time = DateTime::<Utc>::from(d);
     let china_timezone = FixedOffset::east(8 * 3600);
     // Formats the combined date and time with the specified format string.
-    time.with_timezone(&china_timezone).format("%Y-%m-%d %H:%M:%S.%6f").to_string()
+    time.with_timezone(&china_timezone)
+        .format("%Y-%m-%d %H:%M:%S.%6f")
+        .to_string()
 }
 
 fn sk_str_safe(data: *mut c_char) -> String {
@@ -117,10 +119,10 @@ fn sk_l4proto_safe(sd: *mut SK_BPF_DATA) -> &'static str {
 }
 
 fn process_name_safe(sd: *mut SK_BPF_DATA) -> String {
-	unsafe {
-		let v = &(*sd).process_name;
-		String::from_utf8_lossy(v).to_string()
-	}
+    unsafe {
+        let v = &(*sd).process_name;
+        String::from_utf8_lossy(v).to_string()
+    }
 }
 
 extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
@@ -139,8 +141,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         } else if sk_proto_safe(sd) == SOCK_DATA_KAFKA {
             proto_tag.push_str("KAFKA");
         } else if sk_proto_safe(sd) == SOCK_DATA_MQTT {
-		proto_tag.push_str("MQTT");
-	} else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
+            proto_tag.push_str("MQTT");
+        } else if sk_proto_safe(sd) == SOCK_DATA_DUBBO {
             proto_tag.push_str("DUBBO");
         }
 
@@ -203,40 +205,38 @@ fn main() {
     let log_file = CString::new("/var/log/metaflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
-	// 第一个参数空指针传递可以填写std::ptr::null()
+        // 第一个参数空指针传递可以填写std::ptr::null()
         if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
-           println!("bpf_tracer_init() file:{:?} error", log_file);
-           ::std::process::exit(1);
+            println!("bpf_tracer_init() file:{:?} error", log_file);
+            ::std::process::exit(1);
         }
 
         if running_socket_tracer(
             socket_trace_callback, /* 回调接口 rust -> C */
             1,                     /* 工作线程数，是指用户态有多少线程参与数据处理 */
-            128,                    /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
+            128,                   /* 内核共享内存占用的页框数量, 值为2的次幂。用于perf数据传递 */
             65536,                 /* 环形缓存队列大小，值为2的次幂。e.g: 2,4,8,16,32,64,128 */
             524288, /* 设置用于socket追踪的hash表项最大值，取决于实际场景中并发请求数量 */
             524288, /* 设置用于线程/协程追踪会话的hash表项最大值。*/
-	    520000 /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
-        ) != 0 {
+            520000, /* socket map表项进行清理的最大阈值，当前map的表项数量超过这个值进行map清理操作 */
+        ) != 0
+        {
             println!("running_socket_tracer() error.");
             ::std::process::exit(1);
         }
 
-	bpf_tracer_finish();
+        bpf_tracer_finish();
 
         let stats = socket_tracer_stats();
         print!("{:#?}\n", stats);
-    }
 
-    thread::sleep(Duration::from_secs(5));
-    unsafe {
-        let stats = socket_tracer_stats();
-        print!("{:#?}\n", stats);
-	print!("start start ...\n");
-        if tracer_start() != 0 {
-            println!("tracer_start() error");
+        print!("start start ...\n");
+        while tracer_start() != 0 {
+            print!("tracer_start() error, sleep 1s retry.\n");
+            std::thread::sleep(Duration::from_secs(1));
         }
-	print!("tracer_start() finish\n");
+        print!("tracer_start() finish\n");
+
         let stats = socket_tracer_stats();
         print!("{:#?}\n", stats);
     }
