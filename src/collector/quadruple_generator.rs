@@ -445,7 +445,7 @@ impl SubQuadGen {
     ) -> bool {
         if flow_metric.is_active_host || flow_metric.l3_epc_id == EPC_FROM_INTERNET {
             // 有EPC并且是Device, L3Epc是过平台数据获取的，无需添加到PossibleHost中
-            return true;
+            return flow_metric.is_active_host;
         }
         if flow_metric.is_device {
             return true;
