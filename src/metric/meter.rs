@@ -81,7 +81,7 @@ impl FlowMeter {
         self.latency.sequential_merge(&other.latency);
         self.performance.sequential_merge(&other.performance);
         self.anomaly.sequential_merge(&other.anomaly);
-        self.flow_load.sequential_merge(&other.flow_load);
+        self.flow_load.sequential_merge(&other.traffic);
     }
 
     pub fn reverse(&mut self) {
@@ -356,11 +356,17 @@ impl From<Anomaly> for metric::Anomaly {
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct FlowLoad {
     pub load: u64,
+    pub flow_count: u64,
 }
 
 impl FlowLoad {
-    pub fn sequential_merge(&mut self, other: &FlowLoad) {
-        self.load += other.load;
+    pub fn sequential_merge(&mut self, other: &Traffic) {
+        self.load = self.flow_count + other.new_flow;
+        self.flow_count = if self.load > other.closed_flow {
+            self.load - other.closed_flow
+        } else {
+            0
+        };
     }
 }
 

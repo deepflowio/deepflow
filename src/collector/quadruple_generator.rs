@@ -222,11 +222,11 @@ impl ConcurrentConnection {
         &mut self,
         time_in_second: Duration,
         key: &mut QgKey,
-        tagged_flow: &Arc<TaggedFlow>,
+        is_new_flow: bool,
     ) {
         if let Some(v) = self.connections_mut(key) {
             v.time_in_second = time_in_second;
-            if tagged_flow.flow.is_new_flow {
+            if is_new_flow {
                 v.sum += 1;
             } else {
                 v.living -= 1;
@@ -234,7 +234,7 @@ impl ConcurrentConnection {
         } else {
             let mut living = 0i64;
             let mut sum = 0i64;
-            if tagged_flow.flow.is_new_flow {
+            if is_new_flow {
                 sum += 1;
             } else {
                 living -= 1;
@@ -383,6 +383,13 @@ impl SubQuadGen {
             {
                 acc_flow.flow_meter.flow_load.load =
                     connection.get_concurrent(acc_flow.time_in_second, &mut acc_flow.key);
+                acc_flow.flow_meter.flow_load.flow_count = if acc_flow.flow_meter.flow_load.load
+                    > acc_flow.flow_meter.traffic.closed_flow
+                {
+                    acc_flow.flow_meter.flow_load.load - acc_flow.flow_meter.traffic.closed_flow
+                } else {
+                    0
+                };
             }
         }
     }
@@ -484,7 +491,7 @@ impl SubQuadGen {
             {
                 connection.add_connection(time_in_second, key);
             } else if tagged_flow.flow.close_type != CloseType::ForcedReport {
-                connection.delete_connection(time_in_second, key, &tagged_flow);
+                connection.delete_connection(time_in_second, key, tagged_flow.flow.is_new_flow);
             }
         }
 
