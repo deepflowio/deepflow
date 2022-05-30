@@ -952,20 +952,20 @@ impl ConfigHandler {
                 l7_log_dynamic: L7LogDynamicConfig {
                     proxy_client_origin: conf.http_log_proxy_client().to_string(),
                     proxy_client_lower: conf.http_log_proxy_client().to_string().to_lowercase(),
-                    proxy_client_with_colon: format!("{}:", conf.http_log_proxy_client()),
+                    proxy_client_with_colon: format!("{}: ", conf.http_log_proxy_client()),
 
                     x_request_id_origin: conf.http_log_x_request_id().to_string(),
                     x_request_id_lower: conf.http_log_x_request_id().to_string().to_lowercase(),
-                    x_request_id_with_colon: format!("{}:", conf.http_log_x_request_id()),
+                    x_request_id_with_colon: format!("{}: ", conf.http_log_x_request_id()),
 
                     trace_id_origin: conf.http_log_trace_id().to_string(),
                     trace_id_lower: conf.http_log_trace_id().to_string().to_lowercase(),
-                    trace_id_with_colon: format!("{}:", conf.http_log_trace_id()),
+                    trace_id_with_colon: format!("{}: ", conf.http_log_trace_id()),
                     trace_type: conf.http_log_trace_id().into(),
 
                     span_id_origin: conf.http_log_span_id().to_string(),
                     span_id_lower: conf.http_log_span_id().to_string().to_lowercase(),
-                    span_id_with_colon: format!("{}:", conf.http_log_span_id()),
+                    span_id_with_colon: format!("{}: ", conf.http_log_span_id()),
                     span_type: conf.http_log_span_id().into(),
                 },
             },
