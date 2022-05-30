@@ -741,6 +741,7 @@ impl Synchronizer {
                 };
 
                 if !enabled {
+                    ntp_diff.store(0, Ordering::Relaxed);
                     time::sleep(sync_interval).await;
                     continue;
                 }
