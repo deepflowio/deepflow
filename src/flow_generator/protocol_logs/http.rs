@@ -657,11 +657,11 @@ mod tests {
                 x_request_id_with_colon: "".to_string(),
                 trace_id_origin: "sw8".to_string(),
                 trace_id_lower: "sw8".to_string(),
-                trace_id_with_colon: "sw8:".to_string(),
+                trace_id_with_colon: "sw8: ".to_string(),
                 trace_type: TraceType::Sw8,
                 span_id_origin: "sw8".to_string(),
                 span_id_lower: "sw8".to_string(),
-                span_id_with_colon: "sw8:".to_string(),
+                span_id_with_colon: "sw8: ".to_string(),
                 span_type: TraceType::Sw8,
             };
             let _ = http.parse(payload, packet.lookup_key.proto, packet.direction);
