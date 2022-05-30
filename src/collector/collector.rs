@@ -559,10 +559,10 @@ impl Stash {
         let (src_ip, dst_ip) = {
             let (mut src_ip, mut dst_ip) = (flow.flow_key.ip_src, flow.flow_key.ip_dst);
             if is_extra_tracing_doc {
-                if acc_flow.nat_src_ip.is_unspecified() {
+                if !acc_flow.nat_src_ip.is_unspecified() {
                     src_ip = acc_flow.nat_src_ip;
                 }
-                if acc_flow.nat_dst_ip.is_unspecified() {
+                if !acc_flow.nat_dst_ip.is_unspecified() {
                     dst_ip = acc_flow.nat_dst_ip;
                 }
             }
