@@ -171,6 +171,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 }
 
 func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
+	// 把`1m`的反引号去掉
+	table = strings.Trim(table, "`")
 	response := map[string][]interface{}{
 		"columns": []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
@@ -222,6 +224,8 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 }
 
 func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
+	// 把`1m`的反引号去掉
+	table = strings.Trim(table, "`")
 	// 获取tagEnumFile
 	sqlSplit := strings.Split(sql, " ")
 	tag := sqlSplit[2]
