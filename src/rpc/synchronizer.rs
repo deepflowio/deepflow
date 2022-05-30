@@ -306,8 +306,14 @@ impl Status {
         return false;
     }
 
-    fn trigger_flow_acl(&self, listener: &mut Box<dyn FlowAclListener>) {
-        listener.flow_acl_change(&self.ip_groups, &self.interfaces, &self.peers, &self.cidrs);
+    fn trigger_flow_acl(&self, trident_type: TridentType, listener: &mut Box<dyn FlowAclListener>) {
+        listener.flow_acl_change(
+            trident_type,
+            &self.ip_groups,
+            &self.interfaces,
+            &self.peers,
+            &self.cidrs,
+        );
     }
 }
 
@@ -624,7 +630,7 @@ impl Synchronizer {
             let policy_error = false;
             for listener in flow_acl_listener.lock().unwrap().iter_mut() {
                 // TODO: error handling
-                status.trigger_flow_acl(listener);
+                status.trigger_flow_acl(runtime_config.trident_type, listener);
             }
             if policy_error {
                 warn!("OnPolicyChange error, set exception TOO_MANY_POLICIES.");
