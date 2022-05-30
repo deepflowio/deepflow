@@ -4,6 +4,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use ipnetwork::IpNetwork;
 use log::debug;
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
@@ -13,6 +14,8 @@ use crate::common::enums::TapType;
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
 use crate::common::TapPort;
+use crate::proto::common::TridentType;
+use crate::utils::environment::is_tt_workload;
 use crate::utils::net::MacAddr;
 
 pub const FROM_CONTROLLER: u16 = 1;
@@ -165,11 +168,46 @@ impl Forward {
         }
     }
 
+    fn is_link_local(ip_addr: IpAddr) -> bool {
+        match ip_addr {
+            IpAddr::V4(ip) => ip.is_link_local(),
+            IpAddr::V6(ip) => (ip.segments()[0] & 0xffc0) == 0xfe80,
+        }
+    }
+
+    fn get_ip_from_lookback(
+        trident_type: TridentType,
+        interfaces: &Vec<NetworkInterface>,
+    ) -> Vec<IpNetwork> {
+        let mut ips = Vec::new();
+        if !is_tt_workload(trident_type) {
+            return ips;
+        }
+
+        for interface in interfaces {
+            if !interface.is_loopback() || !interface.is_up() {
+                continue;
+            }
+
+            for ip in &interface.ips {
+                let ip_addr = ip.ip();
+                if ip_addr.is_unspecified() || ip_addr.is_loopback() || Self::is_link_local(ip_addr)
+                {
+                    continue;
+                }
+                ips.push(ip.clone())
+            }
+        }
+        return ips;
+    }
+
     fn update_l3_from_interfaces(
         &self,
+        trident_type: TridentType,
         table: &mut TableLruCache,
         interfaces: &Vec<NetworkInterface>,
     ) {
+        let ips = Self::get_ip_from_lookback(trident_type, interfaces);
         debug!("Interface L3:");
         for interface in interfaces {
             if interface.is_loopback() || !interface.is_up() || interface.mac.is_none() {
@@ -177,7 +215,9 @@ impl Forward {
             }
 
             let mac = MacAddr::from(interface.mac.unwrap().octets());
-            for ip in &interface.ips {
+            let mut ips = ips.clone();
+            interface.ips.iter().for_each(|v| ips.push(v.clone()));
+            for ip in &ips {
                 let key = L3Key { ip: ip.ip(), mac };
                 if let Some(value) = table.get_mut(&key) {
                     value.from |= FROM_CONFIG;
@@ -200,13 +240,14 @@ impl Forward {
 
     pub fn update_from_config(
         &mut self,
+        trident_type: TridentType,
         platforms: &Vec<Arc<PlatformData>>,
         interfaces: &Vec<NetworkInterface>,
     ) {
         for i in 0..self.queue_count {
             let mut mac_ip_table = TableLruCache::new(1 << 14);
             self.update_l3_from_platforms(&mut mac_ip_table, platforms);
-            self.update_l3_from_interfaces(&mut mac_ip_table, interfaces);
+            self.update_l3_from_interfaces(trident_type, &mut mac_ip_table, interfaces);
 
             self.mac_ip_tables[i].replace(Box::new(mac_ip_table));
         }
@@ -305,7 +346,7 @@ mod tests {
             ..Default::default()
         }));
 
-        forward.update_from_config(&platforms, &interfaces);
+        forward.update_from_config(TridentType::TtHostPod, &platforms, &interfaces);
 
         // 平台数据查询
         assert_eq!(

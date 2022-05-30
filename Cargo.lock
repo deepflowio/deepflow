@@ -1315,6 +1315,7 @@ dependencies = [
  "http",
  "humantime-serde",
  "ipnet",
+ "ipnetwork",
  "k8s-openapi",
  "kube",
  "libc",

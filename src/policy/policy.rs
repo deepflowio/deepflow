@@ -16,6 +16,7 @@ use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection, PolicyData};
 use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
+use crate::proto::common::TridentType;
 
 pub struct Policy {
     labeler: Labeler,
@@ -126,13 +127,18 @@ impl Policy {
         }
     }
 
-    pub fn update_interfaces(&mut self, ifaces: &Vec<Arc<PlatformData>>) {
+    pub fn update_interfaces(
+        &mut self,
+        trident_type: TridentType,
+        ifaces: &Vec<Arc<PlatformData>>,
+    ) {
         self.labeler.update_interface_table(ifaces);
         self.table.update_interfaces(ifaces);
 
         // TODO: 后续需要添加监控本地网卡，如果网卡配置有变化应该也需要出发表更新
         let local_interfaces = datalink::interfaces();
-        self.forward.update_from_config(ifaces, &local_interfaces);
+        self.forward
+            .update_from_config(trident_type, ifaces, &local_interfaces);
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
@@ -231,12 +237,13 @@ impl From<*mut Policy> for PolicySetter {
 impl FlowAclListener for PolicySetter {
     fn flow_acl_change(
         &mut self,
+        trident_type: TridentType,
         ip_groups: &Vec<Arc<IpGroupData>>,
         platform_data: &Vec<Arc<PlatformData>>,
         peers: &Vec<Arc<PeerConnection>>,
         cidrs: &Vec<Arc<Cidr>>,
     ) {
-        self.update_interfaces(platform_data);
+        self.update_interfaces(trident_type, platform_data);
         self.update_ip_group(ip_groups);
         self.update_peer_connections(peers);
         self.update_cidr(cidrs);
@@ -259,8 +266,12 @@ impl PolicySetter {
         self.policy().table.update_map_size(map_size);
     }
 
-    pub fn update_interfaces(&mut self, ifaces: &Vec<Arc<PlatformData>>) {
-        self.policy().update_interfaces(ifaces);
+    pub fn update_interfaces(
+        &mut self,
+        trident_type: TridentType,
+        ifaces: &Vec<Arc<PlatformData>>,
+    ) {
+        self.policy().update_interfaces(trident_type, ifaces);
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
@@ -314,7 +325,7 @@ mod test {
             cidr_type: CidrType::Wan,
             ..Default::default()
         };
-        setter.update_interfaces(&vec![Arc::new(interface)]);
+        setter.update_interfaces(TridentType::TtHostPod, &vec![Arc::new(interface)]);
         setter.update_cidr(&vec![Arc::new(cidr)]);
         setter.flush();
 

@@ -220,4 +220,8 @@ pub fn is_tt_process(trident_type: TridentType) -> bool {
     trident_type == TridentType::TtProcess
 }
 
+pub fn is_tt_workload(trident_type: TridentType) -> bool {
+    trident_type == TridentType::TtPublicCloud || trident_type == TridentType::TtPhysicalMachine
+}
+
 //TODO Windows 相关

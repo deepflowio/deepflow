@@ -29,6 +29,8 @@ use std::{
     sync::Arc,
 };
 
+use crate::proto::common::TridentType;
+
 use policy::{Cidr, IpGroupData, PeerConnection};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -53,6 +55,7 @@ impl fmt::Display for XflowKey {
 pub trait FlowAclListener: Send + Sync {
     fn flow_acl_change(
         &mut self,
+        trident_type: TridentType,
         ip_groups: &Vec<Arc<IpGroupData>>,
         platform_data: &Vec<Arc<PlatformData>>,
         peers: &Vec<Arc<PeerConnection>>,
