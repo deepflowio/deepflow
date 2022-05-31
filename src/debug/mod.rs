@@ -21,6 +21,7 @@ pub const MAX_BUF_SIZE: usize = 9000;
 pub const QUEUE_LEN: usize = 1024;
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 pub const BEACON_INTERVAL: Duration = Duration::from_secs(60);
+pub const METAFLOW_AGENT_BEACON: &str = "metaflow-agent";
 
 #[derive(PartialEq, Eq, Debug, TryFromPrimitive, IntoPrimitive, Serialize, Deserialize)]
 #[repr(u8)]
