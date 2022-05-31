@@ -12,6 +12,8 @@ use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
 
+const TRACE_ID_MAX_LEN: usize = 51;
+
 #[derive(Debug, Default, Clone)]
 pub struct DubboInfo {
     // header
@@ -159,7 +161,12 @@ impl DubboLog {
                 }
             // logId匹配到'.'
             } else if let Some(end_index) = payload_str[offset..].find(".") {
-                self.info.trace_id = payload_str[offset..offset + end_index].to_string();
+                self.info.trace_id =
+                    payload_str[offset..offset + TRACE_ID_MAX_LEN.min(end_index)].to_string();
+            } else {
+                self.info.trace_id = payload_str
+                    [offset..payload_str.len().min(offset + TRACE_ID_MAX_LEN)]
+                    .to_string();
             }
         }
     }
