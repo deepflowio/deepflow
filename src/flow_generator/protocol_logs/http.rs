@@ -121,19 +121,24 @@ impl HttpLog {
         }
     }
 
-    fn parse_lines(payload: &[u8]) -> Vec<String> {
+    fn parse_lines(payload: &[u8]) -> Vec<&[u8]> {
         let mut lines = Vec::new();
-        let mut line = String::new();
-        for i in 0..payload.len() {
-            let ch = payload[i] as char;
-            if i > 2 && ch == '\n' && payload[i - 1] as char == '\r' {
-                lines.push(line.clone());
-                line.clear();
-            } else if ch != '\r' {
-                line.push(ch);
+        let mut p = payload;
+        loop {
+            let mut next_index = None;
+            for (i, c) in p.iter().enumerate() {
+                if i > 2 && *c == b'\n' && p[i - 1] == b'\r' {
+                    lines.push(&p[0..i - 1]);
+                    next_index = Some(i + 1);
+                    break;
+                }
+            }
+            match next_index {
+                None => return lines,
+                Some(i) if i >= p.len() => return lines,
+                Some(i) => p = &p[i..],
             }
         }
-        return lines;
     }
 
     fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
@@ -144,7 +149,7 @@ impl HttpLog {
 
         if direction == PacketDirection::ServerToClient {
             // HTTP响应行：HTTP/1.1 404 Not Found.
-            let (version, status_code) = get_http_resp_info(lines[0].as_str())?;
+            let (version, status_code) = get_http_resp_info(str::from_utf8(lines[0])?)?;
 
             self.info.version = version;
             self.status_code = status_code as u16;
@@ -154,7 +159,7 @@ impl HttpLog {
             self.set_status(status_code);
         } else {
             // HTTP请求行：GET /background.png HTTP/1.0
-            let contexts: Vec<&str> = lines[0].as_str().split(" ").collect();
+            let contexts: Vec<&str> = str::from_utf8(lines[0])?.split(" ").collect();
             if contexts.len() != 3 {
                 return Err(Error::HttpHeaderParseFailed);
             }
@@ -168,59 +173,55 @@ impl HttpLog {
 
         let mut content_length: Option<u64> = None;
         for body_line in &lines[1..] {
-            if body_line.starts_with("Content-Length:") {
-                content_length = Some(
-                    body_line[HTTP_CONTENT_LENGTH_OFFSET..]
-                        .parse::<u64>()
-                        .unwrap_or_default(),
-                );
+            let col_index = body_line.iter().position(|x| *x == b':');
+            if col_index.is_none() {
+                continue;
+            }
+            let col_index = col_index.unwrap();
+            if col_index + 1 >= body_line.len() {
+                continue;
+            }
+            let key = str::from_utf8(&body_line[..col_index])?.to_lowercase();
+            let value = str::from_utf8(&body_line[col_index + 1..])?.trim();
+            if &key == "content-length" {
+                content_length = Some(value.parse::<u64>().unwrap_or_default());
             } else if !self.l7_log_dynamic_config.trace_id_origin.is_empty()
-                && body_line.starts_with(&self.l7_log_dynamic_config.trace_id_with_colon)
+                && key == self.l7_log_dynamic_config.trace_id_lower
             {
-                if let Some(id) = Self::decode_id(
-                    &body_line[self.l7_log_dynamic_config.trace_id_with_colon.len()..],
-                    self.l7_log_dynamic_config.trace_type,
-                    Self::TRACE_ID,
-                ) {
+                if let Some(id) =
+                    Self::decode_id(value, self.l7_log_dynamic_config.trace_type, Self::TRACE_ID)
+                {
                     self.info.trace_id = id.clone();
                 }
                 // 存在配置相同字段的情况，如“sw8”
                 if self.l7_log_dynamic_config.trace_id_origin
                     == self.l7_log_dynamic_config.span_id_origin
                 {
-                    if let Some(id) = Self::decode_id(
-                        &body_line[self.l7_log_dynamic_config.span_id_with_colon.len()..],
-                        self.l7_log_dynamic_config.span_type,
-                        Self::SPAN_ID,
-                    ) {
+                    if let Some(id) =
+                        Self::decode_id(value, self.l7_log_dynamic_config.span_type, Self::SPAN_ID)
+                    {
                         self.info.span_id = id.clone();
                     }
                 }
             } else if !self.l7_log_dynamic_config.span_id_origin.is_empty()
-                && body_line.starts_with(&self.l7_log_dynamic_config.span_id_with_colon)
+                && key == self.l7_log_dynamic_config.span_id_lower
             {
-                if let Some(id) = Self::decode_id(
-                    &body_line[self.l7_log_dynamic_config.span_id_with_colon.len()..],
-                    self.l7_log_dynamic_config.span_type,
-                    Self::SPAN_ID,
-                ) {
+                if let Some(id) =
+                    Self::decode_id(value, self.l7_log_dynamic_config.span_type, Self::SPAN_ID)
+                {
                     self.info.span_id = id;
                 }
             } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
-                && body_line.starts_with(&self.l7_log_dynamic_config.x_request_id_with_colon)
+                && key == self.l7_log_dynamic_config.x_request_id_lower
             {
-                self.info.x_request_id = body_line
-                    [self.l7_log_dynamic_config.x_request_id_with_colon.len()..]
-                    .to_string();
+                self.info.x_request_id = value.to_owned();
             } else if direction == PacketDirection::ClientToServer {
-                if body_line.starts_with("Host:") {
-                    self.info.host = body_line[HTTP_HOST_OFFSET..].to_string();
+                if &key == "host" {
+                    self.info.host = value.to_owned();
                 } else if !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
-                    && body_line.starts_with(&self.l7_log_dynamic_config.proxy_client_with_colon)
+                    && key == self.l7_log_dynamic_config.proxy_client_lower
                 {
-                    self.info.client_ip = body_line
-                        [self.l7_log_dynamic_config.proxy_client_with_colon.len()..]
-                        .to_string();
+                    self.info.client_ip = value.to_owned();
                 }
             }
         }
@@ -481,7 +482,7 @@ impl HttpLog {
 
     fn decode_id(payload: &str, trace_type: TraceType, id_type: u8) -> Option<String> {
         match trace_type {
-            TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span => Some(payload.to_string()),
+            TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span => Some(payload.to_owned()),
             TraceType::Uber => Self::decode_uber_id(payload, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
         }
