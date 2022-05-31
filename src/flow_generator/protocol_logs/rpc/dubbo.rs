@@ -14,8 +14,6 @@ use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
 
-const TRACE_ID_MSG_LEN: usize = 50;
-
 #[derive(Debug, Default, Clone)]
 pub struct DubboInfo {
     // header
@@ -147,17 +145,19 @@ impl DubboLog {
             para_index += 1;
             n += 1;
         }
-        // Dubbo的其余的参数字段位于Dubbo-Attachment，没有通用确定的分隔符，无法做确切截取，现仅截取TRACE_ID_MSG_LEN(50)长度作为Dubbo的TraceId
-        if self.l7_log_dynamic_config.trace_id_origin.is_empty() {
+
+        if self.l7_log_dynamic_config.trace_id_origin.is_empty() || para_index >= payload.len() {
             return;
         }
-        if let Ok(payload_str) = str::from_utf8(&payload) {
-            if let Some(index) = payload_str.find(&self.l7_log_dynamic_config.trace_id_origin) {
-                let trace_id_prefix_len = self.l7_log_dynamic_config.trace_id_origin.len();
-                let trace_id_end_index = index + trace_id_prefix_len + TRACE_ID_MSG_LEN + 1;
-                if payload_str.len() >= trace_id_end_index {
-                    self.info.trace_id =
-                        payload_str[index + trace_id_prefix_len..trace_id_end_index].to_string();
+        let payload_str = String::from_utf8_lossy(&payload[para_index..]);
+        let mut offset = 0;
+        if let Some(index) = payload_str.find(&self.l7_log_dynamic_config.trace_id_origin) {
+            offset += index + self.l7_log_dynamic_config.trace_id_origin.len();
+            // 以'1-'开头'-'结尾的部分
+            if let Some(begin_index) = payload_str[offset..].find("1-") {
+                offset += begin_index + 2;
+                if let Some(end_index) = payload_str[offset..].find("-") {
+                    self.info.trace_id = payload_str[offset..offset + end_index].to_string();
                 }
             }
         }
