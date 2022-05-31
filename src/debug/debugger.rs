@@ -18,7 +18,8 @@ use super::{
     platform::{PlatformDebugger, PlatformMessage},
     queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
-    Beacon, Message, Module, TestMessage, BEACON_INTERVAL, MAX_BUF_SIZE, SESSION_TIMEOUT,
+    Beacon, Message, Module, TestMessage, BEACON_INTERVAL, MAX_BUF_SIZE, METAFLOW_AGENT_BEACON,
+    SESSION_TIMEOUT,
 };
 
 use crate::{
@@ -106,7 +107,15 @@ impl Debugger {
                     };
                     let serialized_beacon = bincode::serialize(&beacon)?;
                     for &ip in config.load().controller_ips.iter() {
-                        sock_clone.send_to(serialized_beacon.as_slice(), (ip, BEACON_PORT))?;
+                        sock_clone.send_to(
+                            [
+                                METAFLOW_AGENT_BEACON.as_bytes(),
+                                serialized_beacon.as_slice(),
+                            ]
+                            .concat()
+                            .as_slice(),
+                            (ip, BEACON_PORT),
+                        )?;
                     }
 
                     let (running, timer) = &*running_clone;
