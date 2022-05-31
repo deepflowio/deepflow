@@ -742,10 +742,16 @@ impl EbpfCollector {
         if let Some(handler) = self.thread_handle.take() {
             let _ = handler.join();
         }
-
         info!("ebpf collector stopped.");
     }
 }
+
+impl Drop for EbpfCollector {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
