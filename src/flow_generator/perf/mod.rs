@@ -73,7 +73,7 @@ pub enum L7FlowPerfTable {
 
 pub struct FlowPerf {
     l4: L4FlowPerfTable,
-    l7: L7FlowPerfTable,
+    l7: Option<L7FlowPerfTable>,
 
     pub is_http: bool,
 }
@@ -94,16 +94,16 @@ impl FlowPerf {
         };
         let mut is_http = false;
         let l7 = match l7_proto {
-            L7Protocol::Dns => L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone())),
-            L7Protocol::Dubbo => L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone())),
-            L7Protocol::Kafka => L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone())),
-            L7Protocol::Mysql => L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone())),
-            L7Protocol::Redis => L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone())),
+            L7Protocol::Dns => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Mysql => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
             L7Protocol::Http1 | L7Protocol::Http2 => {
                 is_http = true;
-                L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()))
+                Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
             }
-            _ => return None,
+            _ => None,
         };
 
         Some(Self { l4, l7, is_http })
@@ -116,9 +116,9 @@ impl FlowPerf {
         flow_id: u64,
     ) {
         debug!("change to http");
-        self.l7 = L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()));
+        self.l7 = Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())));
         self.is_http = true;
-        let _ = self.l7.parse(packet, flow_id);
+        let _ = self.l7.as_mut().unwrap().parse(packet, flow_id);
     }
 
     pub fn parse(
@@ -134,7 +134,9 @@ impl FlowPerf {
         }
         if l7_performance_enabled {
             // 抛出错误由flowMap.FlowPerfCounter处理
-            self.l7.parse(packet, flow_id)?;
+            if let Some(l7) = self.l7.as_mut() {
+                l7.parse(packet, flow_id)?;
+            }
         }
         Ok(())
     }
@@ -151,15 +153,18 @@ impl FlowPerf {
             stats.replace(self.l4.copy_and_reset_data(flow_reversed));
         }
 
-        if l7_performance_enabled && (self.l7.data_updated() || l7_timeout_count > 0) {
-            if let Some(stats) = stats.as_mut() {
-                let FlowPerfStats {
-                    l7, l7_protocol, ..
-                } = self.l7.copy_and_reset_data(l7_timeout_count);
-                stats.l7 = l7;
-                stats.l7_protocol = l7_protocol;
-            } else {
-                stats.replace(self.l7.copy_and_reset_data(l7_timeout_count));
+        if l7_performance_enabled && self.l7.is_some() {
+            let self_l7 = self.l7.as_mut().unwrap();
+            if self_l7.data_updated() || l7_timeout_count > 0 {
+                if let Some(stats) = stats.as_mut() {
+                    let FlowPerfStats {
+                        l7, l7_protocol, ..
+                    } = self_l7.copy_and_reset_data(l7_timeout_count);
+                    stats.l7 = l7;
+                    stats.l7_protocol = l7_protocol;
+                } else {
+                    stats.replace(self_l7.copy_and_reset_data(l7_timeout_count));
+                }
             }
         }
 
@@ -170,7 +175,11 @@ impl FlowPerf {
         if !l7_performance_enabled {
             return None;
         }
-        self.l7.app_proto_head()
+        if let Some(l7) = self.l7.as_mut() {
+            l7.app_proto_head()
+        } else {
+            None
+        }
     }
 }
 
