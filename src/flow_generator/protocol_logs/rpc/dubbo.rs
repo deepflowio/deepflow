@@ -100,15 +100,15 @@ impl DubboLog {
     // 尽力而为的去解析Dubbo请求中Body各参数
     fn get_req_body_info(&mut self, payload: &[u8]) {
         let mut n = BODY_PARAM_MIN;
-        let mut para_index = 1;
-        let mut para_tag = payload[0];
+        let mut para_index = 0;
         let payload_len = payload.len();
 
         while n < BODY_PARAM_MAX {
-            let para_len = match get_req_param_len(para_tag) {
-                Some(len) if payload_len >= para_index + len => len,
-                _ => return,
-            };
+            let (offset, para_len) = get_req_param_len(&payload[para_index..]);
+            para_index += offset;
+            if para_len == 0 || para_len + para_index > payload_len {
+                return;
+            }
 
             match n {
                 BODY_PARAM_DUBBO_VERSION => {
@@ -116,19 +116,16 @@ impl DubboLog {
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
                             .into_owned()
                 }
-
                 BODY_PARAM_SERVICE_NAME => {
                     self.info.service_name =
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
                             .into_owned();
                 }
-
                 BODY_PARAM_SERVICE_VERSION => {
                     self.info.service_version =
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
                             .into_owned();
                 }
-
                 BODY_PARAM_METHOD_NAME => {
                     self.info.method_name =
                         String::from_utf8_lossy(&payload[para_index..para_index + para_len])
@@ -141,8 +138,6 @@ impl DubboLog {
             if payload_len <= para_index {
                 return;
             }
-            para_tag = payload[para_index];
-            para_index += 1;
             n += 1;
         }
 
@@ -153,9 +148,9 @@ impl DubboLog {
         let mut offset = 0;
         if let Some(index) = payload_str.find(&self.l7_log_dynamic_config.trace_id_origin) {
             offset += index + self.l7_log_dynamic_config.trace_id_origin.len();
-            // sw8匹配 以'1-'开头'-'结尾的部分
-            if let Some(begin_index) = payload_str[offset..].find("1-") {
-                offset += begin_index + 2;
+            // sw8匹配 以' 1-'开头'-'结尾的部分
+            if let Some(begin_index) = payload_str[offset..].find(" 1-") {
+                offset += begin_index + 3;
                 if let Some(end_index) = payload_str[offset..].find("-") {
                     self.info.trace_id = payload_str[offset..offset + end_index].to_string();
                 }
@@ -285,14 +280,17 @@ impl DubboHeader {
 }
 
 // 参考开源代码解析：https://github.com/apache/dubbo-go-hessian2/blob/master/decode.go#L289
-pub fn get_req_param_len(tag: u8) -> Option<usize> {
-    if (tag == BC_STRING_CHUNK || tag == BC_STRING)
-        || (tag >= BC_STRING_DIRECT && tag <= STRING_DIRECT_MAX)
-        || (tag >= 0x30 && tag <= 0x33)
-    {
-        return Some(tag as usize);
+// 返回offset和数据length
+pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
+    let tag = payload[0];
+    match tag {
+        BC_STRING_DIRECT..=STRING_DIRECT_MAX => (1, tag as usize),
+        0x30..=0x33 if payload.len() > 2 => (2, ((tag as usize - 0x30) << 8) + payload[1] as usize),
+        BC_STRING_CHUNK | BC_STRING if payload.len() > 3 => {
+            (3, ((payload[1] as usize) << 8) + payload[2] as usize)
+        }
+        _ => (0, 0),
     }
-    None
 }
 
 #[cfg(test)]
