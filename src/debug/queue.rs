@@ -14,14 +14,15 @@ use serde::{Deserialize, Serialize};
 
 use super::{debugger::send_to, Message, Module, MAX_MESSAGE_SIZE};
 
-use crate::utils::queue::Receiver;
+use crate::utils::queue::{Error, Receiver};
 
-const QUEUE_RECV_TIMEOUT: Duration = Duration::from_micros(1);
+const QUEUE_RELEASE_TIMEOUT: Duration = Duration::from_micros(1);
+const QUEUE_RECV_TIMEOUT: Duration = Duration::from_secs(1);
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum QueueMessage {
     // None 表示请求， Some表示响应
-    Names(Option<Vec<String>>),
+    Names(Option<Vec<(String, bool)>>),
     // 请求queue name, 发送queue item
     Send(Vec<String>),
     On((String, Duration)),
@@ -32,9 +33,11 @@ pub enum QueueMessage {
     Err(String),
 }
 
+#[derive(Clone)]
 struct QueueContext {
     receiver: Arc<Receiver<String>>,
     enabled: Arc<AtomicBool>,
+    already_used: Arc<AtomicBool>,
 }
 
 pub struct QueueDebugger {
@@ -60,6 +63,7 @@ impl QueueDebugger {
         let ctx = QueueContext {
             receiver: Arc::new(queue),
             enabled,
+            already_used: Arc::new(AtomicBool::new(false)),
         };
         self.queues.lock().unwrap().insert(name, ctx);
     }
@@ -79,7 +83,7 @@ impl QueueDebugger {
                 if !ctx.receiver.terminated() {
                     ctx.enabled.store(false, Ordering::SeqCst);
                     // release queue item
-                    while let Ok(_) = ctx.receiver.recv(Some(QUEUE_RECV_TIMEOUT)) {}
+                    while let Ok(_) = ctx.receiver.recv(Some(QUEUE_RELEASE_TIMEOUT)) {}
                     true
                 } else {
                     threads.remove(*name);
@@ -98,8 +102,8 @@ impl QueueDebugger {
             .queues
             .lock()
             .unwrap()
-            .keys()
-            .map(|&c| String::from(c))
+            .iter()
+            .map(|(&c, ctx)| (String::from(c), ctx.enabled.load(Ordering::Relaxed)))
             .collect::<Vec<_>>();
         vec![
             Message {
@@ -116,29 +120,54 @@ impl QueueDebugger {
     pub(super) fn send(&self, name: impl Into<String>, conn: SocketAddr, dur: Duration) {
         let name = name.into();
         let sock = UdpSocket::bind(("::", 0)).unwrap();
-
-        let (receiver, running) = {
+        let ctx = {
             let guard = self.queues.lock().unwrap();
             if let Some(ctx) = guard.get(name.as_str()) {
-                (ctx.receiver.clone(), ctx.enabled.clone())
+                // queue已经被打印，返回错误
+                if ctx.already_used.load(Ordering::Relaxed) {
+                    let msg = Message {
+                        module: Module::Queue,
+                        msg: QueueMessage::Err(format!("queue {} already used", name)),
+                    };
+                    let _ = send_to(&sock, conn, &msg);
+                    return;
+                }
+
+                ctx.already_used.swap(true, Ordering::Relaxed);
+
+                ctx.clone()
             } else {
                 let msg = Message {
                     module: Module::Queue,
-                    msg: QueueMessage::Err(String::from("queue not exist")),
+                    msg: QueueMessage::Err(format!("queue {} not exist", name)),
                 };
                 let _ = send_to(&sock, conn, &msg);
                 return;
             }
         };
+        let queue_name = name.clone();
         let handle = thread::spawn(move || {
             let now = Instant::now();
             let mut cache = None;
             let mut cache_bytes = 0;
-            let mut queue_null = true;
-            while running.load(Ordering::SeqCst) && now.elapsed() < dur {
-                let s = match receiver.recv(Some(dur)) {
+            while ctx.enabled.load(Ordering::SeqCst) && now.elapsed() < dur {
+                let s = match ctx.receiver.recv(Some(QUEUE_RECV_TIMEOUT)) {
                     Ok(s) => s,
-                    Err(_) => continue,
+                    Err(Error::Terminated(..)) => {
+                        ctx.already_used.swap(false, Ordering::Relaxed);
+                        ctx.enabled.swap(false, Ordering::Relaxed);
+
+                        let msg = Message {
+                            module: Module::Queue,
+                            msg: QueueMessage::Err(format!(
+                                "queue {} already terminated",
+                                queue_name
+                            )),
+                        };
+                        let _ = send_to(&sock, conn, &msg);
+                        return;
+                    }
+                    Err(Error::Timeout) => continue,
                 };
 
                 if s.len() > MAX_MESSAGE_SIZE {
@@ -151,7 +180,7 @@ impl QueueDebugger {
                             msg: QueueMessage::Send(vec![s]),
                         };
 
-                        queue_null = send_to(&sock, conn, &msg).is_err();
+                        let _ = send_to(&sock, conn, &msg);
                     }
                 } else if cache_bytes + s.len() < MAX_MESSAGE_SIZE {
                     cache_bytes += s.len();
@@ -166,25 +195,17 @@ impl QueueDebugger {
                         msg: QueueMessage::Send(cache.take().unwrap()),
                     };
 
-                    queue_null = send_to(&sock, conn, &msg).is_err();
+                    let _ = send_to(&sock, conn, &msg);
                     cache_bytes = s.len();
                     cache.replace(vec![s]);
                 }
             }
-
-            if queue_null {
-                let msg = Message {
-                    module: Module::Queue,
-                    msg: QueueMessage::Err(String::from("queue is empty or terminated")),
-                };
-                let _ = send_to(&sock, conn, &msg);
-            } else {
-                let msg = Message {
-                    module: Module::Queue,
-                    msg: QueueMessage::Fin,
-                };
-                let _ = send_to(&sock, conn, &msg);
-            }
+            ctx.already_used.swap(false, Ordering::Relaxed);
+            let msg = Message {
+                module: Module::Queue,
+                msg: QueueMessage::Fin,
+            };
+            let _ = send_to(&sock, conn, &msg);
         });
         self.threads.lock().unwrap().insert(name, handle);
     }
@@ -192,23 +213,30 @@ impl QueueDebugger {
     fn change_running(&self, name: impl AsRef<str>, state: bool) -> Message<QueueMessage> {
         let name = name.as_ref();
 
-        {
-            let mut guard = self.queues.lock().unwrap();
-            if let Some((name, ctx)) = guard.remove_entry(name) {
+        let mut guard = self.queues.lock().unwrap();
+        match guard.remove_entry(name) {
+            Some((name, ctx)) => {
                 if !ctx.receiver.terminated() {
                     ctx.enabled.store(state, Ordering::SeqCst);
                     // release queue item
-                    while let Ok(_) = ctx.receiver.recv(Some(QUEUE_RECV_TIMEOUT)) {}
+                    while let Ok(_) = ctx.receiver.recv(Some(QUEUE_RELEASE_TIMEOUT)) {}
                     guard.insert(name, ctx);
+                    Message {
+                        module: Module::Queue,
+                        msg: QueueMessage::Fin,
+                    }
                 } else {
                     self.threads.lock().unwrap().remove(name);
+                    Message {
+                        module: Module::Queue,
+                        msg: QueueMessage::Err(format!("queue {} already terminated", name)),
+                    }
                 }
             }
-        }
-
-        Message {
-            module: Module::Queue,
-            msg: QueueMessage::Fin,
+            None => Message {
+                module: Module::Queue,
+                msg: QueueMessage::Err(format!("queue {} not exist", name)),
+            },
         }
     }
 }

@@ -11,7 +11,7 @@ use clap::{ArgEnum, Parser, Subcommand};
 
 use metaflow_agent::debug::{
     Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, MAX_BUF_SIZE,
-    SESSION_TIMEOUT,
+    METAFLOW_AGENT_BEACON, SESSION_TIMEOUT,
 };
 
 const LISTENED_IP: &str = "::";
@@ -27,43 +27,61 @@ struct Cmd {
     /// remote metaflow-agent listening port
     #[clap(short, long, parse(try_from_str))]
     port: Option<u16>,
-    /// remote metaflow-agent host ip, ipv6 format is 'fe80::5054:ff:fe95:c839', ipv4 format is '127.0.0.1'
+    /// remote metaflow-agent host ip
+    ///
+    /// ipv6 format is 'fe80::5054:ff:fe95:c839', ipv4 format is '127.0.0.1'
     #[clap(short, long, parse(try_from_str), default_value_t=IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
     address: IpAddr,
 }
 
 #[derive(Subcommand)]
 enum ControllerCmd {
+    /// get information about the rpc synchronizer
     Rpc(RpcCmd),
+    /// get information about the k8s platform
     Platform(PlatformCmd),
+    /// monitor various queues of the selected metaflow-agent
     Queue(QueueCmd),
+    /// get connection information of all metaflow-agents managed under this controller
     List,
 }
 #[derive(Parser)]
 struct QueueCmd {
-    /// monitor module, eg: metaflow-agent-ctl queue --on xxxx --duration 40
-    #[clap(long, validator = queue_name_validator, requires = "monitor")]
+    /// monitor module
+    ///
+    /// eg: monitor 1-tagged-flow-to-quadruple-generator queue with 60s
+    ///
+    /// metaflow-agent-ctl queue --on 1-tagged-flow-to-quadruple-generator --duration 60
+    #[clap(long, requires = "monitor")]
     on: Option<String>,
-    /// monitor duration unit is second
+    /// monitoring duration in seconds
     #[clap(long, group = "monitor")]
     duration: Option<u64>,
-    /// turn off monitor, eg: metaflow-agent-ctl queue --off xxx
-    #[clap(long, validator = queue_name_validator)]
+    /// turn off monitor
+    ///
+    /// eg: turn off 1-tagged-flow-to-quadruple-generator queue monitor
+    ///
+    /// metaflow-agent-ctl queue --off 1-tagged-flow-to-quadruple-generator queue
+    #[clap(long)]
     off: Option<String>,
-    /// show queue list, eg: metaflow-agent-ctl queue --show
+    /// show queue list
+    ///
+    /// eg: metaflow-agent-ctl queue --show
     #[clap(long)]
     show: bool,
-    /// turn off all queue, eg: metaflow-agent-ctl queue --clear
+    /// turn off all queue
+    ///
+    /// eg: metaflow-agent-ctl queue --clear
     #[clap(long)]
     clear: bool,
 }
 
 #[derive(Parser)]
 struct PlatformCmd {
-    /// Get resources with k8s api, eg: metaflow-agent-ctl platform --k8s_get node
+    /// get resources with k8s api, eg: metaflow-agent-ctl platform --k8s_get node
     #[clap(short, long, arg_enum)]
     k8s_get: Option<Resource>,
-    /// Show k8s container mac to global interface index mappings, eg: metaflow-agent-ctl platform --mac_mappings
+    /// show k8s container mac to global interface index mappings, eg: metaflow-agent-ctl platform --mac_mappings
     #[clap(short, long)]
     mac_mappings: bool,
 }
@@ -180,7 +198,7 @@ impl Controller {
 
     /*
     $ metaflow-agent-ctl list
-    metaflow-agent-ctl listening udp port 20035 to find trident
+    metaflow-agent-ctl listening udp port 20035 to find metaflow-agent
 
     -----------------------------------------------------------------------------------------------------
     VTAP ID        HOSTNAME                     IP                                            PORT
@@ -193,7 +211,7 @@ impl Controller {
         let mut vtap_map = HashSet::new();
 
         println!(
-            "trident-ctl listening udp port {} to find trident\n",
+            "metaflow-agent-ctl listening udp port {} to find metaflow-agent\n",
             LISTENED_PORT
         );
         println!("{:-<100}", "");
@@ -210,8 +228,18 @@ impl Controller {
                     if n == 0 {
                         continue;
                     }
-                    let beacon: Beacon = bincode::deserialize(&buf[..n])?;
 
+                    // 过滤trident的beacon包
+                    let length = METAFLOW_AGENT_BEACON.as_bytes().len();
+                    if buf
+                        .get(..length)
+                        .filter(|&s| s == METAFLOW_AGENT_BEACON.as_bytes())
+                        .is_none()
+                    {
+                        continue;
+                    }
+
+                    let beacon: Beacon = bincode::deserialize(&buf[length..n])?;
                     if !vtap_map.contains(&beacon.vtap_id) {
                         println!(
                             "{:<14} {:<28} {:<45} {}",
@@ -310,8 +338,13 @@ impl Controller {
                 match res {
                     QueueMessage::Names(e) => match e {
                         Some(e) => {
-                            for (i, s) in e.into_iter().enumerate() {
-                                println!("{}. {}", i, s);
+                            for (i, (s, e)) in e.into_iter().enumerate() {
+                                println!(
+                                    "{}. {}: {}",
+                                    i,
+                                    s,
+                                    if e { "enabled" } else { "disabled" }
+                                );
                             }
                         }
                         None => return Err(anyhow!("cannot get queue names")),
@@ -335,7 +368,10 @@ impl Controller {
             let mut buf = [0u8; MAX_BUF_SIZE];
             let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
             match res {
-                QueueMessage::Fin => return Ok(()),
+                QueueMessage::Fin => {
+                    println!("turn off all queues successful");
+                    return Ok(());
+                }
                 QueueMessage::Err(e) => return Err(anyhow!(e)),
                 _ => unreachable!(),
             }
@@ -344,14 +380,17 @@ impl Controller {
         if let Some(s) = c.off {
             let msg = Message {
                 module: Module::Queue,
-                msg: QueueMessage::Off(s),
+                msg: QueueMessage::Off(s.clone()),
             };
             client.send_to(&msg, (self.addr, self.port.unwrap()))?;
 
             let mut buf = [0u8; MAX_BUF_SIZE];
             let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
             match res {
-                QueueMessage::Fin => return Ok(()),
+                QueueMessage::Fin => {
+                    println!("turn off queue={} successful", s);
+                    return Ok(());
+                }
                 QueueMessage::Err(e) => return Err(anyhow!(e)),
                 _ => unreachable!(),
             }
@@ -375,6 +414,7 @@ impl Controller {
             if let QueueMessage::Err(e) = res {
                 return Err(anyhow!(e));
             }
+            println!("loading queue item...");
             // clear in case of dirty buffer
             buf.fill(0);
             let mut msg_seq = 0;
@@ -508,21 +548,6 @@ impl Controller {
             }
         }
         Ok(())
-    }
-}
-
-fn queue_name_validator(s: &str) -> Result<(), &'static str> {
-    match s {
-        "1-tagged-flow-to-quadruple-generator"
-        | "1-packet-statistics-to-doc"
-        | "1-mini-meta-packet-to-pcap"
-        | "2-flow-with-meter-to-second-collector"
-        | "2-flow-with-meter-to-minute-collector"
-        | "2-second-flow-to-minute-aggrer"
-        | "2-doc-to-collector-sender"
-        | "3-protolog-to-collector-sender"
-        | "3-flow-to-collector-sender" => Ok(()),
-        _ => Err("invalid queue name"),
     }
 }
 
