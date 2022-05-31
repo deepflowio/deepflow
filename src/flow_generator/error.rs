@@ -1,3 +1,5 @@
+use std::str::Utf8Error;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -36,3 +38,9 @@ pub enum Error {
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+impl From<Utf8Error> for Error {
+    fn from(_: Utf8Error) -> Self {
+        Self::HttpHeaderParseFailed
+    }
+}
