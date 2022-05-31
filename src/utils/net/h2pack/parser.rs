@@ -361,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn arse_http2_headers_block() {
+    fn parse_http2_headers_block() {
         let mut parser = Parser::new();
         let buffer1 = [
             0x82, 0x05, 0x97, 0x60, 0xb5, 0x2d, 0xc3, 0x73, 0x12, 0x9a, 0xc2, 0xca, 0x7f, 0x2c,
