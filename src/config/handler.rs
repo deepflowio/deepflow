@@ -297,6 +297,8 @@ pub struct SynchronizerConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EbpfConfig {
     // 动态配置
+    pub collector_enabled: bool,
+    pub l7_metrics_enabled: bool,
     pub vtap_id: u16,
     pub epc_id: u32,
     pub l7_log_packet_size: usize,
@@ -304,6 +306,18 @@ pub struct EbpfConfig {
     pub l7_log_session_timeout: Duration,
     pub log_path: String,
     pub l7_log_tap_types: [bool; 256],
+}
+
+impl EbpfConfig {
+    pub fn l7_log_enabled(&self) -> bool {
+        // Afpacket应用日志依赖l7_metrics_enabled和collector_enabled，这里统一逻辑
+        if !self.l7_metrics_enabled || !self.collector_enabled {
+            return false;
+        }
+        // Ebpf应用日志都是虚拟的，这里仅需要判断ANY和TOR
+        return self.l7_log_tap_types[u16::from(TapType::Any) as usize]
+            || self.l7_log_tap_types[u16::from(TapType::Tor) as usize];
+    }
 }
 
 // Span/Trace 共用一套TypeMap
@@ -525,6 +539,8 @@ impl Default for NewRuntimeConfig {
                 host,
             },
             ebpf: EbpfConfig {
+                collector_enabled: true,
+                l7_metrics_enabled: true,
                 vtap_id,
                 epc_id: 0,
                 l7_log_session_timeout: Duration::from_secs(120),
@@ -999,6 +1015,8 @@ impl ConfigHandler {
                 },
             },
             ebpf: EbpfConfig {
+                collector_enabled: conf.collector_enabled(),
+                l7_metrics_enabled: conf.l7_metrics_enabled(),
                 vtap_id: conf.vtap_id() as u16,
                 epc_id: conf.epc_id(),
                 l7_log_session_timeout: static_config.l7_log_session_aggr_timeout,

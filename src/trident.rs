@@ -701,6 +701,7 @@ impl Components {
         );
 
         let ebpf_collector = EbpfCollector::new(
+            synchronizer.ntp_diff(),
             &config_handler.candidate_config.ebpf,
             config_handler.log_parser(),
             policy_getter,

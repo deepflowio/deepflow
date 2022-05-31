@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::CString;
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -8,7 +9,6 @@ use log::{debug, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
-use crate::common::enums::TapType;
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
@@ -425,6 +425,8 @@ impl OwnedCountable for SyncEbpfCounter {
 }
 
 struct EbpfRunner {
+    time_diff: Arc<AtomicI64>,
+
     receiver: Receiver<MetaPacket<'static>>,
 
     // 策略查询
@@ -483,11 +485,8 @@ impl EbpfRunner {
         let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
 
         while unsafe { SWITCH } {
-            let packet = self.receiver.recv(Some(Duration::from_millis(1)));
-            if packet.is_err()
-                || (!self.config.l7_log_tap_types[u16::from(TapType::Any) as usize]
-                    && !self.config.l7_log_tap_types[u16::from(TapType::Tor) as usize])
-            {
+            let mut packet = self.receiver.recv(Some(Duration::from_millis(1)));
+            if packet.is_err() {
                 continue;
             }
 
@@ -498,7 +497,15 @@ impl EbpfRunner {
             }
 
             sync_counter.counter().rx += 1;
-            let packet = packet.as_ref().unwrap();
+
+            let packet = packet.as_mut().unwrap();
+            let time_diff = self.time_diff.load(Ordering::Relaxed);
+            if time_diff >= 0 {
+                packet.lookup_key.timestamp += Duration::from_nanos(time_diff as u64);
+            } else {
+                packet.lookup_key.timestamp -= Duration::from_nanos(-time_diff as u64);
+            }
+
             if packet.l7_protocol == L7Protocol::Unknown {
                 sync_counter.counter().unknown_protocol += 1;
                 // 未知协议不处理
@@ -642,18 +649,21 @@ impl EbpfCollector {
     }
 
     pub fn new(
+        time_diff: Arc<AtomicI64>,
         config: &EbpfConfig,
         log_parser_config: LogParserAccess,
         policy_getter: PolicyGetter,
         l7_log_rate: Arc<LeakyBucket>,
         output: DebugSender<SendItem>,
     ) -> Result<Box<Self>> {
+        info!("ebpf collector init...");
         let (sender, receiver, _) = bounded::<MetaPacket>(1024);
 
         Self::ebpf_init(config, sender)?;
-        info!("ebpf collector init.");
+        info!("ebpf collector initialized.");
         return Ok(Box::new(EbpfCollector {
             thread_runner: EbpfRunner {
+                time_diff,
                 receiver,
                 policy_getter,
                 config: config.clone(),
@@ -689,6 +699,12 @@ impl EbpfCollector {
     }
 
     pub fn on_config_change(&mut self, config: &EbpfConfig) {
+        if config.l7_log_enabled() {
+            self.start();
+        } else {
+            self.stop();
+        }
+
         self.thread_runner.on_config_change(config);
     }
 
@@ -720,13 +736,13 @@ impl EbpfCollector {
             }
             SWITCH = false;
         }
+        Self::ebpf_stop();
 
         info!("ebpf collector stopping thread.");
         if let Some(handler) = self.thread_handle.take() {
             let _ = handler.join();
         }
 
-        Self::ebpf_stop();
         info!("ebpf collector stopped.");
     }
 }
