@@ -294,7 +294,7 @@ pub struct SynchronizerConfig {
     pub output_vlan: u16,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct EbpfConfig {
     // 动态配置
     pub collector_enabled: bool,
@@ -306,6 +306,29 @@ pub struct EbpfConfig {
     pub l7_log_session_timeout: Duration,
     pub log_path: String,
     pub l7_log_tap_types: [bool; 256],
+}
+
+impl fmt::Debug for EbpfConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EbpfConfig")
+            .field("collector_enabled", &self.collector_enabled)
+            .field("l7_metrics_enabled", &self.l7_metrics_enabled)
+            .field("vtap_id", &self.vtap_id)
+            .field("epc_id", &self.epc_id)
+            .field("l7_log_packet_size", &self.l7_log_packet_size)
+            .field("l7_log_session_timeout", &self.l7_log_session_timeout)
+            .field("log_path", &self.log_path)
+            .field(
+                "l7_log_tap_types",
+                &self
+                    .l7_log_tap_types
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, b)| *b)
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
 }
 
 impl EbpfConfig {
@@ -1404,8 +1427,16 @@ impl ConfigHandler {
             {
                 info!(
                     "collector config l4_log_store_tap_types change from {:?} to {:?}, will restart dispatcher",
-                    candidate_config.collector.l4_log_store_tap_types,
+                    candidate_config.collector.l4_log_store_tap_types
+                                        .iter()
+                                        .enumerate()
+                                        .filter(|&(_, b)| *b)
+                                        .collect::<Vec<_>>(),
                     new_config.collector.l4_log_store_tap_types
+                                        .iter()
+                                        .enumerate()
+                                        .filter(|&(_, b)| *b)
+                                        .collect::<Vec<_>>()
                 );
                 restart_dispatcher = true;
             }
