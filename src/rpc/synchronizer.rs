@@ -654,17 +654,21 @@ impl Synchronizer {
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
-        if let Some(remote_local_config) = resp.local_config_file {
-            if !remote_local_config.revision().is_empty() {
-                if let Err(e) = Self::update_local_config(
-                    runtime_config.trident_type,
-                    local_config,
-                    remote_local_config,
-                ) {
-                    warn!("update local config file failed, {}", e);
-                    exception_handler.set(Exception::InvalidLocalConfigFile);
+        match resp.local_config_file {
+            Some(remote_local_config) => {
+                if !remote_local_config.revision().is_empty() {
+                    if let Err(e) = Self::update_local_config(
+                        runtime_config.trident_type,
+                        local_config,
+                        remote_local_config,
+                    ) {
+                        warn!("update local config file failed, {}", e);
+                        exception_handler.set(Exception::InvalidLocalConfigFile);
+                    }
                 }
             }
+            // 当控制器删除采集器的时候local_config_file为空，此时需要重传本地配置
+            None => local_config.only_revison.store(false, Ordering::Relaxed),
         }
 
         let (trident_state, cvar) = &**trident_state;
