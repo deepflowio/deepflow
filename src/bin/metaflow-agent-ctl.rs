@@ -45,6 +45,7 @@ enum ControllerCmd {
     /// get connection information of all metaflow-agents managed under this controller
     List,
 }
+
 #[derive(Parser)]
 struct QueueCmd {
     /// monitor module
@@ -149,7 +150,11 @@ impl fmt::Display for Resource {
 
 #[derive(Parser)]
 struct RpcCmd {
-    /// Get data from RPC, eg: metaflow-agent-ctl rpc --get config
+    /// Get data from RPC
+    ///
+    /// eg: get rpc config data
+    /// metaflow-agent-ctl rpc --get config
+    ///
     #[clap(long, arg_enum)]
     get: RpcData,
 }
@@ -340,7 +345,7 @@ impl Controller {
                         Some(e) => {
                             for (i, (s, e)) in e.into_iter().enumerate() {
                                 println!(
-                                    "{}. {}: {}",
+                                    "{:<5} {:<45} {}",
                                     i,
                                     s,
                                     if e { "enabled" } else { "disabled" }
