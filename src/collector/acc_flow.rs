@@ -57,24 +57,22 @@ impl AccumulatedFlow {
         // 未知应用的判断需要通过流结束原因和持续时间，所以同一个流的L7Protocol可能不同这里需要更新，原则如下：
         // 1. unknown协议可以被任何协议覆盖
         // 2. other可以被其他非unknown协议覆盖
-        if let Some((self_stats, flow_stats)) = self
-            .tagged_flow
-            .flow
-            .flow_perf_stats
-            .as_ref()
-            .zip(tagged_flow.flow.flow_perf_stats.as_ref())
-        {
-            if self_stats.l7_protocol == L7Protocol::Unknown
-                || (self_stats.l7_protocol == L7Protocol::Other
-                    && flow_stats.l7_protocol != L7Protocol::Unknown)
+        if let Some(other_stats) = tagged_flow.flow.flow_perf_stats.as_ref() {
+            if self.l7_protocol == L7Protocol::Unknown
+                || (self.l7_protocol == L7Protocol::Other
+                    && other_stats.l7_protocol != L7Protocol::Unknown)
             {
-                self.l7_protocol = flow_stats.l7_protocol;
+                self.l7_protocol = other_stats.l7_protocol;
                 if let Some((self_meter, other_meter)) = self.app_meter.as_mut().zip(app_meter) {
                     *self_meter = *other_meter;
+                } else if let Some(other_meter) = app_meter {
+                    self.app_meter = Some(*other_meter);
                 }
             } else {
                 if let Some((self_meter, other_meter)) = self.app_meter.as_mut().zip(app_meter) {
                     self_meter.sequential_merge(other_meter);
+                } else if let Some(other_meter) = app_meter {
+                    self.app_meter = Some(*other_meter);
                 }
             }
         }

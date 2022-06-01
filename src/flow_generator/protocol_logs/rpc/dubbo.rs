@@ -148,8 +148,8 @@ impl DubboLog {
         let mut offset = 0;
         if let Some(index) = payload_str.find(&self.l7_log_dynamic_config.trace_id_origin) {
             offset += index + self.l7_log_dynamic_config.trace_id_origin.len();
-            // sw8匹配 以' 1-'开头'-'结尾的部分
-            if let Some(begin_index) = payload_str[offset..].find(" 1-") {
+            // sw8匹配 以'=1-'开头'-'结尾的部分
+            if let Some(begin_index) = payload_str[offset..].find("=1-") {
                 offset += begin_index + 3;
                 if let Some(end_index) = payload_str[offset..].find("-") {
                     self.info.trace_id = payload_str[offset..offset + end_index].to_string();
