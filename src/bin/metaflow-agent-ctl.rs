@@ -427,10 +427,12 @@ impl Controller {
                 let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
                 match res {
                     QueueMessage::Send(e) => {
-                        for s in e {
-                            println!("MSG-{} {}", msg_seq, s);
-                            msg_seq += 1;
-                        }
+                        println!("MSG-{} {}", msg_seq, e);
+                        msg_seq += 1;
+                    }
+                    QueueMessage::Continue => {
+                        println!("message in preparation");
+                        continue;
                     }
                     QueueMessage::Fin => return Ok(()),
                     QueueMessage::Err(e) => return Err(anyhow!(e)),

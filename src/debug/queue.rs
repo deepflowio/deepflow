@@ -12,7 +12,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{debugger::send_to, Message, Module, MAX_MESSAGE_SIZE};
+use super::{debugger::send_to, Message, Module, MAX_MESSAGE_SIZE, SESSION_TIMEOUT};
 
 use crate::utils::queue::{Error, Receiver};
 
@@ -24,9 +24,10 @@ pub enum QueueMessage {
     // None 表示请求， Some表示响应
     Names(Option<Vec<(String, bool)>>),
     // 请求queue name, 发送queue item
-    Send(Vec<String>),
+    Send(String),
     On((String, Duration)),
     Off(String),
+    Continue,
     Clear,
     Fin,
     // 如果queue已经关闭，发送关闭消息
@@ -123,7 +124,7 @@ impl QueueDebugger {
         let ctx = {
             let guard = self.queues.lock().unwrap();
             if let Some(ctx) = guard.get(name.as_str()) {
-                // queue已经被打印，返回错误
+                // queue已经被占用接收数据，返回错误
                 if ctx.already_used.load(Ordering::Relaxed) {
                     let msg = Message {
                         module: Module::Queue,
@@ -148,8 +149,8 @@ impl QueueDebugger {
         let queue_name = name.clone();
         let handle = thread::spawn(move || {
             let now = Instant::now();
-            let mut cache = None;
-            let mut cache_bytes = 0;
+            let mut session_timeout = SESSION_TIMEOUT - Duration::from_secs(1);
+
             while ctx.enabled.load(Ordering::SeqCst) && now.elapsed() < dur {
                 let s = match ctx.receiver.recv(Some(QUEUE_RECV_TIMEOUT)) {
                     Ok(s) => s,
@@ -167,7 +168,18 @@ impl QueueDebugger {
                         let _ = send_to(&sock, conn, &msg);
                         return;
                     }
-                    Err(Error::Timeout) => continue,
+                    Err(Error::Timeout) => {
+                        // 一个UDP会话超时还没有数据，就发送消息让客户端继续等待
+                        if now.elapsed() > session_timeout {
+                            let msg = Message {
+                                module: Module::Queue,
+                                msg: QueueMessage::Continue,
+                            };
+                            let _ = send_to(&sock, conn, &msg);
+                            session_timeout += SESSION_TIMEOUT;
+                        }
+                        continue;
+                    }
                 };
 
                 if s.len() > MAX_MESSAGE_SIZE {
@@ -177,30 +189,20 @@ impl QueueDebugger {
                     if let Ok(s) = String::from_utf8(c) {
                         let msg = Message {
                             module: Module::Queue,
-                            msg: QueueMessage::Send(vec![s]),
+                            msg: QueueMessage::Send(s),
                         };
-
                         let _ = send_to(&sock, conn, &msg);
-                    }
-                } else if cache_bytes + s.len() < MAX_MESSAGE_SIZE {
-                    cache_bytes += s.len();
-                    if cache.is_none() {
-                        cache.replace(vec![s]);
-                    } else {
-                        cache.as_mut().unwrap().push(s);
                     }
                 } else {
                     let msg = Message {
                         module: Module::Queue,
-                        msg: QueueMessage::Send(cache.take().unwrap()),
+                        msg: QueueMessage::Send(s),
                     };
-
                     let _ = send_to(&sock, conn, &msg);
-                    cache_bytes = s.len();
-                    cache.replace(vec![s]);
                 }
             }
             ctx.already_used.swap(false, Ordering::Relaxed);
+
             let msg = Message {
                 module: Module::Queue,
                 msg: QueueMessage::Fin,
