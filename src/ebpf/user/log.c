@@ -78,9 +78,20 @@ void _ebpf_error(int how_to_die,
 	uint16_t len = 0;
 	uint16_t max = MSG_SZ;
 	va_list va;
+	time_t timep;
+	struct tm *p;
+	time(&timep);
+	p = localtime(&timep);
+
+	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d ",
+			(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
+			p->tm_hour, p->tm_min, p->tm_sec);
 
 	if (function_name) {
-		len += snprintf(msg + len, max - len, "%s:", function_name);
+		if (how_to_die & ERROR_WARNING)
+			len += snprintf(msg + len, max - len, "WARNING: %s:", function_name);
+		else
+			len += snprintf(msg + len, max - len, "ERROR: %s:", function_name);
 		if (line_number > 0)
 			len +=
 			    snprintf(msg + len, max - len, "%u:",

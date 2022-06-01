@@ -362,6 +362,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	void *socket_data_buff = malloc(alloc_len);
 	if (socket_data_buff == NULL) {
+		ebpf_warning("malloc() error.\n");
 		atomic64_inc(&q->heap_get_faild);
 		return;
 	}
@@ -563,9 +564,11 @@ static int check_kern_adapt_and_state_update(void)
 		return -1;
 
 	if (is_adapt_success(t)) {
-		if (tracer_hooks_detach(t) == 0)
-			t->state = TRACER_STOP;
 		ebpf_info("Linux %d.%d adapt success.\n", major, minor);
+		if (tracer_hooks_detach(t) == 0) {
+			t->state = TRACER_STOP;
+			ebpf_info("Set current state: TRACER_STOP.\n");
+		}
 		set_period_event_invalid("check-kern-adapt");
 		t->adapt_success = true;
 	}
@@ -586,8 +589,8 @@ int running_socket_tracer(l7_handle_fn handle,
 	char *bpf_file_name = TRACER_ELF_NAME;
 
 	if (check_kernel_version(4, 14) != 0) {
-		ebpf_info("Linux %d.%d, not support, require Linux 4.14+\n",
-			  major, minor);
+		ebpf_warning("Currnet linux %d.%d, not support, require Linux 4.14+\n",
+			     major, minor);
 
 		return -EINVAL;
 	}
@@ -606,6 +609,10 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	struct trace_probes_conf *tps =
 	    malloc(sizeof(struct trace_probes_conf));
+	if (tps == NULL) {
+		ebpf_warning("malloc() error.\n");
+		return -ENOMEM;
+	}
 	memset(tps, 0, sizeof(*tps));
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
@@ -710,8 +717,10 @@ static int socket_tracer_stop(void)
 		return -1;
 	}
 
-	if ((ret = tracer_hooks_detach(t)) == 0)
+	if ((ret = tracer_hooks_detach(t)) == 0) {
 		t->state = TRACER_STOP;
+		ebpf_info("Tracer stop success, current state: TRACER_STOP\n");
+	}
 
 	//清空 ebpf map
 	reclaim_socket_map(t, 0);
@@ -732,8 +741,10 @@ static int socket_tracer_start(void)
 		return -1;
 	}
 
-	if ((ret = tracer_hooks_attach(t)) == 0)
+	if ((ret = tracer_hooks_attach(t)) == 0) {
 		t->state = TRACER_RUNNING;
+		ebpf_info("Tracer start success, current state: TRACER_RUNNING\n");
+	}
 
 	return ret;
 }
@@ -768,8 +779,10 @@ static bool is_adapt_success(struct bpf_tracer *t)
 		struct bpf_offset_param *offset;
 		struct bpf_offset_param_array *array =
 		    malloc(sizeof(*array) + sizeof(*offset) * sys_cpus_count);
-		if (array == NULL)
+		if (array == NULL) {
+			ebpf_warning("malloc() error.\n");
 			return false;
+		}
 
 		array->count = sys_cpus_count;
 
