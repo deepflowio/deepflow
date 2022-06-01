@@ -136,6 +136,11 @@ impl RpcDebugger {
                     warn!("parse rpc basic config: {}", e);
                 }
             }
+        } else {
+            res.push(Message {
+                module: Module::Rpc,
+                msg: RpcMessage::Config(Some(c)),
+            });
         }
         res.push(Message {
             module: Module::Rpc,

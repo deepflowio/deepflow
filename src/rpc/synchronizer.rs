@@ -655,7 +655,7 @@ impl Synchronizer {
         // TODO: segments
         // TODO: modify platform
         if let Some(remote_local_config) = resp.local_config_file {
-            if remote_local_config.revision.is_some() {
+            if !remote_local_config.revision().is_empty() {
                 if let Err(e) = Self::update_local_config(
                     runtime_config.trident_type,
                     local_config,
