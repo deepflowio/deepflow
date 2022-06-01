@@ -98,13 +98,17 @@ struct bpf_tracer *create_bpf_tracer(const char *name,
 				     void *handle, unsigned int perf_pages_cnt)
 {
 	if (find_bpf_tracer(name) != NULL) {
-		ebpf_info("%s Tracer '%s', already existed.", __func__, name);
+		ebpf_warning("Tracer '%s', already existed.", name);
 		return NULL;
 	}
 
 	struct bpf_tracer *bt = malloc(sizeof(struct bpf_tracer));
-	memset(bt, 0, sizeof(*bt));
+	if (bt == NULL) {
+		ebpf_warning("Tracer '%s' faild, no memory!", name);
+		return NULL;
+	}
 
+	memset(bt, 0, sizeof(*bt));
 	atomic64_init(&bt->lost);
 
 	int i;
@@ -488,6 +492,7 @@ static void poller(void *t)
 		struct socket_bpf_data *prep_data =
 		    malloc(sizeof(struct socket_bpf_data) + data_len);
 		if (prep_data == NULL) {
+			ebpf_waring("malloc() failed, no memory.\n");
 			atomic64_inc(&q->heap_get_faild);
 			return;
 		}
@@ -524,8 +529,10 @@ static void extra_waiting_process(int type)
 int register_extra_waiting_op(const char *name, extra_waiting_fun_t f, int type)
 {
 	struct extra_waiting_op *ewo = malloc(sizeof(struct extra_waiting_op));
-	if (!ewo)
+	if (!ewo) {
+		ebpf_warning("malloc() failed, no memory.\n");	
 		return -ENOMEM;
+	}
 	ewo->f = f;
 	ewo->type = type;
 	snprintf(ewo->name, sizeof(ewo->name), "%s", name);
@@ -586,8 +593,10 @@ static struct period_event_op *find_period_event(const char *name)
 int register_period_event_op(const char *name, period_event_fun_t f)
 {
 	struct period_event_op *peo = malloc(sizeof(struct period_event_op));
-	if (!peo)
+	if (!peo) {
+		ebpf_warning("malloc() failed, no memory.\n");
 		return -ENOMEM;
+	}
 	peo->f = f;
 	peo->is_valid = true;
 	snprintf(peo->name, sizeof(peo->name), "%s", name);

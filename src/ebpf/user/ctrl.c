@@ -204,7 +204,7 @@ static inline int sockopt_msg_recv(int clt_fd, struct tracer_sock_msg **pmsg)
 
 	*pmsg = malloc(sizeof(struct tracer_sock_msg) + msg_hdr.len);
 	if (unlikely(NULL == *pmsg)) {
-		ebpf_info("[%s] no memory\n", __func__);
+		ebpf_warning("malloc() faild, no memory\n");
 		return ETR_NOMEM;
 	}
 
