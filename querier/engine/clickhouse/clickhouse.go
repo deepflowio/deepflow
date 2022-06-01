@@ -301,6 +301,14 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	//var args []string
 	switch expr := item.Expr.(type) {
 	// 普通字符串
+	case *sqlparser.ParenExpr:
+		binFunction, err := e.parseSelectBinaryExpr(expr)
+		if err != nil {
+			return err
+		}
+		binFunction.SetAlias(as)
+		e.Statements = append(e.Statements, binFunction)
+		return nil
 	case *sqlparser.ColName:
 		err := e.AddTag(sqlparser.String(expr), as)
 		if err != nil {
