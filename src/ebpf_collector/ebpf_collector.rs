@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
@@ -634,9 +634,17 @@ impl EbpfCollector {
     fn ebpf_start() {
         debug!("ebpf collector starting ebpf-kernel.");
         unsafe {
-            while ebpf::tracer_start() != 0 {
-                debug!("tracer_start() error, sleep 1s retry.");
+            const RETRY_MAX: i32 = 20;
+            let mut retry_count = 0;
+            while ebpf::tracer_start() != 0 && retry_count < RETRY_MAX {
                 std::thread::sleep(Duration::from_secs(1));
+                retry_count = retry_count + 1;
+                if retry_count >= RETRY_MAX {
+                    error!(
+                        "The tracer_start() error. Kernel offset adapt failed. \
+                         Check for 'bpf.elf' has been updated at \"/usr/share/metaflow-agent\".\n"
+                    );
+                }
             }
         }
     }
