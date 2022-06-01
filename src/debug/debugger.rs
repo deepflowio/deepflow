@@ -283,6 +283,7 @@ impl Debugger {
                     RpcMessage::Segments(_) => debugger.local_segments(),
                     RpcMessage::TapTypes(_) => debugger.tap_types(),
                     RpcMessage::Version(_) => debugger.current_version(),
+                    RpcMessage::PlatformData(_) => debugger.platform_data(),
                     _ => unreachable!(),
                 };
 
