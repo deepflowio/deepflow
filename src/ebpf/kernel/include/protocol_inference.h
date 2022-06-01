@@ -237,59 +237,63 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
-#define  kComQuery 0x03
-#define  kComConnect 0x0b
-#define  kComStmtPrepare 0x16
-#define  kComStmtExecute 0x17
-#define  kComStmtClose   0x19
+	static const __u8 kComQuery = 0x03;
+	static const __u8 kComConnect = 0x0b;
+	static const __u8 kComStmtPrepare = 0x16;
+	static const __u8 kComStmtExecute = 0x17;
+	static const __u8 kComStmtClose = 0x19;
 
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MYSQL)
 			return MSG_UNKNOWN;
 	}
 
-	if (conn_info->sk != NULL) {
-		__u32 len;
-		__u8 seq, com;
+	if (!conn_info->sk)
+		return MSG_UNKNOWN;
 
-		len = *((__u32 *) buf) & 0x00ffffff;
-		seq = buf[3];
-		com = buf[4];
+	__u32 len;
+	__u8 seq, com;
 
-		if (conn_info->prev_count == 4) {
-			len = *(__u32 *) conn_info->prev_buf & 0x00ffffff;
-			if (len == count) {
-				seq = conn_info->prev_buf[3];
-				count += 4;
-				com = buf[0];
-			}
-		}
+	len = *((__u32 *) buf) & 0x00ffffff;
+	seq = buf[3];
+	com = buf[4];
 
-		if (count < 5 || len == 0)
-			return MSG_UNKNOWN;
-
-		if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-			if (seq == 0)
-				return MSG_REQUEST;
-			else if (seq == 1)
-				return MSG_RESPONSE;
-			else
-				return MSG_UNKNOWN;
-		}
-
-		if (seq == 0) {
-			// 请求长度判断来提高推断准确率。
-			if (len > 10000) {
-				return MSG_UNKNOWN;
-			}
-
-			if (com == kComConnect || com == kComQuery
-			    || com == kComStmtPrepare || com == kComStmtExecute
-			    || com == kComStmtClose) {
-				return MSG_REQUEST;
-			}
+	if (conn_info->prev_count == 4) {
+		len = *(__u32 *) conn_info->prev_buf & 0x00ffffff;
+		if (len == count) {
+			seq = conn_info->prev_buf[3];
+			count += 4;
+			com = buf[0];
 		}
 	}
+
+	if (count < 5 || len == 0)
+		return MSG_UNKNOWN;
+
+	if (is_socket_info_valid(conn_info->socket_info_ptr)){
+		if (seq == 0 || seq == 1)
+			goto out;
+		return MSG_UNKNOWN;
+	}
+
+	if (seq != 0)
+		return MSG_UNKNOWN;
+
+	// 请求长度判断来提高推断准确率。
+	if (len > 10000) {
+		return MSG_UNKNOWN;
+	}
+		
+	if (com != kComConnect && com != kComQuery && com != kComStmtPrepare &&
+	    com != kComStmtExecute && com != kComStmtClose) {
+		return MSG_UNKNOWN;
+	}
+
+out:
+	if (is_current_comm("mysqld")) 
+		return conn_info->direction == T_INGRESS ? MSG_REQUEST : MSG_RESPONSE;
+	else 
+		return conn_info->direction == T_INGRESS ? MSG_RESPONSE : MSG_REQUEST;
 
 	return MSG_UNKNOWN;
 
