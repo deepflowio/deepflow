@@ -57,11 +57,6 @@ message TsdbReportInfo {
     optional string pcap_data_mount_path = 4;
 }
 
-message LocalConfigFile {
-    optional string local_config = 1;	// 全量的配置文件内容
-    optional string revision = 2;	// 配置文件MD5值
-}
-
 message SyncRequest {
     optional uint32 boot_time = 1;
     optional bool config_accepted = 2 [default = true];
@@ -93,8 +88,6 @@ message SyncRequest {
     optional TsdbReportInfo tsdb_report_info = 43; // 仅对数据节点有意义
 
     optional string kubernetes_cluster_id = 45; // 仅对容器类型的采集器有意义
-
-    optional LocalConfigFile local_config_file = 46;
 }
 
 enum Status {
@@ -161,17 +154,17 @@ enum DecapType {
 
 message Config {
     optional bool    enabled              = 1 [default = true];
-    optional uint32  max_cpus             = 2 [default = 2];
+    optional uint32  max_cpus             = 2 [default = 1];
     optional uint32  max_memory           = 3 [default = 768]; // in MiB
     optional uint32  sync_interval        = 4 [default = 60];
     optional uint32  stats_interval       = 5 [default = 60];
-    optional uint64  global_pps_threshold = 6 [default = 100000];
-    optional string  tap_interface_regex  = 8;
+    optional uint64  global_pps_threshold = 6 [default = 200000];
+    optional string  tap_interface_regex  = 8 [default = "^tap.*"];
     optional string  host                 = 9;  // override statsd host tag
-    optional bool    rsyslog_enabled      = 10 [default = false];
+    optional bool    rsyslog_enabled      = 10 [default = true];
     optional uint32  output_vlan          = 11 [default = 0];
     optional uint32  mtu                  = 12 [default = 1500];
-    optional uint64  npb_bps_threshold    = 13;
+    optional uint64  npb_bps_threshold    = 13 [default = 1000000000];
     optional bool    collector_enabled    = 14 [default = false];
     optional bool    packet_header_enabled = 15 [default = true];
     optional bool    platform_enabled     = 16 [default = false];
@@ -188,7 +181,7 @@ message Config {
     optional bool    debug_enabled        = 28 [default = true];
 
     optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
-    optional uint32  max_escape_seconds   = 32;
+    optional uint32  max_escape_seconds   = 32 [default = 3600];
 
     optional string  proxy_controller_ip  = 34; // 控制器代理IP
     optional uint32  region_id            = 35 [default = 0]; // 采集器所在区域ID或数据节点所在区域ID
@@ -196,9 +189,9 @@ message Config {
     optional uint32  epc_id               = 37 [default = 0]; // 采集器所在epc_id, 仅对Workload-V/P, 容器-V/P类型有意义
 
     optional uint32 vtap_id               = 40;  // 限制在64000
-    optional common.TridentType trident_type = 41;
+    optional common.TridentType trident_type = 41 [default = TT_UNKNOWN];
 
-    optional SocketType collector_socket_type = 45 [default = UDP];
+    optional SocketType collector_socket_type = 45 [default = TCP];
     optional SocketType compressor_socket_type = 46 [default = RAW_UDP];
     optional SocketType npb_socket_type   = 47 [default = RAW_UDP];
 
@@ -240,6 +233,7 @@ message Config {
     optional uint32 sys_free_memory_limit = 501 [default = 0];
     optional uint32 log_file_size  = 502 [default = 1000];
 
+    optional string local_config = 510;	// 全量的配置文件内容
 }
 
 message Segment { // e.g. single LAN area
@@ -425,7 +419,6 @@ message VtapIp {
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
-    optional LocalConfigFile local_config_file = 3;
     optional string revision = 4; // 指定升级的目标revision
     optional string self_update_url = 5; // 指定升级的URL路径
 
@@ -515,13 +508,13 @@ message GenesisSyncRequest {
 
     optional common.TridentType trident_type = 2;
 
-    optional GenesisPlatformData platform_data = 9;
-
     optional string source_ip = 3;
     optional uint32 vtap_id = 4;
     optional string kubernetes_cluster_id = 5; // 仅对容器类型的采集器有意义
 
     optional string nat_ip = 6;
+
+    optional GenesisPlatformData platform_data = 9;
 }
 
 message GenesisSyncResponse {
