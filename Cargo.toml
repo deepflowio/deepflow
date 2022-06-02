@@ -28,6 +28,7 @@ hostname = "0.3.1"
 hpack = "0.3.0"
 http = "0.2.5"
 humantime-serde = "1.0"
+hyper = { version = "0.14", features = ["full"] }
 ipnet = "2.4.0"
 k8s-openapi = { version = "^0.13", features = ["v1_19"] }
 kube = { version = "0.64", features = ["derive", "runtime"] }

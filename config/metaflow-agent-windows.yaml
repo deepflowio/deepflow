@@ -103,3 +103,5 @@ controller-ips:
 ## tap2d283dfe,11:22:33:44:55:66
 ## tap2d283223,aa:bb:cc:dd:ee:ff
 #tap-mac-script: ""
+## 接收外部数据的HTTP PROXY发送到sender的队列大小
+#external-metrics-sender-queue-size
