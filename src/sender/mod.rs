@@ -80,3 +80,16 @@ pub enum SendMessageType {
     TaggedFlow = 4,
     ProtocolLog = 5,
 }
+
+impl fmt::Display for SendMessageType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Compress => write!(f, "compress"),
+            Self::Syslog => write!(f, "syslog"),
+            Self::Statsd => write!(f, "statsd"),
+            Self::Metrics => write!(f, "metrics"),
+            Self::TaggedFlow => write!(f, "l4_log"),
+            Self::ProtocolLog => write!(f, "l7_log"),
+        }
+    }
+}
