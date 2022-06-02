@@ -45,7 +45,7 @@ func (d *DomainInterfaceProto) addInterfaceProto(vif *models.VInterface, ifpd *I
 		vifDomain = vif.SubDomain
 	}
 
-	if vif.DeviceType != VIF_DEVICE_TYPE_POD || vif.DeviceType != VIF_DEVICE_TYPE_POD_SERVICE {
+	if vif.DeviceType != VIF_DEVICE_TYPE_POD && vif.DeviceType != VIF_DEVICE_TYPE_POD_SERVICE {
 		if _, ok := d.domainToInterfacesExceptPod[vif.Domain]; ok {
 			d.domainToInterfacesExceptPod[vif.Domain] = append(
 				d.domainToInterfacesExceptPod[vif.Domain], ifpd.sInterface)

@@ -396,10 +396,10 @@ func (n *NodeInfo) isRegisterController() {
 }
 
 func (n *NodeInfo) generateGroups() {
-	servces := n.metaData.GetServiceDataOP().GetServiceData()
+	services := n.metaData.GetServiceDataOP().GetServiceData()
 	groups := &trident.Groups{
 		Groups: nil,
-		Svcs:   servces,
+		Svcs:   services,
 	}
 	groupBytes, err := groups.Marshal()
 	if err == nil {

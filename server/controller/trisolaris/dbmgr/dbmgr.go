@@ -15,7 +15,7 @@ type _DBMgr[M any] struct {
 // AnalyzerMgr open func
 func DBMgr[M any](db *gorm.DB) *_DBMgr[M] {
 	if db == nil {
-		fmt.Errorf("DBMgr need init by db")
+		fmt.Println("DBMgr need init by db")
 		return nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -30,7 +30,7 @@ func (obj *_DBMgr[M]) Gets() (results []*M, err error) {
 }
 
 // GetBatchFromType 批量查找type类型数据
-func (obj *_DBMgr[M]) GetBatchFromType(types []int) (results []*M, err error) {
+func (obj *_DBMgr[M]) GetBatchFromTypes(types []int) (results []*M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`type` IN (?)", types).Find(&results).Error
 
 	return

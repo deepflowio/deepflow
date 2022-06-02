@@ -2,6 +2,7 @@ package vtap
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -129,11 +130,10 @@ type VTapCache struct {
 	os                 *string
 	kernelVersion      *string
 	licenseType        int
-	licenseFunctions   *string
+	licenseFunctions   []int
 	lcuuid             *string
 	//以上db Data
 
-	models.VTap
 	cachedAt        time.Time
 	upgradeRevision *string
 	region          *string
@@ -168,7 +168,7 @@ type VTapCache struct {
 
 func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache := &VTapCache{}
-	vTapCache.ID = vtap.ID
+	vTapCache.id = vtap.ID
 	vTapCache.name = proto.String(vtap.Name)
 	vTapCache.state = vtap.State
 	vTapCache.enable = vtap.Enable
@@ -198,10 +198,20 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.os = proto.String(vtap.Os)
 	vTapCache.kernelVersion = proto.String(vtap.KernelVersion)
 	vTapCache.licenseType = vtap.LicenseType
-	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
+	licenseFunctions := []int{}
+	if vtap.LicenseFunctions != "" {
+		for _, function := range strings.Split(vtap.LicenseFunctions, ",") {
+			intFunction, err := strconv.Atoi(function)
+			if err != nil {
+				log.Error(err, vtap.LicenseFunctions)
+				continue
+			}
+			licenseFunctions = append(licenseFunctions, intFunction)
+		}
+	}
+	vTapCache.licenseFunctions = licenseFunctions
 
-	vTapCache.VTap = *vtap
 	vTapCache.cachedAt = time.Now()
 	vTapCache.config = &atomic.Value{}
 	vTapCache.podDomains = []string{}
@@ -249,7 +259,7 @@ func (c *VTapCache) GetSimplePlatformDataStr() []byte {
 }
 
 func (c *VTapCache) GetVTapID() uint32 {
-	return uint32(c.ID)
+	return uint32(c.id)
 }
 
 func (c *VTapCache) GetVTapType() int {
@@ -867,7 +877,7 @@ func NewVTapIDCacheMap() *VTapIDCacheMap {
 func (m *VTapIDCacheMap) Add(vTapCache *VTapCache) {
 	m.Lock()
 	defer m.Unlock()
-	m.keyToVTapCache[vTapCache.ID] = vTapCache
+	m.keyToVTapCache[vTapCache.id] = vTapCache
 }
 
 func (m *VTapIDCacheMap) Delete(key int) {

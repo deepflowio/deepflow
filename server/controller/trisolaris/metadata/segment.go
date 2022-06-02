@@ -145,21 +145,24 @@ type Segment struct {
 
 	vmIDToPodNodeAllVifs IDToVifs
 	podNodeIDToAllVifs   IDToVifs
+
+	vRouterLaunchServerToSegments ServerToNetworkMacs
 }
 
 func newSegment() *Segment {
 	return &Segment{
-		launchServerToSegments:    newServerToNetworkMacs(),
-		hostIDToSegments:          newIDToNetworkMacs(),
-		gatewayHostIDToSegments:   newIDToNetworkMacs(),
-		allGatewayHostSegments:    []*trident.Segment{},
-		vtapUsedVInterfaceIDs:     mapset.NewSet(),
-		notVtapUsedSegments:       []*trident.Segment{},
-		vmIDToSegments:            newIDToNetworkMacs(),
-		bmDedicatedRemoteSegments: []*trident.Segment{},
-		podNodeIDToSegments:       newIDToNetworkMacs(),
-		vmIDToPodNodeAllVifs:      newIDToVifs(),
-		podNodeIDToAllVifs:        newIDToVifs(),
+		launchServerToSegments:        newServerToNetworkMacs(),
+		hostIDToSegments:              newIDToNetworkMacs(),
+		gatewayHostIDToSegments:       newIDToNetworkMacs(),
+		allGatewayHostSegments:        []*trident.Segment{},
+		vtapUsedVInterfaceIDs:         mapset.NewSet(),
+		notVtapUsedSegments:           []*trident.Segment{},
+		vmIDToSegments:                newIDToNetworkMacs(),
+		bmDedicatedRemoteSegments:     []*trident.Segment{},
+		podNodeIDToSegments:           newIDToNetworkMacs(),
+		vmIDToPodNodeAllVifs:          newIDToVifs(),
+		podNodeIDToAllVifs:            newIDToVifs(),
+		vRouterLaunchServerToSegments: newServerToNetworkMacs(),
 	}
 }
 
@@ -214,6 +217,7 @@ func (s *Segment) generateBaseSegmentsFromDB(rawData *PlatformRawData) {
 	gatewayHostIDToSegments := newIDToNetworkMacs()
 	vmIDToSegments := newIDToNetworkMacs()
 	podNodeIDToSegments := newIDToNetworkMacs()
+	vRouterLaunchServerToSegments := newServerToNetworkMacs()
 
 	for server, vmids := range rawData.serverToVmIDs {
 		netWorkMacs := newNetworkMacs()
@@ -271,11 +275,24 @@ func (s *Segment) generateBaseSegmentsFromDB(rawData *PlatformRawData) {
 		podNodeIDToSegments[podNodeID] = netWorkMacs
 	}
 
+	for server, VRouterIDs := range rawData.launchServerToVRouterIDs {
+		netWorkMacs := newNetworkMacs()
+		for _, VRouterID := range VRouterIDs {
+			if VRouterVifs, ok := rawData.vRouterIDToVifs[VRouterID]; ok {
+				for vRouterVif := range VRouterVifs.Iter() {
+					netWorkMacs.add(vRouterVif)
+				}
+			}
+		}
+		vRouterLaunchServerToSegments[server] = netWorkMacs
+	}
+
 	s.launchServerToSegments = launchServerToSegments
 	s.hostIDToSegments = hostIDToSegments
 	s.gatewayHostIDToSegments = gatewayHostIDToSegments
 	s.vmIDToSegments = vmIDToSegments
 	s.podNodeIDToSegments = podNodeIDToSegments
+	s.vRouterLaunchServerToSegments = vRouterLaunchServerToSegments
 }
 
 func (s *Segment) generateGatewayHostSegments() {
@@ -324,7 +341,10 @@ func (s *Segment) GenerateNoVTapUsedSegments(rawData *PlatformRawData) {
 }
 
 func (s *Segment) GetLaunchServerSegments(launchServer string) []*trident.Segment {
-	return s.launchServerToSegments.getSegmentsByServer(launchServer, s)
+	segment1 := s.launchServerToSegments.getSegmentsByServer(launchServer, s)
+	segment2 := s.vRouterLaunchServerToSegments.getSegmentsByServer(launchServer, s)
+
+	return append(segment1, segment2...)
 }
 
 func (s *Segment) GetVMIDSegments(vmID int) []*trident.Segment {
@@ -343,6 +363,15 @@ func (s *Segment) GetTypeVMSegments(launchServer string, hostID int) []*trident.
 	macs := []string{}
 	vifIDs := []uint32{}
 	if networkMacs, ok := s.launchServerToSegments[launchServer]; ok {
+		for _, macIDs := range networkMacs {
+			for _, macID := range macIDs {
+				macs = append(macs, macID.Mac)
+				vifIDs = append(vifIDs, uint32(macID.ID))
+				s.vtapUsedVInterfaceIDs.Add(macID.ID)
+			}
+		}
+	}
+	if networkMacs, ok := s.vRouterLaunchServerToSegments[launchServer]; ok {
 		for _, macIDs := range networkMacs {
 			for _, macID := range macIDs {
 				macs = append(macs, macID.Mac)

@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
 	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
 
 	. "server/controller/common"
 	models "server/controller/db/mysql"
 	. "server/controller/trisolaris/utils"
-
-	mapset "github.com/deckarep/golang-set"
 )
 
 type TypeIDData struct {
@@ -65,6 +64,7 @@ type PlatformRawData struct {
 	idToVPC                map[int]*models.VPC
 
 	idToHost                    map[int]*models.Host
+	idToVM                      map[int]*models.VM
 	vmIDs                       mapset.Set
 	vRouterIDs                  mapset.Set
 	dhcpPortIDs                 mapset.Set
@@ -102,7 +102,7 @@ type PlatformRawData struct {
 	idToPodNode         map[int]*models.PodNode
 
 	vmIDToVifs            map[int]mapset.Set
-	vgwIDToVifs           map[int]mapset.Set
+	vRouterIDToVifs       map[int]mapset.Set
 	dhcpIDToVifs          map[int]mapset.Set
 	podIDToVifs           map[int]mapset.Set
 	podServiceIDToVifs    map[int]mapset.Set
@@ -117,11 +117,18 @@ type PlatformRawData struct {
 	deviceVifs            []*models.VInterface
 
 	deviceTypeAndIDToVInterfaceID map[TypeIDKey][]int
+
+	launchServerToSkipVifIDs map[string]mapset.Set
+	skipVifIDs               mapset.Set
+	skipDomains              mapset.Set
+
+	launchServerToVRouterIDs map[string][]int
 }
 
 func NewPlatformRawData() *PlatformRawData {
 	return &PlatformRawData{
 		idToHost:                    make(map[int]*models.Host),
+		idToVM:                      make(map[int]*models.VM),
 		vmIDs:                       mapset.NewSet(),
 		vRouterIDs:                  mapset.NewSet(),
 		dhcpPortIDs:                 mapset.NewSet(),
@@ -169,7 +176,7 @@ func NewPlatformRawData() *PlatformRawData {
 		idToPodNode:            make(map[int]*models.PodNode),
 
 		vmIDToVifs:                    make(map[int]mapset.Set),
-		vgwIDToVifs:                   make(map[int]mapset.Set),
+		vRouterIDToVifs:               make(map[int]mapset.Set),
 		dhcpIDToVifs:                  make(map[int]mapset.Set),
 		podIDToVifs:                   make(map[int]mapset.Set),
 		podServiceIDToVifs:            make(map[int]mapset.Set),
@@ -184,6 +191,11 @@ func NewPlatformRawData() *PlatformRawData {
 		deviceVifs:                    []*models.VInterface{},
 		deviceTypeAndIDToVInterfaceID: make(map[TypeIDKey][]int),
 		typeIDToDevice:                make(map[TypeIDKey]*TypeIDData),
+		launchServerToSkipVifIDs:      make(map[string]mapset.Set),
+		skipVifIDs:                    mapset.NewSet(),
+		skipDomains:                   mapset.NewSet(),
+
+		launchServerToVRouterIDs: make(map[string][]int),
 	}
 }
 
@@ -211,10 +223,10 @@ func (r *PlatformRawData) ConvertDBVInterface(dbDataCache *DBDataCache) {
 				r.vmIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
 			}
 		case VIF_DEVICE_TYPE_VROUTER:
-			if vifs, ok := r.vgwIDToVifs[vif.DeviceID]; ok {
+			if vifs, ok := r.vRouterIDToVifs[vif.DeviceID]; ok {
 				vifs.Add(vif)
 			} else {
-				r.vgwIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+				r.vRouterIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
 			}
 		case VIF_DEVICE_TYPE_DHCP_PORT:
 			if vifs, ok := r.dhcpIDToVifs[vif.DeviceID]; ok {
@@ -292,6 +304,7 @@ func (r *PlatformRawData) ConvertDBVM(dbDataCache *DBDataCache) {
 		return
 	}
 	for _, vm := range vms {
+		r.idToVM[vm.ID] = vm
 		r.vmIDs.Add(vm.ID)
 		if vmIDs, ok := r.serverToVmIDs[vm.LaunchServer]; ok {
 			vmIDs.Add(vm.ID)
@@ -334,6 +347,12 @@ func (r *PlatformRawData) ConvertDBVRouter(dbDataCache *DBDataCache) {
 	}
 	for _, vRouter := range vRouters {
 		r.vRouterIDs.Add(vRouter.ID)
+		if _, ok := r.launchServerToVRouterIDs[vRouter.GWLaunchServer]; ok {
+			r.launchServerToVRouterIDs[vRouter.GWLaunchServer] = append(
+				r.launchServerToVRouterIDs[vRouter.GWLaunchServer], vRouter.ID)
+		} else {
+			r.launchServerToVRouterIDs[vRouter.GWLaunchServer] = []int{vRouter.ID}
+		}
 		typeIDKey := TypeIDKey{
 			Type: VIF_DEVICE_TYPE_VROUTER,
 			ID:   vRouter.ID,
@@ -813,6 +832,174 @@ func (r *PlatformRawData) ConvertDBVipDomain(dbDataCache *DBDataCache) {
 	}
 }
 
+func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
+	kvmLaunchServer := mapset.NewSet()
+	vtapLaunchServer := make(map[string][]int)
+	skipVTaps := dbDataCache.GetSkipVTaps()
+	skipAZs := mapset.NewSet()
+	for _, vtap := range skipVTaps {
+		switch vtap.Type {
+		case VTAP_TYPE_KVM:
+			kvmLaunchServer.Add(vtap.LaunchServer)
+			skipAZs.Add(vtap.AZ)
+		case VTAP_TYPE_WORKLOAD_V:
+			vm, ok := r.idToVM[vtap.LaunchServerID]
+			if ok == false {
+				break
+			}
+			if vm.LaunchServer != "" {
+				if _, ok := vtapLaunchServer[vm.LaunchServer]; ok {
+					vtapLaunchServer[vm.LaunchServer] = append(
+						vtapLaunchServer[vm.LaunchServer], vm.ID)
+				} else {
+					vtapLaunchServer[vm.LaunchServer] = []int{vm.ID}
+				}
+			}
+		case VTAP_TYPE_POD_VM:
+			vmid, ok := r.podNodeIDToVmID[vtap.LaunchServerID]
+			if ok == false {
+				break
+			}
+			vm, ok := r.idToVM[vmid]
+			if ok == false {
+				break
+			}
+			if vm.LaunchServer != "" {
+				if _, ok := vtapLaunchServer[vm.LaunchServer]; ok {
+					vtapLaunchServer[vm.LaunchServer] = append(
+						vtapLaunchServer[vm.LaunchServer], vm.ID)
+				} else {
+					vtapLaunchServer[vm.LaunchServer] = []int{vm.ID}
+				}
+			}
+		}
+	}
+
+	skipLaunchServerToVMIDs := make(map[string][]int)
+	skipVMIDs := []int{}
+	for launchServer, vmIDs := range vtapLaunchServer {
+		if kvmLaunchServer.Contains(launchServer) {
+			if _, ok := skipLaunchServerToVMIDs[launchServer]; ok {
+				skipLaunchServerToVMIDs[launchServer] = append(
+					skipLaunchServerToVMIDs[launchServer], vmIDs...)
+			} else {
+				skipLaunchServerToVMIDs[launchServer] = vmIDs[:]
+			}
+			skipVMIDs = append(skipVMIDs, vmIDs...)
+		}
+	}
+
+	skipPodNodeIDs := []int{}
+	for _, vmID := range skipVMIDs {
+		if podNodeID, ok := r.vmIDToPodNodeID[vmID]; ok {
+			skipPodNodeIDs = append(skipPodNodeIDs, podNodeID)
+		}
+	}
+
+	vmIDToPodNodeAllVifs := newIDToVifs()
+	for _, podNodeID := range skipPodNodeIDs {
+		podnode, ok := r.idToPodNode[podNodeID]
+		if ok == false {
+			continue
+		}
+		podnodeID := podnode.ID
+		vmID, ok := r.podNodeIDToVmID[podnodeID]
+		if ok == false {
+			continue
+		}
+		if vifs, ok := r.podNodeIDToVifs[podnodeID]; ok {
+			vmIDToPodNodeAllVifs.add(vmID, vifs)
+		}
+		if podIDs, ok := r.podNodeIDtoPodIDs[podnodeID]; ok {
+			for podID := range podIDs.Iter() {
+				id := podID.(int)
+				if vifs, ok := r.podIDToVifs[id]; ok {
+					vmIDToPodNodeAllVifs.add(vmID, vifs)
+				}
+			}
+		}
+	}
+
+	skipVifIDs := mapset.NewSet()
+	launchServerToSkipVifIDs := make(map[string]mapset.Set)
+	for launchServer, vmIDs := range skipLaunchServerToVMIDs {
+		for _, vmID := range vmIDs {
+			vmVifs, ok := r.vmIDToVifs[vmID]
+			if ok == false {
+				continue
+			}
+			for vmVif := range vmVifs.Iter() {
+				vif := vmVif.(*models.VInterface)
+				if skipVifIDs, ok := launchServerToSkipVifIDs[launchServer]; ok {
+					skipVifIDs.Add(vif.ID)
+				} else {
+					launchServerToSkipVifIDs[launchServer] = mapset.NewSet(vif.ID)
+				}
+				skipVifIDs.Add(vif.ID)
+			}
+			podVifs, ok := vmIDToPodNodeAllVifs[vmID]
+			if ok == false {
+				continue
+			}
+			for podVif := range podVifs.Iter() {
+				vif := podVif.(*models.VInterface)
+				if skipVifIDs, ok := launchServerToSkipVifIDs[launchServer]; ok {
+					skipVifIDs.Add(vif.ID)
+				} else {
+					launchServerToSkipVifIDs[launchServer] = mapset.NewSet(vif.ID)
+				}
+				skipVifIDs.Add(vif.ID)
+			}
+		}
+	}
+	r.launchServerToSkipVifIDs = launchServerToSkipVifIDs
+	r.skipVifIDs = skipVifIDs
+	log.Debug(r.launchServerToSkipVifIDs)
+
+	skipDomains := mapset.NewSet()
+	for az := range skipAZs.Iter() {
+		azStr := az.(string)
+		if dbAZ, ok := r.uuidToAZ[azStr]; ok {
+			skipDomains.Add(dbAZ.Domain)
+		}
+	}
+
+	for _, subDomain := range dbDataCache.GetSubDomains() {
+		if skipDomains.Contains(subDomain.Domain) {
+			skipDomains.Add(subDomain.Lcuuid)
+		}
+	}
+	r.skipDomains = skipDomains
+	log.Debug(r.skipDomains)
+}
+
+// 有依赖 需要按顺序convert
+func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
+	r.ConvertHost(dbDataCache)
+	r.ConvertDBVPC(dbDataCache)
+	r.ConvertDBVM(dbDataCache)
+	r.ConvertDBVRouter(dbDataCache)
+	r.ConvertDBDHCPPort(dbDataCache)
+	r.ConvertDBPod(dbDataCache)
+	r.ConvertDBVInterface(dbDataCache)
+	r.ConvertDBIPs(dbDataCache)
+	r.ConvertDBNetwork(dbDataCache)
+	r.ConvertDBRegion(dbDataCache)
+	r.ConvertDBAZ(dbDataCache)
+	r.ConvertDBPeerConnection(dbDataCache)
+	r.ConvertDBPodService(dbDataCache)
+	r.ConvertDBPodServicePort(dbDataCache)
+	r.ConvertDBRedisInstance(dbDataCache)
+	r.ConvertDBRdsInstance(dbDataCache)
+	r.ConvertDBPodNode(dbDataCache)
+	r.ConvertDBPodGroupPort(dbDataCache)
+	r.ConvertDBLB(dbDataCache)
+	r.ConvertDBNat(dbDataCache)
+	r.ConvertDBVmPodNodeConn(dbDataCache)
+	r.ConvertDBVipDomain(dbDataCache)
+	r.ConvertSkipVTapVIfIDs(dbDataCache)
+}
+
 func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface) bool {
 	//TODO Check config
 	if vif == nil {
@@ -988,6 +1175,15 @@ func (r *PlatformRawData) GetVMIDToPodNodeID() map[int]int {
 
 func (r *PlatformRawData) GetPodNode(podNodeID int) *models.PodNode {
 	return r.idToPodNode[podNodeID]
+}
+
+func (r *PlatformRawData) GetSkipVifIDs(server string) mapset.Set {
+	result, ok := r.launchServerToSkipVifIDs[server]
+	if ok {
+		return result
+	}
+
+	return mapset.NewSet()
 }
 
 func (r *PlatformRawData) equal(o *PlatformRawData) bool {
@@ -1212,5 +1408,9 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 		return false
 	}
 
+	if !r.skipVifIDs.Equal(o.skipVifIDs) {
+		log.Info("skip vif ids changed")
+		return false
+	}
 	return true
 }

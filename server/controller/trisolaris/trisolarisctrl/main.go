@@ -203,12 +203,12 @@ func ipGroups(response *trident.SyncResponse) {
 
 func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
-	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d LaunchServer: %s LaunchServerId: %d RegionId: %d "
+	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d LaunchServer: %s LaunchServerId: %d RegionId: %d SkipTapInterface: %t "
 	buffer.WriteString(fmt.Sprintf(format, utils.Uint64ToMac(data.GetMac()), data.GetEpcId(),
 		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
-		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId()))
+		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(), data.GetSkipTapInterface()))
 	if data.GetPodNodeId() > 0 {
-		buffer.WriteString(fmt.Sprintf("PodNodeId: %d", data.GetPodNodeId()))
+		buffer.WriteString(fmt.Sprintf("PodNodeId: %d ", data.GetPodNodeId()))
 	}
 	if len(data.GetIpResources()) > 0 {
 		buffer.WriteString(fmt.Sprintf("IpResources: %v", data.GetIpResources()))

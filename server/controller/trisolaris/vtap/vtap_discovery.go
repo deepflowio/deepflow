@@ -17,14 +17,14 @@ import (
 )
 
 type VTapRegister struct {
-	tapMode          int      `json:"tap_mode"`
-	ctrlIP           string   `json:"ctrl_ip"`
-	ctrlMac          string   `json:"ctrl_mac"`
-	hostIPs          []string `json:"host_ips"`
-	host             string   `json:"host"`
-	vTapGroupID      string   `json:"vtap_group_id"`
-	region           string   `json:"region"`
-	defaultVTapGroup string   `json:"default_vtap_group"`
+	tapMode          int
+	ctrlIP           string
+	ctrlMac          string
+	hostIPs          []string
+	host             string
+	vTapGroupID      string
+	region           string
+	defaultVTapGroup string
 	vTapAutoRegister bool
 }
 
@@ -369,8 +369,8 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		VIF_DEVICE_TYPE_VM,
 		vifIDs)
 	if err != nil || len(vifs) == 0 {
-		log.Errorf("vtap(%s) vinterface(mac: %s, region: %s, devicetype: %d) not found, err(%s)",
-			r.ctrlIP, r.ctrlMac, r.region, VIF_DEVICE_TYPE_VM, err)
+		log.Errorf("vtap(%s) vinterface(mac: %s, region: %s, devicetype: %d) not found",
+			r.ctrlIP, r.ctrlMac, r.region, VIF_DEVICE_TYPE_VM)
 		if err != nil {
 			log.Error(err)
 		}

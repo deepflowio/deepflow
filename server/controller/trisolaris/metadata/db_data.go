@@ -17,7 +17,7 @@ type DBDataCache struct {
 	dhcpPorts               []*models.DHCPPort
 	pods                    []*models.Pod
 	vInterfaces             []*models.VInterface
-	vtaps                   []*models.VTap
+	skipVTaps               []*models.VTap
 	azs                     []*models.AZ
 	hostDevices             []*models.Host
 	podNodes                []*models.PodNode
@@ -189,6 +189,11 @@ func (d *DBDataCache) GetRdsInstances() []*models.RDSInstance {
 
 func (d *DBDataCache) GetPeerConnections() []*models.PeerConnection {
 	return d.peerConnections
+}
+
+func (d *DBDataCache) GetSkipVTaps() []*models.VTap {
+
+	return d.skipVTaps
 }
 
 func (d *DBDataCache) GetVTapConfigFilesFromDB(db *gorm.DB) []*models.VTapConfigFile {
@@ -442,9 +447,17 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	}
 
 	DomainMgr := dbmgr.DBMgr[models.Domain](db)
-	vipDomains, err := DomainMgr.GetBatchFromType([]int{QINGCLOUD_PRIVATE, CMB_CMDB})
+	vipDomains, err := DomainMgr.GetBatchFromTypes([]int{QINGCLOUD_PRIVATE, CMB_CMDB})
 	if err == nil {
 		d.vipDomains = vipDomains
+	} else {
+		log.Error(err)
+	}
+
+	skipVTaps, err := dbmgr.DBMgr[models.VTap](db).GetBatchFromTypes([]int{
+		VTAP_TYPE_KVM, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_POD_VM})
+	if err == nil {
+		d.skipVTaps = skipVTaps
 	} else {
 		log.Error(err)
 	}

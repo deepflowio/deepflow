@@ -7,9 +7,8 @@ import (
 
 	. "server/controller/common"
 	. "server/controller/trisolaris/common"
-	. "server/controller/trisolaris/utils"
-
 	"server/controller/trisolaris/metadata"
+	. "server/controller/trisolaris/utils"
 )
 
 var ALL_DOMAIMS = []string{"0"}
@@ -97,14 +96,22 @@ func (v *VTapPlatformData) clearPlatformDataTypeCache() {
 }
 
 func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *VTapCache) {
+	if c.GetVTapType() == VTAP_TYPE_KVM {
+		v.setSkipPlatformDataByVTap(p, c)
+	} else {
+		v.setNormalPlatformDataByVTap(p, c)
+	}
+}
+
+func (v *VTapPlatformData) setNormalPlatformDataByVTap(p *metadata.PlatformDataOP, c *VTapCache) {
 	vTapType := c.GetVTapType()
 	// 隧道解封装采集器没有平台数据
 	if vTapType == VTAP_TYPE_TUNNEL_DECAPSULATION {
 		return
 	}
 
-	log.Debug(c.CtrlIP)
-	log.Debug(c.CtrlMac)
+	log.Debug(c.GetCtrlIP())
+	log.Debug(c.GetCtrlMac())
 	log.Debug(c.getPodDomains())
 	vTapGroupLcuuid := c.GetVTapGroupLcuuid()
 	vtapConfig := c.GetVTapConfig()
@@ -165,7 +172,7 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		}
 		domainToPlarformDataOnlyPod := p.GetDomainToPlatformDataOnlyPod()
 		domainAllData := metadata.NewPlatformData("platformDataType2", "", 0, PLATFORM_DATA_TYPE_2)
-		domainAllData.Merge(p.GetAllSimplePlatformData())
+		domainAllData.Merge(p.GetAllSimplePlatformDataExceptPod())
 		for _, podDomain := range podDomains {
 			vTapDomainData := domainToPlarformDataOnlyPod[podDomain]
 			if vTapDomainData == nil {
@@ -243,6 +250,115 @@ func (v *VTapPlatformData) setPlatformDataByVTap(p *metadata.PlatformDataOP, c *
 		domainAllData.GeneratePlatformDataResult()
 		c.setVTapPlatformData(domainAllData)
 		v.platformDataType3.setPlatformDataCache(key, domainAllData)
+		log.Debug(domainAllData)
+	}
+}
+
+func (v *VTapPlatformData) setSkipPlatformDataByVTap(p *metadata.PlatformDataOP, c *VTapCache) {
+	log.Debug(c.GetCtrlIP())
+	log.Debug(c.GetCtrlMac())
+	log.Debug(c.getPodDomains())
+	vtapConfig := c.GetVTapConfig()
+	if vtapConfig == nil {
+		return
+	}
+	log.Debug(vtapConfig.PodClusterInternalIP, vtapConfig.ConvertedDomains)
+	if vtapConfig.PodClusterInternalIP == ALL_CLUSTERS &&
+		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
+		// 下发的云平台列表=全部，容器集群内部IP下发=所有集群
+		// 所有云平台所有数据
+		serverToData := p.GetServerToSkipAllSimplePlatformData()
+		if data, ok := serverToData[c.GetLaunchServer()]; ok {
+			c.setVTapPlatformData(data)
+		} else {
+			log.Debug("all:", p.GetAllSimplePlatformData())
+			c.setVTapPlatformData(p.GetAllSimplePlatformData())
+		}
+	} else if vtapConfig.PodClusterInternalIP == ALL_CLUSTERS {
+		// 下发的云平台列表=xxx，容器集群内部IP下发=所有集群
+		// 云平台列表=xxx的所有数据
+
+		domainToAllPlatformData := p.GetDomainToAllPlatformData()
+		domainToSkipAllPlatformData := p.GetDomainToSkipAllPlatformData()
+		domainAllData := metadata.NewPlatformData("skipPlatformDataType1", "", 0, SKIP_PLATFORM_DATA_TYPE_1)
+		for _, domainLcuuid := range vtapConfig.ConvertedDomains {
+			domainData := domainToSkipAllPlatformData[domainLcuuid]
+			if domainData == nil {
+				domainData = domainToAllPlatformData[domainLcuuid]
+			}
+			if domainData == nil {
+				log.Errorf("domain(%s) no platform data", domainLcuuid)
+				continue
+			}
+			domainAllData.Merge(domainData)
+		}
+		domainAllData.GenerateSkipPlatformDataResult(p.GetRawData().GetSkipVifIDs(c.GetLaunchServer()))
+		c.setVTapPlatformData(domainAllData)
+		log.Debug(domainAllData)
+	} else if vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP &&
+		SliceEqual[string](vtapConfig.ConvertedDomains, ALL_DOMAIMS) {
+		// 下发的云平台列表=全部，容器集群内部IP下发=采集器所在集群
+		// 所有云平台中devicetype != POD/容器服务的所有接口，采集器所在集群devicetype=POD/容器服务的所有接口
+
+		// 获取缓存数据
+		podDomains := c.getPodDomains()
+		domainToPlarformDataOnlyPod := p.GetDomainToPlatformDataOnlyPod()
+		domainToSkipPlarformDataOnlyPod := p.GetDomainToSkipPlatformDataOnlyPod()
+		domainAllData := metadata.NewPlatformData("skipPlatformDataType2", "", 0, SKIP_PLATFORM_DATA_TYPE_2)
+		domainAllData.Merge(p.GetSkipAllSimplePlatformDataExceptPod())
+		for _, podDomain := range podDomains {
+			vTapDomainData := domainToSkipPlarformDataOnlyPod[podDomain]
+			if vTapDomainData == nil {
+				vTapDomainData = domainToPlarformDataOnlyPod[podDomain]
+			}
+			if vTapDomainData == nil {
+				log.Errorf("vtap pod domain(%s) no data", podDomain)
+				continue
+			}
+			domainAllData.MergeInterfaces(vTapDomainData)
+		}
+		domainAllData.GenerateSkipPlatformDataResult(p.GetRawData().GetSkipVifIDs(c.GetLaunchServer()))
+		c.setVTapPlatformData(domainAllData)
+		log.Debug(domainAllData)
+	} else if vtapConfig.PodClusterInternalIP == CLUSTER_OF_VTAP {
+		// 下发的云平台列表=xxx，容器集群内部IP下发=采集器所在集群
+		// 云平台列表=xxx中devicetype != POD/容器服务所有接口，集器所在集群devicetype=POD/容器服务的所有接口
+
+		// 获取缓存数据
+		podDomains := c.getPodDomains()
+		domainToPlatformDataExceptPod := p.GetDomainToPlatformDataExceptPod()
+		domainToSkipPlatformDataExceptPod := p.GetDomainToSkipPlatformDataExceptPod()
+		domainAllData := metadata.NewPlatformData("skipPlatformDataType3", "", 0, SKIP_PLATFORM_DATA_TYPE_3)
+		for _, domainLcuuid := range vtapConfig.ConvertedDomains {
+			domainData := domainToSkipPlatformDataExceptPod[domainLcuuid]
+			if domainData == nil {
+				domainData = domainToPlatformDataExceptPod[domainLcuuid]
+			}
+			if domainData == nil {
+				log.Errorf("domain(%s) no platform data", domainLcuuid)
+				continue
+			}
+			domainAllData.Merge(domainData)
+		}
+
+		for _, podDomain := range podDomains {
+			vtapDomainData := domainToSkipPlatformDataExceptPod[podDomain]
+			if vtapDomainData == nil {
+				vtapDomainData = domainToPlatformDataExceptPod[podDomain]
+			}
+			if vtapDomainData == nil {
+				log.Errorf("domain(%s) no platform data", podDomain)
+				continue
+			}
+			if Find[string](vtapConfig.ConvertedDomains, podDomain) {
+				domainAllData.MergeInterfaces(vtapDomainData)
+			} else {
+				domainAllData.Merge(vtapDomainData)
+			}
+		}
+
+		domainAllData.GenerateSkipPlatformDataResult(p.GetRawData().GetSkipVifIDs(c.GetLaunchServer()))
+		c.setVTapPlatformData(domainAllData)
 		log.Debug(domainAllData)
 	}
 }

@@ -9,17 +9,27 @@ type DomainToPlatformData struct {
 	domainToPlatformDataExceptPod DomainPlatformData
 	// domainn内所有数据只有pod数据
 	domainToPlatformDataOnlyPod DomainPlatformData
-	// 有简化vinterface数据vtap使用
+	// 所有简化vinterface数据vtap使用
 	allSimplePlatformData *PlatformData
 	// 所有简化vinterface数据vtap使用，不包含POD/容器服务接口
 	allSimplePlatformDataExceptPod *PlatformData
+
+	serverToSkipAllSimplePlatformData  DomainPlatformData
+	domainToSkipAllPlatformData        DomainPlatformData
+	domainToSkipPlatformDataExceptPod  DomainPlatformData
+	domainToSkipPlatformDataOnlyPod    DomainPlatformData
+	skipAllSimplePlatformDataExceptPod *PlatformData
 }
 
 func newDomainToPlatformData() *DomainToPlatformData {
 	return &DomainToPlatformData{
-		domainToAllPlatformData:       make(DomainPlatformData),
-		domainToPlatformDataExceptPod: make(DomainPlatformData),
-		domainToPlatformDataOnlyPod:   make(DomainPlatformData),
+		domainToAllPlatformData:           make(DomainPlatformData),
+		domainToPlatformDataExceptPod:     make(DomainPlatformData),
+		domainToPlatformDataOnlyPod:       make(DomainPlatformData),
+		serverToSkipAllSimplePlatformData: make(DomainPlatformData),
+		domainToSkipAllPlatformData:       make(DomainPlatformData),
+		domainToSkipPlatformDataExceptPod: make(DomainPlatformData),
+		domainToSkipPlatformDataOnlyPod:   make(DomainPlatformData),
 	}
 }
 
@@ -30,7 +40,7 @@ func (s DomainPlatformData) checkVersion(t DomainPlatformData) bool {
 		if ok == false {
 			flag = false
 			newDomainData.initVersion()
-			log.Info("add domain data. ", newDomainData)
+			log.Debug("add domain data. ", newDomainData)
 			continue
 		}
 
@@ -57,6 +67,18 @@ func (d *DomainToPlatformData) updateDomainToPlatformDataOnlyPod(data DomainPlat
 	d.domainToPlatformDataOnlyPod = data
 }
 
+func (d *DomainToPlatformData) updateDomainToSkipAllPlatformData(data DomainPlatformData) {
+	d.domainToSkipAllPlatformData = data
+}
+
+func (d *DomainToPlatformData) updateDomainToSkipPlatformDataExceptPod(data DomainPlatformData) {
+	d.domainToSkipPlatformDataExceptPod = data
+}
+
+func (d *DomainToPlatformData) updateDomainToSkipPlatformDataOnlyPod(data DomainPlatformData) {
+	d.domainToSkipPlatformDataOnlyPod = data
+}
+
 func (d *DomainToPlatformData) updateAllsimpleplatformdata(data *PlatformData) {
 	d.allSimplePlatformData = data
 }
@@ -65,12 +87,28 @@ func (d *DomainToPlatformData) updateAllSimplePlatformDataExceptPod(data *Platfo
 	d.allSimplePlatformDataExceptPod = data
 }
 
+func (d *DomainToPlatformData) updateSkipAllSimplePlatformDataExceptPod(data *PlatformData) {
+	d.skipAllSimplePlatformDataExceptPod = data
+}
+
+func (d *DomainToPlatformData) updateServerToSkipAllSimplePlatformData(data DomainPlatformData) {
+	d.serverToSkipAllSimplePlatformData = data
+}
+
 func (d *DomainToPlatformData) GetAllSimplePlatformData() *PlatformData {
 	return d.allSimplePlatformData
 }
 
+func (d *DomainToPlatformData) GetServerToSkipAllSimplePlatformData() DomainPlatformData {
+	return d.serverToSkipAllSimplePlatformData
+}
+
 func (d *DomainToPlatformData) GetAllSimplePlatformDataExceptPod() *PlatformData {
 	return d.allSimplePlatformDataExceptPod
+}
+
+func (d *DomainToPlatformData) GetSkipAllSimplePlatformDataExceptPod() *PlatformData {
+	return d.skipAllSimplePlatformDataExceptPod
 }
 
 func (d *DomainToPlatformData) GetDomainToAllPlatformData() DomainPlatformData {
@@ -83,4 +121,16 @@ func (d *DomainToPlatformData) GetDomainToPlatformDataExceptPod() DomainPlatform
 
 func (d *DomainToPlatformData) GetDomainToPlatformDataOnlyPod() DomainPlatformData {
 	return d.domainToPlatformDataOnlyPod
+}
+
+func (d *DomainToPlatformData) GetDomainToSkipAllPlatformData() DomainPlatformData {
+	return d.domainToSkipAllPlatformData
+}
+
+func (d *DomainToPlatformData) GetDomainToSkipPlatformDataExceptPod() DomainPlatformData {
+	return d.domainToSkipPlatformDataExceptPod
+}
+
+func (d *DomainToPlatformData) GetDomainToSkipPlatformDataOnlyPod() DomainPlatformData {
+	return d.domainToSkipPlatformDataOnlyPod
 }

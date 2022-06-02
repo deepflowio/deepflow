@@ -70,29 +70,7 @@ func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
 func (p *PlatformDataOP) generateRawData() {
 	dbDataCache := p.metaData.GetDBDataCache()
 	r := NewPlatformRawData()
-	r.ConvertHost(dbDataCache)
-	r.ConvertDBVPC(dbDataCache)
-	r.ConvertDBVM(dbDataCache)
-	r.ConvertDBVRouter(dbDataCache)
-	r.ConvertDBDHCPPort(dbDataCache)
-	r.ConvertDBPod(dbDataCache)
-	r.ConvertDBVInterface(dbDataCache)
-	r.ConvertDBIPs(dbDataCache)
-	r.ConvertDBNetwork(dbDataCache)
-	r.ConvertDBRegion(dbDataCache)
-	r.ConvertDBAZ(dbDataCache)
-	r.ConvertDBPeerConnection(dbDataCache)
-	r.ConvertDBPodService(dbDataCache)
-	r.ConvertDBPodServicePort(dbDataCache)
-	r.ConvertDBRedisInstance(dbDataCache)
-	r.ConvertDBRdsInstance(dbDataCache)
-	r.ConvertDBPodNode(dbDataCache)
-	r.ConvertDBPodGroupPort(dbDataCache)
-	r.ConvertDBLB(dbDataCache)
-	r.ConvertDBNat(dbDataCache)
-	r.ConvertDBVmPodNodeConn(dbDataCache)
-	r.ConvertDBVipDomain(dbDataCache)
-
+	r.ConvertDBCache(dbDataCache)
 	p.updateRawData(r)
 }
 
@@ -326,6 +304,44 @@ func (p *PlatformDataOP) generateDropletPlatformData() {
 	log.Info(p.getDropletPlatformData())
 }
 
+func (p *PlatformDataOP) generateSkipAllSimplePlatformData() {
+	domainInterfaceProto := p.getDomainInterfaceProto()
+	domainPeerConnProto := p.getDomainPeerConnProto()
+	domainCIDRProto := p.getDomainCIDRProto()
+
+	serverToSkipAllSimplePlatformData := make(DomainPlatformData)
+	rawData := p.GetRawData()
+	for server, skipVifIDs := range rawData.launchServerToSkipVifIDs {
+		aSPData := NewPlatformData("", "", 0, ALL_SKIP_SIMPLE_PLATFORM_DATA)
+		aSPData.initPlatformData(
+			domainInterfaceProto.allSimpleInterfaces,
+			domainPeerConnProto.peerConns,
+			domainCIDRProto.simplecidrs)
+		aSPData.GenerateSkipPlatformDataResult(skipVifIDs)
+		serverToSkipAllSimplePlatformData[server] = aSPData
+	}
+	if !p.serverToSkipAllSimplePlatformData.checkVersion(serverToSkipAllSimplePlatformData) {
+		p.updateServerToSkipAllSimplePlatformData(serverToSkipAllSimplePlatformData)
+	}
+	log.Info(p.serverToSkipAllSimplePlatformData)
+
+	// 生成简化数据，不包括pod
+	aSPDExceptPod := NewPlatformData("", "", 0, ALL_SIMPLE_PLATFORM_DATA_EXCEPT_POD)
+	aSPDExceptPod.initPlatformData(
+		domainInterfaceProto.allSimpleInterfacesExceptPod,
+		domainPeerConnProto.peerConns,
+		domainCIDRProto.simplecidrs)
+	aSPDExceptPod.GenerateSkipPlatformDataResult(rawData.skipVifIDs)
+	pASPDExceptPod := p.GetSkipAllSimplePlatformDataExceptPod()
+	if pASPDExceptPod == nil {
+		aSPDExceptPod.initVersion()
+		p.updateSkipAllSimplePlatformDataExceptPod(aSPDExceptPod)
+	} else if !pASPDExceptPod.equal(aSPDExceptPod) {
+		aSPDExceptPod.setVersion(pASPDExceptPod.GetVersion() + 1)
+		p.updateSkipAllSimplePlatformDataExceptPod(aSPDExceptPod)
+	}
+}
+
 func (p *PlatformDataOP) generateAllSimplePlatformData() {
 	domainInterfaceProto := p.getDomainInterfaceProto()
 	domainPeerConnProto := p.getDomainPeerConnProto()
@@ -423,6 +439,75 @@ func (p *PlatformDataOP) generateDomainPlatformData() {
 
 }
 
+func (p *PlatformDataOP) generateSkipDomainPlatformData() {
+	domainInterfaceProto := p.getDomainInterfaceProto()
+	domainPeerConnProto := p.getDomainPeerConnProto()
+	domainCIDRProto := p.getDomainCIDRProto()
+
+	dToSkipAPData := make(DomainPlatformData)
+	dToSkipPDExceptPod := make(DomainPlatformData)
+	dToSkipPDOnlyPod := make(DomainPlatformData)
+
+	rawData := p.GetRawData()
+	skipDomains := rawData.skipDomains
+	dbDataCache := p.metaData.GetDBDataCache()
+	domains := dbDataCache.GetDomains()
+	// 生成云平台数据包含subdomain数据
+	for _, domain := range domains {
+		if !skipDomains.Contains(domain.Lcuuid) {
+			continue
+		}
+		// 群内所有vinterface信息
+		interfaces := domainInterfaceProto.domainToAllInterfaces[domain.Lcuuid]
+		peerConnections := domainPeerConnProto.domainToPeerConns[domain.Lcuuid]
+		cidrs := domainCIDRProto.domainToCIDRs[domain.Lcuuid]
+		domainDate := NewPlatformData(domain.Name, domain.Lcuuid, 0, DOMAIN_TO_SKIP_ALL_SIMPLE_PLATFORM_DATA)
+		domainDate.initPlatformData(interfaces, peerConnections, cidrs)
+		domainDate.GenerateSkipPlatformDataResult(rawData.skipVifIDs)
+		dToSkipAPData[domain.Lcuuid] = domainDate
+
+		// vinterface包含集群内非pod信息
+		interfacesExceptPod := domainInterfaceProto.domainToInterfacesExceptPod[domain.Lcuuid]
+		domainCIDRs := domainCIDRProto.domainOrSubdomainToCIDRs[domain.Lcuuid]
+		domainDataExceptPod := NewPlatformData(domain.Name, domain.Lcuuid, 0, DOMAIN_TO_SKIP_PLATFORM_DATA_EXCEPT_POD)
+		domainDataExceptPod.initPlatformData(interfacesExceptPod, peerConnections, domainCIDRs)
+		domainDataExceptPod.GenerateSkipPlatformDataResult(rawData.skipVifIDs)
+		dToSkipPDExceptPod[domain.Lcuuid] = domainDataExceptPod
+
+		// domain仅包含pod信息
+		interfacesOnlyPod := domainInterfaceProto.domainOrSubdomainToInterfacesOnlyPod[domain.Lcuuid]
+		domainDataOnlyPod := NewPlatformData(domain.Name, domain.Lcuuid, 0, DOMAIN_TO_SKIP_PLATFORM_DATA_ONLY_POD)
+		domainDataOnlyPod.initPlatformData(interfacesOnlyPod, peerConnections, domainCIDRs)
+		domainDataOnlyPod.GenerateSkipPlatformDataResult(rawData.skipVifIDs)
+		dToSkipPDOnlyPod[domain.Lcuuid] = domainDataOnlyPod
+	}
+
+	// subdomain 只有pod信息
+	subDomains := dbDataCache.GetSubDomains()
+	for _, subDomain := range subDomains {
+		if !skipDomains.Contains(subDomain.Lcuuid) {
+			continue
+		}
+		interfaces := domainInterfaceProto.domainOrSubdomainToInterfacesOnlyPod[subDomain.Lcuuid]
+		peerConnections := domainPeerConnProto.domainToPeerConns[subDomain.Lcuuid]
+		cidrs := domainCIDRProto.domainOrSubdomainToCIDRs[subDomain.Lcuuid]
+		domainDataOnlyPod := NewPlatformData(subDomain.Name, subDomain.Lcuuid, 0, DOMAIN_TO_SKIP_PLATFORM_DATA_ONLY_POD)
+		domainDataOnlyPod.initPlatformData(interfaces, peerConnections, cidrs)
+		domainDataOnlyPod.GenerateSkipPlatformDataResult(rawData.skipVifIDs)
+		dToSkipPDOnlyPod[subDomain.Name] = domainDataOnlyPod
+	}
+
+	if !p.GetDomainToSkipAllPlatformData().checkVersion(dToSkipAPData) {
+		p.updateDomainToSkipAllPlatformData(dToSkipAPData)
+	}
+	if !p.GetDomainToSkipPlatformDataExceptPod().checkVersion(dToSkipPDExceptPod) {
+		p.updateDomainToSkipPlatformDataExceptPod(dToSkipPDExceptPod)
+	}
+	if !p.GetDomainToSkipPlatformDataOnlyPod().checkVersion(dToSkipPDOnlyPod) {
+		p.updateDomainToSkipPlatformDataOnlyPod(dToSkipPDOnlyPod)
+	}
+}
+
 func (p *PlatformDataOP) GetRawData() *PlatformRawData {
 	return p.rawData.Load().(*PlatformRawData)
 }
@@ -483,7 +568,9 @@ func (p *PlatformDataOP) generateBasePlatformData() {
 	p.generateCIDRs()
 	p.generateDropletPlatformData()
 	p.generateAllSimplePlatformData()
+	p.generateSkipAllSimplePlatformData()
 	p.generateDomainPlatformData()
+	p.generateSkipDomainPlatformData()
 	elapsed := time.Since(start)
 	log.Info("generate platform data cost:", elapsed)
 }

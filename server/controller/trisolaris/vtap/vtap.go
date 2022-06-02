@@ -127,14 +127,12 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 func (v *VTapInfo) AddVTapCache(vtap *models.VTap) {
 	vTapCache := NewVTapCache(vtap)
 	vTapCache.init(v)
-	pdOP := v.metaData.GetPlatformDataOP()
-	v.vTapPlatformData.setPlatformDataByVTap(pdOP, vTapCache)
-	localSegments := v.GenerateVTapLocalSegments(vTapCache)
-	vTapCache.setVTapLocalSegments(localSegments)
+	v.vTapPlatformData.setPlatformDataByVTap(v.metaData.GetPlatformDataOP(), vTapCache)
+	vTapCache.setVTapLocalSegments(v.GenerateVTapLocalSegments(vTapCache))
 	vTapCache.setVTapRemoteSegments(v.GetRemoteSegment(vTapCache))
 	v.vTapCaches.Add(vTapCache)
 	v.vtapIDCaches.Add(vTapCache)
-	if vTapCache.Type == VTAP_TYPE_KVM {
+	if vTapCache.GetVTapType() == VTAP_TYPE_KVM {
 		v.kvmVTapCaches.Add(vTapCache)
 	}
 	log.Infof("add cache ctrl_ip: %s ctrl_mac: %s", vTapCache.GetCtrlIP(), vTapCache.GetCtrlMac())
@@ -148,8 +146,8 @@ func (v *VTapInfo) DeleteVTapCache(key string) {
 	vTapCache := v.vTapCaches.Get(key)
 	if vTapCache != nil {
 		v.vTapCaches.Delete(key)
-		v.vtapIDCaches.Delete(vTapCache.ID)
-		if vTapCache.Type == VTAP_TYPE_KVM {
+		v.vtapIDCaches.Delete(int(vTapCache.GetVTapID()))
+		if vTapCache.GetVTapType() == VTAP_TYPE_KVM {
 			v.kvmVTapCaches.Delete(vTapCache.GetCtrlIP())
 		}
 		log.Infof("delete cache vtap %s", key)
@@ -677,9 +675,9 @@ func (v *VTapInfo) getVTapPodDomains(c *VTapCache) []string {
 	serverPodDomains := []int{VTAP_TYPE_EXSI, VTAP_TYPE_KVM, VTAP_TYPE_HYPER_V, VTAP_TYPE_HYPER_V_NETWORK}
 	nodePodDomains := []int{VTAP_TYPE_POD_HOST, VTAP_TYPE_POD_VM}
 	podDomains := mapset.NewSet()
-	if Find[int](noPodDomains, c.Type) {
+	if Find[int](noPodDomains, c.GetVTapType()) {
 		return result
-	} else if Find[int](serverPodDomains, c.Type) {
+	} else if Find[int](serverPodDomains, c.GetVTapType()) {
 		rawData := v.metaData.GetPlatformDataOP().GetRawData()
 		serverToVmIDs := rawData.GetServerToVmIDs()
 		vmIDs := serverToVmIDs[c.GetLaunchServer()]
@@ -707,7 +705,7 @@ func (v *VTapInfo) getVTapPodDomains(c *VTapCache) []string {
 				podDomains.Add(podNode.SubDomain)
 			}
 		}
-	} else if Find[int](nodePodDomains, c.Type) {
+	} else if Find[int](nodePodDomains, c.GetVTapType()) {
 		rawData := v.metaData.GetPlatformDataOP().GetRawData()
 		podNode := rawData.GetPodNode(c.GetLaunchServerID())
 		if podNode == nil {
