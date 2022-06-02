@@ -68,7 +68,7 @@ impl AccumulatedFlow {
                 } else if let Some(other_meter) = app_meter {
                     self.app_meter = Some(*other_meter);
                 }
-            } else {
+            } else if other_stats.l7_protocol == self.l7_protocol {
                 if let Some((self_meter, other_meter)) = self.app_meter.as_mut().zip(app_meter) {
                     self_meter.sequential_merge(other_meter);
                 } else if let Some(other_meter) = app_meter {
