@@ -421,8 +421,11 @@ impl AppProtoLogsData {
     }
 
     pub fn ebpf_flow_session_id(&self) -> u64 {
+        // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
+        let flow_id_part =
+            (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
         if let Some(session_id) = self.special_info.session_id() {
-            self.base_info.flow_id << 32
+            flow_id_part
                 | (self.base_info.head.proto as u64) << 24
                 | ((session_id as u64) & 0xffffff)
         } else {
@@ -433,9 +436,7 @@ impl AppProtoLogsData {
             if self.base_info.head.msg_type == LogMessageType::Request {
                 cap_seq += 1;
             };
-            self.base_info.flow_id << 32
-                | ((self.base_info.head.proto as u64) << 24)
-                | (cap_seq & 0xffffff)
+            flow_id_part | ((self.base_info.head.proto as u64) << 24) | (cap_seq & 0xffffff)
         }
     }
 
