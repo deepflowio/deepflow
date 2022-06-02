@@ -8,6 +8,7 @@ use std::fmt;
 use std::time::Duration;
 
 use crate::common::tagged_flow::TaggedFlow;
+use crate::external_metrics::OpenTelemetry;
 use crate::flow_generator::AppProtoLogsData;
 use crate::metric::document::Document;
 
@@ -17,11 +18,13 @@ const RCV_TIMEOUT: Duration = Duration::from_secs(1);
 const ERR_INTERVAL: Duration = Duration::from_secs(30);
 const FLOW_LOG_VERSION: u32 = 20220128;
 const METRICS_VERSION: u32 = 20220117;
+const OPEN_TELEMETRY: u32 = 20220607;
 
 pub enum SendItem {
     L4FlowLog(TaggedFlow),
     L7FlowLog(AppProtoLogsData),
     Metrics(Document),
+    ExternalOtel(OpenTelemetry),
 }
 
 impl SendItem {
@@ -30,6 +33,7 @@ impl SendItem {
             Self::L4FlowLog(l4) => l4.encode(buf),
             Self::L7FlowLog(l7) => l7.encode(buf),
             Self::Metrics(m) => m.encode(buf),
+            Self::ExternalOtel(o) => o.encode(buf),
         }
     }
 
@@ -38,6 +42,7 @@ impl SendItem {
             Self::L4FlowLog(_) => SendMessageType::TaggedFlow,
             Self::L7FlowLog(_) => SendMessageType::ProtocolLog,
             Self::Metrics(_) => SendMessageType::Metrics,
+            Self::ExternalOtel(_) => SendMessageType::OpenTelemetry,
         }
     }
 
@@ -46,6 +51,7 @@ impl SendItem {
             Self::L4FlowLog(_) => FLOW_LOG_VERSION,
             Self::L7FlowLog(_) => FLOW_LOG_VERSION,
             Self::Metrics(_) => METRICS_VERSION,
+            Self::ExternalOtel(_) => OPEN_TELEMETRY,
         }
     }
 }
@@ -56,6 +62,7 @@ impl fmt::Display for SendItem {
             Self::L4FlowLog(l) => write!(f, "l4: {}", l),
             Self::L7FlowLog(l) => write!(f, "l7: {}", l),
             Self::Metrics(l) => write!(f, "metric: {:?}", l),
+            Self::ExternalOtel(o) => write!(f, "open_telemetry: {:?}", o),
         }
     }
 }
@@ -66,6 +73,7 @@ impl fmt::Debug for SendItem {
             Self::L4FlowLog(l) => write!(f, "l4: {}", l),
             Self::L7FlowLog(l) => write!(f, "l7: {}", l),
             Self::Metrics(l) => write!(f, "metric: {:?}", l),
+            Self::ExternalOtel(o) => write!(f, "open_telemetry: {:?}", o),
         }
     }
 }
@@ -79,6 +87,7 @@ pub enum SendMessageType {
     Metrics = 3,
     TaggedFlow = 4,
     ProtocolLog = 5,
+    OpenTelemetry = 6,
 }
 
 impl fmt::Display for SendMessageType {
@@ -90,6 +99,7 @@ impl fmt::Display for SendMessageType {
             Self::Metrics => write!(f, "metrics"),
             Self::TaggedFlow => write!(f, "l4_log"),
             Self::ProtocolLog => write!(f, "l7_log"),
+            Self::OpenTelemetry => write!(f, "open_telemetry"),
         }
     }
 }

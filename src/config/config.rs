@@ -89,6 +89,7 @@ pub struct Config {
     pub cloud_gateway_traffic: bool,
     pub ebpf_log_file: String,
     pub kubernetes_namespace: String,
+    pub external_metrics_sender_queue_size: usize,
 }
 
 impl Config {
@@ -153,6 +154,10 @@ impl Config {
         // L7Log Session timeout must more than or equal 10s to keep window
         if c.l7_log_session_aggr_timeout.as_secs() < 10 {
             c.l7_log_session_aggr_timeout = Duration::from_secs(10);
+        }
+
+        if c.external_metrics_sender_queue_size == 0 {
+            c.external_metrics_sender_queue_size = 1 << 12;
         }
 
         if let Err(e) = c.validate() {
@@ -233,6 +238,7 @@ impl Default for Config {
             cloud_gateway_traffic: false,
             ebpf_log_file: "".into(),
             kubernetes_namespace: "".into(),
+            external_metrics_sender_queue_size: 0,
         }
     }
 }

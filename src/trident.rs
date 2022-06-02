@@ -18,6 +18,7 @@ use log::{info, warn};
 use crate::common::DropletMessageType;
 use crate::debug::QueueDebugger;
 use crate::exception::ExceptionHandler;
+use crate::external_metrics::MetricServer;
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
 use crate::utils::cgroups::Cgroups;
@@ -340,6 +341,8 @@ pub struct Components {
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
     pub cgroups_controller: Arc<Cgroups>,
+    pub external_metrics_server: MetricServer,
+    pub external_metrics_sender: UniformSenderThread,
 }
 
 impl Components {
@@ -376,6 +379,10 @@ impl Components {
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.start();
         }
+
+        self.external_metrics_sender.start();
+        self.external_metrics_server.start();
+
         info!("Started components.");
     }
 
@@ -727,6 +734,30 @@ impl Components {
         }
         let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
+        let sender_id = 3;
+        let (external_metrics_sender, external_metrics_receiver, counter) =
+            queue::bounded_with_debug(
+                static_config.external_metrics_sender_queue_size,
+                "external-metrics-to-sender",
+                &queue_debugger,
+            );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "external-metrics-to-sender".to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let external_metrics_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            external_metrics_receiver,
+            config_handler.sender(),
+            stats_collector.clone(),
+        );
+        let external_metrics_server =
+            MetricServer::new(external_metrics_sender, config_handler.metric_server());
+
         Ok(Components {
             rx_leaky_bucket,
             l7_log_rate,
@@ -749,6 +780,8 @@ impl Components {
             stats_collector,
             running: AtomicBool::new(false),
             cgroups_controller,
+            external_metrics_server,
+            external_metrics_sender: external_metrics_uniform_sender,
         })
     }
 
@@ -935,6 +968,9 @@ impl Components {
                 warn!("stop cgroups_controller failed: {}", e);
             }
         }
+
+        self.external_metrics_server.stop();
+        self.external_metrics_sender.stop();
 
         info!("Stopped components.")
     }

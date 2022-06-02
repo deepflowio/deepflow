@@ -44,6 +44,7 @@ use crate::{
 const MB: u64 = 1048576;
 const MINUTE: Duration = Duration::from_secs(60);
 const SECOND: Duration = Duration::from_secs(1);
+const INFLUX_DB_PORT: u16 = 8086;
 
 type Access<C> = Map<Arc<ArcSwap<NewRuntimeConfig>>, NewRuntimeConfig, fn(&NewRuntimeConfig) -> &C>;
 
@@ -74,6 +75,8 @@ pub type DebugAccess = Access<DebugConfig>;
 pub type SynchronizerAccess = Access<SynchronizerConfig>;
 
 pub type EbpfAccess = Access<EbpfConfig>;
+
+pub type MetricServerAccess = Access<MetricServerConfig>;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct CollectorConfig {
@@ -392,6 +395,12 @@ pub struct L7LogDynamicConfig {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MetricServerConfig {
+    pub enabled: bool,
+    pub port: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewRuntimeConfig {
     pub collector: CollectorConfig,
     pub environment: EnvironmentConfig,
@@ -410,6 +419,7 @@ pub struct NewRuntimeConfig {
     pub ebpf: EbpfConfig,
     pub global_pps_threshold: u64,
     pub trident_type: TridentType,
+    pub metric_server: MetricServerConfig,
 }
 
 impl Default for NewRuntimeConfig {
@@ -572,6 +582,10 @@ impl Default for NewRuntimeConfig {
                 l7_log_tap_types: [false; 256],
             },
             trident_type: TridentType::TtProcess,
+            metric_server: MetricServerConfig {
+                enabled: false,
+                port: INFLUX_DB_PORT,
+            },
         };
         conf.collector.l4_log_store_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
         conf.flow.l7_log_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
@@ -805,6 +819,13 @@ impl ConfigHandler {
         Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
             &config.ebpf
         })
+    }
+
+    pub fn metric_server(&self) -> MetricServerAccess {
+        Map::new(
+            self.current_config.clone(),
+            |config| -> &MetricServerConfig { &config.metric_server },
+        )
     }
 
     pub fn new_runtime_config(
@@ -1046,6 +1067,10 @@ impl ConfigHandler {
                 log_path: static_config.ebpf_log_file.clone(),
                 l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size() as usize),
                 l7_log_tap_types,
+            },
+            metric_server: MetricServerConfig {
+                enabled: conf.external_agent_http_proxy_enabled(),
+                port: conf.external_agent_http_proxy_port() as u16,
             },
             trident_type: conf.trident_type(),
         };
@@ -1627,6 +1652,41 @@ impl ConfigHandler {
                 candidate_config.trident_type, new_config.trident_type
             );
             candidate_config.trident_type = new_config.trident_type;
+        }
+
+        if candidate_config.metric_server != new_config.metric_server {
+            if candidate_config.metric_server.enabled != new_config.metric_server.enabled {
+                fn metric_server_enabled_callback(
+                    handler: &ConfigHandler,
+                    components: &mut Components,
+                ) {
+                    if handler.candidate_config.metric_server.enabled {
+                        components.external_metrics_server.start();
+                    } else {
+                        components.external_metrics_server.stop();
+                    }
+                }
+                callbacks.push(metric_server_enabled_callback);
+            }
+
+            // 当端口更新后，在enabled情况下需要重启服务器重新监听
+            if candidate_config.metric_server.port != new_config.metric_server.port {
+                fn metric_server_port_callback(
+                    handler: &ConfigHandler,
+                    components: &mut Components,
+                ) {
+                    if handler.candidate_config.metric_server.enabled {
+                        components.external_metrics_server.stop();
+                        components.external_metrics_server.start();
+                    }
+                }
+                callbacks.push(metric_server_port_callback);
+            }
+            info!(
+                "external metric server config change from {:#?} to {:#?}",
+                candidate_config.metric_server, new_config.metric_server
+            );
+            candidate_config.metric_server = new_config.metric_server;
         }
 
         if restart_dispatcher && candidate_config.dispatcher.enabled {

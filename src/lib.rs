@@ -9,6 +9,7 @@ mod ebpf;
 mod ebpf_collector;
 mod error;
 mod exception;
+mod external_metrics;
 mod flow_generator;
 mod handler;
 mod metric;
