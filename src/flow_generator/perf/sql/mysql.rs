@@ -31,6 +31,7 @@ pub struct MysqlPerfData {
     status: L7ResponseStatus,
     has_log_data: bool,
     decode_response: bool,
+    has_response: bool,
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 }
 
@@ -86,11 +87,15 @@ impl L7FlowPerf for MysqlPerfData {
             LogMessageType::Request if self.l7_proto == L7Protocol::Mysql => {
                 self.parse_request(packet.lookup_key.timestamp, flow_id);
                 self.decode_response = true;
+                self.has_response = false;
                 Ok(())
             }
             LogMessageType::Response
-                if self.decode_response && self.l7_proto == L7Protocol::Mysql =>
+                if !self.has_response
+                    && self.decode_response
+                    && self.l7_proto == L7Protocol::Mysql =>
             {
+                self.has_response = true;
                 if self.parse_response(packet.lookup_key.timestamp, flow_id, &payload[offset..]) {
                     Err(Error::L7ReqNotFound(1))
                 } else {
@@ -184,6 +189,7 @@ impl MysqlPerfData {
             status: L7ResponseStatus::default(),
             has_log_data: false,
             decode_response: false,
+            has_response: false,
             rrt_cache: rrt_cache,
         }
     }
@@ -326,6 +332,7 @@ mod test {
                     status: L7ResponseStatus::Ok,
                     has_log_data: true,
                     decode_response: true,
+                    has_response: true,
                     rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
                 },
             ),
@@ -348,6 +355,7 @@ mod test {
                     status: L7ResponseStatus::ServerError,
                     has_log_data: true,
                     decode_response: true,
+                    has_response: true,
                     rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
                 },
             ),
