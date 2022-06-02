@@ -525,6 +525,7 @@ impl Components {
                 sender_id,
                 l4_flow_aggr_receiver,
                 config_handler.sender(),
+                stats_collector.clone(),
             ));
         }
 
@@ -542,8 +543,12 @@ impl Components {
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
-        let metrics_uniform_sender =
-            UniformSenderThread::new(sender_id, metrics_receiver, config_handler.sender());
+        let metrics_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            metrics_receiver,
+            config_handler.sender(),
+            stats_collector.clone(),
+        );
 
         let sender_id = 2usize;
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
@@ -559,8 +564,12 @@ impl Components {
                 StatsOption::Tag("index", "0".to_string()),
             ],
         );
-        let l7_flow_uniform_sender =
-            UniformSenderThread::new(sender_id, proto_log_receiver, config_handler.sender());
+        let l7_flow_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            proto_log_receiver,
+            config_handler.sender(),
+            stats_collector.clone(),
+        );
 
         // Dispatcher
         let bpf_syntax = if runtime_config.capture_bpf != "" {

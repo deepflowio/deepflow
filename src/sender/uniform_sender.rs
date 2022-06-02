@@ -2,7 +2,7 @@ use std::io::{ErrorKind, Write};
 use std::net::{IpAddr, Shutdown, TcpStream};
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc,
+    Arc, Weak,
 };
 use std::thread;
 use std::time::Duration;
@@ -15,7 +15,7 @@ use super::{SendItem, SendMessageType};
 use crate::config::handler::SenderAccess;
 use crate::utils::{
     queue::{Error, Receiver},
-    stats::{Counter, CounterType, CounterValue, RefCountable},
+    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
 };
 
 #[derive(Debug, Default)]
@@ -25,24 +25,23 @@ pub struct SenderCounter {
     pub dropped: AtomicU64,
 }
 
-// FIXME: counter not registered
-impl RefCountable for UniformSender {
+impl RefCountable for SenderCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
                 "tx",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.tx.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.tx.swap(0, Ordering::Relaxed)),
             ),
             (
                 "tx-bytes",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.tx_bytes.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.tx_bytes.swap(0, Ordering::Relaxed)),
             ),
             (
                 "dropped",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.dropped.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.dropped.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
@@ -141,10 +140,16 @@ pub struct UniformSenderThread {
     thread_handle: Option<JoinHandle<()>>,
 
     running: Arc<AtomicBool>,
+    stats: Arc<Collector>,
 }
 
 impl UniformSenderThread {
-    pub fn new(id: usize, input: Receiver<SendItem>, config: SenderAccess) -> Self {
+    pub fn new(
+        id: usize,
+        input: Receiver<SendItem>,
+        config: SenderAccess,
+        stats: Arc<Collector>,
+    ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
@@ -152,6 +157,7 @@ impl UniformSenderThread {
             config,
             thread_handle: None,
             running,
+            stats,
         }
     }
 
@@ -169,6 +175,7 @@ impl UniformSenderThread {
             self.input.clone(),
             self.config.clone(),
             self.running.clone(),
+            self.stats.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || uniform_sender.process()));
         info!("uniform sender id: {} started", self.id);
@@ -192,7 +199,7 @@ pub struct UniformSender {
     id: usize,
 
     input: Arc<Receiver<SendItem>>,
-    counter: SenderCounter,
+    counter: Arc<SenderCounter>,
 
     tcp_stream: Option<TcpStream>,
     encoder: Encoder,
@@ -203,6 +210,8 @@ pub struct UniformSender {
     reconnect: bool,
 
     running: Arc<AtomicBool>,
+    stats: Arc<Collector>,
+    stats_registered: bool,
 }
 
 impl UniformSender {
@@ -215,11 +224,12 @@ impl UniformSender {
         input: Arc<Receiver<SendItem>>,
         config: SenderAccess,
         running: Arc<AtomicBool>,
+        stats: Arc<Collector>,
     ) -> Self {
         Self {
             id,
             input,
-            counter: SenderCounter::default(),
+            counter: Arc::new(SenderCounter::default()),
             encoder: Encoder::new(0, SendMessageType::TaggedFlow, config.load().vtap_id),
             last_flush: Duration::ZERO,
             dst_ip: config.load().dest_ip,
@@ -227,6 +237,8 @@ impl UniformSender {
             tcp_stream: None,
             reconnect: false,
             running,
+            stats,
+            stats_registered: false,
         }
     }
 
@@ -312,6 +324,21 @@ impl UniformSender {
         }
     }
 
+    fn check_or_register_counterable(&mut self) {
+        if self.stats_registered {
+            return;
+        }
+        self.stats.register_countable(
+            "collect_sender",
+            Countable::Ref(Arc::downgrade(&self.counter) as Weak<dyn RefCountable>),
+            vec![StatsOption::Tag(
+                "type",
+                format!("{}", self.encoder.header.msg_type).to_string(),
+            )],
+        );
+        self.stats_registered = true;
+    }
+
     pub fn process(&mut self) {
         while self.running.load(Ordering::Relaxed) {
             match self
@@ -322,6 +349,7 @@ impl UniformSender {
                     debug!("send item: {}", send_item);
                     self.encoder.cache_to_sender(send_item);
                     if self.encoder.buffer_len() > Encoder::BUFFER_LEN {
+                        self.check_or_register_counterable();
                         self.update_dst_ip();
                         self.flush_encoder();
                     }
