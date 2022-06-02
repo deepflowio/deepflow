@@ -1,11 +1,9 @@
 use std::{
     io::{self, ErrorKind},
-    mem,
     net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle},
-    time::Duration,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use arc_swap::access::Access;
@@ -29,12 +27,9 @@ use crate::{
 };
 
 // 如果结构体长度大于此值就切片分包发送
-const MAX_PKT_SIZE: usize = 540;
 const LISTENED_IP: &str = "::";
 const LISTENED_PORT: u16 = 0;
 const BEACON_PORT: u16 = 20035;
-// PktNum(u8)
-const MAX_CHUNK_SIZE: usize = MAX_PKT_SIZE - mem::size_of::<u8>();
 const SER_BUF_SIZE: usize = 1024;
 
 struct ModuleDebuggers {
@@ -131,53 +126,34 @@ impl Debugger {
                 Ok(())
             });
 
-            'SERVER: loop {
+            while *running.0.lock().unwrap() {
                 let mut buf = [0u8; SER_BUF_SIZE];
                 let mut addr = None;
-                let (mut len, mut count, mut need_num) = (0, 0, 0);
-                while *running.0.lock().unwrap() {
-                    let start = Instant::now();
-                    match sock.recv_from(&mut buf[len..]) {
-                        Ok((n, a)) => {
-                            if n == 0 {
-                                break;
-                            }
-                            if addr.is_none() {
-                                addr.replace(a);
-                            }
-                            len += n - 1;
-                            count += 1;
-                            if need_num == 0 {
-                                need_num = buf[len];
-                            }
-                            //结束就退出,免得等待TIMEOUT
-                            if need_num == count {
-                                break;
-                            }
+                let start = Instant::now();
+                match sock.recv_from(&mut buf) {
+                    Ok((n, a)) => {
+                        if n == 0 {
+                            continue;
                         }
-                        Err(e)
-                            if start.elapsed() >= read_timeout
-                                && (cfg!(target_os = "windows")
-                                    && e.kind() == ErrorKind::TimedOut
-                                    || cfg!(target_os = "linux")
-                                        && e.kind() == ErrorKind::WouldBlock) =>
-                        {
-                            // normal timeout, Window=TimedOut UNIX=WouldBlock
-                            break;
+                        if addr.is_none() {
+                            addr.replace(a);
                         }
-                        Err(e) => {
-                            warn!("{}", e);
-                            continue 'SERVER;
-                        }
-                    };
+                        Self::dispatch((&sock, addr.unwrap()), buf, &debuggers)?;
+                    }
+                    Err(e)
+                        if start.elapsed() >= read_timeout
+                            && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
+                                || cfg!(target_os = "linux")
+                                    && e.kind() == ErrorKind::WouldBlock) =>
+                    {
+                        // normal timeout, Window=TimedOut UNIX=WouldBlock
+                        continue;
+                    }
+                    Err(e) => {
+                        warn!("{}", e);
+                        continue;
+                    }
                 }
-                if !*running.0.lock().unwrap() {
-                    break;
-                }
-                if addr.is_none() || len == 0 {
-                    continue;
-                }
-                Self::dispatch((&sock, addr.unwrap()), &buf[..len], &debuggers)?;
             }
             if let Err(e) = beacon_handle.join().unwrap() {
                 warn!("{}", e);
@@ -367,38 +343,30 @@ impl Client {
     }
 
     pub fn recv<'de, D: Deserialize<'de>>(&self, buf: &'de mut [u8]) -> Result<D> {
-        let (mut len, mut count, mut need_num) = (0, 0, 0);
-        loop {
-            let start = Instant::now();
-            match self.sock.recv(&mut buf[len..]) {
-                Ok(n) => {
-                    if n == 0 {
-                        break;
-                    }
-                    len += n - 1;
-                    count += 1;
-                    if need_num == 0 {
-                        need_num = buf[len];
-                    }
-                    //结束就退出,免得等待TIMEOUT
-                    if need_num == count {
-                        break;
-                    }
+        let start = Instant::now();
+        match self.sock.recv(buf) {
+            Ok(n) => {
+                if n == 0 {
+                    return Err(Error::IoError(io::Error::new(
+                        ErrorKind::Other,
+                        "recv zero byte",
+                    )));
                 }
-                Err(e)
-                    if start.elapsed() >= self.timeout
-                        && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
-                            || cfg!(target_os = "linux") && e.kind() == ErrorKind::WouldBlock) =>
-                {
-                    // normal timeout, Window=TimedOut UNIX=WouldBlock
-                    break;
-                }
-
-                Err(e) => return Err(Error::IoError(e)),
+                bincode::deserialize(&buf[..n]).map_err(|e| Error::BinCode(e))
             }
+            Err(e)
+                if start.elapsed() >= self.timeout
+                    && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
+                        || cfg!(target_os = "linux") && e.kind() == ErrorKind::WouldBlock) =>
+            {
+                // normal timeout, Window=TimedOut UNIX=WouldBlock
+                return Err(Error::IoError(io::Error::new(
+                    ErrorKind::Other,
+                    "NOROMAL RECV TIMEOUT",
+                )));
+            }
+            Err(e) => return Err(Error::IoError(e)),
         }
-
-        bincode::deserialize(&buf[..len]).map_err(|e| Error::BinCode(e))
     }
 }
 
@@ -408,16 +376,13 @@ pub(super) fn send_to(
     msg: &impl Serialize,
 ) -> Result<()> {
     let encoded: Vec<u8> = bincode::serialize(msg)?;
-    let pkt_len = (encoded.len() as f32 / MAX_CHUNK_SIZE as f32).ceil() as u8;
-    if encoded.len() + pkt_len as usize > MAX_BUF_SIZE {
+    if encoded.len() > MAX_BUF_SIZE {
         return Err(Error::IoError(io::Error::new(
             ErrorKind::Other,
             "message length too large",
         )));
     }
-    for chunk in encoded.chunks(MAX_CHUNK_SIZE) {
-        sock.send_to([chunk, &[pkt_len]].concat().as_slice(), addr.clone())?;
-    }
+    sock.send_to(encoded.as_slice(), addr)?;
     Ok(())
 }
 
