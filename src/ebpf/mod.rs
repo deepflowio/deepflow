@@ -76,8 +76,20 @@ pub struct SK_BPF_DATA {
     // 如果process_id等于thread_id说明是一个进程，否则是一个线程
     pub process_name: [u8; 16usize], //进程名字，占用16bytes
 
-    pub tuple: tuple_t,        // Socket五元组信息
-    pub socket_id: u64, // Socket的唯一标识，从启动时的时钟开始自增1，可用此做hash key代替五元组。
+    pub tuple: tuple_t, // Socket五元组信息
+
+    /*
+     * 为每一个数据通信的套接字创建唯一的ID，可用于流标识。
+     * socket_id组成：
+     *
+     * |--CPU-ID(8bit)--|------------ UID-MAIN(56bit) --------------|
+     *
+     * 1 CPU-ID: 高8位，CPU的ID号。
+     * 2 UID-MAIN: 低56位，由eBPF程序启动时的时钟作为基值开始自增。
+     *
+     * 上面保证任何时刻启动程序在当前机器下获取的socket_id都是唯一的。
+     */
+    pub socket_id: u64,
     pub l7_protocal_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
     // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
     pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。

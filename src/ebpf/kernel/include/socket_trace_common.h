@@ -99,9 +99,10 @@ struct socket_info_t {
 } __attribute__((packed));
 
 struct trace_info_t {
-	__u32 update_time;
-	__u32 peer_fd;
-	__u64 thread_trace_id;
+	__u32 update_time; // 从系统开机开始到创建/更新时的间隔时间单位是秒
+	__u32 peer_fd;	   // 用于socket之间的关联
+	__u64 thread_trace_id; // 线程追踪ID
+	__u64 conn_key; // 链接记录哈希表(socket_info_map)中的key值。
 };
 
 #endif /* BPF_SOCKET_TRACE_COMMON */

@@ -580,12 +580,20 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
 		}
 		trace_info.update_time = time_stamp / NS_PER_SEC;
+		trace_info.conn_key = conn_key;
 		trace_map__update(&pid_tgid, &trace_info);
 		if (!trace_info_ptr)
 			trace_stats->trace_map_count++;
 	} else { /* direction == T_EGRESS */
 		if (trace_info_ptr) {
-			*thread_trace_id = trace_info_ptr->thread_trace_id;
+			/*
+			 * 追踪在不同socket之间进行，而对于在同一个socket的情况进行忽略。
+			 */
+			if (conn_key != trace_info_ptr->conn_key)
+				*thread_trace_id = trace_info_ptr->thread_trace_id;
+			else
+				*thread_trace_id = 0;
+
 			trace_stats->trace_map_count--;
 		}
 
