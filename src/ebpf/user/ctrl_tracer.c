@@ -389,6 +389,9 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 		       sk_trace_params->kern_trace_map_max);
 		printf("kern_trace_map_used:\t%u\n\n",
 		       sk_trace_params->kern_trace_map_used);
+		printf("tracer_state:\t%u [ 0 (TRACER_INIT), 1 (TRACER_RUNNING), "
+		       "2 (TRACER_STOP) ]\n\n",
+		       sk_trace_params->tracer_state);
 
 		for (i = 0; i < array->count; i++) {
 			if (array->offsets[i].ready != 1)
