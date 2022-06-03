@@ -271,6 +271,7 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 
 	params->kern_socket_map_max = conf_max_socket_entries;
 	params->kern_trace_map_max = conf_max_trace_entries;
+	params->tracer_state = t->state;
 
 	struct trace_stats stats_total;
 

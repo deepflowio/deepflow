@@ -116,6 +116,7 @@ struct bpf_offset_param_array {
 };
 
 struct bpf_socktrace_params {
+	uint8_t  tracer_state;
 	uint32_t kern_socket_map_max;
 	uint32_t kern_socket_map_used;
 	uint32_t kern_trace_map_max;

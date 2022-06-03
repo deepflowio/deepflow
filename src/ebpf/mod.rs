@@ -221,7 +221,7 @@ pub struct SK_TRACE_STATS {
      * tracer 当前状态
      */
     pub is_adapt_success: bool, // 适配状态：内核适配成功为true，否则为false
-    pub tracer_state: u8,       // 追踪器当前状态。值：TRACER_STOP，TRACER_ACTIVE
+    pub tracer_state: u8,       // 追踪器当前状态。值：TRACER_INIT, TRACER_STOP，TRACER_RUNNING
 }
 
 extern "C" {
