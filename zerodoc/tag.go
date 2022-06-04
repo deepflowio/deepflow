@@ -273,7 +273,7 @@ type Field struct {
 	TagValue uint16
 }
 
-func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version string) *ckdb.Table {
+func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version string) *ckdb.Table {
 	timeKey := "time"
 	cluster := ckdb.DF_CLUSTER
 	if engine == ckdb.ReplicatedMergeTree {
@@ -281,7 +281,7 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 	}
 
 	var orderKeys []string
-	code := metricsDBCodes[id]
+	code := metricsTableCodes[id]
 	if code&L3EpcID != 0 {
 		orderKeys = []string{"l3_epc_id", "ip4", "ip6"}
 	} else if code&L3EpcIDPath != 0 {
@@ -296,21 +296,21 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 
 	var meterColumns []*ckdb.Column
 	switch id {
-	case VTAP_FLOW_PORT, VTAP_FLOW_EDGE_PORT:
+	case VTAP_FLOW_PORT_1M, VTAP_FLOW_EDGE_PORT_1M:
 		meterColumns = FlowMeterColumns()
-	case VTAP_ACL:
+	case VTAP_ACL_1M:
 		meterColumns = UsageMeterColumns()
-	case VTAP_APP_PORT, VTAP_APP_EDGE_PORT:
+	case VTAP_APP_PORT_1M, VTAP_APP_EDGE_PORT_1M:
 		meterColumns = AppMeterColumns()
 	}
 
 	return &ckdb.Table{
 		Version:         version,
 		ID:              uint8(id),
-		Database:        id.DBName(),
-		LocalName:       ckdb.LOCAL_1M,
-		GlobalName:      ckdb.GLOBAL_1M,
-		Columns:         append(genTagColumns(metricsDBCodes[id]), meterColumns...),
+		Database:        ckdb.METRICS_DB,
+		LocalName:       id.TableName() + ckdb.LOCAL_SUBFFIX,
+		GlobalName:      id.TableName(),
+		Columns:         append(genTagColumns(metricsTableCodes[id]), meterColumns...),
 		TimeKey:         timeKey,
 		TTL:             7, // 分钟数据默认保留7天
 		PartitionFunc:   ckdb.TimeFuncTwelveHour,
@@ -325,8 +325,8 @@ func newMetricsMinuteTable(id MetricsDBID, engine ckdb.EngineType, version strin
 func newMetricsSecondTable(minuteTable *ckdb.Table) *ckdb.Table {
 	t := *minuteTable
 	t.ID = minuteTable.ID + uint8(VTAP_FLOW_PORT_1S)
-	t.LocalName = ckdb.LOCAL_1S
-	t.GlobalName = ckdb.GLOBAL_1S
+	t.LocalName = MetricsTableID(t.ID).TableName() + ckdb.LOCAL_SUBFFIX
+	t.GlobalName = MetricsTableID(t.ID).TableName()
 	t.TTL = 1 // 秒数据默认保存1天
 	t.PartitionFunc = ckdb.TimeFuncFourHour
 	t.Engine = ckdb.MergeTree // 秒级数据不用支持使用replica
@@ -343,7 +343,7 @@ func GetMetricsTables(engine ckdb.EngineType, version string) []*ckdb.Table {
 	}
 
 	minuteTables := []*ckdb.Table{}
-	for i := VTAP_FLOW_PORT; i <= VTAP_ACL; i++ {
+	for i := VTAP_FLOW_PORT_1M; i <= VTAP_ACL_1M; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version))
 	}
 	secondTables := []*ckdb.Table{}
@@ -354,16 +354,16 @@ func GetMetricsTables(engine ckdb.EngineType, version string) []*ckdb.Table {
 	return metricsTables
 }
 
-type MetricsDBID uint8
+type MetricsTableID uint8
 
 const (
-	VTAP_FLOW_PORT MetricsDBID = iota
-	VTAP_FLOW_EDGE_PORT
+	VTAP_FLOW_PORT_1M MetricsTableID = iota
+	VTAP_FLOW_EDGE_PORT_1M
 
-	VTAP_APP_PORT
-	VTAP_APP_EDGE_PORT
+	VTAP_APP_PORT_1M
+	VTAP_APP_EDGE_PORT_1M
 
-	VTAP_ACL
+	VTAP_ACL_1M
 
 	VTAP_FLOW_PORT_1S
 	VTAP_FLOW_EDGE_PORT_1S
@@ -371,56 +371,67 @@ const (
 	VTAP_APP_PORT_1S
 	VTAP_APP_EDGE_PORT_1S
 
-	VTAP_DB_ID_MAX
+	VTAP_TABLE_ID_MAX
 )
 
-func (i MetricsDBID) DBName() string {
-	return metricsDBNames[i]
+func (i MetricsTableID) TableName() string {
+	return metricsTableNames[i]
 }
 
-func (i MetricsDBID) DBCode() Code {
-	return metricsDBCodes[i]
+func (i MetricsTableID) TableCode() Code {
+	return metricsTableCodes[i]
 }
 
-var metricsDBNames = []string{
-	VTAP_FLOW_PORT:      "vtap_flow_port",
-	VTAP_FLOW_EDGE_PORT: "vtap_flow_edge_port",
+var metricsTableNames = []string{
+	VTAP_FLOW_PORT_1M:      "vtap_flow_port_1m",
+	VTAP_FLOW_EDGE_PORT_1M: "vtap_flow_edge_port_1m",
 
-	VTAP_APP_PORT:      "vtap_app_port",
-	VTAP_APP_EDGE_PORT: "vtap_app_edge_port",
+	VTAP_APP_PORT_1M:      "vtap_app_port_1m",
+	VTAP_APP_EDGE_PORT_1M: "vtap_app_edge_port_1m",
 
-	VTAP_ACL: "vtap_acl",
+	VTAP_ACL_1M: "vtap_acl_1m",
 
-	VTAP_FLOW_PORT_1S:      "vtap_flow_port",
-	VTAP_FLOW_EDGE_PORT_1S: "vtap_flow_edge_port",
+	VTAP_FLOW_PORT_1S:      "vtap_flow_port_1s",
+	VTAP_FLOW_EDGE_PORT_1S: "vtap_flow_edge_port_1s",
 
-	VTAP_APP_PORT_1S:      "vtap_app_port",
-	VTAP_APP_EDGE_PORT_1S: "vtap_app_edge_port",
+	VTAP_APP_PORT_1S:      "vtap_app_port_1s",
+	VTAP_APP_EDGE_PORT_1S: "vtap_app_edge_port_1s",
 }
 
-func MetricsDBNameToID(name string) MetricsDBID {
-	for i, n := range metricsDBNames {
+func MetricsTableNameToID(name string) MetricsTableID {
+	for i, n := range metricsTableNames {
 		if n == name {
-			return MetricsDBID(i)
+			return MetricsTableID(i)
 		}
 	}
-	return VTAP_DB_ID_MAX
+	return VTAP_TABLE_ID_MAX
 }
 
 const (
 	BaseCode     = AZID | HostID | IP | L3Device | L3EpcID | PodClusterID | PodGroupID | PodID | PodNodeID | PodNSID | RegionID | SubnetID | TAPType | VTAPID | ServiceID | Resource
 	BasePathCode = AZIDPath | HostIDPath | IPPath | L3DevicePath | L3EpcIDPath | PodClusterIDPath | PodGroupIDPath | PodIDPath | PodNodeIDPath | PodNSIDPath | RegionIDPath | SubnetIDPath | TAPSide | TAPType | VTAPID | ServiceIDPath | ResourcePath
 	BasePortCode = Protocol | ServerPort | IsKeyService
+
+	VTAP_FLOW_PORT      = BaseCode | BasePortCode | Direction
+	VTAP_FLOW_EDGE_PORT = BasePathCode | BasePortCode | TAPPort
+	VTAP_APP_PORT       = BaseCode | BasePortCode | Direction | L7Protocol
+	VTAP_APP_EDGE_PORT  = BasePathCode | BasePortCode | TAPPort | L7Protocol
 )
 
-var metricsDBCodes = []Code{
-	VTAP_FLOW_PORT:      BaseCode | BasePortCode | Direction,
-	VTAP_FLOW_EDGE_PORT: BasePathCode | BasePortCode | TAPPort,
+var metricsTableCodes = []Code{
+	VTAP_FLOW_PORT_1M:      VTAP_FLOW_PORT,
+	VTAP_FLOW_EDGE_PORT_1M: VTAP_FLOW_EDGE_PORT,
 
-	VTAP_APP_PORT:      BaseCode | BasePortCode | Direction | L7Protocol,
-	VTAP_APP_EDGE_PORT: BasePathCode | BasePortCode | TAPPort | L7Protocol,
+	VTAP_APP_PORT_1M:      VTAP_APP_PORT,
+	VTAP_APP_EDGE_PORT_1M: VTAP_APP_EDGE_PORT,
 
-	VTAP_ACL: ACLGID | TagType | TagValue | VTAPID,
+	VTAP_ACL_1M: ACLGID | TagType | TagValue | VTAPID,
+
+	VTAP_FLOW_PORT_1S:      VTAP_FLOW_PORT,
+	VTAP_FLOW_EDGE_PORT_1S: VTAP_FLOW_EDGE_PORT,
+
+	VTAP_APP_PORT_1S:      VTAP_APP_PORT,
+	VTAP_APP_EDGE_PORT_1S: VTAP_APP_EDGE_PORT,
 }
 
 type Tag struct {
@@ -817,7 +828,7 @@ func (t *Tag) MarshalTo(b []byte) int {
 }
 
 func (t *Tag) TableID(isSecond bool) (uint8, error) {
-	for i, code := range metricsDBCodes {
+	for i, code := range metricsTableCodes {
 		// 有时会有MAC,MACPath字段，需要先排除再比较
 		if t.Code&^MAC&^MACPath == code {
 			if isSecond {
