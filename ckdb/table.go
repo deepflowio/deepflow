@@ -6,10 +6,8 @@ import (
 )
 
 const (
-	LOCAL_1M  = "1m_local"
-	GLOBAL_1M = "1m"
-	LOCAL_1S  = "1s_local"
-	GLOBAL_1S = "1s"
+	METRICS_DB    = "flow_metrics"
+	LOCAL_SUBFFIX = "_local"
 )
 
 type Table struct {
