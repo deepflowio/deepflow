@@ -254,8 +254,10 @@ var ColumnAdd610 = []*ColumnAdds{
 	},
 }
 
-func getTables(connect *sql.DB, db string) ([]string, error) {
-	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
+var ColumnAdd611 = []*ColumnAdds{}
+
+func getTables(connect *sql.DB, tableName string) ([]string, error) {
+	sql := fmt.Sprintf("SHOW TABLES IN %s", ckdb.METRICS_DB)
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -267,7 +269,9 @@ func getTables(connect *sql.DB, db string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		tables = append(tables, table)
+		if strings.HasPrefix(table, tableName) {
+			tables = append(tables, table)
+		}
 	}
 	return tables, nil
 
@@ -282,8 +286,8 @@ type DatasourceInfo struct {
 	interval   ckdb.TimeFuncType
 }
 
-func getDatasourceInfo(connect *sql.DB, db, name string) (*DatasourceInfo, error) {
-	sql := fmt.Sprintf("SHOW CREATE TABLE %s.%s_mv", db, name)
+func getDatasourceInfo(connect *sql.DB, name string) (*DatasourceInfo, error) {
+	sql := fmt.Sprintf("SHOW CREATE TABLE %s.`%s_mv`", ckdb.METRICS_DB, name)
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -302,7 +306,7 @@ func getDatasourceInfo(connect *sql.DB, db, name string) (*DatasourceInfo, error
 	summableReg := regexp.MustCompile("`packet_tx__agg` AggregateFunction.([a-z]+)")
 	// 匹配 `rtt_sum__agg` AggregateFunction(avg, Float64), 中的 'avg' 为非可累加聚合的方法
 	unsummableReg := regexp.MustCompile("`rtt_sum__agg` AggregateFunction.([a-zA-Z]+)")
-	if strings.HasPrefix(db, "vtap_app") {
+	if strings.HasPrefix(name, "vtap_app") {
 		summableReg = regexp.MustCompile("`request__agg` AggregateFunction.([a-z]+)")
 		unsummableReg = regexp.MustCompile("`rrt_sum__agg` AggregateFunction.([a-zA-Z]+)")
 	}
@@ -337,7 +341,7 @@ func getDatasourceInfo(connect *sql.DB, db, name string) (*DatasourceInfo, error
 	}
 
 	return &DatasourceInfo{
-		db:         db,
+		db:         ckdb.METRICS_DB,
 		baseTable:  baseTable,
 		name:       name,
 		summable:   summable,
@@ -347,8 +351,8 @@ func getDatasourceInfo(connect *sql.DB, db, name string) (*DatasourceInfo, error
 }
 
 // 找出自定义数据源和参数
-func getUserDefinedDatasourceInfos(connect *sql.DB, db string) ([]*DatasourceInfo, error) {
-	tables, err := getTables(connect, db)
+func getUserDefinedDatasourceInfos(connect *sql.DB, tableName string) ([]*DatasourceInfo, error) {
+	tables, err := getTables(connect, tableName)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +367,7 @@ func getUserDefinedDatasourceInfos(connect *sql.DB, db string) ([]*DatasourceInf
 
 	dSInfos := []*DatasourceInfo{}
 	for _, name := range aggTables {
-		ds, err := getDatasourceInfo(connect, db, name)
+		ds, err := getDatasourceInfo(connect, name)
 		if err != nil {
 			return nil, err
 		}
@@ -441,10 +445,15 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		return nil, err
 	}
 
-	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION)[zerodoc.MetricsDBNameToID(d.db)]
+	lastUnderlineIndex := strings.LastIndex(d.name, "_")
+	if lastUnderlineIndex < 0 {
+		return nil, fmt.Errorf("invalid table name %s", d.name)
+	}
+	baseTableName, dstTableName := d.name[:lastUnderlineIndex], d.name[lastUnderlineIndex+1:]
+	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION)[zerodoc.MetricsTableNameToID(baseTableName)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
-		rawTable, d.baseTable, d.name,
+		rawTable, dstTableName,
 		d.summable, d.unsummable, d.interval)
 	log.Info(createMvSql)
 	_, err = connect.Exec(createMvSql)
@@ -462,7 +471,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 
 	// create table local
 	createLocalSql := datasource.MakeCreateTableLocal(
-		rawTable, d.baseTable, d.name,
+		rawTable, dstTableName,
 		d.summable, d.unsummable)
 	log.Info(createLocalSql)
 	_, err = connect.Exec(createLocalSql)
@@ -483,7 +492,7 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	}
 
 	columnAdds := []*ColumnAdd{}
-	for _, adds := range ColumnAdd610 {
+	for _, adds := range ColumnAdd611 {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 	i.columnAdds = columnAdds
@@ -625,8 +634,10 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 		dones = append(dones, add)
 	}
 
-	for _, db := range []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port"} {
-		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, db)
+	for _, tableName := range []string{
+		zerodoc.VTAP_FLOW_PORT_1M.TableName(), zerodoc.VTAP_FLOW_EDGE_PORT_1M.TableName(),
+		zerodoc.VTAP_APP_PORT_1M.TableName(), zerodoc.VTAP_APP_EDGE_PORT_1M.TableName()} {
+		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, tableName)
 		if err != nil {
 			return nil, err
 		}

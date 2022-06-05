@@ -34,7 +34,7 @@ func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabl
 			counterName = "metrics_1s"
 		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1S) {
 			counterName = "app_1s"
-		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT) {
+		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT_1M) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1M) {
 			counterName = "app_1m"
 		}
 		ckwriter, err := ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName, table, replicaEnabled,
@@ -53,7 +53,7 @@ func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabl
 }
 
 func (w *DbWriter) Put(items ...interface{}) error {
-	caches := [zerodoc.VTAP_DB_ID_MAX][]interface{}{}
+	caches := [zerodoc.VTAP_TABLE_ID_MAX][]interface{}{}
 	for i := range caches {
 		caches[i] = make([]interface{}, 0, CACHE_SIZE)
 	}

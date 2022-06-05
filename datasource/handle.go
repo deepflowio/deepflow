@@ -20,20 +20,30 @@ const (
 )
 
 // VATP_ACL数据库, 不进行数据源修改
-var metricsGroupDBIDs = [][]zerodoc.MetricsDBID{
-	zerodoc.VTAP_FLOW_PORT: []zerodoc.MetricsDBID{zerodoc.VTAP_FLOW_EDGE_PORT, zerodoc.VTAP_FLOW_PORT},
-	zerodoc.VTAP_APP_PORT:  []zerodoc.MetricsDBID{zerodoc.VTAP_APP_EDGE_PORT, zerodoc.VTAP_APP_PORT},
+var metricsGroupTableIDs = [][]zerodoc.MetricsTableID{
+	zerodoc.VTAP_FLOW_PORT_1M: []zerodoc.MetricsTableID{zerodoc.VTAP_FLOW_EDGE_PORT_1M, zerodoc.VTAP_FLOW_PORT_1M},
+	zerodoc.VTAP_FLOW_PORT_1S: []zerodoc.MetricsTableID{zerodoc.VTAP_FLOW_EDGE_PORT_1S, zerodoc.VTAP_FLOW_PORT_1S},
+	zerodoc.VTAP_APP_PORT_1M:  []zerodoc.MetricsTableID{zerodoc.VTAP_APP_EDGE_PORT_1M, zerodoc.VTAP_APP_PORT_1M},
+	zerodoc.VTAP_APP_PORT_1S:  []zerodoc.MetricsTableID{zerodoc.VTAP_APP_EDGE_PORT_1S, zerodoc.VTAP_APP_PORT_1S},
 }
 
-func getMetricsSubDBIDs(dbGroup string) ([]zerodoc.MetricsDBID, error) {
-	if dbGroup == "vtap_flow" || dbGroup == "vtap_app" {
-		dbGroup += "_port"
+func getMetricsSubTableIDs(tableGroup, baseTable string) ([]zerodoc.MetricsTableID, error) {
+	switch tableGroup {
+	case "vtap_flow":
+		if baseTable == ORIGIN_TABLE_1S {
+			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1S], nil
+		} else {
+			return metricsGroupTableIDs[zerodoc.VTAP_FLOW_PORT_1M], nil
+		}
+	case "vtap_app":
+		if baseTable == ORIGIN_TABLE_1S {
+			return metricsGroupTableIDs[zerodoc.VTAP_APP_PORT_1S], nil
+		} else {
+			return metricsGroupTableIDs[zerodoc.VTAP_APP_PORT_1M], nil
+		}
+	default:
+		return nil, fmt.Errorf("unknown table group(%s)", tableGroup)
 	}
-	metricsDBID := zerodoc.MetricsDBNameToID(dbGroup)
-	if metricsDBID < zerodoc.VTAP_DB_ID_MAX {
-		return metricsGroupDBIDs[metricsDBID], nil
-	}
-	return nil, fmt.Errorf("unknown db group(%s)", dbGroup)
 }
 
 // zerodoc 的 Latency 结构中的非累加聚合字段
@@ -184,11 +194,14 @@ const (
 )
 
 func getMetricsTableName(id uint8, table string, t TableType) string {
-	dbId := zerodoc.MetricsDBID(id)
-	if len(t.String()) == 0 {
-		return fmt.Sprintf("%s.`%s`", dbId.DBName(), table)
+	tableId := zerodoc.MetricsTableID(id)
+	if len(table) == 0 {
+		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), t.String())
 	}
-	return fmt.Sprintf("%s.`%s_%s`", dbId.DBName(), table, t.String())
+	if len(t.String()) == 0 {
+		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), table)
+	}
+	return fmt.Sprintf("%s.`%s_%s_%s`", ckdb.METRICS_DB, tableId.TableName(), table, t.String())
 }
 
 func stringSliceHas(items []string, item string) bool {
@@ -261,14 +274,14 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrS
 		ckdb.DF_STORAGE_POLICY)
 }
 
-func MakeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
+func MakeMVTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
 	tableMv := getMetricsTableName(t.ID, dstTable, MV)
 	tableAgg := getMetricsTableName(t.ID, dstTable, AGG)
 
 	// 对于从1m,1s表进行聚合的表，使用local表作为源表
 	baseTableType := LOCAL
 	columnTableType := MV
-	tableBase := getMetricsTableName(t.ID, baseTable, baseTableType)
+	tableBase := getMetricsTableName(t.ID, "", baseTableType)
 
 	groupKeys := t.OrderKeys
 	columns := []string{}
@@ -302,7 +315,7 @@ func MakeMVTableCreateSQL(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggr
 		strings.Join(t.OrderKeys, ","))
 }
 
-func MakeCreateTableLocal(t *ckdb.Table, baseTable, dstTable, aggrSummable, aggrUnsummable string) string {
+func MakeCreateTableLocal(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string) string {
 	tableAgg := getMetricsTableName(t.ID, dstTable, AGG)
 	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
 
@@ -344,12 +357,12 @@ func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 	return createTable
 }
 
-func getMetricsTable(id zerodoc.MetricsDBID) *ckdb.Table {
+func getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Table {
 	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION)[id] // GetMetricsTables取的全局变量的值，以roze在启动时对tables初始化的参数为准
 }
 
-func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
-	table := getMetricsTable(dbId)
+func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
+	table := getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
 	}
@@ -363,8 +376,8 @@ func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, dbId zerodoc
 
 	commands := []string{
 		m.makeAggTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, partitionTime, duration),
-		MakeMVTableCreateSQL(table, baseTable, dstTable, aggrSummable, aggrUnsummable, aggTime),
-		MakeCreateTableLocal(table, baseTable, dstTable, aggrSummable, aggrUnsummable),
+		MakeMVTableCreateSQL(table, dstTable, aggrSummable, aggrUnsummable, aggTime),
+		MakeCreateTableLocal(table, dstTable, aggrSummable, aggrUnsummable),
 		MakeGlobalTableCreateSQL(table, dstTable),
 	}
 	for _, cmd := range commands {
@@ -376,13 +389,13 @@ func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, dbId zerodoc
 	return nil
 }
 
-func (m *DatasourceManager) modTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, dstTable string, duration int) error {
-	table := getMetricsTable(dbId)
+func (m *DatasourceManager) modTableMV(ck clickhouse.Clickhouse, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
+	table := getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
-		tableMod = getMetricsTableName(uint8(dbId), dstTable, LOCAL)
+		tableMod = getMetricsTableName(uint8(tableId), dstTable, LOCAL)
 	} else {
-		tableMod = getMetricsTableName(uint8(dbId), dstTable, AGG)
+		tableMod = getMetricsTableName(uint8(tableId), dstTable, AGG)
 	}
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
 		tableMod, makeTTLString(table.TimeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes))
@@ -398,7 +411,7 @@ func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Clickhouse, table
 	return ckwriter.ExecSQL(ck, modTable)
 }
 
-func delTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsDBID, table string) error {
+func delTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsTableID, table string) error {
 	dropTables := []string{
 		getMetricsTableName(uint8(dbId), table, GLOBAL),
 		getMetricsTableName(uint8(dbId), table, LOCAL),
@@ -446,7 +459,7 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		return nil
 	}
 
-	subDBIDs, err := getMetricsSubDBIDs(dbGroup)
+	subTableIDs, err := getMetricsSubTableIDs(dbGroup, baseTable)
 	if err != nil {
 		return err
 	}
@@ -466,9 +479,6 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		if _, err := AggrToEnum(aggrUnsummable); err != nil {
 			return err
 		}
-		if interval < 1 {
-			return fmt.Errorf("interval(%d) must bigger than 0.", interval)
-		}
 		if interval != 60 && interval != 1440 {
 			return fmt.Errorf("interval(%d) only support 60 or 1440.", interval)
 		}
@@ -485,22 +495,22 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 	}
 
 	for _, ck := range cks {
-		for _, dbId := range subDBIDs {
+		for _, tableId := range subTableIDs {
 			switch actionEnum {
 			case ADD:
 				aggInterval := IntervalHour
 				if interval == 1440 {
 					aggInterval = IntervalDay
 				}
-				if err := m.createTableMV(ck, dbId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
+				if err := m.createTableMV(ck, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
 					return err
 				}
 			case MOD:
-				if err := m.modTableMV(ck, dbId, dstTable, duration); err != nil {
+				if err := m.modTableMV(ck, tableId, dstTable, duration); err != nil {
 					return err
 				}
 			case DEL:
-				if err := delTableMV(ck, dbId, dstTable); err != nil {
+				if err := delTableMV(ck, tableId, dstTable); err != nil {
 					return err
 				}
 			default:

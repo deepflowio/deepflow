@@ -60,7 +60,7 @@ type Unmarshaller struct {
 	dbwriter           *dbwriter.DbWriter
 	queueBatchCache    QueueCache
 	counter            *Counter
-	dbCounter          [zerodoc.VTAP_DB_ID_MAX + 1]int64
+	tableCounter       [zerodoc.VTAP_TABLE_ID_MAX + 1]int64
 	utils.Closable
 }
 
@@ -117,12 +117,12 @@ func (u *Unmarshaller) GetCounter() interface{} {
 		counter.MinDelay = 0
 	}
 
-	counter.FlowPortCount, u.dbCounter[zerodoc.VTAP_FLOW_PORT] = u.dbCounter[zerodoc.VTAP_FLOW_PORT], 0
-	counter.FlowPort1sCount, u.dbCounter[zerodoc.VTAP_FLOW_PORT_1S] = u.dbCounter[zerodoc.VTAP_FLOW_PORT_1S], 0
-	counter.FlowEdgePortCount, u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT] = u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT], 0
-	counter.FlowEdgePort1sCount, u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S] = u.dbCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S], 0
-	counter.AclCount, u.dbCounter[zerodoc.VTAP_ACL] = u.dbCounter[zerodoc.VTAP_ACL], 0
-	counter.OtherCount, u.dbCounter[zerodoc.VTAP_DB_ID_MAX] = u.dbCounter[zerodoc.VTAP_DB_ID_MAX], 0
+	counter.FlowPortCount, u.tableCounter[zerodoc.VTAP_FLOW_PORT_1M] = u.tableCounter[zerodoc.VTAP_FLOW_PORT_1M], 0
+	counter.FlowPort1sCount, u.tableCounter[zerodoc.VTAP_FLOW_PORT_1S] = u.tableCounter[zerodoc.VTAP_FLOW_PORT_1S], 0
+	counter.FlowEdgePortCount, u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1M] = u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1M], 0
+	counter.FlowEdgePort1sCount, u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S] = u.tableCounter[zerodoc.VTAP_FLOW_EDGE_PORT_1S], 0
+	counter.AclCount, u.tableCounter[zerodoc.VTAP_ACL_1M] = u.tableCounter[zerodoc.VTAP_ACL_1M], 0
+	counter.OtherCount, u.tableCounter[zerodoc.VTAP_TABLE_ID_MAX] = u.tableCounter[zerodoc.VTAP_TABLE_ID_MAX], 0
 
 	return counter
 }
@@ -229,7 +229,7 @@ func (u *Unmarshaller) QueueProcess() {
 						app.ReleaseDocument(doc)
 						continue
 					}
-					u.dbCounter[tableID]++
+					u.tableCounter[tableID]++
 
 					u.putStoreQueue(doc)
 				}
