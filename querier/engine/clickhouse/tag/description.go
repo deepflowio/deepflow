@@ -229,6 +229,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	// 获取tagEnumFile
 	sqlSplit := strings.Split(sql, " ")
 	tag := sqlSplit[2]
+	tag = strings.Trim(tag, "'")
 	// 标签是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
 		return GetTagResourceValues(sql)
@@ -266,6 +267,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	}
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
+	tag = strings.Trim(tag, "'")
 	var whereSql string
 	if strings.Contains(rawSql, "WHERE") {
 		whereSql = strings.Split(rawSql, "WHERE")[1]
