@@ -62,7 +62,7 @@ ORDER BY (%s)
 PARTITION BY %s
 TTL %s +  toIntervalDay(%d)
 SETTINGS storage_policy = '%s'`,
-		t.Database, t.LocalName,
+		t.Database, fmt.Sprintf("`%s`", t.LocalName),
 		strings.Join(columns, ",\n"),
 		engine,
 		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
@@ -75,7 +75,7 @@ SETTINGS storage_policy = '%s'`,
 
 func (t *Table) MakeGlobalTableCreateSQL() string {
 	engine := fmt.Sprintf(Distributed.String(), t.Cluster.String(), t.Database, t.LocalName)
-	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.%s AS %s.%s ENGINE=%s",
+	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`%s` AS %s.`%s` ENGINE=%s",
 		t.Database, t.GlobalName, t.Database, t.LocalName, engine)
 }
 
@@ -87,7 +87,7 @@ func (t *Table) MakePrepareTableInsertSQL() string {
 		values = append(values, "?")
 	}
 
-	prepare := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)",
+	prepare := fmt.Sprintf("INSERT INTO %s.`%s` (%s) VALUES (%s)",
 		t.Database, t.LocalName,
 		strings.Join(columns, ","),
 		strings.Join(values, ","))

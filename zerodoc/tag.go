@@ -383,19 +383,19 @@ func (i MetricsTableID) TableCode() Code {
 }
 
 var metricsTableNames = []string{
-	VTAP_FLOW_PORT_1M:      "vtap_flow_port_1m",
-	VTAP_FLOW_EDGE_PORT_1M: "vtap_flow_edge_port_1m",
+	VTAP_FLOW_PORT_1M:      "vtap_flow_port.1m",
+	VTAP_FLOW_EDGE_PORT_1M: "vtap_flow_edge_port.1m",
 
-	VTAP_APP_PORT_1M:      "vtap_app_port_1m",
-	VTAP_APP_EDGE_PORT_1M: "vtap_app_edge_port_1m",
+	VTAP_APP_PORT_1M:      "vtap_app_port.1m",
+	VTAP_APP_EDGE_PORT_1M: "vtap_app_edge_port.1m",
 
-	VTAP_ACL_1M: "vtap_acl_1m",
+	VTAP_ACL_1M: "vtap_acl.1m",
 
-	VTAP_FLOW_PORT_1S:      "vtap_flow_port_1s",
-	VTAP_FLOW_EDGE_PORT_1S: "vtap_flow_edge_port_1s",
+	VTAP_FLOW_PORT_1S:      "vtap_flow_port.1s",
+	VTAP_FLOW_EDGE_PORT_1S: "vtap_flow_edge_port.1s",
 
-	VTAP_APP_PORT_1S:      "vtap_app_port_1s",
-	VTAP_APP_EDGE_PORT_1S: "vtap_app_edge_port_1s",
+	VTAP_APP_PORT_1S:      "vtap_app_port.1s",
+	VTAP_APP_EDGE_PORT_1S: "vtap_app_edge_port.1s",
 }
 
 func MetricsTableNameToID(name string) MetricsTableID {
