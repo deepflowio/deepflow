@@ -11,7 +11,9 @@
 
 int major, minor;		// Linux kernel主版本，次版本
 
-uint64_t sys_boot_time_ns;	// 系统启动时间，单位：纳秒
+#define BOOT_TIME_UPDATE_PERIOD	60	// 系统启动时间更新周期
+volatile uint64_t sys_boot_time_ns;	// 系统启动时间，单位：纳秒
+uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
 
 /*
  * tracers
@@ -652,6 +654,24 @@ static int cpus_kick_kern(void)
 	return 0;
 }
 
+/*
+ * 对系统的启动时间（精度为纳秒）做周期性更新
+ */
+static int boot_time_update(void)
+{
+	boot_time_update_count++;
+	// 默认情况下1分钟更新一次系统启动时间
+	if (!((boot_time_update_count * EVENT_PERIOD_TIME) %
+	      BOOT_TIME_UPDATE_PERIOD)) {
+		uint64_t real_time, monotonic_time;
+		real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
+		monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
+		sys_boot_time_ns = real_time - monotonic_time;
+	}
+
+	return 0;
+}
+
 static void period_process_main(__unused void *arg)
 {
 	// 确保所有tracer都运行了，之后触发kick内核操作
@@ -893,6 +913,18 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	}
 
 	if (register_period_event_op("kick_kern", cpus_kick_kern))
+		return -EINVAL;
+
+	/*
+	 * 由于系统运行过程中会存在系统时间被改动而发生变化的情况，
+	 * 因此需要对系统启动时间(精度为纳秒)进行周期性的更新，是之
+	 * 随系统时间变化而相应进行调整。由于eBPF捕获时间的计算是在
+	 * 系统启动时间（sys_boot_time_ns）的基础上加单调时间（monotonic 
+	 * time，指系统启动后流失的时间），所以系统启动时间要进行周期性
+	 * 检查调整，以免系统时间改变而使eBPF数据的捕获时间较之AF_PACKET
+	 * 捕获数据的时间发生较大差异。
+	 */
+	if (register_period_event_op("boot time update", boot_time_update))
 		return -EINVAL;
 
 	err =
