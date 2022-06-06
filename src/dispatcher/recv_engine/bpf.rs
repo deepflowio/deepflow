@@ -40,7 +40,7 @@ impl Builder {
 
         // 不采集分发的VXLAN流量
         conditions.push(format!(
-            "not (udp and dst port {} and udp[4:1]={:#x})",
+            "not (udp and dst port {} and udp[8:1]={:#x})",
             self.vxlan_port, NPB_VXLAN_FLAGS
         ));
 
