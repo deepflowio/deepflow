@@ -142,6 +142,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				valueUInt64 := utils.Mac2Uint64(mac)
 				filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
 			default:
+				t.Tag = strings.Trim(t.Tag, "`")
 				if strings.HasPrefix(t.Tag, "label.") {
 					if strings.HasSuffix(t.Tag, "_0") {
 						tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
