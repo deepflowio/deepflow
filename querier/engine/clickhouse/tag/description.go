@@ -216,7 +216,7 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 		key := _key.([]interface{})[0]
 		labelKey := "label." + key.(string)
 		response["values"] = append(response["values"], []interface{}{
-			labelKey, labelKey + "_0", labelKey + "_1", labelKey, "string",
+			labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
 			"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
 		})
 	}
