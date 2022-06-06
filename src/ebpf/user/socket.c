@@ -38,7 +38,10 @@ static uint32_t conf_max_trace_entries;
 static uint32_t conf_socket_map_max_reclaim;
 
 extern int major, minor;
+
 extern uint64_t sys_boot_time_ns;
+extern uint64_t prev_sys_boot_time_ns;
+
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
 static bool is_adapt_success(struct bpf_tracer *t);
@@ -849,6 +852,10 @@ struct socket_trace_stats socket_tracer_stats(void)
 
 	stats.is_adapt_success = t->adapt_success;
 	stats.tracer_state = t->state;
+
+	// 相邻两次系统启动时间更新后的差值
+	stats.boot_time_update_diff = sys_boot_time_ns -
+			prev_sys_boot_time_ns;
 
 	return stats;
 }

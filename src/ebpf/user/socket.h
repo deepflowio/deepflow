@@ -66,6 +66,8 @@ struct socket_bpf_data {
  * kerenl 适配状态
  * @is_adapt_success: 适配成功为1，否则为0
  * @tracer_state: 追踪器当前状态
+ *
+ * @boot_time_update_diff 这里用于记录相邻两次更新后，系统启动时间之间的差异（单位为纳秒）。
  */
 struct socket_trace_stats {
 
@@ -99,6 +101,8 @@ struct socket_trace_stats {
 	 */
 	bool is_adapt_success;
 	uint8_t tracer_state; 
+
+	int64_t boot_time_update_diff;
 };
 
 struct bpf_offset_param {

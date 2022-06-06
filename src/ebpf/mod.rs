@@ -234,6 +234,13 @@ pub struct SK_TRACE_STATS {
      */
     pub is_adapt_success: bool, // 适配状态：内核适配成功为true，否则为false
     pub tracer_state: u8,       // 追踪器当前状态。值：TRACER_INIT, TRACER_STOP，TRACER_RUNNING
+
+    /*
+     * 纳秒级系统启动时间每分钟进行一次更新，
+     * 这里用于记录相邻两次更新后，系统启动时间之间的差异（单位为纳秒）。
+     * boot_time_update_diff（ns）= 本次更新后的系统启动时间(ns) - 上次更新后的系统启动时间(ns)
+     */
+    pub boot_time_update_diff: i64,
 }
 
 extern "C" {

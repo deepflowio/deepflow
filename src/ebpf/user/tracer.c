@@ -11,9 +11,10 @@
 
 int major, minor;		// Linux kernel主版本，次版本
 
-#define BOOT_TIME_UPDATE_PERIOD	60	// 系统启动时间更新周期
-volatile uint64_t sys_boot_time_ns;	// 系统启动时间，单位：纳秒
-uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
+#define BOOT_TIME_UPDATE_PERIOD	60		// 系统启动时间更新周期, 单位：秒
+volatile uint64_t sys_boot_time_ns;		// 当前系统启动时间，单位：纳秒
+volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
+uint64_t boot_time_update_count;		// 用于记录boot_time_update()调用次数。
 
 /*
  * tracers
@@ -663,6 +664,7 @@ static int boot_time_update(void)
 	// 默认情况下1分钟更新一次系统启动时间
 	if (!((boot_time_update_count * EVENT_PERIOD_TIME) %
 	      BOOT_TIME_UPDATE_PERIOD)) {
+		prev_sys_boot_time_ns = sys_boot_time_ns;
 		uint64_t real_time, monotonic_time;
 		real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 		monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
