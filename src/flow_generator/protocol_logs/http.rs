@@ -191,7 +191,7 @@ impl HttpLog {
                 if let Some(id) =
                     Self::decode_id(value, self.l7_log_dynamic_config.trace_type, Self::TRACE_ID)
                 {
-                    self.info.trace_id = id.clone();
+                    self.info.trace_id = id;
                 }
                 // 存在配置相同字段的情况，如“sw8”
                 if self.l7_log_dynamic_config.trace_id_origin
@@ -200,7 +200,7 @@ impl HttpLog {
                     if let Some(id) =
                         Self::decode_id(value, self.l7_log_dynamic_config.span_type, Self::SPAN_ID)
                     {
-                        self.info.span_id = id.clone();
+                        self.info.span_id = id;
                     }
                 }
             } else if !self.l7_log_dynamic_config.span_id_origin.is_empty()

@@ -23,8 +23,7 @@ use local_mode_dispatcher::LocalModeDispatcher;
 use mirror_mode_dispatcher::MirrorModeDispatcher;
 use recv_engine::{
     af_packet::{self, OptTpacketVersion, Tpacket},
-    Counter as ReCounter, RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN,
-    POLL_TIMEOUT,
+    RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 
 use crate::{
@@ -189,7 +188,6 @@ struct Pipeline {
     timestamp: Duration,
 }
 
-#[derive(Default)]
 struct PacketCounter {
     terminated: Arc<AtomicBool>,
 
@@ -202,11 +200,12 @@ struct PacketCounter {
     invalid_packets: AtomicU64,
     get_token_failed: AtomicU64,
 
-    kernel_counter: Arc<ReCounter>,
+    retired: AtomicU64,
+    kernel_counter: Arc<dyn stats::RefCountable>,
 }
 
 impl PacketCounter {
-    fn new(terminated: Arc<AtomicBool>, kernel_counter: Arc<ReCounter>) -> Self {
+    fn new(terminated: Arc<AtomicBool>, kernel_counter: Arc<dyn stats::RefCountable>) -> Self {
         Self {
             terminated,
 
@@ -219,6 +218,7 @@ impl PacketCounter {
             invalid_packets: AtomicU64::new(0),
             get_token_failed: AtomicU64::new(0),
 
+            retired: AtomicU64::new(0),
             kernel_counter,
         }
     }
@@ -226,12 +226,12 @@ impl PacketCounter {
 
 impl stats::RefCountable for PacketCounter {
     fn get_counters(&self) -> Vec<stats::Counter> {
-        let kc = &self.kernel_counter;
+        let mut counters = self.kernel_counter.get_counters();
         let get_token_failed = self.get_token_failed.swap(0, Ordering::Relaxed);
         if get_token_failed > 0 {
             warn!("rx rate limit hit {}", get_token_failed);
         }
-        vec![
+        counters.extend(vec![
             (
                 "rx",
                 stats::CounterType::Counted,
@@ -270,24 +270,10 @@ impl stats::RefCountable for PacketCounter {
             (
                 "retired",
                 stats::CounterType::Counted,
-                stats::CounterValue::Unsigned(kc.retired.swap(0, Ordering::Relaxed)),
+                stats::CounterValue::Unsigned(self.retired.swap(0, Ordering::Relaxed)),
             ),
-            (
-                "kernel_packets",
-                stats::CounterType::Counted,
-                stats::CounterValue::Unsigned(kc.kernel_packets.swap(0, Ordering::Relaxed)),
-            ),
-            (
-                "kernel_drops",
-                stats::CounterType::Counted,
-                stats::CounterValue::Unsigned(kc.kernel_drops.swap(0, Ordering::Relaxed)),
-            ),
-            (
-                "kernel_freezes",
-                stats::CounterType::Counted,
-                stats::CounterValue::Unsigned(kc.kernel_freezes.swap(0, Ordering::Relaxed)),
-            ),
-        ]
+        ]);
+        counters
     }
 }
 
@@ -418,12 +404,11 @@ impl DispatcherBuilder {
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
-        let kernel_counter = Arc::new(ReCounter::default());
         let tap_mode = options.tap_mode;
         let engine = if tap_mode == TapMode::Mirror && options.dpdk_conf.enabled {
             #[cfg(all(target_os = "linux", not(target_arch = "s390x")))]
             {
-                RecvEngine::Dpdk(kernel_counter.clone())
+                RecvEngine::Dpdk()
             }
             #[cfg(target_os = "windows")]
             return Err(Error::ConfigInvalid(
@@ -450,6 +435,7 @@ impl DispatcherBuilder {
             info!("Afpacket init with {:?}", afp);
             RecvEngine::AfPacket(Tpacket::new(afp).unwrap())
         };
+        let kernel_counter = engine.get_counter_handle();
         let id = self.id.ok_or(Error::ConfigIncomplete("no id".into()))?;
         let terminated = Arc::new(AtomicBool::new(false));
         let counter = Arc::new(PacketCounter::new(terminated.clone(), kernel_counter));
