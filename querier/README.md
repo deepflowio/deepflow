@@ -23,6 +23,55 @@ parse/
 
 基础语句
 --------
+- 获取所有数据库
+  - 请求语句
+  ```
+  sql=show databases
+  ```
+  - 返回结构
+  ```
+  {
+      "OPT_STATUS": "SUCCESS",
+      "DESCRIPTION": "",
+      "result": {
+          "columns": [
+            "database"
+          ],
+          "values": [
+              [
+                "flow_log"
+              ],
+          ]
+      }
+  }
+  ```
+
+- 获取指定数据库{dbName}中所有数据表
+  - 请求语句
+  ```
+  db={dbName} sql=show tables
+  ```
+  - 返回结构
+  ```
+  {
+      "OPT_STATUS": "SUCCESS",
+      "DESCRIPTION": "",
+      "result": {
+          "columns": [
+            "table"
+          ],
+          "values": [
+              [
+                "l4_flow_log"
+              ],
+              [
+                "l7_flow_log"
+              ]
+          ]
+      }
+  }
+  ```
+
 - 获取指定数据库{dbName}中表{tableName}所支持的tag及描述
   - 请求语句
   ```
