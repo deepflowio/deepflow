@@ -206,7 +206,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			if err != nil {
 				return nil, err
 			}
-			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt, valueInt)
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt)
 		case "ip", "ip_0", "ip_1", "tunnel_tx_ip_0", "tunnel_tx_ip_1", "tunnel_rx_ip_0", "tunnel_rx_ip_1":
 			equalFilter := ""
 			ipValues := strings.TrimLeft(t.Value, "(")

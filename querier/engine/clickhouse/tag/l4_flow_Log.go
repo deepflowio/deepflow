@@ -47,7 +47,7 @@ func GenerateL4TagMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"",
 			"",
-			"_id %s %s AND time=toDateTime(bitShiftRight(%v, 32)) AND toStartOfHour(time)=toStartOfHour(toDateTime(bitShiftRight(%v, 32)))",
+			"_id %s %s AND time=toDateTime(bitShiftRight(%v, 32))",
 			"",
 		)}
 	// 采集位置名称
