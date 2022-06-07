@@ -9,13 +9,17 @@ use log::{debug, error, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
+use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::ebpf;
 use crate::flow_generator::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
-    HttpLog, KafkaLog, L7LogParse, LogMessageType, MysqlLog, RedisLog, Result as LogResult,
+    dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
+    kafka_check_protocol, mysql_check_protocol, redis_check_protocol, AppProtoHead,
+    AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppTable, DnsLog, DubboLog,
+    Error as LogError, HttpLog, KafkaLog, L7LogParse, LogMessageType, MysqlLog, RedisLog,
+    Result as LogResult,
 };
 use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
@@ -223,48 +227,257 @@ impl SessionAggr {
 
 struct FlowItem {
     last_policy: u64, // 秒级
+    last_packet: u64, // 秒级
     remote_epc: i32,
 
-    parser: Box<dyn L7LogParse>,
+    // 应用识别
+    protocol_bitmap: u128,
+    l4_protocol: IpProtocol,
+    l7_protocol: L7Protocol,
+
+    is_from_app: bool,
+    is_success: bool,
+    is_local_service: bool,
+    is_skip: bool,
+
+    parser: Option<Box<dyn L7LogParse>>,
 }
 
 impl FlowItem {
     const POLICY_INTERVAL: u64 = 10;
+    const PROTOCOL_CHECK_LIMIT: usize = 2;
+    const FLOW_ITEM_TIMEOUT: u64 = 30;
 
-    fn parse(&mut self, packet: &MetaPacket) -> LogResult<AppProtoHead> {
-        self.parser.parse(
+    fn get_parser(
+        protocol: L7Protocol,
+        log_parser_config: &LogParserAccess,
+    ) -> Option<Box<dyn L7LogParse>> {
+        match protocol {
+            L7Protocol::Dns => Some(Box::from(DnsLog::default())),
+            L7Protocol::Http1 => Some(Box::from(HttpLog::new(log_parser_config))),
+            L7Protocol::Http2 => Some(Box::from(HttpLog::new(log_parser_config))),
+            L7Protocol::Mysql => Some(Box::from(MysqlLog::default())),
+            L7Protocol::Redis => Some(Box::from(RedisLog::default())),
+            L7Protocol::Kafka => Some(Box::from(KafkaLog::default())),
+            L7Protocol::Dubbo => Some(Box::from(DubboLog::new(log_parser_config))),
+            _ => None,
+        }
+    }
+
+    fn new(
+        time_in_sec: u64,
+        l4_protocol: IpProtocol,
+        l7_protocol: Option<(L7Protocol, bool)>,
+        remote_epc: i32,
+        log_parser_config: &LogParserAccess,
+    ) -> Self {
+        let is_from_app = l7_protocol.is_some();
+        let (l7_protocol, is_local_service) = l7_protocol.unwrap_or((L7Protocol::Unknown, false));
+        FlowItem {
+            last_policy: time_in_sec,
+            last_packet: time_in_sec,
+            remote_epc,
+            l4_protocol,
+            l7_protocol,
+            is_success: false,
+            is_local_service,
+            is_from_app,
+            is_skip: false,
+            protocol_bitmap: if l4_protocol == IpProtocol::Tcp {
+                1 << u8::from(L7Protocol::Http1)
+                    | 1 << u8::from(L7Protocol::Http2)
+                    | 1 << u8::from(L7Protocol::Dns)
+                    | 1 << u8::from(L7Protocol::Mysql)
+                    | 1 << u8::from(L7Protocol::Redis)
+                    | 1 << u8::from(L7Protocol::Dubbo)
+                    | 1 << u8::from(L7Protocol::Kafka)
+            } else {
+                1 << u8::from(L7Protocol::Dns)
+            },
+            parser: Self::get_parser(l7_protocol, log_parser_config),
+        }
+    }
+
+    fn _check(&mut self, protocol: L7Protocol, packet: &MetaPacket) -> bool {
+        match protocol {
+            L7Protocol::Dns => dns_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Dubbo => dubbo_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Kafka => kafka_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Http2 => http2_check_protocol(&mut self.protocol_bitmap, packet),
+            _ => false,
+        }
+    }
+
+    fn check(
+        &mut self,
+        packet: &MetaPacket,
+        local_epc: i32,
+        app_table: &mut AppTable,
+        log_parser_config: &LogParserAccess,
+    ) -> LogResult<AppProtoHead> {
+        if self.is_skip {
+            return Err(LogError::L7ProtocolCheckLimit);
+        }
+
+        let protocols = [
+            L7Protocol::Http1,
+            L7Protocol::Http2,
+            L7Protocol::Dubbo,
+            L7Protocol::Mysql,
+            L7Protocol::Redis,
+            L7Protocol::Kafka,
+            L7Protocol::Dns,
+        ];
+
+        for i in protocols {
+            if self.protocol_bitmap & 1 << u8::from(i) == 0 {
+                continue;
+            }
+            if self._check(i, packet) {
+                self.l7_protocol = i;
+                self.parser = Self::get_parser(i, log_parser_config);
+                return self._parse(packet, local_epc, app_table);
+            }
+        }
+        self.is_skip = app_table.set_protocol_from_ebpf(
+            packet,
+            L7Protocol::Unknown,
+            local_epc,
+            self.remote_epc,
+        );
+
+        Err(LogError::L7ProtocolUnknown)
+    }
+
+    fn _parse(
+        &mut self,
+        packet: &MetaPacket,
+        local_epc: i32,
+        app_table: &mut AppTable,
+    ) -> LogResult<AppProtoHead> {
+        if !self.is_success && self.is_skip {
+            return Err(LogError::L7ProtocolParseLimit);
+        }
+
+        let ret = self.parser.as_mut().unwrap().parse(
             packet.raw_from_ebpf.as_ref(),
             packet.lookup_key.proto,
-            packet.direction,
-        )
+            PacketDirection::ClientToServer,
+        );
+
+        if !self.is_success {
+            if ret.is_ok() {
+                app_table.set_protocol_from_ebpf(
+                    packet,
+                    self.l7_protocol,
+                    local_epc,
+                    self.remote_epc,
+                );
+                self.is_success = true;
+                self.is_local_service = packet.lookup_key.l2_end_1;
+            } else {
+                self.is_skip = app_table.set_protocol_from_ebpf(
+                    packet,
+                    L7Protocol::Unknown,
+                    local_epc,
+                    self.remote_epc,
+                );
+            }
+        }
+        return ret;
+    }
+
+    fn reset(&mut self, time_in_sec: u64, l4_protocol: IpProtocol) {
+        self.last_packet = time_in_sec;
+        self.last_packet = 0;
+        self.remote_epc = 0;
+        self.l7_protocol = L7Protocol::Unknown;
+        self.is_skip = false;
+        self.is_success = false;
+        self.is_local_service = false;
+        self.is_from_app = false;
+        self.l4_protocol = l4_protocol;
+        self.protocol_bitmap = if l4_protocol == IpProtocol::Tcp {
+            1 << u8::from(L7Protocol::Http1)
+                | 1 << u8::from(L7Protocol::Http2)
+                | 1 << u8::from(L7Protocol::Dns)
+                | 1 << u8::from(L7Protocol::Mysql)
+                | 1 << u8::from(L7Protocol::Redis)
+                | 1 << u8::from(L7Protocol::Dubbo)
+                | 1 << u8::from(L7Protocol::Kafka)
+        } else {
+            1 << u8::from(L7Protocol::Dns)
+        };
+        self.parser = None;
+    }
+
+    fn parse(
+        &mut self,
+        packet: &MetaPacket,
+        local_epc: i32,
+        app_table: &mut AppTable,
+        log_parser_config: &LogParserAccess,
+    ) -> LogResult<AppProtoHead> {
+        let time_in_sec = packet.lookup_key.timestamp.as_secs();
+        if self.last_packet + Self::FLOW_ITEM_TIMEOUT < time_in_sec {
+            self.reset(time_in_sec, packet.lookup_key.proto);
+        }
+        self.last_packet = time_in_sec;
+
+        if self.parser.is_some() {
+            return self._parse(packet, local_epc, app_table);
+        }
+
+        if self.is_from_app {
+            return Err(LogError::L7ProtocolUnknown);
+        }
+
+        if packet.l4_payload_len() <= 8 {
+            return Err(LogError::L7ProtocolUnknown);
+        }
+
+        return self.check(packet, local_epc, app_table, log_parser_config);
     }
 
     fn get_info(&mut self) -> AppProtoLogsInfo {
-        self.parser.info()
+        self.parser.as_ref().unwrap().info()
+    }
+
+    fn lookup_epc(&mut self, packet: &MetaPacket, mut policy_getter: PolicyGetter, local_epc: i32) {
+        let key = &packet.lookup_key;
+        if key.timestamp.as_secs() > self.last_policy + Self::POLICY_INTERVAL {
+            self.last_policy = key.timestamp.as_secs();
+            self.remote_epc = if key.l2_end_0 {
+                policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, local_epc, 0)
+            } else {
+                policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, 0, local_epc)
+            };
+        }
     }
 
     fn handle(
         &mut self,
-        packet: &MetaPacket,
-        mut policy_getter: PolicyGetter,
+        packet: &mut MetaPacket,
+        policy_getter: PolicyGetter,
+        app_table: &mut AppTable,
+        log_parser_config: &LogParserAccess,
         local_epc: i32,
         vtap_id: u16,
     ) -> Option<AppProtoLogsData> {
-        // 策略查询
-        let key = &packet.lookup_key;
-        if key.timestamp.as_secs() > self.last_policy + Self::POLICY_INTERVAL {
-            self.last_policy = key.timestamp.as_secs();
-            if key.l2_end_0 {
-                self.remote_epc =
-                    policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, local_epc, 0);
-            } else {
-                self.remote_epc =
-                    policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, 0, local_epc);
-            }
-        }
+        // 判断哪一端是服务端
+        packet.direction = if packet.lookup_key.l2_end_0 == self.is_local_service {
+            PacketDirection::ServerToClient
+        } else {
+            PacketDirection::ClientToServer
+        };
 
+        // 策略EPC
+        self.lookup_epc(packet, policy_getter, local_epc);
         // 应用解析
-        if let Ok(head) = self.parse(packet) {
+        if let Ok(head) = self.parse(packet, local_epc, app_table, log_parser_config) {
             // 获取日志信息
             let info = self.get_info();
             let base =
@@ -429,6 +642,9 @@ struct EbpfRunner {
 
     receiver: Receiver<MetaPacket<'static>>,
 
+    // 应用识别
+    app_table: AppTable,
+
     // 策略查询
     policy_getter: PolicyGetter,
 
@@ -442,24 +658,17 @@ struct EbpfRunner {
     output: DebugSender<SendItem>,
 }
 
+fn lookup_epc(packet: &MetaPacket, mut policy_getter: PolicyGetter, local_epc: i32) -> i32 {
+    let key = &packet.lookup_key;
+    if key.l2_end_0 {
+        policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, local_epc, 0)
+    } else {
+        policy_getter.lookup_all_by_epc(key.src_ip, key.dst_ip, 0, local_epc)
+    }
+}
+
 impl EbpfRunner {
     const FLOW_MAP_SIZE: usize = 1 << 14;
-
-    fn get_parser(
-        protocol: L7Protocol,
-        log_parser_config: &LogParserAccess,
-    ) -> Box<dyn L7LogParse> {
-        match protocol {
-            L7Protocol::Dns => Box::from(DnsLog::default()),
-            L7Protocol::Http1 => Box::from(HttpLog::new(log_parser_config)),
-            L7Protocol::Http2 => Box::from(HttpLog::new(log_parser_config)),
-            L7Protocol::Mysql => Box::from(MysqlLog::default()),
-            L7Protocol::Redis => Box::from(RedisLog::default()),
-            L7Protocol::Kafka => Box::from(KafkaLog::default()),
-            L7Protocol::Dubbo => Box::from(DubboLog::new(log_parser_config)),
-            _ => panic!("get_parser unknown protocol."),
-        }
-    }
 
     fn on_config_change(&mut self, config: &EbpfConfig) {
         info!(
@@ -499,31 +708,28 @@ impl EbpfRunner {
             sync_counter.counter().rx += 1;
 
             let packet = packet.as_mut().unwrap();
-            let time_diff = self.time_diff.load(Ordering::Relaxed);
-            if time_diff >= 0 {
-                packet.lookup_key.timestamp += Duration::from_nanos(time_diff as u64);
-            } else {
-                packet.lookup_key.timestamp -= Duration::from_nanos(-time_diff as u64);
-            }
+            packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
 
-            if packet.l7_protocol == L7Protocol::Unknown {
-                sync_counter.counter().unknown_protocol += 1;
-                // 未知协议不处理
-                continue;
-            }
-
-            let key = packet.socket_id << 56 | packet.l7_protocol as u64;
+            // FIXME: 仅用socket_id不够
+            let key = packet.socket_id;
 
             // 流聚合
             let mut flow_item = flow_map.get_mut(&key);
             if flow_item.is_none() {
+                let remote_epc = lookup_epc(packet, self.policy_getter, self.config.epc_id as i32);
                 flow_map.put(
                     key,
-                    FlowItem {
-                        last_policy: 0,
-                        parser: Self::get_parser(packet.l7_protocol, &self.log_parser_config),
-                        remote_epc: 0,
-                    },
+                    FlowItem::new(
+                        packet.lookup_key.timestamp.as_secs(),
+                        packet.lookup_key.proto,
+                        self.app_table.get_protocol_from_ebpf(
+                            packet,
+                            self.config.epc_id as i32,
+                            remote_epc,
+                        ),
+                        remote_epc,
+                        &self.log_parser_config,
+                    ),
                 );
                 flow_item = flow_map.get_mut(&key);
             }
@@ -533,6 +739,8 @@ impl EbpfRunner {
                 if let Some(data) = flow_item.handle(
                     packet,
                     self.policy_getter,
+                    &mut self.app_table,
+                    &self.log_parser_config,
                     self.config.epc_id as i32,
                     self.config.vtap_id,
                 ) {
@@ -673,6 +881,10 @@ impl EbpfCollector {
             thread_runner: EbpfRunner {
                 time_diff,
                 receiver,
+                app_table: AppTable::new(
+                    config.l7_protocol_inference_max_fail_count,
+                    config.l7_protocol_inference_ttl,
+                ),
                 policy_getter,
                 config: config.clone(),
                 log_parser_config,

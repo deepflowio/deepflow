@@ -7,6 +7,7 @@ use super::super::{
 };
 
 use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
@@ -277,6 +278,20 @@ impl DubboHeader {
         self.data_length = read_u32_be(&payload[12..]) as i32;
         Ok(())
     }
+
+    pub fn check(&self) -> bool {
+        // 不通过响应识别Dubbo
+        if self.data_type == 0 {
+            return false;
+        }
+        // 请求时状态码一定是0
+        if self.status_code != 0 {
+            return false;
+        }
+
+        // TODO：增加检查serial_id字段
+        return true;
+    }
 }
 
 // 参考开源代码解析：https://github.com/apache/dubbo-go-hessian2/blob/master/decode.go#L289
@@ -291,6 +306,29 @@ pub fn get_req_param_len(payload: &[u8]) -> (usize, usize) {
         }
         _ => (0, 0),
     }
+}
+
+// 通过请求来识别Dubbo
+pub fn dubbo_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    if packet.lookup_key.proto != IpProtocol::Tcp {
+        *bitmap &= !(1 << u8::from(L7Protocol::Dubbo));
+        return false;
+    }
+
+    let payload = packet.get_l4_payload();
+    if payload.is_none() {
+        return false;
+    }
+    let payload = payload.unwrap();
+
+    let mut header = DubboHeader::default();
+    let ret = header.parse_headers(payload);
+    if ret.is_err() {
+        *bitmap &= !(1 << u8::from(L7Protocol::Dubbo));
+        return false;
+    }
+
+    return header.check();
 }
 
 #[cfg(test)]
@@ -313,6 +351,7 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -326,7 +365,8 @@ mod tests {
 
             let mut dubbo = DubboLog::default();
             let _ = dubbo.parse(payload, packet.lookup_key.proto, packet.direction);
-            output.push_str(&format!("{:?}\r\n", dubbo.info));
+            let is_dubbo = dubbo_check_protocol(&mut bitmap, packet);
+            output.push_str(&format!("{:?} is_dubbo: {}\r\n", dubbo.info, is_dubbo));
         }
         output
     }

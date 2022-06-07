@@ -1,3 +1,5 @@
+use regex::Regex;
+
 use super::super::{
     consts::*, AppProtoHead, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol,
     L7ResponseStatus, LogMessageType,
@@ -6,6 +8,7 @@ use super::super::{
 use crate::proto::flow_log;
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
+    common::meta_packet::MetaPacket,
     flow_generator::error::{Error, Result},
     utils::bytes,
 };
@@ -60,15 +63,19 @@ pub struct MysqlLog {
     status: L7ResponseStatus,
 }
 
+fn mysql_string(payload: &[u8]) -> String {
+    if payload.len() > 2 && payload[0] == 0 && payload[1] == 1 {
+        // MYSQL 8.0.26返回字符串前有0x0、0x1，MYSQL 8.0.21版本没有这个问题
+        // https://gitlab.yunshan.net/platform/trident/-/merge_requests/2592#note_401425
+        String::from_utf8_lossy(&payload[2..]).into_owned()
+    } else {
+        String::from_utf8_lossy(payload).into_owned()
+    }
+}
+
 impl MysqlLog {
     fn request_string(&mut self, payload: &[u8]) {
-        if payload.len() > 2 && payload[0] == 0 && payload[1] == 1 {
-            // MYSQL 8.0.26返回字符串前有0x0、0x1，MYSQL 8.0.21版本没有这个问题
-            // https://gitlab.yunshan.net/platform/trident/-/merge_requests/2592#note_401425
-            self.info.context = String::from_utf8_lossy(&payload[2..]).into_owned();
-        } else {
-            self.info.context = String::from_utf8_lossy(payload).into_owned();
-        }
+        self.info.context = mysql_string(payload);
     }
 
     fn reset_logs(&mut self) {
@@ -210,6 +217,10 @@ impl L7LogParse for MysqlLog {
 
         let mut header = MysqlHeader::default();
         let offset = header.decode(payload);
+        if offset < 0 {
+            return Err(Error::MysqlLogParseFailed);
+        }
+        let offset = offset as usize;
         let msg_type = header
             .check(direction, offset, payload, self.l7_proto)
             .ok_or(Error::MysqlLogParseFailed)?;
@@ -243,9 +254,9 @@ pub struct MysqlHeader {
 }
 
 impl MysqlHeader {
-    pub fn decode(&mut self, payload: &[u8]) -> usize {
+    pub fn decode(&mut self, payload: &[u8]) -> isize {
         if payload.len() < 5 {
-            return 0;
+            return -1;
         }
         let len = bytes::read_u32_le(payload) & 0xffffff;
         if payload[HEADER_LEN + RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_OK
@@ -255,13 +266,14 @@ impl MysqlHeader {
         {
             self.length = len;
             self.number = payload[NUMBER_OFFSET];
-            return HEADER_LEN;
+            return HEADER_LEN as isize;
         }
         let offset = len as usize + HEADER_LEN;
         if offset > payload.len() {
             return 0;
         }
-        offset + self.decode(&payload[offset..])
+        let offset = offset as isize;
+        offset + self.decode(&payload[offset as usize..])
     }
 
     pub fn check(
@@ -301,6 +313,52 @@ impl MysqlHeader {
     }
 }
 
+// 通过请求和Greeting来识别MYSQL
+pub fn mysql_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    if packet.lookup_key.proto != IpProtocol::Tcp {
+        *bitmap &= !(1 << u8::from(L7Protocol::Mysql));
+        return false;
+    }
+
+    let payload = packet.get_l4_payload();
+    if payload.is_none() {
+        return false;
+    }
+    let payload = payload.unwrap();
+
+    let mut header = MysqlHeader::default();
+    let offset = header.decode(payload);
+    if offset < 0 {
+        *bitmap &= !(1 << u8::from(L7Protocol::Mysql));
+        return false;
+    }
+    let offset = offset as usize;
+
+    if header.number != 0 || offset + header.length as usize > payload.len() {
+        return false;
+    }
+
+    let protocol_version_or_query_type = payload[offset];
+    match protocol_version_or_query_type {
+        MYSQL_COMMAND_QUERY => {
+            let context = mysql_string(&payload[offset + 1..]);
+            return context.is_ascii();
+        }
+        n if 8 <= n && n <= 20 => {
+            let max_len = if payload.len() > offset + 8 {
+                offset + 8
+            } else {
+                payload.len()
+            };
+            let context = mysql_string(&payload[offset + 1..max_len]);
+            let regex = Regex::new("^[0-9\\.]{3,}").unwrap();
+            return regex.is_match(context.as_str());
+        }
+        _ => {}
+    }
+    return false;
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -323,6 +381,7 @@ mod tests {
         let mut mysql = MysqlLog::default();
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -334,7 +393,8 @@ mod tests {
                 None => continue,
             };
             let _ = mysql.parse(payload, packet.lookup_key.proto, packet.direction);
-            output.push_str(&format!("{:?}\r\n", mysql.info));
+            let is_mysql = mysql_check_protocol(&mut bitmap, packet);
+            output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
         }
         output
     }

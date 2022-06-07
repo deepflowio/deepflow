@@ -1,3 +1,4 @@
+mod app_table;
 mod error;
 mod flow_config;
 pub mod flow_map;
@@ -7,12 +8,17 @@ pub mod perf;
 mod protocol_logs;
 mod service_table;
 
-pub use error::Result;
+pub use app_table::AppTable;
+pub use error::{Error, Result};
 pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout};
 pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode, FlowTimeKey};
 pub use flow_state::FlowState;
 pub use perf::L7RrtCache;
+pub use protocol_logs::{
+    dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
+    kafka_check_protocol, mysql_check_protocol, redis_check_protocol,
+};
 pub use protocol_logs::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsParser,
     DnsLog, DubboLog, HttpLog, KafkaLog, L7LogParse, LogMessageType, MetaAppProto, MysqlLog,
