@@ -896,6 +896,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
 	monotonic_time = gettime(CLOCK_MONOTONIC, TIME_TYPE_NAN);
 	sys_boot_time_ns = real_time - monotonic_time;
+	prev_sys_boot_time_ns = sys_boot_time_ns;
 	ebpf_info("sys_boot_time_ns : %llu\n", sys_boot_time_ns);
 
 	clear_residual_probes();
