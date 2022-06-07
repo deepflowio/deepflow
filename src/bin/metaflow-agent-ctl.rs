@@ -2,20 +2,19 @@ use std::{
     collections::HashSet,
     fmt,
     io::ErrorKind,
-    net::{IpAddr, Ipv4Addr, UdpSocket},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket},
     time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, Result};
+use bincode::{config, decode_from_std_read};
 use clap::{ArgEnum, Parser, Subcommand};
 
 use metaflow_agent::debug::{
-    Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, MAX_BUF_SIZE,
+    Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, BEACON_PORT,
     METAFLOW_AGENT_BEACON, SESSION_TIMEOUT,
 };
 
-const LISTENED_IP: &str = "::";
-const LISTENED_PORT: u16 = 20035;
 const ERR_PORT_MSG: &str = "error: The following required arguments were not provided:
     \t--port <PORT> required arguments were not provided";
 
@@ -79,10 +78,14 @@ struct QueueCmd {
 
 #[derive(Parser)]
 struct PlatformCmd {
-    /// get resources with k8s api, eg: metaflow-agent-ctl platform --k8s_get node
+    /// get resources with k8s api
+    ///
+    /// eg: metaflow-agent-ctl platform --k8s_get node
     #[clap(short, long, arg_enum)]
     k8s_get: Option<Resource>,
-    /// show k8s container mac to global interface index mappings, eg: metaflow-agent-ctl platform --mac_mappings
+    /// show k8s container mac to global interface index mappings
+    ///
+    /// eg: metaflow-agent-ctl platform --mac_mappings
     #[clap(short, long)]
     mac_mappings: bool,
 }
@@ -196,8 +199,14 @@ impl Controller {
         }
     }
 
-    fn new_client() -> Result<Client> {
-        let client = Client::new(Some(SESSION_TIMEOUT), (LISTENED_IP, 0))?;
+    fn new_client(&self) -> Result<Client> {
+        let client = Client::new(
+            (
+                self.addr,
+                self.port.expect("need input a port to connect debugger"),
+            )
+                .into(),
+        )?;
         Ok(client)
     }
 
@@ -211,13 +220,13 @@ impl Controller {
     1              ubuntu                       ::ffff:127.0.0.1                              42700
     */
     fn list(&self) -> Result<()> {
-        let server = UdpSocket::bind((LISTENED_IP, LISTENED_PORT))?;
+        let server = UdpSocket::bind((Ipv6Addr::UNSPECIFIED, BEACON_PORT))?;
         server.set_read_timeout(Some(SESSION_TIMEOUT))?;
         let mut vtap_map = HashSet::new();
 
         println!(
             "metaflow-agent-ctl listening udp port {} to find metaflow-agent\n",
-            LISTENED_PORT
+            BEACON_PORT
         );
         println!("{:-<100}", "");
         println!(
@@ -244,7 +253,8 @@ impl Controller {
                         continue;
                     }
 
-                    let beacon: Beacon = bincode::deserialize(&buf[length..n])?;
+                    let beacon: Beacon =
+                        decode_from_std_read(&mut &buf[length..n], config::standard())?;
                     if !vtap_map.contains(&beacon.vtap_id) {
                         println!(
                             "{:<14} {:<28} {:<45} {}",
@@ -273,7 +283,7 @@ impl Controller {
         if self.port.is_none() {
             return Err(anyhow!(ERR_PORT_MSG));
         }
-        let client = Self::new_client()?;
+        let mut client = self.new_client()?;
 
         let payload = match c.get {
             RpcData::Acls => RpcMessage::Acls(None),
@@ -285,15 +295,15 @@ impl Controller {
             RpcData::Segments => RpcMessage::Segments(None),
             RpcData::Version => RpcMessage::Version(None),
         };
+
         let msg = Message {
             module: Module::Rpc,
             msg: payload,
         };
-        client.send_to(&msg, (self.addr, self.port.unwrap()))?;
+        client.send_to(msg)?;
 
-        let mut buf = [0u8; MAX_BUF_SIZE];
         loop {
-            let resp = client.recv::<Message<RpcMessage>>(&mut buf)?.into_inner();
+            let resp = client.recv::<RpcMessage>()?;
             match resp {
                 RpcMessage::Acls(v)
                 | RpcMessage::PlatformData(v)
@@ -301,21 +311,16 @@ impl Controller {
                 | RpcMessage::Cidr(v)
                 | RpcMessage::Groups(v)
                 | RpcMessage::Segments(v) => match v {
-                    Some(v) => {
-                        for s in v {
-                            println!("{}", s);
-                        }
-                    }
-                    None => return Err(anyhow!(format!("cannot get {:?}", c.get))),
+                    Some(v) => println!("{}", v),
+                    None => return Err(anyhow!(format!("{:?} data is empty", c.get))),
                 },
                 RpcMessage::Config(s) | RpcMessage::Version(s) => match s {
                     Some(s) => println!("{}", s),
-                    None => return Err(anyhow!(format!("cannot get {:?}", c.get))),
+                    None => return Err(anyhow!(format!("{:?} is empty", c.get))),
                 },
                 RpcMessage::Fin => return Ok(()),
                 RpcMessage::Err(e) => return Err(anyhow!(e)),
             }
-            buf.fill(0);
         }
     }
 
@@ -327,19 +332,18 @@ impl Controller {
             return Err(anyhow!("error: --on and --off cannot set at the same time"));
         }
 
-        let client = Self::new_client()?;
+        let mut client = self.new_client()?;
         if c.show {
             let msg = Message {
                 module: Module::Queue,
                 msg: QueueMessage::Names(None),
             };
-            client.send_to(&msg, (self.addr, self.port.unwrap()))?;
+            client.send_to(msg)?;
 
             println!("available queues: ");
 
-            let mut buf = [0u8; MAX_BUF_SIZE];
             loop {
-                let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
+                let res = client.recv::<QueueMessage>()?;
                 match res {
                     QueueMessage::Names(e) => match e {
                         Some(e) => {
@@ -358,8 +362,6 @@ impl Controller {
                     QueueMessage::Err(e) => return Err(anyhow!(e)),
                     _ => unreachable!(),
                 }
-                // clear in case of dirty buffer
-                buf.fill(0);
             }
         }
 
@@ -368,10 +370,9 @@ impl Controller {
                 module: Module::Queue,
                 msg: QueueMessage::Clear,
             };
-            client.send_to(&msg, (self.addr, self.port.unwrap()))?;
+            client.send_to(msg)?;
 
-            let mut buf = [0u8; MAX_BUF_SIZE];
-            let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
+            let res = client.recv::<QueueMessage>()?;
             match res {
                 QueueMessage::Fin => {
                     println!("turn off all queues successful");
@@ -387,10 +388,8 @@ impl Controller {
                 module: Module::Queue,
                 msg: QueueMessage::Off(s.clone()),
             };
-            client.send_to(&msg, (self.addr, self.port.unwrap()))?;
-
-            let mut buf = [0u8; MAX_BUF_SIZE];
-            let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
+            client.send_to(msg)?;
+            let res = client.recv::<QueueMessage>()?;
             match res {
                 QueueMessage::Fin => {
                     println!("turn off queue={} successful", s);
@@ -412,23 +411,20 @@ impl Controller {
                 module: Module::Queue,
                 msg: QueueMessage::On((s, dur)),
             };
-            client.send_to(&msg, (self.addr, self.port.unwrap()))?;
+            client.send_to(msg)?;
 
-            let mut buf = [0u8; MAX_BUF_SIZE];
-            let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
+            let res = client.recv::<QueueMessage>()?;
             if let QueueMessage::Err(e) = res {
                 return Err(anyhow!(e));
             }
             println!("loading queue item...");
-            // clear in case of dirty buffer
-            buf.fill(0);
-            let mut msg_seq = 0;
+            let mut seq = 0;
             loop {
-                let res = client.recv::<Message<QueueMessage>>(&mut buf)?.into_inner();
+                let res = client.recv::<QueueMessage>()?;
                 match res {
                     QueueMessage::Send(e) => {
-                        println!("MSG-{} {}", msg_seq, e);
-                        msg_seq += 1;
+                        println!("MSG-{} {}", seq, e);
+                        seq += 1;
                     }
                     QueueMessage::Continue => {
                         println!("message in preparation");
@@ -438,8 +434,6 @@ impl Controller {
                     QueueMessage::Err(e) => return Err(anyhow!(e)),
                     _ => unreachable!(),
                 }
-                // clear in case of dirty buffer
-                buf.fill(0);
             }
         }
 
@@ -450,20 +444,17 @@ impl Controller {
         if self.port.is_none() {
             return Err(anyhow!(ERR_PORT_MSG));
         }
-        let client = Self::new_client()?;
+        let mut client = self.new_client()?;
         if c.mac_mappings {
             let msg = Message {
                 module: Module::Platform,
                 msg: PlatformMessage::MacMappings(None),
             };
-            client.send_to(&msg, (self.addr, self.port.unwrap()))?;
+            client.send_to(msg)?;
             println!("Interface Index \t MAC address");
 
-            let mut buf = [0u8; MAX_BUF_SIZE];
             loop {
-                let res = client
-                    .recv::<Message<PlatformMessage>>(&mut buf)?
-                    .into_inner();
+                let res = client.recv::<PlatformMessage>()?;
                 match res {
                     PlatformMessage::MacMappings(e) => {
                         match e {
@@ -479,14 +470,12 @@ impl Controller {
                                     println!("{:<15} \t {}", idx, m);
                                 }
                             }
-                            None => return Err(anyhow!("cannot get mac mappings")),
+                            None => return Err(anyhow!("mac mappings is empty")),
                         }
                     }
                     PlatformMessage::Fin => return Ok(()),
                     _ => unreachable!(),
                 }
-                // clear in case of dirty buffer
-                buf.fill(0);
             }
         }
 
@@ -496,12 +485,9 @@ impl Controller {
                     module: Module::Platform,
                     msg: PlatformMessage::Version(None),
                 };
-                client.send_to(&msg, (self.addr, self.port.unwrap()))?;
-                let mut buf = [0u8; MAX_BUF_SIZE];
+                client.send_to(msg)?;
                 loop {
-                    let res = client
-                        .recv::<Message<PlatformMessage>>(&mut buf)?
-                        .into_inner();
+                    let res = client.recv::<PlatformMessage>()?;
                     match res {
                         PlatformMessage::Version(v) => {
                             /*
@@ -510,48 +496,34 @@ impl Controller {
                             */
                             match v {
                                 Some(v) => println!("{}", v),
-                                None => return Err(anyhow!("cannot get server version")),
+                                None => return Err(anyhow!("server version is empty")),
                             }
                         }
                         PlatformMessage::Fin => return Ok(()),
                         _ => unreachable!(),
                     }
-                    // clear in case of dirty buffer
-                    buf.fill(0);
                 }
             }
 
             let msg = Message {
                 module: Module::Platform,
-                msg: PlatformMessage::WatcherReq(r.to_string()),
+                msg: PlatformMessage::Watcher(r.to_string()),
             };
-
-            client.send_to(&msg, (self.addr, self.port.unwrap()))?;
-            let mut buf = [0u8; MAX_BUF_SIZE];
+            client.send_to(msg)?;
             loop {
-                let res = client
-                    .recv::<Message<PlatformMessage>>(&mut buf)?
-                    .into_inner();
+                let res = client.recv::<PlatformMessage>()?;
                 match res {
-                    PlatformMessage::WatcherRes(v) => {
+                    PlatformMessage::Watcher(v) => {
                         /*
                         $ metaflow-agent-ctl -p 54911 platform --k8s-get node
                         nodes entries...
                         */
-                        match v {
-                            Some(v) => {
-                                for e in v {
-                                    println!("{}", e);
-                                }
-                            }
-                            None => return Err(anyhow!("cannot get watcher entries")),
-                        }
+                        println!("{}", v);
                     }
+                    PlatformMessage::NotFound => return Err(anyhow!("no data")),
                     PlatformMessage::Fin => return Ok(()),
                     _ => unreachable!(),
                 }
-                // clear in case of dirty buffer
-                buf.fill(0);
             }
         }
         Ok(())

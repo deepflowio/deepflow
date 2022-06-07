@@ -18,6 +18,7 @@ use tokio::time;
 
 use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
+use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface};
 use crate::config::RuntimeConfig;
@@ -90,6 +91,7 @@ pub struct Status {
     pub peers: Vec<Arc<PeerConnection>>,
     pub cidrs: Vec<Arc<Cidr>>,
     pub ip_groups: Vec<Arc<IpGroupData>>,
+    pub acls: Vec<Acl>,
 }
 
 impl Default for Status {
@@ -115,6 +117,7 @@ impl Default for Status {
             peers: Default::default(),
             cidrs: Default::default(),
             ip_groups: Default::default(),
+            acls: Default::default(),
         }
     }
 }
@@ -148,18 +151,17 @@ impl Status {
         self.ip_groups = ip_groups;
     }
 
-    fn update_flow_acl(&mut self, version: u64) {
+    fn update_flow_acl(&mut self, version: u64, flow_acls: Vec<Acl>) {
         info!(
             "Update FlowAcls version {} to {}.",
             self.version_acls, version
         );
 
         self.version_acls = version;
-
-        // TODO: add acl
+        self.acls = flow_acls;
     }
 
-    fn get_platform_data(&mut self, resp: &tp::SyncResponse) -> bool {
+    pub fn get_platform_data(&mut self, resp: &tp::SyncResponse) -> bool {
         let current_version = self.version_platform_data;
         let version = resp.version_platform_data.unwrap_or(0);
         debug!(
@@ -251,7 +253,7 @@ impl Status {
         return black_list;
     }
 
-    fn get_flow_acls(&mut self, resp: &tp::SyncResponse) -> bool {
+    pub fn get_flow_acls(&mut self, resp: &tp::SyncResponse) -> bool {
         let version = resp.version_platform_data.unwrap_or(0);
         debug!(
             "get grpc FlowAcls version: {} vs current version: {}.",
@@ -268,16 +270,26 @@ impl Status {
 
         if let Some(acls_commpressed) = &resp.flow_acls {
             let acls = tp::FlowAcls::decode(acls_commpressed.as_slice());
-            if acls.is_ok() {
-                // TODO: acl parse
-                self.update_flow_acl(version);
+            if let Ok(acls) = acls {
+                let flow_acls = acls
+                    .flow_acl
+                    .into_iter()
+                    .filter_map(|a| match a.try_into() {
+                        Err(e) => {
+                            warn!("{}", e);
+                            None
+                        }
+                        t => t.ok(),
+                    })
+                    .collect::<Vec<Acl>>();
+                self.update_flow_acl(version, flow_acls);
                 return true;
             }
         }
         return false;
     }
 
-    fn get_ip_groups(&mut self, resp: &tp::SyncResponse) -> bool {
+    pub fn get_ip_groups(&mut self, resp: &tp::SyncResponse) -> bool {
         let version = resp.version_groups.unwrap_or(0);
         debug!(
             "get grpc Groups version: {} vs current version: {}.",

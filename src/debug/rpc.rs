@@ -1,16 +1,11 @@
 use std::sync::Arc;
 
-use log::warn;
+use bincode::{Decode, Encode};
 use parking_lot::RwLock;
-use prost::Message as ProstMessage;
-use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 
 use super::error::{Error, Result};
-use super::{chunk_string_payload, Message, Module, MAX_MESSAGE_SIZE};
 
-use crate::common::platform_data::PlatformData;
-use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::{self, SyncResponse};
@@ -23,7 +18,7 @@ pub struct RpcDebugger {
     rt: Runtime,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(PartialEq, Debug)]
 pub struct ConfigResp {
     status: i32,
     version_platform_data: u64,
@@ -34,15 +29,15 @@ pub struct ConfigResp {
     self_update_url: String,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(PartialEq, Debug, Encode, Decode)]
 pub enum RpcMessage {
     Config(Option<String>),
-    PlatformData(Option<Vec<String>>),
-    TapTypes(Option<Vec<String>>),
-    Cidr(Option<Vec<String>>),
-    Groups(Option<Vec<String>>),
-    Acls(Option<Vec<String>>),
-    Segments(Option<Vec<String>>),
+    PlatformData(Option<String>),
+    TapTypes(Option<String>),
+    Cidr(Option<String>),
+    Groups(Option<String>),
+    Acls(Option<String>),
+    Segments(Option<String>),
     Version(Option<String>),
     Err(String),
     Fin,
@@ -78,17 +73,19 @@ impl RpcDebugger {
         Ok(resp)
     }
 
-    pub(super) fn basic_config(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn basic_config(&self) -> Result<Vec<RpcMessage>> {
         let mut resp = self
             .rt
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
+
         if resp.config.is_none() {
             return Err(Error::NotFound(String::from(
-                " sync response's config not found",
+                "sync response's config is empty",
             )));
         }
+
         let c = RuntimeConfig::try_from(resp.config.take().unwrap())?;
         let config = ConfigResp {
             status: resp.status() as i32,
@@ -101,72 +98,34 @@ impl RpcDebugger {
         };
 
         let c = format!("{:?}", config);
-        let mut res = vec![];
-        if c.len() > MAX_MESSAGE_SIZE {
-            // String::truncate 削到char的边界的时候会panic
-            let mut c = c.into_bytes();
-            c.truncate(MAX_MESSAGE_SIZE);
-            match String::from_utf8(c) {
-                Ok(s) => {
-                    res.push(Message {
-                        module: Module::Rpc,
-                        msg: RpcMessage::Config(Some(s)),
-                    });
-                }
-                Err(e) => {
-                    warn!("parse rpc basic config: {}", e);
-                }
-            }
-        } else {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Config(Some(c)),
-            });
-        }
-        res.push(Message {
-            module: Module::Rpc,
-            msg: RpcMessage::Fin,
-        });
 
-        Ok(res)
+        Ok(vec![RpcMessage::Config(Some(c)), RpcMessage::Fin])
     }
 
-    pub(super) fn tap_types(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn tap_types(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
             .rt
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
 
-        fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::TapTypes(Some(vec![s])),
-            });
+        if resp.tap_types.is_empty() {
+            return Err(Error::NotFound(String::from(
+                "sync response's tap_types is empty",
+            )));
         }
 
-        fn push_fn(res: &mut Vec<Message<RpcMessage>>, cache: &mut Option<Vec<String>>) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::TapTypes(cache.take()),
-            });
-        }
+        let mut res = resp
+            .tap_types
+            .into_iter()
+            .map(|t| RpcMessage::TapTypes(Some(format!("{:?}", t))))
+            .collect::<Vec<_>>();
 
-        let mut res = chunk_string_payload(
-            resp.tap_types.into_iter().map(|t| format!("{:?}", t)),
-            truncate_fn,
-            push_fn,
-        );
-
-        res.push(Message {
-            module: Module::Rpc,
-            msg: RpcMessage::Fin,
-        });
-
+        res.push(RpcMessage::Fin);
         Ok(res)
     }
 
-    pub(super) fn cidrs(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn cidrs(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
             .rt
             .block_on(self.get_rpc_response())
@@ -177,39 +136,20 @@ impl RpcDebugger {
             return Err(Error::NotFound(String::from("cidrs data in preparation")));
         }
 
-        let platform_data = trident::PlatformData::decode_length_delimited(resp.platform_data())
-            .map_err(|e| Error::ProstDecode(e))?;
-        let cidrs = platform_data
+        self.status.write().get_platform_data(&resp);
+        let mut res = self
+            .status
+            .read()
             .cidrs
-            .into_iter()
-            .filter_map(|c| (&c).try_into().ok())
-            .map(|c: Cidr| format!("{:?}", c));
+            .iter()
+            .map(|c| RpcMessage::Cidr(Some(format!("{:?}", c))))
+            .collect::<Vec<_>>();
 
-        fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Cidr(Some(vec![s])),
-            });
-        }
-
-        fn push_fn(res: &mut Vec<Message<RpcMessage>>, cache: &mut Option<Vec<String>>) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Cidr(cache.take()),
-            });
-        }
-
-        let mut res = chunk_string_payload(cidrs, truncate_fn, push_fn);
-
-        res.push(Message {
-            module: Module::Rpc,
-            msg: RpcMessage::Fin,
-        });
-
+        res.push(RpcMessage::Fin);
         Ok(res)
     }
 
-    pub(super) fn platform_data(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn platform_data(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
             .rt
             .block_on(self.get_rpc_response())
@@ -222,48 +162,27 @@ impl RpcDebugger {
             )));
         }
 
-        let platform_data = trident::PlatformData::decode_length_delimited(resp.platform_data())
-            .map_err(|e| Error::ProstDecode(e))?;
+        self.status.write().get_platform_data(&resp);
+        let mut res = {
+            let status_guard = self.status.read();
+            status_guard
+                .interfaces
+                .iter()
+                .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p))))
+                .chain(
+                    status_guard
+                        .peers
+                        .iter()
+                        .map(|p| RpcMessage::PlatformData(Some(format!("{:?}", p)))),
+                )
+                .collect::<Vec<_>>()
+        };
 
-        let datas = platform_data
-            .interfaces
-            .into_iter()
-            .filter_map(|p| (&p).try_into().ok())
-            .map(|p: PlatformData| format!("{:?}", p));
-
-        let peers = platform_data
-            .peer_connections
-            .into_iter()
-            .map(|p| PeerConnection::from(&p))
-            .map(|p: PeerConnection| format!("{:?}", p));
-
-        let iter = datas.chain(peers);
-
-        fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::PlatformData(Some(vec![s])),
-            });
-        }
-
-        fn push_fn(res: &mut Vec<Message<RpcMessage>>, cache: &mut Option<Vec<String>>) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::PlatformData(cache.take()),
-            });
-        }
-
-        let mut res = chunk_string_payload(iter, truncate_fn, push_fn);
-
-        res.push(Message {
-            module: Module::Rpc,
-            msg: RpcMessage::Fin,
-        });
-
+        res.push(RpcMessage::Fin);
         Ok(res)
     }
 
-    pub(super) fn ip_groups(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn ip_groups(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
             .rt
             .block_on(self.get_rpc_response())
@@ -276,40 +195,20 @@ impl RpcDebugger {
             )));
         }
 
-        let groups = trident::Groups::decode_length_delimited(resp.groups())
-            .map_err(|e| Error::ProstDecode(e))?;
+        self.status.write().get_ip_groups(&resp);
+        let mut res = self
+            .status
+            .read()
+            .ip_groups
+            .iter()
+            .map(|g| RpcMessage::Groups(Some(format!("{:?}", g))))
+            .collect::<Vec<_>>();
 
-        let groups = groups
-            .groups
-            .into_iter()
-            .filter_map(|g| (&g).try_into().ok())
-            .map(|i: IpGroupData| format!("{:?}", i));
-
-        fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Groups(Some(vec![s])),
-            });
-        }
-
-        fn push_fn(res: &mut Vec<Message<RpcMessage>>, cache: &mut Option<Vec<String>>) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Groups(cache.take()),
-            });
-        }
-
-        let mut res = chunk_string_payload(groups, truncate_fn, push_fn);
-
-        res.push(Message {
-            module: Module::Rpc,
-            msg: RpcMessage::Fin,
-        });
-
+        res.push(RpcMessage::Fin);
         Ok(res)
     }
 
-    pub(super) fn flow_acls(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn flow_acls(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
             .rt
             .block_on(self.get_rpc_response())
@@ -321,93 +220,52 @@ impl RpcDebugger {
                 "flow acls data in preparation",
             )));
         }
-        let pb_acls = trident::FlowAcls::decode_length_delimited(resp.flow_acls())
-            .map_err(|e| Error::ProstDecode(e))?;
 
-        let acls = pb_acls.flow_acl.into_iter().map(|a| {
-            let acl = Acl::try_from(a);
-            if acl.is_err() {
-                return format!("{:?}", acl.unwrap_err());
-            } else {
-                return format!("{}", acl.unwrap());
-            }
-        });
+        self.status.write().get_flow_acls(&resp);
+        let mut res = self
+            .status
+            .read()
+            .acls
+            .iter()
+            .map(|a| RpcMessage::Acls(Some(format!("{:?}", a))))
+            .collect::<Vec<_>>();
 
-        fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Acls(Some(vec![s])),
-            });
-        }
-
-        fn push_fn(res: &mut Vec<Message<RpcMessage>>, cache: &mut Option<Vec<String>>) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Acls(cache.take()),
-            });
-        }
-
-        let mut res = chunk_string_payload(acls, truncate_fn, push_fn);
-
-        res.push(Message {
-            module: Module::Rpc,
-            msg: RpcMessage::Fin,
-        });
-
+        res.push(RpcMessage::Fin);
         Ok(res)
     }
 
-    pub(super) fn local_segments(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn local_segments(&self) -> Result<Vec<RpcMessage>> {
         let resp = self
             .rt
             .block_on(self.get_rpc_response())
             .map_err(|e| Error::Tonic(e))?
             .into_inner();
 
-        fn truncate_fn(res: &mut Vec<Message<RpcMessage>>, s: String) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Segments(Some(vec![s])),
-            });
+        if resp.local_segments.is_empty() {
+            return Err(Error::NotFound(
+                "local segments data is empty, maybe metaflow-agent is not properly configured"
+                    .into(),
+            ));
         }
 
-        fn push_fn(res: &mut Vec<Message<RpcMessage>>, cache: &mut Option<Vec<String>>) {
-            res.push(Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Segments(cache.take()),
-            });
-        }
+        let mut segments = resp
+            .local_segments
+            .into_iter()
+            .map(|s| RpcMessage::Segments(Some(format!("{:?}", s))))
+            .collect::<Vec<_>>();
 
-        let mut res = chunk_string_payload(
-            resp.local_segments.into_iter().map(|s| format!("{:?}", s)),
-            truncate_fn,
-            push_fn,
-        );
+        segments.push(RpcMessage::Fin);
 
-        res.push(Message {
-            module: Module::Rpc,
-            msg: RpcMessage::Fin,
-        });
-
-        Ok(res)
+        Ok(segments)
     }
 
-    pub(super) fn current_version(&self) -> Result<Vec<Message<RpcMessage>>> {
+    pub(super) fn current_version(&self) -> Result<Vec<RpcMessage>> {
         let status = self.status.read();
         let version = format!(
             "platformData version: {}\n groups version: {}\nflowAcls version: {}",
             status.version_platform_data, status.version_groups, status.version_acls
         );
 
-        Ok(vec![
-            Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Version(Some(version)),
-            },
-            Message {
-                module: Module::Rpc,
-                msg: RpcMessage::Fin,
-            },
-        ])
+        Ok(vec![RpcMessage::Version(Some(version)), RpcMessage::Fin])
     }
 }
