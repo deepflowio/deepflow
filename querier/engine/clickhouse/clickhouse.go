@@ -26,6 +26,7 @@ type CHEngine struct {
 	Statements []Statement
 	DB         string
 	Table      string
+	DataSource string
 	asTagMap   map[string]string
 	View       *view.View
 }
@@ -183,7 +184,11 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
 			table := sqlparser.String(from)
-			e.AddTable(e.DB + "." + table)
+			if e.DataSource != "" {
+				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
+			} else {
+				e.AddTable(fmt.Sprintf("%s.%s", e.DB, table))
+			}
 			e.Table = table
 		}
 

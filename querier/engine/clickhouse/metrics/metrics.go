@@ -75,14 +75,17 @@ func GetMetricsByDBTable(db string, table string) map[string]*Metrics {
 		case "l7_flow_log":
 			return GetL7FlowLogMetrics()
 		}
-	case "vtap_flow_port":
-		return GetVtapFlowPortMetrics()
-	case "vtap_flow_edge_port":
-		return GetVtapFlowEdgePortMetrics()
-	case "vtap_app_port":
-		return GetVtapAppPortMetrics()
-	case "vtap_app_edge_port":
-		return GetVtapAppEdgePortMetrics()
+	case "flow_metrics":
+		switch table {
+		case "vtap_flow_port":
+			return GetVtapFlowPortMetrics()
+		case "vtap_flow_edge_port":
+			return GetVtapFlowEdgePortMetrics()
+		case "vtap_app_port":
+			return GetVtapAppPortMetrics()
+		case "vtap_app_edge_port":
+			return GetVtapAppEdgePortMetrics()
+		}
 	}
 	return nil
 }
@@ -156,18 +159,21 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 			metrics = L7_FLOW_LOG_METRICS
 			replaceMetrics = L7_FLOW_LOG_METRICS_REPLACE
 		}
-	case "vtap_flow_port":
-		metrics = VTAP_FLOW_PORT_METRICS
-		replaceMetrics = VTAP_FLOW_PORT_METRICS_REPLACE
-	case "vtap_flow_edge_port":
-		metrics = VTAP_FLOW_EDGE_PORT_METRICS
-		replaceMetrics = VTAP_FLOW_EDGE_PORT_METRICS_REPLACE
-	case "vtap_app_port":
-		metrics = VTAP_APP_PORT_METRICS
-		replaceMetrics = VTAP_APP_PORT_METRICS_REPLACE
-	case "vtap_app_edge_port":
-		metrics = VTAP_APP_EDGE_PORT_METRICS
-		replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
+	case "flow_metrics":
+		switch table {
+		case "vtap_flow_port":
+			metrics = VTAP_FLOW_PORT_METRICS
+			replaceMetrics = VTAP_FLOW_PORT_METRICS_REPLACE
+		case "vtap_flow_edge_port":
+			metrics = VTAP_FLOW_EDGE_PORT_METRICS
+			replaceMetrics = VTAP_FLOW_EDGE_PORT_METRICS_REPLACE
+		case "vtap_app_port":
+			metrics = VTAP_APP_PORT_METRICS
+			replaceMetrics = VTAP_APP_PORT_METRICS_REPLACE
+		case "vtap_app_edge_port":
+			metrics = VTAP_APP_EDGE_PORT_METRICS
+			replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
+		}
 	}
 	if metrics == nil {
 		return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))

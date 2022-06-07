@@ -522,7 +522,7 @@ func (f *TagFunction) Format(m *view.Model) {
 		m.AddGroup(&view.Group{Value: f.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
 	}
 	if f.Name == "icon_id" {
-		for resourceStr, _ := range tag.DEVICE_MAP {
+		for resourceStr := range tag.DEVICE_MAP {
 			// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 			for _, suffix := range []string{"", "_0", "_1"} {
 				resourceNameSuffix := resourceStr + suffix

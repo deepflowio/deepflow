@@ -23,6 +23,7 @@ func executeQuery() gin.HandlerFunc {
 		}
 		args["db"] = c.PostForm("db")
 		args["sql"] = c.PostForm("sql")
+		args["datasource"] = c.PostForm("datasource")
 		if args["sql"] == "" && args["db"] == "" {
 			json := make(map[string]interface{})
 			c.BindJSON(&json)
