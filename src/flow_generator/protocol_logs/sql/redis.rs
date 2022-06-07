@@ -5,6 +5,7 @@ use super::super::{
 };
 
 use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::common::meta_packet::MetaPacket;
 use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
 
@@ -293,6 +294,25 @@ pub fn decode_error_code(context: &[u8]) -> Option<&[u8]> {
     None
 }
 
+// 通过请求识别REDIS
+pub fn redis_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    if packet.lookup_key.proto != IpProtocol::Tcp {
+        *bitmap &= !(1 << u8::from(L7Protocol::Redis));
+        return false;
+    }
+
+    let payload = packet.get_l4_payload();
+    if payload.is_none() {
+        return false;
+    }
+    let payload = payload.unwrap();
+
+    if payload[0] != b'*' {
+        return false;
+    }
+    return decode_asterisk(payload, true).is_some();
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -314,6 +334,7 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -327,7 +348,8 @@ mod tests {
 
             let mut redis = RedisLog::default();
             let _ = redis.parse(payload, packet.lookup_key.proto, packet.direction);
-            output.push_str(&format!("{}\r\n", redis.info()));
+            let is_redis = redis_check_protocol(&mut bitmap, packet);
+            output.push_str(&format!("{} is_redis: {}\r\n", redis.info(), is_redis));
         }
         output
     }

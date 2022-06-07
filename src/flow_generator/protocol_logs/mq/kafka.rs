@@ -1,11 +1,12 @@
 use super::super::{
-    consts::{KAFKA_REQ_HEADER_LEN, KAFKA_RESP_HEADER_LEN},
-    AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
+    consts::KAFKA_REQ_HEADER_LEN, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol,
+    L7ResponseStatus, LogMessageType,
 };
 
 use crate::proto::flow_log;
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
+    common::meta_packet::MetaPacket,
     flow_generator::error::{Error, Result},
     utils::bytes::{read_u16_be, read_u32_be},
 };
@@ -25,8 +26,16 @@ pub struct KafkaInfo {
 }
 
 impl KafkaInfo {
+    // https://kafka.apache.org/protocol.html
+    const API_KEY_MAX: u16 = 67;
     pub fn merge(&mut self, other: Self) {
         self.resp_msg_size = other.resp_msg_size;
+    }
+    pub fn check(&self) -> bool {
+        if self.api_key > Self::API_KEY_MAX {
+            return false;
+        }
+        return self.client_id.len() > 0 && self.client_id.is_ascii();
     }
 }
 
@@ -112,7 +121,7 @@ impl L7LogParse for KafkaLog {
             return Err(Error::InvalidIpProtocol);
         }
         self.reset_logs();
-        if payload.len() < KAFKA_RESP_HEADER_LEN {
+        if payload.len() < KAFKA_REQ_HEADER_LEN {
             return Err(Error::KafkaLogParseFailed);
         }
         match direction {
@@ -124,6 +133,29 @@ impl L7LogParse for KafkaLog {
     fn info(&self) -> AppProtoLogsInfo {
         AppProtoLogsInfo::Kafka(self.info.clone())
     }
+}
+
+pub fn kafka_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    if packet.lookup_key.proto != IpProtocol::Tcp {
+        *bitmap &= !(1 << u8::from(L7Protocol::Kafka));
+        return false;
+    }
+
+    let payload = packet.get_l4_payload();
+    if payload.is_none() {
+        return false;
+    }
+    let payload = payload.unwrap();
+    if payload.len() < KAFKA_REQ_HEADER_LEN {
+        return false;
+    }
+    let mut kafka = KafkaLog::default();
+
+    let ret = kafka.request(payload);
+    if ret.is_err() {
+        return false;
+    }
+    return kafka.info.check();
 }
 
 #[cfg(test)]
@@ -146,6 +178,7 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -159,7 +192,8 @@ mod tests {
 
             let mut kafka = KafkaLog::default();
             let _ = kafka.parse(payload, packet.lookup_key.proto, packet.direction);
-            output.push_str(&format!("{:?}\r\n", kafka.info));
+            let is_kafka = kafka_check_protocol(&mut bitmap, packet);
+            output.push_str(&format!("{:?} is_kafka: {}\r\n", kafka.info, is_kafka));
         }
         output
     }

@@ -9,7 +9,10 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::common::decapsulate::TunnelType;
-use crate::common::{enums::TapType, DEFAULT_LOG_FILE};
+use crate::common::{
+    enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
+    L7_PROTOCOL_INFERENCE_TTL,
+};
 use crate::proto::{common, trident};
 
 #[derive(Debug, Error)]
@@ -125,6 +128,8 @@ pub struct YamlConfig {
     pub ebpf_log_file: String,
     pub kubernetes_namespace: String,
     pub external_metrics_sender_queue_size: usize,
+    pub l7_protocol_inference_max_fail_count: usize,
+    pub l7_protocol_inference_ttl: usize,
 }
 
 impl YamlConfig {
@@ -195,6 +200,14 @@ impl YamlConfig {
             c.external_metrics_sender_queue_size = 1 << 12;
         }
 
+        if c.l7_protocol_inference_max_fail_count == 0 {
+            c.l7_protocol_inference_max_fail_count = L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT;
+        }
+
+        if c.l7_protocol_inference_ttl == 0 {
+            c.l7_protocol_inference_ttl = L7_PROTOCOL_INFERENCE_TTL;
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -256,6 +269,8 @@ impl Default for YamlConfig {
             ebpf_log_file: "".into(),
             kubernetes_namespace: "".into(),
             external_metrics_sender_queue_size: 0,
+            l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
+            l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
         }
     }
 }

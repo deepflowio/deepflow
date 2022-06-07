@@ -80,6 +80,10 @@ impl L7FlowPerf for MysqlPerfData {
 
         let mut header = MysqlHeader::default();
         let offset = header.decode(payload);
+        if offset < 0 {
+            return Err(Error::MysqlPerfParseFailed);
+        }
+        let offset = offset as usize;
         let msg_type = header
             .check(packet.direction, offset, payload, self.l7_proto)
             .ok_or(Error::MysqlPerfParseFailed)?;

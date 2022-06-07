@@ -182,3 +182,8 @@ controller-ips:
 #tap-mac-script: ""
 ## 接收外部数据的HTTP PROXY发送到sender的队列大小
 #external-metrics-sender-queue-size
+## 推断一个服务（vpc + ip + protocol + port）的应用层协议类型时，允许的最大连续失败次数
+## 失败次数超过此阈值时，此服务的协议推断结果将会被记为未知，在随后的有效期内不会再进行推断
+#l7-protocol-inference-max-fail-count: 5
+## 一个服务的应用层协议类型推断结果的有效期，单位为秒，超过有效期后会触发下一次推断
+#l7-protocol-inference-ttl: 60

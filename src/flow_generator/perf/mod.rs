@@ -14,28 +14,32 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
-use log::debug;
 
-use super::error::Result;
+use super::app_table::AppTable;
+use super::error::{Error, Result};
 use super::protocol_logs::AppProtoHead;
 
 use crate::common::{
+    enums::IpProtocol,
     flow::{FlowPerfStats, L4Protocol, L7Protocol},
     meta_packet::MetaPacket,
 };
 
+use super::protocol_logs::{
+    dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
+    kafka_check_protocol, mysql_check_protocol, redis_check_protocol,
+};
 use {
     self::http::HttpPerfData,
-    dns::{DnsPerfData, DNS_PORT},
-    mq::{KafkaPerfData, KAFKA_PORT},
+    dns::DnsPerfData,
+    mq::KafkaPerfData,
     rpc::DubboPerfData,
-    sql::{MysqlPerfData, RedisPerfData, MYSQL_PORT, REDIS_PORT},
+    sql::{MysqlPerfData, RedisPerfData},
     tcp::TcpPerf,
     udp::UdpPerf,
 };
 
 pub use l7_rrt::L7RrtCache;
-pub use rpc::DUBBO_PORT;
 pub use stats::FlowPerfCounter;
 
 const ART_MAX: Duration = Duration::from_secs(30);
@@ -75,14 +79,132 @@ pub struct FlowPerf {
     l4: L4FlowPerfTable,
     l7: Option<L7FlowPerfTable>,
 
-    pub is_http: bool,
+    rrt_cache: Rc<RefCell<L7RrtCache>>,
+
+    protocol_bitmap: u128,
+    l7_protocol: L7Protocol,
+
+    is_from_app: bool,
+    is_success: bool,
+    is_skip: bool,
 }
 
 impl FlowPerf {
+    const PROTOCOL_CHECK_LIMIT: usize = 5;
+
+    fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<L7RrtCache>>) -> Option<L7FlowPerfTable> {
+        match protocol {
+            L7Protocol::Dns => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Mysql => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Http1 | L7Protocol::Http2 => {
+                Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
+            }
+            _ => None,
+        }
+    }
+
+    fn _l7_check(&mut self, protocol: L7Protocol, packet: &MetaPacket) -> bool {
+        match protocol {
+            L7Protocol::Dns => dns_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Dubbo => dubbo_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Kafka => kafka_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Http2 => http2_check_protocol(&mut self.protocol_bitmap, packet),
+            _ => false,
+        }
+    }
+
+    fn _l7_parse(
+        &mut self,
+        packet: &MetaPacket,
+        flow_id: u64,
+        app_table: &mut AppTable,
+    ) -> Result<()> {
+        if self.is_skip {
+            return Err(Error::L7ProtocolParseLimit);
+        }
+
+        let ret = self.l7.as_mut().unwrap().parse(packet, flow_id);
+        if !self.is_success {
+            if ret.is_ok() {
+                app_table.set_protocol(packet, self.l7_protocol);
+                self.is_success = true;
+            } else {
+                self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+            }
+        }
+        return ret;
+    }
+
+    fn l7_check(
+        &mut self,
+        packet: &MetaPacket,
+        flow_id: u64,
+        app_table: &mut AppTable,
+    ) -> Result<()> {
+        if self.is_skip {
+            return Err(Error::L7ProtocolCheckLimit);
+        }
+
+        let protocols = if packet.lookup_key.proto == IpProtocol::Tcp {
+            vec![
+                L7Protocol::Http1,
+                L7Protocol::Http2,
+                L7Protocol::Dubbo,
+                L7Protocol::Mysql,
+                L7Protocol::Redis,
+                L7Protocol::Kafka,
+                L7Protocol::Dns,
+            ]
+        } else {
+            vec![L7Protocol::Dns]
+        };
+
+        for i in protocols {
+            if self.protocol_bitmap & 1 << u8::from(i) == 0 {
+                continue;
+            }
+            if self._l7_check(i, packet) {
+                self.l7_protocol = i;
+                self.l7 = Self::l7_new(i, self.rrt_cache.clone());
+                return self._l7_parse(packet, flow_id, app_table);
+            }
+        }
+        self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+
+        Err(Error::L7ProtocolUnknown)
+    }
+
+    fn l7_parse(
+        &mut self,
+        packet: &MetaPacket,
+        flow_id: u64,
+        app_table: &mut AppTable,
+    ) -> Result<()> {
+        if self.l7.is_some() {
+            return self._l7_parse(packet, flow_id, app_table);
+        }
+
+        if self.is_from_app {
+            return Err(Error::L7ProtocolUnknown);
+        }
+
+        if packet.l4_payload_len() <= 8 {
+            return Err(Error::L7ProtocolUnknown);
+        }
+
+        return self.l7_check(packet, flow_id, app_table);
+    }
+
     pub fn new(
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         l4_proto: L4Protocol,
-        l7_proto: L7Protocol,
+        l7_proto: Option<L7Protocol>,
         counter: Arc<FlowPerfCounter>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
@@ -92,33 +214,37 @@ impl FlowPerf {
                 return None;
             }
         };
-        let mut is_http = false;
-        let l7 = match l7_proto {
-            L7Protocol::Dns => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Mysql => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Http1 | L7Protocol::Http2 => {
-                is_http = true;
-                Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
-            }
-            _ => None,
-        };
 
-        Some(Self { l4, l7, is_http })
+        let l7_protocol = l7_proto.unwrap_or(L7Protocol::Unknown);
+
+        Some(Self {
+            l4,
+            l7: Self::l7_new(l7_protocol, rrt_cache.clone()),
+            protocol_bitmap: if l4_proto == L4Protocol::Tcp {
+                1 << u8::from(L7Protocol::Http1)
+                    | 1 << u8::from(L7Protocol::Http2)
+                    | 1 << u8::from(L7Protocol::Dns)
+                    | 1 << u8::from(L7Protocol::Mysql)
+                    | 1 << u8::from(L7Protocol::Redis)
+                    | 1 << u8::from(L7Protocol::Dubbo)
+                    | 1 << u8::from(L7Protocol::Kafka)
+            } else {
+                1 << u8::from(L7Protocol::Dns)
+            },
+            rrt_cache,
+            l7_protocol,
+            is_from_app: l7_proto.is_some(),
+            is_success: false,
+            is_skip: false,
+        })
     }
 
-    pub fn parse_by_http(
-        &mut self,
-        rrt_cache: Rc<RefCell<L7RrtCache>>,
-        packet: &MetaPacket,
-        flow_id: u64,
-    ) {
-        debug!("change to http");
-        self.l7 = Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())));
-        self.is_http = true;
-        let _ = self.l7.as_mut().unwrap().parse(packet, flow_id);
+    pub fn reverse(&mut self, l7_proto: Option<L7Protocol>) {
+        let l7_protocol = l7_proto.unwrap_or(L7Protocol::Unknown);
+        self.is_from_app = l7_proto.is_some();
+        self.is_skip = false;
+        self.is_success = false;
+        self.l7 = Self::l7_new(l7_protocol, self.rrt_cache.clone());
     }
 
     pub fn parse(
@@ -128,15 +254,14 @@ impl FlowPerf {
         flow_id: u64,
         l4_performance_enabled: bool,
         l7_performance_enabled: bool,
+        app_table: &mut AppTable,
     ) -> Result<()> {
         if l4_performance_enabled {
             self.l4.parse(packet, is_first_packet_direction)?;
         }
         if l7_performance_enabled {
             // 抛出错误由flowMap.FlowPerfCounter处理
-            if let Some(l7) = self.l7.as_mut() {
-                l7.parse(packet, flow_id)?;
-            }
+            self.l7_parse(packet, flow_id, app_table)?;
         }
         Ok(())
     }
@@ -181,32 +306,4 @@ impl FlowPerf {
             None
         }
     }
-}
-
-pub fn get_l7_protocol(src_port: u16, dst_port: u16, l7_performance_enabled: bool) -> L7Protocol {
-    if !l7_performance_enabled {
-        return L7Protocol::Unknown;
-    }
-
-    if src_port == DNS_PORT || dst_port == DNS_PORT {
-        return L7Protocol::Dns;
-    }
-
-    if src_port == MYSQL_PORT || dst_port == MYSQL_PORT {
-        return L7Protocol::Mysql;
-    }
-
-    if src_port == REDIS_PORT || dst_port == REDIS_PORT {
-        return L7Protocol::Redis;
-    }
-
-    if src_port == DUBBO_PORT || dst_port == DUBBO_PORT {
-        return L7Protocol::Dubbo;
-    }
-
-    if src_port == KAFKA_PORT || dst_port == KAFKA_PORT {
-        return L7Protocol::Kafka;
-    }
-
-    L7Protocol::Http1
 }

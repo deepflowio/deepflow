@@ -35,6 +35,12 @@ pub enum Error {
     DNSLogParseFailed(String),
     #[error("{0}")]
     DNSPerfParseFailed(&'static str),
+    #[error("l7 protocol unknown")]
+    L7ProtocolUnknown,
+    #[error("l7 protocol check limit")]
+    L7ProtocolCheckLimit,
+    #[error("l7 protocol parse limit")]
+    L7ProtocolParseLimit,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
