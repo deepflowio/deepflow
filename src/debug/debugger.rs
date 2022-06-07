@@ -1,22 +1,28 @@
 use std::{
     io::{self, ErrorKind},
     net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
-    sync::{Arc, Condvar, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use arc_swap::access::Access;
-use log::{info, warn};
+use bincode::{
+    config::{self, Configuration},
+    decode_from_std_read, encode_to_vec, Decode, Encode,
+};
+use log::{error, info, warn};
 use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
 
 use super::{
     error::{Error, Result},
     platform::{PlatformDebugger, PlatformMessage},
     queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
-    Beacon, Message, Module, TestMessage, BEACON_INTERVAL, MAX_BUF_SIZE, METAFLOW_AGENT_BEACON,
+    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, MAX_BUF_SIZE, METAFLOW_AGENT_BEACON,
     SESSION_TIMEOUT,
 };
 
@@ -26,12 +32,6 @@ use crate::{
     rpc::{Session, StaticConfig, Status},
 };
 
-// 如果结构体长度大于此值就切片分包发送
-const LISTENED_IP: &str = "::";
-const LISTENED_PORT: u16 = 0;
-const BEACON_PORT: u16 = 20035;
-const SER_BUF_SIZE: usize = 1024;
-
 struct ModuleDebuggers {
     pub platform: PlatformDebugger,
     pub rpc: RpcDebugger,
@@ -39,9 +39,8 @@ struct ModuleDebuggers {
 }
 
 pub struct Debugger {
-    udp_options: (Duration, SocketAddr, Duration),
-    thread: Mutex<Option<JoinHandle<Result<()>>>>,
-    running: Arc<(Mutex<bool>, Condvar)>,
+    thread: Mutex<Option<JoinHandle<()>>>,
+    running: Arc<AtomicBool>,
     debuggers: Arc<ModuleDebuggers>,
     config: DebugAccess,
 }
@@ -57,30 +56,35 @@ pub struct ConstructDebugCtx {
 
 impl Debugger {
     pub fn start(&self) {
-        {
-            let (started, _) = &*self.running;
-            let mut started = started.lock().unwrap();
-            if *started {
-                return;
-            }
-            *started = true;
+        if self.running.swap(true, Ordering::Relaxed) {
+            return;
         }
 
         let running = self.running.clone();
-        let read_timeout = self.udp_options.0;
-        let addr = self.udp_options.1;
         let debuggers = self.debuggers.clone();
-        let config = self.config.clone();
+        let conf = self.config.clone();
 
-        let beacon_interval = self.udp_options.2;
+        let thread = thread::spawn(move || {
+            let addr: SocketAddr =
+                (IpAddr::from(Ipv6Addr::UNSPECIFIED), conf.load().listen_port).into();
+            let sock = match UdpSocket::bind(addr) {
+                Ok(s) => Arc::new(s),
+                Err(e) => {
+                    error!(
+                        "failed to create debugger socket with addr={:?} error: {}",
+                        addr, e
+                    );
+                    return;
+                }
+            };
+            let _ = sock.set_read_timeout(Some(SESSION_TIMEOUT));
 
-        let thread = thread::spawn(move || -> Result<()> {
-            let sock = Arc::new(UdpSocket::bind(addr)?);
-            sock.set_read_timeout(Some(read_timeout))?;
             let sock_clone = sock.clone();
             let running_clone = running.clone();
-            let beacon_handle = thread::spawn(move || -> Result<()> {
-                loop {
+            let serialize_conf = config::standard();
+            thread::spawn(move || {
+                while running_clone.load(Ordering::Relaxed) {
+                    thread::sleep(BEACON_INTERVAL);
                     let hostname = match hostname::get() {
                         Ok(hostname) => match hostname.into_string() {
                             Ok(s) => s,
@@ -96,12 +100,16 @@ impl Debugger {
                     };
 
                     let beacon = Beacon {
-                        vtap_id: config.load().vtap_id,
+                        vtap_id: conf.load().vtap_id,
                         hostname,
                     };
-                    let serialized_beacon = bincode::serialize(&beacon)?;
-                    for &ip in config.load().controller_ips.iter() {
-                        sock_clone.send_to(
+
+                    let serialized_beacon = match encode_to_vec(beacon, serialize_conf) {
+                        Ok(v) => v,
+                        Err(_) => continue,
+                    };
+                    for &ip in conf.load().controller_ips.iter() {
+                        if let Err(e) = sock_clone.send_to(
                             [
                                 METAFLOW_AGENT_BEACON.as_bytes(),
                                 serialized_beacon.as_slice(),
@@ -109,24 +117,15 @@ impl Debugger {
                             .concat()
                             .as_slice(),
                             (ip, BEACON_PORT),
-                        )?;
-                    }
-
-                    let (running, timer) = &*running_clone;
-                    let mut running = running.lock().unwrap();
-                    if !*running {
-                        break;
-                    }
-                    running = timer.wait_timeout(running, beacon_interval).unwrap().0;
-                    if !*running {
-                        break;
+                        ) {
+                            warn!("write beacon to client error: {}", e);
+                        }
                     }
                 }
-                Ok(())
             });
 
-            while *running.0.lock().unwrap() {
-                let mut buf = [0u8; SER_BUF_SIZE];
+            while running.load(Ordering::Relaxed) {
+                let mut buf = [0u8; MAX_BUF_SIZE];
                 let mut addr = None;
                 let start = Instant::now();
                 match sock.recv_from(&mut buf) {
@@ -137,10 +136,11 @@ impl Debugger {
                         if addr.is_none() {
                             addr.replace(a);
                         }
-                        Self::dispatch((&sock, addr.unwrap()), buf, &debuggers)?;
+                        Self::dispatch((&sock, addr.unwrap()), &buf, &debuggers, serialize_conf)
+                            .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                     }
                     Err(e)
-                        if start.elapsed() >= read_timeout
+                        if start.elapsed() >= SESSION_TIMEOUT
                             && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
                                 || cfg!(target_os = "linux")
                                     && e.kind() == ErrorKind::WouldBlock) =>
@@ -149,103 +149,42 @@ impl Debugger {
                         continue;
                     }
                     Err(e) => {
-                        warn!("{}", e);
+                        warn!("receive udp packet error: {}", e);
                         continue;
                     }
                 }
             }
-            if let Err(e) = beacon_handle.join().unwrap() {
-                warn!("{}", e);
-            }
-            Ok(())
         });
         self.thread.lock().unwrap().replace(thread);
         info!("debugger started");
     }
-}
-
-impl Debugger {
-    /// 传入(read_timeout, bind地址), 构造上下文
-    pub fn new(context: ConstructDebugCtx) -> Self {
-        let debuggers = ModuleDebuggers {
-            platform: PlatformDebugger::new(context.api_watcher, context.poller),
-            rpc: RpcDebugger::new(context.session, context.static_config, context.status),
-            queue: Arc::new(QueueDebugger::new()),
-        };
-
-        let addr = (
-            IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()),
-            context.config.load().listen_port,
-        )
-            .into();
-
-        Self {
-            udp_options: (SESSION_TIMEOUT, addr, BEACON_INTERVAL),
-            thread: Mutex::new(None),
-            running: Arc::new((Mutex::new(false), Condvar::new())),
-            debuggers: Arc::new(debuggers),
-            config: context.config,
-        }
-    }
-
-    pub fn clone_queue(&self) -> Arc<QueueDebugger> {
-        self.debuggers.queue.clone()
-    }
-
-    pub fn stop(&self) {
-        let (stopped, timer) = &*self.running;
-        {
-            let mut stopped = stopped.lock().unwrap();
-            if !*stopped {
-                return;
-            }
-            *stopped = false;
-        }
-        timer.notify_one();
-
-        if let Some(t) = self.thread.lock().unwrap().take() {
-            match t.join() {
-                Ok(r) => {
-                    if let Err(e) = r {
-                        warn!("{}", e);
-                    }
-                }
-                Err(e) => {
-                    warn!("{:?}", e);
-                }
-            };
-        }
-        info!("debugger exited");
-    }
 
     fn dispatch(
         conn: (&Arc<UdpSocket>, SocketAddr),
-        payload: impl AsRef<[u8]>,
+        mut payload: &[u8],
         debuggers: &ModuleDebuggers,
+        serialize_conf: Configuration,
     ) -> Result<()> {
-        let payload = payload.as_ref();
         let m = *payload.first().unwrap();
         let module = Module::try_from(m).unwrap_or_default();
+
         match module {
             Module::Platform => {
-                let req = bincode::deserialize::<Message<PlatformMessage>>(payload)?.into_inner();
+                let req: Message<PlatformMessage> =
+                    decode_from_std_read(&mut payload, serialize_conf)?;
                 let debugger = &debuggers.platform;
-                let resp = match req {
+                let resp = match req.into_inner() {
                     PlatformMessage::Version(_) => debugger.api_version(),
-                    PlatformMessage::WatcherReq(w) => debugger.watcher(w),
+                    PlatformMessage::Watcher(w) => debugger.watcher(w),
                     PlatformMessage::MacMappings(_) => debugger.mac_mapping(),
                     _ => unreachable!(),
                 };
-                iter_send_to(conn.0, conn.1, resp.iter())?;
+                iter_send_to(conn.0, conn.1, resp.iter(), serialize_conf)?;
             }
             Module::Rpc => {
-                let req = bincode::deserialize::<Message<RpcMessage>>(payload)?.into_inner();
+                let req: Message<RpcMessage> = decode_from_std_read(&mut payload, serialize_conf)?;
                 let debugger = &debuggers.rpc;
-                if let RpcMessage::PlatformData(_) = req {
-                    let r = debugger.platform_data()?;
-                    iter_send_to(conn.0, conn.1, r.iter())?;
-                }
-                let resp_result = match req {
+                let resp_result = match req.into_inner() {
                     RpcMessage::Acls(_) => debugger.flow_acls(),
                     RpcMessage::Cidr(_) => debugger.cidrs(),
                     RpcMessage::Config(_) => debugger.basic_config(),
@@ -259,97 +198,118 @@ impl Debugger {
 
                 let resp = match resp_result {
                     Ok(m) => m,
-                    Err(e) => vec![Message {
-                        module: Module::Rpc,
-                        msg: RpcMessage::Err(e.to_string()),
-                    }],
+                    Err(e) => vec![RpcMessage::Err(e.to_string())],
                 };
-                iter_send_to(conn.0, conn.1, resp.iter())?;
+                iter_send_to(conn.0, conn.1, resp.iter(), serialize_conf)?;
             }
             Module::Queue => {
-                let req = bincode::deserialize::<Message<QueueMessage>>(payload)?.into_inner();
+                let req: Message<QueueMessage> =
+                    decode_from_std_read(&mut payload, serialize_conf)?;
                 let debugger = &debuggers.queue;
-                match req {
+                match req.into_inner() {
                     QueueMessage::Clear => {
                         let msg = debugger.turn_off_all_queue();
-                        send_to(conn.0, conn.1, &msg)?;
+                        send_to(conn.0, conn.1, msg, serialize_conf)?;
                     }
                     QueueMessage::Off(v) => {
                         let msg = debugger.turn_off_queue(v);
-                        send_to(conn.0, conn.1, &msg)?;
+                        send_to(conn.0, conn.1, msg, serialize_conf)?;
                     }
                     QueueMessage::Names(_) => {
                         let msgs = debugger.queue_names();
-                        iter_send_to(conn.0, conn.1, msgs.iter())?;
+                        iter_send_to(conn.0, conn.1, msgs.iter(), serialize_conf)?;
                     }
                     QueueMessage::On((name, duration)) => {
                         let msg = debugger.turn_on_queue(name.as_str());
-                        send_to(conn.0, conn.1, &msg)?;
-                        debugger.send(name, conn.1, duration);
+                        send_to(conn.0, conn.1, msg, serialize_conf)?;
+                        debugger.send(name, conn.1, serialize_conf, duration);
                     }
                     _ => unreachable!(),
                 }
             }
-            Module::_Test => {
-                let msg = bincode::deserialize::<Message<TestMessage>>(payload)?.into_inner();
-                match msg {
-                    TestMessage::Huge => {
-                        let resp = Message {
-                            module: Module::_Test,
-                            msg: TestMessage::HugeResp(vec![1; 700]),
-                        };
-                        send_to(conn.0, conn.1, &resp)?;
-                    }
-                    _ => {
-                        let resp = Message {
-                            module: Module::_Test,
-                            msg,
-                        };
-                        send_to(conn.0, conn.1, &resp)?
-                    }
-                }
-            }
-            _ => unreachable!(),
+            _ => warn!("invalid module or invalid request, skip it"),
         }
 
         Ok(())
     }
 }
 
+impl Debugger {
+    /// 传入构造上下文
+    pub fn new(context: ConstructDebugCtx) -> Self {
+        let debuggers = ModuleDebuggers {
+            platform: PlatformDebugger::new(context.api_watcher, context.poller),
+            rpc: RpcDebugger::new(context.session, context.static_config, context.status),
+            queue: Arc::new(QueueDebugger::new()),
+        };
+
+        Self {
+            thread: Mutex::new(None),
+            running: Arc::new(AtomicBool::new(false)),
+            debuggers: Arc::new(debuggers),
+            config: context.config,
+        }
+    }
+
+    pub fn clone_queue(&self) -> Arc<QueueDebugger> {
+        self.debuggers.queue.clone()
+    }
+
+    pub fn stop(&self) {
+        if !self.running.swap(false, Ordering::Relaxed) {
+            return;
+        }
+
+        let _ = self.thread.lock().unwrap().take();
+        info!("debugger exited");
+    }
+}
+
 pub struct Client {
-    timeout: Duration,
     sock: UdpSocket,
+    conf: Configuration,
+    addr: SocketAddr,
 }
 
 impl Client {
-    pub fn new(read_timeout: Option<Duration>, addr: impl ToSocketAddrs) -> Result<Self> {
-        let read_timeout = read_timeout.or(Some(SESSION_TIMEOUT));
-        let s = UdpSocket::bind(addr)?;
-        s.set_read_timeout(read_timeout)?;
+    pub fn new(addr: SocketAddr) -> Result<Self> {
+        let sock = UdpSocket::bind((IpAddr::from(Ipv6Addr::UNSPECIFIED), 0))?;
+        sock.set_read_timeout(Some(SESSION_TIMEOUT))?;
+
         Ok(Self {
-            timeout: read_timeout.unwrap(),
-            sock: s,
+            sock,
+            conf: config::standard(),
+            addr,
         })
     }
 
-    pub fn send_to(&self, msg: &impl Serialize, addr: impl ToSocketAddrs + Clone) -> Result<()> {
-        send_to(&self.sock, addr, msg)
+    /// 消息结构，msg_type占1字节，1个字节构成头部，后面存放序列化的消息
+    /// 仅在client -> server发送的消息使用，server->client使用message
+    /// 0          1               N 单位(字节)
+    /// +----------+---------------+
+    /// | msg_type |   message     |
+    /// +----------+---------------+
+    pub fn send_to(&mut self, msg: impl Encode) -> Result<()> {
+        send_to(&self.sock, self.addr, msg, self.conf)?;
+        Ok(())
     }
 
-    pub fn recv<'de, D: Deserialize<'de>>(&self, buf: &'de mut [u8]) -> Result<D> {
+    pub fn recv<D: Decode>(&mut self) -> Result<D> {
         let start = Instant::now();
-        match self.sock.recv(buf) {
+        let mut buf = [0u8; MAX_BUF_SIZE];
+        match self.sock.recv(&mut buf) {
             Ok(n) => {
                 if n == 0 {
                     return Err(Error::IoError(io::Error::new(
                         ErrorKind::Other,
-                        "recv zero byte",
+                        "receive zero byte",
                     )));
                 }
-                bincode::deserialize(&buf[..n]).map_err(|e| Error::BinCode(e))
+                let d = decode_from_std_read(&mut buf.as_slice(), self.conf)?;
+                Ok(d)
             }
             Err(e)
-                if start.elapsed() >= self.timeout
+                if start.elapsed() >= SESSION_TIMEOUT
                     && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
                         || cfg!(target_os = "linux") && e.kind() == ErrorKind::WouldBlock) =>
             {
@@ -364,183 +324,34 @@ impl Client {
     }
 }
 
-pub(super) fn send_to(
-    sock: &UdpSocket,
-    addr: impl ToSocketAddrs + Clone,
-    msg: &impl Serialize,
-) -> Result<()> {
-    let encoded: Vec<u8> = bincode::serialize(msg)?;
-    if encoded.len() > MAX_BUF_SIZE {
-        return Err(Error::IoError(io::Error::new(
-            ErrorKind::Other,
-            "message length too large",
-        )));
-    }
-    sock.send_to(encoded.as_slice(), addr)?;
-    Ok(())
-}
-
 pub(super) fn iter_send_to<I: Iterator>(
     sock: &UdpSocket,
     addr: impl ToSocketAddrs + Clone,
     msgs: I,
+    conf: Configuration,
 ) -> Result<()>
 where
-    I::Item: Serialize,
+    I::Item: Encode,
 {
     for msg in msgs {
-        send_to(sock, addr.clone(), &msg)?
+        send_to(sock, addr.clone(), msg, conf)?
     }
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use std::net::{IpAddr, Ipv6Addr};
-
-    use arc_swap::{access::Map, ArcSwap};
-    use rand::random;
-
-    use crate::{
-        config::{
-            handler::{DebugConfig, PlatformConfig},
-            ModuleConfig,
-        },
-        debug::Message,
-        exception::ExceptionHandler,
-        platform::ActivePoller,
-        rpc::Session,
-    };
-
-    use super::*;
-
-    fn new_default_debug_ctx() -> ConstructDebugCtx {
-        let s = String::from("yunshan");
-        let session = Arc::new(Session::new(
-            20035,
-            0,
-            Duration::from_secs(5),
-            s.clone(),
-            vec![String::from("10.1.20.21")],
-            ExceptionHandler::default(),
-        ));
-
-        let current_config = Arc::new(ArcSwap::from_pointee(ModuleConfig::default()));
-
-        let static_config = Arc::new(StaticConfig::default());
-        let status = Arc::new(RwLock::new(Status::default()));
-
-        ConstructDebugCtx {
-            api_watcher: Arc::new(ApiWatcher::new(
-                Map::new(current_config.clone(), |config| -> &PlatformConfig {
-                    &config.platform
-                }),
-                session.clone(),
-            )),
-            poller: Arc::new(GenericPoller::from(ActivePoller::new(Duration::from_secs(
-                60,
-            )))),
-            session,
-            static_config,
-            status,
-            config: Map::new(current_config.clone(), |config| -> &DebugConfig {
-                &config.debug
-            }),
-        }
+pub(super) fn send_to(
+    sock: &UdpSocket,
+    addr: impl ToSocketAddrs + Clone,
+    msg: impl Encode,
+    conf: Configuration,
+) -> Result<()> {
+    let encoded = encode_to_vec(msg, conf)?;
+    if encoded.len() > MAX_BUF_SIZE {
+        return Err(Error::IoError(io::Error::new(
+            ErrorKind::Other,
+            "too large packets to send",
+        )));
     }
-
-    #[test]
-    fn one_packet() {
-        let timeout = Duration::from_secs(1);
-        let port = 34444 + random::<u16>() % 1000;
-        let ctx = new_default_debug_ctx();
-        let mut server = Debugger::new(ctx);
-        server.udp_options = (
-            timeout,
-            (IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into(),
-            timeout,
-        );
-        let client = Client::new(Some(timeout), (LISTENED_IP, 0)).unwrap();
-
-        server.start();
-        std::thread::sleep(Duration::from_secs(1));
-        let mut buf = [0u8; 256];
-        let msg = Message {
-            module: Module::_Test,
-            msg: TestMessage::new_small(),
-        };
-        client.send_to(&msg, ("127.0.0.1", port)).unwrap();
-        let res: Message<TestMessage> = client.recv(&mut buf).unwrap();
-        assert_eq!(msg, res);
-        client.send_to(&msg, ("127.0.0.1", port)).unwrap();
-        let res: Message<TestMessage> = client.recv(&mut buf).unwrap();
-        assert_eq!(msg, res);
-        client.send_to(&msg, ("127.0.0.1", port)).unwrap();
-        let res: Message<TestMessage> = client.recv(&mut buf).unwrap();
-        assert_eq!(msg, res);
-        server.stop();
-    }
-
-    #[test]
-    fn multi_packet() {
-        let timeout = Duration::from_secs(1);
-        let port = 34444 + random::<u16>() % 1000;
-        let ctx = new_default_debug_ctx();
-        let mut server = Debugger::new(ctx);
-        server.udp_options = (
-            timeout,
-            (IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()), port).into(),
-            timeout,
-        );
-        let client = Client::new(Some(timeout), (LISTENED_IP, 0)).unwrap();
-        server.start();
-        std::thread::sleep(Duration::from_secs(1));
-        let mut buf = [0u8; MAX_BUF_SIZE];
-        let msg = Message {
-            module: Module::_Test,
-            msg: TestMessage::new_huge(),
-        };
-        client.send_to(&msg, ("127.0.0.1", port)).unwrap();
-        let res = client
-            .recv::<Message<TestMessage>>(&mut buf)
-            .unwrap()
-            .into_inner();
-        if let TestMessage::HugeResp(v) = res {
-            assert_eq!(v, vec![1; 700]);
-        } else {
-            assert_eq!(1, 2);
-        }
-
-        client.send_to(&msg, ("127.0.0.1", port)).unwrap();
-        let res = client
-            .recv::<Message<TestMessage>>(&mut buf)
-            .unwrap()
-            .into_inner();
-        if let TestMessage::HugeResp(v) = res {
-            assert_eq!(v, vec![1; 700]);
-        } else {
-            assert_eq!(1, 2);
-        }
-
-        server.stop();
-    }
-
-    #[test]
-    #[ignore = "用于和trident-ctl调试"]
-    fn list() {
-        let timeout = Duration::from_secs(1);
-        let ctx = new_default_debug_ctx();
-        let mut server = Debugger::new(ctx);
-        server.udp_options = (
-            timeout,
-            (
-                IpAddr::from(LISTENED_IP.parse::<Ipv6Addr>().unwrap()),
-                LISTENED_PORT,
-            )
-                .into(),
-            Duration::ZERO,
-        );
-        server.start();
-        std::thread::sleep(Duration::from_secs(10000));
-    }
+    sock.send_to(encoded.as_slice(), addr)?;
+    Ok(())
 }

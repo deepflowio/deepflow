@@ -11,7 +11,6 @@ pub mod h2pack;
 
 mod error;
 pub use error::{Error, Result};
-use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
 mod ethtool;
@@ -124,7 +123,7 @@ pub struct Route {
 
 pub const MAC_ADDR_LEN: usize = 6;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy, Serialize, Deserialize, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy, Hash)]
 // slice is in bigendian
 pub struct MacAddr([u8; 6]);
 
