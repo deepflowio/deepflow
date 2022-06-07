@@ -97,10 +97,7 @@ impl LocalModeDispatcher {
 
             if timestamp + Duration::from_millis(1) < pipeline.timestamp {
                 // FIXME: just in case
-                base.counter
-                    .kernel_counter
-                    .retired
-                    .fetch_add(1, Ordering::Relaxed);
+                base.counter.retired.fetch_add(1, Ordering::Relaxed);
                 continue;
             } else if timestamp < pipeline.timestamp {
                 timestamp = pipeline.timestamp;
