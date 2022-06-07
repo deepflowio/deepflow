@@ -7,6 +7,7 @@ use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
         flow::L7Protocol,
+        meta_packet::MetaPacket,
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
     flow_generator::error::{Error, Result},
@@ -65,7 +66,7 @@ impl DnsLog {
         let mut index = g_offset;
         let mut buffer = String::new();
 
-        if payload.len() <= l_offset {
+        if payload.len() < l_offset {
             let err_msg = format!("payload too short: {}", payload.len());
             return Err(Error::DNSLogParseFailed(err_msg));
         }
@@ -79,12 +80,12 @@ impl DnsLog {
                 let err_msg = format!("dns name label type error: {}", payload[index]);
                 return Err(Error::DNSLogParseFailed(err_msg));
             } else if payload[index] == DNS_NAME_COMPRESS_POINTER {
-                if index + 2 > payload.len() {
+                if index + 2 >= payload.len() {
                     let err_msg = format!("dns name invalid index: {}", index - 2);
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 let index_ptr = read_u16_be(&payload[index..]) as usize & 0x3fff;
-                if index_ptr > payload.len() {
+                if index_ptr >= payload.len() {
                     let err_msg = format!("dns name offset too large: {}", index_ptr);
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
@@ -324,6 +325,22 @@ impl L7LogParse for DnsLog {
     }
 }
 
+// 通过请求来识别DNS
+pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    let payload = packet.get_l4_payload();
+    if payload.is_none() {
+        return false;
+    }
+    let payload = payload.unwrap();
+    let mut dns = DnsLog::default();
+    let ret = dns.parse(payload, packet.lookup_key.proto, packet.direction);
+    if ret.is_err() && packet.lookup_key.proto == IpProtocol::Udp {
+        *bitmap &= !(1 << u8::from(L7Protocol::Dns));
+        return false;
+    }
+    return ret.is_ok() && dns.msg_type == LogMessageType::Request;
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -344,6 +361,7 @@ mod tests {
 
         let mut output = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -357,7 +375,8 @@ mod tests {
 
             let mut dns = DnsLog::default();
             let _ = dns.parse(payload, packet.lookup_key.proto, packet.direction);
-            output.push_str(&format!("{:?}\r\n", dns.info));
+            let is_dns = dns_check_protocol(&mut bitmap, packet);
+            output.push_str(&format!("{:?} is_dns: {}\r\n", dns.info, is_dns));
         }
         output
     }

@@ -2,12 +2,14 @@ use std::str;
 
 use arc_swap::access::Access;
 use log::info;
+use regex::Regex;
 
 use super::LogMessageType;
 use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
+use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
 use crate::proto::flow_log;
@@ -82,6 +84,27 @@ pub struct HttpLog {
     l7_log_dynamic_config: L7LogDynamicConfig,
 }
 
+fn parse_lines(payload: &[u8], limit: usize) -> Vec<&[u8]> {
+    let mut lines = Vec::new();
+    let mut p = payload;
+    while lines.len() < limit {
+        let mut next_index = None;
+        for (i, c) in p.iter().enumerate() {
+            if i > 2 && *c == b'\n' && p[i - 1] == b'\r' {
+                lines.push(&p[0..i - 1]);
+                next_index = Some(i + 1);
+                break;
+            }
+        }
+        match next_index {
+            None => return lines,
+            Some(i) if i >= p.len() => return lines,
+            Some(i) => p = &p[i..],
+        }
+    }
+    return lines;
+}
+
 impl HttpLog {
     const TRACE_ID: u8 = 0;
     const SPAN_ID: u8 = 1;
@@ -121,31 +144,11 @@ impl HttpLog {
         }
     }
 
-    fn parse_lines(payload: &[u8]) -> Vec<&[u8]> {
-        let mut lines = Vec::new();
-        let mut p = payload;
-        loop {
-            let mut next_index = None;
-            for (i, c) in p.iter().enumerate() {
-                if i > 2 && *c == b'\n' && p[i - 1] == b'\r' {
-                    lines.push(&p[0..i - 1]);
-                    next_index = Some(i + 1);
-                    break;
-                }
-            }
-            match next_index {
-                None => return lines,
-                Some(i) if i >= p.len() => return lines,
-                Some(i) => p = &p[i..],
-            }
-        }
-    }
-
     fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
         if !is_http_v1_payload(payload) {
             return Err(Error::HttpHeaderParseFailed);
         }
-        let lines = Self::parse_lines(payload);
+        let lines = parse_lines(payload, 20);
         if lines.len() == 0 {
             return Err(Error::HttpHeaderParseFailed);
         }
@@ -647,6 +650,48 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
     Ok((version, status_code))
 }
 
+// 通过请求识别HTTPv1
+pub fn http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    if packet.lookup_key.proto != IpProtocol::Tcp {
+        *bitmap &= !(1 << u8::from(L7Protocol::Http1));
+        return false;
+    }
+
+    let payload = packet.get_l4_payload();
+    if payload.is_none() {
+        return false;
+    }
+    let payload = payload.unwrap();
+    let lines = parse_lines(payload, 1);
+    if lines.len() == 0 {
+        // 没有/r/n认为一定不是HTTPv1
+        *bitmap &= !(1 << u8::from(L7Protocol::Http1));
+        return false;
+    }
+
+    let regex = Regex::new("^(GET|POST|HEAD|PUT|DELETE|CONNECT|TRACE|OPTIONS|LINK|UNLINK|COPY|MOVE|PATCH|WRAPPED|EXTENSION\\-METHOD).+HTTP/1.[01]$").unwrap();
+    let line = String::from_utf8_lossy(lines[0]).into_owned();
+    return regex.is_match(line.as_str());
+}
+
+// 通过请求识别HTTPv2
+pub fn http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    if packet.lookup_key.proto != IpProtocol::Tcp {
+        *bitmap &= !(1 << u8::from(L7Protocol::Http2));
+        return false;
+    }
+
+    let payload = packet.get_l4_payload();
+    if payload.is_none() {
+        return false;
+    }
+    let payload = payload.unwrap();
+    let mut http2 = HttpLog::default();
+    return http2
+        .parse_http_v2(payload, PacketDirection::ClientToServer)
+        .is_ok();
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -667,6 +712,7 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
+        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -696,8 +742,10 @@ mod tests {
                 span_type: TraceType::Sw8,
             };
             let _ = http.parse(payload, packet.lookup_key.proto, packet.direction);
+            let mut is_http = http1_check_protocol(&mut bitmap, packet);
+            is_http |= http2_check_protocol(&mut bitmap, packet);
 
-            output.push_str(&format!("{:?}\r\n", http.info));
+            output.push_str(&format!("{:?} is_http: {}\r\n", http.info, is_http));
         }
         output
     }

@@ -20,9 +20,10 @@ use arc_swap::{
 use log::{debug, warn};
 
 use super::{
+    app_table::AppTable,
     error::Error,
     flow_state::{StateMachine, StateValue},
-    perf::{get_l7_protocol, FlowPerf, FlowPerfCounter, L7RrtCache, DUBBO_PORT},
+    perf::{FlowPerf, FlowPerfCounter, L7RrtCache},
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
@@ -58,6 +59,7 @@ pub struct FlowMap {
     state_machine_master: StateMachine,
     state_machine_slave: StateMachine,
     service_table: ServiceTable,
+    app_table: AppTable,
     policy_getter: PolicyGetter,
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
@@ -93,6 +95,10 @@ impl FlowMap {
                 service_table: ServiceTable::new(
                     SERVICE_TABLE_IPV4_CAPACITY,
                     SERVICE_TABLE_IPV6_CAPACITY,
+                ),
+                app_table: AppTable::new(
+                    config.load().l7_protocol_inference_max_fail_count,
+                    config.load().l7_protocol_inference_ttl,
                 ),
                 policy_getter,
                 start_time: Duration::ZERO,
@@ -537,20 +543,7 @@ impl FlowMap {
             packet_in_tick: true,
             policy_in_tick,
             flow_state: FlowState::Raw,
-            meta_flow_perf: if self.config.load().collector_enabled {
-                FlowPerf::new(
-                    self.rrt_cache.clone(),
-                    L4Protocol::from(lookup_key.proto),
-                    get_l7_protocol(
-                        lookup_key.src_port,
-                        lookup_key.dst_port,
-                        self.l7_metrics_enabled(),
-                    ),
-                    self.counter.clone(),
-                )
-            } else {
-                None
-            },
+            meta_flow_perf: None,
             next_tcp_seq0: 0,
             next_tcp_seq1: 0,
             policy_data_cache: Default::default(),
@@ -585,6 +578,15 @@ impl FlowMap {
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
+
+        if self.config.load().collector_enabled {
+            node.meta_flow_perf = FlowPerf::new(
+                self.rrt_cache.clone(),
+                L4Protocol::from(meta_packet.lookup_key.proto),
+                self.app_table.get_protocol(meta_packet),
+                self.counter.clone(),
+            )
+        }
         node
     }
 
@@ -707,23 +709,14 @@ impl FlowMap {
                 flow_id,
                 self.l4_metrics_enabled(),
                 self.l7_metrics_enabled(),
+                &mut self.app_table,
             ) {
                 Err(Error::L7ReqNotFound(c)) => {
                     self.counter
                         .mismatched_response
                         .fetch_add(c, Ordering::Relaxed);
                 }
-                Err(e) => {
-                    if self.l7_metrics_enabled()
-                        && !perf.is_http
-                        && meta_packet.lookup_key.dst_port == DUBBO_PORT
-                        && meta_packet.get_l4_payload().is_some()
-                    {
-                        perf.parse_by_http(self.rrt_cache.clone(), &meta_packet, flow_id);
-                    }
-
-                    debug!("{}", e)
-                }
+                Err(e) => debug!("{}", e),
                 _ => (),
             }
         }
@@ -1013,6 +1006,9 @@ impl FlowMap {
         node.endpoint_data_cache = node.endpoint_data_cache.reversed();
         node.tagged_flow.flow.reverse(no_stats);
         node.tagged_flow.tag.reverse();
+        if let Some(meta_flow_perf) = node.meta_flow_perf.as_mut() {
+            meta_flow_perf.reverse(None);
+        }
     }
 
     fn update_endpoint_and_policy_data(

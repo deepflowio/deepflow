@@ -217,6 +217,9 @@ pub struct FlowConfig {
     pub app_proto_log_enabled: bool,
     pub l4_performance_enabled: bool,
     pub l7_log_packet_size: u32,
+
+    pub l7_protocol_inference_max_fail_count: usize,
+    pub l7_protocol_inference_ttl: usize,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -241,6 +244,10 @@ impl From<&RuntimeConfig> for FlowConfig {
             app_proto_log_enabled: conf.app_proto_log_enabled,
             l4_performance_enabled: conf.l4_performance_enabled,
             l7_log_packet_size: conf.l7_log_packet_size,
+            l7_protocol_inference_max_fail_count: conf
+                .yaml_config
+                .l7_protocol_inference_max_fail_count,
+            l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
         }
     }
 }
@@ -269,6 +276,11 @@ impl fmt::Debug for FlowConfig {
             .field("app_proto_log_enabled", &self.app_proto_log_enabled)
             .field("l4_performance_enabled", &self.l4_performance_enabled)
             .field("l7_log_packet_size", &self.l7_log_packet_size)
+            .field(
+                "l7_protocol_inference_max_fail_count",
+                &self.l7_protocol_inference_max_fail_count,
+            )
+            .field("l7_protocol_inference_ttl", &self.l7_protocol_inference_ttl)
             .finish()
     }
 }
@@ -318,6 +330,8 @@ pub struct EbpfConfig {
     pub l7_log_packet_size: usize,
     // 静态配置
     pub l7_log_session_timeout: Duration,
+    pub l7_protocol_inference_max_fail_count: usize,
+    pub l7_protocol_inference_ttl: usize,
     pub log_path: String,
     pub l7_log_tap_types: [bool; 256],
 }
@@ -331,6 +345,11 @@ impl fmt::Debug for EbpfConfig {
             .field("epc_id", &self.epc_id)
             .field("l7_log_packet_size", &self.l7_log_packet_size)
             .field("l7_log_session_timeout", &self.l7_log_session_timeout)
+            .field(
+                "l7_protocol_inference_max_fail_count",
+                &self.l7_protocol_inference_max_fail_count,
+            )
+            .field("l7_protocol_inference_ttl", &self.l7_protocol_inference_ttl)
             .field("log_path", &self.log_path)
             .field(
                 "l7_log_tap_types",
@@ -616,6 +635,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 log_path: conf.yaml_config.ebpf_log_file.clone(),
                 l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size as usize),
                 l7_log_tap_types: conf.l7_log_store_tap_types,
+                l7_protocol_inference_max_fail_count: conf
+                    .yaml_config
+                    .l7_protocol_inference_max_fail_count,
+                l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,

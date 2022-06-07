@@ -17,7 +17,6 @@ use super::{
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
     enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TapType, TcpFlags},
-    flow::L7Protocol,
     lookup_key::LookupKey,
     policy::PolicyData,
     tap_port::TapPort,
@@ -32,7 +31,6 @@ pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
 
-    pub raw_from_ebpf: Vec<u8>,
     pub raw: Option<&'a [u8]>,
     pub packet_len: usize,
     vlan_tag_size: usize,
@@ -86,7 +84,8 @@ pub struct MetaPacket<'a> {
     pub source_ip: u32,
 
     // for ebpf
-    pub l7_protocol: L7Protocol,
+    pub raw_from_ebpf: Vec<u8>,
+
     pub socket_id: u64,
     pub cap_seq: u64,
 
@@ -97,6 +96,14 @@ pub struct MetaPacket<'a> {
 }
 
 impl<'a> MetaPacket<'a> {
+    pub fn timestamp_adjust(&mut self, time_diff: i64) {
+        if time_diff >= 0 {
+            self.lookup_key.timestamp += Duration::from_nanos(time_diff as u64);
+        } else {
+            self.lookup_key.timestamp -= Duration::from_nanos(-time_diff as u64);
+        }
+    }
+
     pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
             offset_mac_0: FIELD_OFFSET_SA,
@@ -319,7 +326,7 @@ impl<'a> MetaPacket<'a> {
             return None;
         }
         if self.tap_port.is_from(TapPort::FROM_EBPF) {
-            return self.raw;
+            return Some(&self.raw_from_ebpf);
         }
 
         let packet_header_size =
@@ -800,10 +807,6 @@ impl<'a> MetaPacket<'a> {
             .to_str()?
             .to_string();
         packet.socket_id = data.socket_id;
-        if !data.need_reconfirm {
-            packet.l7_protocol = L7Protocol::from(data.l7_protocal_hint as u8);
-        }
-        packet.direction = PacketDirection::from(data.msg_type);
         packet.tcp_data.seq = data.tcp_seq as u32;
         return Ok(packet);
     }

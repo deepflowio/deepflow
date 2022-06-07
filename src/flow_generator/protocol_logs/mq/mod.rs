@@ -1,3 +1,3 @@
 mod kafka;
 
-pub use kafka::{KafkaInfo, KafkaLog};
+pub use kafka::{kafka_check_protocol, KafkaInfo, KafkaLog};
