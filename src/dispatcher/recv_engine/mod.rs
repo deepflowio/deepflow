@@ -13,6 +13,8 @@ use af_packet::{
     tpacket::{Packet, Tpacket},
 };
 
+use crate::utils::stats;
+
 pub const DEFAULT_BLOCK_SIZE: usize = 1 << 20;
 pub const FRAME_SIZE_MAX: usize = 1 << 16; // local and mirror
 pub const FRAME_SIZE_MIN: usize = 1 << 11; // analyzer
@@ -20,14 +22,14 @@ pub const POLL_TIMEOUT: Duration = Duration::from_millis(100);
 
 pub(super) enum RecvEngine {
     AfPacket(Tpacket),
-    Dpdk(Arc<Counter>),
+    Dpdk(),
 }
 
 impl RecvEngine {
     pub fn init(&mut self) -> Result<()> {
         match self {
             Self::AfPacket(_) => Ok(()),
-            Self::Dpdk(_) => todo!(),
+            Self::Dpdk() => todo!(),
         }
     }
 
@@ -41,14 +43,21 @@ impl RecvEngine {
                 Some(p) => Ok(p),
                 None => Err(Error::Timeout),
             },
-            Self::Dpdk(_) => todo!(),
+            Self::Dpdk() => todo!(),
         }
     }
 
     pub fn set_bpf(&mut self, s: &CStr) -> Result<()> {
         match self {
             Self::AfPacket(e) => e.set_bpf(s).map_err(|e| e.into()),
-            Self::Dpdk(_) => todo!(),
+            Self::Dpdk() => todo!(),
+        }
+    }
+
+    pub fn get_counter_handle(&self) -> Arc<dyn stats::RefCountable> {
+        match self {
+            Self::AfPacket(e) => Arc::new(e.get_counter_handle()),
+            Self::Dpdk() => todo!(),
         }
     }
 }

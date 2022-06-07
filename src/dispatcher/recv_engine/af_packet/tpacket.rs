@@ -5,12 +5,16 @@ use libc::{
     sockaddr_ll, socklen_t, AF_PACKET, ETH_P_ALL, MAP_LOCKED, MAP_NORESERVE, MAP_SHARED, POLLERR,
     POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
 };
+use log::warn;
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
 use socket::{self, Socket};
 
 use super::{header, options, Error, Result};
 
-use crate::utils::net::{self, link_by_name};
+use crate::utils::{
+    net::{self, link_by_name},
+    stats,
+};
 
 const PACKET_VERSION: c_int = 10;
 const PACKET_RX_RING: c_int = 5;
@@ -302,51 +306,10 @@ impl Tpacket {
         Ok(())
     }
 
-    pub fn get_socket_stats(&self) -> Result<TpacketStats> {
-        if self.tp_version == options::OptTpacketVersion::TpacketVersion3 {
-            let mut stats_v3 = TpacketStatsV3 {
-                tp_packets: 0,
-                tp_drops: 0,
-                tp_freeze_q_cnt: 0,
-            };
-            let mut opt_len = std::mem::size_of_val(&stats_v3) as socklen_t;
-            unsafe {
-                let ret = getsockopt(
-                    self.raw_socket.fileno(),
-                    SOL_PACKET,
-                    PACKET_STATISTICS,
-                    &mut stats_v3 as *const TpacketStatsV3 as *mut c_void,
-                    &mut opt_len as *mut u32,
-                );
-                if ret != 0 {
-                    return Err(io::Error::last_os_error().into());
-                }
-            }
-            Ok(TpacketStats {
-                tp_packets: stats_v3.tp_packets,
-                tp_drops: stats_v3.tp_drops,
-            })
-        } else if self.tp_version == options::OptTpacketVersion::TpacketVersion2 {
-            let mut stats = TpacketStats {
-                tp_packets: 0,
-                tp_drops: 0,
-            };
-            let mut opt_len = std::mem::size_of_val(&stats) as socklen_t;
-            unsafe {
-                let ret = getsockopt(
-                    self.raw_socket.fileno(),
-                    SOL_PACKET,
-                    PACKET_STATISTICS,
-                    &mut stats as *const TpacketStats as *mut c_void,
-                    &mut opt_len as *mut u32,
-                );
-                if ret != 0 {
-                    return Err(io::Error::last_os_error().into());
-                }
-            }
-            Ok(stats)
-        } else {
-            Err(Error::InvalidTpVersion(self.tp_version as isize))
+    pub fn get_counter_handle(&self) -> TpacketCounter {
+        TpacketCounter {
+            tp_version: self.tp_version,
+            fd: self.raw_socket.fileno(),
         }
     }
 
@@ -392,6 +355,88 @@ impl Drop for Tpacket {
             }
             if let Err(_e) = self.raw_socket.close() {}
             self.ring = std::ptr::null_mut();
+        }
+    }
+}
+
+pub struct TpacketCounter {
+    tp_version: options::OptTpacketVersion,
+    fd: i32,
+}
+
+impl stats::RefCountable for TpacketCounter {
+    fn get_counters(&self) -> Vec<stats::Counter> {
+        if self.tp_version == options::OptTpacketVersion::TpacketVersion3 {
+            let mut stats_v3 = TpacketStatsV3 {
+                tp_packets: 0,
+                tp_drops: 0,
+                tp_freeze_q_cnt: 0,
+            };
+            let mut opt_len = std::mem::size_of_val(&stats_v3) as socklen_t;
+            unsafe {
+                let ret = getsockopt(
+                    self.fd,
+                    SOL_PACKET,
+                    PACKET_STATISTICS,
+                    &mut stats_v3 as *const TpacketStatsV3 as *mut c_void,
+                    &mut opt_len as *mut u32,
+                );
+                if ret != 0 {
+                    warn!("{:?}", io::Error::last_os_error());
+                    return vec![];
+                }
+            }
+            vec![
+                (
+                    "kernel_packets",
+                    stats::CounterType::Counted,
+                    stats::CounterValue::Unsigned(stats_v3.tp_packets as u64),
+                ),
+                (
+                    "kernel_drops",
+                    stats::CounterType::Counted,
+                    stats::CounterValue::Unsigned(stats_v3.tp_drops as u64),
+                ),
+                (
+                    "kernel_freezes",
+                    stats::CounterType::Counted,
+                    stats::CounterValue::Unsigned(stats_v3.tp_freeze_q_cnt as u64),
+                ),
+            ]
+        } else if self.tp_version == options::OptTpacketVersion::TpacketVersion2 {
+            let mut stats = TpacketStats {
+                tp_packets: 0,
+                tp_drops: 0,
+            };
+            let mut opt_len = std::mem::size_of_val(&stats) as socklen_t;
+            unsafe {
+                let ret = getsockopt(
+                    self.fd,
+                    SOL_PACKET,
+                    PACKET_STATISTICS,
+                    &mut stats as *const TpacketStats as *mut c_void,
+                    &mut opt_len as *mut u32,
+                );
+                if ret != 0 {
+                    warn!("{:?}", io::Error::last_os_error());
+                    return vec![];
+                }
+            }
+            vec![
+                (
+                    "kernel_packets",
+                    stats::CounterType::Counted,
+                    stats::CounterValue::Unsigned(stats.tp_packets as u64),
+                ),
+                (
+                    "kernel_drops",
+                    stats::CounterType::Counted,
+                    stats::CounterValue::Unsigned(stats.tp_drops as u64),
+                ),
+            ]
+        } else {
+            warn!("invalid tp version");
+            vec![]
         }
     }
 }
