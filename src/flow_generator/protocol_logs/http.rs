@@ -142,6 +142,9 @@ impl HttpLog {
     }
 
     fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
+        if !is_http_v1_payload(payload) {
+            return Err(Error::HttpHeaderParseFailed);
+        }
         let lines = Self::parse_lines(payload);
         if lines.len() == 0 {
             return Err(Error::HttpHeaderParseFailed);
@@ -553,6 +556,27 @@ impl Httpv2Headers {
         self.stream_id = read_u32_be(&payload[5..]);
         Ok(())
     }
+}
+
+const HTTP_METHODS: [&'static str; 9] = [
+    "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT", "PATCH",
+];
+const RESPONSE_PREFIX: &'static str = "HTTP/";
+
+fn has_prefix(s: &[u8], prefix: &[u8]) -> bool {
+    s.len() >= prefix.len() && &s[..prefix.len()] == prefix
+}
+
+pub fn is_http_v1_payload(buf: &[u8]) -> bool {
+    if has_prefix(buf, RESPONSE_PREFIX.as_bytes()) {
+        return true;
+    }
+    for m in HTTP_METHODS {
+        if has_prefix(buf, m.as_bytes()) {
+            return true;
+        }
+    }
+    false
 }
 
 // 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html

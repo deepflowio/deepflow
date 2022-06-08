@@ -7,8 +7,8 @@ mod rpc;
 mod sql;
 
 pub use self::http::{
-    check_http_method, get_http_request_version, get_http_resp_info, HttpInfo, HttpLog,
-    Httpv2Headers,
+    check_http_method, get_http_request_version, get_http_resp_info, is_http_v1_payload, HttpInfo,
+    HttpLog, Httpv2Headers,
 };
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{KafkaInfo, KafkaLog};
