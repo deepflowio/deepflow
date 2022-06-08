@@ -109,7 +109,47 @@ static __inline int is_http_request(const char *data, int data_len)
 	return 1;
 }
 
+static __inline __u8 get_block_fragment_offset(__u8 fix_sz,
+					       __u8 flags_padding,
+					       __u8 flags_priority)
+{
+	__u8 offset = 0;
+	offset = fix_sz;
+
+	if (flags_padding)
+		offset += 1;
+	if (flags_priority)
+		offset += 5;
+
+	return offset;
+}
+
+#define try_find__static_table_idx() \
+do { \
+	if (table_idx > max || table_idx == 0) \
+		table_idx = buf[++offset] & 0x7f; \
+} while(0)
+
+static __inline __u8 find_idx_from_block_fragment(const __u8 *buf,
+						  __u8 offset,
+						  __u8 max)
+{
+	/*
+	 * Header Block Fragment解析出静态表索引值，最多取前面6个字节。
+	 * 例如：Header Block Fragment: ddda8386e6e5e4e3e2d0 最多分析'dd da 83 86 e6 e5'
+	 */
+	__u8 table_idx = buf[offset] & 0x7f;
+	try_find__static_table_idx();
+	try_find__static_table_idx();
+	try_find__static_table_idx();
+	try_find__static_table_idx();
+	try_find__static_table_idx();
+
+	return table_idx;
+}
+
 // https://tools.ietf.org/html/rfc7540#section-4.1
+// 帧的结构:
 // +-----------------------------------------------+
 // |                 Length (24)                   |
 // +---------------+---------------+---------------+
@@ -119,64 +159,136 @@ static __inline int is_http_request(const char *data, int data_len)
 // +=+=============================================================+
 // |                   Frame Payload (0...)                      ...
 // +---------------------------------------------------------------+
-// Frame Payload (0...)
+//
+// HEADERS 帧格式:
+// +---------------+
+// |Pad Length? (8)|
+// +-+-------------+-----------------------------------------------+
+// |E|                 Stream Dependency? (31)                     |
+// +-+-------------+-----------------------------------------------+
+// |  Weight? (8)  |
+// +-+-------------+-----------------------------------------------+
+// |                   Header Block Fragment (*)                 ...
+// +---------------------------------------------------------------+
+// |                           Padding (*)                       ...
+// +---------------------------------------------------------------+
+//
+// Pad Length: 指定 Padding 长度，存在则代表 PADDING flag 被设置
+// E: 一个比特位声明流的依赖性是否是排他的，存在则代表 PRIORITY flag 被设置
+// Stream Dependency: 指定一个 stream identifier，代表当前流所依赖的流的 id，存在则代表 PRIORITY flag 被设置
+// Weight: 一个无符号 8bit，代表当前流的优先级权重值 (1~256)，存在则代表 PRIORITY flag 被设置
+// Header Block Fragment: header 块片段
+// Padding: 填充字节，没有具体语义，作用与 DATA 的 Padding 一样，存在则代表 PADDING flag 被设置
+//
 // request:
 //      1       :authority
 //      2       :method GET
 //      3       :method POST
+//      4       :path  /
+//      5       :path  /index.html
 // others as response.
 static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
-							    size_t count)
+							    size_t count,
+							    struct conn_info_t
+							    *conn_info)
 {
 #define HTTPV2_FRAME_PROTO_SZ           0x9
-#define HTTPV2_FRAME_READ_SZ            0xa
 #define HTTPV2_FRAME_TYPE_HEADERS       0x1
 #define HTTPV2_STATIC_TABLE_AUTH_IDX    0x1
 #define HTTPV2_STATIC_TABLE_GET_IDX     0x2
 #define HTTPV2_STATIC_TABLE_POST_IDX    0x3
+#define HTTPV2_STATIC_TABLE_PATH_1_IDX  0x4
+#define HTTPV2_STATIC_TABLE_PATH_2_IDX  0x5
 #define HTTPV2_LOOP_MAX 10
+/*
+ *  HTTPV2_FRAME_READ_SZ取值考虑以下3部分：
+ *  (1) fixed 9-octet header
+ *
+ *  HEADERS 帧:
+ *  (2) Pad Length (8) + E(1) + Stream Dependency(31) + Weight(8) = 6 bytes
+ *  (3) Header Block Fragment (*) 取 6bytes
+ */
+#define HTTPV2_FRAME_READ_SZ            21
+#define HTTPV2_STATIC_TABLE_IDX_MAX     61
 
 	// fixed 9-octet header
 	if (count < HTTPV2_FRAME_PROTO_SZ)
 		return MSG_UNKNOWN;
 
 	__u32 offset = 0;
-	__u8 type = 0, flags_unset = 0, reserve = 0, static_table_idx, i;
+	__u8 flags_unset = 0, flags_padding = 0, flags_priority = 0;
+	__u8 type = 0, reserve = 0, static_table_idx, i, block_fragment_offset;
 	__u8 msg_type = MSG_UNKNOWN;
 	__u8 buf[HTTPV2_FRAME_READ_SZ] = { 0 };
-	bool is_valid_len = false;
 
 #pragma unroll
 	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {
-		if (offset == count) {
-			is_valid_len = true;
+		if (offset >= count)
 			break;
-		}
-
-		if (offset + HTTPV2_FRAME_READ_SZ > count)
-			return MSG_UNKNOWN;
 
 		bpf_probe_read(buf, sizeof(buf), buf_src + offset);
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +  
 			HTTPV2_FRAME_PROTO_SZ;
 		type = buf[3];
-		flags_unset = buf[4] & 0xd2;
-		reserve = buf[5] & 0x01;
-		static_table_idx = buf[9] & 0x7f;
 		if (type == HTTPV2_FRAME_TYPE_HEADERS) {
+			flags_unset = buf[4] & 0xd2;
+			flags_padding = buf[4] & 0x08;
+			flags_priority = buf[4] & 0x20;
+			reserve = buf[5] & 0x01;
+
 			if (flags_unset || reserve)
 				return MSG_UNKNOWN;
-			if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
-			    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
-			    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX)
-				msg_type = MSG_REQUEST;
-			else
-				msg_type = MSG_RESPONSE;
+
+			block_fragment_offset =
+				get_block_fragment_offset(HTTPV2_FRAME_PROTO_SZ,
+							  flags_padding,
+							  flags_priority);
+
+			static_table_idx =
+				find_idx_from_block_fragment(buf, block_fragment_offset,
+							     HTTPV2_STATIC_TABLE_IDX_MAX);
+
+			if (static_table_idx <= HTTPV2_STATIC_TABLE_IDX_MAX && static_table_idx != 0) {
+				if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+					if (conn_info->socket_info_ptr->role == ROLE_SERVER) {
+						if (conn_info->direction == T_INGRESS)
+							msg_type = MSG_REQUEST;
+						else
+							msg_type = MSG_RESPONSE;
+						break;
+					}
+
+					if (conn_info->socket_info_ptr->role == ROLE_CLIENT) {
+						if (conn_info->direction == T_INGRESS)
+							msg_type = MSG_RESPONSE;
+						else
+							msg_type = MSG_REQUEST;
+						break;
+					}
+					
+				}
+
+				if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
+			    	    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
+			    	    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
+				    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
+				    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
+					msg_type = MSG_REQUEST;
+					// 角色确认
+					if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+						if (conn_info->direction == T_INGRESS)
+							conn_info->socket_info_ptr->role = ROLE_SERVER;
+						else
+							conn_info->socket_info_ptr->role = ROLE_CLIENT;
+					}
+
+				} else
+					msg_type = MSG_RESPONSE;
+
+				break;
+			}
 		}
 	}
-
-	if (!is_valid_len)
-		msg_type = MSG_UNKNOWN;
 
 	return msg_type;
 }
@@ -191,7 +303,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 			return MSG_UNKNOWN;
 	}
 
-	return parse_http2_headers_frame(buf_src, count);
+	return parse_http2_headers_frame(buf_src, count, conn_info);
 }
 
 static __inline enum message_type infer_http_message(const char *buf,
