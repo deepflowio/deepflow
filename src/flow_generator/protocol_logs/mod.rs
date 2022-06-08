@@ -338,10 +338,10 @@ pub enum AppProtoLogsInfo {
 impl AppProtoLogsInfo {
     fn session_id(&self) -> Option<u32> {
         match self {
-            AppProtoLogsInfo::Dns(t) => Some(t.trans_id as u32),
-            AppProtoLogsInfo::Kafka(t) => Some(t.correlation_id),
-            AppProtoLogsInfo::Dubbo(t) => Some(t.serial_id as u32),
-            AppProtoLogsInfo::HttpV2(t) => Some(t.stream_id),
+            AppProtoLogsInfo::Dns(t) if t.trans_id > 0 => Some(t.trans_id as u32),
+            AppProtoLogsInfo::Kafka(t) if t.correlation_id > 0 => Some(t.correlation_id),
+            AppProtoLogsInfo::Dubbo(t) if t.serial_id > 0 => Some(t.serial_id as u32),
+            AppProtoLogsInfo::HttpV2(t) if t.stream_id > 0 => Some(t.stream_id),
             _ => None,
         }
     }
