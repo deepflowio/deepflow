@@ -107,7 +107,7 @@ impl Parser<'_> {
             let (name_len, len) = parse_int(&buf[1..], 7)?;
             let key_len = name_len + len;
 
-            if key_len > buf.len() {
+            if key_len + 1 >= buf.len() {
                 return Err(ParseError::InvalidInput);
             }
 
