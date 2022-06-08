@@ -554,9 +554,9 @@ func formatStruct(s interface{}) string {
 	return formatted
 }
 
-func (p *L7Protocol) String() string {
+func (p L7Protocol) String() string {
 	formatted := ""
-	switch *p {
+	switch p {
 	case L7_PROTOCOL_HTTP_1:
 		formatted = "httpv1"
 	case L7_PROTOCOL_HTTP_2:
@@ -571,8 +571,24 @@ func (p *L7Protocol) String() string {
 		formatted = "dubbo"
 	case L7_PROTOCOL_KAFKA:
 		formatted = "kafka"
+	case L7_PROTOCOL_OTHER:
+		formatted = "other"
+	default:
+		formatted = "unknown"
 	}
 	return formatted
+}
+
+var L7ProtocolStringMap = map[string]L7Protocol{
+	L7_PROTOCOL_HTTP_1.String():  L7_PROTOCOL_HTTP_1,
+	L7_PROTOCOL_HTTP_2.String():  L7_PROTOCOL_HTTP_2,
+	L7_PROTOCOL_DNS.String():     L7_PROTOCOL_DNS,
+	L7_PROTOCOL_MYSQL.String():   L7_PROTOCOL_MYSQL,
+	L7_PROTOCOL_REDIS.String():   L7_PROTOCOL_REDIS,
+	L7_PROTOCOL_DUBBO.String():   L7_PROTOCOL_DUBBO,
+	L7_PROTOCOL_KAFKA.String():   L7_PROTOCOL_KAFKA,
+	L7_PROTOCOL_OTHER.String():   L7_PROTOCOL_OTHER,
+	L7_PROTOCOL_UNKNOWN.String(): L7_PROTOCOL_UNKNOWN,
 }
 
 func (p *L4Protocol) String() string {

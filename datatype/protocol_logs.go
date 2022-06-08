@@ -11,46 +11,6 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 )
 
-type LogProtoType uint8
-
-const (
-	PROTO_UNKNOWN LogProtoType = 0
-	PROTO_OTHER   LogProtoType = 1
-	PROTO_HTTP_1  LogProtoType = 20
-	PROTO_HTTP_2  LogProtoType = 21
-	PROTO_DUBBO   LogProtoType = 40
-	PROTO_MYSQL   LogProtoType = 60
-	PROTO_REDIS   LogProtoType = 80
-	PROTO_KAFKA   LogProtoType = 100
-	PROTO_DNS     LogProtoType = 120
-)
-
-func (t *LogProtoType) String() string {
-	formatted := ""
-	switch *t {
-	case PROTO_HTTP_1:
-		formatted = "HTTPv1"
-	case PROTO_HTTP_2:
-		formatted = "HTTPv2"
-	case PROTO_DNS:
-		formatted = "DNS"
-	case PROTO_MYSQL:
-		formatted = "MYSQL"
-	case PROTO_REDIS:
-		formatted = "REDIS"
-	case PROTO_DUBBO:
-		formatted = "DUBBO"
-	case PROTO_KAFKA:
-		formatted = "KAFKA"
-	case PROTO_OTHER:
-		formatted = "OTHER"
-	default:
-		formatted = "UNKNOWN"
-	}
-
-	return formatted
-}
-
 type LogMessageType uint8
 
 const (
@@ -88,7 +48,7 @@ const (
 )
 
 type AppProtoHead struct {
-	Proto   LogProtoType
+	Proto   L7Protocol
 	MsgType LogMessageType // HTTP，DNS: request/response
 	Status  uint8          // 状态描述：0：正常，1：已废弃使用(先前用于表示异常)，2：不存在，3：服务端异常，4：客户端异常
 	Code    uint16         // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
@@ -226,19 +186,19 @@ func ReleaseAppProtoLogsData(d *AppProtoLogsData) {
 		return
 	}
 	switch d.Proto {
-	case PROTO_HTTP_2:
+	case L7_PROTOCOL_HTTP_2:
 		fallthrough
-	case PROTO_HTTP_1:
+	case L7_PROTOCOL_HTTP_1:
 		ReleaseHTTPInfo(d.Detail.(*HTTPInfo))
-	case PROTO_DNS:
+	case L7_PROTOCOL_DNS:
 		ReleaseDNSInfo(d.Detail.(*DNSInfo))
-	case PROTO_MYSQL:
+	case L7_PROTOCOL_MYSQL:
 		ReleaseMYSQLInfo(d.Detail.(*MysqlInfo))
-	case PROTO_REDIS:
+	case L7_PROTOCOL_REDIS:
 		ReleaseREDISInfo(d.Detail.(*RedisInfo))
-	case PROTO_DUBBO:
+	case L7_PROTOCOL_DUBBO:
 		ReleaseDubboInfo(d.Detail.(*DubboInfo))
-	case PROTO_KAFKA:
+	case L7_PROTOCOL_KAFKA:
 		ReleaseKafkaInfo(d.Detail.(*KafkaInfo))
 	}
 
@@ -329,9 +289,9 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 	}
 	l.AppProtoLogsBaseInfo.WriteToPB(p.BaseInfo)
 	switch l.Proto {
-	case PROTO_HTTP_1:
+	case L7_PROTOCOL_HTTP_1:
 		fallthrough
-	case PROTO_HTTP_2:
+	case L7_PROTOCOL_HTTP_2:
 		if http, ok := l.Detail.(*HTTPInfo); ok {
 			if p.Http == nil {
 				p.Http = &pb.HTTPInfo{}
@@ -339,7 +299,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			http.WriteToPB(p.Http, l.AppProtoLogsBaseInfo.MsgType)
 		}
 		p.Dns, p.Mysql, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
-	case PROTO_DNS:
+	case L7_PROTOCOL_DNS:
 		if dns, ok := l.Detail.(*DNSInfo); ok {
 			if p.Dns == nil {
 				p.Dns = &pb.DNSInfo{}
@@ -347,7 +307,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			dns.WriteToPB(p.Dns, l.AppProtoLogsBaseInfo.MsgType)
 		}
 		p.Http, p.Mysql, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
-	case PROTO_MYSQL:
+	case L7_PROTOCOL_MYSQL:
 		if mysql, ok := l.Detail.(*MysqlInfo); ok {
 			if p.Mysql == nil {
 				p.Mysql = &pb.MysqlInfo{}
@@ -355,7 +315,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			mysql.WriteToPB(p.Mysql, l.AppProtoLogsBaseInfo.MsgType)
 		}
 		p.Http, p.Dns, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
-	case PROTO_REDIS:
+	case L7_PROTOCOL_REDIS:
 		if redis, ok := l.Detail.(*RedisInfo); ok {
 			if p.Redis == nil {
 				p.Redis = &pb.RedisInfo{}
@@ -363,7 +323,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			redis.WriteToPB(p.Redis, l.AppProtoLogsBaseInfo.MsgType)
 		}
 		p.Http, p.Dns, p.Mysql, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
-	case PROTO_DUBBO:
+	case L7_PROTOCOL_DUBBO:
 		if dubbo, ok := l.Detail.(*DubboInfo); ok {
 			if p.Dubbo == nil {
 				p.Dubbo = &pb.DubboInfo{}
@@ -371,7 +331,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			dubbo.WriteToPB(p.Dubbo, l.AppProtoLogsBaseInfo.MsgType)
 		}
 		p.Http, p.Dns, p.Mysql, p.Redis, p.Kafka = nil, nil, nil, nil, nil
-	case PROTO_KAFKA:
+	case L7_PROTOCOL_KAFKA:
 		if kafka, ok := l.Detail.(*KafkaInfo); ok {
 			if p.Kafka == nil {
 				p.Kafka = &pb.KafkaInfo{}

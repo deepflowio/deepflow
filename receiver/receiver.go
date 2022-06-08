@@ -41,6 +41,7 @@ type RecvBuffer struct {
 	End    int
 	Buffer []byte
 	IP     net.IP // 保存消息的发送方IP
+	VtapID uint16
 }
 
 // 实现空接口，仅用于队列调试打印
@@ -73,6 +74,7 @@ func ReleaseRecvBuffer(b *RecvBuffer) {
 	b.Begin = 0
 	b.End = 0
 	b.IP = nil
+	b.VtapID = 0
 	recvBufferPool.Put(b)
 }
 
@@ -102,7 +104,7 @@ func (s ServerType) String() string {
 }
 
 type Status struct {
-	msgType              uint8
+	msgType              datatype.MessageType
 	VTAPID               uint16
 	serverType           ServerType
 	ip                   net.IP
@@ -114,7 +116,7 @@ type Status struct {
 	firstLocalTimestamp  uint32 // 第一次收到数据时的本地时间
 }
 
-func NewStatus(now uint32, msgType uint8, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) *Status {
+func NewStatus(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) *Status {
 	return &Status{
 		msgType:              msgType,
 		serverType:           serverType,
@@ -129,7 +131,7 @@ func NewStatus(now uint32, msgType uint8, vtapID uint16, ip net.IP, seq uint64, 
 	}
 }
 
-func (s *Status) update(now uint32, msgType uint8, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+func (s *Status) update(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
 	s.msgType = msgType
 	s.VTAPID = vtapID
 	s.ip = ip
@@ -153,7 +155,7 @@ type AdapterStatus struct {
 }
 
 func (s *AdapterStatus) init() {
-	for i := 0; i < datatype.MESSAGE_TYPE_MAX; i++ {
+	for i := 0; i < int(datatype.MESSAGE_TYPE_MAX); i++ {
 		s.TCPStatusFlow[i] = make(map[uint16]*Status)
 		s.UDPStatusFlow[i] = make(map[uint16]*Status)
 		s.TCPStatusOthers[i] = make(map[string]*Status)
@@ -161,7 +163,7 @@ func (s *AdapterStatus) init() {
 	}
 }
 
-func (s *AdapterStatus) Update(now uint32, msgType uint8, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
+func (s *AdapterStatus) Update(now uint32, msgType datatype.MessageType, vtapID uint16, ip net.IP, seq uint64, timestamp uint32, serverType ServerType) {
 	if serverType == UDP { // UDP大部分时间无锁，只有在更新map时加锁, 防止调试命令读取时可能导致异常
 		if vtapID != 0 {
 			if status, ok := s.UDPStatusFlow[msgType][vtapID]; ok {
@@ -231,10 +233,8 @@ func (s *AdapterStatus) Update(now uint32, msgType uint8, vtapID uint16, ip net.
 	}
 }
 
-func (s *AdapterStatus) GetStatus(msgType int) string {
-	if msgType == datatype.MESSAGE_TYPE_METRICS ||
-		msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW ||
-		msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
+func (s *AdapterStatus) GetStatus(msgType datatype.MessageType) string {
+	if msgType.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 		UDPStatus := s.UDPStatusFlow[msgType]
 		TCPStatus := s.TCPStatusFlow[msgType]
 		allStatus := make([]*Status, 0, len(UDPStatus)+len(TCPStatus))
@@ -292,7 +292,7 @@ func (s *AdapterStatus) GetStatus(msgType int) string {
 }
 
 type Handler struct {
-	msgType        uint8 // 在datatype/droplet-message.go中定义
+	msgType        datatype.MessageType // 在datatype/droplet-message.go中定义
 	queues         queue.MultiQueueWriter
 	nQueues        int
 	queueUDPCaches []QueueCache // UDP单线程处理，免锁
@@ -360,7 +360,7 @@ func NewReceiver(
 }
 
 // 注册处理函数，收到msgType的数据，放到outQueues中
-func (r *Receiver) RegistHandler(msgType uint8, outQueues queue.MultiQueueWriter, nQueues int) error {
+func (r *Receiver) RegistHandler(msgType datatype.MessageType, outQueues queue.MultiQueueWriter, nQueues int) error {
 	queueUDPCaches := make([]QueueCache, nQueues)
 	queueTCPCaches := make([]QueueCache, nQueues)
 	for i := 0; i < nQueues; i++ {
@@ -378,15 +378,16 @@ func (r *Receiver) RegistHandler(msgType uint8, outQueues queue.MultiQueueWriter
 }
 
 func (r *Receiver) HandleSimpleCommand(op uint16, arg string) string {
-	if op < datatype.MESSAGE_TYPE_MAX {
-		return r.status.GetStatus(int(op))
+	msgType := datatype.MessageType(op)
+	if msgType < datatype.MESSAGE_TYPE_MAX {
+		return r.status.GetStatus(msgType)
 	}
-	if op == datatype.MESSAGE_TYPE_MAX { // 兼容原来的status参数
+	if msgType == datatype.MESSAGE_TYPE_MAX { // 兼容原来的status参数
 		return r.status.GetStatus(datatype.MESSAGE_TYPE_METRICS)
 	}
 	ret := ""
-	for i := 0; i < datatype.MESSAGE_TYPE_MAX; i++ {
-		ret += r.status.GetStatus(i)
+	for i := 0; i < int(datatype.MESSAGE_TYPE_MAX); i++ {
+		ret += r.status.GetStatus(datatype.MessageType(i))
 		ret += "\n"
 	}
 	return ret
@@ -542,7 +543,7 @@ func (r *Receiver) GetTridentStatus() []*Status {
 }
 
 // 由于引用了app，导致递归引用,不能在datatype中定义类函数，故放到这里
-func ValidateFlowVersion(t uint8, version uint32) error {
+func ValidateFlowVersion(t datatype.MessageType, version uint32) error {
 	var expectVersion uint32
 	switch t {
 	case datatype.MESSAGE_TYPE_METRICS:
@@ -550,7 +551,7 @@ func ValidateFlowVersion(t uint8, version uint32) error {
 	case datatype.MESSAGE_TYPE_TAGGEDFLOW, datatype.MESSAGE_TYPE_PROTOCOLLOG:
 		expectVersion = datatype.VERSION
 	default:
-		return fmt.Errorf("invalid message type %d", t)
+		return nil
 	}
 
 	if version != expectVersion {
@@ -634,9 +635,7 @@ func (r *Receiver) ProcessUDPServer() {
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
 		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
-		// 对Metrics和TaggedFlow,AppProtoLogData处理
-		if baseHeader.Type >= datatype.MESSAGE_TYPE_METRICS &&
-			baseHeader.Type <= datatype.MESSAGE_TYPE_PROTOCOLLOG {
+		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			flowHeader.Decode(recvBuffer.Buffer[datatype.MESSAGE_HEADER_LEN:])
 			headerLen += datatype.FLOW_HEADER_LEN
 
@@ -665,6 +664,7 @@ func (r *Receiver) ProcessUDPServer() {
 			recvBuffer.End = int(baseHeader.FrameSize) // 可能收到的包长会大于FrameSize, 以FrameSize为准
 		}
 		recvBuffer.IP = remoteAddr.IP
+		recvBuffer.VtapID = vtapID
 		r.putUDPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 	}
 }
@@ -775,9 +775,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 
 		headerLen := datatype.MESSAGE_HEADER_LEN
 		metricsTimestamp, vtapID, sequence := uint32(0), uint16(0), uint64(0)
-		// 对metrics和TaggedFlow处理
-		if baseHeader.Type >= datatype.MESSAGE_TYPE_METRICS &&
-			baseHeader.Type <= datatype.MESSAGE_TYPE_PROTOCOLLOG {
+		if baseHeader.Type.HeaderType() == datatype.HEADER_TYPE_LT_VTAP {
 			if err := ReadN(conn, flowHeaderBuffer); err != nil {
 				atomic.AddUint64(&r.counter.Invalid, 1)
 				log.Warningf("TCP client(%s) connection read error.%s", conn.RemoteAddr().String(), err.Error())
@@ -826,6 +824,7 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		recvBuffer.Begin = 0
 		recvBuffer.End = int(baseHeader.FrameSize) - headerLen
 		recvBuffer.IP = ip
+		recvBuffer.VtapID = vtapID
 		r.putTCPQueue(int(r.counter.RxPackets), r.handlers[baseHeader.Type], recvBuffer)
 	}
 }
