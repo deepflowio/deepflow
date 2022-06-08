@@ -601,9 +601,61 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	}
 }
 
+static __inline int iovecs_copy(struct __socket_data *v,
+				struct __socket_data_buffer *v_buff,
+				const struct data_args_t* args,
+				size_t syscall_len,
+				__u32 send_len)
+{
+#define LOOP_LIMIT 12
+
+	struct copy_data_s {
+		char data[CAP_DATA_SIZE];
+	};
+
+	__u32 len;
+	struct copy_data_s *cp;
+	int bytes_sent = 0;
+	__u32 iov_size;
+	__u32 total_size = 0;
+
+	if (syscall_len >= sizeof(v->data))
+		total_size = sizeof(v->data);
+	else
+		total_size = send_len;
+
+#pragma unroll
+	for (unsigned int i = 0; i < LOOP_LIMIT && i < args->iovlen && bytes_sent < total_size; ++i) {
+		struct iovec iov_cpy;
+		bpf_probe_read(&iov_cpy, sizeof(struct iovec), &args->iov[i]);
+
+		const int bytes_remaining = total_size - bytes_sent;
+		iov_size = iov_cpy.iov_len < bytes_remaining ? iov_cpy.iov_len : bytes_remaining;
+
+		len = v_buff->len + offsetof(typeof(struct __socket_data), data) + bytes_sent;
+		cp = (struct copy_data_s *)(v_buff->data + len);
+		if (len > (sizeof(v_buff->data) - sizeof(*cp)))
+			return bytes_sent;
+
+		if (iov_size >= sizeof(cp->data)) {
+			bpf_probe_read(cp->data, sizeof(cp->data), iov_cpy.iov_base);
+			iov_size = sizeof(cp->data);
+		} else {
+			// TODO:需要更多的内核版本测试
+			iov_size = iov_size & (sizeof(cp->data) - 1);
+			bpf_probe_read(cp->data, iov_size, iov_cpy.iov_base);
+		}
+
+		bytes_sent += iov_size;
+	}
+
+	return bytes_sent;
+}
+
 static __inline void data_submit(struct pt_regs *ctx,
 				 struct conn_info_t* conn_info,
-				 const char *from,
+				 const struct data_args_t* args,
+				 const bool vecs,
 				 __u32 syscall_len,
 				 struct member_fields_offset *offset,
 				 __u64 time_stamp)
@@ -782,24 +834,28 @@ static __inline void data_submit(struct pt_regs *ctx,
 	 */
 	__u32 len = syscall_len & (sizeof(v->data) - 1);
 
-	if (syscall_len >= sizeof(v->data)) {
-		if (unlikely(bpf_probe_read(v->data, sizeof(v->data), from) != 0))
-			return;
-		len = sizeof(v->data);
+	if (vecs) {
+		len = iovecs_copy(v, v_buff, args, syscall_len, len);
 	} else {
-		/*
-		 * https://elixir.bootlin.com/linux/v4.14/source/kernel/bpf/verifier.c#812
-		 * __check_map_access() 触发条件检查（size <= 0）
-		 * ```
-		 *     if (off < 0 || size <= 0 || off + size > map->value_size)
-		 * ```
-		 * "invalid access to map value, value_size=10888 off=135 size=0"
-		 * 使用'len + 1'代替'len'，来规避（Linux 4.14.x）这个检查。
-		 */
-		if (unlikely(bpf_probe_read(v->data,
-					    len + 1,
-					    from) != 0))
-			return;
+		if (syscall_len >= sizeof(v->data)) {
+			if (unlikely(bpf_probe_read(v->data, sizeof(v->data), args->buf) != 0))
+				return;
+			len = sizeof(v->data);
+		} else {
+			/*
+			 * https://elixir.bootlin.com/linux/v4.14/source/kernel/bpf/verifier.c#812
+			 * __check_map_access() 触发条件检查（size <= 0）
+			 * ```
+			 *     if (off < 0 || size <= 0 || off + size > map->value_size)
+			 * ```
+			 * "invalid access to map value, value_size=10888 off=135 size=0"
+			 * 使用'len + 1'代替'len'，来规避（Linux 4.14.x）这个检查。
+			 */
+			if (unlikely(bpf_probe_read(v->data,
+						    len + 1,
+						    args->buf) != 0))
+				return;
+		}
 	}
 
 	v->data_len = len;
@@ -864,9 +920,7 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 	init_conn_info(tgid, args->fd, &__conn_info, sk);
 	conn_info->direction = direction;
 
-	const char *__data = NULL;
 	if (!vecs) {
-		__data = args->buf;
 		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state);
 	} else {
 		struct iovec iov_cpy;
@@ -874,11 +928,10 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 		// Ensure we are not reading beyond the available data.
 		const size_t buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
 		infer_l7_class(conn_info, direction, iov_cpy.iov_base, buf_size, sock_state);
-		__data = iov_cpy.iov_base;
 	}
 
 	if (conn_info->protocol != PROTO_UNKNOWN || conn_info->message_type != MSG_UNKNOWN) {
-		data_submit(ctx, conn_info, __data, (__u32)bytes_count, offset, args->enter_ts);
+		data_submit(ctx, conn_info, args, vecs, (__u32)bytes_count, offset, args->enter_ts);
 	}
 }
 

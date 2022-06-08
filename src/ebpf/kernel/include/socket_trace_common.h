@@ -1,5 +1,6 @@
 #ifndef __BPF_SOCKET_TRACE_COMMON_H__
 #define __BPF_SOCKET_TRACE_COMMON_H__
+#define CAP_DATA_SIZE 1024
 
 enum endpoint_role {
 	ROLE_CLIENT,
@@ -46,7 +47,7 @@ struct __socket_data {
 	__u64 data_seq;      // cap_data在Socket中的相对顺序号
 	__u16 data_type;     // HTTP, DNS, MySQL
 	__u16 data_len;      // 数据长度
-	char data[1024];
+	char data[CAP_DATA_SIZE];
 } __attribute__((packed));
 
 /*
