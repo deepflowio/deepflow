@@ -14,6 +14,8 @@ const (
 	TAPPORT_FROM_ID          // 其他镜像流量（dispatcher id）
 	TAPPORT_FROM_NETFLOW
 	TAPPORT_FROM_SFLOW
+	TAPPORT_FROM_EBPF
+	TAPPORT_FROM_OTEL
 )
 
 const (

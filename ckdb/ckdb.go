@@ -231,6 +231,8 @@ const (
 	ArrayString
 	ArrayUInt16
 	ArrayUInt32
+	ArrayInt64
+	ArrayFloat64
 	DateTime
 	DateTime64
 	DateTime64ms
@@ -264,6 +266,8 @@ var cloumnTypeString = []string{
 	ArrayString:          "Array(String)",
 	ArrayUInt16:          "Array(UInt16)",
 	ArrayUInt32:          "Array(UInt32)",
+	ArrayInt64:           "Array(Int64)",
+	ArrayFloat64:         "Array(Float64)",
 	DateTime:             "DateTime('Asia/Shanghai')",
 	DateTime64:           "DateTime64(0, 'Asia/Shanghai')",
 	DateTime64ms:         "DateTime64(3, 'Asia/Shanghai')",

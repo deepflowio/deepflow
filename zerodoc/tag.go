@@ -310,7 +310,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version st
 		Database:        ckdb.METRICS_DB,
 		LocalName:       id.TableName() + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      id.TableName(),
-		Columns:         append(genTagColumns(metricsTableCodes[id]), meterColumns...),
+		Columns:         append(GenTagColumns(metricsTableCodes[id]), meterColumns...),
 		TimeKey:         timeKey,
 		TTL:             7, // 分钟数据默认保留7天
 		PartitionFunc:   ckdb.TimeFuncTwelveHour,
@@ -841,7 +841,7 @@ func (t *Tag) TableID(isSecond bool) (uint8, error) {
 }
 
 // 顺序需要和WriteBlock中一致, 目前time排第一位，其他按字段名字典排序
-func genTagColumns(code Code) []*ckdb.Column {
+func GenTagColumns(code Code) []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumnWithGroupBy("time", ckdb.DateTime))
 	columns = append(columns, ckdb.NewColumn("_tid", ckdb.UInt8).SetComment("用于区分trident不同的pipeline").SetIndex(ckdb.IndexNone))
@@ -1040,7 +1040,7 @@ func genTagColumns(code Code) []*ckdb.Column {
 	return columns
 }
 
-// 顺序需要和genTagColumns的一致
+// 顺序需要和GenTagColumns的一致
 func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 	code := t.Code
 
