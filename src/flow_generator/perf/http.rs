@@ -18,7 +18,7 @@ use crate::{
         perf::L7FlowPerf,
         protocol_logs::{
             check_http_method, consts::*, get_http_request_version, get_http_resp_info,
-            AppProtoHead, Httpv2Headers, L7ResponseStatus, LogMessageType,
+            is_http_v1_payload, AppProtoHead, Httpv2Headers, L7ResponseStatus, LogMessageType,
         },
     },
 };
@@ -194,6 +194,10 @@ impl HttpPerfData {
         direction: PacketDirection,
         flow_id: u64,
     ) -> Result<()> {
+        if !is_http_v1_payload(payload) {
+            return Err(Error::HttpHeaderParseFailed);
+        }
+
         let lines = Self::parse_lines(payload);
         if lines.len() == 0 {
             return Err(Error::HttpHeaderParseFailed);
