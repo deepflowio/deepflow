@@ -16,10 +16,10 @@ use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::ebpf;
 use crate::flow_generator::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
-    kafka_check_protocol, mysql_check_protocol, redis_check_protocol, AppProtoHead,
-    AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppTable, DnsLog, DubboLog,
-    Error as LogError, HttpLog, KafkaLog, L7LogParse, LogMessageType, MysqlLog, RedisLog,
-    Result as LogResult,
+    kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppTable, DnsLog,
+    DubboLog, Error as LogError, HttpLog, KafkaLog, L7LogParse, LogMessageType, MqttLog, MysqlLog,
+    RedisLog, Result as LogResult,
 };
 use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
@@ -260,6 +260,7 @@ impl FlowItem {
             L7Protocol::Redis => Some(Box::from(RedisLog::default())),
             L7Protocol::Kafka => Some(Box::from(KafkaLog::default())),
             L7Protocol::Dubbo => Some(Box::from(DubboLog::new(log_parser_config))),
+            L7Protocol::Mqtt => Some(Box::from(MqttLog::default())),
             _ => None,
         }
     }
@@ -291,6 +292,7 @@ impl FlowItem {
                     | 1 << u8::from(L7Protocol::Redis)
                     | 1 << u8::from(L7Protocol::Dubbo)
                     | 1 << u8::from(L7Protocol::Kafka)
+                    | 1 << u8::from(L7Protocol::Mqtt)
             } else {
                 1 << u8::from(L7Protocol::Dns)
             },
@@ -303,6 +305,7 @@ impl FlowItem {
             L7Protocol::Dns => dns_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Dubbo => dubbo_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Kafka => kafka_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Mqtt => mqtt_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),
@@ -329,6 +332,7 @@ impl FlowItem {
             L7Protocol::Mysql,
             L7Protocol::Redis,
             L7Protocol::Kafka,
+            L7Protocol::Mqtt,
             L7Protocol::Dns,
         ];
 

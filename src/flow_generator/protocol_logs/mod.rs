@@ -11,7 +11,9 @@ pub use self::http::{
     http2_check_protocol, is_http_v1_payload, HttpInfo, HttpLog, Httpv2Headers,
 };
 pub use dns::{dns_check_protocol, DnsInfo, DnsLog};
-pub use mq::{kafka_check_protocol, KafkaInfo, KafkaLog};
+pub use mq::{
+    kafka_check_protocol, mqtt, mqtt_check_protocol, KafkaInfo, KafkaLog, MqttInfo, MqttLog,
+};
 pub use parser::{AppProtoLogsParser, MetaAppProto};
 pub use rpc::{dubbo_check_protocol, DubboHeader, DubboInfo, DubboLog};
 pub use sql::{
@@ -333,6 +335,7 @@ pub enum AppProtoLogsInfo {
     Mysql(MysqlInfo),
     Redis(RedisInfo),
     Kafka(KafkaInfo),
+    Mqtt(MqttInfo),
     Dubbo(DubboInfo),
     HttpV1(HttpInfo),
     HttpV2(HttpInfo),
@@ -355,6 +358,7 @@ impl AppProtoLogsInfo {
             (Self::Mysql(m), Self::Mysql(o)) => m.merge(o),
             (Self::Redis(m), Self::Redis(o)) => m.merge(o),
             (Self::Kafka(m), Self::Kafka(o)) => m.merge(o),
+            (Self::Mqtt(m), Self::Mqtt(o)) => m.merge(o),
             (Self::Dubbo(m), Self::Dubbo(o)) => m.merge(o),
             (Self::HttpV1(m), Self::HttpV1(o)) => m.merge(o),
             (Self::HttpV2(m), Self::HttpV2(o)) => m.merge(o),
@@ -371,6 +375,7 @@ impl fmt::Display for AppProtoLogsInfo {
             Self::Redis(l) => write!(f, "{}", l),
             Self::Dubbo(l) => write!(f, "{:?}", l),
             Self::Kafka(l) => write!(f, "{:?}", l),
+            Self::Mqtt(l) => write!(f, "{:?}", l),
             Self::HttpV1(l) => write!(f, "{:?}", l),
             Self::HttpV2(l) => write!(f, "{:?}", l),
         }
@@ -408,6 +413,7 @@ impl AppProtoLogsData {
             AppProtoLogsInfo::Mysql(t) => pb_proto_logs_data.mysql = Some(t.into()),
             AppProtoLogsInfo::Redis(t) => pb_proto_logs_data.redis = Some(t.into()),
             AppProtoLogsInfo::Kafka(t) => pb_proto_logs_data.kafka = Some(t.into()),
+            AppProtoLogsInfo::Mqtt(t) => pb_proto_logs_data.mqtt = Some(t.into()),
             AppProtoLogsInfo::Dubbo(t) => pb_proto_logs_data.dubbo = Some(t.into()),
             AppProtoLogsInfo::HttpV1(t) => pb_proto_logs_data.http = Some(t.into()),
             AppProtoLogsInfo::HttpV2(t) => pb_proto_logs_data.http = Some(t.into()),

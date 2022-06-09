@@ -488,6 +488,7 @@ const L7_PROTOCOL_DUBBO: u8 = 40;
 const L7_PROTOCOL_MYSQL: u8 = 60;
 const L7_PROTOCOL_REDIS: u8 = 80;
 const L7_PROTOCOL_KAFKA: u8 = 100;
+const L7_PROTOCOL_MQTT: u8 = 101;
 const L7_PROTOCOL_DNS: u8 = 120;
 const L7_PROTOCOL_MAX: u8 = 255;
 
@@ -502,6 +503,7 @@ pub enum L7Protocol {
     Mysql = L7_PROTOCOL_MYSQL,
     Redis = L7_PROTOCOL_REDIS,
     Kafka = L7_PROTOCOL_KAFKA,
+    Mqtt = L7_PROTOCOL_MQTT,
     Dns = L7_PROTOCOL_DNS,
     Max = L7_PROTOCOL_MAX,
 }
@@ -522,6 +524,7 @@ impl From<u8> for L7Protocol {
             L7_PROTOCOL_MYSQL => L7Protocol::Mysql,
             L7_PROTOCOL_REDIS => L7Protocol::Redis,
             L7_PROTOCOL_KAFKA => L7Protocol::Kafka,
+            L7_PROTOCOL_MQTT => L7Protocol::Mqtt,
             L7_PROTOCOL_DNS => L7Protocol::Dns,
             _ => L7Protocol::Unknown,
         }
@@ -538,6 +541,7 @@ impl From<L7Protocol> for u8 {
             L7Protocol::Mysql => L7_PROTOCOL_MYSQL,
             L7Protocol::Redis => L7_PROTOCOL_REDIS,
             L7Protocol::Kafka => L7_PROTOCOL_KAFKA,
+            L7Protocol::Mqtt => L7_PROTOCOL_MQTT,
             L7Protocol::Dns => L7_PROTOCOL_DNS,
             _ => L7_PROTOCOL_UNKNOWN,
         }
