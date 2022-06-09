@@ -157,6 +157,7 @@ message AppProtoLogsData {
     KafkaInfo kafka = 5;
     MysqlInfo mysql = 6;
     RedisInfo redis = 7;
+    MqttInfo mqtt = 8;
 }
 
 message AppProtoLogsBaseInfo {
@@ -282,4 +283,13 @@ message RedisInfo {
     bytes response = 3;
     bytes status = 4;
     bytes error = 5;
+}
+
+message MqttInfo{
+    int32 req_msg_size = 1;
+    uint32 proto_version = 2;
+    string client_id = 3;
+
+    int32 resp_msg_size = 4;
+    uint32 return_code = 5;
 }
