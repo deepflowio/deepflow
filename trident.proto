@@ -402,6 +402,19 @@ message FlowAcls {
     repeated FlowAcl flow_acl = 1;
 }
 
+message PodIp {
+    optional uint32 pod_id = 1;
+    optional string pod_name = 2;
+    optional uint32 epc_id = 3;
+    optional string ip = 4;
+}
+
+message VtapIp {
+    optional uint32 vtap_id = 1;
+    optional uint32 epc_id = 2;
+    optional string ip = 3; // 采集器运行环境的IP
+}
+
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
@@ -419,6 +432,8 @@ message SyncResponse {
     optional bytes flow_acls = 13;      // 仅变化时下发
     optional bytes groups = 15;         // 仅变化时下发
     repeated TapType tap_types = 16;
+    repeated PodIp  pod_ips = 17; // pod_name到vpc + ip的映射关系, 仅下发给数据节点
+    repeated VtapIp vtap_ips = 18; // vtap_id到vpc + ip的映射关系, 仅下发给数据节点
 }
 
 message UpgradeRequest  {

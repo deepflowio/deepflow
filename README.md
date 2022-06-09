@@ -38,3 +38,24 @@ trident.proto
      pod_cluster_id   | 是      | 是
      if_type          | 是      | 是
      其他             | 否      | 是
+
+* SyncResponse字段对应程序，为否表示不发送
+
+     字段                  | trident | droplet、roze和stream
+     ----------------------|---------|------------------------
+     status                | 是      | 是
+     config                | 是      | 是
+     local_config_file     | 是      | 否
+     revision              | 是      | 否
+     self_update_url       | 是      | 否
+     version_platform_data | 是      | 是
+     version_acls          | 是      | 是
+     version_groups        | 是      | 是
+     platform_data         | 是      | 是
+     flow_acls             | 是      | 是
+     groups                | 是      | 是
+     local_segments        | 是      | 否
+     remote_segments       | 是      | 否
+     tap_types             | 是      | 否
+     pod_ips               | 否      | 是
+     vtap_ips              | 否      | 是
