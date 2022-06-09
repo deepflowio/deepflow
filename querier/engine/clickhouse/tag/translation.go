@@ -480,5 +480,99 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
+
+	// 采集点ID
+	tagResourceMap["tap_id"] = map[string]*Tag{
+		"default": NewTag(
+			"tap_type",
+			"",
+			"tap_type %s %s",
+			"",
+		)}
+	// 采集点
+	tagResourceMap["tap"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.tap_type_map, 'name', toUInt64(tap_type))",
+			"",
+			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE name %s %s)",
+			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE %s(name,%s))",
+		)}
+	// 响应码
+	tagResourceMap["response_code"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"isNotNull(response_code)",
+			"",
+			"",
+		)}
+	// IP类型
+	tagResourceMap["ip_version"] = map[string]*Tag{
+		"default": NewTag(
+			"if(is_ipv4=1, 4, 6)",
+			"",
+			"is_ipv4 %s %s",
+			"",
+		)}
+	// _ID
+	tagResourceMap["_id"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"_id %s %s AND time=toDateTime(bitShiftRight(%v, 32))",
+			"",
+		)}
+	// 采集位置名称
+	tagResourceMap["tap_port_name"] = map[string]*Tag{
+		"default": NewTag(
+			"dictGet(deepflow.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port)))",
+			"",
+			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
+			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE %s(name,%s))",
+		)}
+	// Tunnel IP
+	tagResourceMap["tunnel_tx_ip_0"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_0), IPv6NumToString(tunnel_tx_ip6_0))",
+			"",
+			"if(is_ipv4=1, hex(tunnel_tx_ip4_0), hex(tunnel_tx_ip6_0)) %s %s",
+			"",
+		)}
+	tagResourceMap["tunnel_tx_ip_1"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_tx_ip4_1), IPv6NumToString(tunnel_tx_ip6_1))",
+			"",
+			"if(is_ipv4=1, hex(tunnel_tx_ip4_1), hex(tunnel_tx_ip6_1)) %s %s",
+			"",
+		)}
+	tagResourceMap["tunnel_rx_ip_0"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_0), IPv6NumToString(tunnel_rx_ip6_0))",
+			"",
+			"if(is_ipv4=1, hex(tunnel_rx_ip4_0), hex(tunnel_rx_ip6_0)) %s %s",
+			"",
+		)}
+	tagResourceMap["tunnel_rx_ip_1"] = map[string]*Tag{
+		"default": NewTag(
+			"if(tunnel_is_ipv4, IPv4NumToString(tunnel_rx_ip4_1), IPv6NumToString(tunnel_rx_ip6_1))",
+			"",
+			"if(is_ipv4=1, hex(tunnel_rx_ip4_1), hex(tunnel_rx_ip6_1)) %s %s",
+			"",
+		)}
+	// 开始时间
+	tagResourceMap["start_time"] = map[string]*Tag{
+		"toString": NewTag(
+			"toString(start_time)",
+			"",
+			"",
+			"",
+		)}
+	// 结束时间
+	tagResourceMap["end_time"] = map[string]*Tag{
+		"toString": NewTag(
+			"toString(end_time)",
+			"",
+			"",
+			"",
+		)}
 	return tagResourceMap
 }
