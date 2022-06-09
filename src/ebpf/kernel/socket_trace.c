@@ -250,6 +250,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	conn_info->need_reconfirm = false;
 	conn_info->correlation_id = -1; // 当前用于kafka协议推断
 	conn_info->fd = fd;
+	conn_info->role = ROLE_UNKNOWN;
 
 	conn_info->sk = sk;
 	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
@@ -641,9 +642,9 @@ static __inline int iovecs_copy(struct __socket_data *v,
 			bpf_probe_read(cp->data, sizeof(cp->data), iov_cpy.iov_base);
 			iov_size = sizeof(cp->data);
 		} else {
-			// TODO:需要更多的内核版本测试
 			iov_size = iov_size & (sizeof(cp->data) - 1);
-			bpf_probe_read(cp->data, iov_size, iov_cpy.iov_base);
+			// 使用'iov_size + 1'代替'iov_size'，来适应inux 4.14.x
+			bpf_probe_read(cp->data, iov_size + 1, iov_cpy.iov_base);
 		}
 
 		bytes_sent += iov_size;
@@ -730,7 +731,7 @@ static __inline void data_submit(struct pt_regs *ctx,
 		sk_info.uid = ++trace_uid->socket_id;
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
-		sk_info.role = ROLE_UNKNOW;
+		sk_info.role = conn_info->role;
 		sk_info.msg_type = conn_info->message_type;
 		sk_info.update_time = time_stamp / NS_PER_SEC;
 		sk_info.need_reconfirm = conn_info->need_reconfirm;
