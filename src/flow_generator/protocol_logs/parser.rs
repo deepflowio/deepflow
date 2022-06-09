@@ -16,7 +16,7 @@ use log::{debug, info, warn};
 
 use super::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
-    KafkaLog, LogMessageType, MysqlLog, RedisLog,
+    KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
 use crate::{
     common::{
@@ -409,6 +409,7 @@ struct AppLogs {
     redis: RedisLog,
     dubbo: DubboLog,
     kafka: KafkaLog,
+    mqtt: MqttLog,
 }
 
 impl AppLogs {
@@ -584,6 +585,17 @@ impl AppProtoLogsParser {
                     app_proto.direction,
                 )?;
                 let special_info = app_logs.kafka.info();
+                let base_info = app_proto.base_info;
+
+                AppProtoLogsData::new(base_info, special_info)
+            }
+            L7Protocol::Mqtt => {
+                app_logs.mqtt.parse(
+                    app_proto.raw_proto_payload.as_slice(),
+                    app_proto.base_info.protocol,
+                    app_proto.direction,
+                )?;
+                let special_info = app_logs.mqtt.info();
                 let base_info = app_proto.base_info;
 
                 AppProtoLogsData::new(base_info, special_info)
