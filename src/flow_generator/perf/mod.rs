@@ -27,12 +27,12 @@ use crate::common::{
 
 use super::protocol_logs::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
-    kafka_check_protocol, mysql_check_protocol, redis_check_protocol,
+    kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
 };
 use {
     self::http::HttpPerfData,
     dns::DnsPerfData,
-    mq::KafkaPerfData,
+    mq::{KafkaPerfData, MqttPerfData},
     rpc::DubboPerfData,
     sql::{MysqlPerfData, RedisPerfData},
     tcp::TcpPerf,
@@ -69,6 +69,7 @@ pub enum L4FlowPerfTable {
 pub enum L7FlowPerfTable {
     DnsPerfData,
     KafkaPerfData,
+    MqttPerfData,
     RedisPerfData,
     DubboPerfData,
     MysqlPerfData,
@@ -97,6 +98,7 @@ impl FlowPerf {
             L7Protocol::Dns => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
             L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
             L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Mqtt => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),
             L7Protocol::Mysql => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
             L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
             L7Protocol::Http1 | L7Protocol::Http2 => {
@@ -111,6 +113,7 @@ impl FlowPerf {
             L7Protocol::Dns => dns_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Dubbo => dubbo_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Kafka => kafka_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Mqtt => mqtt_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),

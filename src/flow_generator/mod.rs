@@ -17,12 +17,12 @@ pub use flow_state::FlowState;
 pub use perf::L7RrtCache;
 pub use protocol_logs::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
-    kafka_check_protocol, mysql_check_protocol, redis_check_protocol,
+    kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
 };
 pub use protocol_logs::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsParser,
-    DnsLog, DubboLog, HttpLog, KafkaLog, L7LogParse, LogMessageType, MetaAppProto, MysqlLog,
-    RedisLog,
+    DnsLog, DubboLog, HttpLog, KafkaLog, L7LogParse, LogMessageType, MetaAppProto, MqttLog,
+    MysqlLog, RedisLog,
 };
 
 use std::time::Duration;
