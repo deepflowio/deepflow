@@ -40,6 +40,10 @@ func (c *Client) Init(query_uuid string) error {
 	return nil
 }
 
+func (c *Client) Close() error {
+	return c.connection.Close()
+}
+
 func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, values []interface{}) []interface{}) (map[string][]interface{}, error) {
 	rows, err := c.connection.Queryx(sql)
 	c.Debug.Sql = sql
@@ -48,6 +52,7 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
 	}
+	defer rows.Close()
 	columns, err := rows.ColumnTypes()
 	if err != nil {
 		c.Debug.Error = fmt.Sprintf("%s", err)
