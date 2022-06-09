@@ -190,7 +190,8 @@ static __inline __u8 find_idx_from_block_fragment(const __u8 *buf,
 static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 							    size_t count,
 							    struct conn_info_t
-							    *conn_info)
+							    *conn_info,
+							    const bool is_first)
 {
 #define HTTPV2_FRAME_PROTO_SZ           0x9
 #define HTTPV2_FRAME_TYPE_HEADERS       0x1
@@ -223,6 +224,13 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 
 #pragma unroll
 	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {
+
+		/*
+		 * 这个地方考虑iovecs的情况，传递过来进行协议推断的数据
+		 * 是&args->iov[0]第一个iovec，count的值也是第一个
+		 * iovec的数据长度。存在协议分析出来长度是大于count的情况
+		 * 因此这里不能通过“offset == count”来进行判断。
+		 */
 		if (offset >= count)
 			break;
 
@@ -230,64 +238,71 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 		offset += (__bpf_ntohl(*(__u32 *) buf) >> 8) +  
 			HTTPV2_FRAME_PROTO_SZ;
 		type = buf[3];
-		if (type == HTTPV2_FRAME_TYPE_HEADERS) {
-			flags_unset = buf[4] & 0xd2;
-			flags_padding = buf[4] & 0x08;
-			flags_priority = buf[4] & 0x20;
-			reserve = buf[5] & 0x01;
 
-			if (flags_unset || reserve)
+		// 如果不是Header继续寻找下一个Frame
+		if (type != HTTPV2_FRAME_TYPE_HEADERS)
+			continue;
+
+		/*
+		 * 如果不是初次推断（即：socket已经确认了数据协议类型并明确了角色）
+		 * 可以通过方向来判断请求或回应。
+		 */
+		if (!is_first)
+			return MSG_RECONFIRM;
+
+		flags_unset = buf[4] & 0xd2;
+		flags_padding = buf[4] & 0x08;
+		flags_priority = buf[4] & 0x20;
+		reserve = buf[5] & 0x01;
+
+		// flags_unset和reserve必须为0，否则直接放弃判断。
+		if (flags_unset || reserve)
+			return MSG_UNKNOWN;
+
+		/*
+		 * 根据帧结构中的flags的不同设置(具体检查PADDING位和PRIORITY位)
+		 * 来确定HEADERS帧的内容从而得到Header Block Fragment的偏移。
+		 */
+		block_fragment_offset =
+			get_block_fragment_offset(HTTPV2_FRAME_PROTO_SZ,
+						  flags_padding,
+						  flags_priority);
+
+		// 对Header Block Fragment的内容进行分析得到静态表的索引。
+		static_table_idx =
+			find_idx_from_block_fragment(buf, block_fragment_offset,
+						     HTTPV2_STATIC_TABLE_IDX_MAX);
+
+		// 静态索引表的Index取值范围 [1, 61]
+		if (static_table_idx > HTTPV2_STATIC_TABLE_IDX_MAX &&
+		    static_table_idx == 0)
+			continue;
+
+		// HTTPV2 REQUEST
+		if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
+	    	    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
+		    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
+			msg_type = MSG_REQUEST;
+			conn_info->role =	
+			    (conn_info->direction == T_INGRESS) ? ROLE_SERVER : ROLE_CLIENT;
+
+		} else {
+
+			/*
+			 * 如果初次判断时HTTPV2的数据类型是RESPONSE直接放弃推断，
+			 * 因为第一次获取的数据是RESPONSE可认为是无效的数据他无
+			 * 法找到REQUEST进行聚合，并且对RESPONSE的判断比较粗略容
+			 * 易产生误判。
+			 */
+			if (is_first)
 				return MSG_UNKNOWN;
 
-			block_fragment_offset =
-				get_block_fragment_offset(HTTPV2_FRAME_PROTO_SZ,
-							  flags_padding,
-							  flags_priority);
-
-			static_table_idx =
-				find_idx_from_block_fragment(buf, block_fragment_offset,
-							     HTTPV2_STATIC_TABLE_IDX_MAX);
-
-			if (static_table_idx <= HTTPV2_STATIC_TABLE_IDX_MAX && static_table_idx != 0) {
-				if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-					if (conn_info->socket_info_ptr->role == ROLE_SERVER) {
-						if (conn_info->direction == T_INGRESS)
-							msg_type = MSG_REQUEST;
-						else
-							msg_type = MSG_RESPONSE;
-						break;
-					}
-
-					if (conn_info->socket_info_ptr->role == ROLE_CLIENT) {
-						if (conn_info->direction == T_INGRESS)
-							msg_type = MSG_RESPONSE;
-						else
-							msg_type = MSG_REQUEST;
-						break;
-					}
-					
-				}
-
-				if (static_table_idx == HTTPV2_STATIC_TABLE_AUTH_IDX ||
-			    	    static_table_idx == HTTPV2_STATIC_TABLE_GET_IDX ||
-			    	    static_table_idx == HTTPV2_STATIC_TABLE_POST_IDX ||
-				    static_table_idx == HTTPV2_STATIC_TABLE_PATH_1_IDX ||
-				    static_table_idx == HTTPV2_STATIC_TABLE_PATH_2_IDX) {
-					msg_type = MSG_REQUEST;
-					// 角色确认
-					if (is_socket_info_valid(conn_info->socket_info_ptr)) {
-						if (conn_info->direction == T_INGRESS)
-							conn_info->socket_info_ptr->role = ROLE_SERVER;
-						else
-							conn_info->socket_info_ptr->role = ROLE_CLIENT;
-					}
-
-				} else
-					msg_type = MSG_RESPONSE;
-
-				break;
-			}
+			msg_type = MSG_RESPONSE;
 		}
+
+		break;
 	}
 
 	return msg_type;
@@ -301,9 +316,21 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
+
+		if (parse_http2_headers_frame(buf_src, count, conn_info, false) !=
+		    MSG_RECONFIRM)
+			return MSG_UNKNOWN;
+		
+		if (conn_info->socket_info_ptr->role == ROLE_SERVER)
+			return (conn_info->direction == T_INGRESS) ?
+				MSG_REQUEST : MSG_RESPONSE;
+
+		if (conn_info->socket_info_ptr->role == ROLE_CLIENT)
+			return (conn_info->direction == T_INGRESS) ?
+				MSG_RESPONSE: MSG_REQUEST;
 	}
 
-	return parse_http2_headers_frame(buf_src, count, conn_info);
+	return parse_http2_headers_frame(buf_src, count, conn_info, true);
 }
 
 static __inline enum message_type infer_http_message(const char *buf,

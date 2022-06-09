@@ -3,9 +3,9 @@
 #define CAP_DATA_SIZE 1024
 
 enum endpoint_role {
+	ROLE_UNKNOWN,
 	ROLE_CLIENT,
-	ROLE_SERVER,
-	ROLE_UNKNOW
+	ROLE_SERVER
 };
 
 struct __tuple_t {
@@ -83,7 +83,7 @@ struct socket_info_t {
 	__u8 prev_data[4];
 	__u8 direction: 1;
 	__u8 msg_type: 2;	// 保存数据类型，值为MSG_UNKNOWN(0), MSG_REQUEST(1), MSG_RESPONSE(2)
-	__u8 role: 5;           // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOW
+	__u8 role: 5;           // 标识socket角色：ROLE_CLIENT, ROLE_SERVER, ROLE_UNKNOWN
 	bool need_reconfirm;    // l7协议推断是否需要再次确认。
 	__s32 correlation_id;   // 目前用于kafka协议推断。
 
