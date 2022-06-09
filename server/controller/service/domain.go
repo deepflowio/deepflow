@@ -25,6 +25,9 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 	if _, ok := filter["lcuuid"]; ok {
 		Db = Db.Where("lcuuid = ?", filter["lcuuid"])
 	}
+	if _, ok := filter["name"]; ok {
+		Db = Db.Where("name = ?", filter["name"])
+	}
 	Db.Order("created_at DESC").Find(&domains)
 
 	for _, domain := range domains {
