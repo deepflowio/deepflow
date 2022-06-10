@@ -5,9 +5,10 @@ go 1.18
 require (
 	bou.ke/monkey v1.0.2
 	github.com/ClickHouse/clickhouse-go v1.5.4
+	github.com/ClickHouse/clickhouse-go/v2 v2.0.15
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/agiledragon/gomonkey/v2 v2.8.0
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1632
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1633
 	github.com/baidubce/bce-sdk-go v0.9.123
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
@@ -27,9 +28,10 @@ require (
 	github.com/stretchr/testify v1.7.2
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vmware/govmomi v0.28.0
+	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220606071004-82c00921b869
-	gitlab.yunshan.net/yunshan/metaflow/libs v0.0.0-20220610031408-7b79ca5a8526
-	gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220610031408-7b79ca5a8526
+	gitlab.yunshan.net/yunshan/metaflow/libs v0.0.0-20220610075242-25d9b52a957c
+	gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220610075242-25d9b52a957c
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	google.golang.org/grpc v1.47.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -45,7 +47,7 @@ require (
 	github.com/cloudflare/golz4 v0.0.0-20150217214814-ef862a3cdc58 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
-	github.com/go-ole/go-ole v1.2.4 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
@@ -68,14 +70,19 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.19.0 // indirect
+	github.com/paulmach/orb v0.7.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
+	github.com/pierrec/lz4/v4 v4.1.14 // indirect
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/shirou/gopsutil/v3 v3.20.10 // indirect
+	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/smartystreets/assertions v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
+	go.opentelemetry.io/otel v1.7.0 // indirect
+	go.opentelemetry.io/otel/trace v1.7.0 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20211027215541-db492cf91b37 // indirect
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect

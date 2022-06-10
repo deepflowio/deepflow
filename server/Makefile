@@ -17,10 +17,16 @@ vendor:
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
 
+.PHONY: test
+test: vendor
+	go test -mod vendor -short ./... -timeout 5s -coverprofile .test-coverage.txt
+	go tool cover -func=.test-coverage.txt
+
 .PHONY: server
 server: vendor
-	go build -mod vendor ${FLAGS} -o bin/metaflow-server${BINARY_SUFFIX} cmd/server/main.go
 	go build -mod vendor ${FLAGS} -o bin/metaflow-ctl${BINARY_SUFFIX} cmd/ctl/main.go
+	go build -mod vendor ${FLAGS} -o bin/querier${BINARY_SUFFIX} querier/cmd/querier/main.go
+	go build -mod vendor ${FLAGS} -o bin/metaflow-server${BINARY_SUFFIX} cmd/server/main.go
 	go build -mod vendor ${FLAGS} -o bin/trisolaris-ctl${BINARY_SUFFIX} controller/trisolaris/trisolarisctrl/main.go
 
 
@@ -30,3 +36,4 @@ clean:
 	chmod -R 777 vendor
 	rm -rf vendor
 	rm -rf bin
+	rm -rf .test-coverage.txt
