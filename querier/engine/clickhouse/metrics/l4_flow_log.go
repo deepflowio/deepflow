@@ -110,12 +110,11 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"server_half_close_flow":     NewReplaceMetrics(DB_FIELD_SERVER_HALF_CLOSE_FLOW, ""),
 	"tcp_timeout":                NewReplaceMetrics(DB_FIELD_TCP_TIMEOUT, ""),
 
-	"rtt_avg":    NewReplaceMetrics("rtt/1", ""),
-	"rtt_client": NewReplaceMetrics("rtt_client_sum/rtt_client_count", ""),
-	"rtt_server": NewReplaceMetrics("rtt_server_sum/rtt_server_count", ""),
-	"srt":        NewReplaceMetrics("srt_sum/srt_count", ""),
-	"art":        NewReplaceMetrics("art_sum/art_count", ""),
-	"rrt":        NewReplaceMetrics("rrt_sum/rrt_count", ""),
+	"rtt_client": NewReplaceMetrics("rtt_client_sum/rtt_client_count", "").SetIsAgg(false),
+	"rtt_server": NewReplaceMetrics("rtt_server_sum/rtt_server_count", "").SetIsAgg(false),
+	"srt":        NewReplaceMetrics("srt_sum/srt_count", "").SetIsAgg(false),
+	"art":        NewReplaceMetrics("art_sum/art_count", "").SetIsAgg(false),
+	"rrt":        NewReplaceMetrics("rrt_sum/rrt_count", "").SetIsAgg(false),
 
 	"l7_error":              NewReplaceMetrics("l7_client_error+l7_server_error", ""),
 	"l7_error_ratio":        NewReplaceMetrics("l7_error/l7_response", ""),

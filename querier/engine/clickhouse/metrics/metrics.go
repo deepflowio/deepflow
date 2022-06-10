@@ -25,16 +25,18 @@ type Metrics struct {
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
-	// 如果DBField == ""，表示是querier聚合的指标量
-	if m.DBField == "" {
-		m.IsAgg = true
-	}
+	m.IsAgg = metrics.IsAgg
 	if metrics.DBField != "" {
 		m.DBField = metrics.DBField
 	}
 	if metrics.Condition != "" {
 		m.Condition = metrics.Condition
 	}
+}
+
+func (m *Metrics) SetIsAgg(isAgg bool) *Metrics {
+	m.IsAgg = isAgg
+	return m
 }
 
 func NewMetrics(
@@ -57,6 +59,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	return &Metrics{
 		DBField:   dbField,
 		Condition: condition,
+		IsAgg:     true,
 	}
 }
 
@@ -91,16 +94,16 @@ func GetMetricsByDBTable(db string, table string) map[string]*Metrics {
 }
 
 func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, error) {
-	metrics := GetMetricsByDBTable(db, table)
-	if metrics == nil {
+	allMetrics := GetMetricsByDBTable(db, table)
+	if allMetrics == nil {
 		// TODO: metrics not found
 		return nil, nil
 	}
 	columns := []interface{}{
 		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions",
 	}
-	values := make([]interface{}, len(metrics))
-	for field, metrics := range metrics {
+	values := make([]interface{}, len(allMetrics))
+	for field, metrics := range allMetrics {
 		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
 			metrics.Category, METRICS_OPERATORS, metrics.Permissions,
