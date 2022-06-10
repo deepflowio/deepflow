@@ -93,15 +93,16 @@ impl Parser<'_> {
             return Err(ParseError::InvalidInput);
         }
 
-        // RFC7541附录A(https://datatracker.ietf.org/doc/html/rfc7541#appendix-A)规定：
-        // 静态表index从1到61，共60项。如果index大于61, 意味着这是一个dynamic table的
-        // index，我们无法解出index对应的value，应该跳过对应的字节继续解析。
-        if index > STATIC_INDEX_MAX {
-            return Ok((None, val_len));
-        } else if index != 0 {
+        if index != 0 {
             // Indexed
             let (str_len, len) = parse_int(&buf[index_len..], 7)?;
             val_len = val_len + str_len + len;
+            // RFC7541附录A(https://datatracker.ietf.org/doc/html/rfc7541#appendix-A)规定：
+            // 静态表index从1到61，共60项。如果index大于61, 意味着这是一个dynamic table的
+            // index，我们无法解出index对应的value，应该跳过对应的字节继续解析。
+            if index > STATIC_INDEX_MAX {
+                return Ok((None, val_len));
+            }
         } else {
             // New Name
             let (name_len, len) = parse_int(&buf[1..], 7)?;
