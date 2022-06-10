@@ -144,7 +144,7 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 
 func UpdateAnalyzer(
 	lcuuid string, analyzerUpdate map[string]interface{}, m *monitor.AnalyzerCheck,
-	cfg *config.Config,
+	cfg *config.ControllerConfig,
 ) (resp model.Analyzer, err error) {
 	var analyzer mysql.Analyzer
 	var dbUpdateMap = make(map[string]interface{})

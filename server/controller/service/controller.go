@@ -179,7 +179,7 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 
 func UpdateController(
 	lcuuid string, controllerUpdate map[string]interface{}, m *monitor.ControllerCheck,
-	cfg *config.Config,
+	cfg *config.ControllerConfig,
 ) (resp model.Controller, err error) {
 	var controller mysql.Controller
 	var dbUpdateMap = make(map[string]interface{})

@@ -80,7 +80,7 @@ func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err e
 	return response, nil
 }
 
-func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Config) (resp model.VtapGroup, err error) {
+func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
 	var vtapGroupCount int64
 
 	mysql.Db.Model(&mysql.VTapGroup{}).Where("name = ?", vtapGroupCreate.Name).Count(&vtapGroupCount)
@@ -120,7 +120,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Config) 
 	return response[0], nil
 }
 
-func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.Config) (resp model.VtapGroup, err error) {
+func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg *config.ControllerConfig) (resp model.VtapGroup, err error) {
 	var vtapGroup mysql.VTapGroup
 	var dbUpdateMap = make(map[string]interface{})
 

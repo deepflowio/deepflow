@@ -10,7 +10,7 @@ import (
 	"server/controller/service"
 )
 
-func VtapGroupRouter(e *gin.Engine, cfg *config.Config) {
+func VtapGroupRouter(e *gin.Engine, cfg *config.ControllerConfig) {
 	e.GET("/v1/vtap-groups/:lcuuid/", getVtapGroup)
 	e.GET("/v1/vtap-groups/", getVtapGroups)
 	e.POST("/v1/vtap-groups/", createVtapGroup(cfg))
@@ -31,7 +31,7 @@ func getVtapGroups(c *gin.Context) {
 	JsonResponse(c, data, err)
 }
 
-func createVtapGroup(cfg *config.Config) gin.HandlerFunc {
+func createVtapGroup(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var vtapGroupCreate model.VtapGroupCreate
@@ -48,7 +48,7 @@ func createVtapGroup(cfg *config.Config) gin.HandlerFunc {
 	})
 }
 
-func updateVtapGroup(cfg *config.Config) gin.HandlerFunc {
+func updateVtapGroup(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var vtapGroupUpdate model.VtapGroupUpdate

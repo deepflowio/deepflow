@@ -69,7 +69,7 @@ func GetDataSources(filter map[string]interface{}) (resp []model.DataSource, err
 	return response, nil
 }
 
-func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Config) (model.DataSource, error) {
+func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.ControllerConfig) (model.DataSource, error) {
 	var dataSource mysql.DataSource
 	var baseDataSource mysql.DataSource
 	var dataSourceCount int64
@@ -192,7 +192,7 @@ func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Confi
 	return response[0], err
 }
 
-func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.Config) (model.DataSource, error) {
+func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cfg *config.ControllerConfig) (model.DataSource, error) {
 	var dataSource mysql.DataSource
 	var err error
 
@@ -246,7 +246,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	return response[0], err
 }
 
-func DeleteDataSource(lcuuid string, cfg *config.Config) (map[string]string, error) {
+func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]string, error) {
 	var dataSource mysql.DataSource
 	var baseDataSource mysql.DataSource
 	var err error
@@ -309,7 +309,7 @@ func DeleteDataSource(lcuuid string, cfg *config.Config) (map[string]string, err
 	return map[string]string{"LCUUID": lcuuid}, err
 }
 
-func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, cfg *config.Config) error {
+func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, cfg *config.ControllerConfig) error {
 	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), cfg.Roze.Port)
 	body := map[string]interface{}{
 		"name":                  dataSource.Name,
@@ -326,7 +326,7 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, cf
 	return err
 }
 
-func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, cfg *config.Config) error {
+func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, cfg *config.ControllerConfig) error {
 	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), cfg.Roze.Port)
 	db := "vtap_" + dataSource.TsdbType
 	switch dataSource.TsdbType {
@@ -344,7 +344,7 @@ func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, cfg *config.Config
 	return err
 }
 
-func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, cfg *config.Config) error {
+func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, cfg *config.ControllerConfig) error {
 	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), cfg.Roze.Port)
 	body := map[string]interface{}{
 		"name": dataSource.Name,

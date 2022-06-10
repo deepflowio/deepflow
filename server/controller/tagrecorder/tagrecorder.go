@@ -11,10 +11,10 @@ import (
 var log = logging.MustGetLogger("tagrecorder")
 
 type TagRecorder struct {
-	cfg config.Config
+	cfg config.ControllerConfig
 }
 
-func NewTagRecorder(cfg config.Config) *TagRecorder {
+func NewTagRecorder(cfg config.ControllerConfig) *TagRecorder {
 	return &TagRecorder{cfg: cfg}
 }
 

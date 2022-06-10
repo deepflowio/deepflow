@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin/binding"
 )
 
-func AnalyzerRouter(e *gin.Engine, m *monitor.AnalyzerCheck, cfg *config.Config) {
+func AnalyzerRouter(e *gin.Engine, m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) {
 	e.GET("/v1/analyzers/:lcuuid/", getAnalyzer)
 	e.GET("/v1/analyzers/", getAnalyzers)
 	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(m, cfg))
@@ -40,7 +40,7 @@ func getAnalyzers(c *gin.Context) {
 	JsonResponse(c, data, err)
 }
 
-func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.Config) gin.HandlerFunc {
+func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var analyzerUpdate model.AnalyzerUpdate

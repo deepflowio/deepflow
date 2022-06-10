@@ -11,7 +11,7 @@ import (
 	"server/controller/service"
 )
 
-func ControllerRouter(e *gin.Engine, m *monitor.ControllerCheck, cfg *config.Config) {
+func ControllerRouter(e *gin.Engine, m *monitor.ControllerCheck, cfg *config.ControllerConfig) {
 	e.GET("/v1/controllers/:lcuuid/", getController)
 	e.GET("/v1/controllers/", getControllers)
 	e.PATCH("/v1/controllers/:lcuuid/", updateController(m, cfg))
@@ -46,7 +46,7 @@ func getControllers(c *gin.Context) {
 	JsonResponse(c, data, err)
 }
 
-func updateController(m *monitor.ControllerCheck, cfg *config.Config) gin.HandlerFunc {
+func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var controllerUpdate model.ControllerUpdate

@@ -9,7 +9,7 @@ import (
 	"server/controller/service"
 )
 
-func DataSourceRouter(e *gin.Engine, cfg *config.Config) {
+func DataSourceRouter(e *gin.Engine, cfg *config.ControllerConfig) {
 	e.GET("/v1/data-sources/:lcuuid/", getDataSource)
 	e.GET("/v1/data-sources/", getDataSources)
 	e.POST("/v1/data-sources/", createDataSource(cfg))
@@ -30,7 +30,7 @@ func getDataSources(c *gin.Context) {
 	JsonResponse(c, data, err)
 }
 
-func createDataSource(cfg *config.Config) gin.HandlerFunc {
+func createDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var dataSourceCreate model.DataSourceCreate
@@ -47,7 +47,7 @@ func createDataSource(cfg *config.Config) gin.HandlerFunc {
 	})
 }
 
-func updateDataSource(cfg *config.Config) gin.HandlerFunc {
+func updateDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var dataSourceUpdate model.DataSourceUpdate
@@ -65,7 +65,7 @@ func updateDataSource(cfg *config.Config) gin.HandlerFunc {
 	})
 }
 
-func deleteDataSource(cfg *config.Config) gin.HandlerFunc {
+func deleteDataSource(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 
