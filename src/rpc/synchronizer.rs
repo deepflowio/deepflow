@@ -11,7 +11,7 @@ use std::sync::{self, Arc};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
@@ -726,7 +726,9 @@ impl Synchronizer {
                     ))
                     .await;
                 if let Err(m) = response {
-                    warn!("rpc error {:?}", m);
+                    exception_handler.set(Exception::ControllerSocketError);
+                    error!("rpc error {:?}", m);
+
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
@@ -738,7 +740,8 @@ impl Synchronizer {
                         break;
                     }
                     if let Err(m) = message {
-                        warn!("rpc error {:?}", m);
+                        exception_handler.set(Exception::ControllerSocketError);
+                        error!("rpc error {:?}", m);
                         break;
                     }
                     let message = message.unwrap();
@@ -985,7 +988,8 @@ impl Synchronizer {
                 let now = Instant::now();
                 let response = client.as_mut().unwrap().sync(request).await;
                 if let Err(m) = response {
-                    warn!(
+                    exception_handler.set(Exception::ControllerSocketError);
+                    error!(
                         "grpc sync error, server {} unavailable, status-code {}, message: \"{}\"",
                         session.get_current_server(),
                         m.code(),

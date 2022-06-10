@@ -158,12 +158,14 @@ impl Trident {
         let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
         stats_collector.start();
 
+        let exception_handler = ExceptionHandler::default();
         let session = Arc::new(Session::new(
             config.controller_port,
             config.controller_tls_port,
             DEFAULT_TIMEOUT,
             config.controller_cert_file_prefix.clone(),
             config.controller_ips.clone(),
+            exception_handler.clone(),
         ));
         // 目前仅支持local-mod + ebpf-collector，ebpf-collector不适用fast, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
@@ -175,7 +177,6 @@ impl Trident {
 
         let mut config_handler =
             ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle, remote_log_config);
-        let exception_handler = ExceptionHandler::default();
 
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
@@ -533,6 +534,7 @@ impl Components {
                 l4_flow_aggr_receiver,
                 config_handler.sender(),
                 stats_collector.clone(),
+                exception_handler.clone(),
             ));
         }
 
@@ -555,6 +557,7 @@ impl Components {
             metrics_receiver,
             config_handler.sender(),
             stats_collector.clone(),
+            exception_handler.clone(),
         );
 
         let sender_id = 2usize;
@@ -576,6 +579,7 @@ impl Components {
             proto_log_receiver,
             config_handler.sender(),
             stats_collector.clone(),
+            exception_handler.clone(),
         );
 
         // Dispatcher
@@ -754,6 +758,7 @@ impl Components {
             external_metrics_receiver,
             config_handler.sender(),
             stats_collector.clone(),
+            exception_handler.clone(),
         );
         let external_metrics_server =
             MetricServer::new(external_metrics_sender, config_handler.metric_server());
