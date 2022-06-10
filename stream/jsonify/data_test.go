@@ -89,7 +89,7 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 	}
 	appData.BaseInfo.VtapId = 123
 	appData.BaseInfo.EndTime = uint64(10 * time.Microsecond)
-	appData.BaseInfo.Head.Proto = uint32(datatype.PROTO_HTTP_1)
+	appData.BaseInfo.Head.Proto = uint32(datatype.L7_PROTOCOL_HTTP_1)
 	appData.Http = &pb.HTTPInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
@@ -112,7 +112,7 @@ func TestProtoLogToDNSLogger(t *testing.T) {
 	}
 	appData.BaseInfo.TapType = 3
 	appData.BaseInfo.EndTime = uint64(10 * time.Microsecond)
-	appData.BaseInfo.Head.Proto = uint32(datatype.PROTO_DNS)
+	appData.BaseInfo.Head.Proto = uint32(datatype.L7_PROTOCOL_DNS)
 	appData.Dns = &pb.DNSInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)

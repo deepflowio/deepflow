@@ -254,7 +254,32 @@ var ColumnAdd610 = []*ColumnAdds{
 	},
 }
 
-var ColumnAdd611 = []*ColumnAdds{}
+var ColumnAdd611 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"tag_names", "tag_values"},
+		ColumnType:  ckdb.ArrayString,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"l7_protocol_str"},
+		ColumnType:  ckdb.LowCardinalityString,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"span_kind"},
+		ColumnType:  ckdb.UInt8,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"parent_span_id"},
+		ColumnType:  ckdb.String,
+	},
+}
 
 func getTables(connect *sql.DB, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", ckdb.METRICS_DB)

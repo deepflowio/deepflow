@@ -31,6 +31,7 @@ type Stream struct {
 	StreamConfig *config.Config
 	FlowLogger   *Logger
 	ProtoLogger  *Logger
+	OtelLogger   *Logger
 }
 
 type Logger struct {
@@ -55,16 +56,61 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	if err != nil {
 		return nil, err
 	}
-	flowLogger, err := NewFlowLogger(config, controllers, manager, recv, flowLogWriter)
+	flowLogger := NewFlowLogger(config, controllers, manager, recv, flowLogWriter)
 	protoLogger := NewProtoLogger(config, controllers, manager, recv, flowLogWriter)
+	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID)
 	return &Stream{
 		StreamConfig: config,
 		FlowLogger:   flowLogger,
 		ProtoLogger:  protoLogger,
+		OtelLogger:   otelLogger,
 	}, nil
 }
 
-func NewFlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) (*Logger, error) {
+func NewLogger(msgType datatype.MessageType, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowLogId common.FlowLogID) *Logger {
+	queueCount := config.DecoderQueueCount
+	decodeQueues := manager.NewQueues(
+		"1-receive-to-decode-"+datatype.MessageTypeString[msgType],
+		config.DecoderQueueSize,
+		queueCount,
+		1,
+		libqueue.OptionFlushIndicator(3*time.Second),
+		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
+	recv.RegistHandler(msgType, decodeQueues, queueCount)
+	throttle := config.Throttle / queueCount
+
+	throttlers := make([]*throttler.ThrottlingQueue, queueCount)
+	decoders := make([]*decoder.Decoder, queueCount)
+	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
+	for i := 0; i < queueCount; i++ {
+		throttlers[i] = throttler.NewThrottlingQueue(
+			throttle,
+			flowLogWriter,
+			int(flowLogId),
+		)
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", nil)
+		if i == 0 {
+			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
+		}
+		decoders[i] = decoder.NewDecoder(
+			i,
+			config.ShardID,
+			msgType,
+			platformDatas[i],
+			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
+			throttlers[i],
+			&config.FlowLogDisabled,
+		)
+	}
+	return &Logger{
+		Config:        config,
+		Decoders:      decoders,
+		PlatformDatas: platformDatas,
+		FlowLogWriter: flowLogWriter,
+	}
+}
+
+func NewFlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
 	msgType := datatype.MESSAGE_TYPE_TAGGEDFLOW
 	queueCount := config.DecoderQueueCount
 	queueSuffix := "-l4"
@@ -75,7 +121,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		1,
 		libqueue.OptionFlushIndicator(3*time.Second),
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
-	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
+	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
 	throttle := config.Throttle / queueCount
 	if config.L4Throttle != 0 {
@@ -98,8 +144,8 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
-			msgType,
 			config.ShardID,
+			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
@@ -111,7 +157,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		Decoders:      decoders,
 		PlatformDatas: platformDatas,
 		FlowLogWriter: flowLogWriter,
-	}, nil
+	}
 }
 
 func NewProtoLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
@@ -127,7 +173,7 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 		libqueue.OptionFlushIndicator(3*time.Second),
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 
-	recv.RegistHandler(uint8(msgType), decodeQueues, queueCount)
+	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
 	throttle := config.Throttle / queueCount
 	if config.L7Throttle != 0 {
@@ -146,8 +192,9 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 		)
 		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l7-log-"+strconv.Itoa(i), "", nil)
 		decoders[i] = decoder.NewDecoder(
-			i, msgType,
+			i,
 			config.ShardID,
+			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
@@ -181,9 +228,11 @@ func (l *Logger) Close() {
 func (s *Stream) Start() {
 	s.FlowLogger.Start()
 	s.ProtoLogger.Start()
+	s.OtelLogger.Start()
 }
 
 func (s *Stream) Close() {
 	s.FlowLogger.Close()
 	s.ProtoLogger.Close()
+	s.OtelLogger.Close()
 }

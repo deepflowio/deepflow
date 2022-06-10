@@ -175,7 +175,7 @@ ckdb:
 #l7-throttle: 0
 
 #decoder-queue-count: 2
-#decoder-queue-size: 100000
+#decoder-queue-size: 10000
 
 #flow-log-disabled:
 #  l4: false

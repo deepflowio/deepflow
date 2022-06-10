@@ -3,6 +3,8 @@ package decoder
 import (
 	"strconv"
 
+	"github.com/golang/protobuf/proto"
+
 	logging "github.com/op/go-logging"
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
@@ -16,13 +18,14 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet/stream/config"
 	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify"
 	"gitlab.yunshan.net/yunshan/droplet/stream/throttler"
+	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var log = logging.MustGetLogger("stream.decoder")
 
 const (
 	BUFFER_SIZE  = 1024
-	L7_PROTO_MAX = datatype.PROTO_DNS + 1
+	L7_PROTO_MAX = datatype.L7_PROTOCOL_DNS + 1
 )
 
 type Counter struct {
@@ -43,12 +46,14 @@ type Counter struct {
 	L7RPCDropCount   int64 `statsd:"l7-rpc-drop-count"`
 	L7MQCount        int64 `statsd:"l7-mq-count"`
 	L7MQDropCount    int64 `statsd:"l7-mq-drop-count"`
+	OTelCount        int64 `statsd:"otel-count"`
+	OTelDropCount    int64 `statsd:"otel-drop-count"`
 	ErrorCount       int64 `statsd:"err-count"`
 }
 
 type Decoder struct {
 	index        int
-	msgType      int
+	msgType      datatype.MessageType
 	shardID      int
 	platformData *grpc.PlatformInfoTable
 	inQueue      queue.QueueReader
@@ -64,7 +69,7 @@ type Decoder struct {
 }
 
 func NewDecoder(
-	index, msgType, shardID int,
+	index, shardID int, msgType datatype.MessageType,
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
@@ -87,13 +92,13 @@ func NewDecoder(
 
 func getL7Disables(flowLogConfig *config.FlowLogDisabled) [L7_PROTO_MAX]bool {
 	l7Disableds := [L7_PROTO_MAX]bool{}
-	l7Disableds[datatype.PROTO_HTTP_1] = flowLogConfig.Http
-	l7Disableds[datatype.PROTO_HTTP_2] = flowLogConfig.Http
-	l7Disableds[datatype.PROTO_DNS] = flowLogConfig.Dns
-	l7Disableds[datatype.PROTO_MYSQL] = flowLogConfig.Mysql
-	l7Disableds[datatype.PROTO_REDIS] = flowLogConfig.Redis
-	l7Disableds[datatype.PROTO_DUBBO] = flowLogConfig.Dubbo
-	l7Disableds[datatype.PROTO_KAFKA] = flowLogConfig.Kafka
+	l7Disableds[datatype.L7_PROTOCOL_HTTP_1] = flowLogConfig.Http
+	l7Disableds[datatype.L7_PROTOCOL_HTTP_2] = flowLogConfig.Http
+	l7Disableds[datatype.L7_PROTOCOL_DNS] = flowLogConfig.Dns
+	l7Disableds[datatype.L7_PROTOCOL_MYSQL] = flowLogConfig.Mysql
+	l7Disableds[datatype.L7_PROTOCOL_REDIS] = flowLogConfig.Redis
+	l7Disableds[datatype.L7_PROTOCOL_DUBBO] = flowLogConfig.Dubbo
+	l7Disableds[datatype.L7_PROTOCOL_KAFKA] = flowLogConfig.Kafka
 	return l7Disableds
 }
 
@@ -114,6 +119,7 @@ func (d *Decoder) Run() {
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	pbTaggedFlow := pb.NewTaggedFlow()
+	pbTracesData := &v1.TracesData{}
 	for {
 		n := d.inQueue.Gets(buffer)
 		for i := 0; i < n; i++ {
@@ -132,6 +138,8 @@ func (d *Decoder) Run() {
 				d.handleProtoLog(decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW && !d.l4Disabled {
 				d.handleTaggedFlow(decoder, pbTaggedFlow)
+			} else if d.msgType == datatype.MESSAGE_TYPE_OPENTELEMETRY {
+				d.handleOpenTelemetry(recvBytes.VtapID, decoder, pbTracesData)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
@@ -171,6 +179,38 @@ func (d *Decoder) handleProtoLog(decoder *codec.SimpleDecoder) {
 	}
 }
 
+func (d *Decoder) handleOpenTelemetry(vtapID uint16, decoder *codec.SimpleDecoder, pbTracesData *v1.TracesData) {
+	var err error
+	for !decoder.IsEnd() {
+		pbTracesData.Reset()
+		bytes := decoder.ReadBytes()
+		if len(bytes) > 0 {
+			err = proto.Unmarshal(bytes, pbTracesData)
+		}
+		if decoder.Failed() || err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("OpenTelemetry log decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+			}
+			d.counter.ErrorCount++
+			return
+		}
+		d.sendOpenMetetry(vtapID, pbTracesData)
+	}
+}
+
+func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
+	if d.debugEnabled {
+		log.Debugf("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
+	}
+	d.counter.OTelCount++
+	ls := jsonify.OTelTracesDataToL7Loggers(vtapID, tracesData, d.shardID, d.platformData)
+	for _, l := range ls {
+		if !d.throttler.Send(l) {
+			d.counter.OTelDropCount++
+		}
+	}
+}
+
 func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
@@ -201,23 +241,23 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	}
 	proto.Release()
 
-	switch datatype.LogProtoType(proto.BaseInfo.Head.Proto) {
-	case datatype.PROTO_HTTP_1, datatype.PROTO_HTTP_2:
+	switch datatype.L7Protocol(proto.BaseInfo.Head.Proto) {
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
-	case datatype.PROTO_DNS:
+	case datatype.L7_PROTOCOL_DNS:
 		d.counter.L7DNSCount++
 		d.counter.L7DNSDropCount += drop
-	case datatype.PROTO_MYSQL:
+	case datatype.L7_PROTOCOL_MYSQL:
 		d.counter.L7SQLCount++
 		d.counter.L7SQLDropCount += drop
-	case datatype.PROTO_REDIS:
+	case datatype.L7_PROTOCOL_REDIS:
 		d.counter.L7NoSQLCount++
 		d.counter.L7NoSQLDropCount += drop
-	case datatype.PROTO_DUBBO:
+	case datatype.L7_PROTOCOL_DUBBO:
 		d.counter.L7RPCCount++
 		d.counter.L7RPCDropCount += drop
-	case datatype.PROTO_KAFKA:
+	case datatype.L7_PROTOCOL_KAFKA:
 		d.counter.L7MQCount++
 		d.counter.L7MQDropCount += drop
 	}

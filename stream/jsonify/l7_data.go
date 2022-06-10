@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+	logging "github.com/op/go-logging"
 	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
 	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
@@ -14,6 +15,8 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
 	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 )
+
+var log = logging.MustGetLogger("stream.jsonify")
 
 type L7Base struct {
 	// 知识图谱
@@ -222,9 +225,10 @@ type L7Logger struct {
 
 	L7Base
 
-	L7Protocol uint8
-	Version    string
-	Type       uint8
+	L7Protocol    uint8
+	L7ProtocolStr string
+	Version       string
+	Type          uint8
 
 	RequestType     string
 	RequestDomain   string
@@ -244,6 +248,8 @@ type L7Logger struct {
 	XRequestId      string
 	TraceId         string
 	SpanId          string
+	ParentSpanId    string
+	SpanKind        uint8
 
 	ResponseDuration uint64
 	RequestLength    *uint64
@@ -252,6 +258,9 @@ type L7Logger struct {
 	responseLength   uint64
 	SqlAffectedRows  *uint64
 	sqlAffectedRows  uint64
+
+	TagNames  []string
+	TagValues []string
 }
 
 func L7LoggerColumns() []*ckdb.Column {
@@ -260,6 +269,7 @@ func L7LoggerColumns() []*ckdb.Column {
 	l7Columns = append(l7Columns, L7BaseColumns()...)
 	l7Columns = append(l7Columns,
 		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:其他, 20:http1, 21:http2, 40:dubbo, 60:mysql, 80:redis, 100:kafka, 120:dns"),
+		ckdb.NewColumn("l7_protocol_str", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
 
@@ -277,11 +287,15 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("x_request_id", ckdb.String).SetComment("XRequestID"),
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("TraceID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
+		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
+		ckdb.NewColumn("span_kind", ckdb.UInt8).SetComment("SpanKind"),
 
 		ckdb.NewColumn("response_duration", ckdb.UInt64),
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
 		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
+		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("额外的tag"),
+		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("额外的tag对应的值"),
 	)
 	return l7Columns
 }
@@ -299,6 +313,9 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	}
 
 	if err := block.WriteUInt8(h.L7Protocol); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.L7ProtocolStr); err != nil {
 		return err
 	}
 	if err := block.WriteString(h.Version); err != nil {
@@ -346,6 +363,12 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(h.SpanId); err != nil {
 		return err
 	}
+	if err := block.WriteString(h.ParentSpanId); err != nil {
+		return err
+	}
+	if err := block.WriteUInt8(h.SpanKind); err != nil {
+		return err
+	}
 
 	if err := block.WriteUInt64(h.ResponseDuration); err != nil {
 		return err
@@ -357,6 +380,13 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt64Nullable(h.SqlAffectedRows); err != nil {
+		return err
+	}
+
+	if err := block.WriteArray(h.TagNames); err != nil {
+		return err
+	}
+	if err := block.WriteArray(h.TagValues); err != nil {
 		return err
 	}
 
@@ -525,6 +555,7 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 
 	h.Type = uint8(l.BaseInfo.Head.MsgType)
 	h.L7Protocol = uint8(l.BaseInfo.Head.Proto)
+	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
 
 	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 	if h.Type != uint8(datatype.MSG_T_REQUEST) {
@@ -534,27 +565,27 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	}
 
 	h.ResponseDuration = l.BaseInfo.Head.RRT / uint64(time.Microsecond)
-	switch datatype.LogProtoType(l.BaseInfo.Head.Proto) {
-	case datatype.PROTO_HTTP_1, datatype.PROTO_HTTP_2:
+	switch datatype.L7Protocol(l.BaseInfo.Head.Proto) {
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
 		h.fillHttp(l)
-	case datatype.PROTO_DNS:
+	case datatype.L7_PROTOCOL_DNS:
 		h.fillDns(l)
-	case datatype.PROTO_MYSQL:
+	case datatype.L7_PROTOCOL_MYSQL:
 		// mysql 异常时有响应码
 		if h.ResponseStatus != datatype.STATUS_CLIENT_ERROR &&
 			h.ResponseStatus != datatype.STATUS_SERVER_ERROR {
 			h.ResponseCode = nil
 		}
 		h.fillMysql(l)
-	case datatype.PROTO_REDIS:
+	case datatype.L7_PROTOCOL_REDIS:
 		// redis 没有响应码
 		if h.responseCode == 0 {
 			h.ResponseCode = nil
 		}
 		h.fillRedis(l)
-	case datatype.PROTO_DUBBO:
+	case datatype.L7_PROTOCOL_DUBBO:
 		h.fillDubbo(l)
-	case datatype.PROTO_KAFKA:
+	case datatype.L7_PROTOCOL_KAFKA:
 		// 非fetch命令没有响应码
 		h.fillKafka(l)
 	}

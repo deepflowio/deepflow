@@ -18,7 +18,7 @@ const (
 	DefaultCKPrimaryAddr     = "tcp://127.0.0.1:9000"
 	DefaultThrottle          = 50000
 	DefaultDecoderQueueCount = 2
-	DefaultDecoderQueueSize  = 100000
+	DefaultDecoderQueueSize  = 10000
 	DefaultBrokerQueueSize   = 10000
 	DefaultBrokerZMQIP       = "127.0.0.1"
 	DefaultBrokerZMQPort     = 20204
