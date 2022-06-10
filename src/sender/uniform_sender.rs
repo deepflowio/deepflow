@@ -8,11 +8,13 @@ use std::thread;
 use std::time::Duration;
 
 use arc_swap::access::Access;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
 use super::{SendItem, SendMessageType};
 use crate::config::handler::SenderAccess;
+use crate::exception::ExceptionHandler;
+use crate::proto::trident::Exception;
 use crate::utils::{
     queue::{Error, Receiver},
     stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
@@ -141,6 +143,7 @@ pub struct UniformSenderThread {
 
     running: Arc<AtomicBool>,
     stats: Arc<Collector>,
+    exception_handler: ExceptionHandler,
 }
 
 impl UniformSenderThread {
@@ -149,6 +152,7 @@ impl UniformSenderThread {
         input: Receiver<SendItem>,
         config: SenderAccess,
         stats: Arc<Collector>,
+        exception_handler: ExceptionHandler,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -158,6 +162,7 @@ impl UniformSenderThread {
             thread_handle: None,
             running,
             stats,
+            exception_handler,
         }
     }
 
@@ -176,6 +181,7 @@ impl UniformSenderThread {
             self.config.clone(),
             self.running.clone(),
             self.stats.clone(),
+            self.exception_handler.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || uniform_sender.process()));
         info!("uniform sender id: {} started", self.id);
@@ -212,6 +218,7 @@ pub struct UniformSender {
     running: Arc<AtomicBool>,
     stats: Arc<Collector>,
     stats_registered: bool,
+    exception_handler: ExceptionHandler,
 }
 
 impl UniformSender {
@@ -225,6 +232,7 @@ impl UniformSender {
         config: SenderAccess,
         running: Arc<AtomicBool>,
         stats: Arc<Collector>,
+        exception_handler: ExceptionHandler,
     ) -> Self {
         Self {
             id,
@@ -239,6 +247,7 @@ impl UniformSender {
             running,
             stats,
             stats_registered: false,
+            exception_handler,
         }
     }
 
@@ -281,7 +290,8 @@ impl UniformSender {
                 self.reconnect = false;
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                    warn!(
+                    self.exception_handler.set(Exception::AnalyzerSocketError);
+                    error!(
                         "tcp connection to {}:{} failed",
                         self.dst_ip,
                         Self::DST_PORT
@@ -314,7 +324,8 @@ impl UniformSender {
                 }
                 Err(e) => {
                     if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                        warn!("tcp stream write data failed {}", e);
+                        self.exception_handler.set(Exception::AnalyzerSocketError);
+                        error!("tcp stream write data failed {}", e);
                     }
                     self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                     self.tcp_stream.take();

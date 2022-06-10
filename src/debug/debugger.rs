@@ -409,6 +409,7 @@ mod tests {
     use rand::random;
 
     use crate::config::handler::{DebugConfig, NewRuntimeConfig, PlatformConfig};
+    use crate::exception::ExceptionHandler;
     use crate::platform::ActivePoller;
     use crate::{debug::Message, rpc::Session};
 
@@ -422,6 +423,7 @@ mod tests {
             Duration::from_secs(5),
             s.clone(),
             vec![String::from("10.1.20.21")],
+            ExceptionHandler::default(),
         ));
 
         let current_config = Arc::new(ArcSwap::from_pointee(NewRuntimeConfig::default()));
