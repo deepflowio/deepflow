@@ -3,11 +3,11 @@ package clickhouse
 import (
 	"errors"
 	"fmt"
+	"net"
 	"server/querier/common"
 	"server/querier/engine/clickhouse/metrics"
 	"server/querier/engine/clickhouse/tag"
 	"server/querier/engine/clickhouse/view"
-	"net"
 	"strconv"
 	"strings"
 )

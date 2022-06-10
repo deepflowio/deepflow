@@ -5,9 +5,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"server/controller/trisolaris/config"
 	"github.com/op/go-logging"
 	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"server/controller/trisolaris/config"
 )
 
 var log = logging.MustGetLogger("trisolaris/metadata")

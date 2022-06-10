@@ -1,9 +1,9 @@
 package aliyun
 
 import (
+	cbn "github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
 	"server/controller/cloud/model"
 	"server/controller/common"
-	cbn "github.com/aliyun/alibaba-cloud-sdk-go/services/cbn"
 )
 
 func (a *Aliyun) getCens(region model.Region) ([]model.CEN, error) {

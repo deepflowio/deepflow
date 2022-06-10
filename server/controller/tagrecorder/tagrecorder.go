@@ -4,8 +4,8 @@ import (
 	"time"
 
 	// "server/controller/tagrecorder/config"
-	"server/controller/config"
 	logging "github.com/op/go-logging"
+	"server/controller/config"
 )
 
 var log = logging.MustGetLogger("tagrecorder")

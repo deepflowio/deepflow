@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync/atomic"
 
-	cloudmodel "server/controller/cloud/model"
 	"github.com/op/go-logging"
 	"gitlab.yunshan.net/yunshan/metaflow/libs/queue"
+	cloudmodel "server/controller/cloud/model"
 
 	"server/controller/genesis/config"
 	"server/controller/genesis/model"

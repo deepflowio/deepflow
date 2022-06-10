@@ -2,14 +2,14 @@ package genesis
 
 import (
 	"context"
-	"server/controller/common"
-	genesiscommon "server/controller/genesis/common"
-	"server/controller/genesis/model"
-	genesismodel "server/controller/genesis/model"
 	"fmt"
 	tridentcommon "gitlab.yunshan.net/yunshan/metaflow/message/common"
 	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
 	"inet.af/netaddr"
+	"server/controller/common"
+	genesiscommon "server/controller/genesis/common"
+	"server/controller/genesis/model"
+	genesismodel "server/controller/genesis/model"
 	"strconv"
 	"strings"
 	"time"

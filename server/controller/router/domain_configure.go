@@ -1,8 +1,8 @@
 package router
 
 import (
-	"server/controller/service/domain_configure"
 	"github.com/gin-gonic/gin"
+	"server/controller/service/domain_configure"
 )
 
 func DomainConfigRouter(e *gin.Engine) {

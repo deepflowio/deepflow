@@ -1,9 +1,9 @@
 package router
 
 import (
+	"net/http"
 	"server/querier/common"
 	"server/querier/service"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )

@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"server/controller/genesis/config"
 	"github.com/deckarep/golang-set"
 	uuid "github.com/satori/go.uuid"
 	"inet.af/netaddr"
+	"server/controller/genesis/config"
 )
 
 type VinterfacesStorage struct {

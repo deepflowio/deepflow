@@ -5,8 +5,8 @@ import (
 	//"server/querier/common"
 	//"server/querier/parse"
 	//"server/querier/querier"
-	"server/querier/engine/clickhouse/view"
 	"reflect"
+	"server/querier/engine/clickhouse/view"
 	"testing"
 )
 

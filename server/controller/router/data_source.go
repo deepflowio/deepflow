@@ -1,12 +1,12 @@
 package router
 
 import (
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"server/controller/common"
 	"server/controller/config"
 	"server/controller/model"
 	"server/controller/service"
-	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 )
 
 func DataSourceRouter(e *gin.Engine, cfg *config.Config) {

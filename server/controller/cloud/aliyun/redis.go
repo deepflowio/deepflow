@@ -1,9 +1,9 @@
 package aliyun
 
 import (
+	r_kvstore "github.com/aliyun/alibaba-cloud-sdk-go/services/r-kvstore"
 	"server/controller/cloud/model"
 	"server/controller/common"
-	r_kvstore "github.com/aliyun/alibaba-cloud-sdk-go/services/r-kvstore"
 )
 
 func (a *Aliyun) getRedisInstances(region model.Region) (

@@ -1,15 +1,15 @@
 package kubernetes_gather
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"reflect"
 	"server/controller/common"
 	"server/controller/db/mysql"
 	"server/controller/genesis"
 	"server/controller/genesis/config"
 	genesismodel "server/controller/genesis/model"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"reflect"
 	"testing"
 
 	"github.com/agiledragon/gomonkey/v2"

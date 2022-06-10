@@ -4,9 +4,9 @@ import (
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	api "gitlab.yunshan.net/yunshan/metaflow/message/trident"
 	"server/controller/genesis"
 	grpcserver "server/controller/trisolaris/server/grpc"
-	api "gitlab.yunshan.net/yunshan/metaflow/message/trident"
 )
 
 type service struct {

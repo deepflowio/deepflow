@@ -1,10 +1,10 @@
 package router
 
 import (
+	"github.com/gin-gonic/gin"
 	"server/controller/genesis"
 	"server/controller/manager"
 	"server/controller/service"
-	"github.com/gin-gonic/gin"
 )
 
 func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {

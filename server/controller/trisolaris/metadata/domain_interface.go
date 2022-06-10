@@ -1,9 +1,9 @@
 package metadata
 
 import (
+	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
 	. "server/controller/common"
 	models "server/controller/db/mysql"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
 )
 
 type TInterfaces []*trident.Interface
