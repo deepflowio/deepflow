@@ -3,8 +3,11 @@ use std::time::Duration;
 
 use parking_lot::RwLock;
 
-use log::{info, warn};
+use log::{error, info};
 use tonic::transport::{Channel, Endpoint};
+
+use crate::exception::ExceptionHandler;
+use crate::proto::trident::Exception;
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -23,6 +26,7 @@ pub struct Session {
 
     version: AtomicU64,
     client: RwLock<Option<Channel>>,
+    exception_handler: ExceptionHandler,
 }
 
 impl Session {
@@ -32,6 +36,7 @@ impl Session {
         timeout: Duration,
         controller_cert_file_prefix: String,
         controller_ips: Vec<String>,
+        exception_handler: ExceptionHandler,
     ) -> Session {
         Session {
             config: Config {
@@ -43,6 +48,7 @@ impl Session {
             server_ip: RwLock::new(ServerIp::new(controller_ips)),
             version: AtomicU64::new(0),
             client: RwLock::new(None),
+            exception_handler,
         }
     }
 
@@ -56,7 +62,10 @@ impl Session {
             .await
         {
             Ok(channel) => *self.client.write() = Some(channel),
-            Err(e) => warn!("dial server({}) failed {}", remote, e),
+            Err(e) => {
+                self.exception_handler.set(Exception::ControllerSocketError);
+                error!("dial server({}) failed {}", remote, e);
+            }
         }
     }
 
