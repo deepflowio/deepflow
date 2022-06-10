@@ -1,0 +1,69 @@
+// recorder包中使用到的泛型约束
+package constraint
+
+import (
+	cloudmodel "server/controller/cloud/model"
+	"server/controller/db/mysql"
+	"server/controller/recorder/cache"
+)
+
+// 资源的MySQL orm对象
+type MySQLModel interface {
+	mysql.Region | mysql.AZ | mysql.SubDomain | mysql.Host | mysql.VM |
+		mysql.VPC | mysql.Network | mysql.Subnet | mysql.VRouter | mysql.RoutingTable |
+		mysql.DHCPPort | mysql.VInterface | mysql.WANIP | mysql.LANIP | mysql.FloatingIP |
+		mysql.SecurityGroup | mysql.SecurityGroupRule | mysql.VMSecurityGroup |
+		mysql.NATGateway | mysql.NATRule | mysql.NATVMConnection | mysql.LB |
+		mysql.LBListener | mysql.LBTargetServer | mysql.LBVMConnection | mysql.CEN |
+		mysql.PeerConnection | mysql.RDSInstance | mysql.RedisInstance | mysql.PodCluster |
+		mysql.PodNode | mysql.VMPodNodeConnection | mysql.PodNamespace | mysql.PodIngress |
+		mysql.PodIngressRule | mysql.PodIngressRuleBackend | mysql.PodService |
+		mysql.PodServicePort | mysql.PodGroup | mysql.PodGroupPort | mysql.PodReplicaSet |
+		mysql.Pod
+
+	GetLcuuid() string
+	GetID() int
+}
+
+// 资源的原始数据结构
+type CloudModel interface {
+	cloudmodel.Region | cloudmodel.AZ | cloudmodel.SubDomain | cloudmodel.Host | cloudmodel.VM |
+		cloudmodel.VPC | cloudmodel.Network | cloudmodel.Subnet | cloudmodel.VRouter | cloudmodel.RoutingTable |
+		cloudmodel.DHCPPort | cloudmodel.VInterface | cloudmodel.IP | cloudmodel.FloatingIP |
+		cloudmodel.SecurityGroup | cloudmodel.SecurityGroupRule | cloudmodel.VMSecurityGroup |
+		cloudmodel.NATGateway | cloudmodel.NATRule | cloudmodel.NATVMConnection | cloudmodel.LB |
+		cloudmodel.LBListener | cloudmodel.LBTargetServer | cloudmodel.LBVMConnection | cloudmodel.CEN |
+		cloudmodel.PeerConnection | cloudmodel.RDSInstance | cloudmodel.RedisInstance | cloudmodel.PodCluster |
+		cloudmodel.PodNode | cloudmodel.VMPodNodeConnection | cloudmodel.PodNamespace | cloudmodel.PodIngress |
+		cloudmodel.PodIngressRule | cloudmodel.PodIngressRuleBackend | cloudmodel.PodService |
+		cloudmodel.PodServicePort | cloudmodel.PodGroup | cloudmodel.PodGroupPort | cloudmodel.PodReplicaSet |
+		cloudmodel.Pod
+}
+
+// 资源用于比对的缓存对象
+type DiffBase[MT MySQLModel] interface {
+	*cache.Region | *cache.AZ | *cache.SubDomain | *cache.Host | *cache.VM |
+		*cache.VPC | *cache.Network | *cache.Subnet | *cache.VRouter | *cache.RoutingTable |
+		*cache.DHCPPort | *cache.VInterface | *cache.WANIP | *cache.LANIP | *cache.FloatingIP |
+		*cache.SecurityGroup | *cache.SecurityGroupRule | *cache.VMSecurityGroup |
+		*cache.NATGateway | *cache.NATRule | *cache.NATVMConnection | *cache.LB |
+		*cache.LBListener | *cache.LBTargetServer | *cache.LBVMConnection | *cache.CEN |
+		*cache.PeerConnection | *cache.RDSInstance | *cache.RedisInstance | *cache.PodCluster |
+		*cache.PodNode | *cache.VMPodNodeConnection | *cache.PodNamespace | *cache.PodIngress |
+		*cache.PodIngressRule | *cache.PodIngressRuleBackend | *cache.PodService |
+		*cache.PodServicePort | *cache.PodGroup | *cache.PodGroupPort | *cache.PodReplicaSet |
+		*cache.Pod
+
+	GetSequence() int
+	SetSequence(sequence int)
+	GetLcuuid() string
+}
+
+// 软删除资源的MySQL orm对象
+type MySQLSoftDeleteModel interface {
+	mysql.Region | mysql.AZ | mysql.Host | mysql.VM | mysql.VPC | mysql.Network |
+		mysql.VRouter | mysql.DHCPPort | mysql.SecurityGroup | mysql.NATGateway |
+		mysql.LB | mysql.LBListener | mysql.CEN | mysql.PeerConnection | mysql.RDSInstance |
+		mysql.RedisInstance | mysql.PodCluster | mysql.PodNode | mysql.PodNamespace |
+		mysql.PodIngress | mysql.PodService | mysql.PodGroup | mysql.PodReplicaSet | mysql.Pod
+}

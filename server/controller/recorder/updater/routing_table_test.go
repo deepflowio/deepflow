@@ -1,0 +1,86 @@
+package updater
+
+import (
+	"reflect"
+
+	"bou.ke/monkey"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
+
+	cloudmodel "server/controller/cloud/model"
+	"server/controller/db/mysql"
+	"server/controller/recorder/cache"
+)
+
+func newCloudRoutingTable() cloudmodel.RoutingTable {
+	lcuuid := uuid.New().String()
+	return cloudmodel.RoutingTable{
+		Lcuuid:      lcuuid,
+		Destination: uuid.NewString(),
+	}
+}
+
+func (t *SuiteTest) getRoutingTableMock(mockDB bool) (*cache.Cache, cloudmodel.RoutingTable) {
+	cloudItem := newCloudRoutingTable()
+	domainLcuuid := uuid.New().String()
+
+	cache_ := cache.NewCache(domainLcuuid)
+	if mockDB {
+		t.db.Create(&mysql.RoutingTable{Base: mysql.Base{Lcuuid: cloudItem.Lcuuid}, Destination: cloudItem.Destination})
+		cache_.RoutingTables[cloudItem.Lcuuid] = &cache.RoutingTable{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}}
+	}
+
+	cache_.SetSequence(cache_.GetSequence() + 1)
+
+	return cache_, cloudItem
+}
+
+func (t *SuiteTest) TestHandleAddRoutingTableSucess() {
+	cache_, cloudItem := t.getRoutingTableMock(false)
+	vrouterID := randID()
+	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVRouterIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+		return vrouterID, true
+	})
+	assert.Equal(t.T(), len(cache_.RoutingTables), 0)
+
+	updater := NewRoutingTable(cache_, []cloudmodel.RoutingTable{cloudItem})
+	updater.HandleAddAndUpdate()
+
+	monkey.UnpatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVRouterIDByLcuuid")
+
+	var addedItem *mysql.RoutingTable
+	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
+	assert.Equal(t.T(), result.RowsAffected, int64(1))
+	assert.Equal(t.T(), len(cache_.RoutingTables), 1)
+
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.RoutingTable{})
+}
+
+func (t *SuiteTest) TestHandleUpdateRoutingTableSucess() {
+	cache, cloudItem := t.getRoutingTableMock(true)
+	cloudItem.Destination = uuid.NewString()
+
+	updater := NewRoutingTable(cache, []cloudmodel.RoutingTable{cloudItem})
+	updater.HandleAddAndUpdate()
+
+	var addedItem *mysql.RoutingTable
+	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
+	assert.Equal(t.T(), result.RowsAffected, int64(1))
+	assert.Equal(t.T(), len(cache.RoutingTables), 1)
+	assert.Equal(t.T(), addedItem.Destination, cloudItem.Destination)
+
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.RoutingTable{})
+}
+
+func (t *SuiteTest) TestHandleDeleteRoutingTableSucess() {
+	cache, cloudItem := t.getRoutingTableMock(true)
+
+	updater := NewRoutingTable(cache, []cloudmodel.RoutingTable{cloudItem})
+	updater.HandleDelete()
+
+	var addedItem *mysql.RoutingTable
+	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
+	assert.Equal(t.T(), result.RowsAffected, int64(0))
+	assert.Equal(t.T(), len(cache.RoutingTables), 0)
+}

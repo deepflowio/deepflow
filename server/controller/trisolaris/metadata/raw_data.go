@@ -1,0 +1,1216 @@
+package metadata
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/golang/protobuf/proto"
+	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+
+	. "server/controller/common"
+	models "server/controller/db/mysql"
+	. "server/controller/trisolaris/utils"
+
+	mapset "github.com/deckarep/golang-set"
+)
+
+type TypeIDData struct {
+	LaunchServer   string
+	LaunchServerID int
+	AZ             string
+	VPCID          int
+	PodID          int
+	PodGroupID     int
+	PodClusterID   int
+	PodNodeID      int
+	PodNamesapceID int
+	Type           int
+}
+
+type IPData struct {
+	IP     string
+	VPCID  int
+	Domain string
+}
+
+type DomainIPKey struct {
+	Domain string
+	IP     string
+}
+
+type TypeIDKey struct {
+	Type int
+	ID   int
+}
+
+type IpResourceData struct {
+	ipResources       []*trident.IpResource
+	simpleIpResources []*trident.IpResource
+	isVipInterface    bool
+}
+
+type PlatformRawData struct {
+	networkIDToSubnets     map[int][]*models.Subnet
+	idToNetwork            map[int]*models.Network
+	vInterfaceIDToIP       map[int][]*trident.IpResource
+	vInterfaceIDToSimpleIP map[int][]*trident.IpResource
+	noVInterfaceIDIPs      []*IPData
+	typeIDToDevice         map[TypeIDKey]*TypeIDData
+	vipDomainLcuuids       mapset.Set
+	uuidToRegion           map[string]*models.Region
+	uuidToAZ               map[string]*models.AZ
+	podNodeIDToVmID        map[int]int
+	vmIDToPodNodeID        map[int]int
+	idToVPC                map[int]*models.VPC
+
+	idToHost                    map[int]*models.Host
+	vmIDs                       mapset.Set
+	vRouterIDs                  mapset.Set
+	dhcpPortIDs                 mapset.Set
+	podIDs                      mapset.Set
+	vpcIDs                      mapset.Set
+	tunnelIDs                   mapset.Set
+	vifIDsOfLANIP               mapset.Set
+	vifIDsOfWANIP               mapset.Set
+	ipsOfLANIP                  mapset.Set
+	ipsOfWANIP                  mapset.Set
+	vmIDsOfFIP                  mapset.Set
+	regionUUIDs                 mapset.Set
+	azUUIDs                     mapset.Set
+	peerConnIDs                 mapset.Set
+	podServiceIDs               mapset.Set
+	redisInstanceIDs            mapset.Set
+	rdsInstanceIDs              mapset.Set
+	podNodeIDs                  mapset.Set
+	lbIDs                       mapset.Set
+	natIDs                      mapset.Set
+	podServicePortIDs           mapset.Set
+	subnetPrefix                []string
+	subnetMask                  []string
+	serverToVmIDs               map[string]mapset.Set
+	floatingIPs                 map[int]*IPData
+	podServiceIDToPodGroupPorts map[int]mapset.Set
+
+	vpcIDToDeviceIPs    map[int]map[TypeIDKey]mapset.Set
+	podNodeIDtoPodIDs   map[int]mapset.Set
+	VInterfaceIDToWANIP map[int][]*models.WANIP
+	VInterfaceIDToLANIP map[int][]*models.LANIP
+	vpcIDToVmidFips     map[int]map[int][]string
+	domainIpToHostID    map[DomainIPKey]int
+	podServiceIDToPorts map[int]mapset.Set
+	idToPodNode         map[int]*models.PodNode
+
+	vmIDToVifs            map[int]mapset.Set
+	vgwIDToVifs           map[int]mapset.Set
+	dhcpIDToVifs          map[int]mapset.Set
+	podIDToVifs           map[int]mapset.Set
+	podServiceIDToVifs    map[int]mapset.Set
+	redisInstanceIDToVifs map[int]mapset.Set
+	rdsInstanceIDToVifs   map[int]mapset.Set
+	podNodeIDToVifs       map[int]mapset.Set
+	lbIDToVifs            map[int]mapset.Set
+	natIDToVifs           map[int]mapset.Set
+	hostIDToVifs          map[int]mapset.Set
+	gatewayHostIDToVifs   map[int]mapset.Set
+	gatewayHostIDs        []int
+	deviceVifs            []*models.VInterface
+
+	deviceTypeAndIDToVInterfaceID map[TypeIDKey][]int
+}
+
+func NewPlatformRawData() *PlatformRawData {
+	return &PlatformRawData{
+		idToHost:                    make(map[int]*models.Host),
+		vmIDs:                       mapset.NewSet(),
+		vRouterIDs:                  mapset.NewSet(),
+		dhcpPortIDs:                 mapset.NewSet(),
+		podIDs:                      mapset.NewSet(),
+		vpcIDs:                      mapset.NewSet(),
+		tunnelIDs:                   mapset.NewSet(),
+		vifIDsOfLANIP:               mapset.NewSet(),
+		vifIDsOfWANIP:               mapset.NewSet(),
+		ipsOfLANIP:                  mapset.NewSet(),
+		ipsOfWANIP:                  mapset.NewSet(),
+		vmIDsOfFIP:                  mapset.NewSet(),
+		regionUUIDs:                 mapset.NewSet(),
+		azUUIDs:                     mapset.NewSet(),
+		peerConnIDs:                 mapset.NewSet(),
+		podServiceIDs:               mapset.NewSet(),
+		redisInstanceIDs:            mapset.NewSet(),
+		rdsInstanceIDs:              mapset.NewSet(),
+		podNodeIDs:                  mapset.NewSet(),
+		lbIDs:                       mapset.NewSet(),
+		natIDs:                      mapset.NewSet(),
+		podServicePortIDs:           mapset.NewSet(),
+		serverToVmIDs:               make(map[string]mapset.Set),
+		floatingIPs:                 make(map[int]*IPData),
+		podServiceIDToPodGroupPorts: make(map[int]mapset.Set),
+		subnetPrefix:                []string{},
+		subnetMask:                  []string{},
+
+		idToNetwork:            make(map[int]*models.Network),
+		networkIDToSubnets:     make(map[int][]*models.Subnet),
+		vpcIDToDeviceIPs:       make(map[int]map[TypeIDKey]mapset.Set),
+		podNodeIDtoPodIDs:      make(map[int]mapset.Set),
+		idToVPC:                make(map[int]*models.VPC),
+		VInterfaceIDToWANIP:    make(map[int][]*models.WANIP),
+		VInterfaceIDToLANIP:    make(map[int][]*models.LANIP),
+		vpcIDToVmidFips:        make(map[int]map[int][]string),
+		uuidToRegion:           make(map[string]*models.Region),
+		uuidToAZ:               make(map[string]*models.AZ),
+		domainIpToHostID:       make(map[DomainIPKey]int),
+		podServiceIDToPorts:    make(map[int]mapset.Set),
+		vmIDToPodNodeID:        make(map[int]int),
+		podNodeIDToVmID:        make(map[int]int),
+		vipDomainLcuuids:       mapset.NewSet(),
+		vInterfaceIDToIP:       make(map[int][]*trident.IpResource),
+		vInterfaceIDToSimpleIP: make(map[int][]*trident.IpResource),
+		idToPodNode:            make(map[int]*models.PodNode),
+
+		vmIDToVifs:                    make(map[int]mapset.Set),
+		vgwIDToVifs:                   make(map[int]mapset.Set),
+		dhcpIDToVifs:                  make(map[int]mapset.Set),
+		podIDToVifs:                   make(map[int]mapset.Set),
+		podServiceIDToVifs:            make(map[int]mapset.Set),
+		redisInstanceIDToVifs:         make(map[int]mapset.Set),
+		rdsInstanceIDToVifs:           make(map[int]mapset.Set),
+		podNodeIDToVifs:               make(map[int]mapset.Set),
+		lbIDToVifs:                    make(map[int]mapset.Set),
+		natIDToVifs:                   make(map[int]mapset.Set),
+		hostIDToVifs:                  make(map[int]mapset.Set),
+		gatewayHostIDToVifs:           make(map[int]mapset.Set),
+		gatewayHostIDs:                []int{},
+		deviceVifs:                    []*models.VInterface{},
+		deviceTypeAndIDToVInterfaceID: make(map[TypeIDKey][]int),
+		typeIDToDevice:                make(map[TypeIDKey]*TypeIDData),
+	}
+}
+
+func (r *PlatformRawData) ConvertDBVInterface(dbDataCache *DBDataCache) {
+	vinterfaces := dbDataCache.GetVInterfaces()
+	if vinterfaces == nil {
+		return
+	}
+	for _, vif := range vinterfaces {
+		typeIDkey := TypeIDKey{
+			Type: vif.DeviceType,
+			ID:   vif.DeviceID,
+		}
+		if _, ok := r.deviceTypeAndIDToVInterfaceID[typeIDkey]; ok {
+			r.deviceTypeAndIDToVInterfaceID[typeIDkey] = append(r.deviceTypeAndIDToVInterfaceID[typeIDkey], vif.ID)
+		} else {
+			r.deviceTypeAndIDToVInterfaceID[typeIDkey] = []int{vif.ID}
+		}
+		filter := true
+		switch vif.DeviceType {
+		case VIF_DEVICE_TYPE_VM:
+			if vifs, ok := r.vmIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.vmIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_VROUTER:
+			if vifs, ok := r.vgwIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.vgwIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_DHCP_PORT:
+			if vifs, ok := r.dhcpIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.dhcpIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_POD:
+			if vifs, ok := r.podIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.podIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_POD_SERVICE:
+			if vifs, ok := r.podServiceIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.podServiceIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_REDIS_INSTANCE:
+			if vifs, ok := r.redisInstanceIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.redisInstanceIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_RDS_INSTANCE:
+			if vifs, ok := r.rdsInstanceIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.rdsInstanceIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_POD_NODE:
+			if vifs, ok := r.podNodeIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.podNodeIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_LB:
+			if vifs, ok := r.lbIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.lbIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_NAT_GATEWAY:
+			if vifs, ok := r.natIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.natIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+		case VIF_DEVICE_TYPE_HOST:
+			if vifs, ok := r.hostIDToVifs[vif.DeviceID]; ok {
+				vifs.Add(vif)
+			} else {
+				r.hostIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+			}
+			if Find[int](r.gatewayHostIDs, vif.ID) {
+				if vifs, ok := r.gatewayHostIDToVifs[vif.DeviceID]; ok {
+					vifs.Add(vif)
+				} else {
+					r.gatewayHostIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
+				}
+			}
+		default:
+			filter = false
+		}
+		if filter {
+			r.deviceVifs = append(r.deviceVifs, vif)
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBVM(dbDataCache *DBDataCache) {
+	vms := dbDataCache.GetVms()
+	if vms == nil {
+		return
+	}
+	for _, vm := range vms {
+		r.vmIDs.Add(vm.ID)
+		if vmIDs, ok := r.serverToVmIDs[vm.LaunchServer]; ok {
+			vmIDs.Add(vm.ID)
+		} else {
+			r.serverToVmIDs[vm.LaunchServer] = mapset.NewSet(vm.ID)
+		}
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_VM,
+			ID:   vm.ID,
+		}
+		if deviceIPs, ok := r.vpcIDToDeviceIPs[vm.VPCID]; ok == false {
+			r.vpcIDToDeviceIPs[vm.VPCID] = make(map[TypeIDKey]mapset.Set)
+			r.vpcIDToDeviceIPs[vm.VPCID][typeIDKey] = mapset.NewSet()
+		} else {
+			deviceIPs[typeIDKey] = mapset.NewSet()
+		}
+
+		key := DomainIPKey{
+			Domain: vm.Domain,
+			IP:     vm.LaunchServer,
+		}
+		hostID, ok := r.domainIpToHostID[key]
+		if ok == false {
+			hostID = 0
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   vm.LaunchServer,
+			LaunchServerID: hostID,
+			AZ:             vm.AZ,
+			VPCID:          vm.VPCID,
+			Type:           VIF_DEVICE_TYPE_VM,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBVRouter(dbDataCache *DBDataCache) {
+	vRouters := dbDataCache.GetVRouters()
+	if vRouters == nil {
+		return
+	}
+	for _, vRouter := range vRouters {
+		r.vRouterIDs.Add(vRouter.ID)
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_VROUTER,
+			ID:   vRouter.ID,
+		}
+		if deviceIPs, ok := r.vpcIDToDeviceIPs[vRouter.VPCID]; ok == false {
+			r.vpcIDToDeviceIPs[vRouter.VPCID] = make(map[TypeIDKey]mapset.Set)
+			r.vpcIDToDeviceIPs[vRouter.VPCID][typeIDKey] = mapset.NewSet()
+		} else {
+			deviceIPs[typeIDKey] = mapset.NewSet()
+		}
+
+		key := DomainIPKey{
+			Domain: vRouter.Domain,
+			IP:     vRouter.GWLaunchServer,
+		}
+		hostID, ok := r.domainIpToHostID[key]
+		if ok == false {
+			hostID = 0
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   vRouter.GWLaunchServer,
+			LaunchServerID: hostID,
+			AZ:             vRouter.AZ,
+			VPCID:          vRouter.VPCID,
+			Type:           VIF_DEVICE_TYPE_VROUTER,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBDHCPPort(dbDataCache *DBDataCache) {
+	dhcpPorts := dbDataCache.GetDhcpPorts()
+	if dhcpPorts == nil {
+		return
+	}
+	for _, dhcpPort := range dhcpPorts {
+		r.dhcpPortIDs.Add(dhcpPort.ID)
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_DHCP_PORT,
+			ID:   dhcpPort.ID,
+		}
+		if deviceIPs, ok := r.vpcIDToDeviceIPs[dhcpPort.VPCID]; ok == false {
+			r.vpcIDToDeviceIPs[dhcpPort.VPCID] = make(map[TypeIDKey]mapset.Set)
+			r.vpcIDToDeviceIPs[dhcpPort.VPCID][typeIDKey] = mapset.NewSet()
+		} else {
+			deviceIPs[typeIDKey] = mapset.NewSet()
+		}
+
+		az := ""
+		if vpc, ok := r.idToVPC[dhcpPort.VPCID]; ok {
+			az = vpc.AZ
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   "",
+			LaunchServerID: 0,
+			AZ:             az,
+			VPCID:          dhcpPort.VPCID,
+			Type:           VIF_DEVICE_TYPE_DHCP_PORT,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBPod(dbDataCache *DBDataCache) {
+	pods := dbDataCache.GetPods()
+	if pods == nil {
+		return
+	}
+	for _, pod := range pods {
+		r.podIDs.Add(pod.ID)
+		podIDs, ok := r.podNodeIDtoPodIDs[pod.PodNodeID]
+		if ok {
+			podIDs.Add(pod.ID)
+		} else {
+			r.podNodeIDtoPodIDs[pod.PodNodeID] = mapset.NewSet(pod.ID)
+		}
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_POD,
+			ID:   pod.ID,
+		}
+		deviceIPs, ok := r.vpcIDToDeviceIPs[pod.VPCID]
+		if ok == false {
+			r.vpcIDToDeviceIPs[pod.VPCID] = make(map[TypeIDKey]mapset.Set)
+			r.vpcIDToDeviceIPs[pod.VPCID][typeIDKey] = mapset.NewSet()
+		} else {
+			deviceIPs[typeIDKey] = mapset.NewSet()
+		}
+
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServerID: pod.PodNodeID,
+			AZ:             pod.AZ,
+			VPCID:          pod.VPCID,
+			PodGroupID:     pod.PodGroupID,
+			PodClusterID:   pod.PodClusterID,
+			PodNodeID:      pod.PodNodeID,
+			PodID:          pod.ID,
+			Type:           VIF_DEVICE_TYPE_POD,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBVPC(dbDataCache *DBDataCache) {
+	vpcs := dbDataCache.GetVPCs()
+	if vpcs == nil {
+		return
+	}
+	for _, vpc := range vpcs {
+		r.idToVPC[vpc.ID] = vpc
+		r.vpcIDs.Add(vpc.ID)
+		r.tunnelIDs.Add(vpc.TunnelID)
+	}
+}
+
+func (r *PlatformRawData) ConvertDBIPs(dbDataCache *DBDataCache) {
+	wanIPs := dbDataCache.GetWANIPs()
+	for _, wanIP := range wanIPs {
+		r.vifIDsOfWANIP.Add(wanIP.VInterfaceID)
+		r.ipsOfWANIP.Add(wanIP.IP)
+		if _, ok := r.VInterfaceIDToWANIP[wanIP.VInterfaceID]; ok {
+			r.VInterfaceIDToWANIP[wanIP.VInterfaceID] = append(r.VInterfaceIDToWANIP[wanIP.VInterfaceID], wanIP)
+		} else {
+			r.VInterfaceIDToWANIP[wanIP.VInterfaceID] = []*models.WANIP{wanIP}
+		}
+
+		if wanIP.VInterfaceID == 0 {
+			r.noVInterfaceIDIPs = append(r.noVInterfaceIDIPs, &IPData{IP: wanIP.IP, Domain: wanIP.Domain})
+		} else {
+
+			ipReource := generateProtoIpResource(wanIP.IP, uint32(wanIP.Netmask), 0)
+			if _, ok := r.vInterfaceIDToIP[wanIP.VInterfaceID]; ok {
+				r.vInterfaceIDToIP[wanIP.VInterfaceID] = append(r.vInterfaceIDToIP[wanIP.VInterfaceID], ipReource)
+			} else {
+				r.vInterfaceIDToIP[wanIP.VInterfaceID] = []*trident.IpResource{ipReource}
+			}
+			sipReource := ipReource
+			if _, ok := r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID]; ok {
+				r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID] = append(r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID], sipReource)
+			} else {
+				r.vInterfaceIDToSimpleIP[wanIP.VInterfaceID] = []*trident.IpResource{sipReource}
+			}
+		}
+	}
+
+	lanIPs := dbDataCache.GetLANIPs()
+	for _, lanIP := range lanIPs {
+		r.vifIDsOfLANIP.Add(lanIP.VInterfaceID)
+		r.ipsOfLANIP.Add(lanIP.IP)
+		if _, ok := r.VInterfaceIDToLANIP[lanIP.VInterfaceID]; ok {
+			r.VInterfaceIDToLANIP[lanIP.VInterfaceID] = append(r.VInterfaceIDToLANIP[lanIP.VInterfaceID], lanIP)
+		} else {
+			r.VInterfaceIDToLANIP[lanIP.VInterfaceID] = []*models.LANIP{lanIP}
+		}
+
+		if lanIP.VInterfaceID == 0 {
+			r.noVInterfaceIDIPs = append(r.noVInterfaceIDIPs, &IPData{IP: lanIP.IP, Domain: lanIP.Domain})
+		} else {
+			ipReource := generateProtoIpResource(lanIP.IP, 0, uint32(lanIP.VInterfaceID))
+			if _, ok := r.vInterfaceIDToIP[lanIP.VInterfaceID]; ok {
+				r.vInterfaceIDToIP[lanIP.VInterfaceID] = append(r.vInterfaceIDToIP[lanIP.VInterfaceID], ipReource)
+			} else {
+				r.vInterfaceIDToIP[lanIP.VInterfaceID] = []*trident.IpResource{ipReource}
+			}
+
+			sipReource := generateProtoIpResource(lanIP.IP, 0, 0)
+			if _, ok := r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID]; ok {
+				r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID] = append(r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID], sipReource)
+			} else {
+				r.vInterfaceIDToSimpleIP[lanIP.VInterfaceID] = []*trident.IpResource{sipReource}
+			}
+		}
+	}
+
+	for _, device := range r.vpcIDToDeviceIPs {
+		for key, value := range device {
+			vInterfaceIDs, ok := r.deviceTypeAndIDToVInterfaceID[key]
+			if ok {
+				for _, vInterfaceID := range vInterfaceIDs {
+					lanIPs, ok := r.VInterfaceIDToLANIP[vInterfaceID]
+					if ok {
+						for _, lanIP := range lanIPs {
+							if strings.Contains(lanIP.IP, ":") {
+								value.Add(lanIP.IP + "/128")
+							} else {
+								value.Add(lanIP.IP + "/32")
+							}
+						}
+					}
+					wanIPs, ok := r.VInterfaceIDToWANIP[vInterfaceID]
+					if ok {
+						for _, wanIP := range wanIPs {
+							if strings.Contains(wanIP.IP, ":") {
+								value.Add(wanIP.IP + "/128")
+							} else {
+								value.Add(wanIP.IP + "/32")
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	floatingIPs := dbDataCache.GetFloatingIPs()
+	for _, fip := range floatingIPs {
+		r.vmIDsOfFIP.Add(fip.VMID)
+		r.floatingIPs[fip.ID] = &IPData{IP: fip.IP, VPCID: fip.VPCID, Domain: fip.Domain}
+		vmidFips, ok := r.vpcIDToVmidFips[fip.VPCID]
+		if ok == false {
+			r.vpcIDToVmidFips[fip.VPCID] = make(map[int][]string)
+			r.vpcIDToVmidFips[fip.VPCID][fip.VMID] = []string{fip.IP + "/32"}
+		} else {
+			if _, ok := vmidFips[fip.VMID]; ok {
+				vmidFips[fip.VMID] = append(vmidFips[fip.VMID], fip.IP+"/32")
+			} else {
+				vmidFips[fip.VMID] = []string{fip.IP + "/32"}
+			}
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertHost(dbDataCache *DBDataCache) {
+	hosts := dbDataCache.GetHostDevices()
+	if hosts == nil {
+		return
+	}
+	for _, host := range hosts {
+		r.idToHost[host.ID] = host
+		key := DomainIPKey{
+			Domain: host.Domain,
+			IP:     host.IP,
+		}
+		r.domainIpToHostID[key] = host.ID
+
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_HOST,
+			ID:   host.ID,
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   host.IP,
+			LaunchServerID: host.ID,
+			AZ:             host.AZ,
+			Type:           VIF_DEVICE_TYPE_HOST,
+		}
+		if host.Type == HOST_HTYPE_GATEWAY {
+			r.gatewayHostIDs = append(r.gatewayHostIDs, host.ID)
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBNetwork(dbDataCache *DBDataCache) {
+	networks := dbDataCache.GetNetworks()
+	for _, network := range networks {
+		r.idToNetwork[network.ID] = network
+	}
+
+	subnets := dbDataCache.GetSubnets()
+	for _, subnet := range subnets {
+		r.subnetPrefix = append(r.subnetPrefix, subnet.Prefix)
+		r.subnetMask = append(r.subnetMask, subnet.Netmask)
+		if _, ok := r.networkIDToSubnets[subnet.NetworkID]; ok {
+			r.networkIDToSubnets[subnet.NetworkID] = append(r.networkIDToSubnets[subnet.NetworkID], subnet)
+		} else {
+			r.networkIDToSubnets[subnet.NetworkID] = []*models.Subnet{subnet}
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBRegion(dbDataCache *DBDataCache) {
+	regions := dbDataCache.GetRegions()
+	for _, region := range regions {
+		r.uuidToRegion[region.Lcuuid] = region
+		r.regionUUIDs.Add(region.Lcuuid)
+	}
+}
+
+func (r *PlatformRawData) ConvertDBAZ(dbDataCache *DBDataCache) {
+	azs := dbDataCache.GetAZs()
+	if azs == nil {
+		return
+	}
+	for _, az := range azs {
+		r.uuidToAZ[az.Lcuuid] = az
+		r.azUUIDs.Add(az.Lcuuid)
+	}
+}
+
+func (r *PlatformRawData) ConvertDBPeerConnection(dbDataCache *DBDataCache) {
+	peerConnections := dbDataCache.GetPeerConnections()
+	if peerConnections == nil {
+		return
+	}
+	for _, pc := range peerConnections {
+		r.peerConnIDs.Add(pc.ID)
+	}
+}
+
+func (r *PlatformRawData) ConvertDBPodService(dbDataCache *DBDataCache) {
+	podServices := dbDataCache.GetPodServices()
+	if podServices == nil {
+		return
+	}
+	for _, ps := range podServices {
+		r.podServiceIDs.Add(ps.ID)
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_POD_SERVICE,
+			ID:   ps.ID,
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   "",
+			LaunchServerID: 0,
+			VPCID:          ps.VPCID,
+			AZ:             ps.AZ,
+			Type:           VIF_DEVICE_TYPE_POD_SERVICE,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBPodServicePort(dbDataCache *DBDataCache) {
+	podServicePorts := dbDataCache.GetPodServicePorts()
+	if podServicePorts == nil {
+		return
+	}
+	for _, psPort := range podServicePorts {
+		r.podServicePortIDs.Add(psPort.ID)
+		if ports, ok := r.podServiceIDToPorts[psPort.PodServiceID]; ok {
+			ports.Add(psPort)
+		} else {
+			r.podServiceIDToPorts[psPort.PodServiceID] = mapset.NewSet(psPort)
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBRedisInstance(dbDataCache *DBDataCache) {
+	redisInstances := dbDataCache.GetRedisInstances()
+	if redisInstances == nil {
+		return
+	}
+	for _, redisInstance := range redisInstances {
+		r.redisInstanceIDs.Add(redisInstance.ID)
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_REDIS_INSTANCE,
+			ID:   redisInstance.ID,
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   "",
+			LaunchServerID: 0,
+			AZ:             redisInstance.AZ,
+			VPCID:          redisInstance.VPCID,
+			Type:           VIF_DEVICE_TYPE_REDIS_INSTANCE,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBRdsInstance(dbDataCache *DBDataCache) {
+	rdsInstances := dbDataCache.GetRdsInstances()
+	if rdsInstances == nil {
+		return
+	}
+	for _, rdsInstance := range rdsInstances {
+		r.rdsInstanceIDs.Add(rdsInstance.ID)
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_RDS_INSTANCE,
+			ID:   rdsInstance.ID,
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   "",
+			LaunchServerID: 0,
+			AZ:             rdsInstance.AZ,
+			VPCID:          rdsInstance.VPCID,
+			Type:           VIF_DEVICE_TYPE_RDS_INSTANCE,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBPodNode(dbDataCache *DBDataCache) {
+	podNodes := dbDataCache.GetPodNodes()
+	if podNodes == nil {
+		return
+	}
+	for _, podNode := range podNodes {
+		r.podNodeIDs.Add(podNode.ID)
+		r.idToPodNode[podNode.ID] = podNode
+
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_POD_NODE,
+			ID:   podNode.ID,
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   "",
+			LaunchServerID: podNode.ID,
+			AZ:             podNode.AZ,
+			VPCID:          podNode.VPCID,
+			PodClusterID:   podNode.PodClusterID,
+			PodNodeID:      podNode.ID,
+			Type:           VIF_DEVICE_TYPE_POD_NODE,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBPodGroupPort(dbDataCache *DBDataCache) {
+	podGroupPorts := dbDataCache.GetPodGroupPorts()
+	if podGroupPorts == nil {
+		return
+	}
+	for _, podGroupPort := range podGroupPorts {
+		ports, ok := r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID]
+		if ok {
+			ports.Add(podGroupPort.ID)
+		} else {
+			r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID] = mapset.NewSet(podGroupPort.ID)
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBLB(dbDataCache *DBDataCache) {
+	lbs := dbDataCache.GetLBs()
+	if lbs == nil {
+		return
+	}
+	for _, lb := range lbs {
+		r.lbIDs.Add(lb.ID)
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_LB,
+			ID:   lb.ID,
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   "",
+			LaunchServerID: 0,
+			AZ:             "",
+			VPCID:          lb.VPCID,
+			Type:           VIF_DEVICE_TYPE_LB,
+		}
+	}
+}
+
+func (r *PlatformRawData) ConvertDBNat(dbDataCache *DBDataCache) {
+	nats := dbDataCache.GetNats()
+	if nats == nil {
+		return
+	}
+	for _, nat := range nats {
+		r.natIDs.Add(nat.ID)
+		typeIDKey := TypeIDKey{
+			Type: VIF_DEVICE_TYPE_NAT_GATEWAY,
+			ID:   nat.ID,
+		}
+		r.typeIDToDevice[typeIDKey] = &TypeIDData{
+			LaunchServer:   "",
+			LaunchServerID: 0,
+			AZ:             "",
+			VPCID:          nat.VPCID,
+			Type:           VIF_DEVICE_TYPE_NAT_GATEWAY,
+		}
+	}
+}
+
+func (r *PlatformRawData) GetPodNodeIDToVmID() map[int]int {
+	return r.podNodeIDToVmID
+}
+
+func (r *PlatformRawData) ConvertDBVmPodNodeConn(dbDataCache *DBDataCache) {
+	vmPodNodeConns := dbDataCache.GetVmPodNodeConns()
+	if vmPodNodeConns == nil {
+		return
+	}
+	for _, conn := range vmPodNodeConns {
+		r.vmIDToPodNodeID[conn.VMID] = conn.PodNodeID
+		r.podNodeIDToVmID[conn.PodNodeID] = conn.VMID
+	}
+}
+
+func (r *PlatformRawData) ConvertDBVipDomain(dbDataCache *DBDataCache) {
+	vipDomains := dbDataCache.GetVipDomains()
+	if vipDomains == nil {
+		return
+	}
+	for _, vipDomain := range vipDomains {
+		r.vipDomainLcuuids.Add(vipDomain.Lcuuid)
+	}
+}
+
+func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface) bool {
+	//TODO Check config
+	if vif == nil {
+		return false
+	}
+
+	switch vif.DeviceType {
+	case VIF_DEVICE_TYPE_LB:
+	case VIF_DEVICE_TYPE_NAT_GATEWAY:
+		if r.vipDomainLcuuids.Contains(vif.Domain) {
+			return true
+		}
+
+	default:
+		return false
+	}
+
+	return false
+}
+
+func (r *PlatformRawData) vInterfaceToProto(
+	vif *models.VInterface, device *TypeIDData, ipResourceData *IpResourceData) (*InterfaceProto, error) {
+
+	regionID := 0
+	if region, ok := r.uuidToRegion[vif.Region]; ok {
+		regionID = region.ID
+	}
+	azID := 0
+	if az, ok := r.uuidToAZ[device.AZ]; ok {
+		azID = az.ID
+	}
+	vpcID := 0
+	if vif.DeviceType != VIF_DEVICE_TYPE_HOST {
+		vpcID = device.VPCID
+	} else {
+		if vl2, ok := r.idToNetwork[vif.NetworkID]; ok {
+			vpcID = vl2.VPCID
+		} else {
+			errorInfo := fmt.Sprintf("VIF(id:%d) not found vl2(id:%d)", vif.ID, vif.NetworkID)
+			return nil, errors.New(errorInfo)
+		}
+	}
+	macU64, err := MacStrToU64(vif.Mac)
+	if err != nil {
+		log.Error(err, vif.Mac)
+	}
+	aInterface := &trident.Interface{
+		Id:             proto.Uint32(uint32(vif.ID)),
+		Mac:            proto.Uint64(macU64),
+		DeviceType:     proto.Uint32(uint32(vif.DeviceType)),
+		DeviceId:       proto.Uint32(uint32(vif.DeviceID)),
+		IfType:         proto.Uint32(uint32(vif.Type)),
+		EpcId:          proto.Uint32(uint32(vpcID)),
+		LaunchServer:   proto.String(device.LaunchServer),
+		LaunchServerId: proto.Uint32(uint32(device.LaunchServerID)),
+		IpResources:    ipResourceData.ipResources,
+		RegionId:       proto.Uint32(uint32(regionID)),
+		AzId:           proto.Uint32(uint32(azID)),
+		PodGroupId:     proto.Uint32(uint32(device.PodGroupID)),
+		PodNsId:        proto.Uint32(uint32(device.PodNamesapceID)),
+		PodClusterId:   proto.Uint32(uint32(device.PodClusterID)),
+		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
+		PodId:          proto.Uint32(uint32(device.PodID)),
+		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
+	}
+	sInterface := &trident.Interface{
+		Id:             proto.Uint32(uint32(vif.ID)),
+		Mac:            proto.Uint64(macU64),
+		DeviceType:     proto.Uint32(uint32(vif.DeviceType)),
+		EpcId:          proto.Uint32(uint32(vpcID)),
+		IfType:         proto.Uint32(uint32(vif.Type)),
+		IpResources:    ipResourceData.simpleIpResources,
+		RegionId:       proto.Uint32(uint32(regionID)),
+		PodClusterId:   proto.Uint32(uint32(device.PodClusterID)),
+		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
+		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
+	}
+
+	return &InterfaceProto{aInterface: aInterface, sInterface: sInterface}, nil
+}
+
+func (r *PlatformRawData) modifyInterfaceProto(
+	vif *models.VInterface, interfaceProto *InterfaceProto, device *TypeIDData) error {
+
+	aInterface := interfaceProto.aInterface
+	sInterface := interfaceProto.sInterface
+	switch vif.DeviceType {
+	case VIF_DEVICE_TYPE_POD:
+	case VIF_DEVICE_TYPE_POD_NODE:
+		if vmID, ok := r.podNodeIDToVmID[device.PodNodeID]; ok {
+			aInterface.DeviceType = proto.Uint32(uint32(VIF_DEVICE_TYPE_VM))
+			aInterface.DeviceId = proto.Uint32(uint32(vmID))
+			typeIDKey := TypeIDKey{
+				Type: VIF_DEVICE_TYPE_VM,
+				ID:   vmID,
+			}
+			vmDevice, ok := r.typeIDToDevice[typeIDKey]
+			if ok == false {
+				errorInfo := fmt.Sprintf("VIF (%s) not found vm", vif.Lcuuid)
+				return errors.New(errorInfo)
+			}
+			aInterface.LaunchServer = proto.String(vmDevice.LaunchServer)
+			aInterface.LaunchServerId = proto.Uint32(uint32(vmDevice.LaunchServerID))
+		} else {
+			aInterface.DeviceType = proto.Uint32(uint32(0))
+			aInterface.DeviceId = proto.Uint32(uint32(0))
+			aInterface.LaunchServer = proto.String("")
+			aInterface.LaunchServerId = proto.Uint32(uint32(0))
+		}
+	case VIF_DEVICE_TYPE_VM:
+		if PodNodeID, ok := r.vmIDToPodNodeID[vif.DeviceID]; ok {
+			typeIDKey := TypeIDKey{
+				Type: VIF_DEVICE_TYPE_POD_NODE,
+				ID:   PodNodeID,
+			}
+			podNodeDeivce, ok := r.typeIDToDevice[typeIDKey]
+			if ok == false {
+				errorInfo := fmt.Sprintf("VIF (%s) not found pod_node", vif.Lcuuid)
+				return errors.New(errorInfo)
+			}
+			sInterface.PodNodeId = proto.Uint32(uint32(PodNodeID))
+			sInterface.PodClusterId = proto.Uint32(uint32(podNodeDeivce.PodClusterID))
+			aInterface.PodNodeId = proto.Uint32(uint32(PodNodeID))
+			aInterface.PodClusterId = proto.Uint32(uint32(podNodeDeivce.PodClusterID))
+		}
+	}
+
+	return nil
+}
+
+func (r *PlatformRawData) generateIpResoureceData(
+	vif *models.VInterface, vifPubIps []string) (*IpResourceData, []string) {
+
+	ipResources := []*trident.IpResource{}
+	simpleIpResources := []*trident.IpResource{}
+	isVipInterface := false
+
+	// 云私有云中虚拟机上用于容器的hostnic网卡也会返回IP，在此将其忽略避免一个IP对应两块网卡
+	if vif.Name == "" || strings.HasPrefix(strings.ToLower(vif.Name), "hostnic") {
+		if ips, ok := r.vInterfaceIDToIP[vif.ID]; ok {
+			for _, ipResource := range ips {
+				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif)
+				ipResources = append(ipResources, ipResource)
+				if vif.Type == VIF_TYPE_WAN {
+					vifPubIps = append(vifPubIps, ipResource.GetIp())
+				}
+			}
+		}
+		if ips, ok := r.vInterfaceIDToSimpleIP[vif.ID]; ok {
+			for _, ipResource := range ips {
+				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif)
+				simpleIpResources = append(simpleIpResources, ipResource)
+			}
+		}
+	}
+
+	ipResourceData := &IpResourceData{
+		ipResources:       ipResources,
+		simpleIpResources: simpleIpResources,
+		isVipInterface:    isVipInterface,
+	}
+
+	return ipResourceData, vifPubIps
+}
+
+func (r *PlatformRawData) GetServerToVmIDs() map[string]mapset.Set {
+	return r.serverToVmIDs
+}
+
+func (r *PlatformRawData) GetVMIDToPodNodeID() map[int]int {
+	return r.vmIDToPodNodeID
+}
+
+func (r *PlatformRawData) GetPodNode(podNodeID int) *models.PodNode {
+	return r.idToPodNode[podNodeID]
+}
+
+func (r *PlatformRawData) equal(o *PlatformRawData) bool {
+	if !r.vmIDs.Equal(o.vmIDs) {
+		log.Info("platform vm changed")
+		return false
+	}
+
+	if !r.vRouterIDs.Equal(o.vRouterIDs) {
+		log.Info("platform vrouter changed")
+		return false
+	}
+
+	if !r.dhcpPortIDs.Equal(o.dhcpPortIDs) {
+		log.Info("platform dhcp_port changed")
+		return false
+	}
+	if !r.podIDs.Equal(o.podIDs) {
+		log.Info("platform pod changed")
+		return false
+	}
+
+	if len(r.idToNetwork) != len(o.idToNetwork) {
+		log.Info("platform network changed")
+		return false
+	} else {
+		for id, rnetwork := range r.idToNetwork {
+			if onetwork, ok := o.idToNetwork[id]; ok {
+				if rnetwork.NetType != onetwork.NetType {
+					log.Info("platform network changed")
+					return false
+				}
+			} else {
+				log.Info("platform network changed")
+				return false
+			}
+		}
+	}
+
+	if !SliceEqual[string](r.subnetPrefix, o.subnetPrefix) {
+		log.Info("platform subnet changed")
+		return false
+	}
+
+	if !SliceEqual[string](r.subnetMask, o.subnetMask) {
+		log.Info("platform subnet changed")
+		return false
+	}
+
+	if !r.vpcIDs.Equal(o.vpcIDs) {
+		log.Info("platform vpc changed")
+		return false
+	}
+
+	if !r.tunnelIDs.Equal(o.tunnelIDs) {
+		log.Info("platform vpc tunnel_id changed")
+		return false
+	}
+
+	if !r.vifIDsOfLANIP.Equal(o.vifIDsOfLANIP) {
+		log.Info("platform lan vifs changed")
+		return false
+	}
+
+	if !r.vifIDsOfWANIP.Equal(o.vifIDsOfWANIP) {
+		log.Info("platform wan vifs changed")
+		return false
+	}
+
+	if !r.ipsOfLANIP.Equal(o.ipsOfLANIP) {
+		log.Info("platform lan ips changed")
+		return false
+	}
+
+	if !r.ipsOfWANIP.Equal(o.ipsOfWANIP) {
+		log.Info("platform wan ips changed")
+		return false
+	}
+
+	if !r.vmIDsOfFIP.Equal(o.vmIDsOfFIP) {
+		log.Info("platform floating ips changed")
+		return false
+	}
+
+	if !r.regionUUIDs.Equal(o.regionUUIDs) {
+		log.Info("platform region changed")
+		return false
+	}
+
+	if !r.azUUIDs.Equal(o.azUUIDs) {
+		log.Info("platform az changed")
+		return false
+	}
+
+	if !r.peerConnIDs.Equal(o.peerConnIDs) {
+		log.Info("platform peer_connections changed")
+		return false
+	}
+
+	if len(r.serverToVmIDs) != len(o.serverToVmIDs) {
+		log.Info("platform vms launch_server changed")
+		return false
+	} else {
+		for server, vmIDs := range r.serverToVmIDs {
+			if ovmIDs, ok := o.serverToVmIDs[server]; ok {
+				if !vmIDs.Equal(ovmIDs) {
+					log.Info("platform vms launch_server changed")
+					return false
+				}
+			} else {
+				log.Info("platform vms launch_server changed")
+				return false
+			}
+		}
+	}
+
+	if len(r.floatingIPs) != len(o.floatingIPs) {
+		log.Info("platform floating_ip changed")
+		return false
+	} else {
+		for fID, fIP := range r.floatingIPs {
+			if ofIP, ok := o.floatingIPs[fID]; ok {
+				if *fIP != *ofIP {
+					log.Info("platform floating_ip changed")
+					return false
+				}
+			} else {
+				log.Info("platform floating_ip changed")
+				return false
+			}
+		}
+	}
+
+	if !r.podServiceIDs.Equal(o.podServiceIDs) {
+		log.Info("platform pod service changed")
+		return false
+	}
+
+	if !r.redisInstanceIDs.Equal(o.redisInstanceIDs) {
+		log.Info("platform redis instance changed")
+		return false
+	}
+
+	if !r.rdsInstanceIDs.Equal(o.rdsInstanceIDs) {
+		log.Info("platform rds instance changed")
+		return false
+	}
+
+	if !r.podNodeIDs.Equal(o.podNodeIDs) {
+		log.Info("platform pod node changed")
+		return false
+	}
+
+	if !r.lbIDs.Equal(o.lbIDs) {
+		log.Info("platform lb changed")
+		return false
+	}
+
+	if !r.natIDs.Equal(o.natIDs) {
+		log.Info("platform nat changed")
+		return false
+	}
+
+	if len(r.idToHost) != len(o.idToHost) {
+		log.Info("platform host_device changed")
+		return false
+	} else {
+		for id, rhost := range r.idToHost {
+			if ohost, ok := o.idToHost[id]; ok {
+				if rhost.HType != ohost.HType {
+					log.Info("platform host_device changed")
+					return false
+				}
+			} else {
+				log.Info("platform host_device changed")
+				return false
+			}
+		}
+	}
+
+	if !r.podServicePortIDs.Equal(o.podServicePortIDs) {
+		log.Info("platform pod service ports changed")
+		return false
+	}
+
+	if len(r.podServiceIDToPodGroupPorts) != len(o.podServiceIDToPodGroupPorts) {
+		log.Info("platform pod service pod group ports changed")
+		return false
+	} else {
+		for podServiceID, rpodGroupPorts := range r.podServiceIDToPodGroupPorts {
+			if opodGroupPorts, ok := o.podServiceIDToPodGroupPorts[podServiceID]; ok {
+				if !rpodGroupPorts.Equal(opodGroupPorts) {
+					log.Info("platform pod service pod group ports changed")
+					return false
+				}
+			} else {
+				log.Info("platform pod service pod group ports changed")
+				return false
+			}
+		}
+	}
+
+	if len(r.vmIDToPodNodeID) != len(o.vmIDToPodNodeID) {
+		log.Info("platform vm pod_node connection changed")
+		return false
+	} else {
+		for rvmID, rpodNodeID := range r.vmIDToPodNodeID {
+			if opodNodeID, ok := o.vmIDToPodNodeID[rvmID]; ok {
+				if rpodNodeID != opodNodeID {
+					log.Info("platform vm pod_node connection changed")
+					return false
+				}
+			} else {
+				log.Info("platform vm pod_node connection changed")
+				return false
+			}
+		}
+	}
+
+	if !r.vipDomainLcuuids.Equal(o.vipDomainLcuuids) {
+		log.Info("platform vip domains changed")
+		return false
+	}
+
+	return true
+}
