@@ -412,12 +412,14 @@ message PodIp {
     optional string pod_name = 2;
     optional uint32 epc_id = 3;
     optional string ip = 4;
+    optional uint32 pod_cluster_id = 5;
 }
 
 message VtapIp {
     optional uint32 vtap_id = 1;
     optional uint32 epc_id = 2;
     optional string ip = 3; // 采集器运行环境的IP
+    optional uint32 pod_cluster_id = 4;
 }
 
 message SyncResponse {
