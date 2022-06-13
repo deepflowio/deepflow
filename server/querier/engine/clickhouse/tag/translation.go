@@ -481,6 +481,16 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// 外部字段
+	tagResourceMap["external_tag"] = map[string]*Tag{
+		"default": NewTag(
+			"tag_values[indexOf(tag_names,'%s')]",
+			"",
+			"tag_values[indexOf(tag_names,'%s')] %s %v",
+			"%s(tag_values[indexOf(tag_names,'%s')],%v)",
+		),
+	}
+
 	// 采集点ID
 	tagResourceMap["tap_id"] = map[string]*Tag{
 		"default": NewTag(
@@ -497,6 +507,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE name %s %s)",
 			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE %s(name,%s))",
 		)}
+
 	// 响应码
 	tagResourceMap["response_code"] = map[string]*Tag{
 		"default": NewTag(

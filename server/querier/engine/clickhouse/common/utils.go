@@ -35,6 +35,10 @@ func ParseAlias(node sqlparser.SQLNode) string {
 	if strings.HasPrefix(alias, "label.") {
 		return fmt.Sprintf("`%s`", alias)
 	}
+	// 外部字段带上``
+	if strings.HasPrefix(alias, "tag.") {
+		return fmt.Sprintf("`%s`", alias)
+	}
 	return alias
 }
 

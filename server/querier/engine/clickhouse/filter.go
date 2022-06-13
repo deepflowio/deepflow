@@ -115,6 +115,26 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							}
 							return &view.Expr{Value: filter}, nil
 						}
+					} else if strings.HasPrefix(preAsTag, "tag.") {
+						tagItem, ok = tag.GetTag("external_tag", db, table, "default")
+						if ok {
+							nameNoPreffix := strings.TrimPrefix(preAsTag, "tag.")
+							switch strings.ToLower(op) {
+							case "regexp":
+								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value)
+							case "not regexp":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value) + ")"
+							case "not like":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "like", t.Value) + ")"
+							case "not in":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "in", t.Value) + ")"
+							case "!=":
+								filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "=", t.Value) + ")"
+							default:
+								filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, t.Value)
+							}
+							return &view.Expr{Value: filter}, nil
+						}
 					}
 					switch strings.ToLower(op) {
 					case "regexp":
@@ -168,6 +188,26 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value, nameNoPreffix) + ")"
 						default:
 							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, nameNoPreffix)
+						}
+						return &view.Expr{Value: filter}, nil
+					}
+				} else if strings.HasPrefix(t.Tag, "tag.") {
+					tagItem, ok = tag.GetTag("external_tag", db, table, "default")
+					if ok {
+						nameNoPreffix := strings.TrimPrefix(t.Tag, "tag.")
+						switch strings.ToLower(op) {
+						case "regexp":
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value)
+						case "not regexp":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value) + ")"
+						case "not like":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "like", t.Value) + ")"
+						case "not in":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "in", t.Value) + ")"
+						case "!=":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, "=", t.Value) + ")"
+						default:
+							filter = fmt.Sprintf(tagItem.WhereTranslator, nameNoPreffix, op, t.Value)
 						}
 						return &view.Expr{Value: filter}, nil
 					}

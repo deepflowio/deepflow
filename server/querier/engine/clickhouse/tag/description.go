@@ -220,6 +220,35 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 			"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
 		})
 	}
+	// TODO 新数据库增加后要支持
+	if db != "flow_log" || table != "l7_flow_log" {
+		return response, nil
+	}
+	// 查询外部字段
+	externalChClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       db,
+	}
+	err = externalChClient.Init("")
+	if err != nil {
+		return nil, err
+	}
+	externalSql := fmt.Sprintf("SELECT arrayJoin(tag_names) as tag_name FROM %s where time>(now()-1000) GROUP BY tag_name", table)
+	externalRst, err := externalChClient.DoQuery(externalSql, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, _tagName := range externalRst["values"] {
+		tagName := _tagName.([]interface{})[0]
+		externalTag := "tag." + tagName.(string)
+		response["values"] = append(response["values"], []interface{}{
+			externalTag, externalTag, externalTag, externalTag, "external_tag",
+			"外部字段", tagTypeToOperators["string"], []bool{true, true, true}, "",
+		})
+	}
 	return response, nil
 }
 
