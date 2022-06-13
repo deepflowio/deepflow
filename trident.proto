@@ -44,6 +44,8 @@ enum Exception {
     CONTROLLER_SOCKET_ERROR    = 32768;
     ANALYZER_SOCKET_ERROR      = 65536;
     NPB_SOCKET_ERROR           = 131072;
+    // 2^31及以下由采集器使用，采集器最大可用异常是2^31，顺序从前往后
+    // 2^32及以上由控制器使用，顺序从后往前
 }
 
 message CommunicationVtap {
