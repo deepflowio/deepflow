@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gorm.io/gorm"
@@ -55,6 +56,7 @@ type VTapInfo struct {
 	domainIdToLcuuid               map[int]string
 	lcuuidToPodClusterID           map[string]int
 	lcuuidToVPCID                  map[string]int
+	hostIDToVPCID                  map[int]int
 	hypervNetworkHostIds           mapset.Set
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
 	vtapLcuuidToConfigFile         map[string]*models.VTapConfigFile
@@ -90,6 +92,8 @@ type VTapInfo struct {
 	db               *gorm.DB
 	region           *string
 	defaultVTapGroup *string
+
+	vTapIPs *atomic.Value // []*trident.VtapIp
 }
 
 func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *VTapInfo {
@@ -104,6 +108,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		domainIdToLcuuid:               make(map[int]string),
 		lcuuidToPodClusterID:           make(map[string]int),
 		lcuuidToVPCID:                  make(map[string]int),
+		hostIDToVPCID:                  make(map[int]int),
 		hypervNetworkHostIds:           mapset.NewSet(),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
 		vtapLcuuidToConfigFile:         make(map[string]*models.VTapConfigFile),
@@ -121,6 +126,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		chRegisterSuccess:              make(chan struct{}, 1),
 		db:                             db,
 		config:                         cfg,
+		vTapIPs:                        &atomic.Value{},
 	}
 }
 
@@ -165,6 +171,7 @@ func (v *VTapInfo) UpdateVTapCache(key string, vtap *models.VTap) {
 
 func (v *VTapInfo) loadRegion() string {
 	if len(v.config.MasterControllerNetIPs) == 0 {
+		log.Error("master-controller-ips is empty")
 		return ""
 	}
 	ctrlIP := ""
@@ -236,10 +243,25 @@ func (v *VTapInfo) loadDeviceData() {
 	lcuuidToPodClusterID := make(map[string]int)
 	dbDataCache := v.metaData.GetDBDataCache()
 	hostDevices := dbDataCache.GetHostDevices()
+	rawData := v.metaData.GetPlatformDataOP().GetRawData()
+	hostIDToVifs := rawData.GetHostIDToVifs()
+	idToNetwork := rawData.GetIDToNetwork()
+	hostIDToVPCID := make(map[int]int)
 	if hostDevices != nil {
 		for _, hostDevice := range hostDevices {
 			if hostDevice.Type == HOST_HTYPE_GATEWAY && hostDevice.HType == HOST_HTYPE_HYPER_V {
 				hypervNetworkHostIds.Add(hostDevice.ID)
+			}
+			vifs, ok := hostIDToVifs[hostDevice.ID]
+			if ok == false {
+				continue
+			}
+			for vif := range vifs.Iter() {
+				hVif := vif.(*models.VInterface)
+				if network, ok := idToNetwork[hVif.NetworkID]; ok {
+					hostIDToVPCID[hostDevice.ID] = network.VPCID
+					break
+				}
 			}
 		}
 	}
@@ -260,6 +282,7 @@ func (v *VTapInfo) loadDeviceData() {
 	v.lcuuidToVPCID = lcuuidToVPCID
 	v.hypervNetworkHostIds = hypervNetworkHostIds
 	v.lcuuidToPodClusterID = lcuuidToPodClusterID
+	v.hostIDToVPCID = hostIDToVPCID
 }
 
 func (v *VTapInfo) loadTapPortsData() {
@@ -556,10 +579,44 @@ func (v *VTapInfo) GetKvmVTapCache(key string) *VTapCache {
 	return v.kvmVTapCaches.Get(key)
 }
 
+func (v *VTapInfo) GetVTapIPs() []*trident.VtapIp {
+	result, ok := v.vTapIPs.Load().([]*trident.VtapIp)
+	if ok {
+		return result
+	}
+	return nil
+}
+
+func (v *VTapInfo) updateVTapIPs(data []*trident.VtapIp) {
+	v.vTapIPs.Store(data)
+}
+
+func (v *VTapInfo) generateVTapIP() {
+	vTapIPs := make([]*trident.VtapIp, 0, v.vTapCaches.GetCount())
+	cacheKeys := v.vTapCaches.List()
+	for _, cacheKey := range cacheKeys {
+		cacheVTap := v.GetVTapCache(cacheKey)
+		if cacheVTap == nil {
+			continue
+		}
+
+		data := &trident.VtapIp{
+			VtapId:       proto.Uint32(cacheVTap.GetVTapID()),
+			EpcId:        proto.Uint32(uint32(cacheVTap.GetVPCID())),
+			Ip:           proto.String(cacheVTap.GetLaunchServer()),
+			PodClusterId: proto.Uint32(uint32(cacheVTap.GetPodClusterID())),
+		}
+		vTapIPs = append(vTapIPs, data)
+	}
+	log.Debug(vTapIPs)
+	v.updateVTapIPs(vTapIPs)
+}
+
 func (v *VTapInfo) GenerateVTapCache() {
 	v.loadBaseData()
 	v.updateVTapInfo()
 	v.updateCacheToDB()
+	v.generateVTapIP()
 }
 
 func (v *VTapInfo) UpdateTSDBVTapInfo(cVTaps []*trident.CommunicationVtap, tsdbIP string) {
@@ -617,6 +674,7 @@ func (v *VTapInfo) InitData() {
 	log.Info("init generate all vtap platform data")
 	// 最后生成romote segment
 	v.generateAllVTapRemoteSegements()
+	v.generateVTapIP()
 	v.isReady.Set()
 }
 

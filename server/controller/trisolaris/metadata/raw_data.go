@@ -1007,8 +1007,7 @@ func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface) bool {
 	}
 
 	switch vif.DeviceType {
-	case VIF_DEVICE_TYPE_LB:
-	case VIF_DEVICE_TYPE_NAT_GATEWAY:
+	case VIF_DEVICE_TYPE_LB, VIF_DEVICE_TYPE_NAT_GATEWAY:
 		if r.vipDomainLcuuids.Contains(vif.Domain) {
 			return true
 		}
@@ -1087,8 +1086,7 @@ func (r *PlatformRawData) modifyInterfaceProto(
 	aInterface := interfaceProto.aInterface
 	sInterface := interfaceProto.sInterface
 	switch vif.DeviceType {
-	case VIF_DEVICE_TYPE_POD:
-	case VIF_DEVICE_TYPE_POD_NODE:
+	case VIF_DEVICE_TYPE_POD, VIF_DEVICE_TYPE_POD_NODE:
 		if vmID, ok := r.podNodeIDToVmID[device.PodNodeID]; ok {
 			aInterface.DeviceType = proto.Uint32(uint32(VIF_DEVICE_TYPE_VM))
 			aInterface.DeviceId = proto.Uint32(uint32(vmID))
@@ -1163,6 +1161,14 @@ func (r *PlatformRawData) generateIpResoureceData(
 	}
 
 	return ipResourceData, vifPubIps
+}
+
+func (r *PlatformRawData) GetIDToNetwork() map[int]*models.Network {
+	return r.idToNetwork
+}
+
+func (r *PlatformRawData) GetHostIDToVifs() map[int]mapset.Set {
+	return r.hostIDToVifs
 }
 
 func (r *PlatformRawData) GetServerToVmIDs() map[string]mapset.Set {

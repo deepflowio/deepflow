@@ -157,7 +157,7 @@ type VTapCache struct {
 	controllerSyncFlag atomicbool.Bool // bool
 	tsdbSyncFlag       atomicbool.Bool // bool
 	// 容器类型采集器所在容器集群ID
-	PodClusterID int
+	podClusterID int
 	// 采集器所属epc
 	VPCID int
 	// 采集器平台数据
@@ -222,7 +222,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	//vTapCache.VersionGroups = 0
 	vTapCache.controllerSyncFlag = atomicbool.NewBool(false)
 	vTapCache.tsdbSyncFlag = atomicbool.NewBool(false)
-	vTapCache.PodClusterID = 0
+	vTapCache.podClusterID = 0
 	vTapCache.VPCID = 0
 	vTapCache.PlatformData = &atomic.Value{}
 	vTapCache.configFile = &VTapConfigFile{}
@@ -304,7 +304,7 @@ func (c *VTapCache) getPodDomains() []string {
 }
 
 func (c *VTapCache) GetPodClusterID() int {
-	return c.PodClusterID
+	return c.podClusterID
 }
 
 func (c *VTapCache) GetVPCID() int {
@@ -589,21 +589,30 @@ func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
 	}
 	vTapType := c.GetVTapType()
 	if vTapType == VTAP_TYPE_POD_HOST || vTapType == VTAP_TYPE_POD_VM {
-		c.PodClusterID, ok = v.lcuuidToPodClusterID[c.GetLcuuid()]
+		c.podClusterID, ok = v.lcuuidToPodClusterID[c.GetLcuuid()]
 		if ok == false {
 			log.Errorf("vtap(%s) not found podClusterID", c.GetVTapHost())
 		}
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {
-			log.Errorf("vtap(%s) not found epcID", c.GetVTapHost())
+			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
 		}
 	} else if vTapType == VTAP_TYPE_WORKLOAD_V || vTapType == VTAP_TYPE_WORKLOAD_P {
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {
-			log.Errorf("vtap(%s) not found epcID", c.GetVTapHost())
+			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
 		}
 	} else if vTapType == VTAP_TYPE_HYPER_V && v.hypervNetworkHostIds.Contains(c.GetLaunchServerID()) {
 		c.vTapType = VTAP_TYPE_HYPER_V_NETWORK
+		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
+		if ok == false {
+			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
+		}
+	} else if vTapType == VTAP_TYPE_KVM || vTapType == VTAP_TYPE_HYPER_V {
+		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
+		if ok == false {
+			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
+		}
 	}
 }
 
@@ -776,10 +785,16 @@ func (c *VTapCache) GetVTapConfig() *VTapConfig {
 }
 
 func (c *VTapCache) updateVTapConfig(cfg *VTapConfig) {
+	if cfg == nil {
+		return
+	}
 	c.config.Store(cfg)
 }
 
 func (c *VTapCache) setVTapPlatformData(d *metadata.PlatformData) {
+	if d == nil {
+		return
+	}
 	c.PlatformData.Store(d)
 }
 
@@ -839,6 +854,12 @@ func (m *VTapCacheMap) Get(key string) *VTapCache {
 	}
 
 	return nil
+}
+
+func (m *VTapCacheMap) GetCount() int {
+	m.RLock()
+	defer m.RUnlock()
+	return len(m.keyToVTapCache)
 }
 
 func (m *VTapCacheMap) GetKeySet() mapset.Set {

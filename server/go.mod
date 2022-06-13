@@ -30,7 +30,7 @@ require (
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220606071004-82c00921b869
 	gitlab.yunshan.net/yunshan/metaflow/libs v0.0.0-20220610075242-25d9b52a957c
-	gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220610075242-25d9b52a957c
+	gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220613080027-38f930959a19
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	google.golang.org/grpc v1.47.0
 	gopkg.in/yaml.v2 v2.4.0

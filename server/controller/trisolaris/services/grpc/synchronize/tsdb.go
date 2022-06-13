@@ -43,6 +43,7 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 			processName)
 	}
 
+	vTapInfo := trisolaris.GetGVTapInfo()
 	// 只有roze进入数据节点注册流程，其他节点直接返回数据
 	if processName == TSDB_PROCESS_NAME {
 		log.Infof(
@@ -61,7 +62,6 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 			}, nil
 		}
 		if in.GetCommunicationVtaps() != nil {
-			vTapInfo := trisolaris.GetGVTapInfo()
 			vTapInfo.UpdateTSDBVTapInfo(in.GetCommunicationVtaps(), tsdbIP)
 			pcapDataMountPath := ""
 			tsdbReportInfo := in.GetTsdbReportInfo()
@@ -85,10 +85,14 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 		platformData = nodeInfo.GetPlatformDataStr()
 	}
 	groups := nodeInfo.GetGroups()
+	podIPs := nodeInfo.GetPodIPs()
+	vTapIPs := vTapInfo.GetVTapIPs()
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		PlatformData:        platformData,
 		Groups:              groups,
+		PodIps:              podIPs,
+		VtapIps:             vTapIPs,
 		VersionPlatformData: proto.Uint64(uint64(versionPlatformData)),
 		Config:              configure,
 	}, nil
@@ -118,10 +122,14 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		platformData = nodeInfo.GetPlatformDataStr()
 	}
 	groups := nodeInfo.GetGroups()
+	podIPs := nodeInfo.GetPodIPs()
+	vTapIPs := trisolaris.GetGVTapInfo().GetVTapIPs()
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		PlatformData:        platformData,
 		Groups:              groups,
+		PodIps:              podIPs,
+		VtapIps:             vTapIPs,
 		VersionPlatformData: proto.Uint64(uint64(versionPlatformData)),
 		Config:              configure,
 	}, nil

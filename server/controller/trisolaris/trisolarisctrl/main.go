@@ -77,6 +77,13 @@ func regiterCommand() []*cobra.Command {
 			initCmd([]CmdExecute{segments})
 		},
 	}
+	vpcIPCmd := &cobra.Command{
+		Use:   "vpcIP",
+		Short: "get vpcIP from controller",
+		Run: func(cmd *cobra.Command, args []string) {
+			initCmd([]CmdExecute{vpcIP})
+		},
+	}
 	configCmd := &cobra.Command{
 		Use:   "config",
 		Short: "get config from controller",
@@ -95,12 +102,12 @@ func regiterCommand() []*cobra.Command {
 		Use:   "all",
 		Short: "get all data from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, configData})
+			initCmd([]CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, vpcIP, configData})
 		},
 	}
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
-		tapTypesCmd, configCmd, segmentsCmd, configFileCmd, allCmd}
+		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, configFileCmd, allCmd}
 	return commands
 }
 
@@ -128,8 +135,7 @@ func initCmd(cmds []CmdExecute) {
 	defer conn.Close()
 	var name string
 	switch paramData.Type {
-	case "trident":
-	case "analyzer":
+	case "trident", "analyzer":
 		name = paramData.Type
 	default:
 		fmt.Printf("type(%s) muste be in [trident, analyzer]", paramData.Type)
@@ -142,7 +148,12 @@ func initCmd(cmds []CmdExecute) {
 		CtrlMac:     &paramData.CtrlMac,
 		ProcessName: &name,
 	}
-	response, err := c.Sync(context.Background(), reqData)
+	var response *trident.SyncResponse
+	if paramData.Type == "trident" {
+		response, err = c.Sync(context.Background(), reqData)
+	} else {
+		response, err = c.AnalyzerSync(context.Background(), reqData)
+	}
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -259,7 +270,17 @@ func segments(response *trident.SyncResponse) {
 	for index, remoteSegment := range remoteSegments {
 		JsonFormat(index+1, remoteSegment)
 	}
+}
 
+func vpcIP(response *trident.SyncResponse) {
+	fmt.Println("vtap_ip:")
+	for index, vtapIP := range response.GetVtapIps() {
+		JsonFormat(index+1, vtapIP)
+	}
+	fmt.Println("pod_ip:")
+	for index, podIP := range response.GetPodIps() {
+		JsonFormat(index+1, podIP)
+	}
 }
 
 func configFile(response *trident.SyncResponse) {

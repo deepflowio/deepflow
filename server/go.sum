@@ -286,8 +286,8 @@ gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220606071004-82c00921b869/go.mo
 gitlab.yunshan.net/yunshan/message v0.0.0-20220527022829-738c4c149bc1/go.mod h1:ewhcn9CoC6hetqkwq2oOZL8KmzRPQ4hUokN0YTVBk8M=
 gitlab.yunshan.net/yunshan/metaflow/libs v0.0.0-20220610075242-25d9b52a957c h1:kQ4liL12IEahY1y3o7sxdvlI/6Ml6qLMFq03p/b244Q=
 gitlab.yunshan.net/yunshan/metaflow/libs v0.0.0-20220610075242-25d9b52a957c/go.mod h1:6GLkGcuRBM/kXh30oT/m19BSqqV1G9CZzqujM0fzqYI=
-gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220610075242-25d9b52a957c h1:rNyAyrUWPqCBvxAz4Maj2THNw7nFrGpcBQGy7PNj+IE=
-gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220610075242-25d9b52a957c/go.mod h1:BpQMjdtidzlnJ1U+wio/h29ZBkmkxNgQeSGZzHTf0oI=
+gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220613080027-38f930959a19 h1:kthvvM5kwn3KX9NDQU7+5z6WMqxVaxRKBBZ5vZaZ3tY=
+gitlab.yunshan.net/yunshan/metaflow/message v0.0.0-20220613080027-38f930959a19/go.mod h1:BpQMjdtidzlnJ1U+wio/h29ZBkmkxNgQeSGZzHTf0oI=
 go.opentelemetry.io/otel v1.7.0 h1:Z2lA3Tdch0iDcrhJXDIlC94XE+bxok1F9B+4Lz/lGsM=
 go.opentelemetry.io/otel v1.7.0/go.mod h1:5BdUoMIz5WEs0vt0CUEMtSSaTSHBBVwrhnz7+nrD5xk=
 go.opentelemetry.io/otel/trace v1.7.0 h1:O37Iogk1lEkMRXewVtZ1BBTVn5JEp8GrJvP92bJqC6o=

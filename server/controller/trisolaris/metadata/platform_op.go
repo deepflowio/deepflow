@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	. "server/controller/common"
+	models "server/controller/db/mysql"
 	. "server/controller/trisolaris/common"
 	. "server/controller/trisolaris/utils"
 )
@@ -34,6 +35,8 @@ type PlatformDataOP struct {
 	metaData *MetaData
 
 	*Segment
+
+	podIPs *atomic.Value // []*trident.PodIp
 }
 
 func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
@@ -63,6 +66,7 @@ func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
 		chDataChanged:        make(chan struct{}, 1),
 		Segment:              newSegment(),
 		metaData:             metaData,
+		podIPs:               &atomic.Value{},
 	}
 }
 
@@ -323,7 +327,6 @@ func (p *PlatformDataOP) generateSkipAllSimplePlatformData() {
 	if !p.serverToSkipAllSimplePlatformData.checkVersion(serverToSkipAllSimplePlatformData) {
 		p.updateServerToSkipAllSimplePlatformData(serverToSkipAllSimplePlatformData)
 	}
-	log.Info(p.serverToSkipAllSimplePlatformData)
 
 	// 生成简化数据，不包括pod
 	aSPDExceptPod := NewPlatformData("", "", 0, ALL_SIMPLE_PLATFORM_DATA_EXCEPT_POD)
@@ -436,7 +439,48 @@ func (p *PlatformDataOP) generateDomainPlatformData() {
 	if !p.GetDomainToPlatformDataOnlyPod().checkVersion(dToPDOnlyPod) {
 		p.updateDomainToPlatformDataOnlyPod(dToPDOnlyPod)
 	}
+}
 
+func (p *PlatformDataOP) GetPodIPs() []*trident.PodIp {
+	reuslt, ok := p.podIPs.Load().([]*trident.PodIp)
+	if ok {
+		return reuslt
+	}
+	return nil
+}
+
+func (p *PlatformDataOP) updatePodIPs(podIPs []*trident.PodIp) {
+	p.podIPs.Store(podIPs)
+}
+
+func (p *PlatformDataOP) generatePodIPS() {
+	rawData := p.GetRawData()
+	pods := p.metaData.GetDBDataCache().GetPods()
+	podIPs := make([]*trident.PodIp, 0, len(pods))
+	for _, pod := range pods {
+		vifs, ok := rawData.podIDToVifs[pod.ID]
+		if ok == false {
+			continue
+		}
+		for vif := range vifs.Iter() {
+			podVif := vif.(*models.VInterface)
+			ips, ok := rawData.vInterfaceIDToIP[podVif.ID]
+			if ok == false || len(ips) == 0 {
+				continue
+			}
+			data := &trident.PodIp{
+				PodId:        proto.Uint32(uint32(pod.ID)),
+				PodName:      proto.String(pod.Name),
+				EpcId:        proto.Uint32(uint32(pod.VPCID)),
+				Ip:           proto.String(ips[0].GetIp()),
+				PodClusterId: proto.Uint32(uint32(pod.PodClusterID)),
+			}
+			podIPs = append(podIPs, data)
+			break
+		}
+	}
+	log.Debug(podIPs)
+	p.updatePodIPs(podIPs)
 }
 
 func (p *PlatformDataOP) generateSkipDomainPlatformData() {
@@ -571,6 +615,7 @@ func (p *PlatformDataOP) generateBasePlatformData() {
 	p.generateSkipAllSimplePlatformData()
 	p.generateDomainPlatformData()
 	p.generateSkipDomainPlatformData()
+	p.generatePodIPS()
 	elapsed := time.Since(start)
 	log.Info("generate platform data cost:", elapsed)
 }

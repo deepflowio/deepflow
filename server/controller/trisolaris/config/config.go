@@ -36,7 +36,7 @@ type Config struct {
 	ClearKubernetesTime      int      `default:"600" yaml:"clear-kubernetes-time"`
 	MasterControllerNetIPs   []net.IP
 	VTapCacheRefreshInterval int  `default:"300" yaml:"vtapcache-refresh-interval"`
-	MetaDataRefreshInterval  int  `default:"60" yaml:"meatadata-refresh-interval"`
+	MetaDataRefreshInterval  int  `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval      int  `default:"60" yaml:"node-refresh-interval"`
 	VTapAutoRegister         bool `default:"true" yaml:"vtap-auto-register"`
 }
@@ -50,4 +50,7 @@ func (c *Config) Convert() {
 		}
 	}
 	c.MasterControllerNetIPs = controllers
+	if len(c.MasterControllerNetIPs) == 0 {
+		log.Error("yaml: master-controller-ips is not configured")
+	}
 }

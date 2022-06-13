@@ -74,6 +74,10 @@ func (n *NodeInfo) GetPlatformDataStr() []byte {
 	return n.metaData.GetPlatformDataOP().GetDropletPlatforDataStr()
 }
 
+func (n *NodeInfo) GetPodIPs() []*trident.PodIp {
+	return n.metaData.GetPlatformDataOP().GetPodIPs()
+}
+
 func (n *NodeInfo) updateTSDBSyncedToDB() {
 	log.Info("update tsdb info to db")
 	dbTSDBs, err := dbmgr.DBMgr[models.Analyzer](n.db).Gets()
