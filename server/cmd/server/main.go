@@ -6,6 +6,8 @@ import (
 )
 
 func main() {
+	go func() {
+		querier.Start()
+	}()
 	controller.Start()
-	querier.Start()
 }
