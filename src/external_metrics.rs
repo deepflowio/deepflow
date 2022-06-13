@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use arc_swap::access::Access;
 use flate2::read::GzDecoder;
 use http::header::CONTENT_ENCODING;
+use http::HeaderMap;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{
     body::{aggregate, Buf},
@@ -38,6 +39,49 @@ impl OpenTelemetry {
     }
 }
 
+/// Prometheus metrics, 格式是snappy压缩的pb数据
+/// 可以参考https://github.com/prometheus/prometheus/tree/main/documentation/examples/remote_storage/example_write_adapter来解析
+#[derive(Debug, PartialEq)]
+pub struct PrometheusMetric(Vec<u8>);
+
+impl PrometheusMetric {
+    pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let length = self.0.len();
+        buf.append(&mut self.0);
+        Ok(length)
+    }
+}
+
+/// Telegraf metric， 是influxDB标准行协议的UTF8编码的文本数据
+#[derive(Debug, PartialEq)]
+pub struct TelegrafMetric(String);
+
+impl TelegrafMetric {
+    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        buf.extend_from_slice(self.0.as_bytes());
+        Ok(self.0.len())
+    }
+}
+
+fn decode_metric(mut whole_body: impl Buf, headers: &HeaderMap) -> Result<Vec<u8>, GenericError> {
+    let metric = if headers
+        .get(CONTENT_ENCODING)
+        .filter(|&v| v == GZIP)
+        .is_some()
+    {
+        let mut metric = vec![];
+        let mut gz = GzDecoder::new(whole_body.reader());
+        gz.read_to_end(&mut metric)?;
+        metric
+    } else {
+        let mut metric = vec![0u8; whole_body.remaining()];
+        whole_body.copy_to_slice(metric.as_mut_slice());
+        metric
+    };
+
+    Ok(metric)
+}
+
 /// 接收metric server发送的请求，根据路由处理分发
 async fn handler(
     req: Request<Body>,
@@ -45,35 +89,47 @@ async fn handler(
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
-            let doc_str = include_str!("../resources/doc/external_metrics.html");
+            let doc_bytes = include_bytes!("../resources/doc/external_metrics.pdf");
             Ok(Response::builder()
-                .header("Content-Type", "text/html")
-                .body(doc_str.into())
+                .header("Content-Type", "application/pdf")
+                .body(doc_bytes.as_slice().into())
                 .unwrap())
         }
         // OpenTelemetry trace数据接口
         (&Method::POST, "/api/v1/otel/trace") => {
             let (part, body) = req.into_parts();
-            let mut whole_body = aggregate(body).await?;
+            let whole_body = aggregate(body).await?;
 
-            let tracing_data = if part
-                .headers
-                .get(CONTENT_ENCODING)
-                .filter(|&v| v == GZIP)
-                .is_some()
-            {
-                let mut tracing_data = vec![];
-                let mut gz = GzDecoder::new(whole_body.reader());
-                gz.read_to_end(&mut tracing_data)?;
-                tracing_data
-            } else {
-                let mut tracing_data = vec![0u8; whole_body.remaining()];
-                whole_body.copy_to_slice(tracing_data.as_mut_slice());
-                tracing_data
-            };
-
+            let tracing_data = decode_metric(whole_body, &part.headers)?;
             if let Err(Error::Terminated(..)) =
                 sender.send(SendItem::ExternalOtel(OpenTelemetry(tracing_data)))
+            {
+                warn!("sender queue has terminated");
+            }
+            Ok(Response::builder().body(Body::empty()).unwrap())
+        }
+        // Prometheus数据接口
+        (&Method::POST, "/api/v1/prometheus") => {
+            let mut whole_body = aggregate(req.into_body()).await?;
+            let mut metric = vec![0u8; whole_body.remaining()];
+            whole_body.copy_to_slice(metric.as_mut_slice());
+
+            if let Err(Error::Terminated(..)) =
+                sender.send(SendItem::ExternalProm(PrometheusMetric(metric)))
+            {
+                warn!("sender queue has terminated");
+            }
+
+            Ok(Response::builder().body(Body::empty()).unwrap())
+        }
+        // Telegraf数据接口
+        (&Method::POST, "/api/v1/telegraf") => {
+            let (part, body) = req.into_parts();
+            let whole_body = aggregate(body).await?;
+
+            let metric = String::from_utf8(decode_metric(whole_body, &part.headers)?)?;
+            if let Err(Error::Terminated(..)) =
+                sender.send(SendItem::ExternalTelegraf(TelegrafMetric(metric)))
             {
                 warn!("sender queue has terminated");
             }
