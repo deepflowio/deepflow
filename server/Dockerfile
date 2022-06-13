@@ -6,6 +6,7 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 RUN apk add tzdata
 
 COPY ./server.yaml /etc/
+COPY ./querier/db_descriptions /etc/db_descriptions/
 ARG TARGETARCH 
 
 RUN --mount=target=/tmp-mount \
