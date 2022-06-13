@@ -43,6 +43,7 @@ enum Exception {
     LOG_FILE_EXCEEDED          = 16384;
     CONTROLLER_SOCKET_ERROR    = 32768;
     ANALYZER_SOCKET_ERROR      = 65536;
+    NPB_SOCKET_ERROR           = 131072;
 }
 
 message CommunicationVtap {
