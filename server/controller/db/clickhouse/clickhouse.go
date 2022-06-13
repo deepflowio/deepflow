@@ -2,9 +2,7 @@ package clickhouse
 
 import (
 	"fmt"
-	"strconv"
 
-	_ "github.com/ClickHouse/clickhouse-go"
 	"github.com/jmoiron/sqlx"
 	"github.com/op/go-logging"
 )
@@ -22,8 +20,10 @@ type ClickHouseConfig struct {
 }
 
 func Connect(cfg ClickHouseConfig) (*sqlx.DB, error) {
-	portStr := strconv.Itoa(int(cfg.Port))
-	Db, err := sqlx.Open("clickhouse", fmt.Sprintf("tcp://%s:%s?username=%s&password=%s", cfg.Host, portStr, cfg.UserName, cfg.UserPassword))
+	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s", cfg.UserName, cfg.UserPassword, cfg.Host, cfg.Port, cfg.Database)
+	Db, err := sqlx.Open(
+		"clickhouse", url,
+	)
 	if err != nil {
 		log.Error(err)
 		return nil, err

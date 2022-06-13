@@ -1,7 +1,7 @@
 package querier
 
 import (
-	"flag"
+	//"flag"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
@@ -16,15 +16,18 @@ import (
 )
 
 var log = logging.MustGetLogger("querier")
-var configPath = flag.String("f", "/etc/server.yaml", "specify config file location")
+
+//var configPath = flag.String("f", "/etc/server.yaml", "specify config file location")
+var configPath = "/etc/server.yaml"
 
 type Controller struct{}
 
 func Start() {
-	flag.Parse()
+	//flag.Parse()
 	// 加载配置文件
 	ServerCfg := config.DefaultConfig()
-	ServerCfg.Load(*configPath)
+	//ServerCfg.Load(*configPath)
+	ServerCfg.Load(configPath)
 	config.Cfg = &ServerCfg.QuerierConfig
 	cfg := ServerCfg.QuerierConfig
 	logger.EnableFileLog(cfg.LogFile)
