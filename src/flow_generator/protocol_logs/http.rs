@@ -441,6 +441,7 @@ impl HttpLog {
                 self.info.resp_content_length = content_length;
             }
             self.info.version = String::from("2");
+            self.info.stream_id = httpv2_header.stream_id;
             self.proto = L7Protocol::Http2;
             return Ok(());
         }
@@ -549,11 +550,16 @@ impl Httpv2Headers {
             return Err(Error::HttpHeaderParseFailed);
         }
 
-        self.frame_length = read_u32_be(&payload) >> 8;
+        let stream_id = read_u32_be(&payload[5..]);
+        if stream_id & 0x80000000 != 0 {
+            return Err(Error::HttpHeaderParseFailed);
+        }
 
+        self.frame_length = read_u32_be(&payload) >> 8;
         self.frame_type = frame_type;
         self.flags = payload[4];
-        self.stream_id = read_u32_be(&payload[5..]);
+        self.stream_id = stream_id;
+
         Ok(())
     }
 }
@@ -701,7 +707,7 @@ mod tests {
         let files = vec![
             ("httpv1.pcap", "httpv1.result"),
             ("sw8.pcap", "sw8.result"),
-            //("h2c_ascii.pcap", "h2c_ascii.result"),
+            ("h2c_ascii.pcap", "h2c_ascii.result"),
         ];
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
