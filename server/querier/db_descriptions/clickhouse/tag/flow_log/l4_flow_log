@@ -53,7 +53,7 @@ tunnel_rx_mac_1     , tunnel_rx_mac_1      , tunnel_rx_mac_1       , 响应隧�
 
 
 client_port         , client_port          , client_port           , 客户端口                      , int          ,                    , 传输层      , 111        ,
-server_port         , server_port          , server_port           , 服务端口                      , int          ,                    , 传输层      , 111        ,
+server_port         , server_port          , server_port           , 服务端口                      , int_enum     , server_port        , 传输层      , 111        ,
 # 需要将int按位转化位标志位列表展示 @zhenyu
 tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , TCP标志位列表                 , bit_enum     , tcp_flags_bit      , 传输层      , 111        ,
 syn_seq             , syn_seq              , syn_seq               , SYN包SEQ                      , int          ,                    , 传输层      , 111        ,

@@ -38,7 +38,7 @@ tunnel_type               , tunnel_type               , tunnel_type             
 
 protocol                  , protocol                  , protocol                  , 网络协议               , int_enum      , l7_ip_protocol     , 传输层      , 111        ,
 client_port               , client_port               , client_port               , 客户端口               , int           ,                    , 传输层      , 111        ,
-server_port               , server_port               , server_port               , 服务端口               , int           ,                    , 传输层      , 111        ,
+server_port               , server_port               , server_port               , 服务端口               , int_enum      , server_port        , 传输层      , 111        ,
 req_tcp_seq               , req_tcp_seq               , req_tcp_seq               , 请求TCP包SEQ           , int           ,                    , 传输层      , 111        ,
 resp_tcp_seq              , resp_tcp_seq              , resp_tcp_seq              , 响应TCP包SEQ           , int           ,                    , 传输层      , 111        ,
 
