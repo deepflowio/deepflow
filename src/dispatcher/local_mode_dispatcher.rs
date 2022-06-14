@@ -262,6 +262,7 @@ impl LocalModeDispatcherListener {
             }
         }
         // interfaces为实际TAP口的集合，macs为TAP口对应主机的MAC地址集合
+        interfaces.sort_by_key(|link| link.if_index);
         let keys = interfaces
             .iter()
             .map(|link| link.if_index)
