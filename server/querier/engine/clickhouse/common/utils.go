@@ -1,8 +1,11 @@
 package common
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -75,4 +78,49 @@ func IPFilterStringToHex(ip string) string {
 	} else {
 		return fmt.Sprintf("hex(toIPv4(%s))", ip)
 	}
+}
+
+func ParseResponse(response *http.Response) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	body, err := ioutil.ReadAll(response.Body)
+	if err == nil {
+		err = json.Unmarshal(body, &result)
+	}
+	return result, err
+}
+
+func GetDatasourceInterval(db string, table string, name string) (int, error) {
+	var tsdbType string
+	switch db {
+	case "flow_log":
+		return 1, nil
+	case "flow_metrics":
+		if table == "vtap_flow_port" || table == "vtap_flow_edge_port" {
+			tsdbType = "flow"
+		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
+			tsdbType = "app"
+		}
+	}
+	client := &http.Client{}
+	url := fmt.Sprintf("http://localhost:20417/v1/datasource/?name=%s&type=%s", name, tsdbType)
+	reqest, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 1, err
+	}
+	response, err := client.Do(reqest)
+	if err != nil {
+		return 1, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		return 1, errors.New(fmt.Sprintf("get datasource interval error, code '%d'", response.StatusCode))
+	}
+	body, err := ParseResponse(response)
+	if err != nil {
+		return 1, err
+	}
+	if len(body["DATA"].([]interface{})) < 1 {
+		return 1, errors.New(fmt.Sprintf("get datasource interval error, response: '%v'", body))
+	}
+	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
 }

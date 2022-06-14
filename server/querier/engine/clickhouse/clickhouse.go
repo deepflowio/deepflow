@@ -85,6 +85,11 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
+	interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
+	if err != nil {
+		log.Error(err)
+	}
+	e.Model.Time.DatasourceInterval = interval
 }
 
 func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, error) {

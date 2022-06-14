@@ -62,7 +62,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	if !ok {
 		return nil, 0, nil
 	}
-	if _, ok := metrics.METRICS_FUNCTIONS[name]; !ok {
+	if _, ok := metrics.METRICS_FUNCTIONS_MAP[name]; !ok {
 		return nil, 0, nil
 	}
 	// 判断算子是否支持单层

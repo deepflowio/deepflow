@@ -22,7 +22,15 @@ func NewFunction(name string, functionType int, supportMetricsTypes []int, unitO
 	}
 }
 
-var METRICS_FUNCTIONS = map[string]*Function{
+var METRICS_FUNCTIONS = []string{
+	view.FUNCTION_SUM, view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN,
+	view.FUNCTION_STDDEV, view.FUNCTION_SPREAD, view.FUNCTION_RSPREAD,
+	view.FUNCTION_APDEX, view.FUNCTION_PCTL, view.FUNCTION_PCTL_EXACT,
+	view.FUNCTION_UNIQ, view.FUNCTION_UNIQ_EXACT, view.FUNCTION_PERCENTAG,
+	view.FUNCTION_PERSECOND,
+}
+
+var METRICS_FUNCTIONS_MAP = map[string]*Function{
 	view.FUNCTION_SUM:        NewFunction(view.FUNCTION_SUM, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_COUNTER}, "$unit", 0),
 	view.FUNCTION_AVG:        NewFunction(view.FUNCTION_AVG, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_COUNTER, METRICS_TYPE_GAUGE, METRICS_TYPE_DELAY, METRICS_TYPE_PERCENTAGE, METRICS_TYPE_QUOTIENT}, "$unit", 0),
 	view.FUNCTION_MAX:        NewFunction(view.FUNCTION_MAX, FUNCTION_TYPE_AGG, []int{METRICS_TYPE_COUNTER, METRICS_TYPE_GAUGE, METRICS_TYPE_DELAY, METRICS_TYPE_PERCENTAGE, METRICS_TYPE_QUOTIENT}, "$unit", 0),
@@ -44,7 +52,8 @@ func GetFunctionDescriptions() (map[string][]interface{}, error) {
 		"name", "type", "support_metric_types", "unit_overwrite", "additional_param_count",
 	}
 	var values []interface{}
-	for _, f := range METRICS_FUNCTIONS {
+	for _, name := range METRICS_FUNCTIONS {
+		f := METRICS_FUNCTIONS_MAP[name]
 		values = append(values, []interface{}{
 			f.Name, f.Type, f.SupportMetricsTypes, f.UnitOverwrite, f.AdditionnalParamCount,
 		})
