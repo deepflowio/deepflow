@@ -292,6 +292,9 @@ func GetSubDomains(filter map[string]interface{}) ([]model.SubDomain, error) {
 	if _, ok := filter["lcuuid"]; ok {
 		Db = Db.Where("lcuuid = ?", filter["lcuuid"])
 	}
+	if _, ok := filter["domain"]; ok {
+		Db = Db.Where("domain = ?", filter["domain"])
+	}
 	Db.Order("created_at DESC").Find(&subDomains)
 
 	mysql.Db.Select("name", "lcuuid").Find(&vpcs)
@@ -350,6 +353,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 	subDomain.DisplayName = lcuuid
 	subDomain.CreateMethod = common.CREATE_METHOD_USER_DEFINE
 	subDomain.ClusterID = "d-" + common.GenerateShortUUID()
+	subDomain.Domain = subDomainCreate.Domain
 	configStr, _ := json.Marshal(subDomainCreate.Config)
 	subDomain.Config = string(configStr)
 	mysql.Db.Create(&subDomain)
