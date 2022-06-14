@@ -32,8 +32,9 @@ pub struct OpenTelemetry(Vec<u8>);
 
 impl OpenTelemetry {
     pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let length = self.0.len();
         buf.append(&mut self.0);
-        Ok(self.0.len())
+        Ok(length)
     }
 }
 
