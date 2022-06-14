@@ -26,6 +26,12 @@ func getDataSource(c *gin.Context) {
 
 func getDataSources(c *gin.Context) {
 	args := make(map[string]interface{})
+	if value, ok := c.GetQuery("type"); ok {
+		args["type"] = value
+	}
+	if value, ok := c.GetQuery("name"); ok {
+		args["name"] = value
+	}
 	data, err := service.GetDataSources(args)
 	JsonResponse(c, data, err)
 }
