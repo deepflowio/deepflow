@@ -3,6 +3,7 @@ package querier
 import (
 	//"flag"
 	"fmt"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
@@ -19,8 +20,6 @@ var log = logging.MustGetLogger("querier")
 
 //var configPath = flag.String("f", "/etc/server.yaml", "specify config file location")
 var configPath = "/etc/server.yaml"
-
-type Controller struct{}
 
 func Start() {
 	//flag.Parse()
@@ -40,7 +39,8 @@ func Start() {
 	// engine加载数据库tag/metric等信息
 	err := Load()
 	if err != nil {
-		log.Panic(err)
+		log.Error(err)
+		os.Exit(0)
 	}
 	// 注册router
 	r := gin.Default()
@@ -49,6 +49,7 @@ func Start() {
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
+		os.Exit(0)
 	}
 }
 

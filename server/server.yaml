@@ -1,6 +1,6 @@
 controller:
   # logfile path
-  log-file: /var/log/controller/controller.log
+  log-file: /var/log/metaflow/server.log
   # loglevel: "debug/info/warn/error"
   log-level: info
   # controller http listenport
@@ -138,7 +138,7 @@ controller:
 
 querier:
   # logfile path
-  log-file: /var/log/querier/querier.log
+  log-file: /var/log/metaflow/server.log
   # loglevel: "debug/info/warn/error"
   log-level: info
   # querier http listenport

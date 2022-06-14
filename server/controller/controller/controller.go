@@ -58,14 +58,14 @@ func Start() {
 	mysql.Db = mysql.Gorm(cfg.MySqlCfg)
 	if mysql.Db == nil {
 		log.Error("connect mysql failed")
-		return
+		os.Exit(0)
 	}
 
 	// 初始化Redis
 	err := redis.InitRedis(cfg.RedisCfg)
 	if err != nil {
 		log.Error("connect redis failed")
-		// return
+		os.Exit(0)
 	}
 
 	// 启动genesis
@@ -134,5 +134,6 @@ func Start() {
 	router.DomainConfigRouter(r)
 	if err := r.Run(":20417"); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
+		os.Exit(0)
 	}
 }
