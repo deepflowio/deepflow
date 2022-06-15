@@ -33,15 +33,17 @@ OBJS := libbpf/src/bpf.o \
 	libbpf/src/btf_dump.o \
 	libbpf/src/hashmap.o \
 	libbpf/src/ringbuf.o \
+	user/bcc/bcc_elf.o \
+	user/bcc/bcc_proc.o \
 	user/common.o \
 	user/probe.o \
 	user/perf.o \
 	user/symbol.o \
+	user/go_tracer.o \
 	user/table.o \
 	user/ring.o \
 	user/tracer.o \
 	user/socket.o \
-	user/tsc.o \
 	user/log.o \
 	user/ctrl.o
 
@@ -69,7 +71,7 @@ $(ELFFILES):
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
 	$(Q)mkdir -p $@/libbpf/src
-	$(Q)mkdir -p $@/user
+	$(Q)mkdir -p $@/user/bcc
 
 $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)
