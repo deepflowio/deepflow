@@ -16,7 +16,7 @@ use crate::{
         enums::{EthernetType, TapType},
         MetaPacket, PlatformData, TapPort, FIELD_OFFSET_ETH_TYPE, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
     },
-    config::RuntimeConfig,
+    config::DispatcherConfig,
     flow_generator::FlowMap,
     platform::{GenericPoller, LibvirtXmlExtractor, Poller},
     proto::{common::TridentType, trident::IfMacSource},
@@ -228,7 +228,7 @@ impl LocalModeDispatcherListener {
         }
     }
 
-    pub(super) fn on_config_change(&mut self, config: &RuntimeConfig) {
+    pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         self.base.on_config_change(config)
     }
 

@@ -23,7 +23,7 @@ use super::{
 use crate::{
     config::handler::DebugAccess,
     platform::{ApiWatcher, GenericPoller},
-    rpc::{LocalStaticConfig, Session, StaticConfig, Status},
+    rpc::{Session, StaticConfig, Status},
 };
 
 // 如果结构体长度大于此值就切片分包发送
@@ -53,7 +53,6 @@ pub struct ConstructDebugCtx {
     pub session: Arc<Session>,
     pub static_config: Arc<StaticConfig>,
     pub status: Arc<RwLock<Status>>,
-    pub local_config: Arc<LocalStaticConfig>,
 }
 
 impl Debugger {
@@ -170,12 +169,7 @@ impl Debugger {
     pub fn new(context: ConstructDebugCtx) -> Self {
         let debuggers = ModuleDebuggers {
             platform: PlatformDebugger::new(context.api_watcher, context.poller),
-            rpc: RpcDebugger::new(
-                context.session,
-                context.static_config,
-                context.status,
-                context.local_config,
-            ),
+            rpc: RpcDebugger::new(context.session, context.static_config, context.status),
             queue: Arc::new(QueueDebugger::new()),
         };
 
@@ -403,15 +397,20 @@ where
 #[cfg(test)]
 mod tests {
     use std::net::{IpAddr, Ipv6Addr};
-    use std::sync::atomic::AtomicBool;
 
     use arc_swap::{access::Map, ArcSwap};
     use rand::random;
 
-    use crate::config::handler::{DebugConfig, NewRuntimeConfig, PlatformConfig};
-    use crate::exception::ExceptionHandler;
-    use crate::platform::ActivePoller;
-    use crate::{debug::Message, rpc::Session};
+    use crate::{
+        config::{
+            handler::{DebugConfig, PlatformConfig},
+            ModuleConfig,
+        },
+        debug::Message,
+        exception::ExceptionHandler,
+        platform::ActivePoller,
+        rpc::Session,
+    };
 
     use super::*;
 
@@ -426,7 +425,7 @@ mod tests {
             ExceptionHandler::default(),
         ));
 
-        let current_config = Arc::new(ArcSwap::from_pointee(NewRuntimeConfig::default()));
+        let current_config = Arc::new(ArcSwap::from_pointee(ModuleConfig::default()));
 
         let static_config = Arc::new(StaticConfig::default());
         let status = Arc::new(RwLock::new(Status::default()));
@@ -446,12 +445,6 @@ mod tests {
             status,
             config: Map::new(current_config.clone(), |config| -> &DebugConfig {
                 &config.debug
-            }),
-            local_config: Arc::new(LocalStaticConfig {
-                local_config_str: Default::default(),
-                revision: Default::default(),
-                only_revison: AtomicBool::new(false),
-                static_config_path: Default::default(),
             }),
         }
     }

@@ -25,7 +25,7 @@ use crate::{
         MetaPacket, TaggedFlow, TapTyper, ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE,
         VLAN_ID_MASK,
     },
-    config::{handler::FlowAccess, RuntimeConfig},
+    config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     platform::GenericPoller,
@@ -395,7 +395,7 @@ pub(super) struct BaseDispatcherListener {
 }
 
 impl BaseDispatcherListener {
-    fn on_afpacket_change(&mut self, config: &RuntimeConfig) {
+    fn on_afpacket_change(&mut self, config: &DispatcherConfig) {
         if self.options.af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
             info!("Afpacket version update, metaflow-agent restart...");
@@ -403,26 +403,18 @@ impl BaseDispatcherListener {
         }
     }
 
-    fn on_decap_type_change(&mut self, config: &RuntimeConfig) {
-        let tunnel_types = config
-            .decap_type
-            .iter()
-            .map(|&t| TunnelType::try_from(t as u8).unwrap())
-            .collect::<Vec<_>>();
-        let bitmaps = TunnelTypeBitmap::new(&tunnel_types);
-        if *self.tunnel_type_bitmap.lock().unwrap() != bitmaps {
-            *self.tunnel_type_bitmap.lock().unwrap() = bitmaps;
-            info!(
-                "Decap tunnel type change to {}",
-                self.tunnel_type_bitmap.lock().unwrap()
-            );
+    fn on_decap_type_change(&mut self, config: &DispatcherConfig) {
+        let mut old_map = self.tunnel_type_bitmap.lock().unwrap();
+        if *old_map != config.tunnel_type_bitmap {
+            info!("Decap tunnel type change to {}", config.tunnel_type_bitmap);
+            *old_map = config.tunnel_type_bitmap;
         }
     }
 
-    fn on_bpf_change(&mut self, config: &RuntimeConfig) {
+    fn on_bpf_change(&mut self, config: &DispatcherConfig) {
         if self.capture_bpf == config.capture_bpf
-            && self.proxy_controller_ip.to_string() == config.proxy_controller_ip
-            && self.analyzer_ip.to_string() == config.analyzer_ip
+            && self.proxy_controller_ip == config.proxy_controller_ip
+            && self.analyzer_ip == config.analyzer_ip
         {
             return;
         }
@@ -431,22 +423,8 @@ impl BaseDispatcherListener {
             self.capture_bpf = config.capture_bpf.clone();
             self.capture_bpf.clone()
         } else {
-            match (
-                config.proxy_controller_ip.parse(),
-                config.analyzer_ip.parse(),
-            ) {
-                (Ok(pc_ip), Ok(a_ip)) => {
-                    self.proxy_controller_ip = pc_ip;
-                    self.analyzer_ip = a_ip;
-                }
-                _ => {
-                    warn!(
-                        "Invalid proxy_controller_ip {} or ananlyzer_ip {}",
-                        config.proxy_controller_ip, config.analyzer_ip
-                    );
-                    return;
-                }
-            }
+            self.proxy_controller_ip = config.proxy_controller_ip;
+            self.analyzer_ip = config.analyzer_ip;
 
             let source_ip = get_route_src_ip(&self.analyzer_ip);
             if source_ip.is_err() {
@@ -473,7 +451,7 @@ impl BaseDispatcherListener {
         mem::drop(bpf_options);
     }
 
-    pub(super) fn on_config_change(&mut self, config: &RuntimeConfig) {
+    pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         self.on_afpacket_change(config);
         self.on_decap_type_change(config);
         self.on_bpf_change(config);

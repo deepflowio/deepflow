@@ -221,7 +221,7 @@ mod tests {
     use rand::random;
 
     use super::*;
-    use crate::config::handler::{MetricServerConfig, NewRuntimeConfig};
+    use crate::config::{handler::MetricServerConfig, ModuleConfig};
     use crate::debug::QueueDebugger;
     use crate::utils::queue;
 
@@ -232,7 +232,7 @@ mod tests {
             queue::bounded_with_debug(1000, "test_external_metrics", &queue_debugger);
 
         let port = 44444 + random::<u16>() % 1000;
-        let mut rt_conf = NewRuntimeConfig::default();
+        let mut rt_conf = ModuleConfig::default();
         rt_conf.metric_server.enabled = true;
         rt_conf.metric_server.port = port;
         let current_config = Arc::new(ArcSwap::from_pointee(rt_conf));

@@ -1,18 +1,12 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fs;
-use std::io;
-use std::net::IpAddr;
-use std::path::PathBuf;
+use std::net::{IpAddr, Ipv4Addr};
 use std::process;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{self, Arc};
-use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, error, info, warn};
-use md5::{Digest, Md5};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
 use rand::RngCore;
@@ -26,13 +20,11 @@ use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface};
-use crate::common::{NORMAL_EXIT_WITH_RESTART, TEMP_STATIC_CONFIG_FILENAME};
-use crate::config::{self, RuntimeConfig};
-use crate::dispatcher::DispatcherListener;
+use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::policy::PolicySetter;
 use crate::proto::common::TridentType;
-use crate::proto::trident::{self as tp, Exception, LocalConfigFile, TapMode};
+use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
 use crate::trident::{self, TridentState};
 use crate::utils::{
@@ -56,7 +48,6 @@ pub struct StaticConfig {
     pub ctrl_mac: String,
     pub ctrl_ip: String,
     pub controller_ip: String,
-    pub analyzer_ip: String,
 
     pub env: RuntimeEnvironment,
 }
@@ -72,18 +63,11 @@ impl Default for StaticConfig {
             ctrl_ip: Default::default(),
             ctrl_mac: Default::default(),
             controller_ip: Default::default(),
-            analyzer_ip: Default::default(),
             env: Default::default(),
         }
     }
 }
 
-#[derive(Default)]
-pub struct Config {
-    proxy_ip: String,
-}
-
-#[derive(Default)]
 pub struct Status {
     pub hostname: String,
 
@@ -93,7 +77,7 @@ pub struct Status {
     pub synced: bool,
     pub new_revision: Option<String>,
 
-    pub proxy_ip: String,
+    pub proxy_ip: IpAddr,
     pub sync_interval: Duration,
     pub ntp_enabled: bool,
 
@@ -106,6 +90,33 @@ pub struct Status {
     pub peers: Vec<Arc<PeerConnection>>,
     pub cidrs: Vec<Arc<Cidr>>,
     pub ip_groups: Vec<Arc<IpGroupData>>,
+}
+
+impl Default for Status {
+    fn default() -> Self {
+        Self {
+            hostname: "".into(),
+
+            time_diff: 0,
+
+            config_accepted: false,
+            synced: false,
+            new_revision: None,
+
+            proxy_ip: Ipv4Addr::UNSPECIFIED.into(),
+            sync_interval: Default::default(),
+            ntp_enabled: false,
+
+            version_platform_data: 0,
+            version_acls: 0,
+            version_groups: 0,
+
+            interfaces: Default::default(),
+            peers: Default::default(),
+            cidrs: Default::default(),
+            ip_groups: Default::default(),
+        }
+    }
 }
 
 impl Status {
@@ -198,14 +209,9 @@ impl Status {
         return false;
     }
 
-    fn modify_platform(
-        &mut self,
-        tap_mode: TapMode,
-        macs: &Vec<MacAddr>,
-        config: &RuntimeConfig,
-    ) -> Vec<VInterface> {
+    fn modify_platform(&mut self, macs: &Vec<MacAddr>, config: &RuntimeConfig) -> Vec<VInterface> {
         let mut black_list = Vec::new();
-        if tap_mode == TapMode::Analyzer {
+        if config.yaml_config.tap_mode == TapMode::Analyzer {
             return black_list;
         }
         let mut local_mac_map = HashMap::new();
@@ -319,13 +325,11 @@ impl Status {
 
 pub struct Synchronizer {
     pub static_config: Arc<StaticConfig>,
-    config: Arc<RwLock<Config>>,
     pub status: Arc<RwLock<Status>>,
 
     trident_state: TridentState,
 
     session: Arc<Session>,
-    dispatcher_listener: Arc<Mutex<Option<DispatcherListener>>>,
     // 策略模块和NPB带宽检测会用到
     flow_acl_listener: Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
     exception_handler: ExceptionHandler,
@@ -338,16 +342,6 @@ pub struct Synchronizer {
 
     max_memory: Arc<AtomicU64>,
     ntp_diff: Arc<AtomicI64>,
-
-    // 本地配置文件
-    pub local_config: Arc<LocalStaticConfig>,
-}
-
-pub struct LocalStaticConfig {
-    pub local_config_str: String,
-    pub revision: String,
-    pub only_revison: AtomicBool,
-    pub static_config_path: PathBuf,
 }
 
 impl Synchronizer {
@@ -358,31 +352,11 @@ impl Synchronizer {
         ctrl_ip: String,
         ctrl_mac: String,
         controller_ip: String,
-        analyzer_ip: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
         policy_setter: PolicySetter,
         exception_handler: ExceptionHandler,
-        static_config_path: PathBuf,
     ) -> Synchronizer {
-        let local_config_str = fs::read_to_string(static_config_path.as_path()).unwrap_or_default();
-
-        let mut static_config_md5_hasher = Md5::new();
-        static_config_md5_hasher.update(local_config_str.as_bytes());
-        let static_config_revision = static_config_md5_hasher
-            .finalize_reset()
-            .into_iter()
-            .map(|c| format!("{:02x}", c))
-            .collect::<Vec<_>>()
-            .join("");
-
-        let local_config = Arc::new(LocalStaticConfig {
-            local_config_str,
-            revision: static_config_revision,
-            only_revison: AtomicBool::new(false),
-            static_config_path,
-        });
-
         Synchronizer {
             static_config: Arc::new(StaticConfig {
                 revision,
@@ -393,14 +367,11 @@ impl Synchronizer {
                 ctrl_mac,
                 ctrl_ip,
                 controller_ip,
-                analyzer_ip,
                 env: RuntimeEnvironment::new(),
             }),
             trident_state,
-            config: Default::default(),
             status: Default::default(),
             session,
-            dispatcher_listener: Default::default(),
             running: Arc::new(AtomicBool::new(false)),
             rt: Runtime::new().unwrap(),
             threads: Default::default(),
@@ -409,7 +380,6 @@ impl Synchronizer {
 
             max_memory: Default::default(),
             ntp_diff: Default::default(),
-            local_config,
         }
     }
 
@@ -432,7 +402,6 @@ impl Synchronizer {
         status: &Arc<RwLock<Status>>,
         time_diff: i64,
         exception_handler: &ExceptionHandler,
-        local_config: LocalConfigFile,
     ) -> tp::SyncRequest {
         let status = status.read();
 
@@ -487,10 +456,7 @@ impl Synchronizer {
             vtap_group_id_request: Some(static_config.vtap_group_id_request.clone()),
             kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
 
-            // not interested
-            communication_vtaps: vec![],
-            tsdb_report_info: None,
-            local_config_file: Some(local_config),
+            ..Default::default()
         }
     }
 
@@ -507,7 +473,7 @@ impl Synchronizer {
             Some(revision) if revision != "" && revision != &static_config.revision => {
                 if let Some(url) = &resp.self_update_url {
                     if url.trim().to_lowercase() != "grpc" {
-                        warn!("error upgrade method, onlly support grpc: {}", url);
+                        warn!("error upgrade method, only support grpc: {}", url);
                         return;
                     }
                     info!(
@@ -553,17 +519,15 @@ impl Synchronizer {
     }
 
     fn on_response(
-        remote: &str,
+        remote: &IpAddr,
         mut resp: tp::SyncResponse,
         trident_state: &TridentState,
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
-        dispatcher_listener: &Arc<Mutex<Option<DispatcherListener>>>,
         flow_acl_listener: &Arc<sync::Mutex<Vec<Box<dyn FlowAclListener>>>>,
         max_memory: &Arc<AtomicU64>,
         exception_handler: &ExceptionHandler,
         escape_tx: &UnboundedSender<Duration>,
-        local_config: &LocalStaticConfig,
     ) {
         // TODO: 把cleaner UpdatePcapDataRetention挪到别的地方
         Self::parse_upgrade(&resp, static_config, status);
@@ -583,8 +547,7 @@ impl Synchronizer {
             warn!("invalid response from {} without config", remote);
             return;
         }
-        let new_config = config.clone();
-        let runtime_config: Result<RuntimeConfig, _> = config.unwrap().try_into();
+        let runtime_config = RuntimeConfig::try_from(config.unwrap());
         if let Err(e) = runtime_config {
             warn!(
                 "invalid response from {} with invalid config: {}",
@@ -593,32 +556,23 @@ impl Synchronizer {
             exception_handler.set(Exception::InvalidConfiguration);
             return;
         }
-        let mut runtime_config = runtime_config.unwrap();
-        if static_config.analyzer_ip != "" {
-            // 配置文件配置analyzer-ip后，会使用配置文件中的controller-ips和analyzer-ip替换配置器下发的proxy-controller-ip和analyzer-ip
-            runtime_config.proxy_controller_ip = static_config.controller_ip.clone();
-            runtime_config.analyzer_ip = static_config.analyzer_ip.clone();
-        }
+        let runtime_config = runtime_config.unwrap();
+        let yaml_config = &runtime_config.yaml_config;
 
         let _ = escape_tx.send(runtime_config.max_escape);
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
-        let mut dispatcher_listener = dispatcher_listener.lock();
-        if let Some(listener) = (*dispatcher_listener).as_mut() {
-            listener.on_config_change(&runtime_config);
-        }
-
         let mut blacklist = vec![];
-        let (_segments, macs) = Self::parse_segment(static_config.tap_mode, &resp);
+        let (_, macs) = Self::parse_segment(yaml_config.tap_mode, &resp);
 
         let mut status = status.write();
-        status.proxy_ip = runtime_config.proxy_controller_ip.clone();
+        status.proxy_ip = runtime_config.proxy_controller_ip.parse().unwrap();
         status.sync_interval = runtime_config.sync_interval;
         status.ntp_enabled = runtime_config.ntp_enabled;
         let updated_platform = status.get_platform_data(&resp);
         if updated_platform {
-            blacklist = status.modify_platform(static_config.tap_mode, &macs, &runtime_config);
+            blacklist = status.modify_platform(&macs, &runtime_config);
         }
         let mut updated = status.get_ip_groups(&resp) || updated_platform;
         updated = status.get_flow_acls(&resp) || updated;
@@ -654,29 +608,13 @@ impl Synchronizer {
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
-        match resp.local_config_file {
-            Some(remote_local_config) => {
-                if !remote_local_config.revision().is_empty() {
-                    if let Err(e) = Self::update_local_config(
-                        runtime_config.trident_type,
-                        local_config,
-                        remote_local_config,
-                    ) {
-                        warn!("update local config file failed, {}", e);
-                        exception_handler.set(Exception::InvalidLocalConfigFile);
-                    }
-                }
-            }
-            // 当控制器删除采集器的时候local_config_file为空，此时需要重传本地配置
-            None => local_config.only_revison.store(false, Ordering::Relaxed),
-        }
 
         let (trident_state, cvar) = &**trident_state;
         if !runtime_config.enabled {
             *trident_state.lock().unwrap() = trident::State::Disabled;
         } else {
             *trident_state.lock().unwrap() =
-                trident::State::ConfigChanged((runtime_config, new_config.unwrap(), blacklist));
+                trident::State::ConfigChanged((runtime_config, blacklist));
         }
         cvar.notify_one();
     }
@@ -687,12 +625,10 @@ impl Synchronizer {
         let static_config = self.static_config.clone();
         let status = self.status.clone();
         let running = self.running.clone();
-        let dispatcher_listener = self.dispatcher_listener.clone();
         let max_memory = self.max_memory.clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
-        let local_config = self.local_config.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
                 session.update_current_server().await;
@@ -705,24 +641,12 @@ impl Synchronizer {
                 let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
                 let version = session.get_version();
 
-                let current_local_config = if local_config.only_revison.load(Ordering::Relaxed) {
-                    LocalConfigFile {
-                        local_config: None,
-                        revision: Some(local_config.revision.clone()),
-                    }
-                } else {
-                    LocalConfigFile {
-                        local_config: Some(local_config.local_config_str.clone()),
-                        revision: Some(local_config.revision.clone()),
-                    }
-                };
                 let response = client
                     .push(Synchronizer::generate_sync_request(
                         &static_config,
                         &status,
                         ntp_diff.load(Ordering::Relaxed),
                         &exception_handler,
-                        current_local_config,
                     ))
                     .await;
                 if let Err(m) = response {
@@ -762,12 +686,10 @@ impl Synchronizer {
                         &trident_state,
                         &static_config,
                         &status,
-                        &dispatcher_listener,
                         &flow_acl_listener,
                         &max_memory,
                         &exception_handler,
                         &escape_tx,
-                        &local_config,
                     );
                 }
             }
@@ -913,16 +835,13 @@ impl Synchronizer {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
-        let _config = self.config.clone();
         let status = self.status.clone();
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let running = self.running.clone();
-        let dispatcher_listener = self.dispatcher_listener.clone();
         let flow_acl_listener = self.flow_acl_listener.clone();
         let max_memory = self.max_memory.clone();
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
-        let local_config = self.local_config.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             let mut client = None;
             let version = session.get_version();
@@ -952,24 +871,11 @@ impl Synchronizer {
 
                 let changed = session.update_current_server().await;
 
-                let current_local_config = if local_config.only_revison.load(Ordering::Relaxed) {
-                    LocalConfigFile {
-                        local_config: None,
-                        revision: Some(local_config.revision.clone()),
-                    }
-                } else {
-                    LocalConfigFile {
-                        local_config: Some(local_config.local_config_str.clone()),
-                        revision: Some(local_config.revision.clone()),
-                    }
-                };
-
                 let request = Synchronizer::generate_sync_request(
                     &static_config,
                     &status,
                     ntp_diff.load(Ordering::Relaxed),
                     &exception_handler,
-                    current_local_config,
                 );
                 debug!("grpc sync request: {:?}", request);
 
@@ -1016,12 +922,10 @@ impl Synchronizer {
                     &trident_state,
                     &static_config,
                     &status,
-                    &dispatcher_listener,
                     &flow_acl_listener,
                     &max_memory,
                     &exception_handler,
                     &escape_tx,
-                    &local_config,
                 );
                 let (new_revision, proxy_ip, new_sync_interval) = {
                     let status = status.read();
@@ -1049,71 +953,6 @@ impl Synchronizer {
                 time::sleep(sync_interval).await;
             }
         }));
-    }
-
-    fn update_local_config(
-        trident_type: TridentType,
-        local_config: &LocalStaticConfig,
-        remote_local_config: LocalConfigFile,
-    ) -> Result<(), io::Error> {
-        // 容器/Exsi/Dedicate采集器只支持读取配置，不支持修改
-        match trident_type {
-            TridentType::TtHostPod
-            | TridentType::TtVmPod
-            | TridentType::TtVm
-            | TridentType::TtDedicatedPhysicalMachine => {
-                debug!(
-                    "current trident-type {:?} do not support config file update",
-                    trident_type
-                );
-                return Ok(());
-            }
-            _ => (),
-        }
-
-        if local_config.revision == remote_local_config.revision() {
-            local_config.only_revison.swap(true, Ordering::Relaxed);
-            debug!(
-                "don't need update local static config, static config revision ({}) unchanged",
-                local_config.revision
-            );
-            return Ok(());
-        }
-
-        info!("local static config revision ({}) is different from remote static config revision ({})", local_config.revision, remote_local_config.revision());
-
-        // 检查metaflow-server下发的配置，校验通过则进行写入临时文件
-        let static_config = config::Config::load(remote_local_config.local_config())?;
-        let temp_filename =
-            local_config.static_config_path
-            .parent()
-            .ok_or(io::Error::new(io::ErrorKind::Other, "can't create temporary static config file because static config path is root directory"))?
-            .join(TEMP_STATIC_CONFIG_FILENAME);
-        {
-            debug!(
-                "Create temporary static config file: {}",
-                temp_filename.display()
-            );
-            fs::write(temp_filename.as_path(), remote_local_config.local_config())?;
-        }
-        // 读取临时文件，再次进行校验，校验通过写入static_config_path
-        let temp_static_config =
-            config::Config::load(fs::read_to_string(temp_filename.as_path())?)?;
-        if static_config != temp_static_config {
-            debug!("temporary static config file has unexpected change");
-        }
-
-        fs::write(
-            local_config.static_config_path.as_path(),
-            remote_local_config.local_config(),
-        )?;
-
-        fs::remove_file(temp_filename)?;
-
-        info!("metaflow-agent local static config changed, restart metaflow-agent....");
-
-        thread::sleep(SECOND);
-        process::exit(NORMAL_EXIT_WITH_RESTART);
     }
 
     pub fn start(&self) {
@@ -1148,7 +987,6 @@ pub struct SynchronizerBuilder {
     ctrl_ip: String,
     ctrl_mac: String,
     controller_ips: Vec<String>,
-    analyzer_ip: String,
 }
 
 impl SynchronizerBuilder {

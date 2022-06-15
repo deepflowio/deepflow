@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::config::ConfigError;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error(transparent)]
@@ -14,6 +16,8 @@ pub enum Error {
     ProstDecode(#[from] prost::DecodeError),
     #[error(transparent)]
     ProstEncode(#[from] prost::EncodeError),
+    #[error(transparent)]
+    ConfigError(#[from] ConfigError),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
