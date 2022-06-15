@@ -28,7 +28,7 @@ use recv_engine::{
 
 use crate::{
     common::{enums::TapType, PlatformData, TaggedFlow, TapTyper},
-    config::{handler::FlowAccess, RuntimeConfig},
+    config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
@@ -129,7 +129,7 @@ pub enum DispatcherListener {
 }
 
 impl DispatcherListener {
-    pub(super) fn on_config_change(&mut self, config: &RuntimeConfig) {
+    pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         match self {
             Self::Local(l) => l.on_config_change(config),
         }

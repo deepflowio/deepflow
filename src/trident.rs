@@ -1,6 +1,7 @@
 use std::env;
 use std::mem;
-use std::path::{Path, PathBuf};
+use std::net::Ipv4Addr;
+use std::path::Path;
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -35,7 +36,7 @@ use crate::{
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig},
-        Config, RuntimeConfig,
+        Config, RuntimeConfig, YamlConfig,
     },
     debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
@@ -46,7 +47,7 @@ use crate::{
     monitor::Monitor,
     platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
     policy::{Policy, PolicyGetter},
-    proto::trident::{self, TapMode},
+    proto::trident::TapMode,
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
@@ -55,7 +56,7 @@ use crate::{
             trident_process_check,
         },
         logger::{RemoteLogConfig, RemoteLogWriter},
-        net::{get_route_src_ip_and_mac, links_by_name_regex},
+        net::{get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex},
         queue,
         stats::{self, Countable, RefCountable, StatsOption},
         LeakyBucket,
@@ -66,13 +67,13 @@ const MINUTE: Duration = Duration::from_secs(60);
 
 pub enum State {
     Running,
-    ConfigChanged((RuntimeConfig, trident::Config, Vec<PlatformData>)),
+    ConfigChanged((RuntimeConfig, Vec<PlatformData>)),
     Terminated,
     Disabled, // 禁用状态
 }
 
 impl State {
-    fn unwrap_config(self) -> (RuntimeConfig, trident::Config, Vec<PlatformData>) {
+    fn unwrap_config(self) -> (RuntimeConfig, Vec<PlatformData>) {
         match self {
             Self::ConfigChanged(c) => c,
             _ => panic!("not config type"),
@@ -106,7 +107,8 @@ impl Trident {
             vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
         );
 
-        let mut logger = Logger::try_with_str(config.log_level.as_str().to_lowercase())?
+        let mut logger = Logger::try_with_str("info")
+            .unwrap()
             .format(colored_opt_format)
             .log_to_file_and_writer(
                 FileSpec::try_from(&config.log_file)?,
@@ -125,7 +127,6 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         info!("static_config {:#?}", config);
-        let static_config_path = config_path.as_ref().into();
         let handle = Some(thread::spawn(move || {
             if let Err(e) = Self::run(
                 state_thread,
@@ -133,7 +134,6 @@ impl Trident {
                 revision,
                 logger_handle,
                 remote_log_config,
-                static_config_path,
             ) {
                 warn!("metaflow-agent exited: {}", e);
                 process::exit(1);
@@ -149,7 +149,6 @@ impl Trident {
         revision: String,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
-        static_config_path: PathBuf,
     ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
@@ -167,11 +166,13 @@ impl Trident {
             config.controller_ips.clone(),
             exception_handler.clone(),
         ));
+
+        let default_runtime_config = RuntimeConfig::default();
         // 目前仅支持local-mod + ebpf-collector，ebpf-collector不适用fast, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
             1,
-            config.first_path_level as usize,
-            config.fast_path_map_size,
+            default_runtime_config.yaml_config.first_path_level as usize,
+            default_runtime_config.yaml_config.fast_path_map_size,
             false,
         );
 
@@ -185,18 +186,17 @@ impl Trident {
             ctrl_ip.to_string(),
             ctrl_mac.to_string(),
             config_handler.static_config.controller_ips[0].clone(),
-            config_handler.static_config.analyzer_ip.clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             policy_setter,
             exception_handler.clone(),
-            static_config_path,
         ));
         synchronizer.start();
 
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
         let mut components: Option<Components> = None;
+        let mut yaml_conf: Option<YamlConfig> = None;
 
         loop {
             match &*state_guard {
@@ -223,25 +223,20 @@ impl Trident {
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
-            let (new_config, new_pb_config, blacklist) = new_state.unwrap_config();
-            let new_conf = match config_handler.new_runtime_config(new_pb_config) {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!(
-                        "keep using previous runtime config or cannot start components, because invalid runtime config: {}",
-                        e
-                    );
-                    state_guard = state.lock().unwrap();
-                    continue;
+            let (new_conf, blacklist) = new_state.unwrap_config();
+            if let Some(old_yaml) = yaml_conf {
+                if old_yaml != new_conf.yaml_config {
+                    if let Some(mut c) = components.take() {
+                        c.stop();
+                    }
                 }
-            };
-
+            }
+            yaml_conf = Some(new_conf.yaml_config.clone());
             let callbacks = config_handler.on_config(new_conf, &exception_handler);
             match components.as_mut() {
                 None => {
                     let mut comp = Components::new(
                         &config_handler,
-                        &new_config,
                         stats_collector.clone(),
                         &session,
                         &synchronizer,
@@ -269,7 +264,7 @@ impl Trident {
                         callback(&config_handler, components);
                     }
                     for listener in components.dispatcher_listeners.iter_mut() {
-                        listener.on_config_change(&new_config);
+                        listener.on_config_change(&config_handler.candidate_config.dispatcher);
                     }
                 }
             }
@@ -389,7 +384,6 @@ impl Components {
 
     fn new(
         config_handler: &ConfigHandler,
-        runtime_config: &RuntimeConfig,
         stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
@@ -398,6 +392,7 @@ impl Components {
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
+        let yaml_config = &candidate_config.yaml_config;
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
 
@@ -409,7 +404,7 @@ impl Components {
             exception_handler.clone(),
         ));
 
-        match static_config.tap_mode {
+        match yaml_config.tap_mode {
             TapMode::Analyzer => todo!(),
             _ => {
                 check(free_memory_checker(
@@ -420,7 +415,7 @@ impl Components {
 
                 // NPF服务检查
                 // TODO: npf (only on windows)
-                if static_config.tap_mode == TapMode::Mirror {
+                if yaml_config.tap_mode == TapMode::Mirror {
                     kernel_check();
                 }
             }
@@ -445,7 +440,6 @@ impl Components {
             static_config: synchronizer.static_config.clone(),
             status: synchronizer.status.clone(),
             config: config_handler.debug(),
-            local_config: synchronizer.local_config.clone(),
         };
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
@@ -463,9 +457,14 @@ impl Components {
             synchronizer.ntp_diff(),
         );
 
-        let rx_leaky_bucket = Arc::new(LeakyBucket::new(match static_config.tap_mode {
+        let rx_leaky_bucket = Arc::new(LeakyBucket::new(match yaml_config.tap_mode {
             TapMode::Analyzer => None,
-            _ => Some(config_handler.candidate_config.global_pps_threshold),
+            _ => Some(
+                config_handler
+                    .candidate_config
+                    .dispatcher
+                    .global_pps_threshold,
+            ),
         }));
 
         let tap_typer = Arc::new(TapTyper::new());
@@ -494,7 +493,7 @@ impl Components {
         };
 
         // TODO: collector enabled
-        let dispatcher_num = static_config.src_interfaces.len().max(1);
+        let dispatcher_num = yaml_config.src_interfaces.len().max(1);
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
@@ -503,7 +502,7 @@ impl Components {
         // Sender/Collector
         info!(
             "static analyzer ip: {} actual analyzer ip {}",
-            static_config.analyzer_ip, candidate_config.sender.dest_ip
+            yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let sender_id = 0usize;
         let mut l4_flow_aggr_sender = None;
@@ -516,7 +515,7 @@ impl Components {
             .any(|&t| t)
         {
             let (sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
-                static_config.flow_sender_queue_size as usize,
+                yaml_config.flow_sender_queue_size as usize,
                 "3-flow-to-collector-sender",
                 &queue_debugger,
             );
@@ -540,7 +539,7 @@ impl Components {
 
         let sender_id = 1usize;
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
-            static_config.collector_sender_queue_size,
+            yaml_config.collector_sender_queue_size,
             "2-doc-to-collector-sender",
             &queue_debugger,
         );
@@ -562,7 +561,7 @@ impl Components {
 
         let sender_id = 2usize;
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
-            static_config.flow_sender_queue_size,
+            yaml_config.flow_sender_queue_size,
             "3-protolog-to-collector-sender",
             &queue_debugger,
         );
@@ -583,28 +582,38 @@ impl Components {
         );
 
         // Dispatcher
-        let bpf_syntax = if runtime_config.capture_bpf != "" {
-            runtime_config.capture_bpf.clone()
+        let bpf_syntax = if candidate_config.dispatcher.capture_bpf != "" {
+            candidate_config.dispatcher.capture_bpf.clone()
         } else {
+            let source_ip = match get_route_src_ip(&candidate_config.dispatcher.analyzer_ip) {
+                Ok(ip) => ip,
+                Err(e) => {
+                    warn!(
+                        "get route to {} failed: {:?}",
+                        candidate_config.dispatcher.analyzer_ip, e
+                    );
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
+            };
             bpf::Builder {
                 is_ipv6: ctrl_ip.is_ipv6(),
-                vxlan_port: static_config.vxlan_port,
+                vxlan_port: yaml_config.vxlan_port,
                 controller_port: static_config.controller_port,
                 controller_tls_port: static_config.controller_tls_port,
                 proxy_controller_ip: candidate_config.dispatcher.proxy_controller_ip,
-                analyzer_source_ip: candidate_config.dispatcher.source_ip,
+                analyzer_source_ip: source_ip,
             }
             .build_pcap_syntax()
         };
 
         let l7_log_rate = Arc::new(LeakyBucket::new(Some(
-            runtime_config.l7_log_collect_nps_threshold,
+            candidate_config.log_parser.l7_log_collect_nps_threshold,
         )));
 
         let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
         for i in 0..dispatcher_num {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
-                static_config.flow_queue_size,
+                yaml_config.flow_queue_size,
                 "1-tagged-flow-to-quadruple-generator",
                 &queue_debugger,
             );
@@ -619,7 +628,7 @@ impl Components {
 
             // create and start app proto logs
             let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
-                static_config.flow_queue_size,
+                yaml_config.flow_queue_size,
                 "1-tagged-flow-to-app-protocol-logs",
                 &queue_debugger,
             );
@@ -653,10 +662,10 @@ impl Components {
                 .options(Arc::new(dispatcher::Options {
                     af_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
                     af_packet_version: config_handler.candidate_config.dispatcher.af_packet_version,
-                    tap_mode: static_config.tap_mode,
-                    tap_mac_script: static_config.tap_mac_script.clone(),
+                    tap_mode: yaml_config.tap_mode,
+                    tap_mac_script: yaml_config.tap_mac_script.clone(),
                     is_ipv6: ctrl_ip.is_ipv6(),
-                    vxlan_port: static_config.vxlan_port,
+                    vxlan_port: yaml_config.vxlan_port,
                     controller_port: static_config.controller_port,
                     controller_tls_port: static_config.controller_tls_port,
                     handler_builders: vec![PacketHandlerBuilder::Pcap(pcap_sender.clone())],
@@ -664,13 +673,13 @@ impl Components {
                 }))
                 .bpf_options(bpf_options.clone())
                 .default_tap_type(
-                    (static_config.default_tap_type as u16)
+                    (yaml_config.default_tap_type as u16)
                         .try_into()
                         .unwrap_or(TapType::Tor),
                 )
-                .mirror_traffic_pcp(static_config.mirror_traffic_pcp)
+                .mirror_traffic_pcp(yaml_config.mirror_traffic_pcp)
                 .tap_typer(tap_typer.clone())
-                .analyzer_dedup_disabled(static_config.analyzer_dedup_disabled)
+                .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .flow_output_queue(flow_sender)
                 .log_output_queue(log_sender)
@@ -685,7 +694,7 @@ impl Components {
 
             // TODO: 创建dispatcher的时候处理这些
             let mut dispatcher_listener = dispatcher.listener();
-            dispatcher_listener.on_config_change(&runtime_config);
+            dispatcher_listener.on_config_change(&candidate_config.dispatcher);
             dispatcher_listener.on_tap_interface_change(
                 &tap_interfaces,
                 candidate_config.dispatcher.if_mac_source,
@@ -741,7 +750,7 @@ impl Components {
         let sender_id = 3;
         let (external_metrics_sender, external_metrics_receiver, counter) =
             queue::bounded_with_debug(
-                static_config.external_metrics_sender_queue_size,
+                yaml_config.external_metrics_sender_queue_size,
                 "external-metrics-to-sender",
                 &queue_debugger,
             );
@@ -801,9 +810,9 @@ impl Components {
         queue_debugger: &QueueDebugger,
         synchronizer: &Arc<Synchronizer>,
     ) -> CollectorThread {
-        let static_config = &config_handler.static_config;
+        let yaml_config = &config_handler.candidate_config.yaml_config;
         let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
-            static_config.quadruple_queue_size,
+            yaml_config.quadruple_queue_size,
             "2-flow-with-meter-to-second-collector",
             queue_debugger,
         );
@@ -819,7 +828,7 @@ impl Components {
             ],
         );
         let (minute_sender, minute_receiver, counter) = queue::bounded_with_debug(
-            static_config.quadruple_queue_size,
+            yaml_config.quadruple_queue_size,
             "2-flow-with-meter-to-minute-collector",
             queue_debugger,
         );
@@ -838,7 +847,7 @@ impl Components {
         let (mut l4_log_sender, mut l4_log_receiver) = (None, None);
         if l4_flow_aggr_sender.is_some() {
             let (l4_flow_sender, l4_flow_receiver, counter) = queue::bounded_with_debug(
-                static_config.flow.aggr_queue_size as usize,
+                yaml_config.flow.aggr_queue_size as usize,
                 "2-second-flow-to-minute-aggrer",
                 queue_debugger,
             );
@@ -860,14 +869,14 @@ impl Components {
         //   FlowGen中InjectFlushTicker的额外Delay：_TIME_SLOT_UNIT
         //   FlowGen中输出队列Flush的Delay：flushInterval
         //   FlowGen中其它处理流程可能产生的Delay: 5s
-        let second_quadruple_tolerable_delay = (static_config.packet_delay.as_secs()
+        let second_quadruple_tolerable_delay = (yaml_config.packet_delay.as_secs()
             + 1
-            + static_config.flow.flush_interval.as_secs()
+            + yaml_config.flow.flush_interval.as_secs()
             + 5)
-            + static_config.second_flow_extra_delay.as_secs();
-        let minute_quadruple_tolerable_delay = (60 + static_config.packet_delay.as_secs())
+            + yaml_config.second_flow_extra_delay.as_secs();
+        let minute_quadruple_tolerable_delay = (60 + yaml_config.packet_delay.as_secs())
             + 1
-            + static_config.flow.flush_interval.as_secs()
+            + yaml_config.flow.flush_interval.as_secs()
             + 5;
 
         let quadruple_generator = QuadrupleGeneratorThread::new(
@@ -876,7 +885,7 @@ impl Components {
             second_sender,
             minute_sender,
             l4_log_sender,
-            (static_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
+            (yaml_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
             metrics_type,
             second_quadruple_tolerable_delay,
             minute_quadruple_tolerable_delay,

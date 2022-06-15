@@ -41,7 +41,7 @@ use crate::{
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
     },
-    config::handler::{FlowAccess, FlowConfig, NewRuntimeConfig},
+    config::{FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig},
     debug::QueueDebugger,
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
@@ -1106,7 +1106,17 @@ pub fn _new_flow_map_and_receiver(trident_type: TridentType) -> (FlowMap, Receiv
     let (output_queue_sender, output_queue_receiver, _) =
         queue::bounded_with_debug(256, "", &queue_debugger);
     let (app_proto_log_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
-    let mut config = NewRuntimeConfig::default();
+    let mut config = ModuleConfig {
+        flow: FlowConfig {
+            trident_type,
+            collector_enabled: true,
+            l4_performance_enabled: true,
+            l7_metrics_enabled: true,
+            app_proto_log_enabled: true,
+            ..(&RuntimeConfig::default()).into()
+        },
+        ..Default::default()
+    };
     // Any
     config.flow.l7_log_tap_types[0] = true;
     config.flow.trident_type = trident_type;

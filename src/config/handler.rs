@@ -11,23 +11,19 @@ use bytesize::ByteSize;
 use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
-use hostname;
 use log::{info, warn, Level};
 
-use super::{Config, ConfigError, IngressFlavour, KubernetesPollerType};
-
-use crate::common::{
-    decapsulate::{TunnelType, TunnelTypeBitmap},
-    enums::TapType,
-    DEFAULT_CPU_CFS_PERIOD_US, DEFAULT_LIBVIRT_XML_PATH, DEFAULT_LOG_FILE_SIZE_LIMIT,
-    DEFAULT_MAX_CPUS, TRIDENT_MEMORY_LIMIT, TRIDENT_PROCESS_LIMIT, TRIDENT_THREAD_LIMIT,
+use super::{
+    config::{Config, PcapConfig, YamlConfig},
+    ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
-use crate::dispatcher::BpfOptions;
+
+use crate::common::{decapsulate::TunnelTypeBitmap, enums::TapType, DEFAULT_CPU_CFS_PERIOD_US};
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::IfMacSource;
 use crate::utils::cgroups::Cgroups;
 use crate::{
-    dispatcher::recv_engine::{self, bpf, OptTpacketVersion},
+    dispatcher::recv_engine::{self, OptTpacketVersion},
     ebpf::CAP_LEN_MAX,
     flow_generator::{FlowTimeout, TcpTimeout},
     proto::trident::{self, CaptureSocketType},
@@ -46,7 +42,7 @@ const MINUTE: Duration = Duration::from_secs(60);
 const SECOND: Duration = Duration::from_secs(1);
 const INFLUX_DB_PORT: u16 = 8086;
 
-type Access<C> = Map<Arc<ArcSwap<NewRuntimeConfig>>, NewRuntimeConfig, fn(&NewRuntimeConfig) -> &C>;
+type Access<C> = Map<Arc<ArcSwap<ModuleConfig>>, ModuleConfig, fn(&ModuleConfig) -> &C>;
 
 pub type CollectorAccess = Access<CollectorConfig>;
 
@@ -172,13 +168,12 @@ pub struct HandlerConfig {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DispatcherConfig {
+    pub global_pps_threshold: u64,
     pub capture_packet_size: u32,
     pub l7_log_packet_size: u32,
     pub tunnel_type_bitmap: TunnelTypeBitmap,
     pub trident_type: TridentType,
-    pub bpf_options: BpfOptions,
     pub vtap_id: u16,
-    pub source_ip: IpAddr,
     pub capture_socket_type: CaptureSocketType,
     pub tap_interface_regex: String,
     pub packet_header_enabled: bool,
@@ -190,6 +185,8 @@ pub struct DispatcherConfig {
     pub af_packet_blocks: usize,
     pub af_packet_version: OptTpacketVersion,
     pub tap_mode: TapMode,
+    pub region_id: u32,
+    pub pod_cluster_id: u32,
     pub enabled: bool,
 }
 
@@ -220,6 +217,32 @@ pub struct FlowConfig {
     pub app_proto_log_enabled: bool,
     pub l4_performance_enabled: bool,
     pub l7_log_packet_size: u32,
+}
+
+impl From<&RuntimeConfig> for FlowConfig {
+    fn from(conf: &RuntimeConfig) -> Self {
+        let flow_config = &conf.yaml_config.flow;
+        FlowConfig {
+            vtap_id: conf.vtap_id as u16,
+            trident_type: conf.trident_type,
+            cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
+            collector_enabled: conf.collector_enabled,
+            l7_log_tap_types: conf.l7_log_store_tap_types,
+            packet_delay: conf.yaml_config.packet_delay,
+            flush_interval: flow_config.flush_interval,
+            flow_timeout: FlowTimeout::from(TcpTimeout {
+                established: flow_config.established_timeout,
+                closing_rst: flow_config.closing_rst_timeout,
+                others: flow_config.others_timeout,
+            }),
+            ignore_tor_mac: flow_config.ignore_tor_mac,
+            ignore_l2_end: flow_config.ignore_l2_end,
+            l7_metrics_enabled: conf.l7_metrics_enabled,
+            app_proto_log_enabled: conf.app_proto_log_enabled,
+            l4_performance_enabled: conf.l4_performance_enabled,
+            l7_log_packet_size: conf.l7_log_packet_size,
+        }
+    }
 }
 
 impl fmt::Debug for FlowConfig {
@@ -258,16 +281,6 @@ pub struct LogParserConfig {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct PcapConfig {
-    pub queue_size: u32,
-    pub block_size_kb: u32,
-    pub max_concurrent_files: u32,
-    pub max_file_size_mb: u32,
-    pub max_file_period: Duration,
-    pub file_directory: PathBuf,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DebugConfig {
     pub vtap_id: u16,
     pub enabled: bool,
@@ -290,8 +303,6 @@ pub struct StatsConfig {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SynchronizerConfig {
     pub sync_interval: Duration,
-    pub region_id: u32,
-    pub pod_cluster_id: u32,
     pub ntp_enabled: bool,
     pub max_escape: Duration,
     pub output_vlan: u16,
@@ -401,7 +412,9 @@ pub struct MetricServerConfig {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NewRuntimeConfig {
+pub struct ModuleConfig {
+    pub enabled: bool,
+    pub yaml_config: YamlConfig,
     pub collector: CollectorConfig,
     pub environment: EnvironmentConfig,
     pub platform: PlatformConfig,
@@ -417,288 +430,200 @@ pub struct NewRuntimeConfig {
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
     pub ebpf: EbpfConfig,
-    pub global_pps_threshold: u64,
     pub trident_type: TridentType,
     pub metric_server: MetricServerConfig,
 }
 
-impl Default for NewRuntimeConfig {
+impl Default for ModuleConfig {
     fn default() -> Self {
-        let default_ip = Ipv4Addr::UNSPECIFIED.into();
-        let vtap_id = 0u16;
-        let trident_type = TridentType::TtProcess;
-        let host = hostname::get()
-            .ok()
-            .and_then(|c| c.into_string().ok())
-            .unwrap_or_default();
-
-        let mut conf = NewRuntimeConfig {
-            diagnose: DiagnoseConfig {
-                enabled: false,
-                libvirt_xml_path: DEFAULT_LIBVIRT_XML_PATH.into(),
+        Self::try_from((
+            Config {
+                controller_ips: vec!["127.0.0.1".into()],
+                ..Default::default()
             },
-            environment: EnvironmentConfig {
-                max_memory: TRIDENT_MEMORY_LIMIT,
-                max_cpus: DEFAULT_MAX_CPUS,
-                process_threshold: TRIDENT_PROCESS_LIMIT,
-                thread_threshold: TRIDENT_THREAD_LIMIT,
-                sys_free_memory_limit: 0,
-                log_file_size: DEFAULT_LOG_FILE_SIZE_LIMIT,
-            },
-            synchronizer: SynchronizerConfig {
-                sync_interval: MINUTE,
-                region_id: 0,
-                pod_cluster_id: 0,
-                ntp_enabled: false,
-                max_escape: SECOND,
-                output_vlan: 0,
-            },
-            stats: StatsConfig {
-                interval: MINUTE,
-                host: host.clone(),
-            },
-            global_pps_threshold: 2048,
-            dispatcher: DispatcherConfig {
-                capture_packet_size: 1024,
-                l7_log_packet_size: 256,
-                tunnel_type_bitmap: Default::default(),
-                trident_type,
-                bpf_options: Default::default(),
-                vtap_id,
-                source_ip: default_ip,
-                capture_socket_type: trident::CaptureSocketType::Auto,
-                tap_interface_regex: Default::default(),
-                packet_header_enabled: false,
-                if_mac_source: trident::IfMacSource::IfMac,
-                analyzer_ip: default_ip,
-                proxy_controller_ip: default_ip,
-                capture_bpf: Default::default(),
-                max_memory: TRIDENT_MEMORY_LIMIT,
-                af_packet_blocks: 0,
-                af_packet_version: OptTpacketVersion::default(),
-                tap_mode: TapMode::default(),
-                enabled: false,
-            },
-            sender: SenderConfig {
-                mtu: 1500,
-                dest_ip: default_ip,
-                vtap_id,
-                npb_vlan_mode: trident::VlanMode::None,
-                npb_dedup_enabled: false,
-                npb_bps_threshold: 1024,
-                npb_socket_type: trident::SocketType::Tcp,
-                compressor_socket_type: trident::SocketType::Tcp,
-                server_tx_bandwidth_threshold: 1024,
-                bandwidth_probe_interval: MINUTE,
-                collector_socket_type: trident::SocketType::Tcp,
-                enabled: true,
-            },
-            collector: CollectorConfig {
-                enabled: true,
-                inactive_server_port_enabled: false,
-                vtap_flow_1s_enabled: false,
-                l4_log_collect_nps_threshold: 1024,
-                l7_metrics_enabled: true,
-                trident_type,
-                vtap_id,
-                l4_log_store_tap_types: [false; 256],
-                cloud_gateway_traffic: false,
-            },
-            handler: HandlerConfig {
-                compressor_socket_type: trident::SocketType::Tcp,
-                npb_dedup_enabled: false,
-                trident_type,
-            },
-            pcap: PcapConfig {
-                queue_size: 65536,
-                block_size_kb: 64,
-                max_concurrent_files: 5000,
-                max_file_size_mb: 250,
-                max_file_period: Duration::from_secs(300),
-                file_directory: "/var/lib/pcap".into(),
-            },
-            platform: PlatformConfig {
-                sync_interval: MINUTE,
-                kubernetes_cluster_id: Default::default(),
-                libvirt_xml_path: DEFAULT_LIBVIRT_XML_PATH.into(),
-                kubernetes_poller_type: KubernetesPollerType::Adaptive,
-                vtap_id,
-                enabled: false,
-                ingress_flavour: IngressFlavour::Kubernetes,
-                trident_type,
-                source_ip: default_ip,
-                epc_id: 0,
-                kubernetes_api_enabled: false,
-                namespace: None,
-            },
-            flow: {
-                FlowConfig {
-                    vtap_id,
-                    trident_type,
-                    cloud_gateway_traffic: false,
-                    collector_enabled: true,
-                    l7_log_tap_types: [false; 256],
-                    packet_delay: SECOND,
-                    flush_interval: SECOND,
-                    flow_timeout: FlowTimeout::from(TcpTimeout {
-                        established: Duration::from_secs(300),
-                        closing_rst: Duration::from_secs(35),
-                        others: Duration::from_secs(5),
-                    }),
-                    ignore_tor_mac: false,
-                    ignore_l2_end: false,
-                    l7_metrics_enabled: true,
-                    app_proto_log_enabled: true,
-                    l4_performance_enabled: true,
-                    l7_log_packet_size: 256,
-                }
-            },
-            log_parser: LogParserConfig {
-                l7_log_collect_nps_threshold: 1024,
-                l7_log_session_aggr_timeout: Duration::from_secs(120),
-                l7_log_dynamic: L7LogDynamicConfig::default(),
-            },
-            debug: DebugConfig {
-                vtap_id,
-                enabled: false,
-                controller_ips: vec![],
-                listen_port: 0,
-            },
-            log: LogConfig {
-                log_level: Level::Info,
-                log_threshold: 1024,
-                log_retention: 7,
-                rsyslog_enabled: false,
-                host,
-            },
-            ebpf: EbpfConfig {
-                collector_enabled: true,
-                l7_metrics_enabled: true,
-                vtap_id,
-                epc_id: 0,
-                l7_log_session_timeout: Duration::from_secs(120),
-                log_path: "".to_string(),
-                l7_log_packet_size: CAP_LEN_MAX,
-                l7_log_tap_types: [false; 256],
-            },
-            trident_type: TridentType::TtProcess,
-            metric_server: MetricServerConfig {
-                enabled: false,
-                port: INFLUX_DB_PORT,
-            },
-        };
-        conf.collector.l4_log_store_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
-        conf.flow.l7_log_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
-        conf.ebpf.l7_log_tap_types[u16::from(TapType::Isp(2)) as usize] = true;
-        conf
+            RuntimeConfig::default(),
+        ))
+        .unwrap()
     }
 }
 
-impl NewRuntimeConfig {
-    fn validate(&self) -> Result<(), ConfigError> {
-        if self.environment.max_cpus < 1 || self.environment.max_cpus > 100000 {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "max-cpus {:?} not in [1, 100000]",
-                self.environment.max_cpus
-            )));
-        }
-        if self.environment.sys_free_memory_limit > 100 {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "sys_free_memory_limit {:?} not in [0, 100]",
-                self.environment.sys_free_memory_limit
-            )));
-        }
-        if self.environment.log_file_size > 10000 || self.environment.log_file_size < 10 {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "log file size limit {:?} not in [10, 10000] M",
-                self.environment.log_file_size
-            )));
-        }
-        if self.synchronizer.sync_interval < Duration::from_secs(1)
-            || self.synchronizer.sync_interval > Duration::from_secs(60 * 60)
-        {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "sync-interval {:?} not in [1s, 1h]",
-                self.synchronizer.sync_interval
-            )));
-        }
-        if self.stats.interval < Duration::from_secs(1)
-            || self.stats.interval > Duration::from_secs(60 * 60)
-        {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "stats-interval {:?} not in [1s, 1h]",
-                self.stats.interval
-            )));
-        }
+impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
+    type Error = ConfigError;
 
-        // 虽然RFC 791里最低MTU是68，但是此时compressor会崩溃，
-        // 所以MTU最低限定到200以确保trident能够成功运行
-        if self.sender.mtu < 200 {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "MTU({}) specified smaller than 200",
-                self.sender.mtu
-            )));
-        }
+    fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
+        let (static_config, conf) = conf;
+        let ctrl_ip =
+            get_route_src_ip(&static_config.controller_ips[0].parse().unwrap()).map_err(|_| {
+                ConfigError::YamlConfigInvalid(format!(
+                    "no route to controller {}",
+                    static_config.controller_ips[0]
+                ))
+            })?;
+        let dest_ip = conf
+            .analyzer_ip
+            .parse::<IpAddr>()
+            .unwrap_or(Ipv4Addr::UNSPECIFIED.into());
+        let proxy_controller_ip = conf
+            .proxy_controller_ip
+            .parse()
+            .unwrap_or(static_config.controller_ips[0].parse::<IpAddr>().unwrap());
 
-        if self.synchronizer.output_vlan > 4095 {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "output-vlan({}) out of range (0-4095)",
-                self.synchronizer.output_vlan
-            )));
-        }
+        let config = ModuleConfig {
+            enabled: conf.enabled,
+            yaml_config: conf.yaml_config.clone(),
+            diagnose: DiagnoseConfig {
+                enabled: conf.enabled,
+                libvirt_xml_path: conf.libvirt_xml_path.parse().unwrap_or_default(),
+            },
+            environment: EnvironmentConfig {
+                max_memory: conf.max_memory,
+                max_cpus: conf.max_cpus,
+                process_threshold: conf.process_threshold,
+                thread_threshold: conf.thread_threshold,
+                sys_free_memory_limit: conf.sys_free_memory_limit,
+                log_file_size: conf.log_file_size,
+            },
+            synchronizer: SynchronizerConfig {
+                sync_interval: conf.sync_interval,
+                output_vlan: conf.output_vlan,
+                ntp_enabled: conf.ntp_enabled,
+                max_escape: conf.max_escape,
+            },
+            stats: StatsConfig {
+                interval: conf.stats_interval,
+                host: conf.host.clone(),
+            },
+            dispatcher: DispatcherConfig {
+                global_pps_threshold: conf.global_pps_threshold,
+                capture_packet_size: conf.capture_packet_size,
+                l7_log_packet_size: conf.l7_log_packet_size,
+                tunnel_type_bitmap: TunnelTypeBitmap::new(&conf.decap_types),
+                trident_type: conf.trident_type,
+                vtap_id: conf.vtap_id as u16,
+                capture_socket_type: conf.capture_socket_type,
+                tap_interface_regex: conf.tap_interface_regex.to_string(),
+                packet_header_enabled: conf.packet_header_enabled,
+                if_mac_source: conf.if_mac_source,
+                analyzer_ip: dest_ip,
+                proxy_controller_ip: proxy_controller_ip,
+                capture_bpf: conf.capture_bpf.to_string(),
+                max_memory: (conf.max_memory as u64) << 24,
+                af_packet_blocks: conf
+                    .yaml_config
+                    .get_af_packet_blocks((conf.max_memory as u64) << 24),
+                af_packet_version: conf.capture_socket_type.into(),
+                tap_mode: conf.yaml_config.tap_mode,
+                region_id: conf.region_id,
+                pod_cluster_id: conf.pod_cluster_id,
+                enabled: conf.enabled,
+            },
+            sender: SenderConfig {
+                mtu: conf.mtu,
+                dest_ip,
+                vtap_id: conf.vtap_id as u16,
+                npb_vlan_mode: conf.npb_vlan_mode,
+                npb_dedup_enabled: conf.npb_dedup_enabled,
+                npb_bps_threshold: conf.npb_bps_threshold,
+                npb_socket_type: conf.npb_socket_type,
+                compressor_socket_type: conf.compressor_socket_type,
+                server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold,
+                bandwidth_probe_interval: conf.bandwidth_probe_interval,
+                collector_socket_type: conf.collector_socket_type,
+                enabled: conf.collector_enabled,
+            },
+            collector: CollectorConfig {
+                enabled: conf.collector_enabled,
+                inactive_server_port_enabled: conf.inactive_server_port_enabled,
+                vtap_flow_1s_enabled: conf.vtap_flow_1s_enabled,
+                l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold,
+                l7_metrics_enabled: conf.l7_metrics_enabled,
+                trident_type: conf.trident_type,
+                vtap_id: conf.vtap_id as u16,
+                l4_log_store_tap_types: conf.l4_log_store_tap_types,
+                cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
+            },
+            handler: HandlerConfig {
+                compressor_socket_type: conf.compressor_socket_type,
+                npb_dedup_enabled: conf.npb_dedup_enabled,
+                trident_type: conf.trident_type,
+            },
+            pcap: conf.yaml_config.pcap.clone(),
+            platform: PlatformConfig {
+                sync_interval: MINUTE,
+                kubernetes_cluster_id: static_config.kubernetes_cluster_id.clone(),
+                libvirt_xml_path: conf.libvirt_xml_path.parse().unwrap_or_default(),
+                kubernetes_poller_type: conf.yaml_config.kubernetes_poller_type,
+                vtap_id: conf.vtap_id as u16,
+                enabled: conf.platform_enabled,
+                ingress_flavour: conf.yaml_config.ingress_flavour,
+                trident_type: conf.trident_type,
+                source_ip: ctrl_ip,
+                epc_id: conf.epc_id,
+                kubernetes_api_enabled: conf.kubernetes_api_enabled,
+                namespace: if conf.yaml_config.kubernetes_namespace.is_empty() {
+                    None
+                } else {
+                    Some(conf.yaml_config.kubernetes_namespace.clone())
+                },
+            },
+            flow: (&conf).into(),
+            log_parser: LogParserConfig {
+                l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold,
+                l7_log_session_aggr_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
+                l7_log_dynamic: L7LogDynamicConfig {
+                    proxy_client_origin: conf.http_log_proxy_client.to_string(),
+                    proxy_client_lower: conf.http_log_proxy_client.to_string().to_lowercase(),
+                    proxy_client_with_colon: format!("{}: ", conf.http_log_proxy_client),
 
-        if self.dispatcher.analyzer_ip.is_unspecified() {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "analyzer-ip({}) invalid",
-                self.dispatcher.analyzer_ip
-            )));
-        }
-        if self.dispatcher.proxy_controller_ip.is_unspecified() {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "analyzer-ip({}) invalid",
-                self.dispatcher.proxy_controller_ip
-            )));
-        }
+                    x_request_id_origin: conf.http_log_x_request_id.to_string(),
+                    x_request_id_lower: conf.http_log_x_request_id.to_string().to_lowercase(),
+                    x_request_id_with_colon: format!("{}: ", conf.http_log_x_request_id),
 
-        if regex::Regex::new(&self.dispatcher.tap_interface_regex).is_err() {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "malformed tap-interface-regex({})",
-                self.dispatcher.tap_interface_regex
-            )));
-        }
+                    trace_id_origin: conf.http_log_trace_id.to_string(),
+                    trace_id_lower: conf.http_log_trace_id.to_string().to_lowercase(),
+                    trace_id_with_colon: format!("{}: ", conf.http_log_trace_id),
+                    trace_type: conf.http_log_trace_id.as_str().into(),
 
-        if self.synchronizer.max_escape < Duration::from_secs(600)
-            || self.synchronizer.max_escape > Duration::from_secs(30 * 24 * 60 * 60)
-        {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "max-escape-seconds {:?} not in [600s, 30d]",
-                self.synchronizer.max_escape
-            )));
-        }
-
-        if self.dispatcher.capture_packet_size > 65535 || self.dispatcher.capture_packet_size < 128
-        {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "capture packet size {} not in [128, 65535]",
-                self.dispatcher.capture_packet_size
-            )));
-        }
-
-        if self.sender.collector_socket_type == trident::SocketType::RawUdp {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "invalid collector_socket_type {:?}",
-                self.sender.collector_socket_type
-            )));
-        }
-
-        if self.sender.npb_socket_type == trident::SocketType::Tcp {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "invalid npb_socket_type {:?}",
-                self.sender.npb_socket_type
-            )));
-        }
-
-        Ok(())
+                    span_id_origin: conf.http_log_span_id.to_string(),
+                    span_id_lower: conf.http_log_span_id.to_string().to_lowercase(),
+                    span_id_with_colon: format!("{}: ", conf.http_log_span_id),
+                    span_type: conf.http_log_span_id.as_str().into(),
+                },
+            },
+            debug: DebugConfig {
+                vtap_id: conf.vtap_id as u16,
+                enabled: conf.debug_enabled,
+                controller_ips: static_config
+                    .controller_ips
+                    .iter()
+                    .map(|c| c.parse::<IpAddr>().unwrap())
+                    .collect(),
+                listen_port: conf.yaml_config.debug_listen_port,
+            },
+            log: LogConfig {
+                log_level: conf.log_level,
+                log_threshold: conf.log_threshold,
+                log_retention: conf.log_retention,
+                rsyslog_enabled: conf.rsyslog_enabled,
+                host: conf.host.clone(),
+            },
+            ebpf: EbpfConfig {
+                collector_enabled: conf.collector_enabled,
+                l7_metrics_enabled: conf.l7_metrics_enabled,
+                vtap_id: conf.vtap_id as u16,
+                epc_id: conf.epc_id,
+                l7_log_session_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
+                log_path: conf.yaml_config.ebpf_log_file.clone(),
+                l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size as usize),
+                l7_log_tap_types: conf.l7_log_store_tap_types,
+            },
+            metric_server: MetricServerConfig {
+                enabled: conf.external_agent_http_proxy_enabled,
+                port: conf.external_agent_http_proxy_port as u16,
+            },
+            trident_type: conf.trident_type,
+        };
+        Ok(config)
     }
 }
 
@@ -709,8 +634,8 @@ pub struct ConfigHandler {
     pub remote_log_config: RemoteLogConfig,
     // need update
     pub static_config: Config,
-    pub candidate_config: NewRuntimeConfig,
-    pub current_config: Arc<ArcSwap<NewRuntimeConfig>>,
+    pub candidate_config: ModuleConfig,
+    pub current_config: Arc<ArcSwap<ModuleConfig>>,
 }
 
 impl ConfigHandler {
@@ -721,7 +646,8 @@ impl ConfigHandler {
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
     ) -> Self {
-        let candidate_config = NewRuntimeConfig::default();
+        let candidate_config =
+            ModuleConfig::try_from((config.clone(), RuntimeConfig::default())).unwrap();
         let current_config = Arc::new(ArcSwap::from_pointee(candidate_config.clone()));
 
         Self {
@@ -828,287 +754,22 @@ impl ConfigHandler {
         )
     }
 
-    pub fn new_runtime_config(
-        &self,
-        conf: trident::Config,
-    ) -> Result<NewRuntimeConfig, ConfigError> {
-        let candidate_config = &self.candidate_config;
-        let static_config = &self.static_config;
-
-        let dest_ip = if static_config.analyzer_ip.is_empty() {
-            conf.analyzer_ip()
-                .parse::<IpAddr>()
-                .unwrap_or(Ipv4Addr::UNSPECIFIED.into())
-        } else {
-            static_config.analyzer_ip.parse::<IpAddr>().unwrap()
-        };
-
-        let l7_log_tap_types = {
-            let mut l7_log_tap_types = [false; 256];
-            for &tap in conf.l7_log_store_tap_types.iter() {
-                if tap < 256 {
-                    l7_log_tap_types[tap as usize] = true;
-                } else {
-                    warn!("l7 log tap types: {} invalid", tap);
-                }
-            }
-            l7_log_tap_types
-        };
-        let config = NewRuntimeConfig {
-            diagnose: DiagnoseConfig {
-                enabled: conf.enabled(),
-                libvirt_xml_path: conf.libvirt_xml_path().parse().unwrap_or_default(),
-            },
-            environment: EnvironmentConfig {
-                max_memory: (conf.max_memory() as u64) << 20,
-                max_cpus: conf.max_cpus(),
-                process_threshold: conf.process_threshold(),
-                thread_threshold: conf.thread_threshold(),
-                sys_free_memory_limit: conf.sys_free_memory_limit(),
-                log_file_size: conf.log_file_size(),
-            },
-            synchronizer: SynchronizerConfig {
-                sync_interval: Duration::from_secs(conf.sync_interval() as u64),
-                output_vlan: conf.output_vlan() as u16,
-                region_id: conf.region_id(),
-                pod_cluster_id: conf.pod_cluster_id(),
-                ntp_enabled: conf.ntp_enabled(),
-                max_escape: Duration::from_secs(conf.max_escape_seconds() as u64),
-            },
-            stats: StatsConfig {
-                interval: Duration::from_secs(conf.stats_interval() as u64),
-                host: if conf.host().is_empty() {
-                    candidate_config.stats.host.clone()
-                } else {
-                    conf.host().to_string()
-                },
-            },
-            global_pps_threshold: conf.global_pps_threshold(),
-            dispatcher: DispatcherConfig {
-                capture_packet_size: conf.capture_packet_size(),
-                l7_log_packet_size: conf.l7_log_packet_size(),
-                tunnel_type_bitmap: {
-                    let mut tunnel_types = conf
-                        .decap_type
-                        .iter()
-                        .map(|&t| TunnelType::try_from(t as u8).unwrap())
-                        .collect::<Vec<_>>();
-                    if self.static_config.decap_erspan {
-                        tunnel_types.push(TunnelType::ErspanOrTeb);
-                    }
-                    TunnelTypeBitmap::new(&tunnel_types)
-                },
-                trident_type: conf.trident_type(),
-                bpf_options: candidate_config.dispatcher.bpf_options.clone(),
-                vtap_id: conf.vtap_id() as u16,
-                source_ip: candidate_config.dispatcher.source_ip,
-                capture_socket_type: conf.capture_socket_type(),
-                tap_interface_regex: conf.tap_interface_regex().to_string(),
-                packet_header_enabled: conf.packet_header_enabled(),
-                if_mac_source: conf.if_mac_source(),
-                analyzer_ip: dest_ip,
-                proxy_controller_ip: if conf.proxy_controller_ip().is_empty() {
-                    static_config.controller_ips[0].parse::<IpAddr>().unwrap()
-                } else {
-                    conf.proxy_controller_ip()
-                        .parse()
-                        .unwrap_or(Ipv4Addr::UNSPECIFIED.into())
-                },
-                capture_bpf: conf.capture_bpf().to_string(),
-                max_memory: (conf.max_memory() as u64) << 24,
-                af_packet_blocks: Self::get_af_packet_blocks(
-                    static_config,
-                    (conf.max_memory() as u64) << 24,
-                ),
-                af_packet_version: conf.capture_socket_type().into(),
-                tap_mode: static_config.tap_mode,
-                enabled: conf.enabled(),
-            },
-            sender: SenderConfig {
-                mtu: conf.mtu(),
-                dest_ip,
-                vtap_id: conf.vtap_id() as u16,
-                npb_vlan_mode: conf.npb_vlan_mode(),
-                npb_dedup_enabled: conf.npb_dedup_enabled(),
-                npb_bps_threshold: conf.npb_bps_threshold(),
-                npb_socket_type: conf.npb_socket_type(),
-                compressor_socket_type: conf.compressor_socket_type(),
-                server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
-                bandwidth_probe_interval: Duration::from_secs(conf.bandwidth_probe_interval()),
-                collector_socket_type: conf.collector_socket_type(),
-                enabled: conf.collector_enabled(),
-            },
-            collector: CollectorConfig {
-                enabled: conf.collector_enabled(),
-                inactive_server_port_enabled: conf.inactive_server_port_enabled(),
-                vtap_flow_1s_enabled: conf.vtap_flow_1s_enabled(),
-                l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold(),
-                l7_metrics_enabled: conf.l7_metrics_enabled(),
-                trident_type: conf.trident_type(),
-                vtap_id: conf.vtap_id() as u16,
-                l4_log_store_tap_types: {
-                    let mut l4_log_tap_types = [false; 256];
-                    for &tap in conf.l4_log_tap_types.iter() {
-                        if tap < 256 {
-                            l4_log_tap_types[tap as usize] = true;
-                        } else {
-                            warn!("l4 log tap types: {} invalid", tap);
-                        }
-                    }
-                    l4_log_tap_types
-                },
-                cloud_gateway_traffic: static_config.cloud_gateway_traffic,
-            },
-            handler: HandlerConfig {
-                compressor_socket_type: conf.compressor_socket_type(),
-                npb_dedup_enabled: conf.npb_dedup_enabled(),
-                trident_type: conf.trident_type(),
-            },
-            pcap: candidate_config.pcap.clone(),
-            platform: PlatformConfig {
-                sync_interval: MINUTE,
-                kubernetes_cluster_id: static_config.kubernetes_cluster_id.clone(),
-                libvirt_xml_path: conf.libvirt_xml_path().parse().unwrap_or_default(),
-                kubernetes_poller_type: static_config.kubernetes_poller_type,
-                vtap_id: conf.vtap_id() as u16,
-                enabled: conf.platform_enabled(),
-                ingress_flavour: static_config.ingress_flavour,
-                trident_type: conf.trident_type(),
-                source_ip: self.ctrl_ip,
-                epc_id: conf.epc_id(),
-                kubernetes_api_enabled: conf.kubernetes_api_enabled(),
-                namespace: if static_config.kubernetes_namespace.is_empty() {
-                    None
-                } else {
-                    Some(static_config.kubernetes_namespace.clone())
-                },
-            },
-            flow: {
-                let flow_config = &self.static_config.flow;
-
-                FlowConfig {
-                    vtap_id: conf.vtap_id() as u16,
-                    trident_type: conf.trident_type(),
-                    cloud_gateway_traffic: static_config.cloud_gateway_traffic,
-                    collector_enabled: conf.collector_enabled(),
-                    l7_log_tap_types: l7_log_tap_types.clone(),
-                    packet_delay: static_config.packet_delay,
-                    flush_interval: flow_config.flush_interval,
-                    flow_timeout: FlowTimeout::from(TcpTimeout {
-                        established: flow_config.established_timeout,
-                        closing_rst: flow_config.closing_rst_timeout,
-                        others: flow_config.others_timeout,
-                    }),
-                    ignore_tor_mac: flow_config.ignore_tor_mac,
-                    ignore_l2_end: flow_config.ignore_l2_end,
-                    l7_metrics_enabled: conf.l7_metrics_enabled(),
-                    app_proto_log_enabled: !conf.l7_log_store_tap_types.is_empty(),
-                    l4_performance_enabled: conf.l4_performance_enabled(),
-                    l7_log_packet_size: conf.l7_log_packet_size(),
-                }
-            },
-            log_parser: LogParserConfig {
-                l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold(),
-                l7_log_session_aggr_timeout: static_config.l7_log_session_aggr_timeout,
-                l7_log_dynamic: L7LogDynamicConfig {
-                    proxy_client_origin: conf.http_log_proxy_client().to_string(),
-                    proxy_client_lower: conf.http_log_proxy_client().to_string().to_lowercase(),
-                    proxy_client_with_colon: format!("{}: ", conf.http_log_proxy_client()),
-
-                    x_request_id_origin: conf.http_log_x_request_id().to_string(),
-                    x_request_id_lower: conf.http_log_x_request_id().to_string().to_lowercase(),
-                    x_request_id_with_colon: format!("{}: ", conf.http_log_x_request_id()),
-
-                    trace_id_origin: conf.http_log_trace_id().to_string(),
-                    trace_id_lower: conf.http_log_trace_id().to_string().to_lowercase(),
-                    trace_id_with_colon: format!("{}: ", conf.http_log_trace_id()),
-                    trace_type: conf.http_log_trace_id().into(),
-
-                    span_id_origin: conf.http_log_span_id().to_string(),
-                    span_id_lower: conf.http_log_span_id().to_string().to_lowercase(),
-                    span_id_with_colon: format!("{}: ", conf.http_log_span_id()),
-                    span_type: conf.http_log_span_id().into(),
-                },
-            },
-            debug: DebugConfig {
-                vtap_id: conf.vtap_id() as u16,
-                enabled: conf.debug_enabled(),
-                controller_ips: static_config
-                    .controller_ips
-                    .iter()
-                    .map(|c| c.parse::<IpAddr>().unwrap())
-                    .collect(),
-                listen_port: static_config.debug_listen_port,
-            },
-            log: LogConfig {
-                log_level: match conf.log_level().to_lowercase().as_str() {
-                    "error" => log::Level::Error,
-                    "warn" | "warning" => log::Level::Warn,
-                    "info" => log::Level::Info,
-                    "debug" => log::Level::Debug,
-                    "trace" => log::Level::Trace,
-                    _ => log::Level::Info,
-                },
-                log_threshold: conf.log_threshold(),
-                log_retention: conf.log_retention(),
-                rsyslog_enabled: conf.rsyslog_enabled(),
-                host: if conf.host().is_empty() {
-                    candidate_config.log.host.clone()
-                } else {
-                    conf.host().to_string()
-                },
-            },
-            ebpf: EbpfConfig {
-                collector_enabled: conf.collector_enabled(),
-                l7_metrics_enabled: conf.l7_metrics_enabled(),
-                vtap_id: conf.vtap_id() as u16,
-                epc_id: conf.epc_id(),
-                l7_log_session_timeout: static_config.l7_log_session_aggr_timeout,
-                log_path: static_config.ebpf_log_file.clone(),
-                l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size() as usize),
-                l7_log_tap_types,
-            },
-            metric_server: MetricServerConfig {
-                enabled: conf.external_agent_http_proxy_enabled(),
-                port: conf.external_agent_http_proxy_port() as u16,
-            },
-            trident_type: conf.trident_type(),
-        };
-        config.validate()?;
-        Ok(config)
-    }
-
     pub fn on_config(
         &mut self,
-        mut new_config: NewRuntimeConfig,
+        new_config: RuntimeConfig,
         exception_handler: &ExceptionHandler,
     ) -> Vec<fn(&ConfigHandler, &mut Components)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &mut self.static_config;
+        let yaml_config = &candidate_config.yaml_config;
+        let mut new_config: ModuleConfig = (static_config.clone(), new_config).try_into().unwrap();
         let mut callbacks: Vec<fn(&ConfigHandler, &mut Components)> = vec![];
         //TODO dispatcher on_config_change 要迁移过来
         let mut restart_dispatcher = false;
-        let source_ip = match get_route_src_ip(&new_config.dispatcher.analyzer_ip) {
-            Ok(p) => p,
-            Err(e) => {
-                warn!(
-                    "analyzer_ip({}) get route src ip failed: {}",
-                    new_config.dispatcher.analyzer_ip, e
-                );
-                exception_handler.set(Exception::InvalidConfiguration);
-                candidate_config.dispatcher.source_ip
-            }
-        };
 
         if candidate_config.dispatcher != new_config.dispatcher {
-            let mut reset_bpf = false;
-            if candidate_config.dispatcher.analyzer_ip != new_config.dispatcher.analyzer_ip {
-                info!("find source-ip {}", source_ip);
-                reset_bpf = true;
-            }
-
             if candidate_config.dispatcher.if_mac_source != new_config.dispatcher.if_mac_source {
-                if static_config.tap_mode != TapMode::Local {
+                if yaml_config.tap_mode != TapMode::Local {
                     info!(
                         "if_mac_source set to {:?}",
                         new_config.dispatcher.if_mac_source
@@ -1119,7 +780,7 @@ impl ConfigHandler {
             if candidate_config.dispatcher.capture_packet_size
                 != new_config.dispatcher.capture_packet_size
             {
-                if static_config.tap_mode == TapMode::Analyzer || cfg!(target_os = "windows") {
+                if yaml_config.tap_mode == TapMode::Analyzer || cfg!(target_os = "windows") {
                     todo!()
                 }
             }
@@ -1128,16 +789,6 @@ impl ConfigHandler {
                 != new_config.dispatcher.capture_socket_type
             {
                 restart_dispatcher = !cfg!(target_os = "windows");
-            }
-
-            if candidate_config.dispatcher.proxy_controller_ip
-                != new_config.dispatcher.proxy_controller_ip
-            {
-                reset_bpf = true;
-            }
-
-            if candidate_config.dispatcher.capture_bpf != new_config.dispatcher.capture_bpf {
-                reset_bpf = true;
             }
 
             if candidate_config.dispatcher.enabled != new_config.dispatcher.enabled {
@@ -1160,42 +811,45 @@ impl ConfigHandler {
             }
 
             if candidate_config.dispatcher.max_memory != new_config.dispatcher.max_memory {
-                if Self::get_af_packet_blocks(static_config, new_config.dispatcher.max_memory)
-                    != Self::get_af_packet_blocks(
-                        static_config,
-                        candidate_config.dispatcher.max_memory,
-                    )
-                    || Self::get_fast_path_map_size(static_config, new_config.dispatcher.max_memory)
-                        != Self::get_fast_path_map_size(
-                            static_config,
-                            candidate_config.dispatcher.max_memory,
-                        )
-                    || Self::get_channel_size(static_config, new_config.dispatcher.max_memory)
-                        != Self::get_channel_size(
-                            static_config,
-                            candidate_config.dispatcher.max_memory,
-                        )
-                    || Self::get_flow_capacity(static_config, new_config.dispatcher.max_memory)
-                        != Self::get_flow_capacity(
-                            static_config,
-                            candidate_config.dispatcher.max_memory,
-                        )
+                if yaml_config.get_af_packet_blocks(new_config.dispatcher.max_memory)
+                    != yaml_config.get_af_packet_blocks(candidate_config.dispatcher.max_memory)
+                    || yaml_config.get_fast_path_map_size(new_config.dispatcher.max_memory)
+                        != yaml_config
+                            .get_fast_path_map_size(candidate_config.dispatcher.max_memory)
+                    || yaml_config.get_channel_size(new_config.dispatcher.max_memory)
+                        != yaml_config.get_channel_size(candidate_config.dispatcher.max_memory)
+                    || yaml_config.get_flow_capacity(new_config.dispatcher.max_memory)
+                        != yaml_config.get_flow_capacity(candidate_config.dispatcher.max_memory)
                 {
                     restart_dispatcher = true;
                     info!("max_memory change, restart dispatcher");
                 }
             }
-            if reset_bpf {
-                let bpf_syntax = bpf::Builder {
-                    is_ipv6: self.ctrl_ip.is_ipv6(),
-                    vxlan_port: static_config.vxlan_port,
-                    controller_port: static_config.controller_port,
-                    controller_tls_port: static_config.controller_tls_port,
-                    proxy_controller_ip: candidate_config.dispatcher.proxy_controller_ip,
-                    analyzer_source_ip: source_ip,
+
+            if candidate_config.dispatcher.global_pps_threshold
+                != new_config.dispatcher.global_pps_threshold
+            {
+                candidate_config.dispatcher.global_pps_threshold =
+                    new_config.dispatcher.global_pps_threshold;
+
+                fn leaky_bucket_callback(handler: &ConfigHandler, components: &mut Components) {
+                    match handler.candidate_config.yaml_config.tap_mode {
+                        TapMode::Analyzer => {
+                            components.rx_leaky_bucket.set_rate(None);
+                            info!("dispatcher.global pps set ulimit when tap_mode=analyzer");
+                        }
+                        _ => {
+                            components.rx_leaky_bucket.set_rate(Some(
+                                handler.candidate_config.dispatcher.global_pps_threshold,
+                            ));
+                            info!(
+                                "dispatcher.global pps threshold change to {}",
+                                handler.candidate_config.dispatcher.global_pps_threshold
+                            );
+                        }
+                    }
                 }
-                .build_pcap_syntax();
-                new_config.dispatcher.bpf_options.bpf_syntax = bpf_syntax;
+                callbacks.push(leaky_bucket_callback);
             }
 
             info!(
@@ -1206,6 +860,9 @@ impl ConfigHandler {
         }
 
         if candidate_config.log != new_config.log {
+            if new_config.log.host == "" {
+                new_config.log.host = candidate_config.log.host.clone();
+            }
             if candidate_config.log.rsyslog_enabled != new_config.log.rsyslog_enabled {
                 if new_config.log.rsyslog_enabled {
                     info!("Enable rsyslog");
@@ -1303,7 +960,7 @@ impl ConfigHandler {
             let mut max_cpus_change = false;
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
                 max_memory_change = true;
-                if static_config.tap_mode != TapMode::Analyzer {
+                if yaml_config.tap_mode != TapMode::Analyzer {
                     // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                     info!(
                         "memory limit set to {}",
@@ -1408,30 +1065,7 @@ impl ConfigHandler {
             candidate_config.environment = new_config.environment;
         }
 
-        if candidate_config.global_pps_threshold != new_config.global_pps_threshold {
-            candidate_config.global_pps_threshold = new_config.global_pps_threshold;
-
-            fn leaky_bucket_callback(handler: &ConfigHandler, components: &mut Components) {
-                match handler.static_config.tap_mode {
-                    TapMode::Analyzer => {
-                        components.rx_leaky_bucket.set_rate(None);
-                        info!("global pps set ulimit when tap_mode=analyzer");
-                    }
-                    _ => {
-                        components
-                            .rx_leaky_bucket
-                            .set_rate(Some(handler.candidate_config.global_pps_threshold));
-                        info!(
-                            "global pps threshold change to {}",
-                            handler.candidate_config.global_pps_threshold
-                        );
-                    }
-                }
-            }
-            callbacks.push(leaky_bucket_callback);
-        }
-
-        if cfg!(target_os = "windows") && static_config.tap_mode != TapMode::Analyzer {
+        if cfg!(target_os = "windows") && yaml_config.tap_mode != TapMode::Analyzer {
             todo!();
         }
 
@@ -1535,13 +1169,13 @@ impl ConfigHandler {
             }
 
             if candidate_config.sender.npb_socket_type != new_config.sender.npb_socket_type {
-                if static_config.tap_mode != TapMode::Analyzer {
+                if yaml_config.tap_mode != TapMode::Analyzer {
                     restart_dispatcher = true;
                 }
             }
 
             if candidate_config.sender.npb_dedup_enabled != new_config.sender.npb_dedup_enabled {
-                if static_config.tap_mode != TapMode::Analyzer {
+                if yaml_config.tap_mode != TapMode::Analyzer {
                     restart_dispatcher = true;
                 }
             }
@@ -1554,7 +1188,7 @@ impl ConfigHandler {
 
         if candidate_config.handler != new_config.handler {
             if candidate_config.handler.npb_dedup_enabled != new_config.handler.npb_dedup_enabled {
-                if static_config.tap_mode != TapMode::Analyzer {
+                if yaml_config.tap_mode != TapMode::Analyzer {
                     restart_dispatcher = true;
                 }
             }
@@ -1708,34 +1342,36 @@ impl ConfigHandler {
 
         callbacks
     }
+}
 
-    fn get_fast_path_map_size(config: &Config, mem_size: u64) -> usize {
-        if config.fast_path_map_size > 0 {
-            return config.fast_path_map_size;
+impl YamlConfig {
+    fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
+        if self.fast_path_map_size > 0 {
+            return self.fast_path_map_size;
         }
 
         min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
     }
 
-    fn get_channel_size(config: &Config, mem_size: u64) -> usize {
-        if config.tap_mode == TapMode::Analyzer {
+    fn get_channel_size(&self, mem_size: u64) -> usize {
+        if self.tap_mode == TapMode::Analyzer {
             return 1 << 14;
         }
 
         min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 14)
     }
 
-    fn get_flow_capacity(config: &Config, mem_size: u64) -> usize {
-        if config.tap_mode == TapMode::Analyzer {
-            return config.flow.capacity as usize;
+    fn get_flow_capacity(&self, mem_size: u64) -> usize {
+        if self.tap_mode == TapMode::Analyzer {
+            return self.flow.capacity as usize;
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
     }
 
-    fn get_af_packet_blocks(config: &Config, mem_size: u64) -> usize {
-        if config.tap_mode == TapMode::Analyzer || config.af_packet_blocks_enabled {
-            config.af_packet_blocks.max(8)
+    fn get_af_packet_blocks(&self, mem_size: u64) -> usize {
+        if self.tap_mode == TapMode::Analyzer || self.af_packet_blocks_enabled {
+            self.af_packet_blocks.max(8)
         } else {
             (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
         }

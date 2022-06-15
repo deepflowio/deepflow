@@ -24,10 +24,9 @@ pub const DEFAULT_CPU_CFS_PERIOD_US: u32 = 100000; // cfs_period_us默认值
 pub const DEFAULT_LOG_RETENTION: u32 = 365;
 pub const DEFAULT_LOG_FILE_SIZE_LIMIT: u32 = 10000; // 单位：M
 
-pub const TEMP_STATIC_CONFIG_FILENAME: &str = "metaflow-agent.*.yaml";
 #[cfg(target_os = "linux")]
 mod platform_consts {
-    pub const DEFAULT_LOGFILE: &'static str = "/var/log/metaflow-agent/metaflow-agent.log";
+    pub const DEFAULT_LOG_FILE: &'static str = "/var/log/metaflow-agent/metaflow-agent.log";
     pub const DEFAULT_CONF_FILE: &'static str = "/etc/metaflow-agent.yaml";
     pub const COREFILE_FORMAT: &'static str = "core";
     pub const DEFAULT_COREFILE_PATH: &'static str = "/tmp";
@@ -36,7 +35,7 @@ mod platform_consts {
 
 #[cfg(target_os = "windows")]
 mod platform_consts {
-    pub const DEFAULT_LOGFILE: &str = "C:\\DeepFlow\\metaflow-agent\\log\\metaflow-agent.log";
+    pub const DEFAULT_LOG_FILE: &str = "C:\\DeepFlow\\metaflow-agent\\log\\metaflow-agent.log";
     // NOTE yaml must be full path, otherwise service wouldn't start as you wish.
     pub const DEFAULT_CONF_FILE: &str = "C:\\DeepFlow\\metaflow-agent\\metaflow-agent-windows.yaml";
     pub const DEFAULT_COREFILE_PATH: &str = "C:\\DeepFlow\\metaflow-agent";

@@ -1,3 +1,4 @@
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -45,14 +46,19 @@ impl Session {
                 timeout,
                 controller_cert_file_prefix,
             },
-            server_ip: RwLock::new(ServerIp::new(controller_ips)),
+            server_ip: RwLock::new(ServerIp::new(
+                controller_ips
+                    .into_iter()
+                    .map(|x| x.parse().unwrap())
+                    .collect(),
+            )),
             version: AtomicU64::new(0),
             client: RwLock::new(None),
             exception_handler,
         }
     }
 
-    async fn dial(&self, remote: &str) {
+    async fn dial(&self, remote: &IpAddr) {
         // TODO: 错误处理和tls
         match Endpoint::from_shared(format!("http://{}:{}", remote, self.config.port))
             .unwrap()
@@ -73,7 +79,7 @@ impl Session {
         self.client.read().clone()
     }
 
-    pub fn get_current_server(&self) -> String {
+    pub fn get_current_server(&self) -> IpAddr {
         self.server_ip.read().get_current_ip()
     }
 
@@ -103,21 +109,21 @@ impl Session {
         self.server_ip.write().set_request_failed(failed);
     }
 
-    pub fn get_proxy_server(&self) -> Option<String> {
+    pub fn get_proxy_server(&self) -> Option<IpAddr> {
         self.server_ip.read().get_proxy_ip()
     }
 
-    pub fn set_proxy_server(&self, ip: String) {
+    pub fn set_proxy_server(&self, ip: IpAddr) {
         self.server_ip.write().set_proxy_ip(ip);
     }
 }
 
 struct ServerIp {
-    controller_ips: Vec<String>,
+    controller_ips: Vec<IpAddr>,
     this_controller: usize,
 
-    current_ip: String,
-    proxy_ip: Option<String>,
+    current_ip: IpAddr,
+    proxy_ip: Option<IpAddr>,
     proxied: bool,
     request_failed: bool,
 
@@ -125,12 +131,12 @@ struct ServerIp {
 }
 
 impl ServerIp {
-    fn new(controller_ips: Vec<String>) -> ServerIp {
+    fn new(controller_ips: Vec<IpAddr>) -> ServerIp {
         if controller_ips.is_empty() {
             panic!("no controller IP set");
         }
         ServerIp {
-            current_ip: controller_ips[0].clone(),
+            current_ip: controller_ips[0],
 
             controller_ips,
             this_controller: 0,
@@ -143,19 +149,19 @@ impl ServerIp {
         }
     }
 
-    fn get_current_ip(&self) -> String {
-        self.current_ip.clone()
+    fn get_current_ip(&self) -> IpAddr {
+        self.current_ip
     }
 
-    fn set_current_ip(&mut self, ip: String) {
+    fn set_current_ip(&mut self, ip: IpAddr) {
         self.current_ip = ip;
     }
 
-    fn get_proxy_ip(&self) -> Option<String> {
-        self.proxy_ip.clone()
+    fn get_proxy_ip(&self) -> Option<IpAddr> {
+        self.proxy_ip
     }
 
-    fn set_proxy_ip(&mut self, ip: String) {
+    fn set_proxy_ip(&mut self, ip: IpAddr) {
         self.proxy_ip = Some(ip);
     }
 
@@ -167,9 +173,9 @@ impl ServerIp {
         self.request_failed = failed;
     }
 
-    fn get_current_controller_ip(&self) -> String {
+    fn get_current_controller_ip(&self) -> IpAddr {
         // controller_ips一定不为空
-        self.controller_ips[self.this_controller].clone()
+        self.controller_ips[self.this_controller]
     }
 
     fn next_controller_ip(&mut self) {
