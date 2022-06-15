@@ -139,7 +139,6 @@ func (p *PlatformDataOP) generateVInterfaces() {
 		err = rawData.modifyInterfaceProto(vif, interfaceProto, device)
 		if err != nil {
 			log.Error(err)
-			continue
 		}
 		sInterfaces = append(sInterfaces, interfaceProto.sInterface)
 		aInterfaces = append(aInterfaces, interfaceProto.aInterface)
