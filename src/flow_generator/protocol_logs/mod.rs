@@ -398,12 +398,7 @@ impl AppProtoLogsData {
     pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
             base: Some(self.base_info.into()),
-            http: None,
-            dns: None,
-            mysql: None,
-            redis: None,
-            dubbo: None,
-            kafka: None,
+            ..Default::default()
         };
         match self.special_info {
             AppProtoLogsInfo::Dns(t) => pb_proto_logs_data.dns = Some(t.into()),
