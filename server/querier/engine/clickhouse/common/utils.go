@@ -102,7 +102,7 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 		}
 	}
 	client := &http.Client{}
-	url := fmt.Sprintf("http://localhost:20417/v1/datasource/?name=%s&type=%s", name, tsdbType)
+	url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?name=%s&type=%s", name, tsdbType)
 	reqest, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return 1, err
