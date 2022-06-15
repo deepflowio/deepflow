@@ -285,11 +285,13 @@ message RedisInfo {
     bytes error = 5;
 }
 
-message MqttInfo{
-    int32 req_msg_size = 1;
-    uint32 proto_version = 2;
-    string client_id = 3;
+message MqttInfo {
+    string mqtt_type = 1;
 
-    int32 resp_msg_size = 4;
-    uint32 return_code = 5;
+    int32 req_msg_size = 2;
+    uint32 proto_version = 3;
+    string client_id = 4;
+
+    int32 resp_msg_size = 5;
+    uint32 return_code = 6;
 }
