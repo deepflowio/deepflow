@@ -159,13 +159,8 @@ enum {
 	ETR_NOMEM = -2,		/* no memory */
 	ETR_EXIST = -3,		/* already exist */
 	ETR_NOTEXIST = -4,	/* not exist */
-	ETR_INVPKT = -5,	/* invalid packet */
-	ETR_DROP = -6,		/* packet dropped */
+	ETR_NOTGOELF = -5,      /* not go elf */
 	ETR_NOPROT = -7,	/* no protocol */
-	ETR_NOROUTE = -8,	/* no route */
-	ETR_DEFRAG = -9,	/* defragment error */
-	ETR_FRAG = -10,		/* fragment error */
-	ETR_DPDKAPIFAIL = -11,	/* DPDK error */
 	ETR_IDLE = -12,		/* nothing to do */
 	ETR_BUSY = -13,		/* resource busy */
 	ETR_NOTSUPP = -14,	/* not support */
@@ -179,17 +174,11 @@ enum {
 	ETR_IO = -22,		/* I/O error */
 	ETR_MSG_FAIL = -23,	/* msg callback failed */
 	ETR_MSG_DROP = -24,	/* msg callback dropped */
-	ETR_PKTSTOLEN = -25,	/* stolen packet */
 	ETR_SYSCALL = -26,	/* system call failed */
-	ETR_NODEV = -27,	/* no such device */
-	ETR_NOIGMPGROUP = -28,	/* no igmp group */
-	ETR_NOIGMPINTERFACE = -29,	/* no matching interface */
-	ETR_NOPORT = -30,
+	ETR_PROC_FAIL = -27,    /* procfs failed */
 
 	/* positive code for non-error */
-	ETR_KNICONTINUE = 1,	/* KNI to continue */
 	ETR_INPROGRESS = 2,	/* in progress */
-	ETR_SYNCCONTINUE = 3,
 	ETR_CONTINUE = 4,
 	ETR_NEWBUF = 5,
 };
@@ -205,13 +194,8 @@ static struct trace_err_tab err_tab[] = {
 	{ETR_NOMEM, "no memory"},
 	{ETR_EXIST, "already exist"},
 	{ETR_NOTEXIST, "not exist"},
-	{ETR_INVPKT, "invalid packet"},
-	{ETR_DROP, "packet dropped"},
+	{ETR_NOTGOELF, "not go elf"},
 	{ETR_NOPROT, "no protocol"},
-	{ETR_NOROUTE, "no route"},
-	{ETR_DEFRAG, "defragment error"},
-	{ETR_FRAG, "fragment error"},
-	{ETR_DPDKAPIFAIL, "failed dpdk api"},
 	{ETR_IDLE, "nothing to do"},
 	{ETR_BUSY, "resource busy"},
 	{ETR_NOTSUPP, "not support"},
@@ -225,11 +209,9 @@ static struct trace_err_tab err_tab[] = {
 	{ETR_IO, "I/O error"},
 	{ETR_MSG_FAIL, "msg callback failed"},
 	{ETR_MSG_DROP, "msg dropped"},
-	{ETR_PKTSTOLEN, "stolen packet"},
 	{ETR_SYSCALL, "system call failed"},
-	{ETR_NODEV, "no such device"},
+	{ETR_PROC_FAIL, "procfs failed"},
 
-	{ETR_KNICONTINUE, "kni to continue"},
 	{ETR_INPROGRESS, "in progress"},
 };
 

@@ -184,6 +184,8 @@ struct trace_probes_conf {
 	int probes_nr;
 	struct symbol_tracepoint tps[PROBES_NUM_MAX];
 	int tps_nr;
+	struct list_head uprobe_syms_head; // uprobe symbol 信息存放链表。
+	int uprobe_count;
 };
 
 struct probe {

@@ -8,6 +8,7 @@
 #include "common.h"
 #include "socket.h"
 #include "log.h"
+#include "go_tracer.h"
 
 #define TRACER_NAME	"socket-trace"
 #define TRACER_ELF_NAME	"socket_trace.elf"
@@ -92,6 +93,9 @@ static void socket_tracer_set_probes(struct trace_probes_conf *tps)
 	tps_set_symbol(tps, "sys_enter_close");
 
 	tps->tps_nr = index;
+
+	// 收集go可执行文件uprobe符号信息
+	uprobe_syms_collect_for_go(tps);
 }
 
 /* ==========================================================
@@ -618,6 +622,7 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -ENOMEM;
 	}
 	memset(tps, 0, sizeof(*tps));
+	INIT_LIST_HEAD(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
 	    create_bpf_tracer(TRACER_NAME, bpf_path, tps,
