@@ -118,7 +118,9 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 func LoadMetrics(db string, table string, dbDescription map[string]interface{}) (loadMetrics map[string]*Metrics, err error) {
 	tableDate, ok := dbDescription[db]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("get metrics failed! db: %s", db))
+		return loadMetrics, nil
+		// TODO 支持ext_metrics后取消注释
+		//return nil, errors.New(fmt.Sprintf("get metrics failed! db: %s", db))
 	}
 	if ok {
 		metricsData, ok := tableDate.(map[string]interface{})[table]
@@ -179,7 +181,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		}
 	}
 	if metrics == nil {
-		return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))
+		return nil
+		// TODO 支持ext_metrics后取消注释
+		// return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))
 	}
 	for name, value := range loadMetrics {
 		// TAG类型指标量都属于聚合类型

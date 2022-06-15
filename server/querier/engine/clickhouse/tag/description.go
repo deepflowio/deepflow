@@ -220,11 +220,11 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 			"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
 		})
 	}
-	// TODO 新数据库增加后要支持
-	if db != "flow_log" || table != "l7_flow_log" {
+
+	// 查询外部字段
+	if (db != "ext_metrics" && db != "flow_log") || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
-	// 查询外部字段
 	externalChClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -236,7 +236,7 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	externalSql := fmt.Sprintf("SELECT arrayJoin(tag_names) as tag_name FROM %s where time>(now()-1000) GROUP BY tag_name", table)
+	externalSql := fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s LIMIT 1) GROUP BY tag_name", table)
 	externalRst, err := externalChClient.DoQuery(externalSql, nil)
 	if err != nil {
 		return nil, err
@@ -244,10 +244,18 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 	for _, _tagName := range externalRst["values"] {
 		tagName := _tagName.([]interface{})[0]
 		externalTag := "tag." + tagName.(string)
-		response["values"] = append(response["values"], []interface{}{
-			externalTag, externalTag, externalTag, externalTag, "external_tag",
-			"外部字段", tagTypeToOperators["string"], []bool{true, true, true}, "",
-		})
+		if db == "ext_metrics" {
+			response["values"] = append(response["values"], []interface{}{
+				externalTag, externalTag, externalTag, externalTag, "tag",
+				"原始Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
+			})
+		} else {
+			response["values"] = append(response["values"], []interface{}{
+				externalTag, externalTag, externalTag, externalTag, "attribute",
+				"原始Attribute", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
+			})
+		}
+
 	}
 	return response, nil
 }
@@ -262,6 +270,13 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	// 标签是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
 		return GetTagResourceValues(sql)
+	}
+	// 外部字段是动态的,不需要去tag_description里确认
+	if strings.HasPrefix(tag, "tag.") {
+		return GetExternalTagValues(db, table, sql)
+	}
+	if db == "ext_metrics" {
+		table = "ext_common"
 	}
 	tagDescription, ok := TAG_DESCRIPTIONS[TagDescriptionKey{
 		DB: db, Table: table, TagName: tag,
@@ -401,6 +416,39 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 		}
 
 	}
+	log.Debug(sql)
+	rst, err := chClient.DoQuery(sql, nil)
+	if err != nil {
+		return nil, err
+	}
+	return rst, err
+}
+
+func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, error) {
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       db,
+	}
+	sqlSplit := strings.Split(rawSql, " ")
+	tag := sqlSplit[2]
+	tag = strings.Trim(tag, "'")
+	tag = strings.TrimPrefix(tag, "tag.")
+	var whereSql string
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
+		whereSql = whereSql + fmt.Sprintf("AND tag_name='%s'", tag)
+	} else {
+		whereSql = fmt.Sprintf("tag_name='%s'", tag)
+	}
+	err := chClient.Init("")
+	if err != nil {
+		return nil, err
+	}
+	var sql string
+	sql = fmt.Sprintf("WITH arrayJoin(tag_names) AS tag_name SELECT arrayJoin(tag_values) AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", table, whereSql)
 	log.Debug(sql)
 	rst, err := chClient.DoQuery(sql, nil)
 	if err != nil {

@@ -1,6 +1,10 @@
 package clickhouse
 
 import (
+	"strings"
+
+	"server/querier/config"
+	"server/querier/engine/clickhouse/client"
 	"server/querier/engine/clickhouse/common"
 )
 
@@ -21,8 +25,35 @@ func GetTables(db string) map[string][]interface{} {
 	if !ok {
 		return nil
 	}
-	for _, table := range tables {
-		values = append(values, []string{table})
+	if db == "ext_metrics" {
+		chClient := client.Client{
+			Host:     config.Cfg.Clickhouse.Host,
+			Port:     config.Cfg.Clickhouse.Port,
+			UserName: config.Cfg.Clickhouse.User,
+			Password: config.Cfg.Clickhouse.Password,
+			DB:       db,
+		}
+		err := chClient.Init("")
+		if err != nil {
+			log.Error(err)
+			return nil
+		}
+		sql := "show tables"
+		rst, err := chClient.DoQuery(sql, nil)
+		if err != nil {
+			log.Error(err)
+			return nil
+		}
+		for _, _table := range rst["values"] {
+			table := _table.([]interface{})[0].(string)
+			if !strings.HasSuffix(table, "_local") {
+				values = append(values, []string{table})
+			}
+		}
+	} else {
+		for _, table := range tables {
+			values = append(values, []string{table})
+		}
 	}
 	return map[string][]interface{}{
 		"columns": []interface{}{"name"},
