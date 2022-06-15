@@ -3,7 +3,7 @@ request                     , request              ,请求                  , �
 response                    , response             ,响应                  , 个   , counter    , 吞吐         , 111        ,
 
 rrt                         ,                      ,平均时延              , 微秒 , delay      , 时延         , 111        ,
-rrt_max                     , rrt_max              ,最大时延              , 微妙 , delay      , 时延         , 111        ,
+rrt_max                     , rrt_max              ,最大时延              , 微秒 , delay      , 时延         , 111        ,
 
 error                       , error                ,异常                  , 个   , counter    , 异常         , 111        ,
 client_error                , client_error         ,客户端异常            , 个   , counter    , 异常         , 111        ,

@@ -81,5 +81,5 @@ l3_end              , l3_end_0             , l3_end_1              , 三层边�
 is_new_flow         , is_new_flow          , is_new_flow           , 新建流                        , bool         ,                    , 流信息      , 111        ,
 start_time          , start_time           , start_time            , 开始时间                      , int          ,                    , 流信息      , 111        ,
 end_time            , end_time             , end_time              , 结束时间                      , int          ,                    , 流信息      , 111        ,
-duration            , duration             , duration              , 流持续时间                    , int          ,                    , 流信息      , 111        , 单位: 微妙
-status              , status               , status                , 状态                          , int_enum     , status             , 流信息      , 111        ,  由流结束类型决定。正常：正常结束、周期性上报。客户端异常：客户端SYN结束、客户端重置、客户端半关、客户端端口复用、客户端其他重置。服务端异常：服务端重置、连接超时、服务端半关、服务端SYN结束、服务端直接重置、服务端队列溢出、服务端其他重置。未知：其他结束方式。
+duration            , duration             , duration              , 流持续时间                    , int          ,                    , 流信息      , 111        , 单位: 微秒
+status              , status               , status                , 状态                          , int_enum     , status             , 流信息      , 111        , 由流结束类型决定。正常：正常结束、周期性上报。客户端异常：客户端SYN结束、客户端重置、客户端半关、客户端端口复用、客户端其他重置。服务端异常：服务端重置、连接超时、服务端半关、服务端SYN结束、服务端直接重置、服务端队列溢出、服务端其他重置。未知：其他结束方式。

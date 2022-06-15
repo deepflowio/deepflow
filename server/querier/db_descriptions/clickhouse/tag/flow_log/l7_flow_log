@@ -43,6 +43,7 @@ req_tcp_seq               , req_tcp_seq               , req_tcp_seq             
 resp_tcp_seq              , resp_tcp_seq              , resp_tcp_seq              , 响应TCP包SEQ           , int           ,                    , 传输层      , 111        ,
 
 l7_protocol               , l7_protocol               , l7_protocol               , 应用协议               , int_enum      , l7_protocol        , 应用层      , 111        ,
+l7_protocol_str           , l7_protocol_str           , l7_protocol_str           , 应用协议名称           , string        ,                    , 应用层      , 111        ,
 version                   , version                   , version                   , 协议版本               , string        ,                    , 应用层      , 111        ,
 type                      , type                      , type                      , 日志类型               , int_enum      , l7_log_type        , 应用层      , 111        ,
 request_type              , request_type              , request_type              , 请求类型               , string        ,                    , 应用层      , 111        ,
@@ -57,6 +58,9 @@ response_result           , response_result           , response_result         
 http_proxy_client         , http_proxy_client         , http_proxy_client         , HTTP代理客户端         , string        ,                    , 链路追踪    , 111        ,
 trace_id                  , trace_id                  , trace_id                  , TraceID                , string        ,                    , 链路追踪    , 111        ,
 span_id                   , span_id                   , span_id                   , SpanID                 , string        ,                    , 链路追踪    , 111        ,
+parent_span_id            , parent_span_id            , parent_span_id            , ParentSpanID           , string        ,                    , 链路追踪    , 111        ,
+span_kind                 , span_kind                 , span_kind                 , Span类型               , int_enum      , span_kind          , 链路追踪    , 111        ,
+
 x_request_id              , x_request_id              , x_request_id              , XRequestID             , string        ,                    , 链路追踪    , 111        ,
 syscall_trace_id_request  , syscall_trace_id_request  , syscall_trace_id_request  , SyscallTraceID-请求    , int           ,                    , 链路追踪    , 111        ,
 syscall_trace_id_response , syscall_trace_id_response , syscall_trace_id_response , SyscallTraceID-响应    , int           ,                    , 链路追踪    , 111        ,

@@ -69,7 +69,7 @@ tcp_timeout                 , tcp_timeout               , 传输-TCP连接超时
 l7_request                  , l7_request           ,应用请求                 , 个   , counter    , 应用层性能   , 111        ,
 l7_response                 , l7_response          ,应用响应                 , 个   , counter    , 应用层性能   , 111        ,
 rrt                         ,                      ,平均应用时延             , 微秒 , delay      , 应用层性能   , 111        ,
-rrt_max                     , rrt_max              ,最大应用时延             , 微妙 , delay      , 应用层性能   , 111        ,
+rrt_max                     , rrt_max              ,最大应用时延             , 微秒 , delay      , 应用层性能   , 111        ,
 l7_error                    , l7_error             ,应用异常                 , 个   , counter    , 应用层性能   , 111        ,
 l7_client_error             , l7_client_error      ,应用客户端异常           , 个   , counter    , 应用层性能   , 111        ,
 l7_server_error             , l7_server_error      ,应用服务端异常           , 个   , counter    , 应用层性能   , 111        ,
