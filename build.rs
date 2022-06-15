@@ -52,6 +52,10 @@ fn set_build_libebpf() -> Result<(), Box<dyn Error>> {
         "cargo:rustc-link-search=native={}",
         env::join_paths(&[library_dir]).unwrap().to_str().unwrap()
     );
+    println!("cargo:rustc-link-lib=static=bddisasm");
+    println!("cargo:rustc-link-lib=static=dwarf");
+    println!("cargo:rustc-link-search=native=/usr/lib");
+    println!("cargo:rustc-link-search=native=/usr/lib64");
     println!("cargo:rustc-link-lib=dylib=pthread");
     println!("cargo:rustc-link-lib=dylib=elf");
     println!("cargo:rustc-link-lib=dylib=z");

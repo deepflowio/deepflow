@@ -84,6 +84,25 @@ static struct symbol probe_syms[] = {
 		.probe_func = "uprobe/http2_serverConn_writeHeaders",
 		.is_probe_ret = false,
 	},
+
+	/*-------- tls --------------*/
+	{
+		.symbol = "crypto/tls.(*Conn).Write",
+		.probe_func = "uprobe/crypto_tls_conn_write",
+		.is_probe_ret = true,
+	},
+	{
+		.symbol = "crypto/tls.(*Conn).Read",
+		.probe_func = "uprobe/crypto_tls_conn_read",
+		.is_probe_ret = false,
+	},
+
+	/*-------- runtime.casgstatus --------------*/
+	{
+		.symbol = "runtime.casgstatus",
+		.probe_func = "uprobe/runtime_casgstatus",
+		.is_probe_ret = false,
+	},
 };
 
 int main(void)

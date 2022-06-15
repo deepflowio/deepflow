@@ -8,11 +8,11 @@ endif
 
 CC ?= gcc
 
-CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
+CFLAGS ?= -std=gnu99 --static -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 CFLAGS += -I../libbpf/src -I../libbpf/include -I../libbpf/include/uapi -I../
 
-EXECS := test_symbol
-LDLIBS += ../libebpf.a -lelf -lz -lpthread
+EXECS := test_symbol test_offset
+LDLIBS += ../libebpf.a -lbddisasm -ldwarf -lelf -lz -lpthread
 
 all: $(EXECS) 
 % : %.c

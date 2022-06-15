@@ -45,13 +45,14 @@ OBJS := libbpf/src/bpf.o \
 	user/tracer.o \
 	user/socket.o \
 	user/log.o \
-	user/ctrl.o
+	user/ctrl.o \
+	user/offset.o
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Ilibbpf/src -Ilibbpf/include -Ilibbpf/include/uapi -I.
-LDFLAGS ?= -lelf -lz -lpthread
+LDFLAGS ?= -lbddisasm -ldwarf -lelf -lz -lpthread
 
 all: build
 

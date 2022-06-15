@@ -21,6 +21,8 @@
 #include "log.h"
 #include "common.h"
 #include "symbol.h"
+#include "bddisasm/bddisasm.h"
+#include "bddisasm/disasmtypes.h"
 
 void free_uprobe_symbol(struct uprobe_symbol *u_sym)
 {
@@ -63,6 +65,56 @@ int find_load(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
 	}
 
 	return 0;
+}
+
+static void resolve_func_ret_addr(struct uprobe_symbol *uprobe_sym)
+{
+	NDSTATUS status;
+	INSTRUX ix;
+	int fd;
+	size_t pc;
+	int remian;
+	int cnt = 0;
+	size_t offset = 0;
+	char *buffer = NULL;
+
+	fd = open(uprobe_sym->binary_path, O_RDONLY);
+	if (fd == -1)
+		goto out;
+
+	if (lseek(fd, uprobe_sym->entry, SEEK_SET) == -1)
+		goto close_file;
+
+	buffer = malloc(uprobe_sym->size);
+	if (!buffer)
+		goto close_file;
+
+	if (read(fd, buffer, uprobe_sym->size) == -1)
+		goto free_buffer;
+
+	memset(uprobe_sym->rets, 0, sizeof(uprobe_sym->rets));
+	pc = uprobe_sym->entry;
+	while (offset < uprobe_sym->size && cnt < FUNC_RET_MAX) {
+		remian = uprobe_sym->size - offset;
+		status = NdDecodeEx(&ix, (ND_UINT8 *)(buffer + offset), remian,
+				    ND_CODE_64, ND_DATA_64);
+		if (!ND_SUCCESS(status))
+			break;
+
+		if (ix.Instruction == ND_INS_RETF ||
+		    ix.Instruction == ND_INS_RETN) {
+			uprobe_sym->rets[cnt++] = pc;
+		}
+		offset += ix.Length;
+		pc += ix.Length;
+	}
+
+free_buffer:
+	free(buffer);
+close_file:
+	close(fd);
+out:
+	uprobe_sym->rets_count = cnt;
 }
 
 /**
@@ -176,9 +228,7 @@ struct uprobe_symbol *resolve_and_gen_uprobe_symbol(const char *bin_file,
 	}
 
 	if (sym->is_probe_ret) {
-
-		// TODO: 返回地址解析
-		// resolve_func_ret_addr(uprobe_sym);  
+		resolve_func_ret_addr(uprobe_sym);
 	}
 
 	return uprobe_sym;
@@ -223,4 +273,10 @@ char *get_elf_path_by_pid(int pid)
 
 	return path;
 
+}
+
+// bddisasm 库要求定义的函数
+void *nd_memset(void *s, int c, ND_SIZET n)
+{
+	return memset(s, c, n);
 }
