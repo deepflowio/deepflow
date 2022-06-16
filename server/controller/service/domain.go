@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	uuid "github.com/satori/go.uuid"
-	"gorm.io/gorm/clause"
+	// "gorm.io/gorm/clause"
 
 	"server/controller/common"
 	"server/controller/db/mysql"
@@ -201,6 +201,13 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Do
 				dbUpdateMap["controller_ip"] = controllerIP
 			}
 		}
+		// 如果修改region，则清理掉云平台下所有软删除的数据
+		if region, ok := configUpdate["region"]; ok {
+			if region != config["region"] {
+				log.Infof("delete domain (%s) soft deleted resource", domain.Name)
+				deleteSoftDeletedResource(lcuuid)
+			}
+		}
 		configStr, _ := json.Marshal(domainUpdate["CONFIG"])
 		dbUpdateMap["config"] = string(configStr)
 	}
@@ -210,6 +217,33 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Do
 
 	response, _ := GetDomains(map[string]interface{}{"lcuuid": domain.Lcuuid})
 	return &response[0], nil
+}
+
+func deleteSoftDeletedResource(lcuuid string) {
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.CEN{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PeerConnection{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.RedisInstance{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.RDSInstance{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.LBTargetServer{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.LBListener{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.LB{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.NATGateway{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.SecurityGroup{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.DHCPPort{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.VRouter{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.Pod{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodReplicaSet{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodGroup{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodService{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodIngress{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodNamespace{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodNode{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodCluster{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.VM{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.Host{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.Network{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.VPC{})
+	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.AZ{})
 }
 
 func DeleteDomain(lcuuid string) (map[string]string, error) {
@@ -239,7 +273,8 @@ func DeleteDomain(lcuuid string) (map[string]string, error) {
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATRule{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.NATGateway{})
 	var sgs []mysql.SecurityGroup
-	mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&sgs)
+	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&sgs)
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Find(&sgs)
 	sgIDs := make([]int, len(sgs))
 	for _, sg := range sgs {
 		sgIDs = append(sgIDs, sg.ID)
@@ -249,44 +284,52 @@ func DeleteDomain(lcuuid string) (map[string]string, error) {
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.SecurityGroup{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.DHCPPort{})
 	var vRouters []mysql.VRouter
-	mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&vRouters)
+	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&vRouters)
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Find(&vRouters)
 	vRouterIDs := make([]int, len(vRouters))
 	for _, vRouter := range vRouters {
 		vRouterIDs = append(vRouterIDs, vRouter.ID)
 	}
 	mysql.Db.Unscoped().Where("vnet_id IN ?", vRouterIDs).Delete(&mysql.RoutingTable{})
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VRouter{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VMPodNodeConnection{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Pod{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodReplicaSet{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodGroup{})
 	var podServices []mysql.PodService
-	mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&podServices)
+	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&podServices)
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Find(&podServices)
 	podServiceIDs := make([]int, len(podServices))
 	for _, podService := range podServices {
 		podServiceIDs = append(podServiceIDs, podService.ID)
 	}
 	mysql.Db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&mysql.PodServicePort{})
 	mysql.Db.Unscoped().Where("pod_service_id IN ?", podServiceIDs).Delete(&mysql.PodGroupPort{})
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodService{})
 	var podIngresses []mysql.PodIngress
-	mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&podIngresses)
+	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&podIngresses)
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Find(&podIngresses)
 	podIngressIDs := make([]int, len(podIngresses))
 	for _, podIngress := range podIngresses {
 		podIngressIDs = append(podIngressIDs, podIngress.ID)
 	}
 	mysql.Db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&mysql.PodIngressRule{})
 	mysql.Db.Unscoped().Where("pod_ingress_id IN ?", podIngressIDs).Delete(&mysql.PodIngressRuleBackend{})
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodIngress{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodNamespace{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodNode{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.PodCluster{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VM{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Host{})
 	var networks []mysql.Network
-	mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&networks)
+	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("domain = ?", lcuuid).Delete(&networks)
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Find(&networks)
 	networkIDs := make([]int, len(networks))
 	for _, network := range networks {
 		networkIDs = append(networkIDs, network.ID)
 	}
 	mysql.Db.Unscoped().Where("vl2id IN ?", networkIDs).Delete(&mysql.Subnet{})
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.Network{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VPC{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.SubDomain{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.AZ{})
@@ -412,7 +455,10 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 	log.Infof("delete sub_domain (%s)", subDomain.Name)
 
 	var podCluster mysql.PodCluster
-	mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("lcuuid = ?", lcuuid).Delete(&podCluster)
+	mysql.Db.Unscoped().Where("lcuuid = ?", lcuuid).Find(&podCluster)
+	// TODO debug为什么此处赋值在mysql中没生效
+	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("lcuuid = ?", lcuuid).Delete(&podCluster)
+	log.Info(podCluster)
 	if podCluster.ID != 0 {
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.WANIP{})
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.LANIP{})

@@ -52,6 +52,7 @@ func (v *VMSecurityGroup) generateDBItemToAdd(cloudItem *cloudmodel.VMSecurityGr
 	dbItem := &mysql.VMSecurityGroup{
 		VMID:            vmID,
 		SecurityGroupID: securityGroupID,
+		Priority:        cloudItem.Priority,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true
