@@ -361,6 +361,12 @@ const (
 	POD_STATE_RUNNING   = 1
 )
 
+const (
+	RESOURCE_STATE_CODE_SUCCESS = 0
+	RESOURCE_STATE_CODE_WARNING = 1
+	RESOURCE_STATE_CODE_ERROR   = 2
+)
+
 var ProtocolMap = map[string]int{
 	"TCP": 6,
 	"UDP": 17,

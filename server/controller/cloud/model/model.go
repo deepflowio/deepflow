@@ -445,6 +445,8 @@ type Pod struct {
 
 type SubDomainResource struct {
 	Verified               bool `json:"verified"`
+	ErrorState             int
+	ErrorMessage           string
 	Networks               []Network
 	Subnets                []Subnet
 	VInterfaces            []VInterface
@@ -466,6 +468,8 @@ type SubDomainResource struct {
 
 type Resource struct {
 	Verified               bool `json:"verified"`
+	ErrorState             int
+	ErrorMessage           string
 	SubDomains             []SubDomain
 	Regions                []Region
 	AZs                    []AZ

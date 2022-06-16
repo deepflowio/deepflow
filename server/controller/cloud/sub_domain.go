@@ -70,6 +70,8 @@ func (c *Cloud) getSubDomainData() {
 		// 生成SubDomainResource
 		subDomainResource := model.SubDomainResource{
 			Verified:               true,
+			ErrorState:             kubernetesGatherResource.ErrorState,
+			ErrorMessage:           kubernetesGatherResource.ErrorMessage,
 			PodClusters:            podClusters,
 			PodNodes:               podNodes,
 			VMPodNodeConnections:   vmPodNodeConnections,

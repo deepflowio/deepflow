@@ -2,6 +2,7 @@ package kubernetes_gather
 
 import (
 	"server/controller/cloud/kubernetes_gather/model"
+	"server/controller/common"
 	"server/controller/db/mysql"
 	"server/controller/genesis"
 
@@ -173,7 +174,10 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 
 	k8sInfo, err := k.getKubernetesInfo()
 	if err != nil {
-		return model.KubernetesGatherResource{}, err
+		return model.KubernetesGatherResource{
+			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
+			ErrorMessage: err.Error(),
+		}, err
 	}
 	k.k8sInfo = k8sInfo
 

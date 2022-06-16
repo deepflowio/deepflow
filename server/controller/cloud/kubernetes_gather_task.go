@@ -6,6 +6,7 @@ import (
 
 	"server/controller/cloud/kubernetes_gather"
 	kubernetes_gather_model "server/controller/cloud/kubernetes_gather/model"
+	"server/controller/common"
 	"server/controller/db/mysql"
 )
 
@@ -64,7 +65,14 @@ func (k *KubernetesGatherTask) Start() {
 			select {
 			case <-ticker.C:
 				log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name)
-				k.resource, _ = k.kubernetesGather.GetKubernetesGatherData()
+				var err error
+				k.resource, err = k.kubernetesGather.GetKubernetesGatherData()
+				if err != nil {
+					k.resource.ErrorMessage = err.Error()
+					if k.resource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
+						k.resource.ErrorState = common.RESOURCE_STATE_CODE_ERROR
+					}
+				}
 				log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name)
 			case <-k.kCtx.Done():
 				break LOOP

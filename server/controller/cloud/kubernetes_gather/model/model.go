@@ -6,6 +6,8 @@ import (
 )
 
 type KubernetesGatherResource struct {
+	ErrorState             int
+	ErrorMessage           string
 	Region                 model.Region
 	AZ                     model.AZ
 	VPC                    model.VPC

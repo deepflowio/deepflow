@@ -79,7 +79,14 @@ func (c *Cloud) GetKubernetesGatherTaskMap() map[string]*KubernetesGatherTask {
 
 func (c *Cloud) getCloudData() {
 	if c.basicInfo.Type != common.KUBERNETES {
-		c.resource, _ = c.platform.GetCloudData()
+		var err error
+		c.resource, err = c.platform.GetCloudData()
+		if err != nil {
+			c.resource.ErrorMessage = err.Error()
+			if c.resource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
+				c.resource.ErrorState = common.RESOURCE_STATE_CODE_ERROR
+			}
+		}
 		c.getSubDomainData()
 	} else {
 		c.getKubernetesData()

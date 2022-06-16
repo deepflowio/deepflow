@@ -57,6 +57,8 @@ func (c *Cloud) getKubernetesData() {
 		AZs:                    []model.AZ{kubernetesGatherResource.AZ},
 		VPCs:                   []model.VPC{kubernetesGatherResource.VPC},
 		PodClusters:            []model.PodCluster{kubernetesGatherResource.PodCluster},
+		ErrorState:             kubernetesGatherResource.ErrorState,
+		ErrorMessage:           kubernetesGatherResource.ErrorMessage,
 		PodNodes:               kubernetesGatherResource.PodNodes,
 		PodServices:            kubernetesGatherResource.PodServices,
 		PodNamespaces:          kubernetesGatherResource.PodNamespaces,
