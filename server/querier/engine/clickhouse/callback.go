@@ -53,7 +53,12 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 		for _, value := range values {
 			record := value.([]interface{})
 			// 获取record在补点切片中的位置
-			timeIndex := (record[timeFieldIndex].(int) - start) / m.Time.Interval
+			var timeIndex int
+			if orderby == "asc" {
+				timeIndex = (record[timeFieldIndex].(int) - start) / m.Time.Interval
+			} else {
+				timeIndex = (end - record[timeFieldIndex].(int)) / m.Time.Interval
+			}
 			newValues[timeIndex] = value
 		}
 		var timestamp int

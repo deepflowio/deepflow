@@ -483,7 +483,7 @@ func (f *PerSecondFunction) Init() {
 			break
 		}
 	}
-	if aggFuncName == FUNCTION_SUM {
+	if aggFuncName == FUNCTION_SUM || aggFuncName == FUNCTION_UNIQ_EXACT || aggFuncName == FUNCTION_UNIQ || aggFuncName == FUNCTION_COUNT {
 		if f.Time.Interval > 0 {
 			if f.Time.DatasourceInterval > f.Time.Interval {
 				interval = f.Time.DatasourceInterval
