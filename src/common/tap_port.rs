@@ -20,6 +20,7 @@ impl TapPort {
     pub const FROM_NETFLOW: u8 = 5;
     pub const FROM_SFLOW: u8 = 6;
     pub const FROM_EBPF: u8 = 7;
+    pub const FROM_OTEL: u8 = 8;
 
     const TUNNEL_TYPE_OFFSET: u64 = 32;
     const FROM_OFFSET: u64 = 60;
