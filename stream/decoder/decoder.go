@@ -189,7 +189,7 @@ func (d *Decoder) handleOpenTelemetry(vtapID uint16, decoder *codec.SimpleDecode
 		}
 		if decoder.Failed() || err != nil {
 			if d.counter.ErrorCount == 0 {
-				log.Errorf("OpenTelemetry log decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+				log.Errorf("OpenTelemetry log decode failed, offset=%d len=%d err: %s", decoder.Offset(), len(decoder.Bytes()), err)
 			}
 			d.counter.ErrorCount++
 			return

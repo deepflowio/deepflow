@@ -73,7 +73,7 @@ func ExecSQL(ck clickhouse.Clickhouse, query string) error {
 	return nil
 }
 
-func initTable(addr, user, password string, t *ckdb.Table) error {
+func InitTable(addr, user, password string, t *ckdb.Table) error {
 	ck, err := clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s", addr, user, password))
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func initTable(addr, user, password string, t *ckdb.Table) error {
 
 func initReplicaTable(addr, user, password string, t *ckdb.Table) {
 	for {
-		if err := initTable(addr, user, password, t); err != nil {
+		if err := InitTable(addr, user, password, t); err != nil {
 			log.Warningf("Init replica(%s) table failed, will retry after one minute. %s", addr, err)
 			time.Sleep(time.Minute)
 			continue
@@ -112,19 +112,19 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 	var err error
 
 	// primary clickhouse的初始化创建表
-	if err = initTable(primaryAddr, user, password, table); err != nil {
+	if err = InitTable(primaryAddr, user, password, table); err != nil {
 		return nil, err
 	}
 
 	// secondaryAddr作为replica clickhouse, 只需要初始化建表
 	if replicaEnabled {
-		if err := initTable(secondaryAddr, user, password, table); err != nil {
+		if err := InitTable(secondaryAddr, user, password, table); err != nil {
 			// replica 创建table失败，每隔1分钟后台重试创建
 			go initReplicaTable(secondaryAddr, user, password, table)
 		}
 	} else if len(secondaryAddr) > 0 {
 		// FIXME secondaryAddr也作为primary clickhouse时, 只支持初始化建表, 不支持写入
-		if err = initTable(secondaryAddr, user, password, table); err != nil {
+		if err = InitTable(secondaryAddr, user, password, table); err != nil {
 			return nil, err
 		}
 	}

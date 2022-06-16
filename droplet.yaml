@@ -49,6 +49,17 @@ ckdb:
 #  batch-size: 512000  # 多少行数据同时写入
 #  flush-timeout: 10   # 超时写入时间
 
+## ext metrics写入配置
+#ext-metrics-ck-writer:
+#  queue-count: 1      # 每个表并行写数量
+#  queue-size: 100000  # 数据队列长度
+#  batch-size: 51200   # 多少行数据同时写入
+#  flush-timeout: 10   # 超时写入时间
+
+## ext metrics数据的保留的时长(单位: 天)
+#ext-metrics-ttl: 7
+
+
 ## 默认读超时，修改数据保留时长时使用
 #ck-read-timeout: 300
 

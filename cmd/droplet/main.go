@@ -29,6 +29,8 @@ import (
 	"gitlab.yunshan.net/yunshan/droplet/droplet/droplet"
 	"gitlab.yunshan.net/yunshan/droplet/droplet/profiler"
 	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	extmetricscfg "gitlab.yunshan.net/yunshan/droplet/ext_metrics/config"
+	"gitlab.yunshan.net/yunshan/droplet/ext_metrics/ext_metrics"
 	rozecfg "gitlab.yunshan.net/yunshan/droplet/roze/config"
 	"gitlab.yunshan.net/yunshan/droplet/roze/roze"
 	streamcfg "gitlab.yunshan.net/yunshan/droplet/stream/config"
@@ -104,6 +106,10 @@ func main() {
 		bytes, _ = yaml.Marshal(rozeConfig)
 		log.Infof("roze config:\n%s", string(bytes))
 
+		extMetricsConfig := extmetricscfg.Load(*configPath)
+		bytes, _ = yaml.Marshal(extMetricsConfig)
+		log.Infof("ext_metrics config:\n%s", string(bytes))
+
 		// 写遥测数据
 		roze, err := roze.NewRoze(rozeConfig, receiver)
 		checkError(err)
@@ -115,6 +121,12 @@ func main() {
 		checkError(err)
 		stream.Start()
 		defer stream.Close()
+
+		// 写ext_metrics数据
+		extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver)
+		checkError(err)
+		extMetrics.Start()
+		defer extMetrics.Close()
 
 		// 创建、修改、删除数据源及其存储时长
 		ds := datasource.NewDatasourceManager([]string{rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary},
