@@ -68,6 +68,7 @@ func (a *Aliyun) getVMs(region model.Region) (
 				Lcuuid:       vmLcuuid,
 				Name:         vmName,
 				Label:        vmId,
+				HType:        common.VM_HTYPE_VM_C,
 				VPCLcuuid:    VPCLcuuid,
 				State:        vmState,
 				LaunchServer: "",

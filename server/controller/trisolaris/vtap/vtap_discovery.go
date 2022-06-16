@@ -11,7 +11,6 @@ import (
 
 	. "server/controller/common"
 	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
 	"server/controller/trisolaris/dbmgr"
 	. "server/controller/trisolaris/utils"
 )

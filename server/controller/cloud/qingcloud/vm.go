@@ -94,6 +94,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 					Name:         vmName,
 					Label:        vmId,
 					State:        vmState,
+					HType:        common.VM_HTYPE_VM_C,
 					LaunchServer: hostIP,
 					VPCLcuuid:    vpcLcuuid,
 					AZLcuuid:     azLcuuid,
