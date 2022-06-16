@@ -208,7 +208,7 @@ static int resolve_bin_file(const char *path, int pid,
 		probe_sym->ver = *go_ver;
 		list_add_tail(&probe_sym->list, &conf->uprobe_syms_head);
 		ebpf_info
-		    ("Uprobe [%s] pid:%d go%d.%d.%d entry:%lx size:%d symname:%s probe_func:%s rets_count:%d\n",
+		    ("Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
 		     path, probe_sym->pid, probe_sym->ver.major,
 		     probe_sym->ver.minor, probe_sym->ver.revision,
 		     probe_sym->entry, probe_sym->size, probe_sym->name,
@@ -222,7 +222,7 @@ static int resolve_bin_file(const char *path, int pid,
 
 static int proc_parse_and_register(int pid, struct trace_probes_conf *conf)
 {
-	char *path = elf_path_by_pid(pid);
+	char *path = get_elf_path_by_pid(pid);
 	if (path == NULL)
 		return ETR_NOTEXIST;
 
@@ -238,12 +238,12 @@ static int proc_parse_and_register(int pid, struct trace_probes_conf *conf)
 }
 
 /**
- * uprobe_syms_collect_for_go -- 从procfs寻找所有的golang exe,
+ * collect_uprobe_syms_from_procfs -- 从procfs寻找所有的golang exe,
  * 				 解析并注册uprobe symbols。
  * @tps: 用于记录所有probe的结构地址，uprobe symbols会登记到上面。
  * @return: 返回ETR_OK成功，否则失败。
  */
-int uprobe_syms_collect_for_go(struct trace_probes_conf *conf)
+int collect_uprobe_syms_from_procfs(struct trace_probes_conf *conf)
 {
 	log_to_stdout = true;
 	struct dirent *entry = NULL;

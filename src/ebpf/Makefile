@@ -53,7 +53,6 @@ CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-
 CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Ilibbpf/src -Ilibbpf/include -Ilibbpf/include/uapi -I.
 LDFLAGS ?= -lelf -lz -lpthread
 
-
 all: build
 
 ELFFILES = ./.data_done
@@ -101,9 +100,12 @@ rust-sample:
 	$(call msg,RUST-SAMPLE,,samples/rust/target/release/rust_sample)
 
 clean:
-	$(Q)make -C kernel clean
+	$(Q)make -C kernel clean --no-print-directory
+	$(Q)make -C test clean --no-print-directory
 	$(Q)rm -rf $(ELFFILES) data metaflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
 	$(Q)rm -rf samples/rust/target
+test:
+	$(Q)make -C test --no-print-directory
 
-.PHONY: all build clean install tools
+.PHONY: all build clean install tools test
 
