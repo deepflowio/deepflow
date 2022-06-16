@@ -1,10 +1,12 @@
 package genesis
 
 import (
+	"errors"
 	"server/controller/cloud/config"
 	"server/controller/cloud/model"
 	"server/controller/common"
 	"server/controller/db/mysql"
+	"server/controller/genesis"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/op/go-logging"
@@ -47,6 +49,10 @@ func (g *Genesis) CheckAuth() error {
 func (g *Genesis) GetCloudData() (model.Resource, error) {
 	g.azLcuuid = ""
 	g.defaultVpc = false
+
+	if genesis.GenesisService == nil {
+		return model.Resource{}, errors.New("genesis service is nil")
+	}
 
 	regions, err := g.getRegion()
 	if err != nil {
