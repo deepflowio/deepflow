@@ -5,7 +5,6 @@ go 1.18
 require (
 	bou.ke/monkey v1.0.2
 	github.com/ClickHouse/clickhouse-go/v2 v2.0.15
-	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/agiledragon/gomonkey/v2 v2.8.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1633
 	github.com/baidubce/bce-sdk-go v0.9.123
