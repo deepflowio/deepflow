@@ -890,9 +890,9 @@ func (v *VTapInfo) updateCacheToDB() {
 			dbVTap.KernelVersion = cacheVTap.GetKernelVersion()
 			dbVTap.CtrlMac = cacheVTap.GetCtrlMac()
 			cacheExceptions := cacheVTap.GetExceptions()
-			tridentExceptions := int64(VTAP_TRIDENT_EXCEPTIONS_MASK) & cacheExceptions
-			controllerException := VTAP_CONTROLLER_EXCEPTIONS_MASK & dbVTap.Exceptions
-			dbVTap.Exceptions = controllerException | tridentExceptions
+			tridentExceptions := uint64(VTAP_TRIDENT_EXCEPTIONS_MASK) & uint64(cacheExceptions)
+			controllerException := uint64(VTAP_CONTROLLER_EXCEPTIONS_MASK) & uint64(dbVTap.Exceptions)
+			dbVTap.Exceptions = int64(controllerException | tridentExceptions)
 			cacheVTap.UpdateCurControllerIP(hostIP)
 			dbVTap.CurControllerIP = cacheVTap.GetCurControllerIP()
 			filterFlag = true
