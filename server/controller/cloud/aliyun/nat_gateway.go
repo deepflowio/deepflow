@@ -182,7 +182,7 @@ func (a *Aliyun) getDNATRules(region model.Region, natGatewayId string, dnatTabl
 				if err != nil {
 					floatingIPPort = 0
 				}
-				fixedIPPortStr := dnat.Get("FixedIPPort").MustString()
+				fixedIPPortStr := dnat.Get("InternalPort").MustString()
 				fixedIPPort, err := strconv.Atoi(fixedIPPortStr)
 				if err != nil {
 					fixedIPPort = 0
