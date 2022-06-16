@@ -66,7 +66,7 @@ int find_load(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
 }
 
 /**
- * gen_uprobe_symbol -- 完成二进制文件中对给定符号的解析并生成uprobe_symbol
+ * resolve_and_gen_uprobe_symbol -- 完成二进制文件中对给定符号的解析并生成uprobe_symbol
  * @bin_file: 二进制文件，如果是可执行文件需要指定文件的全路径,
  * 	      如果是库文件只需要给出库的名字即可,
  *            例如：libssl.so 只需提供名字"ssl"。
@@ -188,7 +188,7 @@ invalid:
 	return NULL;
 }
 
-char *elf_path_by_pid(int pid)
+char *get_elf_path_by_pid(int pid)
 {
 	int ret;
 	char bin_path[PATH_MAX], *path;

@@ -95,7 +95,7 @@ static void socket_tracer_set_probes(struct trace_probes_conf *tps)
 	tps->tps_nr = index;
 
 	// 收集go可执行文件uprobe符号信息
-	uprobe_syms_collect_for_go(tps);
+	collect_uprobe_syms_from_procfs(tps);
 }
 
 /* ==========================================================

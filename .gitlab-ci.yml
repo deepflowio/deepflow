@@ -28,6 +28,7 @@ verify-x64:
     - cargo check
     - cargo fmt --all -- --check
     - cargo test
+    - cd src/ebpf && make test
     # - cargo clean
   # artifacts:
   #     paths:
