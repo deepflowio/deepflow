@@ -3,12 +3,13 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+
+	uuid "github.com/satori/go.uuid"
+	"gorm.io/gorm/clause"
+
 	"server/controller/common"
 	"server/controller/db/mysql"
 	"server/controller/model"
-
-	"github.com/google/uuid"
-	"gorm.io/gorm/clause"
 )
 
 func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) {
@@ -114,10 +115,11 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	log.Infof("create domain (%v)", domainCreate)
 
 	domain := mysql.Domain{}
-	lcuuid := uuid.New().String()
+	displayName := uuid.NewV4().String()
+	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
-	domain.DisplayName = lcuuid
+	domain.DisplayName = displayName
 	domain.Type = domainCreate.Type
 	domain.IconID = domainCreate.IconID
 	// TODO: controller_ip拿到config外面，直接作为domain的一级参数
@@ -347,10 +349,11 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 	log.Infof("create sub_domain (%v)", subDomainCreate)
 
 	subDomain := mysql.SubDomain{}
-	lcuuid := uuid.New().String()
+	displayName := uuid.NewV4().String()
+	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	subDomain.Lcuuid = lcuuid
 	subDomain.Name = subDomainCreate.Name
-	subDomain.DisplayName = lcuuid
+	subDomain.DisplayName = displayName
 	subDomain.CreateMethod = common.CREATE_METHOD_USER_DEFINE
 	subDomain.ClusterID = "d-" + common.GenerateShortUUID()
 	subDomain.Domain = subDomainCreate.Domain
