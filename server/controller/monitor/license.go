@@ -94,7 +94,7 @@ func (v *VTapLicenseAllocation) GetLicenseTotalCount() (
 	url := fmt.Sprintf("http://%s:%d/licensedata", v.cfg.Warrant.Host, v.cfg.Warrant.Port)
 	response, err := common.CURLPerform("GET", url, nil)
 	if err != nil {
-		log.Error("call url (%s) get licensedata failed", url)
+		log.Errorf("call url (%s) get licensedata failed", url)
 		return licenseTotalCount, functionLicenseTotalCount, err
 	}
 

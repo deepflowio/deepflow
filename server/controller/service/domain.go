@@ -16,6 +16,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 	var response []model.Domain
 	var domains []mysql.Domain
 	var azs []mysql.AZ
+	var podClusters []mysql.PodCluster
 	var controllers []mysql.Controller
 	var domainLcuuids []string
 	var domainToAZLcuuids map[string][]string
@@ -55,6 +56,14 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 		controllerIPToName[controller.IP] = controller.Name
 	}
 
+	mysql.Db.Find(&podClusters)
+	domainToPodClusterNames := make(map[string][]string)
+	for _, podCluster := range podClusters {
+		domainToPodClusterNames[podCluster.Domain] = append(
+			domainToPodClusterNames[podCluster.Domain], podCluster.Name,
+		)
+	}
+
 	for _, domain := range domains {
 		syncedAt := ""
 		if domain.SyncedAt != nil {
@@ -87,9 +96,10 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 		}
 		if domain.Type != common.KUBERNETES {
 			domainResp.K8sEnabled = 1
+			if podClusters, ok := domainToPodClusterNames[domain.Lcuuid]; ok {
+				domainResp.PodClusters = podClusters
+			}
 		}
-		// TODO: 后续与前端沟通，更换字段为PodClusterCount
-		domainResp.PodClusters = []interface{}{}
 
 		domainResp.Config = make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &domainResp.Config)

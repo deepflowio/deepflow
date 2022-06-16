@@ -32,6 +32,9 @@ func getDomain(c *gin.Context) {
 
 func getDomains(c *gin.Context) {
 	args := make(map[string]interface{})
+	if value, ok := c.GetQuery("name"); ok {
+		args["name"] = value
+	}
 	data, err := service.GetDomains(args)
 	JsonResponse(c, data, err)
 }
@@ -89,6 +92,9 @@ func getSubDomain(c *gin.Context) {
 
 func getSubDomains(c *gin.Context) {
 	args := make(map[string]interface{})
+	if value, ok := c.GetQuery("domain"); ok {
+		args["domain"] = value
+	}
 	data, err := service.GetSubDomains(args)
 	JsonResponse(c, data, err)
 }

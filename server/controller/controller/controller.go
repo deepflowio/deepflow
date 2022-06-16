@@ -72,9 +72,6 @@ func Start() {
 	g := genesis.NewGenesis(cfg.GenesisCfg)
 	g.Start()
 
-	// 启动软删除数据清理
-	recorder.CleanDeletedResources(int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceCleanInterval), int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceRetentionTime))
-
 	// 启动resource manager
 	// 每个云平台启动一个cloud和recorder
 	m := manager.NewManager(cfg.ManagerCfg)
@@ -95,6 +92,11 @@ func Start() {
 		// - 控制器和数据节点检查
 		// - license分配和检查
 		// 除非进程重启，才会出现master controller切换的情况，所以暂时无需进行goroutine的停止
+
+		// 从区域控制器无需判断是否为master controller
+		if cfg.TrisolarisCfg.NodeType != "master" {
+			return
+		}
 		masterController := ""
 		for range time.Tick(time.Minute) {
 			isMasterController, curMasterController, err := common.IsMasterController()
@@ -116,6 +118,12 @@ func Start() {
 
 					// license分配和检查
 					vtapLicenseAllocation.Start()
+
+					// 启动软删除数据清理
+					recorder.CleanDeletedResources(
+						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceCleanInterval),
+						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceRetentionTime),
+					)
 				}
 			}
 		}

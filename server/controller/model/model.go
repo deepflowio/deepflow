@@ -244,7 +244,7 @@ type Domain struct {
 	Config         map[string]interface{} `json:"CONFIG"`
 	AZCount        int                    `json:"AZ_COUNT"`
 	RegionCount    int                    `json:"REGION_COUNT"`
-	PodClusters    []interface{}          `json:"POD_CLUSTERS"` // TODO: 更换字段为PodClusterCount
+	PodClusters    []string               `json:"POD_CLUSTERS"`
 	CreatedAt      string                 `json:"CREATED_AT"`
 	SyncedAt       string                 `json:"SYNCED_AT"`
 	Lcuuid         string                 `json:"LCUUID"`
