@@ -42,7 +42,7 @@ struct uprobe_symbol {
 };
 
 void free_uprobe_symbol(struct uprobe_symbol *u_sym);
-char *elf_path_by_pid(int pid);
+char *get_elf_path_by_pid(int pid);
 struct uprobe_symbol *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    struct symbol *sym,
 						    const uint64_t addr,

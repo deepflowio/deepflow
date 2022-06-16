@@ -3,5 +3,5 @@
 #include "symbol.h"
 // 获取go ELF版本信息
 bool fetch_go_elf_version(const char *path, struct version_info *go_ver);
-int uprobe_syms_collect_for_go(struct trace_probes_conf *conf);
+int collect_uprobe_syms_from_procfs(struct trace_probes_conf *conf);
 #endif
