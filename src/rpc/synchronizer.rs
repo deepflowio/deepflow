@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::process;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
@@ -77,7 +77,7 @@ pub struct Status {
     pub synced: bool,
     pub new_revision: Option<String>,
 
-    pub proxy_ip: IpAddr,
+    pub proxy_ip: Option<IpAddr>,
     pub sync_interval: Duration,
     pub ntp_enabled: bool,
 
@@ -103,7 +103,7 @@ impl Default for Status {
             synced: false,
             new_revision: None,
 
-            proxy_ip: Ipv4Addr::UNSPECIFIED.into(),
+            proxy_ip: None,
             sync_interval: Default::default(),
             ntp_enabled: false,
 
@@ -567,7 +567,7 @@ impl Synchronizer {
         let (_, macs) = Self::parse_segment(yaml_config.tap_mode, &resp);
 
         let mut status = status.write();
-        status.proxy_ip = runtime_config.proxy_controller_ip.parse().unwrap();
+        status.proxy_ip = runtime_config.proxy_controller_ip.parse().ok();
         status.sync_interval = runtime_config.sync_interval;
         status.ntp_enabled = runtime_config.ntp_enabled;
         let updated_platform = status.get_platform_data(&resp);
@@ -938,12 +938,13 @@ impl Synchronizer {
                 if new_revision.is_some() {
                     // TODO: upgrade
                 }
-                match session.get_proxy_server() {
-                    Some(ip) if &ip == &proxy_ip => (),
-                    _ => {
-                        info!("proxy_controller_ip update to {}", proxy_ip);
-                        session.set_proxy_server(proxy_ip);
+                match (proxy_ip, session.get_proxy_server()) {
+                    (Some(proxy), Some(ip)) if &ip == &proxy => (),
+                    (Some(proxy), _) => {
+                        info!("proxy_controller_ip update to {}", proxy);
+                        session.set_proxy_server(proxy);
                     }
+                    _ => (),
                 }
                 if sync_interval != new_sync_interval {
                     sync_interval = new_sync_interval;
