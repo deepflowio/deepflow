@@ -62,8 +62,8 @@ var recvBufferPool = pool.NewLockFreePool(
 			Buffer: make([]byte, RECV_BUFSIZE),
 		}
 	},
-	pool.OptionPoolSizePerCPU(32),
-	pool.OptionInitFullPoolSize(32),
+	pool.OptionPoolSizePerCPU(8),
+	pool.OptionInitFullPoolSize(8),
 )
 
 func AcquireRecvBuffer() *RecvBuffer {
