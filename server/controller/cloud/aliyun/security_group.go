@@ -183,6 +183,7 @@ func (a *Aliyun) getSecurityGroupRules(region model.Region, securityGroupId stri
 					Lcuuid:              common.GenerateUUID(key),
 					SecurityGroupLcuuid: securityGroupLcuuid,
 					Direction:           direction,
+					EtherType:           ethertype,
 					Protocol:            "ALL",
 					LocalPortRange:      "0-65535",
 					RemotePortRange:     "0-65535",
