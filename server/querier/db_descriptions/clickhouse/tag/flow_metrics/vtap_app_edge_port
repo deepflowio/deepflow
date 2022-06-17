@@ -1,5 +1,4 @@
 # Name                     , ClientName                , ServerName                , DisplayName                , Type          , EnumFile           , Category    , Permission , Discription
-_tid                       ,                           ,                           ,                            , id            ,                    ,             , 111        ,
 time                       ,                           ,                           ,                            , time          ,                    ,             , 111        ,
 
 region                     , region_0                  , region_1                  , 区域                       , resource      ,                    , 知识图谱    , 110        ,
