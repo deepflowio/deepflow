@@ -1,5 +1,5 @@
 # 编译阶段
-# dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.1
+# dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.2
 # 使用 Centos 为基础镜像，安装所需依赖
 #FIXME: 暂时锁定x86_64架构，以后支持优化构建速度
 FROM centos:centos7.9.2009
@@ -22,6 +22,9 @@ RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfut
      yum --disablerepo=* localinstall -y ./bddisasm-*.rpm && rm -rf bddisasm-1.34.10-1.el7.x86_64.rpm && \
      yum clean all
 
+
+
+
 # 使用依赖缓存
 RUN cargo install sccache && \
     ln -s  /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
@@ -32,7 +35,7 @@ RUN cargo install sccache && \
 # 给cargo crates换镜像源
 COPY config /usr/local/cargo/
 
-# 添加能访问 gitlab 的 key
+# 添加能访问 gitlab 的 key，key 必须有访问依赖仓库的权限
 RUN mkdir /root/.ssh/
 COPY id_rsa /root/.ssh/id_rsa
 COPY ssh_config /root/.ssh/config
