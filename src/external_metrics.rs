@@ -59,7 +59,7 @@ pub struct TelegrafMetric(String);
 impl TelegrafMetric {
     pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         buf.extend_from_slice(self.0.as_bytes());
-        Ok(self.0.len())
+        Ok(self.0.as_bytes().len())
     }
 }
 
