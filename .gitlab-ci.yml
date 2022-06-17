@@ -1,6 +1,6 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-  BUILD_IMAGE: dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.1
+  BUILD_IMAGE: dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.2
   ALIYUN_REGISTRY: dfcloud-image-registry.cn-beijing.cr.aliyuncs.com
   DEPLOY_IMAGE: docker-hosted.nexus.yunshan.net/metaflow-agent
   KUBERNETES_POD_ANNOTATIONS_1: "k8s.aliyun.com/eci-use-specs=ecs.c6.2xlarge,ecs.c5.2xlarge,ecs.c6.3xlarge,ecs.g6.2xlarge,ecs.g5.2xlarge"
