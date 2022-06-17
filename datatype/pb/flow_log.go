@@ -15,6 +15,7 @@ var pbAppProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {
 		Kafka: &KafkaInfo{},
 		Mysql: &MysqlInfo{},
 		Redis: &RedisInfo{},
+		Mqtt:  &MqttInfo{},
 	}
 })
 
@@ -34,17 +35,18 @@ func ReleasePbAppProtoLogsData(d *AppProtoLogsData) {
 	basicInfo.Reset()
 	basicInfo.Head = head
 
-	http, dns, dubbo, kafka, mysql, redis := d.Http, d.Dns, d.Dubbo, d.Kafka, d.Mysql, d.Redis
+	http, dns, dubbo, kafka, mysql, redis, mqtt := d.Http, d.Dns, d.Dubbo, d.Kafka, d.Mysql, d.Redis, d.Mqtt
 	http.Reset()
 	dns.Reset()
 	dubbo.Reset()
 	kafka.Reset()
 	mysql.Reset()
 	redis.Reset()
+	mqtt.Reset()
 
 	d.Reset()
 	d.BaseInfo = basicInfo
-	d.Http, d.Dns, d.Dubbo, d.Kafka, d.Mysql, d.Redis = http, dns, dubbo, kafka, mysql, redis
+	d.Http, d.Dns, d.Dubbo, d.Kafka, d.Mysql, d.Redis, d.Mqtt = http, dns, dubbo, kafka, mysql, redis, mqtt
 
 	pbAppProtoLogsDataPool.Put(d)
 }
