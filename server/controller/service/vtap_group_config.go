@@ -1,0 +1,510 @@
+package service
+
+import (
+	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
+
+	"github.com/google/uuid"
+	"gopkg.in/yaml.v2"
+
+	"server/controller/common"
+	"server/controller/db/mysql"
+	"server/controller/model"
+)
+
+func convertStrToIntList(convertStr string) ([]int, error) {
+	if len(convertStr) == 0 {
+		return []int{}, nil
+	}
+	splitStr := strings.Split(convertStr, ",")
+	result := make([]int, len(splitStr), len(splitStr))
+	for index, src := range splitStr {
+		target, err := strconv.Atoi(src)
+		if err != nil {
+			return []int{}, err
+		} else {
+			result[index] = target
+		}
+	}
+
+	return result, nil
+}
+
+func convertIntSliceToString(intSlice []int) string {
+	strSlice := make([]string, 0, len(intSlice))
+	for _, ci := range intSlice {
+		strSlice = append(strSlice, strconv.Itoa(ci))
+	}
+
+	return strings.Join(strSlice, ",")
+}
+
+func copyStruct(from, to interface{}, ignoreName []string) {
+	fromValue := reflect.ValueOf(from)
+	toValue := reflect.ValueOf(to)
+	if fromValue.Kind() != reflect.Ptr || toValue.Kind() != reflect.Ptr {
+		return
+	}
+	if fromValue.IsNil() || toValue.IsNil() {
+		return
+	}
+	fromElem := fromValue.Elem()
+	toElem := toValue.Elem()
+	for i := 0; i < toElem.NumField(); i++ {
+		toField := toElem.Type().Field(i)
+		if common.IsValueInSliceString(toField.Name, ignoreName) == true {
+			continue
+		}
+		fromFieldName, ok := fromElem.Type().FieldByName(toField.Name)
+		if ok && fromFieldName.Type == toField.Type {
+			toElem.Field(i).Set(fromElem.FieldByName(toField.Name))
+		}
+	}
+}
+
+var DecapTypeData = map[int]string{
+	0: "无",
+	1: "VXLAN",
+	2: "IPIP",
+	3: "GRE",
+}
+
+func getTypeInfo(tapTypeValue int, idToTapTypeName map[int]string) *model.TypeInfo {
+	var typeInfo *model.TypeInfo
+	switch tapTypeValue {
+	case 0:
+		typeInfo = &model.TypeInfo{
+			ID:   tapTypeValue,
+			Name: "全部",
+		}
+	case -1:
+		typeInfo = &model.TypeInfo{
+			ID:   tapTypeValue,
+			Name: "无",
+		}
+	default:
+		name := idToTapTypeName[tapTypeValue]
+		typeInfo = &model.TypeInfo{
+			ID:   tapTypeValue,
+			Name: name,
+		}
+	}
+	return typeInfo
+}
+
+func convertDBToJson(
+	sData *mysql.VTapGroupConfiguration,
+	tData *model.VTapGroupConfigurationResponse,
+	idToTapTypeName map[int]string,
+	lcuuidToDomain map[string]string) {
+
+	ignoreName := []string{"ID", "YamlConfig", "L4LogTapTypes",
+		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
+	copyStruct(sData, tData, ignoreName)
+	tData.L4LogTapTypes = []*model.TypeInfo{}
+	tData.L7LogStoreTapTypes = []*model.TypeInfo{}
+	tData.DecapType = []*model.TypeInfo{}
+	tData.Domains = []*model.DomainInfo{}
+	if sData.L4LogTapTypes != nil {
+		cL4LogTapTypes, err := convertStrToIntList(*sData.L4LogTapTypes)
+		if err == nil {
+			for _, tapTypeValue := range cL4LogTapTypes {
+				tData.L4LogTapTypes = append(tData.L4LogTapTypes,
+					getTypeInfo(tapTypeValue, idToTapTypeName))
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.L7LogStoreTapTypes != nil {
+		cL7LogStoreTapTypes, err := convertStrToIntList(*sData.L7LogStoreTapTypes)
+		if err == nil {
+			for _, tapTypeValue := range cL7LogStoreTapTypes {
+				tData.L7LogStoreTapTypes = append(tData.L7LogStoreTapTypes,
+					getTypeInfo(tapTypeValue, idToTapTypeName))
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.DecapType != nil {
+		cDecapType, err := convertStrToIntList(*sData.DecapType)
+		if err == nil {
+			for _, decapType := range cDecapType {
+				typeInfo := &model.TypeInfo{
+					ID:   decapType,
+					Name: DecapTypeData[decapType],
+				}
+
+				tData.DecapType = append(tData.DecapType, typeInfo)
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.Domains != nil {
+		cDomains := strings.Split(*sData.Domains, ",")
+		for _, domain := range cDomains {
+			var domainInfo *model.DomainInfo
+			if domain == "0" {
+				domainInfo = &model.DomainInfo{
+					ID:   domain,
+					Name: "全部",
+				}
+			}
+			if domainInfo == nil && domain != "" {
+				domainInfo = &model.DomainInfo{
+					ID:   domain,
+					Name: lcuuidToDomain[domain],
+				}
+			}
+			if domainInfo != nil {
+				tData.Domains = append(tData.Domains, domainInfo)
+			}
+		}
+	}
+	if sData.MaxCollectPps != nil {
+		cMaxCollectPps := *sData.MaxCollectPps / 1000
+		tData.MaxCollectPps = &cMaxCollectPps
+	}
+	if sData.MaxNpbBps != nil {
+		cMaxNpbBps := *sData.MaxNpbBps / 1000000
+		tData.MaxNpbBps = &cMaxNpbBps
+	}
+	if sData.MaxTxBandwidth != nil {
+		cMaxTxBandwidth := *sData.MaxTxBandwidth / 1000000
+		tData.MaxTxBandwidth = &cMaxTxBandwidth
+	}
+}
+
+func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroupConfiguration) {
+	ignoreName := []string{"ID", "VTapGroupLcuuid", "Lcuuid", "YamlConfig", "L4LogTapTypes",
+		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
+	copyStruct(sData, tData, ignoreName)
+	if sData.YamlConfig != nil {
+		tData.YamlConfig = sData.YamlConfig
+	} else {
+		yamlConfig := ""
+		tData.YamlConfig = &yamlConfig
+	}
+	if sData.L4LogTapTypes != nil {
+		cL4LogTapTypes, err := convertStrToIntList(*sData.L4LogTapTypes)
+		if err == nil {
+			for _, tapTypeValue := range cL4LogTapTypes {
+				tData.L4LogTapTypes = append(tData.L4LogTapTypes, tapTypeValue)
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.L7LogStoreTapTypes != nil {
+		cL7LogStoreTapTypes, err := convertStrToIntList(*sData.L7LogStoreTapTypes)
+		if err == nil {
+			for _, tapTypeValue := range cL7LogStoreTapTypes {
+				tData.L7LogStoreTapTypes = append(tData.L7LogStoreTapTypes, tapTypeValue)
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.DecapType != nil {
+		cDecapType, err := convertStrToIntList(*sData.DecapType)
+		if err == nil {
+			for _, decapType := range cDecapType {
+				tData.DecapType = append(tData.DecapType, decapType)
+			}
+		} else {
+			log.Error(err)
+		}
+	}
+	if sData.Domains != nil {
+		cDomains := strings.Split(*sData.Domains, ",")
+		for _, domain := range cDomains {
+			if domain != "" {
+				tData.Domains = append(tData.Domains, domain)
+			}
+		}
+	}
+	if sData.MaxCollectPps != nil {
+		cMaxCollectPps := *sData.MaxCollectPps / 1000
+		tData.MaxCollectPps = &cMaxCollectPps
+	}
+	if sData.MaxNpbBps != nil {
+		cMaxNpbBps := *sData.MaxNpbBps / 1000000
+		tData.MaxNpbBps = &cMaxNpbBps
+	}
+	if sData.MaxTxBandwidth != nil {
+		cMaxTxBandwidth := *sData.MaxTxBandwidth / 1000000
+		tData.MaxTxBandwidth = &cMaxTxBandwidth
+	}
+}
+
+func convertJsonToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
+	tData.VTapGroupLcuuid = sData.VTapGroupLcuuid
+	convertToDb(sData, tData)
+}
+
+func convertYamlToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
+	tData.YamlConfig = sData.YamlConfig
+	convertToDb(sData, tData)
+}
+
+func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
+	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "L4LogTapTypes",
+		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
+	copyStruct(sData, tData, ignoreName)
+	if len(sData.L4LogTapTypes) > 0 {
+		cL4LogTapTypes := convertIntSliceToString(sData.L4LogTapTypes)
+		tData.L4LogTapTypes = &cL4LogTapTypes
+	}
+	if len(sData.L7LogStoreTapTypes) > 0 {
+		cL7LogStoreTapTypes := convertIntSliceToString(sData.L7LogStoreTapTypes)
+		tData.L7LogStoreTapTypes = &cL7LogStoreTapTypes
+	}
+	if len(sData.DecapType) > 0 {
+		cDecapType := convertIntSliceToString(sData.DecapType)
+		tData.DecapType = &cDecapType
+	}
+	if len(sData.Domains) > 0 {
+		cDomains := strings.Join(sData.Domains, ",")
+		tData.Domains = &cDomains
+	}
+	if sData.MaxCollectPps != nil {
+		cMaxCollectPps := *sData.MaxCollectPps * 1000
+		tData.MaxCollectPps = &cMaxCollectPps
+	}
+	if sData.MaxNpbBps != nil {
+		cMaxNpbBps := *sData.MaxNpbBps * 1000000
+		tData.MaxNpbBps = &cMaxNpbBps
+	}
+	if sData.MaxTxBandwidth != nil {
+		cMaxTxBandwidth := *sData.MaxTxBandwidth * 1000000
+		tData.MaxTxBandwidth = &cMaxTxBandwidth
+	}
+}
+
+func CreateVTapGroupConfig(createData *model.VTapGroupConfiguration) (*mysql.VTapGroupConfiguration, error) {
+	if createData.VTapGroupLcuuid == nil {
+		return nil, fmt.Errorf("vtap_group_lcuuid is emty")
+	}
+	vTapGroupLcuuid := *createData.VTapGroupLcuuid
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	db := mysql.Db
+	ret := db.Where("vtap_group_lcuuid = ?", vTapGroupLcuuid).First(dbConfig)
+	if ret.Error == nil {
+		return nil, fmt.Errorf("vtapgroup %s configuration already exist", vTapGroupLcuuid)
+	}
+
+	dbGroup := &mysql.VTapGroup{}
+	ret = db.Where("lcuuid = ?", vTapGroupLcuuid).First(dbGroup)
+	if ret.Error != nil {
+		return nil, fmt.Errorf("vtapgroup (%s) not found", vTapGroupLcuuid)
+	}
+	dbData := &mysql.VTapGroupConfiguration{}
+	convertJsonToDb(createData, dbData)
+	lcuuid := uuid.New().String()
+	dbData.Lcuuid = &lcuuid
+	mysql.Db.Create(dbData)
+
+	return dbData, nil
+}
+
+func DeleteVTapGroupConfig(lcuuid string) (*mysql.VTapGroupConfiguration, error) {
+	if lcuuid == "" {
+		return nil, fmt.Errorf("lcuuid is None")
+	}
+
+	db := mysql.Db
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
+	if ret.Error != nil {
+		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
+	}
+	if dbConfig.VTapGroupLcuuid == nil {
+		return nil, fmt.Errorf("delete default vtapgroup configuration is not supported")
+	}
+	db.Delete(dbConfig)
+
+	return dbConfig, nil
+}
+
+func UpdateVTapGroupConfig(lcuuid string, updateData *model.VTapGroupConfiguration) (*mysql.VTapGroupConfiguration, error) {
+	if lcuuid == "" {
+		return nil, fmt.Errorf("lcuuid is None")
+	}
+
+	db := mysql.Db
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
+	if ret.Error != nil {
+		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
+	}
+	if updateData.VTapGroupLcuuid == nil {
+		return nil, fmt.Errorf("vtap group is empty")
+	}
+
+	convertJsonToDb(updateData, dbConfig)
+
+	ret = db.Save(dbConfig)
+	if ret.Error != nil {
+		return nil, fmt.Errorf("save config failed, %s", ret.Error)
+	}
+
+	return dbConfig, nil
+}
+
+func isBlank(value reflect.Value) bool {
+	switch value.Kind() {
+	case reflect.String:
+		return value.Len() == 0
+	case reflect.Bool:
+		return !value.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return value.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return value.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return value.Float() == 0
+	case reflect.Ptr:
+		if !value.IsNil() {
+			rvalue := reflect.Indirect(value)
+			if rvalue.Kind() == reflect.String {
+				return rvalue.Len() == 0
+			}
+		}
+		return value.IsNil()
+	case reflect.Interface:
+		return value.IsNil()
+	}
+	return reflect.DeepEqual(value.Interface(), reflect.Zero(value.Type()).Interface())
+}
+
+func getRealVTapGroupConfig(config *mysql.VTapGroupConfiguration) *mysql.VTapGroupConfiguration {
+	ignoreName := []string{"ID", "VTapGroupLcuuid", "Lcuuid"}
+	typeOfDefaultConfig := reflect.ValueOf(common.DefaultVTapGroupConfig).Elem()
+	tt := reflect.TypeOf(config).Elem()
+	tv := reflect.ValueOf(config).Elem()
+	realConfiguration := &mysql.VTapGroupConfiguration{}
+	typeOfRealConfiguration := reflect.ValueOf(realConfiguration).Elem()
+	for i := 0; i < tv.NumField(); i++ {
+		field := tt.Field(i)
+		if common.IsValueInSliceString(field.Name, ignoreName) == true {
+			typeOfRealConfiguration.Field(i).Set(tv.Field(i))
+		}
+		value := tv.Field(i)
+		defaultValue := typeOfDefaultConfig.Field(i)
+		if isBlank(value) == false {
+			typeOfRealConfiguration.Field(i).Set(value)
+		} else {
+			typeOfRealConfiguration.Field(i).Set(defaultValue)
+		}
+	}
+
+	return realConfiguration
+}
+
+func GetVTapGroupConfigs() ([]*model.VTapGroupConfigurationResponse, error) {
+	var dbConfigs []*mysql.VTapGroupConfiguration
+	var tapTypes []*mysql.TapType
+	var domains []*mysql.Domain
+	idToTapTypeName := make(map[int]string)
+	lcuuidToDomain := make(map[string]string)
+	db := mysql.Db
+	db.Find(&dbConfigs)
+	db.Find(&tapTypes)
+	db.Find(&domains)
+	for _, tapType := range tapTypes {
+		idToTapTypeName[tapType.Value] = tapType.Name
+	}
+	for _, domain := range domains {
+		lcuuidToDomain[domain.Lcuuid] = domain.Name
+	}
+	result := make([]*model.VTapGroupConfigurationResponse, 0, len(dbConfigs))
+	for _, config := range dbConfigs {
+		if config.VTapGroupLcuuid == nil || *config.VTapGroupLcuuid == "" {
+			continue
+		}
+		realConfig := getRealVTapGroupConfig(config)
+		mData := &model.VTapGroupConfigurationResponse{}
+		convertDBToJson(realConfig, mData, idToTapTypeName, lcuuidToDomain)
+		result = append(result, mData)
+	}
+
+	return result, nil
+}
+
+func GetVTapGroupDetailedConfig(lcuuid string) (*model.DetailedConfig, error) {
+	if lcuuid == "" {
+		return nil, fmt.Errorf("lcuuid is None")
+	}
+	db := mysql.Db
+	realConfig := &mysql.VTapGroupConfiguration{}
+	ret := db.Where("lcuuid = ?", lcuuid).First(realConfig)
+	if ret.Error != nil {
+		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
+	}
+	var tapTypes []*mysql.TapType
+	var domains []*mysql.Domain
+	idToTapTypeName := make(map[int]string)
+	lcuuidToDomain := make(map[string]string)
+	db.Find(&tapTypes)
+	db.Find(&domains)
+	for _, tapType := range tapTypes {
+		idToTapTypeName[tapType.Value] = tapType.Name
+	}
+	for _, domain := range domains {
+		lcuuidToDomain[domain.Lcuuid] = domain.Name
+	}
+	realData := &model.VTapGroupConfigurationResponse{}
+	convertDBToJson(realConfig, realData, idToTapTypeName, lcuuidToDomain)
+	defaultData := &model.VTapGroupConfigurationResponse{}
+	convertDBToJson(common.DefaultVTapGroupConfig, defaultData, idToTapTypeName, lcuuidToDomain)
+	response := &model.DetailedConfig{
+		RealConfig:    realData,
+		DefaultConfig: defaultData,
+	}
+
+	return response, nil
+}
+
+func GetVTapGroupAdvancedConfig(lcuuid string) (string, error) {
+	response := &model.VTapGroupConfiguration{}
+	if lcuuid == "" {
+		return "", fmt.Errorf("lcuuid is None")
+	}
+	db := mysql.Db
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
+	if ret.Error != nil {
+		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
+	}
+	convertDBToYaml(dbConfig, response)
+	b, err := yaml.Marshal(response)
+	if err != nil {
+		log.Error(err)
+	}
+	return string(b), nil
+}
+
+func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupConfiguration) (string, error) {
+	db := mysql.Db
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	ret := db.Where("lcuuid = ?", lcuuid).First(dbConfig)
+	if ret.Error != nil {
+		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
+	}
+	convertYamlToDb(updateData, dbConfig)
+	ret = db.Save(dbConfig)
+	if ret.Error != nil {
+		return "", fmt.Errorf("save config failed, %s", ret.Error)
+	}
+	response := &model.VTapGroupConfiguration{}
+	convertDBToYaml(dbConfig, response)
+	b, err := yaml.Marshal(response)
+	if err != nil {
+		log.Error(err)
+	}
+	return string(b), nil
+}
