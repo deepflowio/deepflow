@@ -507,7 +507,7 @@ func (r *PlatformRawData) ConvertDBIPs(dbDataCache *DBDataCache) {
 		if lanIP.VInterfaceID == 0 {
 			r.noVInterfaceIDIPs = append(r.noVInterfaceIDIPs, &IPData{IP: lanIP.IP, Domain: lanIP.Domain})
 		} else {
-			ipReource := generateProtoIpResource(lanIP.IP, 0, uint32(lanIP.VInterfaceID))
+			ipReource := generateProtoIpResource(lanIP.IP, 0, uint32(lanIP.NetworkID))
 			if _, ok := r.vInterfaceIDToIP[lanIP.VInterfaceID]; ok {
 				r.vInterfaceIDToIP[lanIP.VInterfaceID] = append(r.vInterfaceIDToIP[lanIP.VInterfaceID], ipReource)
 			} else {
