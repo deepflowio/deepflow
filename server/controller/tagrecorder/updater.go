@@ -28,9 +28,9 @@ type UpdaterBase[MT MySQLChModel, KT ChModelKey] struct {
 }
 
 func (b *UpdaterBase[MT, KT]) Refresh() {
-	newKeyToDBItem, ok := b.dataGenerator.generateNewData()
-	oldKeyToDBItem, ok := b.generateOldData()
-	if ok {
+	newKeyToDBItem, newOK := b.dataGenerator.generateNewData()
+	oldKeyToDBItem, oldOK := b.generateOldData()
+	if newOK && oldOK {
 		for key, newDBItem := range newKeyToDBItem {
 			oldDBItem, exists := oldKeyToDBItem[key]
 			if !exists {

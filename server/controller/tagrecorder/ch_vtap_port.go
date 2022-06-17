@@ -66,12 +66,12 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		log.Error(errors.New("unable to get resource vtap-port"))
 		return nil, false
 	}
+	keyToItem := make(map[VtapPortKey]mysql.ChVTapPort)
 	if len(response.Get("DATA").MustArray()) == 0 {
 		log.Error(errors.New("no data in get vtap-port response"))
-		return nil, false
+		return keyToItem, true
 	}
 
-	keyToItem := make(map[VtapPortKey]mysql.ChVTapPort)
 	for i, _ := range response.Get("DATA").MustArray() {
 		data := response.Get("DATA").GetIndex(i)
 		if data.Get("TAP_MAC").MustString() == "" {
