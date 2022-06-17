@@ -243,19 +243,19 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 	}
 	for _, _tagName := range externalRst["values"] {
 		tagName := _tagName.([]interface{})[0]
-		externalTag := "tag." + tagName.(string)
 		if db == "ext_metrics" {
+			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
 				"原始Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		} else {
+			externalTag := "attribute." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "attribute",
 				"原始Attribute", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		}
-
 	}
 	return response, nil
 }
@@ -272,7 +272,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		return GetTagResourceValues(sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
-	if strings.HasPrefix(tag, "tag.") {
+	if strings.HasPrefix(tag, "tag.") || strings.HasPrefix(tag, "attribute.") {
 		return GetExternalTagValues(db, table, sql)
 	}
 	if db == "ext_metrics" {
@@ -436,6 +436,7 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
 	tag = strings.TrimPrefix(tag, "tag.")
+	tag = strings.TrimPrefix(tag, "attribute.")
 	var whereSql string
 	if strings.Contains(rawSql, "WHERE") {
 		whereSql = strings.Split(rawSql, "WHERE")[1]

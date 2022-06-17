@@ -586,6 +586,9 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 	// 加载metric定义
 	if metricData, ok := dbDataMap["metrics"]; ok {
 		for db, tables := range chCommon.DB_TABLE_MAP {
+			if db == "ext_metrics" {
+				continue
+			}
 			for _, table := range tables {
 				loadMetrics, err := metrics.LoadMetrics(db, table, metricData.(map[string]interface{}))
 				if err != nil {

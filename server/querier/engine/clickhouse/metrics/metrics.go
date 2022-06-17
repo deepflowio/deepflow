@@ -5,7 +5,11 @@ import (
 	"fmt"
 
 	ckcommon "server/querier/engine/clickhouse/common"
+
+	logging "github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("clickhouse.metrics")
 
 const METRICS_OPERATOR_GTE = ">="
 const METRICS_OPERATOR_LTE = "<="
@@ -64,40 +68,46 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 }
 
 func GetMetrics(field string, db string, table string) (*Metrics, bool) {
-	allMetrics := GetMetricsByDBTable(db, table)
+	allMetrics, err := GetMetricsByDBTable(db, table)
+	if err != nil {
+		return nil, false
+	}
 	metric, ok := allMetrics[field]
 	return metric, ok
 }
 
-func GetMetricsByDBTable(db string, table string) map[string]*Metrics {
+func GetMetricsByDBTable(db string, table string) (map[string]*Metrics, error) {
+	var err error
 	switch db {
 	case "flow_log":
 		switch table {
 		case "l4_flow_log":
-			return GetL4FlowLogMetrics()
+			return GetL4FlowLogMetrics(), err
 		case "l7_flow_log":
-			return GetL7FlowLogMetrics()
+			return GetL7FlowLogMetrics(), err
 		}
 	case "flow_metrics":
 		switch table {
 		case "vtap_flow_port":
-			return GetVtapFlowPortMetrics()
+			return GetVtapFlowPortMetrics(), err
 		case "vtap_flow_edge_port":
-			return GetVtapFlowEdgePortMetrics()
+			return GetVtapFlowEdgePortMetrics(), err
 		case "vtap_app_port":
-			return GetVtapAppPortMetrics()
+			return GetVtapAppPortMetrics(), err
 		case "vtap_app_edge_port":
-			return GetVtapAppEdgePortMetrics()
+			return GetVtapAppEdgePortMetrics(), err
 		}
+	case "ext_metrics":
+		return GetExtMetrics(db, table)
 	}
-	return nil
+	return nil, err
 }
 
 func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, error) {
-	allMetrics := GetMetricsByDBTable(db, table)
-	if allMetrics == nil {
+	allMetrics, err := GetMetricsByDBTable(db, table)
+	if allMetrics == nil || err != nil {
 		// TODO: metrics not found
-		return nil, nil
+		return nil, err
 	}
 	columns := []interface{}{
 		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions",
@@ -118,9 +128,7 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 func LoadMetrics(db string, table string, dbDescription map[string]interface{}) (loadMetrics map[string]*Metrics, err error) {
 	tableDate, ok := dbDescription[db]
 	if !ok {
-		return loadMetrics, nil
-		// TODO 支持ext_metrics后取消注释
-		//return nil, errors.New(fmt.Sprintf("get metrics failed! db: %s", db))
+		return nil, errors.New(fmt.Sprintf("get metrics failed! db: %s", db))
 	}
 	if ok {
 		metricsData, ok := tableDate.(map[string]interface{})[table]
@@ -179,11 +187,11 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 			metrics = VTAP_APP_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
 		}
+	case "ext_metrics":
+		metrics = EXT_METRICS
 	}
 	if metrics == nil {
-		return nil
-		// TODO 支持ext_metrics后取消注释
-		// return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))
+		return errors.New(fmt.Sprintf("merge metrics failed! db:%s, table:%s", db, table))
 	}
 	for name, value := range loadMetrics {
 		// TAG类型指标量都属于聚合类型
