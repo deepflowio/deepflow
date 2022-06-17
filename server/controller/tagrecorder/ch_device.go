@@ -141,6 +141,7 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 			DeviceType: common.VIF_DEVICE_TYPE_VM,
 			DeviceID:   vm.ID,
 			Name:       vm.Name,
+			UID:        vm.UID,
 			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
 		}
 	}
