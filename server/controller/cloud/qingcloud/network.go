@@ -112,6 +112,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 					RegionLcuuid:   regionLcuuid,
 				})
 				q.regionLcuuidToResourceNum[regionLcuuid]++
+				q.azLcuuidToResourceNum[azLcuuid]++
 
 				// 生成网段信息
 				if subnetCidr == "" {
