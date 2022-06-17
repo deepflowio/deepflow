@@ -200,6 +200,8 @@ func ReleaseAppProtoLogsData(d *AppProtoLogsData) {
 		ReleaseDubboInfo(d.Detail.(*DubboInfo))
 	case L7_PROTOCOL_KAFKA:
 		ReleaseKafkaInfo(d.Detail.(*KafkaInfo))
+	case L7_PROTOCOL_MQTT:
+		ReleaseMqttInfo(d.Detail.(*MqttInfo))
 	}
 
 	*d = zeroAppProtoLogsData
@@ -280,6 +282,9 @@ func (l *AppProtoLogsData) EncodePB(encoder *codec.SimpleEncoder, i interface{})
 	if p.Kafka == nil {
 		p.Kafka = data.Kafka
 	}
+	if p.Mqtt == nil {
+		p.Mqtt = data.Mqtt
+	}
 	return nil
 }
 
@@ -298,7 +303,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			}
 			http.WriteToPB(p.Http, l.AppProtoLogsBaseInfo.MsgType)
 		}
-		p.Dns, p.Mysql, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+		p.Dns, p.Mysql, p.Redis, p.Dubbo, p.Kafka, p.Mqtt = nil, nil, nil, nil, nil, nil
 	case L7_PROTOCOL_DNS:
 		if dns, ok := l.Detail.(*DNSInfo); ok {
 			if p.Dns == nil {
@@ -306,7 +311,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			}
 			dns.WriteToPB(p.Dns, l.AppProtoLogsBaseInfo.MsgType)
 		}
-		p.Http, p.Mysql, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+		p.Http, p.Mysql, p.Redis, p.Dubbo, p.Kafka, p.Mqtt = nil, nil, nil, nil, nil, nil
 	case L7_PROTOCOL_MYSQL:
 		if mysql, ok := l.Detail.(*MysqlInfo); ok {
 			if p.Mysql == nil {
@@ -314,7 +319,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			}
 			mysql.WriteToPB(p.Mysql, l.AppProtoLogsBaseInfo.MsgType)
 		}
-		p.Http, p.Dns, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+		p.Http, p.Dns, p.Redis, p.Dubbo, p.Kafka, p.Mqtt = nil, nil, nil, nil, nil, nil
 	case L7_PROTOCOL_REDIS:
 		if redis, ok := l.Detail.(*RedisInfo); ok {
 			if p.Redis == nil {
@@ -322,7 +327,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			}
 			redis.WriteToPB(p.Redis, l.AppProtoLogsBaseInfo.MsgType)
 		}
-		p.Http, p.Dns, p.Mysql, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil
+		p.Http, p.Dns, p.Mysql, p.Dubbo, p.Kafka, p.Mqtt = nil, nil, nil, nil, nil, nil
 	case L7_PROTOCOL_DUBBO:
 		if dubbo, ok := l.Detail.(*DubboInfo); ok {
 			if p.Dubbo == nil {
@@ -330,7 +335,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			}
 			dubbo.WriteToPB(p.Dubbo, l.AppProtoLogsBaseInfo.MsgType)
 		}
-		p.Http, p.Dns, p.Mysql, p.Redis, p.Kafka = nil, nil, nil, nil, nil
+		p.Http, p.Dns, p.Mysql, p.Redis, p.Kafka, p.Mqtt = nil, nil, nil, nil, nil, nil
 	case L7_PROTOCOL_KAFKA:
 		if kafka, ok := l.Detail.(*KafkaInfo); ok {
 			if p.Kafka == nil {
@@ -338,7 +343,15 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 			}
 			kafka.WriteToPB(p.Kafka, l.AppProtoLogsBaseInfo.MsgType)
 		}
-		p.Http, p.Dns, p.Mysql, p.Redis, p.Dubbo = nil, nil, nil, nil, nil
+		p.Http, p.Dns, p.Mysql, p.Redis, p.Dubbo, p.Mqtt = nil, nil, nil, nil, nil, nil
+	case L7_PROTOCOL_MQTT:
+		if mqtt, ok := l.Detail.(*MqttInfo); ok {
+			if p.Mqtt == nil {
+				p.Mqtt = &pb.MqttInfo{}
+			}
+			mqtt.WriteToPB(p.Mqtt, l.AppProtoLogsBaseInfo.MsgType)
+		}
+		p.Http, p.Dns, p.Mysql, p.Redis, p.Dubbo, p.Kafka = nil, nil, nil, nil, nil, nil
 	}
 }
 
