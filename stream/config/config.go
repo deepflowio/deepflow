@@ -55,6 +55,7 @@ type FlowLogDisabled struct {
 	Redis bool `yaml:"redis"`
 	Dubbo bool `yaml:"dubbo"`
 	Kafka bool `yaml:"kafka"`
+	Mqtt  bool `yaml:"mqtt"`
 }
 
 type Config struct {

@@ -99,6 +99,7 @@ func getL7Disables(flowLogConfig *config.FlowLogDisabled) [L7_PROTO_MAX]bool {
 	l7Disableds[datatype.L7_PROTOCOL_REDIS] = flowLogConfig.Redis
 	l7Disableds[datatype.L7_PROTOCOL_DUBBO] = flowLogConfig.Dubbo
 	l7Disableds[datatype.L7_PROTOCOL_KAFKA] = flowLogConfig.Kafka
+	l7Disableds[datatype.L7_PROTOCOL_MQTT] = flowLogConfig.Mqtt
 	return l7Disableds
 }
 
@@ -258,6 +259,8 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		d.counter.L7RPCCount++
 		d.counter.L7RPCDropCount += drop
 	case datatype.L7_PROTOCOL_KAFKA:
+		fallthrough
+	case datatype.L7_PROTOCOL_MQTT:
 		d.counter.L7MQCount++
 		d.counter.L7MQDropCount += drop
 	}

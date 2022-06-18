@@ -268,7 +268,7 @@ func L7LoggerColumns() []*ckdb.Column {
 	l7Columns = append(l7Columns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
 	l7Columns = append(l7Columns, L7BaseColumns()...)
 	l7Columns = append(l7Columns,
-		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:其他, 20:http1, 21:http2, 40:dubbo, 60:mysql, 80:redis, 100:kafka, 120:dns"),
+		ckdb.NewColumn("l7_protocol", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("0:未知 1:其他, 20:http1, 21:http2, 40:dubbo, 60:mysql, 80:redis, 100:kafka, 101:mqtt, 120:dns"),
 		ckdb.NewColumn("l7_protocol_str", ckdb.LowCardinalityString).SetIndex(ckdb.IndexNone).SetComment("应用协议"),
 		ckdb.NewColumn("version", ckdb.LowCardinalityString).SetComment("协议版本"),
 		ckdb.NewColumn("type", ckdb.UInt8).SetIndex(ckdb.IndexNone).SetComment("日志类型, 0:请求, 1:响应, 2:会话"),
@@ -549,6 +549,41 @@ func (h *L7Logger) fillKafka(l *pb.AppProtoLogsData) {
 		h.ResponseLength = &h.responseLength
 	}
 }
+func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
+	if l.Mqtt == nil {
+		return
+	}
+	info := l.Mqtt
+	h.RequestType = info.MqttType
+	h.RequestResource = info.ClientID
+
+	switch info.ProtoVersion {
+	case 3:
+		h.Version = "3.1"
+	case 4:
+		h.Version = "3.1.1"
+	case 5:
+		h.Version = "5.0"
+	}
+
+	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
+		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
+		if info.ProtoVersion != 5 {
+			h.ResponseException = GetMQTTV3ExceptionDesc(uint16(l.BaseInfo.Head.Code))
+		} else {
+			h.ResponseException = GetMQTTV5ExceptionDesc(uint16(l.BaseInfo.Head.Code))
+		}
+	}
+
+	if info.ReqMsgSize != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
+		h.requestLength = uint64(info.ReqMsgSize)
+		h.RequestLength = &h.requestLength
+	}
+	if info.RespMsgSize != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
+		h.responseLength = uint64(info.RespMsgSize)
+		h.ResponseLength = &h.responseLength
+	}
+}
 
 func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	h.L7Base.Fill(l, platformData)
@@ -588,6 +623,8 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	case datatype.L7_PROTOCOL_KAFKA:
 		// 非fetch命令没有响应码
 		h.fillKafka(l)
+	case datatype.L7_PROTOCOL_MQTT:
+		h.fillMqtt(l)
 	}
 }
 

@@ -367,3 +367,70 @@ func GetDNSExceptionDesc(errCode uint16) string {
 	}
 	return ""
 }
+
+var mqttV3ExceptionDescs = []string{
+	0: "Success",
+	1: "unacceptable protocol version",
+	2: "identifier rejected",
+	3: "Server unavailable",
+	4: "bad user name or password",
+	5: "not authorized",
+}
+
+var mqttV5ExceptionDescs = []string{
+	0:   "Success",
+	4:   "Dissconnect with Will Message",
+	16:  "No matching subscribers",
+	17:  "No subscription existed",
+	24:  "Continue authentication",
+	25:  "Re-authenticate",
+	128: "Unspecified error",
+	129: "Malformed Packet",
+	130: "Protocol Error",
+	131: "Implementation specific error",
+	132: "Unsupported Protocol Version",
+	133: "Client Identifier not valid",
+	134: "Bad User Name or Password",
+	135: "Not authorized",
+	136: "Server unavailable",
+	137: "Server busy",
+	138: "Banned",
+	139: "Server shutting down",
+	140: "Bad authentication method",
+	141: "Keep Alive timeout",
+	142: "Session taken over",
+	143: "Topic Filter invalid",
+	144: "Topic Name invalid",
+	145: "Packet Identifier in use",
+	146: "Packet Identifier not found",
+	147: "Receive Maximum exceeded",
+	148: "Topic Alias invalid",
+	149: "Packet too large",
+	150: "Message rate too high",
+	151: "Quota exceeded",
+	152: "Administrative action",
+	153: "Payload format invalid",
+	154: "Retain not supported",
+	155: "QoS not supported",
+	156: "Use another server",
+	157: "Server moved",
+	158: "Shared Subscriptions not supported",
+	159: "Connection rate exceeded",
+	160: "Maximum connect time",
+	161: "Subscription Identifiers not supported",
+	162: "Wildcard Subscriptions not supported",
+}
+
+func GetMQTTV3ExceptionDesc(errCode uint16) string {
+	if errCode > 0 && int(errCode) < len(mqttV3ExceptionDescs) {
+		return mqttV3ExceptionDescs[errCode]
+	}
+	return ""
+}
+
+func GetMQTTV5ExceptionDesc(errCode uint16) string {
+	if errCode > 0 && int(errCode) < len(mqttV5ExceptionDescs) {
+		return mqttV5ExceptionDescs[errCode]
+	}
+	return ""
+}
