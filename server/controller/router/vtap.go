@@ -17,7 +17,7 @@ func VtapRouter(e *gin.Engine) {
 	e.GET("/v1/vtaps/", getVtaps)
 	e.PATCH("/v1/vtaps/:lcuuid/", updateVtap)
 	e.PATCH("/v1/vtaps-by-name/:name/", updateVtap)
-	e.PATCH("/v1/vtaps/batch/", batchUpdateVtap)
+	e.POST("/v1/vtaps/batch/", batchUpdateVtap)
 	e.PATCH("/v1/vtaps-license-type/:lcuuid/", updateVtapLicenseType)
 	e.PATCH("/v1/vtaps-license-type/", batchUpdateVtapLicenseType)
 	e.DELETE("/v1/vtaps/:lcuuid/", deleteVtap)

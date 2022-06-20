@@ -176,10 +176,18 @@ func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp mo
 	log.Infof("update vtap (%s) config %v", vtap.Name, vtapUpdate)
 
 	// enable/state/vtap_group_lcuuid
-	for _, key := range []string{"ENABLE", "STATE", "VTAP_GROUP_LCUUID"} {
+	for _, key := range []string{"ENABLE", "STATE", "VTAP_GROUP_LCUUID", "LICENSE_TYPE"} {
 		if _, ok := vtapUpdate[key]; ok {
 			dbUpdateMap[strings.ToLower(key)] = vtapUpdate[key]
 		}
+	}
+
+	if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"]; ok {
+		licenseFunctionStrs := []string{}
+		for _, licenseFunction := range licenseFunctions.([]int) {
+			licenseFunctionStrs = append(licenseFunctionStrs, strconv.Itoa(licenseFunction))
+		}
+		dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
 	}
 
 	// 更新vtap DB

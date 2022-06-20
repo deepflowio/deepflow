@@ -86,11 +86,12 @@ type Analyzer struct {
 }
 
 type VtapUpdate struct {
-	Lcuuid          string `json:"LCUUID"`
-	Enable          int    `json:"ENABLE"`
-	State           int    `json:"STATE"`
-	VtapGroupLcuuid string `json:"VTAP_GROUP_LCUUID"`
-	LicenseType     int    `json:"LICENSE_TYPE"`
+	Lcuuid           string `json:"LCUUID"`
+	Enable           int    `json:"ENABLE"`
+	State            int    `json:"STATE"`
+	VtapGroupLcuuid  string `json:"VTAP_GROUP_LCUUID"`
+	LicenseType      int    `json:"LICENSE_TYPE"`
+	LicenseFunctions []int  `json:"LICENSE_FUNCTIONS"`
 }
 
 type Vtap struct {
