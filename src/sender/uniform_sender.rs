@@ -325,7 +325,12 @@ impl UniformSender {
                 Err(e) => {
                     if self.counter.dropped.load(Ordering::Relaxed) == 0 {
                         self.exception_handler.set(Exception::AnalyzerSocketError);
-                        error!("tcp stream write data failed {}", e);
+                        error!(
+                            "tcp stream write data to {}:{} failed: {}",
+                            self.dst_ip,
+                            Self::DST_PORT,
+                            e
+                        );
                     }
                     self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                     self.tcp_stream.take();
