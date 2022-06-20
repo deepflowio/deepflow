@@ -7,4 +7,5 @@
 60      , MySQL
 80      , Redis
 100     , Kafka
+101     , MQTT
 120     , DNS
