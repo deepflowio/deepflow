@@ -140,12 +140,6 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 			}
 		}
 	}
-	if h.IsIPv4 && h.IP40 == 0 {
-		h.IP40 = utils.IpToUint32(net.IP{127, 0, 0, 1})
-	}
-	if !h.IsIPv4 && (len(h.IP60) == 0 || h.IP60.IsUnspecified()) {
-		h.IP60 = net.IPv6loopback
-	}
 	if len(h.L7ProtocolStr) > 0 {
 		if strings.Contains(strings.ToLower(h.L7ProtocolStr), "http") {
 			if strings.HasPrefix(h.Version, "2") {
