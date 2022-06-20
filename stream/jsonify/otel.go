@@ -61,6 +61,16 @@ func spanStatusToResponseStatus(status *v1.Status) uint8 {
 	return datatype.STATUS_NOT_EXIST
 }
 
+func httpCodeToResponseStatus(code int16) uint8 {
+	if code >= 400 && code <= 499 {
+		return datatype.STATUS_CLIENT_ERROR
+	} else if code >= 500 && code <= 600 {
+		return datatype.STATUS_SERVER_ERROR
+	} else {
+		return datatype.STATUS_OK
+	}
+}
+
 func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 	h.IsIPv4 = true
 	tagNames, tagValues := []string{}, []string{}
@@ -175,17 +185,27 @@ func (h *L7Logger) FillOTel(l *v1.Span, platformData *grpc.PlatformInfoTable) {
 		h.ResponseDuration = h.L7Base.EndTime - h.StartTime
 	}
 
-	h.ResponseStatus = spanStatusToResponseStatus(l.Status)
-	if l.Status != nil {
-		if l.Status.Code == v1.Status_STATUS_CODE_ERROR {
-			h.ResponseException = l.Status.Message
+	h.fillAttributes(l.GetAttributes())
+	// 优先匹配http的响应码
+	if h.responseCode != 0 {
+		h.ResponseStatus = httpCodeToResponseStatus(h.responseCode)
+		if h.ResponseStatus == datatype.STATUS_CLIENT_ERROR ||
+			h.ResponseStatus == datatype.STATUS_SERVER_ERROR {
+			h.ResponseException = GetHTTPExceptionDesc(uint16(h.responseCode))
 		}
-		if l.Status.Code != v1.Status_STATUS_CODE_UNSET {
-			h.responseCode = int16(l.Status.Code)
-			h.ResponseCode = &h.responseCode
+	} else {
+		// 若没有http的响应码，则使用span的响应码
+		h.ResponseStatus = spanStatusToResponseStatus(l.Status)
+		if l.Status != nil {
+			if l.Status.Code == v1.Status_STATUS_CODE_ERROR {
+				h.ResponseException = l.Status.Message
+			}
+			if l.Status.Code != v1.Status_STATUS_CODE_UNSET {
+				h.responseCode = int16(l.Status.Code)
+				h.ResponseCode = &h.responseCode
+			}
 		}
 	}
-	h.fillAttributes(l.GetAttributes())
 	h.L7Base.KnowledgeGraph.FillOTel(h, platformData)
 }
 
