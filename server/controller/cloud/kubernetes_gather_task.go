@@ -67,11 +67,14 @@ func (k *KubernetesGatherTask) Start() {
 				log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name)
 				var err error
 				k.resource, err = k.kubernetesGather.GetKubernetesGatherData()
+				// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 				if err != nil {
 					k.resource.ErrorMessage = err.Error()
-					if k.resource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
-						k.resource.ErrorState = common.RESOURCE_STATE_CODE_ERROR
+					if k.resource.ErrorState == 0 {
+						k.resource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 					}
+				} else {
+					k.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 				}
 				log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name)
 			case <-k.kCtx.Done():

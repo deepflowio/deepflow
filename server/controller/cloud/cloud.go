@@ -81,11 +81,14 @@ func (c *Cloud) getCloudData() {
 	if c.basicInfo.Type != common.KUBERNETES {
 		var err error
 		c.resource, err = c.platform.GetCloudData()
+		// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
 		if err != nil {
 			c.resource.ErrorMessage = err.Error()
-			if c.resource.ErrorState == common.RESOURCE_STATE_CODE_SUCCESS {
-				c.resource.ErrorState = common.RESOURCE_STATE_CODE_ERROR
+			if c.resource.ErrorState == 0 {
+				c.resource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
 			}
+		} else {
+			c.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 		}
 		c.getSubDomainData()
 	} else {
