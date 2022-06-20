@@ -368,6 +368,10 @@ const (
 	RESOURCE_STATE_CODE_WARNING   = 4
 )
 
+const (
+	SUB_DOMAIN_ERROR_DISPLAY_NUM = 10
+)
+
 var ProtocolMap = map[string]int{
 	"TCP": 6,
 	"UDP": 17,

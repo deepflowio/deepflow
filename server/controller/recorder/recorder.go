@@ -2,11 +2,14 @@ package recorder
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/op/go-logging"
 
 	cloudmodel "server/controller/cloud/model"
+	"server/controller/common"
 	"server/controller/db/mysql"
 	"server/controller/recorder/cache"
 	"server/controller/recorder/config"
@@ -123,7 +126,7 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 
 		log.Infof("domain (lcuuid: %s, name: %s) refresh started", r.domainLcuuid, r.domainName)
 
-		r.syncDomain()
+		r.syncDomain(cloudData)
 
 		// 指定创建及更新操作的资源顺序
 		// 基本原则：无依赖资源优先；实时性需求高资源优先
@@ -151,7 +154,7 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 			}
 			log.Infof("sub_domain (lcuuid: %s) sync refresh started", subDomainLcuuid)
 
-			r.syncSubDomain(subDomainLcuuid)
+			r.syncSubDomain(subDomainLcuuid, subDomainResource)
 
 			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource)
 			for _, updater := range subDomainUpdatersInUpdateOrder {
@@ -239,8 +242,49 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 	}
 }
 
+func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (state int, errMsg string) {
+	// 状态优先级 exception > warning > sunccess
+	stateToLevel := map[int]int{
+		common.RESOURCE_STATE_CODE_SUCCESS:   1,
+		common.RESOURCE_STATE_CODE_WARNING:   2,
+		common.RESOURCE_STATE_CODE_EXCEPTION: 3,
+	}
+
+	// domain的状态：取云平台自身状态 + 附属容器集群状态中，优先级最高的状态
+	// domain的异常信息：取云平台自身异常 + 最多10个附属容器集群异常，剩余附属容器集群异常省略
+	state = domainResource.ErrorState
+	errMsg = domainResource.ErrorMessage
+
+	var subDomainErrMsgs []string
+	for _, subDomainResource := range domainResource.SubDomainResources {
+		if stateToLevel[subDomainResource.ErrorState] > stateToLevel[state] {
+			state = subDomainResource.ErrorState
+		}
+		if subDomainResource.ErrorMessage != "" {
+			subDomainErrMsgs = append(subDomainErrMsgs, subDomainResource.ErrorMessage)
+		}
+	}
+	subDomainErrNum := len(subDomainErrMsgs)
+	if subDomainErrNum != 0 {
+		if errMsg != "" {
+			errMsg += "\n\n"
+		}
+		errMsg += fmt.Sprintf("共有%d个附属容器集群存在异常\n", subDomainErrNum)
+
+		var subDomainErrMsgsString string
+		if subDomainErrNum > common.SUB_DOMAIN_ERROR_DISPLAY_NUM {
+			subDomainErrMsgsString = strings.Join(subDomainErrMsgs[:common.SUB_DOMAIN_ERROR_DISPLAY_NUM], "\n")
+			subDomainErrMsgsString += "\n..."
+		} else {
+			subDomainErrMsgsString = strings.Join(subDomainErrMsgs, "\n")
+		}
+		errMsg += subDomainErrMsgsString
+	}
+	return
+}
+
 // TODO 提供db操作接口
-func (r *Recorder) syncDomain() {
+func (r *Recorder) syncDomain(domainData cloudmodel.Resource) {
 	var domain mysql.Domain
 	err := mysql.Db.Where("lcuuid = ?", r.domainLcuuid).First(&domain).Error
 	if err != nil {
@@ -249,10 +293,11 @@ func (r *Recorder) syncDomain() {
 	}
 	now := time.Now()
 	domain.SyncedAt = &now
+	domain.State, domain.ErrorMsg = r.formatDomainStateInfo(domainData)
 	mysql.Db.Save(&domain)
 }
 
-func (r *Recorder) syncSubDomain(lcuuid string) {
+func (r *Recorder) syncSubDomain(lcuuid string, subDomainResource cloudmodel.SubDomainResource) {
 	var subDomain mysql.SubDomain
 	err := mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
@@ -261,5 +306,7 @@ func (r *Recorder) syncSubDomain(lcuuid string) {
 	}
 	now := time.Now()
 	subDomain.SyncedAt = &now
+	subDomain.State = subDomainResource.ErrorState
+	subDomain.ErrorMsg = subDomainResource.ErrorMessage
 	mysql.Db.Save(&subDomain)
 }
