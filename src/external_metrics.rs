@@ -86,7 +86,9 @@ fn decode_metric(mut whole_body: impl Buf, headers: &HeaderMap) -> Result<Vec<u8
 /// 接收metric server发送的请求，根据路由处理分发
 async fn handler(
     req: Request<Body>,
-    sender: DebugSender<SendItem>,
+    otel_sender: DebugSender<SendItem>,
+    prometheus_sender: DebugSender<SendItem>,
+    telegraf_sender: DebugSender<SendItem>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -103,7 +105,7 @@ async fn handler(
 
             let tracing_data = decode_metric(whole_body, &part.headers)?;
             if let Err(Error::Terminated(..)) =
-                sender.send(SendItem::ExternalOtel(OpenTelemetry(tracing_data)))
+                otel_sender.send(SendItem::ExternalOtel(OpenTelemetry(tracing_data)))
             {
                 warn!("sender queue has terminated");
             }
@@ -115,7 +117,7 @@ async fn handler(
             let mut metric = vec![0u8; whole_body.remaining()];
             whole_body.copy_to_slice(metric.as_mut_slice());
             if let Err(Error::Terminated(..)) =
-                sender.send(SendItem::ExternalProm(PrometheusMetric(metric)))
+                prometheus_sender.send(SendItem::ExternalProm(PrometheusMetric(metric)))
             {
                 warn!("sender queue has terminated");
             }
@@ -128,7 +130,7 @@ async fn handler(
             let whole_body = aggregate(body).await?;
             let metric = decode_metric(whole_body, &part.headers)?;
             if let Err(Error::Terminated(..)) =
-                sender.send(SendItem::ExternalTelegraf(TelegrafMetric(metric)))
+                telegraf_sender.send(SendItem::ExternalTelegraf(TelegrafMetric(metric)))
             {
                 warn!("sender queue has terminated");
             }
@@ -147,17 +149,26 @@ pub struct MetricServer {
     running: Arc<AtomicBool>,
     rt: Runtime,
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
-    sender: DebugSender<SendItem>,
+    otel_sender: DebugSender<SendItem>,
+    prometheus_sender: DebugSender<SendItem>,
+    telegraf_sender: DebugSender<SendItem>,
     conf: MetricServerAccess,
 }
 
 impl MetricServer {
-    pub fn new(sender: DebugSender<SendItem>, conf: MetricServerAccess) -> Self {
+    pub fn new(
+        otel_sender: DebugSender<SendItem>,
+        prometheus_sender: DebugSender<SendItem>,
+        telegraf_sender: DebugSender<SendItem>,
+        conf: MetricServerAccess,
+    ) -> Self {
         Self {
             running: Arc::new(AtomicBool::new(false)),
             rt: Runtime::new().unwrap(),
             thread: Arc::new(Mutex::new(None)),
-            sender,
+            otel_sender,
+            prometheus_sender,
+            telegraf_sender,
             conf,
         }
     }
@@ -172,17 +183,26 @@ impl MetricServer {
         }
 
         let addr = (IpAddr::from(Ipv6Addr::UNSPECIFIED), self.conf.load().port).into();
-        let sender = self.sender.clone();
+        let otel_sender = self.otel_sender.clone();
+        let prometheus_sender = self.prometheus_sender.clone();
+        let telegraf_sender = self.telegraf_sender.clone();
 
         self.thread
             .lock()
             .unwrap()
             .replace(self.rt.spawn(async move {
                 let service = make_service_fn(move |_| {
-                    let metric_sender = sender.clone();
+                    let otel_sender = otel_sender.clone();
+                    let prometheus_sender = prometheus_sender.clone();
+                    let telegraf_sender = telegraf_sender.clone();
                     async {
                         Ok::<_, Infallible>(service_fn(move |req| {
-                            handler(req, metric_sender.clone())
+                            handler(
+                                req,
+                                otel_sender.clone(),
+                                prometheus_sender.clone(),
+                                telegraf_sender.clone(),
+                            )
                         }))
                     }
                 });
@@ -240,7 +260,7 @@ mod tests {
             Map::new(current_config.clone(), |config| -> &MetricServerConfig {
                 &config.metric_server
             });
-        let server = MetricServer::new(sender, conf);
+        let server = MetricServer::new(sender.clone(), sender.clone(), sender, conf);
         server.start();
         let rt = Runtime::new().unwrap();
         rt.block_on(async move {
