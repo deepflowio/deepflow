@@ -293,5 +293,4 @@ message MqttInfo {
     string client_id = 4;
 
     int32 resp_msg_size = 5;
-    uint32 return_code = 6;
 }
