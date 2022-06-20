@@ -182,10 +182,10 @@ func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp mo
 		}
 	}
 
-	if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"]; ok {
+	if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"].([]interface{}); ok {
 		licenseFunctionStrs := []string{}
-		for _, licenseFunction := range licenseFunctions.([]int) {
-			licenseFunctionStrs = append(licenseFunctionStrs, strconv.Itoa(licenseFunction))
+		for _, licenseFunction := range licenseFunctions {
+			licenseFunctionStrs = append(licenseFunctionStrs, strconv.Itoa(int(licenseFunction.(float64))))
 		}
 		dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
 	}
