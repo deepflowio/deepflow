@@ -28,7 +28,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 	for _, param := range []string{
 		"lcuuid", "name", "type", "vtap_group_lcuuid", "controller_ip", "analyzer_ip",
 	} {
-		where := fmt.Sprintf("%s = ?", filter[param])
+		where := fmt.Sprintf("%s = ?", param)
 		if _, ok := filter[param]; ok {
 			Db = Db.Where(where, filter[param])
 		}
