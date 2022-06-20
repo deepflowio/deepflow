@@ -6,6 +6,7 @@ import (
 
 	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
 
+	"server/querier/engine/clickhouse/tag"
 	"server/querier/engine/clickhouse/view"
 )
 
@@ -92,9 +93,16 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
 		newValues = make([]interface{}, len(values))
 		var macIndex int
+		var macTypeIndex int
 		for i, column := range columns {
 			if column.(string) == args[1].(string) {
 				macIndex = i
+				break
+			}
+		}
+		for i, column := range columns {
+			if column.(string) == "tap_port_type" {
+				macTypeIndex = i
 				break
 			}
 		}
@@ -109,8 +117,15 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 				if args[0].(string) == "tap_port" {
 					newMac = strings.TrimPrefix(newMac, "00:00:")
 				}
-				newValueSlice[macIndex] = newMac
-				newValues[i] = newValueSlice
+				if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_1 {
+					newValueSlice[macIndex] = newMac
+					newValues[i] = newValueSlice
+				} else if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_IPV4 {
+					newIP := utils.IpFromUint32(uint32((newValueSlice[macIndex]).(int)))
+					newIPString := newIP.String()
+					newValueSlice[macIndex] = newIPString
+					newValues[i] = newValueSlice
+				}
 			}
 		}
 		return newValues

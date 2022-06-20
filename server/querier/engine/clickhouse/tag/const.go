@@ -18,6 +18,12 @@ const (
 	VIF_DEVICE_TYPE_IP             = 255
 )
 
+const (
+	TAP_PORT_MAC_0 = 0
+	TAP_PORT_MAC_1 = 1
+	TAP_PORT_IPV4  = 2
+)
+
 var TAG_RESOURCE_TYPE_DEFAULT = []string{
 	"region", "az", "pod_node", "pod_ns",
 	"pod_group", "pod", "pod_cluster", "subnet",
