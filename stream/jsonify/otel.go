@@ -111,11 +111,11 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 		case "http.status_code":
 			h.responseCode = int16(value.GetIntValue())
 			h.ResponseCode = &h.responseCode
-		case "http.host", "db.connection_string", "rpc.service":
+		case "http.host", "db.connection_string":
 			h.RequestDomain = value.GetStringValue()
 		case "http.method", "db.operation", "rpc.method":
 			h.RequestType = value.GetStringValue()
-		case "http.target", "db.statement", "messaging.url":
+		case "http.target", "db.statement", "messaging.url", "rpc.service":
 			h.RequestResource = value.GetStringValue()
 		case "http.request_content_length":
 			h.requestLength = uint64(value.GetIntValue())
