@@ -54,12 +54,13 @@ impl PrometheusMetric {
 
 /// Telegraf metric， 是influxDB标准行协议的UTF8编码的文本数据
 #[derive(Debug, PartialEq)]
-pub struct TelegrafMetric(String);
+pub struct TelegrafMetric(Vec<u8>);
 
 impl TelegrafMetric {
-    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        buf.extend_from_slice(self.0.as_bytes());
-        Ok(self.0.as_bytes().len())
+    pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let length = self.0.len();
+        buf.append(&mut self.0);
+        Ok(length)
     }
 }
 
@@ -113,7 +114,6 @@ async fn handler(
             let mut whole_body = aggregate(req.into_body()).await?;
             let mut metric = vec![0u8; whole_body.remaining()];
             whole_body.copy_to_slice(metric.as_mut_slice());
-
             if let Err(Error::Terminated(..)) =
                 sender.send(SendItem::ExternalProm(PrometheusMetric(metric)))
             {
@@ -126,8 +126,7 @@ async fn handler(
         (&Method::POST, "/api/v1/telegraf") => {
             let (part, body) = req.into_parts();
             let whole_body = aggregate(body).await?;
-
-            let metric = String::from_utf8(decode_metric(whole_body, &part.headers)?)?;
+            let metric = decode_metric(whole_body, &part.headers)?;
             if let Err(Error::Terminated(..)) =
                 sender.send(SendItem::ExternalTelegraf(TelegrafMetric(metric)))
             {
