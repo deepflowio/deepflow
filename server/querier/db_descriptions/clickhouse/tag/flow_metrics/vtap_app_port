@@ -31,7 +31,7 @@ resource_gl2               ,                           ,                        
 
 is_key_service             , is_key_service            , is_key_service            , 是否属于关键服务           , bool          ,                    ,             , 111        ,
 l7_protocol                , l7_protocol               , l7_protocol               , 网络协议                   , int_enum      , l7_protocol        , 传输层      , 111        ,
-protocol                   , protocol                  , protocol                  , 网络协议                   , int_enum      , l7_ip_protocol     , 传输层      , 111        ,
+protocol                   , protocol                  , protocol                  , 网络协议                   , int_enum      , protocol           , 传输层      , 111        ,
 server_port                , server_port               , server_port               , 服务端口                   , int_enum      , server_port        , 传输层      , 111        ,
 
 tap                        , tap                       , tap                       , 采集点                     , resource      ,                    , 流信息      , 110        ,
