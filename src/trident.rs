@@ -338,7 +338,9 @@ pub struct Components {
     pub stats_collector: Arc<stats::Collector>,
     pub cgroups_controller: Arc<Cgroups>,
     pub external_metrics_server: MetricServer,
-    pub external_metrics_sender: UniformSenderThread,
+    pub otel_uniform_sender: UniformSenderThread,
+    pub prometheus_uniform_sender: UniformSenderThread,
+    pub telegraf_uniform_sender: UniformSenderThread,
 }
 
 impl Components {
@@ -376,7 +378,9 @@ impl Components {
             ebpf_collector.start();
         }
 
-        self.external_metrics_sender.start();
+        self.otel_uniform_sender.start();
+        self.prometheus_uniform_sender.start();
+        self.telegraf_uniform_sender.start();
         self.external_metrics_server.start();
 
         info!("Started components.");
@@ -748,29 +752,77 @@ impl Components {
         let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
         let sender_id = 3;
-        let (external_metrics_sender, external_metrics_receiver, counter) =
-            queue::bounded_with_debug(
-                yaml_config.external_metrics_sender_queue_size,
-                "external-metrics-to-sender",
-                &queue_debugger,
-            );
+        let (otel_sender, otel_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.external_metrics_sender_queue_size,
+            "otel-to-sender",
+            &queue_debugger,
+        );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "external-metrics-to-sender".to_string()),
+                StatsOption::Tag("module", "otel-to-sender".to_string()),
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
-        let external_metrics_uniform_sender = UniformSenderThread::new(
+        let otel_uniform_sender = UniformSenderThread::new(
             sender_id,
-            external_metrics_receiver,
+            otel_receiver,
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
         );
-        let external_metrics_server =
-            MetricServer::new(external_metrics_sender, config_handler.metric_server());
+
+        let sender_id = 4;
+        let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.external_metrics_sender_queue_size,
+            "prometheus-to-sender",
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "prometheus-to-sender".to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let prometheus_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            prometheus_receiver,
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
+
+        let sender_id = 5;
+        let (telegraf_sender, telegraf_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.external_metrics_sender_queue_size,
+            "telegraf-to-sender",
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "telegraf-to-sender".to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let telegraf_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            telegraf_receiver,
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
+
+        let external_metrics_server = MetricServer::new(
+            otel_sender,
+            prometheus_sender,
+            telegraf_sender,
+            config_handler.metric_server(),
+        );
 
         Ok(Components {
             rx_leaky_bucket,
@@ -795,7 +847,9 @@ impl Components {
             running: AtomicBool::new(false),
             cgroups_controller,
             external_metrics_server,
-            external_metrics_sender: external_metrics_uniform_sender,
+            otel_uniform_sender,
+            prometheus_uniform_sender,
+            telegraf_uniform_sender,
         })
     }
 
@@ -984,7 +1038,9 @@ impl Components {
         }
 
         self.external_metrics_server.stop();
-        self.external_metrics_sender.stop();
+        self.otel_uniform_sender.stop();
+        self.prometheus_uniform_sender.stop();
+        self.telegraf_uniform_sender.stop();
 
         info!("Stopped components.")
     }
