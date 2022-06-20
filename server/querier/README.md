@@ -324,4 +324,6 @@ clickhouse指标量及算子特殊处理：
 - 以下Tag字段在使用时需要携带`单引号`
   - `AS`后的中文字符
   - `label`类型的tag
+  - `tag`类型的tag
+  - `attribute`类型的tag
 - 字符串类型的value需要携带`单引号`

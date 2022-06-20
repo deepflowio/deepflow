@@ -32,9 +32,10 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			nameNoPreffix := strings.TrimPrefix(nameNoSuffix, "label.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
-		} else if strings.HasPrefix(name, "tag.") {
+		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 			tagItem, ok = tag.GetTag("external_tag", db, table, "default")
 			nameNoPreffix := strings.TrimPrefix(name, "tag.")
+			nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		}

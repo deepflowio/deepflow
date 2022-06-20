@@ -115,7 +115,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							}
 							return &view.Expr{Value: filter}, nil
 						}
-					} else if strings.HasPrefix(preAsTag, "tag.") {
+					} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 						tagItem, ok = tag.GetTag("external_tag", db, table, "default")
 						if ok {
 							nameNoPreffix := strings.TrimPrefix(preAsTag, "tag.")
@@ -191,7 +191,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						}
 						return &view.Expr{Value: filter}, nil
 					}
-				} else if strings.HasPrefix(t.Tag, "tag.") {
+				} else if strings.HasPrefix(t.Tag, "tag.") || strings.HasPrefix(t.Tag, "attribute.") {
 					tagItem, ok = tag.GetTag("external_tag", db, table, "default")
 					if ok {
 						nameNoPreffix := strings.TrimPrefix(t.Tag, "tag.")
