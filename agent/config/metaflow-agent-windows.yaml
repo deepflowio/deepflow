@@ -1,0 +1,112 @@
+## Note: the only difference with linux is log-file
+#
+controller-ips:
+  - 127.0.0.1
+## controller listen port
+#controller-port: 20035
+## controller security authenticate port
+#controller-tls-port: 20135
+## 配置后会使用配置文件中的controller-ips和analyzer-ip分别替换控制器下发的proxy-controller-ip和analyzer-ip
+#analyzer-ip: ""
+## genesis rpc listen port
+#genesis-rpc-port: 20036
+## logfile path
+#log-file: "C:\\DeepFlow\\trident\\log\\trident.log"
+## loglevel: "debug/info/warn/error"
+#log-level: info
+## profiler
+#profiler: false
+## 如果afpacket-blocks-enabled为true，afpacket-blocks有效
+#afpacket-blocks-enabled: false
+## winpcap收包内存大小，单位是M
+#afpacket-blocks: 0
+## trident-ctl listen port
+#debug-listen-port: 0
+#enable-debug-stats: false
+## where packet is considered to come by default if packet has no qinq with outer vlan pcp == 7
+## ISP: 1-2,4-255, TOR: 3, default value is 3
+#default-tap-type: 3
+## fastPath的map大小，设置为0时根据配置的MaxMemory自动适应
+#fast-path-map-size: 0
+## src-interfaces will only be used with mirror-mode
+## make sure src-interfaces have been created before running trident
+##
+## example:
+#src-interfaces:
+#  - dummy0
+#  - dummy1
+## LOCAL:0, MIRROR:1, ANALYZER:2
+#tap-mode: 0
+## mirror-traffic-pcp will only be used with analyzer-mode
+#mirror-traffic-pcp: 0
+## controller certificate file prefix, contain path
+## if certificate file exists, do certificate; or no
+## certificate file naming rule is prefix.controller-ip
+## example
+## controller-cert-file-prefix is /etc/trident_controller.cert
+## controller ip is: 10.10.10.10
+## so certificate file name is trident_controller.cert.10.10.10.10 in /etc/
+#controller-cert-file-prefix: ""
+## 支持采集器自动加入组
+#vtap-group-id-request: ""
+## the size of queue linking flow generator and quadruple generator, minimum 65536
+#flow-queue-size: 65536
+## the size of queue linking quadruple generator and collector, minimum 262144
+#quadruple-queue-size: 262144
+## the size of queue linking collector and collector-sender, minimum 65536
+#collector-sender-queue-size: 65536
+## the number of encoders for doc sender
+#collector-sender-queue-count: 1
+## the size of queue linking flow-aggr and collector-sender, minimum 65536
+#flow-sender-queue-size: 65536
+## the number of encoders for raw flow sender
+#flow-sender-queue-count: 1
+## extra delay for second flow output
+#second-flow-extra-delay: 0s
+## ignore tags with port for inactive services
+#ignore-inactive-server-ports: false
+#flow:
+  ## flow hash slots大小
+  ## 由于Flow是计算的第一步，这个值也广泛用于遥测数据统计的字典哈希桶大小
+  ## 包括：QuadrupleGenerator、Collector、PacketCollector
+  #flow-slots-size: 131072
+  ## 当前最大flow数
+  #flow-count-limit: 1048576
+  ## 发送到collector的queue的最大flush间隔，可配置[1s, 10s]，默认为1s
+  #flush-interval: 1s
+  ## 设置为true, 对于inport为0x30000的包,流计算不考虑mac
+  #ignore-tor-mac: false
+  ## 设置为true, 对于inport大于0x30000并且l2end为fasle的包,流计算不考虑mac
+  #ignore-l2-end: false
+  ## tcp连接状态对应的flow超时时间
+  #established-timeout: 300s
+  #closing-rst-timeout: 35s
+  #others-timeout: 5s
+  ## 应用层性能量化使能开关
+  #l7-performance-disabled: false
+## NPB VXLAN目的端口
+#vxlan-port: 4789
+## 网包时间与当前时间相比的最大delay，可配置[1s, 10s]，默认为1s
+## 大流量下该delay可能高达近10秒
+#packet-delay: 1s
+## 二元表配置
+#triple:
+#  hash-slots-size: 65536
+#  capacity: 1048576
+## GRPC接收缓冲大小，单位为M，默认5M
+#grpc-buffer-size: 5
+## 通过该脚本获取采集接口对应的MAC地址，该选项需要如下条件才能生效：
+## 1. 采集器页面配置虚拟机MAC解析项为虚拟机XML
+## 2. tap-mode为0
+## 3. 接口名称和XML配置不冲突
+## 脚本输出格式如下：
+## tap2d283dfe,11:22:33:44:55:66
+## tap2d283223,aa:bb:cc:dd:ee:ff
+#tap-mac-script: ""
+## 接收外部数据的HTTP PROXY发送到sender的队列大小
+#external-metrics-sender-queue-size
+## 推断一个服务（vpc + ip + protocol + port）的应用层协议类型时，允许的最大连续失败次数
+## 失败次数超过此阈值时，此服务的协议推断结果将会被记为未知，在随后的有效期内不会再进行推断
+#l7-protocol-inference-max-fail-count: 5
+## 一个服务的应用层协议类型推断结果的有效期，单位为秒，超过有效期后会触发下一次推断
+#l7-protocol-inference-ttl: 60

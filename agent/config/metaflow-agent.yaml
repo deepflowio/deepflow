@@ -1,0 +1,189 @@
+## controller ip
+controller-ips:
+  - 127.0.0.1
+## kubernetes-cluster-id，在对接kubernetes/openshift时需要配置
+# kubernetes-cluster-id:
+## kubernetes-namespace，当只有一个K8s命名空间权限时，填写此值
+# kubernetes-namespace:
+## ingress的类型，填写为kubernetes or openshift，默认kubernetes
+# ingress-flavour: kubernetes
+## controller listen port
+#controller-port: 20035
+## controller security authenticate port
+#controller-tls-port: 20135
+## 配置后会使用配置文件中的controller-ips和analyzer-ip分别替换控制器下发的proxy-controller-ip和analyzer-ip
+#analyzer-ip: ""
+## genesis rpc listen port
+#genesis-rpc-port: 20036
+## genesis rpc listen security authenticate port
+#genesis-rpc-tls-port: 20136
+## logfile path
+#log-file: /var/log/trident/trident.log
+## loglevel: "debug/info/warn/error"
+#log-level: info
+## profiler
+#profiler: false
+## tap—mode不是2时，afpacket-blocks是默认无效的，具体大小根据配置的MaxMemory自动适应
+## 如果afpacket-blocks-enabled为true，afpacket-blocks有效
+#afpacket-blocks-enabled: false
+## afpacket收包内存大小，单位是M，当ANALYZER模式或该值大于0时，使用该值
+#afpacket-blocks: 0
+## trident-ctl listen port
+#debug-listen-port: 0
+## packet collector and sniffer stats
+#enable-debug-stats: false
+## analyzer模式下tap-type=3采集流量去重开关
+#analyzer-dedup-disabled: false
+## where packet is considered to come by default if packet has no qinq with outer vlan pcp == 7
+## # ISP: 1-2,4-255, TOR: 3, default value is 3
+#default-tap-type: 3
+## if enabled, sender can be accelerated, but
+## only available for kernel with version >= 3.14
+## packets sent in this mode won't able to be captured by tcpdump and trident-dump
+#enable-qos-bypass: false
+## fastPath的map大小，设置为0时根据配置的MaxMemory自动适应
+#fast-path-map-size: 0
+## firstPath配置值越大性能越差内存使用越小，取值范围为[1,16]，其他非法值时使用默认值8
+#first-path-level: 0
+## receive from internal source interfaces
+## src-interfaces will only be used with mirror-mode
+## make sure internal interfaces have been created before running trident
+##
+## example:
+#src-interfaces:
+#  - dummy0
+#  - dummy1
+## Tap mode
+## LOCAL:0, MIRROR/OVS-DPDK:1, ANALYZER:2
+#tap-mode: 0
+## mirror-traffic-pcp will only be used with analyzer-mode
+#mirror-traffic-pcp: 0
+## controller certificate file prefix, contain path
+## if certificate file exists, do certificate; or no
+## certificate file naming rule is prefix.controller-ip
+## example
+## controller-cert-file-prefix is /etc/trident_controller.cert
+## controller ip is: 10.10.10.10
+## so certificate file name is trident_controller.cert.10.10.10.10 in /etc/
+#controller-cert-file-prefix: ""
+## 支持采集器自动加入组
+#vtap-group-id-request: ""
+## the size of queue linking flow generator and quadruple generator, minimum 65536:
+##    - 1-tagged-flow-to-quadruple-generator
+##    - 1-tagged-flow-to-app-protocol-logs
+##    - 0-{flow_type}-{port}-packet-to-tagged-flow   # flow_type: sflow, netflow
+#flow-queue-size: 65536
+## the size of queue linking quadruple generator and collector, minimum 262144:
+##    - 2-flow-with-meter-to-second-collector
+##    - 2-flow-with-meter-to-minute-collector
+#quadruple-queue-size: 262144
+## the size of queue linking collector and collector-sender, minimum 65536:
+##    - 2-doc-to-collector-sender
+#collector-sender-queue-size: 65536
+## the number of encoders for doc sender
+#collector-sender-queue-count: 1
+## the size of queue linking flow-aggr and collector-sender, minimum 65536:
+##    - 3-flow-to-collector-sender
+##    - 3-protolog-to-collector-sender
+#flow-sender-queue-size: 65536
+## the number of encoders for raw flow sender
+#flow-sender-queue-count: 1
+## 该队列在ANALYZER模式下使用:
+##    - 0.1-bytes-to-parse
+##    - 0.2-packet-to-flowgenerator
+##    - 0.3-packet-to-pipeline
+#analyzer-queue-size: 131072
+## extra delay for second flow output
+#second-flow-extra-delay: 0s
+#pcap:
+  #enabled: false
+  ## 缓冲队列长度，最小65536:
+  ##    - 1-mini-meta-packet-to-pcap
+  #queue-size: 65536
+  ## 缓冲队列数量，[1, 16]
+  #queue-count: 1
+  ## 计算TCP/IP checksum，默认不计算
+  #tcpip-checksum: false
+  ## 单次写入文件的块大小，默认64KB
+  #block-size-kb: 64
+  ## 同时在写的最大pcap文件数，默认5000
+  #max-concurrent-files: 5000
+  ## 每个pcap文件的最大大小，默认250MB，但是1秒内即使超过该值也不会切分文件
+  #max-file-size-mb: 250
+  ## 所有pcap文件的最大总大小，默认100GB
+  #max-directory-size-gb: 100
+  ## 磁盘剩余空间不足该数值时进行删除，默认10GB
+  #disk-free-space-margin-gb: 10
+  ## 每个pcap文件的最大时间，默认300秒
+  #max-file-period: 300s
+  ## pcap文件存储的文件夹
+  #file-directory: /var/lib/pcap
+  ## pcap服务器端口
+  #server-port: 20205
+#flow:
+  ## flow hash solts大小
+  ## 由于Flow是计算的第一步，这个值也广泛用于遥测数据统计的字典哈希桶大小
+  ## 包括：QuadrupleGenerator、Collector、PacketCollector
+  #flow-slots-size: 131072
+  ## 当前最大flow数
+  #flow-count-limit: 1048576
+  ## 限制每秒发送到stream的flow的最大数量，超出的随机丢弃
+  #flow-sender-throttle: 1024
+  ## 设置flow分钟聚合队列的长度:
+  ##    - 2-second-flow-to-minute-aggrer
+  #flow-aggr-queue-size: 65535
+  ## 发送到collector的queue的最大flush间隔，可配置[1s, 10s]，默认为1s
+  #flush-interval: 1s
+  ## 设置为true, 对于inport为0x30000的包,流计算不考虑mac
+  #ignore-tor-mac: false
+  ## 设置为true, 对于inport大于0x30000并且l2end为fasle的包,流计算不考虑mac
+  #ignore-l2-end: false
+  ## tcp连接状态对应的flow超时时间
+  #established-timeout: 300s
+  #closing-rst-timeout: 35s
+  #others-timeout: 5s
+## configuration for capture ovs-dpdk traffic
+## use limits refer to https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+#ovs-dpdk-enable: false
+## use different core with primary process
+## 0 <= dpdk-pmd-core-id <= 63
+#dpdk-pmd-core-id:
+#dpdk-ring-port: "dpdkr0"
+## sflow, netflow server ports
+#xflow-collector:
+#  sflow-ports:
+#    - 6343
+#  netflow-ports:
+#    - 2055
+## NPB VXLAN目的端口
+#vxlan-port: 4789
+## 网包时间与当前时间相比的最大delay，可配置[1s, 10s]，默认为1s
+## 大流量下该delay可能高达近10秒
+#packet-delay: 1s
+## 二元表配置
+#triple:
+#  hash-slots-size: 65536
+#  capacity: 1048576
+## kubernetes poller类型，可选adaptive/active/passive，active表示使用setns和ip命令获取网卡，passive表示通过抓包的方式获取，adaptive表示尽可能用active
+#kubernetes-poller-type: adaptive
+## 是否剥离ERSPAN或TEB(Transport Ethernet Bridging目前仅Vmware中使用了该协议)
+#decap-erspan: false
+## GRPC接收缓冲大小，单位为M，默认5M
+#grpc-buffer-size: 5
+## l7日志会话聚合的时间窗口应不小于20秒，不大于300秒. 单位为s，默认120s
+#l7-log-session-aggr-timeout: 120s
+## 通过该脚本获取采集接口对应的MAC地址，该选项需要如下条件才能生效：
+## 1. 采集器页面配置虚拟机MAC解析项为虚拟机XML
+## 2. tap-mode为0
+## 3. 接口名称和XML配置不冲突
+## 脚本输出格式如下：
+## tap2d283dfe,11:22:33:44:55:66
+## tap2d283223,aa:bb:cc:dd:ee:ff
+#tap-mac-script: ""
+## 接收外部数据的HTTP PROXY发送到sender的队列大小
+#external-metrics-sender-queue-size
+## 推断一个服务（vpc + ip + protocol + port）的应用层协议类型时，允许的最大连续失败次数
+## 失败次数超过此阈值时，此服务的协议推断结果将会被记为未知，在随后的有效期内不会再进行推断
+#l7-protocol-inference-max-fail-count: 5
+## 一个服务的应用层协议类型推断结果的有效期，单位为秒，超过有效期后会触发下一次推断
+#l7-protocol-inference-ttl: 60

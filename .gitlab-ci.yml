@@ -1,0 +1,157 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  BUILD_IMAGE: dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.2
+  ALIYUN_REGISTRY: dfcloud-image-registry.cn-beijing.cr.aliyuncs.com
+  DEPLOY_IMAGE: docker-hosted.nexus.yunshan.net/metaflow-agent
+  KUBERNETES_POD_ANNOTATIONS_1: "k8s.aliyun.com/eci-use-specs=ecs.c6.2xlarge,ecs.c5.2xlarge,ecs.c6.3xlarge,ecs.g6.2xlarge,ecs.g5.2xlarge"
+  KUBERNETES_POD_ANNOTATIONS_2: "k8s.aliyun.com/eci-spot-duration=1"
+  KUBERNETES_POD_ANNOTATIONS_3: "k8s.aliyun.com/eci-spot-strategy=SpotAsPriceGo"
+  KUBERNETES_POD_ANNOTATIONS_4: "k8s.aliyun.com/eci-image-cache=true"
+  KUBERNETES_POD_ANNOTATIONS_5: "k8s.aliyun.com/imc-enable-reuse=true"
+  # KUBERNETES_POD_ANNOTATIONS_7: "k8s.aliyun.com/imc-retention-days=7"
+
+
+stages:
+  - pre_build
+  - verify
+  - build_binary
+  - package
+
+verify-x64:
+  stage: verify
+  retry: 1
+  tags:
+    - kubernetes-eci
+  image: $BUILD_IMAGE
+  timeout: 30 minutes
+  script:
+    - cargo check
+    - cargo fmt --all -- --check
+    - cargo test
+    - cd src/ebpf && make test
+    # - cargo clean
+  # artifacts:
+  #     paths:
+  #       - target/*
+  except:
+    - /B_LC_RELEASE_.*/
+    - master
+
+rust-build-env:
+  stage: pre_build
+  timeout: 30 minutes
+  tags:
+    - docker
+  before_script:
+    - docker login -u acrpush@yunshan -p acrimagepush01 $ALIYUN_REGISTRY
+  script:
+    - cd docker
+    - docker build --pull -t $BUILD_IMAGE -f DockerfileToFix.build .
+    - docker push $BUILD_IMAGE
+    - echo "Pushed $BUILD_IMAGE"
+    - docker image rm $BUILD_IMAGE
+  only:
+    - package-rust
+
+
+binary-x64:
+  stage: build_binary
+  tags:
+    - kubernetes-eci
+  image: $BUILD_IMAGE
+  timeout: 30 minutes
+  script:
+    - cargo build --release
+    - cargo build --release --bin metaflow-agent-ctl
+    - ls -alh target/release
+    # - cargo clean
+  only:
+    - master
+    - /B_LC_RELEASE_.*/
+    - /feature-.*/
+  artifacts:
+      paths:
+        - target/release/metaflow-agent
+        - target/release/metaflow-agent-ctl
+        - src/ebpf/data/*
+        - src/ebpf/kernel/socket_trace.elf
+        - src/ebpf/libebpf.a
+        - src/ebpf/metaflow-ebpfctl
+        - src/proto/*
+
+rpm-x64:
+  stage: package
+  tags:
+    - rust
+  script:
+    - rpmbuild -bb metaflow-agent.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+    - rpmbuild -bb metaflow-agent_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+    - zip -r -q artifacts.zip x86_64/
+    - curl -v --user 'admin:yunshan3302' --upload-file artifacts.zip http://nexus.yunshan.net/repository/platform/trident-rs/$CI_COMMIT_REF_NAME/x86_64/artifacts.zip
+    - REV=$(git rev-list --count HEAD)
+    - curl -v --user 'admin:yunshan3302' --upload-file artifacts.zip http://nexus.yunshan.net/repository/platform/trident-rs/$CI_COMMIT_REF_NAME/x86_64/artifacts_${REV}.zip
+    # - cargo clean
+  only:
+    - master
+    - /B_LC_RELEASE_.*/
+    - /feature-.*/
+  artifacts:
+      paths:
+        - x86_64/metaflow*.rpm
+
+docker-x64:
+  stage: package
+  tags:
+    - rust
+  script:
+    - cp target/release/metaflow-agent docker/
+    - cp target/release/metaflow-agent-ctl docker/
+    - cp src/ebpf/metaflow-ebpfctl docker/
+    - cp -r src/ebpf/data docker/
+    - cd docker
+    - ls
+    - RELEASE=$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/')
+    - REV=$(git rev-list --count HEAD)
+    # e.g. metaflow-agnet:latest
+    - docker build --pull -t  $DEPLOY_IMAGE:$RELEASE .
+    - docker push $DEPLOY_IMAGE:$RELEASE
+    # e.g. metaflow-agnet:latest.50
+    - docker build --pull -t  $DEPLOY_IMAGE:$RELEASE.$REV .
+    - docker push $DEPLOY_IMAGE:$RELEASE.$REV
+  only:
+    - master
+    - /B_LC_RELEASE_.*/
+    - /feature-.*/
+  # artifacts:
+  #     paths:
+  #       - x86_64/metaflow*.rpm
+
+
+# 部分docker环境没有安装cargo命令，这里先注释掉，后续可参考
+# package-docker:
+#  stage: package
+#  tags:
+#    - docker
+#  before_script:
+#    - docker login -u admin -p yunshan3302 $NEXUS_REGISTRY
+#  script:
+#    - cargo build --release
+#    - cargo build --release --bin metaflow-agent-ctl
+#    - cp target/release/metaflow-agent docker/
+#    - cp target/release/metaflow-agent-ctl docker/
+#    - cp src/ebpf/metaflow-ebpfctl docker/
+#    - cp -r src/ebpf/data docker/
+#    - cd docker
+#    - ls
+#    - RELEASE=$(echo ${CI_COMMIT_REF_NAME//B_LC_RELEASE_} | tr '_' '.' | sed 's/master/latest/')
+#    - REV=$(git rev-list --count HEAD)
+#    # e.g. metaflow-agnet:latest
+#    - docker build --pull -t  $DEPLOY_IMAGE:$RELEASE .
+#    - docker push $DEPLOY_IMAGE:$RELEASE
+#    # e.g. metaflow-agnet:latest.50
+#    - docker build --pull -t  $DEPLOY_IMAGE:$RELEASE.$REV .
+#    - docker push $DEPLOY_IMAGE:$RELEASE.$REV
+#  only:
+#    - master
+#    - /B_LC_RELEASE_.*/
+#    - /feature-.*/
