@@ -1,0 +1,26 @@
+/target
+
+# generated protobuf files
+src/proto/common.rs
+src/proto/flow_log.rs
+src/proto/metric.rs
+src/proto/trident.rs
+src/proto/flow_log.rs
+src/proto/metric.rs
+.cargo
+src/ebpf/data
+src/ebpf/.data_done
+src/ebpf/libebpf.a
+src/ebpf/metaflow-ebpfctl
+src/ebpf/kernel/*.elf.tmp
+src/ebpf/kernel/socket_trace.ll
+
+*.o
+*.elf
+*.objdump
+src/ebpf/samples/rust/src/ebpf.rs
+src/ebpf/samples/rust/target/*
+src/ebpf/llvm-clang-11.0.0-2.el7.x86_64.rpm
+
+.rpmbuild/
+actual.txt

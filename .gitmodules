@@ -1,0 +1,3 @@
+[submodule "src/proto/message"]
+	path = agent/src/proto/message
+	url = https://gitlab.yunshan.net/yunshan/message.git

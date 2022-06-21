@@ -1,0 +1,2 @@
+RedisInfo { request: "get abcd", request_type: "get", response: "", status: "", error: "" } is_redis: true
+RedisInfo { request: "", request_type: "", response: "", status: "", error: "-NOAUTH Authentication required." } is_redis: false

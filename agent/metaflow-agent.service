@@ -1,0 +1,14 @@
+[Unit]
+Description=metaflow-agent.service
+After=syslog.target network-online.target
+
+[Service]
+Environment=GOTRACEBACK=single
+LimitCORE=1G
+ExecStart=/usr/sbin/metaflow-agent
+Restart=always
+RestartSec=10
+LimitNOFILE=1024:4096
+
+[Install]
+WantedBy=multi-user.target

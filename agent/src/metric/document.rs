@@ -1,0 +1,378 @@
+use std::net::{IpAddr, Ipv4Addr};
+
+use bitflags::bitflags;
+use prost::Message;
+
+use super::meter::Meter;
+
+use crate::common::{
+    enums::{IpProtocol, TapType},
+    flow::L7Protocol,
+    tap_port::TapPort,
+};
+use crate::proto::metric;
+use crate::utils::net::MacAddr;
+
+#[derive(Debug)]
+pub struct Document {
+    pub timestamp: u32,
+    pub tagger: Tagger,
+    pub meter: Meter,
+    pub flags: DocumentFlag,
+}
+
+impl Document {
+    pub fn new(m: Meter) -> Self {
+        Document {
+            timestamp: 0,
+            tagger: Tagger::default(),
+            meter: m,
+            flags: DocumentFlag::default(),
+        }
+    }
+
+    pub fn sequential_merge(&mut self, other: &Document) {
+        self.meter.sequential_merge(&other.meter)
+    }
+
+    pub fn reverse(&mut self) {
+        self.meter.reverse()
+    }
+
+    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let pb_doc: metric::Document = self.into();
+        pb_doc.encode(buf).map(|_| pb_doc.encoded_len())
+    }
+}
+
+impl From<Document> for metric::Document {
+    fn from(d: Document) -> Self {
+        metric::Document {
+            timestamp: d.timestamp,
+            tag: Some(d.tagger.into()),
+            meter: Some(d.meter.into()),
+            flags: d.flags.bits(),
+        }
+    }
+}
+
+bitflags! {
+    pub struct DocumentFlag: u32 {
+        const NONE = 0; // PER_MINUTE_METRICS
+        const PER_SECOND_METRICS = 1<<0;
+   }
+}
+
+impl Default for DocumentFlag {
+    fn default() -> Self {
+        DocumentFlag::NONE
+    }
+}
+
+bitflags! {
+    pub struct Code:u64 {
+        const NONE = 0;
+
+        const IP = 1<<0;
+        const L3_EPC_ID = 1<<1;
+        const MAC = 1<<11;
+
+        const IP_PATH = 1<<20;
+        const L3_EPC_PATH = 1<<21;
+        const MAC_PATH = 1<<31;
+
+        const DIRECTION = 1<<40;
+        const ACL_GID = 1<<41;
+        const PROTOCOL = 1<<42;
+        const SERVER_PORT = 1<<43;
+        const TAP_TYPE = 1<<45;
+        const VTAP_ID = 1<<47;
+        const TAP_SIDE = 1<<48;
+        const TAP_PORT = 1<<49;
+        const L7_PROTOCOL = 1<<51;
+
+        const TAG_TYPE = 1<<62;
+        const TAG_VALUE = 1<<63;
+    }
+}
+
+impl Code {
+    pub fn has_edge_tag(&self) -> bool {
+        self.bits() & 0xfffff00000 != 0
+    }
+}
+
+impl Default for Code {
+    fn default() -> Self {
+        Code::NONE
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Direction {
+    None,
+    ClientToServer = 1 << 0,
+    ServerToClient = 1 << 1,
+    LocalToLocal = 1 << 2,
+
+    // 以下类型为转换TapSide而增加
+    ClientNodeToServer = Direction::ClientToServer as u8 | SIDE_NODE, // 客户端容器节点，路由、SNAT、隧道
+    ServerNodeToClient = Direction::ServerToClient as u8 | SIDE_NODE, // 服务端容器节点，路由、SNAT、隧道
+    ClientHypervisorToServer = Direction::ClientToServer as u8 | SIDE_HYPERVISOR, // 客户端宿主机，隧道
+    ServerHypervisorToClient = Direction::ServerToClient as u8 | SIDE_HYPERVISOR, // 服务端宿主机，隧道
+    ClientGatewayHypervisorToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY_HYPERVISOR, // 客户端网关宿主机
+    ServerGatewayHypervisorToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY_HYPERVISOR, // 服务端网关宿主机
+    ClientGatewayToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY, // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+    ServerGatewayToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY, // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
+    ClientProcessToServer = Direction::ClientToServer as u8 | SIDE_PROCESS, // 客户端进程
+    ServerProcessToClient = Direction::ServerToClient as u8 | SIDE_PROCESS, // 服务端进程
+}
+
+impl Default for Direction {
+    fn default() -> Self {
+        Direction::ClientToServer
+    }
+}
+
+const SIDE_NODE: u8 = 1 << 3;
+const SIDE_HYPERVISOR: u8 = 2 << 3;
+const SIDE_GATEWAY_HYPERVISOR: u8 = 3 << 3;
+const SIDE_GATEWAY: u8 = 4 << 3;
+const SIDE_PROCESS: u8 = 5 << 3;
+
+const MASK_CLIENT_SERVER: u8 = 0x7;
+const MASK_SIDE: u8 = 0xf8;
+
+impl Direction {
+    pub fn is_client_to_server(self) -> bool {
+        self as u8 & MASK_CLIENT_SERVER == Direction::ClientToServer as u8
+    }
+
+    pub fn is_server_to_client(self) -> bool {
+        self as u8 & MASK_CLIENT_SERVER == Direction::ServerToClient as u8
+    }
+
+    pub fn is_gateway(self) -> bool {
+        (self as u8 & MASK_SIDE) & (SIDE_GATEWAY | SIDE_GATEWAY_HYPERVISOR) != 0
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[repr(u8)]
+pub enum TapSide {
+    Rest = 0,
+    Client = 1 << 0,
+    Server = 1 << 1,
+    Local = 1 << 2,
+    ClientNode = TapSide::Client as u8 | SIDE_NODE,
+    ServerNode = TapSide::Server as u8 | SIDE_NODE,
+    ClientHypervisor = TapSide::Client as u8 | SIDE_HYPERVISOR,
+    ServerHypervisor = TapSide::Server as u8 | SIDE_HYPERVISOR,
+    ClientGatewayHypervisor = TapSide::Client as u8 | SIDE_GATEWAY_HYPERVISOR,
+    ServerGatewayHypervisor = TapSide::Server as u8 | SIDE_GATEWAY_HYPERVISOR,
+    ClientGateway = TapSide::Client as u8 | SIDE_GATEWAY,
+    ServerGateway = TapSide::Server as u8 | SIDE_GATEWAY,
+    ClientProcess = TapSide::Client as u8 | SIDE_PROCESS,
+    ServerProcess = TapSide::Server as u8 | SIDE_PROCESS,
+}
+
+impl Default for TapSide {
+    fn default() -> Self {
+        TapSide::Rest
+    }
+}
+
+impl From<Direction> for TapSide {
+    fn from(direction: Direction) -> Self {
+        match direction {
+            Direction::ClientToServer => TapSide::Client,
+            Direction::ServerToClient => TapSide::Server,
+            Direction::LocalToLocal => TapSide::Local,
+            Direction::ClientNodeToServer => TapSide::ClientNode,
+            Direction::ServerNodeToClient => TapSide::ServerNode,
+            Direction::ClientHypervisorToServer => TapSide::ClientHypervisor,
+            Direction::ServerHypervisorToClient => TapSide::ServerHypervisor,
+            Direction::ClientGatewayHypervisorToServer => TapSide::ClientGatewayHypervisor,
+            Direction::ServerGatewayHypervisorToClient => TapSide::ServerGatewayHypervisor,
+            Direction::ClientGatewayToServer => TapSide::ClientGateway,
+            Direction::ServerGatewayToClient => TapSide::ServerGateway,
+            Direction::ClientProcessToServer => TapSide::ClientProcess,
+            Direction::ServerProcessToClient => TapSide::ServerProcess,
+            Direction::None => TapSide::Rest,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum TagType {
+    TunnelIpId = 4,
+}
+
+impl Default for TagType {
+    fn default() -> Self {
+        TagType::TunnelIpId
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Tagger {
+    pub code: Code,
+
+    pub ip: IpAddr,
+    pub ip1: IpAddr,
+
+    // 用于区分不同的agent及其不同的pipeline，用于如下场景：
+    //   - 和ingester之间的数据传输
+    //   - 写入数据库，作用类似_id，序列化为_tid
+    pub global_thread_id: u8,
+    pub is_ipv6: bool,
+    pub l3_epc_id: i16,
+    pub l3_epc_id1: i16,
+    pub mac: MacAddr,
+    pub mac1: MacAddr,
+
+    pub direction: Direction,
+    pub tap_side: TapSide,
+    pub protocol: IpProtocol,
+    pub acl_gid: u16,
+    pub server_port: u16,
+    pub vtap_id: u16,
+    pub tap_port: TapPort,
+    pub tap_type: TapType,
+    pub l7_protocol: L7Protocol,
+
+    pub tag_type: TagType,
+    pub tag_value: u16,
+}
+
+impl Default for Tagger {
+    fn default() -> Self {
+        Tagger {
+            code: Code::default(),
+            ip: Ipv4Addr::UNSPECIFIED.into(),
+            ip1: Ipv4Addr::UNSPECIFIED.into(),
+
+            global_thread_id: 0,
+            is_ipv6: false,
+            l3_epc_id: -2,
+            l3_epc_id1: -2,
+            mac: MacAddr::default(),
+            mac1: MacAddr::default(),
+            direction: Direction::default(),
+            tap_side: TapSide::default(),
+            protocol: IpProtocol::default(),
+            acl_gid: 0,
+            server_port: 0,
+            vtap_id: 0,
+            tap_port: TapPort::default(),
+            tap_type: TapType::default(),
+            l7_protocol: L7Protocol::default(),
+
+            tag_type: TagType::default(),
+            tag_value: 0,
+        }
+    }
+}
+
+impl From<Tagger> for metric::MiniTag {
+    fn from(t: Tagger) -> Self {
+        let (ip_vec, ip1_vec) = if t.code.has_edge_tag() {
+            match (t.ip, t.ip1) {
+                (IpAddr::V4(ip4), IpAddr::V4(ip41)) => {
+                    (ip4.octets().to_vec(), ip41.octets().to_vec())
+                }
+                (IpAddr::V6(ip6), IpAddr::V6(ip61)) => {
+                    (ip6.octets().to_vec(), ip61.octets().to_vec())
+                }
+                _ => panic!("ip, ip1 type mismatch"),
+            }
+        } else {
+            match t.ip {
+                IpAddr::V4(ip4) => (ip4.octets().to_vec(), vec![]),
+                IpAddr::V6(ip6) => (ip6.octets().to_vec(), vec![]),
+            }
+        };
+
+        let mut code = t.code;
+        if code.contains(Code::DIRECTION) && code.has_edge_tag() {
+            code.remove(Code::DIRECTION);
+            code.insert(Code::TAP_SIDE);
+        }
+        metric::MiniTag {
+            code: code.bits(),
+            field: Some(metric::MiniField {
+                ip: ip_vec,
+                ip1: ip1_vec,
+                global_thread_id: t.global_thread_id as u32,
+                is_ipv6: t.is_ipv6 as u32,
+                l3_epc_id: t.l3_epc_id as i32,
+                l3_epc_id1: t.l3_epc_id1 as i32,
+                mac: t.mac.into(),
+                mac1: t.mac.into(),
+                direction: t.direction as u32,
+                tap_side: TapSide::from(t.direction) as u32,
+                protocol: t.protocol as u32,
+                acl_gid: t.acl_gid as u32,
+                server_port: t.server_port as u32,
+                vtap_id: t.vtap_id as u32,
+                tap_port: t.tap_port.0,
+                tap_type: u16::from(t.tap_type) as u32,
+                l7_protocol: t.l7_protocol as u32,
+                tag_type: t.tag_type as u32,
+                tag_value: t.tag_value as u32,
+            }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prost::Message;
+
+    #[test]
+    fn merge_reverse() {
+        let mut doc1 = Document::new(Meter::new_flow());
+        let mut doc2 = Document::new(Meter::new_flow());
+        if let Meter::Flow(ref mut f1) = doc1.meter {
+            f1.traffic.packet_tx = 1;
+        }
+        if let Meter::Flow(ref mut f2) = doc2.meter {
+            f2.traffic.packet_tx = 2;
+        }
+        doc1.sequential_merge(&doc2);
+        if let Meter::Flow(ref f1) = doc1.meter {
+            assert!(f1.traffic.packet_tx == 3)
+        }
+        doc1.reverse();
+        if let Meter::Flow(ref f1) = doc1.meter {
+            assert!(f1.traffic.packet_rx == 3)
+        }
+    }
+
+    #[test]
+    fn encode() {
+        let mut doc = Document::new(Meter::new_flow());
+        doc.tagger.code = Code::IP | Code::L3_EPC_ID;
+        doc.tagger.l3_epc_id = 10;
+        doc.timestamp = 100;
+        doc.flags = DocumentFlag::PER_SECOND_METRICS;
+        if let Meter::Flow(ref mut f) = doc.meter {
+            f.traffic.packet_tx = 1;
+        }
+
+        let mut buf: Vec<u8> = vec![];
+        let encode_len = doc.encode(&mut buf).unwrap();
+
+        let rlt: Result<metric::Document, prost::DecodeError> =
+            Message::decode(buf.as_slice().get(..encode_len).unwrap());
+        let pb_doc = rlt.unwrap();
+
+        assert_eq!(pb_doc.timestamp, 100);
+        assert_eq!(pb_doc.flags, 1);
+        assert_eq!(pb_doc.tag.as_ref().unwrap().code, 3);
+        assert_eq!(pb_doc.tag.unwrap().field.unwrap().l3_epc_id, 10);
+    }
+}
