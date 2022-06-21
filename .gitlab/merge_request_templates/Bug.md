@@ -1,32 +1,32 @@
-(标题)
+(Title)
 
-**现象及复现步骤**
+**Phenomenon and reproduction steps**
 
-(描述问题出现的现象和条件)
+(Describe the phenomenon and scenario of the bug)
 
-**原因和解决方案**
+**Root cause and solution**
 
-(说明问题出现的原因和对应的解决方法)
+(Describe the cause of the bug and corresponding solution)
 
-**影响范围**
+**Impactions**
 
-(此修改可能带来的外部可见变化)
+(Visible changes after this fix)
 
-**验证方案**
+**Test method**
 
-(验证此问题已修复的测试方法)
+(Test method to ensure the bug is fixed)
 
-**涉及分支**
+**Affected branch(es)**
 
-* master
+* main
 
-**检查项**
+**Checklist**
 
-- [ ] 需要同步修改(trident-dump、trident-copy或trident-testsrv)
-- [ ] 需要更新依赖
-- [ ] 是共性问题(代码中存在类似问题)
-- [ ] 打包成功(如果有修改Makefile)
+- [ ] Change synchronize required (trident-dump, trident-copy or trident-testsrv)
+- [ ] Dependencies update required
+- [ ] Common bug (similar problem in other code)
+- [ ] Package successful (has changes in Makefile)
 
-/assign @xiangyang
+/assign @sharang
 
-/cc @xiangyang @yuanchao @jinjie
+/cc @sharang @rvql
