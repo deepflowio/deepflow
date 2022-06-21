@@ -1,0 +1,451 @@
+package lru
+
+import (
+	"bytes"
+	. "encoding/binary"
+	"fmt"
+	"sync"
+	"sync/atomic"
+
+	"gitlab.yunshan.net/yunshan/droplet-libs/hmap"
+	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/keyhash"
+	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+)
+
+{{ range . }}
+
+const (
+	_U{{.}}_KEY_SIZE = {{.}} / 8 // genHash函数限制必须为4字节的倍数
+)
+
+type u{{.}}LRUNode struct {
+	key   [_U{{.}}_KEY_SIZE]byte
+	hash  uint32 // key的hash值
+	value interface{}
+
+	hashListNext int32 // 表示节点所在冲突链的下一个节点的 buffer 数组下标，-1 表示不存在
+	hashListPrev int32 // 表示节点所在冲突链的上一个节点的 buffer 数组下标，-1 表示不存在
+	timeListNext int32 // 时间链表，含义与冲突链类似
+	timeListPrev int32 // 时间链表，含义与冲突链类似
+}
+
+func (n *u{{.}}LRUNode) equal(hash uint32, key []byte) bool {
+	return n.hash == hash && bytes.Compare(n.key[:], key) == 0
+}
+
+var blankU{{.}}LRUNodeForInit u{{.}}LRUNode
+
+type u{{.}}LRUNodeBlock []u{{.}}LRUNode
+
+var u{{.}}LRUNodeBlockPool = sync.Pool{New: func() interface{} {
+	return u{{.}}LRUNodeBlock(make([]u{{.}}LRUNode, _BLOCK_SIZE))
+}}
+
+// 注意：不是线程安全的
+type U{{.}}LRU struct {
+	utils.Closable
+
+	id string
+
+	ringBuffer       []u{{.}}LRUNodeBlock // 存储Map节点，以矩阵环的方式组织，提升内存申请释放效率
+	bufferStartIndex int32              // ringBuffer中的开始下标（二维矩阵下标），闭区间
+	bufferEndIndex   int32              // ringBuffer中的结束下标（二维矩阵下标），开区间
+
+	hashSlots    int32  // 上取整至2^N，哈希桶个数
+	hashSlotBits uint32 // hashSlots中低位连续0比特个数
+
+	hashSlotHead []int32 // 哈希桶，hashSlotHead[i] 表示哈希值为 i 的冲突链的第一个节点为 buffer[[ hashSlotHead[i] ]]
+	timeListHead int32
+	timeListTail int32
+
+	capacity int // 最大容纳的Flow个数
+	size     int // 当前容纳的Flow个数
+
+	counter *Counter
+
+	collisionChainDebugThreshold uint32       // scan宽度超过该值时保留冲突链信息，为0时不保存
+	debugChain                   atomic.Value // 冲突链，类型为[]byte
+	debugChainRead               uint32       // 冲突链是否已读，如果已读替换为新的 (atomic.Value无法清空)
+}
+
+func (m *U{{.}}LRU) ID() string {
+	return m.id
+}
+
+func (m *U{{.}}LRU) KeySize() int {
+	return _U{{.}}_KEY_SIZE
+}
+
+func (m *U{{.}}LRU) Close() error {
+	hmap.DeregisterForDebug(m)
+	return m.Closable.Close()
+}
+
+func (m *U{{.}}LRU) NoStats() *U{{.}}LRU {
+	m.Close()
+	return m
+}
+
+func (m *U{{.}}LRU) Size() int {
+	return m.size
+}
+
+func (m *U{{.}}LRU) incIndex(index int32) int32 {
+	index++
+	if index>>_BLOCK_SIZE_BITS >= int32(len(m.ringBuffer)) {
+		return 0
+	}
+	return index
+}
+
+func (m *U{{.}}LRU) decIndex(index int32) int32 {
+	if index <= 0 {
+		return int32(len(m.ringBuffer)<<_BLOCK_SIZE_BITS) - 1
+	}
+	return index - 1
+}
+
+func (m *U{{.}}LRU) getNode(index int32) *u{{.}}LRUNode {
+	return &m.ringBuffer[index>>_BLOCK_SIZE_BITS][index&_BLOCK_SIZE_MASK]
+}
+
+func (m *U{{.}}LRU) pushNodeToHashList(node *u{{.}}LRUNode, nodeIndex int32, hash int32) {
+	node.hashListNext = m.hashSlotHead[hash]
+	node.hashListPrev = -1
+	if node.hashListNext != -1 {
+		m.getNode(node.hashListNext).hashListPrev = nodeIndex
+	}
+	m.hashSlotHead[hash] = nodeIndex
+}
+
+func (m *U{{.}}LRU) pushNodeToTimeList(node *u{{.}}LRUNode, nodeIndex int32) {
+	node.timeListNext = m.timeListHead
+	node.timeListPrev = -1
+	if node.timeListNext != -1 {
+		m.getNode(node.timeListNext).timeListPrev = nodeIndex
+	}
+	m.timeListHead = nodeIndex
+	if m.timeListTail == -1 {
+		m.timeListTail = nodeIndex
+	}
+}
+
+func (m *U{{.}}LRU) removeNodeFromHashList(node *u{{.}}LRUNode, newNext, newPrev int32) {
+	if node.hashListPrev != -1 {
+		prevNode := m.getNode(node.hashListPrev)
+		prevNode.hashListNext = newNext
+	} else {
+		m.hashSlotHead[m.compressHash(node.hash)] = newNext
+	}
+
+	if node.hashListNext != -1 {
+		nextNode := m.getNode(node.hashListNext)
+		nextNode.hashListPrev = newPrev
+	}
+}
+
+func (m *U{{.}}LRU) removeNodeFromTimeList(node *u{{.}}LRUNode, newNext, newPrev int32) {
+	if node.timeListPrev != -1 {
+		prevNode := m.getNode(node.timeListPrev)
+		prevNode.timeListNext = newNext
+	} else {
+		m.timeListHead = newNext
+	}
+
+	if node.timeListNext != -1 {
+		nextNode := m.getNode(node.timeListNext)
+		nextNode.timeListPrev = newPrev
+	} else {
+		m.timeListTail = newPrev
+	}
+}
+
+func (m *U{{.}}LRU) removeNode(node *u{{.}}LRUNode, nodeIndex int32) {
+	// 从哈希链表、时间链表中删除
+	m.removeNodeFromHashList(node, node.hashListNext, node.hashListPrev)
+	m.removeNodeFromTimeList(node, node.timeListNext, node.timeListPrev)
+
+	// 将节点交换至buffer头部
+	if nodeIndex != m.bufferStartIndex {
+		firstNode := m.getNode(m.bufferStartIndex)
+		// 将firstNode内容拷贝至node
+		*node = *firstNode
+		// 修改firstNode在哈希链、时间链的上下游指向node
+		m.removeNodeFromHashList(firstNode, nodeIndex, nodeIndex)
+		m.removeNodeFromTimeList(firstNode, nodeIndex, nodeIndex)
+		// 将firstNode初始化
+		*firstNode = blankU{{.}}LRUNodeForInit
+	} else {
+		*node = blankU{{.}}LRUNodeForInit
+	}
+
+	// 释放头部节点
+	if m.bufferStartIndex&_BLOCK_SIZE_MASK == _BLOCK_SIZE_MASK {
+		u{{.}}LRUNodeBlockPool.Put(m.ringBuffer[m.bufferStartIndex>>_BLOCK_SIZE_BITS])
+		m.ringBuffer[m.bufferStartIndex>>_BLOCK_SIZE_BITS] = nil
+	}
+	m.bufferStartIndex = m.incIndex(m.bufferStartIndex)
+
+	m.size--
+}
+
+func (m *U{{.}}LRU) updateNode(node *u{{.}}LRUNode, nodeIndex int32, value interface{}) {
+	if nodeIndex != m.timeListHead {
+		// 从时间链表中删除
+		m.removeNodeFromTimeList(node, node.timeListNext, node.timeListPrev)
+		// 插入时间链表头部
+		m.pushNodeToTimeList(node, nodeIndex)
+	}
+
+	node.value = value
+}
+
+func (m *U{{.}}LRU) newNode(hash uint32, key []byte, value interface{}) {
+	// buffer空间检查
+	if m.size >= m.capacity {
+		node := m.getNode(m.timeListTail)
+		m.removeNode(node, m.timeListTail)
+	}
+	row := m.bufferEndIndex >> _BLOCK_SIZE_BITS
+	col := m.bufferEndIndex & _BLOCK_SIZE_MASK
+	if m.ringBuffer[row] == nil {
+		m.ringBuffer[row] = u{{.}}LRUNodeBlockPool.Get().(u{{.}}LRUNodeBlock)
+	}
+	node := &m.ringBuffer[row][col]
+	m.size++
+
+	// 新节点加入哈希链
+	m.pushNodeToHashList(node, m.bufferEndIndex, m.compressHash(hash))
+	// 新节点加入时间链
+	m.pushNodeToTimeList(node, m.bufferEndIndex)
+	// 更新key、value
+	copy(node.key[:], key)
+	node.hash = hash
+	node.value = value
+
+	// 更新buffer信息
+	m.bufferEndIndex = m.incIndex(m.bufferEndIndex)
+}
+
+func (m *U{{.}}LRU) Add(key []byte, value interface{}) {
+	if len(key) != _U{{.}}_KEY_SIZE {
+		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
+	}
+
+	hash := m.genHash(key)
+	node, hashIndex := m.find(hash, key, true)
+	if node != nil {
+		m.updateNode(node, hashIndex, value)
+		return
+	}
+	m.newNode(hash, key, value)
+}
+
+func (m *U{{.}}LRU) Remove(key []byte) {
+	if len(key) != _U{{.}}_KEY_SIZE {
+		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
+	}
+
+	hash := m.genHash(key)
+	for hashListNext := m.hashSlotHead[m.compressHash(hash)]; hashListNext != -1; {
+		node := m.getNode(hashListNext)
+		if node.equal(hash, key) {
+			m.removeNode(node, hashListNext)
+			return
+		}
+		hashListNext = node.hashListNext
+	}
+}
+
+func (m *U{{.}}LRU) find(hash uint32, key []byte, isAdd bool) (*u{{.}}LRUNode, int32) {
+	m.counter.scanTimes++
+	width := 0
+	slot := m.compressHash(hash)
+	for hashListNext := m.hashSlotHead[slot]; hashListNext != -1; {
+		width++
+		node := m.getNode(hashListNext)
+		if node.equal(hash, key) {
+			m.counter.totalScan += width
+			if width > m.counter.Max {
+				m.counter.Max = width
+			}
+			if atomic.LoadUint32(&m.debugChainRead) == 1 {
+				// 已读，构造新的chain
+				if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+					chain := make([]byte, m.KeySize()*width)
+					m.generateCollisionChainIn(chain, slot)
+					m.debugChain.Store(chain)
+					atomic.StoreUint32(&m.debugChainRead, 0)
+				}
+			}
+			return node, hashListNext
+		}
+		hashListNext = node.hashListNext
+	}
+	m.counter.totalScan += width
+	if isAdd {
+		width++
+	}
+	if width > m.counter.Max {
+		m.counter.Max = width
+	}
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
+		// 已读，构造新的chain
+		if threshold := int(atomic.LoadUint32(&m.collisionChainDebugThreshold)); threshold > 0 && width >= threshold {
+			chain := make([]byte, m.KeySize()*width)
+			offset := 0
+			if isAdd {
+				offset += copy(chain, key)
+			}
+			m.generateCollisionChainIn(chain[offset:], slot)
+			m.debugChain.Store(chain)
+			atomic.StoreUint32(&m.debugChainRead, 0)
+		}
+	}
+	return nil, -1
+}
+
+func (m *U{{.}}LRU) generateCollisionChainIn(bs []byte, index int32) {
+	offset := 0
+	bsLen := len(bs)
+
+	for hashListNext := m.hashSlotHead[index]; hashListNext != -1 && offset < bsLen; {
+		node := m.getNode(hashListNext)
+		offset += copy(bs[offset:], node.key[:])
+		hashListNext = node.hashListNext
+	}
+}
+
+func (m *U{{.}}LRU) GetCollisionChain() []byte {
+	if atomic.LoadUint32(&m.debugChainRead) == 1 {
+		return nil
+	}
+	chain := m.debugChain.Load()
+	atomic.StoreUint32(&m.debugChainRead, 1)
+	if chain == nil {
+		return nil
+	}
+	return chain.([]byte)
+}
+
+func (m *U{{.}}LRU) SetCollisionChainDebugThreshold(t int) {
+	atomic.StoreUint32(&m.collisionChainDebugThreshold, uint32(t))
+	// 标记为已读，刷新链
+	if t > 0 {
+		atomic.StoreUint32(&m.debugChainRead, 1)
+	}
+}
+
+func (m *U{{.}}LRU) GetCounter() interface{} {
+	var counter *Counter
+	counter, m.counter = m.counter, &Counter{}
+	if counter.scanTimes != 0 {
+		counter.AvgScan = counter.totalScan / counter.scanTimes
+	}
+	counter.Size = m.size
+	return counter
+}
+
+func (m *U{{.}}LRU) Get(key []byte, peek bool) (interface{}, bool) {
+	if len(key) != _U{{.}}_KEY_SIZE {
+		panic(fmt.Sprintf("传入key的长度不等于 %d 字节", _U{{.}}_KEY_SIZE))
+	}
+
+	hash := m.genHash(key)
+	node, hashIndex := m.find(hash, key, false)
+	if node != nil {
+		if !peek {
+			m.updateNode(node, hashIndex, node.value)
+		}
+		return node.value, true
+	}
+	return nil, false
+}
+
+func (m *U{{.}}LRU) Clear() {
+	for i := range m.ringBuffer {
+		if m.ringBuffer[i] != nil {
+                        for j:=0; j<len(m.ringBuffer[i]); j++ {
+                                m.ringBuffer[i][j].value = nil
+                        }
+			u{{.}}LRUNodeBlockPool.Put(m.ringBuffer[i])
+			m.ringBuffer[i] = nil
+		}
+	}
+	m.bufferStartIndex = 0
+	m.bufferEndIndex = 0
+
+	for i := range m.hashSlotHead {
+		m.hashSlotHead[i] = -1
+	}
+	m.timeListHead = -1
+	m.timeListTail = -1
+
+	m.size = 0
+
+	atomic.StoreUint32(&m.debugChainRead, 1)
+}
+
+func (m *U{{.}}LRU) genHash(key []byte) uint32 {
+	hash := uint32(0)
+	for i := 0; i < _U{{.}}_KEY_SIZE; i += 4 {
+		hash ^= BigEndian.Uint32(key[i:])
+	}
+	return hash
+}
+
+func (m *U{{.}}LRU) compressHash(hash uint32) int32 {
+	return keyhash.Jenkins32(hash) & (m.hashSlots - 1)
+}
+
+func (m *U{{.}}LRU) Walk(callback func(key [_U{{.}}_KEY_SIZE]byte, value interface{}) bool) {
+	for i := m.timeListHead; i != -1; {
+		node := m.getNode(i)
+		if exit := callback(node.key, node.value); exit {
+			break
+		}
+		i = node.timeListNext
+	}
+}
+
+func NewU{{.}}LRU(module string, hashSlots, capacity int, opts ...stats.OptionStatTags) *U{{.}}LRU {
+	m := NewU{{.}}LRUNoStats(module, hashSlots, capacity)
+
+	for i := 0; i < len(m.hashSlotHead); i++ {
+		m.hashSlotHead[i] = -1
+	}
+	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
+	for _, opt := range opts {
+		statOptions = append(statOptions, opt)
+	}
+	stats.RegisterCountable("lru", m, statOptions...)
+
+	hmap.RegisterForDebug(m)
+
+	return m
+}
+
+func NewU{{.}}LRUNoStats(module string, hashSlots, capacity int) *U{{.}}LRU {
+	hashSlots, hashSlotBits := minPowerOfTwo(hashSlots)
+
+	m := &U{{.}}LRU{
+		ringBuffer:   make([]u{{.}}LRUNodeBlock, (capacity+_BLOCK_SIZE)/_BLOCK_SIZE+1),
+		hashSlots:    int32(hashSlots),
+		hashSlotBits: uint32(hashSlotBits),
+		hashSlotHead: make([]int32, hashSlots),
+		timeListHead: -1,
+		timeListTail: -1,
+		capacity:     capacity,
+		counter:      &Counter{},
+		id:           "lru{{.}}-" + module,
+	}
+
+	for i := 0; i < len(m.hashSlotHead); i++ {
+		m.hashSlotHead[i] = -1
+	}
+
+	return m
+}
+
+{{ end }}

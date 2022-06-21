@@ -1,0 +1,197 @@
+package idmap
+
+import (
+	"bytes"
+	. "encoding/binary"
+	"testing"
+
+	"gitlab.yunshan.net/yunshan/droplet-libs/hmap"
+)
+
+{{ range . }}
+
+func newNode{{.}}(key0, key1 uint64) *u{{.}}IDMapNode {
+	node := &u{{.}}IDMapNode{}
+	mid := _U{{.}}_KEY_SIZE / 2
+	BigEndian.PutUint64(node.key[mid-8:mid], key0)
+	BigEndian.PutUint64(node.key[_U{{.}}_KEY_SIZE-8:], key1)
+	node.hash = uint32(key0>>32) ^ uint32(key0) ^ uint32(key1>>32) ^ uint32(key1)
+	return node
+}
+
+func TestU{{.}}KeySize(t *testing.T) {
+	if _U{{.}}_KEY_SIZE % 4 != 0 {
+		t.Errorf("KEY_SIZE must be divisible by 4 bytes")
+	}
+}
+
+func TestU{{.}}IDMapAddOrGet(t *testing.T) {
+	m := NewU{{.}}IDMap("test", 1024)
+
+	exp := true
+	node := newNode{{.}}(0, 1)
+	if _, ret := m.AddOrGet(node.key[:], node.hash, 1, false); ret != exp {
+		t.Errorf("第一次插入，Expected %v found %v", exp, ret)
+	}
+	exp = false
+	if _, ret := m.AddOrGet(node.key[:], node.hash, 2, false); ret != exp {
+		t.Errorf("插入同样的值，Expected %v found %v", exp, ret)
+	}
+	if ret, _ := m.Get(node.key[:], node.hash); ret != 1 {
+		t.Errorf("查找失败，Expected %v found %v", 1, ret)
+	}
+	exp = false
+	if _, ret := m.AddOrGet(node.key[:], node.hash, 2, true); ret != exp {
+		t.Errorf("插入同样的值，Expected %v found %v", exp, ret)
+	}
+	if ret, _ := m.Get(node.key[:], node.hash); ret != 2 {
+		t.Errorf("查找失败，Expected %v found %v", 2, ret)
+	}
+	exp = true
+	node = newNode{{.}}(1, 0)
+	if _, ret := m.AddOrGet(node.key[:], node.hash, 1, false); ret != exp {
+		t.Errorf("插入不同的值，Expected %v found %v", exp, ret)
+	}
+
+	if m.Size() != 2 {
+		t.Errorf("当前长度，Expected %v found %v", 2, m.Size())
+	}
+
+	m.Close()
+}
+
+func TestU{{.}}IDMapSize(t *testing.T) {
+	m := NewU{{.}}IDMap("test", 1024)
+	if m.Size() != 0 {
+		t.Errorf("当前长度，Expected %v found %v", 0, m.Size())
+	}
+
+	node := newNode{{.}}(0, 1)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	if m.Size() != 1 {
+		t.Errorf("当前长度，Expected %v found %v", 1, m.Size())
+	}
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	if m.Size() != 1 {
+		t.Errorf("当前长度，Expected %v found %v", 1, m.Size())
+	}
+	node = newNode{{.}}(0, 2)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	if m.Size() != 2 {
+		t.Errorf("当前长度，Expected %v found %v", 2, m.Size())
+	}
+	node = newNode{{.}}(1, 0)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	if m.Size() != 3 {
+		t.Errorf("当前长度，Expected %v found %v", 3, m.Size())
+	}
+
+	m.Close()
+}
+
+func TestU{{.}}IDMapGet(t *testing.T) {
+	m := NewU{{.}}IDMap("test", 1024)
+
+	node := newNode{{.}}(0, 1)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	if _, in := m.Get(node.key[:], node.hash); !in {
+		t.Errorf("查找失败")
+	}
+	node = newNode{{.}}(0, 2)
+	if _, in := m.Get(node.key[:], node.hash); in {
+		t.Errorf("查找失败")
+	}
+	node = newNode{{.}}(1, 0)
+	if _, in := m.Get(node.key[:], node.hash); in {
+		t.Errorf("查找失败")
+	}
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	if _, in := m.Get(node.key[:], node.hash); !in {
+		t.Errorf("查找失败")
+	}
+
+	m.Close()
+}
+
+func TestU{{.}}IDMapClear(t *testing.T) {
+	m := NewU{{.}}IDMap("test", 4)
+
+	node := newNode{{.}}(0, 1)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	node = newNode{{.}}(0, 2)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	node = newNode{{.}}(1, 0)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	m.Clear()
+	if m.Size() != 0 {
+		t.Errorf("当前长度，Expected %v found %v", 0, m.Size())
+	}
+	node = newNode{{.}}(0, 1)
+	m.AddOrGet(node.key[:], node.hash, 1, false)
+	if _, in := m.Get(node.key[:], node.hash); !in {
+		t.Errorf("查找失败")
+	}
+	if m.Size() != 1 {
+		t.Errorf("当前长度，Expected %v found %v", 1, m.Size())
+	}
+
+	m.Close()
+}
+
+func BenchmarkU{{.}}IDMap(b *testing.B) {
+	m := NewU{{.}}IDMap("test", 1 << 26)
+	nodes := make([]*u{{.}}IDMapNode, (b.N+3)/4*4)
+
+	for i := uint64(0); i < uint64(b.N); i += 4 {
+		// 构造哈希冲突
+		nodes[i] = newNode{{.}}(i, i<<1)
+		nodes[i+1] = newNode{{.}}(i<<1, i)
+		nodes[i+2] = newNode{{.}}(^i, ^(i << 1))
+		nodes[i+3] = newNode{{.}}(^(i << 1), ^i)
+	}
+
+	b.ResetTimer()
+	for i := uint64(0); i < uint64(b.N); i += 4 {
+		m.AddOrGet(nodes[i].key[:], nodes[i].hash, uint32(i<<2), false)
+		m.AddOrGet(nodes[i+1].key[:], nodes[i+1].hash, uint32(i<<2), false)
+		m.AddOrGet(nodes[i+2].key[:], nodes[i+2].hash, uint32(i<<2), false)
+		m.AddOrGet(nodes[i+3].key[:], nodes[i+3].hash, uint32(i<<2), false)
+	}
+	b.Logf("size=%d, width=%d", m.Size(), m.Width())
+
+	m.Close()
+}
+
+func TestU{{.}}IDMapCollisionChain(t *testing.T) {
+	m := NewU{{.}}IDMap("test", 1)
+	m.SetCollisionChainDebugThreshold(5)
+	nodes := make([]*u{{.}}IDMapNode, 10)
+
+	for i := 0; i < 10; i++ {
+		nodes[i] = newNode{{.}}(0, uint64(i))
+		m.AddOrGet(nodes[i].key[:], nodes[i].hash, 0, false)
+	}
+	expected := []byte{}
+	expected = append(expected, nodes[4].key[:]...)
+	expected = append(expected, nodes[3].key[:]...)
+	expected = append(expected, nodes[2].key[:]...)
+	expected = append(expected, nodes[1].key[:]...)
+	expected = append(expected, nodes[0].key[:]...)
+	if chain := m.GetCollisionChain(); !bytes.Equal(chain, expected) {
+		t.Errorf("冲突链获取不正确, 应为%v, 实为%v", hmap.DumpHexBytesGrouped(expected, m.KeySize()), hmap.DumpHexBytesGrouped(chain, m.KeySize()))
+	}
+
+	m.Clear()
+	m.SetCollisionChainDebugThreshold(10)
+	for i := 0; i < 10; i++ {
+		m.AddOrGet(nodes[i].key[:], nodes[i].hash, 0, false)
+	}
+	if len(m.GetCollisionChain()) > 0 {
+		t.Error("冲突链获取不正确")
+	}
+
+	m.Close()
+}
+
+{{ end }}

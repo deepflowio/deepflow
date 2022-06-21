@@ -1,0 +1,296 @@
+syntax = "proto3";
+
+package pb;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+
+option go_package = "pb";
+
+message TaggedFlow {
+	Flow Flow = 1;
+}
+
+message Flow {
+	FlowKey FlowKey = 1;
+	FlowMetricsPeer FlowMetricsPeerSrc = 2;
+	FlowMetricsPeer FlowMetricsPeerDst = 3;
+	TunnelField Tunnel = 4;
+
+	uint64 FlowID = 5;
+
+	uint64 StartTime = 6;
+	uint64 EndTime = 7;
+	uint64 Duration = 8;
+	// uint64 FlowStatTime = 9;  // 目前无需发送
+
+	// uint32 VLAN = 10;  // 目前无需发送
+	uint32 EthType = 11;
+
+	uint32        HasFlowPerfStats = 12;
+	FlowPerfStats FlowPerfStats = 13;
+
+	uint32 CloseType = 14;
+	uint32 FlowSource = 15;
+
+	uint32 IsActiveService = 16;
+	uint32 QueueHash = 17;
+	uint32 IsNewFlow = 18;
+	uint32 TapSide = 19;
+
+	// TCP Seq
+	uint32 SYNSeq       = 20;
+	uint32 SYNACKSeq    = 21;
+	uint32 LastKeepaliveSeq   = 22;
+	uint32 LastKeepaliveAck   = 23;
+}
+
+message FlowKey {
+	uint32 VtapId = 1;
+	uint32 TapType = 2;
+	uint64 TapPort = 3;
+	uint64 MACSrc = 4;
+	uint64 MACDst = 5;
+
+	uint32 IPSrc = 6;
+	uint32 IPDst = 7;
+	bytes IP6Src = 8;
+	bytes IP6Dst = 9;
+
+	uint32 PortSrc = 10;
+	uint32 PortDst = 11;
+
+	uint32 Proto = 12;
+}
+
+message FlowMetricsPeer {
+	uint64 ByteCount = 1;
+	uint64 L3ByteCount= 2;
+	uint64 L4ByteCount= 3;
+	uint64 PacketCount= 4;
+	uint64 TotalByteCount = 5;
+	uint64 TotalPacketCount = 6;
+
+	uint64 First = 7;
+	uint64 Last = 8;
+	uint32 TCPFlags = 9;
+	int32  L3EpcID = 10;
+
+        uint32 IsL2End = 11;
+        uint32 IsL3End = 12;
+        uint32 IsActiveHost = 13;
+        uint32 IsDevice = 14;
+        uint32 IsVIPInterface = 15;
+        uint32 IsVIP = 16;
+}
+
+message TunnelField {
+	uint32 TxIP0 = 1;
+	uint32 TxIP1 = 2;
+	uint32 RxIP0 = 3;
+	uint32 RxIP1 = 4;
+	uint32 TxMAC0 = 5;
+	uint32 TxMAC1 = 6;
+	uint32 RxMAC0 = 7;
+	uint32 RxMAC1 = 8;
+	uint32 TxId = 9;
+	uint32 RxId = 10;
+	uint32 Type = 11;
+	uint32 Tier = 12;
+	uint32 IsIPv6 = 13;
+}
+
+message FlowPerfStats {
+	TCPPerfStats TCPPerfStats = 1;
+	L7PerfStats  l7PerfStats = 2;
+	uint32       L4Protocol = 3;
+	uint32       L7Protocol = 4;
+}
+
+message TCPPerfStats {
+	uint32 RTTClientMax = 1;
+	uint32 RTTServerMax = 2;
+	uint32 SRTMax = 3;
+	uint32 ARTMax = 4;
+
+	uint32 RTT  = 5;
+	uint32 RTTClientSum = 6;
+	uint32 RTTServerSum = 7;
+	uint32 SRTSum = 8;
+	uint32 ARTSum = 9;
+	uint32 RTTClientCount = 10;
+	uint32 RTTServerCount = 11;
+	uint32 SRTCount = 12;
+	uint32 ARTCount = 13;
+
+	TcpPerfCountsPeer TcpPerfCountsPeerTx = 14;
+	TcpPerfCountsPeer TcpPerfCountsPeerRx = 15;
+
+	uint32 TotalRetransCount = 16;
+}
+
+message TcpPerfCountsPeer {
+	uint32 RetransCount = 1;
+	uint32 ZeroWinCount = 2;
+}
+
+message L7PerfStats {
+	uint32 RequestCount = 1;
+	uint32 ResponseCount = 2;
+	uint32 ErrClientCount = 3;
+	uint32 ErrServerCount = 4;
+	uint32 ErrTimeout = 5;
+	uint32 RRTCount = 6;
+	uint64 RRTSum = 7;
+	uint32 RRTMax = 8;
+}
+
+message AppProtoLogsData {
+	AppProtoLogsBaseInfo BaseInfo = 1;
+	HTTPInfo  http = 2;
+	DNSInfo   dns = 3;
+	DubboInfo dubbo = 4;
+	KafkaInfo kafka = 5;
+	MysqlInfo mysql = 6;
+	RedisInfo redis = 7;
+	MqttInfo mqtt = 8;
+}
+
+message AppProtoLogsBaseInfo {
+	uint64 StartTime = 1;
+	uint64 EndTime = 2;
+	uint64 FlowId = 3;
+	uint64 TapPort = 4;
+	uint32 VtapId = 5;
+	uint32 TapType = 6;
+	uint32 IsIPv6 = 7;
+	uint32 TapSide = 8;
+	AppProtoHead Head = 9;
+
+	uint64 MacSrc = 10;
+	uint64 MacDst = 11;
+
+	uint32 IPSrc = 12;
+	uint32 IPDst = 13;
+
+	bytes IP6Src = 14;
+	bytes IP6Dst = 15;
+
+	int32 L3EpcIDSrc = 16;
+	int32 L3EpcIDDst = 17;
+
+	uint32 PortSrc = 18;
+	uint32 PortDst = 19;
+
+	uint32 Protocol = 20;
+	uint32 IsVIPInterfaceSrc = 21;
+	uint32 IsVIPInterfaceDst = 22;
+
+	uint32 ReqTcpSeq = 23;
+	uint32 RespTcpSeq = 24;
+
+        uint32 ProcessId0 = 25;
+        uint32 ProcessId1 = 26;
+        string ProcessKname0 = 27;
+        string ProcessKname1 = 28;
+        uint64 SyscallTraceIdRequest = 29;
+        uint64 SyscallTraceIdResponse = 30;
+        uint32 SyscallTraceIdThread0= 31;
+        uint32 SyscallTraceIdThread1= 32;
+        uint32 SyscallCapSeq0 = 33;
+        uint32 SyscallCapSeq1 = 34;
+}
+
+message AppProtoHead {
+	uint32 Proto = 1;
+	uint32 MsgType = 2;
+	uint32 Status = 3;
+	uint32 Code = 4 ;
+	uint64 RRT = 5;
+}
+
+message HTTPInfo {
+	uint32 StreamID = 1;
+	string Version = 3;
+	string Method = 4;
+	string Path = 5;
+	string Host = 6;
+	string ClientIP = 7;
+	string TraceID = 8;
+	string SpanID = 9;
+
+	int64  ReqContentLength = 10;
+	int64  RespContentLength = 11;
+
+	string XRequestId = 12;
+}
+
+message DNSInfo {
+	uint32 TransID = 1;
+	uint32 QueryType = 2;
+	string QueryName = 3;
+	string Answers = 4;
+}
+
+message DubboInfo {
+	uint32 SerialID = 1;
+	uint32 Type = 2;
+	uint32 ID = 4;
+
+	string DubboVersion = 5;
+	string ServiceName = 6;
+	string ServiceVersion = 7;
+	string MethodName = 8;
+	string TraceId = 11;
+
+	int32 ReqBodyLen = 9;
+	int32 RespBodyLen = 10;
+}
+
+message KafkaInfo{
+	uint32 CorrelationId = 1;
+
+	int32 ReqMsgSize = 2;
+	uint32 ApiVersion = 3;
+	uint32 ApiKey = 4;
+	string ClientID = 5;
+
+	int32 RespMsgSize = 6;
+}
+
+message MysqlInfo {
+	uint32 ProtocolVersion = 1;
+	string ServerVersion = 2;
+	uint32 ServerThreadID = 3;
+
+	uint32 Command = 4;
+	string Context = 5;
+
+	uint32 ResponseCode = 6;
+	uint64 AffectedRows = 7;
+	uint32 ErrorCode = 8;
+	string ErrorMessage = 9;
+}
+
+message RedisInfo {
+	string Request = 1;
+	string RequestType = 2;
+
+	string Response = 3;
+	string Status = 4;
+	string Error = 5;
+}
+
+message MqttInfo {
+	string MqttType = 1;
+
+	int32 ReqMsgSize = 2;
+	uint32 ProtoVersion = 3;
+	string ClientID = 4;
+
+	int32 RespMsgSize = 5;
+}
+
