@@ -16,7 +16,7 @@ SSH="ssh -4 -a \
 usage()
 {
     echo "Usage: $0 [ <compiler-ip> <compiler-root-passwd> ]"
-    echo "Tips:  $0 10.30.200.9 security421"
+    echo "Tips:  $0 10.30.200.9 ******"
 }
 
 parse()
@@ -38,7 +38,7 @@ param_init()
 {
     project=xdpsock
     sys_ip=10.30.200.9
-    sys_passwd=yunshan3302
+    sys_passwd=******
     SYS=root@$sys_ip
     SSH_EXEC="sshpass -p $sys_passwd $SSH"
     SCP_EXEC="sshpass -p $sys_passwd $SCP"
