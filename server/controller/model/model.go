@@ -240,6 +240,9 @@ type Domain struct {
 	ErrorMsg       string                 `json:"ERROR_MSG"`
 	ControllerIP   string                 `json:"CONTROLLER_IP"`
 	ControllerName string                 `json:"CONTROLLER_NAME"`
+	VTapName       string                 `json:"VTAP_NAME"`
+	VTapCtrlIP     string                 `json:"VTAP_CTRL_IP"`
+	VTapCtrlMAC    string                 `json:"VTAP_CTRL_MAC"`
 	IconID         int                    `json:"ICON_ID"`
 	K8sEnabled     int                    `json:"K8S_ENABLED"`
 	Config         map[string]interface{} `json:"CONFIG"`

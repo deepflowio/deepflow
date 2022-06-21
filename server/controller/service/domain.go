@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	uuid "github.com/satori/go.uuid"
 	// "gorm.io/gorm/clause"
@@ -45,7 +46,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 			regionToAZLcuuids := domainToRegionLcuuidsToAZLcuuids[az.Domain]
 			regionToAZLcuuids[az.Region] = append(regionToAZLcuuids[az.Region], az.Lcuuid)
 		} else {
-			regionToAZLcuuids := map[string][]string{az.Region: []string{az.Lcuuid}}
+			regionToAZLcuuids := map[string][]string{az.Region: {az.Lcuuid}}
 			domainToRegionLcuuidsToAZLcuuids[az.Domain] = regionToAZLcuuids
 		}
 	}
@@ -98,6 +99,19 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 			domainResp.K8sEnabled = 1
 			if podClusters, ok := domainToPodClusterNames[domain.Lcuuid]; ok {
 				domainResp.PodClusters = podClusters
+			}
+		} else {
+			var k8sCluster mysql.KubernetesCluster
+			if err = mysql.Db.Where("cluster_id = ?", domain.ClusterID).First(&k8sCluster).Error; err == nil {
+				v := strings.Split(k8sCluster.Value, "-")
+				if len(v) == 2 {
+					var vtap mysql.VTap
+					if err = mysql.Db.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
+						domainResp.VTapName = vtap.Name
+						domainResp.VTapCtrlIP = vtap.CtrlIP
+						domainResp.VTapCtrlMAC = vtap.CtrlMac
+					}
+				}
 			}
 		}
 
