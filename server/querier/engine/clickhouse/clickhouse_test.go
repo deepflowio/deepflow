@@ -119,6 +119,12 @@ var (
 	}, {
 		input:  "select `label.statefulset.kubernetes.io/pod-name_0` as `label.abc` from l4_flow_log where `label.abc`='opensource-loki-0' group by `label.abc`",
 		output: "SELECT dictGet(deepflow.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.abc` FROM flow_log.l4_flow_log PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') GROUP BY `label.abc`",
+	}, {
+		input:  "select `attribute.cc` as `attribute.abc` from l7_flow_log where `attribute.abc`='opensource-loki-0' group by `attribute.abc`",
+		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `attribute.abc` FROM flow_log.l7_flow_log PREWHERE tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' GROUP BY `attribute.abc`",
+	}, {
+		input:  "select `tag.cc` as `tag.abc` from cpu where `tag.abc`='opensource-loki-0' group by `tag.abc`",
+		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM flow_log.cpu PREWHERE tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' GROUP BY `tag.abc`",
 	},
 	}
 )

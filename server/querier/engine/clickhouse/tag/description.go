@@ -34,7 +34,7 @@ var tagTypeToOperators = map[string][]string{
 	"int_enum":    []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"string":      []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"string_enum": []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
-	"ip":          []string{"=", "!=", "IN", "NOT IN"},
+	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
 	"mac":         []string{"=", "!=", "IN", "NOT IN"},
 	"id":          []string{"=", "!=", "IN", "NOT IN"},
 	"time":        []string{"=", "!=", ">=", "<="},

@@ -74,17 +74,30 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			if !ok {
 				filter := ""
 				switch preAsTag {
-				case "tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
+				case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
 					valueStr := strings.Trim(t.Value, "'")
-					if preAsTag == "tap_port" {
-						valueStr = "00:00:" + valueStr
-					}
 					mac, err := net.ParseMAC(valueStr)
 					if err != nil {
 						return nil, err
 					}
 					valueUInt64 := utils.Mac2Uint64(mac)
 					filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+				case "tap_port":
+					valueStr := strings.Trim(t.Value, "'")
+					ip := net.ParseIP(valueStr)
+					if ip != nil {
+						ipUint32 := utils.IpToUint32(ip)
+						filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
+					} else {
+						valueStr = "00:00:" + valueStr
+						mac, err := net.ParseMAC(valueStr)
+						if err != nil {
+							filter = fmt.Sprintf("%s %s %v", t.Tag, op, t.Value)
+						} else {
+							valueUInt64 := utils.Mac2Uint64(mac)
+							filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+						}
+					}
 				default:
 					preAsTag = strings.Trim(preAsTag, "`")
 					if strings.HasPrefix(preAsTag, "label.") {
@@ -119,6 +132,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						tagItem, ok = tag.GetTag("external_tag", db, table, "default")
 						if ok {
 							nameNoPreffix := strings.TrimPrefix(preAsTag, "tag.")
+							nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
 							switch strings.ToLower(op) {
 							case "regexp":
 								filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value)
@@ -150,17 +164,31 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 		} else {
 			filter := ""
 			switch t.Tag {
-			case "tap_port", "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
+			case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
 				valueStr := strings.Trim(t.Value, "'")
-				if t.Tag == "tap_port" {
-					valueStr = "00:00:" + valueStr
-				}
 				mac, err := net.ParseMAC(valueStr)
 				if err != nil {
 					return nil, err
 				}
 				valueUInt64 := utils.Mac2Uint64(mac)
 				filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+			case "tap_port":
+				valueStr := strings.Trim(t.Value, "'")
+				ip := net.ParseIP(valueStr)
+				fmt.Println(ip.String())
+				if ip != nil {
+					ipUint32 := utils.IpToUint32(ip)
+					filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
+				} else {
+					valueStr = "00:00:" + valueStr
+					mac, err := net.ParseMAC(valueStr)
+					if err != nil {
+						filter = fmt.Sprintf("%s %s %v", t.Tag, op, t.Value)
+					} else {
+						valueUInt64 := utils.Mac2Uint64(mac)
+						filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+					}
+				}
 			default:
 				t.Tag = strings.Trim(t.Tag, "`")
 				if strings.HasPrefix(t.Tag, "label.") {
@@ -195,6 +223,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					tagItem, ok = tag.GetTag("external_tag", db, table, "default")
 					if ok {
 						nameNoPreffix := strings.TrimPrefix(t.Tag, "tag.")
+						nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
 						switch strings.ToLower(op) {
 						case "regexp":
 							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", nameNoPreffix, t.Value)
