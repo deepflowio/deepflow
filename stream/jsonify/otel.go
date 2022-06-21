@@ -71,6 +71,22 @@ func httpCodeToResponseStatus(code int16) uint8 {
 	}
 }
 
+func getValueString(value *v11.AnyValue) string {
+	valueString := value.GetStringValue()
+	if valueString != "" {
+		return valueString
+	} else {
+		valueString = value.String()
+		// 获取:后边的内容(:前边的是数据类型)
+		index := strings.Index(valueString, ":")
+		if index > -1 && len(valueString) > index+1 {
+			return valueString[index+1:]
+		} else {
+			return valueString
+		}
+	}
+}
+
 func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 	h.IsIPv4 = true
 	tagNames, tagValues := []string{}, []string{}
@@ -80,6 +96,11 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 		if value == nil {
 			continue
 		}
+
+		// FIXME 不同类型都按string存储，后续不同类型存储应分开, 参考: https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto#L31
+		tagNames = append(tagNames, key)
+		tagValues = append(tagValues, getValueString(value))
+
 		switch key {
 		case "net.transport":
 			protocol := value.GetStringValue()
@@ -134,20 +155,7 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 			h.responseLength = uint64(value.GetIntValue())
 			h.ResponseLength = &h.responseLength
 		default:
-			// FIXME 不同类型都按string存储，后续不同类型存储应分开, 参考: https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto#L31
-			tagNames = append(tagNames, key)
-			valueString := value.GetStringValue()
-			if valueString != "" {
-				tagValues = append(tagValues, valueString)
-			} else {
-				valueString = value.String()
-				index := strings.Index(valueString, ":")
-				if index > -1 && len(valueString) > index+1 {
-					tagValues = append(tagValues, valueString[index+1:])
-				} else {
-					tagValues = append(tagValues, valueString)
-				}
-			}
+			// nothing
 		}
 	}
 	if len(h.L7ProtocolStr) > 0 {
