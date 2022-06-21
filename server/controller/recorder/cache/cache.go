@@ -206,9 +206,21 @@ func (c *Cache) refreshRegions() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_REGION_EN))
 	var regions []*mysql.Region
 
-	// TODO 检查domain是否指定了region，仅获取指定region；暂不实现
-	err := mysql.Db.Where(
-		"lcuuid != ? AND create_method = ?", common.DEFAULT_REGION, common.CREATE_METHOD_LEARN,
+	// 使用az获取domain关联的region数据，排除“系统默认”region
+	var azs []*mysql.AZ
+	err := mysql.Db.Where(c.getConditonDomainCreateMethod()).Find(&azs).Error
+	if err != nil {
+		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_AZ_EN, err))
+		return
+	}
+	var regionLcuuids []string
+	for _, az := range azs {
+		if az.Lcuuid != common.DEFAULT_REGION {
+			regionLcuuids = append(regionLcuuids, az.Region)
+		}
+	}
+	err = mysql.Db.Where(
+		"create_method = ? AND lcuuid IN ?", common.CREATE_METHOD_LEARN, regionLcuuids,
 	).Find(&regions).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_REGION_EN, err))
