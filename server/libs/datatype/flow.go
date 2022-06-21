@@ -1,0 +1,792 @@
+package datatype
+
+import (
+	"fmt"
+	"net"
+	"reflect"
+	"time"
+
+	"github.com/google/gopacket/layers"
+
+	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
+	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+)
+
+type CloseType uint8
+
+const (
+	CloseTypeUnknown CloseType = iota
+
+	// 流日志CloseType和流统计指标量之间的对应关系，见
+	// trident/collector/quadruple_generator.go: init函数
+	//	case datatype.CloseTypeTCPServerRst:
+	//		_CLOSE_TYPE_METERS[flowType].ServerRstFlow = 1
+	//	...
+	// 流统计指标量和数据库字段名之间的对应关系，见
+	// droplet-libs/zerodoc/basic_meter.go: Anomaly结构体定义
+	//	ClientRstFlow       uint64 `db:"client_rst_flow"`
+	//	...
+	// 数据库字段名和页面文案之间的对应关系，见
+	// droplet-libs/zerodoc/basic_meter.go: AnomalyColumns函数
+	//	ANOMALY_CLIENT_RST_FLOW: {"client_rst_flow", "传输-客户端重置"},
+	//	...
+
+	CloseTypeTCPFin                //  1: 正常结束
+	CloseTypeTCPServerRst          //  2: 传输-服务端重置
+	CloseTypeTimeout               //  3: 连接超时
+	_                              //  4: 【废弃】CloseTypeFlood
+	CloseTypeForcedReport          //  5: 周期性上报
+	_                              //  6: 【废弃】CloseTypeFoecedClose
+	CloseTypeClientSYNRepeat       //  7: 建连-客户端SYN结束
+	CloseTypeServerHalfClose       //  8: 断连-服务端半关
+	CloseTypeTCPClientRst          //  9: 传输-客户端重置
+	CloseTypeServerSYNACKRepeat    // 10: 建连-服务端SYN结束
+	CloseTypeClientHalfClose       // 11: 断连-客户端半关
+	_                              // 12: 【废弃】CloseTypeClientNoResponse
+	CloseTypeClientSourcePortReuse // 13: 建连-客户端端口复用
+	_                              // 14: 【废弃】CloseTypeClientSYNRetryLack
+	CloseTypeServerReset           // 15: 建连-服务端直接重置
+	_                              // 16: 【废弃】CloseTypeServerNoResponse
+	CloseTypeServerQueueLack       // 17: 传输-服务端队列溢出
+	CloseTypeClientEstablishReset  // 18: 建连-客户端其他重置
+	CloseTypeServerEstablishReset  // 19: 建连-服务端其他重置
+	MaxCloseType
+)
+
+func (t CloseType) IsClientError() bool {
+	return t == CloseTypeClientSYNRepeat || t == CloseTypeTCPClientRst ||
+		t == CloseTypeClientHalfClose || t == CloseTypeClientSourcePortReuse ||
+		t == CloseTypeClientEstablishReset
+}
+
+func (t CloseType) IsServerError() bool {
+	return t == CloseTypeTCPServerRst || t == CloseTypeTimeout ||
+		t == CloseTypeServerHalfClose || t == CloseTypeServerSYNACKRepeat ||
+		t == CloseTypeServerReset || t == CloseTypeServerQueueLack || t == CloseTypeServerEstablishReset
+}
+
+type DeviceType uint8
+
+const (
+	unknownDeviceType DeviceType = iota
+	VM
+	VGw
+	ThirdPartyDevice
+	VMWAF
+	NSPVGateway
+	HostDevice
+	NetworkDevice
+	FloatingIP
+)
+
+type FlowSource uint8
+
+const (
+	FLOW_SOURCE_NORMAL FlowSource = iota
+	FLOW_SOURCE_SFLOW
+	FLOW_SOURCE_NETFLOW
+)
+
+type TcpPerfCountsPeer struct {
+	RetransCount uint32
+	ZeroWinCount uint32
+}
+
+// size = 20 * 4B = 80Byte
+// UDPPerfStats仅有2个字段，复用ARTSum, ARTCount
+type TCPPerfStats struct { // 除特殊说明外，均为每个流统计周期（目前是自然分）清零
+	RTTClientMax uint32 // us，Trident保证时延最大值不会超过3600s，能容纳在u32内
+	RTTServerMax uint32 // us
+	SRTMax       uint32 // us
+	ARTMax       uint32 // us，UDP复用
+
+	RTT            uint32 // us，TCP建连过程，只会计算出一个RTT
+	RTTClientSum   uint32 // us，假定一条流在一分钟内的时延加和不会超过u32
+	RTTServerSum   uint32 // us
+	SRTSum         uint32 // us
+	ARTSum         uint32 // us，UDP复用
+	RTTClientCount uint32
+	RTTServerCount uint32
+	SRTCount       uint32
+	ARTCount       uint32 // UDP复用
+
+	TcpPerfCountsPeers [2]TcpPerfCountsPeer
+	TotalRetransCount  uint32 // 整个Flow生命周期的统计量
+}
+
+type L4Protocol uint8
+
+const (
+	L4_PROTOCOL_UNKOWN L4Protocol = iota
+	L4_PROTOCOL_TCP
+	L4_PROTOCOL_UDP
+
+	L4_PROTOCOL_MAX
+)
+
+type L7Protocol uint8
+
+const (
+	L7_PROTOCOL_UNKNOWN L7Protocol = 0
+	L7_PROTOCOL_OTHER   L7Protocol = 1
+	L7_PROTOCOL_HTTP_1  L7Protocol = 20
+	L7_PROTOCOL_HTTP_2  L7Protocol = 21
+	L7_PROTOCOL_DUBBO   L7Protocol = 40
+	L7_PROTOCOL_MYSQL   L7Protocol = 60
+	L7_PROTOCOL_REDIS   L7Protocol = 80
+	L7_PROTOCOL_KAFKA   L7Protocol = 100
+	L7_PROTOCOL_MQTT    L7Protocol = 101
+	L7_PROTOCOL_DNS     L7Protocol = 120
+)
+
+// size = 9 * 4B = 36B
+type L7PerfStats struct {
+	RequestCount   uint32
+	ResponseCount  uint32
+	ErrClientCount uint32 // client端原因导致的响应异常数量
+	ErrServerCount uint32 // server端原因导致的响应异常数量
+	ErrTimeout     uint32 // request请求timeout数量
+	RRTCount       uint32 // u32可记录40000M时延，一条流在一分钟内的请求数远无法达到此数值
+	RRTSum         uint64 // us RRT(Request Response Time)
+	RRTMax         uint32 // us RRT(Request Response Time)，Trident保证在3600s以内
+}
+
+// size = 80B + 36B + 2B = 118B
+type FlowPerfStats struct {
+	TCPPerfStats
+	L7PerfStats
+	L4Protocol
+	L7Protocol
+}
+
+type FlowMetricsPeer struct {
+	// 注意字节对齐!
+	NatRealIp net.IP // IsVIP为true，通过MAC查询对应的IP
+
+	ByteCount        uint64        // 每个流统计周期（目前是自然秒）清零
+	L3ByteCount      uint64        // 每个流统计周期的L3载荷量
+	L4ByteCount      uint64        // 每个流统计周期的L4载荷量
+	PacketCount      uint64        // 每个流统计周期（目前是自然秒）清零
+	TotalByteCount   uint64        // 整个Flow生命周期的统计量
+	TotalPacketCount uint64        // 整个Flow生命周期的统计量
+	First, Last      time.Duration // 整个Flow生命周期首包和尾包的时间戳
+
+	L3EpcID      int32
+	IsL2End      bool
+	IsL3End      bool
+	IsActiveHost bool
+	IsDevice     bool  // true表明是从平台数据中获取的
+	TCPFlags     uint8 // 所有TCP的Flags或运算
+	// TODO: IsVIPInterface、IsVIP流日志没有存储，Encode\Decode可以不做
+	IsVIPInterface bool // 目前仅支持微软Mux设备，从grpc Interface中获取
+	IsVIP          bool // 从grpc cidr中获取
+	IsLocalMac     bool // 同EndpointInfo中的IsLocalMac, 流日志中不需要存储
+	IsLocalIp      bool // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
+}
+
+const (
+	FLOW_METRICS_PEER_SRC = iota
+	FLOW_METRICS_PEER_DST
+	FLOW_METRICS_PEER_MAX
+)
+
+type FlowKey struct {
+	VtapId  uint16
+	TapType TapType
+	TapPort TapPort // 采集端口信息类型 + 采集端口信息
+	/* L2 */
+	MACSrc MacInt
+	MACDst MacInt
+	/* L3 */
+	IPSrc IPv4Int
+	IPDst IPv4Int
+	/* L3 IPv6 */
+	IP6Src net.IP
+	IP6Dst net.IP
+	/* L4 */
+	PortSrc uint16
+	PortDst uint16
+	Proto   layers.IPProtocol
+}
+
+type TunnelField struct {
+	TxIP0, TxIP1   IPv4Int // 对应发送方向的源目的隧道IP
+	RxIP0, RxIP1   IPv4Int // 对应接收方向的源目的隧道IP
+	TxMAC0, TxMAC1 uint32  // 对应发送方向的源目的隧道MAC，低4字节
+	RxMAC0, RxMAC1 uint32  // 对应接收方向的源目的隧道MAC，低4字节
+	TxId, RxId     uint32
+	Type           TunnelType
+	Tier           uint8
+	IsIPv6         bool
+}
+
+func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
+	p.TxIP0 = f.TxIP0
+	p.TxIP1 = f.TxIP1
+	p.RxIP0 = f.RxIP0
+	p.RxIP1 = f.RxIP1
+	p.TxMAC0 = f.TxMAC0
+	p.TxMAC1 = f.TxMAC1
+	p.RxMAC0 = f.RxMAC0
+	p.RxMAC1 = f.RxMAC1
+	p.TxId = f.TxId
+	p.RxId = f.RxId
+	p.Type = uint32(f.Type)
+	p.Tier = uint32(f.Tier)
+	if f.IsIPv6 {
+		p.IsIPv6 = 1
+	}
+}
+
+func (t *TunnelField) String() string {
+	if t.Type == TUNNEL_TYPE_NONE {
+		return "none"
+	}
+	return fmt.Sprintf("%s, tx_id: %d, rx_id: %d, tier: %d, tx_0: %s %08x, tx_1: %s %08x, rx_0: %s %08x, rx_1: %s %08x",
+		t.Type, t.TxId, t.RxId, t.Tier,
+		IpFromUint32(t.TxIP0), t.TxMAC0, IpFromUint32(t.TxIP1), t.TxMAC1,
+		IpFromUint32(t.RxIP0), t.RxMAC0, IpFromUint32(t.RxIP1), t.RxMAC1)
+}
+
+// 结构或顺序变化，需要同步修改Encode和Decode
+type Flow struct {
+	// 注意字节对齐!
+	FlowKey
+	FlowMetricsPeers [FLOW_METRICS_PEER_MAX]FlowMetricsPeer
+
+	Tunnel TunnelField
+
+	FlowID uint64
+
+	// TCP Seq
+	SYNSeq           uint32
+	SYNACKSeq        uint32
+	LastKeepaliveSeq uint32
+	LastKeepaliveAck uint32
+
+	/* Timers */
+	StartTime    time.Duration
+	EndTime      time.Duration
+	Duration     time.Duration
+	FlowStatTime time.Duration // 取整至流统计周期的开始
+
+	/* L2 */
+	VLAN    uint16
+	EthType layers.EthernetType
+
+	/* TCP Perf Data */
+	*FlowPerfStats
+
+	CloseType
+	FlowSource
+	IsActiveService bool
+	QueueHash       uint8
+	IsNewFlow       bool
+	Reversed        bool
+	TapSide         uint8
+}
+
+func (t FlowSource) String() string {
+	switch t {
+	case FLOW_SOURCE_NORMAL:
+		return "normal"
+	case FLOW_SOURCE_SFLOW:
+		return "sflow"
+	case FLOW_SOURCE_NETFLOW:
+		return "netflow"
+	default:
+		return "unknown"
+	}
+}
+
+func (_ *FlowKey) SequentialMerge(_ *FlowKey) {
+	// 所有字段均无需改变
+}
+
+func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
+	p.VtapId = uint32(f.VtapId)
+	p.TapType = uint32(f.TapType)
+	p.TapPort = uint64(f.TapPort)
+	p.MACSrc = uint64(f.MACSrc)
+	p.MACDst = uint64(f.MACDst)
+	p.IPSrc = f.IPSrc
+	p.IPDst = f.IPDst
+	p.IP6Src = f.IP6Src
+	p.IP6Dst = f.IP6Dst
+	p.PortSrc = uint32(f.PortSrc)
+	p.PortDst = uint32(f.PortDst)
+	p.Proto = uint32(f.Proto)
+}
+
+func (f *TcpPerfCountsPeer) SequentialMerge(rhs *TcpPerfCountsPeer) {
+	f.RetransCount += rhs.RetransCount
+	f.ZeroWinCount += rhs.ZeroWinCount
+}
+
+func (t *TcpPerfCountsPeer) WriteToPB(p *pb.TcpPerfCountsPeer) {
+	p.RetransCount = t.RetransCount
+	p.ZeroWinCount = t.ZeroWinCount
+}
+
+func (f *TCPPerfStats) SequentialMerge(rhs *TCPPerfStats) {
+	if f.RTTClientMax < rhs.RTTClientMax {
+		f.RTTClientMax = rhs.RTTClientMax
+	}
+	if f.RTTServerMax < rhs.RTTServerMax {
+		f.RTTServerMax = rhs.RTTServerMax
+	}
+	if f.SRTMax < rhs.SRTMax {
+		f.SRTMax = rhs.SRTMax
+	}
+	if f.ARTMax < rhs.ARTMax {
+		f.ARTMax = rhs.ARTMax
+	}
+
+	if f.RTT < rhs.RTT {
+		f.RTT = rhs.RTT
+	}
+	f.RTTClientSum += rhs.RTTClientSum
+	f.RTTServerSum += rhs.RTTServerSum
+	f.SRTSum += rhs.SRTSum
+	f.ARTSum += rhs.ARTSum
+	f.RTTClientCount += rhs.RTTClientCount
+	f.RTTServerCount += rhs.RTTServerCount
+	f.SRTCount += rhs.SRTCount
+	f.ARTCount += rhs.ARTCount
+	f.TcpPerfCountsPeers[0].SequentialMerge(&rhs.TcpPerfCountsPeers[0])
+	f.TcpPerfCountsPeers[1].SequentialMerge(&rhs.TcpPerfCountsPeers[1])
+	f.TotalRetransCount = rhs.TotalRetransCount
+}
+
+func (f *TCPPerfStats) Reverse() {
+	f.RTTClientSum, f.RTTServerSum = f.RTTServerSum, f.RTTClientSum
+	f.RTTClientCount, f.RTTServerCount = f.RTTServerCount, f.RTTClientCount
+	f.TcpPerfCountsPeers[0], f.TcpPerfCountsPeers[1] = f.TcpPerfCountsPeers[1], f.TcpPerfCountsPeers[0]
+}
+
+func (f *TCPPerfStats) WriteToPB(p *pb.TCPPerfStats, l4Protocol L4Protocol) {
+	if l4Protocol == L4_PROTOCOL_TCP {
+		p.RTTClientMax = f.RTTClientMax
+		p.RTTServerMax = f.RTTServerMax
+		p.SRTMax = f.SRTMax
+		p.ARTMax = f.ARTMax
+
+		p.RTT = f.RTT
+		p.RTTClientSum = f.RTTClientSum
+		p.RTTServerSum = f.RTTServerSum
+		p.SRTSum = f.SRTSum
+		p.ARTSum = f.ARTSum
+
+		p.RTTClientCount = f.RTTClientCount
+		p.RTTServerCount = f.RTTServerCount
+		p.SRTCount = f.SRTCount
+		p.ARTCount = f.ARTCount
+
+		if p.TcpPerfCountsPeerTx == nil {
+			p.TcpPerfCountsPeerTx = &pb.TcpPerfCountsPeer{}
+		}
+		f.TcpPerfCountsPeers[0].WriteToPB(p.TcpPerfCountsPeerTx)
+
+		if p.TcpPerfCountsPeerRx == nil {
+			p.TcpPerfCountsPeerRx = &pb.TcpPerfCountsPeer{}
+		}
+		f.TcpPerfCountsPeers[1].WriteToPB(p.TcpPerfCountsPeerRx)
+		p.TotalRetransCount = f.TotalRetransCount
+	} else if l4Protocol == L4_PROTOCOL_UDP {
+		*p = pb.TCPPerfStats{}
+		p.ARTMax = f.ARTMax
+		p.ARTSum = f.ARTSum
+		p.ARTCount = f.ARTCount
+	}
+}
+
+func (f *FlowMetricsPeer) SequentialMerge(rhs *FlowMetricsPeer) {
+	f.ByteCount += rhs.ByteCount
+	f.L3ByteCount += rhs.L3ByteCount
+	f.L4ByteCount += rhs.L4ByteCount
+	f.PacketCount += rhs.PacketCount
+	f.TotalByteCount = rhs.TotalByteCount
+	f.TotalPacketCount = rhs.TotalPacketCount
+	f.First = rhs.First
+	f.Last = rhs.Last
+	f.TCPFlags |= rhs.TCPFlags
+	f.L3EpcID = rhs.L3EpcID
+	f.IsL2End = rhs.IsL2End
+	f.IsL3End = rhs.IsL3End
+	f.IsActiveHost = rhs.IsActiveHost
+	f.IsDevice = rhs.IsDevice
+	f.IsVIPInterface = rhs.IsVIPInterface
+	f.IsVIP = rhs.IsVIP
+	f.IsLocalMac = rhs.IsLocalMac
+	f.IsLocalIp = rhs.IsLocalIp
+}
+
+func (f *FlowMetricsPeer) WriteToPB(p *pb.FlowMetricsPeer) {
+	p.ByteCount = f.ByteCount
+	p.L3ByteCount = f.L3ByteCount
+	p.L4ByteCount = f.L4ByteCount
+	p.PacketCount = f.PacketCount
+	p.TotalByteCount = f.TotalByteCount
+	p.TotalPacketCount = f.TotalPacketCount
+	p.First = uint64(f.First)
+	p.Last = uint64(f.Last)
+	p.TCPFlags = uint32(f.TCPFlags)
+	p.L3EpcID = f.L3EpcID
+	p.IsL2End = Bool2UInt32(f.IsL2End)
+	p.IsL3End = Bool2UInt32(f.IsL3End)
+	p.IsActiveHost = Bool2UInt32(f.IsActiveHost)
+	p.IsDevice = Bool2UInt32(f.IsDevice)
+	p.IsVIPInterface = Bool2UInt32(f.IsVIPInterface)
+	p.IsVIP = Bool2UInt32(f.IsVIP)
+}
+
+// FIXME 注意：由于FlowGenerator中TCPPerfStats在Flow方向调整之后才获取到，
+// 因此这里不包含对TCPPerfStats的反向。
+func (f *Flow) Reverse() {
+	f.Reversed = !f.Reversed
+	f.TapSide = 0 // 反向后需要重新计算
+	f.Tunnel.TxIP0, f.Tunnel.TxIP1, f.Tunnel.RxIP0, f.Tunnel.RxIP1 = f.Tunnel.RxIP0, f.Tunnel.RxIP1, f.Tunnel.TxIP0, f.Tunnel.TxIP1
+	f.Tunnel.TxMAC0, f.Tunnel.TxMAC1, f.Tunnel.RxMAC0, f.Tunnel.RxMAC1 = f.Tunnel.RxMAC0, f.Tunnel.RxMAC1, f.Tunnel.TxMAC0, f.Tunnel.TxMAC1
+	f.Tunnel.TxId, f.Tunnel.RxId = f.Tunnel.RxId, f.Tunnel.TxId
+	f.MACSrc, f.MACDst = f.MACDst, f.MACSrc
+	f.IPSrc, f.IPDst = f.IPDst, f.IPSrc
+	f.IP6Src, f.IP6Dst = f.IP6Dst, f.IP6Src
+	f.PortSrc, f.PortDst = f.PortDst, f.PortSrc
+	flowMetricsPeerSrc := &f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC]
+	flowMetricsPeerDst := &f.FlowMetricsPeers[FLOW_METRICS_PEER_DST]
+	*flowMetricsPeerSrc, *flowMetricsPeerDst = *flowMetricsPeerDst, *flowMetricsPeerSrc
+}
+
+func (f *Flow) SequentialMerge(rhs *Flow) {
+	f.FlowKey.SequentialMerge(&rhs.FlowKey)
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_SRC])
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].SequentialMerge(&rhs.FlowMetricsPeers[FLOW_METRICS_PEER_DST])
+
+	f.EndTime = rhs.EndTime
+	f.Duration = rhs.Duration
+
+	if rhs.FlowPerfStats != nil {
+		if f.FlowPerfStats == nil {
+			f.FlowPerfStats = AcquireFlowPerfStats()
+		}
+		f.FlowPerfStats.SequentialMerge(rhs.FlowPerfStats)
+	}
+
+	f.CloseType = rhs.CloseType
+	f.IsActiveService = rhs.IsActiveService
+	f.Reversed = rhs.Reversed
+
+	// 若flow中存在KeepAlive报文，f.LastKeepaliveSeq及f.LastKeepaliveAck保存最后采集到的信息
+	if rhs.LastKeepaliveSeq != 0 {
+		f.LastKeepaliveSeq = rhs.LastKeepaliveSeq
+	}
+	if rhs.LastKeepaliveAck != 0 {
+		f.LastKeepaliveAck = rhs.LastKeepaliveAck
+	}
+}
+
+func (f *Flow) WriteToPB(p *pb.Flow) {
+	if p.FlowKey == nil {
+		p.FlowKey = &pb.FlowKey{}
+	}
+	f.FlowKey.WriteToPB(p.FlowKey)
+
+	if p.FlowMetricsPeerSrc == nil {
+		p.FlowMetricsPeerSrc = &pb.FlowMetricsPeer{}
+	}
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].WriteToPB(p.FlowMetricsPeerSrc)
+
+	if p.FlowMetricsPeerDst == nil {
+		p.FlowMetricsPeerDst = &pb.FlowMetricsPeer{}
+	}
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].WriteToPB(p.FlowMetricsPeerDst)
+
+	if p.Tunnel == nil {
+		p.Tunnel = &pb.TunnelField{}
+	}
+	f.Tunnel.WriteToPB(p.Tunnel)
+
+	p.FlowID = f.FlowID
+
+	p.SYNSeq = f.SYNSeq
+	p.SYNACKSeq = f.SYNACKSeq
+	p.LastKeepaliveSeq = f.LastKeepaliveSeq
+	p.LastKeepaliveAck = f.LastKeepaliveAck
+
+	p.StartTime = uint64(f.StartTime)
+	p.EndTime = uint64(f.EndTime)
+	p.Duration = uint64(f.Duration)
+
+	p.EthType = uint32(f.EthType)
+	if f.FlowPerfStats != nil {
+		p.HasFlowPerfStats = 1
+		if p.FlowPerfStats == nil {
+			p.FlowPerfStats = &pb.FlowPerfStats{}
+		}
+		f.FlowPerfStats.WriteToPB(p.FlowPerfStats)
+	} else {
+		p.HasFlowPerfStats = 0
+		p.FlowPerfStats = nil
+	}
+
+	p.CloseType = uint32(f.CloseType)
+	p.FlowSource = uint32(f.FlowSource)
+	p.IsActiveService = Bool2UInt32(f.IsActiveService)
+	p.IsNewFlow = Bool2UInt32(f.IsNewFlow)
+	p.TapSide = uint32(f.TapSide)
+}
+
+func formatStruct(s interface{}) string {
+	formatted := ""
+	t := reflect.TypeOf(s)
+	formatted += fmt.Sprintf("formatted kind:%v,%v;", t.Kind(), t.NumField())
+	if t.Kind() != reflect.Struct {
+		return ""
+	}
+
+	v := reflect.ValueOf(s)
+	for i := 0; i < t.NumField(); i++ {
+		if i > 0 {
+			formatted += " "
+		}
+		formatted += fmt.Sprintf("%v: %v", t.Field(i).Name, v.Field(i))
+	}
+	return formatted
+}
+
+func (p L7Protocol) String() string {
+	formatted := ""
+	switch p {
+	case L7_PROTOCOL_HTTP_1:
+		formatted = "httpv1"
+	case L7_PROTOCOL_HTTP_2:
+		formatted = "httpv2"
+	case L7_PROTOCOL_DNS:
+		formatted = "dns"
+	case L7_PROTOCOL_MYSQL:
+		formatted = "mysql"
+	case L7_PROTOCOL_REDIS:
+		formatted = "redis"
+	case L7_PROTOCOL_DUBBO:
+		formatted = "dubbo"
+	case L7_PROTOCOL_KAFKA:
+		formatted = "kafka"
+	case L7_PROTOCOL_MQTT:
+		formatted = "mqtt"
+	case L7_PROTOCOL_OTHER:
+		formatted = "other"
+	default:
+		formatted = "unknown"
+	}
+	return formatted
+}
+
+var L7ProtocolStringMap = map[string]L7Protocol{
+	L7_PROTOCOL_HTTP_1.String():  L7_PROTOCOL_HTTP_1,
+	L7_PROTOCOL_HTTP_2.String():  L7_PROTOCOL_HTTP_2,
+	L7_PROTOCOL_DNS.String():     L7_PROTOCOL_DNS,
+	L7_PROTOCOL_MYSQL.String():   L7_PROTOCOL_MYSQL,
+	L7_PROTOCOL_REDIS.String():   L7_PROTOCOL_REDIS,
+	L7_PROTOCOL_DUBBO.String():   L7_PROTOCOL_DUBBO,
+	L7_PROTOCOL_KAFKA.String():   L7_PROTOCOL_KAFKA,
+	L7_PROTOCOL_MQTT.String():    L7_PROTOCOL_MQTT,
+	L7_PROTOCOL_OTHER.String():   L7_PROTOCOL_OTHER,
+	L7_PROTOCOL_UNKNOWN.String(): L7_PROTOCOL_UNKNOWN,
+}
+
+func (p *L4Protocol) String() string {
+	formatted := ""
+	switch *p {
+	case L4_PROTOCOL_TCP:
+		formatted = "tcp"
+	case L4_PROTOCOL_UDP:
+		formatted = "udp"
+	}
+	return formatted
+}
+
+func (p *L7PerfStats) String() string {
+	formatted := ""
+	formatted += fmt.Sprintf("RequestCount:%v ", p.RequestCount)
+	formatted += fmt.Sprintf("ResponseCount:%v ", p.ResponseCount)
+	formatted += fmt.Sprintf("ErrClientCount:%v ", p.ErrClientCount)
+	formatted += fmt.Sprintf("ErrServerCount:%v ", p.ErrServerCount)
+	formatted += fmt.Sprintf("ErrTimeout:%v ", p.ErrTimeout)
+	formatted += fmt.Sprintf("RTTCount:%v ", p.RRTCount)
+	formatted += fmt.Sprintf("RTTSum:%v ", p.RRTSum)
+	formatted += fmt.Sprintf("RTTMax:%v", p.RRTMax)
+	return formatted
+}
+
+func (p *TCPPerfStats) String() string {
+	formatted := ""
+	formatted += fmt.Sprintf("RTTClientMax:%v ", p.RTTClientMax)
+	formatted += fmt.Sprintf("RTTServerMax:%v ", p.RTTServerMax)
+	formatted += fmt.Sprintf("SRTMax:%v ", p.SRTMax)
+	formatted += fmt.Sprintf("ARTMax:%v ", p.ARTMax)
+	formatted += fmt.Sprintf("RTT:%v ", p.RTT)
+	formatted += fmt.Sprintf("RTTClientSum:%v ", p.RTTClientSum)
+	formatted += fmt.Sprintf("RTTServerSum:%v ", p.RTTServerSum)
+	formatted += fmt.Sprintf("SRTSum:%v ", p.SRTSum)
+	formatted += fmt.Sprintf("ARTSum:%v ", p.ARTSum)
+	formatted += fmt.Sprintf("RTTClientCount:%v ", p.RTTClientCount)
+	formatted += fmt.Sprintf("RTTServerCount:%v ", p.RTTServerCount)
+	formatted += fmt.Sprintf("SRTCount:%v ", p.SRTCount)
+	formatted += fmt.Sprintf("ARTCount:%v ", p.ARTCount)
+	formatted += fmt.Sprintf("RetransCountSrc:%v ", p.TcpPerfCountsPeers[0].RetransCount)
+	formatted += fmt.Sprintf("ZeroWinCountSrc:%v ", p.TcpPerfCountsPeers[0].ZeroWinCount)
+	formatted += fmt.Sprintf("RetransCountDst:%v ", p.TcpPerfCountsPeers[1].RetransCount)
+	formatted += fmt.Sprintf("ZeroWinCountDst:%v ", p.TcpPerfCountsPeers[1].ZeroWinCount)
+	formatted += fmt.Sprintf("TotalRetransCount:%v", p.TotalRetransCount)
+
+	return formatted
+}
+
+func (p *FlowPerfStats) String() string {
+	if p == nil {
+		return ""
+	}
+
+	formatted := ""
+	formatted += fmt.Sprintf("L4Protocol:%s ", p.L4Protocol.String())
+	formatted += fmt.Sprintf("TCPPerfStats:{%s} ", p.TCPPerfStats.String())
+	formatted += fmt.Sprintf("\n\tL7Protocol:%s ", p.L7Protocol.String())
+	formatted += fmt.Sprintf("L7PerfStats:{%s}", p.L7PerfStats.String())
+	return formatted
+}
+
+func (f *FlowKey) String() string {
+	formatted := ""
+	formatted += fmt.Sprintf("VtapId: %d ", f.VtapId)
+	formatted += fmt.Sprintf("TapType: %d ", f.TapType)
+	formatted += fmt.Sprintf("TapPort: %s\n", f.TapPort)
+	formatted += fmt.Sprintf("\tMACSrc: %s ", Uint64ToMac(f.MACSrc))
+	formatted += fmt.Sprintf("MACDst: %s ", Uint64ToMac(f.MACDst))
+	if len(f.IP6Src) > 0 {
+		formatted += fmt.Sprintf("IP6Src: %s ", f.IP6Src)
+		formatted += fmt.Sprintf("IP6Dst: %s ", f.IP6Dst)
+	} else {
+		formatted += fmt.Sprintf("IPSrc: %s ", IpFromUint32(f.IPSrc))
+		formatted += fmt.Sprintf("IPDst: %s ", IpFromUint32(f.IPDst))
+	}
+	formatted += fmt.Sprintf("Proto: %v ", f.Proto)
+	formatted += fmt.Sprintf("PortSrc: %d ", f.PortSrc)
+	formatted += fmt.Sprintf("PortDst: %d", f.PortDst)
+	return formatted
+}
+
+func (f *FlowMetricsPeer) String() string {
+	formatted := ""
+	typeOf := reflect.TypeOf(*f)
+	valueOf := reflect.ValueOf(*f)
+	for i := 0; i < typeOf.NumField(); i++ {
+		field := typeOf.Field(i)
+		value := valueOf.Field(i)
+		if field.Type.Name() == "Duration" {
+			formatted += fmt.Sprintf("%v: %d ", field.Name, value.Int())
+		} else {
+			formatted += fmt.Sprintf("%v: %+v ", field.Name, value)
+		}
+	}
+	return formatted
+}
+
+func (f *Flow) String() string {
+	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
+	formatted += fmt.Sprintf("FlowSource: %s ", f.FlowSource.String())
+	formatted += fmt.Sprintf("Tunnel: %s ", f.Tunnel.String())
+	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
+	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)
+	formatted += fmt.Sprintf("IsNewFlow: %v ", f.IsNewFlow)
+	formatted += fmt.Sprintf("QueueHash: %d ", f.QueueHash)
+	formatted += fmt.Sprintf("SYNSeq: %d ", f.SYNSeq)
+	formatted += fmt.Sprintf("SYNACKSeq: %d ", f.SYNACKSeq)
+	formatted += fmt.Sprintf("LastKeepaliveSeq: %d ", f.LastKeepaliveSeq)
+	formatted += fmt.Sprintf("LastKeepaliveAck: %d ", f.LastKeepaliveAck)
+	formatted += fmt.Sprintf("FlowStatTime: %d\n", f.FlowStatTime/time.Second)
+	formatted += fmt.Sprintf("\tStartTime: %d ", f.StartTime)
+	formatted += fmt.Sprintf("EndTime: %d ", f.EndTime)
+	formatted += fmt.Sprintf("Duration: %d\n", f.Duration)
+	formatted += fmt.Sprintf("\tVLAN: %d ", f.VLAN)
+	formatted += fmt.Sprintf("EthType: %d ", f.EthType)
+	formatted += fmt.Sprintf("Reversed: %v ", f.Reversed)
+	formatted += fmt.Sprintf("%s\n", f.FlowKey.String())
+	formatted += fmt.Sprintf("\tFlowMetricsPeerSrc: {%s}\n", f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].String())
+	formatted += fmt.Sprintf("\tFlowMetricsPeerDst: {%s}", f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].String())
+	if f.FlowPerfStats != nil {
+		formatted += fmt.Sprintf("\n\t%s", f.FlowPerfStats.String())
+	}
+	return formatted
+}
+
+var zeroFlowPerfStats FlowPerfStats = FlowPerfStats{}
+var flowPerfStatsPool = pool.NewLockFreePool(func() interface{} {
+	return new(FlowPerfStats)
+})
+
+func AcquireFlowPerfStats() *FlowPerfStats {
+	return flowPerfStatsPool.Get().(*FlowPerfStats)
+}
+
+func ReleaseFlowPerfStats(s *FlowPerfStats) {
+	*s = zeroFlowPerfStats
+	flowPerfStatsPool.Put(s)
+}
+
+func CloneFlowPerfStats(s *FlowPerfStats) *FlowPerfStats {
+	newFlowPerfStats := AcquireFlowPerfStats()
+	*newFlowPerfStats = *s
+	return newFlowPerfStats
+}
+
+func (p *L7PerfStats) WriteToPB(b *pb.L7PerfStats) {
+	b.RequestCount = p.RequestCount
+	b.ResponseCount = p.ResponseCount
+	b.ErrClientCount = p.ErrClientCount
+	b.ErrServerCount = p.ErrServerCount
+	b.ErrTimeout = p.ErrTimeout
+	b.RRTCount = p.RRTCount
+	b.RRTSum = p.RRTSum
+	b.RRTMax = p.RRTMax
+}
+
+func (p *L7PerfStats) SequentialMerge(rhs *L7PerfStats) {
+	p.RequestCount += rhs.RequestCount
+	p.ResponseCount += rhs.ResponseCount
+	p.ErrClientCount += rhs.ErrClientCount
+	p.ErrServerCount += rhs.ErrServerCount
+	p.ErrTimeout += rhs.ErrTimeout
+	p.RRTCount += rhs.RRTCount
+	p.RRTSum += rhs.RRTSum
+	if p.RRTMax < rhs.RRTMax {
+		p.RRTMax = rhs.RRTMax
+	}
+}
+
+func (f *FlowPerfStats) WriteToPB(p *pb.FlowPerfStats) {
+	p.L4Protocol = uint32(f.L4Protocol)
+	p.L7Protocol = uint32(f.L7Protocol)
+
+	if p.TCPPerfStats == nil {
+		p.TCPPerfStats = &pb.TCPPerfStats{}
+	}
+	f.TCPPerfStats.WriteToPB(p.TCPPerfStats, f.L4Protocol)
+
+	if p.L7PerfStats == nil {
+		p.L7PerfStats = &pb.L7PerfStats{}
+	}
+	f.L7PerfStats.WriteToPB(p.L7PerfStats)
+}
+
+func (f *FlowPerfStats) SequentialMerge(rhs *FlowPerfStats) {
+	if f.L4Protocol == L4_PROTOCOL_UNKOWN {
+		f.L4Protocol = rhs.L4Protocol
+	}
+	if f.L7Protocol == L7_PROTOCOL_UNKNOWN || (f.L7Protocol == L7_PROTOCOL_OTHER &&
+		rhs.L7Protocol != L7_PROTOCOL_UNKNOWN) {
+		f.L7Protocol = rhs.L7Protocol
+	}
+	f.TCPPerfStats.SequentialMerge(&rhs.TCPPerfStats)
+	f.L7PerfStats.SequentialMerge(&rhs.L7PerfStats)
+}
