@@ -1,0 +1,1288 @@
+0th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+1th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 216.3ms,
+        max: 216.3ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+2th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 9.1ms,
+        max: 9.1ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 216.3ms,
+        max: 216.3ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: Some(
+        225.4ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+3th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 9.1ms,
+        max: 9.1ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 216.3ms,
+        max: 216.3ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: Some(
+        225.4ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+4th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 9.1ms,
+        max: 9.1ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 216.3ms,
+        max: 216.3ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: Some(
+        225.4ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+5th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 9.1ms,
+        max: 9.1ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 216.3ms,
+        max: 216.3ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: Some(
+        225.4ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+6th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 9.1ms,
+        max: 9.1ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 216.3ms,
+        max: 216.3ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: Some(
+        225.4ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+0th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+1th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: None,
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+2th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+3th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 0,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 0,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: false,
+    },
+}
+4th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 1,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 1,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+5th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 2,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 2,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+6th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 3,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 3,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+7th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 4,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 4,
+        retrans_1: 0,
+        retrans_syn_0: 0,
+        retrans_syn_1: 0,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+8th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 5,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 4,
+        retrans_1: 1,
+        retrans_syn_0: 0,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+9th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 6,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 5,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+10th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 7,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 6,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+11th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 7,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 1,
+            sum: 809µs,
+            max: 809µs,
+            updated: true,
+        },
+        srt_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 6,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+12th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 7,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 1,
+            sum: 809µs,
+            max: 809µs,
+            updated: true,
+        },
+        srt_0: TimeStats {
+            count: 1,
+            sum: 182µs,
+            max: 182µs,
+            updated: true,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 6,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+13th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 7,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 1,
+            sum: 809µs,
+            max: 809µs,
+            updated: true,
+        },
+        srt_0: TimeStats {
+            count: 1,
+            sum: 182µs,
+            max: 182µs,
+            updated: true,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 6,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+14th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 7,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 1,
+            sum: 809µs,
+            max: 809µs,
+            updated: true,
+        },
+        srt_0: TimeStats {
+            count: 1,
+            sum: 182µs,
+            max: 182µs,
+            updated: true,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 6,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+15th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 7,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 1,
+            sum: 809µs,
+            max: 809µs,
+            updated: true,
+        },
+        srt_0: TimeStats {
+            count: 1,
+            sum: 182µs,
+            max: 182µs,
+            updated: true,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 6,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}
+16th perf data:
+PerfData {
+    rtt_0: TimeStats {
+        count: 1,
+        sum: 15.512ms,
+        max: 15.512ms,
+        updated: true,
+    },
+    rtt_1: TimeStats {
+        count: 1,
+        sum: 10.143ms,
+        max: 10.143ms,
+        updated: true,
+    },
+    retrans_sum: 7,
+    rtt_full: Some(
+        25.655ms,
+    ),
+    period_data: PeriodPerfData {
+        art_0: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        art_1: TimeStats {
+            count: 1,
+            sum: 809µs,
+            max: 809µs,
+            updated: true,
+        },
+        srt_0: TimeStats {
+            count: 1,
+            sum: 182µs,
+            max: 182µs,
+            updated: true,
+        },
+        srt_1: TimeStats {
+            count: 0,
+            sum: 0ns,
+            max: 0ns,
+            updated: false,
+        },
+        retrans_0: 6,
+        retrans_1: 1,
+        retrans_syn_0: 1,
+        retrans_syn_1: 1,
+        psh_urg_count_0: 0,
+        psh_urg_count_1: 0,
+        zero_win_count_0: 0,
+        zero_win_count_1: 0,
+        updated: true,
+    },
+}

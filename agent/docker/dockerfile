@@ -1,0 +1,30 @@
+FROM docker.io/alpine
+
+ARG TZ='Asia/Harbin'
+ENV DEFAULT_TZ ${TZ}
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+RUN apk upgrade --update \
+    && apk add -U tzdata \
+    && cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime \
+    && apk del tzdata \
+    && rm -rf /var/cache/apk/*
+
+# 修改root密码为root
+RUN chmod 600 /etc/passwd; \
+    echo "metaflow:x:1000:1000::/home/metaflow:/bin/bash" >> /etc/passwd; \
+    echo "root:root" | chpasswd; \
+    chmod 000 /etc/passwd
+
+RUN mkdir -p /lib64 /usr/share/metaflow-agent
+COPY data /usr/share/metaflow-agent
+COPY require /lib64
+COPY metaflow-agent /bin/
+COPY metaflow-agent-ctl /bin/
+COPY metaflow-ebpfctl /bin/
+
+# 普通用户获取su命令权限
+RUN chmod 4755 /bin/busybox
+
+USER root
+
+CMD /bin/metaflow-agent -f /etc/metaflow-agent/metaflow-agent.yaml

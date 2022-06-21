@@ -1,0 +1,3 @@
+0th udp perf data:
+UdpPerf { req_timestamp: 0ns, art_max: 0ns, art_sum: 0ns, art_count: 0, last_pkt_direction: ServerToClient, data_update_flag: false }
+

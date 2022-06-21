@@ -1,0 +1,53 @@
+# 编译阶段
+# dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.2
+# 使用 Centos 为基础镜像，安装所需依赖
+#FIXME: 暂时锁定x86_64架构，以后支持优化构建速度
+FROM centos:centos7.9.2009
+
+# 2. 配置rust环境变量
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+# 安装自定义软件
+RUN yum install make -y
+
+# 安装基础依赖
+RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfutils-libelf-devel-static glibc-static zlib-static git  -y && \
+     curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y && \
+     curl http://nexus.yunshan.net/repository/platform/metaflow-agent/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
+     yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-11.0.0-2.el7.x86_64.rpm && \
+     curl http://nexus.yunshan.net/repository/platform/metaflow-agent/libdwarf-0.4.0-1.el7.x86_64.rpm --silent -O && \
+     yum --disablerepo=* localinstall -y ./libdwarf-*.rpm && rm -rf libdwarf-0.4.0-1.el7.x86_64.rpm && \
+     curl http://nexus.yunshan.net/repository/platform/metaflow-agent/bddisasm-1.34.10-1.el7.x86_64.rpm --silent -O && \
+     yum --disablerepo=* localinstall -y ./bddisasm-*.rpm && rm -rf bddisasm-1.34.10-1.el7.x86_64.rpm && \
+     yum clean all
+
+
+
+
+# 使用依赖缓存
+RUN cargo install sccache && \
+    ln -s  /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
+    ln -s /usr/local/llvm-clang/bin/llc /usr/bin/llc && \
+    ln -s /usr/local/llvm-clang/bin/llvm-strip /usr/bin/llvm-strip && \
+    ln -s /usr/local/llvm-clang/bin/llvm-objdump /usr/bin/llvm-objdump
+
+# 给cargo crates换镜像源
+COPY config /usr/local/cargo/
+
+# 添加能访问 gitlab 的 key，key 必须有访问依赖仓库的权限
+RUN mkdir /root/.ssh/
+COPY id_rsa /root/.ssh/id_rsa
+COPY ssh_config /root/.ssh/config
+RUN chmod 600 /root/.ssh/id_rsa
+
+# 增加.gitconfig，将内部库替换成 http 链接，可以直接下载
+COPY gitconfig /etc/
+
+CMD bash
+
+# 编译说明
+# 也可直接在从本地 docker 启动该编译环境，将代码挂载/下载进容器即可
+# cargo build 不加参数编译出来的是 debug 版的可执行文件，
+# 如果想要编译release版的可执行文件，请执行以下操作
+# RUN cargo build --release
