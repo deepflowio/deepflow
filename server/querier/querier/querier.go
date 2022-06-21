@@ -1,7 +1,6 @@
 package querier
 
 import (
-	//"flag"
 	"fmt"
 	"os"
 
@@ -18,7 +17,6 @@ import (
 
 var log = logging.MustGetLogger("querier")
 
-//var configPath = flag.String("f", "/etc/server.yaml", "specify config file location")
 var configPath = "/etc/server.yaml"
 
 func Start() {

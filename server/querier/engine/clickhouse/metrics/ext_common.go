@@ -40,8 +40,9 @@ func GetExtMetrics(db, table string) (map[string]*Metrics, error) {
 		for i, _tagName := range externalMetricIntRst["values"] {
 			tagName := _tagName.([]interface{})[0]
 			externalTag := tagName.(string)
+			dbField := fmt.Sprintf("metrics_int_values[indexOf(metrics_int_names, '%s')]", externalTag)
 			lm := NewMetrics(
-				i, externalTag, externalTag, "", METRICS_TYPE_COUNTER,
+				i, dbField, externalTag, "", METRICS_TYPE_COUNTER,
 				"原始Tag", []bool{true, true, true}, externalTag,
 			)
 			loadMetrics[externalTag] = lm
@@ -49,8 +50,9 @@ func GetExtMetrics(db, table string) (map[string]*Metrics, error) {
 		for i, _tagName := range externalMetricFloatRst["values"] {
 			tagName := _tagName.([]interface{})[0]
 			externalTag := tagName.(string)
+			dbField := fmt.Sprintf("metrics_float_values[indexOf(metrics_float_names, '%s')]", externalTag)
 			lm := NewMetrics(
-				i+len(externalMetricIntRst["values"]), externalTag, externalTag, "", METRICS_TYPE_COUNTER,
+				i+len(externalMetricIntRst["values"]), dbField, externalTag, "", METRICS_TYPE_COUNTER,
 				"原始Tag", []bool{true, true, true}, externalTag,
 			)
 			loadMetrics[externalTag] = lm

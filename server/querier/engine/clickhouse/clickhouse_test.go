@@ -105,20 +105,20 @@ var (
 		input:  "SELECT ip_0 FROM l4_flow_log WHERE  ((is_internet_1=1) OR (is_internet_0=1)) GROUP BY ip_0 limit 1",
 		output: "SELECT if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0 FROM flow_log.l4_flow_log PREWHERE (((l3_epc_id_1 = -2)) OR ((l3_epc_id_0 = -2))) GROUP BY if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0 LIMIT 1",
 	}, {
-		input:  "select Sum(byte) as '流量总量', region_0 as '区域' from l4_flow_log where 1=1 group by '区域' order by '流量总量' desc",
+		input:  "select Sum(byte) as `流量总量`, region_0 as `区域` from l4_flow_log where 1=1 group by `区域` order by `流量总量` desc",
 		output: "SELECT dictGet(deepflow.region_map, 'name', (toUInt64(region_id_0))) AS `区域`, SUM(byte_tx+byte_rx) AS `流量总量` FROM flow_log.l4_flow_log PREWHERE 1 = 1 AND region_id_0!=0 GROUP BY `区域` ORDER BY `流量总量` desc",
 	}, {
-		input:  "select byte as '123' from l4_flow_log where 1=1 group by '123' order by '123' limit 1 ",
+		input:  "select byte as `123` from l4_flow_log where 1=1 group by `123` order by `123` limit 1 ",
 		output: "SELECT byte_tx+byte_rx AS `123` FROM flow_log.l4_flow_log PREWHERE 1 = 1 GROUP BY `123` ORDER BY `123` asc LIMIT 1",
 	}, {
 		input:  "select byte from l4_flow_log where ip>=('1.1.1.1/24','2.2.2.2') and ip<='::/24'",
 		output: "SELECT byte_tx+byte_rx AS byte FROM flow_log.l4_flow_log PREWHERE (((if(is_ipv4=1, hex(ip4), hex(ip6)) >= hex(toIPv4('1.1.1.255'))) OR (if(is_ipv4=1, hex(ip4), hex(ip6)) >= hex(toIPv4('2.2.2.2'))))) AND (((if(is_ipv4=1, hex(ip4), hex(ip6)) <= hex(toIPv6('::')))))",
 	}, {
-		input:  "select 'label.statefulset.kubernetes.io/pod-name_0' from l4_flow_log where 'label.statefulset.kubernetes.io/pod-name_0'='opensource-loki-0' group by 'label.statefulset.kubernetes.io/pod-name_0'",
+		input:  "select `label.statefulset.kubernetes.io/pod-name_0` from l4_flow_log where `label.statefulset.kubernetes.io/pod-name_0`='opensource-loki-0' group by `label.statefulset.kubernetes.io/pod-name_0`",
 		output: "SELECT dictGet(deepflow.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.statefulset.kubernetes.io/pod-name_0` FROM flow_log.l4_flow_log PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') GROUP BY `label.statefulset.kubernetes.io/pod-name_0`",
 	}, {
-		input:  "select 'label.statefulset.kubernetes.io/pod-name_0' as 'label.abc' from l4_flow_log where 'label.abc'='opensource-loki-0' group by 'label.abc'",
-		output: "SELECT dictGet(deepflow.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.abc` FROM flow_log.l4_flow_log PREWHERE toUInt64(pod_id) IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE value = 'opensource-loki-0' and key='abc') GROUP BY `label.abc`",
+		input:  "select `label.statefulset.kubernetes.io/pod-name_0` as `label.abc` from l4_flow_log where `label.abc`='opensource-loki-0' group by `label.abc`",
+		output: "SELECT dictGet(deepflow.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.abc` FROM flow_log.l4_flow_log PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') GROUP BY `label.abc`",
 	},
 	}
 )

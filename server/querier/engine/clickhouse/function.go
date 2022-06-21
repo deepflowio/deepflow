@@ -58,6 +58,7 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 func GetAggFunc(name string, args []string, alias string, db string, table string) (Statement, int, error) {
 	var levelFlag int
 	field := args[0]
+	field = strings.Trim(field, "`")
 	metricStruct, ok := metrics.GetMetrics(field, db, table)
 	if !ok {
 		return nil, 0, nil
