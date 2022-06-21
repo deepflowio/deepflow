@@ -548,14 +548,21 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		}
 		return &view.Nested{Expr: expr}, nil
 	case *sqlparser.ComparisonExpr:
+		var comparExpr sqlparser.Expr
 		switch expr := node.Left.(type) {
+		case *sqlparser.ParenExpr: // 括号
+			comparExpr = expr.Expr
+		default:
+			comparExpr = expr
+		}
+		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)
 			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)
 		case *sqlparser.FuncExpr, *sqlparser.BinaryExpr:
-			function, err := e.parseSelectBinaryExpr(expr)
+			function, err := e.parseSelectBinaryExpr(comparExpr)
 			if err != nil {
 				return nil, err
 			}
