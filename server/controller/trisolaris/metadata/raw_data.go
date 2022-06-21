@@ -23,7 +23,7 @@ type TypeIDData struct {
 	PodGroupID     int
 	PodClusterID   int
 	PodNodeID      int
-	PodNamesapceID int
+	PodNamespaceID int
 	Type           int
 }
 
@@ -446,6 +446,7 @@ func (r *PlatformRawData) ConvertDBPod(dbDataCache *DBDataCache) {
 			PodGroupID:     pod.PodGroupID,
 			PodClusterID:   pod.PodClusterID,
 			PodNodeID:      pod.PodNodeID,
+			PodNamespaceID: pod.PodNamespaceID,
 			PodID:          pod.ID,
 			Type:           VIF_DEVICE_TYPE_POD,
 		}
@@ -663,6 +664,8 @@ func (r *PlatformRawData) ConvertDBPodService(dbDataCache *DBDataCache) {
 			LaunchServerID: 0,
 			VPCID:          ps.VPCID,
 			AZ:             ps.AZ,
+			PodClusterID:   ps.PodClusterID,
+			PodNamespaceID: ps.PodNamespaceID,
 			Type:           VIF_DEVICE_TYPE_POD_SERVICE,
 		}
 	}
@@ -1058,7 +1061,7 @@ func (r *PlatformRawData) vInterfaceToProto(
 		RegionId:       proto.Uint32(uint32(regionID)),
 		AzId:           proto.Uint32(uint32(azID)),
 		PodGroupId:     proto.Uint32(uint32(device.PodGroupID)),
-		PodNsId:        proto.Uint32(uint32(device.PodNamesapceID)),
+		PodNsId:        proto.Uint32(uint32(device.PodNamespaceID)),
 		PodClusterId:   proto.Uint32(uint32(device.PodClusterID)),
 		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
 		PodId:          proto.Uint32(uint32(device.PodID)),
