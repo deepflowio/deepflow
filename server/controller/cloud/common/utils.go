@@ -215,14 +215,38 @@ func AggregateCIDR(ips []netaddr.IPPrefix, maxMask int) (cirdsString []string) {
 	return
 }
 
+func IsIPInCIDR(ip, cidr string) bool {
+	if strings.Contains(cidr, "/") {
+		_, nCIDR, err := net.ParseCIDR(cidr)
+		if err != nil {
+			log.Errorf("parse cidr failed: %v", err)
+			return false
+		}
+		return nCIDR.Contains(net.ParseIP(ip))
+	} else {
+		if ip == cidr {
+			return true
+		}
+		return false
+	}
+}
+
 // 针对各私有云平台，每个区域生成一个基础VPC和子网
 // 宿主机及管理节点的接口和IP属于基础VPC和子网
+func GetBasicVPCLcuuid(uuidGenerate, regionLcuuid string) string {
+	return common.GenerateUUID(uuidGenerate + regionLcuuid)
+}
+
+func GetBasicNetworkLcuuid(vpcLcuuid string) string {
+	return common.GenerateUUID(vpcLcuuid)
+}
+
 func GetBasicVPCAndNetworks(regions []model.Region, domainName, uuidGenerate string) ([]model.VPC, []model.Network) {
 	var retVPCs []model.VPC
 	var retNetworks []model.Network
 
 	for _, region := range regions {
-		vpcLcuuid := common.GenerateUUID(uuidGenerate + region.Lcuuid)
+		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, region.Lcuuid)
 		vpcName := domainName + fmt.Sprintf("%s_基础VPC_%s", domainName, region.Name)
 		retVPCs = append(retVPCs, model.VPC{
 			Lcuuid:       vpcLcuuid,
@@ -230,7 +254,7 @@ func GetBasicVPCAndNetworks(regions []model.Region, domainName, uuidGenerate str
 			RegionLcuuid: region.Lcuuid,
 		})
 		retNetworks = append(retNetworks, model.Network{
-			Lcuuid:         common.GenerateUUID(vpcLcuuid),
+			Lcuuid:         GetBasicNetworkLcuuid(vpcLcuuid),
 			Name:           vpcName + "子网",
 			SegmentationID: 1,
 			NetType:        common.NETWORK_TYPE_LAN,
@@ -243,7 +267,7 @@ func GetBasicVPCAndNetworks(regions []model.Region, domainName, uuidGenerate str
 }
 
 // 根据采集器上报的接口信息，生成宿主机的接口和IP信息
-func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex string) (
+func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex string, excludeIPs []string) (
 	[]model.Subnet, []model.VInterface, []model.IP, map[string][]model.Subnet, error,
 ) {
 	var retSubnets []model.Subnet
@@ -290,9 +314,8 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 		if !ok {
 			continue
 		}
-		// TODO：增加返回新建的VPC及Network
-		vpcLcuuid := common.GenerateUUID(uuidGenerate + host.RegionLcuuid)
-		networkLcuuid := common.GenerateUUID(vpcLcuuid)
+		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, host.RegionLcuuid)
+		networkLcuuid := GetBasicNetworkLcuuid(vpcLcuuid)
 		subnets, ok := vpcLcuuidToSubnets[vpcLcuuid]
 		if !ok {
 			subnets = []model.Subnet{}
@@ -301,7 +324,6 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 		// 遍历采集器上报的宿主机接口列表
 		// 额外对接路由接口为空 或者 不匹配额外对接路由接口时，跳过该接口
 		includeHostIP := false
-		// TODO: 增加excludeIPs的判断
 		for _, vinterface := range vinterfaces {
 			vinterfaceName := vinterface.Get("NAME").MustString()
 			if reg == nil || reg.MatchString(vinterfaceName) {
@@ -326,6 +348,17 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 				if len(ipMasks) > 1 {
 					ipAddr, _ = netaddr.ParseIP(ipMasks[0])
 					ipMask = ipMasks[1]
+				}
+				// 判断是否在excludeIPs；如果是，则跳过
+				IsExcludeIP := false
+				for _, excludeIP := range excludeIPs {
+					if IsIPInCIDR(ipMasks[0], excludeIP) {
+						IsExcludeIP = true
+						break
+					}
+				}
+				if IsExcludeIP {
+					continue
 				}
 
 				// 判断IP + 掩码信息是否已经在当前网段中；如果不在，则生成新的网段信息
