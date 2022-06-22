@@ -304,14 +304,14 @@ func (v *VinterfacesStorage) storeToDatabase() {
 	defer v.mutex.Unlock()
 
 	// 写入新数据前先清空表
-	mysql.Db.Exec("DELETE FROM genesis_vm;")
-	mysql.Db.Exec("DELETE FROM genesis_ip;")
-	mysql.Db.Exec("DELETE FROM genesis_vpc;")
-	mysql.Db.Exec("DELETE FROM genesis_host;")
-	mysql.Db.Exec("DELETE FROM genesis_port;")
-	mysql.Db.Exec("DELETE FROM genesis_lldp;")
-	mysql.Db.Exec("DELETE FROM genesis_network;")
-	mysql.Db.Exec("DELETE FROM genesis_vinterface;")
+	mysql.Db.Exec("DELETE FROM go_genesis_vm;")
+	mysql.Db.Exec("DELETE FROM go_genesis_ip;")
+	mysql.Db.Exec("DELETE FROM go_genesis_vpc;")
+	mysql.Db.Exec("DELETE FROM go_genesis_host;")
+	mysql.Db.Exec("DELETE FROM go_genesis_port;")
+	mysql.Db.Exec("DELETE FROM go_genesis_lldp;")
+	mysql.Db.Exec("DELETE FROM go_genesis_network;")
+	mysql.Db.Exec("DELETE FROM go_genesis_vinterface;")
 
 	vms := v.platformInfo.VMs.Fetch()
 	if len(vms) > 0 {
