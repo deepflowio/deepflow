@@ -849,7 +849,7 @@ func (d *DataLinkLayer) Fill(f *pb.Flow) {
 	d.MAC0 = f.FlowKey.MACSrc
 	d.MAC1 = f.FlowKey.MACDst
 	d.EthType = uint16(f.EthType)
-	// d.VLAN = f.VLAN
+	d.VLAN = uint16(f.VLAN)
 }
 
 func cloneIP(src net.IP) net.IP {

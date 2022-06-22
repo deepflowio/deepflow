@@ -15,8 +15,8 @@ require (
 	github.com/prometheus/common v0.34.0
 	github.com/prometheus/prometheus v0.36.1
 	github.com/spf13/cobra v0.0.5
-	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220620050103-0a869e747ec8
-	gitlab.yunshan.net/yunshan/message v0.0.0-20220613075624-fbd11677d9b5
+	gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220622103001-54719ad55267
+	gitlab.yunshan.net/yunshan/message v0.0.0-20220622100843-59f60181165f
 	go.opentelemetry.io/proto/otlp v0.16.0
 	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2
 	google.golang.org/grpc v1.46.2

@@ -881,10 +881,10 @@ github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yuin/goldmark v1.4.1/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
-gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220620050103-0a869e747ec8 h1:oZ2EVvKyF7grMKreue82by/iYcQTwxuvoUqUW45C6Nk=
-gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220620050103-0a869e747ec8/go.mod h1:IkhnixIQgmmJAHlSYeYThVfp4VSkaTDRvG1+7ax57fg=
-gitlab.yunshan.net/yunshan/message v0.0.0-20220613075624-fbd11677d9b5 h1:taynzGOO2ubXtgAODrtgVIxH/9rqIxrbr4sKYUWa7N0=
-gitlab.yunshan.net/yunshan/message v0.0.0-20220613075624-fbd11677d9b5/go.mod h1:ewhcn9CoC6hetqkwq2oOZL8KmzRPQ4hUokN0YTVBk8M=
+gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220622103001-54719ad55267 h1:HFgyU+m7Fzwk80ncb9CPIqAE6KNV1q7Xx9QPTqBM4vc=
+gitlab.yunshan.net/yunshan/droplet-libs v0.0.0-20220622103001-54719ad55267/go.mod h1:3/DHkjrpFkgMKXztAQphYGihNOGMAG6EyFbpVEZ2ZkI=
+gitlab.yunshan.net/yunshan/message v0.0.0-20220622100843-59f60181165f h1:qmjwjb2qzqRLWut51CTXZDTmqd/UagXEi8T04wR3aMk=
+gitlab.yunshan.net/yunshan/message v0.0.0-20220622100843-59f60181165f/go.mod h1:ewhcn9CoC6hetqkwq2oOZL8KmzRPQ4hUokN0YTVBk8M=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
 go.mongodb.org/mongo-driver v1.7.3/go.mod h1:NqaYOwnXWr5Pm7AOpO5QFxKJ503nbMse/R79oO62zWg=
