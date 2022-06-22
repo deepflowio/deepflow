@@ -10,7 +10,7 @@ controller:
   mysql:
     database: deepflow
     user-name: root
-    user-password: ******
+    user-password: metaflow
     host: mysql
     port: 30130
     timeout: 30
@@ -18,7 +18,7 @@ controller:
   # redis相关配置
   redis:
     dimension_resource_database: 2
-    password: ******
+    password: metaflow
     host: redis
     port: 6379
     timeout: 30

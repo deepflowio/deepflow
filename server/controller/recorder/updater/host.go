@@ -41,7 +41,7 @@ func (h *Host) generateDBItemToAdd(cloudItem *cloudmodel.Host) (*mysql.Host, boo
 		MemTotal:   cloudItem.MemTotal,
 		ExtraInfo:  cloudItem.ExtraInfo,
 		UserName:   "root",
-		UserPasswd: "******",
+		UserPasswd: "metaflow",
 		State:      common.HOST_STATE_COMPLETE,
 		AZ:         cloudItem.AZLcuuid,
 		Region:     cloudItem.RegionLcuuid,
