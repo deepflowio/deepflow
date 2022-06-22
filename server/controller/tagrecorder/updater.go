@@ -1,0 +1,94 @@
+package tagrecorder
+
+import (
+	"server/controller/db/mysql"
+)
+
+type ChResourceUpdater interface {
+	// 刷新ch资源入口
+	// 基于资源基础数据，构建新的ch数据
+	// 直接查询ch表，构建旧的ch数据
+	// 遍历新的ch数据，若key不在旧的ch数据中，则新增；否则检查是否有更新，若有更新，则更新
+	// 遍历旧的ch数据，若key不在新的ch数据中，则删除
+	Refresh()
+}
+
+type DataGenerator[MT MySQLChModel, KT ChModelKey] interface {
+	// 根据db中的基础资源数据，构建最新的ch资源数据
+	generateNewData() (map[KT]MT, bool)
+	// 构建ch资源的结构体key
+	generateKey(MT) KT
+	// 根据新旧数据对比，构建需要更新的ch资源数据
+	generateUpdateInfo(MT, MT) (map[string]interface{}, bool)
+}
+
+type UpdaterBase[MT MySQLChModel, KT ChModelKey] struct {
+	resourceTypeName string
+	dataGenerator    DataGenerator[MT, KT]
+}
+
+func (b *UpdaterBase[MT, KT]) Refresh() {
+	newKeyToDBItem, newOK := b.dataGenerator.generateNewData()
+	oldKeyToDBItem, oldOK := b.generateOldData()
+	if newOK && oldOK {
+		for key, newDBItem := range newKeyToDBItem {
+			oldDBItem, exists := oldKeyToDBItem[key]
+			if !exists {
+				b.add(newDBItem)
+			} else {
+				updateInfo, ok := b.dataGenerator.generateUpdateInfo(oldDBItem, newDBItem)
+				if ok {
+					b.update(oldDBItem, updateInfo)
+				}
+			}
+		}
+		for key, oldDBItem := range oldKeyToDBItem {
+			_, exists := newKeyToDBItem[key]
+			if !exists {
+				b.delete(oldDBItem)
+			}
+		}
+	}
+}
+
+func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
+	var items []MT
+	err := mysql.Db.Find(&items).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
+		return nil, false
+	}
+	idToItem := make(map[KT]MT)
+	for _, item := range items {
+		idToItem[b.dataGenerator.generateKey(item)] = item
+	}
+	return idToItem, true
+}
+
+// TODO 是否需要批量处理
+func (b *UpdaterBase[MT, KT]) add(dbItem MT) {
+	err := mysql.Db.Create(&dbItem).Error
+	if err != nil {
+		log.Errorf("add %s (%v) failed: %s", b.resourceTypeName, dbItem, err)
+		return
+	}
+	log.Infof("add %s (%v) success", b.resourceTypeName, dbItem)
+}
+
+func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}) {
+	err := mysql.Db.Model(&oldDBItem).Updates(updateInfo).Error
+	if err != nil {
+		log.Errorf("update %s (%v) failed: %s", b.resourceTypeName, oldDBItem, err)
+		return
+	}
+	log.Infof("update %s (%v, %v) success", b.resourceTypeName, oldDBItem, updateInfo)
+}
+
+func (b *UpdaterBase[MT, KT]) delete(dbItem MT) {
+	err := mysql.Db.Delete(&dbItem).Error
+	if err != nil {
+		log.Errorf("delete %s failed: %s", b.resourceTypeName, err)
+		return
+	}
+	log.Infof("delete %s %v success", b.resourceTypeName, dbItem)
+}

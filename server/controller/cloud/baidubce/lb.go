@@ -1,0 +1,216 @@
+package baidubce
+
+import (
+	"github.com/baidubce/bce-sdk-go/services/appblb"
+	"github.com/baidubce/bce-sdk-go/services/blb"
+
+	"server/controller/cloud/model"
+	"server/controller/common"
+)
+
+func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
+	[]model.LB, []model.VInterface, []model.IP, error,
+) {
+	var retLBs []model.LB
+	var retVInterfaces []model.VInterface
+	var retIPs []model.IP
+
+	log.Debug("get lbs starting")
+
+	// 普通型负载均衡器
+	tmpLBs, tmpVInterfaces, tmpIPs, err := b.getBLoadBalances(region, vpcIdToLcuuid, networkIdToLcuuid)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	retLBs = append(retLBs, tmpLBs...)
+	retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
+	retIPs = append(retIPs, tmpIPs...)
+
+	// 应用型负载均衡器
+	tmpLBs, tmpVInterfaces, tmpIPs, err = b.getAppBLoadBalances(region, vpcIdToLcuuid, networkIdToLcuuid)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	retLBs = append(retLBs, tmpLBs...)
+	retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
+	retIPs = append(retIPs, tmpIPs...)
+
+	log.Debug("get lbs complete")
+	return retLBs, retVInterfaces, retIPs, nil
+}
+func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
+	[]model.LB, []model.VInterface, []model.IP, error,
+) {
+	var retLBs []model.LB
+	var retVInterfaces []model.VInterface
+	var retIPs []model.IP
+
+	log.Debug("get blbs starting")
+
+	blbClient, _ := blb.NewClient(b.secretID, b.secretKey, "blb."+b.endpoint)
+	marker := ""
+	args := &blb.DescribeLoadBalancersArgs{}
+	results := make([]*blb.DescribeLoadBalancersResult, 0)
+	for {
+		args.Marker = marker
+		result, err := blbClient.DescribeLoadBalancers(args)
+		if err != nil {
+			log.Error(err)
+			return nil, nil, nil, err
+		}
+		results = append(results, result)
+		if !result.IsTruncated {
+			break
+		}
+		marker = result.NextMarker
+	}
+
+	for _, r := range results {
+		for _, lb := range r.BlbList {
+			vpcLcuuid, ok := vpcIdToLcuuid[lb.VpcId]
+			if !ok {
+				log.Debugf("lb (%s) vpc (%s) not found", lb.BlbId, lb.VpcId)
+				continue
+			}
+			networkLcuuid, ok := networkIdToLcuuid[lb.SubnetId]
+			if !ok {
+				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId)
+				continue
+			}
+			lbLcuuid := common.GenerateUUID(lb.BlbId)
+			retLB := model.LB{
+				Lcuuid:       lbLcuuid,
+				Name:         lb.Name,
+				Label:        lb.BlbId,
+				Model:        common.LB_MODEL_INTERNAL,
+				VPCLcuuid:    vpcLcuuid,
+				RegionLcuuid: region.Lcuuid,
+			}
+			retLBs = append(retLBs, retLB)
+			b.regionLcuuidToResourceNum[retLB.RegionLcuuid]++
+
+			tmpVInterfaces, tmpIPs := b.getLBVInterfaceAndIPs(
+				region, vpcLcuuid, networkLcuuid, lbLcuuid, lb.Address, lb.PublicIp,
+			)
+			retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
+			retIPs = append(retIPs, tmpIPs...)
+		}
+	}
+	log.Debug("get blbs complete")
+	return retLBs, retVInterfaces, retIPs, nil
+}
+
+func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
+	[]model.LB, []model.VInterface, []model.IP, error,
+) {
+	var retLBs []model.LB
+	var retVInterfaces []model.VInterface
+	var retIPs []model.IP
+
+	log.Debug("get app_blbs starting")
+
+	appblbClient, _ := appblb.NewClient(b.secretID, b.secretKey, "blb."+b.endpoint)
+	marker := ""
+	args := &appblb.DescribeLoadBalancersArgs{}
+	results := make([]*appblb.DescribeLoadBalancersResult, 0)
+	for {
+		args.Marker = marker
+		result, err := appblbClient.DescribeLoadBalancers(args)
+		if err != nil {
+			log.Error(err)
+			return nil, nil, nil, err
+		}
+		results = append(results, result)
+		if !result.IsTruncated {
+			break
+		}
+		marker = result.NextMarker
+	}
+
+	for _, r := range results {
+		for _, lb := range r.BlbList {
+			vpcLcuuid, ok := vpcIdToLcuuid[lb.VpcId]
+			if !ok {
+				log.Debugf("lb (%s) vpc (%s) not found", lb.BlbId, lb.VpcId)
+				continue
+			}
+			networkLcuuid, ok := networkIdToLcuuid[lb.SubnetId]
+			if !ok {
+				log.Debugf("lb (%s) network (%s) not found", lb.BlbId, lb.SubnetId)
+				continue
+			}
+			lbLcuuid := common.GenerateUUID(lb.BlbId)
+			retLB := model.LB{
+				Lcuuid:       lbLcuuid,
+				Name:         lb.Name,
+				Label:        lb.BlbId,
+				Model:        common.LB_MODEL_INTERNAL,
+				VPCLcuuid:    vpcLcuuid,
+				RegionLcuuid: region.Lcuuid,
+			}
+			retLBs = append(retLBs, retLB)
+			b.regionLcuuidToResourceNum[retLB.RegionLcuuid]++
+
+			tmpVInterfaces, tmpIPs := b.getLBVInterfaceAndIPs(
+				region, vpcLcuuid, networkLcuuid, lbLcuuid, lb.Address, lb.PublicIp,
+			)
+			retVInterfaces = append(retVInterfaces, tmpVInterfaces...)
+			retIPs = append(retIPs, tmpIPs...)
+		}
+	}
+	log.Debug("get app_blbs complete")
+	return retLBs, retVInterfaces, retIPs, nil
+}
+
+func (b *BaiduBce) getLBVInterfaceAndIPs(
+	region model.Region, vpcLcuuid, networkLcuuid, lbLcuuid, ip, publicIP string,
+) ([]model.VInterface, []model.IP) {
+
+	var retVInterfaces []model.VInterface
+	var retIPs []model.IP
+
+	// 内网接口+IP
+	if ip != "" {
+		vinterfaceLcuuid := common.GenerateUUID(lbLcuuid + ip)
+		retVInterfaces = append(retVInterfaces, model.VInterface{
+			Lcuuid:        vinterfaceLcuuid,
+			Type:          common.VIF_TYPE_LAN,
+			Mac:           common.VIF_DEFAULT_MAC,
+			DeviceLcuuid:  lbLcuuid,
+			DeviceType:    common.VIF_DEVICE_TYPE_LB,
+			NetworkLcuuid: networkLcuuid,
+			VPCLcuuid:     vpcLcuuid,
+			RegionLcuuid:  region.Lcuuid,
+		})
+		retIPs = append(retIPs, model.IP{
+			Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + ip),
+			VInterfaceLcuuid: vinterfaceLcuuid,
+			IP:               ip,
+			SubnetLcuuid:     common.GenerateUUID(networkLcuuid),
+			RegionLcuuid:     region.Lcuuid,
+		})
+	}
+
+	// 公网接口+IP
+	if publicIP != "" {
+		vinterfaceLcuuid := common.GenerateUUID(lbLcuuid + publicIP)
+		retVInterfaces = append(retVInterfaces, model.VInterface{
+			Lcuuid:        vinterfaceLcuuid,
+			Type:          common.VIF_TYPE_WAN,
+			Mac:           common.VIF_DEFAULT_MAC,
+			DeviceLcuuid:  lbLcuuid,
+			DeviceType:    common.VIF_DEVICE_TYPE_LB,
+			NetworkLcuuid: common.NETWORK_ISP_LCUUID,
+			VPCLcuuid:     vpcLcuuid,
+			RegionLcuuid:  region.Lcuuid,
+		})
+		retIPs = append(retIPs, model.IP{
+			Lcuuid:           common.GenerateUUID(vinterfaceLcuuid + publicIP),
+			VInterfaceLcuuid: vinterfaceLcuuid,
+			IP:               publicIP,
+			SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
+			RegionLcuuid:     region.Lcuuid,
+		})
+	}
+	return retVInterfaces, retIPs
+}

@@ -1,0 +1,151 @@
+controller:
+  # logfile path
+  log-file: /var/log/metaflow/server.log
+  # loglevel: "debug/info/warn/error"
+  log-level: info
+  # controller http listenport
+  listen-port: 20417
+
+  # mysql相关配置
+  mysql:
+    database: deepflow
+    user-name: root
+    user-password: metaflow
+    host: mysql
+    port: 30130
+    timeout: 30
+
+  # redis相关配置
+  redis:
+    dimension_resource_database: 2
+    password: metaflow
+    host: redis
+    port: 6379
+    timeout: 30
+
+  # clickhouse相关配置
+  clickhouse:
+    database: deepflow
+    user-name: default
+    port: 9000
+    # user-password:
+
+  # roze
+  roze:
+    port: 20106
+    timeout: 60
+
+  # 规格相关定义
+  spec:
+    vtap_group_max: 1000
+    vtap_max_per_group: 10000
+    az_max_per_server: 10
+    data_source_max: 10
+    data_source_retention_time_max: 1000
+
+  # monitor module config
+  monitor:
+    # 控制器和数据节点检查检查时间间隔，单位：秒
+    health_check_interval: 60
+    # 健康检查异常/控制器切换处理channel的长度
+    health_check_handle_channel_len: 1000
+    # License检查的时间间隔，单位: 秒
+    license_check_interval: 60
+    # warrant
+    warrant:
+      host: warrant
+      port: 20413
+      timeout: 30
+
+  # manager module config
+  manager:
+    # 云平台增加/删除/配置变化检测的时间间隔，单位：秒
+    cloud_config_check_interval: 60
+    task:
+      # recorder更新数据库的时间间隔，单位：秒
+      resource_recorder_interval: 60
+      cloud:
+        # Kubernetes数据获取的时间间隔，单位：秒
+        kubernetes_gather_interval: 60
+        # 阿里公有云API获取区域列表时，需要指定一个区域
+        aliyun_region_name: cn-beijing
+      recorder:
+        # recorder模块缓存自愈刷新时间间隔，单位：分钟
+        cache_refresh_interval: 3600
+        # 软删除资源数据清理时间间隔，单位：小时
+        # 此值应小于 soft_deleted_resource_expire_interval 
+        deleted_resource_clean_interval: 24
+        # 软删除资源数据保留时间，单位：小时，默认：7 * 24
+        deleted_resource_retention_time: 168
+
+  trisolaris:
+    tsdb_ip:
+    chrony:
+      host: 127.0.0.1
+      port: 123
+      timeout: 1
+
+    # 默认使用grpc进行trident升级
+    # 若需使用HTTP需修改配置如下所示
+    # self_update_url: http://x.x.x.x:23333/yum/trident
+    self-update-url: "grpc"
+    listen-port: 20014
+    trident-port: 20035
+    max-escape-seconds: 3600
+    trident-revision:
+    trident-type-for-unkonw-vtap: 0
+
+    # trident path
+    trident-linux-path: "/usr/local/deepflow/yum/trident"
+    trident-windows-path: "/usr/local/deepflow/yum/trident.exe"
+
+    platform-vips:
+    #  - 55.11.135.18
+
+    # master/slave 区域标识, 默认为主区域，部署时会自动修改
+    node-type: master
+
+    # grpc max message lenth default 100M
+    grpc-max-message-length: 104857600
+
+    # 区域服务域名前缀
+    region-domain-prefix: ""
+
+    # 采集器是否自动注册
+    vtap-auto-register: True
+
+  genesis:
+    # 平台数据老化时间，单位秒
+    aging_time: 86400
+    # 采集器接口数据老化时间，单位：秒
+    vinterface_aging_time: 300
+    # 内网IP网段范围配置，配置的IP所在网络会被作为内网进行学习
+    local_ip_ranges:
+    # 排除IP范围
+    exclude_ip_ranges:
+    # 无子网IP的最大掩码长度
+    ipv4_cidr_max_mask: 24
+    ipv6_cidr_max_mask: 64
+
+    # 采集器上报数据处理的队列长度
+    queue_length: 1000
+
+    # genesis的grpc通信端口，后续会删除
+    grpc_server_host: genesis
+    grpc_server_port: 20036
+
+querier:
+  # logfile path
+  log-file: /var/log/metaflow/server.log
+  # loglevel: "debug/info/warn/error"
+  log-level: info
+  # querier http listenport
+  listen-port: 20416
+
+  # clickhouse相关配置
+  clickhouse:
+    database: deepflow
+    user: default
+    host: clickhouse
+    port: 9000
+    timeout: 60
