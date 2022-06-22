@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "metaflow.fullname" . }}-server
+  labels:
+    {{- include "metaflow.labels" . | nindent 4 }}
+{{- if .Values.service.server.annotations }}
+  annotations:
+{{ toYaml .Values.service.server.annotations | indent 4 }}
+{{- end }}
+spec:
+{{- if .Values.service.server.clusterIP }}
+  clusterIP: {{ .Values.service.server.clusterIP }}
+{{- end }}
+{{- if .Values.service.server.externalIPs }}
+  externalIPs:
+{{ toYaml .Values.service.server.externalIPs | indent 4 }}
+{{- end }}
+{{- if .Values.service.server.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.service.server.loadBalancerIP }}
+{{- end }}
+{{- if .Values.service.server.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+  {{- range $cidr := .Values.service.server.loadBalancerSourceRanges }}
+    - {{ $cidr }}
+  {{- end }}
+{{- end }}
+{{- if ne .Values.service.server.type "ClusterIP" }}
+  externalTrafficPolicy: {{ .Values.service.server.externalTrafficPolicy }}
+{{- end }}
+  ports:
+  {{- $serviceType := .Values.service.server.type -}}
+  {{- range $index, $item := $.Values.service.server.ports }}
+  - name: {{ $item.name }}
+    port: {{ $item.port }}
+    targetPort: {{ $item.targetPort }}
+    {{- if eq $serviceType "NodePort" }}
+    nodePort: {{ $item.nodePort | default "" }}
+    {{- end }}
+    protocol: {{ $item.protocol }}
+    {{- end }}
+{{- if .Values.service.server.additionalPorts }}
+{{ toYaml .Values.service.server.additionalPorts | indent 2 }}
+{{- end }}
+  selector:
+    {{- include "metaflow.selectorLabels" . | nindent 4 }}
+  type: "{{ .Values.service.server.type }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "metaflow.fullname" . }}-querier
+  labels:
+    {{- include "metaflow.labels" . | nindent 4 }}
+{{- if .Values.service.querier.annotations }}
+  annotations:
+{{ toYaml .Values.service.querier.annotations | indent 4 }}
+{{- end }}
+spec:
+{{- if .Values.service.querier.clusterIP }}
+  clusterIP: {{ .Values.service.querier.clusterIP }}
+{{- end }}
+{{- if .Values.service.querier.externalIPs }}
+  externalIPs:
+{{ toYaml .Values.service.querier.externalIPs | indent 4 }}
+{{- end }}
+{{- if .Values.service.querier.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.service.querier.loadBalancerIP }}
+{{- end }}
+{{- if .Values.service.querier.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+  {{- range $cidr := .Values.service.querier.loadBalancerSourceRanges }}
+    - {{ $cidr }}
+  {{- end }}
+{{- end }}
+{{- if ne .Values.service.querier.type "ClusterIP" }}
+  externalTrafficPolicy: {{ .Values.service.querier.externalTrafficPolicy }}
+{{- end }}
+  ports:
+  {{- $serviceType := .Values.service.querier.type -}}
+  {{- range $index, $item := $.Values.service.querier.ports }}
+  - name: {{ $item.name }}
+    port: {{ $item.port }}
+    targetPort: {{ $item.targetPort }}
+    {{- if eq $serviceType "NodePort" }}
+    nodePort: {{ $item.nodePort | default "" }}
+    {{- end }}
+    protocol: {{ $item.protocol }}
+    {{- end }}
+{{- if .Values.service.querier.additionalPorts }}
+{{ toYaml .Values.service.querier.additionalPorts | indent 2 }}
+{{- end }}
+  selector:
+    {{- include "metaflow.selectorLabels" . | nindent 4 }}
+  type: "{{ .Values.service.querier.type }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "metaflow.fullname" . }}-server-headless
+  labels:
+    {{- include "metaflow.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+  - name: tcp
+    port: 20416
+    targetPort: 20416
+    protocol: TCP
+  selector:
+    {{- include "metaflow.selectorLabels" . | nindent 4 }}
+  type: ClusterIP
