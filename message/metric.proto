@@ -1,0 +1,172 @@
+syntax = "proto3";
+
+package metric;
+
+// rust 不支持以下import和option，暂时删除，go客户端使用时需要加回
+// import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+// option (gogoproto.unmarshaler_all) = true;
+// option (gogoproto.marshaler_all) = true;
+// option (gogoproto.sizer_all) = true;
+
+option go_package = "pb";
+
+message MiniField {
+    bytes ip = 1;
+    bytes ip1 = 2;
+    uint32 global_thread_id = 3;
+    uint32 is_ipv6 = 4;
+    int32 l3_epc_id = 5;
+    int32 l3_epc_id1 = 6;
+
+    uint64 mac = 7;
+    uint64 mac1 = 8;
+
+    uint32 direction = 9;
+    uint32 tap_side = 10;
+    uint32 protocol = 11;
+    uint32 acl_gid = 12;
+
+    uint32 server_port = 13;
+    uint32 vtap_id = 14;
+    uint64 tap_port = 15;
+    uint32 tap_type = 16;
+    uint32 l7_protocol = 17;
+
+    uint32 tag_type = 18;
+    uint32 tag_value = 19;
+}
+
+message MiniTag {
+    MiniField field = 1;
+    uint64    code = 2;
+}
+
+message Meter {
+    uint32     meter_id = 1;
+    FlowMeter  flow = 2;
+    UsageMeter usage = 3;
+    AppMeter   app = 4;
+}
+
+message Document {
+    uint32  timestamp = 1;
+    MiniTag tag = 2;
+    Meter   meter = 3;
+    uint32  flags = 4;
+}
+
+// flow meter
+message FlowMeter {
+    Traffic     traffic = 1;
+    Latency     latency= 2;
+    Performance performance = 3;
+    Anomaly     anomaly = 4;
+    FlowLoad    flow_load = 5;
+}
+
+message Traffic {
+    uint64 packet_tx = 1;
+    uint64 packet_rx = 2;
+    uint64 byte_tx = 3;
+    uint64 byte_rx = 4;
+    uint64 l3_byte_tx = 5;
+    uint64 l3_byte_rx = 6;
+    uint64 l4_byte_tx = 7;
+    uint64 l4_byte_rx = 8;
+    uint64 new_flow = 9;
+    uint64 closed_flow = 10;
+    uint32 l7_request = 11;
+    uint32 l7_response = 12;
+}
+
+message Latency {
+    uint32 rtt_max = 1;
+    uint32 rtt_client_max = 2;
+    uint32 rtt_server_max =3;
+    uint32 srt_max = 4;
+    uint32 art_max = 5;
+    uint32 rrt_max = 6;
+
+    uint64 rtt_sum = 7;
+    uint64 rtt_client_sum = 8;
+    uint64 rtt_server_sum = 9;
+    uint64 srt_sum = 10;
+    uint64 art_sum = 11;
+    uint64 rrt_sum = 12;
+
+    uint32 rtt_count = 13;
+    uint32 rtt_client_count = 14;
+    uint32 rtt_server_count = 15;
+    uint32 srt_count = 16;
+    uint32 art_count = 17;
+    uint32 rrt_count = 18;
+}
+
+message Performance {
+    uint64 retrans_tx = 1;
+    uint64 retrans_rx = 2;
+    uint64 zero_win_tx = 3;
+    uint64 zero_win_rx = 4;
+}
+
+message Anomaly {
+    uint64 client_rst_flow = 1;
+    uint64 server_rst_flow = 2;
+    uint64 client_syn_repeat = 3;
+    uint64 server_synack_repeat = 4;
+    uint64 client_half_close_flow = 5;
+    uint64 server_half_close_flow = 6;
+
+    uint64 client_source_port_reuse = 7;
+    uint64 client_establish_reset = 8;
+    uint64 server_reset = 9;
+    uint64 server_queue_lack = 10;
+    uint64 server_establish_reset = 11;
+    uint64 tcp_timeout = 12;
+
+    uint32 l7_client_error = 13;
+    uint32 l7_server_error = 14;
+    uint32 l7_timeout = 15;
+}
+
+message FlowLoad {
+    uint64 load = 1;
+}
+
+// usage meter
+message UsageMeter {
+    uint64 packet_tx = 1;
+    uint64 packet_rx = 2;
+    uint64 byte_tx = 3;
+    uint64 byte_rx = 4;
+    uint64 l3_byte_tx = 5;
+    uint64 l3_byte_rx = 6;
+    uint64 l4_byte_tx = 7;
+    uint64 l4_byte_rx = 8;
+}
+
+// app meter
+message AppMeter {
+    AppTraffic traffic = 1;
+    AppLatency latency = 2;
+    AppAnomaly anomaly = 3;
+}
+
+message AppTraffic {
+    uint32 request = 1;
+    uint32 response= 2;
+}
+
+message AppLatency {
+    uint32 rrt_max = 1;
+    uint64 rrt_sum = 2;
+    uint32 rrt_count = 3;
+}
+
+message AppAnomaly {
+    uint32 client_error = 1;
+    uint32 server_error = 2;
+    uint32 timeout = 3;
+}
+

@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+package voucher;
+option go_package = "voucher";
+
+message Voucher {
+    optional string customer = 1; // 客户名称
+    optional string contract_no = 2; //合同编号
+    optional uint32 crm_id = 3; //CRM ID
+    optional string product_version = 4; // 版本号 V5
+    repeated string controller_hostname = 5; // 控制器主机名
+    repeated string controller_public_ip = 6; // 控制器IP
+     
+    optional uint32 recharge_amount = 7; // 充值金额
+    optional string activation_time  = 8; // 生效日期 "2019-09-11"
+    optional uint32 expiration_days = 9; // 有效时间
+    optional float tm_cloud_server_price = 10; // 流量监控-云服务器单价
+    optional float tm_container_node_price = 11; // 流量监控-容器节点单价
+}
+

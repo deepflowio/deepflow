@@ -1,0 +1,50 @@
+syntax = "proto2";
+option go_package = "alarm";
+
+package Alarm;
+
+enum DeviceType {
+    VM = 1;
+    THIRD_PARTY = 3;
+    VGATEWAY = 5;
+    HOST = 6;
+    NETWORK = 7;
+    FLOATING_IP = 8;
+    DHCP = 9;
+}
+
+message AlarmInfo {
+    optional uint32 timestamp = 1;
+    optional string type = 2;
+    optional uint32 acl_id = 3;
+    optional uint32 policy_id = 4;
+    optional uint32 server_port = 5;
+    optional uint32 protocol = 6;
+
+    optional int32 l3_epc_id = 7;
+    optional int32 l3_epc_id_0 = 8;
+    optional int32 l3_epc_id_1 = 9;
+
+    optional int32 group_id = 10;
+    optional int32 group_id_0 = 11;
+    optional int32 group_id_1 = 12;
+
+    optional uint32 ip = 13;
+    optional uint32 ip_0 = 14;
+    optional uint32 ip_1 = 15;
+
+    optional uint32 l3_device_id = 16;
+    optional DeviceType l3_device_type = 17;
+    optional uint32 l3_device_id_0 = 18;
+    optional DeviceType l3_device_type_0 = 19;
+    optional uint32 l3_device_id_1 = 20;
+    optional DeviceType l3_device_type_1 = 21;
+
+    optional uint64 sum_bit = 22;
+    optional uint64 max_rx = 23;
+    optional uint64 max_tx = 24;
+    optional uint32 rtt_avg = 25;
+    optional uint64 flow_count = 26;
+
+    optional uint32 tap_type = 27;
+}
