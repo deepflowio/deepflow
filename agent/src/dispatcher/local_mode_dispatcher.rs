@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::str;
 use std::sync::{atomic::Ordering, Arc, Weak};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use log::{debug, info, log_enabled, warn};
 use regex::Regex;
@@ -20,6 +20,7 @@ use crate::{
     flow_generator::FlowMap,
     platform::{GenericPoller, LibvirtXmlExtractor, Poller},
     proto::{common::TridentType, trident::IfMacSource},
+    rpc::get_timestamp,
     utils::{
         bytes::read_u16_be,
         net::{link_list, Link, MacAddr},
@@ -35,7 +36,8 @@ impl LocalModeDispatcher {
     pub(super) fn run(&mut self) {
         let base = &mut self.base;
         info!("Start dispatcher {}", base.id);
-        let mut prev_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let time_diff = base.ntp_diff.load(Ordering::Relaxed);
+        let mut prev_timestamp = get_timestamp(time_diff);
 
         let (mut flow_map, flow_counter) = FlowMap::new(
             base.id as u32,

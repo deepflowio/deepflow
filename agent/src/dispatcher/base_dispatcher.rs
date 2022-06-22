@@ -8,7 +8,7 @@ use std::sync::{
     Arc, Mutex,
 };
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use log::{debug, error, info, warn};
 
@@ -132,7 +132,7 @@ impl BaseDispatcher {
                 // Correct invalid timestamp under some environments. Root cause unclear.
                 // A large timestamp will lead to discarding of following packets, correct
                 // this by setting it to present time
-                let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                let now = get_timestamp(time_diff);
                 if timestamp > now && timestamp - now > Duration::from_secs(60) {
                     timestamp = now;
                 }
