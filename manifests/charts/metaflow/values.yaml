@@ -1,0 +1,465 @@
+# Default values for metaflow-server.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+global:
+  image:
+    ## Dockerhub Image repository address: metaflowys/metaflow-server
+    ## AliyunYun Image repository address: registry.cn-beijing.aliyuncs.com/metaflowys/metaflow-server
+    repository: ghcr.io/metaflowys/metaflow-server
+    pullPolicy: Always
+  hostNetwork: false
+  dnsPolicy: ClusterFirst
+  password:
+    mysql: metaflow
+    redis: metaflow 
+  podManagementPolicy: "OrderedReady"
+  replicas: 1
+
+image:
+  server:
+    repository: "{{ .Values.global.image.repository }}/metaflow-server"
+    tag: latest
+    pullPolicy: "{{ .Values.global.image.pullPolicy }}"
+  elector:
+    repository: "{{ .Values.global.image.repository }}/elector"
+    tag: latest
+    pullPolicy: "{{ .Values.global.image.pullPolicy }}"
+
+replicas: "{{ .Values.global.replicas }}"
+hostNetwork:  "{{ .Values.global.hostNetwork }}"
+dnsPolicy: "{{ .Values.global.dnsPolicy }}"
+podManagementPolicy: "{{ .Values.global.podManagementPolicy }}"
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  server:
+    ## Configuration for Metaflow-server service
+    ##
+    annotations: {}
+    labels: {}
+    clusterIP: ""
+
+    ## Port for Metaflow-server Service to listen on
+    ##
+
+    ports:
+    - name: server
+      port: 20417
+      targetPort: 20417
+      nodePort: 30417
+      protocol: TCP
+    - name: grpc
+      port: 20035
+      targetPort: 20035
+      nodePort: 30035
+      protocol: TCP
+    - name: ssl-grpc
+      port: 20135
+      targetPort: 20135
+      nodePort: 30135
+      protocol: TCP
+
+    ## Additional ports to open for server service
+    additionalPorts: []
+
+    externalIPs: []
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+
+    ## Denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints
+    ## must be Local
+    externalTrafficPolicy: Local
+
+    ## Service type
+    ##
+    type: ClusterIP
+
+  querier:
+    ## Configuration for Metaflow querier service
+    ##
+    annotations: {}
+    labels: {}
+    clusterIP: ""
+
+    ## Port for Metaflow querier service to listen on
+    ##
+    ports:
+    - name: querier
+      port: 20416
+      targetPort: 20416
+      ## Port to expose on each node
+      ## Only used if service.type is 'NodePort'
+      ##
+      nodePort: 30416
+      protocol: TCP
+
+    ## Additional ports to open for Metaflow querier service
+    additionalPorts: []
+
+    externalIPs: []
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+
+    ## Denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints
+    ##
+    externalTrafficPolicy: Cluster
+
+    ## Service type
+    ##
+    type: NodePort
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+tolerations: []
+
+
+podAntiAffinityLabelSelector:
+  - labelSelector:
+    - key: app
+      operator: In
+      values: metaflow
+    - key: component
+      operator: In
+      values: metaflow-server
+    topologyKey: "kubernetes.io/hostname"
+podAntiAffinityTermLabelSelector: []
+  # - labelSelector:
+  #     - key: app
+  #       operator: In
+  #       values: metaflow,metaflowys
+  #   topologyKey: "kubernetes.io/hostname"
+  #   weight: 11
+podAffinityLabelSelector: []
+  # - topologyKey: kubernetes.io/hostname
+  #   labelSelector:
+  #     - key: app
+  #       operator: In
+  #       values: metaflow,metaflowys
+podAffinityTermLabelSelector: []
+  # - topologyKey: kubernetes.io/hostname
+  #   weight: 10
+  #   labelSelector:
+  #     - key: app
+  #       operator: In
+  #       values: metaflow,metaflowys
+nodeAffinityLabelSelector: []
+  # - matchExpressions:
+  #     - key: app
+  #       operator: In
+  #       values: metaflow,metaflowys
+nodeAffinityTermLabelSelector: []
+  # - weight: 10
+  #   matchExpressions:
+  #   - key: app
+  #     operator: In
+  #     values: metaflow,metaflowys
+
+
+
+metaflowServerConfig: |
+    controller:
+      ## logfile path
+      log-file: /var/log/metaflow/server.log
+      ## loglevel: "debug/info/warn/error"
+      log-level: info
+      ## mysql config
+      mysql:
+        database: deepflow
+        user-name: root
+        user-password: "{{ .Values.global.password.mysql }}"
+        host: "{{ .Values.global.master_region_domain_prefix }}mysql"
+        port: 30130
+        timeout: 30
+      ## redis config
+      redis:
+        dimension_resource_database: 2
+        password: "{{ .Values.global.password.redis }}"
+        host: "{{ .Values.global.master_region_domain_prefix }}redis"
+        port: 6379
+        timeout: 30
+      ## clickhouse config
+      clickhouse:
+        database: deepflow
+        user: default
+        port: 30900
+        timeout: 60
+        host: clickhouse
+      ## roze
+      roze:
+        port: 20106
+        timeout: 60
+      ## Specification related Definition
+      spec:
+        vtap_group_max: 1000
+        vtap_max_per_group: 10000
+        az_max_per_server: 10
+        data_source_max: 10
+        data_source_retention_time_max: 1000
+      monitor:
+        ## Controller and data node check Interval (unit: second)
+        health_check_interval: 60
+        ## Health check exception/Controller switchover process channel length
+        health_check_handle_channel_len: 1000
+        ## License check interval (unit: second)
+        license_check_interval: 60
+        ## warrant
+        warrant:
+          host: warrant
+          port: 20413
+          timeout: 30
+      manager:
+        ## Interval for cloud platform to add/delete/configure change detection (unit: second)
+        cloud_config_check_interval: 60
+        ## task module config
+        task:
+          ## Recorder Database update interval, unit: second
+          resource_recorder_interval: 60
+        cloud:
+          ## Kubernetes Interval for data acquisition, in seconds
+          kubernetes_gather_interval: 60
+          ## When ali Public Cloud API obtains the region list, it needs to specify a region
+          aliyun_region_name: cn-beijing
+        recorder:
+          ## Recorder module cache self-healing refresh interval, unit: minute
+          cache_refresh_interval: 3600
+      trisolaris:
+        tsdb_ip:
+        chrony:
+          host: "{{ .Values.global.ntp_server }}"
+          port: 123
+          timeout: 1
+        # - 127.0.0.1
+        ## GRPC is used for upgrade by default
+        ## If HTTP is used, modify the configuration as follows
+        ## self_update_url: http://x.x.x.x:23333/yum/trident
+        self-update-url: "grpc"
+        listen-port: 20014
+        trident-port: 20035
+        max-escape-seconds: 3600
+        trident-revision: ""
+        trident-type-for-unkonw-vtap: 0
+        # trident path
+        trident-linux-path: "/usr/local/deepflow/yum/trident"
+        trident-windows-path: "/usr/local/deepflow/yum/trident.exe"
+        platform-vips:
+        #  - 55.11.135.18
+        node-type: "master"
+        ## grpc max message lenth default 100M
+        grpc-max-message-length: 104857600
+        region-domain-prefix: "{{ .Values.global.current_region_domain_prefix }}"
+      genesis:
+        aging_time: 86400
+        vinterface_aging_time: 300
+        grpc_server_host: "genesis"
+        grpc_server_port: 20036
+        exclude_ip_ranges: []
+        queue_length: 60
+        data_persistence_interval: 60
+    querier:
+      # logfile path
+      log-file: /var/log/metaflow/server.log
+      # loglevel: "debug/info/warn/error"
+      log-level: info
+      # querier http listenport
+      listen-port: 20416
+      # clickhouse config
+      clickhouse:
+        database: deepflow
+        user: default
+        host: clickhouse
+        port: 9000
+        timeout: 60
+
+
+clickhouse:
+  # Default values for clickhouse.
+  # This is a YAML-formatted file.
+  # Declare variables to be passed into your templates.
+
+  replicas: "{{ .Values.global.replicas }}"
+  hostNetwork:  "{{ .Values.global.hostNetwork }}"
+  dnsPolicy: "{{ .Values.global.dnsPolicy }}"
+  podManagementPolicy: "{{ .Values.global.podManagementPolicy }}"
+  image:
+    repository: clickhouse/hclickhouse-server
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "22.3.3.44"
+
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+  podAnnotations: {}
+
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+  storageConfig:
+    ## persistentVolumeClaim/hostPath
+    type: persistentVolumeClaim
+    hostPath: /opt/metaflow-clickhouse
+    persistence:
+      - name: clickhouse-path
+        accessModes:
+        - ReadWriteOnce
+        size: 100Gi
+        annotations: 
+        storageClass: "-"
+        # selector:
+        #   matchLabels:
+        #     app.kubernetes.io/name: clickhouse
+      - name: clickhouse-storage-path
+        accessModes:
+        - ReadWriteOnce
+        size: 200Gi
+        annotations: 
+        storageClass: "-"
+        # selector:
+        #   matchLabels:
+        #     app.kubernetes.io/name: clickhouse
+    s3StorageEnabled: false
+  clickhouse:
+    interserverHttpPort: 9009
+    maxConcurrentQueries: 2000
+    ## 单次查询最大内存 (bytes)
+    maxMemoryUsage: 10000000000
+    maxQuerySize: 10737418240
+    maxAstElements: 2000000
+    maxExpandedAstElements: 2000000
+    connectTimeout: 500
+    backgroudPoolSize: 32
+  service:
+    ## Configuration for Clickhouse service
+    ##
+    annotations: {}
+    labels: {}
+    clusterIP: ""
+
+    ## Port for Clickhouse Service to listen on
+    ##
+
+    ports:
+    - name: http-monitor-port
+      port: 8123
+      targetPort: 8123
+      nodePort: 
+      protocol: TCP
+    - name: tcp-port
+      port: 9000
+      targetPort: 9000
+      nodePort: 30900
+      protocol: TCP
+    - name: interserver-http-port
+      port: 9009
+      targetPort: 9009
+      nodePort: 
+      protocol: TCP
+
+    ## Additional ports to open for server service
+    additionalPorts: []
+
+    externalIPs: []
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+
+    ## Denotes if this Service desires to route external traffic to node-local or cluster-wide endpoints
+    ## must be Local
+    externalTrafficPolicy: Local
+
+    ## Service type
+    ##
+    type: NodePort
+
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  podAntiAffinityLabelSelector:
+    - labelSelector:
+      - key: app
+        operator: In
+        values: metaflow
+      - key: component
+        operator: In
+        values: clickhouse
+      topologyKey: "kubernetes.io/hostname"
+  podAntiAffinityTermLabelSelector: []
+    # - labelSelector:
+    #     - key: app
+    #       operator: In
+    #       values: metaflow,metaflowys
+    #   topologyKey: "kubernetes.io/hostname"
+    #   weight: 11
+  podAffinityLabelSelector:
+    - labelSelector:
+      - key: app
+        operator: In
+        values: metaflow
+      - key: component
+        operator: In
+        values: metaflow-server
+      topologyKey: "kubernetes.io/hostname"
+  podAffinityTermLabelSelector: []
+    # - topologyKey: kubernetes.io/hostname
+    #   weight: 10
+    #   labelSelector:
+    #     - key: app
+    #       operator: In
+    #       values: metaflow,metaflowys
+  nodeAffinityLabelSelector: []
+    # - matchExpressions:
+    #     - key: app
+    #       operator: In
+    #       values: metaflow,metaflowys
+  nodeAffinityTermLabelSelector: []
+    # - weight: 10
+    #   matchExpressions:
+    #   - key: app
+    #     operator: In
+    #     values: metaflow,metaflowys
