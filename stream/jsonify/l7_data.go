@@ -1,6 +1,8 @@
 package jsonify
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strconv"
@@ -393,6 +395,17 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
+func base64ToHexString(str string) string {
+	if len(str) < 2 || str[len(str)-1] != '=' {
+		return str
+	}
+	bytes, err := base64.StdEncoding.DecodeString(str)
+	if err == nil {
+		return hex.EncodeToString(bytes)
+	}
+	return str
+}
+
 func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 	if l.Http == nil {
 		return
@@ -410,8 +423,8 @@ func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 
 	h.HttpProxyClient = info.ClientIP
 	h.XRequestId = info.XRequestId
-	h.TraceId = info.TraceID
-	h.SpanId = info.SpanID
+	h.TraceId = base64ToHexString(info.TraceID)
+	h.SpanId = base64ToHexString(info.SpanID)
 
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {

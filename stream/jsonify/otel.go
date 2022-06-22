@@ -2,6 +2,7 @@ package jsonify
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"net"
 	"strings"
 	"time"
@@ -182,8 +183,8 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 func (h *L7Logger) FillOTel(l *v1.Span, platformData *grpc.PlatformInfoTable) {
 	h.Type = uint8(datatype.MSG_T_SESSION)
 	h.TapPortType = datatype.TAPPORT_FROM_OTEL
-	h.TraceId = base64.StdEncoding.EncodeToString(l.TraceId)
-	h.SpanId = base64.StdEncoding.EncodeToString(l.SpanId)
+	h.TraceId = hex.EncodeToString(l.TraceId)
+	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = base64.StdEncoding.EncodeToString(l.ParentSpanId)
 	h.TapSide = spanKindToTapSide(l.Kind)
 	h.SpanKind = uint8(l.Kind)
