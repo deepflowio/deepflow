@@ -8,7 +8,7 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/logger"
+	"gitlab.yunshan.net/yunshan/metaflow/libs/logger"
 	"runtime"
 	"server/querier/config"
 	"server/querier/router"

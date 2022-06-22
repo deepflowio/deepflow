@@ -2,11 +2,12 @@ package main
 
 import (
 	"os"
-	"server/querier/querier"
 	"strings"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/logger"
+	"gitlab.yunshan.net/yunshan/metaflow/libs/logger"
+
+	"server/querier/querier"
 )
 
 func execName() string {

@@ -10,7 +10,7 @@ import (
 	"github.com/xwb1989/sqlparser"
 	"inet.af/netaddr"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/metaflow/libs/utils"
 
 	"server/querier/engine/clickhouse/common"
 	"server/querier/engine/clickhouse/tag"
@@ -86,8 +86,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					valueStr := strings.Trim(t.Value, "'")
 					ip := net.ParseIP(valueStr)
 					if ip != nil {
-						ipUint32 := utils.IpToUint32(ip)
-						filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
+						ip4 := ip.To4()
+						if ip4 != nil {
+							ipUint32 := utils.IpToUint32(ip4)
+							filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
+						} else {
+							return nil, errors.New("invalid ipv4 mac")
+						}
 					} else {
 						valueStr = "00:00:" + valueStr
 						mac, err := net.ParseMAC(valueStr)
@@ -175,10 +180,14 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			case "tap_port":
 				valueStr := strings.Trim(t.Value, "'")
 				ip := net.ParseIP(valueStr)
-				fmt.Println(ip.String())
 				if ip != nil {
-					ipUint32 := utils.IpToUint32(ip)
-					filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
+					ip4 := ip.To4()
+					if ip4 != nil {
+						ipUint32 := utils.IpToUint32(ip4)
+						filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
+					} else {
+						return nil, errors.New("invalid ipv4 mac")
+					}
 				} else {
 					valueStr = "00:00:" + valueStr
 					mac, err := net.ParseMAC(valueStr)

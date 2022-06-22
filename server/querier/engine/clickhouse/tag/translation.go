@@ -535,7 +535,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 采集位置名称
 	tagResourceMap["tap_port_name"] = map[string]*Tag{
 		"default": NewTag(
-			"dictGet(deepflow.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port)))",
+			"if(tap_port_type in (0,1,2),dictGet(deepflow.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port))),'')",
 			"",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
 			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE %s(name,%s))",

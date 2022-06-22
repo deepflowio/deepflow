@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"gitlab.yunshan.net/yunshan/metaflow/libs/utils"
 
 	"server/querier/engine/clickhouse/tag"
 	"server/querier/engine/clickhouse/view"
