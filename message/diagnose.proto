@@ -1,0 +1,96 @@
+syntax = "proto2";
+
+package diagnose;
+option go_package = "diagnose";
+
+service Diagnose {
+    rpc GetTridentStatus(DiagnoseRequest) returns (DiagnoseResponse) {}
+    // TOPOLOGY
+    rpc GetOvsBridges(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list bridge
+    rpc GetOvsPorts(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list port
+    rpc GetOvsInterfaces(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vsctl -f csv -d bare list interface
+    rpc GetIpLink(DiagnoseRequest) returns (DiagnoseResponse) {} // ip link show
+    rpc GetIpAddress(DiagnoseRequest) returns (DiagnoseResponse) {} // ip address show
+    rpc GetAllVmXml(DiagnoseRequest) returns (DiagnoseResponse) {} // virsh list --all --uuid | xargs virsh dumpxml
+    rpc GetBridgeMapping(DiagnoseRequest) returns (DiagnoseResponse) {} // grep "^bridge_mappings" /etc/neutron/plugins/ml2/openvswitch.agent.ini
+    rpc GetBrctlShow(DiagnoseRequest) returns (DiagnoseResponse) {} // brctl show
+    rpc GetIpsetList(DiagnoseRequest) returns (DiagnoseResponse) {} // ipset list
+    rpc GetOvsVersion(DiagnoseRequest) returns (DiagnoseResponse) {} // ovs-vswitchd --version
+
+    // ACL
+    rpc GetIptablesAcls(DiagnoseRequest) returns (DiagnoseResponse) {} // iptables -w 1 -vnL --line-numbers -x
+
+    // FLOW
+    rpc GetOvsBridgeFlow(DiagnoseRequest) returns (DiagnoseResponse) {} //ovs-ofctl dump-flows $br
+
+    // Platform Info
+    rpc GetHostname(DiagnoseRequest) returns (DiagnoseResponse) {} //hostname
+    rpc GetVmStates(DiagnoseRequest) returns (DiagnoseResponse) {} //virsh list --all
+    rpc GetVlanConfig(DiagnoseRequest) returns (DiagnoseResponse) {} //cat /proc/net/vlan/config
+
+    rpc GetL3Table(L3TableRequest) returns (L3TableResponse) {}
+    rpc GetFlowTable(FlowTableRequest) returns (FlowTableResponse) {}
+}
+
+message DiagnoseRequest {
+    optional string arg = 1;
+}
+
+message DiagnoseResponse {
+    optional string result = 1;
+}
+
+message ArpItem {
+    optional string ip = 1;
+    optional uint64 mac = 2;
+    optional uint32 epc_id = 3;
+    optional uint32 tap_type = 4;
+    optional uint32 tap_port = 5;
+
+    optional uint64 tx_packets = 10;
+    optional uint64 rx_packets = 11;
+    optional uint64 tx_bytes = 12;
+    optional uint64 rx_bytes = 13;
+    optional uint64 tx_last_ns = 14;
+    optional uint64 rx_last_ns = 15;
+}
+
+message L3TableRequest {
+    enum From {
+        FROM_TRAFFIC_TTL = 4;
+        FROM_TRAFFIC_ARP = 8;
+    }
+    optional uint32 item_from = 1;
+}
+
+message L3TableResponse {
+    repeated ArpItem arp_items = 1;
+}
+
+message FlowItem {
+    optional uint32 tap_type = 1;
+    optional uint32 src_epc_id = 2;
+    optional uint32 dst_epc_id = 3;
+    optional string src_ip = 4;
+    optional string dst_ip = 5;
+    optional uint32 protocol = 6;
+    optional uint32 src_port = 7;
+    optional uint32 dst_port = 8;
+    optional uint32 tap_port = 9;
+
+    optional uint64 tx_packets = 20;
+    optional uint64 rx_packets = 21;
+    optional uint64 tx_bytes = 22;
+    optional uint64 rx_bytes = 23;
+    optional uint64 client_first_ns = 30;
+    optional uint64 server_first_ns = 31;
+    optional uint64 client_last_ns = 32;
+    optional uint64 server_last_ns = 33;
+}
+
+message FlowTableRequest {
+}
+
+message FlowTableResponse {
+    repeated FlowItem flow_items = 1;
+}

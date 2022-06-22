@@ -1,0 +1,280 @@
+/*
+ * Copyright (c) 2012-2013 YunShan Networks, Inc.
+ *
+ * Author Name: Xiang Yang
+ * Finish Date: 2013-11-18
+ */
+syntax = "proto2";
+
+package Postman;
+
+enum Priority {
+    NORMAL = 0;
+    URGENT = 9;
+}
+
+enum Event {
+    NONE_EVENT                = 0;
+    EVENT_FLIP_SIGN           = 0x10000000;
+
+    /* pair events must have opposite value */
+
+    CPU_HIGH                  = 0x00000001;
+    CPU_HIGH_OVER             = 0x10000001;
+
+    TRAFFIC_HIGH              = 0x00000002;
+    TRAFFIC_HIGH_OVER         = 0x10000002;
+
+    HOST_DISCONN              = 0x00000003;
+    HOST_DISCONN_OVER         = 0x10000003;
+    HOST_MAINTENANCE          = 0x00000004;
+    HOST_MAINTENANCE_OVER     = 0x10000004;
+    HOST_MEM_HIGH             = 0x00000005;
+    HOST_MEM_HIGH_OVER        = 0x10000005;
+    HOST_DISK_HIGH            = 0x00000006;
+    HOST_DISK_HIGH_OVER       = 0x10000006;
+    HOST_CPU_HIGH             = 0x00000007;
+    HOST_CPU_HIGH_OVER        = 0x10000007;
+
+    VM_STATE_CHG              = 0x00000008;
+    VM_STATE_CHG_OVER         = 0x10000008;
+
+    RACK_EXPIRED              = 0x00000009;
+    RACK_EXPIRED_PADDING      = 0x10000009;
+    VM_EXPIRED                = 0x0000000A;
+    VM_EXPIRED_PADDING        = 0x1000000A;
+
+    DRBD_SPLIT_BRAIN          = 0x0000000B;
+    DRBD_SPLIT_BRAIN_PADDING  = 0x1000000B;
+    VM_RESTORE                = 0x0000000C;
+    VM_RESTORE_PADDING        = 0x1000000C;
+
+    USER_CHARGE               = 0x0000000D;
+    USER_CHARGE_PADDING       = 0x1000000D;
+
+    NSP_FAIL                  = 0x0000000E;
+    NSP_FAIL_OVER             = 0x1000000E;
+
+    USER_MAIL                      = 0x0000000F;
+    USER_MAIL_PADDING              = 0x1000000F;
+    TALKER_CB_NSP_BOOTUP           = 0x00000010;
+    TALKER_CB_NSP_BOOTUP_PADDING   = 0x10000010;
+    TALKER_CONF_INTERFACE          = 0x00000011;
+    TALKER_CONF_INTERFACE_PADDING  = 0x10000011;
+}
+
+enum Resource {
+    NONE_RESOURCE             = 0;
+    HOST                      = 1;
+    VGW                       = 2;
+    VM                        = 3;
+    RACK                      = 4;
+    VMWAF                     = 5;
+    CHARGE                    = 6;
+    USER                      = 7;
+    VGATEWAY                  = 8;
+    VINTERFACE                = 9;
+    VALVE                     = 10;
+}
+
+enum AggregateId {
+    AGG_NO_AGGREGATE = 0;
+    AGG_ALARM_EVENT = 1;
+    AGG_ALARM_OVER_EVENT = 2;
+    AGG_HOST_USAGE_ALARM_EVENT = 3;
+    AGG_VM_USAGE_ALARM_EVENT = 4;
+    AGG_VM_RESTORE = 5;
+    AGG_TALKER_CB_NSP_BOOTUP = 6;
+    AGG_TALKER_CONF_INTERFACE = 7;
+    AGG_BUNDLE_SEND_REQUEST = 8;
+}
+
+message Policy {
+    optional Priority priority = 1 [default = NORMAL];
+    optional AggregateId aggregate_id = 2 [default = AGG_NO_AGGREGATE];
+    optional uint32 aggregate_window = 3 [default = 0];
+    optional uint32 min_event_interval = 4 [default = 0];
+    optional uint32 min_dest_interval = 5 [default = 0];
+    optional uint32 issue_timestamp = 6;
+}
+
+message MailIdentity {
+    optional Event event_type = 1;
+    optional Resource resource_type = 2;
+    optional uint32 resource_id = 3;
+}
+
+message AlarmEvent {
+    optional string resource_type = 1;
+    optional string resource_name = 2;
+    optional uint32 alarm_begin = 3;
+    optional uint32 alarm_last = 4;
+    optional string alarm_message = 5;
+}
+
+message LicenseExpireEvent {
+    optional string host_ip = 1;
+    optional uint32 host_count = 2;
+    optional uint32 host_vm_count = 3;
+    optional string rack_name = 4;
+    optional string rack_location = 5;
+    optional uint32 rack_usage_days = 6;
+    optional uint32 activate_time = 7;
+    optional uint32 expire_time = 8;
+    optional uint32 host_limit = 9;
+    optional uint32 domain_id = 10;
+    optional string domain = 11;
+}
+
+message ServiceExpireEvent {
+    optional string resource_type = 1;
+    optional string resource_name = 2;
+    optional string resource_id = 3;
+    optional uint32 create_time = 4;
+    optional string resource_state = 5;
+    optional uint32 vcpu_num = 6;
+    optional uint32 mem_size = 7;
+    optional uint32 vdi_sys_size = 8;
+    optional uint32 vdi_user_size = 9;
+    optional string remark = 10;
+    optional uint32 domain_id = 11;
+    optional string domain = 12;
+}
+
+message ResourceEvent {
+    optional string resource_type = 1;
+    optional string resource_name = 2;
+    optional uint32 operate_time =3;
+    optional string operate_type = 4;
+    optional string remark = 5;
+}
+
+message ServiceChargeEvent {
+    optional string service_name           = 1;
+    optional string instance_name          = 2;
+    optional uint32 start_time             = 3;
+    optional uint32 end_time               = 4;
+    optional uint32 size                   = 5;
+    optional string cumulative_time        = 6;
+    optional string price                  = 7;
+    optional string settlement_amount      = 8;
+    optional string remark                 = 9;
+    optional uint32 domain_id              = 10;
+    optional string domain                 = 11;
+}
+
+message InstanceChargeEvent {
+    optional string instance_name          = 1;
+    optional uint32 start_time             = 2;
+    optional uint32 end_time               = 3;
+    optional string cumulative_time        = 4;
+    optional string price                  = 5;
+    optional string settlement_amount      = 6;
+    optional string remark                 = 7;
+    optional string type                   = 8;
+    optional uint32 domain_id              = 9;
+    optional string domain                 = 10;
+}
+
+message UserBalanceEvent {
+    optional string username               = 1;
+    optional string email                  = 2;
+    optional string balance                = 3;
+    optional string company                = 4;
+    optional string phone_num              = 5;
+    optional string user_type              = 6;
+}
+
+message NetResourceUsage {
+    optional uint32 domain_id = 1;
+    optional string domain = 2;
+    optional string isp_name = 3;
+    optional string bandwidth = 4;
+    optional uint32 isp_count = 5;
+}
+
+message UserUsageFormEvent {
+    optional string username = 1;
+    optional string company = 2;
+    optional string industry = 3;
+    optional string contact = 4;
+    optional string phone = 5;
+    optional uint32 create_time = 6;
+    optional string isp_name = 7;
+    optional string bandwidth = 8;
+    optional uint32 isp_count = 9;
+    repeated ServiceExpireEvent vms = 10;
+    repeated ResourceEvent events = 11;
+    repeated NetResourceUsage nets = 12;
+}
+
+message UserChargeFormEvent {
+    optional string username                     = 1;
+    optional string company                      = 2;
+    optional string industry                     = 3;
+    optional string contact                      = 4;
+    optional string phone                        = 5;
+    optional uint32 create_time                  = 6;
+    optional string balance                      = 7;
+    optional string daily_account                = 8;
+    optional string available_time               = 9;
+    repeated ServiceChargeEvent services         = 10;
+    repeated InstanceChargeEvent instances       = 11;
+    repeated UserBalanceEvent user_balances      = 12;
+}
+
+enum MailType {
+    NONE_MAIL_TYPE = 0;
+
+    /* different mailtype use different template */
+    ALARM_MAIL = 1;
+    ALARM_OVER_MAIL = 2;
+    NOTIFY_MAIL = 3;
+    NOTIFY_OVER_MAIL = 4;
+
+    LICENSE_EXPIRE_MAIL = 5;
+    SERVICE_EXPIRE_MAIL = 6;
+    USER_USAGE_FORM_MAIL = 7;
+    USER_CHARGE_FORM_MAIL = 8;
+    RAW_STRING = 9;
+    BALANCE_LACKED_MAIL = 10;
+    BALANCE_SOON_LACK_MAIL = 11;
+    BALANCE_LACKED_SUMMARY_MAIL = 12;
+}
+
+message MailContent {
+    optional string head_template = 1; /* file name in template dir */
+    optional string tail_template = 2; /* file name in template dir */
+    repeated string attachments = 3;
+
+    /* the mail body */
+    optional MailType mail_type = 4;
+    repeated AlarmEvent alarms = 5;
+    repeated LicenseExpireEvent license_expires = 6;
+    repeated ServiceExpireEvent service_expires = 7;
+    optional UserUsageFormEvent user_usage_form = 8;
+    optional UserChargeFormEvent user_charge_form = 9;
+    optional string raw_string = 10;
+}
+
+message Mail {
+    optional string from = 1;
+    optional string to = 2;
+    optional string cc = 3;
+    optional string bcc = 4;
+
+    optional string subject = 5;
+    optional string customer_name = 6;
+    optional MailContent content = 7;
+}
+
+message SendRequest {
+    optional Policy policy = 1;
+    optional MailIdentity id = 2;
+    optional Mail mail = 3;
+}
+
+message Message {
+    optional SendRequest send_request = 1;
+}
+

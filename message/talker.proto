@@ -1,0 +1,674 @@
+/*
+ * Copyright (c) 2012-2014 YunShan Networks, Inc.
+ *
+ * Author Name: Song Zhen
+ * Finish Date: 2014-03-04
+ */
+syntax = "proto2";
+
+package Talker;
+
+enum AllocType {
+    AUTO = 1;
+    MANUAL = 2;
+}
+
+enum Result {
+    SUCCESS = 0;
+    FAIL = 1;
+}
+
+enum VmType {
+    VM = 1;
+    VGW = 2;
+    VGATEWAY = 3;
+    SNAPSHOT = 4;
+    VALVE = 5;
+}
+
+enum VmOps {
+    NONE = 0;
+    VM_CREATE = 1;
+    VM_START = 2;
+    VM_STOP  = 3;
+    VM_DELETE = 4;
+    VM_MODIFY = 5;
+    SNAPSHOT_CREATE = 6;
+    SNAPSHOT_REVERT = 7;
+    SNAPSHOT_DELETE = 8;
+    VM_HADISK_CREATE = 9;
+    VM_HADISK_DELETE = 10;
+    VM_HADISK_PLUG = 11;
+    VM_HADISK_UNPLUG = 12;
+    VM_HADISK_MODIFY = 13;
+    VM_REPLACE = 14;
+    VGW_SWITCH = 15;
+}
+
+enum VGatewayOps {
+    VGATEWAY_NONE    = 0;
+    VGATEWAY_CREATE  = 1;
+    VGATEWAY_DELETE  = 2;
+    VGATEWAY_MODIFY  = 3;
+    VGATEWAY_MIGRATE = 4;
+}
+
+enum ValveOps {
+    VALVE_NONE    = 0;
+    VALVE_CREATE  = 1;
+    VALVE_DELETE  = 2;
+    VALVE_MODIFY  = 3;
+    VALVE_MIGRATE = 4;
+}
+
+enum NetworksOps {
+    NETWORKS_NONE = 0;
+    NETWORKS_VL2_CREATE = 1;
+    NETWORKS_VL2_DELETE = 2;
+    NETWORKS_VL2_MODIFY = 3;
+}
+
+enum VmwafOps {
+    VMWAF_NONE = 0;
+    VMWAF_CONF_ADD = 1;
+    VMWAF_CONF_DEL = 2;
+}
+
+enum HadiskOps {
+    HA_DISK_PLUG = 1;
+    HA_DISK_UNPLUG = 2;
+}
+
+enum HWDevOps {
+    HWDEV_NONE = 0;
+    HWDEV_ATTACH = 1;
+    HWDEV_DETACH = 2;
+    HWDEV_CONNECT = 3;
+    HWDEV_DISCONNECT = 4;
+}
+
+enum InterfaceOps {
+    INTERFACE_NONE    = 0;
+    INTERFACE_ATTACH  = 1;
+    INTERFACE_DETACH  = 2;
+    INTERFACE_CONFIG  = 3;
+}
+
+enum ResourceType {
+    RESOURCE_NONE = 0;
+    COMPUTE_RESOUCE = 1;
+    VM_RESOURCE = 2;
+    VGW_RESOURCE = 3;
+    VGW_HA_RESOURCE = 4;
+    VM_SERVER_RESOURCE = 5;
+    VGW_SERVER_RESOURCE = 6;
+    BK_VM_HEALTH_RESOURCE = 7;
+    HOST_HA_RESOURCE = 8;
+}
+
+enum ResourceState {
+    RESOURCE_DOWN = 0;
+    RESOURCE_UP = 1;
+    RESOURCE_MASTER = 2;
+    RESOURCE_BACKUP = 3;
+    RESOURCE_FAULT = 4;
+    RESOURCE_UNKNOWN = 5;
+}
+
+enum ModifyMask {
+    DISK_ADD = 0x00000001;
+    DISK_DEL = 0x00000002;
+    DISK_SYS_RESIZE = 0x00000004;
+    DISK_USER_RESIZE = 0x00000008;
+    CPU_RESIZE = 0x00000010;
+    MEM_RESIZE = 0x00000020;
+    IP_MODIFY = 0x00000040;
+    BW_MODIFY = 0x00000080;
+    HA_DISK = 0x00000100;
+    VL2_ID = 0x00000200;
+    MASK_ALL = 0x000003ff;
+}
+
+enum HaSwitchMode {
+    AUTO_MODE = 1;
+    MANUAL_MODE = 2;
+}
+
+enum HTTPOps {
+    HTTP_GET = 0;
+    HTTP_POST = 1;
+    HTTP_PUT = 2;
+    HTTP_DELETE = 3;
+}
+
+enum SouthDest {
+    LCG = 0;
+    RYU = 1;
+}
+
+enum SouthURI {
+    TUNNEL_QOS = 0;
+    GRE = 1;
+}
+
+message VmOpsReply {
+    optional uint32 id = 1;
+    optional VmType type = 2;
+    optional VmOps  ops  = 3;
+    optional uint32 err   = 4;
+    optional Result result = 5;
+}
+
+message VgatewayOpsReply {
+    optional uint32 id = 1;
+    optional VmType type = 2;
+    optional VGatewayOps  ops  = 3;
+    optional uint32 err   = 4;
+    optional Result result = 5;
+}
+
+message ValveOpsReply {
+    optional uint32 id = 1;
+    optional VmType type = 2;
+    optional ValveOps ops  = 3;
+    optional uint32 err   = 4;
+    optional Result result = 5;
+}
+
+message NetworksOpsReply {
+    optional uint32 id = 1;
+    optional uint32 vnet_id = 2;
+    optional NetworksOps ops  = 3;
+    optional uint32 err   = 4;
+    optional Result result = 5;
+}
+
+message VmwafOpsReply {
+    optional uint32 id = 1;
+    optional VmwafOps ops  = 2;
+    optional Result result = 3;
+}
+
+message Vl2AddReq {
+    optional uint32 vl2_id = 1;
+    optional uint32 vdc_id = 2;
+}
+
+message Vl2DelReq {
+    optional uint32 vl2_id = 1;
+    optional uint32 vdc_id = 2;
+}
+
+message Vl2ModifyReq {
+    optional uint32 vl2_id = 1;
+    optional uint32 rack_id = 2;
+    optional uint32 vlantag = 3;
+}
+
+message VmAddReq {
+    optional AllocType alloc_type = 1;
+    optional string vm_ids = 2;
+    optional string pool_ids = 3;
+    optional string vm_passwd = 4;
+}
+
+message VmReplaceReq {
+    optional uint32 id = 1;
+    optional uint32 vnet_id = 2;
+    optional uint32 vl2_id = 3;
+}
+
+message VmDeleteReq {
+    optional uint32 id = 1;
+    optional uint32 vnet_id = 2 [default = 0];
+    optional uint32 vl2_id = 3 [default = 0];
+}
+
+message VmStartReq {
+    optional uint32 id = 1;
+    optional uint32 vnet_id = 2 [default = 0];
+    optional uint32 vl2_id = 3 [default = 0];
+}
+
+message VmStopReq {
+    optional uint32 id = 1;
+    optional uint32 vnet_id = 2 [default = 0];
+    optional uint32 vl2_id = 3 [default = 0];
+}
+
+message VmModifyReq {
+    optional uint32 vm_id = 1;
+    optional ModifyMask mask = 2;
+    optional uint32 vcpu_num = 3;
+    optional uint32 mem_size = 4;
+    optional uint32 usr_disk_size = 5;
+    optional uint32 ha_disk_size = 6;
+    optional uint32 vdc_id = 7;
+    optional uint32 vl2_id = 8;
+    optional string ip = 9;
+}
+
+message TorswitchModifyReq {
+    optional string ip = 1;
+    optional ResourceState state = 2;
+}
+
+
+message VmIsolateReq {
+    optional uint32 id = 1;
+    optional uint32 vnet_id = 2;
+    optional uint32 vl2_id = 3;
+}
+
+message VmReleaseReq {
+    optional uint32 id = 1;
+    optional uint32 vnet_id = 2;
+    optional uint32 vl2_id = 3;
+}
+
+message VmCreateSnapshotReq {
+    optional uint32 vm_id = 1;
+    optional uint32 snapshot_id = 2;
+}
+
+message VmRevertSnapshotReq {
+    optional uint32 vm_id = 1;
+    optional uint32 snapshot_id = 2;
+}
+
+message VmDeleteSnapshotReq {
+    optional uint32 vm_id = 1;
+    optional uint32 snapshot_id = 2;
+}
+
+message ThirdVmAddReq {
+    optional string vm_ids = 1;
+}
+
+message VmMigrateReq {
+    optional uint32 vm_id = 1;
+    optional uint32 vm_type = 2 [default = 1];
+    optional string launch_server = 3;
+    optional string sr_name = 4;
+}
+
+message NotifyProactive {
+    optional uint32 id = 1;
+    optional ResourceType type = 2;
+    optional ResourceState state  = 3;
+    optional string launch_server = 4;
+    repeated string ips = 5;
+}
+
+message NotifyBundleProactive {
+    repeated NotifyProactive bundle = 1;
+}
+
+message VgwAddReq {
+    optional AllocType alloc_type = 1;
+    optional string vgw_ids = 2;
+}
+
+message VgatewayAddReq {
+    optional AllocType alloc_type = 1;
+    optional string vgw_ids = 2;
+}
+
+message ValveAddReq {
+    optional AllocType alloc_type = 1;
+    optional string vgw_ids = 2;
+}
+
+message VgwStartReq {
+    optional uint32 id = 1;
+}
+
+message VgwStopReq {
+    optional uint32 id = 1;
+}
+
+message VgwModifyReq {
+    optional uint32 id = 1;
+}
+
+message VgatewayModifyReq {
+    optional uint32 id = 1;
+    optional string wanslist = 2;
+    optional string lanslist = 3;
+}
+
+message VgatewayMigrateReq {
+    optional uint32 id = 1;
+    optional string gw_launch_server  = 2;
+}
+
+message ValveModifyReq {
+    optional uint32 id = 1;
+    optional string wanslist = 2;
+    optional string lanslist = 3;
+}
+
+message ValveMigrateReq {
+    optional uint32 id = 1;
+    optional string gw_launch_server  = 2;
+}
+
+message VgwDelReq {
+    optional uint32 id = 1;
+}
+
+message VgatewayDelReq {
+    optional uint32 id = 1;
+}
+
+message ValveDelReq {
+    optional uint32 id = 1;
+}
+
+message VgwSwitchOpt {
+    optional HaSwitchMode mode = 1;
+}
+
+message VgwSwitchReq {
+    optional uint32 id = 1;
+    optional VgwSwitchOpt mode = 2;
+}
+
+message ThirdVgwAddReq {
+    optional string vgw_ids = 1;
+}
+
+message TunnelQos {
+    optional uint32 minrate = 1;
+    optional uint32 maxrate = 2;
+}
+
+message Gre {
+    optional string local_ip = 1;
+    optional string remote_ip = 2;
+    optional string bind_port = 3;
+    optional string switch = 4;
+    optional string gre_name = 5;
+}
+
+message VMWafAddReq {
+    optional uint32 vnet_id = 1;
+}
+
+message VMWafDelReq {
+    optional uint32 vnet_id = 1;
+}
+
+message SouthReq {
+    optional HTTPOps ops = 1;
+    optional SouthURI uri = 2;
+    optional SouthDest dest = 3;
+    optional string ip = 4;
+    optional uint32 port = 5;
+    optional string version = 6;
+    optional TunnelQos tunnel_qos = 7;
+    optional Gre gre = 8;
+}
+
+message SouthReply {
+    optional string result = 1;
+}
+
+message HadiskOpsReq {
+    optional uint32 vdisk_id = 1;
+    optional HadiskOps ops  = 2;
+}
+
+message HWDevInterfaceAttachReq {
+    optional uint32 hwdev_id = 1;
+    optional uint32 vnet_id = 2;
+    optional uint32 if_id = 3;
+    optional uint32 if_index = 4;
+    optional uint32 if_subnetid = 5;
+    optional uint32 subnet_type = 6;
+    optional uint64 if_bandwidth = 7;
+    optional uint32 switch_id = 8;
+    optional uint32 switch_port = 9;
+}
+
+message HWDevInterfaceDetachReq {
+    optional uint32 hwdev_id = 1;
+    optional uint32 vnet_id = 2;
+    optional uint32 if_id = 3;
+    optional uint32 if_index = 4;
+    optional uint32 if_subnetid = 5;
+    optional uint32 subnet_type = 6;
+    optional uint32 switch_id = 7;
+    optional uint32 switch_port = 8;
+}
+
+message HWDevOpsReply {
+    optional uint32 hwdev_id = 1;
+    optional uint32 if_id = 2;
+    optional HWDevOps  ops  = 3;
+    optional uint32 err   = 4;
+    optional Result result = 5;
+}
+
+message InterfaceAttachReq {
+    optional uint32 id = 1;
+    optional uint32 if_id = 2;
+    optional uint32 if_index = 3;
+    optional uint32 if_subnetid = 4;
+    optional uint32 if_vlantag = 5;
+    optional uint64 if_bandwidth = 6;
+    optional string launch_server = 7;
+}
+
+message InterfaceDetachReq {
+    optional uint32 id = 1;
+    optional uint32 if_id = 2;
+    optional uint32 if_index = 3;
+    optional uint32 if_subnetid = 4;
+    optional string launch_server = 5;
+}
+
+message InterfacesConfigReq {
+    optional string if_ids = 1;
+}
+
+message InterfacesOpsReply {
+    optional string if_ids = 1;
+    optional Result result = 2;
+    optional InterfaceOps ops = 3;
+}
+
+message PMAddReq {
+    optional string pm_ipmi_ip = 1;
+    optional string pm_ipmi_user_name = 2;
+    optional string pm_ipmi_passwd = 3;
+}
+
+message PMOpsReq {
+    optional string pm_ipmi_ip = 1;
+    optional PMOps pm_ops = 2;
+}
+
+message PMNic{
+    optional string device_name = 1;
+    optional string ipaddr = 2;
+    optional string netmask = 3;
+    optional string gateway = 4;
+    optional string dns = 5;
+}
+
+message PMDeployReq {
+    optional string pm_ipmi_ip = 1;
+    optional PMOSType os_type = 2;
+    optional string root_passwd = 3;
+    optional string hostname =4;
+    optional string pm_ipmi_mac = 5;
+    optional PMNic pm_nic = 6;
+}
+
+enum PMOSType {
+    CENTOS6_5 = 1;
+    XENSERVER6_2 = 2;
+}
+
+enum PMOps {
+    PM_ADD = 1;
+    PM_START = 2;
+    PM_STOP = 3;
+    PM_DEPLOY = 4;
+    PM_DELETE = 5;
+}
+
+enum PMStates {
+    PM_RUNNING = 1;
+    PM_HALTED = 2;
+}
+
+message PMOpsReply {
+    optional string   pm_ipmi_ip = 1;
+    optional PMOps    ops = 2;
+    optional PMStates state = 3;
+    optional uint32   err = 4;
+    optional Result   result = 5;
+}
+
+message HostBootReq {
+    optional string host_ip = 1;
+}
+
+message HostOpsReply {
+    optional string host_ip = 1;
+    optional Result result = 2;
+}
+
+message ChargeStatsReq {
+    optional uint32 user_id = 1;
+    optional uint32 start_time = 2;
+    optional uint32 end_time = 3;
+}
+
+message OrderChargeReq {
+    optional uint32 user_id = 1;
+    optional uint32 check_charge_days = 2;
+    repeated OrderChargeVM vms = 3;
+    repeated OrderChargeVGW vgws = 4;
+    repeated OrderChargeISP isps = 5;
+    repeated OrderChargeBW bws = 6;
+}
+
+message OrderChargeVM {
+    optional uint32 vm_num = 1;
+    optional string vm_ps_lcuuid = 2;
+}
+
+message OrderChargeVGW {
+    optional uint32 vgw_num = 1;
+    optional string vgw_ps_lcuuid = 2;
+}
+
+message OrderChargeISP {
+    optional uint32 isp = 1;
+    optional string isp_ps_lcuuid = 2;
+    optional uint32 isp_num = 3;
+}
+
+message OrderChargeBW {
+    optional uint32 isp = 1;
+    optional string bw_ps_lcuuid = 2;
+    optional uint64 bandwidth_num = 3;
+}
+
+message ChargeStatsReply {
+    optional uint32 user_id = 1;
+    optional uint32 start_time = 2;
+    optional uint32 end_time = 3;
+    optional string charge_amount = 4;
+    optional uint32 err = 5;
+    optional Result result = 6;
+}
+
+message OrderChargeReply {
+    optional uint32 user_id = 1;
+    optional uint32 order_ok = 2;
+    optional uint32 err = 3;
+    optional Result result = 4;
+}
+
+message VmadapterVmLearnReq {
+    required uint32 vc_id = 1;
+    optional string vcenter_ip = 2;
+    optional string vc_username = 3;
+    optional string vc_password = 4;
+}
+
+message VmadapterVmLearnReply {
+    optional string vcenter_ip = 1;
+    optional uint32 err = 2;
+    optional Result result = 3;
+    optional string vm_info = 4;
+}
+
+message Message {
+    optional VmOpsReply       vm_ops_reply = 1;
+    optional NetworksOpsReply networks_ops_reply = 2;
+    optional VmwafOpsReply    vmwaf_ops_reply = 3;
+    optional PMOpsReply       pm_ops_reply = 4;
+    optional ChargeStatsReply charge_reply = 5;
+    optional OrderChargeReply order_charge_reply = 6;
+    optional Vl2AddReq        vl2_add_req = 11;
+    optional Vl2DelReq        vl2_del_req = 12;
+    optional Vl2ModifyReq     vl2_modify_req = 13;
+    optional VmAddReq         vm_add_req = 31;
+    optional VmModifyReq      vm_modify_req = 32;
+    optional VmStartReq       vm_start_req = 33;
+    optional VmStopReq        vm_stop_req = 34;
+    optional VmIsolateReq     vm_isolate_req = 35;
+    optional VmReleaseReq     vm_release_req = 36;
+    optional VmDeleteReq      vm_delete_req = 37;
+    optional VmCreateSnapshotReq vm_create_snapshot_req = 38;
+    optional VmRevertSnapshotReq vm_revert_snapshot_req = 39;
+    optional VmDeleteSnapshotReq vm_delete_snapshot_req = 40;
+    optional VmReplaceReq     vm_replace_req = 41;
+    optional ThirdVmAddReq    third_vm_add_req = 42;
+    optional VmMigrateReq     vm_migrate_req = 43;
+    optional VgwAddReq        vgw_add_req = 51;
+    optional VgwStartReq      vgw_start_req = 52;
+    optional VgwStopReq       vgw_stop_req = 53;
+    optional VgwDelReq        vgw_del_req = 54;
+    optional VgwSwitchReq     vgw_switch_req = 55;
+    optional VgwModifyReq     vgw_modify_req = 56;
+    optional ThirdVgwAddReq   third_vgw_add_req = 57;
+    optional HadiskOpsReq     ha_disk_ops_req = 60;
+    optional NotifyBundleProactive  notify_bundle = 71;
+    optional SouthReq         south_req = 91;
+    optional SouthReply       south_reply = 92;
+    optional HostBootReq      host_boot_req = 93;
+    optional HostOpsReply     host_ops_reply = 94;
+    optional VMWafAddReq      vmwaf_add_req = 111;
+    optional VMWafDelReq      vmwaf_del_req = 112;
+    optional TorswitchModifyReq torswitch_modify_req = 113;
+    optional InterfaceAttachReq interface_attach_req = 114;
+    optional InterfaceDetachReq interface_detach_req = 115;
+    optional InterfacesConfigReq interfaces_config_req = 116;
+    optional InterfacesOpsReply interfaces_ops_reply = 117;
+    optional VgatewayAddReq     vgateway_add_req = 120;
+    optional VgatewayModifyReq  vgateway_modify_req = 121;
+    optional VgatewayDelReq     vgateway_del_req = 122;
+    optional VgatewayOpsReply   vgateway_ops_reply = 123;
+    optional VgatewayMigrateReq vgateway_migrate_req = 124;
+    optional PMAddReq         pm_add_req = 131;
+    optional PMOpsReq         pm_ops_req = 132;
+    optional PMDeployReq      pm_deploy_req = 133;
+    optional HWDevInterfaceAttachReq hwdev_interface_attach_req = 141;
+    optional HWDevInterfaceDetachReq hwdev_interface_detach_req = 142;
+    optional HWDevOpsReply hwdev_ops_reply = 143;
+    optional ChargeStatsReq charge_req = 144;
+    optional OrderChargeReq order_charge = 145;
+    optional ValveAddReq     valve_add_req = 150;
+    optional ValveModifyReq  valve_modify_req = 151;
+    optional ValveDelReq     valve_del_req = 152;
+    optional ValveOpsReply   valve_ops_reply = 153;
+    optional ValveMigrateReq valve_migrate_req = 154;
+    optional VmadapterVmLearnReq vmadapter_vm_learn_req = 155;
+    optional VmadapterVmLearnReply vmadapter_vm_learn_reply = 156;
+}
