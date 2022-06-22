@@ -11,7 +11,6 @@ require (
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/deckarep/golang-set v1.8.0
-	github.com/ghodss/yaml v1.0.0
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-redis/redis v6.15.9+incompatible
