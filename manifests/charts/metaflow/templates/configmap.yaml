@@ -1,0 +1,8 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "metaflow.fullname" . }}-server
+  labels:
+    {{- include "metaflow.labels" . | nindent 4 }}
+data:
+  server.yaml: {{ tpl (toYaml .Values.metaflowServerConfig) $ | indent 2 }}
