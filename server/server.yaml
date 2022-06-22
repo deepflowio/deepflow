@@ -84,8 +84,6 @@ controller:
       host: 127.0.0.1
       port: 123
       timeout: 1
-    master-controller-ips:
-    # - 127.0.0.1
 
     # 默认使用grpc进行trident升级
     # 若需使用HTTP需修改配置如下所示

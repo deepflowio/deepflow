@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"reflect"
 	"sort"
@@ -170,19 +169,11 @@ func (v *VTapInfo) UpdateVTapCache(key string, vtap *models.VTap) {
 }
 
 func (v *VTapInfo) loadRegion() string {
-	if len(v.config.MasterControllerNetIPs) == 0 {
-		log.Error("master-controller-ips is empty")
+	if v.config.NodeIP == "" {
+		log.Error("config NodeIP is empty")
 		return ""
 	}
-	ctrlIP := ""
-	masterIP := v.config.MasterControllerNetIPs[0]
-	if ip, err := Lookup(masterIP); err == nil {
-		ctrlIP = ip.String()
-	} else {
-		log.Error(err, "lookup controller ip failed", masterIP)
-		return ""
-	}
-
+	ctrlIP := v.config.NodeIP
 	azConMgr := dbmgr.DBMgr[models.AZControllerConnection](v.db)
 	azConn, err := azConMgr.GetFromControllerIP(ctrlIP)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -817,16 +808,11 @@ func (v *VTapInfo) updateCacheToDB() {
 		return
 	}
 	config := v.config
-	if len(config.MasterControllerNetIPs) == 0 {
-		log.Error("no master controller ip")
+	if config.NodeIP == "" {
+		log.Error("config no NodeIP address")
 		return
 	}
-	var ip net.IP
-	if ip, err = Lookup(config.MasterControllerNetIPs[0]); err != nil {
-		log.Error(err)
-		return
-	}
-	hostIP := ip.String()
+	hostIP := config.NodeIP
 	updateVTaps := []*models.VTap{}
 	keytoDBVTap := make(map[string]*models.VTap)
 	vtapLcuuidToConfigFile := make(map[string]*models.VTapConfigFile)

@@ -2,8 +2,10 @@ package config
 
 import (
 	"net"
+	"os"
 
 	"github.com/op/go-logging"
+	. "server/controller/trisolaris/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/config")
@@ -19,7 +21,6 @@ type Config struct {
 	LogLevel                 string   `default:"info"`
 	TsdbIP                   string   `yaml:"tsdb-ip"`
 	Chrony                   Chrony   `yaml:"chrony"`
-	MasterControllerIPs      []string `yaml:"master-controller-ips"`
 	SelfUpdateUrl            string   `default:"grpc" yaml:"self-update-url"`
 	TridentPort              string   `default:"20035" yaml:"trident-port"`
 	StatsdPort               string   `default:"20040" yaml:"statsd-port"`
@@ -34,7 +35,7 @@ type Config struct {
 	GrpcMaxMessageLength     int      `default:"104857600" yaml:"grpc-max-message-length"`
 	RegionDomainPrefix       string   `yaml:"region-domain-prefix"`
 	ClearKubernetesTime      int      `default:"600" yaml:"clear-kubernetes-time"`
-	MasterControllerNetIPs   []net.IP
+	NodeIP                   string
 	VTapCacheRefreshInterval int  `default:"300" yaml:"vtapcache-refresh-interval"`
 	MetaDataRefreshInterval  int  `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval      int  `default:"60" yaml:"node-refresh-interval"`
@@ -42,15 +43,11 @@ type Config struct {
 }
 
 func (c *Config) Convert() {
-	controllers := make([]net.IP, 0, len(c.MasterControllerIPs))
-	for _, ipString := range c.MasterControllerIPs {
-		ip := net.ParseIP(ipString)
-		if ip.To4() != nil {
-			controllers = append(controllers, ip.To4())
-		}
-	}
-	c.MasterControllerNetIPs = controllers
-	if len(c.MasterControllerNetIPs) == 0 {
-		log.Error("yaml: master-controller-ips is not configured")
+	nodeIP := os.Getenv(NODE_IP_KEY)
+	ip := net.ParseIP(nodeIP)
+	if ip == nil {
+		log.Errorf("IP(%s) address format is incorrect", nodeIP)
+	} else {
+		c.NodeIP = nodeIP
 	}
 }

@@ -3,7 +3,6 @@ package node
 import (
 	"errors"
 	"hash/fnv"
-	"net"
 	"strconv"
 	"time"
 
@@ -42,10 +41,6 @@ type NodeInfo struct {
 }
 
 func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *NodeInfo {
-	var masterController net.IP
-	if len(cfg.MasterControllerNetIPs) > 0 {
-		masterController = cfg.MasterControllerNetIPs[0]
-	}
 	return &NodeInfo{
 		tsdbCaches:              newTSDBCacheMap(),
 		tsdbRegion:              make(map[string]uint32),
@@ -54,7 +49,7 @@ func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		sysConfigurationToValue: make(map[string]string),
 		metaData:                metaData,
 		tsdbRegister:            newTSDBDiscovery(),
-		controllerRegister:      newControllerDiscovery(masterController, cfg.NodeType, cfg.RegionDomainPrefix),
+		controllerRegister:      newControllerDiscovery(cfg.NodeIP, cfg.NodeType, cfg.RegionDomainPrefix),
 		chRegister:              make(chan struct{}, 1),
 		config:                  cfg,
 		chNodeInfo:              make(chan struct{}, 1),

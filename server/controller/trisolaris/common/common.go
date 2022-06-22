@@ -47,4 +47,6 @@ const (
 
 	CONN_DEFAULT_AZ     = "ALL"
 	CONN_DEFAULT_REGION = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+
+	NODE_IP_KEY = "NODE_IP"
 )
