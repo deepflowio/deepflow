@@ -14,24 +14,26 @@
  * limitations under the License.
  */
 
-#include "perf.h"
-#include "log.h"
+#include <inttypes.h>
+#include <poll.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <syscall.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <linux/types.h>
+#include <linux/perf_event.h>
 
-extern int ioctl(int fd, unsigned long request, ...);
+#include "libbpf.h"
+#include "perf_reader.h"
 
-enum {
-	RB_NOT_USED = 0,	// ring buffer not usd
-	RB_USED_IN_MUNMAP = 1,	// used in munmap
-	RB_USED_IN_READ = 2,	// used in read
-};
-
-#ifndef PERF_FLAG_FD_CLOEXEC
-#define PERF_FLAG_FD_CLOEXEC (1UL << 3)
-#endif
-
-static struct perf_reader *perf_reader_new(perf_reader_raw_cb raw_cb,
-					   perf_reader_lost_cb lost_cb,
-					   void *cb_cookie, int page_cnt)
+struct perf_reader *perf_reader_new(perf_reader_raw_cb raw_cb,
+				    perf_reader_lost_cb lost_cb,
+				    void *cb_cookie, int page_cnt)
 {
 	struct perf_reader *reader = calloc(1, sizeof(struct perf_reader));
 	if (!reader)
@@ -45,32 +47,7 @@ static struct perf_reader *perf_reader_new(perf_reader_raw_cb raw_cb,
 	return reader;
 }
 
-static void perf_reader_set_fd(struct perf_reader *reader, int fd)
-{
-	reader->fd = fd;
-}
-
-static int perf_reader_mmap(struct perf_reader *reader)
-{
-	int mmap_size = reader->page_size * (reader->page_cnt + 1);
-
-	if (reader->fd < 0) {
-		ebpf_info("%s: reader fd is not set\n", __FUNCTION__);
-		return -1;
-	}
-
-	reader->base =
-	    mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-		 reader->fd, 0);
-	if (reader->base == MAP_FAILED) {
-		perror("mmap");
-		return -1;
-	}
-
-	return 0;
-}
-
-static void perf_reader_free(void *ptr)
+void perf_reader_free(void *ptr)
 {
 	if (ptr) {
 		struct perf_reader *reader = ptr;
@@ -93,49 +70,37 @@ static void perf_reader_free(void *ptr)
 	}
 }
 
-void *bpf_open_perf_buffer(perf_reader_raw_cb raw_cb,
-			   perf_reader_lost_cb lost_cb, void *cb_cookie,
-			   int pid, int cpu, int page_cnt)
+int perf_reader_mmap(struct perf_reader *reader)
 {
-	int pfd;
-	struct perf_event_attr attr = {};
-	struct perf_reader *reader = NULL;
-	reader = perf_reader_new(raw_cb, lost_cb, cb_cookie, page_cnt);
-	if (!reader) {
-		ebpf_info("perf_reader_mmap error\n");
-		goto error;
+	int mmap_size = reader->page_size * (reader->page_cnt + 1);
+
+	if (reader->fd < 0) {
+		fprintf(stderr, "%s: reader fd is not set\n", __FUNCTION__);
+		return -1;
 	}
 
-	attr.config = 10;	//PERF_COUNT_SW_BPF_OUTPUT;
-	attr.type = PERF_TYPE_SOFTWARE;
-	attr.sample_type = PERF_SAMPLE_RAW;
-	attr.sample_period = 1;
-	attr.wakeup_events = 1;
-	pfd =
-	    syscall(__NR_perf_event_open, &attr, pid, cpu, -1,
-		    PERF_FLAG_FD_CLOEXEC);
-	if (pfd < 0) {
-		ebpf_info("perf_event_open: %s\n", strerror(errno));
-		goto error;
-	}
-	perf_reader_set_fd(reader, pfd);
-
-	if (perf_reader_mmap(reader) < 0)
-		goto error;
-
-	if (ioctl(pfd, PERF_EVENT_IOC_ENABLE, 0) < 0) {
-		perror("ioctl(PERF_EVENT_IOC_ENABLE)");
-		goto error;
+	reader->base =
+	    mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+		 reader->fd, 0);
+	if (reader->base == MAP_FAILED) {
+		perror("mmap");
+		return -1;
 	}
 
-	return reader;
-
-error:
-	if (reader)
-		perf_reader_free(reader);
-
-	return NULL;
+	return 0;
 }
+
+struct perf_sample_trace_common {
+	uint16_t id;
+	uint8_t flags;
+	uint8_t preempt_count;
+	int pid;
+};
+
+struct perf_sample_trace_kprobe {
+	struct perf_sample_trace_common common;
+	uint64_t ip;
+};
 
 static void parse_sw(struct perf_reader *reader, void *data, int size)
 {
@@ -149,19 +114,19 @@ static void parse_sw(struct perf_reader *reader, void *data, int size)
 
 	ptr += sizeof(*header);
 	if (ptr > (uint8_t *) data + size) {
-		ebpf_info("%s: corrupt sample header\n", __FUNCTION__);
+		fprintf(stderr, "%s: corrupt sample header\n", __FUNCTION__);
 		return;
 	}
 
 	raw = (void *)ptr;
 	ptr += sizeof(raw->size) + raw->size;
 	if (ptr > (uint8_t *) data + size) {
-		ebpf_info("%s: corrupt raw sample\n", __FUNCTION__);
+		fprintf(stderr, "%s: corrupt raw sample\n", __FUNCTION__);
 		return;
 	}
 	// sanity check
 	if (ptr != (uint8_t *) data + size) {
-		ebpf_info("%s: extra data at end of sample\n",
+		fprintf(stderr, "%s: extra data at end of sample\n",
 			__FUNCTION__);
 		return;
 	}
@@ -185,9 +150,8 @@ static void write_data_tail(volatile struct perf_event_mmap_page *perf_header,
 	perf_header->data_tail = data_tail;
 }
 
-static void perf_reader_event_read(struct perf_reader *reader)
+void perf_reader_event_read(struct perf_reader *reader)
 {
-
 	volatile struct perf_event_mmap_page *perf_header = reader->base;
 	uint64_t buffer_size = (uint64_t) reader->page_size * reader->page_cnt;
 	uint64_t data_head;
@@ -195,6 +159,7 @@ static void perf_reader_event_read(struct perf_reader *reader)
 	uint8_t *sentinel =
 	    (uint8_t *) reader->base + buffer_size + reader->page_size;
 	uint8_t *begin, *end;
+
 	reader->rb_read_tid = syscall(__NR_gettid);
 	if (!__sync_bool_compare_and_swap
 	    (&reader->rb_use_state, RB_NOT_USED, RB_USED_IN_READ))
@@ -225,18 +190,27 @@ static void perf_reader_event_read(struct perf_reader *reader)
 		}
 
 		if (e->type == PERF_RECORD_LOST) {
+			/*
+			 * struct {
+			 *    struct perf_event_header    header;
+			 *    u64                id;
+			 *    u64                lost;
+			 *    struct sample_id        sample_id;
+			 * };
+			 */
 			uint64_t lost =
 			    *(uint64_t *) (ptr + sizeof(*e) + sizeof(uint64_t));
 			if (reader->lost_cb) {
 				reader->lost_cb(reader->cb_cookie, lost);
 			} else {
-				ebpf_info("Possibly lost %" PRIu64 " samples\n",
-					  lost);
+				fprintf(stderr,
+					"Possibly lost %" PRIu64 " samples\n",
+					lost);
 			}
 		} else if (e->type == PERF_RECORD_SAMPLE) {
 			parse_sw(reader, ptr, e->size);
 		} else {
-			ebpf_info("%s: unknown sample type %d\n",
+			fprintf(stderr, "%s: unknown sample type %d\n",
 				__FUNCTION__, e->type);
 		}
 
@@ -263,6 +237,24 @@ int perf_reader_poll(int num_readers, struct perf_reader **readers, int timeout)
 				perf_reader_event_read(readers[i]);
 		}
 	}
-
 	return 0;
+}
+
+int perf_reader_consume(int num_readers, struct perf_reader **readers)
+{
+	int i;
+	for (i = 0; i < num_readers; ++i) {
+		perf_reader_event_read(readers[i]);
+	}
+	return 0;
+}
+
+void perf_reader_set_fd(struct perf_reader *reader, int fd)
+{
+	reader->fd = fd;
+}
+
+int perf_reader_fd(struct perf_reader *reader)
+{
+	return reader->fd;
 }

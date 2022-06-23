@@ -17,27 +17,34 @@ define compile_socket_trace_elf
 	@cp kernel/socket_trace.elf data/linux-$(strip $1)/
 endef
 
+CURRDIR := $(PWD)
 CLANG_VER := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}')
 CLANG_VER_MAIN := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{print int($$0)}')
 LIBTRACE := libebpf.a
-OBJS := libbpf/src/bpf.o \
-	libbpf/src/btf.o \
-	libbpf/src/libbpf.o \
-	libbpf/src/libbpf_errno.o \
-	libbpf/src/netlink.o \
-	libbpf/src/nlattr.o \
-	libbpf/src/str_error.o \
-	libbpf/src/libbpf_probes.o \
-	libbpf/src/bpf_prog_linfo.o \
-	libbpf/src/xsk.o \
-	libbpf/src/btf_dump.o \
-	libbpf/src/hashmap.o \
-	libbpf/src/ringbuf.o \
+LIBBPF_DIR = libbpf/src
+OBJS := $(LIBBPF_DIR)/bpf.o \
+	$(LIBBPF_DIR)/btf.o \
+	$(LIBBPF_DIR)/libbpf.o \
+	$(LIBBPF_DIR)/libbpf_errno.o \
+	$(LIBBPF_DIR)/netlink.o \
+	$(LIBBPF_DIR)/nlattr.o \
+	$(LIBBPF_DIR)/str_error.o \
+	$(LIBBPF_DIR)/libbpf_probes.o \
+	$(LIBBPF_DIR)/bpf_prog_linfo.o \
+	$(LIBBPF_DIR)/xsk.o \
+	$(LIBBPF_DIR)/btf_dump.o \
+	$(LIBBPF_DIR)/hashmap.o \
+	$(LIBBPF_DIR)/ringbuf.o \
+	$(LIBBPF_DIR)/strset.o \
+	$(LIBBPF_DIR)/linker.o \
+	$(LIBBPF_DIR)/gen_loader.o \
+	$(LIBBPF_DIR)/relo_core.o \
 	user/bcc/bcc_elf.o \
 	user/bcc/bcc_proc.o \
+	user/bcc/libbpf.o \
+	user/bcc/perf_reader.o \
 	user/common.o \
 	user/probe.o \
-	user/perf.o \
 	user/symbol.o \
 	user/go_tracer.o \
 	user/table.o \
@@ -51,7 +58,7 @@ OBJS := libbpf/src/bpf.o \
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
-CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -Ilibbpf/src -Ilibbpf/include -Ilibbpf/include/uapi -I.
+CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I$(LIBBPF_DIR) -Ilibbpf/include -Ilibbpf/include/uapi -I.
 LDFLAGS ?= -lbddisasm -ldwarf -lelf -lz -lpthread
 
 all: build
@@ -70,7 +77,7 @@ $(ELFFILES):
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
-	$(Q)mkdir -p $@/libbpf/src
+	$(Q)mkdir -p $@/$(LIBBPF_DIR)
 	$(Q)mkdir -p $@/user/bcc
 
 $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
@@ -80,9 +87,11 @@ $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 $(LIBTRACE): $(STATIC_OBJS)
 	$(call msg,AR,$@)
 	$(Q)$(AR) rcs $@ $^
-	
-build: $(ELFFILES) $(LIBTRACE)
 
+$(LIBBPF_DIR):
+	@cd ../../../ && git submodule update --init --recursive && cd $(CURRDIR)
+	
+build: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 install:
 	rm -rf /usr/share/metaflow-agent
 	mkdir -p /usr/share/metaflow-agent
@@ -101,12 +110,13 @@ rust-sample:
 	$(call msg,RUST-SAMPLE,,samples/rust/target/release/rust_sample)
 
 clean:
-	$(Q)make -C kernel clean --no-print-directory
-	$(Q)make -C test clean --no-print-directory
+	$(Q)$(MAKE) -C kernel clean --no-print-directory
+	$(Q)$(MAKE) -C test clean --no-print-directory
 	$(Q)rm -rf $(ELFFILES) data metaflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
 	$(Q)rm -rf samples/rust/target
-test:
-	$(Q)make -C test --no-print-directory
+
+test: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
+	$(Q)$(MAKE) -C test --no-print-directory
 
 .PHONY: all build clean install tools test
 

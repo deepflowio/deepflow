@@ -78,17 +78,21 @@
 #endif
 #endif
 
+/*
+ * Legacy fixed-layout (through struct bpf_map_def) BPF map declaration in BPF code,
+ * residing in SEC("maps") will be dropped. Only BTF-defined maps will be supported starting from v1.0.
+ * ref:https://github.com/libbpf/libbpf/wiki/Libbpf:-the-road-to-v1.0#drop-support-for-legacy-bpf-map-declaration-syntax
+ */
 #define __BPF_MAP_DEF(_kt, _vt, _ents) \
-	.key_size = sizeof(_kt),		\
-	.value_size = sizeof(_vt),	\
-	.max_entries = (_ents)
+	__type(key, _kt); \
+	__type(value, _vt); \
+	__uint(max_entries, (_ents))
 
 #define MAP_ARRAY(name, key_type, value_type, max_entries) \
-struct bpf_map_def SEC("maps") __##name = \
-{   \
-    .type = BPF_MAP_TYPE_ARRAY, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
-}; \
+struct { \
+    __uint(type, BPF_MAP_TYPE_ARRAY); \
+    __BPF_MAP_DEF(key_type, value_type, max_entries); \
+} __##name SEC(".maps"); \
 static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
@@ -104,11 +108,10 @@ static __always_inline __attribute__((unused)) int name ## __delete(key_type *ke
 
 // BPF_MAP_TYPE_ARRAY define
 #define MAP_PERARRAY(name, key_type, value_type, max_entries) \
-struct bpf_map_def SEC("maps") __##name = \
-{   \
-    .type = BPF_MAP_TYPE_PERCPU_ARRAY, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
-}; \
+struct { \
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY); \
+    __BPF_MAP_DEF(key_type, value_type, max_entries); \
+}  __##name SEC(".maps"); \
 static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
@@ -124,18 +127,16 @@ static __always_inline __attribute__((unused)) int name ## __delete(key_type *ke
 
 
 #define MAP_PERF_EVENT(name, key_type, value_type, max_entries) \
-struct bpf_map_def SEC("maps") __ ## name = \
-{   \
-    .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
-};
+struct {  \
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY); \
+    __BPF_MAP_DEF(key_type, value_type, max_entries); \
+} __##name SEC(".maps");
 
 #define MAP_HASH(name, key_type, value_type, max_entries) \
-struct bpf_map_def SEC("maps") __##name = \
-{   \
-    .type = BPF_MAP_TYPE_HASH, \
-    __BPF_MAP_DEF(key_type, value_type, max_entries), \
-}; \
+struct { \
+    __uint(type, BPF_MAP_TYPE_HASH); \
+    __BPF_MAP_DEF(key_type, value_type, max_entries); \
+} __##name SEC(".maps"); \
 static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
@@ -162,39 +163,5 @@ static __always_inline __attribute__((unused)) int name ## __delete(key_type *ke
   BPF_HASHX(__VA_ARGS__, BPF_HASH4, BPF_HASH3)(__VA_ARGS__)
 
 #define BPF_LEN_CAP(x, cap) (x < cap ? (x & (cap - 1)) : cap)
-#if 0
-static __inline int bpf_memcmp(void * d, const void * s, unsigned int n) {
-     return __builtin_memcmp(d, s, n);
-}
-
-static __inline void * bpf_memcpy(void * d, const void * s, unsigned int n) {
-     return __builtin_memcpy(d, s, n);
-}
-
-static __inline void * bpf_memset(void * d, int c, unsigned int n) {
-     return __builtin_memset(d, c, n);
-}
-
-static __inline int bpf_strcmp(char * d, const char * s) {
-     return __builtin_strcmp(d, s);
-}
-
-static __inline int bpf_strncmp(char * d, const char * s, unsigned int n) {
-     return __builtin_memcmp(d, s, n);
-}
-
-static __inline char * bpf_strcpy(char * d, const char * s) {
-     return __builtin_strcpy(d, s);
-}
-
-static __inline char * bpf_strncpy(char * d, const char * s, unsigned int n) {
-     return (char *)__builtin_memcpy(d, s, n);
-}
-
-static __inline unsigned int bpf_strlen(const char * s) {
-     return __builtin_strlen(s);
-}
-#endif
-//#define BPF_LEN_CAP(x, cap) (x < cap ? (x) : cap)
 
 #endif /* __BPF_BASE_H__ */

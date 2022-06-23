@@ -8,13 +8,15 @@
 #include "table.h"
 #include "common.h"
 #include "log.h"
+#include "bcc/libbpf.h"
+#include "bcc/perf_reader.h"
 
 int major, minor;		// Linux kernel主版本，次版本
 
-#define BOOT_TIME_UPDATE_PERIOD	60		// 系统启动时间更新周期, 单位：秒
-volatile uint64_t sys_boot_time_ns;		// 当前系统启动时间，单位：纳秒
+#define BOOT_TIME_UPDATE_PERIOD	60	// 系统启动时间更新周期, 单位：秒
+volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
 volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
-uint64_t boot_time_update_count;		// 用于记录boot_time_update()调用次数。
+uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
 
 /*
  * tracers
@@ -533,7 +535,7 @@ int register_extra_waiting_op(const char *name, extra_waiting_fun_t f, int type)
 {
 	struct extra_waiting_op *ewo = malloc(sizeof(struct extra_waiting_op));
 	if (!ewo) {
-		ebpf_warning("malloc() failed, no memory.\n");	
+		ebpf_warning("malloc() failed, no memory.\n");
 		return -ENOMEM;
 	}
 	ewo->f = f;
