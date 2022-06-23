@@ -1,0 +1,8 @@
+/bin/
+/vendor/
+/*.test
+/.test-coverage.txt
+.idea/
+.*.swp
+*.pb.go
+x86_64/
