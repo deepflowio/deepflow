@@ -3,8 +3,8 @@ package zmq
 import (
 	logging "github.com/op/go-logging"
 	"github.com/pebbe/zmq4"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/queue"
+	"server/libs/utils"
 )
 
 var log = logging.MustGetLogger("sender")

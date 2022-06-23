@@ -10,12 +10,12 @@ import (
 
 	"github.com/google/gopacket/layers"
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"server/libs/ckdb"
+	"server/libs/datatype"
+	"server/libs/datatype/pb"
+	"server/libs/grpc"
+	"server/libs/pool"
+	"server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("stream.jsonify")

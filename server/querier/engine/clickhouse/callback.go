@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.yunshan.net/metaflowys/metaflow/server/libs/utils"
+	"server/libs/utils"
 
 	"server/querier/engine/clickhouse/tag"
 	"server/querier/engine/clickhouse/view"

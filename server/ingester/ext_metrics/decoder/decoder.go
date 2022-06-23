@@ -8,21 +8,21 @@ import (
 	"strconv"
 
 	"github.com/influxdata/influxdb/models"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"server/libs/zerodoc"
 
 	logging "github.com/op/go-logging"
 
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet/ext_metrics/dbwriter"
+	"server/libs/codec"
+	"server/libs/datatype"
+	"server/libs/grpc"
+	"server/libs/queue"
+	"server/libs/receiver"
+	"server/libs/stats"
+	"server/libs/utils"
+	"github.com/yunshan/droplet/ext_metrics/dbwriter"
 )
 
 var log = logging.MustGetLogger("ext_metrics.decoder")

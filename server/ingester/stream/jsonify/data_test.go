@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet/stream/geo"
+	"server/libs/datatype"
+	"server/libs/datatype/pb"
+	"server/libs/grpc"
+	"github.com/yunshan/droplet/stream/geo"
 )
 
 func TestJsonify(t *testing.T) {

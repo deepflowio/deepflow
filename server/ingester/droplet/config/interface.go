@@ -1,7 +1,7 @@
 package config
 
 import (
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 )
 
 type Handler func(*trident.SyncResponse, *RpcInfoVersions)

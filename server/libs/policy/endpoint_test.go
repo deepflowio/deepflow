@@ -6,8 +6,8 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	. "server/libs/datatype"
+	. "server/libs/utils"
 )
 
 // 平台信息有关测试

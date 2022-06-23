@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
-	"gitlab.yunshan.net/yunshan/droplet/common"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"server/libs/app"
+	"server/libs/datatype"
+	"server/libs/grpc"
+	"server/libs/utils"
+	"server/libs/zerodoc"
+	"github.com/yunshan/droplet/common"
+	"github.com/metaflowys/metaflow/message/trident"
 )
 
 const (

@@ -1,7 +1,7 @@
 package zerodoc
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
+	"server/libs/ckdb"
 )
 
 type Tagger interface {

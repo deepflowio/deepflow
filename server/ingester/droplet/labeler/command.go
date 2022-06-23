@@ -13,13 +13,13 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
-	"gitlab.yunshan.net/yunshan/droplet-libs/policy"
-	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/datatype"
+	"server/libs/debug"
+	"server/libs/policy"
+	. "server/libs/utils"
 
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl/rpc"
+	"github.com/yunshan/droplet/dropletctl"
+	"github.com/yunshan/droplet/dropletctl/rpc"
 )
 
 type command struct {

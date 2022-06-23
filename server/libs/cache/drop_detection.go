@@ -5,7 +5,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	. "server/libs/utils"
 )
 
 type Instance struct {

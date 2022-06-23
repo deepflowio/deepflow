@@ -15,7 +15,7 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
-	"github.yunshan.net/metaflowys/metaflow/server/libs/queue"
+	"server/libs/queue"
 )
 
 type VinterfacesRpcUpdater struct {

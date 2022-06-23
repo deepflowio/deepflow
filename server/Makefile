@@ -15,6 +15,7 @@ vendor:
 	#test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
 	#cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
 	cp -r ../message/* vendor/${MESSAGE}/
+	cp -r ../go.mod vendor/${MESSAGE}/../
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
 

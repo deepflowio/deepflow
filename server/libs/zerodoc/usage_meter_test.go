@@ -1,8 +1,8 @@
 package zerodoc
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/codec"
+	"server/libs/zerodoc/pb"
 
 	"testing"
 )

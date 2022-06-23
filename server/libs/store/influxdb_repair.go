@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/client/v2"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/stats"
+	"server/libs/utils"
 )
 
 const (

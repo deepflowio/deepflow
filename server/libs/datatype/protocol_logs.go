@@ -5,10 +5,10 @@ import (
 	"net"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/codec"
+	"server/libs/datatype/pb"
+	"server/libs/pool"
+	"server/libs/utils"
 )
 
 type LogMessageType uint8

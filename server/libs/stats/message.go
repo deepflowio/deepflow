@@ -4,10 +4,10 @@ import (
 	"errors"
 	"unsafe"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/ckdb"
+	"server/libs/codec"
+	"server/libs/pool"
+	"server/libs/utils"
 )
 
 const (

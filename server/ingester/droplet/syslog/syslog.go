@@ -10,9 +10,9 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/queue"
+	"server/libs/receiver"
+	"server/libs/utils"
 )
 
 var log = logging.MustGetLogger("droplet.syslog")

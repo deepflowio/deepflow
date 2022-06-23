@@ -9,10 +9,10 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/spf13/cobra"
-	"github.yunshan.net/metaflowys/metaflow/server/libs/utils"
 	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"server/libs/utils"
 )
 
 const (
@@ -91,13 +91,6 @@ func regiterCommand() []*cobra.Command {
 			initCmd([]CmdExecute{configData})
 		},
 	}
-	configFileCmd := &cobra.Command{
-		Use:   "configFile",
-		Short: "get config file from controller",
-		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{configFile})
-		},
-	}
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "get all data from controller",
@@ -107,7 +100,7 @@ func regiterCommand() []*cobra.Command {
 	}
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
-		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, configFileCmd, allCmd}
+		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, allCmd}
 	return commands
 }
 
@@ -280,14 +273,6 @@ func vpcIP(response *trident.SyncResponse) {
 	fmt.Println("pod_ip:")
 	for index, podIP := range response.GetPodIps() {
 		JsonFormat(index+1, podIP)
-	}
-}
-
-func configFile(response *trident.SyncResponse) {
-	localConfigFile := response.GetLocalConfigFile()
-	if localConfigFile != nil {
-		fmt.Printf("configFile: \n%s\n", localConfigFile.GetLocalConfig())
-		fmt.Printf("\nrevision: \n%s\n", localConfigFile.GetRevision())
 	}
 }
 

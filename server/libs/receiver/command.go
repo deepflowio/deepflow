@@ -2,7 +2,7 @@ package receiver
 
 import (
 	"github.com/spf13/cobra"
-	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
+	"server/libs/debug"
 )
 
 const (

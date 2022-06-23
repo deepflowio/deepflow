@@ -3,9 +3,9 @@ package datatype
 import (
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"server/libs/codec"
+	"server/libs/datatype/pb"
+	"server/libs/pool"
 )
 
 var kafkaInfoPool = pool.NewLockFreePool(func() interface{} {

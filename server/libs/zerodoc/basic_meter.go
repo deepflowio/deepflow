@@ -3,8 +3,8 @@ package zerodoc
 import (
 	"strconv"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/ckdb"
+	"server/libs/zerodoc/pb"
 )
 
 type Traffic struct {

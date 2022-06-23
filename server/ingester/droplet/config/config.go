@@ -8,7 +8,7 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet/common"
+	"github.com/yunshan/droplet/common"
 	yaml "gopkg.in/yaml.v2"
 )
 

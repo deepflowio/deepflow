@@ -4,16 +4,16 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
-	"gitlab.yunshan.net/yunshan/droplet-libs/dropletpb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/policy"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"server/libs/datatype"
+	"server/libs/debug"
+	"server/libs/dropletpb"
+	"server/libs/policy"
+	"server/libs/queue"
+	"server/libs/stats"
+	"github.com/metaflowys/metaflow/message/trident"
 
-	. "gitlab.yunshan.net/yunshan/droplet/droplet/common"
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	. "github.com/yunshan/droplet/droplet/common"
+	"github.com/yunshan/droplet/dropletctl"
 )
 
 var log = logging.MustGetLogger("labeler")

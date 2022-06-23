@@ -3,7 +3,7 @@ package datatype
 import (
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/utils"
 )
 
 const (
