@@ -366,10 +366,16 @@ impl FlowItem {
             return Err(LogError::L7ProtocolParseLimit);
         }
 
+        let direction = if !self.is_success {
+            PacketDirection::ClientToServer
+        } else {
+            packet.direction
+        };
+
         let ret = self.parser.as_mut().unwrap().parse(
             packet.raw_from_ebpf.as_ref(),
             packet.lookup_key.proto,
-            PacketDirection::ClientToServer,
+            direction,
         );
 
         if !self.is_success {
@@ -484,8 +490,14 @@ impl FlowItem {
         if let Ok(head) = self.parse(packet, local_epc, app_table, log_parser_config) {
             // 获取日志信息
             let info = self.get_info();
-            let base =
-                AppProtoLogsBaseInfo::from_ebpf(&packet, head, vtap_id, local_epc, self.remote_epc);
+            let base = AppProtoLogsBaseInfo::from_ebpf(
+                &packet,
+                head,
+                vtap_id,
+                local_epc,
+                self.remote_epc,
+                self.is_local_service,
+            );
             return Some(AppProtoLogsData {
                 base_info: base,
                 special_info: info,

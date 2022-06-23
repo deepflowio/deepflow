@@ -208,8 +208,14 @@ impl AppProtoLogsBaseInfo {
         vtap_id: u16,
         local_epc: i32,
         remote_epc: i32,
+        is_local_service: bool,
     ) -> Self {
         let is_src = packet.lookup_key.l2_end_0;
+        let direction = if packet.lookup_key.l2_end_1 == is_local_service {
+            PacketDirection::ClientToServer
+        } else {
+            PacketDirection::ServerToClient
+        };
         let mut info = Self {
             start_time: packet.lookup_key.timestamp,
             end_time: packet.lookup_key.timestamp,
@@ -244,42 +250,42 @@ impl AppProtoLogsBaseInfo {
                 "".to_string()
             },
 
-            syscall_trace_id_request: if packet.direction == PacketDirection::ClientToServer {
+            syscall_trace_id_request: if direction == PacketDirection::ClientToServer {
                 packet.syscall_trace_id
             } else {
                 0
             },
-            syscall_trace_id_response: if packet.direction == PacketDirection::ServerToClient {
+            syscall_trace_id_response: if direction == PacketDirection::ServerToClient {
                 packet.syscall_trace_id
             } else {
                 0
             },
-            req_tcp_seq: if packet.direction == PacketDirection::ClientToServer {
+            req_tcp_seq: if direction == PacketDirection::ClientToServer {
                 packet.tcp_data.seq
             } else {
                 0
             },
-            resp_tcp_seq: if packet.direction == PacketDirection::ServerToClient {
+            resp_tcp_seq: if direction == PacketDirection::ServerToClient {
                 packet.tcp_data.seq
             } else {
                 0
             },
-            syscall_trace_id_thread_0: if packet.direction == PacketDirection::ClientToServer {
+            syscall_trace_id_thread_0: if direction == PacketDirection::ClientToServer {
                 packet.thread_id
             } else {
                 0
             },
-            syscall_trace_id_thread_1: if packet.direction == PacketDirection::ServerToClient {
+            syscall_trace_id_thread_1: if direction == PacketDirection::ServerToClient {
                 packet.thread_id
             } else {
                 0
             },
-            syscall_cap_seq_0: if packet.direction == PacketDirection::ClientToServer {
+            syscall_cap_seq_0: if direction == PacketDirection::ClientToServer {
                 packet.cap_seq
             } else {
                 0
             },
-            syscall_cap_seq_1: if packet.direction == PacketDirection::ServerToClient {
+            syscall_cap_seq_1: if direction == PacketDirection::ServerToClient {
                 packet.cap_seq
             } else {
                 0
@@ -291,7 +297,7 @@ impl AppProtoLogsBaseInfo {
             is_vip_interface_src: false,
             is_vip_interface_dst: false,
         };
-        if packet.direction == PacketDirection::ServerToClient {
+        if direction == PacketDirection::ServerToClient {
             swap(&mut info.mac_src, &mut info.mac_dst);
             swap(&mut info.ip_src, &mut info.ip_dst);
             swap(&mut info.l3_epc_id_src, &mut info.l3_epc_id_dst);
