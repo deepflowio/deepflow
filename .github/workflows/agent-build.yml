@@ -1,0 +1,103 @@
+on: 
+  push:
+    branches:
+      - main
+    paths:
+      - 'agent/**'
+      - 'message/**'
+#   release:
+#     branches: 
+#       - main
+#       - release-*
+
+name: build agent
+
+env:
+  IMAGE: "metaflow-agent"
+
+jobs:
+  build_agent:
+    name: build agent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          install: true
+
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "ghcr.io" 
+          username: "${{ github.repository_owner }}"
+          password: "${{ secrets.GITHUB_TOKEN }}" 
+
+      - name: Log in to Docker Registry
+        uses: docker/login-action@v2
+        with:
+          username: "metaflowys"
+          password: "${{ secrets.REGISTRY_PASS }}"
+
+      - name: Log in to ALIYUN Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "registry.cn-beijing.aliyuncs.com"
+          username: "${{ secrets.REGISTRY_ALIYUN_USER }}"
+          password: "${{ secrets.REGISTRY_PASS }}"
+
+      - name: Log in to ALIYUN Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "${{ secrets.REGISTRY_ALIYUN_ADDR }}"
+          username: "${{ secrets.REGISTRY_ALIYUN_USER }}" 
+          password: "${{ secrets.REGISTRY_PASS }}"
+
+      - name: set env
+        run: |
+          echo "IMAGE_TAG=$(date +%y%m)-$(git rev-list --count HEAD)" >> $GITHUB_ENV
+
+      - name: Build  metaflow agent
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: false 
+          file: agent/docker/dockerfile-build
+          platforms: linux/amd64
+          outputs: type=local,dest=./agent/output/
+
+      - name: Build and push metaflow agent images
+        uses: docker/build-push-action@v2
+        with:
+          context: agent
+          push: true 
+          file: agent/docker/dockerfile 
+          platforms: linux/amd64
+          tags: |
+            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
+            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:latest"
+            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
+            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:latest"
+            "metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
+            "metaflowys/${{ env.IMAGE }}:latest"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG }}"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:latest"
+
+      - name: build rpm
+        run: |
+          cd agent
+          rpmbuild -bb metaflow-agent.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+          rpmbuild -bb metaflow-agent_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+          zip -r -q artifacts.zip x86_64/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: metaflow-agent-rpm.zip
+          path: agent/artifacts.zip
+          retention-days: 5

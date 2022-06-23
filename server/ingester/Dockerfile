@@ -1,4 +1,4 @@
-FROM dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/dev/golang:1.18.0 as builder
+FROM golang:1.18.0 as builder
 # ENV CGO_ENABLED=0
 ENV GOPROXY=https://proxy.golang.com.cn,direct
 # 还可以设置不走 proxy 的私有仓库或组，多个用逗号相隔（可选）

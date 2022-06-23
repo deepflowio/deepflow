@@ -1,0 +1,58 @@
+name: build cli
+
+on: 
+  push:
+    branches:
+      - main
+    paths:
+      - 'cli/**'
+#   release:
+#     branches: 
+#       - main
+#       - release-*
+
+jobs:
+  build_cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@master
+        with:
+          go-version: 1.18.x
+
+      - name: build cli
+        run: |
+          cd cli
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.linux-amd64
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 make -e BINARY_SUFFIX=.linux-arm64
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 make -e BINARY_SUFFIX=.darwin-amd64
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 make -e BINARY_SUFFIX=.darwin-arm64
+          cd bin/
+          sha256sum * > metaflow-agent.sha256sum.txt
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: metaflow-cli
+          path: ./cli/bin/*
+
+      # - name: Prepare for upload package
+      #   shell: bash
+      #   run: |
+      #     sha256sum dist/* > metaflow-agent.sha256sum.txt
+
+      # - name: Release and upload packages
+      #   uses: softprops/action-gh-release@v1
+      #   if: startsWith(github.ref, 'refs/tags/')
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     files: |
+      #       metaflow-agent.sha256sum.txt
+      #       dist/*

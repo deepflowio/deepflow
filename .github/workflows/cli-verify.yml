@@ -1,0 +1,35 @@
+name: verify cli
+
+on: 
+  pull_request:
+    paths:
+      - 'cli/**'
+
+jobs:
+  verify_cli:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@master
+        with:
+          go-version: 1.18.x
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          version: '3.6.1'
+      
+      - name: verify cli
+        run: |
+          cd cli
+          go mod tidy
+          go fmt ./...
+          git diff
+          go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
+          make

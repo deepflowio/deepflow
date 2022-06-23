@@ -1,4 +1,4 @@
-FROM dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/dev/alpine:latest as metaflow-server
+FROM alpine:latest as metaflow-server
 
 MAINTAINER songzhen@yunshan.net
 

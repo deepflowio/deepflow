@@ -1,0 +1,47 @@
+name: verify server
+
+on: 
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'message/**'
+
+jobs:
+  verify_server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@master
+        with:
+          go-version: 1.18.x
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          version: '3.6.1'
+      
+      - name: verify server
+        run: |
+          sudo apt-get update
+          sudo apt-get install tmpl
+          pip install ujson
+          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
+          GO111MODULE="off" go get github.com/gogo/protobuf/proto
+          GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
+          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gogo
+          GO111MODULE="off" go get github.com/gogo/protobuf/gogoproto
+          GO111MODULE="off" go get github.com/golang/protobuf/protoc-gen-go
+          cd server
+          touch vendor
+          make clean
+          go mod tidy
+          go fmt ./...
+          git diff
+          go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
+          make
