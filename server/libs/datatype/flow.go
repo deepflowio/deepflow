@@ -476,6 +476,9 @@ func (f *Flow) SequentialMerge(rhs *Flow) {
 	f.CloseType = rhs.CloseType
 	f.IsActiveService = rhs.IsActiveService
 	f.Reversed = rhs.Reversed
+	if rhs.VLAN > 0 {
+		f.VLAN = rhs.VLAN
+	}
 
 	// 若flow中存在KeepAlive报文，f.LastKeepaliveSeq及f.LastKeepaliveAck保存最后采集到的信息
 	if rhs.LastKeepaliveSeq != 0 {
@@ -519,6 +522,7 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	p.Duration = uint64(f.Duration)
 
 	p.EthType = uint32(f.EthType)
+	p.VLAN = uint32(f.VLAN)
 	if f.FlowPerfStats != nil {
 		p.HasFlowPerfStats = 1
 		if p.FlowPerfStats == nil {

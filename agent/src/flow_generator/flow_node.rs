@@ -5,7 +5,7 @@ use crate::{
     common::{
         decapsulate::TunnelType,
         endpoint::EndpointData,
-        enums::{EthernetType, PacketDirection, TapType},
+        enums::{EthernetType, PacketDirection, TapType, TcpFlags},
         flow::FlowMetricsPeer,
         lookup_key::LookupKey,
         meta_packet::MetaPacket,
@@ -153,12 +153,14 @@ impl FlowNode {
         flow_metrics_peer_src.byte_count = 0;
         flow_metrics_peer_src.l3_byte_count = 0;
         flow_metrics_peer_src.l4_byte_count = 0;
+        flow_metrics_peer_src.tcp_flags = TcpFlags::empty();
 
         let flow_metrics_peer_dst = &mut flow.flow_metrics_peers[FLOW_METRICS_PEER_DST];
         flow_metrics_peer_dst.packet_count = 0;
         flow_metrics_peer_dst.byte_count = 0;
         flow_metrics_peer_dst.l3_byte_count = 0;
         flow_metrics_peer_dst.l4_byte_count = 0;
+        flow_metrics_peer_dst.tcp_flags = TcpFlags::empty();
     }
 
     pub fn match_node(

@@ -27,7 +27,7 @@ message Flow {
 	uint64 Duration = 8;
 	// uint64 FlowStatTime = 9;  // 目前无需发送
 
-	// uint32 VLAN = 10;  // 目前无需发送
+	uint32 VLAN = 10;
 	uint32 EthType = 11;
 
 	uint32        HasFlowPerfStats = 12;
