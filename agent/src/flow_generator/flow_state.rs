@@ -227,13 +227,13 @@ impl StateMachine {
         m[FlowState::ClosingTx2 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
         m[FlowState::ClosingTx2 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
 
-        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Reset, true));
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Reset, false));
         m[FlowState::ClosingTx2 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
         m[FlowState::ClosingTx2 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
         m[FlowState::ClosingTx2 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
 
         // ACK(正)
-        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, true));
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, false));
         m[FlowState::ClosingTx2 as usize][TcpFlags::ACK.bits() as usize] = Some(s);
 
         // for FlowState::ClosingRx1
@@ -268,7 +268,7 @@ impl StateMachine {
         m[FlowState::ClosingRx2 as usize][TcpFlags::FIN_ACK.bits() as usize] = Some(s.clone());
         m[FlowState::ClosingRx2 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
 
-        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Reset, true));
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Reset, false));
         m[FlowState::ClosingRx2 as usize][TcpFlags::RST.bits() as usize] = Some(s.clone());
         m[FlowState::ClosingRx2 as usize][TcpFlags::RST_ACK.bits() as usize] = Some(s.clone());
         m[FlowState::ClosingRx2 as usize][TcpFlags::RST_PSH_ACK.bits() as usize] = Some(s);
@@ -586,7 +586,7 @@ impl StateMachine {
         m[FlowState::ClosingRx1 as usize][TcpFlags::FIN_PSH_ACK.bits() as usize] = Some(s);
 
         // for FlowState::ClosingRx2
-        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, true));
+        let s = Rc::new(StateValue::new(t.closed_fin, FlowState::Closed, false));
         m[FlowState::ClosingRx2 as usize][TcpFlags::ACK.bits() as usize] = Some(s);
 
         // for FlowState::Closed

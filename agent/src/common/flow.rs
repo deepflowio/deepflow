@@ -706,6 +706,9 @@ impl Flow {
         self.close_type = other.close_type;
         self.is_active_service = other.is_active_service;
         self.reversed = other.reversed;
+        if other.vlan > 0 {
+            self.vlan = other.vlan
+        }
 
         if other.last_keepalive_seq != 0 {
             self.last_keepalive_seq = other.last_keepalive_seq;
@@ -838,6 +841,7 @@ impl From<Flow> for flow_log::Flow {
             end_time: f.end_time.as_nanos() as u64,
             duration: f.duration.as_nanos() as u64,
             eth_type: f.eth_type as u32,
+            vlan: f.vlan as u32,
             has_perf_stats: f.flow_perf_stats.is_some() as u32,
             perf_stats: {
                 if f.flow_perf_stats.is_none() {

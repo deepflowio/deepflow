@@ -648,6 +648,9 @@ impl FlowMap {
             flow_metrics_peer.first = pkt_timestamp;
         }
 
+        if meta_packet.vlan > 0 {
+            flow.vlan = meta_packet.vlan;
+        }
         if let Some(tunnel) = meta_packet.tunnel {
             match meta_packet.direction {
                 PacketDirection::ClientToServer => {
