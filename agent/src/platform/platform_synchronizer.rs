@@ -10,7 +10,7 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use ring::digest;
 use tokio::runtime::Runtime;
 
@@ -22,14 +22,14 @@ use super::{
     InterfaceEntry, LibvirtXmlExtractor,
 };
 
-use crate::rpc::Session;
 use crate::utils::command::*;
 use crate::{
     config::{handler::PlatformAccess, KubernetesPollerType},
     handler,
-    proto::trident::{self, GenesisSyncRequest, GenesisSyncResponse},
+    proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse},
     utils::environment::is_tt_pod,
 };
+use crate::{exception::ExceptionHandler, rpc::Session};
 
 const SHA1_DIGEST_LEN: usize = 20;
 
@@ -42,6 +42,7 @@ struct ProcessArgs {
     timer: Arc<Condvar>,
     xml_extractor: Arc<LibvirtXmlExtractor>,
     kubernetes_poller: Arc<GenericPoller>,
+    exception_handler: ExceptionHandler,
 }
 
 #[derive(Default)]
@@ -75,6 +76,7 @@ pub struct PlatformSynchronizer {
     session: Arc<Session>,
     xml_extractor: Arc<LibvirtXmlExtractor>,
     sniffer: Arc<sniffer_builder::Sniffer>,
+    exception_handler: ExceptionHandler,
 }
 
 impl PlatformSynchronizer {
@@ -82,6 +84,7 @@ impl PlatformSynchronizer {
         config: PlatformAccess,
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
+        exception_handler: ExceptionHandler,
     ) -> Self {
         let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
 
@@ -130,6 +133,7 @@ impl PlatformSynchronizer {
             session,
             xml_extractor,
             sniffer,
+            exception_handler,
         }
     }
 
@@ -194,6 +198,7 @@ impl PlatformSynchronizer {
             session: self.session.clone(),
             xml_extractor: self.xml_extractor.clone(),
             sniffer: self.sniffer.clone(),
+            exception_handler: self.exception_handler.clone(),
         };
 
         let handle = thread::spawn(move || Self::process(process_args));
@@ -599,7 +604,8 @@ impl PlatformSynchronizer {
                         );
                     }
                     Err(e) => {
-                        warn!("send platform heartbeat failed: {}", e);
+                        args.exception_handler.set(Exception::ControllerSocketError);
+                        error!("send platform heartbeat failed: {}", e);
                         if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                             break;
                         }
@@ -621,7 +627,8 @@ impl PlatformSynchronizer {
             ) {
                 Ok(version) => last_version = version,
                 Err(e) => {
-                    warn!("send platform information failed: {}", e);
+                    args.exception_handler.set(Exception::ControllerSocketError);
+                    error!("send platform information failed: {}", e);
                     if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                         break;
                     }
