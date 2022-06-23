@@ -6,7 +6,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
-	api "gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	api "github.com/metaflowys/metaflow/message/trident"
 	context "golang.org/x/net/context"
 
 	"server/controller/trisolaris"

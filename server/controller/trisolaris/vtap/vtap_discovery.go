@@ -6,7 +6,7 @@ import (
 	"regexp"
 
 	"github.com/google/uuid"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 	"gorm.io/gorm"
 
 	. "server/controller/common"

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 	"gorm.io/gorm"
 
 	. "server/controller/common"

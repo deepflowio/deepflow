@@ -4,7 +4,7 @@ import (
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	api "gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	api "github.com/metaflowys/metaflow/message/trident"
 
 	"server/controller/genesis"
 	grpcserver "server/controller/trisolaris/server/grpc"

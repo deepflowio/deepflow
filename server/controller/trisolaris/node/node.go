@@ -9,7 +9,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 	"github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 	"gorm.io/gorm"
 
 	models "server/controller/db/mysql"

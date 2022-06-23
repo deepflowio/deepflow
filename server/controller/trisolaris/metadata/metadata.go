@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 
 	"server/controller/trisolaris/config"
 )

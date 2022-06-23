@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"gitlab.yunshan.net/yunshan/metaflow/message/common"
-	api "gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/message/common"
+	api "github.com/metaflowys/metaflow/message/trident"
 	context "golang.org/x/net/context"
 
 	. "server/controller/common"

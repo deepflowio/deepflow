@@ -10,8 +10,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
-	"gitlab.yunshan.net/yunshan/metaflow/libs/utils"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.yunshan.net/metaflowys/metaflow/server/libs/utils"
+	"github.com/metaflowys/metaflow/message/trident"
 	"google.golang.org/grpc"
 )
 

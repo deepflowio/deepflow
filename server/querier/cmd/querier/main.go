@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/metaflow/libs/logger"
+	"github.yunshan.net/metaflowys/metaflow/server/libs/logger"
 
 	"server/querier/querier"
 )

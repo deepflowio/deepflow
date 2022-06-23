@@ -1,7 +1,7 @@
 package metadata
 
 import (
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 	. "server/controller/common"
 	models "server/controller/db/mysql"
 )
