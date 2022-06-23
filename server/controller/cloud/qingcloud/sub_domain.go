@@ -47,7 +47,7 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 				config := map[string]string{
 					"vpc_uuid":        vpcLcuuid,
 					"cluster_id":      clusterId,
-					"port_name_regex": "",
+					"port_name_regex": common.DEFAULT_PORT_NAME_REGEX,
 					"vtap_id":         "",
 					"controller_ip":   "",
 				}

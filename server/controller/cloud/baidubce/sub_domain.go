@@ -43,7 +43,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 			config := map[string]string{
 				"vpc_uuid":        vpcLcuuid,
 				"cluster_id":      cluster.ClusterUuid,
-				"port_name_regex": "",
+				"port_name_regex": common.DEFAULT_PORT_NAME_REGEX,
 				"vtap_id":         "",
 				"controller_ip":   "",
 			}
