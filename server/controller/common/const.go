@@ -144,6 +144,7 @@ const (
 
 const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
+	DEFAULT_PORT_NAME_REGEX     = "(cni|flannel|vxlan.calico|tunl)"
 
 	OPENSTACK         = 1
 	VSPHERE           = 2
