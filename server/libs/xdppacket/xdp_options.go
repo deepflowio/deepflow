@@ -63,7 +63,7 @@ const (
 	// 默认包缓存大小：1024; 不宜过大，可能导致无法分配足够内存
 	DFLT_NUM_FRAMES = 1024
 	// 默认包大小：2048B, 否则会导致无法处理超过1024B的包
-	// 参考：http://gitlab.yunshan.net/hpn/linux-kernel/wikis/xdp-zc-排查1400的数据包没有接收的问题
+	// 参考：http://github.com/hpn/linux-kernel/wikis/xdp-zc-排查1400的数据包没有接收的问题
 	DFLT_FRAME_SIZE = 4096
 	// 内核网卡驱动headroom大小
 	DFLT_KERNEL_FRAME_HEADROOM = 256

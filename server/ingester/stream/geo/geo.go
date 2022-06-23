@@ -1,7 +1,7 @@
 package geo
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/geo"
+	"server/libs/geo"
 )
 
 var geoTree geo.GeoTree

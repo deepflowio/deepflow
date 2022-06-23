@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.yunshan.net/metaflowys/metaflow/server/libs/queue"
+	"server/libs/queue"
 	tridentcommon "github.com/metaflowys/metaflow/message/common"
 	"github.com/metaflowys/metaflow/message/trident"
 	"google.golang.org/grpc"

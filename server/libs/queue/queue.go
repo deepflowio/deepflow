@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/stats"
+	"server/libs/utils"
 )
 
 var OverflowError = errors.New("Requested size is larger than capacity")

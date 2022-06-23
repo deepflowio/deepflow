@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap"
+	"server/libs/hmap"
 )
 
 func TestU128LRU(t *testing.T) {

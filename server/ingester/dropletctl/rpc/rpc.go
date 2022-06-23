@@ -18,11 +18,11 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"server/libs/utils"
+	"github.com/metaflowys/metaflow/message/trident"
 
-	"gitlab.yunshan.net/yunshan/droplet/droplet/config"
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	"github.com/yunshan/droplet/droplet/config"
+	"github.com/yunshan/droplet/dropletctl"
 )
 
 type CmdExecute func(response *trident.SyncResponse)

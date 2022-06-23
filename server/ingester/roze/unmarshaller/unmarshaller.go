@@ -7,17 +7,17 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"server/libs/zerodoc"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
-	"gitlab.yunshan.net/yunshan/droplet/roze/dbwriter"
+	"server/libs/app"
+	"server/libs/codec"
+	"server/libs/grpc"
+	"server/libs/queue"
+	"server/libs/receiver"
+	"server/libs/stats"
+	"server/libs/utils"
+	"server/libs/zerodoc/pb"
+	"github.com/yunshan/droplet/roze/dbwriter"
 )
 
 var log = logging.MustGetLogger("roze.unmarshaller")

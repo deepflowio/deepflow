@@ -6,7 +6,7 @@ import (
 	"encoding/gob"
 	"net"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	. "server/libs/utils"
 )
 
 type IP struct {

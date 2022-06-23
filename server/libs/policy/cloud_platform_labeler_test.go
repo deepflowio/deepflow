@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	. "server/libs/datatype"
 )
 
 var (

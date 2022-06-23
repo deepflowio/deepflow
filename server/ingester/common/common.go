@@ -7,8 +7,8 @@ import (
 
 	clickhouse "github.com/ClickHouse/clickhouse-go"
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
+	"server/libs/datatype"
+	"server/libs/grpc"
 )
 
 var log = logging.MustGetLogger("common")

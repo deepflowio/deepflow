@@ -1,6 +1,6 @@
 package dropletctl
 
-import "gitlab.yunshan.net/yunshan/droplet-libs/debug"
+import "server/libs/debug"
 
 const (
 	DEBUG_LISTEN_IP   = "127.0.0.1"

@@ -5,10 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap"
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/keyhash"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/hmap"
+	"server/libs/hmap/keyhash"
+	"server/libs/stats"
+	"server/libs/utils"
 )
 
 type u128LRUNode struct {

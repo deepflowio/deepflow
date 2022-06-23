@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	. "server/libs/utils"
 )
 
 const (

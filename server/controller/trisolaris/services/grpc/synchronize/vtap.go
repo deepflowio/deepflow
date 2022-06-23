@@ -13,7 +13,6 @@ import (
 	"server/controller/trisolaris"
 	. "server/controller/trisolaris/common"
 	"server/controller/trisolaris/pushmanager"
-	. "server/controller/trisolaris/utils"
 	"server/controller/trisolaris/vtap"
 )
 
@@ -173,32 +172,6 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 	return configure
 }
 
-func (e *VTapEvent) generateConfigFile(c *vtap.VTapCache, in *api.SyncRequest) *api.LocalConfigFile {
-	if Find[int](vtap.LOCAL_FILE_VTAP, int(c.GetVTapType())) {
-		return &api.LocalConfigFile{
-			LocalConfig: proto.String(""),
-			Revision:    proto.String(c.GetConfigFileRevison()),
-		}
-	}
-	configFile := c.GetConfigFile()
-	configFileRevision := c.GetConfigFileRevison()
-	localConfigFile := in.GetLocalConfigFile()
-	rpcRevision := ""
-	if localConfigFile != nil {
-		rpcRevision = localConfigFile.GetRevision()
-	}
-	if configFile != "" && configFileRevision != rpcRevision {
-		return &api.LocalConfigFile{
-			LocalConfig: proto.String(configFile),
-			Revision:    proto.String(configFileRevision),
-		}
-	}
-	return &api.LocalConfigFile{
-		LocalConfig: proto.String(""),
-		Revision:    proto.String(c.GetConfigFileRevison()),
-	}
-}
-
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	gVTapInfo := trisolaris.GetGVTapInfo()
 	ctrlIP := in.GetCtrlIp()
@@ -265,10 +238,6 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		in.GetArch(),
 		in.GetOs(),
 		in.GetKernelVersion())
-	localConfigFile := in.GetLocalConfigFile()
-	if localConfigFile != nil {
-		vtapCache.UpdateConfigFileFromGrpc(localConfigFile.GetLocalConfig(), localConfigFile.GetRevision())
-	}
 	// 专属采集器ctrl_mac可能会变，不更新ctrl_mac
 	if vtapCache.GetVTapType() != VTAP_TYPE_DEDICATED {
 		vtapCache.UpdateCtrlMacFromGrpc(in.GetCtrlMac())
@@ -302,14 +271,6 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
-	configFile := e.generateConfigFile(vtapCache, in)
-	if in.GetLocalConfigFile() != nil && in.GetLocalConfigFile().GetRevision() != configFile.GetRevision() {
-		log.Infof("send vtap(ctrl_ip: %s, ctrl_mac: %s), file_revision: %s file_len: %d",
-			ctrlIP, ctrlMac, configFile.GetRevision(), len(configFile.GetLocalConfig()))
-	} else {
-		log.Debugf("send vatp(ctrl_ip: %s, ctrl_mac: %s), file_revision: %s file_len: %d",
-			ctrlIP, ctrlMac, configFile.GetRevision(), len(configFile.GetLocalConfig()))
-	}
 	localSegments := vtapCache.GetVTapLocalSegments()
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
 	upgradeRevision := vtapCache.GetUpgradeRevision()
@@ -321,7 +282,6 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		PlatformData:        platformData,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		TapTypes:            tapTypes,
-		LocalConfigFile:     configFile,
 		SelfUpdateUrl:       proto.String(gVTapInfo.GetSelfUpdateUrl()),
 		Revision:            proto.String(upgradeRevision),
 	}, nil
@@ -454,7 +414,6 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
 		}
 	}
-	configFile := e.generateConfigFile(vtapCache, in)
 	localSegments := vtapCache.GetVTapLocalSegments()
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
 	return &api.SyncResponse{
@@ -465,7 +424,6 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		PlatformData:        platformData,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		TapTypes:            tapTypes,
-		LocalConfigFile:     configFile,
 	}, nil
 }
 

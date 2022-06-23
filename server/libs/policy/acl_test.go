@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	. "server/libs/datatype"
 )
 
 func TestAclSimple(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/keyhash"
+	"server/libs/hmap/keyhash"
 )
 
 const (

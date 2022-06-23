@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap"
+	"server/libs/hmap"
 )
 
 func TestU128IDMapAddOrGet(t *testing.T) {

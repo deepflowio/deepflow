@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
-	"github.com/metaflowys/metaflow/server/libs/logger"
+	"server/libs/logger"
 	yaml "gopkg.in/yaml.v2"
 
 	"server/controller/common"

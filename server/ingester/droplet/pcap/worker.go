@@ -9,9 +9,9 @@ import (
 	"unsafe"
 
 	"github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"server/libs/datatype"
+	"server/libs/queue"
+	"server/libs/zerodoc"
 )
 
 const (

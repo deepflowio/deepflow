@@ -1,5 +1,5 @@
-MESSAGE = gitlab.yunshan.net/yunshan/message
-DROPLET_LIBS = gitlab.yunshan.net/yunshan/droplet-libs
+MESSAGE = github.com/metaflowys/metaflow/message
+DROPLET_LIBS = server/libs
 
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)

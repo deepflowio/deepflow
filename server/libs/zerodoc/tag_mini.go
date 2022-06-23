@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/codec"
+	"server/libs/datatype"
+	"server/libs/pool"
+	"server/libs/zerodoc/pb"
 )
 
 const (

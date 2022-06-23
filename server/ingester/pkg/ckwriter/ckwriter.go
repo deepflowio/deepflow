@@ -10,10 +10,10 @@ import (
 
 	clickhouse "github.com/ClickHouse/clickhouse-go"
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/ckdb"
+	"server/libs/queue"
+	"server/libs/stats"
+	"server/libs/utils"
 )
 
 var log = logging.MustGetLogger("ckwriter")

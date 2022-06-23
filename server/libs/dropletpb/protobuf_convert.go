@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/policy"
-	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/datatype"
+	"server/libs/policy"
+	. "server/libs/utils"
 )
 
 var log = logging.MustGetLogger("dropletpb")

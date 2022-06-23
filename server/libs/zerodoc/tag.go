@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/ckdb"
+	"server/libs/datatype"
+	"server/libs/pool"
+	"server/libs/utils"
+	"server/libs/zerodoc/pb"
 )
 
 type Code uint64

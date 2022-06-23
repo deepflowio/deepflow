@@ -75,8 +75,8 @@ Golang自身具备基于git repo的组件依赖描述，因此我们应当遵循
 package droplet
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/linkedlist"
+	"server/libs/queue"
+	"server/libs/linkedlist"
 )
 ```
 
@@ -108,7 +108,7 @@ import (
 
 * 单元测试通过DLV调试的方法
   1. 首先`go get -u github.com/derekparker/delve/cmd/dlv`下载dlv工具
-  2. 以dedup为例，执行`dlv test gitlab.yunshan.net/yunshan/droplet/handler/`
+  2. 以dedup为例，执行`dlv test github.com/yunshan/droplet/handler/`
   3. 列举测试用例，`funcs test.Test*`
   4. 设置断点，`break TestPacketExtract`
   5. 启动调试，`continue`
@@ -263,7 +263,7 @@ profiler
       - 每自然分钟第0秒上报所有flow
       - 以上超时时间均可通过droplet.yaml文件进行配置
 
-![image](http://gitlab.yunshan.net/hpn/tasks-hpn/uploads/de65de6b51659d4368fd334b6845e40c/image.png)
+![image](http://github.com/hpn/tasks-hpn/uploads/de65de6b51659d4368fd334b6845e40c/image.png)
 
 * 网流结束类型
   - IPv4-TCP

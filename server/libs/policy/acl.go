@@ -3,7 +3,7 @@ package policy
 import (
 	"fmt"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	. "server/libs/datatype"
 )
 
 const (

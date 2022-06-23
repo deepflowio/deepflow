@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet/common"
-	"gitlab.yunshan.net/yunshan/droplet/ext_metrics/config"
-	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
+	"server/libs/ckdb"
+	"server/libs/stats"
+	"server/libs/utils"
+	"github.com/yunshan/droplet/common"
+	"github.com/yunshan/droplet/ext_metrics/config"
+	"github.com/yunshan/droplet/pkg/ckwriter"
 )
 
 var log = logging.MustGetLogger("ext_metrics.dbwriter")

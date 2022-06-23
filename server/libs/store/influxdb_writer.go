@@ -13,14 +13,14 @@ import (
 	"github.com/influxdata/influxdb/models"
 	logging "github.com/op/go-logging"
 
-	// 需要从gitlab.yunshan.net获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
-	// _ "gitlab.yunshan.net/platform/influxdb/client/v2"
+	// 需要从github.com获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
+	// _ "github.com/platform/influxdb/client/v2"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"server/libs/pool"
+	"server/libs/queue"
+	"server/libs/stats"
+	"server/libs/utils"
+	"server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("store")

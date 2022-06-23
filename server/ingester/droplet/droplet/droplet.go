@@ -7,20 +7,20 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	libpcap "gitlab.yunshan.net/yunshan/droplet-libs/pcap"
-	libqueue "gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
+	"server/libs/datatype"
+	libpcap "server/libs/pcap"
+	libqueue "server/libs/queue"
+	"server/libs/receiver"
 
-	"gitlab.yunshan.net/yunshan/droplet/droplet/adapter"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/config"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/labeler"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/pcap"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/queue"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/statsd"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/syslog"
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/yunshan/droplet/droplet/adapter"
+	"github.com/yunshan/droplet/droplet/config"
+	"github.com/yunshan/droplet/droplet/labeler"
+	"github.com/yunshan/droplet/droplet/pcap"
+	"github.com/yunshan/droplet/droplet/queue"
+	"github.com/yunshan/droplet/droplet/statsd"
+	"github.com/yunshan/droplet/droplet/syslog"
+	"github.com/yunshan/droplet/dropletctl"
+	"github.com/metaflowys/metaflow/message/trident"
 )
 
 var log = logging.MustGetLogger("droplet")

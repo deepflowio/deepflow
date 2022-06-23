@@ -10,19 +10,19 @@ import (
 	"unicode"
 
 	"github.com/spf13/cobra"
-	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/adapter"
+	"server/libs/debug"
+	"server/libs/grpc"
+	"server/libs/receiver"
+	"github.com/yunshan/droplet/droplet/adapter"
 
-	"gitlab.yunshan.net/yunshan/droplet/config"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/labeler"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/profiler"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/queue"
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl/rpc"
-	"gitlab.yunshan.net/yunshan/droplet/roze/roze"
-	"gitlab.yunshan.net/yunshan/droplet/stream/stream"
+	"github.com/yunshan/droplet/config"
+	"github.com/yunshan/droplet/droplet/labeler"
+	"github.com/yunshan/droplet/droplet/profiler"
+	"github.com/yunshan/droplet/droplet/queue"
+	"github.com/yunshan/droplet/dropletctl"
+	"github.com/yunshan/droplet/dropletctl/rpc"
+	"github.com/yunshan/droplet/roze/roze"
+	"github.com/yunshan/droplet/stream/stream"
 )
 
 func main() {

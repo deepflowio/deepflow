@@ -3,7 +3,7 @@ package datatype
 import (
 	"net"
 
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 )
 
 const (

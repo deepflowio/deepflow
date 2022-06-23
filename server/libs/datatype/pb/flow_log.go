@@ -1,7 +1,7 @@
 package pb
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"server/libs/pool"
 )
 
 var pbAppProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {

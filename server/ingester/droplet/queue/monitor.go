@@ -7,9 +7,9 @@ import (
 	"net"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
+	"server/libs/debug"
 
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	"github.com/yunshan/droplet/dropletctl"
 )
 
 type MonitorOperator interface {

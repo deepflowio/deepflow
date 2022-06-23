@@ -9,10 +9,10 @@ import (
 
 	"database/sql"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
-	"gitlab.yunshan.net/yunshan/droplet/common"
-	"gitlab.yunshan.net/yunshan/droplet/datasource"
+	"server/libs/ckdb"
+	"server/libs/zerodoc"
+	"github.com/yunshan/droplet/common"
+	"github.com/yunshan/droplet/datasource"
 )
 
 var log = logging.MustGetLogger("issu")

@@ -1,4 +1,4 @@
-MESSAGE = gitlab.yunshan.net/yunshan/message
+MESSAGE = github.com/metaflowys/metaflow/message
 
 afpacket-debug:
 	go build -gcflags 'all=-N -l' -o benchTest_afpacket ./afpacket/main.go

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/gopacket/pcapgo"
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	. "server/libs/datatype"
 )
 
 const (

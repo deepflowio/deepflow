@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/utils"
 )
 
 type GcMonitor struct {

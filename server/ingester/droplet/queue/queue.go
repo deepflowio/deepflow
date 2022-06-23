@@ -1,7 +1,7 @@
 package queue
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"server/libs/queue"
 )
 
 type Queue struct {

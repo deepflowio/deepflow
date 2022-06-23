@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/idmap"
-	"gitlab.yunshan.net/yunshan/droplet-libs/logger"
-	"gitlab.yunshan.net/yunshan/droplet-libs/policy"
-	api "gitlab.yunshan.net/yunshan/droplet-libs/reciter-api"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/datatype"
+	"server/libs/hmap/idmap"
+	"server/libs/logger"
+	"server/libs/policy"
+	api "server/libs/reciter-api"
+	"server/libs/utils"
 )
 
 const (
