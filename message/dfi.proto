@@ -15,7 +15,7 @@ option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 
-option java_package = "cn.net.yunshan.message";
+option java_package = "cn.net.metaflow.message";
 option java_outer_classname = "DFIMessage";
 option go_package = "dfi";
 

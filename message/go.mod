@@ -1,4 +1,4 @@
-module gitlab.yunshan.net/yunshan/message
+module github.com/metaflowys/metaflow/message
 
 require github.com/gogo/protobuf v1.2.0
 
