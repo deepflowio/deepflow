@@ -385,6 +385,7 @@ pub enum TraceType {
     Uber,
     Sw6,
     Sw8,
+    TraceParent,
 }
 
 impl From<&str> for TraceType {
@@ -395,6 +396,7 @@ impl From<&str> for TraceType {
             "uber-trace-id" => TraceType::Uber,
             "sw6" => TraceType::Sw6,
             "sw8" => TraceType::Sw8,
+            "traceparent" => TraceType::TraceParent,
             _ => TraceType::Disabled,
         }
     }

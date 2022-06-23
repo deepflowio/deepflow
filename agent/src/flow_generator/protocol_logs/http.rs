@@ -487,11 +487,30 @@ impl HttpLog {
         None
     }
 
+    // OTel HTTP Trace format:
+    // traceparent: 00-TRACEID-SPANID-01
+    fn decode_traceparent(value: &str, id_type: u8) -> Option<String> {
+        let segs = value.split("-");
+        let mut i = 0;
+        for seg in segs {
+            if id_type == Self::TRACE_ID && i == 1 {
+                return Some(seg.to_string());
+            }
+            if id_type == Self::SPAN_ID && i == 2 {
+                return Some(seg.to_string());
+            }
+
+            i += 1;
+        }
+        None
+    }
+
     fn decode_id(payload: &str, trace_type: TraceType, id_type: u8) -> Option<String> {
         match trace_type {
             TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span => Some(payload.to_owned()),
             TraceType::Uber => Self::decode_uber_id(payload, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
+            TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
         }
     }
 }
