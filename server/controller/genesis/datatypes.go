@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 )
 
 type VIFRPCMessage struct {

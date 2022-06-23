@@ -3,8 +3,8 @@ package genesis
 import (
 	"context"
 	"fmt"
-	tridentcommon "gitlab.yunshan.net/yunshan/metaflow/message/common"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	tridentcommon "github.com/metaflowys/metaflow/message/common"
+	"github.com/metaflowys/metaflow/message/trident"
 	"inet.af/netaddr"
 	"server/controller/common"
 	genesiscommon "server/controller/genesis/common"
@@ -15,7 +15,7 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
-	"gitlab.yunshan.net/yunshan/metaflow/libs/queue"
+	"github.yunshan.net/metaflowys/metaflow/server/libs/queue"
 )
 
 type VinterfacesRpcUpdater struct {

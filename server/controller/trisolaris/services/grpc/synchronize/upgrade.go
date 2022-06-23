@@ -7,7 +7,7 @@ import (
 	"math"
 
 	"github.com/golang/protobuf/proto"
-	api "gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	api "github.com/metaflowys/metaflow/message/trident"
 
 	"server/controller/trisolaris"
 	. "server/controller/trisolaris/common"

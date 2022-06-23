@@ -1,7 +1,7 @@
 package synchronize
 
 import (
-	api "gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	api "github.com/metaflowys/metaflow/message/trident"
 )
 
 var (

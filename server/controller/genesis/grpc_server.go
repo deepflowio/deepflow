@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/metaflow/libs/queue"
-	tridentcommon "gitlab.yunshan.net/yunshan/metaflow/message/common"
-	"gitlab.yunshan.net/yunshan/metaflow/message/trident"
+	"github.yunshan.net/metaflowys/metaflow/server/libs/queue"
+	tridentcommon "github.com/metaflowys/metaflow/message/common"
+	"github.com/metaflowys/metaflow/message/trident"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
