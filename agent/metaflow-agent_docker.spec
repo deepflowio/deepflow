@@ -17,10 +17,10 @@ deepflow metaflow-agent docker
 
 %prep
 mkdir -p $RPM_BUILD_ROOT/temp/
-cp %pwd/target/release/metaflow-agent $RPM_BUILD_ROOT/temp/
-cp %pwd/target/release/metaflow-agent-ctl $RPM_BUILD_ROOT/temp/
-cp %pwd/src/ebpf/metaflow-ebpfctl $RPM_BUILD_ROOT/temp/
-cp -r %pwd/src/ebpf/data $RPM_BUILD_ROOT/temp/
+cp %pwd/output/target/release/metaflow-agent $RPM_BUILD_ROOT/temp/
+cp %pwd/output/target/release/metaflow-agent-ctl $RPM_BUILD_ROOT/temp/
+cp %pwd/output/src/ebpf/metaflow-ebpfctl $RPM_BUILD_ROOT/temp/
+cp -r %pwd/output/src/ebpf/data $RPM_BUILD_ROOT/temp/
 cp %pwd/config/metaflow-agent.yaml $RPM_BUILD_ROOT/temp/
 cp %pwd/docker/dockerfile $RPM_BUILD_ROOT/temp/
 cp %pwd/docker/metaflow-agent-cm.yaml $RPM_BUILD_ROOT/temp/

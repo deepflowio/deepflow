@@ -1,0 +1,21 @@
+on: 
+  - pull_request
+
+name: verify agent
+
+jobs:
+  build_and_test:
+    name: verify agent
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/metaflowys/rust-build:1.2 
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+      - name: verify agent
+        run: |
+          cd agent
+          cargo check
+          cargo fmt --all -- --check
+          cargo test
+          cd src/ebpf && make clean && make test

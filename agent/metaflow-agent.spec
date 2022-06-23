@@ -21,15 +21,15 @@ Deepflow MetaFlow Agent
 
 %prep
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
-cp %pwd/target/release/metaflow-agent $RPM_BUILD_ROOT/usr/sbin/
-cp %pwd/target/release/metaflow-agent-ctl $RPM_BUILD_ROOT/usr/sbin/
-cp %pwd/src/ebpf/metaflow-ebpfctl $RPM_BUILD_ROOT/usr/sbin/
+cp %pwd/output/target/release/metaflow-agent $RPM_BUILD_ROOT/usr/sbin/
+cp %pwd/output/target/release/metaflow-agent-ctl $RPM_BUILD_ROOT/usr/sbin/
+cp %pwd/output/src/ebpf/metaflow-ebpfctl $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/metaflow-agent.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/config/metaflow-agent.yaml $RPM_BUILD_ROOT/etc/
 mkdir -p $RPM_BUILD_ROOT/usr/share/metaflow-agent/
-cp -r %pwd/src/ebpf/data/* $RPM_BUILD_ROOT/usr/share/metaflow-agent/
+cp -r %pwd/output/src/ebpf/data/* $RPM_BUILD_ROOT/usr/share/metaflow-agent/
 
 %files
 /usr/sbin/metaflow-agent
