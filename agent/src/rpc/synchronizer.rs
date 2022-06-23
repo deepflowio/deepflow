@@ -444,7 +444,7 @@ impl Synchronizer {
             state: Some(tp::State::Running.into()),
             revision: Some(static_config.revision.clone()),
             exception: Some(exception_handler.take()),
-            process_name: Some("metaflow-agent".into()),
+            process_name: Some("metaflow-agent-ce".into()),
             ctrl_mac: Some(static_config.ctrl_mac.clone()),
             ctrl_ip: Some(static_config.ctrl_ip.clone()),
             tap_mode: Some(static_config.tap_mode.into()),
