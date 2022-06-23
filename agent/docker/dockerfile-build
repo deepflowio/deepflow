@@ -1,0 +1,10 @@
+FROM ghcr.io/metaflowys/rust-build:1.2 as builder
+COPY .  /metaflow/
+WORKDIR /metaflow/agent
+RUN cargo build --release && \
+    cargo build --release --bin metaflow-agent-ctl && \
+    ls -alh target/release
+FROM scratch
+COPY --from=builder /metaflow/agent/ /
+
+
