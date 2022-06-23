@@ -24,11 +24,6 @@
 
 #define IS_ERR_VALUE(x) ((x) >= (unsigned long)-MAX_ERRNO)
 
-enum bpf_probe_attach_type {
-	BPF_PROBE_ENTRY,
-	BPF_PROBE_RETURN
-};
-
 struct bpf_link {
 	int (*detach) (struct bpf_link * link);	///< detach handle
 	int (*destroy) (struct bpf_link * link);	///< destroy handle

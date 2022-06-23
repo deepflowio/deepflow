@@ -19,7 +19,6 @@
 #include <pthread.h>
 #include <time.h>
 #include <string.h>
-#include "perf.h"
 #include "ring.h"
 #include "ctrl.h"
 #include "atomic.h"
@@ -27,6 +26,7 @@
 #include "../kernel/include/common.h"
 #include "../kernel/include/xxhash.h"
 #include "../kernel/include/socket_trace_common.h"
+#include "bcc/libbpf.h"
 
 // TODO: 对内存拷贝进行硬件优化。
 #if 0
@@ -236,6 +236,7 @@ struct map_config {
 };
 
 typedef int (*tracer_ctl_fun_t)(void);
+struct bpf_object;
 
 struct bpf_tracer {
 	/*

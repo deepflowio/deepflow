@@ -634,7 +634,7 @@ int running_socket_tracer(l7_handle_fn handle,
 	tracer->adapt_success = false;
 
 	/*
-	 * config perf ring-buffer reader callbak
+	 * config perf ring-buffer reader callback
 	 */
 	tracer->raw_cb = reader_raw_cb;
 	tracer->lost_cb = reader_lost_cb;
