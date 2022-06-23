@@ -11,7 +11,7 @@ pub fn get_timestamp(ntp_diff: i64) -> Duration {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
-        .as_nanos() as u64 as i64
-        + ntp_diff;
+        .as_nanos() as i128
+        + ntp_diff as i128;
     Duration::from_nanos(now as u64)
 }

@@ -15,16 +15,17 @@ use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::Client;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use tokio::{runtime::Runtime, task::JoinHandle};
 
 use super::resource_watcher::{GenericResourceWatcher, Watcher};
 use crate::{
     config::{handler::PlatformAccess, IngressFlavour},
     error::{Error, Result},
+    exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
     proto::trident::{
-        self, KubernetesApiInfo, KubernetesApiSyncRequest, KubernetesApiSyncResponse,
+        self, Exception, KubernetesApiInfo, KubernetesApiSyncRequest, KubernetesApiSyncResponse,
     },
     rpc::Session,
 };
@@ -86,10 +87,15 @@ pub struct ApiWatcher {
     err_msgs: Arc<Mutex<Vec<String>>>,
     apiserver_version: Arc<Mutex<Info>>,
     session: Arc<Session>,
+    exception_handler: ExceptionHandler,
 }
 
 impl ApiWatcher {
-    pub fn new(config: PlatformAccess, session: Arc<Session>) -> Self {
+    pub fn new(
+        config: PlatformAccess,
+        session: Arc<Session>,
+        exception_handler: ExceptionHandler,
+    ) -> Self {
         Self {
             context: Arc::new(Context {
                 config,
@@ -103,6 +109,7 @@ impl ApiWatcher {
             apiserver_version: Arc::new(Mutex::new(Info::default())),
             err_msgs: Arc::new(Mutex::new(vec![])),
             watchers: Arc::new(Mutex::new(HashMap::new())),
+            exception_handler,
         }
     }
 
@@ -167,6 +174,7 @@ impl ApiWatcher {
         let apiserver_version = self.apiserver_version.clone();
         let err_msgs = self.err_msgs.clone();
         let watchers = self.watchers.clone();
+        let exception_handler = self.exception_handler.clone();
 
         let handle = thread::spawn(move || {
             Self::run(
@@ -177,6 +185,7 @@ impl ApiWatcher {
                 apiserver_version,
                 err_msgs,
                 watchers,
+                exception_handler,
             )
         });
         self.thread.lock().unwrap().replace(handle);
@@ -407,6 +416,7 @@ impl ApiWatcher {
         watcher_versions: &mut HashMap<String, u64>,
         resource_watchers: &Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
         encoder: &mut ZlibEncoder<Vec<u8>>,
+        exception_handler: &ExceptionHandler,
     ) {
         let version = &context.version;
         // 将缓存的entry 上报，如果没有则跳过
@@ -487,7 +497,8 @@ impl ApiWatcher {
             }
             Err(e) => {
                 let err = format!("KubernetesAPISync failed: {}", e);
-                warn!("{}", err);
+                exception_handler.set(Exception::ControllerSocketError);
+                error!("{}", err);
                 err_msgs.lock().unwrap().push(err);
                 return;
             }
@@ -518,7 +529,8 @@ impl ApiWatcher {
             .block_on(Self::kubernetes_api_sync(session, msg))
         {
             let err = format!("KubernetesAPISync failed: {}", e);
-            warn!("{}", err);
+            exception_handler.set(Exception::ControllerSocketError);
+            error!("{}", err);
             err_msgs.lock().unwrap().push(err);
         }
     }
@@ -581,6 +593,7 @@ impl ApiWatcher {
         apiserver_version: Arc<Mutex<Info>>,
         err_msgs: Arc<Mutex<Vec<String>>>,
         watchers: Arc<Mutex<HashMap<String, GenericResourceWatcher>>>,
+        exception_handler: ExceptionHandler,
     ) {
         info!("kubernetes api watcher starting");
 
@@ -646,6 +659,7 @@ impl ApiWatcher {
                 &mut watcher_versions,
                 &resource_watchers,
                 &mut encoder,
+                &exception_handler,
             );
         }
         info!("kubernetes api watcher stopping");
