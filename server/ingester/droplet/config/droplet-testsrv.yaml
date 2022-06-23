@@ -1,0 +1,36 @@
+# trident使用CPU数量
+max-cpus: 1
+
+# 策略同步时间间隔
+sync-interval: 10
+
+global-pps-threshold: 400000
+
+# 正则表达式匹配流量源接口
+# tap-interface-regex: vnet.*
+
+# Tap接口模式，0代表端口模式，1代表桥接模式
+tap-mode: 0
+
+# 数据发送网卡，可选配置项，未指定时通过source-ip查找
+output-interface: eth20
+
+# 可选，用于作为源报文的vlan tag
+output-vlan: 0
+
+# 指定的MTU大小，当有任意发送网卡MTU小于此值时，此值无效
+mtu: 1500
+
+# 指定源报文的MAC地址，为空时通过使用通过ip找到的接口mac
+source-mac: # 90:b1:1c:41:64:a0
+# 组装报文时填入源IP地址
+source-ip: 172.16.1.111
+
+# 到达DeepFlow分析器下一跳MAC，udp sender使用
+analyzer-gw-mac: 18:66:da:e6:7a:90
+# 分析器的虚IP，udp sender使用
+analyzer-ip: 172.20.1.153
+# 到达DeepFlow流量分发交换机下一跳MAC，vxlan sender使用
+vtep-gw-mac: 00:1B:21:BB:1E:1C
+# 流量分发交换机vtep IP，vxlan sender使用
+vtep-ip: 172.16.2.200
