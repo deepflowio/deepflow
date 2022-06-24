@@ -129,6 +129,15 @@ struct conn_info_t {
 	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
 };
 
+struct process_data_extra {
+	bool vecs : 1;
+	bool go : 1;
+	bool tls : 1;
+	bool use_tcp_seq : 1;
+	__u32 tcp_seq;
+	__u64 coroutine_id;
+};
+
 enum syscall_src_func {
 	SYSCALL_FUNC_UNKNOWN,
 	SYSCALL_FUNC_WRITE,
@@ -210,5 +219,32 @@ static __inline __u64 gen_conn_key_id(__u64 param_1, __u64 param_2)
 	 */
 	return ((param_1 << 32) | (__u32)param_2);
 }
+
+#define MAX_SYSTEM_THREADS 40960
+
+struct go_interface
+{
+	long long type;
+	void *ptr;
+};
+
+struct tls_conn
+{
+	int fd;
+	char *buffer;
+	__u32 tcp_seq;
+};
+
+struct tls_conn_key
+{
+	unsigned int tgid;
+	long long int goid;
+};
+
+#ifdef BPF_USE_CORE
+#define rax ax
+#define rbx bx
+#define rcx cx
+#endif
 
 #endif /* __BPF_SOCKET_TRACE_H__ */

@@ -13,9 +13,9 @@
 
 struct socket_bpf_data {
 	/* session info */
-	uint32_t process_id;	   // 进程ID，对应内核tgid
-	uint32_t thread_id;	   // 线程ID，对应内核pid
-				   // 如果process_id等于thread_id说明是一个进程，否则是一个线程
+	uint32_t process_id;	   // tgid in kernel struct task_struct
+	uint32_t thread_id;	   // pid in kernel struct task_struct, main thread iff pid==tgid
+	uint64_t coroutine_id;	   // CoroutineID, i.e., golang goroutine id
 	uint8_t  process_name[16]; // 进程名字
 
 	struct __tuple_t tuple;	   // Socket五元组信息

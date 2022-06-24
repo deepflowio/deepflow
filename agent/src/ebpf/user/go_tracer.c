@@ -62,6 +62,36 @@ static struct symbol syms[] = {
 		.probe_func = "uprobe_http2_serverConn_writeHeaders",
 		.is_probe_ret = false,
 	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "runtime.casgstatus",
+		.probe_func = "runtime_casgstatus",
+		.is_probe_ret = false,
+	},	
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Write",
+		.probe_func = "uprobe_go_tls_write_enter",
+		.is_probe_ret = false,
+	},	
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Write",
+		.probe_func = "uprobe_go_tls_write_exit",
+		.is_probe_ret = true,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Read",
+		.probe_func = "uprobe_go_tls_read_enter",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Read",
+		.probe_func = "uprobe_go_tls_read_exit",
+		.is_probe_ret = true,
+	},
 };
 /* *INDENT-ON* */
 

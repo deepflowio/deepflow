@@ -24,6 +24,8 @@ pub const SOCK_DATA_HTTP1: u16 = 20;
 #[allow(dead_code)]
 pub const SOCK_DATA_HTTP2: u16 = 21;
 #[allow(dead_code)]
+pub const SOCK_DATA_GO_TLS_HTTP1: u16 = 22;
+#[allow(dead_code)]
 pub const SOCK_DATA_DUBBO: u16 = 40;
 #[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
@@ -71,9 +73,10 @@ pub struct tuple_t {
 #[derive(Debug, Copy, Clone)]
 pub struct SK_BPF_DATA {
     /* session info */
-    pub process_id: u32, // 进程ID，对应内核tgid
-    pub thread_id: u32,  // 线程ID，对应内核pid
-    // 如果process_id等于thread_id说明是一个进程，否则是一个线程
+    pub process_id: u32,   // tgid in kernel struct task_struct
+    pub thread_id: u32,    // pid in kernel struct task_struct, main thread iff pid==tgid
+    pub coroutine_id: u64, // CoroutineID, i.e., golang goroutine id
+
     pub process_name: [u8; 16usize], //进程名字，占用16bytes
 
     pub tuple: tuple_t, // Socket五元组信息
