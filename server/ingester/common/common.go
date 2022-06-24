@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"net"
 
-	clickhouse "github.com/ClickHouse/clickhouse-go"
-	logging "github.com/op/go-logging"
 	"server/libs/datatype"
 	"server/libs/grpc"
+
+	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("common")
 
 func NewCKConnection(addr, username, password string) (*sql.DB, error) {
-	connect, err := sql.Open("clickhouse", fmt.Sprintf("%s?username=%s&password=%s", addr, username, password))
+	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s?username=%s&password=%s", addr, username, password))
 	if err != nil {
 		return nil, err
 	}

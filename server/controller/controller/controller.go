@@ -3,13 +3,13 @@ package controller
 import (
 	"flag"
 	"os"
-	"strings"
 	"time"
+
+	"server/libs/logger"
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
-	"server/libs/logger"
 
 	"server/controller/common"
 	"server/controller/config"
@@ -31,22 +31,16 @@ import (
 	_ "server/controller/trisolaris/services/http/upgrade"
 )
 
-func execName() string {
-	splitted := strings.Split(os.Args[0], "/")
-	return splitted[len(splitted)-1]
-}
-
-var log = logging.MustGetLogger(execName())
-var configPath = flag.String("f", "/etc/server.yaml", "specify config file location")
+var log = logging.MustGetLogger("controller")
 
 type Controller struct{}
 
-func Start() {
+func Start(configPath string) {
 	flag.Parse()
 	logger.EnableStdoutLog()
 
 	serverCfg := config.DefaultConfig()
-	serverCfg.Load(*configPath)
+	serverCfg.Load(configPath)
 	cfg := &serverCfg.ControllerConfig
 	logger.EnableFileLog(cfg.LogFile)
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)

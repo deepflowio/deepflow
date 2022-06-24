@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 
 	"runtime"
 	"server/libs/logger"
@@ -17,13 +17,8 @@ import (
 
 var log = logging.MustGetLogger("querier")
 
-var configPath = "/etc/server.yaml"
-
-func Start() {
-	//flag.Parse()
-	// 加载配置文件
+func Start(configPath string) {
 	ServerCfg := config.DefaultConfig()
-	//ServerCfg.Load(*configPath)
 	ServerCfg.Load(configPath)
 	config.Cfg = &ServerCfg.QuerierConfig
 	cfg := ServerCfg.QuerierConfig

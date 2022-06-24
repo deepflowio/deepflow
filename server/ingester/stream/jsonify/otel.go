@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/gopacket/layers"
-	v11 "go.opentelemetry.io/proto/otlp/common/v1"
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 	"server/libs/datatype"
 	"server/libs/grpc"
 	"server/libs/utils"
 	"server/libs/zerodoc"
+
+	"github.com/google/gopacket/layers"
+	v11 "go.opentelemetry.io/proto/otlp/common/v1"
+	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []interface{} {
@@ -149,10 +150,10 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 		case "http.target", "db.statement", "messaging.url", "rpc.service":
 			h.RequestResource = value.GetStringValue()
 		case "http.request_content_length":
-			h.requestLength = uint64(value.GetIntValue())
+			h.requestLength = value.GetIntValue()
 			h.RequestLength = &h.requestLength
 		case "http.response_content_length":
-			h.responseLength = uint64(value.GetIntValue())
+			h.responseLength = value.GetIntValue()
 			h.ResponseLength = &h.responseLength
 		default:
 			// nothing
@@ -187,10 +188,10 @@ func (h *L7Logger) FillOTel(l *v1.Span, platformData *grpc.PlatformInfoTable) {
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
 	h.TapSide = spanKindToTapSide(l.Kind)
 	h.SpanKind = uint8(l.Kind)
-	h.StartTime = l.StartTimeUnixNano / uint64(time.Microsecond)
-	h.L7Base.EndTime = l.EndTimeUnixNano / uint64(time.Microsecond)
+	h.StartTime = int64(l.StartTimeUnixNano) / int64(time.Microsecond)
+	h.L7Base.EndTime = int64(l.EndTimeUnixNano) / int64(time.Microsecond)
 	if h.L7Base.EndTime > h.StartTime {
-		h.ResponseDuration = h.L7Base.EndTime - h.StartTime
+		h.ResponseDuration = uint64(h.L7Base.EndTime - h.StartTime)
 	}
 
 	h.fillAttributes(l.GetAttributes())

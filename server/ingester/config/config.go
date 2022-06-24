@@ -85,13 +85,14 @@ func Load(path string) Config {
 	configBytes, err := ioutil.ReadFile(path)
 	config := BaseConfig{
 		Base: Config{
-			ControllerPort: 20035,
-			UDPReadBuffer:  64 << 20,
-			TCPReadBuffer:  4 << 20,
-			LogFile:        "/var/log/ingester/ingester.log",
-			CKDiskMonitor:  CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
-			CKS3Storage:    CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
-			Influxdb:       HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
+			ControllerPort:    20035,
+			StreamRozeEnabled: true,
+			UDPReadBuffer:     64 << 20,
+			TCPReadBuffer:     4 << 20,
+			LogFile:           "/var/log/ingester/ingester.log",
+			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
+			CKS3Storage:       CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
+			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
 		},
 	}
 	if err != nil {
