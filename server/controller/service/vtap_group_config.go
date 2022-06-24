@@ -184,10 +184,12 @@ func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroup
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
-		tData.YamlConfig = sData.YamlConfig
-	} else {
-		yamlConfig := ""
-		tData.YamlConfig = &yamlConfig
+		yamlConfig := model.StaticConfig{}
+		if err := yaml.Unmarshal([]byte(*sData.YamlConfig), &yamlConfig); err == nil {
+			tData.YamlConfig = yamlConfig
+		} else {
+			log.Error(err)
+		}
 	}
 	if sData.L4LogTapTypes != nil {
 		cL4LogTapTypes, err := convertStrToIntList(*sData.L4LogTapTypes)
@@ -246,7 +248,13 @@ func convertJsonToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroup
 }
 
 func convertYamlToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
-	tData.YamlConfig = sData.YamlConfig
+	b, err := yaml.Marshal(sData.YamlConfig)
+	if err == nil {
+		dbYamlConfig := string(b)
+		tData.YamlConfig = &dbYamlConfig
+	} else {
+		log.Error(err)
+	}
 	convertToDb(sData, tData)
 }
 
@@ -510,7 +518,7 @@ func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (st
 	vtapGroup := &mysql.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
 	if ret.Error != nil {
-		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
+		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", *shortUUID)
 	}
 	dbConfig := &mysql.VTapGroupConfiguration{}
 	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)

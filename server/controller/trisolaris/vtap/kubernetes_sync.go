@@ -9,17 +9,28 @@ import (
 	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
 	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 type CacheKC struct {
 	sync.RWMutex
-	kc *models.KubernetesCluster
+	syncFlag atomicbool.Bool
+	kc       *models.KubernetesCluster
 }
 
 func newCacheKC(kc *models.KubernetesCluster) *CacheKC {
 	return &CacheKC{
-		kc: kc,
+		kc:       kc,
+		syncFlag: atomicbool.NewBool(false),
 	}
+}
+
+func (c *CacheKC) setSyncFlag() {
+	c.syncFlag.Set()
+}
+
+func (c *CacheKC) unsetSyncFlag() {
+	c.syncFlag.Unset()
 }
 
 func (c *CacheKC) getValue() string {
@@ -113,12 +124,13 @@ func (k *KubernetesCluster) DeleteCache(clusterID string) {
 	k.Unlock()
 }
 
-func (k *KubernetesCluster) updateCacheSyncTime(clusterID string) {
-	k.Lock()
+func (k *KubernetesCluster) updateSyncTime(clusterID string) {
+	k.RLock()
 	cacheKC, ok := k.keyToCache[clusterID]
-	k.Unlock()
+	k.RUnlock()
 	if ok {
 		cacheKC.updateTime(time.Now())
+		cacheKC.setSyncFlag()
 	}
 }
 
@@ -137,26 +149,24 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 	updateData := make([]*models.KubernetesCluster, 0, len(kcs))
 	keyToCache := make(map[string]*CacheKC)
 	var checkSyncedAt time.Time
-	for _, kc := range kcs {
-		updatedAt, ok := k.getCacheSyncedAt(kc.ClusterID)
-		if ok {
-			checkSyncedAt = MaxTime(updatedAt, kc.SyncedAt)
-		} else {
-			checkSyncedAt = now
+	for _, dbkc := range kcs {
+		cacheKC := k.getCache(dbkc.ClusterID)
+		if cacheKC == nil {
+			continue
 		}
-		if int(checkSyncedAt.Sub(kc.SyncedAt).Seconds()) > clearTime {
-			deleteIDs = append(deleteIDs, kc.ID)
+		checkSyncedAt = MaxTime(cacheKC.getSyncedAt(), dbkc.SyncedAt)
+		if int(now.Sub(checkSyncedAt).Seconds()) > clearTime {
+			deleteIDs = append(deleteIDs, dbkc.ID)
 			log.Infof(
 				"delete kubernetes_cluster(%s, %s) data",
-				kc.ClusterID,
-				kc.Value)
+				dbkc.ClusterID,
+				dbkc.Value)
 		} else {
-			if ok {
-				k.updateCacheSyncedAt(kc.ClusterID, checkSyncedAt)
-				kc.SyncedAt = checkSyncedAt
-				updateData = append(updateData, kc)
+			dbkc.SyncedAt = checkSyncedAt
+			if cacheKC.syncFlag.IsSet() {
+				updateData = append(updateData, dbkc)
 			}
-			keyToCache[kc.ClusterID] = newCacheKC(kc)
+			keyToCache[dbkc.ClusterID] = newCacheKC(dbkc)
 		}
 	}
 	if len(deleteIDs) > 0 {
@@ -195,7 +205,7 @@ func (k *KubernetesCluster) getClusterID(clusterID string, value string) string 
 		}
 	} else {
 		if result == value {
-			k.updateCacheSyncTime(clusterID)
+			k.updateSyncTime(clusterID)
 		}
 	}
 
