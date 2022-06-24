@@ -48,7 +48,7 @@ impl From<TcpTimeout> for FlowTimeout {
             closing: t.others,
             established_rst: t.closing_rst,
             exception: t.others,
-            closed_fin: Duration::from_secs(0),
+            closed_fin: Duration::from_secs(2),
             single_direction: t.others,
             min: Duration::from_secs(0),
             max: Duration::from_secs(0),
