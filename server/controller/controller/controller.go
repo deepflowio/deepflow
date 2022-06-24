@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
-	"server/libs/logger"
 	yaml "gopkg.in/yaml.v2"
+	"server/libs/logger"
 
 	"server/controller/common"
 	"server/controller/config"
@@ -84,7 +84,7 @@ func Start() {
 	tr := tagrecorder.NewTagRecorder(*cfg)
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
-	vtapLicenseAllocation := monitor.NewVTapLicenseAllocation(cfg.MonitorCfg)
+	vtapLicenseAllocation := monitor.NewPseudoVTapLicenseAllocation(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
@@ -137,7 +137,6 @@ func Start() {
 	router.VtapRouter(r)
 	router.VtapGroupRouter(r, cfg)
 	router.DataSourceRouter(r, cfg)
-	router.LicenseRouter(r, vtapLicenseAllocation)
 	router.DomainRouter(r)
 	router.VTapGroupConfigRouter(r)
 	if err := r.Run(":20417"); err != nil {
