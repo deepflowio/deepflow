@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"server/ingester/stream/geo"
 	"server/libs/datatype"
 	"server/libs/datatype/pb"
 	"server/libs/grpc"
-	"server/ingester/stream/geo"
 )
 
 func TestJsonify(t *testing.T) {

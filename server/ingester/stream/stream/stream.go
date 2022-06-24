@@ -5,12 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/grpc"
-	"server/libs/queue"
-	libqueue "server/libs/queue"
-	"server/libs/receiver"
+	_ "golang.org/x/net/context"
+	_ "google.golang.org/grpc"
 	dropletqueue "server/ingester/droplet/queue"
 	"server/ingester/dropletctl"
 	"server/ingester/stream/common"
@@ -19,8 +15,12 @@ import (
 	"server/ingester/stream/decoder"
 	"server/ingester/stream/geo"
 	"server/ingester/stream/throttler"
-	_ "golang.org/x/net/context"
-	_ "google.golang.org/grpc"
+	"server/libs/datatype"
+	"server/libs/debug"
+	"server/libs/grpc"
+	"server/libs/queue"
+	libqueue "server/libs/queue"
+	"server/libs/receiver"
 )
 
 const (

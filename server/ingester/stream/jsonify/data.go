@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+	"github.com/metaflowys/metaflow/message/trident"
+	"server/ingester/common"
+	"server/ingester/stream/geo"
 	"server/libs/ckdb"
 	"server/libs/datatype"
 	"server/libs/datatype/pb"
 	"server/libs/grpc"
 	"server/libs/pool"
 	"server/libs/zerodoc"
-	"server/ingester/common"
-	"server/ingester/stream/geo"
-	"github.com/metaflowys/metaflow/message/trident"
 )
 
 const (

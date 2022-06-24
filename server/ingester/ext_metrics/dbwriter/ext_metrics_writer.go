@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	logging "github.com/op/go-logging"
-	"server/libs/ckdb"
-	"server/libs/stats"
-	"server/libs/utils"
 	"server/ingester/common"
 	"server/ingester/ext_metrics/config"
 	"server/ingester/pkg/ckwriter"
+	"server/libs/ckdb"
+	"server/libs/stats"
+	"server/libs/utils"
 )
 
 var log = logging.MustGetLogger("ext_metrics.dbwriter")

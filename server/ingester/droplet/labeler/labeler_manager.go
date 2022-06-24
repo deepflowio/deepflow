@@ -3,6 +3,7 @@ package labeler
 import (
 	"time"
 
+	"github.com/metaflowys/metaflow/message/trident"
 	logging "github.com/op/go-logging"
 	"server/libs/datatype"
 	"server/libs/debug"
@@ -10,7 +11,6 @@ import (
 	"server/libs/policy"
 	"server/libs/queue"
 	"server/libs/stats"
-	"github.com/metaflowys/metaflow/message/trident"
 
 	. "server/ingester/droplet/common"
 	"server/ingester/dropletctl"

@@ -5,19 +5,19 @@ import (
 	"strconv"
 	"time"
 
+	_ "golang.org/x/net/context"
+	_ "google.golang.org/grpc"
+	dropletqueue "server/ingester/droplet/queue"
+	"server/ingester/dropletctl"
+	"server/ingester/ext_metrics/config"
+	"server/ingester/ext_metrics/dbwriter"
+	"server/ingester/ext_metrics/decoder"
 	"server/libs/datatype"
 	"server/libs/debug"
 	"server/libs/grpc"
 	"server/libs/queue"
 	libqueue "server/libs/queue"
 	"server/libs/receiver"
-	dropletqueue "server/ingester/droplet/queue"
-	"server/ingester/dropletctl"
-	"server/ingester/ext_metrics/config"
-	"server/ingester/ext_metrics/dbwriter"
-	"server/ingester/ext_metrics/decoder"
-	_ "golang.org/x/net/context"
-	_ "google.golang.org/grpc"
 )
 
 const (

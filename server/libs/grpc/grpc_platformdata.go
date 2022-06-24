@@ -15,15 +15,15 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/net/context"
 	"server/libs/logger"
 	api "server/libs/reciter-api"
-	"golang.org/x/net/context"
 
+	"github.com/metaflowys/metaflow/message/trident"
 	"server/libs/datatype"
 	"server/libs/hmap/lru"
 	"server/libs/receiver"
 	"server/libs/utils"
-	"github.com/metaflowys/metaflow/message/trident"
 )
 
 const (

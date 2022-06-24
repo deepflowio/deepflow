@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
+	"server/ingester/ext_metrics/dbwriter"
 	"server/libs/codec"
 	"server/libs/datatype"
 	"server/libs/grpc"
@@ -22,7 +23,6 @@ import (
 	"server/libs/receiver"
 	"server/libs/stats"
 	"server/libs/utils"
-	"server/ingester/ext_metrics/dbwriter"
 )
 
 var log = logging.MustGetLogger("ext_metrics.decoder")

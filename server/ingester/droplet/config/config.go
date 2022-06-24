@@ -8,8 +8,8 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"server/ingester/common"
 	yaml "gopkg.in/yaml.v2"
+	"server/ingester/common"
 )
 
 var log = logging.MustGetLogger("config")

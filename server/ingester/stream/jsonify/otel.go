@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
+	v11 "go.opentelemetry.io/proto/otlp/common/v1"
+	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 	"server/libs/datatype"
 	"server/libs/grpc"
 	"server/libs/utils"
 	"server/libs/zerodoc"
-	v11 "go.opentelemetry.io/proto/otlp/common/v1"
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []interface{} {

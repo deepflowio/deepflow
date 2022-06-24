@@ -15,8 +15,8 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
-	"github.com/op/go-logging"
 	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/op/go-logging"
 
 	. "server/controller/common"
 	models "server/controller/db/mysql"

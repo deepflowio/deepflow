@@ -7,6 +7,10 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	"server/ingester/stream/config"
+	"server/ingester/stream/jsonify"
+	"server/ingester/stream/throttler"
 	"server/libs/codec"
 	"server/libs/datatype"
 	"server/libs/datatype/pb"
@@ -15,10 +19,6 @@ import (
 	"server/libs/receiver"
 	"server/libs/stats"
 	"server/libs/utils"
-	"server/ingester/stream/config"
-	"server/ingester/stream/jsonify"
-	"server/ingester/stream/throttler"
-	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 var log = logging.MustGetLogger("stream.decoder")

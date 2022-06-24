@@ -73,6 +73,9 @@ type Config struct {
 	DecoderQueueCount int             `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int             `yaml:"decoder-queue-size"`
 }
+type StreamConfig struct {
+	Stream Config `yaml:"ingester"`
+}
 
 func (c *Config) Validate() error {
 	for _, ipString := range c.ControllerIPs {
@@ -93,32 +96,34 @@ func (c *Config) Validate() error {
 }
 
 func Load(path string) *Config {
-	config := &Config{
-		ControllerPort:    DefaultControllerPort,
-		CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
-		Throttle:          DefaultThrottle,
-		DecoderQueueCount: DefaultDecoderQueueCount,
-		DecoderQueueSize:  DefaultDecoderQueueSize,
-		CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+	config := &StreamConfig{
+		Stream: Config{
+			ControllerPort:    DefaultControllerPort,
+			CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
+			Throttle:          DefaultThrottle,
+			DecoderQueueCount: DefaultDecoderQueueCount,
+			DecoderQueueSize:  DefaultDecoderQueueSize,
+			CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Info("no config file, use defaults")
-		return config
+		return &config.Stream
 	}
 	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Warning("Read config file error:", err)
-		config.Validate()
-		return config
+		config.Stream.Validate()
+		return &config.Stream
 	}
 	if err = yaml.Unmarshal(configBytes, &config); err != nil {
 		log.Error("Unmarshal yaml error:", err)
 		os.Exit(1)
 	}
 
-	if err = config.Validate(); err != nil {
+	if err = config.Stream.Validate(); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
-	return config
+	return &config.Stream
 }

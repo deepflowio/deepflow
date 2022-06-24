@@ -9,6 +9,7 @@ import (
 	logging "github.com/op/go-logging"
 	"server/libs/zerodoc"
 
+	"server/ingester/roze/dbwriter"
 	"server/libs/app"
 	"server/libs/codec"
 	"server/libs/grpc"
@@ -17,7 +18,6 @@ import (
 	"server/libs/stats"
 	"server/libs/utils"
 	"server/libs/zerodoc/pb"
-	"server/ingester/roze/dbwriter"
 )
 
 var log = logging.MustGetLogger("roze.unmarshaller")

@@ -12,6 +12,7 @@ import (
 	libqueue "server/libs/queue"
 	"server/libs/receiver"
 
+	"github.com/metaflowys/metaflow/message/trident"
 	"server/ingester/droplet/adapter"
 	"server/ingester/droplet/config"
 	"server/ingester/droplet/labeler"
@@ -20,7 +21,6 @@ import (
 	"server/ingester/droplet/statsd"
 	"server/ingester/droplet/syslog"
 	"server/ingester/dropletctl"
-	"github.com/metaflowys/metaflow/message/trident"
 )
 
 var log = logging.MustGetLogger("droplet")

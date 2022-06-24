@@ -6,8 +6,9 @@ import (
 	"net"
 	"os"
 
-	logging "github.com/op/go-logging"
 	"server/ingester/common"
+
+	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -60,6 +61,10 @@ type Config struct {
 	ReceiverWindowSize        uint64         `yaml:"receiver-window-size"`
 }
 
+type RozeConfig struct {
+	Roze Config `yaml:"ingester"`
+}
+
 func (c *Config) Validate() error {
 	for _, ipString := range c.ControllerIPs {
 		// 如果controller-ip设置为127.0.0.1，则roze会以127.0.0.1上报分析器IP，trisolaris无法识别出实际的IP，无法注册数据节点
@@ -89,37 +94,39 @@ func (c *Config) Validate() error {
 }
 
 func Load(path string) *Config {
-	config := &Config{
-		ControllerPort:            DefaultControllerPort,
-		CKDB:                      CKAddrs{DefaultCKPrimaryAddr, ""},
-		CKWriterConfig:            CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
-		CKReadTimeout:             DefaultCKReadTimeout,
-		UnmarshallQueueCount:      DefaultUnmarshallQueueCount,
-		UnmarshallQueueSize:       DefaultUnmarshallQueueSize,
-		ReceiverWindowSize:        DefaultReceiverWindowSize,
-		DisableSecondWriteReplica: true,
+	config := &RozeConfig{
+		Roze: Config{
+			ControllerPort:            DefaultControllerPort,
+			CKDB:                      CKAddrs{DefaultCKPrimaryAddr, ""},
+			CKWriterConfig:            CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			CKReadTimeout:             DefaultCKReadTimeout,
+			UnmarshallQueueCount:      DefaultUnmarshallQueueCount,
+			UnmarshallQueueSize:       DefaultUnmarshallQueueSize,
+			ReceiverWindowSize:        DefaultReceiverWindowSize,
+			DisableSecondWriteReplica: true,
 
-		Pcap: PCapConfig{common.DEFAULT_PCAP_DATA_PATH},
+			Pcap: PCapConfig{common.DEFAULT_PCAP_DATA_PATH},
+		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Info("no config file, use defaults")
-		return config
+		return &config.Roze
 	}
 	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Warningf("Read config file error:", err)
-		config.Validate()
-		return config
+		config.Roze.Validate()
+		return &config.Roze
 	}
 	if err = yaml.Unmarshal(configBytes, config); err != nil {
 		log.Error("Unmarshal yaml error:", err)
 		os.Exit(1)
 	}
 
-	if err = config.Validate(); err != nil {
+	if err = config.Roze.Validate(); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
 
-	return config
+	return &config.Roze
 }
