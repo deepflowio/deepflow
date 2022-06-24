@@ -22,6 +22,13 @@
 
 #define SP_OFFSET(offset) (void *)(__u64)PT_REGS_SP(ctx) + offset * 8
 
+#define bpf_debug(fmt, ...)				\
+({							\
+	char ____fmt[] = fmt;				\
+	bpf_trace_printk(____fmt, sizeof(____fmt),	\
+			##__VA_ARGS__);			\
+})
+
 /*
  * 下面定义适合 go version >= 1.17
  * 汇编中使用RAX，EAX，下面是之间的关系

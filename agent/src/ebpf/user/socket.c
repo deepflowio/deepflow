@@ -25,8 +25,8 @@
 #define SOCKET_RECLAIM_TIMEOUT_DEF  10
 // 在trace map回收时，对每条trace信息超过10秒没有发生匹配动作就回收掉
 #define TRACE_RECLAIM_TIMEOUT_DEF   10
-static uint64_t socket_map_reclaim_count; // socket map回收数量统计
-static uint64_t trace_map_reclaim_count;  // trace map回收数量统计
+static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
+static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
 
 extern int sys_cpus_count;
 extern bool *cpu_online;
@@ -49,7 +49,7 @@ static bool is_adapt_success(struct bpf_tracer *t);
 static int socket_tracer_stop(void);
 static int socket_tracer_start(void);
 
-static void socket_tracer_set_probes(struct trace_probes_conf *tps)
+static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
 	int index = 0, curr_idx;
 
@@ -59,7 +59,7 @@ static void socket_tracer_set_probes(struct trace_probes_conf *tps)
 	probes_set_enter_symbol(tps, "__sys_recvmmsg");
 	probes_set_enter_symbol(tps, "do_writev");
 	probes_set_enter_symbol(tps, "do_readv");
-	tps->probes_nr = index;
+	tps->kprobes_nr = index;
 
 	/* tracepoints */
 	index = 0;
@@ -597,8 +597,9 @@ int running_socket_tracer(l7_handle_fn handle,
 	char *bpf_file_name = TRACER_ELF_NAME;
 
 	if (check_kernel_version(4, 14) != 0) {
-		ebpf_warning("Currnet linux %d.%d, not support, require Linux 4.14+\n",
-			     major, minor);
+		ebpf_warning
+		    ("Currnet linux %d.%d, not support, require Linux 4.14+\n",
+		     major, minor);
 
 		return -EINVAL;
 	}
@@ -615,8 +616,8 @@ int running_socket_tracer(l7_handle_fn handle,
 		snprintf(bpf_path, TRACER_PATH_LEN,
 			 "%s/linux-common/%s", ELF_PATH_PREFIX, bpf_file_name);
 
-	struct trace_probes_conf *tps =
-	    malloc(sizeof(struct trace_probes_conf));
+	struct tracer_probes_conf *tps =
+	    malloc(sizeof(struct tracer_probes_conf));
 	if (tps == NULL) {
 		ebpf_warning("malloc() error.\n");
 		return -ENOMEM;
@@ -656,6 +657,9 @@ int running_socket_tracer(l7_handle_fn handle,
 	conf_max_trace_entries = max_trace_entries;
 
 	if (tracer_bpf_load(tracer))
+		return -EINVAL;
+
+	if (tracer_probes_init(tracer))
 		return -EINVAL;
 
 	if (tracer_hooks_attach(tracer))
@@ -730,7 +734,6 @@ static int socket_tracer_stop(void)
 		t->state = TRACER_STOP;
 		ebpf_info("Tracer stop success, current state: TRACER_STOP\n");
 	}
-
 	//清空 ebpf map
 	reclaim_socket_map(t, 0);
 
@@ -752,7 +755,8 @@ static int socket_tracer_start(void)
 
 	if ((ret = tracer_hooks_attach(t)) == 0) {
 		t->state = TRACER_RUNNING;
-		ebpf_info("Tracer start success, current state: TRACER_RUNNING\n");
+		ebpf_info
+		    ("Tracer start success, current state: TRACER_RUNNING\n");
 	}
 
 	return ret;
@@ -859,8 +863,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.tracer_state = t->state;
 
 	// 相邻两次系统启动时间更新后的差值
-	stats.boot_time_update_diff = sys_boot_time_ns -
-			prev_sys_boot_time_ns;
+	stats.boot_time_update_diff = sys_boot_time_ns - prev_sys_boot_time_ns;
 
 	return stats;
 }
@@ -1053,8 +1056,8 @@ void print_dns_info(const char *data, int len)
 					answers[i].rdata[j] = reader[j];
 
 				answers[i].rdata[ntohs
-						 (answers[i].resource->
-						  data_len)]
+						 (answers[i].
+						  resource->data_len)]
 				    = '\0';
 
 				reader =

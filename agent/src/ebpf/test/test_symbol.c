@@ -30,6 +30,7 @@
 const char *test_go_file =
     "../../../resources/test/ebpf/go-elf";
 
+/* *INDENT-OFF* */
 static struct symbol probe_syms[] = {
 	/*-----  grpc client & server -------*/
 	{
@@ -104,12 +105,13 @@ static struct symbol probe_syms[] = {
 		.is_probe_ret = false,
 	},
 };
+/* *INDENT-ON* */
 
 int main(void)
 {
 
 	struct symbol *sym;
-	struct uprobe_symbol *probe_sym;
+	struct symbol_uprobe *probe_sym;
 
 	struct version_info go_version;
 	memset(&go_version, 0, sizeof(go_version));

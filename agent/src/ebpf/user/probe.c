@@ -47,7 +47,8 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 			ebpf_warning("name (%s) snprintf() failed.\n", __name);
 			return ETR_NOROOM;
 		}
-	}
+	} else
+		memcpy(prog_name, __name, sizeof(prog_name));
 
 	prog =
 	    bpf_object__find_program_by_name((struct bpf_object *)obj,
@@ -168,8 +169,8 @@ static int create_probe_event(char *buf, const char *ev_name,
 			     (unsigned long)offset);
 
 		if (res < 0 || res >= PATH_MAX) {
-			ebpf_info("Event alias (%s) too long for buffer\n",
-				  ev_alias);
+			ebpf_warning("Event alias (%s) too long for buffer\n",
+				     ev_alias);
 			close(kfd);
 			return -1;
 		}
@@ -179,12 +180,12 @@ static int create_probe_event(char *buf, const char *ev_name,
 
 	if (write(kfd, buf, strlen(buf)) < 0) {
 		if (errno == ENOENT)
-			ebpf_info
-			    ("\n**__** cannot attach %s, probe entry may not exist\n",
-			     event_type);
+			ebpf_warning
+			    ("**__** cannot attach %s, probe entry may not exist, buf:%s\n",
+			     event_type, buf);
 		else
-			ebpf_info
-			    ("\nwirte buf : %s ##__## cannot attach %s, %s\n---\n",
+			ebpf_warning
+			    ("wirte buf : %s ##__## cannot attach %s, %s\n---\n",
 			     buf, event_type, strerror(errno));
 
 		close(kfd);
@@ -282,55 +283,51 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 	char buf[PATH_MAX], fname[256];
 	bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
-	if (pfd < 0) {
-		if (create_probe_event
-		    (buf, ev_name, attach_type, config1, offset, event_type,
-		     pid, maxactive) < 0) {
+	if (create_probe_event
+	    (buf, ev_name, attach_type, config1, offset, event_type,
+	     pid, maxactive) < 0) {
+		goto error;
+	}
+
+	if (is_kprobe && maxactive > 0 && attach_type == BPF_PROBE_RETURN) {
+		if (snprintf(fname, sizeof(fname), "%s/id", buf) >=
+		    sizeof(fname)) {
+			ebpf_info
+			    ("filename (%s) is too long for buffer\n", buf);
 			goto error;
 		}
-
-		if (is_kprobe && maxactive > 0
-		    && attach_type == BPF_PROBE_RETURN) {
-			if (snprintf(fname, sizeof(fname), "%s/id", buf) >=
-			    sizeof(fname)) {
+		if (access(fname, F_OK) == -1) {
+			/// Deleting kprobe event with incorrect name.
+			kfd =
+			    open
+			    ("/sys/kernel/debug/tracing/kprobe_events",
+			     O_WRONLY | O_APPEND, 0);
+			if (kfd < 0) {
 				ebpf_info
-				    ("filename (%s) is too long for buffer\n",
-				     buf);
+				    ("open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
+				     strerror(errno));
+				return -1;
+			}
+			/// 向"/sys/kernel/debug/tracing/kprobe_events"中写入，"-:kprobes/p_do_exit_0"
+			snprintf(fname, sizeof(fname), "-:kprobes/%s_0",
+				 ev_name);
+			if (write(kfd, fname, strlen(fname)) < 0) {
+				if (errno == ENOENT)
+					ebpf_info
+					    ("cannot detach kprobe, probe entry may not exist\n");
+				else
+					ebpf_info
+					    ("cannot detach kprobe, %s\n",
+					     strerror(errno));
+				close(kfd);
 				goto error;
 			}
-			if (access(fname, F_OK) == -1) {
-				/// Deleting kprobe event with incorrect name.
-				kfd =
-				    open
-				    ("/sys/kernel/debug/tracing/kprobe_events",
-				     O_WRONLY | O_APPEND, 0);
-				if (kfd < 0) {
-					ebpf_info
-					    ("open(/sys/kernel/debug/tracing/kprobe_events): %s\n",
-					     strerror(errno));
-					return -1;
-				}
-				/// 向"/sys/kernel/debug/tracing/kprobe_events"中写入，"-:kprobes/p_do_exit_0"
-				snprintf(fname, sizeof(fname), "-:kprobes/%s_0",
-					 ev_name);
-				if (write(kfd, fname, strlen(fname)) < 0) {
-					if (errno == ENOENT)
-						ebpf_info
-						    ("cannot detach kprobe, probe entry may not exist\n");
-					else
-						ebpf_info
-						    ("cannot detach kprobe, %s\n",
-						     strerror(errno));
-					close(kfd);
-					goto error;
-				}
-				close(kfd);
+			close(kfd);
 
-				if (create_probe_event
-				    (buf, ev_name, attach_type, config1, offset,
-				     event_type, pid, 0) < 0)
-					goto error;
-			}
+			if (create_probe_event
+			    (buf, ev_name, attach_type, config1, offset,
+			     event_type, pid, 0) < 0)
+				goto error;
 		}
 	}
 
@@ -403,12 +400,12 @@ static int bpf_detach_probe(enum bpf_probe_attach_type attach_type,
 		     getpid(), attach_type);
 
 	if (res < 0 || res >= sizeof(buf)) {
-		ebpf_info("snprintf(%s): %d\n", ev_name, res);
+		ebpf_warning("snprintf(%s): %d\n", ev_name, res);
 		goto error;
 	}
 
 	if (write(kfd, buf, strlen(buf)) < 0) {
-		ebpf_info("write(%s): %s\n", buf, strerror(errno));
+		ebpf_warning("write(%s): %s\n", buf, strerror(errno));
 		goto error;
 	}
 
@@ -468,9 +465,9 @@ static int program__attach_probe(const struct bpf_program *prog, bool retprobe, 
 	return 0;
 }
 
-static int program__detach_probe(struct bpf_link *link,
-				 bool retprobe,
-				 const char *ev_name, const char *event_type)
+int program__detach_probe(struct bpf_link *link,
+			  bool retprobe,
+			  const char *ev_name, const char *event_type)
 {
 	if (link->detach(link))
 		ebpf_info("<%s> detach ev_name:%s, error\n", __func__, ev_name);
@@ -506,10 +503,4 @@ int program__attach_kprobe(void *prog,
 				     retprobe, (const char *)ev_name, func_name,
 				     "kprobe", 0, pid, KRETPROBE_MAXACTIVE_MAX,
 				     ret_link);
-}
-
-int program__detach_kprobe(struct bpf_link *link, bool retprobe, char *ev_name)
-{
-	return program__detach_probe(link,
-				     retprobe, (const char *)ev_name, "kprobe");
 }

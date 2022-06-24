@@ -29,61 +29,26 @@
 static char build_info_magic[] = "\xff Go buildinf:";
 static int num_procs;
 
+/* *INDENT-OFF* */
 static struct symbol probe_syms[] = {
-	/*-----  grpc client & server -------*/
-	{
-		// grpc Clinet & Server request headers,call submit_headers
-		.symbol = "grpc/internal/transport.(*loopyWriter).writeHeader",
-		.probe_func = "uprobe/loopy_writer_write_header",
-		.is_probe_ret = false,
-	},
-	{
-		// grpc Clinet response headers,call probe_http2_operate_headers -> submit_headers
-		.symbol = "grpc/internal/transport.(*http2Client).operateHeaders",
-		.probe_func = "uprobe/http2_client_operate_headers",
-		.is_probe_ret = false,
-	},
-	{
-		// grpc Server response headers,call probe_http2_operate_headers -> submit_headers
-		.symbol = "grpc/internal/transport.(*http2Server).operateHeaders",
-		.probe_func = "uprobe/http2_server_operate_headers",
-		.is_probe_ret = false,
-	},
-
-	/*-------- http2 client --------------*/
-	{
-		// Request headers,call submit_header
-		.symbol = "x/net/http2.(*ClientConn).writeHeader",
-		.probe_func = "uprobe/http2_client_conn_writeHeader",
-		.is_probe_ret = false,
-	},
-	{
-		// Confirm request headers last one,call submit_header
-		.symbol = "x/net/http2.(*ClientConn).writeHeaders",
-		.probe_func = "uprobe/http2_client_conn_writeHeaders",
-		.is_probe_ret = false,
-	},
-	{
-		// Response headers, call submit_headers
-		.symbol = "x/net/http2.(*clientConnReadLoop).handleResponse",
-		.probe_func = "uprobe/http2_clientConnReadLoop_handleResponse",
-		.is_probe_ret = false,
-	},
-
 	/*-------- http2 server --------------*/
 	{
 		// Request headers, call submit_headers
+		.type = GO_UPROBE,
 		.symbol = "x/net/http2.(*serverConn).processHeaders",
-		.probe_func = "uprobe/http2_serverConn_processHeaders",
+		.probe_func = "uprobe_http2_serverConn_processHeaders",
 		.is_probe_ret = false,
 	},
 	{
 		// Response headers, call direct_submit_header
+		.type = GO_UPROBE,
 		.symbol = "x/net/http2.(*serverConn).writeHeaders",
-		.probe_func = "uprobe/http2_serverConn_writeHeaders",
+		.probe_func = "uprobe_http2_serverConn_writeHeaders",
 		.is_probe_ret = false,
 	},
 };
+/* *INDENT-ON* */
+
 static char *get_data_buffer_from_addr(Elf * e, uint64_t addr, uint32_t * len)
 {
 	Elf_Scn *section = NULL;
@@ -126,6 +91,8 @@ static uint64_t get_addr_from_size_and_mod(int ptr_sz, int end_mode, void *buf)
 	return addr;
 }
 
+// TODO: go1.18.x - the version cannot be obtained.
+// It needs to be handled in a good way.
 bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 {
 	bool res = false;
@@ -174,9 +141,8 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (buf == NULL || len <= 0)
 		goto exit;
 
-	int num =
-	    sscanf(buf, "go%d.%d.%d", &go_ver->major, &go_ver->minor,
-		   &go_ver->revision);
+	int num = sscanf(buf, "go%d.%d.%d", &go_ver->major, &go_ver->minor,
+			 &go_ver->revision);
 	if (num != 3)
 		ebpf_warning("sscanf() go version failed. num = %d\n", num);
 	else
@@ -194,10 +160,11 @@ exit:
 
 static int resolve_bin_file(const char *path, int pid,
 			    struct version_info *go_ver,
-			    struct trace_probes_conf *conf)
+			    struct tracer_probes_conf *conf)
 {
+	int ret = ETR_OK;
 	struct symbol *sym;
-	struct uprobe_symbol *probe_sym;
+	struct symbol_uprobe *probe_sym;
 
 	for (int i = 0; i < NELEMS(probe_syms); i++) {
 		sym = &probe_syms[i];
@@ -206,7 +173,39 @@ static int resolve_bin_file(const char *path, int pid,
 			continue;
 		}
 		probe_sym->ver = *go_ver;
-		list_add_tail(&probe_sym->list, &conf->uprobe_syms_head);
+
+		if (probe_sym->isret) {
+			size_t addr;
+			int j;
+			struct symbol_uprobe *sub_probe_sym;
+			for (j = 0; j < probe_sym->rets_count; j++) {
+				addr = probe_sym->rets[j];
+				sub_probe_sym =
+				    malloc(sizeof(struct symbol_uprobe));
+				if (sub_probe_sym == NULL) {
+					ebpf_warning("malloc() error.\n");
+					ret = ETR_NOMEM;
+					goto faild;
+				}
+
+				if ((ret = copy_uprobe_symbol(probe_sym, sub_probe_sym))
+				    != ETR_OK) {
+					free((void *)sub_probe_sym);
+					goto faild;
+				}
+
+				sub_probe_sym->entry = addr;
+				sub_probe_sym->isret = false;
+				list_add_tail(&sub_probe_sym->list,
+					      &conf->uprobe_syms_head);
+				conf->uprobe_count++;
+			}
+		} else {
+			list_add_tail(&probe_sym->list,
+				      &conf->uprobe_syms_head);
+			conf->uprobe_count++;
+		}
+
 		ebpf_info
 		    ("Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
 		     path, probe_sym->pid, probe_sym->ver.major,
@@ -214,13 +213,20 @@ static int resolve_bin_file(const char *path, int pid,
 		     probe_sym->entry, probe_sym->size, probe_sym->name,
 		     probe_sym->probe_func, probe_sym->rets_count);
 
-		conf->uprobe_count++;
+		if (probe_sym->isret)
+			free_uprobe_symbol(probe_sym);
 	}
 
-	return ETR_OK;
+	return ret;
+
+faild:
+	if (probe_sym->isret)
+		free_uprobe_symbol(probe_sym);
+
+	return ret;
 }
 
-static int proc_parse_and_register(int pid, struct trace_probes_conf *conf)
+static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
 {
 	char *path = get_elf_path_by_pid(pid);
 	if (path == NULL)
@@ -243,7 +249,7 @@ static int proc_parse_and_register(int pid, struct trace_probes_conf *conf)
  * @tps: 用于记录所有probe的结构地址，uprobe symbols会登记到上面。
  * @return: 返回ETR_OK成功，否则失败。
  */
-int collect_uprobe_syms_from_procfs(struct trace_probes_conf *conf)
+int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 {
 	log_to_stdout = true;
 	struct dirent *entry = NULL;

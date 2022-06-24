@@ -10,6 +10,8 @@
 #define TIME_TYPE_SEC   0
 
 #define KPROBE_EVENTS_FILE "/sys/kernel/debug/tracing/kprobe_events"
+#define UPROBE_EVENTS_FILE "/sys/kernel/debug/tracing/uprobe_events"
+
 #ifndef NELEMS
 #define NELEMS(a) (sizeof(a) / sizeof((a)[0]))
 #endif

@@ -10,8 +10,11 @@
 #include "log.h"
 #include "bcc/libbpf.h"
 #include "bcc/perf_reader.h"
+#include "libbpf/src/libbpf_internal.h"
 
 int major, minor;		// Linux kernel主版本，次版本
+
+#define EV_NAME_SIZE  1024
 
 #define BOOT_TIME_UPDATE_PERIOD	60	// 系统启动时间更新周期, 单位：秒
 volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
@@ -55,30 +58,31 @@ int check_kernel_version(int maj_limit, int min_limit)
 {
 	struct utsname uts;
 	if (uname(&uts) == -1) {
-		ebpf_info("uname() error\n");
-		return -1;
+		ebpf_warning("uname() error\n");
+		return ETR_INVAL;
 	}
 
 	if (!strstr(uts.machine, "x86_64")) {
-		ebpf_info("Current machine is \"%s\", not support.\n");
-		return -1;
+		ebpf_warning("Current machine is \"%s\", not support.\n");
+		return ETR_INVAL;
 	}
 
-	if (sscanf(uts.release, "%d.%d", &major, &minor) != 2) {
-		ebpf_info("sscanf(%s), is error.\n", uts.release);
-		return -1;
-	}
+	uint32_t ver = get_kernel_version();
+	int patch;
+	major = ver >> 16;
+	minor = (ver & 0xffff) >> 8;
+	patch = ver & 0xff;
 
-	ebpf_info("%s Linux %d.%d\n", __func__, major, minor);
+	ebpf_info("%s Linux %d.%d.%d\n", __func__, major, minor, patch);
 
 	if (major < maj_limit || (major == maj_limit && minor < min_limit)) {
 		ebpf_info
 		    ("Current kernel version is %s, but need > %s, eBPF not support.\n",
 		     uts.release, "4.14");
-		return -1;
+		return ETR_INVAL;
 	}
 
-	return 0;
+	return ETR_OK;
 }
 
 struct bpf_tracer *find_bpf_tracer(const char *name)
@@ -98,7 +102,7 @@ struct bpf_tracer *find_bpf_tracer(const char *name)
 
 struct bpf_tracer *create_bpf_tracer(const char *name,
 				     char *bpf_file,
-				     struct trace_probes_conf *tps,
+				     struct tracer_probes_conf *tps,
 				     int workers_nr,
 				     void *handle, unsigned int perf_pages_cnt)
 {
@@ -136,6 +140,7 @@ struct bpf_tracer *create_bpf_tracer(const char *name,
 
 	bt->perf_pages_cnt = perf_pages_cnt;
 
+	INIT_LIST_HEAD(&bt->probes_head);
 	INIT_LIST_HEAD(&bt->maps_conf_head);
 
 	return bt;
@@ -183,21 +188,7 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 
 	tracer->pobj = pobj;
 	ebpf_info("bpf load \"%s\" succeed.\n", tracer->bpf_file);
-	return 0;
-}
-
-static struct probe *find_probe_from_name(struct bpf_tracer *tracer,
-					  const char *probe_name)
-{
-	struct probe *p;
-	int i;
-	for (i = 0; i < PROBES_NUM_MAX; i++) {
-		p = &tracer->probes[i];
-		if (!strcmp(p->name, probe_name))
-			return p;
-	}
-
-	return NULL;
+	return ETR_OK;
 }
 
 static struct tracepoint *find_tracepoint_from_name(struct bpf_tracer *tracer,
@@ -240,92 +231,189 @@ static struct tracepoint *get_tracepoint_from_tracer(struct bpf_tracer *tracer,
 	return tp;
 }
 
-static struct probe *get_probe_from_tracer(struct bpf_tracer *tracer,
-					   const char *func_name, bool isret)
+static struct probe *create_probe(struct bpf_tracer *tracer,
+				  const char *func_name, bool isret,
+				  enum probe_type type, void *private)
 {
-	struct probe *pb = find_probe_from_name(tracer, func_name);
-	if (pb && pb->prog)
-		return pb;
-
+	struct probe *pb;
 	struct bpf_program *prog;
 	int fd = bpf_get_program_fd(tracer->pobj, func_name, (void **)&prog);
 	if (fd < 0) {
-		ebpf_info("fun: %s, bpf_get_program_fd failed, func_name:%s.\n",
-			  __func__, func_name);
+		ebpf_warning
+		    ("fun: %s, bpf_get_program_fd failed, func_name:%s.\n",
+		     __func__, func_name);
 		return NULL;
 	}
 
-	int idx = tracer->probes_count++;
-	pb = &tracer->probes[idx];
+	pb = calloc(1, sizeof(*pb));
+	if (pb == NULL) {
+		ebpf_warning("probe alloc failed, no memory\n");
+		return NULL;
+	}
+
 	pb->prog_fd = fd;
 	pb->prog = prog;
 	pb->isret = isret;
-
+	pb->type = type;
 	snprintf(pb->name, sizeof(pb->name), "%s", func_name);
+	pb->private_data = private;
 
+	list_add_tail(&pb->list, &tracer->probes_head);
+	tracer->probes_count++;
 	return pb;
+}
+
+static int get_uprobe_event_name(const char *bin_path, char *ev_name, int size,
+				 size_t addr)
+{
+	char *path = strdup(bin_path);
+	if (path == NULL) {
+		ebpf_warning("strdup error.\n");
+		return ETR_INVAL;
+	}
+
+	int i;
+	for (i = 0; i < strlen(path); i++) {
+		// TODO: regexp.MustCompile("[^a-zA-Z0-9_]")
+		if (path[i] == '/' || path[i] == '-')
+			path[i] = '_';
+	}
+
+	if (snprintf(ev_name, size, "p_%s_0x%lx", path, addr) < 0) {
+		ebpf_warning("snprintf error.\n");
+		return ETR_INVAL;
+	}
+
+	free(path);
+	return ETR_OK;
+}
+
+static struct bpf_link *exec_attach_uprobe(struct bpf_program *prog,
+					   const char *bin_path, size_t addr,
+					   bool isret, int pid)
+{
+	struct bpf_link *link = NULL;
+	char ev_name[EV_NAME_SIZE];
+	int ret;
+	ret = get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr);
+	if (ret != ETR_OK)
+		return NULL;
+
+	ret = program__attach_uprobe(prog, isret, pid, bin_path, addr, ev_name,
+				     (void **)&link);
+	if (ret != 0) {
+		ebpf_warning("program__attach_uprobe failed, ev_name:%s.\n",
+			     ev_name);
+	}
+
+	return link;
+}
+
+static struct bpf_link *exec_attach_kprobe(struct bpf_program *prog, char *name,
+					   bool isret, int pid)
+{
+	struct bpf_link *link = NULL;
+	char ev_name[EV_NAME_SIZE];
+	char *fn_name;
+	int ret;
+	if (isret)
+		fn_name = name + strlen("kretprobe/");
+	else
+		fn_name = name + strlen("kprobe/");
+
+	snprintf(ev_name, sizeof(ev_name), "p_%s", fn_name);
+	ret =
+	    program__attach_kprobe(prog, isret, pid, fn_name, ev_name,
+				   (void **)&link);
+	if (ret != 0) {
+		ebpf_warning
+		    ("program__attach_kprobe failed, ev_name:%s.\n", ev_name);
+	}
+
+	return link;
 }
 
 static int probe_attach(struct probe *p)
 {
-#define EV_NAME_SIZE  1024
 	if (p->link) {
 		ebpf_info("<%s> fn_name:%s, has been attached.\n",
 			  __func__, p->name);
-		return 0;
+		return ETR_OK;
 	}
+	struct bpf_link *link = NULL;
+	if (p->type == KPROBE) {
+		link = exec_attach_kprobe(p->prog, p->name, p->isret, -1);
+	} else {		/* UPROBE */
+		struct symbol_uprobe *usym = p->private_data;
+		if (usym == NULL) {
+			ebpf_warning("probe private_data is NULL.\n");
+			return ETR_INVAL;
+		}
 
-	char ev_name[EV_NAME_SIZE];
-	char *fn_name;
-	if (p->isret)
-		fn_name = p->name + strlen("kretprobe/");
-	else
-		fn_name = p->name + strlen("kprobe/");
+		if (!usym->binary_path || !usym->probe_func || !usym->entry
+		    || !usym->size) {
+			ebpf_warning("probe is invalid.\n");
+			return ETR_INVAL;
+		}
 
-	// TODO: uprobe name 需要把"/", "*" 替换成"_"
-	snprintf(ev_name, sizeof(ev_name), "p_%s", fn_name);
+		bool ret = usym->isret;
+		if (usym->type == GO_UPROBE && usym->isret)
+			ret = false;
 
-	struct bpf_link *link;
-
-	// TODO: 需要处理uprobe的场景
-	int ret =
-	    program__attach_kprobe(p->prog, p->isret, -1, fn_name, ev_name,
-				   (void **)&link);
-	if (ret != 0) {
-		printf("error %s, %s, %s\n", p->name, fn_name, ev_name);
-		ebpf_info
-		    ("fun: %s, program__attach_kprobe failed, ev_name:%s.\n",
-		     __func__, ev_name);
-		return ret;
+		link =
+		    exec_attach_uprobe(p->prog, usym->binary_path, usym->entry,
+				       ret, usym->pid);
 	}
 
 	p->link = link;
+	if (link == NULL)
+		return ETR_INVAL;
 
-	return 0;
+	return ETR_OK;
+}
+
+static int exec_detach_kprobe(struct bpf_link *link, char *name, bool isret)
+{
+	char ev_name[EV_NAME_SIZE];
+	char *fn_name;
+	if (isret)
+		fn_name = name + strlen("kretprobe/");
+	else
+		fn_name = name + strlen("kprobe/");
+
+	snprintf(ev_name, sizeof(ev_name), "p_%s", fn_name);
+	return program__detach_probe(link, isret, ev_name, "kprobe");
+}
+
+static int exec_detach_uprobe(struct bpf_link *link, const char *bin_path,
+			      size_t addr, bool isret)
+{
+	char ev_name[EV_NAME_SIZE];
+	int ret;
+	ret = get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr);
+	if (ret != ETR_OK)
+		return ret;
+
+	return program__detach_probe(link, isret, ev_name, "uprobe");
 }
 
 static int probe_detach(struct probe *p)
 {
-#define EV_NAME_SIZE  1024
-	char ev_name[EV_NAME_SIZE];
-	char *fn_name;
-	int ret;
-	if (p->link == NULL) {
-		ebpf_info
-		    ("<%s> p->link == NULL, fn_name:%s, has been detached.\n",
-		     __func__, p->name);
-		return 0;
+	int ret = 0;
+	if (p->type == KPROBE) {
+		if ((ret = exec_detach_kprobe(p->link, p->name, p->isret)) == 0)
+			p->link = NULL;
+	} else {		/* UPROBE */
+		struct symbol_uprobe *usym = p->private_data;
+		bool isret = usym->isret;
+		if (usym->type == GO_UPROBE && usym->isret)
+			isret = false;
+
+		if ((ret =
+		     exec_detach_uprobe(p->link, usym->binary_path, usym->entry,
+					isret)) == 0)
+			p->link = NULL;
 	}
-
-	if (p->isret)
-		fn_name = p->name + strlen("kretprobe/");
-	else
-		fn_name = p->name + strlen("kprobe/");
-
-	snprintf(ev_name, sizeof(ev_name), "p_%s", fn_name);
-
-	if ((ret = program__detach_kprobe(p->link, p->isret, ev_name)) == 0)
-		p->link = NULL;
 
 	return ret;
 }
@@ -333,21 +421,21 @@ static int probe_detach(struct probe *p)
 static int tracepoint_attach(struct tracepoint *tp)
 {
 	if (tp->link) {
-		ebpf_info("<%s> name:%s, has been attached.\n", __func__,
-			  tp->name);
-		return 0;
+		ebpf_warning("<%s> name:%s, has been attached.\n", __func__,
+			     tp->name);
+		return ETR_OK;
 	}
 
 	struct bpf_link *bl = bpf_program__attach(tp->prog);
 	tp->link = bl;
 
 	if (IS_ERR(bl)) {
-		ebpf_info("fun: %s, bpf_program__attach failed, name:%s.\n",
-			  __func__, tp->name);
-		return -1;
+		ebpf_warning("bpf_program__attach failed, name:%s.\n",
+			     tp->name);
+		return ETR_INVAL;
 	}
 
-	return 0;
+	return ETR_OK;
 }
 
 static int tracepoint_detach(struct tracepoint *tp)
@@ -356,12 +444,12 @@ static int tracepoint_detach(struct tracepoint *tp)
 		ebpf_info
 		    ("<%s> tp->link == NULL, name:%s, has been detached.\n",
 		     __func__, tp->name);
-		return 0;
+		return ETR_OK;
 	}
 
 	bpf_link__destroy(tp->link);
 	tp->link = NULL;
-	return 0;
+	return ETR_OK;
 }
 
 static int tracer_hooks_process(struct bpf_tracer *tracer,
@@ -376,47 +464,82 @@ static int tracer_hooks_process(struct bpf_tracer *tracer,
 		probe_fun = probe_detach;
 		tracepoint_fun = tracepoint_detach;
 	} else
-		return -EINVAL;
+		return ETR_INVAL;
 
 	if (tracer->pobj == NULL) {
 		ebpf_info("fun: %s, not loaded bpf program yet.\n", __func__);
-		return -EINVAL;
+		return ETR_INVAL;
 	}
 
 	struct probe *p;
-	struct trace_probes_conf *tps = tracer->tps;
-	int i;
-	for (i = 0; i < tps->probes_nr; i++) {
-		p = get_probe_from_tracer(tracer, tps->symbols[i].func,
-					  tps->symbols[i].isret);
+	int error;
+	list_for_each_entry (p, &tracer->probes_head, list) {
 		if (!p)
-			return -EINVAL;
-		if (probe_fun(p)) {
-			ebpf_info("%s %s probe: '%s', failed!",
-				  type == HOOK_ATTACH ? "attach" : "detach",
-				  p->isret ? "exit" : "enter", p->name);
-			return -EINVAL;
-		} else
-			ebpf_info("%s %s probe: '%s', succeed!",
-				  type == HOOK_ATTACH ? "attach" : "detach",
-				  p->isret ? "exit" : "enter", p->name);
+			return ETR_INVAL;
+
+		error = probe_fun(p);
+		ebpf_info("%s %s %s: '%s', %s!",
+			  type == HOOK_ATTACH ? "attach" : "detach",
+			  p->isret ? "exit" : "enter",
+			  p->type == KPROBE ? "kprobe" : "uprobe", p->name,
+			  error ? "failed" : "success");
+
+		if (error)
+			return ETR_INVAL;
 	}
 
 	struct tracepoint *tp;
+	int i;
+	struct tracer_probes_conf *tps = tracer->tps;
 	for (i = 0; i < tps->tps_nr; i++) {
 		tp = get_tracepoint_from_tracer(tracer, tps->tps[i].name);
 		if (!tp)
-			return -EINVAL;
+			return ETR_INVAL;
 
 		if (tracepoint_fun(tp)) {
 			ebpf_info("%s tracepoint: '%s', failed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  tp->name);
-			return -EINVAL;
+			return ETR_INVAL;
 		} else
 			ebpf_info("%s tracepoint: '%s', succeed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  tp->name);
+	}
+
+	return ETR_OK;
+}
+
+int tracer_probes_init(struct bpf_tracer *tracer)
+{
+	struct probe *p;
+	struct tracer_probes_conf *tps;
+	int i;
+	struct symbol_uprobe *usym;
+
+	if (!tracer) {
+		ebpf_warning("tracer_probes_init failed, tracer is NULL\n");
+		return ETR_INVAL;
+	}
+
+	tps = tracer->tps;
+	if (!tps) {
+		ebpf_warning("tracer_probes_init failed, tps is NULL\n");
+		return ETR_INVAL;
+	}
+
+	for (i = 0; i < tps->kprobes_nr; ++i) {
+		p = create_probe(tracer, tps->ksymbols[i].func,
+				 tps->ksymbols[i].isret, KPROBE, NULL);
+		if (!p)
+			return ETR_INVAL;
+	}
+
+	list_for_each_entry (usym, &tps->uprobe_syms_head, list) {
+		p = create_probe(tracer, usym->probe_func, usym->isret, UPROBE,
+				 usym);
+		if (!p)
+			return ETR_INVAL;
 	}
 
 	return 0;
@@ -462,7 +585,7 @@ int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name)
 
 	tracer->data_map = map;
 
-	return 0;
+	return ETR_OK;
 }
 
 #ifdef PERFORMANCE_TEST
@@ -545,7 +668,7 @@ int register_extra_waiting_op(const char *name, extra_waiting_fun_t f, int type)
 
 	ebpf_info("%s '%s' succeed.\n", __func__, name);
 
-	return 0;
+	return ETR_OK;
 }
 
 static void ctrl_main(__unused void *arg)
@@ -609,20 +732,20 @@ int register_period_event_op(const char *name, period_event_fun_t f)
 
 	ebpf_info("%s '%s' succeed.\n", __func__, name);
 
-	return 0;
+	return ETR_OK;
 }
 
 int set_period_event_invalid(const char *name)
 {
 	struct period_event_op *peo = find_period_event(name);
 	if (peo == NULL)
-		return -1;
+		return ETR_INVAL;
 
 	peo->is_valid = false;
 
 	ebpf_info("%s '%s' set invalid succeed.\n", __func__, name);
 
-	return 0;
+	return ETR_OK;
 }
 
 /*
@@ -654,7 +777,7 @@ static int cpus_kick_kern(void)
 			cpu_ebpf_data_timeout_check(i);
 	}
 
-	return 0;
+	return ETR_OK;
 }
 
 /*
@@ -673,7 +796,7 @@ static int boot_time_update(void)
 		sys_boot_time_ns = real_time - monotonic_time;
 	}
 
-	return 0;
+	return ETR_OK;
 }
 
 static void period_process_main(__unused void *arg)
@@ -736,7 +859,7 @@ int maps_config(struct bpf_tracer *tracer, const char *map_name, int entries)
 	map_conf->max_entries = entries;
 	list_add_tail(&map_conf->list, &tracer->maps_conf_head);
 
-	return 0;
+	return ETR_OK;
 }
 
 int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
@@ -781,7 +904,7 @@ int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
 			ebpf_info
 			    ("<%s> process_data, pthread_create is error:%s\n",
 			     __func__, strerror(errno));
-			return -EINVAL;
+			return ETR_INVAL;
 		}
 	}
 
@@ -791,10 +914,10 @@ int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
 	if (ret) {
 		ebpf_info("<%s> perf_worker, pthread_create is error:%s\n",
 			  __func__, strerror(errno));
-		return -EINVAL;
+		return ETR_INVAL;
 	}
 
-	return 0;
+	return ETR_OK;
 }
 
 /*
@@ -802,7 +925,7 @@ int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
  */
 static int tracer_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 {
-	return 0;
+	return ETR_OK;
 }
 
 static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
@@ -814,7 +937,7 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	*out = calloc(1, *outsize);
 	if (*out == NULL) {
 		ebpf_info("%s calloc, error:%s\n", __func__, strerror(errno));
-		return -1;
+		return ETR_INVAL;
 	}
 
 	struct bpf_tracer_param_array *array = *out;
@@ -856,7 +979,7 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		}
 	}
 
-	return 0;
+	return ETR_OK;
 }
 
 static struct tracer_sockopts trace_sockopts = {
@@ -873,10 +996,10 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 {
 	int err;
 	if (max_locked_memory_set_unlimited() != 0)
-		return -1;
+		return ETR_INVAL;
 
 	if (sysfs_write("/proc/sys/net/core/bpf_jit_enable", "1") < 0)
-		return -1;
+		return ETR_INVAL;
 
 	INIT_LIST_HEAD(&extra_waiting_head);
 	INIT_LIST_HEAD(&period_events_head);
@@ -886,13 +1009,13 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		log_stream = fopen(log_file, "a+");
 		if (log_stream == NULL) {
 			ebpf_info("log file: %s", log_file);
-			return -1;
+			return ETR_INVAL;
 		}
 	}
 
 	sys_cpus_count = get_cpus_count(&cpu_online);
 	if (sys_cpus_count <= 0)
-		return -1;
+		return ETR_INVAL;
 
 	uint64_t real_time, monotonic_time;
 	real_time = gettime(CLOCK_REALTIME, TIME_TYPE_NAN);
@@ -904,7 +1027,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	clear_residual_probes();
 
 	if (ctrl_init()) {
-		return -1;
+		return ETR_INVAL;
 	}
 
 	if ((err = sockopt_register(&trace_sockopts)) != ETR_OK)
@@ -914,11 +1037,11 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	if (err) {
 		ebpf_info("<%s> ctrl_pthread, pthread_create is error:%s\n",
 			  __func__, strerror(errno));
-		return -EINVAL;
+		return ETR_INVAL;
 	}
 
 	if (register_period_event_op("kick_kern", cpus_kick_kern))
-		return -EINVAL;
+		return ETR_INVAL;
 
 	/*
 	 * 由于系统运行过程中会存在系统时间被改动而发生变化的情况，
@@ -930,7 +1053,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	 * 捕获数据的时间发生较大差异。
 	 */
 	if (register_period_event_op("boot time update", boot_time_update))
-		return -EINVAL;
+		return ETR_INVAL;
 
 	err =
 	    pthread_create(&cpus_kick_pthread, NULL,
@@ -939,10 +1062,10 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		ebpf_info
 		    ("<%s> cpus_kick_pthread, pthread_create is error:%s\n",
 		     __func__, strerror(errno));
-		return -EINVAL;
+		return ETR_INVAL;
 	}
 
-	return 0;
+	return ETR_OK;
 }
 
 void bpf_tracer_finish(void)
