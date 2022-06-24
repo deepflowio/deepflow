@@ -1,4 +1,4 @@
-package main
+package ingester
 
 import (
 	"flag"
@@ -6,11 +6,8 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/signal"
 	"runtime"
 	"strings"
-	"sync"
-	"syscall"
 	"time"
 
 	"server/ingester/ckmonitor"
@@ -45,7 +42,7 @@ func execName() string {
 
 var log = logging.MustGetLogger(execName())
 
-var configPath = flag.String("f", "/etc/droplet.yaml", "Specify config file location")
+var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")
 var version = flag.Bool("v", false, "Display the version")
 
 var RevCount, Revision, CommitDate, goVersion string
@@ -55,7 +52,7 @@ const (
 	PROFILER_PORT       = 9526
 )
 
-func main() {
+func Start() []io.Closer {
 	logger.EnableStdoutLog()
 
 	flag.Parse()
@@ -69,7 +66,7 @@ func main() {
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
-	log.Info("============================== Launching YUNSHAN DeepFlow Droplet ==============================")
+	log.Info("============================== Launching YUNSHAN MetaFlow Ingester ==============================")
 	log.Infof("base config:\n%s", string(bytes))
 
 	debug.SetIpAndPort(dropletctl.DEBUG_LISTEN_IP, dropletctl.DEBUG_LISTEN_PORT)
@@ -153,22 +150,9 @@ func main() {
 	}
 	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志
 	receiver.Start()
+	closers = append(closers, receiver)
 
-	// setup system signal
-	signalChannel := make(chan os.Signal, 1)
-	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM)
-	<-signalChannel
-	log.Info("Gracefully stopping")
-	wg := sync.WaitGroup{}
-	wg.Add(len(closers))
-	for _, closer := range closers {
-		go func(c io.Closer) {
-			c.Close()
-			wg.Done()
-		}(closer)
-	}
-	wg.Wait()
-	receiver.Close()
+	return closers
 }
 
 func checkError(err error) {

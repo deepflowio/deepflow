@@ -6,8 +6,8 @@ import (
 	"unsafe"
 
 	. "github.com/google/gopacket/layers"
-	. "server/libs/utils"
 	pb "github.com/metaflowys/metaflow/message/trident"
+	. "server/libs/utils"
 )
 
 type TunnelType uint8

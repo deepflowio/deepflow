@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/op/go-logging"
 	api "github.com/metaflowys/metaflow/message/trident"
+	"github.com/op/go-logging"
 	context "golang.org/x/net/context"
 
 	"server/controller/trisolaris"

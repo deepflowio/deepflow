@@ -1,8 +1,8 @@
 package datatype
 
 import (
-	"server/libs/codec"
 	"reflect"
+	"server/libs/codec"
 	"testing"
 )
 

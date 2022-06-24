@@ -55,6 +55,10 @@ type Config struct {
 	Influxdb          HostPort      `yaml:"influxdb"`
 }
 
+type BaseConfig struct {
+	Base Config `yaml:"ingester"`
+}
+
 func (c *Config) Validate() error {
 	if len(c.ControllerIps) == 0 {
 		log.Warning("controller-ips is empty")
@@ -79,14 +83,16 @@ func (c *Config) Validate() error {
 
 func Load(path string) Config {
 	configBytes, err := ioutil.ReadFile(path)
-	config := Config{
-		ControllerPort: 20035,
-		UDPReadBuffer:  64 << 20,
-		TCPReadBuffer:  4 << 20,
-		LogFile:        "/var/log/droplet/droplet.log",
-		CKDiskMonitor:  CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
-		CKS3Storage:    CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
-		Influxdb:       HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
+	config := BaseConfig{
+		Base: Config{
+			ControllerPort: 20035,
+			UDPReadBuffer:  64 << 20,
+			TCPReadBuffer:  4 << 20,
+			LogFile:        "/var/log/ingester/ingester.log",
+			CKDiskMonitor:  CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
+			CKS3Storage:    CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
+			Influxdb:       HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
+		},
 	}
 	if err != nil {
 		log.Error("Read config file error:", err)
@@ -97,9 +103,9 @@ func Load(path string) Config {
 		os.Exit(1)
 	}
 
-	if err = config.Validate(); err != nil {
+	if err = config.Base.Validate(); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
-	return config
+	return config.Base
 }

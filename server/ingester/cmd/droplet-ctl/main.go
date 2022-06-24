@@ -10,10 +10,10 @@ import (
 	"unicode"
 
 	"github.com/spf13/cobra"
+	"server/ingester/droplet/adapter"
 	"server/libs/debug"
 	"server/libs/grpc"
 	"server/libs/receiver"
-	"server/ingester/droplet/adapter"
 
 	"server/ingester/config"
 	"server/ingester/droplet/labeler"

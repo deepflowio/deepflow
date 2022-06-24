@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/op/go-logging"
 	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/op/go-logging"
 
 	"server/controller/trisolaris/config"
 )

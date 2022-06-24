@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go"
-	"server/libs/ckdb"
-	"server/libs/zerodoc"
 	basecommon "server/ingester/common"
 	"server/ingester/pkg/ckwriter"
 	"server/ingester/stream/common"
+	"server/libs/ckdb"
+	"server/libs/zerodoc"
 )
 
 const (

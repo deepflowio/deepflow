@@ -17,9 +17,9 @@ import (
 	"os/signal"
 	"sort"
 
+	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/spf13/cobra"
 	"server/libs/utils"
-	"github.com/metaflowys/metaflow/message/trident"
 
 	"server/ingester/droplet/config"
 	"server/ingester/dropletctl"

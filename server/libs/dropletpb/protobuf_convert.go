@@ -4,8 +4,8 @@ import (
 	"net"
 	"strings"
 
-	logging "github.com/op/go-logging"
 	"github.com/metaflowys/metaflow/message/trident"
+	logging "github.com/op/go-logging"
 
 	"server/libs/datatype"
 	"server/libs/policy"

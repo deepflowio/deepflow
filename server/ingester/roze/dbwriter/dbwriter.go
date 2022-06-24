@@ -4,11 +4,11 @@ import (
 	logging "github.com/op/go-logging"
 	"server/libs/app"
 
-	"server/libs/ckdb"
-	"server/libs/zerodoc"
 	"server/ingester/common"
 	"server/ingester/pkg/ckwriter"
 	"server/ingester/roze/config"
+	"server/libs/ckdb"
+	"server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("roze.dbwriter")

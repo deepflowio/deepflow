@@ -9,10 +9,10 @@ import (
 
 	"database/sql"
 
-	"server/libs/ckdb"
-	"server/libs/zerodoc"
 	"server/ingester/common"
 	"server/ingester/datasource"
+	"server/libs/ckdb"
+	"server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("issu")

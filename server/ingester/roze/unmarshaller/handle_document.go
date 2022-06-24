@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/metaflowys/metaflow/message/trident"
+	"server/ingester/common"
 	"server/libs/app"
 	"server/libs/datatype"
 	"server/libs/grpc"
 	"server/libs/utils"
 	"server/libs/zerodoc"
-	"server/ingester/common"
-	"github.com/metaflowys/metaflow/message/trident"
 )
 
 const (
