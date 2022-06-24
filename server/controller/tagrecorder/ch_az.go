@@ -25,14 +25,14 @@ func NewChAZ(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconK
 func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 	log.Infof("generate data for %s", a.resourceTypeName)
 	var azs []mysql.AZ
-
-	err := mysql.Db.Find(&azs).Error
+	err := mysql.Db.Unscoped().Find(&azs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(a.resourceTypeName, err))
 		return nil, false
 	}
 
 	keyToItem := make(map[IDKey]mysql.ChAZ)
+
 	for _, az := range azs {
 		iconID := a.domainLcuuidToIconID[az.Domain]
 		if iconID == 0 {
@@ -44,12 +44,20 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 				return keyToItem, false
 			}
 		}
-
-		keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
-			ID:     az.ID,
-			Name:   az.Name,
-			IconID: iconID,
+		if az.DeletedAt.Valid {
+			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
+				ID:     az.ID,
+				Name:   az.Name + "(已删除)",
+				IconID: iconID,
+			}
+		} else {
+			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
+				ID:     az.ID,
+				Name:   az.Name,
+				IconID: iconID,
+			}
 		}
+
 	}
 	return keyToItem, true
 }

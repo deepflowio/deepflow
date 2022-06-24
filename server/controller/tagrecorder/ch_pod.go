@@ -22,7 +22,7 @@ func NewChPod(resourceTypeToIconID map[IconKey]int) *ChPod {
 
 func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 	var pods []mysql.Pod
-	err := mysql.Db.Find(&pods).Error
+	err := mysql.Db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -30,10 +30,18 @@ func (p *ChPod) generateNewData() (map[IDKey]mysql.ChPod, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChPod)
 	for _, pod := range pods {
-		keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
-			ID:     pod.ID,
-			Name:   pod.Name,
-			IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+		if pod.DeletedAt.Valid {
+			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
+				ID:     pod.ID,
+				Name:   pod.Name + "(已删除)",
+				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+			}
+		} else {
+			keyToItem[IDKey{ID: pod.ID}] = mysql.ChPod{
+				ID:     pod.ID,
+				Name:   pod.Name,
+				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+			}
 		}
 	}
 	return keyToItem, true

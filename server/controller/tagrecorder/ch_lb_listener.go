@@ -23,17 +23,23 @@ func NewChLbListener(resourceTypeToIconID map[IconKey]int) *ChLbListener {
 
 func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
 	var lbListeners []mysql.LBListener
-	err := mysql.Db.Find(&lbListeners).Error
+	err := mysql.Db.Unscoped().Find(&lbListeners).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(l.resourceTypeName, err))
 		return nil, false
 	}
-
 	keyToItem := make(map[IDKey]mysql.ChLBListener)
 	for _, lbListener := range lbListeners {
-		keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
-			ID:   lbListener.ID,
-			Name: lbListener.Name,
+		if lbListener.DeletedAt.Valid {
+			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
+				ID:   lbListener.ID,
+				Name: lbListener.Name + "(已删除)",
+			}
+		} else {
+			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
+				ID:   lbListener.ID,
+				Name: lbListener.Name,
+			}
 		}
 	}
 	return keyToItem, true

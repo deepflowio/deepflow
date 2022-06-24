@@ -22,7 +22,7 @@ func NewChVPC(resourceTypeToIconID map[IconKey]int) *ChVPC {
 
 func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 	var vpcs []mysql.VPC
-	err := mysql.Db.Find(&vpcs).Error
+	err := mysql.Db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(v.resourceTypeName, err))
 		return nil, false
@@ -30,11 +30,20 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChVPC)
 	for _, vpc := range vpcs {
-		keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
-			ID:     vpc.ID,
-			Name:   vpc.Name,
-			UID:    vpc.UID,
-			IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
+		if vpc.DeletedAt.Valid {
+			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
+				ID:     vpc.ID,
+				Name:   vpc.Name + "(已删除)",
+				UID:    vpc.UID,
+				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
+			}
+		} else {
+			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
+				ID:     vpc.ID,
+				Name:   vpc.Name,
+				UID:    vpc.UID,
+				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
+			}
 		}
 	}
 	return keyToItem, true
