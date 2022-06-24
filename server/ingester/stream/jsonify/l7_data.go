@@ -8,14 +8,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/gopacket/layers"
-	logging "github.com/op/go-logging"
 	"server/libs/ckdb"
 	"server/libs/datatype"
 	"server/libs/datatype/pb"
 	"server/libs/grpc"
 	"server/libs/pool"
 	"server/libs/zerodoc"
+
+	"github.com/google/gopacket/layers"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("stream.jsonify")
@@ -449,7 +450,7 @@ func (h *L7Logger) fillDns(l *pb.AppProtoLogsData) {
 	}
 	info := l.Dns
 	h.RequestType = GetDNSQueryType(uint8(info.QueryType))
-	h.RequestDomain = info.QueryName
+	h.RequestResource = info.QueryName
 
 	if info.TransID != 0 {
 		requestId := uint64(info.TransID)
