@@ -22,7 +22,7 @@ func NewChPodNode(resourceTypeToIconID map[IconKey]int) *ChPodNode {
 
 func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 	var podNodes []mysql.PodNode
-	err := mysql.Db.Find(&podNodes).Error
+	err := mysql.Db.Unscoped().Find(&podNodes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -30,10 +30,18 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChPodNode)
 	for _, podNode := range podNodes {
-		keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
-			ID:     podNode.ID,
-			Name:   podNode.Name,
-			IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+		if podNode.DeletedAt.Valid {
+			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
+				ID:     podNode.ID,
+				Name:   podNode.Name + "(已删除)",
+				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+			}
+		} else {
+			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
+				ID:     podNode.ID,
+				Name:   podNode.Name,
+				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+			}
 		}
 	}
 	return keyToItem, true

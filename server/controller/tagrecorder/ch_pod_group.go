@@ -22,7 +22,7 @@ func NewChPodGroup(resourceTypeToIconID map[IconKey]int) *ChPodGroup {
 
 func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 	var podGroups []mysql.PodGroup
-	err := mysql.Db.Find(&podGroups).Error
+	err := mysql.Db.Unscoped().Find(&podGroups).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
@@ -30,10 +30,18 @@ func (p *ChPodGroup) generateNewData() (map[IDKey]mysql.ChPodGroup, bool) {
 
 	keyToItem := make(map[IDKey]mysql.ChPodGroup)
 	for _, podGroup := range podGroups {
-		keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
-			ID:     podGroup.ID,
-			Name:   podGroup.Name,
-			IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+		if podGroup.DeletedAt.Valid {
+			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
+				ID:     podGroup.ID,
+				Name:   podGroup.Name + "(已删除)",
+				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+			}
+		} else {
+			keyToItem[IDKey{ID: podGroup.ID}] = mysql.ChPodGroup{
+				ID:     podGroup.ID,
+				Name:   podGroup.Name,
+				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+			}
 		}
 	}
 	return keyToItem, true

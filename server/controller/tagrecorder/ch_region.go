@@ -28,7 +28,7 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 	var regions []mysql.Region
 	var azs []mysql.AZ
 	var vpcs []mysql.VPC
-	err := mysql.Db.Find(&regions).Error
+	err := mysql.Db.Unscoped().Find(&regions).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
 		return nil, false
@@ -74,10 +74,18 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 			iconID = r.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REGION}]
 		}
 
-		keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
-			ID:     region.ID,
-			Name:   region.Name,
-			IconID: iconID,
+		if region.DeletedAt.Valid {
+			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
+				ID:     region.ID,
+				Name:   region.Name + "(已删除)",
+				IconID: iconID,
+			}
+		} else {
+			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
+				ID:     region.ID,
+				Name:   region.Name,
+				IconID: iconID,
+			}
 		}
 	}
 	return keyToItem, true

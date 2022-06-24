@@ -103,7 +103,7 @@ func (d *ChDevice) generateUpdateInfo(oldItem, newItem mysql.ChDevice) (map[stri
 
 func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var hosts []mysql.Host
-	err := mysql.Db.Find(&hosts).Error
+	err := mysql.Db.Unscoped().Find(&hosts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -114,19 +114,29 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 			DeviceType: common.VIF_DEVICE_TYPE_HOST,
 			DeviceID:   host.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_HOST,
-			DeviceID:   host.ID,
-			Name:       host.Name,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
+		if host.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_HOST,
+				DeviceID:   host.ID,
+				Name:       host.Name + "(已删除)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_HOST,
+				DeviceID:   host.ID,
+				Name:       host.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
+			}
 		}
+
 	}
 	return true
 }
 
 func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var vms []mysql.VM
-	err := mysql.Db.Find(&vms).Error
+	err := mysql.Db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -137,12 +147,23 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 			DeviceType: common.VIF_DEVICE_TYPE_VM,
 			DeviceID:   vm.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_VM,
-			DeviceID:   vm.ID,
-			Name:       vm.Name,
-			UID:        vm.UID,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
+
+		if vm.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_VM,
+				DeviceID:   vm.ID,
+				Name:       vm.Name + "(已删除)",
+				UID:        vm.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_VM,
+				DeviceID:   vm.ID,
+				Name:       vm.Name,
+				UID:        vm.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
+			}
 		}
 	}
 	return true
@@ -173,7 +194,7 @@ func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysql.ChDevice) b
 
 func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var dhcpPorts []mysql.DHCPPort
-	err := mysql.Db.Find(&dhcpPorts).Error
+	err := mysql.Db.Unscoped().Find(&dhcpPorts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -184,11 +205,21 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) 
 			DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
 			DeviceID:   dhcpPort.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
-			DeviceID:   dhcpPort.ID,
-			Name:       dhcpPort.Name,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
+
+		if dhcpPort.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
+				DeviceID:   dhcpPort.ID,
+				Name:       dhcpPort.Name + "(已删除)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
+				DeviceID:   dhcpPort.ID,
+				Name:       dhcpPort.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
+			}
 		}
 	}
 	return true
@@ -196,7 +227,7 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) 
 
 func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var natGateways []mysql.NATGateway
-	err := mysql.Db.Find(&natGateways).Error
+	err := mysql.Db.Unscoped().Find(&natGateways).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -207,12 +238,23 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice
 			DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 			DeviceID:   natGateway.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
-			DeviceID:   natGateway.ID,
-			Name:       natGateway.Name,
-			UID:        natGateway.UID,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
+
+		if natGateway.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
+				DeviceID:   natGateway.ID,
+				Name:       natGateway.Name + "(已删除)",
+				UID:        natGateway.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
+				DeviceID:   natGateway.ID,
+				Name:       natGateway.Name,
+				UID:        natGateway.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
+			}
 		}
 	}
 	return true
@@ -220,7 +262,7 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice
 
 func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var lbs []mysql.LB
-	err := mysql.Db.Find(&lbs).Error
+	err := mysql.Db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -231,12 +273,23 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 			DeviceType: common.VIF_DEVICE_TYPE_LB,
 			DeviceID:   lb.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_LB,
-			DeviceID:   lb.ID,
-			Name:       lb.Name,
-			UID:        lb.UID,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
+
+		if lb.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_LB,
+				DeviceID:   lb.ID,
+				Name:       lb.Name + "(已删除)",
+				UID:        lb.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_LB,
+				DeviceID:   lb.ID,
+				Name:       lb.Name,
+				UID:        lb.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
+			}
 		}
 	}
 	return true
@@ -244,7 +297,7 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 
 func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var rdsInstances []mysql.RDSInstance
-	err := mysql.Db.Find(&rdsInstances).Error
+	err := mysql.Db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -255,12 +308,23 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevic
 			DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 			DeviceID:   rdsInstance.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
-			DeviceID:   rdsInstance.ID,
-			Name:       rdsInstance.Name,
-			UID:        rdsInstance.UID,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
+
+		if rdsInstance.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+				DeviceID:   rdsInstance.ID,
+				Name:       rdsInstance.Name + "(已删除)",
+				UID:        rdsInstance.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
+				DeviceID:   rdsInstance.ID,
+				Name:       rdsInstance.Name,
+				UID:        rdsInstance.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
+			}
 		}
 	}
 	return true
@@ -268,7 +332,7 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevic
 
 func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var redisInstances []mysql.RedisInstance
-	err := mysql.Db.Find(&redisInstances).Error
+	err := mysql.Db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -279,12 +343,23 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDev
 			DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 			DeviceID:   redisInstance.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
-			DeviceID:   redisInstance.ID,
-			Name:       redisInstance.Name,
-			UID:        redisInstance.UID,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
+
+		if redisInstance.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+				DeviceID:   redisInstance.ID,
+				Name:       redisInstance.Name + "(已删除)",
+				UID:        redisInstance.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
+				DeviceID:   redisInstance.ID,
+				Name:       redisInstance.Name,
+				UID:        redisInstance.UID,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
+			}
 		}
 	}
 	return true
@@ -292,35 +367,61 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDev
 
 func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var podServices []mysql.PodService
-	err := mysql.Db.Find(&podServices).Error
+	err := mysql.Db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
 	}
 
 	for _, podService := range podServices {
-		// pod_service
-		podServiceKey := DeviceKey{
-			DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-			DeviceID:   podService.ID,
-		}
-		keyToItem[podServiceKey] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
-			DeviceID:   podService.ID,
-			Name:       podService.Name,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
-		}
 
-		// service
-		serviceKey := DeviceKey{
-			DeviceType: CH_DEVICE_TYPE_SERVICE,
-			DeviceID:   podService.ID,
-		}
-		keyToItem[serviceKey] = mysql.ChDevice{
-			DeviceType: CH_DEVICE_TYPE_SERVICE,
-			DeviceID:   podService.ID,
-			Name:       podService.Name,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+		if podService.DeletedAt.Valid {
+			podServiceKey := DeviceKey{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:   podService.ID,
+			}
+			keyToItem[podServiceKey] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:   podService.ID,
+				Name:       podService.Name + "(已删除)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+			}
+
+			// service
+			serviceKey := DeviceKey{
+				DeviceType: CH_DEVICE_TYPE_SERVICE,
+				DeviceID:   podService.ID,
+			}
+			keyToItem[serviceKey] = mysql.ChDevice{
+				DeviceType: CH_DEVICE_TYPE_SERVICE,
+				DeviceID:   podService.ID,
+				Name:       podService.Name + "(已删除)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+			}
+		} else {
+			// pod_service
+			podServiceKey := DeviceKey{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:   podService.ID,
+			}
+			keyToItem[podServiceKey] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
+				DeviceID:   podService.ID,
+				Name:       podService.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+			}
+
+			// service
+			serviceKey := DeviceKey{
+				DeviceType: CH_DEVICE_TYPE_SERVICE,
+				DeviceID:   podService.ID,
+			}
+			keyToItem[serviceKey] = mysql.ChDevice{
+				DeviceType: CH_DEVICE_TYPE_SERVICE,
+				DeviceID:   podService.ID,
+				Name:       podService.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
+			}
 		}
 	}
 	return true
@@ -328,7 +429,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 
 func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var pods []mysql.Pod
-	err := mysql.Db.Find(&pods).Error
+	err := mysql.Db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -339,11 +440,20 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 			DeviceType: common.VIF_DEVICE_TYPE_POD,
 			DeviceID:   pod.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_POD,
-			DeviceID:   pod.ID,
-			Name:       pod.Name,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+		if pod.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD,
+				DeviceID:   pod.ID,
+				Name:       pod.Name + "(已删除)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD,
+				DeviceID:   pod.ID,
+				Name:       pod.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
+			}
 		}
 	}
 	return true
@@ -351,7 +461,7 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 
 func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var podGroups []mysql.PodGroup
-	err := mysql.Db.Find(&podGroups).Error
+	err := mysql.Db.Unscoped().Find(&podGroups).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -362,11 +472,20 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 			DeviceType: CH_DEVICE_TYPE_POD_GROUP,
 			DeviceID:   podGroup.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: CH_DEVICE_TYPE_POD_GROUP,
-			DeviceID:   podGroup.ID,
-			Name:       podGroup.Name,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+		if podGroup.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: CH_DEVICE_TYPE_POD_GROUP,
+				DeviceID:   podGroup.ID,
+				Name:       podGroup.Name + "(已删除)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: CH_DEVICE_TYPE_POD_GROUP,
+				DeviceID:   podGroup.ID,
+				Name:       podGroup.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
+			}
 		}
 	}
 	return true
@@ -374,7 +493,7 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 
 func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var podNodes []mysql.PodNode
-	err := mysql.Db.Find(&podNodes).Error
+	err := mysql.Db.Unscoped().Find(&podNodes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
@@ -385,11 +504,20 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 			DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
 			DeviceID:   podNode.ID,
 		}
-		keyToItem[key] = mysql.ChDevice{
-			DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
-			DeviceID:   podNode.ID,
-			Name:       podNode.Name,
-			IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+		if podNode.DeletedAt.Valid {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+				DeviceID:   podNode.ID,
+				Name:       podNode.Name + "(已删除)",
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+			}
+		} else {
+			keyToItem[key] = mysql.ChDevice{
+				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
+				DeviceID:   podNode.ID,
+				Name:       podNode.Name,
+				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
+			}
 		}
 	}
 	return true
