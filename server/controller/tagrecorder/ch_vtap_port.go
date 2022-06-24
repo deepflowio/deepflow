@@ -8,6 +8,7 @@ import (
 
 	"server/controller/common"
 	"server/controller/db/mysql"
+	"server/controller/model"
 )
 
 type ChVTapPort struct {
@@ -60,24 +61,22 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 	for _, chDevice := range chDevices {
 		deviceKeyToIconID[DeviceKey{DeviceID: chDevice.DeviceID, DeviceType: chDevice.DeviceType}] = chDevice.IconID
 	}
-	body := make(map[string]interface{})
-	response, err := common.CURLPerform("GET", "http://talker:20013/v2/vtap-interfaces/", body)
+	vtapVIFs, err := GetVTapInterfaces(nil)
 	if err != nil {
 		log.Error(errors.New("unable to get resource vtap-port"))
 		return nil, false
 	}
 	keyToItem := make(map[VtapPortKey]mysql.ChVTapPort)
-	if len(response.Get("DATA").MustArray()) == 0 {
+	if len(vtapVIFs) == 0 {
 		log.Error(errors.New("no data in get vtap-port response"))
 		return keyToItem, true
 	}
 
-	for i, _ := range response.Get("DATA").MustArray() {
-		data := response.Get("DATA").GetIndex(i)
-		if data.Get("TAP_MAC").MustString() == "" {
+	for _, data := range vtapVIFs {
+		if data.TapMAC == "" {
 			continue
 		}
-		tapMacSlice := strings.Split(data.Get("TAP_MAC").MustString(), ":")
+		tapMacSlice := strings.Split(data.TapMAC, ":")
 		tapMacSlice = tapMacSlice[2:]
 		tapMacStr := strings.Join(tapMacSlice, "")
 		tapPort, err := strconv.ParseInt(tapMacStr, 16, 64)
@@ -86,10 +85,10 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 			return nil, false
 		}
 		var macPort int64
-		if data.Get("MAC").MustString() == "" {
+		if data.MAC == "" {
 			macPort = 0
 		} else {
-			macSlice := strings.Split(data.Get("MAC").MustString(), ":")
+			macSlice := strings.Split(data.MAC, ":")
 			macSlice = macSlice[2:]
 			macStr := strings.Join(macSlice, "")
 			macPort, err = strconv.ParseInt(macStr, 16, 64)
@@ -99,7 +98,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 			}
 		}
 		// 采集网卡+MAC
-		vTapPort, ok := keyToItem[VtapPortKey{VtapID: data.Get("VTAP_ID").MustInt(), TapPort: tapPort}]
+		vTapPort, ok := keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: tapPort}]
 		if ok {
 			vTapPort.MacType = CH_VTAP_PORT_TYPE_TAP_MAC
 			nameSlice := strings.Split(vTapPort.Name, ", ")
@@ -108,33 +107,33 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					vTapPort.Name = vTapPort.Name + ", ..."
 				}
 			} else {
-				if !strings.Contains(vTapPort.Name, data.Get("TAP_NAME").MustString()) {
-					vTapPort.Name = vTapPort.Name + ", " + data.Get("TAP_NAME").MustString()
+				if !strings.Contains(vTapPort.Name, data.TapName) {
+					vTapPort.Name = vTapPort.Name + ", " + data.TapName
 				}
 			}
-			if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && data.Get("DEVICE_ID").MustInt() != 0 && data.Get("DEVICE_TYPE").MustInt() != 0 {
-				vTapPort.DeviceID = data.Get("DEVICE_ID").MustInt()
-				vTapPort.DeviceType = data.Get("DEVICE_TYPE").MustInt()
-				vTapPort.DeviceName = data.Get("DEVICE_NAME").MustString()
-				vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.Get("DEVICE_ID").MustInt(), DeviceType: data.Get("DEVICE_TYPE").MustInt()}]
+			if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && data.DeviceID != 0 && data.DeviceType != 0 {
+				vTapPort.DeviceID = data.DeviceID
+				vTapPort.DeviceType = data.DeviceType
+				vTapPort.DeviceName = data.DeviceName
+				vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
 			}
 		} else {
-			keyToItem[VtapPortKey{VtapID: data.Get("VTAP_ID").MustInt(), TapPort: tapPort}] = mysql.ChVTapPort{
-				VTapID:     data.Get("VTAP_ID").MustInt(),
+			keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: tapPort}] = mysql.ChVTapPort{
+				VTapID:     data.VTapID,
 				TapPort:    tapPort,
 				MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
-				Name:       data.Get("TAP_NAME").MustString(),
-				DeviceID:   data.Get("DEVICE_ID").MustInt(),
-				HostID:     data.Get("DEVICE_HOST_ID").MustInt(),
-				DeviceType: data.Get("DEVICE_TYPE").MustInt(),
-				DeviceName: data.Get("DEVICE_NAME").MustString(),
-				HostName:   data.Get("DEVICE_HOST_NAME").MustString(),
-				IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.Get("DEVICE_ID").MustInt(), DeviceType: data.Get("DEVICE_TYPE").MustInt()}],
+				Name:       data.TapName,
+				DeviceID:   data.DeviceID,
+				HostID:     data.DeviceHostID,
+				DeviceType: data.DeviceType,
+				DeviceName: data.DeviceName,
+				HostName:   data.DeviceHostName,
+				IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
 			}
 		}
 		// 网卡+MAC
 		if tapPort != macPort && macPort != 0 {
-			vTapPort, ok := keyToItem[VtapPortKey{VtapID: data.Get("VTAP_ID").MustInt(), TapPort: macPort}]
+			vTapPort, ok := keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: macPort}]
 			if ok {
 				nameSlice := strings.Split(vTapPort.Name, ", ")
 				if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
@@ -142,28 +141,28 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 						vTapPort.Name = vTapPort.Name + ", ..."
 					}
 				} else {
-					if !strings.Contains(vTapPort.Name, data.Get("NAME").MustString()) {
-						vTapPort.Name = vTapPort.Name + ", " + data.Get("NAME").MustString()
+					if !strings.Contains(vTapPort.Name, data.Name) {
+						vTapPort.Name = vTapPort.Name + ", " + data.Name
 					}
 				}
-				if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && data.Get("DEVICE_ID").MustInt() != 0 && data.Get("DEVICE_TYPE").MustInt() != 0 {
-					vTapPort.DeviceID = data.Get("DEVICE_ID").MustInt()
-					vTapPort.DeviceType = data.Get("DEVICE_TYPE").MustInt()
-					vTapPort.DeviceName = data.Get("DEVICE_NAME").MustString()
-					vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.Get("DEVICE_ID").MustInt(), DeviceType: data.Get("DEVICE_TYPE").MustInt()}]
+				if vTapPort.DeviceID == 0 && vTapPort.DeviceType == 0 && data.DeviceID != 0 && data.DeviceType != 0 {
+					vTapPort.DeviceID = data.DeviceID
+					vTapPort.DeviceType = data.DeviceType
+					vTapPort.DeviceName = data.DeviceName
+					vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
 				}
 			} else {
-				keyToItem[VtapPortKey{VtapID: data.Get("VTAP_ID").MustInt(), TapPort: macPort}] = mysql.ChVTapPort{
-					VTapID:     data.Get("VTAP_ID").MustInt(),
+				keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: macPort}] = mysql.ChVTapPort{
+					VTapID:     data.VTapID,
 					TapPort:    macPort,
 					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
-					Name:       data.Get("NAME").MustString(),
-					DeviceID:   data.Get("DEVICE_ID").MustInt(),
-					HostID:     data.Get("DEVICE_HOST_ID").MustInt(),
-					DeviceType: data.Get("DEVICE_TYPE").MustInt(),
-					DeviceName: data.Get("DEVICE_NAME").MustString(),
-					HostName:   data.Get("DEVICE_HOST_NAME").MustString(),
-					IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.Get("DEVICE_ID").MustInt(), DeviceType: data.Get("DEVICE_TYPE").MustInt()}],
+					Name:       data.Name,
+					DeviceID:   data.DeviceID,
+					HostID:     data.DeviceHostID,
+					DeviceType: data.DeviceType,
+					DeviceName: data.DeviceName,
+					HostName:   data.DeviceHostName,
+					IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
 				}
 			}
 		}
@@ -366,4 +365,146 @@ func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysql.ChVTapPort) (map[
 		return updateInfo, true
 	}
 	return nil, false
+}
+
+func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, error) {
+	var vtapVIFs []model.VTapInterface
+	var genesisVIFs []*mysql.GoGenesisVInterface
+	db := mysql.Db
+	if _, ok := filter["name"]; ok {
+		db = db.Where("name = ?", filter["name"])
+	}
+	if err := db.Select("name", "mac", "tap_name", "tap_mac", "vtap_id", "host_ip").Find(&genesisVIFs).Error; err != nil {
+		log.Error(dbQueryResourceFailed("genesis_vinterface", err))
+		return nil, err
+	}
+
+	// generate tool dataset
+	var vtaps []*mysql.VTap
+	if err := mysql.Db.Find(&vtaps).Error; err != nil {
+		log.Error(dbQueryResourceFailed("vtap", err))
+		return nil, err
+	}
+	idToVTap := make(map[int]*mysql.VTap)
+	for _, vtap := range vtaps {
+		idToVTap[vtap.ID] = vtap
+	}
+
+	var vifs []*mysql.VInterface
+	if err := mysql.Db.Select("mac", "deviceid", "devicetype").Find(&vifs).Error; err != nil {
+		log.Error(dbQueryResourceFailed("vinterface", err))
+		return nil, err
+	}
+	macToVIFs := make(map[string][]*mysql.VInterface)
+	for _, vif := range vifs {
+		macToVIFs[vif.Mac] = append(macToVIFs[vif.Mac], vif)
+	}
+
+	var hosts []*mysql.Host
+	if err := mysql.Db.Select("id", "name").Find(&hosts).Error; err != nil {
+		log.Error(dbQueryResourceFailed("host_device", err))
+		return nil, err
+	}
+	hostIDToName := make(map[int]string)
+	hostIPToID := make(map[string]int)
+	for _, host := range hosts {
+		hostIDToName[host.ID] = host.Name
+	}
+
+	var vms []*mysql.VM
+	if err := mysql.Db.Select("id", "name", "launch_server").Find(&vms).Error; err != nil {
+		log.Error(dbQueryResourceFailed("vm", err))
+		return nil, err
+	}
+	vmIDToName := make(map[int]string)
+	vmIDToLaunchServer := make(map[int]string)
+	for _, vm := range vms {
+		vmIDToName[vm.ID] = vm.Name
+		vmIDToLaunchServer[vm.ID] = vm.LaunchServer
+	}
+
+	var podNodes []*mysql.PodNode
+	if err := mysql.Db.Select("id", "name").Find(&podNodes).Error; err != nil {
+		log.Error(dbQueryResourceFailed("pod_node", err))
+		return nil, err
+	}
+	podNodeIDToName := make(map[int]string)
+	for _, podNode := range podNodes {
+		podNodeIDToName[podNode.ID] = podNode.Name
+	}
+
+	var vmPodNodeConns []*mysql.VMPodNodeConnection
+	if err := mysql.Db.Find(&vmPodNodeConns).Error; err != nil {
+		log.Error(dbQueryResourceFailed("vm_pod_node_connection", err))
+		return nil, err
+	}
+	vmIDToPodNodeID := make(map[int]int)
+	podNodeIDToVMID := make(map[int]int)
+	for _, conn := range vmPodNodeConns {
+		vmIDToPodNodeID[conn.VMID] = conn.PodNodeID
+		podNodeIDToVMID[conn.PodNodeID] = conn.VMID
+	}
+
+	vtapTypeToDeviceType := map[int]int{
+		common.VTAP_TYPE_KVM:        common.VIF_DEVICE_TYPE_HOST,
+		common.VTAP_TYPE_EXSI:       common.VIF_DEVICE_TYPE_HOST,
+		common.VTAP_TYPE_WORKLOAD_V: common.VIF_DEVICE_TYPE_VM,
+		common.VTAP_TYPE_WORKLOAD_P: common.VIF_DEVICE_TYPE_VM,
+		common.VTAP_TYPE_POD_HOST:   common.VIF_DEVICE_TYPE_POD_NODE,
+		common.VTAP_TYPE_POD_VM:     common.VIF_DEVICE_TYPE_POD_NODE,
+		common.VTAP_TYPE_HYPER_V:    common.VIF_DEVICE_TYPE_HOST,
+	}
+
+	for _, gVIF := range genesisVIFs {
+		vtapVIF := model.VTapInterface{
+			Name:    gVIF.Name,
+			MAC:     gVIF.MAC,
+			TapName: gVIF.TapName,
+			TapMAC:  gVIF.TapMAC,
+			VTapID:  gVIF.VTapID,
+			HostIP:  gVIF.HostIP,
+		}
+		vtap, ok := idToVTap[vtapVIF.VTapID]
+		if ok {
+			vtapVIF.VTapLaunchServer = vtap.LaunchServer
+			vtapVIF.VTapLaunchServerID = vtap.LaunchServerID
+			vtapVIF.VTapType = vtap.Type
+			vtapVIF.VTapName = vtap.Name
+
+			macVIFs := macToVIFs[vtapVIF.MAC]
+			if len(macVIFs) > 0 {
+				var macVIF *mysql.VInterface
+				if len(macVIFs) == 1 {
+					macVIF = macVIFs[0]
+				} else {
+					deviceType := vtapTypeToDeviceType[vtapVIF.VTapType]
+					for _, mv := range macVIFs {
+						if mv.DeviceType == deviceType {
+							macVIF = mv
+							break
+						}
+					}
+				}
+				vtapVIF.DeviceType = macVIF.DeviceType
+				vtapVIF.DeviceID = macVIF.DeviceID
+				if vtapVIF.DeviceType == common.VIF_DEVICE_TYPE_HOST {
+					vtapVIF.DeviceName = hostIDToName[vtapVIF.DeviceID]
+				} else if vtapVIF.DeviceType == common.VIF_DEVICE_TYPE_VM {
+					if vmIDToPodNodeID[vtapVIF.DeviceID] != 0 {
+						vtapVIF.DeviceName = podNodeIDToName[vtapVIF.DeviceID]
+					} else {
+						vtapVIF.DeviceName = vmIDToName[vtapVIF.DeviceID]
+					}
+					vtapVIF.DeviceHostID = hostIPToID[vmIDToLaunchServer[vtapVIF.DeviceID]]
+					vtapVIF.DeviceHostName = hostIDToName[vtapVIF.DeviceHostID]
+				} else if vtapVIF.DeviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+					vtapVIF.DeviceName = podNodeIDToName[vtapVIF.DeviceID]
+					vtapVIF.DeviceHostID = hostIPToID[vmIDToLaunchServer[podNodeIDToVMID[vtapVIF.DeviceID]]]
+					vtapVIF.DeviceHostName = hostIDToName[vtapVIF.DeviceHostID]
+				}
+			}
+		}
+		vtapVIFs = append(vtapVIFs, vtapVIF)
+	}
+	return vtapVIFs, nil
 }
