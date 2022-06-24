@@ -168,6 +168,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 	if pcapDataRetention != 0 {
 		configure.PcapDataRetention = proto.Uint32(pcapDataRetention)
 	}
+	localConfig := gVTapInfo.GetVTapLocalConfig(c.GetVTapGroupLcuuid())
+	configure.LocalConfig = &localConfig
 
 	return configure
 }

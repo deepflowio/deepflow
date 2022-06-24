@@ -100,16 +100,8 @@ func (r *VTapRegister) insertToDB(dbVTap *models.VTap, db *gorm.DB) bool {
 		dbVTap.State = VTAP_STATE_NORMAL
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
-		vTapConfigFile := &models.VTapConfigFile{
-			VTapLcuuid: dbVTap.Lcuuid,
-		}
 		if err := tx.Create(dbVTap).Error; err != nil {
 			log.Errorf("insert vtap(%s) faild, err: %s", r, err)
-			return err
-		}
-
-		if err := tx.Create(vTapConfigFile).Error; err != nil {
-			log.Errorf("insert vtap(%s) config file faild, err: %s", r, err)
 			return err
 		}
 		finishLog(dbVTap)
