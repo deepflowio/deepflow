@@ -22,6 +22,7 @@ use crate::common::{decapsulate::TunnelTypeBitmap, enums::TapType, DEFAULT_CPU_C
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::IfMacSource;
 use crate::utils::cgroups::Cgroups;
+use crate::utils::environment::free_memory_check;
 use crate::{
     dispatcher::recv_engine::{self, OptTpacketVersion},
     ebpf::CAP_LEN_MAX,
@@ -792,6 +793,11 @@ impl ConfigHandler {
         //TODO dispatcher on_config_change 要迁移过来
         let mut restart_dispatcher = false;
 
+        // Check and send out exceptions in time
+        if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler) {
+            warn!("{}", e);
+        }
+
         if candidate_config.dispatcher != new_config.dispatcher {
             if candidate_config.dispatcher.if_mac_source != new_config.dispatcher.if_mac_source {
                 if yaml_config.tap_mode != TapMode::Local {
@@ -819,9 +825,19 @@ impl ConfigHandler {
             if candidate_config.dispatcher.enabled != new_config.dispatcher.enabled {
                 info!("enabled set to {}", new_config.dispatcher.enabled);
                 if new_config.dispatcher.enabled {
-                    fn start_dispatcher(_: &ConfigHandler, components: &mut Components) {
-                        for dispatcher in components.dispatchers.iter() {
-                            dispatcher.start();
+                    fn start_dispatcher(handler: &ConfigHandler, components: &mut Components) {
+                        match free_memory_check(
+                            handler.candidate_config.environment.max_memory,
+                            &components.exception_handler,
+                        ) {
+                            Ok(()) => {
+                                for dispatcher in components.dispatchers.iter() {
+                                    dispatcher.start();
+                                }
+                            }
+                            Err(e) => {
+                                warn!("{}", e);
+                            }
                         }
                     }
                     callbacks.push(start_dispatcher);
@@ -1349,12 +1365,22 @@ impl ConfigHandler {
         }
 
         if restart_dispatcher && candidate_config.dispatcher.enabled {
-            fn dispatcher_callback(_: &ConfigHandler, components: &mut Components) {
+            fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
                 }
-                for dispatcher in components.dispatchers.iter() {
-                    dispatcher.start();
+                match free_memory_check(
+                    handler.candidate_config.environment.max_memory,
+                    &components.exception_handler,
+                ) {
+                    Ok(()) => {
+                        for dispatcher in components.dispatchers.iter() {
+                            dispatcher.start();
+                        }
+                    }
+                    Err(e) => {
+                        warn!("{}", e);
+                    }
                 }
             }
             callbacks.push(dispatcher_callback);
