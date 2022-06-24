@@ -9,18 +9,18 @@ import (
 )
 
 func VTapGroupConfigRouter(e *gin.Engine) {
-	e.POST("/v1/vtap-group-configurations/", createVTapGroupConfig)
-	e.DELETE("/v1/vtap-group-configurations/:lcuuid/", deleteVTapGroupConfig)
-	e.PATCH("/v1/vtap-group-configurations/:lcuuid/", updateVTapGroupConfig)
-	e.GET("/v1/vtap-group-configurations/", getVTapGroupConfigs)
+	e.POST("/v1/vtap-group-configuration/", createVTapGroupConfig)
+	e.DELETE("/v1/vtap-group-configuration/:lcuuid/", deleteVTapGroupConfig)
+	e.PATCH("/v1/vtap-group-configuration/:lcuuid/", updateVTapGroupConfig)
+	e.GET("/v1/vtap-group-configuration/", getVTapGroupConfigs)
 	e.GET("/v1/vtap-group-configuration/detailed/:lcuuid/", getVTapGroupDetailedConfig)
 	e.POST("/v1/vtap-group-configuration/advanced/", createVTapGroupAdvancedConfig)
 	e.GET("/v1/vtap-group-configuration/advanced/:lcuuid/", getVTapGroupAdvancedConfig)
 	e.PATCH("/v1/vtap-group-configuration/advanced/:lcuuid/", updateVTapGroupAdvancedConfig)
 	e.GET("/v1/vtap-group-configuration/example/", getVTapGroupExampleConfig)
 
-	e.GET("/v1/vtap-group-configuration/", getVTapGroupConfigByFilter)
-	e.DELETE("/v1/vtap-group-configuration/", deleteVTapGroupConfigByFilter)
+	e.GET("/v1/vtap-group-configuration/filter/", getVTapGroupConfigByFilter)
+	e.DELETE("/v1/vtap-group-configuration/filter/", deleteVTapGroupConfigByFilter)
 }
 
 func createVTapGroupConfig(c *gin.Context) {
