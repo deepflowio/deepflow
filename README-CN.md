@@ -61,3 +61,4 @@ MetaFlow未来还有很多激动人心的特性等待我们和社区一起开发
 # 致谢
 
 - 感谢[eBPF](https://ebpf.io/)，革命性的Linux内核技术
+- 感谢[OpenTelemetry](https://opentelemetry.io/)，提供了采集应用可观测性数据的标准API
