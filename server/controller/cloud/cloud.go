@@ -135,7 +135,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 					continue
 				}
 				domain := domains[0]
-				kubernetesGatherTask := NewKubernetesGatherTask(&domain, nil, c.cCtx)
+				kubernetesGatherTask := NewKubernetesGatherTask(&domain, nil, c.cCtx, false)
 				if kubernetesGatherTask == nil {
 					continue
 				}
@@ -179,8 +179,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 				for _, subDomain := range addSubDomains.ToSlice() {
 					lcuuid := subDomain.(string)
 					kubernetesGatherTask := NewKubernetesGatherTask(
-						nil, lcuuidToSubDomain[lcuuid], c.cCtx,
-					)
+						nil, lcuuidToSubDomain[lcuuid], c.cCtx, true)
 					if kubernetesGatherTask == nil {
 						continue
 					}
@@ -202,8 +201,7 @@ func (c *Cloud) runKubernetesGatherTask() {
 						log.Infof("newSubDomainConfig: %s", newSubDomainConfig)
 						c.kubernetesGatherTaskMap[lcuuid].Stop()
 						kubernetesGatherTask := NewKubernetesGatherTask(
-							nil, lcuuidToSubDomain[lcuuid], c.cCtx,
-						)
+							nil, lcuuidToSubDomain[lcuuid], c.cCtx, true)
 						if kubernetesGatherTask == nil {
 							continue
 						}

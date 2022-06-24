@@ -34,6 +34,7 @@ type KubernetesGather struct {
 	PortNameRegex                string
 	PodNetIPv4CIDRMaxMask        int
 	PodNetIPv6CIDRMaxMask        int
+	isSubDomain                  bool
 	azLcuuid                     string
 	podGroupLcuuids              mapset.Set
 	podNetworkLcuuidCIDRs        networkLcuuidCIDRs
@@ -55,7 +56,7 @@ type networkLcuuidCIDRs struct {
 	cidrs         []string
 }
 
-func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain) *KubernetesGather {
+func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSubDomain bool) *KubernetesGather {
 	var name string
 	var displayName string
 	var clusterID string
@@ -115,6 +116,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain) *Kube
 
 		// 以下属性为获取资源所用的关联关系
 		azLcuuid:                     "",
+		isSubDomain:                  isSubDomain,
 		podGroupLcuuids:              mapset.NewSet(),
 		nodeNetworkLcuuidCIDRs:       networkLcuuidCIDRs{},
 		podNetworkLcuuidCIDRs:        networkLcuuidCIDRs{},
