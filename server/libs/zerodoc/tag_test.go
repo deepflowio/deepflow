@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/codec"
+	"server/libs/datatype"
+	"server/libs/zerodoc/pb"
 )
 
 func TestHasEdgeTagField(t *testing.T) {

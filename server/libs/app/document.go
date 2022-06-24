@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/ckdb"
+	"server/libs/codec"
+	"server/libs/pool"
+	"server/libs/zerodoc"
+	"server/libs/zerodoc/pb"
 )
 
 const (

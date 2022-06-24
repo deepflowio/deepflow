@@ -893,17 +893,6 @@ func (VTap) TableName() string {
 	return "vtap"
 }
 
-type VTapConfigFile struct {
-	ID             int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	VTapLcuuid     string `gorm:"column:vtap_lcuuid;type:char(64);default:null" json:"VTAP_LCUUID"`
-	ConfigFile     string `gorm:"column:config_file;type:text;default:null" json:"CONFIG_FILE"`             // vtap config file
-	ConfigRevision string `gorm:"column:config_revision;type:char(64);default:null" json:"CONFIG_REVISION"` // vtap config MD5
-}
-
-func (VTapConfigFile) TableName() string {
-	return "vtap_config_file"
-}
-
 type VTapGroup struct {
 	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
 	Name      string    `gorm:"column:name;type:varchar(64);not null" json:"NAME"`

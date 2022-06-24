@@ -1,8 +1,8 @@
 package zerodoc
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/ckdb"
+	"server/libs/zerodoc/pb"
 )
 
 type AppMeter struct {

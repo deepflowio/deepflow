@@ -17,7 +17,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 	var response []model.Domain
 	var domains []mysql.Domain
 	var azs []mysql.AZ
-	var podClusters []mysql.PodCluster
+	var subDomains []mysql.SubDomain
 	var controllers []mysql.Controller
 	var domainLcuuids []string
 	var domainToAZLcuuids map[string][]string
@@ -57,11 +57,11 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 		controllerIPToName[controller.IP] = controller.Name
 	}
 
-	mysql.Db.Find(&podClusters)
-	domainToPodClusterNames := make(map[string][]string)
-	for _, podCluster := range podClusters {
-		domainToPodClusterNames[podCluster.Domain] = append(
-			domainToPodClusterNames[podCluster.Domain], podCluster.Name,
+	mysql.Db.Find(&subDomains)
+	domainToSubDomainNames := make(map[string][]string)
+	for _, subDomain := range subDomains {
+		domainToSubDomainNames[subDomain.Domain] = append(
+			domainToSubDomainNames[subDomain.Domain], subDomain.Name,
 		)
 	}
 
@@ -97,8 +97,8 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 		}
 		if domain.Type != common.KUBERNETES {
 			domainResp.K8sEnabled = 1
-			if podClusters, ok := domainToPodClusterNames[domain.Lcuuid]; ok {
-				domainResp.PodClusters = podClusters
+			if subDomains, ok := domainToSubDomainNames[domain.Lcuuid]; ok {
+				domainResp.PodClusters = subDomains
 			}
 		} else {
 			var k8sCluster mysql.KubernetesCluster
@@ -139,7 +139,7 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	log.Infof("create domain (%v)", domainCreate)
 
 	domain := mysql.Domain{}
-	displayName := uuid.NewV4().String()
+	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
@@ -416,7 +416,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 	log.Infof("create sub_domain (%v)", subDomainCreate)
 
 	subDomain := mysql.SubDomain{}
-	displayName := uuid.NewV4().String()
+	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	subDomain.Lcuuid = lcuuid
 	subDomain.Name = subDomainCreate.Name

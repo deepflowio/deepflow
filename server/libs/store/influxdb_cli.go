@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/client/v2"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"server/libs/zerodoc"
 )
 
 const (

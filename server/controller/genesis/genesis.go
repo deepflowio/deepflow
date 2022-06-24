@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 
 	"github.com/op/go-logging"
-	"github.yunshan.net/metaflowys/metaflow/server/libs/queue"
 	cloudmodel "server/controller/cloud/model"
+	"server/libs/queue"
 
 	"server/controller/genesis/config"
 	"server/controller/genesis/model"

@@ -15,8 +15,12 @@ vendor:
 	#test -n "$(shell go list -e -f '{{.Dir}}' ${MESSAGE})"
 	#cp -r $(shell go list -e -f '{{.Dir}}' ${MESSAGE})/* vendor/${MESSAGE}/
 	cp -r ../message/* vendor/${MESSAGE}/
+	cp -r ../go.mod vendor/${MESSAGE}/../
 	find vendor -type d -exec chmod +w {} \;
 	cd vendor/${MESSAGE} && go generate ./...
+	cd libs && go generate ./...
+	# 修复clickhouse-go的WritexxxNullable接口写入数据错误的问题
+	#patch vendor/github.com/ClickHouse/clickhouse-go/lib/data/block_write_column.go < ingester/patch/clickhouse-go/nullable.patch
 
 .PHONY: test
 test: vendor
@@ -27,6 +31,7 @@ test: vendor
 server: vendor
 	go build -mod vendor ${FLAGS} -o bin/metaflow-server${BINARY_SUFFIX} cmd/server/main.go
 	go build -mod vendor ${FLAGS} -o bin/trisolaris-ctl${BINARY_SUFFIX} controller/trisolaris/trisolarisctrl/main.go
+	go build -mod vendor ${FLAGS} -o bin/ingester-ctl${BINARY_SUFFIX} ingester/cmd/droplet-ctl/main.go
 
 
 .PHONY: clean

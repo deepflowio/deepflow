@@ -5,7 +5,7 @@ import (
 	"os"
 	"sync"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	"server/libs/datatype"
 )
 
 const (

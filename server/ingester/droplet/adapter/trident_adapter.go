@@ -6,14 +6,14 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/debug"
+	"server/libs/pool"
+	"server/libs/queue"
+	"server/libs/receiver"
+	"server/libs/stats"
+	"server/libs/utils"
 
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
+	"server/ingester/dropletctl"
 )
 
 const (

@@ -3,8 +3,8 @@ package datatype
 import (
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"server/libs/datatype/pb"
+	"server/libs/pool"
 )
 
 var mysqlInfoPool = pool.NewLockFreePool(func() interface{} {

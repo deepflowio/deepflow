@@ -50,7 +50,11 @@ struct mmsghdr {
 	unsigned int msg_len;
 };
 #else
+
+#ifndef NULL
 #define NULL ((void*)0)
+#endif
+
 #define AF_INET         2	/* Internet IP Protocol         */
 #define PF_INET         AF_INET
 #define AF_INET6        10	/* IP version 6                 */

@@ -2,11 +2,11 @@ package dbwriter
 
 import (
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
-	"gitlab.yunshan.net/yunshan/droplet/stream/common"
-	"gitlab.yunshan.net/yunshan/droplet/stream/config"
-	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify"
+	"server/ingester/pkg/ckwriter"
+	"server/ingester/stream/common"
+	"server/ingester/stream/config"
+	"server/ingester/stream/jsonify"
+	"server/libs/ckdb"
 )
 
 var log = logging.MustGetLogger("stream.dbwriter")

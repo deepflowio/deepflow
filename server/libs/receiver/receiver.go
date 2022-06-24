@@ -13,14 +13,14 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/app"
-	"gitlab.yunshan.net/yunshan/droplet-libs/cache"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/debug"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	. "gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/app"
+	"server/libs/cache"
+	"server/libs/datatype"
+	"server/libs/debug"
+	"server/libs/pool"
+	"server/libs/queue"
+	"server/libs/stats"
+	. "server/libs/utils"
 )
 
 const (

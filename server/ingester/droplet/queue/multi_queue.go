@@ -3,7 +3,7 @@ package queue
 import (
 	"errors"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
+	"server/libs/queue"
 )
 
 type MultiQueue struct {

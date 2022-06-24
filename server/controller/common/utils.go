@@ -14,7 +14,7 @@ import (
 
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 var log = logging.MustGetLogger("common")
@@ -136,7 +136,10 @@ func GetUUID(str string, namespace uuid.UUID) string {
 		}
 		return uuid.NewV5(uuid.NamespaceOID, str).String()
 	}
-	return uuid.NewV4().String()
+	if v4, err := uuid.NewV4(); err == nil {
+		return v4.String()
+	}
+	return uuid.NewV5(uuid.NamespaceOID, str).String()
 }
 
 // 功能：判断当前控制器是否为masterController

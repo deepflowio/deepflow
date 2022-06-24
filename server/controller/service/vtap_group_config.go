@@ -242,7 +242,6 @@ func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroup
 }
 
 func convertJsonToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
-	tData.VTapGroupLcuuid = sData.VTapGroupLcuuid
 	convertToDb(sData, tData)
 }
 
@@ -304,6 +303,7 @@ func CreateVTapGroupConfig(createData *model.VTapGroupConfiguration) (*mysql.VTa
 	}
 	dbData := &mysql.VTapGroupConfiguration{}
 	convertJsonToDb(createData, dbData)
+	dbData.VTapGroupLcuuid = createData.VTapGroupLcuuid
 	lcuuid := uuid.New().String()
 	dbData.Lcuuid = &lcuuid
 	mysql.Db.Create(dbData)
@@ -322,9 +322,6 @@ func DeleteVTapGroupConfig(lcuuid string) (*mysql.VTapGroupConfiguration, error)
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	if dbConfig.VTapGroupLcuuid == nil {
-		return nil, fmt.Errorf("delete default vtapgroup configuration is not supported")
-	}
 	db.Delete(dbConfig)
 
 	return dbConfig, nil
@@ -341,12 +338,7 @@ func UpdateVTapGroupConfig(lcuuid string, updateData *model.VTapGroupConfigurati
 	if ret.Error != nil {
 		return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	if updateData.VTapGroupLcuuid == nil {
-		return nil, fmt.Errorf("vtap group is empty")
-	}
-
 	convertJsonToDb(updateData, dbConfig)
-
 	ret = db.Save(dbConfig)
 	if ret.Error != nil {
 		return nil, fmt.Errorf("save config failed, %s", ret.Error)
@@ -500,6 +492,91 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupCon
 	if ret.Error != nil {
 		return "", fmt.Errorf("save config failed, %s", ret.Error)
 	}
+	response := &model.VTapGroupConfiguration{}
+	convertDBToYaml(dbConfig, response)
+	b, err := yaml.Marshal(response)
+	if err != nil {
+		log.Error(err)
+	}
+	return string(b), nil
+}
+
+func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (string, error) {
+	if createData.VTapGroupLcuuid == nil {
+		return "", fmt.Errorf("vtap_group_lcuuid is None")
+	}
+	shortUUID := createData.VTapGroupLcuuid
+	db := mysql.Db
+	vtapGroup := &mysql.VTapGroup{}
+	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
+	if ret.Error != nil {
+		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
+	}
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)
+	if ret.Error == nil {
+		return "", fmt.Errorf("vtapgroup(short_uuid=%s) configuration already exist", *createData.VTapGroupLcuuid)
+	}
+	convertYamlToDb(createData, dbConfig)
+	dbConfig.VTapGroupLcuuid = &vtapGroup.Lcuuid
+	lcuuid := uuid.New().String()
+	dbConfig.Lcuuid = &lcuuid
+	ret = db.Save(dbConfig)
+	if ret.Error != nil {
+		return "", fmt.Errorf("save config failed, %s", ret.Error)
+	}
+	response := &model.VTapGroupConfiguration{}
+	convertDBToYaml(dbConfig, response)
+	b, err := yaml.Marshal(response)
+	if err != nil {
+		log.Error(err)
+	}
+	return string(b), nil
+}
+
+func GetVTapGroupConfigByFilter(args map[string]string) (string, error) {
+	shortUUID := args["short_uuid"]
+	if shortUUID == "" {
+		return "", fmt.Errorf("short uuid is None")
+	}
+	db := mysql.Db
+	vtapGroup := &mysql.VTapGroup{}
+	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
+	if ret.Error != nil {
+		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
+	}
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)
+	if ret.Error != nil {
+		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration not found", shortUUID)
+	}
+	response := &model.VTapGroupConfiguration{}
+	convertDBToYaml(dbConfig, response)
+	b, err := yaml.Marshal(response)
+	if err != nil {
+		log.Error(err)
+	}
+	return string(b), nil
+}
+
+func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
+	shortUUID := args["short_uuid"]
+	if shortUUID == "" {
+		return "", fmt.Errorf("short uuid is None")
+	}
+	db := mysql.Db
+	vtapGroup := &mysql.VTapGroup{}
+	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
+	if ret.Error != nil {
+		return "", fmt.Errorf("vtap group(short_uuid=%s) not found", shortUUID)
+	}
+
+	dbConfig := &mysql.VTapGroupConfiguration{}
+	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)
+	if ret.Error != nil {
+		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration not found", shortUUID)
+	}
+	db.Delete(dbConfig)
 	response := &model.VTapGroupConfiguration{}
 	convertDBToYaml(dbConfig, response)
 	b, err := yaml.Marshal(response)

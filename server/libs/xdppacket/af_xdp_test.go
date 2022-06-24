@@ -1,3 +1,4 @@
+//go:build linux && xdp
 // +build linux,xdp
 
 package xdppacket

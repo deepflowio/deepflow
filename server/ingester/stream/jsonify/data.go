@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
-	"gitlab.yunshan.net/yunshan/droplet/common"
-	"gitlab.yunshan.net/yunshan/droplet/stream/geo"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
+	"server/ingester/common"
+	"server/ingester/stream/geo"
+	"server/libs/ckdb"
+	"server/libs/datatype"
+	"server/libs/datatype/pb"
+	"server/libs/grpc"
+	"server/libs/pool"
+	"server/libs/zerodoc"
 )
 
 const (

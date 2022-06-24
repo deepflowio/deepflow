@@ -11,7 +11,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/utils"
 )
 
 const PKT_CNT_INFINITE = 0

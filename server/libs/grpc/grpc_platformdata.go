@@ -15,15 +15,15 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
-	"gitlab.yunshan.net/yunshan/droplet-libs/logger"
-	api "gitlab.yunshan.net/yunshan/droplet-libs/reciter-api"
 	"golang.org/x/net/context"
+	"server/libs/logger"
+	api "server/libs/reciter-api"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/lru"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
+	"server/libs/datatype"
+	"server/libs/hmap/lru"
+	"server/libs/receiver"
+	"server/libs/utils"
 )
 
 const (

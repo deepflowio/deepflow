@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
 	"golang.org/x/net/context"
+	"server/libs/grpc"
 )
 
 const (

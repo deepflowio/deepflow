@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
+	"server/libs/codec"
+	"server/libs/datatype/pb"
 )
 
 func TestTaggedFlowEncodeDecode(t *testing.T) {

@@ -53,6 +53,10 @@ type Config struct {
 	TTL               int            `yaml:"ext-metrics-ttl"`
 }
 
+type ExtMetricsConfig struct {
+	ExtMetrics Config `yaml:"ingester"`
+}
+
 func (c *Config) Validate() error {
 	for _, ipString := range c.ControllerIPs {
 		if net.ParseIP(string(ipString)) == nil {
@@ -71,32 +75,34 @@ func (c *Config) Validate() error {
 }
 
 func Load(path string) *Config {
-	config := &Config{
-		ControllerPort:    DefaultControllerPort,
-		CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
-		DecoderQueueCount: DefaultDecoderQueueCount,
-		DecoderQueueSize:  DefaultDecoderQueueSize,
-		CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 10},
-		TTL:               DefaultExtMetricsTTL,
+	config := &ExtMetricsConfig{
+		ExtMetrics: Config{
+			ControllerPort:    DefaultControllerPort,
+			CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
+			DecoderQueueCount: DefaultDecoderQueueCount,
+			DecoderQueueSize:  DefaultDecoderQueueSize,
+			CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 10},
+			TTL:               DefaultExtMetricsTTL,
+		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Info("no config file, use defaults")
-		return config
+		return &config.ExtMetrics
 	}
 	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Warning("Read config file error:", err)
-		config.Validate()
-		return config
+		config.ExtMetrics.Validate()
+		return &config.ExtMetrics
 	}
 	if err = yaml.Unmarshal(configBytes, &config); err != nil {
 		log.Error("Unmarshal yaml error:", err)
 		os.Exit(1)
 	}
 
-	if err = config.Validate(); err != nil {
+	if err = config.ExtMetrics.Validate(); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
-	return config
+	return &config.ExtMetrics
 }

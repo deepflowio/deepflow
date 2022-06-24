@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
+	"server/libs/codec"
 )
 
 func TestCustomTagMeterMetaEncodeDecode(t *testing.T) {

@@ -433,9 +433,14 @@ impl Components {
             config_handler.platform(),
             session.clone(),
             libvirt_xml_extractor.clone(),
+            exception_handler.clone(),
         );
 
-        let api_watcher = Arc::new(ApiWatcher::new(config_handler.platform(), session.clone()));
+        let api_watcher = Arc::new(ApiWatcher::new(
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
+        ));
 
         let context = ConstructDebugCtx {
             api_watcher: api_watcher.clone(),

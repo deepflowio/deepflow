@@ -8,7 +8,7 @@ import (
 	. "github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
+	"server/libs/stats"
 )
 
 var log = logging.MustGetLogger("dedup")

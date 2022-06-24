@@ -8,8 +8,8 @@ import (
 
 	"github.com/Workiva/go-datastructures/bitarray"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datastructure"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	. "server/libs/datastructure"
+	"server/libs/pool"
 )
 
 type EndpointType = int

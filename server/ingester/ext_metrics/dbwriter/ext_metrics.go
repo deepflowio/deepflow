@@ -1,9 +1,9 @@
 package dbwriter
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
+	"server/libs/ckdb"
+	"server/libs/pool"
+	"server/libs/zerodoc"
 )
 
 type ExtMetrics struct {

@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go"
-	"gitlab.yunshan.net/yunshan/droplet-libs/ckdb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
-	basecommon "gitlab.yunshan.net/yunshan/droplet/common"
-	"gitlab.yunshan.net/yunshan/droplet/pkg/ckwriter"
-	"gitlab.yunshan.net/yunshan/droplet/stream/common"
+	basecommon "server/ingester/common"
+	"server/ingester/pkg/ckwriter"
+	"server/ingester/stream/common"
+	"server/libs/ckdb"
+	"server/libs/zerodoc"
 )
 
 const (

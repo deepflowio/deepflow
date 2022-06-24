@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	"gitlab.yunshan.net/yunshan/droplet/stream/dbwriter"
+	"server/ingester/stream/dbwriter"
 )
 
 const (

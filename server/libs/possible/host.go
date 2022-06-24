@@ -4,8 +4,8 @@ import (
 	"net"
 	"sync"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap/lru"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	"server/libs/hmap/lru"
+	"server/libs/utils"
 )
 
 type PossibleHost struct {

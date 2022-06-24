@@ -18,8 +18,8 @@ import (
 	logging "github.com/op/go-logging"
 	statsd "gopkg.in/alexcesaro/statsd.v2"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datastructure"
+	"server/libs/codec"
+	. "server/libs/datastructure"
 )
 
 var log = logging.MustGetLogger("stats")

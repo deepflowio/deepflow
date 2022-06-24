@@ -14,8 +14,12 @@ func VTapGroupConfigRouter(e *gin.Engine) {
 	e.PATCH("/v1/vtap-group-configurations/:lcuuid/", updateVTapGroupConfig)
 	e.GET("/v1/vtap-group-configurations/", getVTapGroupConfigs)
 	e.GET("/v1/vtap-group-configuration/detailed/:lcuuid/", getVTapGroupDetailedConfig)
+	e.POST("/v1/vtap-group-configuration/advanced/", createVTapGroupAdvancedConfig)
 	e.GET("/v1/vtap-group-configuration/advanced/:lcuuid/", getVTapGroupAdvancedConfig)
 	e.PATCH("/v1/vtap-group-configuration/advanced/:lcuuid/", updateVTapGroupAdvancedConfig)
+
+	e.GET("/v1/vtap-group-configuration/", getVTapGroupConfigByFilter)
+	e.DELETE("/v1/vtap-group-configuration/", deleteVTapGroupConfigByFilter)
 }
 
 func createVTapGroupConfig(c *gin.Context) {
@@ -61,5 +65,30 @@ func updateVTapGroupAdvancedConfig(c *gin.Context) {
 	vTapGroupConfig := &model.VTapGroupConfiguration{}
 	c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
 	data, err := service.UpdateVTapGroupAdvancedConfig(lcuuid, vTapGroupConfig)
+	JsonResponse(c, data, err)
+}
+
+func createVTapGroupAdvancedConfig(c *gin.Context) {
+	vTapGroupConfig := &model.VTapGroupConfiguration{}
+	c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
+	data, err := service.CreateVTapGroupAdvancedConfig(vTapGroupConfig)
+	JsonResponse(c, data, err)
+}
+
+func getVTapGroupConfigByFilter(c *gin.Context) {
+	args := make(map[string]string)
+	if value, ok := c.GetQuery("short_uuid"); ok {
+		args["short_uuid"] = value
+	}
+	data, err := service.GetVTapGroupConfigByFilter(args)
+	JsonResponse(c, data, err)
+}
+
+func deleteVTapGroupConfigByFilter(c *gin.Context) {
+	args := make(map[string]string)
+	if value, ok := c.GetQuery("short_uuid"); ok {
+		args["short_uuid"] = value
+	}
+	data, err := service.DeleteVTapGroupConfigByFilter(args)
 	JsonResponse(c, data, err)
 }

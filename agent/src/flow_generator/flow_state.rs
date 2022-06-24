@@ -1326,7 +1326,7 @@ mod tests {
                     pkt_dir,
                     next_state: FlowState::Reset,
                     timeout: flow_timeout.closed_fin,
-                    closed: true,
+                    closed: false,
                 });
             }
         }
@@ -1336,7 +1336,7 @@ mod tests {
             pkt_dir,
             next_state: FlowState::Closed,
             timeout: flow_timeout.closed_fin,
-            closed: true,
+            closed: false,
         });
 
         let pkt_dir = PacketDirection::ServerToClient;
@@ -1456,7 +1456,7 @@ mod tests {
                     pkt_dir,
                     next_state: FlowState::Reset,
                     timeout: flow_timeout.closed_fin,
-                    closed: true,
+                    closed: false,
                 });
             }
         }
@@ -1486,7 +1486,7 @@ mod tests {
             pkt_dir,
             next_state: FlowState::Closed,
             timeout: flow_timeout.closed_fin,
-            closed: true,
+            closed: false,
         });
 
         // FlowState::Reset

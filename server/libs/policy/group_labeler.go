@@ -4,8 +4,8 @@ import (
 	"math"
 	"net"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
+	. "server/libs/datatype"
+	"server/libs/utils"
 )
 
 const (

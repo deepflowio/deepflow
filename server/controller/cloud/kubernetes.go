@@ -16,6 +16,11 @@ func (c *Cloud) getKubernetesData() {
 	// 避免合并时产生默认的空值，对kubernetes_gather resource的az做判断
 	if kubernetesGatherResource.AZ.Lcuuid == "" {
 		log.Infof("domain (%s) kubernetes_gather_task resource is null", c.basicInfo.Name)
+		// return k8s gather error info
+		c.resource = model.Resource{
+			ErrorState:   kubernetesGatherResource.ErrorState,
+			ErrorMessage: kubernetesGatherResource.ErrorMessage,
+		}
 		return
 	}
 

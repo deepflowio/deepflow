@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc/pb"
+	"server/libs/codec"
+	"server/libs/zerodoc"
+	"server/libs/zerodoc/pb"
 )
 
 func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (*Document, error) {

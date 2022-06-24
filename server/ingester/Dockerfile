@@ -2,7 +2,7 @@ FROM dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/dev/golang:1.18.0 as buil
 # ENV CGO_ENABLED=0
 ENV GOPROXY=https://proxy.golang.com.cn,direct
 # 还可以设置不走 proxy 的私有仓库或组，多个用逗号相隔（可选）
-ENV  GOPRIVATE=gitlab.yunshan.net
+ENV  GOPRIVATE=github.com
 RUN  sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list  && \
      sed -i 's|security.debian.org/debian-security|mirrors.aliyun.com/debian-security|g' /etc/apt/sources.list && \
      apt update && \

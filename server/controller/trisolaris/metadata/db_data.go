@@ -196,14 +196,6 @@ func (d *DBDataCache) GetSkipVTaps() []*models.VTap {
 	return d.skipVTaps
 }
 
-func (d *DBDataCache) GetVTapConfigFilesFromDB(db *gorm.DB) []*models.VTapConfigFile {
-	vtapConfigFiles, err := dbmgr.DBMgr[models.VTapConfigFile](db).Gets()
-	if err != nil {
-		log.Error(err)
-	}
-	return vtapConfigFiles
-}
-
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
 	tapTypes, err := dbmgr.DBMgr[models.TapType](db).Gets()
 	if err != nil {

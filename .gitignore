@@ -12,4 +12,7 @@
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+/server/vendor/
+/server/bin/
+/server/controller/cloud/aliyun/api_response.gen.go
+/server/libs/geo/ip_info.go

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/hmap"
+	"server/libs/hmap"
 )
 
 const (

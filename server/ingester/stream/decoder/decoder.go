@@ -7,18 +7,18 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype/pb"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
-	"gitlab.yunshan.net/yunshan/droplet-libs/stats"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet/stream/config"
-	"gitlab.yunshan.net/yunshan/droplet/stream/jsonify"
-	"gitlab.yunshan.net/yunshan/droplet/stream/throttler"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	"server/ingester/stream/config"
+	"server/ingester/stream/jsonify"
+	"server/ingester/stream/throttler"
+	"server/libs/codec"
+	"server/libs/datatype"
+	"server/libs/datatype/pb"
+	"server/libs/grpc"
+	"server/libs/queue"
+	"server/libs/receiver"
+	"server/libs/stats"
+	"server/libs/utils"
 )
 
 var log = logging.MustGetLogger("stream.decoder")

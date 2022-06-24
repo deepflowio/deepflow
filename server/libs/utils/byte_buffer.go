@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/pool"
+	"server/libs/pool"
 )
 
 type ByteBuffer struct {

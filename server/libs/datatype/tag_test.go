@@ -1,8 +1,8 @@
 package datatype
 
 import (
-	"gitlab.yunshan.net/yunshan/droplet-libs/codec"
 	"reflect"
+	"server/libs/codec"
 	"testing"
 )
 

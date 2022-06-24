@@ -8,8 +8,8 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
-	"github.yunshan.net/metaflowys/metaflow/server/libs/logger"
 	"runtime"
+	"server/libs/logger"
 	"server/querier/config"
 	"server/querier/router"
 	"time"

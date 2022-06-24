@@ -7,20 +7,20 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	libpcap "gitlab.yunshan.net/yunshan/droplet-libs/pcap"
-	libqueue "gitlab.yunshan.net/yunshan/droplet-libs/queue"
-	"gitlab.yunshan.net/yunshan/droplet-libs/receiver"
+	"server/libs/datatype"
+	libpcap "server/libs/pcap"
+	libqueue "server/libs/queue"
+	"server/libs/receiver"
 
-	"gitlab.yunshan.net/yunshan/droplet/droplet/adapter"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/config"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/labeler"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/pcap"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/queue"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/statsd"
-	"gitlab.yunshan.net/yunshan/droplet/droplet/syslog"
-	"gitlab.yunshan.net/yunshan/droplet/dropletctl"
-	"gitlab.yunshan.net/yunshan/message/trident"
+	"github.com/metaflowys/metaflow/message/trident"
+	"server/ingester/droplet/adapter"
+	"server/ingester/droplet/config"
+	"server/ingester/droplet/labeler"
+	"server/ingester/droplet/pcap"
+	"server/ingester/droplet/queue"
+	"server/ingester/droplet/statsd"
+	"server/ingester/droplet/syslog"
+	"server/ingester/dropletctl"
 )
 
 var log = logging.MustGetLogger("droplet")

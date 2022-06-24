@@ -134,7 +134,9 @@ func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
 	kDataResource := genesis.GenesisService.GetKubernetesData()
 	kData, ok := kDataResource[k.ClusterID]
 	if !ok {
-		return map[string][]string{}, errors.New("no vtap report cluster id:" + k.ClusterID)
+		msg := "no vtap report cluster id:" + k.ClusterID
+		log.Warning(msg)
+		return map[string][]string{}, errors.New(msg)
 	}
 	if kData.ErrorMSG != "" {
 		log.Warningf("cluster id (%s) Error: %s", k.ClusterID, kData.ErrorMSG)

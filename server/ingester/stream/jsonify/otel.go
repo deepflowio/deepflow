@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/google/gopacket/layers"
-	"gitlab.yunshan.net/yunshan/droplet-libs/datatype"
-	"gitlab.yunshan.net/yunshan/droplet-libs/grpc"
-	"gitlab.yunshan.net/yunshan/droplet-libs/utils"
-	"gitlab.yunshan.net/yunshan/droplet-libs/zerodoc"
 	v11 "go.opentelemetry.io/proto/otlp/common/v1"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
+	"server/libs/datatype"
+	"server/libs/grpc"
+	"server/libs/utils"
+	"server/libs/zerodoc"
 )
 
 func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []interface{} {

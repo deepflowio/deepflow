@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.yunshan.net/metaflowys/metaflow/server/libs/utils"
+	"server/libs/utils"
 
 	. "server/controller/common"
 	models "server/controller/db/mysql"

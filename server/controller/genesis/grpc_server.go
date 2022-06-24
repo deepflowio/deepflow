@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.yunshan.net/metaflowys/metaflow/server/libs/queue"
 	tridentcommon "github.com/metaflowys/metaflow/message/common"
 	"github.com/metaflowys/metaflow/message/trident"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
+	"server/libs/queue"
 
 	"server/controller/genesis/common"
 	"server/controller/genesis/config"

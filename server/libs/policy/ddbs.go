@@ -10,7 +10,7 @@ import (
 
 	"github.com/shirou/gopsutil/process"
 
-	. "gitlab.yunshan.net/yunshan/droplet-libs/datatype"
+	. "server/libs/datatype"
 )
 
 type link6 struct {

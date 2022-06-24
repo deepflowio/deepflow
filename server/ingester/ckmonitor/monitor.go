@@ -9,8 +9,8 @@ import (
 
 	"database/sql"
 
-	"gitlab.yunshan.net/yunshan/droplet/common"
-	"gitlab.yunshan.net/yunshan/droplet/config"
+	"server/ingester/common"
+	"server/ingester/config"
 )
 
 var log = logging.MustGetLogger("monitor")

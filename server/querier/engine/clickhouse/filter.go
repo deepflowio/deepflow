@@ -10,7 +10,7 @@ import (
 	"github.com/xwb1989/sqlparser"
 	"inet.af/netaddr"
 
-	"github.yunshan.net/metaflowys/metaflow/server/libs/utils"
+	"server/libs/utils"
 
 	"server/querier/engine/clickhouse/common"
 	"server/querier/engine/clickhouse/tag"

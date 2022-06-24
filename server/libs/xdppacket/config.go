@@ -1,3 +1,4 @@
+//go:build linux && xdp
 // +build linux,xdp
 
 // XDP socket配置文件，主要记录当前在哪个网卡的哪些队列上创建的XDP socket

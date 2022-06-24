@@ -97,7 +97,7 @@ func (q *QingCloud) getSecurityGroupRules() ([]model.SecurityGroupRule, error) {
 
 	log.Debug("get security_group rules starting")
 
-	for regionId, _ := range q.RegionIdToLcuuid {
+	for regionId := range q.RegionIdToLcuuid {
 		kwargs := []*Param{{"zone", regionId}}
 		response, err := q.GetResponse(
 			"DescribeSecurityGroupIPSets", "security_group_ipset_set", kwargs,

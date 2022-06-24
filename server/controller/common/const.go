@@ -144,6 +144,7 @@ const (
 
 const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
+	DEFAULT_PORT_NAME_REGEX     = "(cni|flannel|vxlan.calico|tunl)"
 
 	OPENSTACK         = 1
 	VSPHERE           = 2
@@ -372,7 +373,25 @@ const (
 	SUB_DOMAIN_ERROR_DISPLAY_NUM = 10
 )
 
+const (
+	METAFLOW_STATSD_PREFIX       = "metaflow.server.controller"
+	CLOUD_METRIC_NAME_TASK_COST  = "cloud.task.cost"
+	CLOUD_METRIC_NAME_INFO_COUNT = "cloud.info.count"
+	CLOUD_METRIC_NAME_API_COUNT  = "cloud.api.count"
+	CLOUD_METRIC_NAME_API_COST   = "cloud.api.cost"
+)
+
 var ProtocolMap = map[string]int{
 	"TCP": 6,
 	"UDP": 17,
+}
+
+var CloudMonitorExceptionAPI = map[string]string{
+	"aliyun":            "NetworkInterfaceSet,ListenerPortAndProtocol,BackendServer,SnatTableEntry,ForwardTableEntry,KVStoreZone,RouteEntry,Permission",
+	"tencent":           "Listeners,NetworkInterfaceSet",
+	"openstack":         "services,users",
+	"qingcloud":         "DescribeSecurityGroupIPSets,DescribeSecurityGroupRules,DescribeLoadBalancerListeners,DescribeLoadBalancerBackends,DescribeNics,DescribeEips",
+	"apsara_stack":      "NetworkInterfaceSet,ListenerPortAndProtocol,BackendServer,SnatTableEntry,ForwardTableEntry,RouteEntry,Permission",
+	"tencent_tce":       "DescribeNetworkInterfacesEx,DescribeSecurityGroupPolicy",
+	"qingcloud_private": "DescribeSecurityGroupIPSets,DescribeSecurityGroupRules,DescribeLoadBalancerListeners,DescribeLoadBalancerBackends,DescribeNics,DescribeEips",
 }
