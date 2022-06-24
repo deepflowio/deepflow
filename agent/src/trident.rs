@@ -23,6 +23,7 @@ use crate::external_metrics::MetricServer;
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
 use crate::utils::cgroups::Cgroups;
+use crate::utils::environment::free_memory_check;
 use crate::utils::guard::Guard;
 use crate::{
     collector::Collector,
@@ -52,8 +53,7 @@ use crate::{
     sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
         environment::{
-            check, controller_ip_check, free_memory_checker, free_space_checker, kernel_check,
-            trident_process_check,
+            check, controller_ip_check, free_space_checker, kernel_check, trident_process_check,
         },
         logger::{RemoteLogConfig, RemoteLogWriter},
         net::{get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex},
@@ -193,6 +193,18 @@ impl Trident {
         ));
         synchronizer.start();
 
+        let log_dir = Path::new(config_handler.static_config.log_file.as_str());
+        let log_dir = log_dir.parent().unwrap().to_str().unwrap();
+        let guard = Guard::new(
+            config_handler.environment(),
+            log_dir.to_string(),
+            exception_handler.clone(),
+        );
+        guard.start();
+
+        let monitor = Monitor::new(stats_collector.clone(), log_dir.to_string())?;
+        monitor.start();
+
         let (state, cond) = &*state;
         let mut state_guard = state.lock().unwrap();
         let mut components: Option<Components> = None;
@@ -207,6 +219,8 @@ impl Trident {
                 State::Terminated => {
                     if let Some(mut c) = components {
                         c.stop();
+                        guard.stop();
+                        monitor.stop();
                     }
                     return Ok(());
                 }
@@ -327,12 +341,10 @@ pub struct Components {
     pub l4_flow_uniform_sender: Option<UniformSenderThread>,
     pub metrics_uniform_sender: UniformSenderThread,
     pub l7_flow_uniform_sender: UniformSenderThread,
-    pub monitor: Monitor,
     pub platform_synchronizer: PlatformSynchronizer,
     pub api_watcher: Arc<ApiWatcher>,
     pub debugger: Debugger,
     pub pcap_manager: WorkerManager,
-    pub guard: Guard,
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
@@ -341,6 +353,9 @@ pub struct Components {
     pub otel_uniform_sender: UniformSenderThread,
     pub prometheus_uniform_sender: UniformSenderThread,
     pub telegraf_uniform_sender: UniformSenderThread,
+    pub exception_handler: ExceptionHandler,
+    max_memory: u64,
+    tap_mode: TapMode,
 }
 
 impl Components {
@@ -361,8 +376,18 @@ impl Components {
             l4_sender.start();
         }
 
-        for dispatcher in self.dispatchers.iter() {
-            dispatcher.start();
+        match self.tap_mode {
+            TapMode::Analyzer => (),
+            _ => match free_memory_check(self.max_memory, &self.exception_handler) {
+                Ok(()) => {
+                    for dispatcher in self.dispatchers.iter() {
+                        dispatcher.start();
+                    }
+                }
+                Err(e) => {
+                    warn!("{}", e);
+                }
+            },
         }
 
         for log_parser in self.log_parsers.iter() {
@@ -372,8 +397,6 @@ impl Components {
         for collector in self.collectors.iter_mut() {
             collector.start();
         }
-        self.monitor.start();
-        self.guard.start();
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.start();
         }
@@ -399,6 +422,8 @@ impl Components {
         let yaml_config = &candidate_config.yaml_config;
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
+        let max_memory = config_handler.candidate_config.environment.max_memory;
+        let tap_mode = config_handler.candidate_config.yaml_config.tap_mode;
 
         trident_process_check();
         controller_ip_check(&static_config.controller_ips);
@@ -411,12 +436,6 @@ impl Components {
         match yaml_config.tap_mode {
             TapMode::Analyzer => todo!(),
             _ => {
-                check(free_memory_checker(
-                    config_handler.candidate_config.environment.max_memory,
-                    exception_handler.clone(),
-                ));
-                info!("Complete memory check");
-
                 // NPF服务检查
                 // TODO: npf (only on windows)
                 if yaml_config.tap_mode == TapMode::Mirror {
@@ -729,15 +748,6 @@ impl Components {
             collectors.push(collector);
         }
 
-        let log_dir = Path::new(static_config.log_file.as_str());
-        let log_dir = log_dir.parent().unwrap().to_str().unwrap();
-        let monitor = Monitor::new(stats_collector.clone(), log_dir.to_string())?;
-        let guard = Guard::new(
-            config_handler.environment(),
-            log_dir.to_string(),
-            exception_handler.clone(),
-        );
-
         let ebpf_collector = EbpfCollector::new(
             synchronizer.ntp_diff(),
             &config_handler.candidate_config.ebpf,
@@ -840,21 +850,22 @@ impl Components {
             l4_flow_uniform_sender,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
-            monitor,
             platform_synchronizer,
             api_watcher,
             debugger,
             pcap_manager,
             log_parsers,
-            guard,
             ebpf_collector,
             stats_collector,
             running: AtomicBool::new(false),
             cgroups_controller,
             external_metrics_server,
+            exception_handler,
+            max_memory,
             otel_uniform_sender,
             prometheus_uniform_sender,
             telegraf_uniform_sender,
+            tap_mode,
         })
     }
 
@@ -1028,8 +1039,6 @@ impl Components {
         self.libvirt_xml_extractor.stop();
         self.pcap_manager.stop();
         self.debugger.stop();
-        self.monitor.stop();
-        self.guard.stop();
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.stop();
         }
