@@ -24,7 +24,7 @@
 #include "bddisasm/bddisasm.h"
 #include "bddisasm/disasmtypes.h"
 
-void free_uprobe_symbol(struct uprobe_symbol *u_sym)
+void free_uprobe_symbol(struct symbol_uprobe *u_sym)
 {
 	if (u_sym == NULL)
 		return;
@@ -38,10 +38,26 @@ void free_uprobe_symbol(struct uprobe_symbol *u_sym)
 	free(u_sym);
 }
 
+int copy_uprobe_symbol(struct symbol_uprobe *src, struct symbol_uprobe *dst)
+{
+	if (src == NULL || dst == NULL)
+		return ETR_NOTEXIST;
+
+	memcpy((void *)dst, src, sizeof(struct symbol_uprobe));
+	if (src->name)
+		dst->name = strdup(src->name);
+	if (src->binary_path)
+		dst->binary_path = strdup(src->binary_path);
+	if (src->probe_func)
+		dst->probe_func = strdup(src->probe_func);
+
+	return ETR_OK;
+}
+
 static int find_sym(const char *symname, uint64_t addr, uint64_t size,
 		    void *payload)
 {
-	struct uprobe_symbol *sym = (struct uprobe_symbol *)payload;
+	struct symbol_uprobe *sym = (struct symbol_uprobe *)payload;
 	char *pos;
 	if ((pos = strstr(symname, sym->name))) {
 		if (pos[strlen(sym->name)] == '\0') {
@@ -67,7 +83,7 @@ int find_load(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
 	return 0;
 }
 
-static void resolve_func_ret_addr(struct uprobe_symbol *uprobe_sym)
+static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
 {
 	NDSTATUS status;
 	INSTRUX ix;
@@ -96,7 +112,7 @@ static void resolve_func_ret_addr(struct uprobe_symbol *uprobe_sym)
 	pc = uprobe_sym->entry;
 	while (offset < uprobe_sym->size && cnt < FUNC_RET_MAX) {
 		remian = uprobe_sym->size - offset;
-		status = NdDecodeEx(&ix, (ND_UINT8 *)(buffer + offset), remian,
+		status = NdDecodeEx(&ix, (ND_UINT8 *) (buffer + offset), remian,
 				    ND_CODE_64, ND_DATA_64);
 		if (!ND_SUCCESS(status))
 			break;
@@ -128,7 +144,7 @@ out:
  * 返回值：
  *   成功返回0，失败返回非0
  */
-struct uprobe_symbol *resolve_and_gen_uprobe_symbol(const char *bin_file,
+struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    struct symbol *sym,
 						    const uint64_t addr,
 						    int pid)
@@ -150,20 +166,18 @@ struct uprobe_symbol *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		return NULL;
 	}
 
-	struct uprobe_symbol *uprobe_sym =
-	    calloc(1, sizeof(struct uprobe_symbol));
+	struct symbol_uprobe *uprobe_sym =
+	    calloc(1, sizeof(struct symbol_uprobe));
 	if (uprobe_sym == NULL) {
 		ebpf_warning("uprobe_sym = calloc() failed.\n");
 		return NULL;
 	}
 
-	uprobe_sym->type = GO_UPROBE;
-	if (sym->is_probe_ret)
-		uprobe_sym->type = GO_UPROBE_RET;
+	uprobe_sym->type = sym->type;
+	uprobe_sym->isret = sym->is_probe_ret;
 	uprobe_sym->name = strdup(sym->symbol);
 	uprobe_sym->pid = pid;
 	uprobe_sym->probe_func = strdup(sym->probe_func);
-
 	/*
 	 * 判断是可执行目标文件还是库文件。
 	 */
@@ -227,7 +241,7 @@ struct uprobe_symbol *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		uprobe_sym->entry = addr.binary_addr;
 	}
 
-	if (sym->is_probe_ret) {
+	if (uprobe_sym->isret && uprobe_sym->type == GO_UPROBE) {
 		resolve_func_ret_addr(uprobe_sym);
 	}
 

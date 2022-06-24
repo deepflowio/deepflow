@@ -6,11 +6,12 @@
 
 enum uprobe_type {
 	GO_UPROBE = 0,
-	GO_UPROBE_RET,
-	C_UPROBE
+	C_UPROBE,
+	OTHER_UPROBE
 };
 
 struct symbol {
+	enum uprobe_type type;
 	const char *symbol;
 	const char *probe_func;
 	bool is_probe_ret;
@@ -27,7 +28,7 @@ struct load_addr_t {
 	uint64_t binary_addr;
 };
 
-struct uprobe_symbol {
+struct symbol_uprobe {
 	struct list_head list;
 	enum uprobe_type type;
 	int pid;
@@ -39,11 +40,23 @@ struct uprobe_symbol {
 	struct version_info ver;
 	size_t rets[FUNC_RET_MAX];
 	int rets_count;		// 返回数量 可用来判断是否attch rets
+	bool isret;
 };
 
-void free_uprobe_symbol(struct uprobe_symbol *u_sym);
+struct symbol_kprobe {
+	bool isret;		// only use kprobe
+	char *symbol;		// only use uprobe
+	char *func;
+};
+
+struct symbol_tracepoint {
+	char *name;
+};
+
+void free_uprobe_symbol(struct symbol_uprobe *u_sym);
+int copy_uprobe_symbol(struct symbol_uprobe *src, struct symbol_uprobe *dst);
 char *get_elf_path_by_pid(int pid);
-struct uprobe_symbol *resolve_and_gen_uprobe_symbol(const char *bin_file,
+struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    struct symbol *sym,
 						    const uint64_t addr,
 						    int pid);

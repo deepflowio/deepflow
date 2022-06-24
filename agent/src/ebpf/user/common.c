@@ -28,7 +28,7 @@ bool is_core_kernel(void)
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
 }
 
-int get_cpus_count(bool **mask)
+int get_cpus_count(bool ** mask)
 {
 	bool *online = NULL;
 	int err, n;
@@ -51,10 +51,11 @@ uint32_t get_sys_uptime(void)
 	if (sysinfo(&s_info) != 0)
 		return 0;
 
-	return (uint32_t)s_info.uptime;
+	return (uint32_t) s_info.uptime;
 }
 
-void clear_residual_probes(void)
+static void exec_clear_residual_probes(const char *events_file,
+				       const char *type_name)
 {
 #define MAXLINE 1024
 	struct probe_elem {
@@ -70,8 +71,8 @@ void clear_residual_probes(void)
 
 	INIT_LIST_HEAD(&probe_head);
 
-	if ((fp = fopen(KPROBE_EVENTS_FILE, "r")) == NULL) {
-		ebpf_info("Open config file(\"%s\") faild.\n", KPROBE_EVENTS_FILE);
+	if ((fp = fopen(events_file, "r")) == NULL) {
+		ebpf_info("Open config file(\"%s\") faild.\n", events_file);
 		return;
 	}
 
@@ -89,10 +90,10 @@ void clear_residual_probes(void)
 	struct list_head *p, *n;
 	char rm_event_cmd[MAXLINE];
 
-	int kfd = open(KPROBE_EVENTS_FILE, O_WRONLY | O_APPEND, 0);
+	int kfd = open(events_file, O_WRONLY | O_APPEND, 0);
 
 	if (kfd < 0) {
-		ebpf_info("open(%s): failed %s\n", KPROBE_EVENTS_FILE,
+		ebpf_info("open(%s): failed %s\n", events_file,
 			  strerror(errno));
 		return;
 	}
@@ -112,17 +113,18 @@ void clear_residual_probes(void)
 				     strlen(rm_event_cmd)) < 0) {
 					if (errno == ENOENT)
 						ebpf_info
-						    ("clear kprobe error, probe entry may not exist.(%s)\n",
-						     rm_event_cmd);
+						    ("clear %s error, probe entry may not exist.(%s)\n",
+						     type_name, rm_event_cmd);
 					else
 						ebpf_info
-						    ("cannot clear kprobe, %s (%s)\n",
-						     strerror(errno),
+						    ("cannot clear %s, %s (%s)\n",
+						     type_name, strerror(errno),
 						     rm_event_cmd);
 					close(kfd);
 				} else
-					ebpf_info("Clear residual kprobe event \"%s\" success.\n",
-						  rm_event_cmd);
+					ebpf_info
+					    ("Clear residual %s event \"%s\" success.\n",
+					     type_name, rm_event_cmd);
 			}
 		}
 
@@ -131,6 +133,12 @@ void clear_residual_probes(void)
 	}
 
 	close(kfd);
+}
+
+void clear_residual_probes(void)
+{
+	exec_clear_residual_probes(KPROBE_EVENTS_FILE, "kprobe");
+	exec_clear_residual_probes(UPROBE_EVENTS_FILE, "uprobe");
 }
 
 /* Make sure max locked memory is set to unlimited. */

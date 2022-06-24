@@ -1393,4 +1393,7 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 	return 0;
 }
 
+//Refer to the eBPF programs here
+#include "go_sample_bpf.c"
+
 char _license[] SEC("license") = "GPL";

@@ -50,9 +50,13 @@ int program__attach_kprobe(void *prog,
 			   const char *func_name,
 			   char *ev_name, void **ret_link);
 
-int program__detach_kprobe(struct bpf_link *link,
-			   bool retprobe,
-			   char *ev_name);
+int program__attach_uprobe(void *prog, bool retprobe, pid_t pid,
+			   const char *binary_path,
+			   size_t func_offset, char *ev_name, void **ret_link);
+
+int program__detach_probe(struct bpf_link *link,
+			  bool retprobe,
+			  const char *ev_name, const char *event_type);
 
 int bpf_get_program_fd(void *obj, const char *prog_name, void **p);
 #endif

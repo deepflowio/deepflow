@@ -1,7 +1,3 @@
-/* Copyright (c) 2020 YunShan.net, Inc.
- *
- * Author: jiping@yunshan.net.cn
- */
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -82,8 +78,7 @@ void _ebpf_error(int how_to_die,
 	struct tm *p;
 	time(&timep);
 	p = localtime(&timep);
-
-	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d ",
+	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d \033[0;33;m",
 			(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
 			p->tm_hour, p->tm_min, p->tm_sec);
 
@@ -102,10 +97,11 @@ void _ebpf_error(int how_to_die,
 		len += snprintf(msg + len, max - len,
 				": %s (errno %d)", strerror(errno), errno);
 #endif
-
 	va_start(va, fmt);
 	len += vsnprintf(msg + len, max - len, fmt, va);
 	va_end(va);
+
+	len += snprintf(msg + len, max - len, "\033[0m");
 
 	if (msg[len - 1] != '\n') {
 		if (len < max)

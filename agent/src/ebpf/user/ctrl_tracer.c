@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include "tracer.h"
 #include "socket.h"
+#include "../libbpf/src/libbpf_internal.h"
 
 #define MFBPF_NAME           "metaflow-ebpfctl"
 #define MFBPF_VERSION        "v1.0.0"
@@ -90,7 +91,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("%-18s %s\n", "Bpf File", btp->bpf_file);
 	printf("%-18s %d\n", "Workers", btp->dispatch_workers_nr);
 	printf("%-18s %d\n", "Perf-Pages-Count", btp->perf_pg_cnt);
-	printf("%-18s %llu\n", "Events Lost", btp->lost);
+	printf("%-18s %" PRIu64 "\n", "Events Lost", btp->lost);
 	printf("\n-------------------- Queue ---------------------------\n");
 	int j;
 	uint64_t enqueue_nr, enqueue_lost, burst_count, heap_get_faild,
@@ -100,10 +101,11 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	for (j = 0; j < btp->dispatch_workers_nr; j++) {
 		rx_q = &btp->rx_queues[j];
 		printf
-		    ("worker %d for queue, de %llu en %llu lost %llu alloc faild %llu burst %llu queue size %u cap %u\n",
-		     j, rx_q->dequeue_nr, rx_q->enqueue_nr, rx_q->enqueue_lost,
-		     rx_q->heap_get_faild, rx_q->burst_count, rx_q->queue_size,
-		     rx_q->ring_capacity);
+		    ("worker %d for queue, de %" PRIu64 " en %" PRIu64 " lost %"
+		     PRIu64 " alloc faild %" PRIu64 " burst %" PRIu64
+		     " queue size %u cap %u\n", j, rx_q->dequeue_nr,
+		     rx_q->enqueue_nr, rx_q->enqueue_lost, rx_q->heap_get_faild,
+		     rx_q->burst_count, rx_q->queue_size, rx_q->ring_capacity);
 		heap_get_faild += rx_q->heap_get_faild;
 		dequeue_nr += rx_q->dequeue_nr;
 		enqueue_nr += rx_q->enqueue_nr;
@@ -112,15 +114,17 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	}
 
 	printf
-	    ("\nSUM dequeue %llu enqueue %llu lost %llu alloc faild %llu burst count %llu\n",
-	     dequeue_nr, enqueue_nr, enqueue_lost, heap_get_faild, burst_count);
+	    ("\nSUM dequeue %" PRIu64 " enqueue %" PRIu64 " lost %" PRIu64
+	     " alloc faild %" PRIu64 " burst count %" PRIu64 "\n", dequeue_nr,
+	     enqueue_nr, enqueue_lost, heap_get_faild, burst_count);
 
 	fflush(stdout);
 
 	printf("\n-------------------- Protocol ------------------------\n");
 	for (j = 0; j < PROTO_NUM; j++) {
 		if (btp->proto_status[j] > 0) {
-			printf("- %-10s %llu\n", get_proto_name((uint16_t) j),
+			printf("- %-10s %" PRIu64 "\n",
+			       get_proto_name((uint16_t) j),
 			       btp->proto_status[j]);
 		}
 	}
@@ -325,33 +329,20 @@ static inline void mfbpf_sockopt_msg_free(void *msg)
 	msg = NULL;
 }
 
-static inline void fetch_kernel_version(const char *buf)
+static inline void fetch_kernel_version(char *buf)
 {
-	FILE *fp;
-	int rc = 0;
-	char *ret;
-	char line[LINUX_VER_LEN];
-
-	fp = popen("uname -r", "r");
-	if (NULL == fp) {
-		printf("\"uname -r\" popen error. %s", strerror(errno));
-		exit(-1);
-	}
-
-	memset((void *)line, 0, sizeof(line));
-	ret = fgets(line, sizeof(line), fp);
-	if (ret != NULL) {
-		memcpy((void *)buf, line, sizeof(line));
-	}
-
-	pclose(fp);
+	uint32_t ver = get_kernel_version();
+	int major, minor, patch;
+	major = ver >> 16;
+	minor = (ver & 0xffff) >> 8;
+	patch = ver & 0xff;
+	snprintf(buf, LINUX_VER_LEN, "Linux %d.%d.%d\n", major, minor, patch);
 }
 
 static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 			    struct mfbpf_conf *conf)
 {
 	struct bpf_socktrace_params *sk_trace_params = NULL;
-	struct bpf_offset_param param;
 	struct bpf_offset_param_array *array = NULL;
 	size_t size, i;
 	int err;
@@ -389,9 +380,9 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 		       sk_trace_params->kern_trace_map_max);
 		printf("kern_trace_map_used:\t%u\n\n",
 		       sk_trace_params->kern_trace_map_used);
-		printf("tracer_state:\t%u [ 0 (TRACER_INIT), 1 (TRACER_RUNNING), "
-		       "2 (TRACER_STOP) ]\n\n",
-		       sk_trace_params->tracer_state);
+		printf
+		    ("tracer_state:\t%u [ 0 (TRACER_INIT), 1 (TRACER_RUNNING), "
+		     "2 (TRACER_STOP) ]\n\n", sk_trace_params->tracer_state);
 
 		for (i = 0; i < array->count; i++) {
 			if (array->offsets[i].ready != 1)
@@ -412,7 +403,6 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 static int tracer_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 			 struct mfbpf_conf *conf)
 {
-	struct bpf_tracer_param param;
 	struct bpf_tracer_param_array *array;
 	size_t size, i;
 	int err;

@@ -97,9 +97,9 @@ install:
 	mkdir -p /usr/share/metaflow-agent
 	cp data/* /usr/share/metaflow-agent/ -raf
 
-tools:
+tools: $(LIBBPF_DIR) $(LIBTRACE)
 	$(call msg,TOOLS,metaflow-ebpfctl)
-	$(Q)gcc user/ctrl_tracer.c user/ctrl.c user/log.c -o metaflow-ebpfctl
+	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c libebpf.a -o metaflow-ebpfctl -lelf -lz -lpthread
 
 rust-sample:
 	$(call msg,Current-DIR,,$(CURR))

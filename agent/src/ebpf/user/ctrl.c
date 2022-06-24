@@ -93,13 +93,6 @@ static inline int sockopt_init(void)
 		ebpf_info("[%s] Fail to create server socket\n", __func__);
 		return ETR_IO;
 	}
-	//srv_fd_flags = fcntl(srv_fd, F_GETFL, 0);
-	//srv_fd_flags |= O_NONBLOCK;
-	//if (-1 == fcntl(srv_fd, F_SETFL, srv_fd_flags)) {
-	//        ebpf_info(
-	//                "[%s] Fail to set server socket NONBLOCK\n", __func__);
-	//        return ETR_IO;
-	//}
 
 	memset(&srv_addr, 0, sizeof(struct sockaddr_un));
 	srv_addr.sun_family = AF_UNIX;
@@ -330,12 +323,17 @@ int sockopt_ctl(__unused void *arg)
 	memset(&clt_addr, 0, sizeof(struct sockaddr_un));
 	clt_len = sizeof(clt_addr);
 
+	if (srv_fd == 0)
+		return ETR_IO;
+
 	/* Note: srv_fd is nonblock */
 	clt_fd = accept(srv_fd, (struct sockaddr *)&clt_addr, &clt_len);
 	if (clt_fd < 0) {
 		if (EWOULDBLOCK != errno) {
 			ebpf_info("[%s] Fail to accept client request\n",
 				  __func__);
+			close(srv_fd);
+			srv_fd = 0;
 			/*unlink(ipc_unix_domain); */
 		}
 		return ETR_IO;
