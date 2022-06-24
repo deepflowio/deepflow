@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
-	"server/libs/logger"
 	yaml "gopkg.in/yaml.v2"
+	"server/libs/logger"
 
 	"server/controller/common"
 	"server/controller/config"
@@ -20,6 +20,7 @@ import (
 	"server/controller/monitor"
 	"server/controller/recorder"
 	"server/controller/router"
+	"server/controller/statsd"
 	"server/controller/tagrecorder"
 	"server/controller/trisolaris"
 
@@ -66,6 +67,13 @@ func Start() {
 	if err != nil {
 		log.Error("connect redis failed")
 		os.Exit(0)
+	}
+
+	// start statsd
+	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
+	if err != nil {
+		log.Error("cloud statsd connect telegraf failed")
+		return
 	}
 
 	// 启动genesis

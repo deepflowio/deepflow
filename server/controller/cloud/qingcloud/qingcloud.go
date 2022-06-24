@@ -16,9 +16,11 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	"server/controller/cloud/common"
+	cloudcommon "server/controller/cloud/common"
 	"server/controller/cloud/model"
+	"server/controller/common"
 	"server/controller/db/mysql"
+	"server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud.qingcloud")
@@ -48,6 +50,9 @@ type QingCloud struct {
 	// 以下两个字段的作用：消除公有云的无资源的区域和可用区
 	regionLcuuidToResourceNum map[string]int
 	azLcuuidToResourceNum     map[string]int
+
+	// statsd monitor
+	cloudStatsd statsd.CloudStatsd
 }
 
 func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
@@ -88,6 +93,12 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 		defaultVxnetName:          "vxnet-0",
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),
+		cloudStatsd: statsd.CloudStatsd{
+			APICount: make(map[string][]int),
+			APICost:  make(map[string][]int),
+			ResCount: make(map[string][]int),
+			TaskCost: make(map[string][]int),
+		},
 	}, nil
 }
 
@@ -142,6 +153,8 @@ func (q *QingCloud) getURL(action string, kwargs []*Param, offset, limit int) st
 
 func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param) ([]*simplejson.Json, error) {
 	var response []*simplejson.Json
+	startTime := time.Now()
+	count := 0
 
 	offset, limit := 0, 100
 	for {
@@ -176,7 +189,9 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 		}
 		if curResp, ok := respJson.CheckGet(resultKey); ok {
 			response = append(response, curResp)
-			if len(curResp.MustArray()) < limit {
+			curRespLens := len(curResp.MustArray())
+			count += curRespLens
+			if curRespLens < limit {
 				break
 			}
 			offset += 1
@@ -184,6 +199,21 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 			err := errors.New(fmt.Sprintf("get (%s) response (%s) failed", action, resultKey))
 			log.Error(err)
 			return nil, err
+		}
+	}
+
+	// qingcloud has a unified call API，so this could be very convenient
+	if !strings.Contains(common.CloudMonitorExceptionAPI["qingcloud"], action) {
+		cost := time.Now().Sub(startTime).Milliseconds()
+		if _, ok := q.cloudStatsd.APICost[action]; !ok {
+			q.cloudStatsd.APICost[action] = []int{int(cost)}
+		} else {
+			q.cloudStatsd.APICost[action] = append(q.cloudStatsd.APICost[action], int(cost))
+		}
+		if _, ok := q.cloudStatsd.APICount[action]; !ok {
+			q.cloudStatsd.APICount[action] = []int{count}
+		} else {
+			q.cloudStatsd.APICount[action] = append(q.cloudStatsd.APICount[action], count)
 		}
 	}
 	return response, nil
@@ -212,8 +242,27 @@ func (q *QingCloud) CheckAuth() error {
 	return err
 }
 
+func (q *QingCloud) GetStatter() statsd.StatsdStatter {
+	globalTags := map[string]string{
+		"domain_name": q.Name,
+		"domain":      q.UuidGenerate,
+		"platform":    "qingcloud",
+	}
+
+	return statsd.StatsdStatter{
+		GlobalTags: globalTags,
+		Element:    statsd.GetCloudStatsd(q.cloudStatsd),
+	}
+}
+
 func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	var resource model.Resource
+	// every tasks must init
+	q.cloudStatsd.APICount = map[string][]int{}
+	q.cloudStatsd.APICost = map[string][]int{}
+	q.cloudStatsd.ResCount = map[string][]int{}
+	q.cloudStatsd.TaskCost = map[string][]int{}
+	startTime := time.Now()
 
 	// 区域和可用区
 	regions, azs, err := q.getRegionAndAZs()
@@ -301,8 +350,8 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 		return resource, err
 	}
 
-	resource.Regions = common.EliminateEmptyRegions(regions, q.regionLcuuidToResourceNum)
-	resource.AZs = common.EliminateEmptyAZs(azs, q.azLcuuidToResourceNum)
+	resource.Regions = cloudcommon.EliminateEmptyRegions(regions, q.regionLcuuidToResourceNum)
+	resource.AZs = cloudcommon.EliminateEmptyAZs(azs, q.azLcuuidToResourceNum)
 	resource.VPCs = vpcs
 	resource.Networks = networks
 	resource.Subnets = subnets
@@ -323,5 +372,10 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	resource.LBVMConnections = lbVMConnections
 	resource.FloatingIPs = floatingIPs
 	resource.SubDomains = subDomains
+	// write monitor
+	q.cloudStatsd.ResCount = statsd.GetResCount(resource)
+	q.cloudStatsd.TaskCost[q.UuidGenerate] = []int{int(time.Now().Sub(startTime).Milliseconds())}
+	// register statsd
+	statsd.MetaStatsd.RegisterStatsdTable(q)
 	return resource, nil
 }

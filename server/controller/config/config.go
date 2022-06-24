@@ -13,6 +13,7 @@ import (
 	genesis "server/controller/genesis/config"
 	manager "server/controller/manager/config"
 	monitor "server/controller/monitor/config"
+	statsd "server/controller/statsd/config"
 	tagrecorder "server/controller/tagrecorder/config"
 	trisolaris "server/controller/trisolaris/config"
 )
@@ -47,6 +48,7 @@ type ControllerConfig struct {
 	MonitorCfg     monitor.MonitorConfig         `yaml:"monitor"`
 	ManagerCfg     manager.ManagerConfig         `yaml:"manager"`
 	GenesisCfg     genesis.GenesisConfig         `yaml:"genesis"`
+	StatsdCfg      statsd.StatsdConfig           `yaml:"statsd"`
 	TrisolarisCfg  trisolaris.Config             `yaml:"trisolaris"`
 	TagRecorderCfg tagrecorder.TagRecorderConfig `yaml:"tagrecorder"`
 }

@@ -13,6 +13,7 @@ require (
 	github.com/baidubce/bce-sdk-go v0.9.123
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
+	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/docker/go-units v0.4.0
 	github.com/gin-contrib/pprof v1.3.0
