@@ -1,5 +1,5 @@
 #ifdef BPF_USE_CORE
-#include "vmlinux.h"
+#include "../libbpf/.github/actions/build-selftests/vmlinux.h"
 #endif
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
