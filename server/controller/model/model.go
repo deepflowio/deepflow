@@ -425,3 +425,21 @@ type DetailedConfig struct {
 	RealConfig    *VTapGroupConfigurationResponse `json:"REAL_CONFIG"`
 	DefaultConfig *VTapGroupConfigurationResponse `json:"DEFAULT_CONFIG"`
 }
+
+type VTapInterface struct {
+	Name               string `json:"NAME"`
+	MAC                string `json:"MAC"`
+	TapName            string `json:"TAP_NAME"`
+	TapMAC             string `json:"TAP_MAC"`
+	VTapID             int    `json:"VTAP_ID"`
+	VTapType           int    `json:"VTAP_TYPE"`
+	VTapName           string `json:"VTAP_NAME"`
+	VTapLaunchServer   string `json:"VTAP_LAUNCH_SERVER"`
+	VTapLaunchServerID int    `json:"VTAP_LAUNCH_SERVER_ID"`
+	DeviceName         string `json:"DEVICE_NAME"`
+	DeviceType         int    `json:"DEVICE_TYPE"`
+	DeviceID           int    `json:"DEVICE_ID"`
+	DeviceHostID       int    `json:"DEVICE_HOST_ID"`
+	DeviceHostName     string `json:"DEVICE_HOST_NAME"`
+	HostIP             string `json:"HOST_IP"`
+}

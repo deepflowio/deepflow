@@ -140,6 +140,7 @@ func Start() {
 	router.LicenseRouter(r, vtapLicenseAllocation)
 	router.DomainRouter(r)
 	router.VTapGroupConfigRouter(r)
+	router.VTapInterface(r, cfg)
 	if err := r.Run(":20417"); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
 		os.Exit(0)
