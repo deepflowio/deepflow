@@ -324,7 +324,7 @@ type VTapGroupConfiguration struct {
 	NatIPEnabled                  *int     `json:"NAT_IP_ENABLED" yaml:"nat_ip_enabled,omitempty"` // 0: disabled 1:enabled
 	CapturePacketSize             *int     `json:"CAPTURE_PACKET_SIZE" yaml:"capture_packet_size,omitempty"`
 	InactiveServerPortEnabled     *int     `json:"INACTIVE_SERVER_PORT_ENABLED" yaml:"inactive_server_port_enabled,omitempty"` // 0: disabled 1:enabled
-	VTapGroupLcuuid               *string  `json:"VTAP_GROUP_LCUUID" yaml:"-"`
+	VTapGroupLcuuid               *string  `json:"VTAP_GROUP_LCUUID" yaml:"vtap_group_lcuuid,omitempty"`
 	LogThreshold                  *int     `json:"LOG_THRESHOLD" yaml:"log_threshold,omitempty"`
 	LogLevel                      *string  `json:"LOG_LEVEL" yaml:"log_level,omitempty"`
 	LogRetention                  *int     `json:"LOG_RETENTION" yaml:"log_retention,omitempty"`
@@ -351,7 +351,7 @@ type VTapGroupConfiguration struct {
 	HTTPLogXRequestID             *string  `json:"HTTP_LOG_X_REQUEST_ID" yaml:"http_log_x_request_id,omitempty"`
 	ExternalAgentHTTPProxyEnabled *int     `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED" yaml:"external_agent_http_proxy_enabled,omitempty"`
 	ExternalAgentHTTPProxyPort    *int     `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT" yaml:"external_agent_http_proxy_port,omitempty"`
-	YamlConfig                    *string  `yaml:"advanced_config"`
+	YamlConfig                    *string  `yaml:"trident.yaml"`
 }
 
 type TypeInfo struct {
