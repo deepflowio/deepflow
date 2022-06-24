@@ -25,7 +25,7 @@ func TestKubernetes(t *testing.T) {
 			Config:      fmt.Sprintf(`{"port_name_regex": "","pod_net_ipv4_cidr_max_mask": %v,"pod_net_ipv6_cidr_max_mask": %v,"region_uuid": "%s","vpc_uuid": ""}`, K8S_POD_IPV4_NETMASK, K8S_POD_IPV6_NETMASK, common.DEFAULT_REGION),
 		}
 
-		k8s := NewKubernetesGather(nil, &k8sConfig)
+		k8s := NewKubernetesGather(nil, &k8sConfig, false)
 		type KResource struct {
 			Pod        []string `json:"*v1.Pod"`
 			Info       []string `json:"*version.Info"`

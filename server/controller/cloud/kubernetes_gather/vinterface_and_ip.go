@@ -441,6 +441,11 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			// K8s API的容器节点IP，直接处理port和ip
 			// 如果上报的node相关ip在node ip中，则使用上报ip的cidr替换掉聚合的node cidr
 			case k8sNodeIPs.Contains(ipPrefix.IP().String()):
+				// if is subdomain, don't record node ip and vinterface
+				if k.isSubDomain {
+					k8sNodeIPs.Remove(ipPrefix.IP().String())
+					continue
+				}
 				rangePrefix, ok := ipPrefix.Range().Prefix()
 				if !ok {
 					log.Warningf("vinterface,ip node ip (%s) to cidr format not valid", ipString)
