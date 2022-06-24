@@ -7,9 +7,9 @@ import (
 	clickhouse "github.com/ClickHouse/clickhouse-go"
 	"server/libs/ckdb"
 	"server/libs/zerodoc"
-	basecommon "github.com/yunshan/droplet/common"
-	"github.com/yunshan/droplet/pkg/ckwriter"
-	"github.com/yunshan/droplet/stream/common"
+	basecommon "server/ingester/common"
+	"server/ingester/pkg/ckwriter"
+	"server/ingester/stream/common"
 )
 
 const (

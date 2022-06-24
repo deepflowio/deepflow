@@ -13,16 +13,16 @@ import (
 	"server/libs/debug"
 	"server/libs/grpc"
 	"server/libs/receiver"
-	"github.com/yunshan/droplet/droplet/adapter"
+	"server/ingester/droplet/adapter"
 
-	"github.com/yunshan/droplet/config"
-	"github.com/yunshan/droplet/droplet/labeler"
-	"github.com/yunshan/droplet/droplet/profiler"
-	"github.com/yunshan/droplet/droplet/queue"
-	"github.com/yunshan/droplet/dropletctl"
-	"github.com/yunshan/droplet/dropletctl/rpc"
-	"github.com/yunshan/droplet/roze/roze"
-	"github.com/yunshan/droplet/stream/stream"
+	"server/ingester/config"
+	"server/ingester/droplet/labeler"
+	"server/ingester/droplet/profiler"
+	"server/ingester/droplet/queue"
+	"server/ingester/dropletctl"
+	"server/ingester/dropletctl/rpc"
+	"server/ingester/roze/roze"
+	"server/ingester/stream/stream"
 )
 
 func main() {

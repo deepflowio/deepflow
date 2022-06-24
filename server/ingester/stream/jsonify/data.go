@@ -14,8 +14,8 @@ import (
 	"server/libs/grpc"
 	"server/libs/pool"
 	"server/libs/zerodoc"
-	"github.com/yunshan/droplet/common"
-	"github.com/yunshan/droplet/stream/geo"
+	"server/ingester/common"
+	"server/ingester/stream/geo"
 	"github.com/metaflowys/metaflow/message/trident"
 )
 

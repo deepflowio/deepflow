@@ -11,8 +11,8 @@ import (
 
 	"server/libs/ckdb"
 	"server/libs/zerodoc"
-	"github.com/yunshan/droplet/common"
-	"github.com/yunshan/droplet/datasource"
+	"server/ingester/common"
+	"server/ingester/datasource"
 )
 
 var log = logging.MustGetLogger("issu")

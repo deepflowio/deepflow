@@ -12,8 +12,8 @@ import (
 	"server/libs/stats"
 	"github.com/metaflowys/metaflow/message/trident"
 
-	. "github.com/yunshan/droplet/droplet/common"
-	"github.com/yunshan/droplet/dropletctl"
+	. "server/ingester/droplet/common"
+	"server/ingester/dropletctl"
 )
 
 var log = logging.MustGetLogger("labeler")

@@ -12,14 +12,14 @@ import (
 	libqueue "server/libs/queue"
 	"server/libs/receiver"
 
-	"github.com/yunshan/droplet/droplet/adapter"
-	"github.com/yunshan/droplet/droplet/config"
-	"github.com/yunshan/droplet/droplet/labeler"
-	"github.com/yunshan/droplet/droplet/pcap"
-	"github.com/yunshan/droplet/droplet/queue"
-	"github.com/yunshan/droplet/droplet/statsd"
-	"github.com/yunshan/droplet/droplet/syslog"
-	"github.com/yunshan/droplet/dropletctl"
+	"server/ingester/droplet/adapter"
+	"server/ingester/droplet/config"
+	"server/ingester/droplet/labeler"
+	"server/ingester/droplet/pcap"
+	"server/ingester/droplet/queue"
+	"server/ingester/droplet/statsd"
+	"server/ingester/droplet/syslog"
+	"server/ingester/dropletctl"
 	"github.com/metaflowys/metaflow/message/trident"
 )
 

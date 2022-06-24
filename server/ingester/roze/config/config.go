@@ -7,7 +7,7 @@ import (
 	"os"
 
 	logging "github.com/op/go-logging"
-	"github.com/yunshan/droplet/common"
+	"server/ingester/common"
 	yaml "gopkg.in/yaml.v2"
 )
 

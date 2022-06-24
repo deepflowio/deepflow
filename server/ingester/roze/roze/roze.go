@@ -13,11 +13,11 @@ import (
 	libqueue "server/libs/queue"
 	"server/libs/receiver"
 
-	"github.com/yunshan/droplet/droplet/queue"
-	"github.com/yunshan/droplet/dropletctl"
-	"github.com/yunshan/droplet/roze/config"
-	"github.com/yunshan/droplet/roze/dbwriter"
-	"github.com/yunshan/droplet/roze/unmarshaller"
+	"server/ingester/droplet/queue"
+	"server/ingester/dropletctl"
+	"server/ingester/roze/config"
+	"server/ingester/roze/dbwriter"
+	"server/ingester/roze/unmarshaller"
 )
 
 const (

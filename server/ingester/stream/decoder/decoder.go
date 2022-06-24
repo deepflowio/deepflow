@@ -15,9 +15,9 @@ import (
 	"server/libs/receiver"
 	"server/libs/stats"
 	"server/libs/utils"
-	"github.com/yunshan/droplet/stream/config"
-	"github.com/yunshan/droplet/stream/jsonify"
-	"github.com/yunshan/droplet/stream/throttler"
+	"server/ingester/stream/config"
+	"server/ingester/stream/jsonify"
+	"server/ingester/stream/throttler"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
