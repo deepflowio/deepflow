@@ -15,7 +15,7 @@ var log = logging.MustGetLogger("ext_metrics.config")
 const (
 	DefaultControllerIP      = "127.0.0.1"
 	DefaultControllerPort    = 20035
-	DefaultCKPrimaryAddr     = "tcp://127.0.0.1:9000"
+	DefaultCKPrimaryAddr     = "127.0.0.1:9000"
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 100000
 	DefaultExtMetricsTTL     = 7

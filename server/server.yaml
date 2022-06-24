@@ -150,7 +150,7 @@ querier:
     port: 9000
     timeout: 60
 
-ingester:
+#ingester:
   ## trisolaris的ips, 默认值为空
   #controller-ips:
   #  - x.x.x.x
@@ -171,7 +171,7 @@ ingester:
   #  password:
 
   #ckdb:
-  #  primary: tcp://127.0.0.1:9000
+  #  primary: 127.0.0.1:9000
   #  secondary:          // 如果配置2个地址，xxx-replica-enabled 为false，则作为primary写入, xxx-replica-enabled 为true 作为replica写入
 
   ## ckdb若使用对象存储,需要设置将数据转移至对象存储
@@ -221,8 +221,8 @@ ingester:
   #  used-percent: 90    # 磁盘占用率阈值
   #  free-space: 50      # 磁盘空闲阈值(单位: GB)
  
-  ## stream,roze模块是否启用，默认不启用(处于单独的控制器)
-  #stream-roze-enabled: false
+  ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
+  #stream-roze-enabled: true
  
   ## syslog存储位置
   #syslog-directory: /var/log/metaflow-agent

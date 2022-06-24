@@ -15,7 +15,7 @@ var log = logging.MustGetLogger("stream.config")
 const (
 	DefaultControllerIP      = "127.0.0.1"
 	DefaultControllerPort    = 20035
-	DefaultCKPrimaryAddr     = "tcp://127.0.0.1:9000"
+	DefaultCKPrimaryAddr     = "127.0.0.1:9000"
 	DefaultThrottle          = 50000
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 10000

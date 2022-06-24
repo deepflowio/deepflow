@@ -3,16 +3,18 @@ package ckdb
 import (
 	"fmt"
 	"net"
+	"server/libs/utils"
+	"time"
 
 	logging "github.com/op/go-logging"
 
-	"github.com/ClickHouse/clickhouse-go/lib/data"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
 var log = logging.MustGetLogger("ckdb")
 
 type Block struct {
-	Block *data.Block
+	Batch driver.Batch
 	index int
 }
 
@@ -21,7 +23,7 @@ func (b *Block) ResetIndex() {
 }
 
 func (b *Block) WriteBool(v bool) error {
-	if err := b.Block.WriteBool(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]uint8{utils.Bool2UInt8(v)}); err != nil {
 		return err
 	}
 	b.index++
@@ -29,7 +31,7 @@ func (b *Block) WriteBool(v bool) error {
 }
 
 func (b *Block) WriteUInt8(v uint8) error {
-	if err := b.Block.WriteUInt8(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]uint8{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -37,7 +39,7 @@ func (b *Block) WriteUInt8(v uint8) error {
 }
 
 func (b *Block) WriteUInt8Nullable(v *uint8) error {
-	if err := b.Block.WriteUInt8Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*uint8{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -45,7 +47,7 @@ func (b *Block) WriteUInt8Nullable(v *uint8) error {
 }
 
 func (b *Block) WriteUInt16(v uint16) error {
-	if err := b.Block.WriteUInt16(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]uint16{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -53,7 +55,7 @@ func (b *Block) WriteUInt16(v uint16) error {
 }
 
 func (b *Block) WriteUInt16Nullable(v *uint16) error {
-	if err := b.Block.WriteUInt16Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*uint16{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -61,7 +63,7 @@ func (b *Block) WriteUInt16Nullable(v *uint16) error {
 }
 
 func (b *Block) WriteUInt32(v uint32) error {
-	if err := b.Block.WriteUInt32(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]uint32{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -69,7 +71,7 @@ func (b *Block) WriteUInt32(v uint32) error {
 }
 
 func (b *Block) WriteUInt32Nullable(v *uint32) error {
-	if err := b.Block.WriteUInt32Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*uint32{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -77,7 +79,7 @@ func (b *Block) WriteUInt32Nullable(v *uint32) error {
 }
 
 func (b *Block) WriteUInt64(v uint64) error {
-	if err := b.Block.WriteUInt64(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]uint64{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -85,7 +87,7 @@ func (b *Block) WriteUInt64(v uint64) error {
 }
 
 func (b *Block) WriteUInt64Nullable(v *uint64) error {
-	if err := b.Block.WriteUInt64Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*uint64{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -93,7 +95,7 @@ func (b *Block) WriteUInt64Nullable(v *uint64) error {
 }
 
 func (b *Block) WriteInt8(v int8) error {
-	if err := b.Block.WriteInt8(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]int8{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -101,7 +103,7 @@ func (b *Block) WriteInt8(v int8) error {
 }
 
 func (b *Block) WriteInt8Nullable(v *int8) error {
-	if err := b.Block.WriteInt8Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*int8{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -109,7 +111,7 @@ func (b *Block) WriteInt8Nullable(v *int8) error {
 }
 
 func (b *Block) WriteInt16(v int16) error {
-	if err := b.Block.WriteInt16(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]int16{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -117,7 +119,7 @@ func (b *Block) WriteInt16(v int16) error {
 }
 
 func (b *Block) WriteInt16Nullable(v *int16) error {
-	if err := b.Block.WriteInt16Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*int16{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -125,7 +127,7 @@ func (b *Block) WriteInt16Nullable(v *int16) error {
 }
 
 func (b *Block) WriteInt32(v int32) error {
-	if err := b.Block.WriteInt32(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]int32{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -133,7 +135,7 @@ func (b *Block) WriteInt32(v int32) error {
 }
 
 func (b *Block) WriteInt32Nullable(v *int32) error {
-	if err := b.Block.WriteInt32Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*int32{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -141,7 +143,7 @@ func (b *Block) WriteInt32Nullable(v *int32) error {
 }
 
 func (b *Block) WriteInt64(v int64) error {
-	if err := b.Block.WriteInt64(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]int64{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -149,7 +151,7 @@ func (b *Block) WriteInt64(v int64) error {
 }
 
 func (b *Block) WriteInt64Nullable(v *int64) error {
-	if err := b.Block.WriteInt64Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*int64{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -157,7 +159,7 @@ func (b *Block) WriteInt64Nullable(v *int64) error {
 }
 
 func (b *Block) WriteFloat64(v float64) error {
-	if err := b.Block.WriteFloat64(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]float64{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -165,7 +167,7 @@ func (b *Block) WriteFloat64(v float64) error {
 }
 
 func (b *Block) WriteFloat64Nullable(v *float64) error {
-	if err := b.Block.WriteFloat64Nullable(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]*float64{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -173,7 +175,7 @@ func (b *Block) WriteFloat64Nullable(v *float64) error {
 }
 
 func (b *Block) WriteString(v string) error {
-	if err := b.Block.WriteString(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]string{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -181,15 +183,23 @@ func (b *Block) WriteString(v string) error {
 }
 
 func (b *Block) WriteFixedString(v []byte) error {
-	if err := b.Block.WriteFixedString(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([][]byte{v}); err != nil {
 		return err
 	}
 	b.index++
 	return nil
 }
 
-func (b *Block) WriteIP(v net.IP) error {
-	if err := b.Block.WriteIP(b.index, v); err != nil {
+func (b *Block) WriteIPv4(v uint32) error {
+	if err := b.Batch.Column(b.index).Append([]net.IP{utils.IpFromUint32(v)}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteIPv6(v net.IP) error {
+	if err := b.Batch.Column(b.index).Append([]net.IP{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -197,7 +207,23 @@ func (b *Block) WriteIP(v net.IP) error {
 }
 
 func (b *Block) WriteArray(v interface{}) error {
-	if err := b.Block.WriteArray(b.index, v); err != nil {
+	if err := b.Batch.Column(b.index).Append([]interface{}{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteArrayString(v []string) error {
+	if err := b.Batch.Column(b.index).Append([][]string{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteDateTime(v uint32) error {
+	if err := b.Batch.Column(b.index).Append([]time.Time{time.Unix(int64(v), 0)}); err != nil {
 		return err
 	}
 	b.index++

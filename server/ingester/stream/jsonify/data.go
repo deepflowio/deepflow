@@ -7,8 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/gopacket/layers"
-	"github.com/metaflowys/metaflow/message/trident"
 	"server/ingester/common"
 	"server/ingester/stream/geo"
 	"server/libs/ckdb"
@@ -17,6 +15,9 @@ import (
 	"server/libs/grpc"
 	"server/libs/pool"
 	"server/libs/zerodoc"
+
+	"github.com/google/gopacket/layers"
+	"github.com/metaflowys/metaflow/message/trident"
 )
 
 const (
@@ -121,22 +122,22 @@ var NetworkLayerColumns = []*ckdb.Column{
 }
 
 func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteUInt32(n.IP40); err != nil {
+	if err := block.WriteIPv4(n.IP40); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(n.IP41); err != nil {
+	if err := block.WriteIPv4(n.IP41); err != nil {
 		return err
 	}
 	if len(n.IP60) == 0 {
 		n.IP60 = net.IPv6zero
 	}
-	if err := block.WriteIP(n.IP60); err != nil {
+	if err := block.WriteIPv6(n.IP60); err != nil {
 		return err
 	}
 	if len(n.IP61) == 0 {
 		n.IP61 = net.IPv6zero
 	}
-	if err := block.WriteIP(n.IP61); err != nil {
+	if err := block.WriteIPv6(n.IP61); err != nil {
 		return err
 	}
 
@@ -159,16 +160,16 @@ func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(n.TunnelRxID); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(n.TunnelTxIP40); err != nil {
+	if err := block.WriteIPv4(n.TunnelTxIP40); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(n.TunnelTxIP41); err != nil {
+	if err := block.WriteIPv4(n.TunnelTxIP41); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(n.TunnelRxIP40); err != nil {
+	if err := block.WriteIPv4(n.TunnelRxIP40); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(n.TunnelRxIP41); err != nil {
+	if err := block.WriteIPv4(n.TunnelRxIP41); err != nil {
 		return err
 	}
 	if len(n.TunnelTxIP60) == 0 {
@@ -183,16 +184,16 @@ func (n *NetworkLayer) WriteBlock(block *ckdb.Block) error {
 	if len(n.TunnelRxIP61) == 0 {
 		n.TunnelRxIP61 = net.IPv6zero
 	}
-	if err := block.WriteIP(n.TunnelTxIP60); err != nil {
+	if err := block.WriteIPv6(n.TunnelTxIP60); err != nil {
 		return err
 	}
-	if err := block.WriteIP(n.TunnelTxIP61); err != nil {
+	if err := block.WriteIPv6(n.TunnelTxIP61); err != nil {
 		return err
 	}
-	if err := block.WriteIP(n.TunnelRxIP60); err != nil {
+	if err := block.WriteIPv6(n.TunnelRxIP60); err != nil {
 		return err
 	}
-	if err := block.WriteIP(n.TunnelRxIP61); err != nil {
+	if err := block.WriteIPv6(n.TunnelRxIP61); err != nil {
 		return err
 	}
 	if err := block.WriteBool(n.TunnelIsIPv4); err != nil {
@@ -534,8 +535,8 @@ type FlowInfo struct {
 	L2End1      bool   `json:"l2_end_1"`
 	L3End0      bool   `json:"l3_end_0"`
 	L3End1      bool   `json:"l3_end_1"`
-	StartTime   uint64 `json:"start_time"` // us
-	EndTime     uint64 `json:"end_time"`   // us
+	StartTime   int64  `json:"start_time"` // us
+	EndTime     int64  `json:"end_time"`   // us
 	Duration    uint64 `json:"duration"`   // us
 	IsNewFlow   uint8  `json:"is_new_flow"`
 	Status      uint8  `json:"status"`
@@ -600,13 +601,13 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteBool(f.L3End1); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64(f.StartTime); err != nil {
+	if err := block.WriteInt64(f.StartTime); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64(f.EndTime); err != nil {
+	if err := block.WriteInt64(f.EndTime); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
+	if err := block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(f.Duration); err != nil {
@@ -1084,8 +1085,8 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.L3End0 = f.FlowMetricsPeerSrc.IsL3End == 1
 	i.L3End1 = f.FlowMetricsPeerDst.IsL3End == 1
 
-	i.StartTime = f.StartTime / uint64(time.Microsecond)
-	i.EndTime = f.EndTime / uint64(time.Microsecond)
+	i.StartTime = int64(f.StartTime) / int64(time.Microsecond)
+	i.EndTime = int64(f.EndTime) / int64(time.Microsecond)
 	i.Duration = f.Duration / uint64(time.Microsecond)
 	i.IsNewFlow = uint8(f.IsNewFlow)
 	i.Status = getStatus(datatype.CloseType(i.CloseType))

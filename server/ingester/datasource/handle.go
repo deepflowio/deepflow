@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	clickhouse "github.com/ClickHouse/clickhouse-go"
 	basecommon "server/ingester/common"
 	"server/ingester/pkg/ckwriter"
 	"server/ingester/stream/common"
 	"server/libs/ckdb"
 	"server/libs/zerodoc"
+
+	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 )
 
 const (
@@ -361,7 +362,7 @@ func getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Table {
 	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION)[id] // GetMetricsTables取的全局变量的值，以roze在启动时对tables初始化的参数为准
 }
 
-func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
+func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
 	table := getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
@@ -389,7 +390,7 @@ func (m *DatasourceManager) createTableMV(ck clickhouse.Clickhouse, tableId zero
 	return nil
 }
 
-func (m *DatasourceManager) modTableMV(ck clickhouse.Clickhouse, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
+func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
 	table := getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
@@ -403,7 +404,7 @@ func (m *DatasourceManager) modTableMV(ck clickhouse.Clickhouse, tableId zerodoc
 	return ckwriter.ExecSQL(ck, modTable)
 }
 
-func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Clickhouse, tableID common.FlowLogID, duration int) error {
+func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Conn, tableID common.FlowLogID, duration int) error {
 	timeKey := tableID.TimeKey()
 	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
@@ -411,7 +412,7 @@ func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Clickhouse, table
 	return ckwriter.ExecSQL(ck, modTable)
 }
 
-func delTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsTableID, table string) error {
+func delTableMV(ck clickhouse.Conn, dbId zerodoc.MetricsTableID, table string) error {
 	dropTables := []string{
 		getMetricsTableName(uint8(dbId), table, GLOBAL),
 		getMetricsTableName(uint8(dbId), table, LOCAL),
@@ -428,12 +429,21 @@ func delTableMV(ck clickhouse.Clickhouse, dbId zerodoc.MetricsTableID, table str
 }
 
 func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
-	var cks []clickhouse.Clickhouse
+	var cks []clickhouse.Conn
 	for _, addr := range m.ckAddrs {
 		if len(addr) == 0 {
 			continue
 		}
-		ck, err := clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s&read_timeout=%d", addr, m.user, m.password, m.readTimeout))
+		ck, err := clickhouse.Open(&clickhouse.Options{
+			Addr: []string{addr},
+			Auth: clickhouse.Auth{
+				Database: "default",
+				Username: m.user,
+				Password: m.password,
+			},
+			Settings: map[string]interface{}{"read_timeout": m.readTimeout},
+		})
+
 		if err != nil {
 			return err
 		}

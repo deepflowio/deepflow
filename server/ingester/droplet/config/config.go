@@ -7,9 +7,10 @@ import (
 	"os"
 	"time"
 
+	"server/ingester/common"
+
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
-	"server/ingester/common"
 )
 
 var log = logging.MustGetLogger("config")
@@ -36,6 +37,10 @@ type Config struct {
 	PCap            PCapConfig    `yaml:"pcap"`
 	SyslogDirectory string        `yaml:"syslog-directory"`
 	ESSyslog        bool          `yaml:"es-syslog"`
+}
+
+type DropletConfig struct {
+	Droplet Config `yaml:"ingester"`
 }
 
 type AdapterConfig struct {
@@ -152,25 +157,27 @@ func (c *Config) Validate() error {
 
 func Load(path string) *Config {
 	configBytes, err := ioutil.ReadFile(path)
-	config := &Config{
-		ControllerPort: 20035,
-		ESHostPorts:    []string{DefaultESHostPort},
-		RpcTimeout:     8,
-		ESSyslog:       true,
+	config := &DropletConfig{
+		Droplet: Config{
+			ControllerPort: 20035,
+			ESHostPorts:    []string{DefaultESHostPort},
+			RpcTimeout:     8,
+			ESSyslog:       true,
+		},
 	}
 	if err != nil {
 		log.Warningf("Read config file error:", err)
-		config.Validate()
-		return config
+		config.Droplet.Validate()
+		return &config.Droplet
 	}
 	if err = yaml.Unmarshal(configBytes, config); err != nil {
 		log.Error("Unmarshal yaml error:", err)
 		os.Exit(1)
 	}
 
-	if err = config.Validate(); err != nil {
+	if err = config.Droplet.Validate(); err != nil {
 		log.Error(err)
 		os.Exit(1)
 	}
-	return config
+	return &config.Droplet
 }

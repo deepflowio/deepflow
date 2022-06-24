@@ -28,19 +28,19 @@ func (m *ExtMetrics) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 
-	if err := block.WriteArray(m.TagNames); err != nil {
+	if err := block.WriteArrayString(m.TagNames); err != nil {
 		return err
 	}
-	if err := block.WriteArray(m.TagValues); err != nil {
+	if err := block.WriteArrayString(m.TagValues); err != nil {
 		return err
 	}
-	if err := block.WriteArray(m.MetricsIntNames); err != nil {
+	if err := block.WriteArrayString(m.MetricsIntNames); err != nil {
 		return err
 	}
 	if err := block.WriteArray(m.MetricsIntValues); err != nil {
 		return err
 	}
-	if err := block.WriteArray(m.MetricsFloatNames); err != nil {
+	if err := block.WriteArrayString(m.MetricsFloatNames); err != nil {
 		return err
 	}
 	if err := block.WriteArray(m.MetricsFloatValues); err != nil {

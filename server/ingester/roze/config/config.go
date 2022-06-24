@@ -16,7 +16,7 @@ var log = logging.MustGetLogger("config")
 var ShardID string
 
 const (
-	DefaultCKPrimaryAddr        = "tcp://127.0.0.1:9000"
+	DefaultCKPrimaryAddr        = "127.0.0.1:9000"
 	DefaultControllerPort       = 20035
 	DefaultUnmarshallQueueCount = 4
 	DefaultUnmarshallQueueSize  = 10240

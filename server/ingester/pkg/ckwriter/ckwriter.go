@@ -1,19 +1,20 @@
 package ckwriter
 
 import (
-	"database/sql/driver"
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
 	"time"
 
-	clickhouse "github.com/ClickHouse/clickhouse-go"
-	logging "github.com/op/go-logging"
 	"server/libs/ckdb"
 	"server/libs/queue"
 	"server/libs/stats"
 	"server/libs/utils"
+
+	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
+	logging "github.com/op/go-logging"
 )
 
 var log = logging.MustGetLogger("ckwriter")
@@ -36,7 +37,7 @@ type CKWriter struct {
 
 	name       string // 数据库名-表名 用作 queue名字和counter名字
 	prepare    string // 写入数据时，先执行prepare
-	cks        []clickhouse.Clickhouse
+	conns      []clickhouse.Conn
 	dataQueues queue.FixedMultiQueue
 	counters   []Counter
 	putCounter int
@@ -50,46 +51,35 @@ type CKItem interface {
 	Release()
 }
 
-func ExecSQL(ck clickhouse.Clickhouse, query string) error {
+func ExecSQL(conn clickhouse.Conn, query string) error {
 	log.Info("Exec SQL: ", query)
-
-	var err error
-	_, err = ck.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := ck.Prepare(query)
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec([]driver.Value{})
-	if err != nil {
-		return err
-	}
-	err = ck.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
+	return conn.Exec(context.Background(), query)
 }
 
 func InitTable(addr, user, password string, t *ckdb.Table) error {
-	ck, err := clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s", addr, user, password))
+	conn, err := clickhouse.Open(&clickhouse.Options{
+		Addr: []string{addr},
+		Auth: clickhouse.Auth{
+			Database: "default",
+			Username: user,
+			Password: password,
+		},
+	})
 	if err != nil {
 		return err
 	}
 
-	if err := ExecSQL(ck, fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", t.Database)); err != nil {
+	if err := ExecSQL(conn, fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", t.Database)); err != nil {
 		return err
 	}
 
-	if err := ExecSQL(ck, t.MakeLocalTableCreateSQL()); err != nil {
+	if err := ExecSQL(conn, t.MakeLocalTableCreateSQL()); err != nil {
 		return err
 	}
-	if err := ExecSQL(ck, t.MakeGlobalTableCreateSQL()); err != nil {
+	if err := ExecSQL(conn, t.MakeGlobalTableCreateSQL()); err != nil {
 		return err
 	}
-	ck.Close()
+	conn.Close()
 	return nil
 }
 
@@ -108,7 +98,7 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 	log.Infof("New CK writer: primaryAddr=%s, secondaryAddr=%s, user=%s, database=%s, table=%s, replica=%v, queueCount=%d, queueSize=%d, batchSize=%d, flushTimeout=%ds",
 		primaryAddr, secondaryAddr, user, table.Database, table.LocalName, replicaEnabled, queueCount, queueSize, batchSize, flushTimeout)
 
-	cks := make([]clickhouse.Clickhouse, queueCount)
+	conns := make([]clickhouse.Conn, queueCount)
 	var err error
 
 	// primary clickhouse的初始化创建表
@@ -130,7 +120,14 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 	}
 
 	for i := 0; i < queueCount; i++ {
-		if cks[i], err = clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s", primaryAddr, user, password)); err != nil {
+		if conns[i], err = clickhouse.Open(&clickhouse.Options{
+			Addr: []string{primaryAddr},
+			Auth: clickhouse.Auth{
+				Database: "default",
+				Username: user,
+				Password: password,
+			},
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -153,7 +150,7 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 
 		name:       name,
 		prepare:    table.MakePrepareTableInsertSQL(),
-		cks:        cks,
+		conns:      conns,
 		dataQueues: dataQueues,
 		counters:   make([]Counter, queueCount),
 	}, nil
@@ -218,11 +215,18 @@ func (w *CKWriter) queueProcess(queueID int) {
 
 func (w *CKWriter) ResetConnection(queueID int) error {
 	var err error
-	if !IsNil(w.cks[queueID]) {
-		w.cks[queueID].Close()
-		w.cks[queueID] = nil
+	if !IsNil(w.conns[queueID]) {
+		w.conns[queueID].Close()
+		w.conns[queueID] = nil
 	}
-	if w.cks[queueID], err = clickhouse.OpenDirect(fmt.Sprintf("%s?username=%s&password=%s", w.primaryAddr, w.user, w.password)); err != nil {
+	if w.conns[queueID], err = clickhouse.Open(&clickhouse.Options{
+		Addr: []string{w.primaryAddr},
+		Auth: clickhouse.Auth{
+			Database: "default",
+			Username: w.user,
+			Password: w.password,
+		},
+	}); err != nil {
 		return err
 	}
 	return nil
@@ -275,31 +279,22 @@ func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 	if len(items) == 0 {
 		return nil
 	}
-	ck := w.cks[queueID]
+	ck := w.conns[queueID]
 	if IsNil(ck) {
 		if err := w.ResetConnection(queueID); err != nil {
 			time.Sleep(time.Minute)
 			return fmt.Errorf("can not ck to clickhouse: %s", err)
 		}
-		ck = w.cks[queueID]
-	}
-	_, err := ck.Begin()
-	if err != nil {
-		return fmt.Errorf("ck failed: %s", err)
+		ck = w.conns[queueID]
 	}
 
-	_, err = ck.Prepare(w.prepare)
+	batch, err := ck.PrepareBatch(context.Background(), w.prepare)
 	if err != nil {
-		return fmt.Errorf("prepare failed: %s", err)
+		return err
 	}
-	block, err := ck.Block()
-	if err != nil {
-		return fmt.Errorf("get ck block failed: %s", err)
-	}
-	block.Reserve()
-	block.NumRows = uint64(len(items))
+
 	ckdbBlock := &ckdb.Block{
-		Block: block,
+		Batch: batch,
 	}
 	for _, item := range items {
 		if err := item.WriteBlock(ckdbBlock); err != nil {
@@ -307,15 +302,11 @@ func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 		}
 		ckdbBlock.ResetIndex()
 	}
-	if err := ck.WriteBlock(block); err != nil {
-		return fmt.Errorf("ck write block failed: %s", err)
-	}
-
-	err = ck.Commit()
+	err = ckdbBlock.Batch.Send()
 	if err != nil {
-		return fmt.Errorf("commit write block failed: %s", err)
+		return fmt.Errorf("send write block failed: %s", err)
 	} else {
-		log.Debugf("commit success, table (%s.%s) commit %d items", w.table.Database, w.table.LocalName, len(items))
+		log.Debugf("batch write success, table (%s.%s) commit %d items", w.table.Database, w.table.LocalName, len(items))
 	}
 	return nil
 }
@@ -323,10 +314,10 @@ func (w *CKWriter) writeItems(queueID int, items []CKItem) error {
 func (w *CKWriter) Close() {
 	w.exit = true
 	w.wg.Wait()
-	for i, c := range w.cks {
+	for i, c := range w.conns {
 		if !IsNil(c) {
 			c.Close()
-			w.cks[i] = nil
+			w.conns[i] = nil
 		}
 	}
 	for _, c := range w.counters {

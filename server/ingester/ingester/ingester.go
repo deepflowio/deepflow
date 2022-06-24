@@ -1,13 +1,11 @@
 package ingester
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
 	"server/ingester/ckmonitor"
@@ -35,39 +33,23 @@ import (
 	"server/ingester/stream/stream"
 )
 
-func execName() string {
-	splitted := strings.Split(os.Args[0], "/")
-	return splitted[len(splitted)-1]
-}
-
-var log = logging.MustGetLogger(execName())
-
-var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")
-var version = flag.Bool("v", false, "Display the version")
-
-var RevCount, Revision, CommitDate, goVersion string
+var log = logging.MustGetLogger("ingester")
 
 const (
 	INFLUXDB_RELAY_PORT = 20048
 	PROFILER_PORT       = 9526
 )
 
-func Start() []io.Closer {
+func Start(configPath string) []io.Closer {
 	logger.EnableStdoutLog()
 
-	flag.Parse()
-	if *version {
-		fmt.Printf("%s %s %s\n%s\n", RevCount, Revision, CommitDate, goVersion)
-		os.Exit(0)
-	}
-
-	cfg := config.Load(*configPath)
+	cfg := config.Load(configPath)
 	logger.EnableFileLog(cfg.LogFile)
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN MetaFlow Ingester ==============================")
-	log.Infof("base config:\n%s", string(bytes))
+	log.Infof("ingester base config:\n%s", string(bytes))
 
 	debug.SetIpAndPort(dropletctl.DEBUG_LISTEN_IP, dropletctl.DEBUG_LISTEN_PORT)
 	debug.NewLogLevelControl()
@@ -87,7 +69,7 @@ func Start() []io.Closer {
 	stats.SetMinInterval(10 * time.Second)
 	stats.SetRemotes(net.JoinHostPort(cfg.Influxdb.Host, cfg.Influxdb.Port))
 
-	dropletConfig := dropletcfg.Load(*configPath)
+	dropletConfig := dropletcfg.Load(configPath)
 	bytes, _ = yaml.Marshal(dropletConfig)
 	log.Infof("droplet config:\n%s", string(bytes))
 
@@ -96,15 +78,15 @@ func Start() []io.Closer {
 	closers := droplet.Start(dropletConfig, receiver)
 
 	if cfg.StreamRozeEnabled {
-		streamConfig := streamcfg.Load(*configPath)
+		streamConfig := streamcfg.Load(configPath)
 		bytes, _ = yaml.Marshal(streamConfig)
 		log.Infof("stream config:\n%s", string(bytes))
 
-		rozeConfig := rozecfg.Load(*configPath)
+		rozeConfig := rozecfg.Load(configPath)
 		bytes, _ = yaml.Marshal(rozeConfig)
 		log.Infof("roze config:\n%s", string(bytes))
 
-		extMetricsConfig := extmetricscfg.Load(*configPath)
+		extMetricsConfig := extmetricscfg.Load(configPath)
 		bytes, _ = yaml.Marshal(extMetricsConfig)
 		log.Infof("ext_metrics config:\n%s", string(bytes))
 

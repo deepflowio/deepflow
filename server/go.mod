@@ -4,8 +4,7 @@ go 1.18
 
 require (
 	bou.ke/monkey v1.0.2
-	github.com/ClickHouse/clickhouse-go v1.5.4
-	// github.com/ClickHouse/clickhouse-go/v2 v2.0.15
+	github.com/ClickHouse/clickhouse-go/v2 v2.1.0
 	github.com/OneOfOne/xxhash v1.2.8
 	github.com/Workiva/go-datastructures v1.0.53
 	github.com/agiledragon/gomonkey/v2 v2.8.0
@@ -57,8 +56,6 @@ require (
 	inet.af/netaddr v0.0.0-20211027220019-c74959edd3b6
 )
 
-require github.com/ClickHouse/clickhouse-go/v2 v2.1.0
-
 require (
 	cloud.google.com/go/compute v1.7.0 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
@@ -66,7 +63,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cloudflare/golz4 v0.0.0-20150217214814-ef862a3cdc58 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect

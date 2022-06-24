@@ -109,6 +109,13 @@ func Bool2UInt32(b bool) uint32 {
 	return 0
 }
 
+func Bool2UInt8(b bool) uint8 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 func MaskLenToNetmask(mask uint32) uint32 {
 	return (math.MaxUint32) << (32 - mask)
 }

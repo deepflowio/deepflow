@@ -47,8 +47,8 @@ type L7Base struct {
 	VtapID      uint16 `json:"vtap_id"`
 	ReqTcpSeq   uint32 `json:"req_tcp_seq"`
 	RespTcpSeq  uint32 `json:"resp_tcp_seq"`
-	StartTime   uint64 `json:"start_time"` // us
-	EndTime     uint64 `json:"end_time"`   // us
+	StartTime   int64  `json:"start_time"` // us
+	EndTime     int64  `json:"end_time"`   // us
 
 	ProcessID0             uint32
 	ProcessID1             uint32
@@ -114,22 +114,22 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 
-	if err := block.WriteUInt32(f.IP40); err != nil {
+	if err := block.WriteIPv4(f.IP40); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.IP41); err != nil {
+	if err := block.WriteIPv4(f.IP41); err != nil {
 		return err
 	}
 	if len(f.IP60) == 0 {
 		f.IP60 = net.IPv6zero
 	}
-	if err := block.WriteIP(f.IP60); err != nil {
+	if err := block.WriteIPv6(f.IP60); err != nil {
 		return err
 	}
 	if len(f.IP61) == 0 {
 		f.IP61 = net.IPv6zero
 	}
-	if err := block.WriteIP(f.IP61); err != nil {
+	if err := block.WriteIPv6(f.IP61); err != nil {
 		return err
 	}
 
@@ -175,23 +175,23 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(f.RespTcpSeq); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64(f.StartTime); err != nil {
+	if err := block.WriteInt64(f.StartTime); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64(f.EndTime); err != nil {
+	if err := block.WriteInt64(f.EndTime); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
+	if err := block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
+	if err := block.WriteDateTime(uint32(f.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
 
-	if err := block.WriteUInt32(f.ProcessID0); err != nil {
+	if err := block.WriteInt32(int32(f.ProcessID0)); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(f.ProcessID1); err != nil {
+	if err := block.WriteInt32(int32(f.ProcessID1)); err != nil {
 		return err
 	}
 	if err := block.WriteString(f.ProcessKName0); err != nil {
@@ -255,10 +255,10 @@ type L7Logger struct {
 	SpanKind        uint8
 
 	ResponseDuration uint64
-	RequestLength    *uint64
-	requestLength    uint64
-	ResponseLength   *uint64
-	responseLength   uint64
+	RequestLength    *int64
+	requestLength    int64
+	ResponseLength   *int64
+	responseLength   int64
 	SqlAffectedRows  *uint64
 	sqlAffectedRows  uint64
 
@@ -376,20 +376,20 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt64(h.ResponseDuration); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64Nullable(h.RequestLength); err != nil {
+	if err := block.WriteInt64Nullable(h.RequestLength); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64Nullable(h.ResponseLength); err != nil {
+	if err := block.WriteInt64Nullable(h.ResponseLength); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64Nullable(h.SqlAffectedRows); err != nil {
 		return err
 	}
 
-	if err := block.WriteArray(h.TagNames); err != nil {
+	if err := block.WriteArrayString(h.TagNames); err != nil {
 		return err
 	}
-	if err := block.WriteArray(h.TagValues); err != nil {
+	if err := block.WriteArrayString(h.TagValues); err != nil {
 		return err
 	}
 
@@ -434,12 +434,12 @@ func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 	}
 
 	if info.ReqContentLength != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = uint64(info.ReqContentLength)
+		h.requestLength = info.ReqContentLength
 		h.RequestLength = &h.requestLength
 	}
 
 	if info.RespContentLength != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = uint64(info.RespContentLength)
+		h.responseLength = info.RespContentLength
 		h.ResponseLength = &h.responseLength
 	}
 }
@@ -523,11 +523,11 @@ func (h *L7Logger) fillDubbo(l *pb.AppProtoLogsData) {
 	h.TraceId = info.TraceId
 
 	if info.ReqBodyLen != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = uint64(info.ReqBodyLen)
+		h.requestLength = int64(info.ReqBodyLen)
 		h.RequestLength = &h.requestLength
 	}
 	if info.RespBodyLen != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = uint64(info.RespBodyLen)
+		h.responseLength = int64(info.RespBodyLen)
 		h.ResponseLength = &h.responseLength
 	}
 }
@@ -555,11 +555,11 @@ func (h *L7Logger) fillKafka(l *pb.AppProtoLogsData) {
 	}
 
 	if info.ReqMsgSize != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = uint64(info.ReqMsgSize)
+		h.requestLength = int64(info.ReqMsgSize)
 		h.RequestLength = &h.requestLength
 	}
 	if info.RespMsgSize != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = uint64(info.RespMsgSize)
+		h.responseLength = int64(info.RespMsgSize)
 		h.ResponseLength = &h.responseLength
 	}
 }
@@ -590,11 +590,11 @@ func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
 	}
 
 	if info.ReqMsgSize != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = uint64(info.ReqMsgSize)
+		h.requestLength = int64(info.ReqMsgSize)
 		h.RequestLength = &h.requestLength
 	}
 	if info.RespMsgSize != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = uint64(info.RespMsgSize)
+		h.responseLength = int64(info.RespMsgSize)
 		h.ResponseLength = &h.responseLength
 	}
 }
@@ -685,8 +685,8 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.VtapID = uint16(l.VtapId)
 	b.ReqTcpSeq = l.ReqTcpSeq
 	b.RespTcpSeq = l.RespTcpSeq
-	b.StartTime = l.StartTime / uint64(time.Microsecond)
-	b.EndTime = l.EndTime / uint64(time.Microsecond)
+	b.StartTime = int64(l.StartTime) / int64(time.Microsecond)
+	b.EndTime = int64(l.EndTime) / int64(time.Microsecond)
 
 	// FIXME 补充填充链路追踪数据
 	b.ProcessID0 = l.ProcessId0

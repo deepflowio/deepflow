@@ -8,12 +8,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gopacket/layers"
 	"server/libs/ckdb"
 	"server/libs/datatype"
 	"server/libs/pool"
 	"server/libs/utils"
 	"server/libs/zerodoc/pb"
+
+	"github.com/google/gopacket/layers"
 )
 
 type Code uint64
@@ -1044,7 +1045,7 @@ func GenTagColumns(code Code) []*ckdb.Column {
 func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 	code := t.Code
 
-	if err := block.WriteUInt32(time); err != nil {
+	if err := block.WriteDateTime(time); err != nil {
 		return err
 	}
 
@@ -1098,13 +1099,13 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 		}
 	}
 	if code&IP != 0 {
-		if err := block.WriteUInt32(t.IP); err != nil {
+		if err := block.WriteIPv4(t.IP); err != nil {
 			return err
 		}
 		if len(t.IP6) == 0 {
 			t.IP6 = net.IPv6zero
 		}
-		if err := block.WriteIP(t.IP6); err != nil {
+		if err := block.WriteIPv6(t.IP6); err != nil {
 			return err
 		}
 		if err := block.WriteUInt8(1 - t.IsIPv6); err != nil {
@@ -1112,22 +1113,22 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 		}
 	}
 	if code&IPPath != 0 {
-		if err := block.WriteUInt32(t.IP); err != nil {
+		if err := block.WriteIPv4(t.IP); err != nil {
 			return err
 		}
-		if err := block.WriteUInt32(t.IP1); err != nil {
+		if err := block.WriteIPv4(t.IP1); err != nil {
 			return err
 		}
 		if len(t.IP6) == 0 {
 			t.IP6 = net.IPv6zero
 		}
-		if err := block.WriteIP(t.IP6); err != nil {
+		if err := block.WriteIPv6(t.IP6); err != nil {
 			return err
 		}
 		if len(t.IP61) == 0 {
 			t.IP61 = net.IPv6zero
 		}
-		if err := block.WriteIP(t.IP61); err != nil {
+		if err := block.WriteIPv6(t.IP61); err != nil {
 			return err
 		}
 		if err := block.WriteUInt8(1 - t.IsIPv6); err != nil {
