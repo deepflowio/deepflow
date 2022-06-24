@@ -58,14 +58,12 @@ type VTapInfo struct {
 	hostIDToVPCID                  map[int]int
 	hypervNetworkHostIds           mapset.Set
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
-	vtapLcuuidToConfigFile         map[string]*models.VTapConfigFile
+	vtapGroupLcuuidToLocalConfig   map[string]string
 	noVTapTapPortsMac              mapset.Set
 	kvmVTapCtrlIPToTapPorts        map[string]mapset.Set
 	kcData                         *KubernetesCluster
-	isReady                        atomicbool.Bool                // 缓存是否初始化完成
-	dbDefaultConfig                *models.VTapGroupConfiguration // 数据库默认配置
-	dbGlobalConfig                 *models.VTapGroupConfiguration // 数据库全局配置
-	realDefaultConfig              *VTapConfig                    // 实际默认值配置
+	isReady                        atomicbool.Bool // 缓存是否初始化完成
+	realDefaultConfig              *VTapConfig     // 实际默认值配置
 
 	// 配置改变重新生成平台数据
 	isVTapChangedForPD atomicbool.Bool
@@ -110,7 +108,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		hostIDToVPCID:                  make(map[int]int),
 		hypervNetworkHostIds:           mapset.NewSet(),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
-		vtapLcuuidToConfigFile:         make(map[string]*models.VTapConfigFile),
+		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
 		noVTapTapPortsMac:              mapset.NewSet(),
 		kvmVTapCtrlIPToTapPorts:        make(map[string]mapset.Set),
 		kcData:                         newKubernetesCluster(db),
@@ -316,33 +314,21 @@ func (v *VTapInfo) loadTapPortsData() {
 }
 
 func (v *VTapInfo) loadConfigData() {
+	deafaultConfiguration := &models.RVTapGroupConfiguration{}
+	b, err := json.Marshal(DefaultVTapGroupConfig)
+	if err == nil {
+		err = json.Unmarshal(b, deafaultConfiguration)
+		if err != nil {
+			log.Error(err)
+		}
+	} else {
+		log.Error(err)
+	}
+
+	v.realDefaultConfig = NewVTapConfig(deafaultConfiguration)
 	dbDataCache := v.metaData.GetDBDataCache()
 	configs := dbDataCache.GetVTapGroupConfigurationsFromDB(v.db)
-	if configs != nil {
-		for _, config := range configs {
-			if config.ID == -1 {
-				v.dbDefaultConfig = config
-				continue
-			}
-			if config.VTapGroupLcuuid == nil {
-				v.dbGlobalConfig = config
-				continue
-			}
-			if v.dbDefaultConfig != nil && v.dbGlobalConfig != nil {
-				break
-			}
-		}
-	}
 	v.convertConfig(configs)
-
-	vtapLcuuidToConfigFile := make(map[string]*models.VTapConfigFile)
-	vtapConfigFiles := dbDataCache.GetVTapConfigFilesFromDB(v.db)
-	if vtapConfigFiles != nil {
-		for _, configFile := range vtapConfigFiles {
-			vtapLcuuidToConfigFile[configFile.VTapLcuuid] = configFile
-		}
-	}
-	v.vtapLcuuidToConfigFile = vtapLcuuidToConfigFile
 }
 
 func (v *VTapInfo) loadKubernetesCluster() {
@@ -420,17 +406,18 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 		log.Error("no vtap configs data")
 		return
 	}
-	if v.dbDefaultConfig == nil || v.dbGlobalConfig == nil {
-		log.Error("no defaultconfig data or no gloablconfig data")
-		return
-	}
 
 	vtapGroupLcuuidToConfiguration := make(map[string]*VTapConfig)
-	typeOfDefaultConfig := reflect.ValueOf(v.dbDefaultConfig).Elem()
-	typeOfGlobalConfig := reflect.ValueOf(v.dbGlobalConfig).Elem()
+	vtapGroupLcuuidToLocalConfig := make(map[string]string)
+	typeOfDefaultConfig := reflect.ValueOf(DefaultVTapGroupConfig).Elem()
 	for _, config := range configs {
-		if config.ID == -1 {
+		if config.VTapGroupLcuuid == nil {
 			continue
+		}
+		if config.YamlConfig != nil {
+			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = *config.YamlConfig
+		} else {
+			vtapGroupLcuuidToLocalConfig[*config.VTapGroupLcuuid] = ""
 		}
 		tapConfiguration := &models.VTapGroupConfiguration{}
 		typeOfVTapConfiguration := reflect.ValueOf(tapConfiguration).Elem()
@@ -447,15 +434,10 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 			}
 			value := tv.Field(i)
 			defaultValue := typeOfDefaultConfig.Field(i)
-			globalValue := typeOfGlobalConfig.Field(i)
 			if isBlank(value) == false {
 				typeOfVTapConfiguration.Field(i).Set(value)
-			} else if isBlank(globalValue) == false {
-				typeOfVTapConfiguration.Field(i).Set(globalValue)
-			} else if DefaultFieldNone(field.Name) || isBlank(defaultValue) == false {
-				typeOfVTapConfiguration.Field(i).Set(defaultValue)
 			} else {
-				log.Warning("vtap config no filed data", config.ID, field.Name)
+				typeOfVTapConfiguration.Field(i).Set(defaultValue)
 			}
 		}
 		// 转换结构体类型
@@ -471,32 +453,24 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 		}
 
 		vTapConfig := NewVTapConfig(rtapConfiguration)
-
 		if config.VTapGroupLcuuid != nil {
 			vtapGroupLcuuidToConfiguration[vTapConfig.VTapGroupLcuuid] = vTapConfig
-		} else {
-			log.Debugf("%+v", vTapConfig)
-			v.realDefaultConfig = vTapConfig
 		}
 	}
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
+	v.vtapGroupLcuuidToLocalConfig = vtapGroupLcuuidToLocalConfig
+}
+
+func (v *VTapInfo) GetVTapLocalConfig(vtapGroupLcuuid string) string {
+	return v.vtapGroupLcuuidToLocalConfig[vtapGroupLcuuid]
 }
 
 func (v *VTapInfo) GetDefaultMaxEscapeSeconds() int {
-	defaultMaxEscapeSeconds := DEFAULT_MAX_ESCAPE_SECONDS
-	if v.realDefaultConfig != nil {
-		defaultMaxEscapeSeconds = v.realDefaultConfig.MaxEscapeSeconds
-	}
-	return defaultMaxEscapeSeconds
+	return MaxEscapeSeconds
 }
 
 func (v *VTapInfo) GetDefaultMaxMemory() int {
-	defaultMaxMemory := DEFAULT_MAX_MEMORY
-	if v.realDefaultConfig != nil {
-		defaultMaxMemory = v.realDefaultConfig.MaxMemory
-	}
-
-	return defaultMaxMemory
+	return MaxMemory
 }
 
 func (v *VTapInfo) GetVTapCacheIsReady() bool {
@@ -815,14 +789,6 @@ func (v *VTapInfo) updateCacheToDB() {
 	hostIP := config.NodeIP
 	updateVTaps := []*models.VTap{}
 	keytoDBVTap := make(map[string]*models.VTap)
-	vtapLcuuidToConfigFile := make(map[string]*models.VTapConfigFile)
-
-	configFiles, err := dbmgr.DBMgr[models.VTapConfigFile](v.db).Gets()
-	createConfigFiles := []*models.VTapConfigFile{}
-	changeConfigFiles := []*models.VTapConfigFile{}
-	for _, configFile := range configFiles {
-		vtapLcuuidToConfigFile[configFile.VTapLcuuid] = configFile
-	}
 
 	dbVTaps, err := dbmgr.DBMgr[models.VTap](v.db).Gets()
 	if err != nil {
@@ -885,26 +851,6 @@ func (v *VTapInfo) updateCacheToDB() {
 			cacheVTap.UpdateCurControllerIP(hostIP)
 			dbVTap.CurControllerIP = cacheVTap.GetCurControllerIP()
 			filterFlag = true
-			CacheConfigFile := cacheVTap.configFile.GetFile()
-			CacheConfigFileRevision := cacheVTap.configFile.GetRevision()
-			if len(CacheConfigFile) != 0 {
-				dbConfigFile, ok := vtapLcuuidToConfigFile[cacheVTap.GetLcuuid()]
-				if ok == false {
-					vtapConfigFile := &models.VTapConfigFile{}
-					vtapConfigFile.ConfigFile = CacheConfigFile
-					vtapConfigFile.ConfigRevision = CacheConfigFileRevision
-					vtapConfigFile.VTapLcuuid = dbVTap.Lcuuid
-					createConfigFiles = append(createConfigFiles, vtapConfigFile)
-				} else if dbConfigFile.ConfigFile == "" {
-					dbConfigFile.ConfigFile = CacheConfigFile
-					dbConfigFile.ConfigRevision = CacheConfigFileRevision
-					changeConfigFiles = append(changeConfigFiles, dbConfigFile)
-				} else if Find[int](LOCAL_FILE_VTAP, dbVTap.Type) && CacheConfigFileRevision != dbConfigFile.ConfigRevision {
-					dbConfigFile.ConfigFile = CacheConfigFile
-					dbConfigFile.ConfigRevision = CacheConfigFileRevision
-					changeConfigFiles = append(changeConfigFiles, dbConfigFile)
-				}
-			}
 		}
 
 		if cacheVTap.tsdbSyncFlag.IsSet() {
@@ -950,21 +896,6 @@ func (v *VTapInfo) updateCacheToDB() {
 	if len(updateVTaps) > 0 {
 		log.Infof("update vtap count(%d)", len(updateVTaps))
 		err = vTapmgr.UpdateBulk(updateVTaps)
-		if err != nil {
-			log.Error(err)
-		}
-	}
-	configMgr := dbmgr.DBMgr[models.VTapConfigFile](v.db)
-	if len(changeConfigFiles) > 0 {
-		log.Infof("update vtap config file count(%d)", len(changeConfigFiles))
-		err = configMgr.UpdateBulk(changeConfigFiles)
-		if err != nil {
-			log.Error(err)
-		}
-	}
-	if len(createConfigFiles) > 0 {
-		log.Infof("create vtap config file count(%d)", len(createConfigFiles))
-		err = configMgr.InsertBulk(createConfigFiles)
 		if err != nil {
 			log.Error(err)
 		}

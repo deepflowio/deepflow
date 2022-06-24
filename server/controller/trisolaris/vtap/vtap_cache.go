@@ -20,32 +20,6 @@ import (
 	"server/controller/trisolaris/utils/atomicbool"
 )
 
-type VTapConfigFile struct {
-	sync.RWMutex
-	file         string
-	fileRevision string
-}
-
-func (f *VTapConfigFile) GetRevision() string {
-	f.RLock()
-	defer f.RUnlock()
-	return f.fileRevision
-}
-
-func (f *VTapConfigFile) GetFile() string {
-	f.RLock()
-	defer f.RUnlock()
-	return f.file
-
-}
-
-func (f *VTapConfigFile) UpdateFile(file string, revision string) {
-	f.Lock()
-	defer f.Unlock()
-	f.file = file
-	f.fileRevision = revision
-}
-
 type VTapConfig struct {
 	models.RVTapGroupConfiguration
 	ConvertedL4LogTapTypes      []uint32
@@ -162,8 +136,6 @@ type VTapCache struct {
 	VPCID int
 	// 采集器平台数据
 	PlatformData *atomic.Value //*PlatformData
-	// 采集器配置文件
-	configFile *VTapConfigFile //*ConfigFile
 }
 
 func NewVTapCache(vtap *models.VTap) *VTapCache {
@@ -225,7 +197,6 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.podClusterID = 0
 	vTapCache.VPCID = 0
 	vTapCache.PlatformData = &atomic.Value{}
-	vTapCache.configFile = &VTapConfigFile{}
 
 	return vTapCache
 }
@@ -574,7 +545,6 @@ func (c *VTapCache) init(v *VTapInfo) {
 	c.modifyVTapCache(v)
 	c.initVTapPodDomains(v)
 	c.initVTapConfig(v)
-	c.initConfigFile(v)
 }
 
 func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
@@ -631,53 +601,6 @@ func (c *VTapCache) initVTapConfig(v *VTapInfo) {
 		}
 	}
 	c.updateVTapConfig(&realConfig)
-}
-
-func (c *VTapCache) initConfigFile(v *VTapInfo) {
-	configFile, ok := v.vtapLcuuidToConfigFile[c.GetLcuuid()]
-	if ok {
-		c.configFile.UpdateFile(configFile.ConfigFile, configFile.ConfigRevision)
-	}
-}
-
-func (c *VTapCache) UpdateConfigFileFromGrpc(file string, revision string) {
-	cacheConfigFile := c.configFile.GetFile()
-	if cacheConfigFile != "" && !Find[int](LOCAL_FILE_VTAP, c.vTapType) {
-		return
-	}
-	if file != "" {
-		c.configFile.UpdateFile(file, revision)
-		log.Infof("update vtap(%s) config file version(%s) file_len(%d)",
-			c.GetCtrlIP(), revision, len(file))
-	}
-}
-
-func (c *VTapCache) updateConfigFileFromDB(v *VTapInfo) {
-	cacheConfigFile := c.configFile.GetFile()
-	cacheConfigFileRevision := c.configFile.GetRevision()
-	if configFile, ok := v.vtapLcuuidToConfigFile[c.GetLcuuid()]; ok {
-		if len(configFile.ConfigFile) != 0 {
-			if len(cacheConfigFile) == 0 {
-				c.configFile.UpdateFile(configFile.ConfigFile, configFile.ConfigRevision)
-				log.Infof("update vtap(%s) config file from db, revision=%s len=%d",
-					c.GetCtrlIP(), configFile.ConfigRevision, len(configFile.ConfigFile))
-			} else if cacheConfigFileRevision != configFile.ConfigRevision {
-				if !Find[int](LOCAL_FILE_VTAP, c.vTapType) {
-					c.configFile.UpdateFile(configFile.ConfigFile, configFile.ConfigRevision)
-					log.Infof("update vtap(%s) config file from db, revision=%s len=%d",
-						c.GetCtrlIP(), configFile.ConfigRevision, len(configFile.ConfigFile))
-				}
-			}
-		}
-	}
-}
-
-func (c *VTapCache) GetConfigFileRevison() string {
-	return c.configFile.GetRevision()
-}
-
-func (c *VTapCache) GetConfigFile() string {
-	return c.configFile.GetFile()
 }
 
 func (c *VTapCache) updateVTapConfigFromDB(v *VTapInfo) {
@@ -743,7 +666,6 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 		v.setVTapChangedForPD()
 	}
 	c.updateVTapConfigFromDB(v)
-	c.updateConfigFileFromDB(v)
 	newPodDomains := v.getVTapPodDomains(c)
 	oldPodDomains := c.getPodDomains()
 	// podDomain 发生变化重新生成平台数据
