@@ -186,7 +186,7 @@ func (v *VTapInfo) loadRegion() string {
 func (v *VTapInfo) loadDefaultVTapGroup() string {
 	defaultVTapGroup, err := dbmgr.DBMgr[models.VTapGroup](v.db).GetFromID(DEFAULT_VTAP_GROUP_ID)
 	if err != nil {
-		log.Error("no default vtap group, err(%s)", err)
+		log.Errorf("no default vtap group, err(%s)", err)
 		return ""
 	}
 
