@@ -6,9 +6,9 @@ import (
 
 	"server/libs/ckdb"
 	"server/libs/zerodoc"
-	"github.com/yunshan/droplet/common"
-	"github.com/yunshan/droplet/pkg/ckwriter"
-	"github.com/yunshan/droplet/roze/config"
+	"server/ingester/common"
+	"server/ingester/pkg/ckwriter"
+	"server/ingester/roze/config"
 )
 
 var log = logging.MustGetLogger("roze.dbwriter")

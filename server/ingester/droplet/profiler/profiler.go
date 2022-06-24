@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"server/libs/debug"
 
-	"github.com/yunshan/droplet/dropletctl"
+	"server/ingester/dropletctl"
 )
 
 type ProfilerServer struct {

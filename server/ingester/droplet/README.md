@@ -108,7 +108,7 @@ import (
 
 * 单元测试通过DLV调试的方法
   1. 首先`go get -u github.com/derekparker/delve/cmd/dlv`下载dlv工具
-  2. 以dedup为例，执行`dlv test github.com/yunshan/droplet/handler/`
+  2. 以dedup为例，执行`dlv test ingester/handler/`
   3. 列举测试用例，`funcs test.Test*`
   4. 设置断点，`break TestPacketExtract`
   5. 启动调试，`continue`

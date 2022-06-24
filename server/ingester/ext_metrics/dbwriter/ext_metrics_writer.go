@@ -8,9 +8,9 @@ import (
 	"server/libs/ckdb"
 	"server/libs/stats"
 	"server/libs/utils"
-	"github.com/yunshan/droplet/common"
-	"github.com/yunshan/droplet/ext_metrics/config"
-	"github.com/yunshan/droplet/pkg/ckwriter"
+	"server/ingester/common"
+	"server/ingester/ext_metrics/config"
+	"server/ingester/pkg/ckwriter"
 )
 
 var log = logging.MustGetLogger("ext_metrics.dbwriter")

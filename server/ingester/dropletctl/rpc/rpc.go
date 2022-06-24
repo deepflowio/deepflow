@@ -21,8 +21,8 @@ import (
 	"server/libs/utils"
 	"github.com/metaflowys/metaflow/message/trident"
 
-	"github.com/yunshan/droplet/droplet/config"
-	"github.com/yunshan/droplet/dropletctl"
+	"server/ingester/droplet/config"
+	"server/ingester/dropletctl"
 )
 
 type CmdExecute func(response *trident.SyncResponse)

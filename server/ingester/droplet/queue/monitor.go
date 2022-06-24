@@ -9,7 +9,7 @@ import (
 
 	"server/libs/debug"
 
-	"github.com/yunshan/droplet/dropletctl"
+	"server/ingester/dropletctl"
 )
 
 type MonitorOperator interface {

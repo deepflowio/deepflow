@@ -17,7 +17,7 @@ import (
 	"server/libs/stats"
 	"server/libs/utils"
 	"server/libs/zerodoc/pb"
-	"github.com/yunshan/droplet/roze/dbwriter"
+	"server/ingester/roze/dbwriter"
 )
 
 var log = logging.MustGetLogger("roze.unmarshaller")

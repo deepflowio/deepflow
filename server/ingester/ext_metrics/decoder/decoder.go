@@ -22,7 +22,7 @@ import (
 	"server/libs/receiver"
 	"server/libs/stats"
 	"server/libs/utils"
-	"github.com/yunshan/droplet/ext_metrics/dbwriter"
+	"server/ingester/ext_metrics/dbwriter"
 )
 
 var log = logging.MustGetLogger("ext_metrics.decoder")

@@ -139,7 +139,7 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	log.Infof("create domain (%v)", domainCreate)
 
 	domain := mysql.Domain{}
-	displayName := uuid.NewV4().String()
+	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
@@ -416,7 +416,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 	log.Infof("create sub_domain (%v)", subDomainCreate)
 
 	subDomain := mysql.SubDomain{}
-	displayName := uuid.NewV4().String()
+	displayName := common.GetUUID("", uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	subDomain.Lcuuid = lcuuid
 	subDomain.Name = subDomainCreate.Name

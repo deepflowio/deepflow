@@ -18,8 +18,8 @@ import (
 	"server/libs/policy"
 	. "server/libs/utils"
 
-	"github.com/yunshan/droplet/dropletctl"
-	"github.com/yunshan/droplet/dropletctl/rpc"
+	"server/ingester/dropletctl"
+	"server/ingester/dropletctl/rpc"
 )
 
 type command struct {

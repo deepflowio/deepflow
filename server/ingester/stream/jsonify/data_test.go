@@ -9,7 +9,7 @@ import (
 	"server/libs/datatype"
 	"server/libs/datatype/pb"
 	"server/libs/grpc"
-	"github.com/yunshan/droplet/stream/geo"
+	"server/ingester/stream/geo"
 )
 
 func TestJsonify(t *testing.T) {

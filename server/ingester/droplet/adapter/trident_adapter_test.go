@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/yunshan/droplet/droplet/queue"
+	"server/ingester/droplet/queue"
 )
 
 func TestTridentAdapter(t *testing.T) {

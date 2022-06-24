@@ -9,7 +9,7 @@ import (
 	"server/libs/grpc"
 	"server/libs/utils"
 	"server/libs/zerodoc"
-	"github.com/yunshan/droplet/common"
+	"server/ingester/common"
 	"github.com/metaflowys/metaflow/message/trident"
 )
 

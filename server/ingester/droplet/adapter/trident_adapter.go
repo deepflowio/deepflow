@@ -13,7 +13,7 @@ import (
 	"server/libs/stats"
 	"server/libs/utils"
 
-	"github.com/yunshan/droplet/dropletctl"
+	"server/ingester/dropletctl"
 )
 
 const (
