@@ -53,6 +53,12 @@ func newKubernetesCluster(db *gorm.DB) *KubernetesCluster {
 	}
 }
 
+func (k *KubernetesCluster) updateCache(keyToCache map[string]*CacheKC) {
+	k.Lock()
+	k.keyToCache = keyToCache
+	k.Unlock()
+}
+
 func (k *KubernetesCluster) add(clusterID string, kc *models.KubernetesCluster) {
 	cacheKC := newCacheKC(kc)
 	k.Lock()
@@ -129,6 +135,7 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 	now := time.Now()
 	deleteIDs := []int{}
 	updateData := make([]*models.KubernetesCluster, 0, len(kcs))
+	keyToCache := make(map[string]*CacheKC)
 	var checkSyncedAt time.Time
 	for _, kc := range kcs {
 		updatedAt, ok := k.getCacheSyncedAt(kc.ClusterID)
@@ -139,9 +146,6 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 		}
 		if int(checkSyncedAt.Sub(kc.SyncedAt).Seconds()) > clearTime {
 			deleteIDs = append(deleteIDs, kc.ID)
-			if ok {
-				k.DeleteCache(kc.ClusterID)
-			}
 			log.Infof(
 				"delete kubernetes_cluster(%s, %s) data",
 				kc.ClusterID,
@@ -152,6 +156,7 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 				kc.SyncedAt = checkSyncedAt
 				updateData = append(updateData, kc)
 			}
+			keyToCache[kc.ClusterID] = newCacheKC(kc)
 		}
 	}
 	if len(deleteIDs) > 0 {
@@ -160,6 +165,8 @@ func (k *KubernetesCluster) loadAndCheck(clearTime int) {
 	if len(updateData) > 0 {
 		mgr.UpdateBulk(updateData)
 	}
+	k.updateCache(keyToCache)
+
 }
 
 // 查询内存中的kubernetes_cluster_id字典
