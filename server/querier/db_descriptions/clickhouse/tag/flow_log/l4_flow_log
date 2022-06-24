@@ -33,9 +33,9 @@ is_internet         , is_internet_0        , is_internet_1         , Internet标
 
 mac                 , mac_0                , mac_1                 , MAC                           , mac          ,                    , 链路层      , 111        ,
 eth_type            , eth_type             , eth_type              , 链路协议                      , int_enum     , eth_type           , 链路层      , 111        ,
+vlan                , vlan                 , vlan                  , VLAN                          , int          ,                    , 链路层      , 111        ,
 
 ip                  , ip_0                 , ip_1                  , IP地址                        , ip           ,                    , 网络层      , 111        ,
-
 is_ipv4             , is_ipv4              , is_ipv4               , IP类型                        , int_enum     , ip_type            , 网络层      , 111        ,
 protocol            , protocol             , protocol              , 网络协议                      , int_enum     , protocol           , 网络层      , 111        ,
 tunnel_tier         , tunnel_tier          , tunnel_tier           , 隧道层数                      , int_enum     , tunnel_tier        , 网络层      , 111        ,
@@ -54,7 +54,6 @@ tunnel_rx_mac_1     , tunnel_rx_mac_1      , tunnel_rx_mac_1       , 响应隧�
 
 client_port         , client_port          , client_port           , 客户端口                      , int          ,                    , 传输层      , 111        ,
 server_port         , server_port          , server_port           , 服务端口                      , int_enum     , server_port        , 传输层      , 111        ,
-# 需要将int按位转化位标志位列表展示 @zhenyu
 tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , TCP标志位列表                 , bit_enum     , tcp_flags_bit      , 传输层      , 111        ,
 syn_seq             , syn_seq              , syn_seq               , SYN包SEQ                      , int          ,                    , 传输层      , 111        ,
 syn_ack_seq         , syn_ack_seq          , syn_ack_seq           , SYN-ACK包SEQ                  , int          ,                    , 传输层      , 111        ,
@@ -69,7 +68,6 @@ close_type          , close_type           , close_type            , 流结束�
 flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enum     , flow_source        , 流信息      , 111        ,
 flow_id             , flow_id              , flow_id               , 流日志ID                      , int          ,                    , 流信息      , 111        ,
 tap                 , tap                  , tap                   , 采集点                        , resource     ,                    , 流信息      , 110        ,
-# 需要转化为xx:xx:xx:xx格式展示
 tap_port            , tap_port             , tap_port              , 采集位置标识                  , mac          ,                    , 流信息      , 111        ,
 tap_port_name       , tap_port_name        , tap_port_name         , 采集位置名称                  , string       ,                    , 流信息      , 111        ,
 tap_port_type       , tap_port_type        , tap_port_type         , 采集位置类型                  , int_enum     , tap_port_type      , 流信息      , 111        ,
