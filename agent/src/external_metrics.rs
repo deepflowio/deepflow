@@ -250,7 +250,7 @@ mod tests {
         let (sender, receiver, _) =
             queue::bounded_with_debug(1000, "test_external_metrics", &queue_debugger);
 
-        let port = 44444 + random::<u16>() % 1000;
+        let port = 44444 + random::<u16>() % 10000;
         let mut rt_conf = ModuleConfig::default();
         rt_conf.metric_server.enabled = true;
         rt_conf.metric_server.port = port;
