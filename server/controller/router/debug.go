@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"server/controller/genesis"
 	"server/controller/manager"
@@ -11,6 +12,7 @@ func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {
 	e.GET("/v1/tasks/", getCloudBasicInfos(m))
 	e.GET("/v1/tasks/:lcuuid/", getCloudBasicInfo(m))
 	e.GET("/v1/info/:lcuuid/", getCloudResource(m))
+	e.GET("/v1/genesis/:type/", getGenesisData(g))
 	e.GET("/v1/vinterfaces/", getGenesisVinterfacesData(g))
 	e.GET("/v1/kubernetes-info/", getGenesisKubernetesData(g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(m))
@@ -129,6 +131,37 @@ func getGenesisVinterfacesData(g *genesis.Genesis) gin.HandlerFunc {
 func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		data, err := service.GetGenesisKubernetesData(g)
+		JsonResponse(c, data, err)
+	})
+}
+
+func getGenesisData(g *genesis.Genesis) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		dataType := c.Param("type")
+		var data interface{}
+		var err error
+		switch dataType {
+		case "ip":
+			data, err = service.GetGenesisIPsData(g)
+		case "subnet":
+			data, err = service.GetGenesisSubnetsData(g)
+		case "vm":
+			data, err = service.GetGenesisVMsData(g)
+		case "vpc":
+			data, err = service.GetGenesisVPCsData(g)
+		case "host":
+			data, err = service.GetGenesisHostsData(g)
+		case "lldp":
+			data, err = service.GetGenesisLldpsData(g)
+		case "port":
+			data, err = service.GetGenesisPortsData(g)
+		case "network":
+			data, err = service.GetGenesisNetworksData(g)
+		case "iplastseen":
+			data, err = service.GetGenesisIPLastSeensData(g)
+		default:
+			err = errors.New("not found " + dataType + " data")
+		}
 		JsonResponse(c, data, err)
 	})
 }

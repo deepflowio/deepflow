@@ -8,8 +8,7 @@ import (
 	"inet.af/netaddr"
 	"server/controller/common"
 	genesiscommon "server/controller/genesis/common"
-	"server/controller/genesis/model"
-	genesismodel "server/controller/genesis/model"
+	"server/controller/model"
 	"strconv"
 	"strings"
 	"time"
@@ -74,13 +73,13 @@ func NewVinterfacesRpcUpdater(storage *VinterfacesStorage, queue queue.QueueRead
 	}
 }
 
-func (v *VinterfacesRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatformData, peer string, vtapID int, k8sClusterID, deviceType string) []genesismodel.GenesisVinterface {
+func (v *VinterfacesRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatformData, peer string, vtapID int, k8sClusterID, deviceType string) []model.GenesisVinterface {
 	var isContainer bool
 	if deviceType == genesiscommon.DEVICE_TYPE_DOCKER_HOST {
 		isContainer = true
 	}
 	epoch := time.Now()
-	VIFs := []genesismodel.GenesisVinterface{}
+	VIFs := []model.GenesisVinterface{}
 	parsedGlobalIPs, err := genesiscommon.ParseIPOutput(info.GetRawIpAddrs()[0])
 	if err != nil {
 		log.Errorf("parse ip output error: (%s)", err)
@@ -97,7 +96,7 @@ func (v *VinterfacesRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 		}
 		ifIDToInterface[uint32(item.Index)] = item
 		ifNameToInterface[item.Name] = item
-		vIF := genesismodel.GenesisVinterface{
+		vIF := model.GenesisVinterface{
 			Name:    item.Name,
 			Mac:     item.MAC,
 			TapName: item.Name,
@@ -142,7 +141,7 @@ func (v *VinterfacesRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 		deviceIDToUUID[key] = common.GetUUID(key+fmt.Sprintf("%d", value), uuid.Nil)
 	}
 	for _, iface := range info.Interfaces {
-		vIF := genesismodel.GenesisVinterface{
+		vIF := model.GenesisVinterface{
 			Name: iface.GetName(),
 			Mac:  genesiscommon.Uint64ToMac(iface.GetMac()).String(),
 		}

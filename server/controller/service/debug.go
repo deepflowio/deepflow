@@ -7,8 +7,8 @@ import (
 	cloudmodel "server/controller/cloud/model"
 	"server/controller/common"
 	"server/controller/genesis"
-	genesismodel "server/controller/genesis/model"
 	"server/controller/manager"
+	"server/controller/model"
 	"server/controller/recorder/cache"
 )
 
@@ -105,10 +105,46 @@ func GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field string, m *m
 	}
 }
 
-func GetGenesisVinterfacesData(g *genesis.Genesis) ([]genesismodel.GenesisVinterface, error) {
+func GetGenesisVinterfacesData(g *genesis.Genesis) ([]model.GenesisVinterface, error) {
 	return g.GetVinterfacesData(), nil
 }
 
 func GetGenesisKubernetesData(g *genesis.Genesis) (map[string]genesis.KubernetesResponse, error) {
 	return g.GetKubernetesData(), nil
+}
+
+func GetGenesisIPsData(g *genesis.Genesis) ([]cloudmodel.IP, error) {
+	return g.GetIPsData(), nil
+}
+
+func GetGenesisSubnetsData(g *genesis.Genesis) ([]cloudmodel.Subnet, error) {
+	return g.GetSubnetsData(), nil
+}
+
+func GetGenesisVMsData(g *genesis.Genesis) ([]model.GenesisVM, error) {
+	return g.GetVMsData(), nil
+}
+
+func GetGenesisVPCsData(g *genesis.Genesis) ([]model.GenesisVpc, error) {
+	return g.GetVPCsData(), nil
+}
+
+func GetGenesisHostsData(g *genesis.Genesis) ([]model.GenesisHost, error) {
+	return g.GetHostsData(), nil
+}
+
+func GetGenesisLldpsData(g *genesis.Genesis) ([]model.GenesisLldp, error) {
+	return g.GetLldpsData(), nil
+}
+
+func GetGenesisPortsData(g *genesis.Genesis) ([]model.GenesisPort, error) {
+	return g.GetPortsData(), nil
+}
+
+func GetGenesisNetworksData(g *genesis.Genesis) ([]model.GenesisNetwork, error) {
+	return g.GetNetworksData(), nil
+}
+
+func GetGenesisIPLastSeensData(g *genesis.Genesis) ([]model.GenesisIP, error) {
+	return g.GetIPLastSeensData(), nil
 }

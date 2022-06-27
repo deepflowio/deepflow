@@ -3,7 +3,7 @@ package genesis
 import (
 	"reflect"
 	cloudmodel "server/controller/cloud/model"
-	"server/controller/genesis/model"
+	"server/controller/model"
 	"sync"
 	"time"
 

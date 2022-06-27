@@ -9,7 +9,7 @@ import (
 	"server/libs/queue"
 
 	"server/controller/genesis/config"
-	"server/controller/genesis/model"
+	"server/controller/model"
 )
 
 var log = logging.MustGetLogger("genesis")
