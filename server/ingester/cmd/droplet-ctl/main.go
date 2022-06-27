@@ -47,8 +47,8 @@ func main() {
 	}
 
 	cfg := config.Load(dropletctl.ConfigPath)
-	controllers := make([]net.IP, len(cfg.ControllerIps))
-	for i, ipString := range cfg.ControllerIps {
+	controllers := make([]net.IP, len(cfg.ControllerIPs))
+	for i, ipString := range cfg.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)
 		if controllers[i].To4() != nil {
 			controllers[i] = controllers[i].To4()

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/metaflowys/metaflow/server/ingester/common"
 	"github.com/metaflowys/metaflow/server/libs/ckdb"
 	"github.com/metaflowys/metaflow/server/libs/queue"
 	"github.com/metaflowys/metaflow/server/libs/stats"
@@ -181,7 +182,7 @@ func (w *CKWriter) Put(items ...interface{}) {
 }
 
 func (w *CKWriter) queueProcess(queueID int) {
-	stats.RegisterCountable("ckwriter_"+w.counterName, &(w.counters[queueID]), stats.OptionStatTags{"thread": strconv.Itoa(queueID), "table": w.name})
+	common.RegisterCountableForIngester("ckwriter_"+w.counterName, &(w.counters[queueID]), stats.OptionStatTags{"thread": strconv.Itoa(queueID), "table": w.name})
 	defer w.wg.Done()
 	w.wg.Add(1)
 

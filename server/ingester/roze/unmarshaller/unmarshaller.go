@@ -8,6 +8,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	"github.com/metaflowys/metaflow/server/ingester/common"
 	"github.com/metaflowys/metaflow/server/ingester/roze/dbwriter"
 	"github.com/metaflowys/metaflow/server/libs/app"
 	"github.com/metaflowys/metaflow/server/libs/codec"
@@ -187,7 +188,7 @@ func decodeForDebug(b []byte) (BatchDocument, error) {
 }
 
 func (u *Unmarshaller) QueueProcess() {
-	stats.RegisterCountable("unmarshaller", u, stats.OptionStatTags{"thread": strconv.Itoa(u.index)})
+	common.RegisterCountableForIngester("unmarshaller", u, stats.OptionStatTags{"thread": strconv.Itoa(u.index)})
 	rawDocs := make([]interface{}, GET_MAX_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	pbDoc := pb.NewDocument()

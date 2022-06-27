@@ -7,14 +7,13 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 	"github.com/metaflowys/metaflow/server/libs/debug"
 	"github.com/metaflowys/metaflow/server/libs/pool"
 	"github.com/metaflowys/metaflow/server/libs/queue"
 	"github.com/metaflowys/metaflow/server/libs/receiver"
-	"github.com/metaflowys/metaflow/server/libs/stats"
 	"github.com/metaflowys/metaflow/server/libs/utils"
-
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 )
 
 const (
@@ -98,7 +97,7 @@ func NewTridentAdapter(in queue.QueueReader, queues []queue.QueueWriter, cacheSi
 	}
 	adapter.command.init(adapter)
 	adapter.decoder = newDecoder(in, uint64(cacheSize), adapter.slaves)
-	stats.RegisterCountable("trident-adapter", adapter)
+	common.RegisterCountableForIngester("trident-adapter", adapter)
 	debug.Register(dropletctl.DROPLETCTL_ADAPTER, adapter)
 	return adapter
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/metaflowys/metaflow/server/libs/datatype"
 	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	logging "github.com/op/go-logging"
@@ -26,6 +27,10 @@ func NewCKConnection(addr, username, password string) (*sql.DB, error) {
 		return nil, err
 	}
 	return connect, nil
+}
+
+func RegisterCountableForIngester(module string, countable stats.Countable, opts ...stats.Option) error {
+	return stats.RegisterCountableWithMoudlePrefix("ingester.", module, countable, opts)
 }
 
 // 如果通过MAC匹配平台信息失败，则需要通过IP再获取, 解决工单122/126问题

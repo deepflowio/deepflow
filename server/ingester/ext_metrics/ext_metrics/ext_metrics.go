@@ -40,8 +40,8 @@ type Metricsor struct {
 
 func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics, error) {
 	manager := dropletqueue.NewManager(dropletctl.DROPLETCTL_EXTMETRICS_QUEUE)
-	controllers := make([]net.IP, len(config.ControllerIPs))
-	for i, ipString := range config.ControllerIPs {
+	controllers := make([]net.IP, len(config.Base.ControllerIPs))
+	for i, ipString := range config.Base.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)
 		if controllers[i].To4() != nil {
 			controllers[i] = controllers[i].To4()
@@ -71,7 +71,7 @@ func NewMetricsor(msgType datatype.MessageType, config *config.Config, controlle
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i), "", nil)
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		if i == 0 {
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
 		}

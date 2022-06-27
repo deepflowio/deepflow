@@ -19,20 +19,25 @@ import (
 func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []interface{} {
 	ret := []interface{}{}
 	for _, resourceSpan := range l.GetResourceSpans() {
+		var resAttributes []*v11.KeyValue
+		resource := resourceSpan.GetResource()
+		if resource != nil {
+			resAttributes = resource.Attributes
+		}
 		for _, scopeSpan := range resourceSpan.GetScopeSpans() {
 			for _, span := range scopeSpan.GetSpans() {
-				ret = append(ret, spanToL7Logger(vtapID, span, shardID, platformData))
+				ret = append(ret, spanToL7Logger(vtapID, span, resAttributes, shardID, platformData))
 			}
 		}
 	}
 	return ret
 }
 
-func spanToL7Logger(vtapID uint16, span *v1.Span, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireL7Logger()
 	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7LogCounter, shardID)
 	h.VtapID = vtapID
-	h.FillOTel(span, platformData)
+	h.FillOTel(span, resAttributes, platformData)
 	return h
 }
 
@@ -88,10 +93,10 @@ func getValueString(value *v11.AnyValue) string {
 	}
 }
 
-func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
+func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue) {
 	h.IsIPv4 = true
-	tagNames, tagValues := []string{}, []string{}
-	for _, attr := range attributes {
+	attributeNames, attributeValues := []string{}, []string{}
+	for i, attr := range append(spanAttributes, resAttributes...) {
 		key := attr.GetKey()
 		value := attr.GetValue()
 		if value == nil {
@@ -99,8 +104,12 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 		}
 
 		// FIXME 不同类型都按string存储，后续不同类型存储应分开, 参考: https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto#L31
-		tagNames = append(tagNames, key)
-		tagValues = append(tagValues, getValueString(value))
+		attributeNames = append(attributeNames, key)
+		attributeValues = append(attributeValues, getValueString(value))
+
+		if i >= len(spanAttributes) {
+			continue
+		}
 
 		switch key {
 		case "net.transport":
@@ -159,6 +168,7 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 			// nothing
 		}
 	}
+
 	if len(h.L7ProtocolStr) > 0 {
 		if strings.Contains(strings.ToLower(h.L7ProtocolStr), "http") {
 			if strings.HasPrefix(h.Version, "2") {
@@ -176,11 +186,11 @@ func (h *L7Logger) fillAttributes(attributes []*v11.KeyValue) {
 		}
 	}
 
-	h.TagNames = tagNames
-	h.TagValues = tagValues
+	h.AttributeNames = attributeNames
+	h.AttributeValues = attributeValues
 }
 
-func (h *L7Logger) FillOTel(l *v1.Span, platformData *grpc.PlatformInfoTable) {
+func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) {
 	h.Type = uint8(datatype.MSG_T_SESSION)
 	h.TapPortType = datatype.TAPPORT_FROM_OTEL
 	h.TraceId = hex.EncodeToString(l.TraceId)
@@ -194,7 +204,7 @@ func (h *L7Logger) FillOTel(l *v1.Span, platformData *grpc.PlatformInfoTable) {
 		h.ResponseDuration = uint64(h.L7Base.EndTime - h.StartTime)
 	}
 
-	h.fillAttributes(l.GetAttributes())
+	h.fillAttributes(l.GetAttributes(), resAttributes)
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {
 		h.ResponseStatus = httpCodeToResponseStatus(h.responseCode)

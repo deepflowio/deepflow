@@ -262,8 +262,8 @@ type L7Logger struct {
 	SqlAffectedRows  *uint64
 	sqlAffectedRows  uint64
 
-	TagNames  []string
-	TagValues []string
+	AttributeNames  []string
+	AttributeValues []string
 }
 
 func L7LoggerColumns() []*ckdb.Column {
@@ -297,8 +297,8 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
 		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
-		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("额外的tag"),
-		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("额外的tag对应的值"),
+		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
+		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
 	)
 	return l7Columns
 }
@@ -386,10 +386,10 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 
-	if err := block.WriteArrayString(h.TagNames); err != nil {
+	if err := block.WriteArrayString(h.AttributeNames); err != nil {
 		return err
 	}
-	if err := block.WriteArrayString(h.TagValues); err != nil {
+	if err := block.WriteArrayString(h.AttributeValues); err != nil {
 		return err
 	}
 
