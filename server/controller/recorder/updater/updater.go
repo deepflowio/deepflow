@@ -1,9 +1,9 @@
 package updater
 
 import (
-	"server/controller/recorder/cache"
-	"server/controller/recorder/constraint"
-	"server/controller/recorder/db"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
+	"github.com/metaflowys/metaflow/server/controller/recorder/constraint"
+	"github.com/metaflowys/metaflow/server/controller/recorder/db"
 )
 
 // ResourceUpdater 实现资源进行新旧数据比对，并根据比对结果增删改资源

@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"server/controller/model"
-	"server/controller/service"
+	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/service"
 )
 
 func VTapGroupConfigRouter(e *gin.Engine) {

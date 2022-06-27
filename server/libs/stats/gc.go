@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"time"
 
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type GcMonitor struct {

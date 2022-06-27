@@ -13,13 +13,14 @@ import (
 
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/policy"
-	. "server/libs/utils"
 
-	"server/ingester/dropletctl"
-	"server/ingester/dropletctl/rpc"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/policy"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl/rpc"
 )
 
 type command struct {

@@ -5,7 +5,7 @@ import (
 	"math"
 	"net"
 
-	"server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/codec"
 )
 
 var (

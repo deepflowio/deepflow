@@ -9,11 +9,11 @@ import (
 	api "github.com/metaflowys/metaflow/message/trident"
 	context "golang.org/x/net/context"
 
-	. "server/controller/common"
-	"server/controller/trisolaris"
-	. "server/controller/trisolaris/common"
-	"server/controller/trisolaris/pushmanager"
-	"server/controller/trisolaris/vtap"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/vtap"
 )
 
 var (

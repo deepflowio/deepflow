@@ -6,9 +6,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/metaflowys/metaflow/message/trident"
 
-	. "server/controller/common"
-	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 )
 
 type TSDBDiscovery struct {

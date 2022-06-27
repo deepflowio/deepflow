@@ -12,12 +12,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/metaflowys/metaflow/message/trident"
 
-	. "server/controller/common"
-	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
-	"server/controller/trisolaris/metadata"
-	. "server/controller/trisolaris/utils"
-	"server/controller/trisolaris/utils/atomicbool"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 type VTapConfig struct {

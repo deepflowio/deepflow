@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"server/controller/cloud/kubernetes_gather"
-	kubernetes_gather_model "server/controller/cloud/kubernetes_gather/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather"
+	kubernetes_gather_model "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 type KubernetesGatherTask struct {

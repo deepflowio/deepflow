@@ -2,10 +2,6 @@ package kubernetes_gather
 
 import (
 	"regexp"
-	cloudcommon "server/controller/cloud/common"
-	"server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/genesis"
 	"sort"
 	"strings"
 
@@ -13,6 +9,11 @@ import (
 	"github.com/mikioh/ipaddr"
 	uuid "github.com/satori/go.uuid"
 	"inet.af/netaddr"
+
+	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
 )
 
 func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []model.Subnet, nodeVInterfaces, podVInterfaces []model.VInterface, nodeIPs, podIPs []model.IP, err error) {

@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"server/libs/datatype"
-	"server/libs/hmap/idmap"
-	"server/libs/logger"
-	"server/libs/policy"
-	api "server/libs/reciter-api"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/hmap/idmap"
+	"github.com/metaflowys/metaflow/server/libs/logger"
+	"github.com/metaflowys/metaflow/server/libs/policy"
+	api "github.com/metaflowys/metaflow/server/libs/reciter-api"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

@@ -4,13 +4,13 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	"server/controller/trisolaris/config"
-	"server/controller/trisolaris/metadata"
-	"server/controller/trisolaris/node"
-	grpcserver "server/controller/trisolaris/server/grpc"
-	httpserver "server/controller/trisolaris/server/http"
-	"server/controller/trisolaris/utils"
-	"server/controller/trisolaris/vtap"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/node"
+	grpcserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/grpc"
+	httpserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/vtap"
 )
 
 var log = logging.MustGetLogger("trisolaris")

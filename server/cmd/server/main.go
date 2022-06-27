@@ -10,9 +10,9 @@ import (
 	"sync"
 	"syscall"
 
-	"server/controller/controller"
-	"server/ingester/ingester"
-	"server/querier/querier"
+	"github.com/metaflowys/metaflow/server/controller/controller"
+	"github.com/metaflowys/metaflow/server/ingester/ingester"
+	"github.com/metaflowys/metaflow/server/querier/querier"
 
 	logging "github.com/op/go-logging"
 )

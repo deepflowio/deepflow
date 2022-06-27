@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"server/controller/db/mysql"
-	"server/controller/db/redis"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/db/redis"
 )
 
 type ChIPResource struct {

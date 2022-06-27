@@ -3,9 +3,9 @@ package adapter
 import (
 	"strconv"
 
-	"server/libs/datatype"
-	"server/libs/queue"
-	"server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 )
 
 type slave struct {

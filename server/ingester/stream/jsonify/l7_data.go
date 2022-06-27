@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"time"
 
-	"server/libs/ckdb"
-	"server/libs/datatype"
-	"server/libs/datatype/pb"
-	"server/libs/grpc"
-	"server/libs/pool"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 
 	"github.com/google/gopacket/layers"
 	logging "github.com/op/go-logging"

@@ -1,8 +1,8 @@
 package db
 
 import (
-	"server/controller/db/mysql"
-	"server/controller/recorder/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/common"
 )
 
 type RoutingTable struct {

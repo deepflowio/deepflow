@@ -12,12 +12,12 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
-	"server/controller/trisolaris/config"
-	"server/controller/trisolaris/dbmgr"
-	"server/controller/trisolaris/metadata"
-	"server/controller/trisolaris/pushmanager"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
 )
 
 var log = logging.MustGetLogger("trisolaris/node")

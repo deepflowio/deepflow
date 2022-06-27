@@ -14,9 +14,10 @@ import (
 
 	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/queue"
+
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("queue_manager")

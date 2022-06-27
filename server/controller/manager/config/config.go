@@ -1,8 +1,8 @@
 package config
 
 import (
-	cloudconfig "server/controller/cloud/config"
-	recorderconfig "server/controller/recorder/config"
+	cloudconfig "github.com/metaflowys/metaflow/server/controller/cloud/config"
+	recorderconfig "github.com/metaflowys/metaflow/server/controller/recorder/config"
 )
 
 type TaskConfig struct {

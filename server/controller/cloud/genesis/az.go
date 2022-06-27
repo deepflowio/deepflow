@@ -1,8 +1,8 @@
 package genesis
 
 import (
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 
 	uuid "github.com/satori/go.uuid"
 )

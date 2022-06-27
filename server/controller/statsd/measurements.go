@@ -2,9 +2,10 @@ package statsd
 
 import (
 	"reflect"
-	k8sgathermodel "server/controller/cloud/kubernetes_gather/model"
-	"server/controller/cloud/model"
-	"server/controller/common"
+
+	k8sgathermodel "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 const (

@@ -1,12 +1,14 @@
 package statsd
 
 import (
-	"github.com/cactus/go-statsd-client/v5/statsd"
 	"net"
-	"server/controller/common"
-	"server/controller/statsd/config"
 	"sort"
 	"time"
+
+	"github.com/cactus/go-statsd-client/v5/statsd"
+
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/statsd/config"
 )
 
 var MetaStatsd *StatsdMonitor

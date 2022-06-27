@@ -5,8 +5,9 @@ import (
 	"sort"
 
 	logging "github.com/op/go-logging"
-	. "server/libs/datatype"
-	. "server/libs/utils"
+
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type SortedAcls []*Acl

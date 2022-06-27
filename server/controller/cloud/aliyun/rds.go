@@ -2,8 +2,8 @@ package aliyun
 
 import (
 	rds "github.com/aliyun/alibaba-cloud-sdk-go/services/rds"
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (a *Aliyun) getRDSInstances(region model.Region) (

@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"server/libs/ckdb"
-	"server/libs/datatype"
-	"server/libs/pool"
-	"server/libs/utils"
-	"server/libs/zerodoc/pb"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc/pb"
 
 	"github.com/google/gopacket/layers"
 )

@@ -6,7 +6,7 @@ import (
 	"encoding/gob"
 	"net"
 
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type IP struct {

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var (

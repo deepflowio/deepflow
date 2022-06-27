@@ -8,21 +8,20 @@ import (
 	"strconv"
 
 	"github.com/influxdata/influxdb/models"
-	"server/libs/zerodoc"
-
 	logging "github.com/op/go-logging"
-
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
-	"server/ingester/ext_metrics/dbwriter"
-	"server/libs/codec"
-	"server/libs/datatype"
-	"server/libs/grpc"
-	"server/libs/queue"
-	"server/libs/receiver"
-	"server/libs/stats"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/dbwriter"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("ext_metrics.decoder")

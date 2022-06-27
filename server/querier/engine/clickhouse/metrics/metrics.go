@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	ckcommon "server/querier/engine/clickhouse/common"
+	ckcommon "github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
 
 	logging "github.com/op/go-logging"
 )

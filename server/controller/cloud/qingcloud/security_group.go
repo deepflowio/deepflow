@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (q *QingCloud) GetSecurityGroups() ([]model.SecurityGroup, []model.SecurityGroupRule, error) {

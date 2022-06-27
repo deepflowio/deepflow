@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/monitor/config"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/monitor/config"
 )
 
 var VTAP_LICENSE_TYPE_DEFAULT = common.VTAP_LICENSE_TYPE_C

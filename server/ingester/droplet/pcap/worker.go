@@ -9,9 +9,10 @@ import (
 	"unsafe"
 
 	"github.com/op/go-logging"
-	"server/libs/datatype"
-	"server/libs/queue"
-	"server/libs/zerodoc"
+
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 const (

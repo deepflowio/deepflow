@@ -1,8 +1,8 @@
 package querier
 
 import (
-	"server/querier/common"
-	"server/querier/engine/clickhouse"
+	"github.com/metaflowys/metaflow/server/querier/common"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse"
 )
 
 /*

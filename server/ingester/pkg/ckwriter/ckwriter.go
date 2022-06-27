@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"server/libs/ckdb"
-	"server/libs/queue"
-	"server/libs/stats"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	logging "github.com/op/go-logging"

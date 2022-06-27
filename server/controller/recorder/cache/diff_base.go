@@ -3,9 +3,9 @@ package cache
 import (
 	"time"
 
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/db/mysql"
-	"server/controller/recorder/common"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/common"
 )
 
 // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源

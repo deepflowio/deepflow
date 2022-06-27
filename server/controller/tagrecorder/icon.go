@@ -3,8 +3,8 @@ package tagrecorder
 import (
 	"errors"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 type IconData struct {

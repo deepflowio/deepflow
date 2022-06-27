@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"server/querier/engine/clickhouse/view"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
 )
 
 type Function struct {

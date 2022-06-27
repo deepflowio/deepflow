@@ -5,11 +5,11 @@ import (
 	"sync/atomic"
 
 	"github.com/op/go-logging"
-	cloudmodel "server/controller/cloud/model"
-	"server/libs/queue"
 
-	"server/controller/genesis/config"
-	"server/controller/model"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/genesis/config"
+	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("genesis")

@@ -7,9 +7,9 @@ import (
 	"github.com/metaflowys/metaflow/message/trident"
 	logging "github.com/op/go-logging"
 
-	"server/libs/datatype"
-	"server/libs/policy"
-	. "server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/policy"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("dropletpb")

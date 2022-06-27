@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"server/libs/datatype/pb"
-	"server/libs/pool"
-	. "server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type CloseType uint8

@@ -10,10 +10,10 @@ import (
 	"github.com/metaflowys/metaflow/message/trident"
 	"gorm.io/gorm"
 
-	. "server/controller/common"
-	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
-	. "server/controller/trisolaris/utils"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
 
 type PlatformDataOP struct {

@@ -6,9 +6,9 @@ import (
 
 	"gorm.io/gorm"
 
-	models "server/controller/db/mysql"
-	"server/controller/trisolaris/dbmgr"
-	. "server/controller/trisolaris/utils"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
 
 type CacheKC struct {

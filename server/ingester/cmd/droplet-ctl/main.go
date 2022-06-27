@@ -10,19 +10,20 @@ import (
 	"unicode"
 
 	"github.com/spf13/cobra"
-	"server/ingester/droplet/adapter"
-	"server/libs/debug"
-	"server/libs/grpc"
-	"server/libs/receiver"
 
-	"server/ingester/config"
-	"server/ingester/droplet/labeler"
-	"server/ingester/droplet/profiler"
-	"server/ingester/droplet/queue"
-	"server/ingester/dropletctl"
-	"server/ingester/dropletctl/rpc"
-	"server/ingester/roze/roze"
-	"server/ingester/stream/stream"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/adapter"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+
+	"github.com/metaflowys/metaflow/server/ingester/config"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/labeler"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/profiler"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/queue"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl/rpc"
+	"github.com/metaflowys/metaflow/server/ingester/roze/roze"
+	"github.com/metaflowys/metaflow/server/ingester/stream/stream"
 )
 
 func main() {

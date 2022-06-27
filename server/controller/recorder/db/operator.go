@@ -3,9 +3,9 @@ package db
 import (
 	"github.com/op/go-logging"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/recorder/constraint"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/constraint"
 )
 
 var log = logging.MustGetLogger("recorder.db")

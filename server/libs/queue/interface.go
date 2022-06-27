@@ -3,7 +3,7 @@ package queue
 import (
 	"time"
 
-	"server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 )
 
 const MAX_QUEUE_COUNT = 16

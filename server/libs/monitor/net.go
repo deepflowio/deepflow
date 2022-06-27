@@ -5,8 +5,8 @@ import (
 
 	"github.com/shirou/gopsutil/net"
 
-	"server/libs/stats"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var (

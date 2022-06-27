@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"server/libs/stats"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var OverflowError = errors.New("Requested size is larger than capacity")

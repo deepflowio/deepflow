@@ -16,11 +16,11 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	cloudcommon "server/controller/cloud/common"
-	"server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/statsd"
+	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud.qingcloud")

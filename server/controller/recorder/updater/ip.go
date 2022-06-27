@@ -1,10 +1,10 @@
 package updater
 
 import (
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/recorder/cache"
-	rcommon "server/controller/recorder/common"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
+	rcommon "github.com/metaflowys/metaflow/server/controller/recorder/common"
 )
 
 type IP struct {

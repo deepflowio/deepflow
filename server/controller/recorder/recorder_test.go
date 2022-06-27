@@ -10,11 +10,11 @@ import (
 
 	"github.com/google/uuid"
 
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/db/mysql"
-	rcommon "server/controller/recorder/common"
-	"server/controller/recorder/config"
-	"server/controller/recorder/test"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	rcommon "github.com/metaflowys/metaflow/server/controller/recorder/common"
+	"github.com/metaflowys/metaflow/server/controller/recorder/config"
+	"github.com/metaflowys/metaflow/server/controller/recorder/test"
 )
 
 const (

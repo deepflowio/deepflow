@@ -3,8 +3,8 @@ package tagrecorder
 import (
 	"strings"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 // 以VPCID和IP为key，获取IP关联的NAT网关、负载均衡、负载均衡监听器、容器Ingress和容器服务数据

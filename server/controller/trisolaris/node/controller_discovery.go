@@ -4,11 +4,11 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 
-	. "server/controller/common"
-	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 )
 
 type ControllerDiscovery struct {

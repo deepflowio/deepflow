@@ -2,10 +2,11 @@ package router
 
 import (
 	"net/http"
-	"server/querier/common"
-	"server/querier/service"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/metaflowys/metaflow/server/querier/common"
+	"github.com/metaflowys/metaflow/server/querier/service"
 )
 
 type Response struct {

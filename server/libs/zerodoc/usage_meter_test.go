@@ -1,8 +1,8 @@
 package zerodoc
 
 import (
-	"server/libs/codec"
-	"server/libs/zerodoc/pb"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc/pb"
 
 	"testing"
 )

@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"encoding/json"
-	"server/querier/engine/clickhouse/view"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
 )
 
 // 指标量类型

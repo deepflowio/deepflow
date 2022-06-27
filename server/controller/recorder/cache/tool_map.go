@@ -1,9 +1,9 @@
 package cache
 
 import (
-	"server/controller/common"
-	"server/controller/db/mysql"
-	rcommon "server/controller/recorder/common"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	rcommon "github.com/metaflowys/metaflow/server/controller/recorder/common"
 )
 
 // 各类资源的映射关系，用于刷新资源时，转换所需数据

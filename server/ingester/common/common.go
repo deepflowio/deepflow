@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
-	"server/libs/datatype"
-	"server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	logging "github.com/op/go-logging"

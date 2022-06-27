@@ -20,10 +20,10 @@ import (
 	"github.com/mikioh/ipaddr"
 	logging "github.com/op/go-logging"
 
-	"server/controller/cloud/config"
-	"server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/cloud/config"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud.common")

@@ -2,8 +2,9 @@ package datatype
 
 import (
 	"reflect"
-	"server/libs/codec"
 	"testing"
+
+	"github.com/metaflowys/metaflow/server/libs/codec"
 )
 
 func TestTagEncodeAndDecode(t *testing.T) {

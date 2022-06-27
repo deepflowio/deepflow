@@ -1,8 +1,8 @@
 package qingcloud
 
 import (
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.FloatingIP, error) {

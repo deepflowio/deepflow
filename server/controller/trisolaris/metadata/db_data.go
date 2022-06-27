@@ -3,9 +3,9 @@ package metadata
 import (
 	"gorm.io/gorm"
 
-	. "server/controller/common"
-	models "server/controller/db/mysql"
-	dbmgr "server/controller/trisolaris/dbmgr"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	dbmgr "github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
 )
 
 type DBDataCache struct {

@@ -4,7 +4,7 @@ package recorder
 import (
 	"reflect"
 
-	"server/controller/recorder/cache"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
 )
 
 func (r *Recorder) GetCache(domainLcuuid, subDomainLcuuid string) cache.Cache {

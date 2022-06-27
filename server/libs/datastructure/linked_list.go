@@ -2,7 +2,7 @@
 package datastructure
 
 import (
-	"server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 var elementPool = pool.NewLockFreePool(func() interface{} {

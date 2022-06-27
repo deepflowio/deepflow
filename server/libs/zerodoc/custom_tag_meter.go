@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"sort"
 
-	"server/libs/codec"
-	"server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 type CustomTagMeterMeta struct {

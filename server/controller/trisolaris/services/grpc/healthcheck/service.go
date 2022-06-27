@@ -5,7 +5,7 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
-	grpcserver "server/controller/trisolaris/server/grpc"
+	grpcserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/grpc"
 )
 
 type service struct {

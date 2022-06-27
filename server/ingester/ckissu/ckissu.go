@@ -9,10 +9,10 @@ import (
 
 	"database/sql"
 
-	"server/ingester/common"
-	"server/ingester/datasource"
-	"server/libs/ckdb"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/datasource"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("issu")
