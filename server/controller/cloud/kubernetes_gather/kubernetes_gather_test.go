@@ -9,7 +9,7 @@ import (
 	"server/controller/db/mysql"
 	"server/controller/genesis"
 	"server/controller/genesis/config"
-	genesismodel "server/controller/genesis/model"
+	"server/controller/model"
 	"testing"
 
 	"github.com/agiledragon/gomonkey/v2"
@@ -67,15 +67,15 @@ func TestKubernetes(t *testing.T) {
 
 		g := genesis.NewGenesis(config.GenesisConfig{})
 		type VDataResp struct {
-			Desc   string                           `json:"DESCRIPTION"`
-			Status string                           `json:"OPT_STATUS"`
-			Type   string                           `json:"TYPE"`
-			Data   []genesismodel.GenesisVinterface `json:"DATA"`
+			Desc   string                    `json:"DESCRIPTION"`
+			Status string                    `json:"OPT_STATUS"`
+			Type   string                    `json:"TYPE"`
+			Data   []model.GenesisVinterface `json:"DATA"`
 		}
 		vJsonData, _ := ioutil.ReadFile("./testfiles/vinterfaces.json")
 		var vData VDataResp
 		json.Unmarshal(vJsonData, &vData)
-		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetVinterfacesData", func(_ *genesis.Genesis) []genesismodel.GenesisVinterface {
+		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetVinterfacesData", func(_ *genesis.Genesis) []model.GenesisVinterface {
 			return vData.Data
 		})
 		defer vinterfacesInfoPatch.Reset()

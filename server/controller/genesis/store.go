@@ -8,7 +8,7 @@ import (
 	"server/controller/common"
 	"server/controller/db/mysql"
 	genesiscommon "server/controller/genesis/common"
-	"server/controller/genesis/model"
+	"server/controller/model"
 	"sync"
 	"time"
 
