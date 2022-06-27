@@ -146,4 +146,5 @@ func Start(configPath string) {
 		log.Errorf("startup service failed, err:%v\n", err)
 		os.Exit(0)
 	}
+
 }
