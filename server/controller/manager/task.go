@@ -4,16 +4,16 @@ import (
 	"context"
 	"time"
 
-	"server/controller/cloud"
-	"server/controller/cloud/aliyun"
-	"server/controller/cloud/baidubce"
-	"server/controller/cloud/genesis"
-	"server/controller/cloud/kubernetes"
-	"server/controller/cloud/qingcloud"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/manager/config"
-	"server/controller/recorder"
+	"github.com/metaflowys/metaflow/server/controller/cloud"
+	"github.com/metaflowys/metaflow/server/controller/cloud/aliyun"
+	"github.com/metaflowys/metaflow/server/controller/cloud/baidubce"
+	"github.com/metaflowys/metaflow/server/controller/cloud/genesis"
+	"github.com/metaflowys/metaflow/server/controller/cloud/kubernetes"
+	"github.com/metaflowys/metaflow/server/controller/cloud/qingcloud"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/manager/config"
+	"github.com/metaflowys/metaflow/server/controller/recorder"
 )
 
 type Task struct {

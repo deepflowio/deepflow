@@ -4,18 +4,19 @@ import (
 	"bytes"
 	"compress/zlib"
 	"context"
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	genesiscommon "server/controller/genesis/common"
-	"server/controller/model"
 	"sync"
 	"time"
 
 	"github.com/deckarep/golang-set"
 	uuid "github.com/satori/go.uuid"
 	"inet.af/netaddr"
-	"server/controller/genesis/config"
+
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	genesiscommon "github.com/metaflowys/metaflow/server/controller/genesis/common"
+	"github.com/metaflowys/metaflow/server/controller/genesis/config"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 type VinterfacesStorage struct {

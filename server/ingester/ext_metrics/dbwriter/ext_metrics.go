@@ -1,9 +1,9 @@
 package dbwriter
 
 import (
-	"server/libs/ckdb"
-	"server/libs/pool"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 type ExtMetrics struct {

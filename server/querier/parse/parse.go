@@ -2,7 +2,8 @@ package parse
 
 import (
 	"github.com/xwb1989/sqlparser"
-	"server/querier/engine"
+
+	"github.com/metaflowys/metaflow/server/querier/engine"
 )
 
 type Parser struct {

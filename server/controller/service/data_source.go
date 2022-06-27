@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/controller/common"
-	"server/controller/config"
-	"server/controller/db/mysql"
-	"server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/config"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 var DEFAULT_DATA_SOURCE_NAMES = []string{"1s", "1m", "flow_log.l4", "flow_log.l7"}

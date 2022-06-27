@@ -8,9 +8,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 
-	"server/controller/common"
-	"server/controller/db/clickhouse"
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/clickhouse"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 func (c *TagRecorder) UpdateChDictionary() {

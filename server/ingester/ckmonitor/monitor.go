@@ -9,8 +9,8 @@ import (
 
 	"database/sql"
 
-	"server/ingester/common"
-	"server/ingester/config"
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/config"
 )
 
 var log = logging.MustGetLogger("monitor")

@@ -2,7 +2,7 @@ package view
 
 import (
 	"bytes"
-	"server/querier/common"
+	"github.com/metaflowys/metaflow/server/querier/common"
 	"strings"
 	"time"
 )

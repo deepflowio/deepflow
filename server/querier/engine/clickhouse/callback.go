@@ -4,10 +4,10 @@ import (
 	"strconv"
 	"strings"
 
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 
-	"server/querier/engine/clickhouse/tag"
-	"server/querier/engine/clickhouse/view"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/tag"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
 )
 
 type Callback struct {

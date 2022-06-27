@@ -5,9 +5,9 @@ import (
 	"strings"
 
 	logging "github.com/op/go-logging"
-	"server/libs/logger"
 
-	"server/querier/querier"
+	"github.com/metaflowys/metaflow/server/libs/logger"
+	"github.com/metaflowys/metaflow/server/querier/querier"
 )
 
 func execName() string {

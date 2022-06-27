@@ -4,7 +4,7 @@ import (
 	"io"
 	"net"
 
-	"server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
 )
 
 const (

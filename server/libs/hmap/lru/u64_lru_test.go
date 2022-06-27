@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"server/libs/hmap"
-	oldlru "server/libs/lru"
+	"github.com/metaflowys/metaflow/server/libs/hmap"
+	oldlru "github.com/metaflowys/metaflow/server/libs/lru"
 )
 
 func TestU64LRU(t *testing.T) {

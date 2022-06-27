@@ -9,8 +9,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	api "github.com/metaflowys/metaflow/message/trident"
 
-	"server/controller/trisolaris"
-	. "server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 )
 
 type UpgradeEvent struct{}

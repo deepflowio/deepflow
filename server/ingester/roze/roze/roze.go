@@ -7,17 +7,17 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/grpc"
-	libqueue "server/libs/queue"
-	"server/libs/receiver"
 
-	"server/ingester/droplet/queue"
-	"server/ingester/dropletctl"
-	"server/ingester/roze/config"
-	"server/ingester/roze/dbwriter"
-	"server/ingester/roze/unmarshaller"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/queue"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/roze/config"
+	"github.com/metaflowys/metaflow/server/ingester/roze/dbwriter"
+	"github.com/metaflowys/metaflow/server/ingester/roze/unmarshaller"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	libqueue "github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 )
 
 const (

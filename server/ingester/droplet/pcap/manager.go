@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"server/libs/queue"
-	"server/libs/stats"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 var (

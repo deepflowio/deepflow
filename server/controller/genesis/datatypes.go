@@ -2,12 +2,12 @@ package genesis
 
 import (
 	"reflect"
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/model"
 	"sync"
 	"time"
 
 	"github.com/metaflowys/metaflow/message/trident"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 type VIFRPCMessage struct {

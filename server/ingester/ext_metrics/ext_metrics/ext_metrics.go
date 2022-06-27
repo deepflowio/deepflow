@@ -7,17 +7,18 @@ import (
 
 	_ "golang.org/x/net/context"
 	_ "google.golang.org/grpc"
-	dropletqueue "server/ingester/droplet/queue"
-	"server/ingester/dropletctl"
-	"server/ingester/ext_metrics/config"
-	"server/ingester/ext_metrics/dbwriter"
-	"server/ingester/ext_metrics/decoder"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/grpc"
-	"server/libs/queue"
-	libqueue "server/libs/queue"
-	"server/libs/receiver"
+
+	dropletqueue "github.com/metaflowys/metaflow/server/ingester/droplet/queue"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/dbwriter"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/decoder"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	libqueue "github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 )
 
 const (

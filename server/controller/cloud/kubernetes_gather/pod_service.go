@@ -1,9 +1,9 @@
 package kubernetes_gather
 
 import (
-	cloudcommon "server/controller/cloud/common"
-	"server/controller/cloud/model"
-	"server/controller/common"
+	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 	"strconv"
 	"strings"
 

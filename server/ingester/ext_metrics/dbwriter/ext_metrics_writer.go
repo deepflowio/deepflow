@@ -5,12 +5,13 @@ import (
 	"fmt"
 
 	logging "github.com/op/go-logging"
-	"server/ingester/common"
-	"server/ingester/ext_metrics/config"
-	"server/ingester/pkg/ckwriter"
-	"server/libs/ckdb"
-	"server/libs/stats"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
+	"github.com/metaflowys/metaflow/server/ingester/pkg/ckwriter"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("ext_metrics.dbwriter")

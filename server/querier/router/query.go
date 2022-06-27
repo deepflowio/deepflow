@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 	// "github.com/k0kubun/pp"
 	//logging "github.com/op/go-logging"
-	"server/querier/service"
+	"github.com/metaflowys/metaflow/server/querier/service"
 )
 
 func QueryRouter(e *gin.Engine) {

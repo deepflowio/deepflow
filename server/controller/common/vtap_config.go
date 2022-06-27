@@ -1,7 +1,7 @@
 package common
 
 import (
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{

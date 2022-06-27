@@ -17,8 +17,9 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/afpacket"
 	logging "github.com/op/go-logging"
-	. "server/libs/logger"
-	. "server/libs/xdppacket/cmd/common"
+
+	. "github.com/metaflowys/metaflow/server/libs/logger"
+	. "github.com/metaflowys/metaflow/server/libs/xdppacket/cmd/common"
 )
 
 const (

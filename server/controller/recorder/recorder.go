@@ -8,12 +8,12 @@ import (
 
 	"github.com/op/go-logging"
 
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/recorder/cache"
-	"server/controller/recorder/config"
-	"server/controller/recorder/updater"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
+	"github.com/metaflowys/metaflow/server/controller/recorder/config"
+	"github.com/metaflowys/metaflow/server/controller/recorder/updater"
 )
 
 var log = logging.MustGetLogger("recorder")

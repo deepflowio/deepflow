@@ -8,7 +8,7 @@ import (
 	. "github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
 
-	"server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 )
 
 var log = logging.MustGetLogger("dedup")

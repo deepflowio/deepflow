@@ -5,8 +5,8 @@ import (
 
 	"github.com/baidubce/bce-sdk-go/services/bcc"
 
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]string, error) {

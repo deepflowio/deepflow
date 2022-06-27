@@ -6,14 +6,15 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"server/libs/debug"
-	"server/libs/pool"
-	"server/libs/queue"
-	"server/libs/receiver"
-	"server/libs/stats"
-	"server/libs/utils"
 
-	"server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 )
 
 const (

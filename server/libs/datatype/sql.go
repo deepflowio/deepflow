@@ -3,8 +3,8 @@ package datatype
 import (
 	"fmt"
 
-	"server/libs/datatype/pb"
-	"server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 var mysqlInfoPool = pool.NewLockFreePool(func() interface{} {

@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"server/controller/db/mysql"
-	"server/controller/recorder/test"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/test"
 )
 
 func TestDelete(t *testing.T) {

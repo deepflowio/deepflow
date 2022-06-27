@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"server/libs/hmap/keyhash"
+	"github.com/metaflowys/metaflow/server/libs/hmap/keyhash"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"github.com/baidubce/bce-sdk-go/services/bcc"
 	bcc_api "github.com/baidubce/bce-sdk-go/services/bcc/api"
 
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[string]string) (

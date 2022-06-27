@@ -4,8 +4,9 @@ import (
 	"net"
 
 	logging "github.com/op/go-logging"
-	"server/libs/queue"
-	"server/libs/receiver"
+
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 )
 
 var log = logging.MustGetLogger("droplet.statsd")

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"server/libs/datatype"
-	"server/libs/grpc"
-	"server/libs/utils"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 
 	"github.com/google/gopacket/layers"
 	v11 "go.opentelemetry.io/proto/otlp/common/v1"

@@ -3,12 +3,12 @@ package ckdb
 import (
 	"fmt"
 	"net"
-	"server/libs/utils"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	logging "github.com/op/go-logging"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("ckdb")

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"server/ingester/stream/geo"
-	"server/libs/datatype"
-	"server/libs/datatype/pb"
-	"server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/ingester/stream/geo"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
 )
 
 func TestJsonify(t *testing.T) {

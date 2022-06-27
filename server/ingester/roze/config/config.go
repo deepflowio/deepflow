@@ -6,7 +6,7 @@ import (
 	"net"
 	"os"
 
-	"server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/common"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"

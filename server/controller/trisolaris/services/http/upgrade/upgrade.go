@@ -6,11 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	models "server/controller/db/mysql"
-	"server/controller/trisolaris"
-	"server/controller/trisolaris/dbmgr"
-	"server/controller/trisolaris/server/http"
-	"server/controller/trisolaris/server/http/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/upgrade")

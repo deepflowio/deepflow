@@ -7,9 +7,9 @@ import (
 	"net"
 	"time"
 
-	"server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/debug"
 
-	"server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 )
 
 type MonitorOperator interface {

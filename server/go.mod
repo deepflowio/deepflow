@@ -1,4 +1,4 @@
-module server
+module github.com/metaflowys/metaflow/server
 
 go 1.18
 

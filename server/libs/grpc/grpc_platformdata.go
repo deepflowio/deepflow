@@ -16,14 +16,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/context"
-	"server/libs/logger"
-	api "server/libs/reciter-api"
 
 	"github.com/metaflowys/metaflow/message/trident"
-	"server/libs/datatype"
-	"server/libs/hmap/lru"
-	"server/libs/receiver"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/hmap/lru"
+	"github.com/metaflowys/metaflow/server/libs/logger"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	api "github.com/metaflowys/metaflow/server/libs/reciter-api"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

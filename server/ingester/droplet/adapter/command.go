@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"server/libs/debug"
+
+	"github.com/metaflowys/metaflow/server/libs/debug"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 
 	. "github.com/google/gopacket/layers"
 	pb "github.com/metaflowys/metaflow/message/trident"
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type TunnelType uint8

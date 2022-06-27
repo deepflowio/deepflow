@@ -3,9 +3,9 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"server/controller/common"
-	"server/controller/model"
-	"server/controller/service"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/service"
 )
 
 func DomainRouter(e *gin.Engine) {

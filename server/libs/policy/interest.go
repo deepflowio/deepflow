@@ -3,7 +3,7 @@ package policy
 import (
 	"math"
 
-	. "server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
 )
 
 type InterestTable struct {

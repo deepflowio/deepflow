@@ -3,9 +3,9 @@ package clickhouse
 import (
 	"strings"
 
-	"server/querier/config"
-	"server/querier/engine/clickhouse/client"
-	"server/querier/engine/clickhouse/common"
+	"github.com/metaflowys/metaflow/server/querier/config"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/client"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
 )
 
 func GetDatabases() map[string][]interface{} {

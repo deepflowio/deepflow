@@ -3,8 +3,8 @@ package metrics
 import (
 	"fmt"
 
-	"server/querier/config"
-	"server/querier/engine/clickhouse/client"
+	"github.com/metaflowys/metaflow/server/querier/config"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/client"
 )
 
 var EXT_METRICS = map[string]*Metrics{}

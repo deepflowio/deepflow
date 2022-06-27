@@ -6,10 +6,10 @@ import (
 	"github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
-	"server/controller/common"
-	"server/controller/config"
-	"server/controller/db/mysql"
-	"server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/config"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err error) {

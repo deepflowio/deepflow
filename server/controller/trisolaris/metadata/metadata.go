@@ -8,7 +8,7 @@ import (
 	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/op/go-logging"
 
-	"server/controller/trisolaris/config"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
 )
 
 var log = logging.MustGetLogger("trisolaris/metadata")

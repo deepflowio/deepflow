@@ -1,7 +1,7 @@
 package tagrecorder
 
 import (
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 type ChResourceUpdater interface {

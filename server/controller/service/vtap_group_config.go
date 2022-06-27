@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 func convertStrToIntList(convertStr string) ([]int, error) {

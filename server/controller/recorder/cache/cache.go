@@ -1,9 +1,9 @@
 package cache
 
 import (
-	"server/controller/common"
-	"server/controller/db/mysql"
-	rcommon "server/controller/recorder/common"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	rcommon "github.com/metaflowys/metaflow/server/controller/recorder/common"
 )
 
 // 为支持domain及其sub_domain的独立刷新，将缓存拆分成对应的独立Cache

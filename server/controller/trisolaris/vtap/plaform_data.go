@@ -5,10 +5,10 @@ import (
 	"strings"
 	"sync"
 
-	. "server/controller/common"
-	. "server/controller/trisolaris/common"
-	"server/controller/trisolaris/metadata"
-	. "server/controller/trisolaris/utils"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
 
 var ALL_DOMAIMS = []string{"0"}

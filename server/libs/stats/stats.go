@@ -18,8 +18,8 @@ import (
 	logging "github.com/op/go-logging"
 	statsd "gopkg.in/alexcesaro/statsd.v2"
 
-	"server/libs/codec"
-	. "server/libs/datastructure"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	. "github.com/metaflowys/metaflow/server/libs/datastructure"
 )
 
 var log = logging.MustGetLogger("stats")

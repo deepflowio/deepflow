@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"server/libs/policy"
-	api "server/libs/reciter-api"
+	"github.com/metaflowys/metaflow/server/libs/policy"
+	api "github.com/metaflowys/metaflow/server/libs/reciter-api"
 )
 
 func TestDedup(t *testing.T) {

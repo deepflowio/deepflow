@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"reflect"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/genesis"
-	"server/controller/genesis/config"
-	"server/controller/model"
 	"testing"
 
 	"github.com/agiledragon/gomonkey/v2"
 	. "github.com/smartystreets/goconvey/convey"
+
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/genesis/config"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 func TestKubernetes(t *testing.T) {
