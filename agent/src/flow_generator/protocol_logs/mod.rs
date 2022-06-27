@@ -93,6 +93,7 @@ pub struct AppProtoHead {
     pub status: L7ResponseStatus, // 状态描述：0：正常，1：已废弃使用(先前用于表示异常)，2：不存在，3：服务端异常，4：客户端异常
     pub code: u16,                // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
     pub rrt: u64,                 // HTTP，DNS时延: response-request
+    pub version: u8,
 }
 
 impl From<AppProtoHead> for flow_log::AppProtoHead {

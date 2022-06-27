@@ -162,6 +162,7 @@ impl FlowPerf {
                 L7Protocol::Mysql,
                 L7Protocol::Redis,
                 L7Protocol::Kafka,
+                L7Protocol::Mqtt,
                 L7Protocol::Dns,
             ]
         } else {
@@ -197,7 +198,7 @@ impl FlowPerf {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        if packet.l4_payload_len() <= 8 {
+        if packet.l4_payload_len() < 2 {
             return Err(Error::L7ProtocolUnknown);
         }
 
@@ -231,6 +232,7 @@ impl FlowPerf {
                     | 1 << u8::from(L7Protocol::Redis)
                     | 1 << u8::from(L7Protocol::Dubbo)
                     | 1 << u8::from(L7Protocol::Kafka)
+                    | 1 << u8::from(L7Protocol::Mqtt)
             } else {
                 1 << u8::from(L7Protocol::Dns)
             },

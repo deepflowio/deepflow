@@ -156,6 +156,7 @@ impl L7FlowPerf for KafkaPerfData {
                 status: self.status,
                 code: self.status_code,
                 rrt: rrt,
+                version: 0,
             },
             0,
         ))
