@@ -132,6 +132,7 @@ impl L7FlowPerf for MqttPerfData {
                 status: self.status,
                 code: self.status_code as u16,
                 rrt: rrt,
+                version: self.proto_version,
             },
             0,
         ))
@@ -198,12 +199,17 @@ impl MqttPerfData {
             )?;
         }
 
+        self.l7_proto = L7Protocol::Mqtt;
+        self.has_log_data = true;
+
         match message_type {
-            MQTT_CONNECT | MQTT_SUBSCRIBE | MQTT_UNSUBSCRIBE | MQTT_PINGREQ => {
+            MQTT_CONNECT | MQTT_PUBLISH | MQTT_PUBREC | MQTT_SUBSCRIBE | MQTT_UNSUBSCRIBE
+            | MQTT_PINGREQ | MQTT_AUTH | MQTT_DISCONNECT => {
                 self.msg_type = LogMessageType::Request;
                 self.calc_request(timestamp, flow_id);
             }
-            MQTT_CONNACK | MQTT_SUBACK | MQTT_UNSUBACK | MQTT_PINGRESP => {
+            MQTT_CONNACK | MQTT_PUBACK | MQTT_PUBREL | MQTT_SUBACK | MQTT_UNSUBACK
+            | MQTT_PINGRESP => {
                 self.msg_type = LogMessageType::Response;
                 self.calc_response(timestamp, direction, flow_id);
             }

@@ -590,6 +590,7 @@ impl AppProtoLogsParser {
                 AppProtoLogsData::new(base_info, special_info)
             }
             L7Protocol::Mqtt => {
+                app_logs.mqtt.set_version(app_proto.base_info.head.version);
                 app_logs.mqtt.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,

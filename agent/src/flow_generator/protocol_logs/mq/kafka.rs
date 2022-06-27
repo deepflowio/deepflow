@@ -92,6 +92,7 @@ impl KafkaLog {
             status: self.status,
             code: self.status_code,
             rrt: 0,
+            version: 0,
         })
     }
 
@@ -106,6 +107,7 @@ impl KafkaLog {
             status: L7ResponseStatus::Ok,
             code: 0,
             rrt: 0,
+            version: 0,
         })
     }
 }
