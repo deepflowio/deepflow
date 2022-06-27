@@ -22,5 +22,5 @@ func (t *GcMonitor) GetCounter() interface{} {
 }
 
 func RegisterGcMonitor() {
-	registerCountable("gc", &GcMonitor{}, OptionInterval(time.Second))
+	registerCountable("", "gc", &GcMonitor{}, OptionInterval(time.Second))
 }

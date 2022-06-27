@@ -50,7 +50,7 @@ func (s *GrpcSession) nextServer() error {
 	if s.ips[s.ipIndex].To4() == nil {
 		server = fmt.Sprintf("[%s]:%d", s.ips[s.ipIndex], s.port)
 	}
-	size := 1024 * 1024 * 20
+	size := 1024 * 1024 * 40
 	options := make([]grpc.DialOption, 0, 4)
 	options = append(options, grpc.WithInsecure(), grpc.WithTimeout(s.syncInterval),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(size)), grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(size)))

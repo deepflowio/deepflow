@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
 
+	"github.com/metaflowys/metaflow/server/ingester/common"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/dbwriter"
 	"github.com/metaflowys/metaflow/server/libs/codec"
 	"github.com/metaflowys/metaflow/server/libs/datatype"
@@ -75,7 +76,7 @@ func (d *Decoder) GetCounter() interface{} {
 }
 
 func (d *Decoder) Run() {
-	stats.RegisterCountable("decoder", d, stats.OptionStatTags{
+	common.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"thread":   strconv.Itoa(d.index),
 		"msg_type": d.msgType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)

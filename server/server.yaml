@@ -150,7 +150,13 @@ querier:
     port: 9000
     timeout: 60
 
-#ingester:
+ingester:
+  #ckdb-service-prefix: clickhouse
+  #ckdb-service-port: 9000
+
+  # local node ip, if not set will get from environment variable 'NODE_IP', dafault: ""
+  #node-ip:
+
   ## trisolaris的ips, 默认值为空
   #controller-ips:
   #  - x.x.x.x

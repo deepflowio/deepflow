@@ -258,7 +258,7 @@ var ColumnAdd611 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"tag_names", "tag_values"},
+		ColumnNames: []string{"attribute_names", "attribute_values"},
 		ColumnType:  ckdb.ArrayString,
 	},
 	&ColumnAdds{

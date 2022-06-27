@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/metaflowys/metaflow/server/ingester/common"
 	"github.com/metaflowys/metaflow/server/libs/queue"
 	"github.com/metaflowys/metaflow/server/libs/stats"
 	"github.com/metaflowys/metaflow/server/libs/zerodoc"
@@ -74,7 +75,7 @@ func (m *WorkerManager) Start() []io.Closer {
 	for i := 0; i < len(m.packetQueueReaders); i++ {
 		worker := m.newWorker(queue.HashKey(i))
 		m.workers[i] = worker
-		stats.RegisterCountable("pcap", worker, stats.OptionStatTags{"index": strconv.Itoa(i)})
+		common.RegisterCountableForIngester("pcap", worker, stats.OptionStatTags{"index": strconv.Itoa(i)})
 		go worker.Process()
 	}
 	return []io.Closer{m}

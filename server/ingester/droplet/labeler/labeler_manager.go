@@ -11,8 +11,8 @@ import (
 	"github.com/metaflowys/metaflow/server/libs/dropletpb"
 	"github.com/metaflowys/metaflow/server/libs/policy"
 	"github.com/metaflowys/metaflow/server/libs/queue"
-	"github.com/metaflowys/metaflow/server/libs/stats"
 
+	"github.com/metaflowys/metaflow/server/ingester/common"
 	. "github.com/metaflowys/metaflow/server/ingester/droplet/common"
 	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 )
@@ -67,7 +67,7 @@ func NewLabelerManager(packetQueueReaders []queue.QueueReader, packetQueueWriter
 	}
 	labeler.command.init(labeler)
 	debug.Register(dropletctl.DROPLETCTL_LABELER, labeler)
-	stats.RegisterCountable("labeler", labeler)
+	common.RegisterCountableForIngester("labeler", labeler)
 	return labeler
 }
 
