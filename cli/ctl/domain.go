@@ -35,7 +35,7 @@ func RegisterDomainCommand() *cobra.Command {
 
 	var createFilename string
 	create := &cobra.Command{
-		Use:     "create [name]",
+		Use:     "create",
 		Short:   "create domain",
 		Example: "metaflow-ctl domain create deepflow-domain",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -82,8 +82,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		url += fmt.Sprintf("?name=%s", name)
 	}
 
-	// 调用domain API，并输出返回结果
-	response, err := common.CURLPerform("GET", url, nil)
+	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -112,22 +111,15 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 }
 
 func createDomain(cmd *cobra.Command, args []string, createFilename string) {
-	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name. Use: %s", cmd.Use)
-		return
-	}
-
-	// TODO 读取配置文件
+	// TODO: read metaflow host from config file
 	url := "http://metaflow-server:20417/v1/domains/"
-
-	// 调用domain API，并输出返回结果
 	yamlFile, err := ioutil.ReadFile(createFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	var body map[string]interface{}
-	yaml.Unmarshal(yamlFile, body)
-	resp, err := common.CURLPerform("POST", url, body)
+	yaml.Unmarshal(yamlFile, &body)
+	resp, err := common.CURLPerform("POST", url, body, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -141,10 +133,10 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// TODO 读取配置文件
-	url := fmt.Sprintf("http://metaflow-server:20417/v1/domains/?name=%s", args[0])
-	// 调用domain API，获取lcuuid
-	response, err := common.CURLPerform("GET", url, nil)
+	// TODO read metaflow-server host from config file
+	url := fmt.Sprintf("http://metaflow-server:20417/v2/domains/?name=%s", args[0])
+	// curl domain API，get lcuuid
+	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -155,7 +147,7 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 		// TODO 读取配置文件
 		url := fmt.Sprintf("http://metaflow-server:20417/v1/domains/%s/", lcuuid)
 		// 调用domain API，删除对应的采集器
-		_, err := common.CURLPerform("DELETE", url, nil)
+		_, err := common.CURLPerform("DELETE", url, nil, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return

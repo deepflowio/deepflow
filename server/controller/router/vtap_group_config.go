@@ -46,7 +46,11 @@ func updateVTapGroupConfig(c *gin.Context) {
 }
 
 func getVTapGroupConfigs(c *gin.Context) {
-	data, err := service.GetVTapGroupConfigs()
+	args := make(map[string]interface{})
+	if value, ok := c.GetQuery("vtap_group_id"); ok {
+		args["vtap_group_id"] = value
+	}
+	data, err := service.GetVTapGroupConfigs(args)
 	JsonResponse(c, data, err)
 }
 
@@ -80,7 +84,7 @@ func createVTapGroupAdvancedConfig(c *gin.Context) {
 func getVTapGroupConfigByFilter(c *gin.Context) {
 	args := make(map[string]string)
 	if value, ok := c.GetQuery("vtap_group_id"); ok {
-		args["short_uuid"] = value
+		args["vtap_group_id"] = value
 	}
 	data, err := service.GetVTapGroupConfigByFilter(args)
 	JsonResponse(c, data, err)

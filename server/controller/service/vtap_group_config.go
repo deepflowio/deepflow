@@ -405,29 +405,45 @@ func getRealVTapGroupConfig(config *mysql.VTapGroupConfiguration) *mysql.VTapGro
 	return realConfiguration
 }
 
-func GetVTapGroupConfigs() ([]*model.VTapGroupConfigurationResponse, error) {
+func GetVTapGroupConfigs(filter map[string]interface{}) ([]*model.VTapGroupConfigurationResponse, error) {
 	var dbConfigs []*mysql.VTapGroupConfiguration
 	var tapTypes []*mysql.TapType
 	var domains []*mysql.Domain
+	var vtapGroups []*mysql.VTapGroup
 	idToTapTypeName := make(map[int]string)
 	lcuuidToDomain := make(map[string]string)
+	lcuuidToVTapGroup := make(map[string]*mysql.VTapGroup)
 	db := mysql.Db
-	db.Find(&dbConfigs)
-	db.Find(&tapTypes)
-	db.Find(&domains)
+	mysql.Db.Find(&dbConfigs)
+	mysql.Db.Find(&tapTypes)
+	mysql.Db.Find(&domains)
+	if _, ok := filter["vtap_group_id"]; ok {
+		mysql.Db.Where("short_uuid = ?", filter["vtap_group_id"]).Find(&vtapGroups)
+	} else {
+		db.Find(&vtapGroups)
+	}
 	for _, tapType := range tapTypes {
 		idToTapTypeName[tapType.Value] = tapType.Name
 	}
 	for _, domain := range domains {
 		lcuuidToDomain[domain.Lcuuid] = domain.Name
 	}
+	for i, vtapGroup := range vtapGroups {
+		lcuuidToVTapGroup[vtapGroup.Lcuuid] = vtapGroups[i]
+	}
 	result := make([]*model.VTapGroupConfigurationResponse, 0, len(dbConfigs))
 	for _, config := range dbConfigs {
 		if config.VTapGroupLcuuid == nil || *config.VTapGroupLcuuid == "" {
 			continue
 		}
+		vtapGroup, ok := lcuuidToVTapGroup[*config.VTapGroupLcuuid]
+		if !ok {
+			continue
+		}
 		realConfig := getRealVTapGroupConfig(config)
 		mData := &model.VTapGroupConfigurationResponse{}
+		mData.VTapGroupID = &vtapGroup.ShortUUID
+		mData.VTapGroupName = &vtapGroup.Name
 		convertDBToJson(realConfig, mData, idToTapTypeName, lcuuidToDomain)
 		result = append(result, mData)
 	}
@@ -524,6 +540,7 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupCon
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
+	fmt.Println(*updateData.MaxCPUs)
 	convertYamlToDb(updateData, dbConfig)
 	ret = db.Save(dbConfig)
 	if ret.Error != nil {
@@ -539,7 +556,7 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupCon
 }
 
 func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (string, error) {
-	if createData.VTapGroupLcuuid == nil {
+	if createData.VTapGroupID == nil {
 		return "", fmt.Errorf("vtap_group_lcuuid is None")
 	}
 	shortUUID := createData.VTapGroupID

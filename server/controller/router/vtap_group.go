@@ -27,6 +27,12 @@ func getVtapGroup(c *gin.Context) {
 
 func getVtapGroups(c *gin.Context) {
 	args := make(map[string]interface{})
+	if value, ok := c.GetQuery("name"); ok {
+		args["name"] = value
+	}
+	if value, ok := c.GetQuery("short_uuid"); ok {
+		args["short_uuid"] = value
+	}
 	data, err := service.GetVtapGroups(args)
 	JsonResponse(c, data, err)
 }

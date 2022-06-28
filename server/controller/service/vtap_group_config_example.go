@@ -1,6 +1,8 @@
 package service
 
-var YamlVTapGroupConfig = []byte(`# 资源限制
+var YamlVTapGroupConfig = []byte(`# 采集器组ID
+vtap_group_id: g-xxxxxx
+# 资源限制
 # CPU限制，单位：逻辑核，默认值: 1，值域[1, 100000]
 max_cpus: 1
 # 内存限制，单位：M字节，默认值: 768，值域[128, 100000]
