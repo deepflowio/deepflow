@@ -119,7 +119,7 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 		}
 		return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 	case "tags":
-		data, err := tagdescription.GetTagDescriptions(e.DB, table)
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql)
 		return data, true, err
 	case "tables":
 		return GetTables(e.DB), true, nil

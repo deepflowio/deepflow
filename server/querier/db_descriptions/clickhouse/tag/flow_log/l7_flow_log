@@ -79,3 +79,4 @@ vtap                      , vtap                      , vtap                    
 start_time                , start_time                , start_time                , 开始时间               , int           ,                    , 流信息      , 111        ,
 end_time                  , end_time                  , end_time                  , 结束时间               , int           ,                    , 流信息      , 111        ,
 tap_side                  , tap_side                  , tap_side                  , 路径统计位置           , string_enum   , tap_side           , 流信息      , 111        ,
+attributes                ,                           ,                           , attributes            , map           ,                    , 原始Attribute  , 111        ,
