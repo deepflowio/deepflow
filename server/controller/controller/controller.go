@@ -60,7 +60,6 @@ func Start(configPath string) {
 	err := redis.InitRedis(cfg.RedisCfg)
 	if err != nil {
 		log.Error("connect redis failed")
-		os.Exit(0)
 	}
 
 	// start statsd
