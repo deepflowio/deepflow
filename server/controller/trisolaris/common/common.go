@@ -49,4 +49,9 @@ const (
 	CONN_DEFAULT_REGION = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 	NODE_IP_KEY = "NODE_IP"
+
+	TAPMODE_LOCAL    = 0
+	TAPMODE_MIRROR   = 1
+	TAPMODE_ANALYZER = 2
+	TAPMODE_DECAP    = 3
 )
