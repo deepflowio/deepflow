@@ -180,7 +180,7 @@ func convertDBToJson(
 }
 
 func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroupConfiguration) {
-	ignoreName := []string{"ID", "VTapGroupLcuuid", "Lcuuid", "YamlConfig", "L4LogTapTypes",
+	ignoreName := []string{"ID", "VTapGroupLcuuid", "VTapGroupID", "Lcuuid", "YamlConfig", "L4LogTapTypes",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
@@ -259,7 +259,7 @@ func convertYamlToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroup
 }
 
 func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
-	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "L4LogTapTypes",
+	ignoreName := []string{"ID", "YamlConfig", "Lcuuid", "VTapGroupLcuuid", "VTapGroupID", "L4LogTapTypes",
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
 	copyStruct(sData, tData, ignoreName)
 	if len(sData.L4LogTapTypes) > 0 {
@@ -490,12 +490,23 @@ func GetVTapGroupAdvancedConfig(lcuuid string) (string, error) {
 
 func GetVTapGroupAdvancedConfigs() ([]string, error) {
 	var dbConfigs []mysql.VTapGroupConfiguration
+	var dbGroups []mysql.VTapGroup
+	lcuuidToShortUUID := make(map[string]string)
 	db := mysql.Db
+	db.Find(&dbGroups)
+	for _, dbGroup := range dbGroups {
+		lcuuidToShortUUID[dbGroup.Lcuuid] = dbGroup.ShortUUID
+	}
 	db.Find(&dbConfigs)
 	result := make([]string, 0, len(dbConfigs))
 	for _, dbConfig := range dbConfigs {
+		if dbConfig.VTapGroupLcuuid == nil || *dbConfig.VTapGroupLcuuid == "" {
+			continue
+		}
 		response := &model.VTapGroupConfiguration{}
 		convertDBToYaml(&dbConfig, response)
+		shortUUID := lcuuidToShortUUID[*dbConfig.VTapGroupLcuuid]
+		response.VTapGroupID = &shortUUID
 		b, err := yaml.Marshal(response)
 		if err != nil {
 			log.Error(err)
@@ -531,7 +542,7 @@ func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (st
 	if createData.VTapGroupLcuuid == nil {
 		return "", fmt.Errorf("vtap_group_lcuuid is None")
 	}
-	shortUUID := createData.VTapGroupLcuuid
+	shortUUID := createData.VTapGroupID
 	db := mysql.Db
 	vtapGroup := &mysql.VTapGroup{}
 	ret := db.Where("short_uuid = ?", shortUUID).First(vtapGroup)
@@ -553,6 +564,7 @@ func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (st
 	}
 	response := &model.VTapGroupConfiguration{}
 	convertDBToYaml(dbConfig, response)
+	response.VTapGroupID = shortUUID
 	b, err := yaml.Marshal(response)
 	if err != nil {
 		log.Error(err)
@@ -561,7 +573,7 @@ func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (st
 }
 
 func GetVTapGroupConfigByFilter(args map[string]string) (string, error) {
-	shortUUID := args["short_uuid"]
+	shortUUID := args["vtap_group_id"]
 	if shortUUID == "" {
 		return "", fmt.Errorf("short uuid is None")
 	}
@@ -578,6 +590,7 @@ func GetVTapGroupConfigByFilter(args map[string]string) (string, error) {
 	}
 	response := &model.VTapGroupConfiguration{}
 	convertDBToYaml(dbConfig, response)
+	response.VTapGroupID = &shortUUID
 	b, err := yaml.Marshal(response)
 	if err != nil {
 		log.Error(err)
@@ -586,7 +599,7 @@ func GetVTapGroupConfigByFilter(args map[string]string) (string, error) {
 }
 
 func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
-	shortUUID := args["short_uuid"]
+	shortUUID := args["vtap_group_id"]
 	if shortUUID == "" {
 		return "", fmt.Errorf("short uuid is None")
 	}
@@ -605,6 +618,7 @@ func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
 	db.Delete(dbConfig)
 	response := &model.VTapGroupConfiguration{}
 	convertDBToYaml(dbConfig, response)
+	response.VTapGroupID = &shortUUID
 	b, err := yaml.Marshal(response)
 	if err != nil {
 		log.Error(err)
