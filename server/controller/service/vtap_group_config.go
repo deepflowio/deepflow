@@ -488,6 +488,24 @@ func GetVTapGroupAdvancedConfig(lcuuid string) (string, error) {
 	return string(b), nil
 }
 
+func GetVTapGroupAdvancedConfigs() ([]string, error) {
+	var dbConfigs []mysql.VTapGroupConfiguration
+	db := mysql.Db
+	db.Find(&dbConfigs)
+	result := make([]string, 0, len(dbConfigs))
+	for _, dbConfig := range dbConfigs {
+		response := &model.VTapGroupConfiguration{}
+		convertDBToYaml(&dbConfig, response)
+		b, err := yaml.Marshal(response)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		result = append(result, string(b))
+	}
+	return result, nil
+}
+
 func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupConfiguration) (string, error) {
 	db := mysql.Db
 	dbConfig := &mysql.VTapGroupConfiguration{}
