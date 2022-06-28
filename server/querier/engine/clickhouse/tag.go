@@ -82,4 +82,7 @@ func (t *SelectTag) Format(m *view.Model) {
 		}
 		m.AddCallback(MacTranslate([]interface{}{t.Value, alias}))
 	}
+	if t.Alias == "tags" || t.Alias == "attributes" {
+		m.AddCallback(ExternalTagsFormat([]interface{}{}))
+	}
 }

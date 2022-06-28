@@ -171,7 +171,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
+func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	response := map[string][]interface{}{
@@ -226,6 +226,12 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 	if (db != "ext_metrics" && db != "flow_log") || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
+	var whereSql string
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
+	} else {
+		whereSql = "now()-1000"
+	}
 	externalChClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -237,7 +243,7 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	externalSql := fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s LIMIT 1) GROUP BY tag_name", table)
+	externalSql := fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s WHERE %s) GROUP BY tag_name", table, whereSql)
 	externalRst, err := externalChClient.DoQuery(externalSql, nil)
 	if err != nil {
 		return nil, err
@@ -247,16 +253,22 @@ func GetTagDescriptions(db, table string) (map[string][]interface{}, error) {
 		if db == "ext_metrics" {
 			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "tag",
+				externalTag, "", "", externalTag, "tag",
 				"原始Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "attribute",
+				externalTag, "", "", externalTag, "attribute",
 				"原始Attribute", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		}
+	}
+	if db == "ext_metrics" {
+		response["values"] = append(response["values"], []interface{}{
+			"tags", "", "", "tags", "map",
+			"原始Tag", []string{}, []bool{true, true, true}, "tags",
+		})
 	}
 	return response, nil
 }

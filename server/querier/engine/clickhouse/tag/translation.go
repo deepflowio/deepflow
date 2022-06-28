@@ -481,7 +481,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
-	// 外部字段
+	// 单个外部字段
 	tagResourceMap["external_tag"] = map[string]*Tag{
 		"default": NewTag(
 			"tag_values[indexOf(tag_names,'%s')]",
@@ -490,7 +490,23 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"%s(tag_values[indexOf(tag_names,'%s')],%v)",
 		),
 	}
-
+	// 外部字段map
+	tagResourceMap["tags"] = map[string]*Tag{
+		"default": NewTag(
+			"arrayZip(tag_names, tag_values)",
+			"",
+			"",
+			"",
+		),
+	}
+	tagResourceMap["attributes"] = map[string]*Tag{
+		"default": NewTag(
+			"arrayZip(attribute_names, attribute_values)",
+			"",
+			"",
+			"",
+		),
+	}
 	// 采集点ID
 	tagResourceMap["tap_id"] = map[string]*Tag{
 		"default": NewTag(

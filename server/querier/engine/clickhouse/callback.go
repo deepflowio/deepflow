@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -127,6 +128,40 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 					newValues[i] = newValueSlice
 				}
 			}
+		}
+		return newValues
+	}
+}
+
+func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+		newValues = make([]interface{}, len(values))
+		var tagsIndex int
+		for i, column := range columns {
+			if column.(string) == "tags" || column.(string) == "attributes" {
+				tagsIndex = i
+				break
+			}
+		}
+		for i, value := range values {
+			newValues[i] = value
+		}
+
+		for i, newValue := range newValues {
+			newValueSlice := newValue.([]interface{})
+			tagsMap := make(map[string]interface{})
+			for _, tagValue := range newValueSlice[tagsIndex].([][]interface{}) {
+				if len(tagValue) == 2 {
+					tagsMap[tagValue[0].(string)] = tagValue[1]
+				}
+			}
+			tagsStr, err := json.Marshal(tagsMap)
+			if err != nil {
+				log.Error(err)
+				return newValues
+			}
+			newValueSlice[tagsIndex] = tagsStr
+			newValues[i] = newValueSlice
 		}
 		return newValues
 	}
