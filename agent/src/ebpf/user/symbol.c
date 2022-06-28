@@ -193,15 +193,6 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 	if (uprobe_sym->binary_path == NULL)
 		goto invalid;
 
-	if (pid != 0 && pid != -1) {
-		char *temp = (char *)uprobe_sym->binary_path;
-		char format_mod[4096];
-		snprintf(format_mod, 4096, "/proc/%d/root%s", pid,
-			 uprobe_sym->binary_path);
-		uprobe_sym->binary_path = strdup(format_mod);
-		free(temp);
-	}
-
 	uprobe_sym->name = strdup(sym->symbol);
 	uprobe_sym->entry = addr;
 
