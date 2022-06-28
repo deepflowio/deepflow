@@ -21,6 +21,7 @@ struct __socket_data {
 	/* 进程/线程信息 */
 	__u32 pid;  // 表示线程号 如果'pid == tgid'表示一个进程, 否则是线程
 	__u32 tgid; // 进程号
+	__u64 coroutine_id; // CoroutineID, i.e., golang goroutine id
 	__u8  comm[16]; // 进程名
 
 	/* 连接（socket）信息 */

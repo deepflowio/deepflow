@@ -400,6 +400,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		    need_proto_reconfirm(sd->data_type);
 		submit_data->process_id = sd->tgid;
 		submit_data->thread_id = sd->pid;
+		submit_data->coroutine_id = sd->coroutine_id;
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;
