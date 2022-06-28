@@ -28,7 +28,7 @@ type Config struct {
 	RemoteApiTimeout         uint16   `default:"30" yaml:"remote-api-timeout"`
 	MaxEscapeSeconds         uint16   `default:"3600" yaml:"max-escape-seconds"`
 	TridentRevision          string   `yaml:"trident-revision"`
-	TridentTypeForUnkonwVtap uint16   `default:"1" yaml:"trident-type-for-unkonw-vtap"`
+	TridentTypeForUnkonwVtap uint16   `default:"0" yaml:"trident-type-for-unkonw-vtap"`
 	TridentLinuxPath         string   `default:"/usr/local/deepflow/yum/trident" yaml:"trident-linux-path"`
 	TridentWindowsPath       string   `default:"/usr/local/deepflow/yum/trident.exe" yaml:"trident-windows-path"`
 	PlatformVips             []string `yaml:"platform-vips"`

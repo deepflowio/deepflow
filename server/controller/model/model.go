@@ -297,7 +297,7 @@ type SubDomainUpdate struct {
 }
 
 type VTapGroupConfiguration struct {
-	VTapGroupID                   *string      `json:"VTAP_GROUP_ID" yaml:"vtap_group_id"`
+	VTapGroupID                   *string      `json:"VTAP_GROUP_ID" yaml:"vtap_group_id,omitempty"`
 	VTapGroupLcuuid               *string      `json:"VTAP_GROUP_LCUUID" yaml:"vtap_group_lcuuid,omitempty"`
 	MaxCollectPps                 *int         `json:"MAX_COLLECT_PPS" yaml:"max_collect_pps,omitempty"`
 	MaxNpbBps                     *int64       `json:"MAX_NPB_BPS" yaml:"max_npb_bps,omitempty"` // unit: bps
