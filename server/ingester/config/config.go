@@ -111,7 +111,7 @@ func (c *Config) Validate() error {
 		if index == -1 || index >= len(hostName)-1 {
 			panic(fmt.Sprintf("host name is %s,  should cantains '-'", hostName))
 		}
-		indexInt, err := strconv.Atoi(hostName[index:])
+		indexInt, err := strconv.Atoi(hostName[index+1:])
 		if err != nil {
 			panic(fmt.Sprintf("host name is %s,  should have digit subfix", hostName))
 		}
