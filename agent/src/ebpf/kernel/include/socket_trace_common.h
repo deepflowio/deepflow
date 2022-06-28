@@ -106,4 +106,16 @@ struct trace_info_t {
 	__u64 conn_key; // 链接记录哈希表(socket_info_map)中的key值。
 };
 
+// struct member_offsets -> data[]  arrays index.
+enum offsets_index {
+	runtime_g_goid_offset = 0,
+	offsets_num,
+};
+
+// Store the member_offsets to eBPF Map.
+struct member_offsets {
+	__u32 version;
+	__u16 data[offsets_num];
+};
+
 #endif /* BPF_SOCKET_TRACE_COMMON */

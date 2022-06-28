@@ -662,6 +662,9 @@ int running_socket_tracer(l7_handle_fn handle,
 	if (tracer_probes_init(tracer))
 		return -EINVAL;
 
+	// Update go offsets to eBPF "go_offsets_map" 
+	update_go_offsets_to_map(tracer);
+
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;
 

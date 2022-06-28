@@ -35,6 +35,7 @@ jobs:
           cd  agent && \
           cd src/ebpf && \
           make clean && \
+          make rust-sample && \
           make test && \
           cd ../../ && \
           cargo check && \

@@ -84,9 +84,9 @@ bool bpf_table_set_value(struct bpf_tracer * tracer,
 	int map_fd = bpf_map__fd(map);
 
 	if (bpf_map_update_elem(map_fd, &key, val_buf, BPF_ANY) != 0) {
-		ebpf_info("[%s] bpf_map_update_elem, err tb_name:%s, key : %"
-			  PRIu64 ", err_message:%s\n", __func__, tb_name, key,
-			  strerror(errno));
+		ebpf_warning("[%s] bpf_map_update_elem, err tb_name:%s, key : %"
+			     PRIu64 ", err_message:%s\n", __func__, tb_name,
+			     key, strerror(errno));
 		return false;
 	}
 
