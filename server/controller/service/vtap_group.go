@@ -28,6 +28,9 @@ func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err e
 	if _, ok := filter["name"]; ok {
 		Db = Db.Where("name = ?", filter["name"])
 	}
+	if _, ok := filter["short_uuid"]; ok {
+		Db = Db.Where("short_uuid = ?", filter["short_uuid"])
+	}
 	Db.Order("created_at DESC").Find(&vtapGroups)
 
 	for _, vtapGroup := range vtapGroups {
