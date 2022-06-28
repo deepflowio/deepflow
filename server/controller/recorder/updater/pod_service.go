@@ -87,13 +87,17 @@ func (s *PodService) generateDBItemToAdd(cloudItem *cloudmodel.PodService) (*mys
 func (s *PodService) generateUpdateInfo(diffBase *cache.PodService, cloudItem *cloudmodel.PodService) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.PodIngressLcuuid != cloudItem.PodIngressLcuuid {
-		podIngressID, exists := s.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
-		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
-				common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
+		var podIngressID int
+		if cloudItem.PodIngressLcuuid != "" {
+			var exists bool
+			podIngressID, exists = s.cache.ToolDataSet.GetPodIngressIDByLcuuid(cloudItem.PodIngressLcuuid)
+			if !exists {
+				log.Errorf(resourceAForResourceBNotFound(
+					common.RESOURCE_TYPE_POD_INGRESS_EN, cloudItem.PodIngressLcuuid,
+					common.RESOURCE_TYPE_POD_SERVICE_EN, cloudItem.Lcuuid,
+				))
+				return nil, false
+			}
 		}
 		updateInfo["pod_ingress_id"] = podIngressID
 	}
