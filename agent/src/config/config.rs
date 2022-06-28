@@ -51,9 +51,14 @@ impl Config {
             // parsing empty string leads to EOF error
             Ok(Self::default())
         } else {
-            serde_yaml::from_str(contents)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))
-                .into()
+            let mut cfg: Self = serde_yaml::from_str(contents)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
+            cfg.controller_ips = cfg
+                .controller_ips
+                .drain(..)
+                .filter_map(|addr| resolve_domain(&addr))
+                .collect();
+            Ok(cfg)
         }
     }
 }
