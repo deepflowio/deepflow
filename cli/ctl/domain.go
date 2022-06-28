@@ -42,8 +42,8 @@ func RegisterDomainCommand() *cobra.Command {
 			createDomain(cmd, args, createFilename)
 		},
 	}
-	list.Flags().StringVarP(&createFilename, "filename", "f", "", "file to use create domain")
-	list.MarkFlagRequired("filename")
+	create.Flags().StringVarP(&createFilename, "filename", "f", "", "file to use create domain")
+	create.MarkFlagRequired("filename")
 
 	delete := &cobra.Command{
 		Use:     "delete [name]",
@@ -77,7 +77,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 	}
 
 	// TODO 读取配置文件
-	url := "http://metaflow-server:20417/v1/domains/"
+	url := "http://metaflow-server:20417/v2/domains/"
 	if name != "" {
 		url += fmt.Sprintf("?name=%s", name)
 	}

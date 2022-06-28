@@ -17,6 +17,7 @@ func VTapGroupConfigRouter(e *gin.Engine) {
 	e.POST("/v1/vtap-group-configuration/advanced/", createVTapGroupAdvancedConfig)
 	e.GET("/v1/vtap-group-configuration/advanced/:lcuuid/", getVTapGroupAdvancedConfig)
 	e.PATCH("/v1/vtap-group-configuration/advanced/:lcuuid/", updateVTapGroupAdvancedConfig)
+	e.GET("/v1/vtap-group-configuration/example/", getVTapGroupExampleConfig)
 
 	e.GET("/v1/vtap-group-configuration/", getVTapGroupConfigByFilter)
 	e.DELETE("/v1/vtap-group-configuration/", deleteVTapGroupConfigByFilter)
@@ -90,5 +91,10 @@ func deleteVTapGroupConfigByFilter(c *gin.Context) {
 		args["short_uuid"] = value
 	}
 	data, err := service.DeleteVTapGroupConfigByFilter(args)
+	JsonResponse(c, data, err)
+}
+
+func getVTapGroupExampleConfig(c *gin.Context) {
+	data, err := service.GetVTapGroupExampleConfig()
 	JsonResponse(c, data, err)
 }

@@ -2,10 +2,11 @@ package ctl
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
-	"cli/ctl/example"
+	"cli/ctl/common"
 )
 
 func RegisterAgentGroupConfigCommand() *cobra.Command {
@@ -21,9 +22,20 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 		Use:   "example",
 		Short: "example agent-group config",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf(string(example.YamlVTapGroupConfig))
+			exampleAgentConfig(cmd, args)
 		},
 	}
 	agentGroupConfig.AddCommand(example)
 	return agentGroupConfig
+}
+
+func exampleAgentConfig(cmd *cobra.Command, args []string) {
+	// TODO read metaflow-server host from file
+	url := "http://metaflow-server:20417/v1/vtap-group-configuration/example/"
+	response, err := common.CURLPerform("GET", url, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	fmt.Printf(response.Get("DATA").MustString())
 }
