@@ -131,13 +131,17 @@ func (p *Pod) generateUpdateInfo(diffBase *cache.Pod, cloudItem *cloudmodel.Pod)
 		updateInfo["pod_node_id"] = podNodeID
 	}
 	if diffBase.PodReplicaSetLcuuid != cloudItem.PodReplicaSetLcuuid {
-		podReplicaSetID, exists := p.cache.ToolDataSet.GetPodReplicaSetIDByLcuuid(cloudItem.PodReplicaSetLcuuid)
-		if !exists {
-			log.Errorf(resourceAForResourceBNotFound(
-				common.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
-				common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
-			))
-			return nil, false
+		var podReplicaSetID int
+		if cloudItem.PodReplicaSetLcuuid != "" {
+			var exists bool
+			podReplicaSetID, exists = p.cache.ToolDataSet.GetPodReplicaSetIDByLcuuid(cloudItem.PodReplicaSetLcuuid)
+			if !exists {
+				log.Errorf(resourceAForResourceBNotFound(
+					common.RESOURCE_TYPE_POD_REPLICA_SET_EN, cloudItem.PodReplicaSetLcuuid,
+					common.RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid,
+				))
+				return nil, false
+			}
 		}
 		updateInfo["pod_rs_id"] = podReplicaSetID
 	}
