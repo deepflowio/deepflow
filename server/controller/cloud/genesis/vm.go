@@ -12,6 +12,10 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 	log.Debug("get vms starting")
 	vms := []model.VM{}
 	vmsData := genesis.GenesisService.GetVMsData()
+
+	g.cloudStatsd.APICost["vms"] = []int{0}
+	g.cloudStatsd.APICount["vms"] = []int{len(vmsData)}
+
 	for _, v := range vmsData {
 		vpcLcuuid := v.VPCLcuuid
 		if vpcLcuuid == "" {

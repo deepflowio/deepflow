@@ -12,6 +12,10 @@ func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 	log.Debug("get vinterfaces starting")
 	vinterfaces := []model.VInterface{}
 	vinterfacesData := genesis.GenesisService.GetPortsData()
+
+	g.cloudStatsd.APICost["vinterfaces"] = []int{0}
+	g.cloudStatsd.APICount["vinterfaces"] = []int{len(vinterfacesData)}
+
 	for _, v := range vinterfacesData {
 		if v.DeviceLcuuid == "" || v.NetworkLcuuid == "" {
 			log.Debug("device lcuuid or network lcuuid not found")
