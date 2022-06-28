@@ -304,32 +304,32 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 
 	gVTapInfo := trisolaris.GetGVTapInfo()
-	tridentTypeForUnkonwVTap := gVTapInfo.GetTridentTypeForUnkonwVTap()
-	tridentType := common.TridentType(tridentTypeForUnkonwVTap)
-
 	if in.GetKubernetesClusterId() != "" {
-		tridentType = common.TridentType(VTAP_TYPE_POD_VM)
+		tridentType := common.TridentType(VTAP_TYPE_POD_VM)
+		configInfo := &api.Config{
+			KubernetesApiEnabled: proto.Bool(false),
+			AnalyzerIp:           proto.String("127.0.0.1"),
+			MaxEscapeSeconds:     proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),
+			MaxMemory:            proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
+			Enabled:              proto.Bool(true),
+			TridentType:          &tridentType,
+		}
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
 		if value == vtapCacheKey {
-			configInfo := &api.Config{
-				KubernetesApiEnabled: proto.Bool(true),
-				AnalyzerIp:           proto.String("127.0.0.1"),
-				MaxEscapeSeconds:     proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),
-				MaxMemory:            proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
-				Enabled:              proto.Bool(true),
-				TridentType:          &tridentType,
-			}
+			configInfo.KubernetesApiEnabled = proto.Bool(true)
 			log.Infof(
 				"open cluster(%s) kubernetes_api_enabled VTap(ctrl_ip: %s, ctrl_mac: %s)",
 				in.GetKubernetesClusterId(), ctrlIP, ctrlMac)
-			return &api.SyncResponse{
-				Status: &STATUS_SUCCESS,
-				Config: configInfo,
-			}
+		}
+		return &api.SyncResponse{
+			Status: &STATUS_SUCCESS,
+			Config: configInfo,
 		}
 	}
 
+	tridentTypeForUnkonwVTap := gVTapInfo.GetTridentTypeForUnkonwVTap()
 	if tridentTypeForUnkonwVTap != 0 {
+		tridentType := common.TridentType(tridentTypeForUnkonwVTap)
 		configInfo := &api.Config{
 			TridentType:      &tridentType,
 			AnalyzerIp:       proto.String("127.0.0.1"),
