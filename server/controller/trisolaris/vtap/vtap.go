@@ -933,6 +933,10 @@ func (v *VTapInfo) getDefaultVTapGroup() string {
 	return ""
 }
 
+func (v *VTapInfo) getDefaultTapMode() int {
+	return v.config.DefaultTapMode
+}
+
 func (v *VTapInfo) getVTapAutoRegister() bool {
 	return v.config.VTapAutoRegister
 }

@@ -113,6 +113,8 @@ controller:
 
     # 采集器是否自动注册
     vtap-auto-register: True
+ 
+    default-tap-mode:
 
   genesis:
     # 平台数据老化时间，单位秒

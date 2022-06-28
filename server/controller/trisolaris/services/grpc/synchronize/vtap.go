@@ -171,6 +171,15 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 	localConfig := gVTapInfo.GetVTapLocalConfig(c.GetVTapGroupLcuuid())
 	configure.LocalConfig = &localConfig
 
+	if c.EnabledApplicationMonitoring() == false {
+		configure.L7MetricsEnabled = proto.Bool(false)
+		configure.L7LogStoreTapTypes = nil
+	}
+	if c.EnabledNetworkMonitoring() == false {
+		configure.L4PerformanceEnabled = proto.Bool(false)
+		configure.L4LogTapTypes = nil
+	}
+
 	return configure
 }
 
@@ -317,11 +326,8 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 	}
 
 	tridentTypeForUnkonwVTap := gVTapInfo.GetTridentTypeForUnkonwVTap()
-	if tridentTypeForUnkonwVTap != 0 || in.GetTapMode() == api.TapMode_LOCAL {
-		tridentType := common.TridentType(VTAP_TYPE_KVM)
-		if tridentTypeForUnkonwVTap != 0 {
-			tridentType = common.TridentType(tridentTypeForUnkonwVTap)
-		}
+	if tridentTypeForUnkonwVTap != 0 {
+		tridentType := common.TridentType(tridentTypeForUnkonwVTap)
 		configInfo := &api.Config{
 			TridentType:      &tridentType,
 			AnalyzerIp:       proto.String("127.0.0.1"),
