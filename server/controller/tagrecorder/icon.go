@@ -23,6 +23,7 @@ func (c *TagRecorder) UpdateIconInfo() (map[string]int, map[IconKey]int, error) 
 	body := make(map[string]interface{})
 	response, err := common.CURLPerform("GET", "http://df-web:20825/v1/icons", body)
 	if err != nil {
+		log.Error(err)
 		return domainToIconID, resourceToIconID, err
 	}
 	if len(response.Get("DATA").MustArray()) == 0 {

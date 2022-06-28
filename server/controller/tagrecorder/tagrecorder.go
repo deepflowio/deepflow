@@ -31,7 +31,6 @@ func (c *TagRecorder) run() {
 		return
 	}
 	c.refresh(domainToIconID, resourceToIconID)
-	// c.UpdateChServerPort()
 }
 
 func (c *TagRecorder) Start() {
