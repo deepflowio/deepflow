@@ -31,6 +31,8 @@ resource_gl2_type         , resource_gl2_type_0       , resource_gl2_type_1     
 resource_gl2              , resource_gl2_0            , resource_gl2_1            , 资源-服务优先          , resource      ,                    , 知识图谱    , 111        ,
 process_id                , process_id_0              , process_id_1              , 进程ID                 , int           ,                    , 知识图谱    , 111        ,
 process_kname             , process_kname_0           , process_kname_1           , 线程名                 , string        ,                    , 知识图谱    , 111        ,
+service_name              , service_name              , service_name              , 服务名称               , string        ,                    , 知识图谱    , 111        ,
+service_instance_id       , service_instance_id       , service_instance_id       , 服务实例               , string        ,                    , 知识图谱    , 111        ,
 is_internet               , is_internet_0             , is_internet_1             , Internet标志           , bool          ,                    ,             , 111        ,
 
 ip                        , ip_0                      , ip_1                      , IP地址                 , ip            ,                    , 网络层      , 111        ,

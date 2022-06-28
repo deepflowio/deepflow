@@ -247,12 +247,14 @@ type L7Logger struct {
 	ResponseException string
 	ResponseResult    string
 
-	HttpProxyClient string
-	XRequestId      string
-	TraceId         string
-	SpanId          string
-	ParentSpanId    string
-	SpanKind        uint8
+	HttpProxyClient   string
+	XRequestId        string
+	TraceId           string
+	SpanId            string
+	ParentSpanId      string
+	SpanKind          uint8
+	ServiceName       string
+	ServiceInstanceId string
 
 	ResponseDuration uint64
 	RequestLength    *int64
@@ -292,6 +294,8 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8).SetComment("SpanKind"),
+		ckdb.NewColumn("service_name", ckdb.LowCardinalityString).SetComment("service name"),
+		ckdb.NewColumn("service_instance_id", ckdb.String).SetComment("service instance id"),
 
 		ckdb.NewColumn("response_duration", ckdb.UInt64),
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
@@ -370,6 +374,12 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt8(h.SpanKind); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.ServiceName); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.ServiceInstanceId); err != nil {
 		return err
 	}
 
