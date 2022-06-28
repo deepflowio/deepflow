@@ -37,6 +37,7 @@ jobs:
           make clean && \
           make rust-sample && \
           make test && \
+          make tools && \
           cd ../../ && \
           cargo check && \
           cargo fmt --all -- --check && \
