@@ -15,7 +15,6 @@
  */
 
 use std::collections::{HashMap, HashSet};
-use std::ffi::CString;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
 use std::process;
@@ -26,7 +25,7 @@ use std::sync::{
 use std::thread;
 use std::time::Duration;
 
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 
 use super::{
     error::Result,
@@ -38,8 +37,8 @@ use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
         enums::{EthernetType, TapType},
-        MetaPacket, TaggedFlow, TapTyper, ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE,
-        VLAN_ID_MASK,
+        MetaPacket, TaggedFlow, TapTyper, DEFAULT_CONTROLLER_PORT, DEFAULT_INGESTER_PORT,
+        ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE, VLAN_ID_MASK,
     },
     config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
@@ -260,7 +259,9 @@ impl BaseDispatcher {
             platform_poller: self.platform_poller.clone(),
             capture_bpf: "".into(),
             proxy_controller_ip: Ipv4Addr::UNSPECIFIED.into(),
+            proxy_controller_port: DEFAULT_CONTROLLER_PORT,
             analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
+            analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
         }
     }
@@ -302,11 +303,11 @@ impl BaseDispatcher {
         if tap_interfaces.len() == 0 {
             return;
         }
+
         let bpf_options = self.bpf_options.lock().unwrap();
-        info!("bpf set to: {}", bpf_options.bpf_syntax);
         if let Err(e) = self
             .engine
-            .set_bpf(&CString::new(&*bpf_options.bpf_syntax).unwrap())
+            .set_bpf(bpf_options.get_bpf_instructions(&tap_interfaces))
         {
             warn!("set_bpf failed: {}", e);
         }
@@ -412,6 +413,8 @@ pub(super) struct BaseDispatcherListener {
     capture_bpf: String,
     proxy_controller_ip: IpAddr,
     analyzer_ip: IpAddr,
+    proxy_controller_port: u16,
+    analyzer_port: u16,
 }
 
 impl BaseDispatcherListener {
@@ -434,40 +437,40 @@ impl BaseDispatcherListener {
     fn on_bpf_change(&mut self, config: &DispatcherConfig) {
         if self.capture_bpf == config.capture_bpf
             && self.proxy_controller_ip == config.proxy_controller_ip
+            && self.proxy_controller_port == config.proxy_controller_port
             && self.analyzer_ip == config.analyzer_ip
+            && self.analyzer_port == config.analyzer_port
         {
             return;
         }
+        self.capture_bpf = config.capture_bpf.clone();
+        self.proxy_controller_ip = config.proxy_controller_ip;
+        self.proxy_controller_port = config.proxy_controller_port;
+        self.analyzer_ip = config.analyzer_ip;
+        self.analyzer_port = config.analyzer_port;
 
-        let bpf_syntax = if config.capture_bpf != "" {
-            self.capture_bpf = config.capture_bpf.clone();
-            self.capture_bpf.clone()
-        } else {
-            self.proxy_controller_ip = config.proxy_controller_ip;
-            self.analyzer_ip = config.analyzer_ip;
-
-            let source_ip = get_route_src_ip(&self.analyzer_ip);
-            if source_ip.is_err() {
-                warn!("get route to {} failed", self.analyzer_ip);
-                return;
-            }
-            bpf::Builder {
-                is_ipv6: self.options.is_ipv6,
-                vxlan_port: self.options.vxlan_port,
-                controller_port: self.options.controller_port,
-                controller_tls_port: self.options.controller_tls_port,
-                proxy_controller_ip: self.proxy_controller_ip,
-                analyzer_source_ip: source_ip.unwrap(),
-            }
-            .build_pcap_syntax()
-        };
-
-        debug!("PcapBpf: {}", bpf_syntax);
-        let mut bpf_options = self.bpf_options.lock().unwrap();
-        if bpf_options.bpf_syntax != bpf_syntax {
-            bpf_options.bpf_syntax = bpf_syntax;
-            self.need_update_bpf.store(true, Ordering::Release);
+        let source_ip = get_route_src_ip(&self.analyzer_ip);
+        if source_ip.is_err() {
+            warn!("get route to {} failed", self.analyzer_ip);
+            return;
         }
+
+        let bpf_syntax = bpf::Builder {
+            is_ipv6: self.options.is_ipv6,
+            vxlan_port: self.options.vxlan_port,
+            controller_port: self.options.controller_port,
+            controller_tls_port: self.options.controller_tls_port,
+            proxy_controller_port: self.proxy_controller_port,
+            analyzer_source_ip: source_ip.unwrap(),
+            analyzer_port: self.analyzer_port,
+        }
+        .build_pcap_syntax();
+
+        let mut bpf_options = self.bpf_options.lock().unwrap();
+        bpf_options.capture_bpf = config.capture_bpf.clone();
+        bpf_options.bpf_syntax = bpf_syntax;
+        self.need_update_bpf.store(true, Ordering::Release);
+
         mem::drop(bpf_options);
     }
 

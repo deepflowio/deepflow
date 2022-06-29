@@ -814,29 +814,26 @@ impl Components {
         );
 
         // Dispatcher
-        let bpf_syntax = if candidate_config.dispatcher.capture_bpf != "" {
-            candidate_config.dispatcher.capture_bpf.clone()
-        } else {
-            let source_ip = match get_route_src_ip(&candidate_config.dispatcher.analyzer_ip) {
-                Ok(ip) => ip,
-                Err(e) => {
-                    warn!(
-                        "get route to {} failed: {:?}",
-                        candidate_config.dispatcher.analyzer_ip, e
-                    );
-                    Ipv4Addr::UNSPECIFIED.into()
-                }
-            };
-            bpf::Builder {
-                is_ipv6: ctrl_ip.is_ipv6(),
-                vxlan_port: yaml_config.vxlan_port,
-                controller_port: static_config.controller_port,
-                controller_tls_port: static_config.controller_tls_port,
-                proxy_controller_ip: candidate_config.dispatcher.proxy_controller_ip,
-                analyzer_source_ip: source_ip,
+        let source_ip = match get_route_src_ip(&candidate_config.dispatcher.analyzer_ip) {
+            Ok(ip) => ip,
+            Err(e) => {
+                warn!(
+                    "get route to {} failed: {:?}",
+                    candidate_config.dispatcher.analyzer_ip, e
+                );
+                Ipv4Addr::UNSPECIFIED.into()
             }
-            .build_pcap_syntax()
         };
+        let bpf_syntax = bpf::Builder {
+            is_ipv6: ctrl_ip.is_ipv6(),
+            vxlan_port: yaml_config.vxlan_port,
+            controller_port: static_config.controller_port,
+            controller_tls_port: static_config.controller_tls_port,
+            proxy_controller_port: candidate_config.dispatcher.proxy_controller_port,
+            analyzer_source_ip: source_ip,
+            analyzer_port: candidate_config.dispatcher.analyzer_port,
+        }
+        .build_pcap_syntax();
 
         let l7_log_rate = Arc::new(LeakyBucket::new(Some(
             candidate_config.log_parser.l7_log_collect_nps_threshold,
@@ -867,7 +864,10 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
+        let bpf_options = Arc::new(Mutex::new(BpfOptions {
+            capture_bpf: candidate_config.dispatcher.capture_bpf.clone(),
+            bpf_syntax,
+        }));
         for i in 0..dispatcher_num {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
