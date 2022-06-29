@@ -46,7 +46,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 	}
 
 	// 调用采集器API，并输出返回结果
-	response, err := common.CURLPerform("GET", url, nil)
+	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Println(err)
 		return

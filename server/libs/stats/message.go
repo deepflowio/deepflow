@@ -4,10 +4,10 @@ import (
 	"errors"
 	"unsafe"
 
-	"server/libs/ckdb"
-	"server/libs/codec"
-	"server/libs/pool"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

@@ -95,7 +95,7 @@ static struct symbol probe_syms[] = {
 	{
 		.symbol = "crypto/tls.(*Conn).Read",
 		.probe_func = "uprobe/crypto_tls_conn_read",
-		.is_probe_ret = false,
+		.is_probe_ret = true,
 	},
 
 	/*-------- runtime.casgstatus --------------*/
@@ -146,6 +146,12 @@ int main(void)
 		     probe_sym->entry, probe_sym->size, probe_sym->name,
 		     probe_sym->probe_func, probe_sym->rets_count);
 
+		if (!sym->is_probe_ret)
+			continue;
+		printf("rets: ");
+		for (int j = 0; j < probe_sym->rets_count; ++j) {
+			printf("%p ", (void *)probe_sym->rets[j]);
+		}
 	}
 
 	if (count <= 0) {

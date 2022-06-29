@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	logging "github.com/op/go-logging"
-	"server/ingester/common"
-	"server/ingester/ext_metrics/config"
-	"server/ingester/pkg/ckwriter"
-	"server/libs/ckdb"
-	"server/libs/stats"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
+	"github.com/metaflowys/metaflow/server/ingester/pkg/ckwriter"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("ext_metrics.dbwriter")
@@ -161,15 +161,15 @@ func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 func NewExtMetricsWriter(
 	config *config.Config) *ExtMetricsWriter {
 	writer := &ExtMetricsWriter{
-		ckdbAddr:     config.CKDB.Primary,
-		ckdbUsername: config.CKAuth.User,
-		ckdbPassword: config.CKAuth.Password,
+		ckdbAddr:     config.Base.CKDB.Primary,
+		ckdbUsername: config.Base.CKDBAuth.Username,
+		ckdbPassword: config.Base.CKDBAuth.Password,
 		tables:       make(map[string]*tableInfo),
 		ttl:          config.TTL,
 		writerConfig: config.CKWriterConfig,
 
 		counter: &Counter{},
 	}
-	stats.RegisterCountable("ext_metrics_writer", writer)
+	common.RegisterCountableForIngester("ext_metrics_writer", writer)
 	return writer
 }

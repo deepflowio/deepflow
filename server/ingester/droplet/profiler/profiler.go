@@ -11,9 +11,9 @@ import (
 
 	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
-	"server/libs/debug"
 
-	"server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/libs/debug"
 )
 
 type ProfilerServer struct {

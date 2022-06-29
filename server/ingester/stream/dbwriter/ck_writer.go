@@ -2,11 +2,12 @@ package dbwriter
 
 import (
 	logging "github.com/op/go-logging"
-	"server/ingester/pkg/ckwriter"
-	"server/ingester/stream/common"
-	"server/ingester/stream/config"
-	"server/ingester/stream/jsonify"
-	"server/libs/ckdb"
+
+	"github.com/metaflowys/metaflow/server/ingester/pkg/ckwriter"
+	"github.com/metaflowys/metaflow/server/ingester/stream/common"
+	"github.com/metaflowys/metaflow/server/ingester/stream/config"
+	"github.com/metaflowys/metaflow/server/ingester/stream/jsonify"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
 )
 
 var log = logging.MustGetLogger("stream.dbwriter")

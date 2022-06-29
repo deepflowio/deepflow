@@ -6,9 +6,9 @@ import (
 
 	"github.com/deckarep/golang-set"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/monitor/config"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/monitor/config"
 )
 
 type ControllerCheck struct {

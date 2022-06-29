@@ -2,8 +2,8 @@ package clickhouse
 
 import (
 	"fmt"
-	"server/querier/engine/clickhouse/tag"
-	"server/querier/engine/clickhouse/view"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/tag"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
 )
 
 func GetGroup(name string, asTagMap map[string]string, db, table string) (Statement, error) {

@@ -13,14 +13,14 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"server/libs/app"
-	"server/libs/cache"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/pool"
-	"server/libs/queue"
-	"server/libs/stats"
-	. "server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/app"
+	"github.com/metaflowys/metaflow/server/libs/cache"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

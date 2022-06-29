@@ -4,22 +4,24 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"server/controller/model"
-	"server/controller/service"
+	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/service"
 )
 
 func VTapGroupConfigRouter(e *gin.Engine) {
-	e.POST("/v1/vtap-group-configurations/", createVTapGroupConfig)
-	e.DELETE("/v1/vtap-group-configurations/:lcuuid/", deleteVTapGroupConfig)
-	e.PATCH("/v1/vtap-group-configurations/:lcuuid/", updateVTapGroupConfig)
-	e.GET("/v1/vtap-group-configurations/", getVTapGroupConfigs)
+	e.POST("/v1/vtap-group-configuration/", createVTapGroupConfig)
+	e.DELETE("/v1/vtap-group-configuration/:lcuuid/", deleteVTapGroupConfig)
+	e.PATCH("/v1/vtap-group-configuration/:lcuuid/", updateVTapGroupConfig)
+	e.GET("/v1/vtap-group-configuration/", getVTapGroupConfigs)
 	e.GET("/v1/vtap-group-configuration/detailed/:lcuuid/", getVTapGroupDetailedConfig)
 	e.POST("/v1/vtap-group-configuration/advanced/", createVTapGroupAdvancedConfig)
 	e.GET("/v1/vtap-group-configuration/advanced/:lcuuid/", getVTapGroupAdvancedConfig)
+	e.GET("/v1/vtap-group-configuration/advanced/", getVTapGroupAdvancedConfigs)
 	e.PATCH("/v1/vtap-group-configuration/advanced/:lcuuid/", updateVTapGroupAdvancedConfig)
+	e.GET("/v1/vtap-group-configuration/example/", getVTapGroupExampleConfig)
 
-	e.GET("/v1/vtap-group-configuration/", getVTapGroupConfigByFilter)
-	e.DELETE("/v1/vtap-group-configuration/", deleteVTapGroupConfigByFilter)
+	e.GET("/v1/vtap-group-configuration/filter/", getVTapGroupConfigByFilter)
+	e.DELETE("/v1/vtap-group-configuration/filter/", deleteVTapGroupConfigByFilter)
 }
 
 func createVTapGroupConfig(c *gin.Context) {
@@ -44,7 +46,11 @@ func updateVTapGroupConfig(c *gin.Context) {
 }
 
 func getVTapGroupConfigs(c *gin.Context) {
-	data, err := service.GetVTapGroupConfigs()
+	args := make(map[string]interface{})
+	if value, ok := c.GetQuery("vtap_group_id"); ok {
+		args["vtap_group_id"] = value
+	}
+	data, err := service.GetVTapGroupConfigs(args)
 	JsonResponse(c, data, err)
 }
 
@@ -77,8 +83,8 @@ func createVTapGroupAdvancedConfig(c *gin.Context) {
 
 func getVTapGroupConfigByFilter(c *gin.Context) {
 	args := make(map[string]string)
-	if value, ok := c.GetQuery("short_uuid"); ok {
-		args["short_uuid"] = value
+	if value, ok := c.GetQuery("vtap_group_id"); ok {
+		args["vtap_group_id"] = value
 	}
 	data, err := service.GetVTapGroupConfigByFilter(args)
 	JsonResponse(c, data, err)
@@ -86,9 +92,19 @@ func getVTapGroupConfigByFilter(c *gin.Context) {
 
 func deleteVTapGroupConfigByFilter(c *gin.Context) {
 	args := make(map[string]string)
-	if value, ok := c.GetQuery("short_uuid"); ok {
-		args["short_uuid"] = value
+	if value, ok := c.GetQuery("vtap_group_id"); ok {
+		args["vtap_group_id"] = value
 	}
 	data, err := service.DeleteVTapGroupConfigByFilter(args)
+	JsonResponse(c, data, err)
+}
+
+func getVTapGroupExampleConfig(c *gin.Context) {
+	data, err := service.GetVTapGroupExampleConfig()
+	JsonResponse(c, data, err)
+}
+
+func getVTapGroupAdvancedConfigs(c *gin.Context) {
+	data, err := service.GetVTapGroupAdvancedConfigs()
 	JsonResponse(c, data, err)
 }

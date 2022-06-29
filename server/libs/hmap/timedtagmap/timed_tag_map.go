@@ -3,9 +3,9 @@ package timedtagmap
 import (
 	"strconv"
 
-	"server/libs/pool"
-	"server/libs/stats"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type TagID int32

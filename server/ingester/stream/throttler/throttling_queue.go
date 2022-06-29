@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	"server/ingester/stream/dbwriter"
+	"github.com/metaflowys/metaflow/server/ingester/stream/dbwriter"
 )
 
 const (

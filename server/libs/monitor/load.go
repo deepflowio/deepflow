@@ -3,8 +3,8 @@ package monitor
 import (
 	"github.com/shirou/gopsutil/load"
 
-	"server/libs/stats"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type LoadMonitor struct {

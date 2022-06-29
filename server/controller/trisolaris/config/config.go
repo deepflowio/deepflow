@@ -5,7 +5,8 @@ import (
 	"os"
 
 	"github.com/op/go-logging"
-	. "server/controller/trisolaris/common"
+
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/config")

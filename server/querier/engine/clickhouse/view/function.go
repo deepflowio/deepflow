@@ -3,7 +3,7 @@ package view
 import (
 	"bytes"
 	"fmt"
-	"server/querier/common"
+	"github.com/metaflowys/metaflow/server/querier/common"
 	"strconv"
 	"strings"
 )

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	basecommon "server/ingester/common"
-	"server/ingester/pkg/ckwriter"
-	"server/ingester/stream/common"
-	"server/libs/ckdb"
-	"server/libs/zerodoc"
+	basecommon "github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/pkg/ckwriter"
+	"github.com/metaflowys/metaflow/server/ingester/stream/common"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 )

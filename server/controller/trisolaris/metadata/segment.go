@@ -5,7 +5,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/metaflowys/metaflow/message/trident"
 
-	models "server/controller/db/mysql"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 type MacID struct {

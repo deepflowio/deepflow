@@ -8,8 +8,8 @@ import (
 
 	"github.com/Workiva/go-datastructures/bitarray"
 
-	. "server/libs/datastructure"
-	"server/libs/pool"
+	. "github.com/metaflowys/metaflow/server/libs/datastructure"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 type EndpointType = int

@@ -6,8 +6,8 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	. "server/libs/datatype"
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 // 平台信息有关测试

@@ -177,6 +177,7 @@ impl L7FlowPerf for MysqlPerfData {
                 status: self.status,
                 code: 0,
                 rrt: rrt,
+                version: 0,
             },
             0,
         ))

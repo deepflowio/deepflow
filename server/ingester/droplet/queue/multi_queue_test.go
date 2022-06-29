@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	rawqueue "server/libs/queue"
+	rawqueue "github.com/metaflowys/metaflow/server/libs/queue"
 )
 
 func TestSingleQueueSingleUserPuts(t *testing.T) {

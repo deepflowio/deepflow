@@ -8,7 +8,7 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type LookupKey struct {

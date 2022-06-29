@@ -3,8 +3,8 @@ package health
 import (
 	"github.com/gin-gonic/gin"
 
-	"server/controller/trisolaris/server/http"
-	"server/controller/trisolaris/server/http/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http/common"
 )
 
 func init() {

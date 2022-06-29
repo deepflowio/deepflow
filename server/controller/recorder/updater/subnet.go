@@ -1,11 +1,11 @@
 package updater
 
 import (
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/db/mysql"
-	"server/controller/recorder/cache"
-	"server/controller/recorder/common"
-	"server/controller/recorder/db"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
+	"github.com/metaflowys/metaflow/server/controller/recorder/common"
+	"github.com/metaflowys/metaflow/server/controller/recorder/db"
 )
 
 type Subnet struct {

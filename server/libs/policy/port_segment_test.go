@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	. "server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
 )
 
 func TestPortSegmentSimple(t *testing.T) {

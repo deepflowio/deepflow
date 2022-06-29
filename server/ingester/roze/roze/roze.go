@@ -7,17 +7,17 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/grpc"
-	libqueue "server/libs/queue"
-	"server/libs/receiver"
 
-	"server/ingester/droplet/queue"
-	"server/ingester/dropletctl"
-	"server/ingester/roze/config"
-	"server/ingester/roze/dbwriter"
-	"server/ingester/roze/unmarshaller"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/queue"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/roze/config"
+	"github.com/metaflowys/metaflow/server/ingester/roze/dbwriter"
+	"github.com/metaflowys/metaflow/server/ingester/roze/unmarshaller"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	libqueue "github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 )
 
 const (
@@ -35,8 +35,8 @@ type Roze struct {
 func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 	roze := Roze{}
 
-	controllers := make([]net.IP, len(cfg.ControllerIPs))
-	for i, ipString := range cfg.ControllerIPs {
+	controllers := make([]net.IP, len(cfg.Base.ControllerIPs))
+	for i, ipString := range cfg.Base.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)
 		if controllers[i].To4() != nil {
 			controllers[i] = controllers[i].To4()
@@ -54,7 +54,7 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 	recv.RegistHandler(datatype.MESSAGE_TYPE_METRICS, unmarshallQueues, unmarshallQueueCount)
 
 	var err error
-	roze.dbwriter, err = dbwriter.NewDbWriter(cfg.CKDB.Primary, cfg.CKDB.Secondary, cfg.CKDBAuth.Username, cfg.CKDBAuth.Password, cfg.ReplicaEnabled, cfg.CKWriterConfig)
+	roze.dbwriter, err = dbwriter.NewDbWriter(cfg.Base.CKDB.Primary, cfg.Base.CKDB.Secondary, cfg.Base.CKDBAuth.Username, cfg.Base.CKDBAuth.Password, cfg.ReplicaEnabled, cfg.CKWriterConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, err
@@ -65,10 +65,10 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 	for i := 0; i < unmarshallQueueCount; i++ {
 		if i == 0 {
 			// 只第一个上报数据节点信息
-			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, cfg.ControllerPort, "roze", cfg.Pcap.FileDirectory, recv)
+			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), "roze", cfg.Pcap.FileDirectory, cfg.Base.NodeIP, recv)
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA, roze.platformDatas[i])
 		} else {
-			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, cfg.ControllerPort, "roze-"+strconv.Itoa(i), "", nil)
+			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), "roze-"+strconv.Itoa(i), "", cfg.Base.NodeIP, nil)
 		}
 		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, roze.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.dbwriter)
 	}

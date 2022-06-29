@@ -4,7 +4,7 @@ import (
 	"net"
 	"testing"
 
-	. "server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
 )
 
 var (

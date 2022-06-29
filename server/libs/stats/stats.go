@@ -18,8 +18,8 @@ import (
 	logging "github.com/op/go-logging"
 	statsd "gopkg.in/alexcesaro/statsd.v2"
 
-	"server/libs/codec"
-	. "server/libs/datastructure"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	. "github.com/metaflowys/metaflow/server/libs/datastructure"
 )
 
 var log = logging.MustGetLogger("stats")
@@ -27,11 +27,12 @@ var log = logging.MustGetLogger("stats")
 var remoteType = REMOTE_TYPE_INFLUXDB
 
 type StatSource struct {
-	module    string
-	interval  time.Duration // use MinInterval when 0
-	countable Countable
-	tags      OptionStatTags
-	skip      int
+	moudlePrefix string
+	module       string
+	interval     time.Duration // use MinInterval when 0
+	countable    Countable
+	tags         OptionStatTags
+	skip         int
 }
 
 func (s *StatSource) Equal(other *StatSource) bool {
@@ -62,8 +63,8 @@ type StatItem struct {
 	Value interface{}
 }
 
-func registerCountable(module string, countable Countable, opts ...Option) error {
-	source := StatSource{module: module, countable: countable, tags: OptionStatTags{}}
+func registerCountable(moudlePrefix, module string, countable Countable, opts ...Option) error {
+	source := StatSource{moudlePrefix: moudlePrefix, module: module, countable: countable, tags: OptionStatTags{}}
 	for _, opt := range opts {
 		if tags, ok := opt.(OptionStatTags); ok { // 可能有多个
 			for k, v := range tags {
@@ -151,7 +152,7 @@ func collectBatchPoints() client.BatchPoints {
 		statSource.skip = int(max(statSource.interval, MinInterval) / TICK_CYCLE)
 
 		fields := counterToFields(statSource.countable.GetCounter())
-		point, _ := client.NewPoint(processName+"."+statSource.module, statSource.tags, fields, timestamp)
+		point, _ := client.NewPoint(processName+"."+statSource.moudlePrefix+statSource.module, statSource.tags, fields, timestamp)
 		bp.AddPoint(point)
 	}
 	lock.Unlock()

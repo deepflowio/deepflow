@@ -1,10 +1,10 @@
 package config
 
 import (
-	"errors"
 	"io/ioutil"
-	"net"
 	"os"
+
+	"github.com/metaflowys/metaflow/server/ingester/config"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
@@ -13,27 +13,10 @@ import (
 var log = logging.MustGetLogger("ext_metrics.config")
 
 const (
-	DefaultControllerIP      = "127.0.0.1"
-	DefaultControllerPort    = 20035
-	DefaultCKPrimaryAddr     = "127.0.0.1:9000"
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 100000
 	DefaultExtMetricsTTL     = 7
 )
-
-type Auth struct {
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-}
-type DBAddr struct {
-	Primary string `yaml:"primary"`
-	Replica string `yaml:"replica"`
-}
-
-type CKAddr struct {
-	Primary   string `yaml:"primary"`
-	Secondary string `yaml:"secondary"`
-}
 
 type CKWriterConfig struct {
 	QueueCount   int `yaml:"queue-count"`
@@ -43,10 +26,7 @@ type CKWriterConfig struct {
 }
 
 type Config struct {
-	ControllerIPs     []string       `yaml:"controller-ips"`
-	ControllerPort    int            `yaml:"controller-port"`
-	CKDB              CKAddr         `yaml:"ckdb"`
-	CKAuth            Auth           `yaml:"ck-auth"`
+	Base              *config.Config
 	CKWriterConfig    CKWriterConfig `yaml:"ext-metrics-ck-writer"`
 	DecoderQueueCount int            `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int            `yaml:"decoder-queue-size"`
@@ -58,12 +38,6 @@ type ExtMetricsConfig struct {
 }
 
 func (c *Config) Validate() error {
-	for _, ipString := range c.ControllerIPs {
-		if net.ParseIP(string(ipString)) == nil {
-			return errors.New("controller-ips invalid")
-		}
-	}
-
 	if c.DecoderQueueCount == 0 {
 		c.DecoderQueueCount = DefaultDecoderQueueCount
 	}
@@ -74,11 +48,10 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func Load(path string) *Config {
+func Load(base *config.Config, path string) *Config {
 	config := &ExtMetricsConfig{
 		ExtMetrics: Config{
-			ControllerPort:    DefaultControllerPort,
-			CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
+			Base:              base,
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 10},

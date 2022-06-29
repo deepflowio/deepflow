@@ -1,7 +1,7 @@
 package zerodoc
 
 import (
-	"server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
 )
 
 type Tagger interface {

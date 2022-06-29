@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"server/querier/common"
-	"server/querier/engine/clickhouse/metrics"
-	"server/querier/engine/clickhouse/tag"
-	"server/querier/engine/clickhouse/view"
 	"strconv"
 	"strings"
+
+	"github.com/metaflowys/metaflow/server/querier/common"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/metrics"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/tag"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
 )
 
 const (

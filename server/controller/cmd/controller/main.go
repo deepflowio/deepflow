@@ -1,7 +1,7 @@
 package main
 
 import (
-	"server/controller/controller"
+	"github.com/metaflowys/metaflow/server/controller/controller"
 )
 
 func main() {

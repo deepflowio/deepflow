@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"server/libs/ckdb"
-	"server/libs/codec"
-	"server/libs/pool"
-	"server/libs/zerodoc"
-	"server/libs/zerodoc/pb"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc/pb"
 )
 
 const (

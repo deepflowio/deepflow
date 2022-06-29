@@ -2,8 +2,8 @@ package aliyun
 
 import (
 	slb "github.com/aliyun/alibaba-cloud-sdk-go/services/slb"
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 	"strconv"
 	"strings"
 )

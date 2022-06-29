@@ -536,6 +536,7 @@ impl L7LogParse for HttpLog {
             status: self.status,
             code: self.status_code,
             rrt: 0,
+            version: 0,
         })
     }
 

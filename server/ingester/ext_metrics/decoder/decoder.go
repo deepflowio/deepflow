@@ -6,29 +6,33 @@ import (
 	"math"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/influxdata/influxdb/models"
-	"server/libs/zerodoc"
-
 	logging "github.com/op/go-logging"
-
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
-	"server/ingester/ext_metrics/dbwriter"
-	"server/libs/codec"
-	"server/libs/datatype"
-	"server/libs/grpc"
-	"server/libs/queue"
-	"server/libs/receiver"
-	"server/libs/stats"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/dbwriter"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("ext_metrics.decoder")
 
 const (
-	BUFFER_SIZE = 1024
+	BUFFER_SIZE         = 1024
+	TELEGRAF_POD        = "pod"
+	PROMETHEUS_POD      = "pod_name"
+	PROMETHEUS_INSTANCE = "instance"
 )
 
 type Counter struct {
@@ -76,7 +80,7 @@ func (d *Decoder) GetCounter() interface{} {
 }
 
 func (d *Decoder) Run() {
-	stats.RegisterCountable("decoder", d, stats.OptionStatTags{
+	common.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"thread":   strconv.Itoa(d.index),
 		"msg_type": d.msgType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
@@ -186,21 +190,10 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 	d.counter.OutCount++
 }
 
-var podTags = []string{"pod", "pod_name"}
-
-func isPod(name string) bool {
-	for _, v := range podTags {
-		if name == v {
-			return true
-		}
-	}
-	return false
-}
-
 func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) ([]*dbwriter.ExtMetrics, error) {
 	ms := make([]*dbwriter.ExtMetrics, 0, len(ts.Samples))
 
-	tableName, podName := "", ""
+	tableName, podName, instance := "", "", ""
 	tagNames := make([]string, 0, len(ts.Labels))
 	tagValues := make([]string, 0, len(ts.Labels))
 	for _, l := range ts.Labels {
@@ -208,8 +201,10 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 			tableName = l.Value
 			continue
 		}
-		if isPod(l.Name) {
+		if l.Name == PROMETHEUS_POD {
 			podName = l.Value
+		} else if l.Name == PROMETHEUS_INSTANCE {
+			instance = l.Value
 		}
 		tagNames = append(tagNames, l.Name)
 		tagValues = append(tagValues, l.Value)
@@ -235,51 +230,78 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 		m.MetricsFloatNames = append(m.MetricsFloatNames, "value")
 		m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 
-		d.fillExtMetricsBase(m, vtapID, podName)
+		d.fillExtMetricsBase(m, vtapID, podName, instance)
 		ms = append(ms, m)
 	}
 	return ms, nil
 }
 
-func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName string) {
+func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName, instance string) {
 	m.Tag.Code = zerodoc.AZID | zerodoc.HostID | zerodoc.IP | zerodoc.L3Device | zerodoc.L3EpcID | zerodoc.PodClusterID | zerodoc.PodGroupID | zerodoc.PodID | zerodoc.PodNodeID | zerodoc.PodNSID | zerodoc.RegionID | zerodoc.SubnetID | zerodoc.VTAPID
 	m.Tag.VTAPID = vtapID
 	m.Tag.L3EpcID = datatype.EPC_FROM_INTERNET
+	var ip net.IP
 	if podName != "" {
 		podInfo := d.platformData.QueryPodInfo(uint32(vtapID), podName)
 		if podInfo != nil {
 			m.Tag.PodClusterID = uint16(podInfo.PodClusterId)
 			m.Tag.PodID = podInfo.PodId
 			m.Tag.L3EpcID = int16(podInfo.EpcId)
-			ip := net.ParseIP(podInfo.Ip)
-			if ip != nil {
-				if ip4 := ip.To4(); ip4 != nil {
-					m.Tag.IsIPv6 = 0
-					m.Tag.IP = utils.IpToUint32(ip4)
-				} else {
-					m.Tag.IsIPv6 = 1
-					m.Tag.IP6 = ip
-				}
-			}
-			var info *grpc.Info
-			if m.Tag.IsIPv6 == 1 {
-				info = d.platformData.QueryIPV6Infos(m.Tag.L3EpcID, m.Tag.IP6)
-			} else {
-				info = d.platformData.QueryIPV4Infos(m.Tag.L3EpcID, m.Tag.IP)
-			}
-			if info != nil {
-				m.Tag.RegionID = uint16(info.RegionID)
-				m.Tag.AZID = uint16(info.AZID)
-				m.Tag.HostID = uint16(info.HostID)
-				m.Tag.PodGroupID = info.PodGroupID
-				m.Tag.PodNSID = uint16(info.PodNSID)
-				m.Tag.PodNodeID = info.PodNodeID
-				m.Tag.SubnetID = uint16(info.SubnetID)
-				m.Tag.L3DeviceID = info.DeviceID
-				m.Tag.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
-			}
+			ip = net.ParseIP(podInfo.Ip)
+		}
+	} else if instance != "" {
+		m.Tag.L3EpcID = int16(d.platformData.QueryVtapEpc0(uint32(vtapID)))
+		ip = parseIPFromInstance(instance)
+	}
+
+	if ip != nil {
+		if ip4 := ip.To4(); ip4 != nil {
+			m.Tag.IsIPv6 = 0
+			m.Tag.IP = utils.IpToUint32(ip4)
+		} else {
+			m.Tag.IsIPv6 = 1
+			m.Tag.IP6 = ip
 		}
 	}
+	var info *grpc.Info
+	if m.Tag.IsIPv6 == 1 {
+		info = d.platformData.QueryIPV6Infos(m.Tag.L3EpcID, m.Tag.IP6)
+	} else {
+		info = d.platformData.QueryIPV4Infos(m.Tag.L3EpcID, m.Tag.IP)
+	}
+	if info != nil {
+		m.Tag.RegionID = uint16(info.RegionID)
+		m.Tag.AZID = uint16(info.AZID)
+		m.Tag.HostID = uint16(info.HostID)
+		m.Tag.PodGroupID = info.PodGroupID
+		m.Tag.PodNSID = uint16(info.PodNSID)
+		m.Tag.PodNodeID = info.PodNodeID
+		m.Tag.SubnetID = uint16(info.SubnetID)
+		m.Tag.L3DeviceID = info.DeviceID
+		m.Tag.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
+		if m.Tag.PodClusterID == 0 {
+			m.Tag.PodClusterID = uint16(info.PodClusterID)
+		}
+		if m.Tag.PodID == 0 {
+			m.Tag.PodID = info.PodID
+		}
+	}
+}
+
+// parse ip from "192.168.0.1:22" or "[2001:db8::68]:22"
+func parseIPFromInstance(instance string) net.IP {
+	var ipPart string
+	index := strings.LastIndex(instance, ":")
+	if index < 0 {
+		ipPart = instance
+	} else {
+		ipPart = instance[:index]
+	}
+	if ipPart[0] == '[' && ipPart[len(ipPart)-1] == ']' {
+		ipPart = ipPart[1 : len(ipPart)-1]
+	}
+
+	return net.ParseIP(ipPart)
 }
 
 func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwriter.ExtMetrics, error) {
@@ -293,11 +315,11 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 		tagValue := string(tag.Value)
 		m.TagNames = append(m.TagNames, tagName)
 		m.TagValues = append(m.TagValues, tagValue)
-		if isPod(tagName) {
+		if tagName == TELEGRAF_POD {
 			podName = tagValue
 		}
 	}
-	d.fillExtMetricsBase(m, vtapID, podName)
+	d.fillExtMetricsBase(m, vtapID, podName, "")
 
 	iter := point.FieldIterator()
 	for iter.Next() {

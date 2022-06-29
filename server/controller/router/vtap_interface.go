@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"server/controller/config"
-	"server/controller/service"
+	"github.com/metaflowys/metaflow/server/controller/config"
+	"github.com/metaflowys/metaflow/server/controller/service"
 )
 
 func VTapInterface(e *gin.Engine, cfg *config.ControllerConfig) {

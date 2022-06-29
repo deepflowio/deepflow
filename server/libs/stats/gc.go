@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"time"
 
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type GcMonitor struct {
@@ -22,5 +22,5 @@ func (t *GcMonitor) GetCounter() interface{} {
 }
 
 func RegisterGcMonitor() {
-	registerCountable("gc", &GcMonitor{}, OptionInterval(time.Second))
+	registerCountable("", "gc", &GcMonitor{}, OptionInterval(time.Second))
 }

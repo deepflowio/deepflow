@@ -1,7 +1,7 @@
 package pb
 
 import (
-	"server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 var pbAppProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {

@@ -1,8 +1,8 @@
 package service
 
 import (
-	"server/querier/engine"
-	"server/querier/engine/clickhouse"
+	"github.com/metaflowys/metaflow/server/querier/engine"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse"
 )
 
 func Execute(args map[string]string) (result map[string][]interface{}, debug map[string]interface{}, err error) {

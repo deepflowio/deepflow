@@ -7,11 +7,11 @@ import (
 	"github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
-	"server/controller/common"
-	"server/controller/config"
-	"server/controller/db/mysql"
-	"server/controller/model"
-	"server/controller/monitor"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/config"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/monitor"
 )
 
 func GetControllers(filter map[string]string) (resp []model.Controller, err error) {

@@ -230,6 +230,8 @@ message Config {
     optional bool external_agent_http_proxy_enabled = 406 [default = false]; // 外部Agent数据HTTP代理开关
     optional uint32 external_agent_http_proxy_port = 407 [default = 8086]; // 外部Agent数据HTTP代理端口
 
+    optional uint32 packet_sequence_flag = 410 [default = 0];
+
     optional uint32 sys_free_memory_limit = 501 [default = 0];
     optional uint32 log_file_size  = 502 [default = 1000];
 

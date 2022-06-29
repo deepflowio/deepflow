@@ -3,7 +3,7 @@ package datatype
 import (
 	"fmt"
 
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

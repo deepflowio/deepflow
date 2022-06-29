@@ -8,8 +8,8 @@ import (
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
-	"server/controller/trisolaris/config"
-	"server/controller/trisolaris/utils"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
 
 var log = logging.MustGetLogger("server")

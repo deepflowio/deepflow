@@ -9,8 +9,8 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 
-	"server/controller/trisolaris/config"
-	"server/controller/trisolaris/utils"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
 
 func Run(ctx context.Context, cfg *config.Config) {

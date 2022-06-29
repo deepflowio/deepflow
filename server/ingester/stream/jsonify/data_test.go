@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"server/ingester/stream/geo"
-	"server/libs/datatype"
-	"server/libs/datatype/pb"
-	"server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/ingester/stream/geo"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
 )
 
 func TestJsonify(t *testing.T) {
@@ -34,7 +34,7 @@ func TestJsonify(t *testing.T) {
 }
 
 func TestZeroToNull(t *testing.T) {
-	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
+	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
 	taggedFlow := pb.TaggedFlow{
 		Flow: &pb.Flow{
 			FlowKey:            &pb.FlowKey{},
@@ -92,7 +92,7 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 	appData.BaseInfo.Head.Proto = uint32(datatype.L7_PROTOCOL_HTTP_1)
 	appData.Http = &pb.HTTPInfo{}
 
-	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
+	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
 	httpData := ProtoLogToL7Logger(appData, 0, pf).(*L7Logger)
 	if httpData.VtapID != 123 {
 		t.Errorf("expect 123, result %v", httpData.VtapID)
@@ -115,7 +115,7 @@ func TestProtoLogToDNSLogger(t *testing.T) {
 	appData.BaseInfo.Head.Proto = uint32(datatype.L7_PROTOCOL_DNS)
 	appData.Dns = &pb.DNSInfo{}
 
-	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", nil)
+	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
 	dnsData := ProtoLogToL7Logger(appData, 0, pf).(*L7Logger)
 	if dnsData.TapType != 3 {
 		t.Errorf("expect 3, result %v", dnsData.TapType)

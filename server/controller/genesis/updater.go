@@ -3,18 +3,19 @@ package genesis
 import (
 	"context"
 	"fmt"
-	tridentcommon "github.com/metaflowys/metaflow/message/common"
-	"github.com/metaflowys/metaflow/message/trident"
 	"inet.af/netaddr"
-	"server/controller/common"
-	genesiscommon "server/controller/genesis/common"
-	"server/controller/model"
 	"strconv"
 	"strings"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
-	"server/libs/queue"
+
+	tridentcommon "github.com/metaflowys/metaflow/message/common"
+	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	genesiscommon "github.com/metaflowys/metaflow/server/controller/genesis/common"
+	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/libs/queue"
 )
 
 type VinterfacesRpcUpdater struct {

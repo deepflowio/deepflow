@@ -445,7 +445,7 @@ impl FlowItem {
             return Err(LogError::L7ProtocolUnknown);
         }
 
-        if packet.l4_payload_len() <= 8 {
+        if packet.l4_payload_len() <= 1 {
             return Err(LogError::L7ProtocolUnknown);
         }
 

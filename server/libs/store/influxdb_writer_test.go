@@ -11,7 +11,7 @@ import (
 
 	. "github.com/golang/mock/gomock"
 	"github.com/influxdata/influxdb/client/v2"
-	"server/libs/store/mock_client"
+	"github.com/metaflowys/metaflow/server/libs/store/mock_client"
 )
 
 const (

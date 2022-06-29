@@ -10,9 +10,10 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"server/libs/queue"
-	"server/libs/receiver"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("droplet.syslog")

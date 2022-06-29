@@ -7,17 +7,18 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"server/libs/zerodoc"
 
-	"server/ingester/roze/dbwriter"
-	"server/libs/app"
-	"server/libs/codec"
-	"server/libs/grpc"
-	"server/libs/queue"
-	"server/libs/receiver"
-	"server/libs/stats"
-	"server/libs/utils"
-	"server/libs/zerodoc/pb"
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/roze/dbwriter"
+	"github.com/metaflowys/metaflow/server/libs/app"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc/pb"
 )
 
 var log = logging.MustGetLogger("roze.unmarshaller")
@@ -187,7 +188,7 @@ func decodeForDebug(b []byte) (BatchDocument, error) {
 }
 
 func (u *Unmarshaller) QueueProcess() {
-	stats.RegisterCountable("unmarshaller", u, stats.OptionStatTags{"thread": strconv.Itoa(u.index)})
+	common.RegisterCountableForIngester("unmarshaller", u, stats.OptionStatTags{"thread": strconv.Itoa(u.index)})
 	rawDocs := make([]interface{}, GET_MAX_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	pbDoc := pb.NewDocument()

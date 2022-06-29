@@ -6,7 +6,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/shirou/gopsutil/process"
 
-	"server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 )
 
 var log = logging.MustGetLogger("monitor")

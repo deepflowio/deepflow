@@ -6,8 +6,8 @@ import (
 
 	api "github.com/metaflowys/metaflow/message/trident"
 
-	"server/controller/genesis"
-	grpcserver "server/controller/trisolaris/server/grpc"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
+	grpcserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/grpc"
 )
 
 type service struct {

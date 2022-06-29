@@ -6,8 +6,8 @@ import (
 
 	"github.com/mikioh/ipaddr"
 
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {

@@ -8,29 +8,29 @@ import (
 	"runtime"
 	"time"
 
-	"server/ingester/ckmonitor"
-	"server/ingester/datasource"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/logger"
-	"server/libs/receiver"
-	"server/libs/stats"
+	"github.com/metaflowys/metaflow/server/ingester/ckmonitor"
+	"github.com/metaflowys/metaflow/server/ingester/datasource"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/logger"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"server/ingester/ckissu"
-	"server/ingester/config"
-	dropletcfg "server/ingester/droplet/config"
-	"server/ingester/droplet/droplet"
-	"server/ingester/droplet/profiler"
-	"server/ingester/dropletctl"
-	extmetricscfg "server/ingester/ext_metrics/config"
-	"server/ingester/ext_metrics/ext_metrics"
-	rozecfg "server/ingester/roze/config"
-	"server/ingester/roze/roze"
-	streamcfg "server/ingester/stream/config"
-	"server/ingester/stream/stream"
+	"github.com/metaflowys/metaflow/server/ingester/ckissu"
+	"github.com/metaflowys/metaflow/server/ingester/config"
+	dropletcfg "github.com/metaflowys/metaflow/server/ingester/droplet/config"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/droplet"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/profiler"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	extmetricscfg "github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/ext_metrics"
+	rozecfg "github.com/metaflowys/metaflow/server/ingester/roze/config"
+	"github.com/metaflowys/metaflow/server/ingester/roze/roze"
+	streamcfg "github.com/metaflowys/metaflow/server/ingester/stream/config"
+	"github.com/metaflowys/metaflow/server/ingester/stream/stream"
 )
 
 var log = logging.MustGetLogger("ingester")
@@ -78,15 +78,15 @@ func Start(configPath string) []io.Closer {
 	closers := droplet.Start(dropletConfig, receiver)
 
 	if cfg.StreamRozeEnabled {
-		streamConfig := streamcfg.Load(configPath)
+		streamConfig := streamcfg.Load(cfg, configPath)
 		bytes, _ = yaml.Marshal(streamConfig)
 		log.Infof("stream config:\n%s", string(bytes))
 
-		rozeConfig := rozecfg.Load(configPath)
+		rozeConfig := rozecfg.Load(cfg, configPath)
 		bytes, _ = yaml.Marshal(rozeConfig)
 		log.Infof("roze config:\n%s", string(bytes))
 
-		extMetricsConfig := extmetricscfg.Load(configPath)
+		extMetricsConfig := extmetricscfg.Load(cfg, configPath)
 		bytes, _ = yaml.Marshal(extMetricsConfig)
 		log.Infof("ext_metrics config:\n%s", string(bytes))
 
@@ -109,20 +109,20 @@ func Start(configPath string) []io.Closer {
 		defer extMetrics.Close()
 
 		// 创建、修改、删除数据源及其存储时长
-		ds := datasource.NewDatasourceManager([]string{rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary},
-			rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled,
+		ds := datasource.NewDatasourceManager([]string{rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary},
+			rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled,
 			cfg.CKS3Storage.Enabled, cfg.CKS3Storage.Volume, cfg.CKS3Storage.TTLTimes)
 		ds.Start()
 		defer ds.Close()
 
 		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
-		cm, err := ckmonitor.NewCKMonitor(&cfg.CKDiskMonitor, rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary, rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password)
+		cm, err := ckmonitor.NewCKMonitor(&cfg.CKDiskMonitor, rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)
 		checkError(err)
 		cm.Start()
 		defer cm.Close()
 
 		// clickhouse表结构变更处理
-		issu, err := ckissu.NewCKIssu(rozeConfig.CKDB.Primary, rozeConfig.CKDB.Secondary, rozeConfig.CKDBAuth.Username, rozeConfig.CKDBAuth.Password)
+		issu, err := ckissu.NewCKIssu(rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)
 		checkError(err)
 		// 等roze,stream初始化建表完成,再执行issu
 		time.Sleep(time.Second)

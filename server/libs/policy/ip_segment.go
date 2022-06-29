@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"net"
 
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type ipSegment struct {

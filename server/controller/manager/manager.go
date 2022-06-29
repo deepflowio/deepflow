@@ -11,13 +11,13 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
 
-	cloudcfg "server/controller/cloud/config"
-	kubernetes_gather_model "server/controller/cloud/kubernetes_gather/model"
-	"server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/manager/config"
-	"server/controller/recorder"
+	cloudcfg "github.com/metaflowys/metaflow/server/controller/cloud/config"
+	kubernetes_gather_model "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/manager/config"
+	"github.com/metaflowys/metaflow/server/controller/recorder"
 )
 
 var log = logging.MustGetLogger("manager")

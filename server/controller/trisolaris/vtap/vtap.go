@@ -18,15 +18,15 @@ import (
 	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/op/go-logging"
 
-	. "server/controller/common"
-	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
-	"server/controller/trisolaris/config"
-	"server/controller/trisolaris/dbmgr"
-	"server/controller/trisolaris/metadata"
-	"server/controller/trisolaris/pushmanager"
-	. "server/controller/trisolaris/utils"
-	"server/controller/trisolaris/utils/atomicbool"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 var log = logging.MustGetLogger("trisolaris/vtap")
@@ -186,7 +186,7 @@ func (v *VTapInfo) loadRegion() string {
 func (v *VTapInfo) loadDefaultVTapGroup() string {
 	defaultVTapGroup, err := dbmgr.DBMgr[models.VTapGroup](v.db).GetFromID(DEFAULT_VTAP_GROUP_ID)
 	if err != nil {
-		log.Error("no default vtap group, err(%s)", err)
+		log.Errorf("no default vtap group, err(%s)", err)
 		return ""
 	}
 

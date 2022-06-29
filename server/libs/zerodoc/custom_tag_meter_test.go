@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/codec"
 )
 
 func TestCustomTagMeterMetaEncodeDecode(t *testing.T) {

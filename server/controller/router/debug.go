@@ -3,9 +3,9 @@ package router
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	"server/controller/genesis"
-	"server/controller/manager"
-	"server/controller/service"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/manager"
+	"github.com/metaflowys/metaflow/server/controller/service"
 )
 
 func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {

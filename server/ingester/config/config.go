@@ -2,9 +2,11 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -14,13 +16,18 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultCheckInterval   = 600 // clickhouse是异步删除
-	DefaultDiskUsedPercent = 90
-	DefaultDiskFreeSpace   = 50
-	DefaultCKDBS3Volume    = "vol_s3"
-	DefaultCKDBS3TTLTimes  = 3 // 对象存储的保留时长是本地存储的3倍
-	DefaultInfluxdbHost    = "influxdb"
-	DefaultInfluxdbPort    = "20044"
+	DefaultContrallerIP      = "127.0.0.1"
+	DefaultControllerPort    = 20035
+	DefaultCheckInterval     = 600 // clickhouse是异步删除
+	DefaultDiskUsedPercent   = 90
+	DefaultDiskFreeSpace     = 50
+	DefaultCKDBS3Volume      = "vol_s3"
+	DefaultCKDBS3TTLTimes    = 3 // 对象存储的保留时长是本地存储的3倍
+	DefaultInfluxdbHost      = "influxdb"
+	DefaultInfluxdbPort      = "20044"
+	EnvNodeIP                = "NODE_IP"
+	DefaultCKDBServicePrefix = "clickhouse"
+	DefaultCKDBServicePort   = 9000
 )
 
 type CKDiskMonitor struct {
@@ -40,9 +47,23 @@ type HostPort struct {
 	Port string `yaml:"port"`
 }
 
+type CKAddrs struct {
+	Primary   string `yaml:"primary"`
+	Secondary string `yaml:"secondary"` // 既可以是primary也可以是replica
+}
+
+type Auth struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
 type Config struct {
-	ControllerIps     []string      `yaml:"controller-ips,flow"`
+	ControllerIPs     []string      `yaml:"controller-ips,flow"`
 	ControllerPort    uint16        `yaml:"controller-port"`
+	CKDBServicePrefix string        `yaml:"ckdb-service-prefix"`
+	CKDBServicePort   int           `yaml:"ckdb-service-port"`
+	CKDB              CKAddrs       `yaml:"ckdb"`
+	CKDBAuth          Auth          `yaml:"ckdb-auth"`
 	StreamRozeEnabled bool          `yaml:"stream-roze-enabled"`
 	UDPReadBuffer     int           `yaml:"udp-read-buffer"`
 	TCPReadBuffer     int           `yaml:"tcp-read-buffer"`
@@ -53,6 +74,7 @@ type Config struct {
 	CKDiskMonitor     CKDiskMonitor `yaml:"ck-disk-monitor"`
 	CKS3Storage       CKS3Storage   `yaml:"ckdb-s3"`
 	Influxdb          HostPort      `yaml:"influxdb"`
+	NodeIP            string        `yaml:"node-ip"`
 }
 
 type BaseConfig struct {
@@ -60,14 +82,45 @@ type BaseConfig struct {
 }
 
 func (c *Config) Validate() error {
-	if len(c.ControllerIps) == 0 {
+	if len(c.ControllerIPs) == 0 {
 		log.Warning("controller-ips is empty")
 	} else {
-		for _, ipString := range c.ControllerIps {
+		for _, ipString := range c.ControllerIPs {
 			if net.ParseIP(ipString) == nil {
 				return errors.New("controller-ips invalid")
 			}
 		}
+	}
+
+	// if the controller IP is localhost, can't get node ip through ip routing,
+	// should get node ip from ENV
+	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
+		nodeIP, exist := os.LookupEnv("NODE_IP")
+		if !exist {
+			panic(fmt.Sprintf("Can't get env %s", EnvNodeIP))
+		}
+		c.NodeIP = nodeIP
+	}
+
+	if c.CKDB.Primary == "" {
+		hostName, err := os.Hostname()
+		if err != nil {
+			panic(fmt.Sprintf("get hostname failed. err: %s", err))
+		}
+		index := strings.LastIndex(hostName, "-")
+		if index == -1 || index >= len(hostName)-1 {
+			panic(fmt.Sprintf("host name is %s,  should cantains '-'", hostName))
+		}
+		indexInt, err := strconv.Atoi(hostName[index+1:])
+		if err != nil {
+			panic(fmt.Sprintf("host name is %s,  should have digit subfix", hostName))
+		}
+		c.CKDB.Primary = fmt.Sprintf("%s-%d:%d", c.CKDBServicePrefix, indexInt, c.CKDBServicePort)
+		log.Infof("get clickhouse address: %s", c.CKDB.Primary)
+	}
+
+	if c.CKDB.Primary == c.CKDB.Secondary {
+		return errors.New("in 'ckdb' config, 'primary' is equal to 'secondary', it is not allowed")
 	}
 
 	level := strings.ToLower(c.LogLevel)
@@ -81,11 +134,14 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func Load(path string) Config {
+func Load(path string) *Config {
 	configBytes, err := ioutil.ReadFile(path)
 	config := BaseConfig{
 		Base: Config{
-			ControllerPort:    20035,
+			ControllerIPs:     []string{DefaultContrallerIP},
+			ControllerPort:    DefaultControllerPort,
+			CKDBServicePrefix: DefaultCKDBServicePrefix,
+			CKDBServicePort:   DefaultCKDBServicePort,
 			StreamRozeEnabled: true,
 			UDPReadBuffer:     64 << 20,
 			TCPReadBuffer:     4 << 20,
@@ -108,5 +164,5 @@ func Load(path string) Config {
 		log.Error(err)
 		os.Exit(1)
 	}
-	return config.Base
+	return &config.Base
 }

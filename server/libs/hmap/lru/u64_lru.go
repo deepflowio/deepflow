@@ -5,10 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"server/libs/hmap"
-	"server/libs/hmap/keyhash"
-	"server/libs/stats"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/hmap"
+	"github.com/metaflowys/metaflow/server/libs/hmap/keyhash"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type u64LRUNode struct {

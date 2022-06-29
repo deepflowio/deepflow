@@ -8,9 +8,9 @@ import (
 	uuid "github.com/satori/go.uuid"
 	// "gorm.io/gorm/clause"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) {

@@ -1,7 +1,7 @@
 package queue
 
 import (
-	"server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/queue"
 )
 
 type Queue struct {

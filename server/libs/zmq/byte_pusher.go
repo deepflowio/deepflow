@@ -3,8 +3,9 @@ package zmq
 import (
 	logging "github.com/op/go-logging"
 	"github.com/pebbe/zmq4"
-	"server/libs/queue"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("sender")

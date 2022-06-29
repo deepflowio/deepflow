@@ -136,6 +136,7 @@ impl L7LogParse for RedisLog {
             status: self.status,
             code: 0,
             rrt: 0,
+            version: 0,
         })
     }
 

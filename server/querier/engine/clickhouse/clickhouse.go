@@ -9,14 +9,14 @@ import (
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 
-	"server/querier/common"
-	"server/querier/config"
-	"server/querier/engine/clickhouse/client"
-	chCommon "server/querier/engine/clickhouse/common"
-	"server/querier/engine/clickhouse/metrics"
-	tagdescription "server/querier/engine/clickhouse/tag"
-	"server/querier/engine/clickhouse/view"
-	"server/querier/parse"
+	"github.com/metaflowys/metaflow/server/querier/common"
+	"github.com/metaflowys/metaflow/server/querier/config"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/client"
+	chCommon "github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/metrics"
+	tagdescription "github.com/metaflowys/metaflow/server/querier/engine/clickhouse/tag"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
+	"github.com/metaflowys/metaflow/server/querier/parse"
 )
 
 var log = logging.MustGetLogger("clickhouse")

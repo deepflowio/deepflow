@@ -3,13 +3,13 @@ package service
 import (
 	"fmt"
 
-	kubernetes_gather_model "server/controller/cloud/kubernetes_gather/model"
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/genesis"
-	"server/controller/manager"
-	"server/controller/model"
-	"server/controller/recorder/cache"
+	kubernetes_gather_model "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather/model"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/manager"
+	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
 )
 
 func GetCloudBasicInfos(filter map[string]string, m *manager.Manager) (resp []cloudmodel.BasicInfo, err error) {
