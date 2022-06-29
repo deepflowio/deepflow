@@ -5,8 +5,6 @@ type GenesisConfig struct {
 	VinterfaceAgingTime     float64  `default:"300" yaml:"vinterface_aging_time"`
 	LocalIPRanges           []string `yaml:"local_ip_ranges"`
 	ExcludeIPRanges         []string `yaml:"exclude_ip_ranges"`
-	GRPCServerHost          string   `default:"genesis" yaml:"grpc_server_host"`
-	GRPCServerPort          int      `default:"20036" yaml:"grpc_server_port"`
 	QueueLengths            int      `default:"60" yaml:"queue_length"`
 	DataPersistenceInterval int      `default:"60" yaml:"data_persistence_interval"`
 	IPv4CIDRMaxMask         int      `default:"16" yaml:"ipv4_cidr_max_mask"`
