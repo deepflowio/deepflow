@@ -4,11 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
-	"strconv"
 	"time"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 
 	tridentcommon "github.com/metaflowys/metaflow/message/common"
@@ -41,7 +38,6 @@ type TridentStats struct {
 
 type SynchronizerServer struct {
 	cfg                 config.GenesisConfig
-	conn                *grpc.ClientConn
 	k8sQueue            queue.QueueWriter
 	vinterfaceQueue     queue.QueueWriter
 	vtapIDToVersion     map[uint32]uint64
@@ -49,18 +45,11 @@ type SynchronizerServer struct {
 	vtapIDToLastSeen    map[uint32]time.Time
 	clusterIDToLastSeen map[string]time.Time
 	tridentStatsMap     map[uint32]TridentStats
-	// trident.UnimplementedSynchronizerServer
 }
 
 func NewGenesisSynchronizerServer(cfg config.GenesisConfig, vinterfaceQueue, k8sQueue queue.QueueWriter) *SynchronizerServer {
-	grpcServer := net.JoinHostPort(cfg.GRPCServerHost, strconv.Itoa(cfg.GRPCServerPort))
-	conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
-	if err != nil {
-		log.Error(err.Error())
-	}
 	return &SynchronizerServer{
 		cfg:                 cfg,
-		conn:                conn,
 		k8sQueue:            k8sQueue,
 		vinterfaceQueue:     vinterfaceQueue,
 		vtapIDToVersion:     map[uint32]uint64{},
@@ -72,14 +61,6 @@ func NewGenesisSynchronizerServer(cfg config.GenesisConfig, vinterfaceQueue, k8s
 }
 
 func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.GenesisSyncRequest) (*trident.GenesisSyncResponse, error) {
-	client := trident.NewSynchronizerClient(g.conn)
-	// 因为py版本的genesis暂未完全取消，所以trident上报的消息要先透传给py版的genesis
-	_, err := client.GenesisSync(ctx, request)
-	if err != nil {
-		log.Warning(err.Error())
-		return &trident.GenesisSyncResponse{}, err
-	}
-
 	stats := TridentStats{}
 	remote := ""
 	peerIP, _ := peer.FromContext(ctx)
@@ -168,14 +149,6 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 }
 
 func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *trident.KubernetesAPISyncRequest) (*trident.KubernetesAPISyncResponse, error) {
-	client := trident.NewSynchronizerClient(g.conn)
-	// 因为py版本的genesis暂未完全取消，所以trident上报的消息要先透传给py版的genesis
-	_, err := client.KubernetesAPISync(ctx, request)
-	if err != nil {
-		log.Warning(err.Error())
-		return &trident.KubernetesAPISyncResponse{}, err
-	}
-
 	stats := TridentStats{}
 	remote := ""
 	peerIP, _ := peer.FromContext(ctx)
