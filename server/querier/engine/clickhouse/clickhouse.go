@@ -101,7 +101,7 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 	}
 	switch strings.ToLower(sqlSplit[1]) {
 	case "metrics":
-		if strings.ToLower(sqlSplit[2]) == "functions" {
+		if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, true, err
 		} else {
