@@ -83,7 +83,8 @@ jobs:
 
       - name: set env
         run: |
-          echo "IMAGE_TAG=$(date +%y%m)-$(git rev-list --count HEAD)" >> $GITHUB_ENV
+          echo "IMAGE_TAG_PREFIX=${{ github.GITHUB_REF_NAME }}"|sed 's|main|latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
       - name: Build and push metaflow server images
         uses: docker/build-push-action@v2
@@ -93,11 +94,11 @@ jobs:
           file: server/Dockerfile
           platforms: linux/amd64
           tags: |
-            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
-            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:latest"
-            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
-            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:latest"
-            "metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG }}"
-            "metaflowys/${{ env.IMAGE }}:latest"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG }}"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:latest"
+            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
+            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX"
+            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
+            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX"
+            "metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
+            "metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:$IMAGE_TAG_PREFIX"
