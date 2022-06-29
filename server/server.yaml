@@ -188,6 +188,9 @@ ingester:
   #  volume: vol_s3  #ckdb中对象存储的卷名
   #  ttl-times: 3    #对象存储中数据的存储时长是本地存储的几倍
 
+  ## whether write stats data to influxdb
+  #influxdb-writer-enabled: false
+
   ## 存储stats统计数据的influxdb地址
   #influxdb:
   #  host: influxdb
