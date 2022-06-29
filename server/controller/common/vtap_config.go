@@ -107,7 +107,7 @@ var (
 	Domains                       = "0"
 	DecapType                     = "0"
 	HTTPLogSpanID                 = "关闭"
-	SysFreeMemoryLimit            = 30
+	SysFreeMemoryLimit            = 0
 	LogFileSize                   = 1000
 	HTTPLogXRequestID             = "关闭"
 	ExternalAgentHTTPProxyEnabled = 0
