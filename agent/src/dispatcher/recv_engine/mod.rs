@@ -17,7 +17,6 @@
 pub(crate) mod af_packet;
 pub(crate) mod bpf;
 
-use std::ffi::CStr;
 use std::sync::{atomic::AtomicU64, Arc};
 use std::time::Duration;
 
@@ -63,7 +62,7 @@ impl RecvEngine {
         }
     }
 
-    pub fn set_bpf(&mut self, s: &CStr) -> Result<()> {
+    pub fn set_bpf(&mut self, s: Vec<af_packet::RawInstruction>) -> Result<()> {
         match self {
             Self::AfPacket(e) => e.set_bpf(s).map_err(|e| e.into()),
             Self::Dpdk() => todo!(),
