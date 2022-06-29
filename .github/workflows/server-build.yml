@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'feature-**'
     paths:
       - 'server/**'
       - 'message/**'
@@ -94,11 +95,11 @@ jobs:
           file: server/Dockerfile
           platforms: linux/amd64
           tags: |
-            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
-            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX"
-            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
-            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX"
-            "metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
-            "metaflowys/${{ env.IMAGE }}:$IMAGE_TAG_PREFIX"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:$IMAGE_TAG_PREFIX-${{ env.IMAGE_TAG }}"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:$IMAGE_TAG_PREFIX"
+            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "registry.cn-beijing.aliyuncs.com/metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+            "metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "metaflowys/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG_PREFIX }}"
