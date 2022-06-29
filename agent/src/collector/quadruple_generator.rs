@@ -420,7 +420,7 @@ impl SubQuadGen {
     }
 
     fn flush_all_flow(&mut self, possible_host: &mut PossibleHost) {
-        let mut tmp = ConcurrentConnection::with_capacity(1 << 18);
+        let mut tmp = ConcurrentConnection::with_capacity(1 << 13);
         for i in 0..self.stashs.len() {
             tmp.merge(Duration::ZERO, &self.connections[i]);
             self.flush_flow(i, &mut tmp, possible_host);
