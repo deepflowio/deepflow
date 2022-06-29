@@ -58,23 +58,24 @@ type Auth struct {
 }
 
 type Config struct {
-	ControllerIPs     []string      `yaml:"controller-ips,flow"`
-	ControllerPort    uint16        `yaml:"controller-port"`
-	CKDBServicePrefix string        `yaml:"ckdb-service-prefix"`
-	CKDBServicePort   int           `yaml:"ckdb-service-port"`
-	CKDB              CKAddrs       `yaml:"ckdb"`
-	CKDBAuth          Auth          `yaml:"ckdb-auth"`
-	StreamRozeEnabled bool          `yaml:"stream-roze-enabled"`
-	UDPReadBuffer     int           `yaml:"udp-read-buffer"`
-	TCPReadBuffer     int           `yaml:"tcp-read-buffer"`
-	LogFile           string        `yaml:"log-file"`
-	LogLevel          string        `yaml:"log-level"`
-	Profiler          bool          `yaml:"profiler"`
-	MaxCPUs           int           `yaml:"max-cpus"`
-	CKDiskMonitor     CKDiskMonitor `yaml:"ck-disk-monitor"`
-	CKS3Storage       CKS3Storage   `yaml:"ckdb-s3"`
-	Influxdb          HostPort      `yaml:"influxdb"`
-	NodeIP            string        `yaml:"node-ip"`
+	ControllerIPs         []string      `yaml:"controller-ips,flow"`
+	ControllerPort        uint16        `yaml:"controller-port"`
+	CKDBServicePrefix     string        `yaml:"ckdb-service-prefix"`
+	CKDBServicePort       int           `yaml:"ckdb-service-port"`
+	CKDB                  CKAddrs       `yaml:"ckdb"`
+	CKDBAuth              Auth          `yaml:"ckdb-auth"`
+	StreamRozeEnabled     bool          `yaml:"stream-roze-enabled"`
+	UDPReadBuffer         int           `yaml:"udp-read-buffer"`
+	TCPReadBuffer         int           `yaml:"tcp-read-buffer"`
+	LogFile               string        `yaml:"log-file"`
+	LogLevel              string        `yaml:"log-level"`
+	Profiler              bool          `yaml:"profiler"`
+	MaxCPUs               int           `yaml:"max-cpus"`
+	CKDiskMonitor         CKDiskMonitor `yaml:"ck-disk-monitor"`
+	CKS3Storage           CKS3Storage   `yaml:"ckdb-s3"`
+	InfluxdbWriterEnabled bool          `yaml:"influxdb-writer-enabled"`
+	Influxdb              HostPort      `yaml:"influxdb"`
+	NodeIP                string        `yaml:"node-ip"`
 }
 
 type BaseConfig struct {

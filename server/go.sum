@@ -353,7 +353,8 @@ github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NH
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/influxdb v1.9.7 h1:asjvZJ8NFFmxkSw+kOJj1ItGLQdU1nvRQE3jvdQXeRU=
 github.com/influxdata/influxdb v1.9.7/go.mod h1:YZMcI9MYeMGLcg7Td7z5YRk52tL85r5bF4qX6WCnSt4=
-github.com/ionos-cloud/sdk-go/v6 v6.0.5851 h1:Xjdta3uR5SDLXXl0oahgVIJ+AQNFCyOCuAwxPAXFUCM=
+github.com/ionos-cloud/sdk-go/v6 v6.1.0 h1:0EZz5H+t6W23zHt6dgHYkKavr72/30O9nA97E3FZaS4=
+github.com/ionos-cloud/sdk-go/v6 v6.1.0/go.mod h1:Ox3W0iiEz0GHnfY9e5LmAxwklsxguuNFEUSu0gVRTME=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD/E=
 github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
