@@ -43,6 +43,21 @@ struct data_members offsets[] = {
 		.structure = "runtime.g",
 		.field_name = "goid",
 		.idx = runtime_g_goid_offset,
+		.default_offset = 152,
+	},
+	{
+		.structure = "crypto/tls.Conn",
+		.field_name = "conn",
+		.idx = crypto_tls_conn_conn_offset,
+		.default_offset = 0,
+	},
+	{
+		// on go 1.8 the structure is "net/poll.FD", but the offset 
+		// is the same as on go 1.7, so a default offset is given
+		.structure = "internal/poll.FD",
+		.field_name = "Sysfd",
+		.idx = net_poll_fd_sysfd,
+		.default_offset = 16,
 	},
 };
 
@@ -187,9 +202,9 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (buf == NULL || len <= 0)
 		goto exit;
 
-	int num = sscanf(buf, "go%d.%d.%d", &go_ver->major, &go_ver->minor,
-			 &go_ver->revision);
-	if (num != 3)
+	int num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+	go_ver->revision = 0;
+	if (num != 2)
 		ebpf_warning("sscanf() go version failed. num = %d\n", num);
 	else
 		res = true;
@@ -259,7 +274,11 @@ static int resolve_bin_file(const char *path, int pid,
 			    struct_member_offset_analyze(probe_sym->binary_path,
 							 off->structure,
 							 off->field_name);
+			if (offset == ETR_INVAL)
+				offset = off->default_offset;
+
 			p_offs->offs.data[off->idx] = offset;
+
 			p_offs->offs.version =
 			    GO_VERSION(go_ver->major, go_ver->minor,
 				       go_ver->revision);
