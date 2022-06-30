@@ -2,7 +2,10 @@ module github.com/metaflowys/metaflow/server
 
 go 1.18
 
-replace github.com/metaflowys/metaflow/message => ../message
+replace (
+	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
+	github.com/metaflowys/metaflow/message => ../message
+)
 
 require (
 	bou.ke/monkey v1.0.2
@@ -84,7 +87,6 @@ require (
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
 	github.com/grafana/regexp v0.0.0-20220304095617-2e8d9baf4ac2 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
