@@ -61,7 +61,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 		connect, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
 		if err != nil {
 			log.Error(err)
-			return
+			continue
 		}
 		var ports []struct {
 			Port string `db:"port"`
@@ -69,7 +69,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 		if err := connect.Select(&ports, fmt.Sprintf("SELECT port FROM system.clusters WHERE host_address ='%s'", analyzer.IP)); err != nil {
 			log.Error(err)
 			connect.Close()
-			return
+			continue
 		}
 		connect.Close()
 
@@ -79,33 +79,30 @@ func (c *TagRecorder) UpdateChDictionary() {
 			portInt, err := strconv.Atoi(port.Port)
 			if err != nil {
 				log.Error(err)
-				return
+				continue
 			}
 			c.cfg.ClickHouseCfg.Port = uint32(portInt)
 			connect, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
 			if err != nil {
-				return
+				continue
 			}
 
 			// 检查并创建数据库
 			if err := connect.Select(&databases, "SHOW DATABASES"); err != nil {
 				log.Error(err)
 				connect.Close()
-				return
-			}
-			if len(databases) == 0 {
 				continue
 			}
 			sort.Strings(databases)
 			databaseIndex := sort.SearchStrings(databases, c.cfg.ClickHouseCfg.Database)
-			if databaseIndex == len(databases) || databases[databaseIndex] != c.cfg.ClickHouseCfg.Database {
+			if len(databases) == 0 || databaseIndex == len(databases) || databases[databaseIndex] != c.cfg.ClickHouseCfg.Database {
 				log.Infof("create database %s", c.cfg.ClickHouseCfg.Database)
 				sql := fmt.Sprintf("CREATE DATABASE %s", c.cfg.ClickHouseCfg.Database)
 				_, err = connect.Exec(sql)
 				if err != nil {
 					log.Error(err)
 					connect.Close()
-					return
+					continue
 				}
 			}
 
@@ -114,7 +111,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 			if err := connect.Select(&dictionaries, fmt.Sprintf("SHOW DICTIONARIES IN %s", c.cfg.ClickHouseCfg.Database)); err != nil {
 				log.Error(err)
 				connect.Close()
-				return
+				continue
 			}
 			wantedDicts := mapset.NewSet(
 				CH_DICTIONARY_IP_RESOURCE,
@@ -154,7 +151,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 				if err != nil {
 					log.Error(err)
 					connect.Close()
-					return
+					continue
 				}
 			}
 
@@ -172,7 +169,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 				if err != nil {
 					log.Error(err)
 					connect.Close()
-					return
+					continue
 				}
 			}
 
@@ -186,7 +183,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 				if err := connect.Select(&dictSQL, showSQL); err != nil {
 					log.Error(err)
 					connect.Close()
-					return
+					continue
 				}
 				createSQL := CREATE_SQL_MAP[dictName]
 				mysqlPortStr := strconv.Itoa(int(c.cfg.MySqlCfg.Port))
@@ -202,13 +199,13 @@ func (c *TagRecorder) UpdateChDictionary() {
 				if err != nil {
 					log.Error(err)
 					connect.Close()
-					return
+					continue
 				}
 				_, err = connect.Exec(createSQL)
 				if err != nil {
 					log.Error(err)
 					connect.Close()
-					return
+					continue
 				}
 			}
 			connect.Close()

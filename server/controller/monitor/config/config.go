@@ -8,6 +8,7 @@ type Warrant struct {
 
 type MonitorConfig struct {
 	HealthCheckInterval         int     `default:"60" yaml:"health_check_interval"`
+	HealthCheckPort             int     `default:"30417" yaml:"health_check_port"`
 	HealthCheckHandleChannelLen int     `default:"1000" yaml:"health_check_handle_channel_len"`
 	LicenseCheckInterval        int     `default:"60" yaml:"license_check_interval"`
 	Warrant                     Warrant `yaml:"warrant"`

@@ -130,9 +130,10 @@ func Start(configPath string) {
 		}
 	}()
 
-	// 注册router
+	// register router
 	r := gin.Default()
 	router.DebugRouter(r, m, g)
+	router.HealthRouter(r)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
 	router.VtapRouter(r)

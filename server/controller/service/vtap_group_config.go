@@ -540,7 +540,6 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupCon
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
-	fmt.Println(*updateData.MaxCPUs)
 	convertYamlToDb(updateData, dbConfig)
 	ret = db.Save(dbConfig)
 	if ret.Error != nil {

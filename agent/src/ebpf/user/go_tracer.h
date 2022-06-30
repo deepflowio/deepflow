@@ -3,14 +3,13 @@
 #include "symbol.h"
 #include "list_head.h"
 
-#define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
-
 #include "../kernel/include/socket_trace_common.h"
 
 struct data_members {
 	const char *structure;
 	const char *field_name;
 	enum offsets_index idx;
+	int default_offset;
 };
 
 // Pid correspond to offsets.

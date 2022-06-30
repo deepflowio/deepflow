@@ -34,7 +34,7 @@ process_threshold: 10
 
 # 基础配置参数
 # 采集网口，默认值：^tap*，长度范围[0, 65535]
-tap_interface_regex: ^tap*
+tap_interface_regex: ^(tap|cali|veth|eth).*
 # 流量过滤，默认值：空，表示全采集，长度范围[1, 512]
 # 请参考BPF语法：https://biot.com/capstats/bpf.html
 capture_bpf:

@@ -233,6 +233,7 @@ struct tls_conn
 	int fd;
 	char *buffer;
 	__u32 tcp_seq;
+	void* sp; // stack pointer
 };
 
 struct tls_conn_key
@@ -245,6 +246,7 @@ struct tls_conn_key
 #define rax ax
 #define rbx bx
 #define rcx cx
+#define rsp sp
 #endif
 
 #endif /* __BPF_SOCKET_TRACE_H__ */

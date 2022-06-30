@@ -6,11 +6,11 @@ import (
 	"regexp"
 
 	"github.com/google/uuid"
-	"github.com/metaflowys/metaflow/message/trident"
 	"gorm.io/gorm"
 
 	. "github.com/metaflowys/metaflow/server/controller/common"
 	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
 	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
@@ -152,6 +152,7 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 		AZ:              az,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          uuid.NewString(),
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -233,6 +234,7 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 		AZ:              matchPodNode.AZ,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          matchPodNode.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -340,6 +342,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 		AZ:              host.AZ,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_MIRROR,
 		Lcuuid:          uuid.NewString(),
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -401,44 +404,11 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		AZ:              vm.AZ,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          vm.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
 	return dbVTap, result
-}
-
-func (r *VTapRegister) registerVTapLocalTapMode(db *gorm.DB) *models.VTap {
-	vtap, ok := r.registerVTapByHost(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerVTapByPodNode(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerLocalVTapByIP(db)
-	if ok == true {
-		return vtap
-	}
-
-	return nil
-}
-
-func (r *VTapRegister) registerVTapMirrorTapMode(db *gorm.DB) *models.VTap {
-	vtap, ok := r.registerVTapByHost(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerVTapByPodNode(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerMirrorVTapByIP(db)
-	if ok == true {
-		return vtap
-	}
-
-	return nil
 }
 
 func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
@@ -457,6 +427,7 @@ func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
 		AZ:              az.Lcuuid,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_ANALYZER,
 		Lcuuid:          uuid.NewString(),
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -486,15 +457,33 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 	r.vTapAutoRegister = v.getVTapAutoRegister()
 	log.Infof("register vtap: %s", r)
 	var vtap *models.VTap
-	if trident.TapMode(r.tapMode) == trident.TapMode_LOCAL {
-		vtap = r.registerVTapLocalTapMode(v.db)
-	} else if trident.TapMode(r.tapMode) == trident.TapMode_MIRROR {
-		vtap = r.registerVTapMirrorTapMode(v.db)
-	} else if trident.TapMode(r.tapMode) == trident.TapMode_ANALYZER {
-		vtap = r.registerVTapAnalyzerTapMode(v.db)
-	} else {
-		log.Errorf("unkown tap_mode (%d)", r.tapMode)
+	ok := false
+	for {
+		vtap, ok = r.registerVTapByHost(v.db)
+		if ok == true {
+			break
+		}
+		vtap, ok = r.registerVTapByPodNode(v.db)
+		if ok == true {
+			break
+		}
+		if v.getDefaultTapMode() == TAPMODE_MIRROR {
+			vtap, ok = r.registerMirrorVTapByIP(v.db)
+			if ok == true {
+				break
+			}
+		} else {
+			vtap, ok = r.registerLocalVTapByIP(v.db)
+			if ok == true {
+				break
+			}
+		}
+		break
 	}
+	if ok == false && v.getDefaultTapMode() == TAPMODE_ANALYZER {
+		vtap = r.registerVTapAnalyzerTapMode(v.db)
+	}
+
 	if vtap != nil {
 		v.AddVTapCache(vtap)
 		v.putChRegisterFisnish()

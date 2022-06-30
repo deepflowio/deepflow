@@ -100,25 +100,11 @@ impl MqttLog {
         payload: &[u8],
         direction: PacketDirection,
     ) -> Result<AppProtoHead> {
-        let message_type = (payload[0] & 0xf0) >> 4;
-        let message_flag = payload[0] & 0x0f;
-
-        match message_type {
-            0 => {
-                return Err(Error::MqttLogParseFailed);
-            }
-            MQTT_PUBLISH => {}
-            MQTT_PUBREL | MQTT_SUBSCRIBE | MQTT_UNSUBSCRIBE => {
-                if message_flag != 2 {
-                    return Err(Error::MqttLogParseFailed);
-                }
-            }
-            _ => {
-                if message_flag != 0 {
-                    return Err(Error::MqttLogParseFailed);
-                }
-            }
+        let mqtt_msg = check_mqtt_type(payload);
+        if mqtt_msg.is_none() {
+            return Err(Error::MqttLogParseFailed);
         }
+        let message_type = mqtt_msg.unwrap();
 
         self.info.mqtt_type = MQTT_TYPE_TBALE[(message_type - 1) as usize].to_string();
         let (var_len, payload_len) = parse_variable_length(&payload[1..])?;
@@ -187,7 +173,7 @@ impl MqttLog {
                     if direction == PacketDirection::ClientToServer {
                         self.status = L7ResponseStatus::ClientError;
                     } else {
-                        self.status = L7ResponseStatus::ServerError
+                        self.status = L7ResponseStatus::ServerError;
                     }
                 }
                 _ => return Err(Error::MqttLogParseFailed),
@@ -275,6 +261,33 @@ fn with_mqtt(payload: &[u8], msg_len: u16) -> bool {
     }
 }
 
+fn check_mqtt_type(payload: &[u8]) -> Option<u8> {
+    let message_type = (payload[0] & 0xf0) >> 4;
+    let message_flag = payload[0] & 0x0f;
+
+    match message_type {
+        0 => {
+            return None;
+        }
+        MQTT_PUBLISH => {
+            if message_flag & 6 == 6 {
+                return None;
+            }
+        }
+        MQTT_PUBREL | MQTT_SUBSCRIBE | MQTT_UNSUBSCRIBE => {
+            if message_flag != 2 {
+                return None;
+            }
+        }
+        _ => {
+            if message_flag != 0 {
+                return None;
+            }
+        }
+    }
+    return Some(message_type);
+}
+
 pub fn parse_connect(input: &[u8], error: Error) -> Result<(u8, String), Error> {
     let mut offset = 0;
     let mut msg_len = read_u16_be(&input[offset..]);
@@ -360,14 +373,28 @@ pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if payload.len() < MQTT_FIXED_HEADER_LEN {
         return false;
     }
-    let mut mqtt = MqttLog::default();
+    if let Some(message_type) = check_mqtt_type(payload) {
+        if message_type == MQTT_CONNECT {
+            let res = parse_variable_length(&payload[1..]);
+            if res.is_err() {
+                return false;
+            }
 
-    let ret = mqtt.parse_mqtt_info(payload, packet.direction);
-    if ret.is_err() {
-        return false;
+            let (var_len, _) = res.unwrap();
+            let offset = var_len + 1;
+
+            let res = parse_connect(&payload[offset..], Error::MqttLogParseFailed);
+            if res.is_err() {
+                return false;
+            }
+            let (protocol, _) = res.unwrap();
+
+            if protocol >= 3 && protocol <= 5 {
+                return true;
+            }
+        }
     }
-
-    return mqtt.info.check();
+    return false;
 }
 
 #[cfg(test)]
@@ -418,7 +445,10 @@ mod tests {
 
     #[test]
     fn check() {
-        let files = vec![("mqtt_connect.pcap", "mqtt_connect.result")];
+        let files = vec![
+            ("mqtt_connect.pcap", "mqtt_connect.result"),
+            ("mqtt_error.pcap", "mqtt_error.result"),
+        ];
 
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();

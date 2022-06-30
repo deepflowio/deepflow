@@ -45,8 +45,10 @@ controller:
 
   # monitor module config
   monitor:
-    # 控制器和数据节点检查检查时间间隔，单位：秒
+    # controller/analyzer health_check interval, unit: s
     health_check_interval: 60
+    # controller/analyzer health_check port, default: 30417
+    health_check_port: 30417
     # 健康检查异常/控制器切换处理channel的长度
     health_check_handle_channel_len: 1000
     # License检查的时间间隔，单位: 秒
@@ -113,6 +115,8 @@ controller:
 
     # 采集器是否自动注册
     vtap-auto-register: True
+ 
+    default-tap-mode:
 
   genesis:
     # 平台数据老化时间，单位秒
