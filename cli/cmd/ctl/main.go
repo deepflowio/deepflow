@@ -1,7 +1,7 @@
 package main
 
 import (
-	"cli/ctl"
+	"github.com/metaflowys/metaflow/cli/ctl"
 )
 
 func main() {
