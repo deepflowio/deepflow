@@ -1,4 +1,4 @@
-pub const DROPLET_PORT: u16 = 20033;
+pub const DROPLET_PORT: u16 = 30033;
 
 pub enum DropletMessageType {
     Compress = 0,
