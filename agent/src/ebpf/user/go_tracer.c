@@ -152,8 +152,6 @@ static uint64_t get_addr_from_size_and_mod(int ptr_sz, int end_mode, void *buf)
 	return addr;
 }
 
-// TODO: go1.18.x - the version cannot be obtained.
-// It needs to be handled in a good way.
 bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 {
 	bool res = false;
@@ -183,6 +181,26 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (memcmp(info, build_info_magic, strlen(build_info_magic)))
 		goto exit;
 
+	/**
+	 * go 1.18+
+	 * Contents of section .go.buildinfo:
+	 * 575000 ff20476f 20627569 6c64696e 663a0802  . Go buildinf:..
+	 * 575010 00000000 00000000 00000000 00000000  ................
+	 * 575020 08676f31 2e31382e 33d40530 77af0c92  .go1.18.3..0w...
+	 */
+	char *buf;
+	int num;
+	static const int go_version_offset = 0x21;
+	if (data->d_size > go_version_offset){
+		buf = info + go_version_offset;
+		num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+		go_ver->revision = 0;
+		if (num == 2) {
+			res = true;
+			goto exit;
+		}
+	}
+
 	int ptr_sz = info[14];
 	int end_mode = info[15];	// 0 small end mode, Not 0 For big end
 
@@ -191,7 +209,7 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	    get_addr_from_size_and_mod(ptr_sz, end_mode, (void *)&info[16]);
 
 	uint32_t len = 0;
-	char *buf = get_data_buffer_from_addr(e, read_ptr, &len);
+	buf = get_data_buffer_from_addr(e, read_ptr, &len);
 	if (buf == NULL || len <= 0)
 		goto exit;
 
@@ -202,7 +220,7 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (buf == NULL || len <= 0)
 		goto exit;
 
-	int num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+	num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
 	go_ver->revision = 0;
 	if (num != 2)
 		ebpf_warning("sscanf() go version failed. num = %d\n", num);
