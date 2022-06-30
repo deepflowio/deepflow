@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::process::exit;
 use std::thread;
 use std::time::Duration;
 
@@ -81,12 +82,12 @@ fn main() -> Result<()> {
         let tmp_config = Config::load_from_file(&Path::new(&opts.config_file))?;
         if config.controller_ips != tmp_config.controller_ips {
             println!(
-                "controller_ips change from {:?} to {:?}, restart trident module.",
+                "controller_ips change from {:?} to {:?}, restart metaflow-agent.",
                 config.controller_ips, tmp_config.controller_ips
             );
             t.stop();
-            t = trident::Trident::start(&Path::new(&opts.config_file), version.clone())?;
-            config = tmp_config;
+            thread::sleep(Duration::from_secs(1));
+            exit(0);
         }
         thread::sleep(Duration::from_secs(60));
     }
