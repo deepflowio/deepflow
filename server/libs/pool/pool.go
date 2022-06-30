@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"reflect"
 	"sync"
 
 	logging "github.com/op/go-logging"
@@ -12,8 +13,46 @@ type Option = interface{}
 type OptionPoolSizePerCPU int
 type OptionInitFullPoolSize int // 太大会导致Get操作卡顿，太小会导致创建过多的slice
 
+const OPTIMAL_BLOCK_SIZE = 1 << 16
 const POOL_SIZE_PER_CPU = OptionPoolSizePerCPU(256)
 const INIT_FULL_POOL_SIZE = OptionInitFullPoolSize(256)
+
+type Counter struct {
+	Name             string
+	ObjectSize       uint64
+	PoolSizePerCPU   uint32
+	InitFullPoolSize uint32
+	closed           bool
+
+	InUseObjects uint64 `statsd:"in_use_objects,gauge"`
+	InUseBytes   uint64 `statsd:"in_use_bytes,gauge"`
+}
+
+func (c *Counter) GetCounter() interface{} {
+	return c
+}
+
+func (c *Counter) Closed() bool {
+	return c.closed
+}
+
+// 此Callback可用于为Counter添加statsd监控
+type CounterRegisterCallback func(*Counter)
+
+var (
+	counterListLock         sync.Mutex
+	counterRegisterCallback CounterRegisterCallback
+	allCounters             []*Counter
+)
+
+func SetCounterRegisterCallback(callback CounterRegisterCallback) {
+	counterListLock.Lock()
+	counterRegisterCallback = callback
+	for _, counter := range allCounters {
+		counterRegisterCallback(counter)
+	}
+	counterListLock.Unlock()
+}
 
 // sync.Pool对于每一个系统线程，能够无锁提取存放一个元素，
 // 其余元素会通过锁追加到数组中。为了能够尽可能避免锁的使用，
@@ -24,10 +63,13 @@ type LockFreePool struct {
 	emptyPool *sync.Pool
 	fullPool  *sync.Pool
 
-	alloc func() interface{}
+	counter *Counter
 }
 
 func (p *LockFreePool) Get() interface{} {
+	p.counter.InUseObjects += 1
+	p.counter.InUseBytes += p.counter.ObjectSize
+
 	elemPool := p.fullPool.Get().(*[]interface{}) // avoid convT2Eslice
 	pool := *elemPool
 	e := pool[len(pool)-1]
@@ -41,6 +83,9 @@ func (p *LockFreePool) Get() interface{} {
 }
 
 func (p *LockFreePool) Put(x interface{}) {
+	p.counter.InUseObjects -= 1
+	p.counter.InUseBytes -= p.counter.ObjectSize
+
 	pool := p.emptyPool.Get().(*[]interface{}) // avoid convT2Eslice
 	*pool = append(*pool, x)
 	if len(*pool) < cap(*pool) {
@@ -51,7 +96,8 @@ func (p *LockFreePool) Put(x interface{}) {
 }
 
 // 注意OptionInitFullPoolSize不能大于OptionPoolSizePerCPU，且不能小于等于0
-func NewLockFreePool(alloc func() interface{}, options ...Option) LockFreePool {
+func NewLockFreePool(alloc func() interface{}, options ...Option) *LockFreePool {
+	// options
 	poolSizePerCPU := POOL_SIZE_PER_CPU
 	initFullPoolSize := INIT_FULL_POOL_SIZE
 	for _, opt := range options {
@@ -65,6 +111,17 @@ func NewLockFreePool(alloc func() interface{}, options ...Option) LockFreePool {
 		poolSizePerCPU = POOL_SIZE_PER_CPU
 		initFullPoolSize = INIT_FULL_POOL_SIZE
 	}
+	objectType := reflect.Indirect(reflect.ValueOf(alloc())).Type()
+	objectSize := uint64(objectType.Size())
+	if len(options) == 0 { // automatically adjust pool size if no option is assigned
+		optimalSize := uint64(OPTIMAL_BLOCK_SIZE) / objectSize
+		if optimalSize > 4 && OptionPoolSizePerCPU(optimalSize) < POOL_SIZE_PER_CPU {
+			poolSizePerCPU = OptionPoolSizePerCPU(optimalSize)
+			initFullPoolSize = OptionInitFullPoolSize(optimalSize)
+		}
+	}
+
+	// functions
 	newEmptySlice := func() interface{} {
 		p := make([]interface{}, 0, poolSizePerCPU)
 		return &p
@@ -76,13 +133,33 @@ func NewLockFreePool(alloc func() interface{}, options ...Option) LockFreePool {
 		}
 		return &p
 	}
-	return LockFreePool{
+
+	// counter
+	counter := &Counter{
+		Name:             objectType.String(),
+		ObjectSize:       objectSize,
+		PoolSizePerCPU:   uint32(poolSizePerCPU),
+		InitFullPoolSize: uint32(initFullPoolSize),
+	}
+	counterListLock.Lock()
+	for _, c := range allCounters {
+		if c.Name == counter.Name {
+			c.closed = true // close old counter with the same objectType
+		}
+	}
+	if counterRegisterCallback != nil {
+		counterRegisterCallback(counter)
+	}
+	allCounters = append(allCounters, counter)
+	counterListLock.Unlock()
+
+	return &LockFreePool{
 		emptyPool: &sync.Pool{
 			New: newEmptySlice,
 		},
 		fullPool: &sync.Pool{
 			New: newFullSlice,
 		},
-		alloc: alloc,
+		counter: counter,
 	}
 }
