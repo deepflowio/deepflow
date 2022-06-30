@@ -109,7 +109,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	vtapGroup := mysql.VTapGroup{}
 	lcuuid := uuid.New().String()
 	vtapGroup.Lcuuid = lcuuid
-	vtapGroup.ShortUUID = common.GenerateShortUUID()
+	vtapGroup.ShortUUID = "g-" + common.GenerateShortUUID()
 	vtapGroup.Name = vtapGroupCreate.Name
 	mysql.Db.Create(&vtapGroup)
 
