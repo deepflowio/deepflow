@@ -103,3 +103,11 @@ jobs:
           name: metaflow-agent-rpm.zip
           path: agent/artifacts.zip
           retention-days: 5
+
+      - uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint: "oss-cn-beijing.aliyuncs.com"
+          access-key-id: "${{ secrets.ALIYUN_OSS_ACCESS_KEY }}"
+          access-key-secret: "${{ secrets.ALIYUN_OSS_SECRETS_KEY }}"
+
+      - run: ossutil cp -rf agent/output/target/release/metaflow-agent-ctl oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-ctl
