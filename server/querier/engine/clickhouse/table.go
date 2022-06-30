@@ -22,10 +22,10 @@ func GetTables(db string) map[string][]interface{} {
 		return nil
 	}
 	if db == "ext_metrics" {
-		values = append(values, common.GetExtTables(db))
+		values = append(values, common.GetExtTables(db)...)
 	} else {
 		for _, table := range tables {
-			values = append(values, []string{table})
+			values = append(values, table)
 		}
 	}
 	return map[string][]interface{}{
