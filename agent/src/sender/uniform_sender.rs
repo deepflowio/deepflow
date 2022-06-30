@@ -222,7 +222,7 @@ pub struct UniformSender {
 }
 
 impl UniformSender {
-    const DST_PORT: u16 = 20033;
+    const DST_PORT: u16 = 30033;
     const TCP_WRITE_TIMEOUT: u64 = 3; // s
     const QUEUE_READ_TIMEOUT: u64 = 3; // s
 
