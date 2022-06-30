@@ -2,6 +2,10 @@ module github.com/metaflowys/metaflow/server
 
 go 1.18
 
+replace github.com/metaflowys/metaflow/message => ../message
+
+require github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
+
 require (
 	bou.ke/monkey v1.0.2
 	github.com/ClickHouse/clickhouse-go/v2 v2.1.0
