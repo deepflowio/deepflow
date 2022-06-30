@@ -224,6 +224,9 @@ ingester:
  
   ## ext metrics数据的保留的时长(单位: 天)
   #ext-metrics-ttl: 7
+
+  ## split prometheus metrics name lable to table name and metrics name, on the nth position of '_'
+  # prometheus-separate-pos: 1
  
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300

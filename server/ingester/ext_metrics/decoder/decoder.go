@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/prometheus/storage/remote"
 
 	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/dbwriter"
 	"github.com/metaflowys/metaflow/server/libs/codec"
 	"github.com/metaflowys/metaflow/server/libs/datatype"
@@ -50,6 +51,7 @@ type Decoder struct {
 	inQueue          queue.QueueReader
 	extMetricsWriter *dbwriter.ExtMetricsWriter
 	debugEnabled     bool
+	config           *config.Config
 
 	counter *Counter
 	utils.Closable
@@ -60,6 +62,7 @@ func NewDecoder(
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
 	extMetricsWriter *dbwriter.ExtMetricsWriter,
+	config *config.Config,
 ) *Decoder {
 	return &Decoder{
 		index:            index,
@@ -68,6 +71,7 @@ func NewDecoder(
 		inQueue:          inQueue,
 		debugEnabled:     log.IsEnabledFor(logging.DEBUG),
 		extMetricsWriter: extMetricsWriter,
+		config:           config,
 		counter:          &Counter{},
 	}
 }
@@ -190,15 +194,40 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 	d.counter.OutCount++
 }
 
+// return the index of the character in 'str', which is the 'n' th same as 'c'
+func findNthChar(str string, c byte, n int) int {
+	if n <= 0 {
+		return -1
+	}
+	for i := 0; i < len(str); i++ {
+		if str[i] == c {
+			n--
+			if n == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func (d *Decoder) prometheusSplitMetricNameLabel(label string) (string, string) {
+	index := findNthChar(label, '_', d.config.PrometheusSeparatePos)
+	if index > 0 && index < len(label)-1 {
+		return label[:index], label[index+1:]
+	}
+
+	return label, "value"
+}
+
 func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) ([]*dbwriter.ExtMetrics, error) {
 	ms := make([]*dbwriter.ExtMetrics, 0, len(ts.Samples))
 
-	tableName, podName, instance := "", "", ""
+	metricNameLabel, podName, instance := "", "", ""
 	tagNames := make([]string, 0, len(ts.Labels))
 	tagValues := make([]string, 0, len(ts.Labels))
 	for _, l := range ts.Labels {
 		if l.Name == model.MetricNameLabel {
-			tableName = l.Value
+			metricNameLabel = l.Value
 			continue
 		}
 		if l.Name == PROMETHEUS_POD {
@@ -209,10 +238,11 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 		tagNames = append(tagNames, l.Name)
 		tagValues = append(tagValues, l.Value)
 	}
-	if tableName == "" {
-		return nil, fmt.Errorf("table name is null")
+	if metricNameLabel == "" {
+		return nil, fmt.Errorf("prometheum metric name label is null")
 	}
 
+	tableName, metricName := d.prometheusSplitMetricNameLabel(metricNameLabel)
 	for _, s := range ts.Samples {
 		m := dbwriter.AcquireExtMetrics()
 
@@ -227,7 +257,7 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 			dbwriter.ReleaseExtMetrics(m)
 			continue
 		}
-		m.MetricsFloatNames = append(m.MetricsFloatNames, "value")
+		m.MetricsFloatNames = append(m.MetricsFloatNames, metricName)
 		m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 
 		d.fillExtMetricsBase(m, vtapID, podName, instance)

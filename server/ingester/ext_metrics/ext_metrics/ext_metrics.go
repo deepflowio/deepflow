@@ -81,6 +81,7 @@ func NewMetricsor(msgType datatype.MessageType, config *config.Config, controlle
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			dbwriter.NewExtMetricsWriter(config),
+			config,
 		)
 	}
 	return &Metricsor{
