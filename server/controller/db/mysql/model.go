@@ -197,7 +197,7 @@ type VPC struct {
 	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
-	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
+	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	TunnelID       int    `gorm:"column:tunnel_id;type:int;default:0" json:"TUNNEL_ID"`
 	Mode           int    `gorm:"column:mode;type:int;default:2" json:"MODE"` //  1:route, 2:transparent
 	CIDR           string `gorm:"column:cidr;type:char(64);default:''" json:"CIDR"`
@@ -261,7 +261,7 @@ type VRouter struct {
 	GWLaunchServer string `gorm:"index:state_server_index;column:gw_launch_server;type:char(64);default:null" json:"GW_LAUNCH_SERVER"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
+	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 }
 
 func (VRouter) TableName() string {
@@ -395,7 +395,7 @@ type NATGateway struct {
 	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
 	FloatingIPs    string `gorm:"column:floating_ips;type:text;default:null" json:"FLOATING_IPS"` // separated by ,
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
-	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
+	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
@@ -441,7 +441,7 @@ type LB struct {
 	Model          int    `gorm:"column:model;type:int;default:0" json:"MODEL"` // 1.Internal 2.External
 	VIP            string `gorm:"column:vip;type:char(64);default:''" json:"VIP"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
-	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
+	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`

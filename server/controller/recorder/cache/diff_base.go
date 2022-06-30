@@ -1314,6 +1314,7 @@ type RedisInstance struct {
 	State        int    `json:"state"`
 	PublicHost   string `json:"public_host"`
 	RegionLcuuid string `json:"region_lcuuid"`
+	AZLcuuid     string `json:"az_lcuuid"`
 }
 
 func (r *RedisInstance) Update(cloudItem *cloudmodel.RedisInstance) {
@@ -1321,6 +1322,7 @@ func (r *RedisInstance) Update(cloudItem *cloudmodel.RedisInstance) {
 	r.State = cloudItem.State
 	r.PublicHost = cloudItem.PublicHost
 	r.RegionLcuuid = cloudItem.RegionLcuuid
+	r.AZLcuuid = cloudItem.AZLcuuid
 	log.Info(updateDiffBase(common.RESOURCE_TYPE_REDIS_INSTANCE_EN, r))
 }
 
