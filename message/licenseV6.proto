@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 package licenseV6;
-option go_package = "licenseV6";
+option go_package = "license_v6";
 
 
 enum VtapFunction {
