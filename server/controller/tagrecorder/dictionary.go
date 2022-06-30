@@ -60,7 +60,6 @@ func (c *TagRecorder) UpdateChDictionary() {
 		c.cfg.ClickHouseCfg.Host = analyzer.IP
 		connect, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
 		if err != nil {
-			log.Error(err)
 			continue
 		}
 		var ports []struct {
