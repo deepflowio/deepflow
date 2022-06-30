@@ -43,4 +43,5 @@ pub use {
     proto::common::TridentType as _TridentType,
     utils::net::MacAddr as _MacAddr,
     utils::{leaky_bucket::LeakyBucket as _LeakyBucket, queue::bounded as _queue_bounded},
+    config::Config
 };
