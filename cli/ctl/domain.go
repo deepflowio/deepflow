@@ -9,8 +9,8 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
-	"cli/ctl/common"
-	"cli/ctl/example"
+	"github.com/metaflowys/metaflow/cli/ctl/common"
+	"github.com/metaflowys/metaflow/cli/ctl/example"
 )
 
 func RegisterDomainCommand() *cobra.Command {

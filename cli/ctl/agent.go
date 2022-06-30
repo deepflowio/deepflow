@@ -9,7 +9,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
-	"cli/ctl/common"
+	"github.com/metaflowys/metaflow/cli/ctl/common"
 )
 
 func RegisterAgentCommand() *cobra.Command {
