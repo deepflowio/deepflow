@@ -5,12 +5,6 @@ import (
 	"time"
 
 	"github.com/metaflowys/metaflow/server/controller/cloud"
-	"github.com/metaflowys/metaflow/server/controller/cloud/aliyun"
-	"github.com/metaflowys/metaflow/server/controller/cloud/baidubce"
-	"github.com/metaflowys/metaflow/server/controller/cloud/genesis"
-	"github.com/metaflowys/metaflow/server/controller/cloud/kubernetes"
-	"github.com/metaflowys/metaflow/server/controller/cloud/qingcloud"
-	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/manager/config"
 	"github.com/metaflowys/metaflow/server/controller/recorder"
@@ -27,37 +21,20 @@ type Task struct {
 }
 
 func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context) *Task {
-	var platform cloud.Platform
-	var err error
 
-	// FIXME task本身不关心platform，生成后仅供NewCloud使用，可将此逻辑移入NewCloud中
-	switch domain.Type {
-	case common.ALIYUN:
-		platform, err = aliyun.NewAliyun(domain)
-	case common.GENESIS:
-		platform, err = genesis.NewGenesis(domain, cfg.CloudCfg)
-	case common.QINGCLOUD:
-		platform, err = qingcloud.NewQingCloud(domain)
-	case common.BAIDU_BCE:
-		platform, err = baidubce.NewBaiduBce(domain)
-	case common.KUBERNETES:
-		platform, err = kubernetes.NewKubernetes(domain)
-	// TODO: 其他云平台
-	default:
-		return nil
-	}
-	if err != nil {
+	tCtx, tCancel := context.WithCancel(ctx)
+	cloud := cloud.NewCloud(domain, 60, cfg.CloudCfg, tCtx)
+	if cloud == nil {
 		return nil
 	}
 
 	log.Infof("task (%s) init success", domain.Name)
 
-	tCtx, tCancel := context.WithCancel(ctx)
 	return &Task{
 		tCtx:         tCtx,
 		tCancel:      tCancel,
 		cfg:          cfg,
-		Cloud:        cloud.NewCloud(domain, 60, platform, cfg.CloudCfg, tCtx),
+		Cloud:        cloud,
 		Recorder:     recorder.NewRecorder(domain.Lcuuid, cfg.RecorderCfg, tCtx),
 		DomainName:   domain.Name,
 		DomainConfig: domain.Config,
