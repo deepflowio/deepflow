@@ -2,6 +2,9 @@ package ctl
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -22,13 +25,24 @@ func RegisterAgentCommand() *cobra.Command {
 	list := &cobra.Command{
 		Use:     "list [name]",
 		Short:   "list agent info",
-		Example: "metaflow-ctl agent list deepflow-agent -o yaml",
+		Example: "metaflow-ctl agent list metaflow-agent -o yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			listAgent(cmd, args, listOutput)
 		},
 	}
 	list.Flags().StringVarP(&listOutput, "output", "o", "", "output format")
+
+	delete := &cobra.Command{
+		Use:     "delete [name]",
+		Short:   "delete agent",
+		Example: "metaflow-ctl agent delete metaflow-agent",
+		Run: func(cmd *cobra.Command, args []string) {
+			deleteAgent(cmd, args)
+		},
+	}
+
 	agent.AddCommand(list)
+	agent.AddCommand(delete)
 	return agent
 }
 
@@ -57,8 +71,8 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		dataYaml, _ := yaml.JSONToYAML(dataJson)
 		fmt.Printf(string(dataYaml))
 	} else {
-		cmdFormat := "%-48s%-32s%-24s%s\n"
-		fmt.Printf(cmdFormat, "NAME", "CTRL_IP", "CTRL_MAC", "STATE")
+		cmdFormat := "%-48s%-32s%-24s%-16s%s\n"
+		fmt.Printf(cmdFormat, "NAME", "CTRL_IP", "CTRL_MAC", "STATE", "EXCEPTIONS")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
 			stateString := ""
@@ -72,10 +86,44 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 			case common.VTAP_STATE_PENDING:
 				stateString = common.VTAP_STATE_PENDING_STR
 			}
+
+			exceptionStrings := []string{}
+			for i := range vtap.Get("EXCEPTIONS").MustArray() {
+				exceptionInt := vtap.Get("EXCEPTIONS").GetIndex(i).MustInt()
+				exceptionStrings = append(exceptionStrings, strconv.Itoa(exceptionInt))
+			}
+
 			fmt.Printf(
 				cmdFormat, vtap.Get("NAME").MustString(), vtap.Get("CTRL_IP").MustString(),
-				vtap.Get("CTRL_MAC").MustString(), stateString,
+				vtap.Get("CTRL_MAC").MustString(), stateString, strings.Join(exceptionStrings, ","),
 			)
+		}
+	}
+}
+
+func deleteAgent(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify name. Example: %s", cmd.Example)
+		return
+	}
+
+	// TODO read metaflow-server host from config file
+	url := fmt.Sprintf("http://metaflow-server:20417/v1/vtaps/?name=%s", args[0])
+	// curl vtap API，get lcuuid
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	if len(response.Get("DATA").MustArray()) > 0 {
+		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+		url := fmt.Sprintf("http://metaflow-server:20417/v1/vtaps/%s/", lcuuid)
+		// call vtap delete api
+		_, err := common.CURLPerform("DELETE", url, nil, "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
 		}
 	}
 }
