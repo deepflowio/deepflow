@@ -97,7 +97,7 @@ func (w *ExtMetricsWriter) createTableOnCluster(table *ckdb.Table) error {
 		return err
 	}
 	for _, node := range nodes {
-		err := ckwriter.InitTable(fmt.Sprintf("tcp://%s:%d", node.Addr, node.Port), w.ckdbUsername, w.ckdbPassword, table)
+		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", node.Addr, node.Port), w.ckdbUsername, w.ckdbPassword, table)
 		if err != nil {
 			log.Warningf("node %s:%d init table failed. err: %s", node.Addr, node.Port, err)
 		} else {
