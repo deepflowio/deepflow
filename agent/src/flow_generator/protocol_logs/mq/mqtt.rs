@@ -297,11 +297,10 @@ pub fn parse_connect(input: &[u8], error: Error) -> Result<(u8, String), Error> 
     }
 
     offset += 2 + msg_len as usize;
-    if input[offset] != 3 && input[offset] != 4 && input[offset] != 5 {
+    let proto_version = input[offset];
+    if proto_version != 3 && proto_version != 4 && proto_version != 5 {
         return Err(error);
     }
-
-    let proto_version = input[offset];
 
     offset += 4;
     if proto_version == 5 {
@@ -311,8 +310,13 @@ pub fn parse_connect(input: &[u8], error: Error) -> Result<(u8, String), Error> 
 
     msg_len = read_u16_be(&input[offset..]);
     offset += 2;
-    let client_id = String::from_utf8_lossy(&input[offset..offset + msg_len as usize]).into_owned();
 
+    let mut client_id_end = msg_len as usize + offset;
+    if client_id_end > input.len() {
+        client_id_end = input.len();
+    }
+
+    let client_id = String::from_utf8_lossy(&input[offset..client_id_end]).into_owned();
     Ok((proto_version, client_id))
 }
 
