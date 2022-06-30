@@ -23,8 +23,8 @@ func (h *dfHostCheck) duration() int64 {
 }
 
 // TODO: 后续修改为通过RPC调用
-func isActive(urlPrefix string, ip string) bool {
-	url := fmt.Sprintf(urlPrefix, ip)
+func isActive(urlPrefix string, ip string, port int) bool {
+	url := fmt.Sprintf(urlPrefix, ip, port)
 	response, err := http.Get(url)
 	if err != nil {
 		log.Warningf("curl (%s) failed, (%v)", url, err)
