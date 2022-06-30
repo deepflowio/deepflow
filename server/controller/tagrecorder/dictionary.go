@@ -51,9 +51,9 @@ func (c *TagRecorder) UpdateChDictionary() {
 		}
 		replicaSQL := ""
 		if analyzerRegion == masterRegion {
-			replicaSQL = fmt.Sprintf("REPLICA (HOST '%s' PRIORITY %s)", "mysql", "1")
+			replicaSQL = fmt.Sprintf("REPLICA (HOST '%s' PRIORITY %s)", c.cfg.MySqlCfg.Host, "1")
 		} else {
-			replicaSQL = fmt.Sprintf("REPLICA (HOST '%s%s' PRIORITY %s)", masterRegionPrefix, "mysql", "1")
+			replicaSQL = fmt.Sprintf("REPLICA (HOST '%s%s' PRIORITY %s)", masterRegionPrefix, c.cfg.MySqlCfg.Host, "1")
 		}
 		c.cfg.ClickHouseCfg.Host = analyzer.IP
 		connect, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
