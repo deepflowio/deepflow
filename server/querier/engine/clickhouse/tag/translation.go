@@ -490,13 +490,13 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"%s(tag_values[indexOf(tag_names,'%s')],%v)",
 		),
 	}
-	// 单个外部字段
+	// 单个外部字段-l7_flow_log
 	tagResourceMap["attribute"] = map[string]*Tag{
 		"default": NewTag(
-			"tag_values[indexOf(attribute_names,'%s')]",
+			"attribute_values[indexOf(attribute_names,'%s')]",
 			"",
-			"tag_values[indexOf(attribute_names,'%s')] %s %v",
-			"%s(tag_values[indexOf(attribute_names,'%s')],%v)",
+			"attribute_values[indexOf(attribute_names,'%s')] %s %v",
+			"%s(attribute_values[indexOf(attribute_names,'%s')],%v)",
 		),
 	}
 	// 外部字段map
