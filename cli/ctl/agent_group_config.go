@@ -79,8 +79,8 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 }
 
 func exampleAgentGroupConfig(cmd *cobra.Command, args []string) {
-	// TODO read metaflow-server host from file
-	url := "http://metaflow-server:20417/v1/vtap-group-configuration/example/"
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/example/", server.IP, server.Port)
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -95,8 +95,8 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 		agentGroupShortUUID = args[0]
 	}
 
-	// TODO: read metaflow-server host from file
-	url := "http://metaflow-server:20417/v1/vtap-group-configuration/"
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/", server.IP, server.Port)
 	if output == "yaml" {
 		if agentGroupShortUUID != "" {
 			url += fmt.Sprintf("filter/?vtap_group_id=%s", agentGroupShortUUID)
@@ -140,7 +140,8 @@ func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {
 }
 
 func createAgentGroupConfig(cmd *cobra.Command, args []string, createFilename string) {
-	url := "http://metaflow-server:20417/v1/vtap-group-configuration/advanced/"
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/advanced/", server.IP, server.Port)
 	yamlFile, err := ioutil.ReadFile(createFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -158,7 +159,8 @@ func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename st
 		return
 	}
 
-	url := fmt.Sprintf("http://metaflow-server:20417/v1/vtap-group-configuration/?vtap_group_id=%s", args[0])
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, args[0])
 	// call vtap-group api, get lcuuid
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
@@ -173,7 +175,7 @@ func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename st
 	lcuuid := group.Get("LCUUID").MustString()
 
 	// call vtap-group config update api
-	url = fmt.Sprintf("http://metaflow-server:20417/v1/vtap-group-configuration/advanced/%s/", lcuuid)
+	url = fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/advanced/%s/", server.IP, server.Port, lcuuid)
 	yamlFile, err := ioutil.ReadFile(updateFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -191,8 +193,8 @@ func deleteAgentGroupConfig(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// TODO: read metaflow-server host from file
-	url := fmt.Sprintf("http://metaflow-server:20417/v1/vtap-group-configuration/filter/?vtap_group_id=%s", args[0])
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, args[0])
 	_, err := common.CURLPerform("DELETE", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

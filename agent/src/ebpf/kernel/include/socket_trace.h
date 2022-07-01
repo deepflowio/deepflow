@@ -203,6 +203,13 @@ struct syscall_comm_enter_ctx {
 	size_t count;		/*    32     8 */
 };
 
+struct sched_comm_exit_ctx {
+	__u64 __pad_0;          /*     0     8 */
+	char comm[16];          /*     offset:8;       size:16 */
+	pid_t pid;        	/*     offset:24;      size:4  */
+	int prio;		/*     offset:28;      size:4  */
+};
+
 struct syscall_comm_exit_ctx {
 	__u64 __pad_0;		/*     0     8 */
 	int __syscall_nr;	/*    offset:8     4 */

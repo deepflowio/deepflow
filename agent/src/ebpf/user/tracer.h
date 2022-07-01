@@ -98,6 +98,7 @@ static inline unsigned int max_log2(unsigned int x)
 	return l;
 }
 
+/* *INDENT-OFF* */
 #define probes_set_enter_symbol(t, fn)                      \
 do {                                                        \
   curr_idx = index++;                  		            \
@@ -125,9 +126,10 @@ do {                                                        \
 do {                                                        \
   curr_idx = index++;                                       \
   char *name = (char*)calloc(PROBE_NAME_SZ, 1);             \
-  snprintf(name, PROBE_NAME_SZ, "tracepoint/syscalls/%s", tp);  \
-  t->tps[curr_idx].name = name;                       		\
+  snprintf(name, PROBE_NAME_SZ, "%s", tp);  		    \
+  t->tps[curr_idx].name = name;                       	    \
 } while(0)
+/* *INDENT-ON* */
 
 enum {
 	/* set */
@@ -177,6 +179,8 @@ struct probe {
 	int prog_fd;
 	bool isret;
 	void *private_data;	// Store uprobe information
+	bool installed;
+	struct bpf_tracer *tracer;
 };
 
 struct tracepoint {
@@ -337,21 +341,23 @@ static inline void prefetch0(const volatile void *p)
 #define PREFETCH_READ 0
 #define PREFETCH_WRITE 1
 
-#define _PREFETCH(n,size,type)                             	  \
-  if ((size) > (n)*CACHE_LINE_BYTES)                 	  \
-          __builtin_prefetch (_addr + (n)*CACHE_LINE_BYTES, \
-                              PREFETCH_##type,              \
-                              /* locality */ 3);
+/* *INDENT-OFF* */
+#define _PREFETCH(n,size,type)				\
+  if ((size) > (n)*CACHE_LINE_BYTES)			\
+    __builtin_prefetch (_addr + (n)*CACHE_LINE_BYTES, 	\
+                        PREFETCH_##type,              	\
+                        /* locality */ 3);
 
-#define PREFETCH(addr,size,type)                   \
-do {                                               \
-  void * _addr = (addr);                     \
-	int __sz = (size);                         \
-  if (__sz > 2*CACHE_LINE_BYTES)             \
-		__sz = 2*CACHE_LINE_BYTES;    	   \
-  _PREFETCH (0, __sz, type);                 \
-  _PREFETCH (1, __sz, type);                 \
+#define PREFETCH(addr,size,type)		\
+do {						\
+  void * _addr = (addr);			\
+	int __sz = (size);			\
+  if (__sz > 2*CACHE_LINE_BYTES)		\
+		__sz = 2*CACHE_LINE_BYTES;	\
+  _PREFETCH (0, __sz, type);			\
+  _PREFETCH (1, __sz, type);			\
 } while (0)
+/* *INDENT-ON* */
 
 static inline void
 prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)
@@ -407,4 +413,23 @@ int set_period_event_invalid(const char *name);
 int tracer_stop(void);
 // 开启tracer运行。返回值：0：成功，非0：失败
 int tracer_start(void);
+/**
+ * probe_detach - eBPF probe detach
+ * @p struct probe
+ *
+ * @return 0 if ok, not 0 on error
+ */
+int probe_detach(struct probe *p);
+/**
+ * add_probe_to_tracer - add probe
+ * @pb struct probe
+ */
+void add_probe_to_tracer(struct probe *pb);
+/**
+ * free_probe_from_tracer - free probe
+ * @pb struct probe
+ */
+void free_probe_from_tracer(struct probe *pb);
+int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type);
+int tracer_uprobes_update(struct bpf_tracer *tracer);
 #endif
