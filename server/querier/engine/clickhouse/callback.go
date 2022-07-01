@@ -163,7 +163,7 @@ func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values [
 				log.Error(err)
 				return newValues
 			}
-			newValueSlice[tagsIndex] = tagsStr
+			newValueSlice[tagsIndex] = string(tagsStr)
 			newValues[i] = newValueSlice
 		}
 		return newValues
