@@ -74,7 +74,7 @@ func BenchmarkLockFreePoolGetPut1Thread(b *testing.B) {
 		for i := 0; i < 1024; i++ {
 			pool.Put(0)
 		}
-		pools[p] = &pool
+		pools[p] = pool
 	}
 
 	b.ResetTimer()
@@ -90,7 +90,7 @@ func BenchmarkLockFreePoolGetPut2Thread(b *testing.B) {
 	pools := make([]*LockFreePool, 16)
 	for i := range pools {
 		pool := NewLockFreePool(func() interface{} { return 0 })
-		pools[i] = &pool
+		pools[i] = pool
 	}
 
 	put := func(pool []*LockFreePool) {

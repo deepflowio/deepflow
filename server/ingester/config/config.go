@@ -25,7 +25,7 @@ const (
 	DefaultCKDBS3TTLTimes    = 3 // 对象存储的保留时长是本地存储的3倍
 	DefaultInfluxdbHost      = "influxdb"
 	DefaultInfluxdbPort      = "20044"
-	EnvNodeIP                = "NODE_IP"
+	EnvK8sNodeIP             = "K8S_NODE_IP_FOR_METAFLOW"
 	DefaultCKDBServicePrefix = "clickhouse"
 	DefaultCKDBServicePort   = 9000
 )
@@ -58,23 +58,24 @@ type Auth struct {
 }
 
 type Config struct {
-	ControllerIPs     []string      `yaml:"controller-ips,flow"`
-	ControllerPort    uint16        `yaml:"controller-port"`
-	CKDBServicePrefix string        `yaml:"ckdb-service-prefix"`
-	CKDBServicePort   int           `yaml:"ckdb-service-port"`
-	CKDB              CKAddrs       `yaml:"ckdb"`
-	CKDBAuth          Auth          `yaml:"ckdb-auth"`
-	StreamRozeEnabled bool          `yaml:"stream-roze-enabled"`
-	UDPReadBuffer     int           `yaml:"udp-read-buffer"`
-	TCPReadBuffer     int           `yaml:"tcp-read-buffer"`
-	LogFile           string        `yaml:"log-file"`
-	LogLevel          string        `yaml:"log-level"`
-	Profiler          bool          `yaml:"profiler"`
-	MaxCPUs           int           `yaml:"max-cpus"`
-	CKDiskMonitor     CKDiskMonitor `yaml:"ck-disk-monitor"`
-	CKS3Storage       CKS3Storage   `yaml:"ckdb-s3"`
-	Influxdb          HostPort      `yaml:"influxdb"`
-	NodeIP            string        `yaml:"node-ip"`
+	ControllerIPs         []string      `yaml:"controller-ips,flow"`
+	ControllerPort        uint16        `yaml:"controller-port"`
+	CKDBServicePrefix     string        `yaml:"ckdb-service-prefix"`
+	CKDBServicePort       int           `yaml:"ckdb-service-port"`
+	CKDB                  CKAddrs       `yaml:"ckdb"`
+	CKDBAuth              Auth          `yaml:"ckdb-auth"`
+	StreamRozeEnabled     bool          `yaml:"stream-roze-enabled"`
+	UDPReadBuffer         int           `yaml:"udp-read-buffer"`
+	TCPReadBuffer         int           `yaml:"tcp-read-buffer"`
+	LogFile               string        `yaml:"log-file"`
+	LogLevel              string        `yaml:"log-level"`
+	Profiler              bool          `yaml:"profiler"`
+	MaxCPUs               int           `yaml:"max-cpus"`
+	CKDiskMonitor         CKDiskMonitor `yaml:"ck-disk-monitor"`
+	CKS3Storage           CKS3Storage   `yaml:"ckdb-s3"`
+	InfluxdbWriterEnabled bool          `yaml:"influxdb-writer-enabled"`
+	Influxdb              HostPort      `yaml:"influxdb"`
+	NodeIP                string        `yaml:"node-ip"`
 }
 
 type BaseConfig struct {
@@ -95,9 +96,9 @@ func (c *Config) Validate() error {
 	// if the controller IP is localhost, can't get node ip through ip routing,
 	// should get node ip from ENV
 	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
-		nodeIP, exist := os.LookupEnv("NODE_IP")
+		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
 		if !exist {
-			panic(fmt.Sprintf("Can't get env %s", EnvNodeIP))
+			panic(fmt.Sprintf("Can't get env %s", EnvK8sNodeIP))
 		}
 		c.NodeIP = nodeIP
 	}

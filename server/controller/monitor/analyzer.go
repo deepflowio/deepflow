@@ -31,7 +31,6 @@ func (c *AnalyzerCheck) Start() {
 	go func() {
 		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
 			// 数据节点健康检查
-			// TODO: 由trisolaris更新状态，这里只是发现异常触发重新分配
 			c.healthCheck()
 			// 检查没有分配数据节点的采集器，并进行分配
 			c.vtapAnalyzerCheck()
@@ -61,7 +60,7 @@ func (c *AnalyzerCheck) healthCheck() {
 		}
 
 		// 检查逻辑同控制器
-		active := isActive(common.ANALYZER_CHECK_URL, checkIP)
+		active := isActive(common.HEALTH_CHECK_URL, checkIP, c.cfg.HealthCheckPort)
 		if analyzer.State == common.HOST_STATE_COMPLETE {
 			if active {
 				if _, ok := c.normalAnalyzerDict[analyzer.IP]; ok {

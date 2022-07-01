@@ -724,7 +724,7 @@ func (f *Flow) String() string {
 	return formatted
 }
 
-var zeroFlowPerfStats FlowPerfStats = FlowPerfStats{}
+var ZeroFlowPerfStats FlowPerfStats = FlowPerfStats{}
 var flowPerfStatsPool = pool.NewLockFreePool(func() interface{} {
 	return new(FlowPerfStats)
 })
@@ -734,7 +734,7 @@ func AcquireFlowPerfStats() *FlowPerfStats {
 }
 
 func ReleaseFlowPerfStats(s *FlowPerfStats) {
-	*s = zeroFlowPerfStats
+	*s = ZeroFlowPerfStats
 	flowPerfStatsPool.Put(s)
 }
 

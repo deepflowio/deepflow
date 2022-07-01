@@ -1,0 +1,14 @@
+on: 
+  pull_request:
+    paths-ignore:
+      - 'server/**'
+      - 'message/**'
+
+name: verify server
+
+jobs:
+  verify_server:
+    name: verify server
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "No build required" '

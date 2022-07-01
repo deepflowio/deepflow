@@ -6,11 +6,11 @@ import (
 	"regexp"
 
 	"github.com/google/uuid"
-	"github.com/metaflowys/metaflow/message/trident"
 	"gorm.io/gorm"
 
 	. "github.com/metaflowys/metaflow/server/controller/common"
 	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
 	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
@@ -119,10 +119,10 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 	hostMgr := dbmgr.DBMgr[models.Host](db)
 	dbHost, err := hostMgr.GetFirstFromBatchIPs(r.hostIPs)
 	if err != nil {
-		log.Errorf("vtap(%s) query host_device failed from host_ips(%s), err: %s", r.ctrlIP, r.hostIPs, err)
+		log.Errorf("vtap(%s) query host_device failed from host_ips(%s), err: %s", r.getKey(), r.hostIPs, err)
 		dbHost, err = hostMgr.GetFromName(r.host)
 		if err != nil {
-			log.Errorf("vtap(%s) query host_device failed from host(%s), err: %s", r.ctrlIP, r.host, err)
+			log.Errorf("vtap(%s) query host_device failed from host(%s), err: %s", r.getKey(), r.host, err)
 			return nil, false
 		}
 	}
@@ -152,6 +152,7 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 		AZ:              az,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          uuid.NewString(),
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -198,11 +199,11 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 				VIF_DEVICE_TYPE_VM,
 				vmIDs)
 			if err != nil {
-				log.Errorf("vtap(%s) vinterface(%s) not found, err(%s)", r.ctrlIP, r.ctrlMac, err)
+				log.Errorf("vtap(%s) vinterface(%s) not found, err(%s)", r.getKey(), r.ctrlMac, err)
 				return nil, false
 			}
 		} else {
-			log.Errorf("vtap(%s) vinterface(%s) not found, err(%s)", r.ctrlIP, r.ctrlMac, err)
+			log.Errorf("vtap(%s) vinterface(%s) not found, err(%s)", r.getKey(), r.ctrlMac, err)
 		}
 	}
 	var (
@@ -219,7 +220,7 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 		}
 	}
 	if matchPodNode == nil {
-		log.Errorf("vtap(%s) pod_node not found", r.ctrlIP)
+		log.Errorf("vtap(%s) pod_node not found", r.getKey())
 		return nil, false
 	}
 	vTapName := fmt.Sprintf("%s-P%d", matchPodNode.Name, matchPodNode.ID)
@@ -233,6 +234,7 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 		AZ:              matchPodNode.AZ,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          matchPodNode.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -243,7 +245,7 @@ func (r *VTapRegister) getLanIPVIFIDs(db *gorm.DB) ([]int, map[int]string) {
 	lanIPMgr := dbmgr.DBMgr[models.LANIP](db)
 	lanIPs, err := lanIPMgr.GetBatchFromIPs(r.hostIPs)
 	if err != nil || len(lanIPs) == 0 {
-		log.Errorf("vtap(%s) vinterface_ip(%s) not found", r.ctrlIP, r.hostIPs)
+		log.Errorf("vtap(%s) vinterface_ip(%s) not found", r.getKey(), r.hostIPs)
 		if err != nil {
 			log.Error(err)
 		}
@@ -261,7 +263,7 @@ func (r *VTapRegister) getLanIPVIFIDs(db *gorm.DB) ([]int, map[int]string) {
 func (r *VTapRegister) getWanIPVIFIDs(db *gorm.DB) ([]int, map[int]string) {
 	wanIPs, err := dbmgr.DBMgr[models.WANIP](db).GetBatchFromIPs(r.hostIPs)
 	if err != nil || len(wanIPs) == 0 {
-		log.Errorf("vtap(%s) ip_resource(%s) not found", r.ctrlIP, r.hostIPs)
+		log.Errorf("vtap(%s) ip_resource(%s) not found", r.getKey(), r.hostIPs)
 		if err != nil {
 			log.Error(err)
 		}
@@ -290,7 +292,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 		vifIDs)
 	if err != nil || len(vifs) == 0 {
 		log.Errorf("vtap(%s) vinterface(mac: %s, region: %s, devicetype: %d) not found",
-			r.ctrlIP, r.ctrlMac, r.region, VIF_DEVICE_TYPE_VM)
+			r.getKey(), r.ctrlMac, r.region, VIF_DEVICE_TYPE_VM)
 		if err != nil {
 			log.Error(err)
 		}
@@ -304,7 +306,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 	}
 	vms, err := dbmgr.DBMgr[models.VM](db).GetBatchFromIDs(deviceIDs)
 	if err != nil || len(vms) == 0 {
-		log.Errorf("vtap(%s), vms(id=%s) not in DB", r.ctrlIP, deviceIDs)
+		log.Errorf("vtap(%s), vms(id=%s) not in DB", r.getKey(), deviceIDs)
 		if err != nil {
 			log.Error(err)
 		}
@@ -314,7 +316,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 	vmLaunchServers := make([]string, 0, len(vms))
 	for _, vm := range vms {
 		if vm.LaunchServer == "" {
-			log.Errorf("vtap(%s), vm(id=%d) not launch server", r.ctrlIP, vm.ID)
+			log.Errorf("vtap(%s), vm(id=%d) not launch server", r.getKey(), vm.ID)
 			continue
 		}
 		if !Find[string](vmLaunchServers, vm.LaunchServer) {
@@ -326,7 +328,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 	}
 	host, err := dbmgr.DBMgr[models.Host](db).GetFirstFromBatchIPs(vmLaunchServers)
 	if err != nil {
-		log.Error("vtap(%s) host(%s) not found", r.ctrlIP, vmLaunchServers)
+		log.Error("vtap(%s) host(%s) not found", r.getKey(), vmLaunchServers)
 		return nil, false
 	}
 	vTapName := fmt.Sprintf("%s-H%d", host.Name, host.ID)
@@ -340,6 +342,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 		AZ:              host.AZ,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_MIRROR,
 		Lcuuid:          uuid.NewString(),
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -361,7 +364,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		vifIDs)
 	if err != nil || len(vifs) == 0 {
 		log.Errorf("vtap(%s) vinterface(mac: %s, region: %s, devicetype: %d) not found",
-			r.ctrlIP, r.ctrlMac, r.region, VIF_DEVICE_TYPE_VM)
+			r.getKey(), r.ctrlMac, r.region, VIF_DEVICE_TYPE_VM)
 		if err != nil {
 			log.Error(err)
 		}
@@ -375,7 +378,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 	}
 	vm, err := dbmgr.DBMgr[models.VM](db).GetFirstFromBatchIDs(deviceIDs)
 	if err != nil {
-		log.Errorf("vtap(%s), vm(id=%s) not in DB, err: %s", r.ctrlIP, deviceIDs, err)
+		log.Errorf("vtap(%s), vm(id=%s) not in DB, err: %s", r.getKey(), deviceIDs, err)
 		return nil, false
 	}
 	var (
@@ -401,50 +404,17 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		AZ:              vm.AZ,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          vm.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
 	return dbVTap, result
 }
 
-func (r *VTapRegister) registerVTapLocalTapMode(db *gorm.DB) *models.VTap {
-	vtap, ok := r.registerVTapByHost(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerVTapByPodNode(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerLocalVTapByIP(db)
-	if ok == true {
-		return vtap
-	}
-
-	return nil
-}
-
-func (r *VTapRegister) registerVTapMirrorTapMode(db *gorm.DB) *models.VTap {
-	vtap, ok := r.registerVTapByHost(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerVTapByPodNode(db)
-	if ok == true {
-		return vtap
-	}
-	vtap, ok = r.registerMirrorVTapByIP(db)
-	if ok == true {
-		return vtap
-	}
-
-	return nil
-}
-
 func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
 	az, err := dbmgr.DBMgr[models.AZ](db).GetFromRegion(r.region)
 	if err != nil {
-		log.Errorf("vtap(%s) no az in region %s", r.ctrlIP, r.region)
+		log.Errorf("vtap(%s) no az in region %s", r.getKey(), r.region)
 		return nil
 	}
 
@@ -457,6 +427,7 @@ func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
 		AZ:              az.Lcuuid,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
 		State:           VTAP_STATE_PENDING,
+		TapMode:         TAPMODE_ANALYZER,
 		Lcuuid:          uuid.NewString(),
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -486,15 +457,33 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 	r.vTapAutoRegister = v.getVTapAutoRegister()
 	log.Infof("register vtap: %s", r)
 	var vtap *models.VTap
-	if trident.TapMode(r.tapMode) == trident.TapMode_LOCAL {
-		vtap = r.registerVTapLocalTapMode(v.db)
-	} else if trident.TapMode(r.tapMode) == trident.TapMode_MIRROR {
-		vtap = r.registerVTapMirrorTapMode(v.db)
-	} else if trident.TapMode(r.tapMode) == trident.TapMode_ANALYZER {
-		vtap = r.registerVTapAnalyzerTapMode(v.db)
-	} else {
-		log.Errorf("unkown tap_mode (%d)", r.tapMode)
+	ok := false
+	for {
+		vtap, ok = r.registerVTapByHost(v.db)
+		if ok == true {
+			break
+		}
+		vtap, ok = r.registerVTapByPodNode(v.db)
+		if ok == true {
+			break
+		}
+		if v.getDefaultTapMode() == TAPMODE_MIRROR {
+			vtap, ok = r.registerMirrorVTapByIP(v.db)
+			if ok == true {
+				break
+			}
+		} else {
+			vtap, ok = r.registerLocalVTapByIP(v.db)
+			if ok == true {
+				break
+			}
+		}
+		break
 	}
+	if ok == false && v.getDefaultTapMode() == TAPMODE_ANALYZER {
+		vtap = r.registerVTapAnalyzerTapMode(v.db)
+	}
+
 	if vtap != nil {
 		v.AddVTapCache(vtap)
 		v.putChRegisterFisnish()
@@ -502,5 +491,5 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 }
 
 func (r *VTapRegister) getKey() string {
-	return r.ctrlIP + "-" + r.ctrlMac
+	return fmt.Sprintf("%s-%s", r.ctrlIP, r.ctrlMac)
 }

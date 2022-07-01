@@ -40,24 +40,34 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {
-        let contents = fs::read_to_string(path)?;
+    pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, ConfigError> {
+        let contents =
+            fs::read_to_string(path).map_err(|e| ConfigError::YamlConfigInvalid(e.to_string()))?;
         Self::load(&contents)
     }
 
-    pub fn load<C: AsRef<str>>(contents: C) -> Result<Self, io::Error> {
+    pub fn load<C: AsRef<str>>(contents: C) -> Result<Self, ConfigError> {
         let contents = contents.as_ref();
         if contents.len() == 0 {
             // parsing empty string leads to EOF error
             Ok(Self::default())
         } else {
             let mut cfg: Self = serde_yaml::from_str(contents)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
+                .map_err(|e| ConfigError::YamlConfigInvalid(e.to_string()))?;
             cfg.controller_ips = cfg
                 .controller_ips
                 .drain(..)
-                .filter_map(|addr| resolve_domain(&addr))
+                .filter_map(|addr| match resolve_domain(&addr) {
+                    Some(ip) => Some(ip),
+                    None => {
+                        warn!("Cannot resolve domain {}", addr);
+                        None
+                    }
+                })
                 .collect();
+            if cfg.controller_ips.is_empty() {
+                return Err(ConfigError::ControllerIpsEmpty);
+            }
             Ok(cfg)
         }
     }

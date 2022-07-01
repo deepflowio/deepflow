@@ -48,5 +48,10 @@ const (
 	CONN_DEFAULT_AZ     = "ALL"
 	CONN_DEFAULT_REGION = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-	NODE_IP_KEY = "NODE_IP"
+	NODE_IP_KEY = "K8S_NODE_IP_FOR_METAFLOW"
+
+	TAPMODE_LOCAL    = 0
+	TAPMODE_MIRROR   = 1
+	TAPMODE_ANALYZER = 2
+	TAPMODE_DECAP    = 3
 )

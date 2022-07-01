@@ -33,7 +33,11 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
-			tagItem, ok = tag.GetTag("external_tag", db, table, "default")
+			if strings.HasPrefix(name, "tag.") {
+				tagItem, ok = tag.GetTag("tag", db, table, "default")
+			} else {
+				tagItem, ok = tag.GetTag("attribute", db, table, "default")
+			}
 			nameNoPreffix := strings.TrimPrefix(name, "tag.")
 			nameNoPreffix = strings.TrimPrefix(nameNoPreffix, "attribute.")
 			TagTranslatorStr := fmt.Sprintf(tagItem.TagTranslator, nameNoPreffix)
@@ -81,5 +85,8 @@ func (t *SelectTag) Format(m *view.Model) {
 			alias = t.Alias
 		}
 		m.AddCallback(MacTranslate([]interface{}{t.Value, alias}))
+	}
+	if t.Alias == "tags" || t.Alias == "attributes" {
+		m.AddCallback(ExternalTagsFormat([]interface{}{}))
 	}
 }

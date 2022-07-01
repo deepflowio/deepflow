@@ -297,6 +297,8 @@ type SubDomainUpdate struct {
 }
 
 type VTapGroupConfiguration struct {
+	VTapGroupID                   *string      `json:"VTAP_GROUP_ID" yaml:"vtap_group_id,omitempty"`
+	VTapGroupLcuuid               *string      `json:"VTAP_GROUP_LCUUID" yaml:"vtap_group_lcuuid,omitempty"`
 	MaxCollectPps                 *int         `json:"MAX_COLLECT_PPS" yaml:"max_collect_pps,omitempty"`
 	MaxNpbBps                     *int64       `json:"MAX_NPB_BPS" yaml:"max_npb_bps,omitempty"` // unit: bps
 	MaxCPUs                       *int         `json:"MAX_CPUS" yaml:"max_cpus,omitempty"`
@@ -324,7 +326,6 @@ type VTapGroupConfiguration struct {
 	NatIPEnabled                  *int         `json:"NAT_IP_ENABLED" yaml:"nat_ip_enabled,omitempty"` // 0: disabled 1:enabled
 	CapturePacketSize             *int         `json:"CAPTURE_PACKET_SIZE" yaml:"capture_packet_size,omitempty"`
 	InactiveServerPortEnabled     *int         `json:"INACTIVE_SERVER_PORT_ENABLED" yaml:"inactive_server_port_enabled,omitempty"` // 0: disabled 1:enabled
-	VTapGroupLcuuid               *string      `json:"VTAP_GROUP_LCUUID" yaml:"vtap_group_lcuuid,omitempty"`
 	LogThreshold                  *int         `json:"LOG_THRESHOLD" yaml:"log_threshold,omitempty"`
 	LogLevel                      *string      `json:"LOG_LEVEL" yaml:"log_level,omitempty"`
 	LogRetention                  *int         `json:"LOG_RETENTION" yaml:"log_retention,omitempty"`
@@ -393,6 +394,8 @@ type VTapGroupConfigurationResponse struct {
 	CapturePacketSize             *int          `json:"CAPTURE_PACKET_SIZE"`
 	InactiveServerPortEnabled     *int          `json:"INACTIVE_SERVER_PORT_ENABLED"` // 0: disabled 1:enabled
 	VTapGroupLcuuid               *string       `json:"VTAP_GROUP_LCUUID"`
+	VTapGroupID                   *string       `json:"VTAP_GROUP_ID"`
+	VTapGroupName                 *string       `json:"VTAP_GROUP_NAME"`
 	LogThreshold                  *int          `json:"LOG_THRESHOLD"`
 	LogLevel                      *string       `json:"LOG_LEVEL"`
 	LogRetention                  *int          `json:"LOG_RETENTION"`

@@ -18,6 +18,7 @@ import (
 	"github.com/metaflowys/metaflow/server/controller/genesis"
 	"github.com/metaflowys/metaflow/server/controller/manager"
 	"github.com/metaflowys/metaflow/server/controller/monitor"
+	"github.com/metaflowys/metaflow/server/controller/monitor/license"
 	"github.com/metaflowys/metaflow/server/controller/recorder"
 	"github.com/metaflowys/metaflow/server/controller/router"
 	"github.com/metaflowys/metaflow/server/controller/statsd"
@@ -85,7 +86,7 @@ func Start(configPath string) {
 	tr := tagrecorder.NewTagRecorder(*cfg)
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
-	vtapLicenseAllocation := monitor.NewPseudoVTapLicenseAllocation(cfg.MonitorCfg)
+	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
@@ -130,9 +131,10 @@ func Start(configPath string) {
 		}
 	}()
 
-	// 注册router
+	// register router
 	r := gin.Default()
 	router.DebugRouter(r, m, g)
+	router.HealthRouter(r)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
 	router.VtapRouter(r)

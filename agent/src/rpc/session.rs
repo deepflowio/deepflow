@@ -223,7 +223,7 @@ impl ServerIp {
                 self.proxied = true;
                 true
             } else {
-                info!("rpc IP not changed, proxy unavailable");
+                info!("rpc IP not changed, no valid proxy IP provided");
                 false
             }
         } else {

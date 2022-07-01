@@ -11,8 +11,13 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/metaflowys/metaflow/server/querier/config"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/client"
+	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 )
+
+var log = logging.MustGetLogger("common")
 
 func ParseAlias(node sqlparser.SQLNode) string {
 	alias := sqlparser.String(node)
@@ -123,4 +128,32 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 		return 1, errors.New(fmt.Sprintf("get datasource interval error, url: %s, response: '%v'", url, body))
 	}
 	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
+}
+
+func GetExtTables(db string) (values []interface{}) {
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       db,
+	}
+	err := chClient.Init("")
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	sql := "show tables"
+	rst, err := chClient.DoQuery(sql, nil)
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	for _, _table := range rst["values"] {
+		table := _table.([]interface{})[0].(string)
+		if !strings.HasSuffix(table, "_local") {
+			values = append(values, []string{table})
+		}
+	}
+	return values
 }

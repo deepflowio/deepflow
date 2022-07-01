@@ -12,7 +12,7 @@ use crate::external_metrics::{OpenTelemetry, PrometheusMetric, TelegrafMetric};
 use crate::flow_generator::AppProtoLogsData;
 use crate::metric::document::Document;
 
-const COMPRESSOR_PORT: u16 = 20033;
+const COMPRESSOR_PORT: u16 = 30033;
 const SEQUENCE_OFFSET: usize = 8;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
 const ERR_INTERVAL: Duration = Duration::from_secs(30);

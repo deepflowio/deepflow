@@ -108,64 +108,69 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 		attributeValues = append(attributeValues, getValueString(value))
 
 		if i >= len(spanAttributes) {
-			continue
-		}
-
-		switch key {
-		case "net.transport":
-			protocol := value.GetStringValue()
-			if strings.Contains(protocol, "tcp") {
-				h.Protocol = uint8(layers.IPProtocolTCP)
-			} else if strings.Contains(protocol, "udp") {
-				h.Protocol = uint8(layers.IPProtocolUDP)
+			switch key {
+			case "service.name":
+				h.ServiceName = getValueString(value)
+			case "service.instance.id":
+				h.ServiceInstanceId = getValueString(value)
 			}
-		case "net.host.ip":
-			ip := net.ParseIP(value.GetStringValue())
-			if ip == nil {
-				continue
+		} else {
+			switch key {
+			case "net.transport":
+				protocol := value.GetStringValue()
+				if strings.Contains(protocol, "tcp") {
+					h.Protocol = uint8(layers.IPProtocolTCP)
+				} else if strings.Contains(protocol, "udp") {
+					h.Protocol = uint8(layers.IPProtocolUDP)
+				}
+			case "net.host.ip":
+				ip := net.ParseIP(value.GetStringValue())
+				if ip == nil {
+					continue
+				}
+				if ip4 := ip.To4(); ip4 != nil {
+					h.IP40 = utils.IpToUint32(ip4)
+				} else {
+					h.IsIPv4 = false
+					h.IP60 = ip
+				}
+			case "net.host.port":
+				h.ClientPort = uint16(value.GetIntValue())
+			case "net.peer.ip":
+				ip := net.ParseIP(value.GetStringValue())
+				if ip == nil {
+					continue
+				}
+				if ip4 := ip.To4(); ip4 != nil {
+					h.IP41 = utils.IpToUint32(ip4)
+				} else {
+					h.IsIPv4 = false
+					h.IP61 = ip
+				}
+			case "net.peer.port":
+				h.ServerPort = uint16(value.GetIntValue())
+			case "http.scheme", "db.system", "rpc.system", "messaging.system", "messaging.protocol":
+				h.L7ProtocolStr = value.GetStringValue()
+			case "http.flavor":
+				h.Version = value.GetStringValue()
+			case "http.status_code":
+				h.responseCode = int16(value.GetIntValue())
+				h.ResponseCode = &h.responseCode
+			case "http.host", "db.connection_string":
+				h.RequestDomain = value.GetStringValue()
+			case "http.method", "db.operation", "rpc.method":
+				h.RequestType = value.GetStringValue()
+			case "http.target", "db.statement", "messaging.url", "rpc.service":
+				h.RequestResource = value.GetStringValue()
+			case "http.request_content_length":
+				h.requestLength = value.GetIntValue()
+				h.RequestLength = &h.requestLength
+			case "http.response_content_length":
+				h.responseLength = value.GetIntValue()
+				h.ResponseLength = &h.responseLength
+			default:
+				// nothing
 			}
-			if ip4 := ip.To4(); ip4 != nil {
-				h.IP40 = utils.IpToUint32(ip4)
-			} else {
-				h.IsIPv4 = false
-				h.IP60 = ip
-			}
-		case "net.host.port":
-			h.ClientPort = uint16(value.GetIntValue())
-		case "net.peer.ip":
-			ip := net.ParseIP(value.GetStringValue())
-			if ip == nil {
-				continue
-			}
-			if ip4 := ip.To4(); ip4 != nil {
-				h.IP41 = utils.IpToUint32(ip4)
-			} else {
-				h.IsIPv4 = false
-				h.IP61 = ip
-			}
-		case "net.peer.port":
-			h.ServerPort = uint16(value.GetIntValue())
-		case "http.scheme", "db.system", "rpc.system", "messaging.system", "messaging.protocol":
-			h.L7ProtocolStr = value.GetStringValue()
-		case "http.flavor":
-			h.Version = value.GetStringValue()
-		case "http.status_code":
-			h.responseCode = int16(value.GetIntValue())
-			h.ResponseCode = &h.responseCode
-		case "http.host", "db.connection_string":
-			h.RequestDomain = value.GetStringValue()
-		case "http.method", "db.operation", "rpc.method":
-			h.RequestType = value.GetStringValue()
-		case "http.target", "db.statement", "messaging.url", "rpc.service":
-			h.RequestResource = value.GetStringValue()
-		case "http.request_content_length":
-			h.requestLength = value.GetIntValue()
-			h.RequestLength = &h.requestLength
-		case "http.response_content_length":
-			h.responseLength = value.GetIntValue()
-			h.ResponseLength = &h.responseLength
-		default:
-			// nothing
 		}
 	}
 

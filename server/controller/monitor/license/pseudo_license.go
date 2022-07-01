@@ -1,14 +1,18 @@
-package monitor
+package license
 
 import (
 	"strconv"
 	"strings"
 	"time"
 
+	logging "github.com/op/go-logging"
+
 	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/monitor/config"
 )
+
+var log = logging.MustGetLogger("monitor.license")
 
 var VTAP_LICENSE_TYPE_DEFAULT = common.VTAP_LICENSE_TYPE_C
 var VTAP_LICENSE_FUNCTIONS = []string{
@@ -16,15 +20,15 @@ var VTAP_LICENSE_FUNCTIONS = []string{
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_NETWORK_MONITORING),
 }
 
-type PseudoVTapLicenseAllocation struct {
+type VTapLicenseAllocation struct {
 	cfg config.MonitorConfig
 }
 
-func NewPseudoVTapLicenseAllocation(cfg config.MonitorConfig) *PseudoVTapLicenseAllocation {
-	return &PseudoVTapLicenseAllocation{cfg: cfg}
+func NewVTapLicenseAllocation(cfg config.MonitorConfig) *VTapLicenseAllocation {
+	return &VTapLicenseAllocation{cfg: cfg}
 }
 
-func (v *PseudoVTapLicenseAllocation) Start() {
+func (v *VTapLicenseAllocation) Start() {
 	go func() {
 		for range time.Tick(time.Duration(v.cfg.LicenseCheckInterval) * time.Second) {
 			v.allocLicense()
@@ -32,7 +36,7 @@ func (v *PseudoVTapLicenseAllocation) Start() {
 	}()
 }
 
-func (v *PseudoVTapLicenseAllocation) allocLicense() {
+func (v *VTapLicenseAllocation) allocLicense() {
 	log.Info("alloc license starting")
 	mysql.Db.Model(&mysql.VTap{}).Where("license_type IS NULL").Updates(
 		map[string]interface{}{

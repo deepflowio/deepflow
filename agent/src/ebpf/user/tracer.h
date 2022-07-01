@@ -98,6 +98,7 @@ static inline unsigned int max_log2(unsigned int x)
 	return l;
 }
 
+/* *INDENT-OFF* */
 #define probes_set_enter_symbol(t, fn)                      \
 do {                                                        \
   curr_idx = index++;                  		            \
@@ -128,6 +129,7 @@ do {                                                        \
   snprintf(name, PROBE_NAME_SZ, "%s", tp);  		    \
   t->tps[curr_idx].name = name;                       	    \
 } while(0)
+/* *INDENT-ON* */
 
 enum {
 	/* set */
@@ -339,21 +341,23 @@ static inline void prefetch0(const volatile void *p)
 #define PREFETCH_READ 0
 #define PREFETCH_WRITE 1
 
-#define _PREFETCH(n,size,type)                             	  \
-  if ((size) > (n)*CACHE_LINE_BYTES)                 	  \
-    __builtin_prefetch (_addr + (n)*CACHE_LINE_BYTES, \
-                        PREFETCH_##type,              \
+/* *INDENT-OFF* */
+#define _PREFETCH(n,size,type)				\
+  if ((size) > (n)*CACHE_LINE_BYTES)			\
+    __builtin_prefetch (_addr + (n)*CACHE_LINE_BYTES, 	\
+                        PREFETCH_##type,              	\
                         /* locality */ 3);
 
-#define PREFETCH(addr,size,type)                   \
-do {                                               \
-  void * _addr = (addr);                     \
-	int __sz = (size);                         \
-  if (__sz > 2*CACHE_LINE_BYTES)             \
-		__sz = 2*CACHE_LINE_BYTES;    	   \
-  _PREFETCH (0, __sz, type);                 \
-  _PREFETCH (1, __sz, type);                 \
+#define PREFETCH(addr,size,type)		\
+do {						\
+  void * _addr = (addr);			\
+	int __sz = (size);			\
+  if (__sz > 2*CACHE_LINE_BYTES)		\
+		__sz = 2*CACHE_LINE_BYTES;	\
+  _PREFETCH (0, __sz, type);			\
+  _PREFETCH (1, __sz, type);			\
 } while (0)
+/* *INDENT-ON* */
 
 static inline void
 prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)

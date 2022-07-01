@@ -46,6 +46,21 @@ struct data_members offsets[] = {
 		.structure = "runtime.g",
 		.field_name = "goid",
 		.idx = runtime_g_goid_offset,
+		.default_offset = 152,
+	},
+	{
+		.structure = "crypto/tls.Conn",
+		.field_name = "conn",
+		.idx = crypto_tls_conn_conn_offset,
+		.default_offset = 0,
+	},
+	{
+		// on go 1.8 the structure is "net/poll.FD", but the offset 
+		// is the same as on go 1.7, so a default offset is given
+		.structure = "internal/poll.FD",
+		.field_name = "Sysfd",
+		.idx = net_poll_fd_sysfd,
+		.default_offset = 16,
 	},
 };
 
@@ -126,8 +141,6 @@ static uint64_t get_addr_from_size_and_mod(int ptr_sz, int end_mode, void *buf)
 	return addr;
 }
 
-// TODO: go1.18.x - the version cannot be obtained.
-// It needs to be handled in a good way.
 bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 {
 	bool res = false;
@@ -157,6 +170,26 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (memcmp(info, build_info_magic, strlen(build_info_magic)))
 		goto exit;
 
+	/**
+	 * go 1.18+
+	 * Contents of section .go.buildinfo:
+	 * 575000 ff20476f 20627569 6c64696e 663a0802  . Go buildinf:..
+	 * 575010 00000000 00000000 00000000 00000000  ................
+	 * 575020 08676f31 2e31382e 33d40530 77af0c92  .go1.18.3..0w...
+	 */
+	char *buf;
+	int num;
+	static const int go_version_offset = 0x21;
+	if (data->d_size > go_version_offset){
+		buf = info + go_version_offset;
+		num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+		go_ver->revision = 0;
+		if (num == 2) {
+			res = true;
+			goto exit;
+		}
+	}
+
 	int ptr_sz = info[14];
 	int end_mode = info[15];	// 0 small end mode, Not 0 For big end
 
@@ -165,7 +198,7 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	    get_addr_from_size_and_mod(ptr_sz, end_mode, (void *)&info[16]);
 
 	uint32_t len = 0;
-	char *buf = get_data_buffer_from_addr(e, read_ptr, &len);
+	buf = get_data_buffer_from_addr(e, read_ptr, &len);
 	if (buf == NULL || len <= 0)
 		goto exit;
 
@@ -176,7 +209,8 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (buf == NULL || len <= 0)
 		goto exit;
 
-	int num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+	num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+	go_ver->revision = 0;
 	if (num != 2)
 		ebpf_warning("sscanf() go version failed. num = %d\n", num);
 	else
@@ -247,7 +281,11 @@ static int resolve_bin_file(const char *path, int pid,
 			    struct_member_offset_analyze(probe_sym->binary_path,
 							 off->structure,
 							 off->field_name);
+			if (offset == ETR_INVAL)
+				offset = off->default_offset;
+
 			p_offs->offs.data[off->idx] = offset;
+
 			p_offs->offs.version =
 			    GO_VERSION(go_ver->major, go_ver->minor,
 				       go_ver->revision);

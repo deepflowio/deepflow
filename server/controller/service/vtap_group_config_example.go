@@ -1,6 +1,8 @@
 package service
 
-var YamlVTapGroupConfig = []byte(`# 资源限制
+var YamlVTapGroupConfig = []byte(`# 采集器组ID
+vtap_group_id: g-xxxxxx
+# 资源限制
 # CPU限制，单位：逻辑核，默认值: 1，值域[1, 100000]
 max_cpus: 1
 # 内存限制，单位：M字节，默认值: 768，值域[128, 100000]
@@ -32,7 +34,7 @@ process_threshold: 10
 
 # 基础配置参数
 # 采集网口，默认值：^tap*，长度范围[0, 65535]
-tap_interface_regex: ^tap*
+tap_interface_regex: ^(tap|cali|veth|eth).*
 # 流量过滤，默认值：空，表示全采集，长度范围[1, 512]
 # 请参考BPF语法：https://biot.com/capstats/bpf.html
 capture_bpf:

@@ -110,6 +110,8 @@ struct trace_info_t {
 // struct member_offsets -> data[]  arrays index.
 enum offsets_index {
 	runtime_g_goid_offset = 0,
+	crypto_tls_conn_conn_offset = 1,
+	net_poll_fd_sysfd = 2,
 	offsets_num,
 };
 
@@ -118,5 +120,7 @@ struct member_offsets {
 	__u32 version;
 	__u16 data[offsets_num];
 };
+
+#define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
 
 #endif /* BPF_SOCKET_TRACE_COMMON */

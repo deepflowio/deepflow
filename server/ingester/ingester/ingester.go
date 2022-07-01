@@ -67,7 +67,9 @@ func Start(configPath string) []io.Closer {
 
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
-	stats.SetRemotes(net.JoinHostPort(cfg.Influxdb.Host, cfg.Influxdb.Port))
+	if cfg.InfluxdbWriterEnabled {
+		stats.SetRemotes(net.JoinHostPort(cfg.Influxdb.Host, cfg.Influxdb.Port))
+	}
 
 	dropletConfig := dropletcfg.Load(configPath)
 	bytes, _ = yaml.Marshal(dropletConfig)

@@ -26,11 +26,12 @@ type CKWriterConfig struct {
 }
 
 type Config struct {
-	Base              *config.Config
-	CKWriterConfig    CKWriterConfig `yaml:"ext-metrics-ck-writer"`
-	DecoderQueueCount int            `yaml:"decoder-queue-count"`
-	DecoderQueueSize  int            `yaml:"decoder-queue-size"`
-	TTL               int            `yaml:"ext-metrics-ttl"`
+	Base                  *config.Config
+	CKWriterConfig        CKWriterConfig `yaml:"ext-metrics-ck-writer"`
+	DecoderQueueCount     int            `yaml:"decoder-queue-count"`
+	DecoderQueueSize      int            `yaml:"decoder-queue-size"`
+	TTL                   int            `yaml:"ext-metrics-ttl"`
+	PrometheusSeparatePos int            `yaml:"prometheus-separate-pos"`
 }
 
 type ExtMetricsConfig struct {
@@ -51,11 +52,12 @@ func (c *Config) Validate() error {
 func Load(base *config.Config, path string) *Config {
 	config := &ExtMetricsConfig{
 		ExtMetrics: Config{
-			Base:              base,
-			DecoderQueueCount: DefaultDecoderQueueCount,
-			DecoderQueueSize:  DefaultDecoderQueueSize,
-			CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 10},
-			TTL:               DefaultExtMetricsTTL,
+			Base:                  base,
+			DecoderQueueCount:     DefaultDecoderQueueCount,
+			DecoderQueueSize:      DefaultDecoderQueueSize,
+			CKWriterConfig:        CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 10},
+			TTL:                   DefaultExtMetricsTTL,
+			PrometheusSeparatePos: 1,
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

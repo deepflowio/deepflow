@@ -41,6 +41,7 @@ type Config struct {
 	MetaDataRefreshInterval  int  `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval      int  `default:"60" yaml:"node-refresh-interval"`
 	VTapAutoRegister         bool `default:"true" yaml:"vtap-auto-register"`
+	DefaultTapMode           int  `yaml:"default-tap-mode"`
 }
 
 func (c *Config) Convert() {
