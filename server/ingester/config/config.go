@@ -25,7 +25,7 @@ const (
 	DefaultCKDBS3TTLTimes    = 3 // 对象存储的保留时长是本地存储的3倍
 	DefaultInfluxdbHost      = "influxdb"
 	DefaultInfluxdbPort      = "20044"
-	EnvNodeIP                = "NODE_IP"
+	EnvK8sNodeIP             = "K8S_NODE_IP_FOR_METAFLOW"
 	DefaultCKDBServicePrefix = "clickhouse"
 	DefaultCKDBServicePort   = 9000
 )
@@ -96,7 +96,7 @@ func (c *Config) Validate() error {
 	// if the controller IP is localhost, can't get node ip through ip routing,
 	// should get node ip from ENV
 	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
-		nodeIP, exist := os.LookupEnv("NODE_IP")
+		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
 		if !exist {
 			panic(fmt.Sprintf("Can't get env %s", EnvNodeIP))
 		}
