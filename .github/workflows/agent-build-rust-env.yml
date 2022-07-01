@@ -8,7 +8,7 @@ on:
 name: build agent env
 
 jobs:
-  build_and_test:
+  build_agent_env:
     name: build agent env
     runs-on: ubuntu-latest
     steps:

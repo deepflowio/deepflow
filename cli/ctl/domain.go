@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -45,6 +46,18 @@ func RegisterDomainCommand() *cobra.Command {
 	create.Flags().StringVarP(&createFilename, "filename", "f", "", "file to use create domain")
 	create.MarkFlagRequired("filename")
 
+	var updateFilename string
+	update := &cobra.Command{
+		Use:     "update",
+		Short:   "update domain",
+		Example: "metaflow-ctl domain update deepflow-domain",
+		Run: func(cmd *cobra.Command, args []string) {
+			updateDomain(cmd, args, updateFilename)
+		},
+	}
+	update.Flags().StringVarP(&updateFilename, "filename", "f", "", "file to use update domain")
+	update.MarkFlagRequired("filename")
+
 	delete := &cobra.Command{
 		Use:     "delete [name]",
 		Short:   "delete domain",
@@ -57,6 +70,7 @@ func RegisterDomainCommand() *cobra.Command {
 	exampleCmd := &cobra.Command{
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
+		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.ALIYUN_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.GENESIS_EN}, ",")),
 		Example: "metaflow-ctl domain example genesis",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
@@ -65,6 +79,7 @@ func RegisterDomainCommand() *cobra.Command {
 
 	Domain.AddCommand(list)
 	Domain.AddCommand(create)
+	Domain.AddCommand(update)
 	Domain.AddCommand(delete)
 	Domain.AddCommand(exampleCmd)
 	return Domain
@@ -76,8 +91,8 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		name = args[0]
 	}
 
-	// TODO 读取配置文件
-	url := "http://metaflow-server:20417/v2/domains/"
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v2/domains/", server.IP, server.Port)
 	if name != "" {
 		url += fmt.Sprintf("?name=%s", name)
 	}
@@ -93,7 +108,7 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		yData, _ := yaml.JSONToYAML(jData)
 		fmt.Printf(string(yData))
 	} else {
-		format := "%-46s %-14s %-6s %-14s %-10s %-20s %-22s %-22s %-8s %s\n"
+		format := "%-46s %-14s %-6s %-14s %-10s %-40s %-22s %-22s %-8s %s\n"
 		fmt.Printf(
 			format, "NAME", "ID", "TYPE", "REGION_COUNT", "AZ_COUNT", "CONTROLLER_NAME", "CREATED_AT",
 			"SYNCED_AT", "ENABLED", "STATE",
@@ -111,8 +126,8 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 }
 
 func createDomain(cmd *cobra.Command, args []string, createFilename string) {
-	// TODO: read metaflow host from config file
-	url := "http://metaflow-server:20417/v1/domains/"
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/domains/", server.IP, server.Port)
 	yamlFile, err := ioutil.ReadFile(createFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -124,18 +139,18 @@ func createDomain(cmd *cobra.Command, args []string, createFilename string) {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	fmt.Printf("%s", resp)
+	fmt.Println(resp)
 }
 
-func deleteDomain(cmd *cobra.Command, args []string) {
+func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "must specify name. Example: %s", cmd.Example)
 		return
 	}
 
-	// TODO read metaflow-server host from config file
-	url := fmt.Sprintf("http://metaflow-server:20417/v2/domains/?name=%s", args[0])
-	// curl domain API，get lcuuid
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, args[0])
+	// curl domain API，list lcuuid
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -144,14 +159,47 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 
 	if len(response.Get("DATA").MustArray()) > 0 {
 		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
-		// TODO 读取配置文件
-		url := fmt.Sprintf("http://metaflow-server:20417/v1/domains/%s/", lcuuid)
-		// 调用domain API，删除对应的采集器
-		_, err := common.CURLPerform("DELETE", url, nil, "")
+		url := fmt.Sprintf("http://%s:%d/v1/domains/%s/", server.IP, server.Port, lcuuid)
+		yamlFile, err := ioutil.ReadFile(updateFilename)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		var body map[string]interface{}
+		yaml.Unmarshal(yamlFile, &body)
+		resp, err := common.CURLPerform("PATCH", url, body, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
+		fmt.Println(resp)
+	}
+}
+
+func deleteDomain(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify name. Example: %s", cmd.Example)
+		return
+	}
+
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, args[0])
+	// curl domain API，list lcuuid
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	if len(response.Get("DATA").MustArray()) > 0 {
+		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+		url := fmt.Sprintf("http://%s:%d/v1/domains/%s/", server.IP, server.Port, lcuuid)
+		// 调用domain API，删除对应的云平台
+		resp, err := common.CURLPerform("DELETE", url, nil, "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		fmt.Println(resp)
 	}
 }
 
