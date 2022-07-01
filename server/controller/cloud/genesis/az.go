@@ -10,6 +10,10 @@ import (
 func (g *Genesis) getAZ() (model.AZ, error) {
 	log.Debug("get az starting")
 	azLcuuid := common.GetUUID(common.DEFAULT_REGION_NAME, uuid.Nil)
+
+	g.cloudStatsd.APICost["az"] = []int{0}
+	g.cloudStatsd.APICount["az"] = []int{0}
+
 	az := model.AZ{
 		Lcuuid:       azLcuuid,
 		RegionLcuuid: g.regionUuid,
