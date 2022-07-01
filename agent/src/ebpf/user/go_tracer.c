@@ -65,7 +65,6 @@ struct data_members offsets[] = {
 };
 
 static struct symbol syms[] = {
-	/*-------- http2 server --------------*/
 	{
 		.type = GO_UPROBE,
 		.symbol = "runtime.casgstatus",
@@ -258,6 +257,7 @@ static int resolve_bin_file(const char *path, int pid,
 	struct symbol *sym;
 	struct symbol_uprobe *probe_sym;
 	struct data_members *off;
+	int syms_count = 0;
 
 	for (int i = 0; i < NELEMS(syms); i++) {
 		sym = &syms[i];
@@ -274,6 +274,7 @@ static int resolve_bin_file(const char *path, int pid,
 				goto faild;
 			is_new_offset = true;
 		}
+
 		// resolve all offsets.
 		for (int k = 0; k < NELEMS(offsets); k++) {
 			off = &offsets[k];
@@ -343,6 +344,14 @@ static int resolve_bin_file(const char *path, int pid,
 
 		if (probe_sym->isret)
 			free_uprobe_symbol(probe_sym, conf);
+
+		syms_count++;
+	}
+
+	if (syms_count == 0) {
+		ret = ETR_NOSYMBOL;
+		ebpf_warning("Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
+			     pid, path, go_ver->major, go_ver->minor);
 	}
 
 	return ret;
