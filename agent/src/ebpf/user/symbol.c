@@ -21,13 +21,22 @@
 #include "log.h"
 #include "common.h"
 #include "symbol.h"
+#include "tracer.h"
 #include "bddisasm/bddisasm.h"
 #include "bddisasm/disasmtypes.h"
 
-void free_uprobe_symbol(struct symbol_uprobe *u_sym)
+void free_uprobe_symbol(struct symbol_uprobe *u_sym,
+			struct tracer_probes_conf *conf)
 {
 	if (u_sym == NULL)
 		return;
+
+	if (u_sym->list.prev != NULL && u_sym->list.next != NULL) {
+		list_head_del(&u_sym->list);
+		if (conf)
+			conf->uprobe_count--;
+	}
+
 	if (u_sym->name)
 		free((void *)u_sym->name);
 	if (u_sym->binary_path)
@@ -36,6 +45,15 @@ void free_uprobe_symbol(struct symbol_uprobe *u_sym)
 		free((void *)u_sym->probe_func);
 
 	free(u_sym);
+}
+
+void add_uprobe_symbol(int pid, struct symbol_uprobe *u_sym,
+		       struct tracer_probes_conf *conf)
+{
+	u_sym->starttime = get_process_starttime(pid);
+	u_sym->in_probe = false;
+	list_add_tail(&u_sym->list, &conf->uprobe_syms_head);
+	conf->uprobe_count++;
 }
 
 int copy_uprobe_symbol(struct symbol_uprobe *src, struct symbol_uprobe *dst)
@@ -239,7 +257,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 	return uprobe_sym;
 
 invalid:
-	free_uprobe_symbol(uprobe_sym);
+	free_uprobe_symbol(uprobe_sym, NULL);
 	return NULL;
 }
 

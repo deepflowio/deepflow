@@ -1,8 +1,9 @@
 #define _GNU_SOURCE
-#include "tracer.h"
 #include <arpa/inet.h>
 #include "libbpf/include/linux/err.h"
 #include <sched.h>
+#include "symbol.h"
+#include "tracer.h"
 #include "probe.h"
 #include "table.h"
 #include "common.h"
@@ -10,7 +11,6 @@
 #include "log.h"
 #include "go_tracer.h"
 
-#define TRACER_NAME	"socket-trace"
 #define TRACER_ELF_NAME	"socket_trace.elf"
 
 // eBPF Map Name
@@ -68,29 +68,32 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	 * 由于在Linux 4.17+ sys_write, sys_read, sys_sendto, sys_recvfrom
 	 * 接口会发生变化为了避免对内核的依赖采用tracepoints方式
 	 */
-	tps_set_symbol(tps, "sys_enter_write");
-	tps_set_symbol(tps, "sys_enter_read");
-	tps_set_symbol(tps, "sys_enter_sendto");
-	tps_set_symbol(tps, "sys_enter_recvfrom");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_write");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_read");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_sendto");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_recvfrom");
 
 	// exit tracepoints
-	tps_set_symbol(tps, "sys_exit_socket");
-	tps_set_symbol(tps, "sys_exit_read");
-	tps_set_symbol(tps, "sys_exit_write");
-	tps_set_symbol(tps, "sys_exit_sendto");
-	tps_set_symbol(tps, "sys_exit_recvfrom");
-	tps_set_symbol(tps, "sys_exit_sendmsg");
-	tps_set_symbol(tps, "sys_exit_sendmmsg");
-	tps_set_symbol(tps, "sys_exit_recvmsg");
-	tps_set_symbol(tps, "sys_exit_recvmmsg");
-	tps_set_symbol(tps, "sys_exit_writev");
-	tps_set_symbol(tps, "sys_exit_readv");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_socket");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_read");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_write");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendto");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvfrom");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendmsg");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_sendmmsg");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmsg");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_writev");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
 
 	// 周期性触发用于缓存的数据的超时检查
-	tps_set_symbol(tps, "sys_enter_getppid");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
 
 	// clear trace connection
-	tps_set_symbol(tps, "sys_enter_close");
+	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_close");
+
+	// Used for process offsets management
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exit");
 
 	tps->tps_nr = index;
 
@@ -139,9 +142,6 @@ next_cpu_client:
 
 		buffer[len] = '\0';
 		if (strcmp(buffer, "hello") == 0) {
-			ebpf_info
-			    ("kernel_offset_infer_server rcv message: \"%s\"\n",
-			     buffer);
 			snprintf(buffer, sizeof(buffer), "OK");
 			send(cli_fd, buffer, 2, 0);
 		}
@@ -196,8 +196,6 @@ static int kernel_offset_infer_client(void)
 	}
 
 	close(cli_fd);
-
-	ebpf_info("kernel_offset_infer_client rcv message: \"%s\"\n", buf);
 	return ETR_OK;
 }
 
@@ -272,7 +270,7 @@ static int socktrace_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 	struct bpf_offset_param_array *array = &params->offset_array;
 	array->count = sys_cpus_count;
 
-	struct bpf_tracer *t = find_bpf_tracer(TRACER_NAME);
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
 		return -1;
 
@@ -530,7 +528,7 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 
 static int check_map_exceeded(void)
 {
-	struct bpf_tracer *t = find_bpf_tracer(TRACER_NAME);
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
 		return -1;
 
@@ -568,7 +566,7 @@ static int check_map_exceeded(void)
 
 static int check_kern_adapt_and_state_update(void)
 {
-	struct bpf_tracer *t = find_bpf_tracer(TRACER_NAME);
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
 		return -1;
 
@@ -627,7 +625,7 @@ int running_socket_tracer(l7_handle_fn handle,
 	INIT_LIST_HEAD(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
-	    create_bpf_tracer(TRACER_NAME, bpf_path, tps,
+	    create_bpf_tracer(SK_TRACER_NAME, bpf_path, tps,
 			      thread_nr, (void *)handle, perf_pages_cnt);
 	if (tracer == NULL)
 		return -EINVAL;
@@ -718,13 +716,17 @@ int running_socket_tracer(l7_handle_fn handle,
 	if ((ret = sockopt_register(&socktrace_sockopts)) != ETR_OK)
 		return ret;
 
+	ret = go_probes_manage_init();
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
 static int socket_tracer_stop(void)
 {
 	int ret = -1;
-	struct bpf_tracer *t = find_bpf_tracer(TRACER_NAME);
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
 		return ret;
 
@@ -747,7 +749,7 @@ static int socket_tracer_stop(void)
 static int socket_tracer_start(void)
 {
 	int ret = -1;
-	struct bpf_tracer *t = find_bpf_tracer(TRACER_NAME);
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
 		return ret;
 
@@ -830,7 +832,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 	struct socket_trace_stats stats;
 	memset(&stats, 0, sizeof(stats));
 
-	struct bpf_tracer *t = find_bpf_tracer(TRACER_NAME);
+	struct bpf_tracer *t = find_bpf_tracer(SK_TRACER_NAME);
 	if (t == NULL)
 		return stats;
 
@@ -1060,8 +1062,8 @@ void print_dns_info(const char *data, int len)
 					answers[i].rdata[j] = reader[j];
 
 				answers[i].rdata[ntohs
-						 (answers[i].
-						  resource->data_len)]
+						 (answers[i].resource->
+						  data_len)]
 				    = '\0';
 
 				reader =

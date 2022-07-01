@@ -3,6 +3,7 @@ module github.com/metaflowys/metaflow/server
 go 1.18
 
 replace (
+	cloud.google.com/go => cloud.google.com/go v0.103.0
 	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
 	github.com/metaflowys/metaflow/message => ../message
 )
@@ -32,7 +33,7 @@ require (
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
-	github.com/metaflowys/metaflow/message v0.0.0-00010101000000-000000000000
+	github.com/metaflowys/metaflow/message v0.0.0-20220701060022-016d806f5466
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
@@ -50,8 +51,8 @@ require (
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	go.opentelemetry.io/proto/otlp v0.18.0
-	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
-	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
+	golang.org/x/sys v0.0.0-20220624220833-87e55d714810
 	google.golang.org/grpc v1.47.0
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -62,7 +63,6 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.7.0 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/aws/aws-sdk-go v1.44.20 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -133,13 +133,11 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20211027215541-db492cf91b37 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
-	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
+	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
-	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220616135557-88e70c0c3a90 // indirect
+	google.golang.org/genproto v0.0.0-20220628213854-d9e0b6570c03 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

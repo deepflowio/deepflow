@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <linux/types.h>
+#include "symbol.h"
 #include "tracer.h"
 #include "libbpf/src/libbpf.h"
 #include "libbpf/src/bpf.h"
