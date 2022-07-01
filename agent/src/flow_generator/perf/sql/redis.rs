@@ -140,6 +140,7 @@ impl L7FlowPerf for RedisPerfData {
                 status: self.status,
                 code: 0,
                 rrt: rrt,
+                version: 0,
             },
             0,
         ))

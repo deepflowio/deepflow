@@ -1,10 +1,10 @@
 package kubernetes_gather
 
 import (
-	"server/controller/cloud/kubernetes_gather/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
 
 	"errors"
 	"regexp"

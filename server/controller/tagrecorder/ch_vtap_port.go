@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 type ChVTapPort struct {

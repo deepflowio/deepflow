@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 type ByteBuffer struct {

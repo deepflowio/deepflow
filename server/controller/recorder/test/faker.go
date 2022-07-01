@@ -7,9 +7,9 @@ import (
 	"github.com/bxcodec/faker/v3"
 	"github.com/google/uuid"
 
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/common"
-	rcommon "server/controller/recorder/common"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	rcommon "github.com/metaflowys/metaflow/server/controller/recorder/common"
 )
 
 func RandID() int {

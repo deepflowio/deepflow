@@ -3,8 +3,8 @@ package qingcloud
 import (
 	"github.com/deckarep/golang-set"
 
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (q *QingCloud) GetVPCs() ([]model.VPC, error) {

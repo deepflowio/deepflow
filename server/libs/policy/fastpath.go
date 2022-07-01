@@ -5,10 +5,10 @@ import (
 	"math"
 	"strconv"
 
-	. "server/libs/datatype"
-	"server/libs/hmap/lru"
-	"server/libs/stats"
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/hmap/lru"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

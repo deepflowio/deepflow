@@ -1,7 +1,7 @@
 package common
 
 import (
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
@@ -69,7 +69,7 @@ var (
 	RsyslogEnabled                = 1
 	MaxTxBandwidth                = int64(0)
 	BandwidthProbeInterval        = 10
-	TapInterfaceRegex             = "^tap.*"
+	TapInterfaceRegex             = "^(tap|cali|veth|eth).*"
 	MaxEscapeSeconds              = 3600
 	Mtu                           = 1500
 	OutputVlan                    = 0
@@ -107,7 +107,7 @@ var (
 	Domains                       = "0"
 	DecapType                     = "0"
 	HTTPLogSpanID                 = "关闭"
-	SysFreeMemoryLimit            = 30
+	SysFreeMemoryLimit            = 0
 	LogFileSize                   = 1000
 	HTTPLogXRequestID             = "关闭"
 	ExternalAgentHTTPProxyEnabled = 0

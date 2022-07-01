@@ -3,12 +3,12 @@ package ckdb
 import (
 	"fmt"
 	"net"
-	"server/libs/utils"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	logging "github.com/op/go-logging"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("ckdb")
@@ -182,14 +182,6 @@ func (b *Block) WriteString(v string) error {
 	return nil
 }
 
-func (b *Block) WriteFixedString(v []byte) error {
-	if err := b.Batch.Column(b.index).Append([][]byte{v}); err != nil {
-		return err
-	}
-	b.index++
-	return nil
-}
-
 func (b *Block) WriteIPv4(v uint32) error {
 	if err := b.Batch.Column(b.index).Append([]net.IP{utils.IpFromUint32(v)}); err != nil {
 		return err
@@ -216,6 +208,30 @@ func (b *Block) WriteArray(v interface{}) error {
 
 func (b *Block) WriteArrayString(v []string) error {
 	if err := b.Batch.Column(b.index).Append([][]string{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteArrayInt64(v []int64) error {
+	if err := b.Batch.Column(b.index).Append([][]int64{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteArrayUInt64(v []uint64) error {
+	if err := b.Batch.Column(b.index).Append([][]uint64{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteArrayFloat64(v []float64) error {
+	if err := b.Batch.Column(b.index).Append([][]float64{v}); err != nil {
 		return err
 	}
 	b.index++

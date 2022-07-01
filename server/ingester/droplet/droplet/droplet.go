@@ -7,20 +7,21 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	"server/libs/datatype"
-	libpcap "server/libs/pcap"
-	libqueue "server/libs/queue"
-	"server/libs/receiver"
+
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	libpcap "github.com/metaflowys/metaflow/server/libs/pcap"
+	libqueue "github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 
 	"github.com/metaflowys/metaflow/message/trident"
-	"server/ingester/droplet/adapter"
-	"server/ingester/droplet/config"
-	"server/ingester/droplet/labeler"
-	"server/ingester/droplet/pcap"
-	"server/ingester/droplet/queue"
-	"server/ingester/droplet/statsd"
-	"server/ingester/droplet/syslog"
-	"server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/adapter"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/config"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/labeler"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/pcap"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/queue"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/statsd"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/syslog"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 )
 
 var log = logging.MustGetLogger("droplet")

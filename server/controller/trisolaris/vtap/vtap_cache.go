@@ -12,12 +12,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/metaflowys/metaflow/message/trident"
 
-	. "server/controller/common"
-	models "server/controller/db/mysql"
-	. "server/controller/trisolaris/common"
-	"server/controller/trisolaris/metadata"
-	. "server/controller/trisolaris/utils"
-	"server/controller/trisolaris/utils/atomicbool"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 type VTapConfig struct {
@@ -71,7 +71,6 @@ func NewVTapConfig(config *models.RVTapGroupConfiguration) *VTapConfig {
 	vTapConfig := &VTapConfig{}
 	vTapConfig.RVTapGroupConfiguration = *config
 	vTapConfig.convertData()
-	//fmt.Printf("%+v\n", vTapConfig)
 	return vTapConfig
 }
 
@@ -104,37 +103,40 @@ type VTapCache struct {
 	os                 *string
 	kernelVersion      *string
 	licenseType        int
-	licenseFunctions   []int
 	lcuuid             *string
-	//以上db Data
+	licenseFunctions   *string
+	//above db Data
+
+	enabledTrafficDistribution   atomicbool.Bool
+	enabledNetworkMonitoring     atomicbool.Bool
+	enabledApplicationMonitoring atomicbool.Bool
 
 	cachedAt        time.Time
 	upgradeRevision *string
 	region          *string
 	domain          *string
 
-	// 采集器配置 TODO
+	// vtap group config
 	config *atomic.Value //*VTapConfig
-	// 采集器所在所在容器集群domain
+	// Container cluster domain where the vtap is located
 	podDomains []string
 
-	//  segments TODO
+	// segments
 	localSegments  []*trident.Segment
 	remoteSegments []*trident.Segment
 
 	// vtap version
 	pushVersionPlatformData uint64
-	// 暂不支持
 	//VersionAcls         int
 	//VersionGroups       int
 
 	controllerSyncFlag atomicbool.Bool // bool
 	tsdbSyncFlag       atomicbool.Bool // bool
-	// 容器类型采集器所在容器集群ID
+	// ID of the container cluster where the container type vtap resides
 	podClusterID int
-	// 采集器所属epc
+	// vtap vtap id
 	VPCID int
-	// 采集器平台数据
+	// vtap platform data
 	PlatformData *atomic.Value //*PlatformData
 }
 
@@ -171,18 +173,10 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.kernelVersion = proto.String(vtap.KernelVersion)
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
-	licenseFunctions := []int{}
-	if vtap.LicenseFunctions != "" {
-		for _, function := range strings.Split(vtap.LicenseFunctions, ",") {
-			intFunction, err := strconv.Atoi(function)
-			if err != nil {
-				log.Error(err, vtap.LicenseFunctions)
-				continue
-			}
-			licenseFunctions = append(licenseFunctions, intFunction)
-		}
-	}
-	vTapCache.licenseFunctions = licenseFunctions
+	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
+	vTapCache.enabledTrafficDistribution = atomicbool.NewBool(false)
+	vTapCache.enabledNetworkMonitoring = atomicbool.NewBool(false)
+	vTapCache.enabledApplicationMonitoring = atomicbool.NewBool(false)
 
 	vTapCache.cachedAt = time.Now()
 	vTapCache.config = &atomic.Value{}
@@ -197,8 +191,71 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.podClusterID = 0
 	vTapCache.VPCID = 0
 	vTapCache.PlatformData = &atomic.Value{}
-
+	vTapCache.convertLicenseFunctions()
 	return vTapCache
+}
+
+func ConvertStrToIntList(convertStr string) ([]int, error) {
+	if len(convertStr) == 0 {
+		return []int{}, nil
+	}
+	splitStr := strings.Split(convertStr, ",")
+	result := make([]int, len(splitStr), len(splitStr))
+	for index, src := range splitStr {
+		target, err := strconv.Atoi(src)
+		if err != nil {
+			return []int{}, err
+		} else {
+			result[index] = target
+		}
+	}
+
+	return result, nil
+}
+
+func (c *VTapCache) unsetLicenseFunctionEnable() {
+	c.enabledApplicationMonitoring.Unset()
+	c.enabledNetworkMonitoring.Unset()
+	c.enabledTrafficDistribution.Unset()
+}
+
+func (c *VTapCache) convertLicenseFunctions() {
+	c.unsetLicenseFunctionEnable()
+	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
+		log.Warningf("vtap(%s) no license functins", c.GetKey())
+		return
+	}
+	licenseFunctionsInt, err := ConvertStrToIntList(*c.licenseFunctions)
+	if err != nil {
+		log.Errorf("convert licence functions failed err :%s", err)
+		return
+	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING) {
+		c.enabledApplicationMonitoring.Set()
+	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_NETWORK_MONITORING) {
+		c.enabledNetworkMonitoring.Set()
+	}
+	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_TRAFFIC_DISTRIBUTION) {
+		c.enabledTrafficDistribution.Set()
+	}
+}
+
+func (c *VTapCache) EnabledApplicationMonitoring() bool {
+	return c.enabledApplicationMonitoring.IsSet()
+}
+
+func (c *VTapCache) EnabledNetworkMonitoring() bool {
+	return c.enabledNetworkMonitoring.IsSet()
+}
+
+func (c *VTapCache) EnabledTrafficDistribution() bool {
+	return c.enabledTrafficDistribution.IsSet()
+}
+
+func (c *VTapCache) updateLicenseFunctions(licenseFunctions string) {
+	c.licenseFunctions = proto.String(licenseFunctions)
+	c.convertLicenseFunctions()
 }
 
 func (c *VTapCache) GetCachedAt() time.Time {
@@ -628,10 +685,11 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State
 	c.enable = vtap.Enable
+	c.updateLicenseFunctions(vtap.LicenseFunctions)
 	if c.vTapType != vtap.Type {
+		c.vTapType = vtap.Type
 		v.setVTapChangedForSegment()
 	}
-	c.vTapType = vtap.Type
 	if c.GetVTapHost() != vtap.Name {
 		c.updateVTapHost(vtap.Name)
 	}

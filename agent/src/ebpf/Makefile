@@ -101,7 +101,7 @@ tools: $(LIBBPF_DIR) $(LIBTRACE)
 	$(call msg,TOOLS,metaflow-ebpfctl)
 	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c libebpf.a -o metaflow-ebpfctl -lelf -lz -lpthread
 
-rust-sample:
+rust-sample: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/src/ebpf.rs
 	$(Q)cp mod.rs samples/rust/src/ebpf.rs

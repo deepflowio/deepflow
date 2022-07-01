@@ -21,6 +21,7 @@ struct __socket_data {
 	/* 进程/线程信息 */
 	__u32 pid;  // 表示线程号 如果'pid == tgid'表示一个进程, 否则是线程
 	__u32 tgid; // 进程号
+	__u64 coroutine_id; // CoroutineID, i.e., golang goroutine id
 	__u8  comm[16]; // 进程名
 
 	/* 连接（socket）信息 */
@@ -105,5 +106,21 @@ struct trace_info_t {
 	__u64 thread_trace_id; // 线程追踪ID
 	__u64 conn_key; // 链接记录哈希表(socket_info_map)中的key值。
 };
+
+// struct member_offsets -> data[]  arrays index.
+enum offsets_index {
+	runtime_g_goid_offset = 0,
+	crypto_tls_conn_conn_offset = 1,
+	net_poll_fd_sysfd = 2,
+	offsets_num,
+};
+
+// Store the member_offsets to eBPF Map.
+struct member_offsets {
+	__u32 version;
+	__u16 data[offsets_num];
+};
+
+#define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
 
 #endif /* BPF_SOCKET_TRACE_COMMON */

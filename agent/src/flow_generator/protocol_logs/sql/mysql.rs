@@ -239,6 +239,7 @@ impl L7LogParse for MysqlLog {
             status: self.status,
             code: self.info.error_code,
             rrt: 0,
+            version: 0,
         })
     }
 

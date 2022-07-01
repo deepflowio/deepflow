@@ -6,19 +6,19 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	logging "github.com/op/go-logging"
-
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
-	"server/ingester/stream/config"
-	"server/ingester/stream/jsonify"
-	"server/ingester/stream/throttler"
-	"server/libs/codec"
-	"server/libs/datatype"
-	"server/libs/datatype/pb"
-	"server/libs/grpc"
-	"server/libs/queue"
-	"server/libs/receiver"
-	"server/libs/stats"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/server/ingester/stream/config"
+	"github.com/metaflowys/metaflow/server/ingester/stream/jsonify"
+	"github.com/metaflowys/metaflow/server/ingester/stream/throttler"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("stream.decoder")

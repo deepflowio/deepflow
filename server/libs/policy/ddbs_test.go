@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	. "github.com/google/gopacket/layers"
-	. "server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
 )
 
 func TestDdbsSimple(t *testing.T) {

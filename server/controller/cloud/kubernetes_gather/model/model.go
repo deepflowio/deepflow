@@ -1,7 +1,7 @@
 package model
 
 import (
-	"server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
 	"time"
 )
 

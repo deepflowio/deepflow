@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"server/libs/stats"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 )
 
 type FixedMultiQueue []*OverwriteQueue

@@ -3,9 +3,10 @@ package adapter
 import (
 	"strconv"
 
-	"server/libs/datatype"
-	"server/libs/queue"
-	"server/libs/stats"
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 )
 
 type slave struct {
@@ -86,7 +87,7 @@ func (s *slave) init(id int, out queue.QueueWriter) {
 	s.inQueue = make(chan *packetBuffer, 1024)
 	s.itemBatch = make([]interface{}, 0, QUEUE_BATCH_SIZE)
 	s.statsCounter.init()
-	stats.RegisterCountable("slave-queue", s, stats.OptionStatTags{"index": strconv.Itoa(id)})
+	common.RegisterCountableForIngester("slave-queue", s, stats.OptionStatTags{"index": strconv.Itoa(id)})
 }
 
 func newSlave(id int, out queue.QueueWriter) *slave {

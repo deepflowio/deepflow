@@ -1,10 +1,10 @@
 package config
 
 import (
-	"errors"
 	"io/ioutil"
-	"net"
 	"os"
+
+	"github.com/metaflowys/metaflow/server/ingester/config"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
@@ -13,31 +13,11 @@ import (
 var log = logging.MustGetLogger("stream.config")
 
 const (
-	DefaultControllerIP      = "127.0.0.1"
-	DefaultControllerPort    = 20035
-	DefaultCKPrimaryAddr     = "127.0.0.1:9000"
 	DefaultThrottle          = 50000
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 10000
 	DefaultBrokerQueueSize   = 10000
-	DefaultBrokerZMQIP       = "127.0.0.1"
-	DefaultBrokerZMQPort     = 20204
-	DefaultBrokerZMQHWM      = 1000
 )
-
-type Auth struct {
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-}
-type DBAddr struct {
-	Primary string `yaml:"primary"`
-	Replica string `yaml:"replica"`
-}
-
-type CKAddr struct {
-	Primary   string `yaml:"primary"`
-	Secondary string `yaml:"secondary"`
-}
 
 type CKWriterConfig struct {
 	QueueCount   int `yaml:"queue-count"`
@@ -59,11 +39,8 @@ type FlowLogDisabled struct {
 }
 
 type Config struct {
+	Base              *config.Config
 	ShardID           int             `yaml:"shard-id"`
-	ControllerIPs     []string        `yaml:"controller-ips"`
-	ControllerPort    int             `yaml:"controller-port"`
-	CKDB              CKAddr          `yaml:"ckdb"`
-	CKAuth            Auth            `yaml:"ck-auth"`
 	ReplicaEnabled    bool            `yaml:"flowlog-replica-enabled"`
 	CKWriterConfig    CKWriterConfig  `yaml:"flowlog-ck-writer"`
 	Throttle          int             `yaml:"throttle"`
@@ -78,28 +55,17 @@ type StreamConfig struct {
 }
 
 func (c *Config) Validate() error {
-	for _, ipString := range c.ControllerIPs {
-		if net.ParseIP(string(ipString)) == nil {
-			return errors.New("controller-ips invalid")
-		}
-	}
-
 	if c.DecoderQueueCount == 0 {
 		c.DecoderQueueCount = DefaultDecoderQueueCount
-	}
-
-	if c.ReplicaEnabled && c.CKDB.Secondary == "" {
-		return errors.New("'flowlog-replica-enabled' is 'true', but 'ckdb.secondary' is empty")
 	}
 
 	return nil
 }
 
-func Load(path string) *Config {
+func Load(base *config.Config, path string) *Config {
 	config := &StreamConfig{
 		Stream: Config{
-			ControllerPort:    DefaultControllerPort,
-			CKDB:              CKAddr{DefaultCKPrimaryAddr, ""},
+			Base:              base,
 			Throttle:          DefaultThrottle,
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,

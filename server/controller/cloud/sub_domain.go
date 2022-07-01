@@ -3,9 +3,9 @@ package cloud
 import (
 	"inet.af/netaddr"
 
-	kubernetes_model "server/controller/cloud/kubernetes_gather/model"
-	"server/controller/cloud/model"
-	"server/controller/common"
+	kubernetes_model "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 // 合并附属容器集群的资源到云平台资源中

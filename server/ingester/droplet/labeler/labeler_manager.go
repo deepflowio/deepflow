@@ -3,17 +3,18 @@ package labeler
 import (
 	"time"
 
-	"github.com/metaflowys/metaflow/message/trident"
 	logging "github.com/op/go-logging"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/dropletpb"
-	"server/libs/policy"
-	"server/libs/queue"
-	"server/libs/stats"
 
-	. "server/ingester/droplet/common"
-	"server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/dropletpb"
+	"github.com/metaflowys/metaflow/server/libs/policy"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	. "github.com/metaflowys/metaflow/server/ingester/droplet/common"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 )
 
 var log = logging.MustGetLogger("labeler")
@@ -66,7 +67,7 @@ func NewLabelerManager(packetQueueReaders []queue.QueueReader, packetQueueWriter
 	}
 	labeler.command.init(labeler)
 	debug.Register(dropletctl.DROPLETCTL_LABELER, labeler)
-	stats.RegisterCountable("labeler", labeler)
+	common.RegisterCountableForIngester("labeler", labeler)
 	return labeler
 }
 

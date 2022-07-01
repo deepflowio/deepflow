@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 func randomIP() string {

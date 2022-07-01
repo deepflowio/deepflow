@@ -1,7 +1,7 @@
 package datatype
 
 import (
-	"server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/codec"
 )
 
 type Tag struct {

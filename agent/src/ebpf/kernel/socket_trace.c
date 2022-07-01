@@ -653,13 +653,60 @@ static __inline int iovecs_copy(struct __socket_data *v,
 	return bytes_sent;
 }
 
-static __inline void data_submit(struct pt_regs *ctx,
-				 struct conn_info_t* conn_info,
-				 const struct data_args_t* args,
-				 const bool vecs,
-				 __u32 syscall_len,
-				 struct member_fields_offset *offset,
-				 __u64 time_stamp)
+#ifdef BPF_USE_CORE
+static __u32 __inline get_tcp_write_seq_from_fd(int fd)
+{
+	void *sock = get_socket_from_fd(fd, NULL);
+	__u32 tcp_seq = 0;
+	struct tcp_sock *tcp_sock = (struct tcp_sock *)sock;
+	bpf_core_read(&tcp_seq, sizeof(tcp_seq), &tcp_sock->write_seq);
+	return tcp_seq;
+}
+
+static __u32 __inline get_tcp_read_seq_from_fd(int fd)
+{
+	void *sock = get_socket_from_fd(fd, NULL);
+	__u32 tcp_seq = 0;
+	struct tcp_sock *tcp_sock = (struct tcp_sock *)sock;
+	bpf_core_read(&tcp_seq, sizeof(tcp_seq), &tcp_sock->copied_seq);
+	return tcp_seq;
+}
+#else
+static __u32 __inline get_tcp_write_seq_from_fd(int fd)
+{
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return 0;
+
+	void *sock = get_socket_from_fd(fd, offset);
+	__u32 tcp_seq = 0;
+	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
+		       sock + offset->tcp_sock__write_seq_offset);
+	return tcp_seq;
+}
+
+static __u32 __inline get_tcp_read_seq_from_fd(int fd)
+{
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return 0;
+
+	void *sock = get_socket_from_fd(fd, offset);
+	__u32 tcp_seq = 0;
+	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
+		       sock + offset->tcp_sock__copied_seq_offset);
+	return tcp_seq;
+}
+#endif
+
+static __inline void
+data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
+	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
+	    struct member_fields_offset *offset, __u64 time_stamp,
+	    const struct process_data_extra *extra)
+
 {
 	if (conn_info == NULL) {
 		return;
@@ -684,23 +731,9 @@ static __inline void data_submit(struct pt_regs *ctx,
 	__u64 thread_trace_id = 0;
 
 	if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-#ifdef BPF_USE_CORE
-		struct tcp_sock *tp_sock = (struct tcp_sock *)conn_info->sk;
-		bpf_core_read(&tcp_seq, sizeof(tcp_seq),
-			      &tp_sock->copied_seq);
-#else
-		bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-			       conn_info->sk + offset->tcp_sock__copied_seq_offset);
-#endif
+		tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
 	} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-#ifdef BPF_USE_CORE
-		struct tcp_sock *tp_sock = (struct tcp_sock *)conn_info->sk;
-		bpf_core_read(&tcp_seq, sizeof(tcp_seq),
-			      &tp_sock->write_seq);
-#else
-		bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-			       conn_info->sk + offset->tcp_sock__write_seq_offset);
-#endif
+		tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
 	}
 
 	__u32 k0 = 0;
@@ -806,6 +839,10 @@ static __inline void data_submit(struct pt_regs *ctx,
 	v->tuple.dport = conn_info->tuple.dport;
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
+
+	if (conn_info->protocol == PROTO_HTTP1 && extra->go && extra->tls)
+		v->data_type = PROTO_GO_TLS_HTTP1;
+
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
 	v->tgid = tgid;
@@ -829,6 +866,11 @@ static __inline void data_submit(struct pt_regs *ctx,
 	} else
 		v->extra_data_count = 0;
 
+	if (extra->use_tcp_seq)
+		v->tcp_seq = extra->tcp_seq;
+
+	if (extra->go)
+		v->coroutine_id = extra->coroutine_id;
 	/*
 	 * the bitwise AND operation will set the range of possible values for
 	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
@@ -881,14 +923,21 @@ static __inline void data_submit(struct pt_regs *ctx,
 	}
 }
 
-static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id,
+static __inline void process_data(struct pt_regs *ctx, __u64 id,
 				  const enum traffic_direction direction,
-				  const struct data_args_t* args, ssize_t bytes_count) {
+				  const struct data_args_t *args,
+				  ssize_t bytes_count,
+				  const struct process_data_extra *extra)
+{
 	__u32 tgid = id >> 32;
-	if (!vecs && args->buf == NULL)
+
+	if (!extra)
 		return;
 
-	if (vecs && (args->iov == NULL || args->iovlen <= 0))
+	if (!extra->vecs && args->buf == NULL)
+		return;
+
+	if (extra->vecs && (args->iov == NULL || args->iovlen <= 0))
 		return;
 
 	if (unlikely(args->fd < 0 || (int)bytes_count <= 0))
@@ -921,7 +970,7 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 	init_conn_info(tgid, args->fd, &__conn_info, sk);
 	conn_info->direction = direction;
 
-	if (!vecs) {
+	if (!extra->vecs) {
 		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state);
 	} else {
 		struct iovec iov_cpy;
@@ -931,22 +980,40 @@ static __inline void process_data(const bool vecs, struct pt_regs* ctx, __u64 id
 		infer_l7_class(conn_info, direction, iov_cpy.iov_base, buf_size, sock_state);
 	}
 
-	if (conn_info->protocol != PROTO_UNKNOWN || conn_info->message_type != MSG_UNKNOWN) {
-		data_submit(ctx, conn_info, args, vecs, (__u32)bytes_count, offset, args->enter_ts);
-	}
+	if (conn_info->protocol == PROTO_UNKNOWN)
+		return;
+	if (conn_info->message_type == MSG_UNKNOWN)
+		return;
+
+	data_submit(ctx, conn_info, args, extra->vecs, (__u32)bytes_count,
+		    offset, args->enter_ts, extra);
 }
 
 static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 					  const enum traffic_direction direction,
 					  const struct data_args_t* args, ssize_t bytes_count) {
-	process_data(false, ctx, id, direction, args, bytes_count);
+	struct process_data_extra extra = {};
+	process_data(ctx, id, direction, args, bytes_count, &extra);
+
 }
 
 static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 					       const enum traffic_direction direction,
 					       const struct data_args_t* args,
 					       ssize_t bytes_count) {
-	process_data(true, ctx, id, direction, args, bytes_count);
+	struct process_data_extra extra = {
+		.vecs = true,
+	};
+	process_data(ctx, id, direction, args, bytes_count, &extra);
+}
+
+static __inline void
+process_uprobe_data_tls(struct pt_regs *ctx, __u64 id,
+			const enum traffic_direction direction,
+			const struct data_args_t *args, ssize_t bytes_count,
+			struct process_data_extra *extra)
+{
+	process_data(ctx, id, direction, args, bytes_count, extra);
 }
 
 /***********************************************************
@@ -1005,7 +1072,9 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* read_args = active_read_args_map__lookup(&id);
 	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
 	if (read_args != NULL && read_args->fd > 2) {
-		process_data(false, (struct pt_regs*)ctx, id, T_INGRESS, read_args, bytes_count);
+		struct process_data_extra extra = {};
+		process_data((struct pt_regs *)ctx, id, T_INGRESS, read_args,
+			     bytes_count, &extra);
 	}
 
 	active_read_args_map__delete(&id);
@@ -1394,6 +1463,8 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 //Refer to the eBPF programs here
+#include "go_base_bpf.c"
 #include "go_sample_bpf.c"
+#include "go_tls_bpf.c"
 
 char _license[] SEC("license") = "GPL";

@@ -20,7 +20,7 @@ type ClickHouseConfig struct {
 }
 
 func Connect(cfg ClickHouseConfig) (*sqlx.DB, error) {
-	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s", cfg.UserName, cfg.UserPassword, cfg.Host, cfg.Port, cfg.Database)
+	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s", cfg.UserName, cfg.UserPassword, cfg.Host, cfg.Port, "default")
 	Db, err := sqlx.Open(
 		"clickhouse", url,
 	)

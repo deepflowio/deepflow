@@ -12,9 +12,9 @@ import (
 	"time"
 
 	logging "github.com/op/go-logging"
-	. "server/libs/logger"
-	. "server/libs/xdppacket"
-	. "server/libs/xdppacket/cmd/common"
+	. "github.com/metaflowys/metaflow/server/libs/logger"
+	. "github.com/metaflowys/metaflow/server/libs/xdppacket"
+	. "github.com/metaflowys/metaflow/server/libs/xdppacket/cmd/common"
 )
 
 var log = logging.MustGetLogger(os.Args[0])

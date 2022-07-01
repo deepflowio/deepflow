@@ -7,20 +7,21 @@ import (
 
 	_ "golang.org/x/net/context"
 	_ "google.golang.org/grpc"
-	dropletqueue "server/ingester/droplet/queue"
-	"server/ingester/dropletctl"
-	"server/ingester/stream/common"
-	"server/ingester/stream/config"
-	"server/ingester/stream/dbwriter"
-	"server/ingester/stream/decoder"
-	"server/ingester/stream/geo"
-	"server/ingester/stream/throttler"
-	"server/libs/datatype"
-	"server/libs/debug"
-	"server/libs/grpc"
-	"server/libs/queue"
-	libqueue "server/libs/queue"
-	"server/libs/receiver"
+
+	dropletqueue "github.com/metaflowys/metaflow/server/ingester/droplet/queue"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/stream/common"
+	"github.com/metaflowys/metaflow/server/ingester/stream/config"
+	"github.com/metaflowys/metaflow/server/ingester/stream/dbwriter"
+	"github.com/metaflowys/metaflow/server/ingester/stream/decoder"
+	"github.com/metaflowys/metaflow/server/ingester/stream/geo"
+	"github.com/metaflowys/metaflow/server/ingester/stream/throttler"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	libqueue "github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 )
 
 const (
@@ -43,8 +44,8 @@ type Logger struct {
 
 func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) {
 	manager := dropletqueue.NewManager(dropletctl.DROPLETCTL_STREAM_QUEUE)
-	controllers := make([]net.IP, len(config.ControllerIPs))
-	for i, ipString := range config.ControllerIPs {
+	controllers := make([]net.IP, len(config.Base.ControllerIPs))
+	for i, ipString := range config.Base.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)
 		if controllers[i].To4() != nil {
 			controllers[i] = controllers[i].To4()
@@ -52,7 +53,7 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	}
 	geo.NewGeoTree()
 
-	flowLogWriter, err := dbwriter.NewFlowLogWriter(config.CKDB.Primary, config.CKDB.Secondary, config.CKAuth.User, config.CKAuth.Password, config.ReplicaEnabled, config.CKWriterConfig)
+	flowLogWriter, err := dbwriter.NewFlowLogWriter(config.Base.CKDB.Primary, config.Base.CKDB.Secondary, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password, config.ReplicaEnabled, config.CKWriterConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 			flowLogWriter,
 			int(flowLogId),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", nil)
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		if i == 0 {
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
 		}
@@ -138,7 +139,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 			flowLogWriter,
 			int(common.L4_FLOW_ID),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l4-log-"+strconv.Itoa(i), "", nil)
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-l4-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		if i == 0 {
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
 		}
@@ -190,7 +191,7 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 			flowLogWriter,
 			int(common.L7_FLOW_ID),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, config.ControllerPort, "stream-l7-log-"+strconv.Itoa(i), "", nil)
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-l7-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		decoders[i] = decoder.NewDecoder(
 			i,
 			config.ShardID,

@@ -30,8 +30,7 @@ const (
 
 const (
 	HEALTH_CHECK_INTERVAL = 60 * time.Second
-	CONTROLLER_CHECK_URL  = "http://%s:20014/v1/health/"
-	ANALYZER_CHECK_URL    = "http://%s:20205/v1/health/"
+	HEALTH_CHECK_URL      = "http://%s:%d/v1/health/"
 )
 
 const (

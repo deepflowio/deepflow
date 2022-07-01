@@ -45,8 +45,10 @@ controller:
 
   # monitor module config
   monitor:
-    # 控制器和数据节点检查检查时间间隔，单位：秒
+    # controller/analyzer health_check interval, unit: s
     health_check_interval: 60
+    # controller/analyzer health_check port, default: 30417
+    health_check_port: 30417
     # 健康检查异常/控制器切换处理channel的长度
     health_check_handle_channel_len: 1000
     # License检查的时间间隔，单位: 秒
@@ -113,6 +115,8 @@ controller:
 
     # 采集器是否自动注册
     vtap-auto-register: True
+ 
+    default-tap-mode:
 
   genesis:
     # 平台数据老化时间，单位秒
@@ -150,7 +154,13 @@ querier:
     port: 9000
     timeout: 60
 
-#ingester:
+ingester:
+  #ckdb-service-prefix: clickhouse
+  #ckdb-service-port: 9000
+
+  # local node ip, if not set will get from environment variable 'NODE_IP', dafault: ""
+  #node-ip:
+
   ## trisolaris的ips, 默认值为空
   #controller-ips:
   #  - x.x.x.x
@@ -179,6 +189,9 @@ querier:
   #  enabled: false  #是否使用了对象存储
   #  volume: vol_s3  #ckdb中对象存储的卷名
   #  ttl-times: 3    #对象存储中数据的存储时长是本地存储的几倍
+
+  ## whether write stats data to influxdb
+  #influxdb-writer-enabled: false
 
   ## 存储stats统计数据的influxdb地址
   #influxdb:
@@ -211,6 +224,9 @@ querier:
  
   ## ext metrics数据的保留的时长(单位: 天)
   #ext-metrics-ttl: 7
+
+  ## split prometheus metrics name lable to table name and metrics name, on the nth position of '_'
+  # prometheus-separate-pos: 1
  
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300

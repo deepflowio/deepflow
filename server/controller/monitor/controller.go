@@ -6,9 +6,9 @@ import (
 
 	"github.com/deckarep/golang-set"
 
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/monitor/config"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/monitor/config"
 )
 
 type ControllerCheck struct {
@@ -80,7 +80,7 @@ func (c *ControllerCheck) healthCheck() {
 		// - 检查是否在正常/异常Dict中
 		//   - 如果在，则从正常/异常Dict中移除
 		//   - 如果不在，do nothing
-		active := isActive(common.CONTROLLER_CHECK_URL, checkIP)
+		active := isActive(common.HEALTH_CHECK_URL, checkIP, c.cfg.HealthCheckPort)
 		if controller.State == common.HOST_STATE_COMPLETE {
 			if active {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {

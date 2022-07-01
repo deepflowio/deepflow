@@ -8,9 +8,9 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	"server/libs/bit"
-	. "server/libs/datatype"
-	. "server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/bit"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

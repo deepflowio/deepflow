@@ -3,7 +3,7 @@ package policy
 import (
 	"fmt"
 
-	. "server/libs/datatype"
+	. "github.com/metaflowys/metaflow/server/libs/datatype"
 )
 
 const (

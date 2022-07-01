@@ -25,12 +25,43 @@
 #include "log.h"
 #include "symbol.h"
 #include "tracer.h"
+#include "go_tracer.h"
+#include "offset.h"
+#include "table.h"
+
+#define MAP_GO_OFFSETS_MAP_NAME	"go_offsets_map"
 
 static char build_info_magic[] = "\xff Go buildinf:";
 static int num_procs;
 
+struct list_head proc_offsets_head;	// For pid-offsets correspondence lists.
+
 /* *INDENT-OFF* */
-static struct symbol probe_syms[] = {
+/* ------------- offsets info -------------- */
+struct data_members offsets[] = {
+	{
+		.structure = "runtime.g",
+		.field_name = "goid",
+		.idx = runtime_g_goid_offset,
+		.default_offset = 152,
+	},
+	{
+		.structure = "crypto/tls.Conn",
+		.field_name = "conn",
+		.idx = crypto_tls_conn_conn_offset,
+		.default_offset = 0,
+	},
+	{
+		// on go 1.8 the structure is "net/poll.FD", but the offset 
+		// is the same as on go 1.7, so a default offset is given
+		.structure = "internal/poll.FD",
+		.field_name = "Sysfd",
+		.idx = net_poll_fd_sysfd,
+		.default_offset = 16,
+	},
+};
+
+static struct symbol syms[] = {
 	/*-------- http2 server --------------*/
 	{
 		// Request headers, call submit_headers
@@ -45,6 +76,36 @@ static struct symbol probe_syms[] = {
 		.symbol = "x/net/http2.(*serverConn).writeHeaders",
 		.probe_func = "uprobe_http2_serverConn_writeHeaders",
 		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "runtime.casgstatus",
+		.probe_func = "runtime_casgstatus",
+		.is_probe_ret = false,
+	},	
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Write",
+		.probe_func = "uprobe_go_tls_write_enter",
+		.is_probe_ret = false,
+	},	
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Write",
+		.probe_func = "uprobe_go_tls_write_exit",
+		.is_probe_ret = true,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Read",
+		.probe_func = "uprobe_go_tls_read_enter",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "crypto/tls.(*Conn).Read",
+		.probe_func = "uprobe_go_tls_read_exit",
+		.is_probe_ret = true,
 	},
 };
 /* *INDENT-ON* */
@@ -91,8 +152,6 @@ static uint64_t get_addr_from_size_and_mod(int ptr_sz, int end_mode, void *buf)
 	return addr;
 }
 
-// TODO: go1.18.x - the version cannot be obtained.
-// It needs to be handled in a good way.
 bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 {
 	bool res = false;
@@ -122,6 +181,26 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (memcmp(info, build_info_magic, strlen(build_info_magic)))
 		goto exit;
 
+	/**
+	 * go 1.18+
+	 * Contents of section .go.buildinfo:
+	 * 575000 ff20476f 20627569 6c64696e 663a0802  . Go buildinf:..
+	 * 575010 00000000 00000000 00000000 00000000  ................
+	 * 575020 08676f31 2e31382e 33d40530 77af0c92  .go1.18.3..0w...
+	 */
+	char *buf;
+	int num;
+	static const int go_version_offset = 0x21;
+	if (data->d_size > go_version_offset){
+		buf = info + go_version_offset;
+		num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+		go_ver->revision = 0;
+		if (num == 2) {
+			res = true;
+			goto exit;
+		}
+	}
+
 	int ptr_sz = info[14];
 	int end_mode = info[15];	// 0 small end mode, Not 0 For big end
 
@@ -130,7 +209,7 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	    get_addr_from_size_and_mod(ptr_sz, end_mode, (void *)&info[16]);
 
 	uint32_t len = 0;
-	char *buf = get_data_buffer_from_addr(e, read_ptr, &len);
+	buf = get_data_buffer_from_addr(e, read_ptr, &len);
 	if (buf == NULL || len <= 0)
 		goto exit;
 
@@ -141,9 +220,9 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	if (buf == NULL || len <= 0)
 		goto exit;
 
-	int num = sscanf(buf, "go%d.%d.%d", &go_ver->major, &go_ver->minor,
-			 &go_ver->revision);
-	if (num != 3)
+	num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
+	go_ver->revision = 0;
+	if (num != 2)
 		ebpf_warning("sscanf() go version failed. num = %d\n", num);
 	else
 		res = true;
@@ -158,6 +237,30 @@ exit:
 
 }
 
+static struct proc_offsets *find_offset_by_pid(int pid)
+{
+	struct proc_offsets *p_off;
+	list_for_each_entry(p_off, &proc_offsets_head, list) {
+		if (p_off->pid == pid)
+			return p_off;
+	}
+
+	return NULL;
+}
+
+static struct proc_offsets *alloc_offset_by_pid(int pid)
+{
+	struct proc_offsets *offs;
+	offs = calloc(1, sizeof(struct proc_offsets));
+	if (offs == NULL) {
+		ebpf_warning
+		    ("calloc() size:sizeof(struct proc_offsets) error.\n");
+		return NULL;
+	}
+
+	return offs;
+}
+
 static int resolve_bin_file(const char *path, int pid,
 			    struct version_info *go_ver,
 			    struct tracer_probes_conf *conf)
@@ -165,13 +268,49 @@ static int resolve_bin_file(const char *path, int pid,
 	int ret = ETR_OK;
 	struct symbol *sym;
 	struct symbol_uprobe *probe_sym;
+	struct data_members *off;
 
-	for (int i = 0; i < NELEMS(probe_syms); i++) {
-		sym = &probe_syms[i];
+	for (int i = 0; i < NELEMS(syms); i++) {
+		sym = &syms[i];
 		probe_sym = resolve_and_gen_uprobe_symbol(path, sym, 0, pid);
 		if (probe_sym == NULL) {
 			continue;
 		}
+
+		bool is_new_offset = false;
+		struct proc_offsets *p_offs = find_offset_by_pid(pid);
+		if (p_offs == NULL) {
+			p_offs = alloc_offset_by_pid(pid);
+			if (p_offs == NULL)
+				goto faild;
+			is_new_offset = true;
+		}
+		// resolve all offsets.
+		for (int k = 0; k < NELEMS(offsets); k++) {
+			off = &offsets[k];
+			int offset =
+			    struct_member_offset_analyze(probe_sym->binary_path,
+							 off->structure,
+							 off->field_name);
+			if (offset == ETR_INVAL)
+				offset = off->default_offset;
+
+			p_offs->offs.data[off->idx] = offset;
+
+			p_offs->offs.version =
+			    GO_VERSION(go_ver->major, go_ver->minor,
+				       go_ver->revision);
+			p_offs->pid = pid;
+			p_offs->path = strdup(probe_sym->binary_path);
+			if (p_offs->path == NULL) {
+				free(p_offs);
+				goto faild;
+			}
+		}
+
+		if (is_new_offset)
+			list_add_tail(&p_offs->list, &proc_offsets_head);
+
 		probe_sym->ver = *go_ver;
 
 		if (probe_sym->isret) {
@@ -188,7 +327,9 @@ static int resolve_bin_file(const char *path, int pid,
 					goto faild;
 				}
 
-				if ((ret = copy_uprobe_symbol(probe_sym, sub_probe_sym))
+				if ((ret =
+				     copy_uprobe_symbol(probe_sym,
+							sub_probe_sym))
 				    != ETR_OK) {
 					free((void *)sub_probe_sym);
 					goto faild;
@@ -208,7 +349,7 @@ static int resolve_bin_file(const char *path, int pid,
 
 		ebpf_info
 		    ("Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
-		     path, probe_sym->pid, probe_sym->ver.major,
+		     probe_sym->binary_path, probe_sym->pid, probe_sym->ver.major,
 		     probe_sym->ver.minor, probe_sym->ver.revision,
 		     probe_sym->entry, probe_sym->size, probe_sym->name,
 		     probe_sym->probe_func, probe_sym->rets_count);
@@ -244,16 +385,19 @@ static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
 }
 
 /**
- * collect_uprobe_syms_from_procfs -- 从procfs寻找所有的golang exe,
- * 				 解析并注册uprobe symbols。
- * @tps: 用于记录所有probe的结构地址，uprobe symbols会登记到上面。
- * @return: 返回ETR_OK成功，否则失败。
+ * collect_uprobe_syms_from_procfs -- Find all golang binary executables from Procfs,
+ * 				      parse and register uprobe symbols.
+ *
+ * @tps Where probe was registered.
+ * @return ETR_OK if ok, else an error
  */
 int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 {
 	log_to_stdout = true;
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
+
+	INIT_LIST_HEAD(&proc_offsets_head);
 
 	fddir = opendir("/proc/");
 	if (fddir == NULL) {
@@ -265,10 +409,38 @@ int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	while ((entry = readdir(fddir)) != NULL) {
 		pid = atoi(entry->d_name);
 		if (entry->d_type == DT_DIR && pid > 1)
-			if (proc_parse_and_register(pid, conf) == 0)
+			if (proc_parse_and_register(pid, conf) == ETR_OK)
 				num_procs++;
 	}
 
 	closedir(fddir);
 	return ETR_OK;
+}
+
+void update_go_offsets_to_map(struct bpf_tracer *tracer)
+{
+	struct proc_offsets *p_off;
+	char buff[4096];
+	struct member_offsets *offs;
+	int len, i;
+
+	list_for_each_entry(p_off, &proc_offsets_head, list) {
+		offs = &p_off->offs;
+		uint64_t pid = p_off->pid;
+		if (!bpf_table_set_value
+		    (tracer, MAP_GO_OFFSETS_MAP_NAME, pid, (void *)offs))
+			continue;
+		len =
+		    snprintf(buff, sizeof(buff), "go%d.%d.%d offsets:",
+			     offs->version >> 16, ((offs->version >> 8) & 0xff),
+			     (uint8_t) offs->version);
+		for (i = 0; i < offsets_num; i++) {
+			len +=
+			    snprintf(buff + len, sizeof(buff) - len, "%d:%d ",
+				     i, offs->data[i]);
+		}
+
+		ebpf_info("Udpate map %s, key(pid):%d, value:%s",
+			  MAP_GO_OFFSETS_MAP_NAME, p_off->pid, buff);
+	}
 }

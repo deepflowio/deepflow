@@ -9,10 +9,10 @@ import (
 
 	"database/sql"
 
-	"server/ingester/common"
-	"server/ingester/datasource"
-	"server/libs/ckdb"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/datasource"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("issu")
@@ -258,13 +258,13 @@ var ColumnAdd611 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"tag_names", "tag_values"},
+		ColumnNames: []string{"attribute_names", "attribute_values"},
 		ColumnType:  ckdb.ArrayString,
 	},
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"l7_protocol_str"},
+		ColumnNames: []string{"l7_protocol_str", "service_name"},
 		ColumnType:  ckdb.LowCardinalityString,
 	},
 	&ColumnAdds{
@@ -276,7 +276,7 @@ var ColumnAdd611 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
-		ColumnNames: []string{"parent_span_id"},
+		ColumnNames: []string{"parent_span_id", "service_instance_id"},
 		ColumnType:  ckdb.String,
 	},
 }

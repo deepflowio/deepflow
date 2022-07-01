@@ -6,7 +6,7 @@ import (
 	"net"
 	"unsafe"
 
-	"server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 // buffered encoder

@@ -3,9 +3,10 @@ package tagrecorder
 import (
 	"time"
 
-	// "server/controller/tagrecorder/config"
 	logging "github.com/op/go-logging"
-	"server/controller/config"
+
+	// "github.com/metaflowys/metaflow/server/controller/tagrecorder/config"
+	"github.com/metaflowys/metaflow/server/controller/config"
 )
 
 var log = logging.MustGetLogger("tagrecorder")
@@ -30,7 +31,6 @@ func (c *TagRecorder) run() {
 		return
 	}
 	c.refresh(domainToIconID, resourceToIconID)
-	// c.UpdateChServerPort()
 }
 
 func (c *TagRecorder) Start() {

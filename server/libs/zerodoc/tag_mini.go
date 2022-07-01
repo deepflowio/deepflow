@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"server/libs/codec"
-	"server/libs/datatype"
-	"server/libs/pool"
-	"server/libs/zerodoc/pb"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc/pb"
 )
 
 const (

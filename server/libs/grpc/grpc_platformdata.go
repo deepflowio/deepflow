@@ -16,14 +16,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/context"
-	"server/libs/logger"
-	api "server/libs/reciter-api"
 
 	"github.com/metaflowys/metaflow/message/trident"
-	"server/libs/datatype"
-	"server/libs/hmap/lru"
-	"server/libs/receiver"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/hmap/lru"
+	"github.com/metaflowys/metaflow/server/libs/logger"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
+	api "github.com/metaflowys/metaflow/server/libs/reciter-api"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (
@@ -108,9 +108,10 @@ type PlatformInfoTable struct {
 	moduleName          string
 	versionPlatformData uint64
 	ctlIP               string
-	hostname            string
-	runtimeEnv          utils.RuntimeEnv
-	pcapDataMountPath   string
+
+	hostname          string
+	runtimeEnv        utils.RuntimeEnv
+	pcapDataMountPath string
 
 	versionGroups        uint64
 	serviceLabeler       *GroupLabeler
@@ -238,7 +239,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 	return
 }
 
-func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, pcapDataPath string, receiver *receiver.Receiver) *PlatformInfoTable {
+func NewPlatformInfoTable(ips []net.IP, port int, moduleName, pcapDataPath, nodeIP string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		receiver:             receiver,
 		bootTime:             uint32(time.Now().Unix()),
@@ -261,6 +262,7 @@ func NewPlatformInfoTable(ips []net.IP, port int, moduleName string, pcapDataPat
 		podNameInfos:    make(map[string][]*PodInfo),
 		vtapIdInfos:     make(map[uint32]*VtapInfo),
 		peerConnections: make(map[int32][]int32),
+		ctlIP:           nodeIP,
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -861,12 +863,14 @@ func (t *PlatformInfoTable) Reload() error {
 	var response *trident.SyncResponse
 	err := t.Request(func(ctx context.Context, remote net.IP) error {
 		var err error
-		var local net.IP
-		// 根据remote ip获取本端ip
-		if local, err = lookup(remote); err != nil {
-			return err
+		if t.ctlIP == "" {
+			var local net.IP
+			// 根据remote ip获取本端ip
+			if local, err = lookup(remote); err != nil {
+				return err
+			}
+			t.ctlIP = local.String()
 		}
-		t.ctlIP = local.String()
 
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -889,7 +893,7 @@ func (t *PlatformInfoTable) Reload() error {
 			BootTime:            proto.Uint32(t.bootTime),
 			VersionPlatformData: proto.Uint64(t.versionPlatformData),
 			VersionGroups:       proto.Uint64(t.versionGroups),
-			CtrlIp:              proto.String(local.String()),
+			CtrlIp:              proto.String(t.ctlIP),
 			ProcessName:         proto.String(t.moduleName),
 			Host:                proto.String(hostname),
 			CommunicationVtaps:  communicationVtaps,
@@ -1368,7 +1372,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, "debug", "", nil)
+			table := NewPlatformInfoTable(ips, port, "debug", "", "", nil)
 			table.Reload()
 			fmt.Println(table)
 		},

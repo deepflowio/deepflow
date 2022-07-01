@@ -5,30 +5,31 @@ import (
 	"os"
 	"time"
 
-	"server/libs/logger"
+	"github.com/metaflowys/metaflow/server/libs/logger"
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"server/controller/common"
-	"server/controller/config"
-	"server/controller/db/mysql"
-	"server/controller/db/redis"
-	"server/controller/genesis"
-	"server/controller/manager"
-	"server/controller/monitor"
-	"server/controller/recorder"
-	"server/controller/router"
-	"server/controller/statsd"
-	"server/controller/tagrecorder"
-	"server/controller/trisolaris"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/config"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/db/redis"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/manager"
+	"github.com/metaflowys/metaflow/server/controller/monitor"
+	"github.com/metaflowys/metaflow/server/controller/monitor/license"
+	"github.com/metaflowys/metaflow/server/controller/recorder"
+	"github.com/metaflowys/metaflow/server/controller/router"
+	"github.com/metaflowys/metaflow/server/controller/statsd"
+	"github.com/metaflowys/metaflow/server/controller/tagrecorder"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris"
 
-	_ "server/controller/trisolaris/services/grpc/healthcheck"
-	_ "server/controller/trisolaris/services/grpc/synchronize"
-	_ "server/controller/trisolaris/services/http/cache"
-	_ "server/controller/trisolaris/services/http/health"
-	_ "server/controller/trisolaris/services/http/upgrade"
+	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/grpc/healthcheck"
+	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/grpc/synchronize"
+	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/http/cache"
+	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/http/health"
+	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/http/upgrade"
 )
 
 var log = logging.MustGetLogger("controller")
@@ -60,7 +61,6 @@ func Start(configPath string) {
 	err := redis.InitRedis(cfg.RedisCfg)
 	if err != nil {
 		log.Error("connect redis failed")
-		os.Exit(0)
 	}
 
 	// start statsd
@@ -86,7 +86,7 @@ func Start(configPath string) {
 	tr := tagrecorder.NewTagRecorder(*cfg)
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
-	vtapLicenseAllocation := monitor.NewPseudoVTapLicenseAllocation(cfg.MonitorCfg)
+	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
@@ -131,9 +131,10 @@ func Start(configPath string) {
 		}
 	}()
 
-	// 注册router
+	// register router
 	r := gin.Default()
 	router.DebugRouter(r, m, g)
+	router.HealthRouter(r)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
 	router.VtapRouter(r)

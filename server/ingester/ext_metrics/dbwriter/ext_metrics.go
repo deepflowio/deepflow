@@ -1,9 +1,9 @@
 package dbwriter
 
 import (
-	"server/libs/ckdb"
-	"server/libs/pool"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 type ExtMetrics struct {
@@ -37,13 +37,13 @@ func (m *ExtMetrics) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteArrayString(m.MetricsIntNames); err != nil {
 		return err
 	}
-	if err := block.WriteArray(m.MetricsIntValues); err != nil {
+	if err := block.WriteArrayInt64(m.MetricsIntValues); err != nil {
 		return err
 	}
 	if err := block.WriteArrayString(m.MetricsFloatNames); err != nil {
 		return err
 	}
-	if err := block.WriteArray(m.MetricsFloatValues); err != nil {
+	if err := block.WriteArrayFloat64(m.MetricsFloatValues); err != nil {
 		return err
 	}
 

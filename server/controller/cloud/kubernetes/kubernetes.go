@@ -1,12 +1,14 @@
 package kubernetes
 
 import (
+	"regexp"
+
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
-	"regexp"
-	k8sGather "server/controller/cloud/kubernetes_gather"
-	"server/controller/cloud/model"
-	"server/controller/db/mysql"
+
+	k8sGather "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud.kubernetes")

@@ -75,8 +75,8 @@ Golang自身具备基于git repo的组件依赖描述，因此我们应当遵循
 package droplet
 
 import (
-	"server/libs/queue"
-	"server/libs/linkedlist"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/linkedlist"
 )
 ```
 

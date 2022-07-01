@@ -1,6 +1,11 @@
-module server
+module github.com/metaflowys/metaflow/server
 
 go 1.18
+
+replace (
+	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
+	github.com/metaflowys/metaflow/message => ../message
+)
 
 require (
 	bou.ke/monkey v1.0.2
@@ -27,7 +32,7 @@ require (
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
-	github.com/metaflowys/metaflow v0.0.0-20220623110514-3787264c4079
+	github.com/metaflowys/metaflow/message v0.0.0-00010101000000-000000000000
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7

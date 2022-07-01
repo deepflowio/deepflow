@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"server/querier/engine/clickhouse/view"
+	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
 )
 
 type Function struct {
@@ -23,9 +23,9 @@ func NewFunction(name string, functionType int, supportMetricsTypes []int, unitO
 }
 
 var METRICS_FUNCTIONS = []string{
-	view.FUNCTION_SUM, view.FUNCTION_AVG, view.FUNCTION_MAX, view.FUNCTION_MIN,
-	view.FUNCTION_STDDEV, view.FUNCTION_SPREAD, view.FUNCTION_RSPREAD,
-	view.FUNCTION_APDEX, view.FUNCTION_PCTL, view.FUNCTION_PCTL_EXACT,
+	view.FUNCTION_AVG, view.FUNCTION_SUM, view.FUNCTION_MAX, view.FUNCTION_MIN,
+	view.FUNCTION_PCTL, view.FUNCTION_PCTL_EXACT, view.FUNCTION_SPREAD,
+	view.FUNCTION_RSPREAD, view.FUNCTION_STDDEV, view.FUNCTION_APDEX,
 	view.FUNCTION_UNIQ, view.FUNCTION_UNIQ_EXACT, view.FUNCTION_PERCENTAG,
 	view.FUNCTION_PERSECOND,
 }

@@ -400,6 +400,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		    need_proto_reconfirm(sd->data_type);
 		submit_data->process_id = sd->tgid;
 		submit_data->thread_id = sd->pid;
+		submit_data->coroutine_id = sd->coroutine_id;
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;
@@ -661,6 +662,9 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	if (tracer_probes_init(tracer))
 		return -EINVAL;
+
+	// Update go offsets to eBPF "go_offsets_map" 
+	update_go_offsets_to_map(tracer);
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;

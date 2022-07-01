@@ -1,8 +1,8 @@
 package metrics
 
 import (
-	"server/querier/common"
-	chCommon "server/querier/engine/clickhouse/common"
+	"github.com/metaflowys/metaflow/server/querier/common"
+	chCommon "github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
 	"testing"
 )
 

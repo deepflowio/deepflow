@@ -9,8 +9,8 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	"server/libs/pool"
-	. "server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const VLAN_ID_MASK = uint16((1 << 12) - 1)

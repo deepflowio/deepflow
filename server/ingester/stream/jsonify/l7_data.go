@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"time"
 
-	"server/libs/ckdb"
-	"server/libs/datatype"
-	"server/libs/datatype/pb"
-	"server/libs/grpc"
-	"server/libs/pool"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 
 	"github.com/google/gopacket/layers"
 	logging "github.com/op/go-logging"
@@ -247,12 +247,14 @@ type L7Logger struct {
 	ResponseException string
 	ResponseResult    string
 
-	HttpProxyClient string
-	XRequestId      string
-	TraceId         string
-	SpanId          string
-	ParentSpanId    string
-	SpanKind        uint8
+	HttpProxyClient   string
+	XRequestId        string
+	TraceId           string
+	SpanId            string
+	ParentSpanId      string
+	SpanKind          uint8
+	ServiceName       string
+	ServiceInstanceId string
 
 	ResponseDuration uint64
 	RequestLength    *int64
@@ -262,8 +264,8 @@ type L7Logger struct {
 	SqlAffectedRows  *uint64
 	sqlAffectedRows  uint64
 
-	TagNames  []string
-	TagValues []string
+	AttributeNames  []string
+	AttributeValues []string
 }
 
 func L7LoggerColumns() []*ckdb.Column {
@@ -292,13 +294,15 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
 		ckdb.NewColumn("span_kind", ckdb.UInt8).SetComment("SpanKind"),
+		ckdb.NewColumn("service_name", ckdb.LowCardinalityString).SetComment("service name"),
+		ckdb.NewColumn("service_instance_id", ckdb.String).SetComment("service instance id"),
 
 		ckdb.NewColumn("response_duration", ckdb.UInt64),
 		ckdb.NewColumn("request_length", ckdb.Int64Nullable).SetComment("请求长度"),
 		ckdb.NewColumn("response_length", ckdb.Int64Nullable).SetComment("响应长度"),
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
-		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("额外的tag"),
-		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("额外的tag对应的值"),
+		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
+		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
 	)
 	return l7Columns
 }
@@ -372,6 +376,12 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt8(h.SpanKind); err != nil {
 		return err
 	}
+	if err := block.WriteString(h.ServiceName); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.ServiceInstanceId); err != nil {
+		return err
+	}
 
 	if err := block.WriteUInt64(h.ResponseDuration); err != nil {
 		return err
@@ -386,10 +396,10 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 
-	if err := block.WriteArrayString(h.TagNames); err != nil {
+	if err := block.WriteArrayString(h.AttributeNames); err != nil {
 		return err
 	}
-	if err := block.WriteArrayString(h.TagValues); err != nil {
+	if err := block.WriteArrayString(h.AttributeValues); err != nil {
 		return err
 	}
 

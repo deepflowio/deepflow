@@ -287,6 +287,7 @@ impl DnsLog {
             status: self.status,
             code: self.status_code as u16,
             rrt: 0,
+            version: 0,
         })
     }
 }

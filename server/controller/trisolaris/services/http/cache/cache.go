@@ -4,9 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	"server/controller/trisolaris"
-	"server/controller/trisolaris/server/http"
-	"server/controller/trisolaris/server/http/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/cache")

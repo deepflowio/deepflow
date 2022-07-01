@@ -9,9 +9,9 @@ import (
 	"github.com/op/go-logging"
 	context "golang.org/x/net/context"
 
-	"server/controller/trisolaris"
-	. "server/controller/trisolaris/common"
-	"server/controller/trisolaris/pushmanager"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
 )
 
 var log = logging.MustGetLogger("trisolaris/synchronize")

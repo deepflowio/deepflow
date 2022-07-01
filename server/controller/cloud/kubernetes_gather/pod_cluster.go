@@ -1,8 +1,8 @@
 package kubernetes_gather
 
 import (
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 
 	"github.com/bitly/go-simplejson"
 	uuid "github.com/satori/go.uuid"

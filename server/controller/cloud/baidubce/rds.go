@@ -3,8 +3,8 @@ package baidubce
 import (
 	"github.com/baidubce/bce-sdk-go/services/rds"
 
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (b *BaiduBce) getRDSInstances(

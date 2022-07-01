@@ -2,9 +2,9 @@
 package constraint
 
 import (
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/db/mysql"
-	"server/controller/recorder/cache"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
 )
 
 // 资源的MySQL orm对象

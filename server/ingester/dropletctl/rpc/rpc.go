@@ -17,12 +17,12 @@ import (
 	"os/signal"
 	"sort"
 
-	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/spf13/cobra"
-	"server/libs/utils"
 
-	"server/ingester/droplet/config"
-	"server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/server/ingester/droplet/config"
+	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type CmdExecute func(response *trident.SyncResponse)

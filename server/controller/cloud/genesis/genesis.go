@@ -2,11 +2,11 @@ package genesis
 
 import (
 	"errors"
-	"server/controller/cloud/config"
-	"server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
-	"server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/cloud/config"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/genesis"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/op/go-logging"

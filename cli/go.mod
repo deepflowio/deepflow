@@ -1,4 +1,4 @@
-module cli
+module github.com/metaflowys/metaflow/cli
 
 go 1.18
 

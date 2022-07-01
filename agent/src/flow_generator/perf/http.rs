@@ -148,6 +148,7 @@ impl L7FlowPerf for HttpPerfData {
                 status: self.session_data.status,
                 code: self.session_data.status_code,
                 rrt,
+                version: 0,
             },
             0,
         ))

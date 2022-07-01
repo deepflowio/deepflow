@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 'feature-**'
     paths:
       - 'cli/**'
 #   release:
@@ -41,6 +42,24 @@ jobs:
         with:
           name: metaflow-cli
           path: ./cli/bin/*
+
+      - uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint: "oss-cn-beijing.aliyuncs.com"
+          access-key-id: "${{ secrets.ALIYUN_OSS_ACCESS_KEY }}"
+          access-key-secret: "${{ secrets.ALIYUN_OSS_SECRETS_KEY }}"
+
+      - name: set env
+        run: |
+          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+          
+      - name: upload cli
+        run: |
+          ossutil cp -rf cli/bin/metaflow-ctl.linux-amd64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-ctl
+          ossutil cp -rf cli/bin/metaflow-ctl.linux-arm64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/metaflow-ctl
+          ossutil cp -rf cli/bin/metaflow-ctl.darwin-amd64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/amd64/metaflow-ctl
+          ossutil cp -rf cli/bin/metaflow-ctl.darwin-arm64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/arm64/metaflow-ctl
 
       # - name: Prepare for upload package
       #   shell: bash

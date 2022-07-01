@@ -4,8 +4,8 @@ import (
 	"net"
 	"sync"
 
-	"server/libs/hmap/lru"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/hmap/lru"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type PossibleHost struct {

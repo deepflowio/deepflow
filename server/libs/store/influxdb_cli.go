@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/client/v2"
-	"server/libs/zerodoc"
+	"github.com/metaflowys/metaflow/server/libs/zerodoc"
 )
 
 const (

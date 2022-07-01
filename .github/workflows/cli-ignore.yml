@@ -1,0 +1,13 @@
+on: 
+  pull_request:
+    paths-ignore:
+      - 'cli/**'
+
+name: verify cli
+
+jobs:
+  verify_cli:
+    name: verify cli
+    runs-on: ubuntu-latest
+    steps:
+      - run: 'echo "No build required" '

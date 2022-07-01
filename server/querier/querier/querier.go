@@ -3,16 +3,16 @@ package querier
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"runtime"
-	"server/libs/logger"
-	"server/querier/config"
-	"server/querier/router"
-	"time"
+	"github.com/metaflowys/metaflow/server/libs/logger"
+	"github.com/metaflowys/metaflow/server/querier/config"
+	"github.com/metaflowys/metaflow/server/querier/router"
 )
 
 var log = logging.MustGetLogger("querier")

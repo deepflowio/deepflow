@@ -3,9 +3,9 @@ package datatype
 import (
 	"fmt"
 
-	"server/libs/codec"
-	"server/libs/datatype/pb"
-	"server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/pool"
 )
 
 var dubboInfoPool = pool.NewLockFreePool(func() interface{} {

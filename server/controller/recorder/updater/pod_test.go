@@ -7,10 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	cloudmodel "server/controller/cloud/model"
-	"server/controller/db/mysql"
-	"server/controller/recorder/cache"
-	"server/controller/recorder/test"
+	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
+	"github.com/metaflowys/metaflow/server/controller/recorder/test"
 )
 
 func newCloudPod() cloudmodel.Pod {

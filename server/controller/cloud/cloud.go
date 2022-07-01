@@ -8,18 +8,14 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logging "github.com/op/go-logging"
 
-	"server/controller/cloud/config"
-	"server/controller/cloud/model"
-	"server/controller/common"
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/cloud/config"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/cloud/platform"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud")
-
-type Platform interface {
-	CheckAuth() error
-	GetCloudData() (model.Resource, error)
-}
 
 type Cloud struct {
 	cfg                     config.CloudConfig
@@ -28,12 +24,18 @@ type Cloud struct {
 	mutex                   sync.RWMutex
 	basicInfo               model.BasicInfo
 	resource                model.Resource
-	platform                Platform
+	platform                platform.Platform
 	kubernetesGatherTaskMap map[string]*KubernetesGatherTask
 }
 
 // TODO 添加参数
-func NewCloud(domain mysql.Domain, interval int, platform Platform, cfg config.CloudConfig, ctx context.Context) *Cloud {
+func NewCloud(domain mysql.Domain, interval int, cfg config.CloudConfig, ctx context.Context) *Cloud {
+	platform, err := platform.NewPlatform(domain, cfg)
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
 		basicInfo: model.BasicInfo{

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"server/ingester/common"
+	"github.com/metaflowys/metaflow/server/ingester/common"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"

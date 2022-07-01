@@ -5,7 +5,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type Instance struct {

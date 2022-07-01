@@ -1,7 +1,7 @@
 package tagrecorder
 
 import (
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 const (

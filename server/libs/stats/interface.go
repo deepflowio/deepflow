@@ -66,5 +66,9 @@ func RegisterPreHook(hook func()) {
 }
 
 func RegisterCountable(module string, countable Countable, opts ...Option) error {
-	return registerCountable(module, countable, opts...)
+	return registerCountable("", module, countable, opts...)
+}
+
+func RegisterCountableWithMoudlePrefix(moudlePrefix, module string, countable Countable, opts ...Option) error {
+	return registerCountable(moudlePrefix, module, countable, opts...)
 }

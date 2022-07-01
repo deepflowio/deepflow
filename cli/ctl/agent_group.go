@@ -7,7 +7,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
-	"cli/ctl/common"
+	"github.com/metaflowys/metaflow/cli/ctl/common"
 )
 
 func RegisterAgentGroupCommand() *cobra.Command {
@@ -60,15 +60,13 @@ func listAgentGroup(cmd *cobra.Command, args []string, output string) {
 		name = args[0]
 	}
 
-	// TODO: 补充metaflow-ctl的配置文件
-	// 生成URL
+	// TODO: read metaflow-server host from config
 	url := "http://metaflow-server:20417/v1/vtap-groups/"
 	if name != "" {
 		url += fmt.Sprintf("?name=%s", name)
 	}
 
-	// 调用采集器组API，并输出返回结果
-	response, err := common.CURLPerform("GET", url, nil)
+	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -100,7 +98,7 @@ func createAgentGroup(cmd *cobra.Command, args []string) {
 
 	// 调用采集器组API，并输出返回结果
 	body := map[string]interface{}{"name": args[0]}
-	_, err := common.CURLPerform("POST", url, body)
+	_, err := common.CURLPerform("POST", url, body, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -117,7 +115,7 @@ func deleteAgentGroup(cmd *cobra.Command, args []string) {
 	// 生成URL
 	url := fmt.Sprintf("http://metaflow-server:20417/v1/vtap-groups/?name=%s", args[0])
 	// 调用采集器组API，获取lcuuid
-	response, err := common.CURLPerform("GET", url, nil)
+	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -126,9 +124,9 @@ func deleteAgentGroup(cmd *cobra.Command, args []string) {
 	if len(response.Get("DATA").MustArray()) > 0 {
 		group := response.Get("DATA").GetIndex(0)
 		lcuuid := group.Get("LCUUID").MustString()
+
 		url := fmt.Sprintf("http://metaflow-server:20417/v1/vtap-groups/%s/", lcuuid)
-		// 调用采集器组API，删除对应的采集器
-		_, err := common.CURLPerform("DELETE", url, nil)
+		_, err := common.CURLPerform("DELETE", url, nil, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return

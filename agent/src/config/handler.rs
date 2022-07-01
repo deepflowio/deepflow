@@ -529,10 +529,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 analyzer_ip: dest_ip,
                 proxy_controller_ip: proxy_controller_ip,
                 capture_bpf: conf.capture_bpf.to_string(),
-                max_memory: (conf.max_memory as u64) << 24,
-                af_packet_blocks: conf
-                    .yaml_config
-                    .get_af_packet_blocks((conf.max_memory as u64) << 24),
+                max_memory: conf.max_memory,
+                af_packet_blocks: conf.yaml_config.get_af_packet_blocks(conf.max_memory),
                 af_packet_version: conf.capture_socket_type.into(),
                 tap_mode: conf.yaml_config.tap_mode,
                 region_id: conf.region_id,

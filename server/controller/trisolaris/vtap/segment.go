@@ -3,9 +3,9 @@ package vtap
 import (
 	"github.com/metaflowys/metaflow/message/trident"
 
-	. "server/controller/common"
-	. "server/controller/trisolaris/common"
-	. "server/controller/trisolaris/utils"
+	. "github.com/metaflowys/metaflow/server/controller/common"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 )
 
 /*

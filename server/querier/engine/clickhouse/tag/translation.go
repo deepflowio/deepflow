@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"server/querier/common"
+	"github.com/metaflowys/metaflow/server/querier/common"
 )
 
 var TagResoureMap = GenerateTagResoureMap()

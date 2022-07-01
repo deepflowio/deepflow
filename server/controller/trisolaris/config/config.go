@@ -5,7 +5,8 @@ import (
 	"os"
 
 	"github.com/op/go-logging"
-	. "server/controller/trisolaris/common"
+
+	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/config")
@@ -40,6 +41,7 @@ type Config struct {
 	MetaDataRefreshInterval  int  `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval      int  `default:"60" yaml:"node-refresh-interval"`
 	VTapAutoRegister         bool `default:"true" yaml:"vtap-auto-register"`
+	DefaultTapMode           int  `yaml:"default-tap-mode"`
 }
 
 func (c *Config) Convert() {

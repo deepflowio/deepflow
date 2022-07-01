@@ -6,10 +6,10 @@ import (
 	"github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
-	"server/controller/common"
-	"server/controller/config"
-	"server/controller/db/mysql"
-	"server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/config"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/model"
 )
 
 func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
@@ -27,6 +27,9 @@ func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err e
 	}
 	if _, ok := filter["name"]; ok {
 		Db = Db.Where("name = ?", filter["name"])
+	}
+	if _, ok := filter["short_uuid"]; ok {
+		Db = Db.Where("short_uuid = ?", filter["short_uuid"])
 	}
 	Db.Order("created_at DESC").Find(&vtapGroups)
 
@@ -106,7 +109,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	vtapGroup := mysql.VTapGroup{}
 	lcuuid := uuid.New().String()
 	vtapGroup.Lcuuid = lcuuid
-	vtapGroup.ShortUUID = common.GenerateShortUUID()
+	vtapGroup.ShortUUID = "g-" + common.GenerateShortUUID()
 	vtapGroup.Name = vtapGroupCreate.Name
 	mysql.Db.Create(&vtapGroup)
 

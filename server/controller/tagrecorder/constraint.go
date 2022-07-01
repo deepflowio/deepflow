@@ -2,7 +2,7 @@
 package tagrecorder
 
 import (
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 // 资源的MySQL orm对象

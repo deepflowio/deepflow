@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
-	. "server/libs/utils"
+	. "github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	ckcommon "server/querier/engine/clickhouse/common"
+	ckcommon "github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
 
 	logging "github.com/op/go-logging"
 )
@@ -26,6 +26,7 @@ type Metrics struct {
 	Condition   string // 聚合过滤
 	IsAgg       bool   // 是否为聚合指标量
 	Permissions []bool // 指标量的权限控制
+	Table       string // 所属表
 }
 
 func (m *Metrics) Replace(metrics *Metrics) {
@@ -45,7 +46,7 @@ func (m *Metrics) SetIsAgg(isAgg bool) *Metrics {
 
 func NewMetrics(
 	index int, dbField string, displayname string, unit string, metricType int, category string,
-	permissions []bool, condition string,
+	permissions []bool, condition string, table string,
 ) *Metrics {
 	return &Metrics{
 		Index:       index,
@@ -56,6 +57,7 @@ func NewMetrics(
 		Category:    category,
 		Permissions: permissions,
 		Condition:   condition,
+		Table:       table,
 	}
 }
 
@@ -103,21 +105,54 @@ func GetMetricsByDBTable(db string, table string) (map[string]*Metrics, error) {
 	return nil, err
 }
 
-func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, error) {
+func GetMetricsDescriptionsByDBTable(db string, table string) ([]interface{}, error) {
 	allMetrics, err := GetMetricsByDBTable(db, table)
 	if allMetrics == nil || err != nil {
 		// TODO: metrics not found
 		return nil, err
 	}
-	columns := []interface{}{
-		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions",
-	}
+	/* columns := []interface{}{
+		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table"
+	} */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
 		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
-			metrics.Category, METRICS_OPERATORS, metrics.Permissions,
+			metrics.Category, METRICS_OPERATORS, metrics.Permissions, metrics.Table,
 		}
+	}
+	return values, nil
+}
+
+func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, error) {
+	var values []interface{}
+	if table == "" {
+		var tables []interface{}
+		if db == "ext_metrics" {
+			for _, extTables := range ckcommon.GetExtTables(db) {
+				tables = append(tables, extTables.([]interface{})...)
+			}
+		} else {
+			for _, dbTable := range ckcommon.DB_TABLE_MAP[db] {
+				tables = append(tables, dbTable)
+			}
+		}
+		for _, dbTable := range tables {
+			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string))
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, metrics...)
+		}
+	} else {
+		metrics, err := GetMetricsDescriptionsByDBTable(db, table)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, metrics...)
+	}
+	columns := []interface{}{
+		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table",
 	}
 	return map[string][]interface{}{
 		"columns": columns,
@@ -148,7 +183,7 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 				}
 				lm := NewMetrics(
 					i, metrics[1].(string), metrics[2].(string), metrics[3].(string), metricType,
-					metrics[5].(string), permissions, "",
+					metrics[5].(string), permissions, "", table,
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}

@@ -5,10 +5,10 @@ import (
 	"net"
 	"time"
 
-	"server/libs/codec"
-	"server/libs/datatype/pb"
-	"server/libs/pool"
-	"server/libs/utils"
+	"github.com/metaflowys/metaflow/server/libs/codec"
+	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
+	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 type LogMessageType uint8

@@ -2,8 +2,8 @@ package aliyun
 
 import (
 	vpc "github.com/aliyun/alibaba-cloud-sdk-go/services/vpc"
-	"server/controller/cloud/model"
-	"server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 )
 
 func (a *Aliyun) getAZs(region model.Region) ([]model.AZ, error) {

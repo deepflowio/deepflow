@@ -64,6 +64,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "HTTP";
 	case PROTO_HTTP2:
 		return "HTTP2";
+	case PROTO_GO_TLS_HTTP1:
+		return "GO_TLS_HTTP1";
 	case PROTO_MYSQL:
 		return "MySQL";
 	case PROTO_DNS:

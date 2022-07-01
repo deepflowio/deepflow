@@ -3,7 +3,7 @@ package queue
 import (
 	"errors"
 
-	"server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/queue"
 )
 
 type MultiQueue struct {

@@ -1,8 +1,8 @@
 package tagrecorder
 
 import (
-	"server/controller/common"
-	"server/controller/db/mysql"
+	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 )
 
 type ChIPPort struct {
@@ -370,7 +370,7 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 	for _, lbVInterface := range lbVInterfaces {
 		lbIDToVifIDs[lbVInterface.DeviceID] = append(lbIDToVifIDs[lbVInterface.DeviceID], lbVInterface.ID)
 		for _, ipResource := range ipResources {
-			if lbVInterface.ID == ipResource.VInterfaceID {
+			if lbVInterface.ID != ipResource.VInterfaceID {
 				continue
 			}
 			vifIDToIPSubnetIDs[ipResource.VInterfaceID] = append(vifIDToIPSubnetIDs[ipResource.VInterfaceID], IPSubnet{IP: ipResource.IP, SubnetID: lbVInterface.NetworkID})

@@ -9,10 +9,11 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
-	"server/libs/utils"
+
+	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
 const (

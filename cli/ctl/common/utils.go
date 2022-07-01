@@ -7,24 +7,37 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
 )
 
 // 功能：调用其他模块API并获取返回结果
-func CURLPerform(method string, url string, body map[string]interface{}) (*simplejson.Json, error) {
+func CURLPerform(method string, url string, body map[string]interface{}, strBody string) (*simplejson.Json, error) {
 	errResponse, _ := simplejson.NewJson([]byte("{}"))
 
 	// TODO: 通过配置文件获取API超时时间
 	client := &http.Client{Timeout: time.Second * 30}
 
-	bodyStr, _ := json.Marshal(&body)
-	req, err := http.NewRequest(method, url, bytes.NewReader(bodyStr))
+	var err error
+	var contentType string
+	req := &http.Request{}
+	if strBody != "" {
+		reader := strings.NewReader(strBody)
+		req, err = http.NewRequest(method, url, reader)
+		contentType = "application/x-www-form-urlencoded"
+	} else {
+		bodyStr, _ := json.Marshal(&body)
+		reader := bytes.NewReader(bodyStr)
+		req, err = http.NewRequest(method, url, reader)
+		contentType = "application/json"
+	}
+
 	if err != nil {
 		return errResponse, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", "application/json, text/plain")
 	req.Header.Set("X-User-Id", "1")
 	req.Header.Set("X-User-Type", "1")

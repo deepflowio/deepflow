@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"server/libs/queue"
-	"server/libs/receiver"
+	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 )
 
 const (
