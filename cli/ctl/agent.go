@@ -52,9 +52,9 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		name = args[0]
 	}
 
-	// TODO: 补充metaflow-ctl的配置文件
 	// 生成URL
-	url := "http://metaflow-server:20417/v1/vtaps/"
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtaps/", server.IP, server.Port)
 	if name != "" {
 		url += fmt.Sprintf("?name=%s", name)
 	}
@@ -107,8 +107,8 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// TODO read metaflow-server host from config file
-	url := fmt.Sprintf("http://metaflow-server:20417/v1/vtaps/?name=%s", args[0])
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, args[0])
 	// curl vtap API，get lcuuid
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
@@ -118,7 +118,7 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 
 	if len(response.Get("DATA").MustArray()) > 0 {
 		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
-		url := fmt.Sprintf("http://metaflow-server:20417/v1/vtaps/%s/", lcuuid)
+		url := fmt.Sprintf("http://%s:%d/v1/vtaps/%s/", server.IP, server.Port, lcuuid)
 		// call vtap delete api
 		_, err := common.CURLPerform("DELETE", url, nil, "")
 		if err != nil {
