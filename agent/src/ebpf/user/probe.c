@@ -3,10 +3,11 @@
 #include "libbpf/include/linux/err.h"
 #include "log.h"
 #include "bcc/libbpf.h"
+#include "symbol.h"
 #include "tracer.h"
+#include "bcc/setns.h"
 
 extern int ioctl(int fd, unsigned long request, ...);
-extern int setns(int fd, int nstype);
 int bpf_get_program_fd(void *obj, const char *name, void **p)
 {
 	struct bpf_program *prog;
@@ -38,8 +39,10 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 			ebpf_warning("name (%s) snprintf() failed.\n", __name);
 			return ETR_NOROOM;
 		}
-	} else if (strstr(__name, "tracepoint/syscalls/")) {
-		__name += (sizeof("tracepoint/syscalls/") - 1);
+	} else if (strstr(__name, "tracepoint/")) {
+		char *p = __name;
+		while (*p != '\0')
+			if (*p++ == '/') __name = p;
 		res =
 		    snprintf((char *)prog_name, sizeof(prog_name),
 			     "bpf_func_%s", __name);
@@ -480,7 +483,7 @@ int program__detach_probe(struct bpf_link *link,
 			  ev_name);
 
 	free(link);
-	return 0;
+	return ret;
 }
 
 int program__attach_uprobe(void *prog, bool retprobe, pid_t pid,

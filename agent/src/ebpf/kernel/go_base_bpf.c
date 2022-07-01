@@ -1,5 +1,10 @@
 #define HASH_ENTRIES_MAX 40960
 
+/*
+ * The binary executable file offset of the GO process
+ * key: pid
+ * value: struct member_offsets
+ */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, int);
@@ -44,5 +49,24 @@ int runtime_casgstatus(struct pt_regs *ctx)
 	__u64 current_thread = bpf_get_current_pid_tgid();
 	bpf_map_update_elem(&goroutines_map, &current_thread, &goid, BPF_ANY);
 
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/sched/sched_process_exit/format
+SEC("tracepoint/sched/sched_process_exit")
+int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
+{
+	pid_t pid, tid;
+	__u64 id;
+
+	id = bpf_get_current_pid_tgid();
+	pid = id >> 32;
+	tid = (__u32)id;
+
+	// Is it a process?
+	if (pid != tid)
+		return 0;
+	bpf_debug("bpf_func_sched_process_exit pid %d\n", pid);
+	bpf_map_delete_elem(&go_offsets_map, &pid);
 	return 0;
 }
