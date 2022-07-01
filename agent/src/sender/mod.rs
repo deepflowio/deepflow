@@ -8,8 +8,8 @@ use std::fmt;
 use std::time::Duration;
 
 use crate::common::tagged_flow::TaggedFlow;
-use crate::external_metrics::{OpenTelemetry, PrometheusMetric, TelegrafMetric};
 use crate::flow_generator::AppProtoLogsData;
+use crate::integration_collector::{OpenTelemetry, PrometheusMetric, TelegrafMetric};
 use crate::metric::document::Document;
 
 const COMPRESSOR_PORT: u16 = 30033;
