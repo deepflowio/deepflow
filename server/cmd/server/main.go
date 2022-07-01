@@ -32,7 +32,12 @@ var RevCount, Revision, CommitDate, goVersion string
 func main() {
 	flag.Parse()
 	if *version {
-		fmt.Printf("%s %s %s\n%s\n", RevCount, Revision, CommitDate, goVersion)
+		fmt.Printf(
+			"%s %s %s\n%s\n%s\n",
+			RevCount, Revision, CommitDate,
+			"metaflow-server community edition",
+			goVersion,
+		)
 		os.Exit(0)
 	}
 
