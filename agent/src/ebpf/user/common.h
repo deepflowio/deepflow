@@ -163,6 +163,7 @@ enum {
 	ETR_NOTEXIST = -4,	/* not exist */
 	ETR_NOTGOELF = -5,      /* not go elf */
 	ETR_NOPROT = -7,	/* no protocol */
+	ETR_NOSYMBOL = -8,	/* no uprobe symbols */
 	ETR_IDLE = -12,		/* nothing to do */
 	ETR_BUSY = -13,		/* resource busy */
 	ETR_NOTSUPP = -14,	/* not support */
@@ -198,6 +199,7 @@ static struct trace_err_tab err_tab[] = {
 	{ETR_NOTEXIST, "not exist"},
 	{ETR_NOTGOELF, "not go elf"},
 	{ETR_NOPROT, "no protocol"},
+	{ETR_NOSYMBOL, "no uprobe symbols"},
 	{ETR_IDLE, "nothing to do"},
 	{ETR_BUSY, "resource busy"},
 	{ETR_NOTSUPP, "not support"},

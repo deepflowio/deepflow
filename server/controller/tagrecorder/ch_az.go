@@ -40,9 +40,6 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 				NodeType: RESOURCE_TYPE_AZ,
 			}
 			iconID = a.resourceTypeToIconID[key]
-			if iconID == 0 {
-				return keyToItem, false
-			}
 		}
 		if az.DeletedAt.Valid {
 			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
