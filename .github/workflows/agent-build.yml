@@ -110,4 +110,7 @@ jobs:
           access-key-id: "${{ secrets.ALIYUN_OSS_ACCESS_KEY }}"
           access-key-secret: "${{ secrets.ALIYUN_OSS_SECRETS_KEY }}"
 
-      - run: ossutil cp -rf agent/output/target/release/metaflow-agent-ctl oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-ctl
+      - name: upload agent artifacts
+        run: |
+          ossutil cp -rf agent/artifacts.zip oss://metaflow/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-rpm.zip
+          ossutil cp -rf agent/output/target/release/metaflow-agent-ctl oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-ctl
