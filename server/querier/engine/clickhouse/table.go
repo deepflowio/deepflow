@@ -25,7 +25,7 @@ func GetTables(db string) map[string][]interface{} {
 		values = append(values, common.GetExtTables(db)...)
 	} else {
 		for _, table := range tables {
-			values = append(values, table)
+			values = append(values, []string{table})
 		}
 	}
 	return map[string][]interface{}{
