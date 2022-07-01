@@ -129,7 +129,9 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 	if table == "" {
 		var tables []interface{}
 		if db == "ext_metrics" {
-			tables = ckcommon.GetExtTables(db)
+			for _, extTables :range ckcommon.GetExtTables(db) {
+				tables = append(tables, extTables...)
+			}
 		} else {
 			for _, dbTable := range ckcommon.DB_TABLE_MAP[db] {
 				tables = append(tables, dbTable)
