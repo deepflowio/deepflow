@@ -98,7 +98,7 @@ func (c *Config) Validate() error {
 	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
 		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
 		if !exist {
-			panic(fmt.Sprintf("Can't get env %s", EnvNodeIP))
+			panic(fmt.Sprintf("Can't get env %s", EnvK8sNodeIP))
 		}
 		c.NodeIP = nodeIP
 	}
