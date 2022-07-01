@@ -55,7 +55,6 @@ test: vendor $(proto) $(generated_libs)
 .PHONY: server
 server: vendor $(proto) $(generated_libs)
 	go build -mod vendor ${FLAGS} -o bin/metaflow-server${BINARY_SUFFIX} cmd/server/main.go
-	go build -mod vendor ${FLAGS} -o bin/trisolaris-ctl${BINARY_SUFFIX} controller/trisolaris/trisolarisctrl/main.go
 	go build -mod vendor ${FLAGS} -o bin/ingester-ctl${BINARY_SUFFIX} ingester/cmd/droplet-ctl/main.go
 
 .PHONY: clean
