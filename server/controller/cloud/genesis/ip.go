@@ -12,6 +12,10 @@ func (g *Genesis) getIPs() ([]model.IP, error) {
 	log.Debug("get ips starting")
 	ips := []model.IP{}
 	ipsData := genesis.GenesisService.GetIPsData()
+
+	g.cloudStatsd.APICost["ips"] = []int{0}
+	g.cloudStatsd.APICount["ips"] = []int{len(ipsData)}
+
 	for _, i := range ipsData {
 		if i.VInterfaceLcuuid == "" || i.SubnetLcuuid == "" {
 			log.Debug("vinterface lcuuid or subnet lcuuid not found")
