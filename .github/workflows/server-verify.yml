@@ -8,6 +8,7 @@ on:
 
 jobs:
   verify_server:
+    name: verify server
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
