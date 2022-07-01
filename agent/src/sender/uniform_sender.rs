@@ -1,4 +1,5 @@
-use std::io::{ErrorKind, Write};
+use std::fs::{rename, File, OpenOptions};
+use std::io::{BufWriter, ErrorKind, Write};
 use std::net::{IpAddr, Shutdown, TcpStream};
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -11,10 +12,10 @@ use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
-use super::{SendItem, SendMessageType};
+use super::{SendItem, SendMessageType, FILE_PATH, MAX_FILE_SIZE, PRE_FILE_PATH};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::Exception;
+use crate::proto::trident::{Exception, SocketType};
 use crate::utils::{
     queue::{Error, Receiver},
     stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
@@ -22,6 +23,7 @@ use crate::utils::{
 
 #[derive(Debug, Default)]
 pub struct SenderCounter {
+    pub rx: AtomicU64,
     pub tx: AtomicU64,
     pub tx_bytes: AtomicU64,
     pub dropped: AtomicU64,
@@ -30,6 +32,11 @@ pub struct SenderCounter {
 impl RefCountable for SenderCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
+            (
+                "rx",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.rx.swap(0, Ordering::Relaxed)),
+            ),
             (
                 "tx",
                 CounterType::Counted,
@@ -219,6 +226,8 @@ pub struct UniformSender {
     stats: Arc<Collector>,
     stats_registered: bool,
     exception_handler: ExceptionHandler,
+    buf_writer: Option<BufWriter<File>>,
+    written_size: usize,
 }
 
 impl UniformSender {
@@ -248,6 +257,8 @@ impl UniformSender {
             stats,
             stats_registered: false,
             exception_handler,
+            buf_writer: None,
+            written_size: 0,
         }
     }
 
@@ -340,45 +351,110 @@ impl UniformSender {
         }
     }
 
-    fn check_or_register_counterable(&mut self) {
+    fn check_or_register_counterable(&mut self, message_type: SendMessageType) {
         if self.stats_registered {
             return;
         }
         self.stats.register_countable(
             "collect_sender",
             Countable::Ref(Arc::downgrade(&self.counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag(
-                "type",
-                format!("{}", self.encoder.header.msg_type).to_string(),
-            )],
+            vec![StatsOption::Tag("type", message_type.to_string())],
         );
         self.stats_registered = true;
     }
 
     pub fn process(&mut self) {
+        let socket_type = self.config.load().collector_socket_type;
+        let mut kv_string = String::with_capacity(2048);
         while self.running.load(Ordering::Relaxed) {
             match self
                 .input
                 .recv(Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)))
             {
                 Ok(send_item) => {
-                    debug!("send item: {}", send_item);
-                    self.encoder.cache_to_sender(send_item);
-                    if self.encoder.buffer_len() > Encoder::BUFFER_LEN {
-                        self.check_or_register_counterable();
+                    let message_type = send_item.message_type();
+                    self.counter.rx.fetch_add(1, Ordering::Relaxed);
+                    debug!("send item {}: {}", message_type, send_item);
+                    let result = match socket_type {
+                        SocketType::File => self.handle_target_file(send_item, &mut kv_string),
+                        _ => self.handle_target_server(send_item),
+                    };
+                    if let Err(e) = result {
+                        if self.counter.dropped.load(Ordering::Relaxed) == 0 {
+                            warn!("send item {} failed {}", message_type, e);
+                            // reopen write file and overwritten
+                            let _ = self.buf_writer.take();
+                        }
+                        self.counter.dropped.fetch_add(1, Ordering::Relaxed);
+                    }
+                }
+                Err(Error::Timeout) => match socket_type {
+                    SocketType::File => self.flush_writer(),
+                    _ => {
                         self.update_dst_ip();
                         self.flush_encoder();
                     }
-                }
-                Err(Error::Timeout) => {
-                    self.update_dst_ip();
-                    self.flush_encoder();
-                }
+                },
                 Err(Error::Terminated(_, _)) => {
-                    self.flush_encoder();
+                    match socket_type {
+                        SocketType::File => self.flush_writer(),
+                        _ => self.flush_encoder(),
+                    }
                     break;
                 }
             }
         }
+    }
+
+    pub fn flush_writer(&mut self) {
+        if let Some(buf_writer) = self.buf_writer.as_mut() {
+            _ = buf_writer.flush();
+        }
+    }
+
+    pub fn handle_target_file(
+        &mut self,
+        send_item: SendItem,
+        kv_string: &mut String,
+    ) -> std::io::Result<()> {
+        send_item.to_kv_string(kv_string);
+        if kv_string.is_empty() {
+            return Ok(());
+        }
+
+        if self.buf_writer.is_none() {
+            self.check_or_register_counterable(send_item.message_type());
+            let f = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(FILE_PATH)?;
+            self.buf_writer = Some(BufWriter::new(f));
+        }
+
+        self.buf_writer
+            .as_mut()
+            .unwrap()
+            .write_all(kv_string.as_bytes())?;
+        self.written_size += kv_string.len();
+        kv_string.truncate(0);
+
+        if self.written_size > MAX_FILE_SIZE {
+            self.buf_writer.as_mut().unwrap().flush()?;
+            self.buf_writer.take();
+            rename(FILE_PATH, PRE_FILE_PATH)?;
+            self.written_size = 0;
+        }
+
+        Ok(())
+    }
+
+    pub fn handle_target_server(&mut self, send_item: SendItem) -> std::io::Result<()> {
+        self.encoder.cache_to_sender(send_item);
+        if self.encoder.buffer_len() > Encoder::BUFFER_LEN {
+            self.check_or_register_counterable(self.encoder.header.msg_type);
+            self.update_dst_ip();
+            self.flush_encoder();
+        }
+        Ok(())
     }
 }

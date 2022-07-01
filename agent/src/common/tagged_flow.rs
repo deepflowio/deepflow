@@ -30,6 +30,12 @@ impl TaggedFlow {
             .encode(buf)
             .map(|_| pb_tagged_flow.encoded_len())
     }
+    pub fn to_kv_string(&self, dst: &mut String) {
+        self.flow.to_kv_string(dst);
+        // replace first ',' to '{'
+        dst.replace_range(..1, "{");
+        dst.push_str("}\n");
+    }
 }
 
 impl fmt::Display for TaggedFlow {
