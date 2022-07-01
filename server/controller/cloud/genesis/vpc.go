@@ -12,6 +12,10 @@ func (g *Genesis) getVPCs() ([]model.VPC, error) {
 	log.Debug("get vpcs starting")
 	vpcs := []model.VPC{}
 	vpcsData := genesis.GenesisService.GetVPCsData()
+
+	g.cloudStatsd.APICost["vpcs"] = []int{0}
+	g.cloudStatsd.APICount["vpcs"] = []int{len(vpcsData)}
+
 	for _, v := range vpcsData {
 		vpcLcuuid := v.Lcuuid
 		if vpcLcuuid == "" {

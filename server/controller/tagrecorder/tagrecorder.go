@@ -26,10 +26,7 @@ func (c *TagRecorder) run() {
 	// 连接数据节点刷新ClickHouse中的字典定义
 	c.UpdateChDictionary()
 	// 调用API获取资源对应的icon_id
-	domainToIconID, resourceToIconID, err := c.UpdateIconInfo()
-	if err != nil {
-		return
-	}
+	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo()
 	c.refresh(domainToIconID, resourceToIconID)
 }
 

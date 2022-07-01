@@ -183,8 +183,10 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
-		if key.DB != db || key.Table != table {
-			continue
+		if db != "ext_metrics" {
+			if key.DB != db || key.Table != table {
+				continue
+			}
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
 		response["values"] = append(

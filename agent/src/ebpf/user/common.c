@@ -204,3 +204,31 @@ uint64_t gettime(clockid_t clk_id, int flag)
 
 	return time;
 }
+
+// refs: https://man7.org/linux/man-pages/man5/proc.5.html
+// /proc/[pid]/stat Status information about the process.
+unsigned long long get_process_starttime(int pid)
+{
+	char file[PATH_MAX], buff[4096];
+	int fd;
+	unsigned long long starttime = 0;
+
+	snprintf(file, sizeof(file), "/proc/%d/stat", pid);
+	if (access(file, F_OK))
+		return 0;
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0)
+		return false;
+
+	read(fd, buff, sizeof(buff));
+	close(fd);
+
+	if (sscanf(buff, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s"
+		   " %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %llu ",
+		   &starttime) != 1) {
+		return 0;
+	}
+
+	return starttime;
+}
