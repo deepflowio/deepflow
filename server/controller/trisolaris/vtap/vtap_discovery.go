@@ -64,9 +64,16 @@ func (r *VTapRegister) String() string {
 	return fmt.Sprintf("%+v", *r)
 }
 
-func (r *VTapRegister) getVTapGroupLcuuid() string {
+func (r *VTapRegister) getVTapGroupLcuuid(db *gorm.DB) string {
 	if r.vTapGroupID != "" {
-		return r.vTapGroupID
+		vtapGroup := &models.VTapGroup{}
+		ret := db.Where("short_uuid = ?", r.vTapGroupID).First(vtapGroup)
+		if ret.Error != nil {
+			log.Error("vtap group(short_uuid=%s) not found", r.vTapGroupID)
+			return r.defaultVTapGroup
+		} else {
+			return vtapGroup.Lcuuid
+		}
 	}
 
 	return r.defaultVTapGroup
@@ -150,7 +157,7 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 		LaunchServerID:  launchServerID,
 		Name:            vTapName,
 		AZ:              az,
-		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
+		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          uuid.NewString(),
@@ -232,7 +239,7 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 		LaunchServerID:  matchPodNode.ID,
 		Name:            vTapName,
 		AZ:              matchPodNode.AZ,
-		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
+		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          matchPodNode.Lcuuid,
@@ -340,7 +347,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 		LaunchServerID:  host.ID,
 		Name:            vTapName,
 		AZ:              host.AZ,
-		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
+		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_MIRROR,
 		Lcuuid:          uuid.NewString(),
@@ -402,7 +409,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		LaunchServerID:  vm.ID,
 		Name:            vTapName,
 		AZ:              vm.AZ,
-		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
+		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_LOCAL,
 		Lcuuid:          vm.Lcuuid,
@@ -425,7 +432,7 @@ func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
 		Name:            r.host,
 		LaunchServer:    r.ctrlIP,
 		AZ:              az.Lcuuid,
-		VtapGroupLcuuid: r.getVTapGroupLcuuid(),
+		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_ANALYZER,
 		Lcuuid:          uuid.NewString(),
