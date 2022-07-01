@@ -19,8 +19,8 @@ use log::{info, warn};
 use crate::common::DropletMessageType;
 use crate::debug::QueueDebugger;
 use crate::exception::ExceptionHandler;
-use crate::external_metrics::MetricServer;
 use crate::handler::PacketHandlerBuilder;
+use crate::integration_collector::MetricServer;
 use crate::pcap::WorkerManager;
 use crate::utils::cgroups::Cgroups;
 use crate::utils::environment::{free_memory_check, get_k8s_local_node_ip};
@@ -880,6 +880,7 @@ impl Components {
             prometheus_sender,
             telegraf_sender,
             config_handler.metric_server(),
+            exception_handler.clone(),
         );
 
         Ok(Components {
