@@ -23,13 +23,13 @@ vendor/${MESSAGE}/common/common.pb.go: vendor/${MESSAGE}/common.proto
 	cd vendor/${MESSAGE} && go generate common/stub.go
 
 vendor/${MESSAGE}/common.proto: vendor
-	cp -r ../message/common.proto vendor/${MESSAGE}/
+	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/common.proto vendor/${MESSAGE}/
 
 vendor/${MESSAGE}/trident/trident.pb.go: vendor/${MESSAGE}/trident.proto
 	cd vendor/${MESSAGE} && go generate trident/stub.go
 
 vendor/${MESSAGE}/trident.proto: vendor
-	cp -r ../message/trident.proto vendor/${MESSAGE}/
+	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/trident.proto vendor/${MESSAGE}/
 
 libs/datatype/pb/flow_log.pb.go: libs/datatype/pb/flow_log.proto
 	go generate ./...
