@@ -1,3 +1,4 @@
+MESSAGE = github.com/metaflowys/metaflow/message
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
@@ -9,7 +10,10 @@ BINARY_SUFFIX :=
 all: cli
 
 vendor:
-	go mod tidy
+	go mod tidy && go mod vendor
+	cp -r ../message/* vendor/${MESSAGE}/
+	find vendor -type d -exec chmod +w {} \;
+	cd vendor/${MESSAGE} && go generate ./...
 
 .PHONY: cli
 cli: vendor
@@ -19,3 +23,5 @@ cli: vendor
 .PHONY: clean
 clean:
 	rm -rf bin
+	chmod -R 777 vendor
+	rm -rf vendor

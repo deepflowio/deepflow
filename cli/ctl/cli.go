@@ -22,6 +22,7 @@ func Execute() {
 	root.AddCommand(RegisterAgentGroupCommand())
 	root.AddCommand(RegisterAgentGroupConfigCommand())
 	root.AddCommand(RegisterDomainCommand())
+	root.AddCommand(RegisterTrisolarisCommand())
 
 	root.SetArgs(os.Args[1:])
 	root.Execute()
