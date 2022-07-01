@@ -215,7 +215,7 @@ func (c *Cache) refreshRegions() {
 	}
 	var regionLcuuids []string
 	for _, az := range azs {
-		if az.Lcuuid != common.DEFAULT_REGION {
+		if az.Region != common.DEFAULT_REGION {
 			regionLcuuids = append(regionLcuuids, az.Region)
 		}
 	}
