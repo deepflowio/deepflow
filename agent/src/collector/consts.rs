@@ -14,8 +14,8 @@ pub const CONCURRENT_TIMEOUT: Duration = Duration::from_secs(300); // 单位：�
 pub const OFFSET_L3_EPC_ID_0: usize = 0;
 pub const OFFSET_L3_EPC_ID_1: usize = OFFSET_L3_EPC_ID_0 + L3_EPC_ID_SIZE;
 pub const OFFSET_TAP_PORT: usize = OFFSET_L3_EPC_ID_1 + L3_EPC_ID_SIZE;
-pub const OFFSET_CLOSE_TYPE: usize = OFFSET_TAP_PORT + TAP_PORT_SIZE;
-pub const OFFSET_PROTOCOL: usize = OFFSET_CLOSE_TYPE + CLOSE_TYPE_SIZE;
+pub const OFFSET_RESERVED: usize = OFFSET_TAP_PORT + TAP_PORT_SIZE;
+pub const OFFSET_PROTOCOL: usize = OFFSET_RESERVED + CLOSE_TYPE_SIZE;
 pub const OFFSET_PORT: usize = OFFSET_PROTOCOL + PROTOCOL_SIZE;
 pub const OFFSET_IP: usize = OFFSET_PORT + PORT_SIZE;
 
