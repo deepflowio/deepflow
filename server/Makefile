@@ -3,7 +3,8 @@ REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
 FLAGS = -gcflags "-l -l" -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE} \
-		-X 'main.goVersion=$(shell go version)'"
+		-X 'main.goVersion=$(shell go version)' \
+                -linkmode 'external' -extldflags '-static'"
 BINARY_SUFFIX :=
 
 .PHONY: all
