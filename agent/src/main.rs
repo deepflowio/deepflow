@@ -1,21 +1,20 @@
 use std::path::Path;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{ArgAction, Parser};
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::iterator::Signals;
 
 use ::metaflow_agent::*;
 
 #[derive(Parser)]
-#[clap(version=concat!(env!("REV_COUNT"), "-", env!("REVISION"), " ", env!("COMMIT_DATE"), "\n", env!("RUSTC_VERSION")))]
 struct Opts {
     /// Specify config file location
     #[clap(short = 'f', long, default_value = "/etc/metaflow-agent.yaml")]
     config_file: String,
 
     /// Display the version
-    #[clap(short, long)]
+    #[clap(short, long, action = ArgAction::SetTrue)]
     version: bool,
 
     /// Dump interface info
@@ -52,7 +51,13 @@ fn wait_on_signals() {}
 
 fn main() -> Result<()> {
     let opts = Opts::parse();
-    let version = format!("{}-{}", env!("REV_COUNT"), env!("REVISION"));
+    let version = concat!(env!("REV_COUNT"), "-", env!("REVISION"));
+    if opts.version {
+        println!("{} {}", version, env!("COMMIT_DATE"));
+        println!("metaflow-server community edition");
+        println!(env!("RUSTC_VERSION"));
+        return Ok(());
+    }
     let mut t = trident::Trident::start(&Path::new(&opts.config_file), version)?;
     wait_on_signals();
     t.stop();
