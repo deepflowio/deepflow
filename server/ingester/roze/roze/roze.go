@@ -83,9 +83,10 @@ func (r *Roze) Start() {
 	}
 }
 
-func (r *Roze) Close() {
+func (r *Roze) Close() error {
 	for i := 0; i < len(r.unmarshallers); i++ {
 		r.platformDatas[i].Close()
 	}
 	r.dbwriter.Close()
+	return nil
 }
