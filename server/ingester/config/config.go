@@ -76,6 +76,7 @@ type Config struct {
 	InfluxdbWriterEnabled bool          `yaml:"influxdb-writer-enabled"`
 	Influxdb              HostPort      `yaml:"influxdb"`
 	NodeIP                string        `yaml:"node-ip"`
+	ShardID               int           `yaml:"shard-id"`
 }
 
 type BaseConfig struct {
@@ -115,6 +116,9 @@ func (c *Config) Validate() error {
 		indexInt, err := strconv.Atoi(hostName[index+1:])
 		if err != nil {
 			panic(fmt.Sprintf("host name is %s,  should have digit subfix", hostName))
+		}
+		if c.ShardID == 0 {
+			c.ShardID = indexInt
 		}
 		c.CKDB.Primary = fmt.Sprintf("%s-%d:%d", c.CKDBServicePrefix, indexInt, c.CKDBServicePort)
 		log.Infof("get clickhouse address: %s", c.CKDB.Primary)
