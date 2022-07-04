@@ -135,7 +135,7 @@ pub struct Collector {
 }
 
 impl Collector {
-    const STATS_PREFIX: &'static str = "metaflow-agent";
+    const STATS_PREFIX: &'static str = "metaflow_agent";
 
     pub fn new(remotes: &Vec<String>) -> Self {
         Self::with_min_interval(remotes, TICK_CYCLE)
