@@ -707,11 +707,12 @@ func (i *Issu) Start() error {
 	return nil
 }
 
-func (i *Issu) Close() {
+func (i *Issu) Close() error {
 	for _, connect := range []*sql.DB{i.primaryConnection, i.SecondaryConnection} {
 		if connect == nil {
 			continue
 		}
 		connect.Close()
 	}
+	return nil
 }
