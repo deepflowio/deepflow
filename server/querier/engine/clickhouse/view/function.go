@@ -264,7 +264,7 @@ func (f *DefaultFunction) GetDefaultAlias(inner bool) string {
 		case Function:
 			fieldStr = f.GetDefaultAlias(inner)
 		}
-		buf.WriteString(fieldStr)
+		buf.WriteString(strings.ReplaceAll(fieldStr, "'", ""))
 		if i < len(f.Fields)-1 {
 			buf.WriteString("_")
 		}
@@ -272,7 +272,7 @@ func (f *DefaultFunction) GetDefaultAlias(inner bool) string {
 
 	for _, arg := range f.Args {
 		buf.WriteString("_")
-		buf.WriteString(arg)
+		buf.WriteString(strings.ReplaceAll(arg, "'", ""))
 	}
 	return buf.String()
 }
