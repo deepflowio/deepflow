@@ -219,6 +219,40 @@ pub fn is_unicast_link_local(ip: &Ipv6Addr) -> bool {
     ip.segments()[0] & 0xffc0 == 0xfe80
 }
 
+pub fn get_mac_by_ip(ip: IpAddr) -> Result<MacAddr> {
+    let links = link_list()?;
+    let addrs = addr_list()?;
+    let if_idx = addrs
+        .iter()
+        .find_map(|a| {
+            if a.ip_addr == ip {
+                Some(a.if_index)
+            } else {
+                None
+            }
+        })
+        .ok_or(Error::LinkIdxNotFoundByIP(format!(
+            "can't find interface index by ip {}",
+            ip
+        )))?;
+
+    let mac = links
+        .iter()
+        .find_map(|l| {
+            if l.if_index == if_idx {
+                Some(l.mac_addr)
+            } else {
+                None
+            }
+        })
+        .ok_or(Error::LinkIdxNotFoundByIP(format!(
+            "can't find mac address by ip {}",
+            ip
+        )))?;
+
+    Ok(mac)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
