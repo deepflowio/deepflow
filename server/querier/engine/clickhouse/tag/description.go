@@ -260,20 +260,20 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		if db == "ext_metrics" {
 			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
-				externalTag, "", "", externalTag, "tag",
+				externalTag, externalTag, externalTag, externalTag, "tag",
 				"原始Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
-				externalTag, "", "", externalTag, "attribute",
+				externalTag, externalTag, externalTag, externalTag, "attribute",
 				"原始Attribute", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		}
 	}
 	if db == "ext_metrics" {
 		response["values"] = append(response["values"], []interface{}{
-			"tags", "", "", "tags", "map",
+			"tags", "tags", "tags", "tags", "map",
 			"原始Tag", []string{}, []bool{true, true, true}, "tags",
 		})
 	}
