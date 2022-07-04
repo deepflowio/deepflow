@@ -54,7 +54,7 @@ fn main() -> Result<()> {
     let version = concat!(env!("REV_COUNT"), "-", env!("REVISION"));
     if opts.version {
         println!("{} {}", version, env!("COMMIT_DATE"));
-        println!("metaflow-server community edition");
+        println!("metaflow-agent community edition");
         println!(env!("RUSTC_VERSION"));
         return Ok(());
     }
