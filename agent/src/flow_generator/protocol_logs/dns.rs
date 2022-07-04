@@ -76,51 +76,56 @@ impl DnsLog {
         }
 
         while payload[index] != DNS_NAME_TAIL {
-            if payload[index] == DNS_NAME_RESERVERD_40 || payload[index] == DNS_NAME_RESERVERD_80 {
-                let err_msg = format!("dns name label type error: {}", payload[index]);
-                return Err(Error::DNSLogParseFailed(err_msg));
-            } else if payload[index] == DNS_NAME_COMPRESS_POINTER {
-                if index + 2 >= payload.len() {
-                    let err_msg = format!("dns name invalid index: {}", index - 2);
+            let name_type = payload[index] & 0xc0;
+            match name_type {
+                DNS_NAME_RESERVERD_40 | DNS_NAME_RESERVERD_80 => {
+                    let err_msg = format!("dns name label type error: {}", payload[index]);
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
-                let index_ptr = read_u16_be(&payload[index..]) as usize & 0x3fff;
-                if index_ptr >= payload.len() {
-                    let err_msg = format!("dns name offset too large: {}", index_ptr);
-                    return Err(Error::DNSLogParseFailed(err_msg));
-                }
-                index = index_ptr;
-            } else {
-                let size = index + 1 + payload[index] as usize;
-                if size > payload.len()
-                    || (size > g_offset && (size - g_offset) > DNS_NAME_MAX_SIZE)
-                {
-                    let err_msg = format!("dns name invalid index: {}", size);
-                    return Err(Error::DNSLogParseFailed(err_msg));
-                }
-
-                if buffer.len() > 0 {
-                    buffer.push('.');
-                }
-                match std::str::from_utf8(&payload[index + 1..size]) {
-                    Ok(s) => {
-                        buffer.push_str(s);
-                    }
-                    Err(e) => {
-                        let err_msg = format!("decode name error {}", e);
+                DNS_NAME_COMPRESS_POINTER => {
+                    if index + 2 >= payload.len() {
+                        let err_msg = format!("dns name invalid index: {}", index - 2);
                         return Err(Error::DNSLogParseFailed(err_msg));
                     }
+                    let index_ptr = read_u16_be(&payload[index..]) as usize & 0x3fff;
+                    if index_ptr >= index {
+                        let err_msg = format!("dns name compress pointer invalid: {}", index_ptr);
+                        return Err(Error::DNSLogParseFailed(err_msg));
+                    }
+                    index = index_ptr;
                 }
-                index = size;
-                if index >= payload.len() {
-                    let err_msg = format!("dns name invalid index: {}", index);
-                    return Err(Error::DNSLogParseFailed(err_msg));
-                }
+                _ => {
+                    let size = index + 1 + payload[index] as usize;
+                    if size > payload.len()
+                        || (size > g_offset && (size - g_offset) > DNS_NAME_MAX_SIZE)
+                    {
+                        let err_msg = format!("dns name invalid index: {}", size);
+                        return Err(Error::DNSLogParseFailed(err_msg));
+                    }
 
-                if index > l_offset {
-                    l_offset = size;
-                } else if payload[index] == DNS_NAME_TAIL {
-                    l_offset += 1;
+                    if buffer.len() > 0 {
+                        buffer.push('.');
+                    }
+                    match std::str::from_utf8(&payload[index + 1..size]) {
+                        Ok(s) => {
+                            buffer.push_str(s);
+                        }
+                        Err(e) => {
+                            let err_msg = format!("decode name error {}", e);
+                            return Err(Error::DNSLogParseFailed(err_msg));
+                        }
+                    }
+                    index = size;
+                    if index >= payload.len() {
+                        let err_msg = format!("dns name invalid index: {}", index);
+                        return Err(Error::DNSLogParseFailed(err_msg));
+                    }
+
+                    if index > l_offset {
+                        l_offset = size;
+                    } else if payload[index] == DNS_NAME_TAIL {
+                        l_offset += 1;
+                    }
                 }
             }
         }
