@@ -384,7 +384,7 @@ static int probe_attach(struct probe *p)
 
 		link =
 		    exec_attach_uprobe(p->prog, usym->binary_path, usym->entry,
-				       ret, usym->pid);
+				       ret, -1);
 	}
 
 	p->link = link;
