@@ -22,7 +22,7 @@ use crate::common::{decapsulate::TunnelTypeBitmap, enums::TapType, DEFAULT_CPU_C
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::IfMacSource;
 use crate::utils::cgroups::Cgroups;
-use crate::utils::environment::free_memory_check;
+use crate::utils::environment::{free_memory_check, get_k8s_local_node_ip};
 use crate::{
     dispatcher::recv_engine::{self, OptTpacketVersion},
     ebpf::CAP_LEN_MAX,
@@ -474,13 +474,20 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
         let (static_config, conf) = conf;
-        let ctrl_ip =
-            get_route_src_ip(&static_config.controller_ips[0].parse().unwrap()).map_err(|_| {
-                ConfigError::YamlConfigInvalid(format!(
-                    "no route to controller {}",
-                    static_config.controller_ips[0]
-                ))
-            })?;
+        // Directlly use env.K8S_NODE_IP_FOR_METAFLOW as the ctrl_ip reported by metaflow-agent if available
+        let ctrl_ip = match get_k8s_local_node_ip() {
+            Some(ip) => ip,
+            None => get_route_src_ip(&static_config.controller_ips[0].parse().unwrap()).map_err(
+                |_| {
+                    ConfigError::YamlConfigInvalid(format!(
+                        "no route to controller {}",
+                        static_config.controller_ips[0]
+                    ))
+                },
+            )?,
+        };
+        info!("ctrl_ip {}", ctrl_ip);
+
         let dest_ip = conf
             .analyzer_ip
             .parse::<IpAddr>()

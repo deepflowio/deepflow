@@ -68,7 +68,7 @@ static char *dispatch_message(char *msg, uint16_t len)
 }
 
 void _ebpf_error(int how_to_die,
-		  char *function_name, uint32_t line_number, char *fmt, ...)
+		 char *function_name, uint32_t line_number, char *fmt, ...)
 {
 	char msg[MSG_SZ];
 	uint16_t len = 0;
@@ -102,16 +102,7 @@ void _ebpf_error(int how_to_die,
 	va_end(va);
 
 	len += snprintf(msg + len, max - len, "\033[0m");
-
-	if (msg[len - 1] != '\n') {
-		if (len < max)
-			msg[len++] = '\n';
-		else
-			msg[len - 1] = '\n';
-	}
-
 	dispatch_message(msg, len);
-
 	if (how_to_die & ERROR_ABORT)
 		debugger();
 

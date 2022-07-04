@@ -328,7 +328,7 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 					BPF_F_CURRENT_CPU, v,
 					128);
 
-	if (ret) bpf_printk("connect_submit: %d\n", ret);
+	if (ret) bpf_debug("connect_submit: %d\n", ret);
 }
 #endif
 
@@ -710,6 +710,12 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 {
 	if (conn_info == NULL) {
 		return;
+	}
+
+	// ignore non-http protocols that are go tls
+	if (extra->go && extra->tls) {
+		if (conn_info->protocol != PROTO_HTTP1)
+			return;
 	}
 
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {

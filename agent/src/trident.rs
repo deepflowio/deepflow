@@ -10,7 +10,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, LoggerHandle, Naming,
 };
@@ -23,8 +23,10 @@ use crate::external_metrics::MetricServer;
 use crate::handler::PacketHandlerBuilder;
 use crate::pcap::WorkerManager;
 use crate::utils::cgroups::Cgroups;
-use crate::utils::environment::free_memory_check;
+use crate::utils::environment::{free_memory_check, get_k8s_local_node_ip};
 use crate::utils::guard::Guard;
+use crate::utils::net::addr_list;
+use crate::utils::net::link_list;
 use crate::{
     collector::Collector,
     collector::{
@@ -152,8 +154,49 @@ impl Trident {
     ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
-        let (ctrl_ip, ctrl_mac) = get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
-            .context("failed getting control ip and mac")?;
+        // Directlly use env.K8S_NODE_IP_FOR_METAFLOW as the ctrl_ip reported by metaflow-agent if available
+        let (ctrl_ip, ctrl_mac) = match get_k8s_local_node_ip() {
+            Some(ip) => {
+                info!(
+                    "use K8S_NODE_IP_FOR_METAFLOW env ip as destination_ip({})",
+                    ip
+                );
+                let links = link_list()?;
+                let addrs = addr_list()?;
+                let if_idx = addrs
+                    .iter()
+                    .find_map(|a| {
+                        if a.ip_addr == ip {
+                            Some(a.if_index)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or(anyhow!(format!(
+                        "can't find interface index by node ip {}",
+                        ip
+                    )))?;
+
+                let ctrl_mac = links
+                    .iter()
+                    .find_map(|l| {
+                        if l.if_index == if_idx {
+                            Some(l.mac_addr)
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or(anyhow!(format!(
+                        "can't find ctrl_mac address by node ip {}",
+                        ip
+                    )))?;
+                (ip, ctrl_mac)
+            }
+            None => get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
+                .context("failed getting control ip and mac")?,
+        };
+        info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
+
         let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
         stats_collector.start();
 
