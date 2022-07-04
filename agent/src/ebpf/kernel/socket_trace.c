@@ -712,6 +712,12 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		return;
 	}
 
+	// ignore non-http protocols that are go tls
+	if (extra->go && extra->tls) {
+		if (conn_info->protocol != PROTO_HTTP1)
+			return;
+	}
+
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
 		return;
 	}
