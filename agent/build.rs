@@ -22,6 +22,7 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
 struct EnvCommand(&'static str, Vec<&'static str>);
 
 fn set_build_info() -> Result<(), Box<dyn Error>> {
+    println!("cargo:rustc-env=AGENT_NAME=metaflow-agent-ce");
     let entries = vec![
         EnvCommand("REV_COUNT", vec!["git", "rev-list", "--count", "HEAD"]),
         EnvCommand(
