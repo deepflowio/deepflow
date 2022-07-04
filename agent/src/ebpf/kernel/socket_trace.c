@@ -328,7 +328,7 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 					BPF_F_CURRENT_CPU, v,
 					128);
 
-	if (ret) bpf_printk("connect_submit: %d\n", ret);
+	if (ret) bpf_debug("connect_submit: %d\n", ret);
 }
 #endif
 
