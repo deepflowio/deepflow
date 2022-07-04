@@ -117,14 +117,17 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 				newMac := utils.Uint64ToMac(uint64((newValueSlice[macIndex]).(int))).String()
 				if args[0].(string) == "tap_port" {
 					newMac = strings.TrimPrefix(newMac, "00:00:")
-				}
-				if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_1 {
+					if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_1 {
+						newValueSlice[macIndex] = newMac
+						newValues[i] = newValueSlice
+					} else if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_IPV4 {
+						newIP := utils.IpFromUint32(uint32((newValueSlice[macIndex]).(int)))
+						newIPString := newIP.String()
+						newValueSlice[macIndex] = newIPString
+						newValues[i] = newValueSlice
+					}
+				} else {
 					newValueSlice[macIndex] = newMac
-					newValues[i] = newValueSlice
-				} else if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_IPV4 {
-					newIP := utils.IpFromUint32(uint32((newValueSlice[macIndex]).(int)))
-					newIPString := newIP.String()
-					newValueSlice[macIndex] = newIPString
 					newValues[i] = newValueSlice
 				}
 			}
@@ -160,7 +163,7 @@ func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values [
 				log.Error(err)
 				return newValues
 			}
-			newValueSlice[tagsIndex] = tagsStr
+			newValueSlice[tagsIndex] = string(tagsStr)
 			newValues[i] = newValueSlice
 		}
 		return newValues

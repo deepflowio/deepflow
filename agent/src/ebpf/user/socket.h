@@ -5,6 +5,8 @@
 #define CACHE_LINE_SIZE 64
 #endif
 
+#define SK_TRACER_NAME  "socket-trace"
+
 // trace map回收的最大比例（指当前数量超过了整个MAP的容量的回收比例才进行回收）
 #define RECLAIM_TRACE_MAP_SCALE  0.9
 

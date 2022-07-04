@@ -40,7 +40,6 @@ type FlowLogDisabled struct {
 
 type Config struct {
 	Base              *config.Config
-	ShardID           int             `yaml:"shard-id"`
 	ReplicaEnabled    bool            `yaml:"flowlog-replica-enabled"`
 	CKWriterConfig    CKWriterConfig  `yaml:"flowlog-ck-writer"`
 	Throttle          int             `yaml:"throttle"`

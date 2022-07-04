@@ -11,6 +11,7 @@ import (
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
+	"github.com/spf13/cobra"
 )
 
 // 功能：调用其他模块API并获取返回结果
@@ -68,4 +69,15 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	}
 
 	return response, nil
+}
+
+type Server struct {
+	IP   string
+	Port uint32
+}
+
+func GetServerInfo(cmd *cobra.Command) *Server {
+	ip, _ := cmd.Flags().GetString("ip")
+	port, _ := cmd.Flags().GetUint32("port")
+	return &Server{ip, port}
 }

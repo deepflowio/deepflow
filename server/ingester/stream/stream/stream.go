@@ -95,7 +95,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.ShardID,
+			config.Base.ShardID,
 			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
@@ -145,7 +145,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.ShardID,
+			config.Base.ShardID,
 			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
@@ -194,7 +194,7 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-l7-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.ShardID,
+			config.Base.ShardID,
 			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),

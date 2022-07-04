@@ -150,16 +150,6 @@ impl ConcurrentConnection {
         }
     }
 
-    fn swap_close_type_in_key(key: &mut QgKey, close_type: u8) -> u8 {
-        let value = match key {
-            QgKey::V6(k) => &mut k[OFFSET_CLOSE_TYPE],
-            QgKey::V4(k) => &mut k[OFFSET_CLOSE_TYPE],
-        };
-        let old = *value;
-        *value = close_type;
-        old
-    }
-
     fn connections_put(
         &mut self,
         key: &mut QgKey,
@@ -167,8 +157,6 @@ impl ConcurrentConnection {
         living: i64,
         sum: i64,
     ) {
-        // 忽略close_type
-        let close_type = Self::swap_close_type_in_key(key, 0);
         match key {
             QgKey::V6(k) => self
                 .v6_connections
@@ -177,17 +165,13 @@ impl ConcurrentConnection {
                 .v4_connections
                 .put(*k, QuadrupleConnections::new(sum, living, time_in_second)),
         };
-        Self::swap_close_type_in_key(key, close_type);
     }
 
     fn connections_mut(&mut self, key: &mut QgKey) -> Option<&mut QuadrupleConnections> {
-        // 忽略close_type
-        let close_type = Self::swap_close_type_in_key(key, 0);
         let ret = match key {
             QgKey::V6(k) => self.v6_connections.get_mut(k),
             QgKey::V4(k) => self.v4_connections.get_mut(k),
         };
-        Self::swap_close_type_in_key(key, close_type);
         ret
     }
 
@@ -1053,7 +1037,6 @@ impl QuadrupleGenerator {
         key[OFFSET_TAP_PORT + 5] = u16::from(tagged_flow.flow.flow_key.tap_type) as u8;
         key[OFFSET_TAP_PORT + 6] = tunnel_type as u8;
         key[OFFSET_TAP_PORT + 7] = tagged_flow.flow.tap_side as u8;
-        key[OFFSET_CLOSE_TYPE] = tagged_flow.flow.close_type as u8;
         key[OFFSET_PROTOCOL] = tagged_flow.flow.flow_key.proto as u8;
         // 对于sflow, netflow流量，仅当确定目的IP是服务端时，将目的端口作为查询key
         if tagged_flow.flow.flow_source == FlowSource::Normal || tagged_flow.flow.is_active_service

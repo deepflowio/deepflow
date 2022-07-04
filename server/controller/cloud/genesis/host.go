@@ -12,6 +12,10 @@ func (g *Genesis) getHosts() ([]model.Host, error) {
 	log.Debug("get hosts starting")
 	hosts := []model.Host{}
 	hostsData := genesis.GenesisService.GetHostsData()
+
+	g.cloudStatsd.APICost["hosts"] = []int{0}
+	g.cloudStatsd.APICount["hosts"] = []int{len(hostsData)}
+
 	for _, h := range hostsData {
 		host := model.Host{
 			Lcuuid:       common.GetUUID(h.IP, uuid.Nil),

@@ -7,6 +7,8 @@ import (
 	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/statsd"
+	"time"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/op/go-logging"
@@ -17,13 +19,14 @@ var log = logging.MustGetLogger("cloud.genesis")
 
 type Genesis struct {
 	defaultVpc        bool
-	name              string
+	Name              string
 	uuid              string
-	uuidGenerate      string
+	UuidGenerate      string
 	regionUuid        string
 	azLcuuid          string
 	defaultVpcName    string
 	defaultRegionName string
+	cloudStatsd       statsd.CloudStatsd
 }
 
 func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
@@ -33,12 +36,18 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		return nil, err
 	}
 	return &Genesis{
-		name:              domain.Name,
+		Name:              domain.Name,
 		uuid:              domain.Lcuuid,
-		uuidGenerate:      domain.DisplayName,
+		UuidGenerate:      domain.DisplayName,
 		defaultVpcName:    cfg.GenesisDefaultVpcName,
 		defaultRegionName: cfg.GenesisDefaultRegionName,
 		regionUuid:        config.Get("region_uuid").MustString(),
+		cloudStatsd: statsd.CloudStatsd{
+			APICount: make(map[string][]int),
+			APICost:  make(map[string][]int),
+			ResCount: make(map[string][]int),
+			TaskCost: make(map[string][]int),
+		},
 	}, nil
 }
 
@@ -46,9 +55,27 @@ func (g *Genesis) CheckAuth() error {
 	return nil
 }
 
+func (g *Genesis) GetStatter() statsd.StatsdStatter {
+	globalTags := map[string]string{
+		"domain_name": g.Name,
+		"domain":      g.UuidGenerate,
+		"platform":    "genesis",
+	}
+
+	return statsd.StatsdStatter{
+		GlobalTags: globalTags,
+		Element:    statsd.GetCloudStatsd(g.cloudStatsd),
+	}
+}
+
 func (g *Genesis) GetCloudData() (model.Resource, error) {
 	g.azLcuuid = ""
 	g.defaultVpc = false
+	g.cloudStatsd.APICount = map[string][]int{}
+	g.cloudStatsd.APICost = map[string][]int{}
+	g.cloudStatsd.ResCount = map[string][]int{}
+	g.cloudStatsd.TaskCost = map[string][]int{}
+	startTime := time.Now()
 
 	if genesis.GenesisService == nil {
 		return model.Resource{}, errors.New("genesis service is nil")
@@ -106,7 +133,8 @@ func (g *Genesis) GetCloudData() (model.Resource, error) {
 		}
 		vpcs = append(vpcs, vpc)
 	}
-	return model.Resource{
+
+	resource := model.Resource{
 		IPs:         ips,
 		VMs:         vms,
 		VPCs:        vpcs,
@@ -116,5 +144,9 @@ func (g *Genesis) GetCloudData() (model.Resource, error) {
 		Networks:    networks,
 		VInterfaces: vinterfaces,
 		AZs:         []model.AZ{az},
-	}, nil
+	}
+	g.cloudStatsd.ResCount = statsd.GetResCount(resource)
+	g.cloudStatsd.TaskCost[g.UuidGenerate] = []int{int(time.Now().Sub(startTime).Milliseconds())}
+	statsd.MetaStatsd.RegisterStatsdTable(g)
+	return resource, nil
 }

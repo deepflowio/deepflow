@@ -5,9 +5,11 @@ import (
 	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/genesis"
+	"github.com/metaflowys/metaflow/server/controller/statsd"
 
 	"errors"
 	"regexp"
+	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
@@ -48,6 +50,7 @@ type KubernetesGather struct {
 	k8sInfo                      map[string][]string
 	nsLabelToGroupLcuuids        map[string]mapset.Set
 	nsServiceNameToService       map[string]map[string]map[string]int
+	cloudStatsd                  statsd.CloudStatsd
 }
 
 // 使用结构体代替python中的元组
@@ -129,6 +132,12 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 		k8sInfo:                      map[string][]string{},
 		nsLabelToGroupLcuuids:        map[string]mapset.Set{},
 		nsServiceNameToService:       map[string]map[string]map[string]int{},
+		cloudStatsd: statsd.CloudStatsd{
+			APICount: make(map[string][]int),
+			APICost:  make(map[string][]int),
+			ResCount: make(map[string][]int),
+			TaskCost: make(map[string][]int),
+		},
 	}
 }
 
@@ -143,7 +152,28 @@ func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
 	if kData.ErrorMSG != "" {
 		log.Warningf("cluster id (%s) Error: %s", k.ClusterID, kData.ErrorMSG)
 	}
+
+	for key, v := range kData.Resources {
+		// resource from genesis , so api cost is 0 ms
+		k.cloudStatsd.APICost[key] = []int{0}
+
+		k.cloudStatsd.APICount[key] = []int{len(v)}
+
+	}
 	return kData.Resources, nil
+}
+
+func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
+	globalTags := map[string]string{
+		"domain_name": k.Name,
+		"domain":      k.UuidGenerate,
+		"platform":    "kubernetes",
+	}
+
+	return statsd.StatsdStatter{
+		GlobalTags: globalTags,
+		Element:    statsd.GetCloudStatsd(k.cloudStatsd),
+	}
 }
 
 func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherResource, error) {
@@ -160,6 +190,11 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.serviceLcuuidToIngressLcuuid = map[string]string{}
 	k.nsLabelToGroupLcuuids = map[string]mapset.Set{}
 	k.nsServiceNameToService = map[string]map[string]map[string]int{}
+	k.cloudStatsd.APICount = map[string][]int{}
+	k.cloudStatsd.APICost = map[string][]int{}
+	k.cloudStatsd.ResCount = map[string][]int{}
+	k.cloudStatsd.TaskCost = map[string][]int{}
+	startTime := time.Now()
 
 	region, err := k.getRegion()
 	if err != nil {
@@ -244,7 +279,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		return model.KubernetesGatherResource{}, err
 	}
 
-	return model.KubernetesGatherResource{
+	resource := model.KubernetesGatherResource{
 		Region:                 region,
 		AZ:                     az,
 		VPC:                    vpc,
@@ -272,7 +307,11 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		PodReplicaSets:         replicaSets,
 		PodGroups:              podGroups,
 		Pods:                   pods,
-	}, nil
+	}
+	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
+	k.cloudStatsd.TaskCost[k.UuidGenerate] = []int{int(time.Now().Sub(startTime).Milliseconds())}
+	statsd.MetaStatsd.RegisterStatsdTable(k)
+	return resource, nil
 }
 
 func (k *KubernetesGather) CheckAuth() error {

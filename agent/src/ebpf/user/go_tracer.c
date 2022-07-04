@@ -28,11 +28,14 @@
 #include "go_tracer.h"
 #include "offset.h"
 #include "table.h"
+#include "symbol.h"
+#include "socket.h"
 
 #define MAP_GO_OFFSETS_MAP_NAME	"go_offsets_map"
+#define PROCFS_CHECK_PERIOD  60 // 60 seconds
+static uint64_t procfs_check_count;
 
 static char build_info_magic[] = "\xff Go buildinf:";
-static int num_procs;
 
 struct list_head proc_offsets_head;	// For pid-offsets correspondence lists.
 
@@ -62,21 +65,6 @@ struct data_members offsets[] = {
 };
 
 static struct symbol syms[] = {
-	/*-------- http2 server --------------*/
-	{
-		// Request headers, call submit_headers
-		.type = GO_UPROBE,
-		.symbol = "x/net/http2.(*serverConn).processHeaders",
-		.probe_func = "uprobe_http2_serverConn_processHeaders",
-		.is_probe_ret = false,
-	},
-	{
-		// Response headers, call direct_submit_header
-		.type = GO_UPROBE,
-		.symbol = "x/net/http2.(*serverConn).writeHeaders",
-		.probe_func = "uprobe_http2_serverConn_writeHeaders",
-		.is_probe_ret = false,
-	},
 	{
 		.type = GO_UPROBE,
 		.symbol = "runtime.casgstatus",
@@ -248,7 +236,7 @@ static struct proc_offsets *find_offset_by_pid(int pid)
 	return NULL;
 }
 
-static struct proc_offsets *alloc_offset_by_pid(int pid)
+static struct proc_offsets *alloc_offset_by_pid(void)
 {
 	struct proc_offsets *offs;
 	offs = calloc(1, sizeof(struct proc_offsets));
@@ -269,6 +257,7 @@ static int resolve_bin_file(const char *path, int pid,
 	struct symbol *sym;
 	struct symbol_uprobe *probe_sym;
 	struct data_members *off;
+	int syms_count = 0;
 
 	for (int i = 0; i < NELEMS(syms); i++) {
 		sym = &syms[i];
@@ -280,11 +269,12 @@ static int resolve_bin_file(const char *path, int pid,
 		bool is_new_offset = false;
 		struct proc_offsets *p_offs = find_offset_by_pid(pid);
 		if (p_offs == NULL) {
-			p_offs = alloc_offset_by_pid(pid);
+			p_offs = alloc_offset_by_pid();
 			if (p_offs == NULL)
 				goto faild;
 			is_new_offset = true;
 		}
+
 		// resolve all offsets.
 		for (int k = 0; k < NELEMS(offsets); k++) {
 			off = &offsets[k];
@@ -307,6 +297,8 @@ static int resolve_bin_file(const char *path, int pid,
 				goto faild;
 			}
 		}
+
+		p_offs->has_updated = false;
 
 		if (is_new_offset)
 			list_add_tail(&p_offs->list, &proc_offsets_head);
@@ -337,32 +329,36 @@ static int resolve_bin_file(const char *path, int pid,
 
 				sub_probe_sym->entry = addr;
 				sub_probe_sym->isret = false;
-				list_add_tail(&sub_probe_sym->list,
-					      &conf->uprobe_syms_head);
-				conf->uprobe_count++;
+				add_uprobe_symbol(pid, sub_probe_sym, conf);
 			}
-		} else {
-			list_add_tail(&probe_sym->list,
-				      &conf->uprobe_syms_head);
-			conf->uprobe_count++;
-		}
+		} else
+			add_uprobe_symbol(pid, probe_sym, conf);
 
 		ebpf_info
 		    ("Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
-		     probe_sym->binary_path, probe_sym->pid, probe_sym->ver.major,
-		     probe_sym->ver.minor, probe_sym->ver.revision,
-		     probe_sym->entry, probe_sym->size, probe_sym->name,
-		     probe_sym->probe_func, probe_sym->rets_count);
+		     probe_sym->binary_path, probe_sym->pid,
+		     probe_sym->ver.major, probe_sym->ver.minor,
+		     probe_sym->ver.revision, probe_sym->entry, probe_sym->size,
+		     probe_sym->name, probe_sym->probe_func,
+		     probe_sym->rets_count);
 
 		if (probe_sym->isret)
-			free_uprobe_symbol(probe_sym);
+			free_uprobe_symbol(probe_sym, conf);
+
+		syms_count++;
+	}
+
+	if (syms_count == 0) {
+		ret = ETR_NOSYMBOL;
+		ebpf_warning("Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
+			     pid, path, go_ver->major, go_ver->minor);
 	}
 
 	return ret;
 
 faild:
 	if (probe_sym->isret)
-		free_uprobe_symbol(probe_sym);
+		free_uprobe_symbol(probe_sym, conf);
 
 	return ret;
 }
@@ -377,11 +373,46 @@ static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
 	memset(&go_version, 0, sizeof(go_version));
 	if (fetch_go_elf_version(path, &go_version)) {
 		resolve_bin_file(path, pid, &go_version, conf);
-	} else
+	} else {
+		free((void *)path);
 		return ETR_NOTGOELF;
+	}
 
 	free((void *)path);
 	return ETR_OK;
+}
+
+// pid is process or thread ?
+static bool is_process(int pid)
+{
+	char file[PATH_MAX], buff[4096];
+	int fd;
+	int read_tgid = -1, read_pid = -1;
+
+	snprintf(file, sizeof(file), "/proc/%d/status", pid);
+	if (access(file, F_OK))
+		return false;
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0)
+		return false;
+
+	read(fd, buff, sizeof(buff));
+	close(fd);
+
+	char *p = strstr(buff, "Tgid:");
+	sscanf(p, "Tgid:\t%d", &read_tgid);
+
+	p = strstr(buff, "Pid:");
+	sscanf(p, "Pid:\t%d", &read_pid);
+
+	if (read_tgid == -1 || read_pid == -1)
+		return false;
+
+	if (read_tgid != -1 && read_pid != -1 && read_tgid == read_pid)
+		return true;
+
+	return false;
 }
 
 /**
@@ -393,7 +424,6 @@ static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
  */
 int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 {
-	log_to_stdout = true;
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
 
@@ -408,12 +438,183 @@ int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	int pid;
 	while ((entry = readdir(fddir)) != NULL) {
 		pid = atoi(entry->d_name);
-		if (entry->d_type == DT_DIR && pid > 1)
-			if (proc_parse_and_register(pid, conf) == ETR_OK)
-				num_procs++;
+		if (entry->d_type == DT_DIR && pid > 1 && is_process(pid))
+			proc_parse_and_register(pid, conf);
 	}
 
 	closedir(fddir);
+	return ETR_OK;
+}
+
+static bool pid_exist_in_procfs(int pid, unsigned long long starttime)
+{
+	struct dirent *entry = NULL;
+	DIR *fddir = NULL;
+	fddir = opendir("/proc/");
+	if (fddir == NULL) {
+		ebpf_warning("Failed to open %s.\n");
+		return false;
+	}
+
+	int read_pid;
+	unsigned long long stime;
+	while ((entry = readdir(fddir)) != NULL) {
+		read_pid = atoi(entry->d_name);
+		if (entry->d_type == DT_DIR && pid > 1) {
+			stime = get_process_starttime(pid);
+			if (stime > 0 && starttime == stime && read_pid == pid) {
+				closedir(fddir);
+				return true;
+			}
+		}
+	}
+
+	closedir(fddir);
+	return false;
+}
+
+static bool probe_exist_in_procfs(struct probe *p)
+{
+	struct symbol_uprobe *sym_uprobe;
+	sym_uprobe = p->private_data;
+	return pid_exist_in_procfs(sym_uprobe->pid, sym_uprobe->starttime);
+}
+
+static bool pid_exist_in_probes(struct bpf_tracer *tracer, int pid,
+				unsigned long long starttime)
+{
+	struct probe *p;
+	struct symbol_uprobe *sym;
+	list_for_each_entry(p, &tracer->probes_head, list) {
+		if (!(p->type == UPROBE && p->private_data != NULL))
+			continue;
+		sym = p->private_data;
+		if (sym->pid == pid && sym->starttime == starttime)
+			return true;
+	}
+
+	return false;
+}
+
+/*
+ * Clear all probes, if probe->pid == pid
+ */
+static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
+				struct tracer_probes_conf *conf)
+{
+	struct probe *probe;
+	struct list_head *p, *n;
+	struct symbol_uprobe *sym_uprobe;
+
+	list_for_each_safe(p, n, &tracer->probes_head) {
+		probe = container_of(p, struct probe, list);
+		if (!(probe->type == UPROBE && probe->private_data != NULL))
+			continue;
+		sym_uprobe = probe->private_data;
+		if (sym_uprobe->pid == pid) {
+			if (probe_detach(probe) != 0)
+				ebpf_warning
+				    ("path:%s, symbol name:%s probe_detach() faild.\n",
+				     sym_uprobe->binary_path, sym_uprobe->name);
+			else
+				ebpf_info
+				    ("%s path:%s, symbol name:%s probe_detach() success.\n",
+				     __func__, sym_uprobe->binary_path,
+				     sym_uprobe->name);
+
+			free_probe_from_tracer(probe);
+			free_uprobe_symbol(sym_uprobe, conf);
+		}
+	}
+}
+
+/**
+ * period_update_procfs - Managing all golang processes
+ * @tracer: struct bpf_tracer
+ */
+static int period_update_procfs(void)
+{
+	procfs_check_count++;
+	if (procfs_check_count % PROCFS_CHECK_PERIOD != 0)
+		return ETR_INVAL;
+
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL)
+		return ETR_INVAL;
+
+	if (tracer->state != TRACER_RUNNING)
+		return ETR_INVAL;
+
+	struct tracer_probes_conf *conf = tracer->tps;
+	struct probe *probe;
+	struct list_head *p, *n;
+	unsigned long long stime;	// The time the process started after system boot.
+
+	/*
+	 * Walk through the existing probes to find the probes that 
+	 * have been installed but the process does not exist.
+	 */
+	list_for_each_safe(p, n, &tracer->probes_head) {
+		probe = container_of(p, struct probe, list);
+		if (!(probe->type == UPROBE && probe->private_data != NULL))
+			continue;
+
+		if (probe_exist_in_procfs(probe))
+			continue;
+
+		/*
+		 *  The process does not exist.
+		 *  1. detach probe
+		 *  2. remove probe from tracer->probes_head list and free probe
+		 *  3. free symbol
+		 */
+		struct symbol_uprobe *sym_uprobe = probe->private_data;
+		if (probe_detach(probe) != 0)
+			ebpf_warning
+			    ("path:%s, symbol name:%s address:0x%x probe_detach() faild.\n",
+			     sym_uprobe->binary_path, sym_uprobe->name,
+			     sym_uprobe->entry);
+		else
+			ebpf_info
+			    ("%s path:%s, symbol name:%s address:0x%x probe_detach() success.\n",
+			     __func__, sym_uprobe->binary_path,
+			     sym_uprobe->name, sym_uprobe->entry);
+
+		free_probe_from_tracer(probe);
+		free_uprobe_symbol(sym_uprobe, conf);
+	}
+
+	struct dirent *entry = NULL;
+	DIR *fddir = NULL;
+	int pid;
+
+	fddir = opendir("/proc/");
+	if (fddir == NULL) {
+		ebpf_warning("Failed opendir() /proc/ errno %d\n", errno);
+		return ETR_PROC_FAIL;
+	}
+
+	/*
+	 * Walk through procfs to find the process that not in
+	 * tracer->probes_head list.
+	 */
+	while ((entry = readdir(fddir)) != NULL) {
+		pid = atoi(entry->d_name);
+		if (entry->d_type == DT_DIR && pid > 1 && is_process(pid)) {
+			stime = get_process_starttime(pid);
+			if (pid_exist_in_probes(tracer, pid, stime))
+				continue;
+			// clear probe->pid == pid
+			clear_probes_by_pid(tracer, pid, conf);
+			// Resolve bin file and add new uprobe symbol
+			proc_parse_and_register(pid, conf);
+		}
+	}
+
+	closedir(fddir);
+	tracer_uprobes_update(tracer);
+	tracer_hooks_process(tracer, HOOK_ATTACH);
+	update_go_offsets_to_map(tracer);
 	return ETR_OK;
 }
 
@@ -425,6 +626,8 @@ void update_go_offsets_to_map(struct bpf_tracer *tracer)
 	int len, i;
 
 	list_for_each_entry(p_off, &proc_offsets_head, list) {
+		if (p_off->has_updated)
+			continue;
 		offs = &p_off->offs;
 		uint64_t pid = p_off->pid;
 		if (!bpf_table_set_value
@@ -440,7 +643,22 @@ void update_go_offsets_to_map(struct bpf_tracer *tracer)
 				     i, offs->data[i]);
 		}
 
+		p_off->has_updated = true;
 		ebpf_info("Udpate map %s, key(pid):%d, value:%s",
 			  MAP_GO_OFFSETS_MAP_NAME, p_off->pid, buff);
 	}
+}
+
+int go_probes_manage_init(void)
+{
+	int ret;
+	if ((ret =
+	     register_period_event_op("go-probes-check",
+				      period_update_procfs))) {
+		ebpf_warning
+		    ("go-probes-check register_period_event_op() faild.");
+		return ret;
+	}
+
+	return ETR_OK;
 }

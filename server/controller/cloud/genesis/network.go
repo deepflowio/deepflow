@@ -13,6 +13,10 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 	log.Debug("get networks starting")
 	networks := []model.Network{}
 	networksData := genesis.GenesisService.GetNetworksData()
+
+	g.cloudStatsd.APICost["networks"] = []int{0}
+	g.cloudStatsd.APICount["networks"] = []int{len(networksData)}
+
 	for _, n := range networksData {
 		if n.SegmentationID == 0 {
 			log.Debug("segmentation id not found")

@@ -12,7 +12,6 @@ import (
 )
 
 var log = logging.MustGetLogger("config")
-var ShardID string
 
 const (
 	DefaultUnmarshallQueueCount = 4
