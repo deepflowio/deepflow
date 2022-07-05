@@ -144,6 +144,8 @@ struct bpf_tracer *create_bpf_tracer(const char *name,
 	INIT_LIST_HEAD(&bt->probes_head);
 	INIT_LIST_HEAD(&bt->maps_conf_head);
 
+	pthread_mutex_init(&bt->mutex_probes_lock, NULL);
+
 	return bt;
 }
 
@@ -245,8 +247,10 @@ void add_probe_to_tracer(struct probe *pb)
 void free_probe_from_tracer(struct probe *pb)
 {
 	struct bpf_tracer *tracer = pb->tracer;
-	if (pb->type == UPROBE && pb->private_data != NULL)
-		((struct symbol_uprobe *)pb->private_data)->in_probe = false;
+	if (pb->type == UPROBE && pb->private_data != NULL) {
+		struct symbol_uprobe *sym_u = pb->private_data;
+		free_uprobe_symbol(sym_u, tracer->tps);
+	}
 
 	list_head_del(&pb->list);
 	tracer->probes_count--;
@@ -483,7 +487,8 @@ static int tracepoint_detach(struct tracepoint *tp)
 	return ETR_OK;
 }
 
-int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type)
+int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
+			 int *probes_count)
 {
 	int (*probe_fun) (struct probe * p) = NULL;
 	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
@@ -502,10 +507,20 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type)
 	}
 
 	struct probe *p;
-	int error;
-	list_for_each_entry(p, &tracer->probes_head, list) {
+	int error, count = 0;
+	struct list_head *c, *n;
+
+	list_for_each_safe(c, n, &tracer->probes_head) {
+		p = container_of(c, struct probe, list);
 		if (!p)
 			return ETR_INVAL;
+
+		if (tracer->probes_count > OPEN_FILES_MAX) {
+			ebpf_warning
+			    ("Probes count too many. The maximum is %d\n",
+			     OPEN_FILES_MAX);
+			break;
+		}
 
 		error = probe_fun(p);
 		if (type == HOOK_ATTACH && error == ETR_EXIST)
@@ -520,9 +535,16 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type)
 			  p->type == KPROBE ? "kprobe" : "uprobe", p->name,
 			  error ? "failed" : "success");
 
-		if (error)
-			return ETR_INVAL;
+		if (error) {
+			free_probe_from_tracer(p);
+			continue;
+		}
+
+		count++;
 	}
+
+	if (probes_count != NULL)
+		*probes_count = count;
 
 	struct tracepoint *tp;
 	int i;
@@ -619,12 +641,12 @@ int tracer_uprobes_update(struct bpf_tracer *tracer)
 
 int tracer_hooks_attach(struct bpf_tracer *tracer)
 {
-	return tracer_hooks_process(tracer, HOOK_ATTACH);
+	return tracer_hooks_process(tracer, HOOK_ATTACH, NULL);
 }
 
 int tracer_hooks_detach(struct bpf_tracer *tracer)
 {
-	return tracer_hooks_process(tracer, HOOK_DETACH);
+	return tracer_hooks_process(tracer, HOOK_DETACH, NULL);
 }
 
 int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name)
@@ -1028,6 +1050,9 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		btp->dispatch_workers_nr = t->dispatch_workers_nr;
 		btp->perf_pg_cnt = t->perf_pages_cnt;
 		btp->lost = atomic64_read(&t->lost);
+		btp->probes_count = t->probes_count;
+		btp->state = t->state;
+		btp->adapt_success = t->adapt_success;
 
 		for (j = 0; j < PROTO_NUM; j++) {
 			btp->proto_status[j] =
@@ -1085,6 +1110,7 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 		}
 	}
 
+	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);
 	if (sys_cpus_count <= 0)
 		return ETR_INVAL;
@@ -1150,6 +1176,7 @@ int tracer_stop(void)
 {
 	struct bpf_tracer *t = NULL;
 	int i, ret = 0;
+
 	for (i = 0; i < tracers_count; i++) {
 		t = tracers[i];
 		ret = t->stop_handle();
@@ -1162,6 +1189,7 @@ int tracer_start(void)
 {
 	struct bpf_tracer *t = NULL;
 	int i, ret = 0;
+
 	for (i = 0; i < tracers_count; i++) {
 		t = tracers[i];
 		ret = t->start_handle();
