@@ -105,6 +105,11 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 	}
 
 	for _, controller := range controllers {
+		// controller name = ${DomainPrefix}-${Name}
+		name := controller.Name
+		if controller.RegionDomainPrefix != "" {
+			name = controller.RegionDomainPrefix + "-" + name
+		}
 		controllerResp := model.Controller{
 			ID:                 controller.ID,
 			IP:                 controller.IP,

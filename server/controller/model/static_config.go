@@ -45,6 +45,7 @@ type StaticConfig struct {
 	KubernetesPollerType            *string               `yaml:"kubernetes-poller-type,omitempty"`
 	DecapErspan                     *bool                 `yaml:"decap-erspan,omitempty"`
 	AnalyzerIp                      *string               `yaml:"analyzer-ip,omitempty"`
+	AnalyzerPort                    *uint16               `yaml:"analyzer-port,omitempty"`
 	KubernetesClusterID             *string               `yaml:"kubernetes-cluster-id,omitempty"`
 	KubernetesNamespace             *string               `yaml:"kubernetes-namespace,omitempty"`
 	IngressFlavour                  *string               `yaml:"ingress-flavour,omitempty"`

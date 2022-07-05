@@ -102,6 +102,7 @@ type VTapCache struct {
 	arch               *string
 	os                 *string
 	kernelVersion      *string
+	processName        *string
 	licenseType        int
 	lcuuid             *string
 	licenseFunctions   *string
@@ -171,6 +172,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.arch = proto.String(vtap.Arch)
 	vTapCache.os = proto.String(vtap.Os)
 	vTapCache.kernelVersion = proto.String(vtap.KernelVersion)
+	vTapCache.processName = proto.String(vtap.ProcessName)
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
@@ -517,6 +519,17 @@ func (c *VTapCache) updateKernelVersion(version string) {
 	c.kernelVersion = &version
 }
 
+func (c *VTapCache) GetProcessName() string {
+	if c.processName != nil {
+		return *c.processName
+	}
+	return ""
+}
+
+func (c *VTapCache) updateProcessName(processName string) {
+	c.processName = &processName
+}
+
 func (c *VTapCache) UpdateRevision(revision string) {
 	c.revision = &revision
 }
@@ -564,7 +577,7 @@ func (c *VTapCache) UpdateExceptions(exceptions int64) {
 	atomic.StoreInt64(&c.exceptions, int64(exceptions))
 }
 
-func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch string, os string, kernelVersion string) {
+func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch, os, kernelVersion, processName string) {
 	if cpuNum != 0 {
 		c.updateCPUNum(cpuNum)
 	}
@@ -579,6 +592,9 @@ func (c *VTapCache) UpdateSystemInfoFromGrpc(cpuNum int, memorySize int64, arch 
 	}
 	if kernelVersion != "" {
 		c.updateKernelVersion(kernelVersion)
+	}
+	if processName != "" {
+		c.updateProcessName(processName)
 	}
 }
 

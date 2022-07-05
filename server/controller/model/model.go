@@ -127,6 +127,7 @@ type Vtap struct {
 	Os                 string  `json:"OS"`
 	OsType             int     `json:"OS_TYPE"`
 	KernelVersion      string  `json:"KERNEL_VERSION"`
+	ProcessName        string  `json:"PROCESS_NAME"`
 	LicenseType        int     `json:"LICENSE_TYPE"`
 	LicenseFunctions   []int   `json:"LICENSE_FUNCTIONS"`
 	Lcuuid             string  `json:"LCUUID"`
