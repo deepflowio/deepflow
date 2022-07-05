@@ -19,7 +19,7 @@ env:
 jobs:
   build_server:
     name: build server
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, 16c16g]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -51,10 +51,34 @@ jobs:
           cd server
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.amd64
 
+      - name: Archive code build results
+        uses: actions/upload-artifact@v3
+        with:
+          name: build results
+          path: |
+            server/bin
+
+  build_server_image:
+    name: build server image
+    needs: [build_server]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
           install: true
+
+      - name: Download code build results
+        uses: actions/download-artifact@v3
+        with:
+          name: build results
+          path: server/bin/
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
