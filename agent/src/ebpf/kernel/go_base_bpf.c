@@ -1,11 +1,28 @@
 #define HASH_ENTRIES_MAX 40960
 
+/*
+ * The binary executable file offset of the GO process
+ * key: pid
+ * value: struct member_offsets
+ */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, int);
 	__type(value, struct member_offsets);
 	__uint(max_entries, HASH_ENTRIES_MAX);
 } go_offsets_map SEC(".maps");
+
+/*
+ * Goroutines Map
+ * key: {tgid, pid}
+ * value: goroutine ID
+ */
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, __s64);
+	__uint(max_entries, MAX_SYSTEM_THREADS);
+} goroutines_map SEC(".maps");
 
 static __inline int get_uprobe_offset(int offset_idx){
 	__u64 id;
@@ -53,14 +70,6 @@ static __inline int get_net_poll_fd_sysfd(void)
 	return get_uprobe_offset(net_poll_fd_sysfd);
 }
 
-struct {
-	// FIXME: LRU should be replaced when there is a better way to free memory
-	__uint(type, BPF_MAP_TYPE_LRU_HASH);
-	__type(key, __u64);
-	__type(value, __s64);
-	__uint(max_entries, MAX_SYSTEM_THREADS);
-} goroutines_map SEC(".maps");
-
 static __inline __s64 get_current_goroutine(void)
 {
 	__u64 current_thread = bpf_get_current_pid_tgid();
@@ -99,5 +108,24 @@ int runtime_casgstatus(struct pt_regs *ctx)
 	__u64 current_thread = bpf_get_current_pid_tgid();
 	bpf_map_update_elem(&goroutines_map, &current_thread, &goid, BPF_ANY);
 
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/sched/sched_process_exit/format
+SEC("tracepoint/sched/sched_process_exit")
+int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
+{
+	pid_t pid, tid;
+	__u64 id;
+
+	id = bpf_get_current_pid_tgid();
+	pid = id >> 32;
+	tid = (__u32)id;
+
+	// If is a process, clear go_offsets_map element
+	if (pid == tid)
+		bpf_map_delete_elem(&go_offsets_map, &pid);
+
+	bpf_map_delete_elem(&goroutines_map, &id);
 	return 0;
 }

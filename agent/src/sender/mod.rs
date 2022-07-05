@@ -8,8 +8,8 @@ use std::fmt;
 use std::time::Duration;
 
 use crate::common::tagged_flow::TaggedFlow;
-use crate::external_metrics::{OpenTelemetry, PrometheusMetric, TelegrafMetric};
 use crate::flow_generator::AppProtoLogsData;
+use crate::integration_collector::{OpenTelemetry, PrometheusMetric, TelegrafMetric};
 use crate::metric::document::Document;
 
 const COMPRESSOR_PORT: u16 = 30033;
@@ -21,6 +21,10 @@ const METRICS_VERSION: u32 = 20220117;
 const OPEN_TELEMETRY: u32 = 20220607;
 const PROMETHEUS: u32 = 20220613;
 const TELEGRAF: u32 = 20220613;
+
+const FILE_PATH: &str = "/var/log/metaflow-agent/l4_flow_log";
+const PRE_FILE_PATH: &str = "/var/log/metaflow-agent/l4_flow_log.pre";
+const MAX_FILE_SIZE: usize = 1_000_000_000;
 
 pub enum SendItem {
     L4FlowLog(TaggedFlow),
@@ -40,6 +44,13 @@ impl SendItem {
             Self::ExternalOtel(o) => o.encode(buf),
             Self::ExternalProm(p) => p.encode(buf),
             Self::ExternalTelegraf(p) => p.encode(buf),
+        }
+    }
+
+    pub fn to_kv_string(&self, kv_string: &mut String) {
+        match self {
+            Self::L4FlowLog(l4) => l4.to_kv_string(kv_string),
+            _ => return,
         }
     }
 

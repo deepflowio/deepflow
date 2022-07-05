@@ -8,6 +8,10 @@ import (
 func (g *Genesis) getRegion() ([]model.Region, error) {
 	log.Debug("get region starting")
 	var regions []model.Region
+
+	g.cloudStatsd.APICost["region"] = []int{0}
+	g.cloudStatsd.APICount["region"] = []int{0}
+
 	if g.regionUuid == "" {
 		g.regionUuid = common.DEFAULT_REGION
 		region := model.Region{

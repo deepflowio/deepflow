@@ -1,10 +1,11 @@
+use std::env;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use log::warn;
+use log::{info, warn};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -14,6 +15,7 @@ use crate::common::{
     L7_PROTOCOL_INFERENCE_TTL,
 };
 use crate::proto::{common, trident};
+use crate::utils::environment::K8S_NODE_IP_FOR_METAFLOW;
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -67,6 +69,20 @@ impl Config {
                 .collect();
             if cfg.controller_ips.is_empty() {
                 return Err(ConfigError::ControllerIpsEmpty);
+            }
+            // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
+            // 发现存在K8S_NODE_IP_FOR_METAFLOW环境变量、且ConfigMap中kubernetes-cluster-id为空，
+            // 传一个特殊的k8s-cluster-id请求控制器。
+            // ======================================================================================================
+            // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
+            // It is found that the K8S_NODE_IP_FOR_METAFLOW environment variable exists, and the kubernetes-cluster-id in the
+            // ConfigMap is empty, pass a special k8s-cluster-id request controller
+            if let Ok(ip) = env::var(K8S_NODE_IP_FOR_METAFLOW) {
+                if cfg.kubernetes_cluster_id.is_empty() {
+                    let cluster_id = format!("METAFLOW_K8S_CLUSTER-{}", ip);
+                    info!("set kubernetes_cluster_id to {}", cluster_id);
+                    cfg.kubernetes_cluster_id = cluster_id;
+                }
             }
             Ok(cfg)
         }

@@ -20,12 +20,14 @@ var (
 	RAW_UDP = api.SocketType_RAW_UDP
 	TCP     = api.SocketType_TCP
 	UDP     = api.SocketType_UDP
+	FILE    = api.SocketType_FILE
 )
 
 var SOCKET_TYPE_TO_MESSAGE = map[string]api.SocketType{
 	"RAW_UDP": RAW_UDP,
 	"TCP":     TCP,
 	"UDP":     UDP,
+	"FILE":    FILE,
 }
 
 type VTapEvent struct{}

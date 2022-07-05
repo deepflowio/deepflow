@@ -311,6 +311,13 @@ func setRemotes(addrs ...string) {
 	log.Info("Remote changed to", addrs)
 	remotes = addrs
 	lock.Lock()
+	for i := range statsdClients {
+		if statsdClients[i] != nil {
+			statsdClients[i].Close()
+			statsdClients[i] = nil
+		}
+	}
+
 	if connection != nil {
 		connection.Close()
 		connection = nil

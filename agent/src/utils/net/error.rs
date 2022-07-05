@@ -20,6 +20,8 @@ pub enum Error {
     NoRouteToHost(String),
     #[error("Windows related error:{0}")]
     Windows(String),
+    #[error("{0}")]
+    LinkIdxNotFoundByIP(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

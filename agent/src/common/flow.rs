@@ -87,11 +87,71 @@ pub struct FlowKey {
     pub proto: IpProtocol,
 }
 
+fn append_key(dst: &mut String, key: &str) {
+    dst.push_str(",\"");
+    dst.push_str(key);
+    dst.push_str("\":");
+}
+
+fn append_keys(dst: &mut String, key1: &str, key2: &str) {
+    dst.push_str(",\"");
+    dst.push_str(key1);
+    dst.push_str(key2);
+    dst.push_str("\":");
+}
+
+fn append_key_value(dst: &mut String, key: &str, value: &str) {
+    append_key(dst, key);
+    dst.push_str(value);
+}
+
+fn append_keys_value(dst: &mut String, key1: &str, key2: &str, value: &str) {
+    append_keys(dst, key1, key2);
+    dst.push_str(value);
+}
+
+fn append_key_string(dst: &mut String, key: &str, value: &str) {
+    append_key(dst, key);
+    dst.push('\"');
+    dst.push_str(value);
+    dst.push('\"');
+}
+
+fn append_key_bool(dst: &mut String, key: &str, value: bool) {
+    append_key(dst, key);
+    if value {
+        dst.push_str("true");
+    } else {
+        dst.push_str("false");
+    }
+}
+
+fn append_keys_bool(dst: &mut String, key1: &str, key2: &str, value: bool) {
+    append_keys(dst, key1, key2);
+    if value {
+        dst.push_str("true");
+    } else {
+        dst.push_str("false");
+    }
+}
+
 impl FlowKey {
     pub fn reverse(&mut self) {
         swap(&mut self.mac_src, &mut self.mac_dst);
         swap(&mut self.ip_src, &mut self.ip_dst);
         swap(&mut self.port_src, &mut self.port_dst);
+    }
+    pub fn to_kv_string(&self, dst: &mut String) {
+        append_key_value(dst, "vtap_id", &self.vtap_id.to_string());
+        append_key_string(dst, "tap_type", &self.tap_type.to_string());
+        append_key_string(dst, "tap_port", &self.tap_port.to_string());
+        append_key_string(dst, "mac_src", &self.mac_src.to_string());
+        append_key_string(dst, "mac_dst", &self.mac_dst.to_string());
+        append_key_string(dst, "ip_src", &self.ip_src.to_string());
+        append_key_string(dst, "ip_dst", &self.ip_dst.to_string());
+        append_key_value(dst, "port_src", &self.port_src.to_string());
+        append_key_value(dst, "port_dst", &self.port_dst.to_string());
+        append_key_string(dst, "protocol", &format!("{:?}", self.proto));
     }
 }
 
@@ -218,6 +278,21 @@ impl TunnelField {
         swap(&mut self.tx_mac1, &mut self.rx_mac1);
         swap(&mut self.tx_id, &mut self.rx_id);
     }
+
+    pub fn to_kv_string(&self, dst: &mut String) {
+        append_key_string(dst, "tunnel_type", &self.tunnel_type.to_string());
+        append_key_string(dst, "tunnel_tx_ip_0", &self.tx_ip0.to_string());
+        append_key_string(dst, "tunnel_tx_ip_1", &self.tx_ip1.to_string());
+        append_key_string(dst, "tunnel_rx_ip_0", &self.rx_ip0.to_string());
+        append_key_string(dst, "tunnel_rx_ip_1", &self.rx_ip1.to_string());
+        append_key_string(dst, "tunnel_tx_mac_0", &format!("{:08x}", self.tx_mac0));
+        append_key_string(dst, "tunnel_tx_mac_1", &format!("{:08x}", self.tx_mac1));
+        append_key_string(dst, "tunnel_rx_mac_0", &format!("{:08x}", self.tx_mac0));
+        append_key_string(dst, "tunnel_rx_mac_1", &format!("{:08x}", self.tx_mac1));
+        append_key_value(dst, "tunnel_tx_id", &self.tx_id.to_string());
+        append_key_value(dst, "tunnel_rx_id", &self.rx_id.to_string());
+        append_key_value(dst, "tunnel_tier", &self.tier.to_string());
+    }
 }
 
 impl fmt::Display for TunnelField {
@@ -305,6 +380,45 @@ pub struct TcpPerfStats {
 }
 
 impl TcpPerfStats {
+    pub fn to_kv_string(&self, dst: &mut String) {
+        append_key_value(dst, "rtt", &self.rtt.to_string());
+
+        append_key_value(dst, "rtt_client_max", &self.rtt_client_max.to_string());
+        append_key_value(dst, "rtt_server_max", &self.rtt_server_max.to_string());
+        append_key_value(dst, "srt_max", &self.srt_max.to_string());
+        append_key_value(dst, "art_max", &self.art_max.to_string());
+
+        append_key_value(dst, "rtt_client_sum", &self.rtt_client_sum.to_string());
+        append_key_value(dst, "rtt_server_sum", &self.rtt_server_sum.to_string());
+        append_key_value(dst, "srt_sum", &self.srt_sum.to_string());
+        append_key_value(dst, "art_sum", &self.art_sum.to_string());
+
+        append_key_value(dst, "rtt_client_count", &self.rtt_client_count.to_string());
+        append_key_value(dst, "rtt_server_count", &self.rtt_server_count.to_string());
+        append_key_value(dst, "srt_count", &self.srt_count.to_string());
+        append_key_value(dst, "art_count", &self.art_count.to_string());
+
+        append_key_value(
+            dst,
+            "retrans_tx",
+            &self.counts_peers[0].retrans_count.to_string(),
+        );
+        append_key_value(
+            dst,
+            "retrans_rx",
+            &self.counts_peers[1].retrans_count.to_string(),
+        );
+        append_key_value(
+            dst,
+            "zero_win_tx",
+            &self.counts_peers[0].zero_win_count.to_string(),
+        );
+        append_key_value(
+            dst,
+            "zero_win_rx",
+            &self.counts_peers[1].zero_win_count.to_string(),
+        );
+    }
     pub fn sequential_merge(&mut self, other: &TcpPerfStats) {
         if self.rtt_client_max < other.rtt_client_max {
             self.rtt_client_max = other.rtt_client_max;
@@ -374,6 +488,13 @@ pub struct FlowPerfStats {
 }
 
 impl FlowPerfStats {
+    pub fn to_kv_string(&self, dst: &mut String) {
+        self.tcp.to_kv_string(dst);
+        self.l7.to_kv_string(dst);
+        append_key_string(dst, "l4_protocol", &format!("{:?}", self.l4_protocol));
+        append_key_string(dst, "l7_protocol", &format!("{:?}", self.l7_protocol));
+    }
+
     pub fn sequential_merge(&mut self, other: &FlowPerfStats) {
         if self.l4_protocol == L4Protocol::Unknown {
             self.l4_protocol = other.l4_protocol;
@@ -427,6 +548,17 @@ pub struct L7PerfStats {
 }
 
 impl L7PerfStats {
+    pub fn to_kv_string(&self, dst: &mut String) {
+        append_key_value(dst, "l7_request", &self.request_count.to_string());
+        append_key_value(dst, "l7_response", &self.response_count.to_string());
+        append_key_value(dst, "l7_client_err", &self.err_client_count.to_string());
+        append_key_value(dst, "l7_server_err", &self.err_server_count.to_string());
+        append_key_value(dst, "l7_server_timeout", &self.err_timeout.to_string());
+        append_key_value(dst, "rrt_count", &self.rrt_count.to_string());
+        append_key_value(dst, "rrt_sum", &self.rrt_sum.to_string());
+        append_key_value(dst, "rrt_max", &self.rrt_max.to_string());
+    }
+
     pub fn sequential_merge(&mut self, other: &L7PerfStats) {
         self.request_count += other.request_count;
         self.response_count += other.response_count;
@@ -603,6 +735,36 @@ impl Default for FlowMetricsPeer {
 impl FlowMetricsPeer {
     pub const SRC: u8 = 0;
     pub const DST: u8 = 1;
+
+    pub fn to_kv_string(&self, dst: &mut String, direction: u8) {
+        let mut subfix = ["_tx", "_0"];
+        if direction == Self::DST {
+            subfix = ["_rx", "_1"];
+        }
+
+        append_keys_value(dst, "byte", subfix[0], &self.byte_count.to_string());
+        append_keys_value(dst, "l3_byte", subfix[0], &self.l3_byte_count.to_string());
+        append_keys_value(dst, "l4_byte", subfix[0], &self.l4_byte_count.to_string());
+        append_keys_value(dst, "packet", subfix[0], &self.packet_count.to_string());
+        append_keys_value(
+            dst,
+            "total_byte",
+            subfix[0],
+            &self.total_byte_count.to_string(),
+        );
+        append_keys_value(
+            dst,
+            "total_packet",
+            subfix[1],
+            &self.total_packet_count.to_string(),
+        );
+
+        append_keys_value(dst, "l3_epc_id", subfix[1], &self.l3_epc_id.to_string());
+        append_keys_bool(dst, "l2_end", subfix[1], self.is_l2_end);
+        append_keys_bool(dst, "l3_end", subfix[1], self.is_l3_end);
+        append_key_string(dst, "tcp_flags", &self.tcp_flags.to_string());
+    }
+
     pub fn sequential_merge(&mut self, other: &FlowMetricsPeer) {
         self.byte_count += other.byte_count;
         self.l3_byte_count += other.l3_byte_count;
@@ -687,6 +849,42 @@ pub struct Flow {
 }
 
 impl Flow {
+    pub fn to_kv_string(&self, dst: &mut String) {
+        self.flow_key.to_kv_string(dst);
+        self.flow_metrics_peers[0].to_kv_string(dst, 0);
+        self.flow_metrics_peers[1].to_kv_string(dst, 1);
+
+        if self.tunnel.tunnel_type != TunnelType::None {
+            self.tunnel.to_kv_string(dst);
+        }
+
+        append_key_value(dst, "flow_id", &self.flow_id.to_string());
+        append_key_value(dst, "syn_seq", &self.syn_seq.to_string());
+        append_key_value(dst, "syn_ack_seq", &self.synack_seq.to_string());
+        append_key_value(
+            dst,
+            "last_keepalive_seq",
+            &self.last_keepalive_seq.to_string(),
+        );
+        append_key_value(
+            dst,
+            "last_keepalive_ack",
+            &self.last_keepalive_ack.to_string(),
+        );
+        append_key_value(dst, "start_time", &self.start_time.as_micros().to_string());
+        append_key_value(dst, "end_time", &self.end_time.as_micros().to_string());
+        append_key_value(dst, "duration", &self.duration.as_micros().to_string());
+        append_key_value(dst, "vlan", &self.vlan.to_string());
+        append_key_string(dst, "eth_type", &format!("{:?}", self.eth_type));
+        if let Some(flow_perf_stats) = &self.flow_perf_stats {
+            flow_perf_stats.to_kv_string(dst);
+        }
+        append_key_string(dst, "close_type", &format!("{:?}", self.close_type));
+        append_key_string(dst, "flow_source", &format!("{:?}", self.flow_source));
+        append_key_bool(dst, "is_new_flow", self.is_new_flow);
+        append_key_string(dst, "tap_side", &format!("{:?}", self.tap_side));
+    }
+
     pub fn sequential_merge(&mut self, other: &Flow) {
         self.flow_metrics_peers[0].sequential_merge(&other.flow_metrics_peers[0]);
         self.flow_metrics_peers[1].sequential_merge(&other.flow_metrics_peers[1]);

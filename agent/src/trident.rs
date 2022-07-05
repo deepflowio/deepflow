@@ -19,12 +19,13 @@ use log::{info, warn};
 use crate::common::DropletMessageType;
 use crate::debug::QueueDebugger;
 use crate::exception::ExceptionHandler;
-use crate::external_metrics::MetricServer;
 use crate::handler::PacketHandlerBuilder;
+use crate::integration_collector::MetricServer;
 use crate::pcap::WorkerManager;
 use crate::utils::cgroups::Cgroups;
-use crate::utils::environment::free_memory_check;
+use crate::utils::environment::{free_memory_check, get_k8s_local_node_ip};
 use crate::utils::guard::Guard;
+use crate::utils::net::get_mac_by_ip;
 use crate::{
     collector::Collector,
     collector::{
@@ -152,8 +153,21 @@ impl Trident {
     ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
-        let (ctrl_ip, ctrl_mac) = get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
-            .context("failed getting control ip and mac")?;
+        // Directlly use env.K8S_NODE_IP_FOR_METAFLOW as the ctrl_ip reported by metaflow-agent if available
+        let (ctrl_ip, ctrl_mac) = match get_k8s_local_node_ip() {
+            Some(ip) => {
+                info!(
+                    "use K8S_NODE_IP_FOR_METAFLOW env ip as destination_ip({})",
+                    ip
+                );
+                let ctrl_mac = get_mac_by_ip(ip)?;
+                (ip, ctrl_mac)
+            }
+            None => get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
+                .context("failed getting control ip and mac")?,
+        };
+        info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
+
         let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
         stats_collector.start();
 
@@ -837,6 +851,7 @@ impl Components {
             prometheus_sender,
             telegraf_sender,
             config_handler.metric_server(),
+            exception_handler.clone(),
         );
 
         Ok(Components {

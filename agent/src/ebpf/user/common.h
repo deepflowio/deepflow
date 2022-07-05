@@ -99,18 +99,18 @@ static inline uint32_t align32pow2(uint32_t x)
 #define __unused __attribute__((__unused__))
 
 #ifndef min
-#define min(x,y) ({ \
-    typeof(x) _x = (x);    \
-    typeof(y) _y = (y);    \
-    (void) (&_x == &_y);    \
+#define min(x,y) ({		\
+    typeof(x) _x = (x);		\
+    typeof(y) _y = (y);		\
+    (void) (&_x == &_y);	\
     _x < _y ? _x : _y; })
 #endif
 
 #ifndef max
-#define max(x,y) ({ \
-    typeof(x) _x = (x);    \
-    typeof(y) _y = (y);    \
-    (void) (&_x == &_y);    \
+#define max(x,y) ({		\
+    typeof(x) _x = (x);		\
+    typeof(y) _y = (y);		\
+    (void) (&_x == &_y);	\
     _x > _y ? _x : _y; })
 #endif
 
@@ -163,6 +163,7 @@ enum {
 	ETR_NOTEXIST = -4,	/* not exist */
 	ETR_NOTGOELF = -5,      /* not go elf */
 	ETR_NOPROT = -7,	/* no protocol */
+	ETR_NOSYMBOL = -8,	/* no uprobe symbols */
 	ETR_IDLE = -12,		/* nothing to do */
 	ETR_BUSY = -13,		/* resource busy */
 	ETR_NOTSUPP = -14,	/* not support */
@@ -198,6 +199,7 @@ static struct trace_err_tab err_tab[] = {
 	{ETR_NOTEXIST, "not exist"},
 	{ETR_NOTGOELF, "not go elf"},
 	{ETR_NOPROT, "no protocol"},
+	{ETR_NOSYMBOL, "no uprobe symbols"},
 	{ETR_IDLE, "nothing to do"},
 	{ETR_BUSY, "resource busy"},
 	{ETR_NOTSUPP, "not support"},
@@ -257,4 +259,5 @@ int max_locked_memory_set_unlimited(void);
 int sysfs_write(char *file_name, char *v);
 uint64_t gettime(clockid_t clk_id, int flag);
 uint32_t get_sys_uptime(void);
+unsigned long long get_process_starttime(int pid);
 #endif /* __COMMON_H__ */

@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include "tracer.h"
 #include <arpa/inet.h>
 #include "libbpf/include/linux/err.h"
 #include <sched.h>
@@ -11,6 +10,8 @@
 #include "bcc/libbpf.h"
 #include "bcc/perf_reader.h"
 #include "libbpf/src/libbpf_internal.h"
+#include "symbol.h"
+#include "tracer.h"
 
 int major, minor;		// Linux kernel主版本，次版本
 
@@ -231,6 +232,27 @@ static struct tracepoint *get_tracepoint_from_tracer(struct bpf_tracer *tracer,
 	return tp;
 }
 
+void add_probe_to_tracer(struct probe *pb)
+{
+	struct bpf_tracer *tracer = pb->tracer;
+	if (pb->type == UPROBE && pb->private_data != NULL)
+		((struct symbol_uprobe *)pb->private_data)->in_probe = true;
+
+	list_add_tail(&pb->list, &tracer->probes_head);
+	tracer->probes_count++;
+}
+
+void free_probe_from_tracer(struct probe *pb)
+{
+	struct bpf_tracer *tracer = pb->tracer;
+	if (pb->type == UPROBE && pb->private_data != NULL)
+		((struct symbol_uprobe *)pb->private_data)->in_probe = false;
+
+	list_head_del(&pb->list);
+	tracer->probes_count--;
+	free(pb);
+}
+
 static struct probe *create_probe(struct bpf_tracer *tracer,
 				  const char *func_name, bool isret,
 				  enum probe_type type, void *private)
@@ -255,11 +277,12 @@ static struct probe *create_probe(struct bpf_tracer *tracer,
 	pb->prog = prog;
 	pb->isret = isret;
 	pb->type = type;
+	pb->installed = false;
 	snprintf(pb->name, sizeof(pb->name), "%s", func_name);
 	pb->private_data = private;
+	pb->tracer = tracer;
 
-	list_add_tail(&pb->list, &tracer->probes_head);
-	tracer->probes_count++;
+	add_probe_to_tracer(pb);
 	return pb;
 }
 
@@ -335,11 +358,10 @@ static struct bpf_link *exec_attach_kprobe(struct bpf_program *prog, char *name,
 
 static int probe_attach(struct probe *p)
 {
-	if (p->link) {
-		ebpf_info("<%s> fn_name:%s, has been attached.\n",
-			  __func__, p->name);
-		return ETR_OK;
+	if (p->link || p->installed) {
+		return ETR_EXIST;
 	}
+
 	struct bpf_link *link = NULL;
 	if (p->type == KPROBE) {
 		link = exec_attach_kprobe(p->prog, p->name, p->isret, -1);
@@ -362,13 +384,14 @@ static int probe_attach(struct probe *p)
 
 		link =
 		    exec_attach_uprobe(p->prog, usym->binary_path, usym->entry,
-				       ret, usym->pid);
+				       ret, -1);
 	}
 
 	p->link = link;
 	if (link == NULL)
 		return ETR_INVAL;
 
+	p->installed = true;
 	return ETR_OK;
 }
 
@@ -397,9 +420,19 @@ static int exec_detach_uprobe(struct bpf_link *link, const char *bin_path,
 	return program__detach_probe(link, isret, ev_name, "uprobe");
 }
 
-static int probe_detach(struct probe *p)
+/**
+ * probe_detach - eBPF probe detach
+ * @p struct probe
+ *
+ * @return 0 if ok, not 0 on error
+ */
+int probe_detach(struct probe *p)
 {
 	int ret = 0;
+	if (!p->installed) {
+		return ETR_NOTEXIST;
+	}
+
 	if (p->type == KPROBE) {
 		if ((ret = exec_detach_kprobe(p->link, p->name, p->isret)) == 0)
 			p->link = NULL;
@@ -415,15 +448,16 @@ static int probe_detach(struct probe *p)
 			p->link = NULL;
 	}
 
+	if (ret == 0)
+		p->installed = false;
+
 	return ret;
 }
 
 static int tracepoint_attach(struct tracepoint *tp)
 {
 	if (tp->link) {
-		ebpf_warning("<%s> name:%s, has been attached.\n", __func__,
-			     tp->name);
-		return ETR_OK;
+		return ETR_EXIST;
 	}
 
 	struct bpf_link *bl = bpf_program__attach(tp->prog);
@@ -441,10 +475,7 @@ static int tracepoint_attach(struct tracepoint *tp)
 static int tracepoint_detach(struct tracepoint *tp)
 {
 	if (tp->link == NULL) {
-		ebpf_info
-		    ("<%s> tp->link == NULL, name:%s, has been detached.\n",
-		     __func__, tp->name);
-		return ETR_OK;
+		return ETR_NOTEXIST;
 	}
 
 	bpf_link__destroy(tp->link);
@@ -452,8 +483,7 @@ static int tracepoint_detach(struct tracepoint *tp)
 	return ETR_OK;
 }
 
-static int tracer_hooks_process(struct bpf_tracer *tracer,
-				enum tracer_hook_type type)
+int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type)
 {
 	int (*probe_fun) (struct probe * p) = NULL;
 	int (*tracepoint_fun) (struct tracepoint * p) = NULL;
@@ -473,11 +503,17 @@ static int tracer_hooks_process(struct bpf_tracer *tracer,
 
 	struct probe *p;
 	int error;
-	list_for_each_entry (p, &tracer->probes_head, list) {
+	list_for_each_entry(p, &tracer->probes_head, list) {
 		if (!p)
 			return ETR_INVAL;
 
 		error = probe_fun(p);
+		if (type == HOOK_ATTACH && error == ETR_EXIST)
+			continue;
+
+		if (type == HOOK_DETACH && error == ETR_NOTEXIST)
+			continue;
+
 		ebpf_info("%s %s %s: '%s', %s!",
 			  type == HOOK_ATTACH ? "attach" : "detach",
 			  p->isret ? "exit" : "enter",
@@ -496,7 +532,14 @@ static int tracer_hooks_process(struct bpf_tracer *tracer,
 		if (!tp)
 			return ETR_INVAL;
 
-		if (tracepoint_fun(tp)) {
+		error = tracepoint_fun(tp);
+		if (type == HOOK_ATTACH && error == ETR_EXIST)
+			continue;
+
+		if (type == HOOK_DETACH && error == ETR_NOTEXIST)
+			continue;
+
+		if (error) {
 			ebpf_info("%s tracepoint: '%s', failed!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  tp->name);
@@ -535,7 +578,36 @@ int tracer_probes_init(struct bpf_tracer *tracer)
 			return ETR_INVAL;
 	}
 
-	list_for_each_entry (usym, &tps->uprobe_syms_head, list) {
+	list_for_each_entry(usym, &tps->uprobe_syms_head, list) {
+		p = create_probe(tracer, usym->probe_func, usym->isret, UPROBE,
+				 usym);
+		if (!p)
+			return ETR_INVAL;
+	}
+
+	return 0;
+}
+
+int tracer_uprobes_update(struct bpf_tracer *tracer)
+{
+	struct probe *p;
+	struct tracer_probes_conf *tps;
+	struct symbol_uprobe *usym;
+
+	if (!tracer) {
+		ebpf_warning("tracer_probes_init failed, tracer is NULL\n");
+		return ETR_INVAL;
+	}
+
+	tps = tracer->tps;
+	if (!tps) {
+		ebpf_warning("tracer_probes_init failed, tps is NULL\n");
+		return ETR_INVAL;
+	}
+
+	list_for_each_entry(usym, &tps->uprobe_syms_head, list) {
+		if (usym->in_probe)
+			continue;
 		p = create_probe(tracer, usym->probe_func, usym->isret, UPROBE,
 				 usym);
 		if (!p)

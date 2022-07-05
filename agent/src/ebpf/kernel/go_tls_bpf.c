@@ -1,5 +1,11 @@
+/*
+ * Pass function parameters by process ID and coroutine ID
+ * key: struct tls_conn_key {process ID, coroutine ID}
+ * value: struct tls_conn
+ */
 struct {
-	__uint(type, BPF_MAP_TYPE_LRU_HASH);
+	// FIXME: function entry without exit will cause memory leaks
+	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, struct tls_conn_key);
 	__type(value, struct tls_conn);
 	__uint(max_entries, MAX_SYSTEM_THREADS);
@@ -77,7 +83,7 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 			       (void *)(c->sp + 40));
 	}
 	if (bytes_count == 0)
-		return 0;
+		goto out;
 
 	struct data_args_t write_args = {};
 	write_args.buf = c->buffer;
@@ -94,6 +100,8 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 	};
 	process_uprobe_data_tls((struct pt_regs *)ctx, id, T_EGRESS,
 				&write_args, bytes_count, &extra);
+out:
+	bpf_map_delete_elem(&tls_conn_map, &key);
 	return 0;
 }
 
@@ -150,7 +158,7 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 	}
 
 	if (bytes_count == 0)
-		return 0;
+		goto out;
 
 	struct data_args_t read_args = {};
 	read_args.buf = c->buffer;
@@ -168,5 +176,7 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 
 	process_uprobe_data_tls((struct pt_regs *)ctx, id, T_INGRESS,
 				&read_args, bytes_count, &extra);
+out:
+	bpf_map_delete_elem(&tls_conn_map, &key);
 	return 0;
 }

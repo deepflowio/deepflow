@@ -1,6 +1,7 @@
 #ifndef _BPF_TABLE_H_
 #define _BPF_TABLE_H_
 #include "libbpf/include/linux/err.h"
+#include "tracer.h"
 
 unsigned int bpf_table_key_size(struct bpf_map *map);
 unsigned int bpf_table_value_size(struct bpf_map *map);

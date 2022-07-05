@@ -44,6 +44,7 @@ enum Exception {
     CONTROLLER_SOCKET_ERROR    = 32768;
     ANALYZER_SOCKET_ERROR      = 65536;
     NPB_SOCKET_ERROR           = 131072;
+    INTEGRATION_SOCKET_ERROR   = 262144;
     // 2^31及以下由采集器使用，采集器最大可用异常是2^31，顺序从前往后
     // 2^32及以上由控制器使用，顺序从后往前
 }
@@ -113,6 +114,7 @@ enum SocketType {
     RAW_UDP = 0;
     TCP = 1;
     UDP = 2;
+    FILE = 3;
 }
 
 enum PacketType {
@@ -228,7 +230,7 @@ message Config {
     optional bool   l4_performance_enabled = 404 [default = true];
     optional bool   l7_metrics_enabled     = 405 [default = true];
     optional bool external_agent_http_proxy_enabled = 406 [default = false]; // 外部Agent数据HTTP代理开关
-    optional uint32 external_agent_http_proxy_port = 407 [default = 8086]; // 外部Agent数据HTTP代理端口
+    optional uint32 external_agent_http_proxy_port = 407 [default = 38086]; // 外部Agent数据HTTP代理端口
 
     optional uint32 packet_sequence_flag = 410 [default = 0];
 

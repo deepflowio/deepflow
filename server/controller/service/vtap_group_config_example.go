@@ -65,7 +65,7 @@ nat_ip_enabled: 0
 log_retention: 300
 
 # 全景图配置参数
-# 数据套接字，默认值: TCP，可选值：TCP/UDP
+# 数据套接字，默认值: TCP，可选值：TCP/UDP/FILE
 collector_socket_type: TCP
 # PCAP套接字，默认值: TCP，可选值：TCP/UDP/RAW_UDP
 compressor_socket_type: TCP
