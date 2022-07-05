@@ -51,12 +51,16 @@ jobs:
           cd server
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.amd64
 
-      - name: Archive code build results
+      - name: Package code build results
+        run: |
+          tar cvf server-artifact.tar server/bin/
+
+      - name: Archive code build results packager
         uses: actions/upload-artifact@v3
         with:
           name: build results
           path: |
-            server/bin
+            server-artifact.tar
 
   build_server_image:
     name: build server image
@@ -78,7 +82,11 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: build results
-          path: server/bin/
+          path: .
+
+      - name: Unpack code build results
+        run: |
+          tar xvf server-artifact.tar
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2

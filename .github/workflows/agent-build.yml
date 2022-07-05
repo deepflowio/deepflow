@@ -43,15 +43,16 @@ jobs:
           platforms: linux/amd64
           outputs: type=local,dest=./agent/output/
 
+      - name: Package code build results
+        run: |
+          tar cvf agent-artifact.tar agent/output/src/ebpf/data agent/output/target/release/metaflow-agent agent/output/target/release/metaflow-agent-ctl agent/output/src/ebpf/metaflow-ebpfctl
+
       - name: Archive code build results
         uses: actions/upload-artifact@v3
         with:
           name: build results
           path: |
-            agent/output/src/ebpf/data
-            agent/output/target/release/metaflow-agent
-            agent/output/target/release/metaflow-agent-ctl
-            agent/output/src/ebpf/metaflow-ebpfctl
+            agent-artifact.tar
 
   build_agent_image:
     name: build agent image
@@ -68,7 +69,11 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: build results
-          path: agent/output/
+          path: .
+
+      - name: Unpack code build results
+        run: |
+          tar xvf agent-artifact.tar
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
