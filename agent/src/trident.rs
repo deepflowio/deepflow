@@ -90,7 +90,7 @@ pub struct Trident {
 }
 
 impl Trident {
-    pub fn start<P: AsRef<Path>>(config_path: P, revision: String) -> Result<Trident> {
+    pub fn start<P: AsRef<Path>>(config_path: P, revision: &'static str) -> Result<Trident> {
         let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
         let state_thread = state.clone();
 
@@ -147,7 +147,7 @@ impl Trident {
     fn run(
         state: TridentState,
         config: Config,
-        revision: String,
+        revision: &'static str,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
     ) -> Result<()> {

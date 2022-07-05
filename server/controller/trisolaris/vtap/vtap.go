@@ -843,6 +843,7 @@ func (v *VTapInfo) updateCacheToDB() {
 			dbVTap.Arch = cacheVTap.GetArch()
 			dbVTap.Os = cacheVTap.GetOs()
 			dbVTap.KernelVersion = cacheVTap.GetKernelVersion()
+			dbVTap.ProcessName = cacheVTap.GetProcessName()
 			dbVTap.CtrlMac = cacheVTap.GetCtrlMac()
 			cacheExceptions := cacheVTap.GetExceptions()
 			tridentExceptions := uint64(VTAP_TRIDENT_EXCEPTIONS_MASK) & uint64(cacheExceptions)

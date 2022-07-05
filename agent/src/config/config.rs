@@ -106,8 +106,6 @@ impl Default for Config {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
-    pub genesis_rpc_port: u16,
-    pub genesis_rpc_tls_port: u16,
     #[serde(with = "LevelDef")]
     pub log_level: log::Level,
     pub profiler: bool,
@@ -253,8 +251,6 @@ impl YamlConfig {
 impl Default for YamlConfig {
     fn default() -> Self {
         Self {
-            genesis_rpc_port: 20036,
-            genesis_rpc_tls_port: 20136,
             log_level: log::Level::Info,
             profiler: false,
             af_packet_blocks_enabled: false,

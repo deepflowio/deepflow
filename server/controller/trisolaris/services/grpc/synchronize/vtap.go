@@ -250,7 +250,8 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		int64(in.GetMemorySize()),
 		in.GetArch(),
 		in.GetOs(),
-		in.GetKernelVersion())
+		in.GetKernelVersion(),
+		in.GetProcessName())
 	// 专属采集器ctrl_mac可能会变，不更新ctrl_mac
 	if vtapCache.GetVTapType() != VTAP_TYPE_DEDICATED {
 		vtapCache.UpdateCtrlMacFromGrpc(in.GetCtrlMac())
