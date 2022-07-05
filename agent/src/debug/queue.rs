@@ -14,7 +14,7 @@ use std::{
 use bincode::{config::Configuration, Decode, Encode};
 use log::warn;
 
-use super::{debugger::send_to, SESSION_TIMEOUT};
+use super::{debugger::send_to, DEBUG_QUEUE_IDLE_TIMEOUT};
 
 use crate::utils::queue::{Error, Receiver};
 
@@ -136,7 +136,9 @@ impl QueueDebugger {
         let queue_name = name.clone();
         let handle = thread::spawn(move || {
             let now = Instant::now();
-            let mut session_timeout = SESSION_TIMEOUT - Duration::from_secs(1);
+
+            let mut idle_now = Instant::now();
+            let mut msg_counter = 0;
             while ctx.enabled.load(Ordering::SeqCst) && now.elapsed() < dur {
                 let s = match ctx.receiver.recv(Some(QUEUE_RECV_TIMEOUT)) {
                     Ok(s) => s,
@@ -149,14 +151,17 @@ impl QueueDebugger {
                         return;
                     }
                     Err(Error::Timeout) => {
-                        // 一个会话超时还没有数据，就发送消息让客户端继续等待
-                        if now.elapsed() > session_timeout {
+                        // 一个IDLE超时还没有数据，就发送消息让客户端继续等待
+                        // An IDLE timeout and there is no data, send a message to let the client continue to wait
+                        if idle_now.elapsed() > DEBUG_QUEUE_IDLE_TIMEOUT && msg_counter == 0 {
                             let _ = send_to(&sock, conn, QueueMessage::Continue, serialize_conf);
-                            session_timeout += SESSION_TIMEOUT;
+                            idle_now = Instant::now();
                         }
+                        msg_counter = 0;
                         continue;
                     }
                 };
+                msg_counter += 1;
                 let msg = QueueMessage::Send(s);
                 if let Err(e) = send_to(&sock, conn, msg, serialize_conf) {
                     warn!("send queue item error: {}", e);

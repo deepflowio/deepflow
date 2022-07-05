@@ -19,6 +19,43 @@ env:
 jobs:
   build_agent:
     name: build agent
+    runs-on: [self-hosted, 16c16g]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "ghcr.io" 
+          username: "${{ github.repository_owner }}"
+          password: "${{ secrets.GITHUB_TOKEN }}" 
+
+      - name: Build  metaflow agent
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: false 
+          file: agent/docker/dockerfile-build
+          platforms: linux/amd64
+          outputs: type=local,dest=./agent/output/
+
+      - name: Archive code build results
+        uses: actions/upload-artifact@v3
+        with:
+          name: build results
+          path: |
+            agent/output/src/ebpf/data
+            agent/output/target/release/metaflow-agent
+            agent/output/target/release/metaflow-agent-ctl
+            agent/output/src/ebpf/metaflow-ebpfctl
+
+  build_agent_image:
+    name: build agent image
+    needs: [build_agent]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,6 +63,12 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Download code build results
+        uses: actions/download-artifact@v3
+        with:
+          name: build results
+          path: agent/output/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -63,15 +106,6 @@ jobs:
         run: |
           echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
           echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
-
-      - name: Build  metaflow agent
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: false 
-          file: agent/docker/dockerfile-build
-          platforms: linux/amd64
-          outputs: type=local,dest=./agent/output/
 
       - name: Build and push metaflow agent images
         uses: docker/build-push-action@v2
