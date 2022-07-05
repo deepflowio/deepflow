@@ -459,8 +459,7 @@ int bpf_get_first_key(int fd, void *key, size_t key_size)
 				return -1;
 			// This means the key doesn't exist.
 			if (errno == ENOENT)
-				return bpf_map_get_next_key(fd,
-							    (void *)
+				return bpf_map_get_next_key(fd, (void *)
 							    &try_values[i],
 							    key);
 		}
@@ -999,10 +998,9 @@ static int bpf_get_retprobe_bit(const char *event_type)
  * creating [k,u]probe with perf_event_open, which makes it easier to clean up
  * the [k,u]probe. This function tries to create pfd with the perf_kprobe PMU.
  */
-static int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
-					      int pid, const char *event_type,
-					      int is_return,
-					      uint64_t ref_ctr_offset)
+int bpf_try_perf_event_open_with_probe(const char *name, uint64_t offs,
+				       int pid, const char *event_type,
+				       int is_return, uint64_t ref_ctr_offset)
 {
 	struct perf_event_attr attr = {};
 	int type = bpf_find_probe_type(event_type);

@@ -96,32 +96,32 @@ func Start(configPath string) []io.Closer {
 		roze, err := roze.NewRoze(rozeConfig, receiver)
 		checkError(err)
 		roze.Start()
-		defer roze.Close()
+		closers = append(closers, roze)
 
 		// 写流日志数据
 		stream, err := stream.NewStream(streamConfig, receiver)
 		checkError(err)
 		stream.Start()
-		defer stream.Close()
+		closers = append(closers, stream)
 
 		// 写ext_metrics数据
 		extMetrics, err := ext_metrics.NewExtMetrics(extMetricsConfig, receiver)
 		checkError(err)
 		extMetrics.Start()
-		defer extMetrics.Close()
+		closers = append(closers, extMetrics)
 
 		// 创建、修改、删除数据源及其存储时长
 		ds := datasource.NewDatasourceManager([]string{rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary},
 			rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled,
 			cfg.CKS3Storage.Enabled, cfg.CKS3Storage.Volume, cfg.CKS3Storage.TTLTimes)
 		ds.Start()
-		defer ds.Close()
+		closers = append(closers, ds)
 
 		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
 		cm, err := ckmonitor.NewCKMonitor(&cfg.CKDiskMonitor, rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)
 		checkError(err)
 		cm.Start()
-		defer cm.Close()
+		closers = append(closers, cm)
 
 		// clickhouse表结构变更处理
 		issu, err := ckissu.NewCKIssu(rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)
@@ -130,7 +130,7 @@ func Start(configPath string) []io.Closer {
 		time.Sleep(time.Second)
 		err = issu.Start()
 		checkError(err)
-		issu.Close()
+		closers = append(closers, issu)
 	}
 	// receiver后启动，防止启动后收到数据无法处理，而上报异常日志
 	receiver.Start()

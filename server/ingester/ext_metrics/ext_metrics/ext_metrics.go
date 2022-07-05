@@ -112,7 +112,8 @@ func (s *ExtMetrics) Start() {
 	s.Prometheus.Start()
 }
 
-func (s *ExtMetrics) Close() {
+func (s *ExtMetrics) Close() error {
 	s.Telegraf.Close()
 	s.Prometheus.Close()
+	return nil
 }

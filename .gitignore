@@ -16,3 +16,5 @@
 /server/bin/
 /server/controller/cloud/aliyun/api_response.gen.go
 /server/libs/geo/ip_info.go
+/cli/vendor/
+/cli/bin/

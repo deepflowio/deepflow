@@ -232,8 +232,9 @@ func (s *Stream) Start() {
 	s.OtelLogger.Start()
 }
 
-func (s *Stream) Close() {
+func (s *Stream) Close() error {
 	s.FlowLogger.Close()
 	s.ProtoLogger.Close()
 	s.OtelLogger.Close()
+	return nil
 }

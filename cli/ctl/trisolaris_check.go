@@ -1,44 +1,32 @@
-package main
+package ctl
 
 import (
 	"bytes"
 	"context"
+	. "encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
-
 	"github.com/metaflowys/metaflow/message/trident"
-	"github.com/metaflowys/metaflow/server/libs/utils"
-)
-
-const (
-	PORT = "20035"
+	"github.com/spf13/cobra"
+	_ "golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 type ParamData struct {
-	CtrlIP      string
-	CtrlMac     string
-	ControlleIP string
-	Type        string
+	CtrlIP     string
+	CtrlMac    string
+	RemoteIP   string
+	RemotePort string
+	Type       string
 }
 
 type SortedAcls []*trident.FlowAcl
 
 var paramData ParamData
-
-func init() {
-	rootCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "ctrl_ip", "", "", "采集器控制器IP")
-	rootCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "ctrl_mac", "", "", "采集器控制MAC")
-	rootCmd.PersistentFlags().StringVarP(&paramData.ControlleIP, "controller_ip", "", "127.0.0.1", "控制器IP")
-	rootCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "请求类型trdient/analyzer")
-}
-
-var rootCmd = RegisterRpcCommand()
 
 type CmdExecute func(response *trident.SyncResponse)
 
@@ -105,22 +93,26 @@ func regiterCommand() []*cobra.Command {
 	return commands
 }
 
-func RegisterRpcCommand() *cobra.Command {
-	root := &cobra.Command{
-		Use:   "rpc",
-		Short: "pull policy from controller by rpc",
+func RegisterTrisolarisCommand() *cobra.Command {
+	trisolarisCmd := &cobra.Command{
+		Use:   "trisolaris.check",
+		Short: "pull rpc data from controller",
 	}
-
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "采集器控制IP")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "采集器控制MAC")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.RemoteIP, "rip", "", "127.0.0.1", "控制器IP")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.RemotePort, "rport", "", "20035", "控制器PORT")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "请求类型trdient/analyzer")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
-		root.AddCommand(handler)
+		trisolarisCmd.AddCommand(handler)
 	}
 
-	return root
+	return trisolarisCmd
 }
 
 func initCmd(cmds []CmdExecute) {
-	addr := net.JoinHostPort(paramData.ControlleIP, PORT)
+	addr := net.JoinHostPort(paramData.RemoteIP, paramData.RemotePort)
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		fmt.Println(err)
@@ -206,10 +198,16 @@ func ipGroups(response *trident.SyncResponse) {
 	}
 }
 
+func Uint64ToMac(v uint64) net.HardwareAddr {
+	bytes := [8]byte{}
+	BigEndian.PutUint64(bytes[:], v)
+	return net.HardwareAddr(bytes[2:])
+}
+
 func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
 	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d LaunchServer: %s LaunchServerId: %d RegionId: %d SkipTapInterface: %t "
-	buffer.WriteString(fmt.Sprintf(format, utils.Uint64ToMac(data.GetMac()), data.GetEpcId(),
+	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(data.GetMac()), data.GetEpcId(),
 		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
 		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(), data.GetSkipTapInterface()))
 	if data.GetPodNodeId() > 0 {
@@ -275,8 +273,4 @@ func vpcIP(response *trident.SyncResponse) {
 	for index, podIP := range response.GetPodIps() {
 		JsonFormat(index+1, podIP)
 	}
-}
-
-func main() {
-	rootCmd.Execute()
 }

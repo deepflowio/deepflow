@@ -42,7 +42,8 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 	} else if (strstr(__name, "tracepoint/")) {
 		char *p = __name;
 		while (*p != '\0')
-			if (*p++ == '/') __name = p;
+			if (*p++ == '/')
+				__name = p;
 		res =
 		    snprintf((char *)prog_name, sizeof(prog_name),
 			     "bpf_func_%s", __name);
@@ -286,6 +287,18 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 	char buf[PATH_MAX], fname[256];
 	bool is_kprobe = strncmp("kprobe", event_type, 6) == 0;
 
+	if (maxactive <= 0 || attach_type != BPF_PROBE_RETURN) {
+		pfd =
+		    bpf_try_perf_event_open_with_probe(config1, offset, pid,
+						       event_type,
+						       attach_type !=
+						       BPF_PROBE_ENTRY, 0);
+
+	}
+
+	if (pfd > 0)
+		goto attach_event;
+
 	if (create_probe_event
 	    (buf, ev_name, attach_type, config1, offset, event_type,
 	     pid, maxactive) < 0) {
@@ -334,6 +347,7 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 		}
 	}
 
+attach_event:
 	if (bpf_attach_tracing_event(progfd, buf, pid, &pfd) == 0)
 		return pfd;
 	else

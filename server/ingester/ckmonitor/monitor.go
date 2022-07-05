@@ -252,6 +252,7 @@ func (m *Monitor) start() {
 	}
 }
 
-func (m *Monitor) Close() {
+func (m *Monitor) Close() error {
 	m.exit = true
+	return nil
 }

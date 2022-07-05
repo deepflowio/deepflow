@@ -16,7 +16,7 @@ use super::process::{get_memory_rss, get_process_num_by_name};
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
 // K8S environment node ip environment variable
-const K8S_NODE_IP_FOR_METAFLOW: &str = "K8S_NODE_IP_FOR_METAFLOW";
+pub const K8S_NODE_IP_FOR_METAFLOW: &str = "K8S_NODE_IP_FOR_METAFLOW";
 
 pub fn check(f: Checker) {
     let mut logged = false;

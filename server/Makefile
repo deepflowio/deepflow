@@ -3,7 +3,7 @@ REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
 FLAGS = -gcflags "-l -l" -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE} \
-		-X 'main.goVersion=$(shell go version)'"
+		-X 'main.goVersion=$(shell go version)'" 
 BINARY_SUFFIX :=
 
 .PHONY: all
@@ -54,7 +54,6 @@ test: vendor $(proto) $(generated_libs)
 .PHONY: server
 server: vendor $(proto) $(generated_libs)
 	go build -mod vendor ${FLAGS} -o bin/metaflow-server${BINARY_SUFFIX} cmd/server/main.go
-	go build -mod vendor ${FLAGS} -o bin/trisolaris-ctl${BINARY_SUFFIX} controller/trisolaris/trisolarisctrl/main.go
 	go build -mod vendor ${FLAGS} -o bin/ingester-ctl${BINARY_SUFFIX} ingester/cmd/droplet-ctl/main.go
 
 .PHONY: clean
