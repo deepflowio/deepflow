@@ -113,7 +113,7 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 		controllerResp := model.Controller{
 			ID:                 controller.ID,
 			IP:                 controller.IP,
-			Name:               controller.Name,
+			Name:               name,
 			NodeType:           controller.NodeType,
 			State:              controller.State,
 			NatIP:              controller.NATIP,

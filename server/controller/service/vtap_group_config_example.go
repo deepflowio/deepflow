@@ -133,29 +133,16 @@ npb_dedup_enabled: 1
 
 # 采集器静态配置
 static_config:
-  # controller ip
-  controller-ips:
-    - 127.0.0.1
-  # kubernetes-cluster-id，在对接kubernetes/openshift时需要配置
-  kubernetes-cluster-id:
   # kubernetes-namespace，当只有一个K8s命名空间权限时，填写此值
   kubernetes-namespace:
   # ingress的类型，填写为kubernetes or openshift，默认kubernetes
   ingress-flavour: kubernetes
-  # controller listen port
-  controller-port: 30035
-  # controller security authenticate port
-  controller-tls-port: 30135
-  # 配置后会使用配置文件中的controller-ips和analyzer-ip分别替换控制器下发的proxy-controller-ip和analyzer-ip
+  # proxy controller listen port
+  proxy-controller-port: 30035
+  # 配置后会使用配置文件中的analyzer-ip分别替换控制器下发的analyzer-ip
   analyzer-ip: ""
   # analyzer listen port
   analyzer-port: 30033
-  # genesis rpc listen port
-  genesis-rpc-port: 20036
-  # genesis rpc listen security authenticate port
-  genesis-rpc-tls-port: 20136
-  # logfile path
-  log-file: /var/log/trident/trident.log
   # loglevel: "debug/info/warn/error"
   log-level: info
   # profiler
@@ -197,16 +184,6 @@ static_config:
   cloud-gateway-traffic: false
   # mirror-traffic-pcp will only be used with analyzer-mode
   mirror-traffic-pcp: 0
-  # controller certificate file prefix, contain path
-  # if certificate file exists, do certificate; or no
-  # certificate file naming rule is prefix.controller-ip
-  # example
-  # controller-cert-file-prefix is /etc/trident_controller.cert
-  # controller ip is: 10.10.10.10
-  # so certificate file name is trident_controller.cert.10.10.10.10 in /etc/
-  controller-cert-file-prefix: ""
-  # 支持采集器自动加入组
-  vtap-group-id-request: ""
   # the size of queue linking flow generator and quadruple generator, minimum 65536:
   #    - 1-tagged-flow-to-quadruple-generator
   #    - 1-tagged-flow-to-app-protocol-logs
