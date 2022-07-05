@@ -6,7 +6,6 @@ use std::{
         Arc, Mutex,
     },
     thread::{self, JoinHandle},
-    time::Instant,
 };
 
 use arc_swap::access::Access;
@@ -23,7 +22,6 @@ use super::{
     queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
     Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, MAX_BUF_SIZE, METAFLOW_AGENT_BEACON,
-    SESSION_TIMEOUT,
 };
 
 use crate::{
@@ -77,8 +75,6 @@ impl Debugger {
                     return;
                 }
             };
-            let _ = sock.set_read_timeout(Some(SESSION_TIMEOUT));
-
             let sock_clone = sock.clone();
             let running_clone = running.clone();
             let serialize_conf = config::standard();
@@ -127,7 +123,6 @@ impl Debugger {
             while running.load(Ordering::Relaxed) {
                 let mut buf = [0u8; MAX_BUF_SIZE];
                 let mut addr = None;
-                let start = Instant::now();
                 match sock.recv_from(&mut buf) {
                     Ok((n, a)) => {
                         if n == 0 {
@@ -139,17 +134,8 @@ impl Debugger {
                         Self::dispatch((&sock, addr.unwrap()), &buf, &debuggers, serialize_conf)
                             .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                     }
-                    Err(e)
-                        if start.elapsed() >= SESSION_TIMEOUT
-                            && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
-                                || cfg!(target_os = "linux")
-                                    && e.kind() == ErrorKind::WouldBlock) =>
-                    {
-                        // normal timeout, Window=TimedOut UNIX=WouldBlock
-                        continue;
-                    }
                     Err(e) => {
-                        warn!("receive udp packet error: {}", e);
+                        warn!("receive udp packet error: kind=({}) detail={}", e.kind(), e);
                         continue;
                     }
                 }
@@ -274,8 +260,6 @@ pub struct Client {
 impl Client {
     pub fn new(addr: SocketAddr) -> Result<Self> {
         let sock = UdpSocket::bind((IpAddr::from(Ipv6Addr::UNSPECIFIED), 0))?;
-        sock.set_read_timeout(Some(SESSION_TIMEOUT))?;
-
         Ok(Self {
             sock,
             conf: config::standard(),
@@ -295,7 +279,6 @@ impl Client {
     }
 
     pub fn recv<D: Decode>(&mut self) -> Result<D> {
-        let start = Instant::now();
         let mut buf = [0u8; MAX_BUF_SIZE];
         match self.sock.recv(&mut buf) {
             Ok(n) => {
@@ -308,18 +291,7 @@ impl Client {
                 let d = decode_from_std_read(&mut buf.as_slice(), self.conf)?;
                 Ok(d)
             }
-            Err(e)
-                if start.elapsed() >= SESSION_TIMEOUT
-                    && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
-                        || cfg!(target_os = "linux") && e.kind() == ErrorKind::WouldBlock) =>
-            {
-                // normal timeout, Window=TimedOut UNIX=WouldBlock
-                return Err(Error::IoError(io::Error::new(
-                    ErrorKind::Other,
-                    "NOROMAL RECV TIMEOUT",
-                )));
-            }
-            Err(e) => return Err(Error::IoError(e)),
+            Err(e) => Err(Error::IoError(e)),
         }
     }
 }

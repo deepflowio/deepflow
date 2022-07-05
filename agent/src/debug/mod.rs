@@ -18,7 +18,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 pub const QUEUE_LEN: usize = 1024;
 pub const BEACON_INTERVAL: Duration = Duration::from_secs(60);
 pub const BEACON_PORT: u16 = 20035;
-pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
+pub const DEBUG_QUEUE_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 pub const METAFLOW_AGENT_BEACON: &str = "metaflow-agent";
 pub const MAX_BUF_SIZE: usize = 9000;
 

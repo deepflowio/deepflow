@@ -1,9 +1,8 @@
 use std::{
     collections::HashSet,
     fmt,
-    io::ErrorKind,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use anyhow::{anyhow, Result};
@@ -12,7 +11,7 @@ use clap::{ArgEnum, Parser, Subcommand};
 
 use metaflow_agent::debug::{
     Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, BEACON_PORT,
-    METAFLOW_AGENT_BEACON, SESSION_TIMEOUT,
+    DEBUG_QUEUE_IDLE_TIMEOUT, METAFLOW_AGENT_BEACON,
 };
 
 const ERR_PORT_MSG: &str = "error: The following required arguments were not provided:
@@ -221,7 +220,6 @@ impl Controller {
     */
     fn list(&self) -> Result<()> {
         let server = UdpSocket::bind((Ipv6Addr::UNSPECIFIED, BEACON_PORT))?;
-        server.set_read_timeout(Some(SESSION_TIMEOUT))?;
         let mut vtap_map = HashSet::new();
 
         println!(
@@ -236,7 +234,6 @@ impl Controller {
         println!("{:-<100}", "");
         loop {
             let mut buf = [0u8; 1024];
-            let start = Instant::now();
             match server.recv_from(&mut buf) {
                 Ok((n, a)) => {
                     if n == 0 {
@@ -265,14 +262,6 @@ impl Controller {
                         );
                         vtap_map.insert(beacon.vtap_id);
                     }
-                }
-                Err(e)
-                    if start.elapsed() >= SESSION_TIMEOUT
-                        && (cfg!(target_os = "windows") && e.kind() == ErrorKind::TimedOut
-                            || cfg!(target_os = "linux") && e.kind() == ErrorKind::WouldBlock) =>
-                {
-                    // normal timeout, Window=TimedOut UNIX=WouldBlock
-                    continue;
                 }
                 Err(e) => return Err(anyhow!("{}", e)),
             };
@@ -427,7 +416,7 @@ impl Controller {
                         seq += 1;
                     }
                     QueueMessage::Continue => {
-                        println!("message in preparation");
+                        println!("nothing received for {:?}", DEBUG_QUEUE_IDLE_TIMEOUT);
                         continue;
                     }
                     QueueMessage::Fin => return Ok(()),
