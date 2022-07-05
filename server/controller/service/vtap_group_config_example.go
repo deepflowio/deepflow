@@ -143,11 +143,13 @@ static_config:
   # ingress的类型，填写为kubernetes or openshift，默认kubernetes
   ingress-flavour: kubernetes
   # controller listen port
-  controller-port: 20035
+  controller-port: 30035
   # controller security authenticate port
-  controller-tls-port: 20135
+  controller-tls-port: 30135
   # 配置后会使用配置文件中的controller-ips和analyzer-ip分别替换控制器下发的proxy-controller-ip和analyzer-ip
   analyzer-ip: ""
+  # analyzer listen port
+  analyzer-port: 30033
   # genesis rpc listen port
   genesis-rpc-port: 20036
   # genesis rpc listen security authenticate port

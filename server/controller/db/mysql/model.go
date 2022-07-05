@@ -884,6 +884,7 @@ type VTap struct {
 	Arch               string    `gorm:"column:arch;type:varchar(256);default:null" json:"ARCH"`
 	Os                 string    `gorm:"column:os;type:varchar(256);default:null" json:"OS"`
 	KernelVersion      string    `gorm:"column:kernel_version;type:varchar(256);default:null" json:"KERNEL_VERSION"`
+	ProcessName        string    `gorm:"column:process_name;type:varchar(256);default:null" json:"PROCESS_NAME"`
 	LicenseType        int       `gorm:"column:license_type;type:int;default:null" json:"LICENSE_TYPE"`   // 1: A类 2: B类 3: C类
 	LicenseFunctions   string    `gorm:"column:license_functions;type:char(64)" json:"LICENSE_FUNCTIONS"` // separated by ,; 1: 流量分发 2: 网络监控 3: 应用监控
 	TapMode            int       `gorm:"column:tap_mode;type:int;default:null" json:"TAP_MODE"`
