@@ -28,6 +28,8 @@
 static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
 static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
 
+static pthread_t proc_events_pthread;	// Process exec/exit thread
+
 extern int sys_cpus_count;
 extern bool *cpu_online;
 
@@ -85,6 +87,8 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_recvmmsg");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_writev");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
+	// process execute
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
 
 	// 周期性触发用于缓存的数据的超时检查
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
@@ -311,6 +315,14 @@ static inline bool need_proto_reconfirm(uint16_t l7_proto)
 	return false;
 }
 
+static void process_event(struct event_data *e)
+{
+	if (e->event_type == EVENT_TYPE_PROC_EXEC)
+		go_process_exec(e->pid);
+	else if (e->event_type == EVENT_TYPE_PROC_EXIT)
+		go_process_exit(e->pid);
+}
+
 static void reader_raw_cb(void *t, void *raw, int raw_size)
 {
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
@@ -318,6 +330,12 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	if (buf->events_num == 0)
 		return;
+
+	if (buf->events_num >= EVENT_TYPE_PROC_EXEC) {
+		struct event_data *event = raw;
+		process_event(event);
+		return;
+	}
 
 	int i, start = 0;
 	struct __socket_data *sd;
@@ -583,6 +601,11 @@ static int check_kern_adapt_and_state_update(void)
 	return 0;
 }
 
+static void process_events_handle_main(__unused void *arg)
+{
+	go_process_events_handle();
+}
+
 int running_socket_tracer(l7_handle_fn handle,
 			  int thread_nr,
 			  uint32_t perf_pages_cnt,
@@ -716,9 +739,15 @@ int running_socket_tracer(l7_handle_fn handle,
 	if ((ret = sockopt_register(&socktrace_sockopts)) != ETR_OK)
 		return ret;
 
-	ret = go_probes_manage_init();
-	if (ret)
+	ret =
+	    pthread_create(&proc_events_pthread, NULL,
+			   (void *)&process_events_handle_main, NULL);
+	if (ret) {
+		ebpf_info
+			("<%s> proc_events_pthread, pthread_create is error:%s\n",
+			 __func__, strerror(errno));
 		return ret;
+        }
 
 	return 0;
 }
@@ -731,17 +760,31 @@ static int socket_tracer_stop(void)
 		return ret;
 
 	if (t->state == TRACER_INIT) {
-		ebpf_info
+		ebpf_warning
 		    ("socket_tracer state is TRACER_INIT, not permit stop.\n");
 		return -1;
 	}
 
+	if (t->state == TRACER_STOP) {
+		ebpf_warning
+		    ("socket_tracer state is already TRACER_STOP, without operating.\n");
+		return 0;
+	}
+
+	/*
+	 * Probes attach/detach in multithreading, e.g.:
+	 * 1. Snoop go process execute/exit events, then process events(add/remove probes).
+	 * 2. Start/stop tracer need process probes. 
+	 * The above scenario is handled in different threads, so use thread locks for protection.
+	 */
+        pthread_mutex_lock(&t->mutex_probes_lock);
 	if ((ret = tracer_hooks_detach(t)) == 0) {
 		t->state = TRACER_STOP;
 		ebpf_info("Tracer stop success, current state: TRACER_STOP\n");
 	}
 	//清空 ebpf map
 	reclaim_socket_map(t, 0);
+	pthread_mutex_unlock(&t->mutex_probes_lock);
 
 	return ret;
 }
@@ -759,11 +802,20 @@ static int socket_tracer_start(void)
 		return -1;
 	}
 
+	if (t->state == TRACER_RUNNING) {
+		ebpf_warning
+		    ("socket_tracer state is already TRACER_RUNNING, without operating.\n");
+		return 0;
+	}
+
+	// Protect the probes operation in multiple threads, similar to socket_tracer_stop()
+	pthread_mutex_lock(&t->mutex_probes_lock);
 	if ((ret = tracer_hooks_attach(t)) == 0) {
 		t->state = TRACER_RUNNING;
 		ebpf_info
 		    ("Tracer start success, current state: TRACER_RUNNING\n");
 	}
+	pthread_mutex_unlock(&t->mutex_probes_lock);
 
 	return ret;
 }
@@ -843,6 +895,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.kern_socket_map_max = conf_max_socket_entries;
 	stats.kern_trace_map_max = conf_max_trace_entries;
 	stats.socket_map_max_reclaim = conf_socket_map_max_reclaim;
+	stats.probes_count = t->probes_count;
 
 	struct trace_stats stats_total;
 
@@ -1062,8 +1115,8 @@ void print_dns_info(const char *data, int len)
 					answers[i].rdata[j] = reader[j];
 
 				answers[i].rdata[ntohs
-						 (answers[i].resource->
-						  data_len)]
+						 (answers[i].
+						  resource->data_len)]
 				    = '\0';
 
 				reader =

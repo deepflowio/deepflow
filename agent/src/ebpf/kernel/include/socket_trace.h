@@ -210,6 +210,13 @@ struct sched_comm_exit_ctx {
 	int prio;		/*     offset:28;      size:4  */
 };
 
+struct sched_comm_exec_ctx {
+	__u64 __pad_0;		/*     0     8 */
+	int __data_loc;		/*    offset:8     4 */
+	__u32 pid;		/*    offset:12    4 */
+	__u32 old_pid;		/*    offset:16    4 */
+};
+
 struct syscall_comm_exit_ctx {
 	__u64 __pad_0;		/*     0     8 */
 	int __syscall_nr;	/*    offset:8     4 */

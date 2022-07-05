@@ -32,12 +32,16 @@
 #include "socket.h"
 
 #define MAP_GO_OFFSETS_MAP_NAME	"go_offsets_map"
-#define PROCFS_CHECK_PERIOD  60 // 60 seconds
+#define PROCFS_CHECK_PERIOD  60	// 60 seconds
 static uint64_t procfs_check_count;
 
 static char build_info_magic[] = "\xff Go buildinf:";
 
 struct list_head proc_offsets_head;	// For pid-offsets correspondence lists.
+
+struct list_head proc_events_head;     // For process execute/exit events list.
+#define PROC_EVENT_DELAY_HANDLE_DEF	10 // execute/exit events delayed processing time, unit: second
+pthread_mutex_t mutex_proc_events_lock;
 
 /* *INDENT-OFF* */
 /* ------------- offsets info -------------- */
@@ -142,6 +146,10 @@ static uint64_t get_addr_from_size_and_mod(int ptr_sz, int end_mode, void *buf)
 
 bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 {
+	// TODO : Ignore kubernetes, there needs to be a better way.
+	if (strstr(path, "root/opt/kube/"))
+		return false;
+
 	bool res = false;
 	Elf *e;
 	int fd;
@@ -179,7 +187,7 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 	char *buf;
 	int num;
 	static const int go_version_offset = 0x21;
-	if (data->d_size > go_version_offset){
+	if (data->d_size > go_version_offset) {
 		buf = info + go_version_offset;
 		num = sscanf(buf, "go%d.%d", &go_ver->major, &go_ver->minor);
 		go_ver->revision = 0;
@@ -251,7 +259,7 @@ static struct proc_offsets *alloc_offset_by_pid(void)
 
 static int resolve_bin_file(const char *path, int pid,
 			    struct version_info *go_ver,
-			    struct tracer_probes_conf *conf)
+			    struct tracer_probes_conf *conf, int *resolve_num)
 {
 	int ret = ETR_OK;
 	struct symbol *sym;
@@ -274,7 +282,6 @@ static int resolve_bin_file(const char *path, int pid,
 				goto faild;
 			is_new_offset = true;
 		}
-
 		// resolve all offsets.
 		for (int k = 0; k < NELEMS(offsets); k++) {
 			off = &offsets[k];
@@ -350,13 +357,16 @@ static int resolve_bin_file(const char *path, int pid,
 
 	if (syms_count == 0) {
 		ret = ETR_NOSYMBOL;
-		ebpf_warning("Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
-			     pid, path, go_ver->major, go_ver->minor);
+		ebpf_warning
+		    ("Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
+		     pid, path, go_ver->major, go_ver->minor);
 	}
 
+	*resolve_num = syms_count;
 	return ret;
 
 faild:
+	*resolve_num = syms_count;
 	if (probe_sym->isret)
 		free_uprobe_symbol(probe_sym, conf);
 
@@ -365,21 +375,39 @@ faild:
 
 static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
 {
+	int syms_count = 0;
 	char *path = get_elf_path_by_pid(pid);
 	if (path == NULL)
-		return ETR_NOTEXIST;
+		return syms_count;
 
 	struct version_info go_version;
 	memset(&go_version, 0, sizeof(go_version));
 	if (fetch_go_elf_version(path, &go_version)) {
-		resolve_bin_file(path, pid, &go_version, conf);
+		resolve_bin_file(path, pid, &go_version, conf, &syms_count);
 	} else {
 		free((void *)path);
-		return ETR_NOTGOELF;
+		return syms_count;
 	}
 
 	free((void *)path);
-	return ETR_OK;
+	return syms_count;
+}
+
+/*
+ * Check if it is the GO program ?
+ */
+bool is_go_process(int pid)
+{
+	bool ret = false;
+	char *path = get_elf_path_by_pid(pid);
+	if (path == NULL)
+		return false;
+	struct version_info go_version;
+	memset(&go_version, 0, sizeof(go_version));
+	if (fetch_go_elf_version(path, &go_version))
+		ret = true;
+	free((void *)path);
+	return ret;
 }
 
 // pid is process or thread ?
@@ -427,7 +455,9 @@ int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
 
+	INIT_LIST_HEAD(&proc_events_head);
 	INIT_LIST_HEAD(&proc_offsets_head);
+	pthread_mutex_init(&mutex_proc_events_lock, NULL);
 
 	fddir = opendir("/proc/");
 	if (fddir == NULL) {
@@ -496,6 +526,34 @@ static bool pid_exist_in_probes(struct bpf_tracer *tracer, int pid,
 	return false;
 }
 
+static bool __attribute__ ((unused)) pid_exist_in_probes_without_stime(struct bpf_tracer
+								       *tracer,
+								       int pid)
+{
+	struct probe *p;
+	struct symbol_uprobe *sym;
+	list_for_each_entry(p, &tracer->probes_head, list) {
+		if (!(p->type == UPROBE && p->private_data != NULL))
+			continue;
+		sym = p->private_data;
+		if (sym->pid == pid)
+			return true;
+	}
+
+	return false;
+}
+
+static struct proc_offsets *find_go_offsets(int pid)
+{
+	struct proc_offsets *p_off = NULL;
+	list_for_each_entry(p_off, &proc_offsets_head, list) {
+		if (p_off->pid == pid)
+			return p_off;
+	}
+
+	return NULL;
+}
+
 /*
  * Clear all probes, if probe->pid == pid
  */
@@ -505,6 +563,12 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 	struct probe *probe;
 	struct list_head *p, *n;
 	struct symbol_uprobe *sym_uprobe;
+
+	struct proc_offsets *p_off = find_go_offsets(pid);
+	if (p_off) {
+		list_head_del(&p_off->list);
+		free(p_off);
+	}
 
 	list_for_each_safe(p, n, &tracer->probes_head) {
 		probe = container_of(p, struct probe, list);
@@ -523,7 +587,6 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 				     sym_uprobe->name);
 
 			free_probe_from_tracer(probe);
-			free_uprobe_symbol(sym_uprobe, conf);
 		}
 	}
 }
@@ -532,7 +595,7 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
  * period_update_procfs - Managing all golang processes
  * @tracer: struct bpf_tracer
  */
-static int period_update_procfs(void)
+static int __attribute__ ((unused)) period_update_procfs(void)
 {
 	procfs_check_count++;
 	if (procfs_check_count % PROCFS_CHECK_PERIOD != 0)
@@ -581,7 +644,6 @@ static int period_update_procfs(void)
 			     sym_uprobe->name, sym_uprobe->entry);
 
 		free_probe_from_tracer(probe);
-		free_uprobe_symbol(sym_uprobe, conf);
 	}
 
 	struct dirent *entry = NULL;
@@ -613,7 +675,7 @@ static int period_update_procfs(void)
 
 	closedir(fddir);
 	tracer_uprobes_update(tracer);
-	tracer_hooks_process(tracer, HOOK_ATTACH);
+	tracer_hooks_process(tracer, HOOK_ATTACH, NULL);
 	update_go_offsets_to_map(tracer);
 	return ETR_OK;
 }
@@ -629,7 +691,7 @@ void update_go_offsets_to_map(struct bpf_tracer *tracer)
 		if (p_off->has_updated)
 			continue;
 		offs = &p_off->offs;
-		uint64_t pid = p_off->pid;
+		int pid = p_off->pid;
 		if (!bpf_table_set_value
 		    (tracer, MAP_GO_OFFSETS_MAP_NAME, pid, (void *)offs))
 			continue;
@@ -649,16 +711,142 @@ void update_go_offsets_to_map(struct bpf_tracer *tracer)
 	}
 }
 
-int go_probes_manage_init(void)
+static void process_execute_handle(int pid, struct bpf_tracer *tracer)
 {
-	int ret;
-	if ((ret =
-	     register_period_event_op("go-probes-check",
-				      period_update_procfs))) {
-		ebpf_warning
-		    ("go-probes-check register_period_event_op() faild.");
-		return ret;
+	/*
+	 * Probes attach/detach in multithreading
+	 * e.g.: In start/stop tracer need process probes in different threads.
+	 * Protect the probes operation in multiple threads by use mutex_probes_lock. 
+	 */
+	pthread_mutex_lock(&tracer->mutex_probes_lock);
+	struct tracer_probes_conf *conf = tracer->tps;
+	// Clear all probe process id == pid
+	clear_probes_by_pid(tracer, pid, conf);
+	// Resolve symbols and register uprobe symbols  
+	if (proc_parse_and_register(pid, conf) > 0) {
+		// Add new probes by symbols 
+		tracer_uprobes_update(tracer);
+		// Attach probes
+		int count = 0;
+		if (tracer_hooks_process(tracer, HOOK_ATTACH, &count) == ETR_OK) {
+			if (count > 0)
+				// Update offsets map
+				update_go_offsets_to_map(tracer);
+		}
+	}
+	pthread_mutex_unlock(&tracer->mutex_probes_lock);
+}
+
+static void process_exit_handle(int pid, struct bpf_tracer *tracer)
+{
+	// Protect the probes operation in multiple threads, similar to process_execute_handle()
+	pthread_mutex_lock(&tracer->mutex_probes_lock);
+	struct tracer_probes_conf *conf = tracer->tps;
+	clear_probes_by_pid(tracer, pid, conf);
+	pthread_mutex_unlock(&tracer->mutex_probes_lock);
+}
+
+static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid, uint8_t type)
+{
+	char *path = get_elf_path_by_pid(pid);
+	if (path == NULL)
+		return;
+	struct process_event *pe = calloc(1, sizeof(struct process_event));
+	if (pe == NULL) {
+		free(path);
+		ebpf_warning("Without memory.\n");
+		return;
 	}
 
-	return ETR_OK;
+	pe->tracer = tracer;
+	pe->path = path;
+	pe->pid = pid;
+	pe->type = type;
+	pe->expire_time = get_sys_uptime() + PROC_EVENT_DELAY_HANDLE_DEF; 
+
+	pthread_mutex_lock(&mutex_proc_events_lock);
+	list_add_tail(&pe->list, &proc_events_head);
+	pthread_mutex_unlock(&mutex_proc_events_lock);	
+}
+
+/**
+ * go_process_exec - syscalls/sys_exit_execve event process.
+ * @pid Process ID 
+ */
+void go_process_exec(int pid)
+{
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL)
+		return;
+
+	if (tracer->state != TRACER_RUNNING)
+		return;
+
+	if (tracer->probes_count > OPEN_FILES_MAX) {
+		ebpf_warning("Probes count too many. The maximum is %d\n",
+			     OPEN_FILES_MAX);
+		return;
+	}
+
+	add_event_to_proc_header(tracer, pid, EVENT_TYPE_PROC_EXEC);
+}
+
+/**
+ * go_process_exit - sched/sched_process_exit event process.
+ * @pid Process ID
+ */
+void go_process_exit(int pid)
+{
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL)
+		return;
+
+	if (tracer->state != TRACER_RUNNING)
+		return;
+
+	process_exit_handle(pid, tracer);
+}
+
+/**
+ * go_process_events_handle - process exec/exit events handle for thread entry.
+ */
+void go_process_events_handle(void)
+{
+	struct process_event *pe;
+
+	for(;;) {
+		do {
+			// Multithreaded safe fetch 'struct process_event'
+			pthread_mutex_lock(&mutex_proc_events_lock);
+			if (!list_empty(&proc_events_head)) {
+				pe = list_first_entry(&proc_events_head,
+						      struct process_event, list);
+			} else {
+				pe = NULL;
+			}
+			pthread_mutex_unlock(&mutex_proc_events_lock);
+
+			if (pe == NULL)
+				break;
+
+			if (get_sys_uptime() >= pe->expire_time) {
+				pthread_mutex_lock(&mutex_proc_events_lock);
+				list_head_del(&pe->list);
+				pthread_mutex_unlock(&mutex_proc_events_lock);
+
+				if (pe->type == EVENT_TYPE_PROC_EXEC) {
+					if (access(pe->path, F_OK) == 0) {
+						process_execute_handle(pe->pid, pe->tracer);
+					}
+				}
+
+				free(pe->path);
+				free(pe);
+			} else {
+				break;
+			}
+		} while(true);
+
+		usleep(LOOP_DELAY_US);
+	}
 }

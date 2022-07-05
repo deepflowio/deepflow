@@ -244,6 +244,8 @@ pub struct SK_TRACE_STATS {
      * boot_time_update_diff（ns）= 本次更新后的系统启动时间(ns) - 上次更新后的系统启动时间(ns)
      */
     pub boot_time_update_diff: i64,
+    // How many probes now
+    pub probes_count: u32,
 }
 
 extern "C" {

@@ -165,6 +165,36 @@ int max_locked_memory_set_unlimited(void)
 	return ret;
 }
 
+int max_rlim_open_files_set(int num)
+{
+	int ret;
+	struct rlimit rlim;
+	errno = 0;
+	if ((ret = getrlimit(RLIMIT_NOFILE, &rlim)) < 0) {
+		ebpf_info("Call getrlimit is error(%d). %s", errno,
+			  strerror(errno));
+		return -1;
+	}
+
+	if (rlim.rlim_cur < num) {
+		rlim.rlim_cur = rlim.rlim_max = num;
+		if ((ret = setrlimit(RLIMIT_NOFILE, &rlim)) < 0) {
+			ebpf_info
+			    ("Call setrlimit set RLIMIT_NOFILE is error. error(%d). %s",
+			     errno, strerror(errno));
+			return -1;
+		}
+	}
+
+	memset(&rlim, 0, sizeof(rlim));
+	getrlimit(RLIMIT_NOFILE, &rlim);
+	ebpf_info("RLIMIT_NOFILE cur:%d, rlim_max:%d\n", rlim.rlim_cur,
+		  rlim.rlim_max);
+
+	return ret;
+}
+
+//OPEN_FILES_MAX
 static int fs_write(char *file_name, char *v, int mode, int len)
 {
 	int fd, err = 0;

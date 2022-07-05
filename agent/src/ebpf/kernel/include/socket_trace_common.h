@@ -121,6 +121,16 @@ struct member_offsets {
 	__u16 data[offsets_num];
 };
 
+enum {
+	EVENT_TYPE_PROC_EXEC = 128,
+	EVENT_TYPE_PROC_EXIT,
+};
+
+struct event_data {
+	__u32 event_type;
+	__u32 pid; // process ID
+};
+
 #define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
 
 #endif /* BPF_SOCKET_TRACE_COMMON */
