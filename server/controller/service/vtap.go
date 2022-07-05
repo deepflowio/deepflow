@@ -81,6 +81,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			Os:              vtap.Os,
 			OsType:          common.GetOsType(vtap.Os),
 			KernelVersion:   vtap.KernelVersion,
+			ProcessName:     vtap.ProcessName,
 			LicenseType:     vtap.LicenseType,
 		}
 		// state
