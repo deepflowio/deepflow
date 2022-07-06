@@ -14,6 +14,7 @@ service Synchronizer {
     rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
+    rpc GenesisSharingK8S (GenesisSharingK8SRequest) returns (GenesisSharingK8SResponse) {}
 }
 
 enum State {
@@ -553,4 +554,12 @@ message KubernetesClusterIDRequest {
 
 message KubernetesClusterIDResponse {
     optional string cluster_id = 1;
+}
+message GenesisSharingK8SRequest {
+    optional string cluster_id = 1;
+}
+
+message GenesisSharingK8SResponse {
+    optional string error_msg = 1;
+    repeated KubernetesAPIInfo entries = 2;
 }

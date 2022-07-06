@@ -1,8 +1,6 @@
 package genesis
 
 import (
-	"bytes"
-	"compress/zlib"
 	"context"
 	"sync"
 	"time"
@@ -392,12 +390,12 @@ type KubernetesStorage struct {
 	cfg            config.GenesisConfig
 	kCtx           context.Context
 	kCancel        context.CancelFunc
-	channel        chan map[string]KubernetesResponse
+	channel        chan map[string]KubernetesInfo
 	kubernetesData map[string]KubernetesInfo
 	mutex          sync.Mutex
 }
 
-func NewKubernetesStorage(cfg config.GenesisConfig, kChan chan map[string]KubernetesResponse, ctx context.Context) *KubernetesStorage {
+func NewKubernetesStorage(cfg config.GenesisConfig, kChan chan map[string]KubernetesInfo, ctx context.Context) *KubernetesStorage {
 	kCtx, kCancel := context.WithCancel(ctx)
 	return &KubernetesStorage{
 		cfg:            cfg,
@@ -431,35 +429,8 @@ func (k *KubernetesStorage) Add(k8sInfo KubernetesInfo) {
 	}
 }
 
-func (k *KubernetesStorage) fetch() (map[string]KubernetesResponse, error) {
-	kResponses := map[string]KubernetesResponse{}
-	for key, v := range k.kubernetesData {
-		kResponse := KubernetesResponse{
-			ClusterID: key,
-			ErrorMSG:  v.ErrorMSG,
-			SyncedAt:  v.Epoch,
-			Resources: map[string][]string{},
-		}
-		for _, e := range v.Entries {
-			eType := e.GetType()
-			eInfo := e.GetCompressedInfo()
-			reader := bytes.NewReader(eInfo)
-			var out bytes.Buffer
-			r, err := zlib.NewReader(reader)
-			if err != nil {
-				log.Errorf("zlib decompress error: %s", err.Error())
-				return map[string]KubernetesResponse{}, err
-			}
-			out.ReadFrom(r)
-			if _, ok := kResponse.Resources[eType]; ok {
-				kResponse.Resources[eType] = append(kResponse.Resources[eType], string(out.Bytes()))
-			} else {
-				kResponse.Resources[eType] = []string{string(out.Bytes())}
-			}
-		}
-		kResponses[key] = kResponse
-	}
-	return kResponses, nil
+func (k *KubernetesStorage) fetch() (map[string]KubernetesInfo, error) {
+	return k.kubernetesData, nil
 }
 
 func (k *KubernetesStorage) run() {
