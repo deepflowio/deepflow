@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include "libbpf/include/linux/err.h"
 #include <sched.h>
+#include <sys/prctl.h>
 #include "symbol.h"
 #include "tracer.h"
 #include "probe.h"
@@ -601,8 +602,10 @@ static int check_kern_adapt_and_state_update(void)
 	return 0;
 }
 
+// Manage process start or exit events.
 static void process_events_handle_main(__unused void *arg)
 {
+	prctl(PR_SET_NAME,"proc-events");
 	go_process_events_handle();
 }
 
