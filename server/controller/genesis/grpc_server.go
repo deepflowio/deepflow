@@ -227,3 +227,17 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 		return &trident.KubernetesAPISyncResponse{}, nil
 	}
 }
+
+func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *trident.GenesisSharingK8SRequest) (*trident.GenesisSharingK8SResponse, error) {
+	clusterID := request.GetClusterId()
+	k8sDatas := GenesisService.GetKubernetesData()
+
+	if k8sData, ok := k8sDatas[clusterID]; ok {
+		return &trident.GenesisSharingK8SResponse{
+			ErrorMsg: &k8sData.ErrorMSG,
+			Entries:  k8sData.Entries,
+		}, nil
+	}
+
+	return &trident.GenesisSharingK8SResponse{}, errors.New("GenesisSharingK8s api not found k8s data")
+}

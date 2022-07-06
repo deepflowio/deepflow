@@ -1,12 +1,19 @@
 package genesis
 
 import (
+	"bytes"
+	"compress/zlib"
 	"context"
+	"errors"
+	"net"
 	"sync/atomic"
 
 	"github.com/op/go-logging"
+	"google.golang.org/grpc"
 
+	"github.com/metaflowys/metaflow/message/trident"
 	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/genesis/config"
 	"github.com/metaflowys/metaflow/server/controller/model"
 	"github.com/metaflowys/metaflow/server/libs/queue"
@@ -53,7 +60,7 @@ func NewGenesis(cfg config.GenesisConfig) *Genesis {
 	var lData atomic.Value
 	lData.Store([]model.GenesisIP{})
 	var kData atomic.Value
-	kData.Store(map[string]KubernetesResponse{})
+	kData.Store(map[string]KubernetesInfo{})
 	GenesisService = &Genesis{
 		cfg:            cfg,
 		ips:            ipData,
@@ -81,7 +88,7 @@ func NewGenesis(cfg config.GenesisConfig) *Genesis {
 func (g *Genesis) Start() {
 	ctx := context.Context(context.Background())
 	platformDataChan := make(chan PlatformData)
-	kubernetesDataChan := make(chan map[string]KubernetesResponse)
+	kubernetesDataChan := make(chan map[string]KubernetesInfo)
 	vQueue := queue.NewOverwriteQueue("genesis platfrom data", g.cfg.QueueLengths)
 	kQueue := queue.NewOverwriteQueue("genesis kubernetes info", g.cfg.QueueLengths)
 
@@ -122,7 +129,7 @@ func (g *Genesis) receivePlatformData(pChan chan PlatformData) {
 	}
 }
 
-func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesResponse) {
+func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
 	for {
 		select {
 		case k := <-kChan:
@@ -171,6 +178,71 @@ func (g *Genesis) GetIPLastSeensData() []model.GenesisIP {
 	return g.iplastseens.Load().([]model.GenesisIP)
 }
 
-func (g *Genesis) GetKubernetesData() map[string]KubernetesResponse {
-	return g.kubernetesData.Load().(map[string]KubernetesResponse)
+func (g *Genesis) GetKubernetesData() map[string]KubernetesInfo {
+	return g.kubernetesData.Load().(map[string]KubernetesInfo)
+}
+
+func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, error) {
+	k8sResp := map[string][]string{}
+
+	localK8sDatas := g.GetKubernetesData()
+	k8sInfo, ok := localK8sDatas[clusterID]
+	if !ok {
+		var controllers []mysql.Controller
+		mysql.Db.Find(&controllers)
+		retFlag := false
+		for _, controller := range controllers {
+			grpcServer := net.JoinHostPort(controller.IP, g.cfg.GRPCServerPort)
+			conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
+			if err != nil {
+				log.Error("create grpc connection faild:" + err.Error())
+				continue
+			}
+			defer conn.Close()
+
+			client := trident.NewSynchronizerClient(conn)
+			req := trident.GenesisSharingK8SRequest{
+				ClusterId: &clusterID,
+			}
+			ret, err := client.GenesisSharingK8S(context.Background(), &req)
+			if err != nil {
+				log.Error("request grpc api faild:" + err.Error())
+				continue
+			} else {
+				retFlag = true
+				entries := ret.GetEntries()
+				errorMsg := ret.GetErrorMsg()
+				if errorMsg != "" {
+					log.Warningf("cluster id (%s) Error: %s", clusterID, errorMsg)
+				}
+				k8sInfo = KubernetesInfo{
+					Entries:  entries,
+					ErrorMSG: errorMsg,
+				}
+				break
+			}
+		}
+		if !retFlag {
+			return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
+		}
+	}
+
+	for _, e := range k8sInfo.Entries {
+		eType := e.GetType()
+		eInfo := e.GetCompressedInfo()
+		reader := bytes.NewReader(eInfo)
+		var out bytes.Buffer
+		r, err := zlib.NewReader(reader)
+		if err != nil {
+			log.Errorf("zlib decompress error: %s", err.Error())
+			return k8sResp, err
+		}
+		out.ReadFrom(r)
+		if _, ok := k8sResp[eType]; ok {
+			k8sResp[eType] = append(k8sResp[eType], string(out.Bytes()))
+		} else {
+			k8sResp[eType] = []string{string(out.Bytes())}
+		}
+	}
+	return k8sResp, nil
 }
