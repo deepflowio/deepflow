@@ -288,6 +288,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	localSegments := vtapCache.GetVTapLocalSegments()
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
 	upgradeRevision := vtapCache.GetUpgradeRevision()
+	skipInterface := gVTapInfo.GetSkipInterface(vtapCache)
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
@@ -296,6 +297,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		PlatformData:        platformData,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		TapTypes:            tapTypes,
+		SkipInterface:       skipInterface,
 		SelfUpdateUrl:       proto.String(gVTapInfo.GetSelfUpdateUrl()),
 		Revision:            proto.String(upgradeRevision),
 	}, nil
@@ -429,12 +431,14 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	}
 	localSegments := vtapCache.GetVTapLocalSegments()
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
+	skipInterface := gVTapInfo.GetSkipInterface(vtapCache)
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
 		RemoteSegments:      remoteSegments,
 		Config:              configInfo,
 		PlatformData:        platformData,
+		SkipInterface:       skipInterface,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		TapTypes:            tapTypes,
 	}, nil
