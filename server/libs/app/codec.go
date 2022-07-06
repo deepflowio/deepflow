@@ -24,10 +24,10 @@ func DecodePB(decoder *codec.SimpleDecoder, pbDoc *pb.Document) (*Document, erro
 
 	tag := zerodoc.AcquireTag()
 	tag.Field = zerodoc.AcquireField()
-	tag.ReadFromPB(pbDoc.Minitag)
+	tag.ReadFromPB(pbDoc.Tag)
 	doc.Tagger = tag
 
-	meterID := uint8(pbDoc.Meter.MeterID)
+	meterID := uint8(pbDoc.Meter.MeterId)
 	switch meterID {
 	case zerodoc.FLOW_ID:
 		flowMeter := zerodoc.AcquireFlowMeter()
@@ -63,10 +63,10 @@ func DecodeForQueueMonitor(decoder *codec.SimpleDecoder) (*Document, error) {
 
 	tag := &zerodoc.Tag{}
 	tag.Field = &zerodoc.Field{}
-	tag.ReadFromPB(pbDoc.Minitag)
+	tag.ReadFromPB(pbDoc.Tag)
 	doc.Tagger = tag
 
-	meterID := uint8(pbDoc.Meter.MeterID)
+	meterID := uint8(pbDoc.Meter.MeterId)
 	switch meterID {
 	case zerodoc.FLOW_ID:
 		flowMeter := zerodoc.AcquireFlowMeter()

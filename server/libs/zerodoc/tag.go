@@ -1454,36 +1454,36 @@ func (t *Tag) String() string {
 
 func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	t.Code = Code(p.Code)
-	t.IsIPv6 = uint8(p.Field.IsIPv6)
+	t.IsIPv6 = uint8(p.Field.IsIpv6)
 	if t.IsIPv6 != 0 {
 		if t.IP6 == nil {
 			t.IP6 = make([]byte, 16)
 		}
-		copy(t.IP6, p.Field.RawIP[:net.IPv6len])
+		copy(t.IP6, p.Field.Ip[:net.IPv6len])
 		if t.Code&IPPath != 0 {
 			if t.IP61 == nil {
 				t.IP61 = make([]byte, 16)
 			}
-			copy(t.IP61, p.Field.RawIP1[:net.IPv6len])
+			copy(t.IP61, p.Field.Ip1[:net.IPv6len])
 		}
 	} else {
-		t.IP = binary.BigEndian.Uint32(p.Field.RawIP[:net.IPv4len])
+		t.IP = binary.BigEndian.Uint32(p.Field.Ip[:net.IPv4len])
 		if t.Code&IPPath != 0 {
-			t.IP1 = binary.BigEndian.Uint32(p.Field.RawIP1[:net.IPv4len])
+			t.IP1 = binary.BigEndian.Uint32(p.Field.Ip1[:net.IPv4len])
 		}
 	}
-	t.MAC = p.Field.MAC
-	t.MAC1 = p.Field.MAC1
-	t.L3EpcID = int16(p.Field.L3EpcID)
-	t.L3EpcID1 = int16(p.Field.L3EpcID1)
+	t.MAC = p.Field.Mac
+	t.MAC1 = p.Field.Mac1
+	t.L3EpcID = int16(p.Field.L3EpcId)
+	t.L3EpcID1 = int16(p.Field.L3EpcId1)
 	t.Direction = DirectionEnum(p.Field.Direction)
 	t.TAPSide = TAPSideEnum(p.Field.TapSide)
 	t.Protocol = layers.IPProtocol(p.Field.Protocol)
-	t.ACLGID = uint16(p.Field.ACLGID)
+	t.ACLGID = uint16(p.Field.AclGid)
 	t.ServerPort = uint16(p.Field.ServerPort)
-	t.VTAPID = uint16(p.Field.VTAPID)
-	t.TAPPort = datatype.TapPort(p.Field.TAPPort)
-	t.TAPType = TAPTypeEnum(p.Field.TAPType)
+	t.VTAPID = uint16(p.Field.VtapId)
+	t.TAPPort = datatype.TapPort(p.Field.TapPort)
+	t.TAPType = TAPTypeEnum(p.Field.TapType)
 	t.L7Protocol = datatype.L7Protocol(p.Field.L7Protocol)
 	t.TagType = uint8(p.Field.TagType)
 	t.TagValue = uint16(p.Field.TagValue)

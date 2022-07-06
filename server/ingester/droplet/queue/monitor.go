@@ -9,7 +9,7 @@ import (
 
 	"github.com/metaflowys/metaflow/server/libs/debug"
 
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 )
 
 type MonitorOperator interface {
@@ -106,8 +106,8 @@ func (m *Monitor) sendDebug(conn *net.UDPConn, remote *net.UDPAddr, items []inte
 			break
 		}
 		message := item.(fmt.Stringer).String()
-		if len(message) > dropletctl.DEBUG_MESSAGE_LEN-8 {
-			message = message[:dropletctl.DEBUG_MESSAGE_LEN-8-3] + "..."
+		if len(message) > ingesterctl.DEBUG_MESSAGE_LEN-8 {
+			message = message[:ingesterctl.DEBUG_MESSAGE_LEN-8-3] + "..."
 		}
 		encoder := gob.NewEncoder(&buffer)
 		if err := encoder.Encode(message); err != nil {

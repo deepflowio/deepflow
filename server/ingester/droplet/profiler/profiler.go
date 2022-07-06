@@ -12,7 +12,7 @@ import (
 	logging "github.com/op/go-logging"
 	"github.com/spf13/cobra"
 
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 	"github.com/metaflowys/metaflow/server/libs/debug"
 )
 
@@ -33,7 +33,7 @@ var log = logging.MustGetLogger("profile")
 
 func NewProfiler(port int) *ProfilerServer {
 	server := &ProfilerServer{http.Server{Addr: "0.0.0.0:" + strconv.Itoa(port)}, port, false}
-	debug.Register(dropletctl.DROPLETCTL_CONFIG, server)
+	debug.Register(ingesterctl.INGESTERCTL_CONFIG, server)
 	return server
 }
 
@@ -129,7 +129,7 @@ func (s *ProfilerServer) isRunning() bool {
 }
 
 func sendProfilerOn(args []string) {
-	_, messageBuffer, err := debug.SendToServer(dropletctl.DROPLETCTL_CONFIG, CONFIG_CMD_PROFILER_ON, nil)
+	_, messageBuffer, err := debug.SendToServer(ingesterctl.INGESTERCTL_CONFIG, CONFIG_CMD_PROFILER_ON, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -139,7 +139,7 @@ func sendProfilerOn(args []string) {
 }
 
 func sendProfilerOff(args []string) {
-	_, messageBuffer, err := debug.SendToServer(dropletctl.DROPLETCTL_CONFIG, CONFIG_CMD_PROFILER_OFF, nil)
+	_, messageBuffer, err := debug.SendToServer(ingesterctl.INGESTERCTL_CONFIG, CONFIG_CMD_PROFILER_OFF, nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -149,7 +149,7 @@ func sendProfilerOff(args []string) {
 }
 
 func sendProfilerStatus(args []string) {
-	_, messageBuffer, err := debug.SendToServer(dropletctl.DROPLETCTL_CONFIG, CONFIG_CMD_PROFILER_STATUS, nil)
+	_, messageBuffer, err := debug.SendToServer(ingesterctl.INGESTERCTL_CONFIG, CONFIG_CMD_PROFILER_STATUS, nil)
 	if err != nil {
 		fmt.Println(err)
 	}

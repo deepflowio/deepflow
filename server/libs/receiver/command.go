@@ -15,48 +15,60 @@ func RegisterTridentStatusCommand() *cobra.Command {
 	return debug.ClientRegisterSimple(TRIDENT_ADAPTER_STATUS_CMD,
 		debug.CmdHelper{
 			Cmd:    "adapter",
-			Helper: "show trident status",
+			Helper: "show agent status",
 		},
 		[]debug.CmdHelper{
 			debug.CmdHelper{
 				Cmd:    "pcap",
-				Helper: "show trident pcap status",
+				Helper: "show agent pcap status",
 			},
 			debug.CmdHelper{
 				Cmd:    "syslog",
-				Helper: "show trident syslog status",
+				Helper: "show agent syslog status",
 			},
 			debug.CmdHelper{
 				Cmd:    "statsd",
-				Helper: "show trident statsd status",
+				Helper: "show agent statsd status",
 			},
 			debug.CmdHelper{
 				Cmd:    "metric",
-				Helper: "show trident metric status",
+				Helper: "show agent metric status",
 			},
 			debug.CmdHelper{
 				Cmd:    "l4-log",
-				Helper: "show trident l4-flow-log status",
+				Helper: "show agent l4-flow-log status",
 			},
 			debug.CmdHelper{
 				Cmd:    "l7-log",
-				Helper: "show trident l7-http-dns flow log status",
+				Helper: "show agent l7-http-dns flow log status",
 			},
 			debug.CmdHelper{
-				Cmd:    "open_telemetry",
-				Helper: "show trident open telemetry data status",
+				Cmd:    "otel",
+				Helper: "show agent open telemetry data status",
+			},
+			debug.CmdHelper{
+				Cmd:    "prometheus",
+				Helper: "show agent prometheus data status",
+			},
+			debug.CmdHelper{
+				Cmd:    "telegraf",
+				Helper: "show agent telegraf data status",
+			},
+			debug.CmdHelper{
+				Cmd:    "pkg-seq",
+				Helper: "show agent packet sequence data status",
 			},
 			debug.CmdHelper{
 				Cmd:    "dfstatsd",
-				Helper: "show trident dfstatsd status",
+				Helper: "show agent dfstatsd status",
 			},
 			debug.CmdHelper{
 				Cmd:    "status",
-				Helper: "show trident metric status",
+				Helper: "show agent metrics status",
 			},
 			debug.CmdHelper{
 				Cmd:    "all",
-				Helper: "show trident all status",
+				Helper: "show agent all status",
 			},
 		},
 	)

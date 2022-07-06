@@ -19,8 +19,8 @@ import (
 	"github.com/metaflowys/metaflow/server/libs/policy"
 	. "github.com/metaflowys/metaflow/server/libs/utils"
 
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl/rpc"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl/rpc"
 )
 
 type command struct {
@@ -117,8 +117,8 @@ func (c *command) recvShowAcl(conn *net.UDPConn, remote *net.UDPAddr, arg *bytes
 		encoder := gob.NewEncoder(&buffer)
 		context := acl.String()
 		// gob封装为'String: ' + context
-		if len(context) >= dropletctl.DEBUG_MESSAGE_LEN-8 {
-			context = context[:dropletctl.DEBUG_MESSAGE_LEN-8-3] + "..."
+		if len(context) >= ingesterctl.DEBUG_MESSAGE_LEN-8 {
+			context = context[:ingesterctl.DEBUG_MESSAGE_LEN-8-3] + "..."
 		}
 
 		if err := encoder.Encode(context); err != nil {
@@ -342,7 +342,7 @@ func sendLookupKey(cmdLine string) (*bytes.Buffer, error) {
 	if err := encoder.Encode(key); err != nil {
 		return nil, err
 	}
-	_, result, err := debug.SendToServer(dropletctl.DROPLETCTL_LABELER, debug.ModuleOperate(queryType), &buffer)
+	_, result, err := debug.SendToServer(ingesterctl.INGESTERCTL_LABELER, debug.ModuleOperate(queryType), &buffer)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +359,7 @@ func sendDumpKey(cmdLine string) (*bytes.Buffer, error) {
 	if err := encoder.Encode(key); err != nil {
 		return nil, err
 	}
-	_, result, err := debug.SendToServer(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_DUMP_PLATFORM, &buffer)
+	_, result, err := debug.SendToServer(ingesterctl.INGESTERCTL_LABELER, LABELER_CMD_DUMP_PLATFORM, &buffer)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func dumpAcl(cmdLine string) {
 }
 
 func showAcl() {
-	conn, result, err := debug.SendToServer(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_SHOW_ACL, nil)
+	conn, result, err := debug.SendToServer(ingesterctl.INGESTERCTL_LABELER, LABELER_CMD_SHOW_ACL, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -442,7 +442,7 @@ func delAcl(arg string) {
 		fmt.Println(err)
 		return
 	}
-	debug.SendToServer(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_DEL_ACL, &buffer)
+	debug.SendToServer(ingesterctl.INGESTERCTL_LABELER, LABELER_CMD_DEL_ACL, &buffer)
 }
 
 func parseAcl(args []string) *policy.Acl {
@@ -531,11 +531,11 @@ func addAcl(args []string) {
 		return
 	}
 	fmt.Printf("acl: %+v\n", acl)
-	debug.SendToServer(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_ADD_ACL, &buffer)
+	debug.SendToServer(ingesterctl.INGESTERCTL_LABELER, LABELER_CMD_ADD_ACL, &buffer)
 }
 
 func showIpGroup() {
-	conn, result, err := debug.SendToServer(dropletctl.DROPLETCTL_LABELER, LABELER_CMD_SHOW_IPGROUP, nil)
+	conn, result, err := debug.SendToServer(ingesterctl.INGESTERCTL_LABELER, LABELER_CMD_SHOW_IPGROUP, nil)
 	if err != nil {
 		fmt.Println(err)
 		return

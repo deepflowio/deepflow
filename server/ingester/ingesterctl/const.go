@@ -1,0 +1,28 @@
+package ingesterctl
+
+import "github.com/metaflowys/metaflow/server/libs/debug"
+
+const (
+	DEBUG_LISTEN_IP   = "0.0.0.0"
+	DEBUG_LISTEN_PORT = 39527
+)
+
+const (
+	INGESTERCTL_ADAPTER debug.ModuleId = iota
+	INGESTERCTL_QUEUE
+	INGESTERCTL_LABELER
+	INGESTERCTL_RPC
+	INGESTERCTL_LOGLEVEL
+	INGESTERCTL_CONFIG
+	INGESTERCTL_ROZE_QUEUE
+	INGESTERCTL_STREAM_QUEUE
+	INGESTERCTL_EXTMETRICS_QUEUE
+
+	INGESTERCTL_MAX
+)
+
+const (
+	DEBUG_MESSAGE_LEN = 4096
+)
+
+var ConfigPath string

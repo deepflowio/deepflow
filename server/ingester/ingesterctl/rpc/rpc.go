@@ -21,7 +21,7 @@ import (
 
 	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/config"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
@@ -70,7 +70,10 @@ func RegisterRpcCommand() *cobra.Command {
 }
 
 func initCmd(cmd CmdExecute) {
-	cfg := config.Load(dropletctl.ConfigPath)
+	if ingesterctl.ConfigPath == "" {
+		ingesterctl.ConfigPath = "/etc/server.yaml"
+	}
+	cfg := config.Load(ingesterctl.ConfigPath)
 
 	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
 	for _, ipString := range cfg.ControllerIps {

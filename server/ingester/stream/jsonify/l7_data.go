@@ -427,20 +427,20 @@ func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 	h.RequestDomain = info.Host
 	h.RequestResource = info.Path
 
-	if info.StreamID != 0 {
-		h.requestId = uint64(info.StreamID)
+	if info.StreamId != 0 {
+		h.requestId = uint64(info.StreamId)
 		h.RequestId = &h.requestId
 	}
 
-	h.HttpProxyClient = info.ClientIP
+	h.HttpProxyClient = info.ClientIp
 	h.XRequestId = info.XRequestId
-	h.TraceId = base64ToHexString(info.TraceID)
-	h.SpanId = base64ToHexString(info.SpanID)
+	h.TraceId = base64ToHexString(info.TraceId)
+	h.SpanId = base64ToHexString(info.SpanId)
 
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
 
-		h.ResponseException = GetHTTPExceptionDesc(uint16(l.BaseInfo.Head.Code))
+		h.ResponseException = GetHTTPExceptionDesc(uint16(l.Base.Head.Code))
 	}
 
 	if info.ReqContentLength != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
@@ -462,8 +462,8 @@ func (h *L7Logger) fillDns(l *pb.AppProtoLogsData) {
 	h.RequestType = GetDNSQueryType(uint8(info.QueryType))
 	h.RequestResource = info.QueryName
 
-	if info.TransID != 0 {
-		requestId := uint64(info.TransID)
+	if info.TransId != 0 {
+		requestId := uint64(info.TransId)
 		h.RequestId = &requestId
 	}
 
@@ -471,7 +471,7 @@ func (h *L7Logger) fillDns(l *pb.AppProtoLogsData) {
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
 
-		h.ResponseException = GetDNSExceptionDesc(uint16(l.BaseInfo.Head.Code))
+		h.ResponseException = GetDNSExceptionDesc(uint16(l.Base.Head.Code))
 	}
 }
 
@@ -505,11 +505,11 @@ func (h *L7Logger) fillRedis(l *pb.AppProtoLogsData) {
 		return
 	}
 	info := l.Redis
-	h.RequestType = info.RequestType
-	h.RequestResource = info.Request
+	h.RequestType = string(info.RequestType)
+	h.RequestResource = string(info.Request)
 
-	h.ResponseException = info.Error
-	h.ResponseResult = info.Response
+	h.ResponseException = string(info.Error)
+	h.ResponseResult = string(info.Response)
 }
 
 func (h *L7Logger) fillDubbo(l *pb.AppProtoLogsData) {
@@ -517,18 +517,17 @@ func (h *L7Logger) fillDubbo(l *pb.AppProtoLogsData) {
 		return
 	}
 	info := l.Dubbo
-	h.Version = info.DubboVersion
+	h.Version = info.Version
 	h.RequestDomain = info.ServiceName
 	h.RequestResource = info.MethodName
-	if info.ID != 0 {
-		h.requestId = uint64(info.ID)
+	if info.Id != 0 {
+		h.requestId = uint64(info.Id)
 		h.RequestId = &h.requestId
 	}
 
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
-
-		h.ResponseException = GetDubboExceptionDesc(uint16(l.BaseInfo.Head.Code))
+		h.ResponseException = GetDubboExceptionDesc(uint16(l.Base.Head.Code))
 	}
 	h.TraceId = info.TraceId
 
@@ -561,7 +560,7 @@ func (h *L7Logger) fillKafka(l *pb.AppProtoLogsData) {
 
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
-		h.ResponseException = GetKafkaExceptionDesc(int16(l.BaseInfo.Head.Code))
+		h.ResponseException = GetKafkaExceptionDesc(int16(l.Base.Head.Code))
 	}
 
 	if info.ReqMsgSize != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
@@ -579,7 +578,7 @@ func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
 	}
 	info := l.Mqtt
 	h.RequestType = info.MqttType
-	h.RequestResource = info.ClientID
+	h.RequestResource = info.ClientId
 
 	switch info.ProtoVersion {
 	case 3:
@@ -593,9 +592,9 @@ func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
 		if info.ProtoVersion != 5 {
-			h.ResponseException = GetMQTTV3ExceptionDesc(uint16(l.BaseInfo.Head.Code))
+			h.ResponseException = GetMQTTV3ExceptionDesc(uint16(l.Base.Head.Code))
 		} else {
-			h.ResponseException = GetMQTTV5ExceptionDesc(uint16(l.BaseInfo.Head.Code))
+			h.ResponseException = GetMQTTV5ExceptionDesc(uint16(l.Base.Head.Code))
 		}
 	}
 
@@ -612,19 +611,19 @@ func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
 func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	h.L7Base.Fill(l, platformData)
 
-	h.Type = uint8(l.BaseInfo.Head.MsgType)
-	h.L7Protocol = uint8(l.BaseInfo.Head.Proto)
+	h.Type = uint8(l.Base.Head.MsgType)
+	h.L7Protocol = uint8(l.Base.Head.Proto)
 	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
 
 	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
 	if h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.ResponseStatus = uint8(l.BaseInfo.Head.Status)
-		h.responseCode = int16(l.BaseInfo.Head.Code)
+		h.ResponseStatus = uint8(l.Base.Head.Status)
+		h.responseCode = int16(l.Base.Head.Code)
 		h.ResponseCode = &h.responseCode
 	}
 
-	h.ResponseDuration = l.BaseInfo.Head.RRT / uint64(time.Microsecond)
-	switch datatype.L7Protocol(l.BaseInfo.Head.Proto) {
+	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
+	switch datatype.L7Protocol(l.Base.Head.Proto) {
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
 		h.fillHttp(l)
 	case datatype.L7_PROTOCOL_DNS:
@@ -665,16 +664,16 @@ func (h *L7Logger) String() string {
 }
 
 func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
-	l := log.BaseInfo
+	l := log.Base
 	// 网络层
-	if l.IsIPv6 == 1 {
+	if l.IsIpv6 == 1 {
 		b.IsIPv4 = false
-		b.IP60 = l.IP6Src[:]
-		b.IP61 = l.IP6Dst[:]
+		b.IP60 = l.Ip6Src[:]
+		b.IP61 = l.Ip6Dst[:]
 	} else {
 		b.IsIPv4 = true
-		b.IP40 = l.IPSrc
-		b.IP41 = l.IPDst
+		b.IP40 = l.IpSrc
+		b.IP41 = l.IpDst
 	}
 
 	// 传输层
@@ -682,7 +681,7 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.ServerPort = uint16(l.PortDst)
 
 	// 知识图谱
-	b.Protocol = uint8(log.BaseInfo.Protocol)
+	b.Protocol = uint8(log.Base.Protocol)
 	b.KnowledgeGraph.FillL7(l, platformData, layers.IPProtocol(b.Protocol))
 
 	// 流信息
@@ -699,25 +698,25 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.EndTime = int64(l.EndTime) / int64(time.Microsecond)
 
 	// FIXME 补充填充链路追踪数据
-	b.ProcessID0 = l.ProcessId0
-	b.ProcessID1 = l.ProcessId1
-	b.ProcessKName0 = l.ProcessKname0
-	b.ProcessKName1 = l.ProcessKname1
+	b.ProcessID0 = l.ProcessId_0
+	b.ProcessID1 = l.ProcessId_1
+	b.ProcessKName0 = l.ProcessKname_0
+	b.ProcessKName1 = l.ProcessKname_1
 	b.SyscallTraceIDRequest = l.SyscallTraceIdRequest
 	b.SyscallTraceIDResponse = l.SyscallTraceIdResponse
-	b.SyscallThread0 = l.SyscallTraceIdThread0
-	b.SyscallThread1 = l.SyscallTraceIdThread1
-	b.SyscallCapSeq0 = l.SyscallCapSeq0
-	b.SyscallCapSeq1 = l.SyscallCapSeq1
+	b.SyscallThread0 = l.SyscallTraceIdThread_0
+	b.SyscallThread1 = l.SyscallTraceIdThread_1
+	b.SyscallCapSeq0 = l.SyscallCapSeq_0
+	b.SyscallCapSeq1 = l.SyscallCapSeq_1
 }
 
 func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.PlatformInfoTable, protocol layers.IPProtocol) {
 	k.fill(
 		platformData,
-		l.IsIPv6 == 1, l.IsVIPInterfaceSrc == 1, l.IsVIPInterfaceDst == 1,
-		int16(l.L3EpcIDSrc), int16(l.L3EpcIDDst),
-		l.IPSrc, l.IPDst,
-		l.IP6Src, l.IP6Dst,
+		l.IsIpv6 == 1, l.IsVipInterfaceSrc == 1, l.IsVipInterfaceDst == 1,
+		int16(l.L3EpcIdSrc), int16(l.L3EpcIdDst),
+		l.IpSrc, l.IpDst,
+		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,
 		uint16(l.PortDst),
 		l.TapSide,
@@ -750,7 +749,7 @@ var L7LogCounter uint32
 
 func ProtoLogToL7Logger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
 	h := AcquireL7Logger()
-	h._id = genID(uint32(l.BaseInfo.EndTime/uint64(time.Second)), &L7LogCounter, shardID)
+	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7LogCounter, shardID)
 	h.Fill(l, platformData)
 	return h
 }

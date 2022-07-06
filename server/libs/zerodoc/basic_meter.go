@@ -211,49 +211,49 @@ func (_ *Latency) Reverse() {
 }
 
 func (l *Latency) WriteToPB(p *pb.Latency) {
-	p.RTTMax = l.RTTMax
-	p.RTTClientMax = l.RTTClientMax
-	p.RTTServerMax = l.RTTServerMax
-	p.SRTMax = l.SRTMax
-	p.ARTMax = l.ARTMax
-	p.RRTMax = l.RRTMax
+	p.RttMax = l.RTTMax
+	p.RttClientMax = l.RTTClientMax
+	p.RttServerMax = l.RTTServerMax
+	p.SrtMax = l.SRTMax
+	p.ArtMax = l.ARTMax
+	p.RrtMax = l.RRTMax
 
-	p.RTTSum = l.RTTSum
-	p.RTTClientSum = l.RTTClientSum
-	p.RTTServerSum = l.RTTServerSum
-	p.SRTSum = l.SRTSum
-	p.ARTSum = l.ARTSum
-	p.RRTSum = l.RRTSum
+	p.RttSum = l.RTTSum
+	p.RttClientSum = l.RTTClientSum
+	p.RttServerSum = l.RTTServerSum
+	p.SrtSum = l.SRTSum
+	p.ArtSum = l.ARTSum
+	p.RrtSum = l.RRTSum
 
-	p.RTTCount = l.RTTCount
-	p.RTTClientCount = l.RTTClientCount
-	p.RTTServerCount = l.RTTServerCount
-	p.SRTCount = l.SRTCount
-	p.ARTCount = l.ARTCount
-	p.RRTCount = l.RRTCount
+	p.RttCount = l.RTTCount
+	p.RttClientCount = l.RTTClientCount
+	p.RttServerCount = l.RTTServerCount
+	p.SrtCount = l.SRTCount
+	p.ArtCount = l.ARTCount
+	p.RrtCount = l.RRTCount
 }
 
 func (l *Latency) ReadFromPB(p *pb.Latency) {
-	l.RTTMax = p.RTTMax
-	l.RTTClientMax = p.RTTClientMax
-	l.RTTServerMax = p.RTTServerMax
-	l.SRTMax = p.SRTMax
-	l.ARTMax = p.ARTMax
-	l.RRTMax = p.RRTMax
+	l.RTTMax = p.RttMax
+	l.RTTClientMax = p.RttClientMax
+	l.RTTServerMax = p.RttServerMax
+	l.SRTMax = p.SrtMax
+	l.ARTMax = p.ArtMax
+	l.RRTMax = p.RrtMax
 
-	l.RTTSum = p.RTTSum
-	l.RTTClientSum = p.RTTClientSum
-	l.RTTServerSum = p.RTTServerSum
-	l.SRTSum = p.SRTSum
-	l.ARTSum = p.ARTSum
-	l.RRTSum = p.RRTSum
+	l.RTTSum = p.RttSum
+	l.RTTClientSum = p.RttClientSum
+	l.RTTServerSum = p.RttServerSum
+	l.SRTSum = p.SrtSum
+	l.ARTSum = p.ArtSum
+	l.RRTSum = p.RrtSum
 
-	l.RTTCount = p.RTTCount
-	l.RTTClientCount = p.RTTClientCount
-	l.RTTServerCount = p.RTTServerCount
-	l.SRTCount = p.SRTCount
-	l.ARTCount = p.ARTCount
-	l.RRTCount = p.RRTCount
+	l.RTTCount = p.RttCount
+	l.RTTClientCount = p.RttClientCount
+	l.RTTServerCount = p.RttServerCount
+	l.SRTCount = p.SrtCount
+	l.ARTCount = p.ArtCount
+	l.RRTCount = p.RrtCount
 }
 
 func (l *Latency) ConcurrentMerge(other *Latency) {
@@ -514,7 +514,7 @@ func (a *Anomaly) WriteToPB(p *pb.Anomaly) {
 	p.ClientRstFlow = a.ClientRstFlow
 	p.ServerRstFlow = a.ServerRstFlow
 	p.ClientSynRepeat = a.ClientSynRepeat
-	p.ServerSYNACKRepeat = a.ServerSYNACKRepeat
+	p.ServerSynackRepeat = a.ServerSYNACKRepeat
 	p.ClientHalfCloseFlow = a.ClientHalfCloseFlow
 	p.ServerHalfCloseFlow = a.ServerHalfCloseFlow
 
@@ -523,7 +523,7 @@ func (a *Anomaly) WriteToPB(p *pb.Anomaly) {
 	p.ServerReset = a.ServerReset
 	p.ServerQueueLack = a.ServerQueueLack
 	p.ServerEstablishReset = a.ServerEstablishReset
-	p.TCPTimeout = a.TCPTimeout
+	p.TcpTimeout = a.TCPTimeout
 
 	p.L7ClientError = a.L7ClientError
 	p.L7ServerError = a.L7ServerError
@@ -534,7 +534,7 @@ func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
 	a.ClientRstFlow = p.ClientRstFlow
 	a.ServerRstFlow = p.ServerRstFlow
 	a.ClientSynRepeat = p.ClientSynRepeat
-	a.ServerSYNACKRepeat = p.ServerSYNACKRepeat
+	a.ServerSYNACKRepeat = p.ServerSynackRepeat
 	a.ClientHalfCloseFlow = p.ClientHalfCloseFlow
 	a.ServerHalfCloseFlow = p.ServerHalfCloseFlow
 
@@ -543,7 +543,7 @@ func (a *Anomaly) ReadFromPB(p *pb.Anomaly) {
 	a.ServerReset = p.ServerReset
 	a.ServerQueueLack = p.ServerQueueLack
 	a.ServerEstablishReset = p.ServerEstablishReset
-	a.TCPTimeout = p.TCPTimeout
+	a.TCPTimeout = p.TcpTimeout
 
 	a.L7ClientError = p.L7ClientError
 	a.L7ServerError = p.L7ServerError

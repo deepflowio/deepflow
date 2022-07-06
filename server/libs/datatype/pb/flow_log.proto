@@ -1,7 +1,8 @@
 syntax = "proto3";
 
-package pb;
+package flow_log;
 
+// rust 不支持以下import和option, 先删除，用于ingester时，需要加回
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
 option (gogoproto.unmarshaler_all) = true;
@@ -11,286 +12,285 @@ option (gogoproto.sizer_all) = true;
 option go_package = "pb";
 
 message TaggedFlow {
-	Flow Flow = 1;
+    Flow flow = 1;
 }
 
 message Flow {
-	FlowKey FlowKey = 1;
-	FlowMetricsPeer FlowMetricsPeerSrc = 2;
-	FlowMetricsPeer FlowMetricsPeerDst = 3;
-	TunnelField Tunnel = 4;
+    FlowKey flow_key = 1;
+    FlowMetricsPeer metrics_peer_src = 2;
+    FlowMetricsPeer metrics_peer_dst = 3;
+    TunnelField Tunnel = 4;
 
-	uint64 FlowID = 5;
+    uint64 flow_id = 5;
 
-	uint64 StartTime = 6;
-	uint64 EndTime = 7;
-	uint64 Duration = 8;
-	// uint64 FlowStatTime = 9;  // 目前无需发送
+    uint64 start_time = 6;
+    uint64 end_time = 7;
+    uint64 duration = 8;
+    // uint64 flow_start_time = 9;  // 目前无需发送
 
-	uint32 VLAN = 10;
-	uint32 EthType = 11;
+    uint32 vlan = 10;
+    uint32 eth_type = 11;
 
-	uint32        HasFlowPerfStats = 12;
-	FlowPerfStats FlowPerfStats = 13;
+    uint32 has_perf_stats = 12;
+    FlowPerfStats perf_stats = 13;
 
-	uint32 CloseType = 14;
-	uint32 FlowSource = 15;
+    uint32 close_type = 14;
+    uint32 flow_source = 15;
 
-	uint32 IsActiveService = 16;
-	uint32 QueueHash = 17;
-	uint32 IsNewFlow = 18;
-	uint32 TapSide = 19;
+    uint32 is_active_service = 16;
+    uint32 queue_hash = 17;
+    uint32 is_new_flow = 18;
+    uint32 tap_side = 19;
 
-	// TCP Seq
-	uint32 SYNSeq       = 20;
-	uint32 SYNACKSeq    = 21;
-	uint32 LastKeepaliveSeq   = 22;
-	uint32 LastKeepaliveAck   = 23;
+    // TCP Seq
+    uint32 syn_seq = 20;
+    uint32 synack_seq = 21;
+    uint32 last_keepalive_seq = 22;
+    uint32 last_keepalive_ack = 23;
 }
 
 message FlowKey {
-	uint32 VtapId = 1;
-	uint32 TapType = 2;
-	uint64 TapPort = 3;
-	uint64 MACSrc = 4;
-	uint64 MACDst = 5;
+    uint32 vtap_id = 1;
+    uint32 tap_type = 2;
+    uint64 tap_port = 3;
+    uint64 mac_src = 4;
+    uint64 mac_dst = 5;
 
-	uint32 IPSrc = 6;
-	uint32 IPDst = 7;
-	bytes IP6Src = 8;
-	bytes IP6Dst = 9;
+    uint32 ip_src = 6;
+    uint32 ip_dst = 7;
+    bytes ip6_src = 8;
+    bytes ip6_dst = 9;
 
-	uint32 PortSrc = 10;
-	uint32 PortDst = 11;
+    uint32 port_src = 10;
+    uint32 port_dst = 11;
 
-	uint32 Proto = 12;
+    uint32 proto = 12;
 }
 
 message FlowMetricsPeer {
-	uint64 ByteCount = 1;
-	uint64 L3ByteCount= 2;
-	uint64 L4ByteCount= 3;
-	uint64 PacketCount= 4;
-	uint64 TotalByteCount = 5;
-	uint64 TotalPacketCount = 6;
+    uint64 byte_count = 1;
+    uint64 l3_byte_count= 2;
+    uint64 l4_byte_count= 3;
+    uint64 packet_count= 4;
+    uint64 total_byte_count = 5;
+    uint64 total_packet_count = 6;
 
-	uint64 First = 7;
-	uint64 Last = 8;
-	uint32 TCPFlags = 9;
-	int32  L3EpcID = 10;
+    uint64 first = 7;
+    uint64 last = 8;
+    uint32 tcp_flags = 9;
+    int32 l3_epc_id = 10;
 
-        uint32 IsL2End = 11;
-        uint32 IsL3End = 12;
-        uint32 IsActiveHost = 13;
-        uint32 IsDevice = 14;
-        uint32 IsVIPInterface = 15;
-        uint32 IsVIP = 16;
+    uint32 is_l2_end = 11;
+    uint32 is_l3_end = 12;
+    uint32 is_active_host = 13;
+    uint32 is_device = 14;
+    uint32 is_vip_interface = 15;
+    uint32 is_vip = 16;
 }
 
 message TunnelField {
-	uint32 TxIP0 = 1;
-	uint32 TxIP1 = 2;
-	uint32 RxIP0 = 3;
-	uint32 RxIP1 = 4;
-	uint32 TxMAC0 = 5;
-	uint32 TxMAC1 = 6;
-	uint32 RxMAC0 = 7;
-	uint32 RxMAC1 = 8;
-	uint32 TxId = 9;
-	uint32 RxId = 10;
-	uint32 Type = 11;
-	uint32 Tier = 12;
-	uint32 IsIPv6 = 13;
+    uint32 tx_ip0 = 1;
+    uint32 tx_ip1 = 2;
+    uint32 rx_ip0 = 3;
+    uint32 rx_ip1 = 4;
+    uint32 tx_mac0 = 5;
+    uint32 tx_mac1 = 6;
+    uint32 rx_mac0 = 7;
+    uint32 rx_mac1 = 8;
+    uint32 tx_id = 9;
+    uint32 rx_id = 10;
+    uint32 tunnel_type = 11;
+    uint32 tier = 12;
+    uint32 is_ipv6 = 13;
 }
 
 message FlowPerfStats {
-	TCPPerfStats TCPPerfStats = 1;
-	L7PerfStats  l7PerfStats = 2;
-	uint32       L4Protocol = 3;
-	uint32       L7Protocol = 4;
+    TCPPerfStats tcp = 1;
+    L7PerfStats l7 = 2;
+    uint32 l4_protocol = 3;
+    uint32 l7_protocol = 4;
 }
 
 message TCPPerfStats {
-	uint32 RTTClientMax = 1;
-	uint32 RTTServerMax = 2;
-	uint32 SRTMax = 3;
-	uint32 ARTMax = 4;
+    uint32 rtt_client_max = 1;
+    uint32 rtt_server_max = 2;
+    uint32 srt_max = 3;
+    uint32 art_max = 4;
 
-	uint32 RTT  = 5;
-	uint32 RTTClientSum = 6;
-	uint32 RTTServerSum = 7;
-	uint32 SRTSum = 8;
-	uint32 ARTSum = 9;
-	uint32 RTTClientCount = 10;
-	uint32 RTTServerCount = 11;
-	uint32 SRTCount = 12;
-	uint32 ARTCount = 13;
+    uint32 rtt = 5;
+    uint32 rtt_client_sum = 6;
+    uint32 rtt_server_sum = 7;
+    uint32 srt_sum = 8;
+    uint32 art_sum = 9;
+    uint32 rtt_client_count = 10;
+    uint32 rtt_server_count = 11;
+    uint32 srt_count = 12;
+    uint32 art_count = 13;
 
-	TcpPerfCountsPeer TcpPerfCountsPeerTx = 14;
-	TcpPerfCountsPeer TcpPerfCountsPeerRx = 15;
+    TcpPerfCountsPeer counts_peer_tx = 14;
+    TcpPerfCountsPeer counts_peer_rx = 15;
 
-	uint32 TotalRetransCount = 16;
+    uint32 total_retrans_count = 16;
 }
 
 message TcpPerfCountsPeer {
-	uint32 RetransCount = 1;
-	uint32 ZeroWinCount = 2;
+    uint32 retrans_count = 1;
+    uint32 zero_win_count = 2;
 }
 
 message L7PerfStats {
-	uint32 RequestCount = 1;
-	uint32 ResponseCount = 2;
-	uint32 ErrClientCount = 3;
-	uint32 ErrServerCount = 4;
-	uint32 ErrTimeout = 5;
-	uint32 RRTCount = 6;
-	uint64 RRTSum = 7;
-	uint32 RRTMax = 8;
+    uint32 request_count = 1;
+    uint32 response_count = 2;
+    uint32 err_client_count = 3;
+    uint32 err_server_count = 4;
+    uint32 err_timeout = 5;
+    uint32 rrt_count = 6;
+    uint64 rrt_sum = 7;
+    uint32 rrt_max = 8;
 }
 
 message AppProtoLogsData {
-	AppProtoLogsBaseInfo BaseInfo = 1;
-	HTTPInfo  http = 2;
-	DNSInfo   dns = 3;
-	DubboInfo dubbo = 4;
-	KafkaInfo kafka = 5;
-	MysqlInfo mysql = 6;
-	RedisInfo redis = 7;
-	MqttInfo mqtt = 8;
+    AppProtoLogsBaseInfo base = 1;
+    HttpInfo http = 2;
+    DnsInfo dns = 3;
+    DubboInfo dubbo = 4;
+    KafkaInfo kafka = 5;
+    MysqlInfo mysql = 6;
+    RedisInfo redis = 7;
+    MqttInfo mqtt = 8;
 }
 
 message AppProtoLogsBaseInfo {
-	uint64 StartTime = 1;
-	uint64 EndTime = 2;
-	uint64 FlowId = 3;
-	uint64 TapPort = 4;
-	uint32 VtapId = 5;
-	uint32 TapType = 6;
-	uint32 IsIPv6 = 7;
-	uint32 TapSide = 8;
-	AppProtoHead Head = 9;
+    uint64 start_time = 1;
+    uint64 end_time = 2;
+    uint64 flow_id = 3;
+    uint64 tap_port = 4;
+    uint32 vtap_id = 5;
+    uint32 tap_type = 6;
+    uint32 is_ipv6 = 7;
+    uint32 tap_side = 8;
+    AppProtoHead head = 9;
 
-	uint64 MacSrc = 10;
-	uint64 MacDst = 11;
+    uint64 mac_src = 10;
+    uint64 mac_dst = 11;
 
-	uint32 IPSrc = 12;
-	uint32 IPDst = 13;
+    uint32 ip_src = 12;
+    uint32 ip_dst = 13;
 
-	bytes IP6Src = 14;
-	bytes IP6Dst = 15;
+    bytes ip6_src = 14;
+    bytes ip6_dst = 15;
 
-	int32 L3EpcIDSrc = 16;
-	int32 L3EpcIDDst = 17;
+    int32 l3_epc_id_src = 16;
+    int32 l3_epc_id_dst = 17;
 
-	uint32 PortSrc = 18;
-	uint32 PortDst = 19;
+    uint32 port_src = 18;
+    uint32 port_dst = 19;
 
-	uint32 Protocol = 20;
-	uint32 IsVIPInterfaceSrc = 21;
-	uint32 IsVIPInterfaceDst = 22;
+    uint32 protocol = 20;
+    uint32 is_vip_interface_src = 21;
+    uint32 is_vip_interface_dst = 22;
 
-	uint32 ReqTcpSeq = 23;
-	uint32 RespTcpSeq = 24;
+    uint32 req_tcp_seq = 23;
+    uint32 resp_tcp_seq = 24;
 
-        uint32 ProcessId0 = 25;
-        uint32 ProcessId1 = 26;
-        string ProcessKname0 = 27;
-        string ProcessKname1 = 28;
-        uint64 SyscallTraceIdRequest = 29;
-        uint64 SyscallTraceIdResponse = 30;
-        uint32 SyscallTraceIdThread0= 31;
-        uint32 SyscallTraceIdThread1= 32;
-        uint32 SyscallCapSeq0 = 33;
-        uint32 SyscallCapSeq1 = 34;
+    uint32 process_id_0 = 25;
+    uint32 process_id_1 = 26;
+    string process_kname_0 = 27;
+    string process_kname_1 = 28;
+    uint64 syscall_trace_id_request = 29;
+    uint64 syscall_trace_id_response = 30;
+    uint32 syscall_trace_id_thread_0 = 31;
+    uint32 syscall_trace_id_thread_1 = 32;
+    uint32 syscall_cap_seq_0 = 33;
+    uint32 syscall_cap_seq_1 = 34;
 }
 
 message AppProtoHead {
-	uint32 Proto = 1;
-	uint32 MsgType = 2;
-	uint32 Status = 3;
-	uint32 Code = 4 ;
-	uint64 RRT = 5;
+    uint32 proto = 1;
+    uint32 msg_type = 2;
+    uint32 status = 3;
+    uint32 code = 4 ;
+    uint64 rrt = 5;
 }
 
-message HTTPInfo {
-	uint32 StreamID = 1;
-	string Version = 3;
-	string Method = 4;
-	string Path = 5;
-	string Host = 6;
-	string ClientIP = 7;
-	string TraceID = 8;
-	string SpanID = 9;
+message HttpInfo {
+    uint32 stream_id = 1;
+    string version = 3;
+    string method = 4;
+    string path = 5;
+    string host = 6;
+    string client_ip = 7;
+    string trace_id = 8;
+    string span_id = 9;
 
-	int64  ReqContentLength = 10;
-	int64  RespContentLength = 11;
-
-	string XRequestId = 12;
+    int64 req_content_length = 10;
+    int64 resp_content_length = 11;
+    string x_request_id = 12;
 }
 
-message DNSInfo {
-	uint32 TransID = 1;
-	uint32 QueryType = 2;
-	string QueryName = 3;
-	string Answers = 4;
+message DnsInfo {
+    uint32 trans_id = 1;
+    uint32 query_type = 2;
+    string query_name = 3;
+    string answers = 4;
 }
 
 message DubboInfo {
-	uint32 SerialID = 1;
-	uint32 Type = 2;
-	uint32 ID = 4;
+    uint32 serial_id = 1;
+    uint32 type = 2;
+    uint32 id = 4;
 
-	string DubboVersion = 5;
-	string ServiceName = 6;
-	string ServiceVersion = 7;
-	string MethodName = 8;
-	string TraceId = 11;
+    string version = 5;
+    string service_name = 6;
+    string service_version = 7;
+    string method_name = 8;
 
-	int32 ReqBodyLen = 9;
-	int32 RespBodyLen = 10;
+    int32 req_body_len = 9;
+    int32 resp_body_len = 10;
+
+    string trace_id = 11;
 }
 
 message KafkaInfo{
-	uint32 CorrelationId = 1;
+    uint32 correlation_id = 1;
 
-	int32 ReqMsgSize = 2;
-	uint32 ApiVersion = 3;
-	uint32 ApiKey = 4;
-	string ClientID = 5;
+    int32 req_msg_size = 2;
+    uint32 api_version = 3;
+    uint32 api_key = 4;
+    string client_id = 5;
 
-	int32 RespMsgSize = 6;
+    int32 resp_msg_size = 6;
 }
 
 message MysqlInfo {
-	uint32 ProtocolVersion = 1;
-	string ServerVersion = 2;
-	uint32 ServerThreadID = 3;
+    uint32 protocol_version = 1;
+    string server_version = 2;
+    uint32 server_thread_id = 3;
 
-	uint32 Command = 4;
-	string Context = 5;
+    uint32 command = 4;
+    string context = 5;
 
-	uint32 ResponseCode = 6;
-	uint64 AffectedRows = 7;
-	uint32 ErrorCode = 8;
-	string ErrorMessage = 9;
+    uint32 response_code = 6;
+    uint64 affected_rows = 7;
+    uint32 error_code = 8;
+    string error_message = 9;
 }
 
 message RedisInfo {
-	string Request = 1;
-	string RequestType = 2;
+    bytes request = 1;
+    bytes request_type = 2;
 
-	string Response = 3;
-	string Status = 4;
-	string Error = 5;
+    bytes response = 3;
+    bytes status = 4;
+    bytes error = 5;
 }
 
 message MqttInfo {
-	string MqttType = 1;
+    string mqtt_type = 1;
 
-	int32 ReqMsgSize = 2;
-	uint32 ProtoVersion = 3;
-	string ClientID = 4;
+    int32 req_msg_size = 2;
+    uint32 proto_version = 3;
+    string client_id = 4;
 
-	int32 RespMsgSize = 5;
+    int32 resp_msg_size = 5;
 }
-
