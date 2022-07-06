@@ -9,7 +9,7 @@ import (
 	_ "google.golang.org/grpc"
 
 	dropletqueue "github.com/metaflowys/metaflow/server/ingester/droplet/queue"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 	"github.com/metaflowys/metaflow/server/ingester/stream/common"
 	"github.com/metaflowys/metaflow/server/ingester/stream/config"
 	"github.com/metaflowys/metaflow/server/ingester/stream/dbwriter"
@@ -43,7 +43,7 @@ type Logger struct {
 }
 
 func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) {
-	manager := dropletqueue.NewManager(dropletctl.DROPLETCTL_STREAM_QUEUE)
+	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_STREAM_QUEUE)
 	controllers := make([]net.IP, len(config.Base.ControllerIPs))
 	for i, ipString := range config.Base.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)

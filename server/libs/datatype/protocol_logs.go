@@ -61,7 +61,7 @@ func (h *AppProtoHead) WriteToPB(p *pb.AppProtoHead) {
 	p.MsgType = uint32(h.MsgType)
 	p.Status = uint32(h.Status)
 	p.Code = uint32(h.Code)
-	p.RRT = uint64(h.RRT)
+	p.Rrt = uint64(h.RRT)
 }
 
 type AppProtoLogsBaseInfo struct {
@@ -231,7 +231,7 @@ func (l *AppProtoLogsBaseInfo) WriteToPB(p *pb.AppProtoLogsBaseInfo) {
 	p.TapPort = uint64(l.TapPort)
 	p.VtapId = uint32(l.VtapId)
 	p.TapType = uint32(l.TapType)
-	p.IsIPv6 = utils.Bool2UInt32(l.IsIPv6)
+	p.IsIpv6 = utils.Bool2UInt32(l.IsIPv6)
 	p.TapSide = uint32(l.TapSide)
 	if p.Head == nil {
 		p.Head = &pb.AppProtoHead{}
@@ -240,17 +240,17 @@ func (l *AppProtoLogsBaseInfo) WriteToPB(p *pb.AppProtoLogsBaseInfo) {
 
 	p.MacSrc = l.MacSrc
 	p.MacDst = l.MacDst
-	p.IPSrc = l.IPSrc
-	p.IPDst = l.IPDst
-	p.IP6Src = l.IP6Src[:]
-	p.IP6Dst = l.IP6Dst[:]
-	p.L3EpcIDSrc = l.L3EpcIDSrc
-	p.L3EpcIDDst = l.L3EpcIDDst
+	p.IpSrc = l.IPSrc
+	p.IpDst = l.IPDst
+	p.Ip6Src = l.IP6Src[:]
+	p.Ip6Dst = l.IP6Dst[:]
+	p.L3EpcIdSrc = l.L3EpcIDSrc
+	p.L3EpcIdDst = l.L3EpcIDDst
 	p.PortSrc = uint32(l.PortSrc)
 	p.PortDst = uint32(l.PortDst)
 	p.Protocol = uint32(l.Protocol)
-	p.IsVIPInterfaceSrc = utils.Bool2UInt32(l.IsVIPInterfaceSrc)
-	p.IsVIPInterfaceDst = utils.Bool2UInt32(l.IsVIPInterfaceDst)
+	p.IsVipInterfaceSrc = utils.Bool2UInt32(l.IsVIPInterfaceSrc)
+	p.IsVipInterfaceDst = utils.Bool2UInt32(l.IsVIPInterfaceDst)
 	p.ReqTcpSeq = l.ReqTcpSeq
 	p.RespTcpSeq = l.RespTcpSeq
 }
@@ -289,17 +289,17 @@ func (l *AppProtoLogsData) EncodePB(encoder *codec.SimpleEncoder, i interface{})
 }
 
 func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
-	if p.BaseInfo == nil {
-		p.BaseInfo = &pb.AppProtoLogsBaseInfo{}
+	if p.Base == nil {
+		p.Base = &pb.AppProtoLogsBaseInfo{}
 	}
-	l.AppProtoLogsBaseInfo.WriteToPB(p.BaseInfo)
+	l.AppProtoLogsBaseInfo.WriteToPB(p.Base)
 	switch l.Proto {
 	case L7_PROTOCOL_HTTP_1:
 		fallthrough
 	case L7_PROTOCOL_HTTP_2:
 		if http, ok := l.Detail.(*HTTPInfo); ok {
 			if p.Http == nil {
-				p.Http = &pb.HTTPInfo{}
+				p.Http = &pb.HttpInfo{}
 			}
 			http.WriteToPB(p.Http, l.AppProtoLogsBaseInfo.MsgType)
 		}
@@ -307,7 +307,7 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 	case L7_PROTOCOL_DNS:
 		if dns, ok := l.Detail.(*DNSInfo); ok {
 			if p.Dns == nil {
-				p.Dns = &pb.DNSInfo{}
+				p.Dns = &pb.DnsInfo{}
 			}
 			dns.WriteToPB(p.Dns, l.AppProtoLogsBaseInfo.MsgType)
 		}
@@ -377,18 +377,18 @@ type HTTPInfo struct {
 	RespContentLength int64
 }
 
-func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
-	p.StreamID = h.StreamID
+func (h *HTTPInfo) WriteToPB(p *pb.HttpInfo, msgType LogMessageType) {
+	p.StreamId = h.StreamID
 	p.Version = h.Version
-	p.TraceID = h.TraceID
-	p.SpanID = h.SpanID
+	p.TraceId = h.TraceID
+	p.SpanId = h.SpanID
 
 	switch msgType {
 	case MSG_T_REQUEST:
 		p.Method = h.Method
 		p.Path = h.Path
 		p.Host = h.Host
-		p.ClientIP = h.ClientIP
+		p.ClientIp = h.ClientIP
 		p.XRequestId = h.XRequestId
 		p.ReqContentLength = h.ReqContentLength
 		p.RespContentLength = 0
@@ -397,14 +397,14 @@ func (h *HTTPInfo) WriteToPB(p *pb.HTTPInfo, msgType LogMessageType) {
 		p.Method = ""
 		p.Path = ""
 		p.Host = ""
-		p.ClientIP = ""
+		p.ClientIp = ""
 		p.XRequestId = h.XRequestId
 		p.ReqContentLength = 0
 	case MSG_T_SESSION:
 		p.Method = h.Method
 		p.Path = h.Path
 		p.Host = h.Host
-		p.ClientIP = h.ClientIP
+		p.ClientIp = h.ClientIP
 		p.XRequestId = h.XRequestId
 		p.ReqContentLength = h.ReqContentLength
 
@@ -455,8 +455,8 @@ type DNSInfo struct {
 	Answers string
 }
 
-func (h *DNSInfo) WriteToPB(p *pb.DNSInfo, msgType LogMessageType) {
-	p.TransID = uint32(h.TransID)
+func (h *DNSInfo) WriteToPB(p *pb.DnsInfo, msgType LogMessageType) {
+	p.TransId = uint32(h.TransID)
 	p.QueryType = uint32(h.QueryType)
 
 	if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {

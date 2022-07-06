@@ -58,10 +58,10 @@ func (m *FlowMeter) WriteToPB(p *pb.FlowMeter) {
 	}
 	m.Anomaly.WriteToPB(p.Anomaly)
 
-	if p.Flowload == nil {
-		p.Flowload = &pb.FlowLoad{}
+	if p.FlowLoad == nil {
+		p.FlowLoad = &pb.FlowLoad{}
 	}
-	m.FlowLoad.WriteToPB(p.Flowload)
+	m.FlowLoad.WriteToPB(p.FlowLoad)
 }
 
 func (m *FlowMeter) ReadFromPB(p *pb.FlowMeter) {
@@ -69,7 +69,7 @@ func (m *FlowMeter) ReadFromPB(p *pb.FlowMeter) {
 	m.Latency.ReadFromPB(p.Latency)
 	m.Performance.ReadFromPB(p.Performance)
 	m.Anomaly.ReadFromPB(p.Anomaly)
-	m.FlowLoad.ReadFromPB(p.Flowload)
+	m.FlowLoad.ReadFromPB(p.FlowLoad)
 }
 
 func (m *FlowMeter) ConcurrentMerge(other Meter) {

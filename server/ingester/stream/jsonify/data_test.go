@@ -37,10 +37,10 @@ func TestZeroToNull(t *testing.T) {
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
 	taggedFlow := pb.TaggedFlow{
 		Flow: &pb.Flow{
-			FlowKey:            &pb.FlowKey{},
-			Tunnel:             &pb.TunnelField{},
-			FlowMetricsPeerSrc: &pb.FlowMetricsPeer{},
-			FlowMetricsPeerDst: &pb.FlowMetricsPeer{},
+			FlowKey:        &pb.FlowKey{},
+			Tunnel:         &pb.TunnelField{},
+			MetricsPeerSrc: &pb.FlowMetricsPeer{},
+			MetricsPeerDst: &pb.FlowMetricsPeer{},
 		},
 	}
 
@@ -83,14 +83,14 @@ func TestParseUint32EpcID(t *testing.T) {
 
 func TestProtoLogToHTTPLogger(t *testing.T) {
 	appData := &pb.AppProtoLogsData{
-		BaseInfo: &pb.AppProtoLogsBaseInfo{
+		Base: &pb.AppProtoLogsBaseInfo{
 			Head: &pb.AppProtoHead{},
 		},
 	}
-	appData.BaseInfo.VtapId = 123
-	appData.BaseInfo.EndTime = uint64(10 * time.Microsecond)
-	appData.BaseInfo.Head.Proto = uint32(datatype.L7_PROTOCOL_HTTP_1)
-	appData.Http = &pb.HTTPInfo{}
+	appData.Base.VtapId = 123
+	appData.Base.EndTime = uint64(10 * time.Microsecond)
+	appData.Base.Head.Proto = uint32(datatype.L7_PROTOCOL_HTTP_1)
+	appData.Http = &pb.HttpInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
 	httpData := ProtoLogToL7Logger(appData, 0, pf).(*L7Logger)
@@ -106,14 +106,14 @@ func TestProtoLogToHTTPLogger(t *testing.T) {
 
 func TestProtoLogToDNSLogger(t *testing.T) {
 	appData := &pb.AppProtoLogsData{
-		BaseInfo: &pb.AppProtoLogsBaseInfo{
+		Base: &pb.AppProtoLogsBaseInfo{
 			Head: &pb.AppProtoHead{},
 		},
 	}
-	appData.BaseInfo.TapType = 3
-	appData.BaseInfo.EndTime = uint64(10 * time.Microsecond)
-	appData.BaseInfo.Head.Proto = uint32(datatype.L7_PROTOCOL_DNS)
-	appData.Dns = &pb.DNSInfo{}
+	appData.Base.TapType = 3
+	appData.Base.EndTime = uint64(10 * time.Microsecond)
+	appData.Base.Head.Proto = uint32(datatype.L7_PROTOCOL_DNS)
+	appData.Dns = &pb.DnsInfo{}
 
 	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
 	dnsData := ProtoLogToL7Logger(appData, 0, pf).(*L7Logger)

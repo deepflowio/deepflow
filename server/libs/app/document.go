@@ -108,14 +108,14 @@ func (d *Document) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error {
 
 func (d *Document) WriteToPB(p *pb.Document) error {
 	p.Timestamp = d.Timestamp
-	if p.Minitag == nil {
-		p.Minitag = &pb.MiniTag{}
+	if p.Tag == nil {
+		p.Tag = &pb.MiniTag{}
 	}
-	d.Tagger.(*zerodoc.MiniTag).WriteToPB(p.Minitag)
+	d.Tagger.(*zerodoc.MiniTag).WriteToPB(p.Tag)
 	if p.Meter == nil {
 		p.Meter = &pb.Meter{}
 	}
-	p.Meter.MeterID = uint32(d.Meter.ID())
+	p.Meter.MeterId = uint32(d.Meter.ID())
 	switch d.Meter.ID() {
 	case zerodoc.FLOW_ID:
 		if p.Meter.Flow == nil {
