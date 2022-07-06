@@ -3,6 +3,8 @@ package dbwriter
 import (
 	"database/sql"
 	"fmt"
+	"sync"
+	"sync/atomic"
 
 	logging "github.com/op/go-logging"
 
@@ -10,6 +12,8 @@ import (
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
 	"github.com/metaflowys/metaflow/server/ingester/pkg/ckwriter"
 	"github.com/metaflowys/metaflow/server/libs/ckdb"
+	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/metaflowys/metaflow/server/libs/stats"
 	"github.com/metaflowys/metaflow/server/libs/utils"
 )
 
@@ -26,9 +30,7 @@ type ClusterNode struct {
 }
 
 type Counter struct {
-	PacketCount  int64 `statsd:"packet-count"`
 	MetricsCount int64 `statsd:"metrics-count"`
-	DecodeErr    int64 `statsd:"decode-err"`
 	WriteErr     int64 `statsd:"write-err"`
 }
 
@@ -38,6 +40,7 @@ type tableInfo struct {
 }
 
 type ExtMetricsWriter struct {
+	msgType      datatype.MessageType
 	ckdbAddr     string
 	ckdbUsername string
 	ckdbPassword string
@@ -46,13 +49,26 @@ type ExtMetricsWriter struct {
 
 	ckdbConn *sql.DB
 
-	tables map[string]*tableInfo
+	createTable sync.Mutex
+	tablesLock  sync.RWMutex
+	tables      map[string]*tableInfo
 
 	counter *Counter
 	utils.Closable
 }
 
 func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWriter, error) {
+	w.tablesLock.RLock()
+	if info, ok := w.tables[s.TableName]; ok {
+		if info.ckwriter != nil {
+			w.tablesLock.RUnlock()
+			return info.ckwriter, nil
+		}
+	}
+	w.tablesLock.RUnlock()
+
+	w.createTable.Lock()
+	defer w.createTable.Unlock()
 	if info, ok := w.tables[s.TableName]; ok {
 		if info.ckwriter != nil {
 			return info.ckwriter, nil
@@ -83,10 +99,12 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 		w.setTTL(s.TableName)
 	}
 
+	w.tablesLock.Lock()
 	w.tables[s.TableName] = &tableInfo{
 		tableName: s.TableName,
 		ckwriter:  ckwriter,
 	}
+	w.tablesLock.Unlock()
 
 	return ckwriter, nil
 }
@@ -151,16 +169,18 @@ func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 		if w.counter.WriteErr == 0 {
 			log.Warningf("get writer failed:", err)
 		}
-		w.counter.WriteErr++
+		atomic.AddInt64(&w.counter.WriteErr, 1)
 		return
 	}
-	w.counter.MetricsCount++
+	atomic.AddInt64(&w.counter.MetricsCount, 1)
 	ckwriter.Put(m)
 }
 
 func NewExtMetricsWriter(
+	msgType datatype.MessageType,
 	config *config.Config) *ExtMetricsWriter {
 	writer := &ExtMetricsWriter{
+		msgType:      msgType,
 		ckdbAddr:     config.Base.CKDB.Primary,
 		ckdbUsername: config.Base.CKDBAuth.Username,
 		ckdbPassword: config.Base.CKDBAuth.Password,
@@ -170,6 +190,6 @@ func NewExtMetricsWriter(
 
 		counter: &Counter{},
 	}
-	common.RegisterCountableForIngester("ext_metrics_writer", writer)
+	common.RegisterCountableForIngester("ext_metrics_writer", writer, stats.OptionStatTags{"msg": msgType.String()})
 	return writer
 }

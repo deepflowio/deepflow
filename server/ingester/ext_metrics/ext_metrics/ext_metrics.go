@@ -68,6 +68,7 @@ func NewMetricsor(msgType datatype.MessageType, config *config.Config, controlle
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
+	metricsWriter := dbwriter.NewExtMetricsWriter(msgType, config)
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
@@ -80,7 +81,7 @@ func NewMetricsor(msgType datatype.MessageType, config *config.Config, controlle
 			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
-			dbwriter.NewExtMetricsWriter(config),
+			metricsWriter,
 			config,
 		)
 	}
