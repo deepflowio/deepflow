@@ -147,6 +147,20 @@ func TestWriteBytes(t *testing.T) {
 	}
 }
 
+func TestWriteBytesWithVarintLen(t *testing.T) {
+	e := &SimpleEncoder{}
+	d := &SimpleDecoder{}
+	exp := []byte{90, 91, 92, 93, 94, 95}
+	e.WriteBytesWithVarintLen(exp)
+	d.Init(e.Bytes())
+	bytes := d.ReadBytesWithVarintLen()
+	for i, v := range bytes {
+		if v != exp[i] {
+			t.Errorf("Expected %v found %v", exp[i], v)
+		}
+	}
+}
+
 func TestRefOfString(t *testing.T) {
 	e := &SimpleEncoder{}
 	exp := ""
