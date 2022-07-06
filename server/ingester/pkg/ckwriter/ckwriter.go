@@ -21,7 +21,8 @@ import (
 var log = logging.MustGetLogger("ckwriter")
 
 const (
-	FLUSH_TIMEOUT = 10 * time.Second
+	FLUSH_TIMEOUT  = 10 * time.Second
+	SQL_LOG_LENGTH = 256
 )
 
 type CKWriter struct {
@@ -53,7 +54,11 @@ type CKItem interface {
 }
 
 func ExecSQL(conn clickhouse.Conn, query string) error {
-	log.Info("Exec SQL: ", query)
+	if len(query) > SQL_LOG_LENGTH {
+		log.Infof("Exec SQL: %s ...", query[:SQL_LOG_LENGTH])
+	} else {
+		log.Info("Exec SQL: ", query)
+	}
 	return conn.Exec(context.Background(), query)
 }
 
