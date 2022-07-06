@@ -6,6 +6,12 @@ on:
     paths:
       - 'agent/**'
       - 'message/**'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
 #   release:
 #     branches: 
 #       - main
@@ -136,6 +142,14 @@ jobs:
           rpmbuild -bb metaflow-agent_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
           zip -r -q artifacts.zip x86_64/
 
+      - name: build binary package  
+        run: |
+          mkdir -p agent/bin-package/depends
+          cp -raf agent/output/src/ebpf/data/* agent/bin-package/depends
+          cp -raf agent/output/target/release/metaflow-agent agent/bin-package/
+          cd agent/bin-package/
+          tar -czvf metaflow-agent.tar.gz *
+ 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -153,3 +167,4 @@ jobs:
         run: |
           ossutil cp -rf agent/artifacts.zip oss://metaflow/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-rpm.zip
           ossutil cp -rf agent/output/target/release/metaflow-agent-ctl oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-ctl
+          ossutil cp -rf agent/bin-package/metaflow-agent.tar.gz  oss://metaflow/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent.tar.gz
