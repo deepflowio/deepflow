@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use std::{fmt, process};
@@ -139,6 +139,7 @@ pub struct SenderConfig {
     pub npb_socket_type: trident::SocketType,
     pub compressor_socket_type: trident::SocketType,
     pub collector_socket_type: trident::SocketType,
+    pub log_dir: String,
     pub server_tx_bandwidth_threshold: u64,
     pub bandwidth_probe_interval: Duration,
     pub enabled: bool,
@@ -556,6 +557,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold,
                 bandwidth_probe_interval: conf.bandwidth_probe_interval,
                 collector_socket_type: conf.collector_socket_type,
+                log_dir: Path::new(&static_config.log_file)
+                    .parent()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
                 enabled: conf.collector_enabled,
             },
             collector: CollectorConfig {
