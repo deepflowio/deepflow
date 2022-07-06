@@ -146,7 +146,7 @@ impl Trident {
 
     fn run(
         state: TridentState,
-        config: Config,
+        mut config: Config,
         revision: &'static str,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
@@ -180,6 +180,12 @@ impl Trident {
             config.controller_ips.clone(),
             exception_handler.clone(),
         ));
+
+        if config.kubernetes_cluster_id.is_empty() {
+            if let Some(id) = Config::get_k8s_cluster_id(&session) {
+                config.kubernetes_cluster_id = id;
+            }
+        }
 
         let default_runtime_config = RuntimeConfig::default();
         // 目前仅支持local-mod + ebpf-collector，ebpf-collector不适用fast, 所以队列数为1
