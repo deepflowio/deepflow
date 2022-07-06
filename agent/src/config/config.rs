@@ -63,6 +63,7 @@ pub struct Config {
     pub log_file: String,
     pub kubernetes_cluster_id: String,
     pub vtap_group_id_request: String,
+    pub controller_domain_name: Vec<String>,
 }
 
 impl Config {
@@ -80,19 +81,18 @@ impl Config {
         } else {
             let mut cfg: Self = serde_yaml::from_str(contents)
                 .map_err(|e| ConfigError::YamlConfigInvalid(e.to_string()))?;
-            cfg.controller_ips = cfg
-                .controller_ips
-                .drain(..)
-                .filter_map(|addr| match resolve_domain(&addr) {
-                    Some(ip) => Some(ip),
-                    None => {
-                        warn!("Cannot resolve domain {}", addr);
-                        None
+
+            for i in 0..cfg.controller_ips.len() {
+                if cfg.controller_ips[i].parse::<IpAddr>().is_err() {
+                    let ip = resolve_domain(&cfg.controller_ips[i]);
+                    if ip.is_none() {
+                        return Err(ConfigError::ControllerIpsInvalid);
                     }
-                })
-                .collect();
-            if cfg.controller_ips.is_empty() {
-                return Err(ConfigError::ControllerIpsEmpty);
+
+                    cfg.controller_domain_name
+                        .push(cfg.controller_ips[i].clone());
+                    cfg.controller_ips[i] = ip.unwrap();
+                }
             }
 
             Ok(cfg)
@@ -188,6 +188,7 @@ impl Default for Config {
             log_file: DEFAULT_LOG_FILE.into(),
             kubernetes_cluster_id: "".into(),
             vtap_group_id_request: "".into(),
+            controller_domain_name: vec![],
         }
     }
 }
@@ -415,6 +416,24 @@ enum TapModeDef {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct PortConfig {
+    pub analyzer_port: u16,
+    pub proxy_controller_port: u16,
+}
+
+impl Default for PortConfig {
+    fn default() -> Self {
+        let config = trident::Config {
+            ..Default::default()
+        };
+        PortConfig {
+            analyzer_port: config.analyzer_port.unwrap() as u16,
+            proxy_controller_port: config.proxy_controller_port.unwrap() as u16,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct PcapConfig {
     pub enabled: bool,
@@ -574,8 +593,10 @@ pub struct RuntimeConfig {
     pub log_threshold: u32,
     pub log_level: log::Level,
     pub analyzer_ip: String,
+    pub analyzer_port: u16,
     pub max_escape: Duration,
     pub proxy_controller_ip: String,
+    pub proxy_controller_port: u16,
     pub epc_id: u32,
     pub vtap_id: u16,
     pub collector_socket_type: trident::SocketType,
@@ -654,6 +675,13 @@ impl RuntimeConfig {
             )));
         }
 
+        if self.analyzer_port == 0 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "analyzer-port({}) invalid",
+                self.analyzer_port
+            )));
+        }
+
         if regex::Regex::new(&self.tap_interface_regex).is_err() {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "malformed tap-interface-regex({})",
@@ -677,6 +705,13 @@ impl RuntimeConfig {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "proxy-controller-ip({}) invalid",
                 self.proxy_controller_ip
+            )));
+        }
+
+        if self.proxy_controller_port == 0 {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "proxy-controller-port({}) invalid",
+                self.proxy_controller_port
             )));
         }
 
@@ -759,8 +794,10 @@ impl TryFrom<trident::Config> for RuntimeConfig {
                 _ => log::Level::Info,
             },
             analyzer_ip: conf.analyzer_ip().to_owned(),
+            analyzer_port: conf.analyzer_port() as u16,
             max_escape: Duration::from_secs(conf.max_escape_seconds() as u64),
             proxy_controller_ip: conf.proxy_controller_ip().to_owned(),
+            proxy_controller_port: conf.proxy_controller_port() as u16,
             epc_id: conf.epc_id(),
             vtap_id: (conf.vtap_id() & 0xFFFFFFFF) as u16,
             collector_socket_type: conf.collector_socket_type(),

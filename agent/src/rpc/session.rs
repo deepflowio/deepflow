@@ -15,7 +15,7 @@
  */
 
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use parking_lot::RwLock;
@@ -23,6 +23,7 @@ use parking_lot::RwLock;
 use log::{error, info};
 use tonic::transport::{Channel, Endpoint};
 
+use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::Exception;
 
@@ -32,15 +33,50 @@ pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 struct Config {
     port: u16,
     tls_port: u16,
+    proxy_port: u16,
     timeout: Duration,
     controller_cert_file_prefix: String,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            port: DEFAULT_CONTROLLER_PORT,
+            tls_port: DEFAULT_CONTROLLER_TLS_PORT,
+            proxy_port: DEFAULT_CONTROLLER_PORT,
+            timeout: DEFAULT_TIMEOUT,
+            controller_cert_file_prefix: "".to_string(),
+        }
+    }
+}
+
+impl Config {
+    fn get_port(&self, is_proxy: bool) -> u16 {
+        if is_proxy {
+            return self.proxy_port;
+        }
+        if self.controller_cert_file_prefix.len() > 0 {
+            return self.tls_port;
+        }
+        return self.port;
+    }
+
+    pub fn set_proxy_port(&mut self, port: u16) {
+        self.proxy_port = port;
+    }
+
+    fn get_proxy_port(&self) -> u16 {
+        return self.proxy_port;
+    }
+}
+
 pub struct Session {
-    config: Config,
+    config: RwLock<Config>,
 
     server_ip: RwLock<ServerIp>,
 
+    reset_triggered_session: AtomicBool,
+    reset_session: AtomicBool,
     version: AtomicU64,
     client: RwLock<Option<Channel>>,
     exception_handler: ExceptionHandler,
@@ -56,12 +92,13 @@ impl Session {
         exception_handler: ExceptionHandler,
     ) -> Session {
         Session {
-            config: Config {
+            config: RwLock::new(Config {
                 port,
                 tls_port,
                 timeout,
                 controller_cert_file_prefix,
-            },
+                ..Default::default()
+            }),
             server_ip: RwLock::new(ServerIp::new(
                 controller_ips
                     .into_iter()
@@ -69,14 +106,30 @@ impl Session {
                     .collect(),
             )),
             version: AtomicU64::new(0),
+            reset_session: AtomicBool::new(false),
+            reset_triggered_session: AtomicBool::new(false),
             client: RwLock::new(None),
             exception_handler,
         }
     }
 
+    pub fn reset_server_ip(&self, controller_ips: Vec<String>) {
+        self.server_ip.write().update_controller_ips(
+            controller_ips
+                .into_iter()
+                .map(|x| x.parse().unwrap())
+                .collect(),
+        );
+
+        self.reset_session.store(true, Ordering::Relaxed);
+        self.reset_triggered_session.store(true, Ordering::Relaxed);
+    }
+
     async fn dial(&self, remote: &IpAddr) {
+        let is_proxy = self.server_ip.read().is_proxy_ip();
+        let remote_port = self.config.read().get_port(is_proxy);
         // TODO: 错误处理和tls
-        match Endpoint::from_shared(format!("http://{}:{}", remote, self.config.port))
+        match Endpoint::from_shared(format!("http://{}:{}", remote, remote_port))
             .unwrap()
             .connect_timeout(DEFAULT_TIMEOUT)
             .timeout(SESSION_TIMEOUT)
@@ -100,13 +153,30 @@ impl Session {
     }
 
     pub async fn update_current_server(&self) -> bool {
-        let changed = self.server_ip.write().update_current_ip();
+        let changed = self.server_ip.write().update_current_ip()
+            || self.reset_session.swap(false, Ordering::Relaxed);
+        if changed {
+            let ip = self.server_ip.read().get_current_ip();
+            self.dial(&ip).await;
+            self.version.fetch_add(1, Ordering::SeqCst);
+
+            self.reset_triggered_session.store(true, Ordering::Relaxed);
+        }
+        changed
+    }
+
+    pub async fn update_triggered_current_server(&self) -> bool {
+        let changed = self.reset_triggered_session.swap(false, Ordering::Relaxed);
         if changed {
             let ip = self.server_ip.read().get_current_ip();
             self.dial(&ip).await;
             self.version.fetch_add(1, Ordering::SeqCst);
         }
         changed
+    }
+
+    pub fn reset_triggered(&self) -> bool {
+        self.reset_triggered_session.load(Ordering::Relaxed)
     }
 
     pub fn get_version(&self) -> u64 {
@@ -125,12 +195,19 @@ impl Session {
         self.server_ip.write().set_request_failed(failed);
     }
 
-    pub fn get_proxy_server(&self) -> Option<IpAddr> {
-        self.server_ip.read().get_proxy_ip()
+    pub fn get_proxy_server(&self) -> (Option<IpAddr>, u16) {
+        (
+            self.server_ip.read().get_proxy_ip(),
+            self.config.read().get_proxy_port(),
+        )
     }
 
-    pub fn set_proxy_server(&self, ip: IpAddr) {
+    pub fn set_proxy_server(&self, ip: Option<IpAddr>, port: u16) {
         self.server_ip.write().set_proxy_ip(ip);
+        self.config.write().set_proxy_port(port);
+
+        self.reset_session.store(true, Ordering::Relaxed);
+        self.reset_triggered_session.store(true, Ordering::Relaxed);
     }
 }
 
@@ -165,6 +242,16 @@ impl ServerIp {
         }
     }
 
+    fn update_controller_ips(&mut self, controller_ips: Vec<IpAddr>) {
+        self.proxied = false;
+        self.proxy_ip = None;
+        self.current_ip = controller_ips[0];
+        self.controller_ips = controller_ips;
+        self.initialized = false;
+        self.this_controller = 0;
+        self.request_failed = false;
+    }
+
     fn get_current_ip(&self) -> IpAddr {
         self.current_ip
     }
@@ -177,8 +264,12 @@ impl ServerIp {
         self.proxy_ip
     }
 
-    fn set_proxy_ip(&mut self, ip: IpAddr) {
-        self.proxy_ip = Some(ip);
+    fn set_proxy_ip(&mut self, ip: Option<IpAddr>) {
+        self.proxy_ip = ip;
+    }
+
+    fn is_proxy_ip(&self) -> bool {
+        return self.proxied;
     }
 
     fn get_request_failed(&self) -> bool {

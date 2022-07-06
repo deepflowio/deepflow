@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-pub const DROPLET_PORT: u16 = 30033;
+pub const DEFAULT_INGESTER_PORT: u16 = 30033;
+pub const DEFAULT_CONTROLLER_PORT: u16 = 30035;
+pub const DEFAULT_CONTROLLER_TLS_PORT: u16 = 30135;
 
 pub enum DropletMessageType {
     Compress = 0,

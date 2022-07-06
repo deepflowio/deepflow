@@ -235,6 +235,7 @@ pub struct UniformSender {
     last_flush: Duration,
 
     dst_ip: IpAddr,
+    dst_port: u16,
     config: SenderAccess,
     reconnect: bool,
 
@@ -249,7 +250,6 @@ pub struct UniformSender {
 }
 
 impl UniformSender {
-    const DST_PORT: u16 = 30033;
     const TCP_WRITE_TIMEOUT: u64 = 3; // s
     const QUEUE_READ_TIMEOUT: u64 = 3; // s
 
@@ -268,6 +268,7 @@ impl UniformSender {
             encoder: Encoder::new(0, SendMessageType::TaggedFlow, config.load().vtap_id),
             last_flush: Duration::ZERO,
             dst_ip: config.load().dest_ip,
+            dst_port: config.load().dest_port,
             config,
             tcp_stream: None,
             reconnect: false,
@@ -282,7 +283,7 @@ impl UniformSender {
         }
     }
 
-    fn update_dst_ip(&mut self) {
+    fn update_dst_ip_and_port(&mut self) {
         if self.dst_ip != self.config.load().dest_ip {
             info!(
                 "update dst ip from {} to {}",
@@ -291,6 +292,16 @@ impl UniformSender {
             );
             self.reconnect = true;
             self.dst_ip = self.config.load().dest_ip;
+        }
+
+        if self.dst_port != self.config.load().dest_port {
+            info!(
+                "update dst port from {} to {}",
+                self.dst_port,
+                self.config.load().dest_port
+            );
+            self.reconnect = true;
+            self.dst_port = self.config.load().dest_port;
         }
     }
 
@@ -309,7 +320,7 @@ impl UniformSender {
                     debug!("tcp stream shutdown failed {}", e);
                 }
             }
-            self.tcp_stream = TcpStream::connect((self.dst_ip, Self::DST_PORT)).ok();
+            self.tcp_stream = TcpStream::connect((self.dst_ip, self.dst_port)).ok();
             if let Some(tcp_stream) = self.tcp_stream.as_mut() {
                 if let Err(e) =
                     tcp_stream.set_write_timeout(Some(Duration::from_secs(Self::TCP_WRITE_TIMEOUT)))
@@ -322,11 +333,7 @@ impl UniformSender {
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {
                     self.exception_handler.set(Exception::AnalyzerSocketError);
-                    error!(
-                        "tcp connection to {}:{} failed",
-                        self.dst_ip,
-                        Self::DST_PORT
-                    );
+                    error!("tcp connection to {}:{} failed", self.dst_ip, self.dst_port,);
                 }
                 self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                 return;
@@ -358,9 +365,7 @@ impl UniformSender {
                         self.exception_handler.set(Exception::AnalyzerSocketError);
                         error!(
                             "tcp stream write data to {}:{} failed: {}",
-                            self.dst_ip,
-                            Self::DST_PORT,
-                            e
+                            self.dst_ip, self.dst_port, e
                         );
                     }
                     self.counter.dropped.fetch_add(1, Ordering::Relaxed);
@@ -411,7 +416,7 @@ impl UniformSender {
                 Err(Error::Timeout) => match socket_type {
                     SocketType::File => self.flush_writer(),
                     _ => {
-                        self.update_dst_ip();
+                        self.update_dst_ip_and_port();
                         self.flush_encoder();
                     }
                 },
@@ -476,7 +481,7 @@ impl UniformSender {
         self.encoder.cache_to_sender(send_item);
         if self.encoder.buffer_len() > Encoder::BUFFER_LEN {
             self.check_or_register_counterable(self.encoder.header.msg_type);
-            self.update_dst_ip();
+            self.update_dst_ip_and_port();
             self.flush_encoder();
         }
         Ok(())

@@ -25,12 +25,13 @@ use super::error::{Error, Result};
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::{self, SyncResponse};
-use crate::rpc::{Session, StaticConfig, Status, Synchronizer};
+use crate::rpc::{RunningConfig, Session, StaticConfig, Status, Synchronizer};
 
 pub struct RpcDebugger {
     session: Arc<Session>,
     status: Arc<RwLock<Status>>,
     config: Arc<StaticConfig>,
+    running_config: Arc<RwLock<RunningConfig>>,
     rt: Runtime,
 }
 
@@ -63,20 +64,27 @@ impl RpcDebugger {
     pub(super) fn new(
         session: Arc<Session>,
         config: Arc<StaticConfig>,
+        running_config: Arc<RwLock<RunningConfig>>,
         status: Arc<RwLock<Status>>,
     ) -> Self {
         Self {
             session,
             status,
             config,
+            running_config,
             rt: Runtime::new().unwrap(),
         }
     }
 
     async fn get_rpc_response(&self) -> Result<tonic::Response<SyncResponse>, tonic::Status> {
         let exception_handler = ExceptionHandler::default();
-        let req =
-            Synchronizer::generate_sync_request(&self.config, &self.status, 0, &exception_handler);
+        let req = Synchronizer::generate_sync_request(
+            &self.running_config,
+            &self.config,
+            &self.status,
+            0,
+            &exception_handler,
+        );
         self.session.update_current_server().await;
 
         let client = self
