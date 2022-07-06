@@ -71,3 +71,7 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 func (s *service) GetKubernetesClusterID(ctx context.Context, in *api.KubernetesClusterIDRequest) (*api.KubernetesClusterIDResponse, error) {
 	return &api.KubernetesClusterIDResponse{}, nil
 }
+
+func (s *service) GenesisSharingK8S(ctx context.Context, in *api.GenesisSharingK8SRequest) (*api.GenesisSharingK8SResponse, error) {
+	return genesis.Synchronizer.GenesisSharingK8S(ctx, in)
+}
