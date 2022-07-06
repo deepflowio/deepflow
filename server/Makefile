@@ -76,3 +76,5 @@ clean:
 	find . -name '*.pb.go' -delete
 	rm -f libs/geo/ip_info.go
 	rm -f $(generated_libs)
+	rm -f libs/datatype/pb/flow_log.proto
+	rm -f libs/zerodoc/pb/metric.proto

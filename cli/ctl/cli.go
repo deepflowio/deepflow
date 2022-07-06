@@ -3,6 +3,7 @@ package ctl
 import (
 	"os"
 
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl/cmd"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,8 @@ func Execute() {
 	root.AddCommand(RegisterAgentGroupConfigCommand())
 	root.AddCommand(RegisterDomainCommand())
 	root.AddCommand(RegisterTrisolarisCommand())
+
+	cmd.RegisterIngesterCommand(root)
 
 	root.SetArgs(os.Args[1:])
 	root.Execute()

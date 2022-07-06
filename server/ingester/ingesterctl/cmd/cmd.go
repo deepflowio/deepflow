@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 	"unicode"
@@ -68,9 +67,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	}))
 	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
 
-	root.GenBashCompletionFile("/usr/share/bash-completion/completions/droplet-ctl")
-	root.SetArgs(os.Args[1:])
-	root.Execute()
+	root.GenBashCompletionFile("/usr/share/bash-completion/completions/metaflow-ctl")
 }
 
 // 从字符串中解析出所有时间(大于100000000)
