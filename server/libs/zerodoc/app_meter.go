@@ -6,13 +6,13 @@ import (
 )
 
 type AppMeter struct {
-	AppTriffic
+	AppTraffic
 	AppLatency
 	AppAnomaly
 }
 
 func (m *AppMeter) Reverse() {
-	m.AppTriffic.Reverse()
+	m.AppTraffic.Reverse()
 	m.AppLatency.Reverse()
 	m.AppAnomaly.Reverse()
 }
@@ -34,31 +34,31 @@ func (m *AppMeter) SortKey() uint64 {
 }
 
 func (m *AppMeter) WriteToPB(p *pb.AppMeter) {
-	if p.AppTriffic == nil {
-		p.AppTriffic = &pb.AppTriffic{}
+	if p.Traffic == nil {
+		p.Traffic = &pb.AppTraffic{}
 	}
-	m.AppTriffic.WriteToPB(p.AppTriffic)
+	m.AppTraffic.WriteToPB(p.Traffic)
 
-	if p.AppLatency == nil {
-		p.AppLatency = &pb.AppLatency{}
+	if p.Latency == nil {
+		p.Latency = &pb.AppLatency{}
 	}
-	m.AppLatency.WriteToPB(p.AppLatency)
+	m.AppLatency.WriteToPB(p.Latency)
 
-	if p.AppAnomaly == nil {
-		p.AppAnomaly = &pb.AppAnomaly{}
+	if p.Anomaly == nil {
+		p.Anomaly = &pb.AppAnomaly{}
 	}
-	m.AppAnomaly.WriteToPB(p.AppAnomaly)
+	m.AppAnomaly.WriteToPB(p.Anomaly)
 }
 
 func (m *AppMeter) ReadFromPB(p *pb.AppMeter) {
-	m.AppTriffic.ReadFromPB(p.AppTriffic)
-	m.AppLatency.ReadFromPB(p.AppLatency)
-	m.AppAnomaly.ReadFromPB(p.AppAnomaly)
+	m.AppTraffic.ReadFromPB(p.Traffic)
+	m.AppLatency.ReadFromPB(p.Latency)
+	m.AppAnomaly.ReadFromPB(p.Anomaly)
 }
 
 func (m *AppMeter) ConcurrentMerge(other Meter) {
 	if pm, ok := other.(*AppMeter); ok {
-		m.AppTriffic.ConcurrentMerge(&pm.AppTriffic)
+		m.AppTraffic.ConcurrentMerge(&pm.AppTraffic)
 		m.AppLatency.ConcurrentMerge(&pm.AppLatency)
 		m.AppAnomaly.ConcurrentMerge(&pm.AppAnomaly)
 	}
@@ -66,7 +66,7 @@ func (m *AppMeter) ConcurrentMerge(other Meter) {
 
 func (m *AppMeter) SequentialMerge(other Meter) {
 	if pm, ok := other.(*AppMeter); ok {
-		m.AppTriffic.SequentialMerge(&pm.AppTriffic)
+		m.AppTraffic.SequentialMerge(&pm.AppTraffic)
 		m.AppLatency.SequentialMerge(&pm.AppLatency)
 		m.AppAnomaly.SequentialMerge(&pm.AppAnomaly)
 	}
@@ -81,7 +81,7 @@ func (m *AppMeter) ToKVString() string {
 func (m *AppMeter) MarshalTo(b []byte) int {
 	offset := 0
 
-	offset += m.AppTriffic.MarshalTo(b[offset:])
+	offset += m.AppTraffic.MarshalTo(b[offset:])
 	if offset > 0 && b[offset-1] != ',' {
 		b[offset] = ','
 		offset++
@@ -103,14 +103,14 @@ func (m *AppMeter) MarshalTo(b []byte) int {
 
 func AppMeterColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
-	columns = append(columns, AppTrifficColumns()...)
+	columns = append(columns, AppTrafficColumns()...)
 	columns = append(columns, AppLatencyColumns()...)
 	columns = append(columns, AppAnomalyColumns()...)
 	return columns
 }
 
 func (m *AppMeter) WriteBlock(block *ckdb.Block) error {
-	if err := m.AppTriffic.WriteBlock(block); err != nil {
+	if err := m.AppTraffic.WriteBlock(block); err != nil {
 		return err
 	}
 	if err := m.AppLatency.WriteBlock(block); err != nil {
@@ -122,35 +122,35 @@ func (m *AppMeter) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-type AppTriffic struct {
+type AppTraffic struct {
 	Request  uint32 `db:"request"`
 	Response uint32 `db:"response"`
 }
 
-func (_ *AppTriffic) Reverse() {
+func (_ *AppTraffic) Reverse() {
 	// 异常统计量以客户端、服务端为视角，无需Reverse
 }
 
-func (t *AppTriffic) WriteToPB(p *pb.AppTriffic) {
+func (t *AppTraffic) WriteToPB(p *pb.AppTraffic) {
 	p.Request = t.Request
 	p.Response = t.Response
 }
 
-func (t *AppTriffic) ReadFromPB(p *pb.AppTriffic) {
+func (t *AppTraffic) ReadFromPB(p *pb.AppTraffic) {
 	t.Request = p.Request
 	t.Response = p.Response
 }
 
-func (t *AppTriffic) ConcurrentMerge(other *AppTriffic) {
+func (t *AppTraffic) ConcurrentMerge(other *AppTraffic) {
 	t.Request += other.Request
 	t.Response += other.Response
 }
 
-func (t *AppTriffic) SequentialMerge(other *AppTriffic) {
+func (t *AppTraffic) SequentialMerge(other *AppTraffic) {
 	t.ConcurrentMerge(other)
 }
 
-func (t *AppTriffic) MarshalTo(b []byte) int {
+func (t *AppTraffic) MarshalTo(b []byte) int {
 	fields := []string{"request=", "response="}
 	values := []uint64{uint64(t.Request), uint64(t.Response)}
 	return marshalKeyValues(b, fields, values)
@@ -163,7 +163,7 @@ const (
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
-func AppTrifficColumns() []*ckdb.Column {
+func AppTrafficColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumn("request", ckdb.UInt32).SetComment("累计请求次数").SetIndex(ckdb.IndexNone))
 	columns = append(columns, ckdb.NewColumn("response", ckdb.UInt32).SetComment("累计响应次数").SetIndex(ckdb.IndexNone))
@@ -171,7 +171,7 @@ func AppTrifficColumns() []*ckdb.Column {
 }
 
 // WriteBlock和LatencyColumns的列需要按顺序一一对应
-func (t *AppTriffic) WriteBlock(block *ckdb.Block) error {
+func (t *AppTraffic) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(t.Request); err != nil {
 		return err
 	}
@@ -192,15 +192,15 @@ func (_ *AppLatency) Reverse() {
 }
 
 func (l *AppLatency) WriteToPB(p *pb.AppLatency) {
-	p.RRTMax = l.RRTMax
-	p.RRTSum = l.RRTSum
-	p.RRTCount = l.RRTCount
+	p.RrtMax = l.RRTMax
+	p.RrtSum = l.RRTSum
+	p.RrtCount = l.RRTCount
 }
 
 func (l *AppLatency) ReadFromPB(p *pb.AppLatency) {
-	l.RRTMax = p.RRTMax
-	l.RRTSum = p.RRTSum
-	l.RRTCount = p.RRTCount
+	l.RRTMax = p.RrtMax
+	l.RRTSum = p.RrtSum
+	l.RRTCount = p.RrtCount
 }
 
 func (l *AppLatency) ConcurrentMerge(other *AppLatency) {

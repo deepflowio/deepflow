@@ -59,6 +59,10 @@ func SetHostname(name string) {
 	setHostname(name)
 }
 
+func SetProcessName(name string) {
+	setProcessName(name)
+}
+
 func RegisterPreHook(hook func()) {
 	lock.Lock()
 	preHooks = append(preHooks, hook)

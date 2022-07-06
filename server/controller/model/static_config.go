@@ -1,12 +1,7 @@
 package model
 
 type StaticConfig struct {
-	ControllerIps                   []string              `yaml:"controller-ips,omitempty"`
-	ControllerPort                  *uint16               `yaml:"controller-port,omitempty"`
-	ControllerTLSPort               *uint16               `yaml:"controller-tls-port,omitempty"`
-	GenesisRpcPort                  *uint16               `yaml:"genesis-rpc-port,omitempty"`
-	GenesisRpcTLSPort               *uint16               `yaml:"genesis-rpc-tls-port,omitempty"`
-	Logfile                         *string               `yaml:"log-file,omitempty"`
+	ProxyControllerPort             *uint16               `yaml:"proxy-controller-port,omitempty"`
 	LogLevel                        *string               `yaml:"log-level,omitempty"`
 	Profiler                        *bool                 `yaml:"profiler,omitempty"`
 	AfpacketBlocksEnabled           *bool                 `yaml:"afpacket-blocks-enabled,omitempty"`
@@ -22,8 +17,6 @@ type StaticConfig struct {
 	TapMode                         *int                  `yaml:"tap-mode,omitempty"`
 	CloudGatewayTraffic             *bool                 `yaml:"cloud-gateway-traffic,omitempty"`
 	MirrorTrafficPcp                *uint16               `yaml:"mirror-traffic-pcp,omitempty"`
-	ControllerCertFilePrefix        *string               `yaml:"controller-cert-file-prefix,omitempty"`
-	VtapGroupIdRequest              *string               `yaml:"vtap-group-id-request,omitempty"`
 	PCap                            *PCapConfig           `yaml:"pcap,omitempty"`
 	Flow                            *FlowGeneratorConfig  `yaml:"flow,omitempty"`
 	FlowQueueSize                   *int                  `yaml:"flow-queue-size,omitempty"`
@@ -45,7 +38,7 @@ type StaticConfig struct {
 	KubernetesPollerType            *string               `yaml:"kubernetes-poller-type,omitempty"`
 	DecapErspan                     *bool                 `yaml:"decap-erspan,omitempty"`
 	AnalyzerIp                      *string               `yaml:"analyzer-ip,omitempty"`
-	KubernetesClusterID             *string               `yaml:"kubernetes-cluster-id,omitempty"`
+	AnalyzerPort                    *uint16               `yaml:"analyzer-port,omitempty"`
 	KubernetesNamespace             *string               `yaml:"kubernetes-namespace,omitempty"`
 	IngressFlavour                  *string               `yaml:"ingress-flavour,omitempty"`
 	GrpcBufferSize                  *int                  `yaml:"grpc-buffer-size,omitempty"`            // 单位：M

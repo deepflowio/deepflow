@@ -7,6 +7,12 @@ on:
       - 'feature-**'
     paths:
       - 'cli/**'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
 #   release:
 #     branches: 
 #       - main

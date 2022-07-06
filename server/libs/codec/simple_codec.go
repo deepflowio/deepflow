@@ -112,6 +112,11 @@ func (e *SimpleEncoder) WriteBytes(v []byte) {
 	e.buf = append(e.buf, v...)
 }
 
+func (e *SimpleEncoder) WriteBytesWithVarintLen(v []byte) {
+	e.WriteVarintU32(uint32(len(v)))
+	e.buf = append(e.buf, v...)
+}
+
 func (e *SimpleEncoder) Reset() {
 	e.buf = e.buf[:0]
 }
@@ -307,6 +312,16 @@ func (d *SimpleDecoder) ReadString255() string {
 
 func (d *SimpleDecoder) ReadBytes() []byte {
 	l := int(d.ReadU32())
+	d.offset += l
+	if d.offset > len(d.buf) {
+		d.err++
+		return nil
+	}
+	return d.buf[d.offset-l : d.offset]
+}
+
+func (d *SimpleDecoder) ReadBytesWithVarintLen() []byte {
+	l := int(d.ReadVarintU32())
 	d.offset += l
 	if d.offset > len(d.buf) {
 		d.err++

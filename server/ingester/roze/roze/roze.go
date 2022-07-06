@@ -9,7 +9,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	"github.com/metaflowys/metaflow/server/ingester/droplet/queue"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 	"github.com/metaflowys/metaflow/server/ingester/roze/config"
 	"github.com/metaflowys/metaflow/server/ingester/roze/dbwriter"
 	"github.com/metaflowys/metaflow/server/ingester/roze/unmarshaller"
@@ -43,7 +43,7 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 		}
 	}
 
-	manager := queue.NewManager(dropletctl.DROPLETCTL_ROZE_QUEUE)
+	manager := queue.NewManager(ingesterctl.INGESTERCTL_ROZE_QUEUE)
 	unmarshallQueueCount := int(cfg.UnmarshallQueueCount)
 	unmarshallQueues := manager.NewQueuesUnmarshal(
 		"1-recv-unmarshall", int(cfg.UnmarshallQueueSize), unmarshallQueueCount, 1,

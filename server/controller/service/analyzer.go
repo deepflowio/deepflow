@@ -16,6 +16,7 @@ import (
 func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err error) {
 	var response []model.Analyzer
 	var analyzers []mysql.Analyzer
+	var controllers []mysql.Controller
 	var regions []mysql.Region
 	var azs []mysql.AZ
 	var azAnalyzerconns []mysql.AZAnalyzerConnection
@@ -39,6 +40,7 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 		db = db.Where("state IN (?)", states)
 	}
 	db.Find(&analyzers)
+	mysql.Db.Find(&controllers)
 	mysql.Db.Find(&regions)
 	mysql.Db.Find(&azs)
 	mysql.Db.Find(&azAnalyzerconns)
@@ -69,11 +71,22 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 		analyzerIPToVtapCount[vtap.AnalyzerIP]++
 	}
 
+	// controller ip == analyzer ip
+	ipToDomainPrefix := make(map[string]string)
+	for _, controller := range controllers {
+		ipToDomainPrefix[controller.IP] = controller.RegionDomainPrefix
+	}
+
 	for _, analyzer := range analyzers {
+		// analyzer name = ${DomainPrefix}-${Name}
+		name := analyzer.Name
+		if domainPrefix, ok := ipToDomainPrefix[analyzer.IP]; ok {
+			name = domainPrefix + "-" + name
+		}
 		analyzerResp := model.Analyzer{
 			ID:                analyzer.ID,
 			IP:                analyzer.IP,
-			Name:              analyzer.Name,
+			Name:              name,
 			State:             analyzer.State,
 			NatIP:             analyzer.NATIP,
 			NatIPEnabled:      analyzer.NATIPEnabled,

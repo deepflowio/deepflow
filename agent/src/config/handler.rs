@@ -1363,7 +1363,7 @@ impl ConfigHandler {
                 callbacks.push(metric_server_port_callback);
             }
             info!(
-                "external metric server config change from {:#?} to {:#?}",
+                "integration collector config change from {:#?} to {:#?}",
                 candidate_config.metric_server, new_config.metric_server
             );
             candidate_config.metric_server = new_config.metric_server;

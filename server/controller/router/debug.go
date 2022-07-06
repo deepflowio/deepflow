@@ -14,7 +14,7 @@ func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {
 	e.GET("/v1/info/:lcuuid/", getCloudResource(m))
 	e.GET("/v1/genesis/:type/", getGenesisData(g))
 	e.GET("/v1/vinterfaces/", getGenesisVinterfacesData(g))
-	e.GET("/v1/kubernetes-info/", getGenesisKubernetesData(g))
+	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(m))
 	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(m))
 	e.GET("/v1/recorders/:domainLcuuid/:subDomainLcuuid/cache/", getRecorderCache(m))
@@ -130,7 +130,7 @@ func getGenesisVinterfacesData(g *genesis.Genesis) gin.HandlerFunc {
 
 func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetGenesisKubernetesData(g)
+		data, err := service.GetGenesisKubernetesData(g, c.Param("clusterID"))
 		JsonResponse(c, data, err)
 	})
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/metaflowys/metaflow/server/controller/genesis"
 	"github.com/metaflowys/metaflow/server/controller/statsd"
 
-	"errors"
 	"regexp"
 	"time"
 
@@ -142,25 +141,19 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 }
 
 func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
-	kDataResource := genesis.GenesisService.GetKubernetesData()
-	kData, ok := kDataResource[k.ClusterID]
-	if !ok {
-		msg := "no vtap report cluster id:" + k.ClusterID
-		log.Warning(msg)
-		return map[string][]string{}, errors.New(msg)
-	}
-	if kData.ErrorMSG != "" {
-		log.Warningf("cluster id (%s) Error: %s", k.ClusterID, kData.ErrorMSG)
+	kData, err := genesis.GenesisService.GetKubernetesResponse(k.ClusterID)
+	if err != nil {
+		return map[string][]string{}, err
 	}
 
-	for key, v := range kData.Resources {
+	for key, v := range kData {
 		// resource from genesis , so api cost is 0 ms
 		k.cloudStatsd.APICost[key] = []int{0}
 
 		k.cloudStatsd.APICount[key] = []int{len(v)}
 
 	}
-	return kData.Resources, nil
+	return kData, nil
 }
 
 func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
@@ -213,6 +206,7 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 
 	k8sInfo, err := k.getKubernetesInfo()
 	if err != nil {
+		log.Warning(err.Error())
 		return model.KubernetesGatherResource{
 			ErrorState:   common.RESOURCE_STATE_CODE_WARNING,
 			ErrorMessage: err.Error(),

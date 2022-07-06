@@ -55,7 +55,7 @@ func (i *MysqlInfo) WriteToPB(p *pb.MysqlInfo, msgType LogMessageType) {
 		*p = pb.MysqlInfo{}
 		p.ProtocolVersion = uint32(i.ProtocolVersion)
 		p.ServerVersion = i.ServerVersion
-		p.ServerThreadID = i.ServerThreadID
+		p.ServerThreadId = i.ServerThreadID
 	case MSG_T_REQUEST:
 		*p = pb.MysqlInfo{}
 		p.Command = uint32(i.Command)
@@ -120,25 +120,25 @@ type RedisInfo struct {
 func (i *RedisInfo) WriteToPB(p *pb.RedisInfo, msgType LogMessageType) {
 	switch msgType {
 	case MSG_T_REQUEST:
-		p.Request = i.Request
-		p.RequestType = i.RequestType
+		p.Request = []byte(i.Request)
+		p.RequestType = []byte(i.RequestType)
 
-		p.Response = ""
-		p.Status = ""
-		p.Error = ""
+		p.Response = nil
+		p.Status = nil
+		p.Error = nil
 	case MSG_T_RESPONSE:
-		p.Request = ""
-		p.RequestType = ""
+		p.Request = nil
+		p.RequestType = nil
 
-		p.Response = i.Response
-		p.Status = i.Status
-		p.Error = i.Error
+		p.Response = []byte(i.Response)
+		p.Status = []byte(i.Status)
+		p.Error = []byte(i.Error)
 	case MSG_T_SESSION:
-		p.Request = i.Request
-		p.RequestType = i.RequestType
-		p.Response = i.Response
-		p.Status = i.Status
-		p.Error = i.Error
+		p.Request = []byte(i.Request)
+		p.RequestType = []byte(i.RequestType)
+		p.Response = []byte(i.Response)
+		p.Status = []byte(i.Status)
+		p.Error = []byte(i.Error)
 	default:
 		panic("RedisInfo encode msg type error!")
 	}

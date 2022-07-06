@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/prometheus/prometheus/storage/remote"
 
+	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/metaflowys/metaflow/server/ingester/common"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/dbwriter"
@@ -267,54 +268,68 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 }
 
 func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName, instance string) {
-	m.Tag.Code = zerodoc.AZID | zerodoc.HostID | zerodoc.IP | zerodoc.L3Device | zerodoc.L3EpcID | zerodoc.PodClusterID | zerodoc.PodGroupID | zerodoc.PodID | zerodoc.PodNodeID | zerodoc.PodNSID | zerodoc.RegionID | zerodoc.SubnetID | zerodoc.VTAPID
-	m.Tag.VTAPID = vtapID
-	m.Tag.L3EpcID = datatype.EPC_FROM_INTERNET
+	t := &m.Tag
+	t.Code = zerodoc.AZID | zerodoc.HostID | zerodoc.IP | zerodoc.L3Device | zerodoc.L3EpcID | zerodoc.PodClusterID | zerodoc.PodGroupID | zerodoc.PodID | zerodoc.PodNodeID | zerodoc.PodNSID | zerodoc.RegionID | zerodoc.SubnetID | zerodoc.VTAPID | zerodoc.ServiceID | zerodoc.Resource
+	t.VTAPID = vtapID
+	t.L3EpcID = datatype.EPC_FROM_INTERNET
 	var ip net.IP
 	if podName != "" {
 		podInfo := d.platformData.QueryPodInfo(uint32(vtapID), podName)
 		if podInfo != nil {
-			m.Tag.PodClusterID = uint16(podInfo.PodClusterId)
-			m.Tag.PodID = podInfo.PodId
-			m.Tag.L3EpcID = int16(podInfo.EpcId)
+			t.PodClusterID = uint16(podInfo.PodClusterId)
+			t.PodID = podInfo.PodId
+			t.L3EpcID = int16(podInfo.EpcId)
 			ip = net.ParseIP(podInfo.Ip)
 		}
 	} else if instance != "" {
-		m.Tag.L3EpcID = int16(d.platformData.QueryVtapEpc0(uint32(vtapID)))
+		t.L3EpcID = int16(d.platformData.QueryVtapEpc0(uint32(vtapID)))
 		ip = parseIPFromInstance(instance)
 	}
 
 	if ip != nil {
 		if ip4 := ip.To4(); ip4 != nil {
-			m.Tag.IsIPv6 = 0
-			m.Tag.IP = utils.IpToUint32(ip4)
+			t.IsIPv6 = 0
+			t.IP = utils.IpToUint32(ip4)
 		} else {
-			m.Tag.IsIPv6 = 1
-			m.Tag.IP6 = ip
+			t.IsIPv6 = 1
+			t.IP6 = ip
 		}
 	}
 	var info *grpc.Info
-	if m.Tag.IsIPv6 == 1 {
-		info = d.platformData.QueryIPV6Infos(m.Tag.L3EpcID, m.Tag.IP6)
+	if t.IsIPv6 == 1 {
+		info = d.platformData.QueryIPV6Infos(t.L3EpcID, t.IP6)
 	} else {
-		info = d.platformData.QueryIPV4Infos(m.Tag.L3EpcID, m.Tag.IP)
+		info = d.platformData.QueryIPV4Infos(t.L3EpcID, t.IP)
 	}
 	if info != nil {
-		m.Tag.RegionID = uint16(info.RegionID)
-		m.Tag.AZID = uint16(info.AZID)
-		m.Tag.HostID = uint16(info.HostID)
-		m.Tag.PodGroupID = info.PodGroupID
-		m.Tag.PodNSID = uint16(info.PodNSID)
-		m.Tag.PodNodeID = info.PodNodeID
-		m.Tag.SubnetID = uint16(info.SubnetID)
-		m.Tag.L3DeviceID = info.DeviceID
-		m.Tag.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
-		if m.Tag.PodClusterID == 0 {
-			m.Tag.PodClusterID = uint16(info.PodClusterID)
+		t.RegionID = uint16(info.RegionID)
+		t.AZID = uint16(info.AZID)
+		t.HostID = uint16(info.HostID)
+		t.PodGroupID = info.PodGroupID
+		t.PodNSID = uint16(info.PodNSID)
+		t.PodNodeID = info.PodNodeID
+		t.SubnetID = uint16(info.SubnetID)
+		t.L3DeviceID = info.DeviceID
+		t.L3DeviceType = zerodoc.DeviceType(info.DeviceType)
+		if t.PodClusterID == 0 {
+			t.PodClusterID = uint16(info.PodClusterID)
 		}
-		if m.Tag.PodID == 0 {
-			m.Tag.PodID = info.PodID
+		if t.PodID == 0 {
+			t.PodID = info.PodID
 		}
+
+		if t.L3DeviceType == zerodoc.DeviceType(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) ||
+			t.PodID != 0 ||
+			t.PodNodeID != 0 {
+			if t.IsIPv6 == 1 {
+				_, t.ServiceID = d.platformData.QueryIPv6IsKeyServiceAndID(t.L3EpcID, t.IP6, 0, 0)
+			} else {
+				_, t.ServiceID = d.platformData.QueryIsKeyServiceAndID(t.L3EpcID, t.IP, 0, 0)
+			}
+		}
+		t.ResourceGl0ID, t.ResourceGl0Type = common.GetResourceGl0(t.PodID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.ResourceGl1ID, t.ResourceGl1Type = common.GetResourceGl1(t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
+		t.ResourceGl2ID, t.ResourceGl2Type = common.GetResourceGl2(t.ServiceID, t.PodGroupID, t.PodNodeID, t.L3DeviceID, uint8(t.L3DeviceType), t.L3EpcID)
 	}
 }
 

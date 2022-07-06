@@ -6,6 +6,12 @@ on:
     paths:
       - 'agent/**'
       - 'message/**'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Why trigger?"
+        required: true 
+        type: string
 #   release:
 #     branches: 
 #       - main
@@ -19,6 +25,44 @@ env:
 jobs:
   build_agent:
     name: build agent
+    runs-on: [self-hosted, 16c16g]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "ghcr.io" 
+          username: "${{ github.repository_owner }}"
+          password: "${{ secrets.GITHUB_TOKEN }}" 
+
+      - name: Build  metaflow agent
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: false 
+          file: agent/docker/dockerfile-build
+          platforms: linux/amd64
+          outputs: type=local,dest=./agent/output/
+
+      - name: Package code build results
+        run: |
+          tar cvf agent-artifact.tar agent/output/src/ebpf/data agent/output/target/release/metaflow-agent agent/output/target/release/metaflow-agent-ctl agent/output/src/ebpf/metaflow-ebpfctl
+
+      - name: Archive code build results
+        uses: actions/upload-artifact@v3
+        with:
+          name: build results
+          path: |
+            agent-artifact.tar
+
+  build_agent_image:
+    name: build agent image
+    needs: [build_agent]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,6 +70,16 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Download code build results
+        uses: actions/download-artifact@v3
+        with:
+          name: build results
+          path: .
+
+      - name: Unpack code build results
+        run: |
+          tar xvf agent-artifact.tar
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -64,15 +118,6 @@ jobs:
           echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
           echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
-      - name: Build  metaflow agent
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: false 
-          file: agent/docker/dockerfile-build
-          platforms: linux/amd64
-          outputs: type=local,dest=./agent/output/
-
       - name: Build and push metaflow agent images
         uses: docker/build-push-action@v2
         with:
@@ -97,6 +142,14 @@ jobs:
           rpmbuild -bb metaflow-agent_docker.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
           zip -r -q artifacts.zip x86_64/
 
+      - name: build binary package  
+        run: |
+          mkdir -p agent/bin-package/depends
+          cp -raf agent/output/src/ebpf/data/* agent/bin-package/depends
+          cp -raf agent/output/target/release/metaflow-agent agent/bin-package/
+          cd agent/bin-package/
+          tar -czvf metaflow-agent.tar.gz *
+ 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -114,3 +167,4 @@ jobs:
         run: |
           ossutil cp -rf agent/artifacts.zip oss://metaflow/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-rpm.zip
           ossutil cp -rf agent/output/target/release/metaflow-agent-ctl oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent-ctl
+          ossutil cp -rf agent/bin-package/metaflow-agent.tar.gz  oss://metaflow/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-agent.tar.gz

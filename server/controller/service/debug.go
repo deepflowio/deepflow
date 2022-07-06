@@ -109,8 +109,9 @@ func GetGenesisVinterfacesData(g *genesis.Genesis) ([]model.GenesisVinterface, e
 	return g.GetVinterfacesData(), nil
 }
 
-func GetGenesisKubernetesData(g *genesis.Genesis) (map[string]genesis.KubernetesResponse, error) {
-	return g.GetKubernetesData(), nil
+func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string][]string, error) {
+	data, err := g.GetKubernetesResponse(clusterID)
+	return data, err
 }
 
 func GetGenesisIPsData(g *genesis.Genesis) ([]cloudmodel.IP, error) {

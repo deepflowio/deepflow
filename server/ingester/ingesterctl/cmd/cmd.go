@@ -1,9 +1,7 @@
-package main
+package cmd
 
 import (
-	"flag"
 	"fmt"
-	"net"
 	"os"
 	"strconv"
 	"time"
@@ -12,27 +10,24 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/metaflowys/metaflow/server/ingester/droplet/adapter"
-	"github.com/metaflowys/metaflow/server/libs/debug"
-	"github.com/metaflowys/metaflow/server/libs/grpc"
-	"github.com/metaflowys/metaflow/server/libs/receiver"
-
-	"github.com/metaflowys/metaflow/server/ingester/config"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/labeler"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/profiler"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/queue"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl/rpc"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl/rpc"
 	"github.com/metaflowys/metaflow/server/ingester/roze/roze"
 	"github.com/metaflowys/metaflow/server/ingester/stream/stream"
+	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/metaflowys/metaflow/server/libs/receiver"
 )
 
-func main() {
-	flag.StringVar(&dropletctl.ConfigPath, "f", "/etc/droplet.yaml", "Specify config file location")
-	debug.SetIpAndPort(dropletctl.DEBUG_LISTEN_IP, dropletctl.DEBUG_LISTEN_PORT)
-	root := &cobra.Command{
-		Use:   "droplet-ctl",
-		Short: "Droplet Config Tool",
+func RegisterIngesterCommand(root *cobra.Command) {
+	debug.SetIpAndPort(ingesterctl.DEBUG_LISTEN_IP, ingesterctl.DEBUG_LISTEN_PORT)
+	ingesterCmd := &cobra.Command{
+		Use:   "ingester",
+		Short: "ingester debug commands",
 	}
+
 	dropletCmd := &cobra.Command{
 		Use:   "droplet",
 		Short: "Droplet debug commands",
@@ -46,37 +41,28 @@ func main() {
 		Short: "Stream debug commands",
 	}
 
-	cfg := config.Load(dropletctl.ConfigPath)
-	controllers := make([]net.IP, len(cfg.ControllerIPs))
-	for i, ipString := range cfg.ControllerIPs {
-		controllers[i] = net.ParseIP(ipString)
-		if controllers[i].To4() != nil {
-			controllers[i] = controllers[i].To4()
-		}
-	}
+	root.AddCommand(ingesterCmd)
+	ingesterCmd.AddCommand(dropletCmd, rozeCmd, streamCmd)
+	ingesterCmd.AddCommand(profiler.RegisterProfilerCommand())
+	ingesterCmd.AddCommand(debug.RegisterLogLevelCommand())
+	ingesterCmd.AddCommand(RegisterTimeConvertCommand())
 
-	root.AddCommand(dropletCmd, rozeCmd, streamCmd)
-	root.AddCommand(profiler.RegisterProfilerCommand())
-	root.AddCommand(debug.RegisterLogLevelCommand())
-	root.AddCommand(RegisterTimeConvertCommand())
-	root.AddCommand(grpc.RegisterPlatformDataCommand(controllers, int(cfg.ControllerPort)))
-
-	dropletCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_QUEUE, []string{
+	dropletCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_QUEUE, []string{
 		"1-receiver-to-statsd",
 		"1-receiver-to-syslog",
 		"1-receiver-to-meta-packet",
 		"2-meta-packet-block-to-labeler",
 		"3-meta-packet-block-to-pcap-app",
 	}))
-	dropletCmd.AddCommand(adapter.RegisterCommand(dropletctl.DROPLETCTL_ADAPTER))
-	dropletCmd.AddCommand(labeler.RegisterCommand(dropletctl.DROPLETCTL_LABELER))
+	dropletCmd.AddCommand(adapter.RegisterCommand(ingesterctl.INGESTERCTL_ADAPTER))
+	dropletCmd.AddCommand(labeler.RegisterCommand(ingesterctl.INGESTERCTL_LABELER))
 	dropletCmd.AddCommand(rpc.RegisterRpcCommand())
 
-	rozeCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_ROZE_QUEUE, []string{"1-recv-unmarshall"}))
+	rozeCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_ROZE_QUEUE, []string{"1-recv-unmarshall"}))
 	rozeCmd.AddCommand(debug.ClientRegisterSimple(roze.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show roze platform data statistics"}, nil))
 	rozeCmd.AddCommand(receiver.RegisterTridentStatusCommand())
 
-	streamCmd.AddCommand(queue.RegisterCommand(dropletctl.DROPLETCTL_STREAM_QUEUE, []string{
+	streamCmd.AddCommand(queue.RegisterCommand(ingesterctl.INGESTERCTL_STREAM_QUEUE, []string{
 		"1-receive-to-decode-l4",
 		"1-receive-to-decode-l7",
 	}))

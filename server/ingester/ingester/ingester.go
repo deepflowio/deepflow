@@ -24,9 +24,9 @@ import (
 	dropletcfg "github.com/metaflowys/metaflow/server/ingester/droplet/config"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/droplet"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/profiler"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 	extmetricscfg "github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/ext_metrics"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 	rozecfg "github.com/metaflowys/metaflow/server/ingester/roze/config"
 	"github.com/metaflowys/metaflow/server/ingester/roze/roze"
 	streamcfg "github.com/metaflowys/metaflow/server/ingester/stream/config"
@@ -51,7 +51,7 @@ func Start(configPath string) []io.Closer {
 	log.Info("============================== Launching YUNSHAN MetaFlow Ingester ==============================")
 	log.Infof("ingester base config:\n%s", string(bytes))
 
-	debug.SetIpAndPort(dropletctl.DEBUG_LISTEN_IP, dropletctl.DEBUG_LISTEN_PORT)
+	debug.SetIpAndPort(ingesterctl.DEBUG_LISTEN_IP, ingesterctl.DEBUG_LISTEN_PORT)
 	debug.NewLogLevelControl()
 
 	profiler := profiler.NewProfiler(PROFILER_PORT)

@@ -40,7 +40,7 @@ const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
 const SECOND: Duration = Duration::from_secs(1);
 
 pub struct StaticConfig {
-    pub revision: String,
+    pub revision: &'static str,
     pub boot_time: SystemTime,
 
     pub tap_mode: tp::TapMode,
@@ -56,7 +56,7 @@ pub struct StaticConfig {
 impl Default for StaticConfig {
     fn default() -> Self {
         Self {
-            revision: Default::default(),
+            revision: "",
             boot_time: SystemTime::now(),
             tap_mode: Default::default(),
             vtap_group_id_request: Default::default(),
@@ -360,7 +360,7 @@ impl Synchronizer {
     pub fn new(
         session: Arc<Session>,
         trident_state: TridentState,
-        revision: String,
+        revision: &'static str,
         ctrl_ip: String,
         ctrl_mac: String,
         controller_ip: String,
@@ -442,9 +442,9 @@ impl Synchronizer {
             version_acls: Some(status.version_acls),
             version_groups: Some(status.version_groups),
             state: Some(tp::State::Running.into()),
-            revision: Some(static_config.revision.clone()),
+            revision: Some(static_config.revision.to_owned()),
             exception: Some(exception_handler.take()),
-            process_name: Some("metaflow-agent-ce".into()),
+            process_name: Some(env!("AGENT_NAME").into()),
             ctrl_mac: Some(static_config.ctrl_mac.clone()),
             ctrl_ip: Some(static_config.ctrl_ip.clone()),
             tap_mode: Some(static_config.tap_mode.into()),

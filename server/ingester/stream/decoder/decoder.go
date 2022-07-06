@@ -230,8 +230,8 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 
 	d.counter.L7Count++
 	drop := int64(0)
-	if proto.BaseInfo.Head.Proto < uint32(L7_PROTO_MAX) &&
-		d.l7Disableds[proto.BaseInfo.Head.Proto] {
+	if proto.Base.Head.Proto < uint32(L7_PROTO_MAX) &&
+		d.l7Disableds[proto.Base.Head.Proto] {
 		drop = 1
 	} else {
 		l := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
@@ -242,7 +242,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	}
 	proto.Release()
 
-	switch datatype.L7Protocol(proto.BaseInfo.Head.Proto) {
+	switch datatype.L7Protocol(proto.Base.Head.Proto) {
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
