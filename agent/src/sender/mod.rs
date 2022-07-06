@@ -22,8 +22,7 @@ const OPEN_TELEMETRY: u32 = 20220607;
 const PROMETHEUS: u32 = 20220613;
 const TELEGRAF: u32 = 20220613;
 
-const FILE_PATH: &str = "/var/log/metaflow-agent/l4_flow_log";
-const PRE_FILE_PATH: &str = "/var/log/metaflow-agent/l4_flow_log.pre";
+const PRE_FILE_SUFFIX: &str = ".pre";
 const MAX_FILE_SIZE: usize = 1_000_000_000;
 
 pub enum SendItem {
@@ -51,6 +50,13 @@ impl SendItem {
         match self {
             Self::L4FlowLog(l4) => l4.to_kv_string(kv_string),
             _ => return,
+        }
+    }
+
+    pub fn file_name(&self) -> &str {
+        match self {
+            Self::L4FlowLog(_) => "l4_flow_log",
+            _ => "other",
         }
     }
 

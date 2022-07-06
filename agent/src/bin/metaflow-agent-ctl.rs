@@ -211,7 +211,7 @@ impl Controller {
 
     /*
     $ metaflow-agent-ctl list
-    metaflow-agent-ctl listening udp port 20035 to find metaflow-agent
+    metaflow-agent-ctl listening udp port 30035 to find metaflow-agent
 
     -----------------------------------------------------------------------------------------------------
     VTAP ID        HOSTNAME                     IP                                            PORT
