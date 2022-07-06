@@ -424,6 +424,12 @@ message VtapIp {
     optional uint32 pod_cluster_id = 4;
 }
 
+message SkipInterface {
+    // 若该接口对应的虚拟机内已经部署采集器,
+    // 发送此接口给虚拟机所在宿主机采集器
+    optional uint64 mac = 1;
+}
+
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
@@ -442,6 +448,7 @@ message SyncResponse {
     repeated TapType tap_types = 16;
     repeated PodIp  pod_ips = 17; // pod_name到vpc + ip的映射关系, 仅下发给数据节点
     repeated VtapIp vtap_ips = 18; // vtap_id到vpc + ip的映射关系, 仅下发给数据节点
+    repeated SkipInterface skip_interface = 19;
 }
 
 message UpgradeRequest  {

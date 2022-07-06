@@ -118,9 +118,7 @@ type PlatformRawData struct {
 
 	deviceTypeAndIDToVInterfaceID map[TypeIDKey][]int
 
-	launchServerToSkipVifIDs map[string]mapset.Set
-	skipVifIDs               mapset.Set
-	skipDomains              mapset.Set
+	launchServerToSkipInterface map[string][]*trident.SkipInterface
 
 	launchServerToVRouterIDs map[string][]int
 }
@@ -191,9 +189,7 @@ func NewPlatformRawData() *PlatformRawData {
 		deviceVifs:                    []*models.VInterface{},
 		deviceTypeAndIDToVInterfaceID: make(map[TypeIDKey][]int),
 		typeIDToDevice:                make(map[TypeIDKey]*TypeIDData),
-		launchServerToSkipVifIDs:      make(map[string]mapset.Set),
-		skipVifIDs:                    mapset.NewSet(),
-		skipDomains:                   mapset.NewSet(),
+		launchServerToSkipInterface:   make(map[string][]*trident.SkipInterface),
 
 		launchServerToVRouterIDs: make(map[string][]int),
 	}
@@ -839,12 +835,10 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 	kvmLaunchServer := mapset.NewSet()
 	vtapLaunchServer := make(map[string][]int)
 	skipVTaps := dbDataCache.GetSkipVTaps()
-	skipAZs := mapset.NewSet()
 	for _, vtap := range skipVTaps {
 		switch vtap.Type {
 		case VTAP_TYPE_KVM:
 			kvmLaunchServer.Add(vtap.LaunchServer)
-			skipAZs.Add(vtap.AZ)
 		case VTAP_TYPE_WORKLOAD_V:
 			vm, ok := r.idToVM[vtap.LaunchServerID]
 			if ok == false {
@@ -923,8 +917,7 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 		}
 	}
 
-	skipVifIDs := mapset.NewSet()
-	launchServerToSkipVifIDs := make(map[string]mapset.Set)
+	launchServerToSkipVifMacs := make(map[string]mapset.Set)
 	for launchServer, vmIDs := range skipLaunchServerToVMIDs {
 		for _, vmID := range vmIDs {
 			vmVifs, ok := r.vmIDToVifs[vmID]
@@ -933,12 +926,19 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 			}
 			for vmVif := range vmVifs.Iter() {
 				vif := vmVif.(*models.VInterface)
-				if skipVifIDs, ok := launchServerToSkipVifIDs[launchServer]; ok {
-					skipVifIDs.Add(vif.ID)
-				} else {
-					launchServerToSkipVifIDs[launchServer] = mapset.NewSet(vif.ID)
+				if vif.Mac == "00:00:00:00:00:00" {
+					continue
 				}
-				skipVifIDs.Add(vif.ID)
+				macU64, err := MacStrToU64(vif.Mac)
+				if err != nil {
+					log.Error(err, vif.Mac)
+					continue
+				}
+				if skipVifMacs, ok := launchServerToSkipVifMacs[launchServer]; ok {
+					skipVifMacs.Add(macU64)
+				} else {
+					launchServerToSkipVifMacs[launchServer] = mapset.NewSet(macU64)
+				}
 			}
 			podVifs, ok := vmIDToPodNodeAllVifs[vmID]
 			if ok == false {
@@ -946,34 +946,36 @@ func (r *PlatformRawData) ConvertSkipVTapVIfIDs(dbDataCache *DBDataCache) {
 			}
 			for podVif := range podVifs.Iter() {
 				vif := podVif.(*models.VInterface)
-				if skipVifIDs, ok := launchServerToSkipVifIDs[launchServer]; ok {
-					skipVifIDs.Add(vif.ID)
-				} else {
-					launchServerToSkipVifIDs[launchServer] = mapset.NewSet(vif.ID)
+				if vif.Mac == "00:00:00:00:00:00" {
+					continue
 				}
-				skipVifIDs.Add(vif.ID)
+				macU64, err := MacStrToU64(vif.Mac)
+				if err != nil {
+					log.Error(err, vif.Mac)
+					continue
+				}
+				if skipVifMacs, ok := launchServerToSkipVifMacs[launchServer]; ok {
+					skipVifMacs.Add(macU64)
+				} else {
+					launchServerToSkipVifMacs[launchServer] = mapset.NewSet(macU64)
+				}
 			}
 		}
 	}
-	r.launchServerToSkipVifIDs = launchServerToSkipVifIDs
-	r.skipVifIDs = skipVifIDs
-	log.Debug(r.launchServerToSkipVifIDs)
 
-	skipDomains := mapset.NewSet()
-	for az := range skipAZs.Iter() {
-		azStr := az.(string)
-		if dbAZ, ok := r.uuidToAZ[azStr]; ok {
-			skipDomains.Add(dbAZ.Domain)
+	launchServerToSkipInterface := make(map[string][]*trident.SkipInterface)
+	for launchServer, skipVifMacs := range launchServerToSkipVifMacs {
+		for mac := range skipVifMacs.Iter() {
+			macU64 := mac.(uint64)
+			skipInterface := &trident.SkipInterface{
+				Mac: proto.Uint64(macU64),
+			}
+			launchServerToSkipInterface[launchServer] = append(
+				launchServerToSkipInterface[launchServer], skipInterface)
 		}
 	}
-
-	for _, subDomain := range dbDataCache.GetSubDomains() {
-		if skipDomains.Contains(subDomain.Domain) {
-			skipDomains.Add(subDomain.Lcuuid)
-		}
-	}
-	r.skipDomains = skipDomains
-	log.Debug(r.skipDomains)
+	r.launchServerToSkipInterface = launchServerToSkipInterface
+	log.Debug(r.launchServerToSkipInterface)
 }
 
 // 有依赖 需要按顺序convert
@@ -1186,13 +1188,12 @@ func (r *PlatformRawData) GetPodNode(podNodeID int) *models.PodNode {
 	return r.idToPodNode[podNodeID]
 }
 
-func (r *PlatformRawData) GetSkipVifIDs(server string) mapset.Set {
-	result, ok := r.launchServerToSkipVifIDs[server]
-	if ok {
+func (r *PlatformRawData) GetSkipInterface(server string) []*trident.SkipInterface {
+	if result, ok := r.launchServerToSkipInterface[server]; ok {
 		return result
 	}
 
-	return mapset.NewSet()
+	return nil
 }
 
 func (r *PlatformRawData) equal(o *PlatformRawData) bool {
@@ -1417,9 +1418,5 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 		return false
 	}
 
-	if !r.skipVifIDs.Equal(o.skipVifIDs) {
-		log.Info("skip vif ids changed")
-		return false
-	}
 	return true
 }

@@ -6,8 +6,6 @@ import (
 	"math/rand"
 	"time"
 
-	mapset "github.com/deckarep/golang-set"
-	"github.com/golang/protobuf/proto"
 	"github.com/metaflowys/metaflow/message/trident"
 )
 
@@ -97,43 +95,6 @@ func (f *PlatformData) GeneratePlatformDataResult() {
 	h64.Write(f.platformDataStr)
 	f.platformDataHash = h64.Sum64()
 }
-
-func (f *PlatformData) GenerateSkipPlatformDataResult(skipVifIDs mapset.Set) {
-	skipInterfaceProtos := make([]*trident.Interface, 0, len(f.interfaceProtos))
-	if skipVifIDs.Cardinality() > 0 {
-		for _, interfaceProto := range f.interfaceProtos {
-			tInterfaceProto := proto.Clone(interfaceProto).(*trident.Interface)
-			if skipVifIDs.Contains(int(interfaceProto.GetId())) {
-				tInterfaceProto.SkipTapInterface = proto.Bool(true)
-				skipInterfaceProtos = append(skipInterfaceProtos, tInterfaceProto)
-			} else {
-				tInterfaceProto.SkipTapInterface = proto.Bool(false)
-				skipInterfaceProtos = append(skipInterfaceProtos, tInterfaceProto)
-			}
-		}
-	} else {
-		for _, interfaceProto := range f.interfaceProtos {
-			tInterfaceProto := proto.Clone(interfaceProto).(*trident.Interface)
-			tInterfaceProto.SkipTapInterface = proto.Bool(false)
-			skipInterfaceProtos = append(skipInterfaceProtos, tInterfaceProto)
-		}
-	}
-	f.platformDataProtos = &trident.PlatformData{
-		Interfaces:      skipInterfaceProtos,
-		PeerConnections: f.peerConnProtos,
-		Cidrs:           f.cidrProtos,
-	}
-	var err error
-	f.platformDataStr, err = f.platformDataProtos.Marshal()
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	h64 := fnv.New64()
-	h64.Write(f.platformDataStr)
-	f.platformDataHash = h64.Sum64()
-}
-
 func (f *PlatformData) Merge(other *PlatformData) {
 	f.interfaceProtos = append(f.interfaceProtos, other.interfaceProtos...)
 	f.peerConnProtos = append(f.peerConnProtos, other.peerConnProtos...)
@@ -146,58 +107,6 @@ func (f *PlatformData) Merge(other *PlatformData) {
 
 func (f *PlatformData) MergeInterfaces(other *PlatformData) {
 	f.interfaceProtos = append(f.interfaceProtos, other.interfaceProtos...)
-	f.version += other.version
-	if len(other.domain) != 0 {
-		f.mergeDomains = append(f.mergeDomains, other.domain)
-	}
-}
-
-func (f *PlatformData) SkipMerge(other *PlatformData, skipVifIDs mapset.Set) {
-	if skipVifIDs.Cardinality() > 0 {
-		for _, interfaceProto := range other.interfaceProtos {
-			tInterfaceProto := proto.Clone(interfaceProto).(*trident.Interface)
-			if skipVifIDs.Contains(int(interfaceProto.GetId())) {
-				tInterfaceProto.SkipTapInterface = proto.Bool(true)
-				f.interfaceProtos = append(f.interfaceProtos, tInterfaceProto)
-			} else {
-				tInterfaceProto.SkipTapInterface = proto.Bool(false)
-				f.interfaceProtos = append(f.interfaceProtos, tInterfaceProto)
-			}
-		}
-	} else {
-		for _, interfaceProto := range other.interfaceProtos {
-			tInterfaceProto := proto.Clone(interfaceProto).(*trident.Interface)
-			tInterfaceProto.SkipTapInterface = proto.Bool(false)
-			f.interfaceProtos = append(f.interfaceProtos, tInterfaceProto)
-		}
-	}
-	f.peerConnProtos = append(f.peerConnProtos, other.peerConnProtos...)
-	f.cidrProtos = append(f.cidrProtos, other.cidrProtos...)
-	f.version += other.version
-	if len(other.domain) != 0 {
-		f.mergeDomains = append(f.mergeDomains, other.domain)
-	}
-}
-
-func (f *PlatformData) SkipMergeInterfaces(other *PlatformData, skipVifIDs mapset.Set) {
-	if skipVifIDs.Cardinality() > 0 {
-		for _, interfaceProto := range other.interfaceProtos {
-			tInterfaceProto := proto.Clone(interfaceProto).(*trident.Interface)
-			if skipVifIDs.Contains(int(interfaceProto.GetId())) {
-				tInterfaceProto.SkipTapInterface = proto.Bool(true)
-				f.interfaceProtos = append(f.interfaceProtos, tInterfaceProto)
-			} else {
-				tInterfaceProto.SkipTapInterface = proto.Bool(false)
-				f.interfaceProtos = append(f.interfaceProtos, tInterfaceProto)
-			}
-		}
-	} else {
-		for _, interfaceProto := range other.interfaceProtos {
-			tInterfaceProto := proto.Clone(interfaceProto).(*trident.Interface)
-			tInterfaceProto.SkipTapInterface = proto.Bool(false)
-			f.interfaceProtos = append(f.interfaceProtos, tInterfaceProto)
-		}
-	}
 	f.version += other.version
 	if len(other.domain) != 0 {
 		f.mergeDomains = append(f.mergeDomains, other.domain)
