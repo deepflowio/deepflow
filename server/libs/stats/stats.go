@@ -374,6 +374,7 @@ func init() {
 	} else {
 
 	}
+	processName = strings.Replace(processName, "-", "_", -1)
 
 	go run()
 }
