@@ -5,17 +5,26 @@ use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use log::{info, warn};
+use log::{error, info, warn};
+use md5::{Digest, Md5};
 use serde::Deserialize;
 use thiserror::Error;
+use tokio::runtime::Runtime;
 
 use crate::common::decapsulate::TunnelType;
 use crate::common::{
     enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
     L7_PROTOCOL_INFERENCE_TTL,
 };
-use crate::proto::{common, trident};
+use crate::proto::{
+    common,
+    trident::{self, KubernetesClusterIdRequest},
+};
+use crate::rpc::Session;
 use crate::utils::environment::K8S_NODE_IP_FOR_METAFLOW;
+
+const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+const MINUTE: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -70,22 +79,78 @@ impl Config {
             if cfg.controller_ips.is_empty() {
                 return Err(ConfigError::ControllerIpsEmpty);
             }
-            // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
-            // 发现存在K8S_NODE_IP_FOR_METAFLOW环境变量、且ConfigMap中kubernetes-cluster-id为空，
-            // 传一个特殊的k8s-cluster-id请求控制器。
-            // ======================================================================================================
-            // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
-            // It is found that the K8S_NODE_IP_FOR_METAFLOW environment variable exists, and the kubernetes-cluster-id in the
-            // ConfigMap is empty, pass a special k8s-cluster-id request controller
-            if let Ok(ip) = env::var(K8S_NODE_IP_FOR_METAFLOW) {
-                if cfg.kubernetes_cluster_id.is_empty() {
-                    let cluster_id = format!("METAFLOW_K8S_CLUSTER-{}", ip);
-                    info!("set kubernetes_cluster_id to {}", cluster_id);
-                    cfg.kubernetes_cluster_id = cluster_id;
-                }
-            }
+
             Ok(cfg)
         }
+    }
+
+    // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
+    // 发现存在K8S_NODE_IP_FOR_METAFLOW环境变量、且ConfigMap中kubernetes-cluster-id为空,
+    // 调用GetKubernetesClusterID RPC，获取cluster-id, 如果RPC调用失败，sleep 1分钟后再次调用，直到成功
+    // ======================================================================================================
+    // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
+    // It is found that the K8S_NODE_IP_FOR_METAFLOW environment variable exists, and the kubernetes-cluster-id in the
+    // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
+    // after 1 minute of sleep until it succeeds
+    pub fn get_k8s_cluster_id(session: &Session) -> Option<String> {
+        if env::var(K8S_NODE_IP_FOR_METAFLOW).is_err() {
+            error!(
+                "cannot get K8S_NODE_IP_FOR_METAFLOW value,  maybe that is not set 
+                or the agent is not running in the k8s environment"
+            );
+            return None;
+        }
+
+        let ca_md5 = match fs::read_to_string(K8S_CA_CRT_PATH) {
+            Ok(c) => {
+                let mut hasher = Md5::new();
+                hasher.update(c.as_bytes());
+                Some(
+                    hasher
+                        .finalize_reset()
+                        .into_iter()
+                        .map(|c| format!("{:02x}", c))
+                        .collect::<Vec<_>>()
+                        .join(""),
+                )
+            }
+            Err(e) => {
+                error!("failed to read {} error: {}", K8S_CA_CRT_PATH, e);
+                return None;
+            }
+        };
+        let runtime = Runtime::new().unwrap();
+        runtime.block_on(async {
+            loop {
+                session.update_current_server().await;
+                let client = match session.get_client() {
+                    Some(c) => c,
+                    None => {
+                        warn!("rpc client not connected");
+                        tokio::time::sleep(MINUTE).await;
+                        continue;
+                    }
+                };
+                let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+                let request = KubernetesClusterIdRequest {
+                    ca_md5: ca_md5.clone(),
+                };
+
+                match client.get_kubernetes_cluster_id(request).await {
+                    Ok(response) => match response.into_inner().cluster_id {
+                        Some(id) => {
+                            info!("set kubernetes_cluster_id to {}", id);
+                            return Some(id);
+                        }
+                        None => {
+                            error!("call get_kubernetes_cluster_id return response is none")
+                        }
+                    },
+                    Err(e) => error!("failed to call get_kubernetes_cluster_id error: {}", e),
+                }
+                tokio::time::sleep(MINUTE).await;
+            }
+        })
     }
 }
 

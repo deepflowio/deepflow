@@ -340,6 +340,11 @@ func setHostname(name string) {
 	lock.Unlock()
 }
 
+func setProcessName(name string) {
+	log.Info("Process name changed to", name)
+	processName = name
+}
+
 func winBase(path string) string {
 	// Find the last element
 	if i := strings.LastIndex(path, "\\"); i >= 0 {
@@ -369,6 +374,7 @@ func init() {
 	} else {
 
 	}
+	processName = strings.Replace(processName, "-", "_", -1)
 
 	go run()
 }

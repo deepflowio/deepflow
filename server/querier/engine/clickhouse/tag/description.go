@@ -208,6 +208,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	if err != nil {
 		return nil, err
 	}
+	defer chClient.Close()
 	sql := "SELECT key FROM k8s_label_map GROUP BY key"
 	rst, err := chClient.DoQuery(sql, nil)
 	if err != nil {
@@ -243,6 +244,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	if err != nil {
 		return nil, err
 	}
+	defer externalChClient.Close()
 	externalSql := ""
 	if db == "ext_metrics" {
 		externalSql = fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s WHERE %s) GROUP BY tag_name", table, whereSql)
@@ -334,6 +336,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer chClient.Close()
 	var sql string
 	var dictTag = "''"
 	var whereSql string
@@ -516,6 +519,7 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 	if err != nil {
 		return nil, err
 	}
+	defer chClient.Close()
 	var sql string
 	if db == "ext_metrics" {
 		sql = fmt.Sprintf("WITH arrayJoin(tag_names) AS tag_name SELECT arrayJoin(tag_values) AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", table, whereSql)
