@@ -18,7 +18,7 @@ use std::{
     io::Write,
     net::{IpAddr, TcpStream},
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -29,7 +29,7 @@ use std::{
 
 use log::{info, warn};
 
-use super::{COMPRESSOR_PORT, ERR_INTERVAL, RCV_TIMEOUT, SEQUENCE_OFFSET};
+use super::{ERR_INTERVAL, RCV_TIMEOUT, SEQUENCE_OFFSET};
 
 use crate::utils::{
     bytes::write_u64_be,
@@ -65,6 +65,7 @@ impl RefCountable for TcpPacketCounter {
 
 pub struct TcpPacketSender {
     dst_ip: Arc<Mutex<IpAddr>>,
+    dst_port: Arc<AtomicU16>,
     reconnect: Arc<AtomicBool>,
     running: Arc<AtomicBool>,
 
@@ -77,6 +78,7 @@ impl TcpPacketSender {
     pub fn new(
         id: u32,
         dst_ip: IpAddr,
+        dst_port: u16,
         receiver: Receiver<Vec<u8>>,
     ) -> (Self, Arc<TcpPacketCounter>) {
         let running = Arc::new(AtomicBool::new(false));
@@ -88,6 +90,7 @@ impl TcpPacketSender {
         (
             Self {
                 dst_ip: Arc::new(Mutex::new(dst_ip)),
+                dst_port: Arc::new(AtomicU16::new(dst_port)),
                 reconnect: Arc::new(AtomicBool::new(true)),
                 running,
                 receiver: Arc::new(receiver),
@@ -107,6 +110,7 @@ impl TcpPacketSender {
         let reconnect = self.reconnect.clone();
         let counter = self.counter.clone();
         let dst_ip = self.dst_ip.clone();
+        let dst_port = self.dst_port.clone();
         let receiver = self.receiver.clone();
 
         let thread = thread::spawn(move || {
@@ -117,7 +121,12 @@ impl TcpPacketSender {
                 match receiver.recv(Some(RCV_TIMEOUT)) {
                     Ok(mut pkt) => {
                         if (socket.is_none() || reconnect.load(Ordering::Relaxed))
-                            && !Self::connect(&reconnect, &mut socket, *dst_ip.lock().unwrap())
+                            && !Self::connect(
+                                &reconnect,
+                                &mut socket,
+                                *dst_ip.lock().unwrap(),
+                                dst_port.load(Ordering::Relaxed),
+                            )
                         {
                             continue;
                         }
@@ -162,13 +171,19 @@ impl TcpPacketSender {
         info!("tcp packet sender exited");
     }
 
-    pub fn update_tsdb_ip(&self, ip: IpAddr) {
+    pub fn update_tsdb_ip_and_port(&self, ip: IpAddr, port: u16) {
         *self.dst_ip.lock().unwrap() = ip;
+        self.dst_port.store(port, Ordering::Relaxed);
         self.reconnect.store(true, Ordering::Relaxed);
     }
 
-    fn connect(reconnect: &AtomicBool, socket: &mut Option<TcpStream>, dst_ip: IpAddr) -> bool {
-        match TcpStream::connect((dst_ip, COMPRESSOR_PORT)) {
+    fn connect(
+        reconnect: &AtomicBool,
+        socket: &mut Option<TcpStream>,
+        dst_ip: IpAddr,
+        dst_port: u16,
+    ) -> bool {
+        match TcpStream::connect((dst_ip, dst_port)) {
             Ok(s) => {
                 socket.replace(s);
                 reconnect.swap(false, Ordering::Relaxed);

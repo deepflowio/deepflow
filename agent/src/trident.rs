@@ -16,7 +16,7 @@
 
 use std::env;
 use std::mem;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
 use std::process;
 use std::sync::{
@@ -26,11 +26,13 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
+use arc_swap::access::Access;
+use dns_lookup::lookup_host;
 use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, LoggerHandle, Naming,
 };
-use log::{info, warn};
+use log::{error, info, warn};
 
 use crate::{
     collector::Collector,
@@ -40,10 +42,10 @@ use crate::{
     },
     common::{
         enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
-        DEFAULT_LOG_RETENTION, DROPLET_PORT, FREE_SPACE_REQUIREMENT,
+        DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
     },
     config::{
-        handler::{ConfigHandler, DispatcherConfig},
+        handler::{ConfigHandler, DispatcherConfig, PortAccess},
         Config, ConfigError, RuntimeConfig, YamlConfig,
     },
     debug::{ConstructDebugCtx, Debugger, QueueDebugger},
@@ -70,7 +72,9 @@ use crate::{
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
-        net::{get_mac_by_ip, get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex},
+        net::{
+            get_mac_by_ip, get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex, MacAddr,
+        },
         queue,
         stats::{self, Countable, RefCountable, StatsOption},
         LeakyBucket,
@@ -100,6 +104,30 @@ pub type TridentState = Arc<(Mutex<State>, Condvar)>;
 pub struct Trident {
     state: TridentState,
     handle: Option<JoinHandle<()>>,
+}
+
+fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
+    // Directlly use env.K8S_NODE_IP_FOR_METAFLOW as the ctrl_ip reported by metaflow-agent if available
+    match get_k8s_local_node_ip() {
+        Some(ip) => {
+            info!(
+                "use K8S_NODE_IP_FOR_METAFLOW env ip as destination_ip({})",
+                ip
+            );
+            let ctrl_mac = get_mac_by_ip(ip);
+            if ctrl_mac.is_err() {
+                error!("failed getting ctrl_mac from {}: {:?}", ip, ctrl_mac);
+            }
+            (ip, ctrl_mac.unwrap())
+        }
+        None => {
+            let tuple = get_route_src_ip_and_mac(&dest);
+            if tuple.is_err() {
+                error!("failed getting control ip and mac");
+            }
+            tuple.unwrap()
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -136,7 +164,7 @@ impl Trident {
             .to_owned();
         let (remote_log_writer, remote_log_config) = RemoteLogWriter::new(
             &config.controller_ips,
-            DROPLET_PORT,
+            DEFAULT_INGESTER_PORT,
             base_name,
             vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
         );
@@ -200,19 +228,7 @@ impl Trident {
     ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
-        // Directlly use env.K8S_NODE_IP_FOR_METAFLOW as the ctrl_ip reported by metaflow-agent if available
-        let (ctrl_ip, ctrl_mac) = match get_k8s_local_node_ip() {
-            Some(ip) => {
-                info!(
-                    "use K8S_NODE_IP_FOR_METAFLOW env ip as destination_ip({})",
-                    ip
-                );
-                let ctrl_mac = get_mac_by_ip(ip)?;
-                (ip, ctrl_mac)
-            }
-            None => get_route_src_ip_and_mac(&config.controller_ips[0].parse()?)
-                .context("failed getting control ip and mac")?,
-        };
+        let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
         info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
 
         let exception_handler = ExceptionHandler::default();
@@ -238,8 +254,13 @@ impl Trident {
             false,
         );
 
-        let mut config_handler =
-            ConfigHandler::new(config, ctrl_ip, ctrl_mac, logger_handle, remote_log_config);
+        let mut config_handler = ConfigHandler::new(
+            config,
+            ctrl_ip,
+            ctrl_mac,
+            logger_handle,
+            remote_log_config.clone(),
+        );
 
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
@@ -318,6 +339,7 @@ impl Trident {
                         &synchronizer,
                         policy_getter,
                         exception_handler.clone(),
+                        remote_log_config.clone(),
                     )?;
                     comp.start();
                     for callback in callbacks {
@@ -391,6 +413,123 @@ fn dispatcher_listener_callback(
     }
 }
 
+pub struct DomainNameListener {
+    stats_collector: Arc<stats::Collector>,
+    synchronizer: Arc<Synchronizer>,
+    remote_log_config: RemoteLogConfig,
+
+    ips: Vec<String>,
+    domain_names: Vec<String>,
+    port_config: PortAccess,
+
+    thread_handler: Option<JoinHandle<()>>,
+    stopped: Arc<AtomicBool>,
+}
+
+impl DomainNameListener {
+    const INTERVAL: u64 = 5;
+
+    fn new(
+        stats_collector: Arc<stats::Collector>,
+        synchronizer: Arc<Synchronizer>,
+        remote_log_config: RemoteLogConfig,
+        domain_names: Vec<String>,
+        ips: Vec<String>,
+        port_config: PortAccess,
+    ) -> DomainNameListener {
+        Self {
+            stats_collector: stats_collector.clone(),
+            synchronizer: synchronizer.clone(),
+            remote_log_config,
+
+            domain_names: domain_names.clone(),
+            ips: ips.clone(),
+            port_config,
+
+            thread_handler: None,
+            stopped: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn start(&mut self) {
+        if self.thread_handler.is_some() {
+            return;
+        }
+        self.stopped.store(false, Ordering::Relaxed);
+        self.run();
+    }
+
+    fn stop(&mut self) {
+        if self.thread_handler.is_none() {
+            return;
+        }
+        self.stopped.store(true, Ordering::Relaxed);
+        if let Some(handler) = self.thread_handler.take() {
+            let _ = handler.join();
+        }
+    }
+
+    fn run(&mut self) {
+        if self.domain_names.len() == 0 {
+            return;
+        }
+        let stats_collector = self.stats_collector.clone();
+        let synchronizer = self.synchronizer.clone();
+
+        let mut ips = self.ips.clone();
+        let domain_names = self.domain_names.clone();
+        let stopped = self.stopped.clone();
+        let remote_log_config = self.remote_log_config.clone();
+        let port_config = self.port_config.clone();
+
+        info!(
+            "Resolve controller domain name {} {}",
+            domain_names[0], ips[0]
+        );
+
+        self.thread_handler = Some(thread::spawn(move || {
+            while !stopped.swap(false, Ordering::Relaxed) {
+                thread::sleep(Duration::from_secs(Self::INTERVAL));
+
+                let mut changed = false;
+                for i in 0..domain_names.len() {
+                    let current = lookup_host(domain_names[i].as_str());
+                    if current.is_err() {
+                        continue;
+                    }
+                    let current = current.unwrap();
+
+                    changed = current.iter().find(|&&x| x.to_string() == ips[i]).is_none();
+                    if changed {
+                        info!(
+                            "Domain name {} ip {} change to {}",
+                            domain_names[i], ips[i], current[0]
+                        );
+                        ips[i] = current[0].to_string();
+                    }
+                }
+
+                if changed {
+                    let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(ips[0].parse().unwrap());
+
+                    synchronizer.reset_session(
+                        ips.clone(),
+                        ctrl_ip.to_string(),
+                        ctrl_mac.to_string(),
+                    );
+                    stats_collector.set_remotes(
+                        ips.iter()
+                            .map(|item| item.parse::<IpAddr>().unwrap())
+                            .collect(),
+                    );
+
+                    remote_log_config.set_remotes(&ips, port_config.load().analyzer_port);
+                }
+            }
+        }));
+    }
+}
+
 pub struct Components {
     pub rx_leaky_bucket: Arc<LeakyBucket>,
     pub l7_log_rate: Arc<LeakyBucket>,
@@ -416,6 +555,7 @@ pub struct Components {
     pub prometheus_uniform_sender: UniformSenderThread,
     pub telegraf_uniform_sender: UniformSenderThread,
     pub exception_handler: ExceptionHandler,
+    pub domain_name_listener: DomainNameListener,
     max_memory: u64,
     tap_mode: TapMode,
 }
@@ -467,6 +607,7 @@ impl Components {
         self.prometheus_uniform_sender.start();
         self.telegraf_uniform_sender.start();
         self.external_metrics_server.start();
+        self.domain_name_listener.start();
 
         info!("Started components.");
     }
@@ -478,6 +619,7 @@ impl Components {
         synchronizer: &Arc<Synchronizer>,
         policy_getter: PolicyGetter,
         exception_handler: ExceptionHandler,
+        remote_log_config: RemoteLogConfig,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -528,6 +670,7 @@ impl Components {
             poller: platform_synchronizer.clone_poller(),
             session: session.clone(),
             static_config: synchronizer.static_config.clone(),
+            running_config: synchronizer.running_config.clone(),
             status: synchronizer.status.clone(),
             config: config_handler.debug(),
         };
@@ -805,7 +948,7 @@ impl Components {
                 MetricsType::SECOND | MetricsType::MINUTE,
                 config_handler,
                 &queue_debugger,
-                synchronizer,
+                &synchronizer,
             );
             collectors.push(collector);
         }
@@ -902,6 +1045,15 @@ impl Components {
             exception_handler.clone(),
         );
 
+        let domain_name_listener = DomainNameListener::new(
+            stats_collector.clone(),
+            synchronizer.clone(),
+            remote_log_config,
+            config_handler.static_config.controller_domain_name.clone(),
+            config_handler.static_config.controller_ips.clone(),
+            config_handler.port(),
+        );
+
         Ok(Components {
             rx_leaky_bucket,
             l7_log_rate,
@@ -929,6 +1081,7 @@ impl Components {
             prometheus_uniform_sender,
             telegraf_uniform_sender,
             tap_mode,
+            domain_name_listener,
         })
     }
 
@@ -1118,6 +1271,7 @@ impl Components {
         self.otel_uniform_sender.stop();
         self.prometheus_uniform_sender.stop();
         self.telegraf_uniform_sender.stop();
+        self.domain_name_listener.stop();
 
         info!("Stopped components.")
     }
