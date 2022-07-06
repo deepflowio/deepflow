@@ -70,6 +70,7 @@ struct socket_bpf_data {
  * @tracer_state: 追踪器当前状态
  *
  * @boot_time_update_diff 这里用于记录相邻两次更新后，系统启动时间之间的差异（单位为纳秒）。
+ * @probes_count How many probes now 
  */
 struct socket_trace_stats {
 
@@ -105,6 +106,7 @@ struct socket_trace_stats {
 	uint8_t tracer_state; 
 
 	int64_t boot_time_update_diff;
+	uint32_t probes_count;
 };
 
 struct bpf_offset_param {

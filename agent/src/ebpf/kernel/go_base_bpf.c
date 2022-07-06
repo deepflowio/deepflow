@@ -24,7 +24,8 @@ struct {
 	__uint(max_entries, MAX_SYSTEM_THREADS);
 } goroutines_map SEC(".maps");
 
-static __inline int get_uprobe_offset(int offset_idx){
+static __inline int get_uprobe_offset(int offset_idx)
+{
 	__u64 id;
 	pid_t pid;
 
@@ -34,9 +35,9 @@ static __inline int get_uprobe_offset(int offset_idx){
 	offsets = bpf_map_lookup_elem(&go_offsets_map, &pid);
 	if (offsets) {
 		return offsets->data[offset_idx];
-	} else {
-		return -1;
 	}
+
+	return -1;
 }
 
 static __inline __u32 get_go_version(void)
@@ -50,9 +51,9 @@ static __inline __u32 get_go_version(void)
 	offsets = bpf_map_lookup_elem(&go_offsets_map, &pid);
 	if (offsets) {
 		return offsets->version;
-	} else {
-		return 0;
 	}
+
+	return 0;
 }
 
 static __inline int get_runtime_g_goid_offset(void)
@@ -74,18 +75,20 @@ static __inline __s64 get_current_goroutine(void)
 {
 	__u64 current_thread = bpf_get_current_pid_tgid();
 	__s64 *goid_ptr = bpf_map_lookup_elem(&goroutines_map, &current_thread);
-	if (goid_ptr)
+	if (goid_ptr) {
 		return *goid_ptr;
-	else
-		return 0;
+	}
+
+	return 0;
 }
 
 SEC("uprobe/runtime.casgstatus")
 int runtime_casgstatus(struct pt_regs *ctx)
 {
 	int offset_g_goid = get_runtime_g_goid_offset();
-	if (offset_g_goid < 0)
+	if (offset_g_goid < 0) {
 		return 0;
+	}
 
 	__s32 newval;
 	void *g_ptr;
@@ -99,12 +102,12 @@ int runtime_casgstatus(struct pt_regs *ctx)
 			       (void *)(ctx->rsp + 20));
 	}
 
-	if (newval != 2)
+	if (newval != 2) {
 		return 0;
+	}
 
 	__s64 goid = 0;
 	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
-	
 	__u64 current_thread = bpf_get_current_pid_tgid();
 	bpf_map_update_elem(&goroutines_map, &current_thread, &goid, BPF_ANY);
 
@@ -122,10 +125,50 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 	pid = id >> 32;
 	tid = (__u32)id;
 
-	// If is a process, clear go_offsets_map element
-	if (pid == tid)
+	// If is a process, clear go_offsets_map element and submit event.
+	if (pid == tid) {
 		bpf_map_delete_elem(&go_offsets_map, &pid);
+		struct event_data data;
+		data.pid = pid;
+		data.event_type = EVENT_TYPE_PROC_EXIT;
+		int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
+						BPF_F_CURRENT_CPU, &data,
+						sizeof(data));
+
+		if (ret) {
+			bpf_debug
+			    ("bpf_func_sched_process_exit event outputfaild: %d\n",
+			     ret);
+		}
+
+	}
 
 	bpf_map_delete_elem(&goroutines_map, &id);
+	return 0;
+}
+
+// /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
+SEC("tracepoint/sched/sched_process_exec")
+int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
+{
+	struct event_data data;
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+	pid_t tid = (__u32) id;
+
+	if (pid == tid) {
+		data.event_type = EVENT_TYPE_PROC_EXEC;
+		data.pid = pid;
+		int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
+						BPF_F_CURRENT_CPU, &data,
+						sizeof(data));
+
+		if (ret) {
+			bpf_debug
+			    ("bpf_func_sys_exit_execve event output() faild: %d\n",
+			     ret);
+		}
+	}
+
 	return 0;
 }

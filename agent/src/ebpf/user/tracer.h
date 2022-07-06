@@ -241,6 +241,7 @@ struct bpf_tracer {
 	int probes_count;	// probe count.
 	struct tracepoint tracepoints[PROBES_NUM_MAX];
 	int tracepoints_count;
+	pthread_mutex_t mutex_probes_lock; // Protect the probes operation in multiple threads
 
 	/*
 	 * 数据分发处理worker，queues
@@ -323,6 +324,9 @@ struct bpf_tracer_param {
 	unsigned int perf_pg_cnt;
 	struct rx_queue_info rx_queues[MAX_CPU_NR];
 	uint64_t lost;
+	int probes_count;
+	int state;
+	bool adapt_success;
 	uint64_t proto_status[PROTO_NUM];
 } __attribute__ ((__packed__));
 
@@ -345,8 +349,8 @@ static inline void prefetch0(const volatile void *p)
 #define _PREFETCH(n,size,type)				\
   if ((size) > (n)*CACHE_LINE_BYTES)			\
     __builtin_prefetch (_addr + (n)*CACHE_LINE_BYTES, 	\
-                        PREFETCH_##type,              	\
-                        /* locality */ 3);
+                  PREFETCH_##type,              	\
+                  /* locality */ 3);
 
 #define PREFETCH(addr,size,type)		\
 do {						\
@@ -430,6 +434,7 @@ void add_probe_to_tracer(struct probe *pb);
  * @pb struct probe
  */
 void free_probe_from_tracer(struct probe *pb);
-int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type);
+int tracer_hooks_process(struct bpf_tracer *tracer,
+			 enum tracer_hook_type type, int *probes_count);
 int tracer_uprobes_update(struct bpf_tracer *tracer);
 #endif

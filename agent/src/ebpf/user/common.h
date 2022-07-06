@@ -9,6 +9,7 @@
 #define TIME_TYPE_NAN   1
 #define TIME_TYPE_SEC   0
 
+#define OPEN_FILES_MAX 65536
 #define KPROBE_EVENTS_FILE "/sys/kernel/debug/tracing/kprobe_events"
 #define UPROBE_EVENTS_FILE "/sys/kernel/debug/tracing/uprobe_events"
 
@@ -260,4 +261,5 @@ int sysfs_write(char *file_name, char *v);
 uint64_t gettime(clockid_t clk_id, int flag);
 uint32_t get_sys_uptime(void);
 unsigned long long get_process_starttime(int pid);
+int max_rlim_open_files_set(int num);
 #endif /* __COMMON_H__ */

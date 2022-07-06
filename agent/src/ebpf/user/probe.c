@@ -293,11 +293,12 @@ static int bpf_attach_probe(int progfd, enum bpf_probe_attach_type attach_type,
 						       event_type,
 						       attach_type !=
 						       BPF_PROBE_ENTRY, 0);
+		if (pfd > 0)
+			goto attach_event;
+		else
+			return -1;
 
 	}
-
-	if (pfd > 0)
-		goto attach_event;
 
 	if (create_probe_event
 	    (buf, ev_name, attach_type, config1, offset, event_type,
