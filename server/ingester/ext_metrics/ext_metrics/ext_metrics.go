@@ -9,10 +9,10 @@ import (
 	_ "google.golang.org/grpc"
 
 	dropletqueue "github.com/metaflowys/metaflow/server/ingester/droplet/queue"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/config"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/dbwriter"
 	"github.com/metaflowys/metaflow/server/ingester/ext_metrics/decoder"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 	"github.com/metaflowys/metaflow/server/libs/datatype"
 	"github.com/metaflowys/metaflow/server/libs/debug"
 	"github.com/metaflowys/metaflow/server/libs/grpc"
@@ -39,7 +39,7 @@ type Metricsor struct {
 }
 
 func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics, error) {
-	manager := dropletqueue.NewManager(dropletctl.DROPLETCTL_EXTMETRICS_QUEUE)
+	manager := dropletqueue.NewManager(ingesterctl.INGESTERCTL_EXTMETRICS_QUEUE)
 	controllers := make([]net.IP, len(config.Base.ControllerIPs))
 	for i, ipString := range config.Base.ControllerIPs {
 		controllers[i] = net.ParseIP(ipString)

@@ -2,7 +2,7 @@ package pb
 
 func NewDocument() *Document {
 	return &Document{
-		Minitag: &MiniTag{
+		Tag: &MiniTag{
 			Field: &MiniField{},
 		},
 		Meter: &Meter{
@@ -11,13 +11,13 @@ func NewDocument() *Document {
 				Latency:     &Latency{},
 				Performance: &Performance{},
 				Anomaly:     &Anomaly{},
-				Flowload:    &FlowLoad{},
+				FlowLoad:    &FlowLoad{},
 			},
 			Usage: &UsageMeter{},
 			App: &AppMeter{
-				AppTriffic: &AppTriffic{},
-				AppLatency: &AppLatency{},
-				AppAnomaly: &AppAnomaly{},
+				Traffic: &AppTraffic{},
+				Latency: &AppLatency{},
+				Anomaly: &AppAnomaly{},
 			},
 		},
 	}
@@ -25,19 +25,19 @@ func NewDocument() *Document {
 
 // 清空pb的Document使解码时可以反复使用
 func (d *Document) ResetAll() {
-	miniTag := d.Minitag
+	miniTag := d.Tag
 	field := miniTag.Field
-	ip0 := field.RawIP
+	ip0 := field.Ip
 	if ip0 != nil {
 		ip0 = ip0[:0]
 	}
-	ip1 := field.RawIP1
+	ip1 := field.Ip1
 	if ip1 != nil {
 		ip1 = ip1[:0]
 	}
 	field.Reset()
-	field.RawIP = ip0
-	field.RawIP1 = ip1
+	field.Ip = ip0
+	field.Ip1 = ip1
 
 	miniTag.Reset()
 	miniTag.Field = field
@@ -53,7 +53,7 @@ func (d *Document) ResetAll() {
 	performance.Reset()
 	anomaly := flow.Anomaly
 	anomaly.Reset()
-	flowload := flow.Flowload
+	flowload := flow.FlowLoad
 	flowload.Reset()
 
 	flow.Reset()
@@ -61,23 +61,23 @@ func (d *Document) ResetAll() {
 	flow.Latency = latency
 	flow.Performance = performance
 	flow.Anomaly = anomaly
-	flow.Flowload = flowload
+	flow.FlowLoad = flowload
 
 	usage := meter.Usage
 	usage.Reset()
 
 	app := meter.App
-	appTriffic := app.AppTriffic
-	appTriffic.Reset()
-	appLatency := app.AppLatency
+	appTraffic := app.Traffic
+	appTraffic.Reset()
+	appLatency := app.Latency
 	appLatency.Reset()
-	appAnomaly := app.AppAnomaly
+	appAnomaly := app.Anomaly
 	appAnomaly.Reset()
 
 	app.Reset()
-	app.AppTriffic = appTriffic
-	app.AppLatency = appLatency
-	app.AppAnomaly = appAnomaly
+	app.Traffic = appTraffic
+	app.Latency = appLatency
+	app.Anomaly = appAnomaly
 
 	meter.Reset()
 	meter.Flow = flow
@@ -85,6 +85,6 @@ func (d *Document) ResetAll() {
 	meter.App = app
 
 	d.Reset()
-	d.Minitag = miniTag
+	d.Tag = miniTag
 	d.Meter = meter
 }

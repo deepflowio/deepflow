@@ -33,12 +33,12 @@ func (f *TaggedFlow) EncodePB(encoder *codec.SimpleEncoder, i interface{}) error
 	// 传入的的p *pb.TaggedFlow是可复用的，若p.FlowPerfStats无须发送，会被置为空，故先保留，使可复用
 	var flowPerfStats *pb.FlowPerfStats
 	if p.Flow != nil {
-		flowPerfStats = p.Flow.FlowPerfStats
+		flowPerfStats = p.Flow.PerfStats
 	}
 	f.WriteToPB(p)
 	encoder.WritePB(p)
-	if p.Flow.FlowPerfStats == nil {
-		p.Flow.FlowPerfStats = flowPerfStats
+	if p.Flow.PerfStats == nil {
+		p.Flow.PerfStats = flowPerfStats
 	}
 	return nil
 }

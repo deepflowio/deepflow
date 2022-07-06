@@ -178,7 +178,7 @@ func recvDebugMsg(moduleId debug.ModuleId, conn *net.UDPConn, name string) {
 			if err != nil {
 				if isNotTimeout(err) {
 					queueOperate(moduleId, name, QUEUE_CMD_MONITOR_OFF)
-					fmt.Printf("dropletctl.RecvFromDroplet: %v\n", err)
+					fmt.Printf("ingesterctl.RecvFromDroplet: %v\n", err)
 					return
 				}
 				break

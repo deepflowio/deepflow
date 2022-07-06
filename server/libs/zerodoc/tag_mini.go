@@ -65,23 +65,23 @@ func (f *MiniField) IP1() net.IP {
 }
 
 func (f *MiniField) WriteToPB(p *pb.MiniField) {
-	p.RawIP = f.rawIP[:]
-	p.RawIP1 = f.rawIP1[:]
-	p.GlobalThreadID = uint32(f.GlobalThreadID)
-	p.IsIPv6 = uint32(f.IsIPv6)
-	p.L3EpcID = int32(f.L3EpcID)
-	p.L3EpcID1 = int32(f.L3EpcID1)
-	p.MAC = uint64(f.MAC)
-	p.MAC1 = uint64(f.MAC1)
+	p.Ip = f.rawIP[:]
+	p.Ip1 = f.rawIP1[:]
+	p.GlobalThreadId = uint32(f.GlobalThreadID)
+	p.IsIpv6 = uint32(f.IsIPv6)
+	p.L3EpcId = int32(f.L3EpcID)
+	p.L3EpcId1 = int32(f.L3EpcID1)
+	p.Mac = uint64(f.MAC)
+	p.Mac1 = uint64(f.MAC1)
 
 	p.Direction = uint32(f.Direction)
 	p.TapSide = uint32(f.Direction.ToTAPSide())
 	p.Protocol = uint32(f.Protocol)
-	p.ACLGID = uint32(f.ACLGID)
+	p.AclGid = uint32(f.ACLGID)
 	p.ServerPort = uint32(f.ServerPort)
-	p.VTAPID = uint32(f.VTAPID)
-	p.TAPPort = uint64(f.TAPPort)
-	p.TAPType = uint32(f.TAPType)
+	p.VtapId = uint32(f.VTAPID)
+	p.TapPort = uint64(f.TAPPort)
+	p.TapType = uint32(f.TAPType)
 	p.L7Protocol = uint32(f.L7Protocol)
 	p.TagType = uint32(f.TagType)
 	p.TagValue = uint32(f.TagValue)

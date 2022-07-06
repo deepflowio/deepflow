@@ -3,7 +3,6 @@ package datatype
 import (
 	"fmt"
 
-	"github.com/metaflowys/metaflow/server/libs/codec"
 	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
 	"github.com/metaflowys/metaflow/server/libs/pool"
 )
@@ -34,27 +33,6 @@ type KafkaInfo struct {
 	RespMsgSize int32
 }
 
-func (i *KafkaInfo) Encode(encoder *codec.SimpleEncoder, msgType LogMessageType, code uint16) {
-	encoder.WriteU32(i.CorrelationId)
-
-	switch msgType {
-	case MSG_T_REQUEST:
-		encoder.WriteU32(uint32(i.ReqMsgSize))
-		encoder.WriteU16(i.ApiVersion)
-		encoder.WriteU16(i.ApiKey)
-		encoder.WriteString255(i.ClientID)
-	case MSG_T_RESPONSE:
-		encoder.WriteU32(uint32(i.RespMsgSize))
-	case MSG_T_SESSION:
-		encoder.WriteU32(uint32(i.ReqMsgSize))
-		encoder.WriteU16(i.ApiVersion)
-		encoder.WriteU16(i.ApiKey)
-		encoder.WriteString255(i.ClientID)
-
-		encoder.WriteU32(uint32(i.RespMsgSize))
-	}
-}
-
 func (i *KafkaInfo) WriteToPB(p *pb.KafkaInfo, msgType LogMessageType) {
 
 	switch msgType {
@@ -63,7 +41,7 @@ func (i *KafkaInfo) WriteToPB(p *pb.KafkaInfo, msgType LogMessageType) {
 		p.ReqMsgSize = i.ReqMsgSize
 		p.ApiVersion = uint32(i.ApiVersion)
 		p.ApiKey = uint32(i.ApiKey)
-		p.ClientID = i.ClientID
+		p.ClientId = i.ClientID
 
 		p.RespMsgSize = 0
 	case MSG_T_RESPONSE:
@@ -75,29 +53,9 @@ func (i *KafkaInfo) WriteToPB(p *pb.KafkaInfo, msgType LogMessageType) {
 		p.ReqMsgSize = i.ReqMsgSize
 		p.ApiVersion = uint32(i.ApiVersion)
 		p.ApiKey = uint32(i.ApiKey)
-		p.ClientID = i.ClientID
+		p.ClientId = i.ClientID
 
 		p.RespMsgSize = i.RespMsgSize
-	}
-}
-
-func (i *KafkaInfo) Decode(decoder *codec.SimpleDecoder, msgType LogMessageType, code uint16) {
-	i.CorrelationId = decoder.ReadU32()
-	switch msgType {
-	case MSG_T_REQUEST:
-		i.ReqMsgSize = int32(decoder.ReadU32())
-		i.ApiVersion = decoder.ReadU16()
-		i.ApiKey = decoder.ReadU16()
-		i.ClientID = decoder.ReadString255()
-	case MSG_T_RESPONSE:
-		i.RespMsgSize = int32(decoder.ReadU32())
-	case MSG_T_SESSION:
-		i.ReqMsgSize = int32(decoder.ReadU32())
-		i.ApiVersion = decoder.ReadU16()
-		i.ApiKey = decoder.ReadU16()
-		i.ClientID = decoder.ReadString255()
-
-		i.RespMsgSize = int32(decoder.ReadU32())
 	}
 }
 
@@ -143,7 +101,7 @@ func (i *MqttInfo) WriteToPB(p *pb.MqttInfo, msgType LogMessageType) {
 	case MSG_T_REQUEST:
 		p.ReqMsgSize = i.ReqMsgSize
 		p.ProtoVersion = uint32(i.ProtoVersion)
-		p.ClientID = i.ClientID
+		p.ClientId = i.ClientID
 
 		p.RespMsgSize = 0
 	case MSG_T_RESPONSE:
@@ -151,7 +109,7 @@ func (i *MqttInfo) WriteToPB(p *pb.MqttInfo, msgType LogMessageType) {
 	case MSG_T_SESSION:
 		p.ReqMsgSize = i.ReqMsgSize
 		p.ProtoVersion = uint32(i.ProtoVersion)
-		p.ClientID = i.ClientID
+		p.ClientId = i.ClientID
 
 		p.RespMsgSize = i.RespMsgSize
 	}

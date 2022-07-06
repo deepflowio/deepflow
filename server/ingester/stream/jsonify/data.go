@@ -847,10 +847,10 @@ func parseUint32EpcID(v uint32) int32 {
 }
 
 func (d *DataLinkLayer) Fill(f *pb.Flow) {
-	d.MAC0 = f.FlowKey.MACSrc
-	d.MAC1 = f.FlowKey.MACDst
+	d.MAC0 = f.FlowKey.MacSrc
+	d.MAC1 = f.FlowKey.MacDst
 	d.EthType = uint16(f.EthType)
-	d.VLAN = uint16(f.VLAN)
+	d.VLAN = uint16(f.Vlan)
 }
 
 func cloneIP(src net.IP) net.IP {
@@ -867,52 +867,52 @@ func (n *NetworkLayer) Fill(f *pb.Flow, isIPV6 bool) {
 	// 广域网IP为0.0.0.0或::
 	if isIPV6 {
 		n.IsIPv4 = false
-		n.IP60 = cloneIP(f.FlowKey.IP6Src)
-		n.IP61 = cloneIP(f.FlowKey.IP6Dst)
+		n.IP60 = cloneIP(f.FlowKey.Ip6Src)
+		n.IP61 = cloneIP(f.FlowKey.Ip6Dst)
 	} else {
 		n.IsIPv4 = true
-		n.IP40 = f.FlowKey.IPSrc
-		n.IP41 = f.FlowKey.IPDst
+		n.IP40 = f.FlowKey.IpSrc
+		n.IP41 = f.FlowKey.IpDst
 	}
 
 	n.Protocol = uint8(f.FlowKey.Proto)
-	if f.Tunnel.Type != uint32(datatype.TUNNEL_TYPE_NONE) {
+	if f.Tunnel.TunnelType != uint32(datatype.TUNNEL_TYPE_NONE) {
 		n.TunnelTier = uint8(f.Tunnel.Tier)
 		n.TunnelTxID = f.Tunnel.TxId
 		n.TunnelRxID = f.Tunnel.RxId
-		n.TunnelType = uint16(f.Tunnel.Type)
-		n.TunnelTxIP40 = f.Tunnel.TxIP0
-		n.TunnelTxIP41 = f.Tunnel.TxIP1
-		n.TunnelRxIP40 = f.Tunnel.RxIP0
-		n.TunnelRxIP41 = f.Tunnel.RxIP1
+		n.TunnelType = uint16(f.Tunnel.TunnelType)
+		n.TunnelTxIP40 = f.Tunnel.TxIp0
+		n.TunnelTxIP41 = f.Tunnel.TxIp1
+		n.TunnelRxIP40 = f.Tunnel.RxIp0
+		n.TunnelRxIP41 = f.Tunnel.RxIp1
 		n.TunnelIsIPv4 = true
-		n.TunnelTxMac0 = f.Tunnel.TxMAC0
-		n.TunnelTxMac1 = f.Tunnel.TxMAC1
-		n.TunnelRxMac0 = f.Tunnel.RxMAC0
-		n.TunnelRxMac1 = f.Tunnel.RxMAC1
+		n.TunnelTxMac0 = f.Tunnel.TxMac0
+		n.TunnelTxMac1 = f.Tunnel.TxMac1
+		n.TunnelRxMac0 = f.Tunnel.RxMac0
+		n.TunnelRxMac1 = f.Tunnel.RxMac1
 	}
 }
 
 func (t *TransportLayer) Fill(f *pb.Flow) {
 	t.ClientPort = uint16(f.FlowKey.PortSrc)
 	t.ServerPort = uint16(f.FlowKey.PortDst)
-	t.TCPFlagsBit0 = uint16(f.FlowMetricsPeerSrc.TCPFlags)
-	t.TCPFlagsBit1 = uint16(f.FlowMetricsPeerDst.TCPFlags)
-	t.SynSeq = f.SYNSeq
-	t.SynAckSeq = f.SYNACKSeq
+	t.TCPFlagsBit0 = uint16(f.MetricsPeerSrc.TcpFlags)
+	t.TCPFlagsBit1 = uint16(f.MetricsPeerDst.TcpFlags)
+	t.SynSeq = f.SynSeq
+	t.SynAckSeq = f.SynackSeq
 	t.LastKeepaliveSeq = f.LastKeepaliveSeq
 	t.LastKeepaliveAck = f.LastKeepaliveAck
 }
 
 func (a *ApplicationLayer) Fill(f *pb.Flow) {
-	if f.HasFlowPerfStats == 1 {
-		a.L7Protocol = uint8(f.FlowPerfStats.L7Protocol)
+	if f.HasPerfStats == 1 {
+		a.L7Protocol = uint8(f.PerfStats.L7Protocol)
 	}
 }
 
 func (i *Internet) Fill(f *pb.Flow) {
-	i.Province0 = geo.QueryProvince(f.FlowKey.IPSrc)
-	i.Province1 = geo.QueryProvince(f.FlowKey.IPDst)
+	i.Province0 = geo.QueryProvince(f.FlowKey.IpSrc)
+	i.Province1 = geo.QueryProvince(f.FlowKey.IpDst)
 }
 
 func (k *KnowledgeGraph) fill(
@@ -1049,11 +1049,11 @@ func (k *KnowledgeGraph) fill(
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
 	k.fill(platformData,
-		isIPv6, f.FlowMetricsPeerSrc.IsVIPInterface == 1, f.FlowMetricsPeerDst.IsVIPInterface == 1,
-		int16(f.FlowMetricsPeerSrc.L3EpcID), int16(f.FlowMetricsPeerDst.L3EpcID),
-		f.FlowKey.IPSrc, f.FlowKey.IPDst,
-		f.FlowKey.IP6Src, f.FlowKey.IP6Dst,
-		f.FlowKey.MACSrc, f.FlowKey.MACDst,
+		isIPv6, f.MetricsPeerSrc.IsVipInterface == 1, f.MetricsPeerDst.IsVipInterface == 1,
+		int16(f.MetricsPeerSrc.L3EpcId), int16(f.MetricsPeerDst.L3EpcId),
+		f.FlowKey.IpSrc, f.FlowKey.IpDst,
+		f.FlowKey.Ip6Src, f.FlowKey.Ip6Dst,
+		f.FlowKey.MacSrc, f.FlowKey.MacDst,
 		uint16(f.FlowKey.PortDst),
 		f.TapSide,
 		layers.IPProtocol(f.FlowKey.Proto))
@@ -1074,16 +1074,16 @@ func getStatus(t datatype.CloseType) uint8 {
 func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.CloseType = uint16(f.CloseType)
 	i.FlowSource = uint16(f.FlowSource)
-	i.FlowID = f.FlowID
+	i.FlowID = f.FlowId
 	i.TapType = uint16(f.FlowKey.TapType)
 	i.TapPort, i.TapPortType, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
 	i.TapSide = zerodoc.TAPSideEnum(f.TapSide).String()
 	i.VtapID = uint16(f.FlowKey.VtapId)
 
-	i.L2End0 = f.FlowMetricsPeerSrc.IsL2End == 1
-	i.L2End1 = f.FlowMetricsPeerDst.IsL2End == 1
-	i.L3End0 = f.FlowMetricsPeerSrc.IsL3End == 1
-	i.L3End1 = f.FlowMetricsPeerDst.IsL3End == 1
+	i.L2End0 = f.MetricsPeerSrc.IsL2End == 1
+	i.L2End1 = f.MetricsPeerDst.IsL2End == 1
+	i.L3End0 = f.MetricsPeerSrc.IsL3End == 1
+	i.L3End1 = f.MetricsPeerDst.IsL3End == 1
 
 	i.StartTime = int64(f.StartTime) / int64(time.Microsecond)
 	i.EndTime = int64(f.EndTime) / int64(time.Microsecond)
@@ -1093,58 +1093,58 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 }
 
 func (m *Metrics) Fill(f *pb.Flow) {
-	m.PacketTx = f.FlowMetricsPeerSrc.PacketCount
-	m.PacketRx = f.FlowMetricsPeerDst.PacketCount
-	m.ByteTx = f.FlowMetricsPeerSrc.ByteCount
-	m.ByteRx = f.FlowMetricsPeerDst.ByteCount
-	m.L3ByteTx = f.FlowMetricsPeerSrc.L3ByteCount
-	m.L3ByteRx = f.FlowMetricsPeerDst.L3ByteCount
-	m.L4ByteTx = f.FlowMetricsPeerSrc.L4ByteCount
-	m.L4ByteRx = f.FlowMetricsPeerDst.L4ByteCount
+	m.PacketTx = f.MetricsPeerSrc.PacketCount
+	m.PacketRx = f.MetricsPeerDst.PacketCount
+	m.ByteTx = f.MetricsPeerSrc.ByteCount
+	m.ByteRx = f.MetricsPeerDst.ByteCount
+	m.L3ByteTx = f.MetricsPeerSrc.L3ByteCount
+	m.L3ByteRx = f.MetricsPeerDst.L3ByteCount
+	m.L4ByteTx = f.MetricsPeerSrc.L4ByteCount
+	m.L4ByteRx = f.MetricsPeerDst.L4ByteCount
 
-	m.TotalPacketTx = f.FlowMetricsPeerSrc.TotalPacketCount
-	m.TotalPacketRx = f.FlowMetricsPeerDst.TotalPacketCount
-	m.TotalByteTx = f.FlowMetricsPeerSrc.TotalByteCount
-	m.TotalByteRx = f.FlowMetricsPeerDst.TotalByteCount
+	m.TotalPacketTx = f.MetricsPeerSrc.TotalPacketCount
+	m.TotalPacketRx = f.MetricsPeerDst.TotalPacketCount
+	m.TotalByteTx = f.MetricsPeerSrc.TotalByteCount
+	m.TotalByteRx = f.MetricsPeerDst.TotalByteCount
 
-	if f.HasFlowPerfStats == 1 {
-		p := f.FlowPerfStats
-		m.L7Request = p.L7PerfStats.RequestCount
-		m.L7Response = p.L7PerfStats.ResponseCount
-		m.L7ClientError = p.L7PerfStats.ErrClientCount
-		m.L7ServerError = p.L7PerfStats.ErrServerCount
-		m.L7ServerTimeout = p.L7PerfStats.ErrTimeout
+	if f.HasPerfStats == 1 {
+		p := f.PerfStats
+		m.L7Request = p.L7.RequestCount
+		m.L7Response = p.L7.ResponseCount
+		m.L7ClientError = p.L7.ErrClientCount
+		m.L7ServerError = p.L7.ErrServerCount
+		m.L7ServerTimeout = p.L7.ErrTimeout
 		m.L7Error = m.L7ClientError + m.L7ServerError
 
-		m.RTT = p.TCPPerfStats.RTT
-		m.RTTClientSum = p.TCPPerfStats.RTTClientSum
-		m.RTTClientCount = p.TCPPerfStats.RTTClientCount
+		m.RTT = p.Tcp.Rtt
+		m.RTTClientSum = p.Tcp.RttClientSum
+		m.RTTClientCount = p.Tcp.RttClientCount
 
-		m.RTTServerSum = p.TCPPerfStats.RTTServerSum
-		m.RTTServerCount = p.TCPPerfStats.RTTServerCount
+		m.RTTServerSum = p.Tcp.RttServerSum
+		m.RTTServerCount = p.Tcp.RttServerCount
 
-		m.SRTSum = p.TCPPerfStats.SRTSum
-		m.SRTCount = p.TCPPerfStats.SRTCount
+		m.SRTSum = p.Tcp.SrtSum
+		m.SRTCount = p.Tcp.SrtCount
 
-		m.ARTSum = p.TCPPerfStats.ARTSum
-		m.ARTCount = p.TCPPerfStats.ARTCount
+		m.ARTSum = p.Tcp.ArtSum
+		m.ARTCount = p.Tcp.ArtCount
 
-		m.RRTSum = p.L7PerfStats.RRTSum
-		m.RRTCount = p.L7PerfStats.RRTCount
+		m.RRTSum = p.L7.RrtSum
+		m.RRTCount = p.L7.RrtCount
 
-		m.RTTClientMax = p.TCPPerfStats.RTTClientMax
-		m.RTTServerMax = p.TCPPerfStats.RTTServerMax
-		m.SRTMax = p.TCPPerfStats.SRTMax
-		m.ARTMax = p.TCPPerfStats.ARTMax
-		m.RRTMax = p.L7PerfStats.RRTMax
+		m.RTTClientMax = p.Tcp.RttClientMax
+		m.RTTServerMax = p.Tcp.RttServerMax
+		m.SRTMax = p.Tcp.SrtMax
+		m.ARTMax = p.Tcp.ArtMax
+		m.RRTMax = p.L7.RrtMax
 
-		if p.TCPPerfStats.TcpPerfCountsPeerTx != nil {
-			m.RetransTx = p.TCPPerfStats.TcpPerfCountsPeerTx.RetransCount
-			m.ZeroWinTx = p.TCPPerfStats.TcpPerfCountsPeerTx.ZeroWinCount
+		if p.Tcp.CountsPeerTx != nil {
+			m.RetransTx = p.Tcp.CountsPeerTx.RetransCount
+			m.ZeroWinTx = p.Tcp.CountsPeerTx.ZeroWinCount
 		}
-		if p.TCPPerfStats.TcpPerfCountsPeerRx != nil {
-			m.RetransRx = p.TCPPerfStats.TcpPerfCountsPeerRx.RetransCount
-			m.ZeroWinRx = p.TCPPerfStats.TcpPerfCountsPeerRx.ZeroWinCount
+		if p.Tcp.CountsPeerRx != nil {
+			m.RetransRx = p.Tcp.CountsPeerRx.RetransCount
+			m.ZeroWinRx = p.Tcp.CountsPeerRx.ZeroWinCount
 		}
 	}
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/metaflowys/metaflow/server/ingester/droplet/queue"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/statsd"
 	"github.com/metaflowys/metaflow/server/ingester/droplet/syslog"
-	"github.com/metaflowys/metaflow/server/ingester/dropletctl"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
 )
 
 var log = logging.MustGetLogger("droplet")
@@ -42,7 +42,7 @@ func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 	cleaner.Start()
 
 	// L1 - packet source from tridentAdapter
-	manager := queue.NewManager(dropletctl.DROPLETCTL_QUEUE)
+	manager := queue.NewManager(ingesterctl.INGESTERCTL_QUEUE)
 
 	statsdRecvQueues := manager.NewQueues(
 		"1-receiver-to-statsd", cfg.Queue.StatsdQueueSize, 1, 1,

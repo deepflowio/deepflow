@@ -222,20 +222,20 @@ type TunnelField struct {
 }
 
 func (f *TunnelField) WriteToPB(p *pb.TunnelField) {
-	p.TxIP0 = f.TxIP0
-	p.TxIP1 = f.TxIP1
-	p.RxIP0 = f.RxIP0
-	p.RxIP1 = f.RxIP1
-	p.TxMAC0 = f.TxMAC0
-	p.TxMAC1 = f.TxMAC1
-	p.RxMAC0 = f.RxMAC0
-	p.RxMAC1 = f.RxMAC1
+	p.TxIp0 = f.TxIP0
+	p.TxIp1 = f.TxIP1
+	p.RxIp0 = f.RxIP0
+	p.RxIp1 = f.RxIP1
+	p.TxMac0 = f.TxMAC0
+	p.TxMac1 = f.TxMAC1
+	p.RxMac0 = f.RxMAC0
+	p.RxMac1 = f.RxMAC1
 	p.TxId = f.TxId
 	p.RxId = f.RxId
-	p.Type = uint32(f.Type)
+	p.TunnelType = uint32(f.Type)
 	p.Tier = uint32(f.Tier)
 	if f.IsIPv6 {
-		p.IsIPv6 = 1
+		p.IsIpv6 = 1
 	}
 }
 
@@ -308,12 +308,12 @@ func (f *FlowKey) WriteToPB(p *pb.FlowKey) {
 	p.VtapId = uint32(f.VtapId)
 	p.TapType = uint32(f.TapType)
 	p.TapPort = uint64(f.TapPort)
-	p.MACSrc = uint64(f.MACSrc)
-	p.MACDst = uint64(f.MACDst)
-	p.IPSrc = f.IPSrc
-	p.IPDst = f.IPDst
-	p.IP6Src = f.IP6Src
-	p.IP6Dst = f.IP6Dst
+	p.MacSrc = uint64(f.MACSrc)
+	p.MacDst = uint64(f.MACDst)
+	p.IpSrc = f.IPSrc
+	p.IpDst = f.IPDst
+	p.Ip6Src = f.IP6Src
+	p.Ip6Dst = f.IP6Dst
 	p.PortSrc = uint32(f.PortSrc)
 	p.PortDst = uint32(f.PortDst)
 	p.Proto = uint32(f.Proto)
@@ -367,37 +367,37 @@ func (f *TCPPerfStats) Reverse() {
 
 func (f *TCPPerfStats) WriteToPB(p *pb.TCPPerfStats, l4Protocol L4Protocol) {
 	if l4Protocol == L4_PROTOCOL_TCP {
-		p.RTTClientMax = f.RTTClientMax
-		p.RTTServerMax = f.RTTServerMax
-		p.SRTMax = f.SRTMax
-		p.ARTMax = f.ARTMax
+		p.RttClientMax = f.RTTClientMax
+		p.RttServerMax = f.RTTServerMax
+		p.SrtMax = f.SRTMax
+		p.ArtMax = f.ARTMax
 
-		p.RTT = f.RTT
-		p.RTTClientSum = f.RTTClientSum
-		p.RTTServerSum = f.RTTServerSum
-		p.SRTSum = f.SRTSum
-		p.ARTSum = f.ARTSum
+		p.Rtt = f.RTT
+		p.RttClientSum = f.RTTClientSum
+		p.RttServerSum = f.RTTServerSum
+		p.SrtSum = f.SRTSum
+		p.ArtSum = f.ARTSum
 
-		p.RTTClientCount = f.RTTClientCount
-		p.RTTServerCount = f.RTTServerCount
-		p.SRTCount = f.SRTCount
-		p.ARTCount = f.ARTCount
+		p.RttClientCount = f.RTTClientCount
+		p.RttServerCount = f.RTTServerCount
+		p.SrtCount = f.SRTCount
+		p.ArtCount = f.ARTCount
 
-		if p.TcpPerfCountsPeerTx == nil {
-			p.TcpPerfCountsPeerTx = &pb.TcpPerfCountsPeer{}
+		if p.CountsPeerTx == nil {
+			p.CountsPeerTx = &pb.TcpPerfCountsPeer{}
 		}
-		f.TcpPerfCountsPeers[0].WriteToPB(p.TcpPerfCountsPeerTx)
+		f.TcpPerfCountsPeers[0].WriteToPB(p.CountsPeerTx)
 
-		if p.TcpPerfCountsPeerRx == nil {
-			p.TcpPerfCountsPeerRx = &pb.TcpPerfCountsPeer{}
+		if p.CountsPeerRx == nil {
+			p.CountsPeerRx = &pb.TcpPerfCountsPeer{}
 		}
-		f.TcpPerfCountsPeers[1].WriteToPB(p.TcpPerfCountsPeerRx)
+		f.TcpPerfCountsPeers[1].WriteToPB(p.CountsPeerRx)
 		p.TotalRetransCount = f.TotalRetransCount
 	} else if l4Protocol == L4_PROTOCOL_UDP {
 		*p = pb.TCPPerfStats{}
-		p.ARTMax = f.ARTMax
-		p.ARTSum = f.ARTSum
-		p.ARTCount = f.ARTCount
+		p.ArtMax = f.ARTMax
+		p.ArtSum = f.ARTSum
+		p.ArtCount = f.ARTCount
 	}
 }
 
@@ -431,14 +431,14 @@ func (f *FlowMetricsPeer) WriteToPB(p *pb.FlowMetricsPeer) {
 	p.TotalPacketCount = f.TotalPacketCount
 	p.First = uint64(f.First)
 	p.Last = uint64(f.Last)
-	p.TCPFlags = uint32(f.TCPFlags)
-	p.L3EpcID = f.L3EpcID
+	p.TcpFlags = uint32(f.TCPFlags)
+	p.L3EpcId = f.L3EpcID
 	p.IsL2End = Bool2UInt32(f.IsL2End)
 	p.IsL3End = Bool2UInt32(f.IsL3End)
 	p.IsActiveHost = Bool2UInt32(f.IsActiveHost)
 	p.IsDevice = Bool2UInt32(f.IsDevice)
-	p.IsVIPInterface = Bool2UInt32(f.IsVIPInterface)
-	p.IsVIP = Bool2UInt32(f.IsVIP)
+	p.IsVipInterface = Bool2UInt32(f.IsVIPInterface)
+	p.IsVip = Bool2UInt32(f.IsVIP)
 }
 
 // FIXME 注意：由于FlowGenerator中TCPPerfStats在Flow方向调整之后才获取到，
@@ -495,25 +495,25 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	}
 	f.FlowKey.WriteToPB(p.FlowKey)
 
-	if p.FlowMetricsPeerSrc == nil {
-		p.FlowMetricsPeerSrc = &pb.FlowMetricsPeer{}
+	if p.MetricsPeerSrc == nil {
+		p.MetricsPeerSrc = &pb.FlowMetricsPeer{}
 	}
-	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].WriteToPB(p.FlowMetricsPeerSrc)
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_SRC].WriteToPB(p.MetricsPeerSrc)
 
-	if p.FlowMetricsPeerDst == nil {
-		p.FlowMetricsPeerDst = &pb.FlowMetricsPeer{}
+	if p.MetricsPeerDst == nil {
+		p.MetricsPeerDst = &pb.FlowMetricsPeer{}
 	}
-	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].WriteToPB(p.FlowMetricsPeerDst)
+	f.FlowMetricsPeers[FLOW_METRICS_PEER_DST].WriteToPB(p.MetricsPeerDst)
 
 	if p.Tunnel == nil {
 		p.Tunnel = &pb.TunnelField{}
 	}
 	f.Tunnel.WriteToPB(p.Tunnel)
 
-	p.FlowID = f.FlowID
+	p.FlowId = f.FlowID
 
-	p.SYNSeq = f.SYNSeq
-	p.SYNACKSeq = f.SYNACKSeq
+	p.SynSeq = f.SYNSeq
+	p.SynackSeq = f.SYNACKSeq
 	p.LastKeepaliveSeq = f.LastKeepaliveSeq
 	p.LastKeepaliveAck = f.LastKeepaliveAck
 
@@ -522,16 +522,16 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	p.Duration = uint64(f.Duration)
 
 	p.EthType = uint32(f.EthType)
-	p.VLAN = uint32(f.VLAN)
+	p.Vlan = uint32(f.VLAN)
 	if f.FlowPerfStats != nil {
-		p.HasFlowPerfStats = 1
-		if p.FlowPerfStats == nil {
-			p.FlowPerfStats = &pb.FlowPerfStats{}
+		p.HasPerfStats = 1
+		if p.PerfStats == nil {
+			p.PerfStats = &pb.FlowPerfStats{}
 		}
-		f.FlowPerfStats.WriteToPB(p.FlowPerfStats)
+		f.FlowPerfStats.WriteToPB(p.PerfStats)
 	} else {
-		p.HasFlowPerfStats = 0
-		p.FlowPerfStats = nil
+		p.HasPerfStats = 0
+		p.PerfStats = nil
 	}
 
 	p.CloseType = uint32(f.CloseType)
@@ -750,9 +750,9 @@ func (p *L7PerfStats) WriteToPB(b *pb.L7PerfStats) {
 	b.ErrClientCount = p.ErrClientCount
 	b.ErrServerCount = p.ErrServerCount
 	b.ErrTimeout = p.ErrTimeout
-	b.RRTCount = p.RRTCount
-	b.RRTSum = p.RRTSum
-	b.RRTMax = p.RRTMax
+	b.RrtCount = p.RRTCount
+	b.RrtSum = p.RRTSum
+	b.RrtMax = p.RRTMax
 }
 
 func (p *L7PerfStats) SequentialMerge(rhs *L7PerfStats) {
@@ -772,15 +772,15 @@ func (f *FlowPerfStats) WriteToPB(p *pb.FlowPerfStats) {
 	p.L4Protocol = uint32(f.L4Protocol)
 	p.L7Protocol = uint32(f.L7Protocol)
 
-	if p.TCPPerfStats == nil {
-		p.TCPPerfStats = &pb.TCPPerfStats{}
+	if p.Tcp == nil {
+		p.Tcp = &pb.TCPPerfStats{}
 	}
-	f.TCPPerfStats.WriteToPB(p.TCPPerfStats, f.L4Protocol)
+	f.TCPPerfStats.WriteToPB(p.Tcp, f.L4Protocol)
 
-	if p.L7PerfStats == nil {
-		p.L7PerfStats = &pb.L7PerfStats{}
+	if p.L7 == nil {
+		p.L7 = &pb.L7PerfStats{}
 	}
-	f.L7PerfStats.WriteToPB(p.L7PerfStats)
+	f.L7PerfStats.WriteToPB(p.L7)
 }
 
 func (f *FlowPerfStats) SequentialMerge(rhs *FlowPerfStats) {

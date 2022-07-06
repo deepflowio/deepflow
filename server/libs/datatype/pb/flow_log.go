@@ -6,11 +6,11 @@ import (
 
 var pbAppProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {
 	return &AppProtoLogsData{
-		BaseInfo: &AppProtoLogsBaseInfo{
+		Base: &AppProtoLogsBaseInfo{
 			Head: &AppProtoHead{},
 		},
-		Http:  &HTTPInfo{},
-		Dns:   &DNSInfo{},
+		Http:  &HttpInfo{},
+		Dns:   &DnsInfo{},
 		Dubbo: &DubboInfo{},
 		Kafka: &KafkaInfo{},
 		Mysql: &MysqlInfo{},
@@ -29,9 +29,9 @@ func ReleasePbAppProtoLogsData(d *AppProtoLogsData) {
 		return
 	}
 
-	head := d.BaseInfo.Head
+	head := d.Base.Head
 	head.Reset()
-	basicInfo := d.BaseInfo
+	basicInfo := d.Base
 	basicInfo.Reset()
 	basicInfo.Head = head
 
@@ -45,7 +45,7 @@ func ReleasePbAppProtoLogsData(d *AppProtoLogsData) {
 	mqtt.Reset()
 
 	d.Reset()
-	d.BaseInfo = basicInfo
+	d.Base = basicInfo
 	d.Http, d.Dns, d.Dubbo, d.Kafka, d.Mysql, d.Redis, d.Mqtt = http, dns, dubbo, kafka, mysql, redis, mqtt
 
 	pbAppProtoLogsDataPool.Put(d)
@@ -57,8 +57,8 @@ func (d *AppProtoLogsData) Release() {
 
 func (d *AppProtoLogsData) IsValid() bool {
 	if d == nil ||
-		d.BaseInfo == nil ||
-		d.BaseInfo.Head == nil {
+		d.Base == nil ||
+		d.Base.Head == nil {
 		return false
 	}
 	return true
@@ -68,8 +68,8 @@ func (t *TaggedFlow) IsValid() bool {
 	if t == nil ||
 		t.Flow == nil ||
 		t.Flow.FlowKey == nil ||
-		t.Flow.FlowMetricsPeerSrc == nil ||
-		t.Flow.FlowMetricsPeerDst == nil ||
+		t.Flow.MetricsPeerSrc == nil ||
+		t.Flow.MetricsPeerDst == nil ||
 		t.Flow.Tunnel == nil {
 		return false
 	}
@@ -79,16 +79,16 @@ func (t *TaggedFlow) IsValid() bool {
 func NewTaggedFlow() *TaggedFlow {
 	return &TaggedFlow{
 		Flow: &Flow{
-			FlowKey:            &FlowKey{},
-			FlowMetricsPeerSrc: &FlowMetricsPeer{},
-			FlowMetricsPeerDst: &FlowMetricsPeer{},
-			Tunnel:             &TunnelField{},
-			FlowPerfStats: &FlowPerfStats{
-				TCPPerfStats: &TCPPerfStats{
-					TcpPerfCountsPeerTx: &TcpPerfCountsPeer{},
-					TcpPerfCountsPeerRx: &TcpPerfCountsPeer{},
+			FlowKey:        &FlowKey{},
+			MetricsPeerSrc: &FlowMetricsPeer{},
+			MetricsPeerDst: &FlowMetricsPeer{},
+			Tunnel:         &TunnelField{},
+			PerfStats: &FlowPerfStats{
+				Tcp: &TCPPerfStats{
+					CountsPeerTx: &TcpPerfCountsPeer{},
+					CountsPeerRx: &TcpPerfCountsPeer{},
 				},
-				L7PerfStats: &L7PerfStats{},
+				L7: &L7PerfStats{},
 			},
 		},
 	}
@@ -96,31 +96,31 @@ func NewTaggedFlow() *TaggedFlow {
 
 // 清空pb的TaggedFlow 使解码时可以反复使用
 func (t *TaggedFlow) ResetAll() {
-	flowPerfStats := t.Flow.FlowPerfStats
+	flowPerfStats := t.Flow.PerfStats
 	if flowPerfStats != nil {
-		tcpPerfStats := flowPerfStats.TCPPerfStats
-		tcpPerfCountsPeerTx := tcpPerfStats.TcpPerfCountsPeerTx
-		tcpPerfCountsPeerRx := tcpPerfStats.TcpPerfCountsPeerRx
+		tcpPerfStats := flowPerfStats.Tcp
+		tcpPerfCountsPeerTx := tcpPerfStats.CountsPeerTx
+		tcpPerfCountsPeerRx := tcpPerfStats.CountsPeerRx
 
 		tcpPerfCountsPeerTx.Reset()
 		tcpPerfCountsPeerRx.Reset()
 		tcpPerfStats.Reset()
-		tcpPerfStats.TcpPerfCountsPeerTx = tcpPerfCountsPeerTx
-		tcpPerfStats.TcpPerfCountsPeerRx = tcpPerfCountsPeerRx
+		tcpPerfStats.CountsPeerTx = tcpPerfCountsPeerTx
+		tcpPerfStats.CountsPeerRx = tcpPerfCountsPeerRx
 
-		l7PerfStats := flowPerfStats.L7PerfStats
+		l7PerfStats := flowPerfStats.L7
 		l7PerfStats.Reset()
 
 		flowPerfStats.Reset()
-		flowPerfStats.L7PerfStats = l7PerfStats
-		flowPerfStats.TCPPerfStats = tcpPerfStats
+		flowPerfStats.L7 = l7PerfStats
+		flowPerfStats.Tcp = tcpPerfStats
 	}
 
 	flowKey := t.Flow.FlowKey
 	flowKey.Reset()
-	flowMetricsPeerSrc := t.Flow.FlowMetricsPeerSrc
+	flowMetricsPeerSrc := t.Flow.MetricsPeerSrc
 	flowMetricsPeerSrc.Reset()
-	flowMetricsPeerDst := t.Flow.FlowMetricsPeerDst
+	flowMetricsPeerDst := t.Flow.MetricsPeerDst
 	flowMetricsPeerDst.Reset()
 	tunnel := t.Flow.Tunnel
 	tunnel.Reset()
@@ -129,11 +129,11 @@ func (t *TaggedFlow) ResetAll() {
 	flow.Reset()
 
 	if flowPerfStats != nil {
-		flow.FlowPerfStats = flowPerfStats
+		flow.PerfStats = flowPerfStats
 	}
 	flow.FlowKey = flowKey
-	flow.FlowMetricsPeerSrc = flowMetricsPeerSrc
-	flow.FlowMetricsPeerDst = flowMetricsPeerDst
+	flow.MetricsPeerSrc = flowMetricsPeerSrc
+	flow.MetricsPeerDst = flowMetricsPeerDst
 	flow.Tunnel = tunnel
 
 	t.Reset()
