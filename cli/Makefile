@@ -1,4 +1,6 @@
 MESSAGE = github.com/metaflowys/metaflow/message
+LIBS = github.com/metaflowys/metaflow/server/libs
+SERVER = github.com/metaflowys/metaflow/server
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
@@ -10,15 +12,20 @@ BINARY_SUFFIX :=
 all: cli
 
 vendor:
-	go mod tidy && go mod vendor
+	go mod tidy && go mod download && go mod vendor
 	cp -r ../message/* vendor/${MESSAGE}/
+	cp -r ../server/go.* vendor/${SERVER}/
 	find vendor -type d -exec chmod +w {} \;
+	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/zerodoc/pb
+	cp vendor/${MESSAGE}/flow_log.proto vendor/${LIBS}/datatype/pb
+	sed -i '6,10s/^...//' vendor/${LIBS}/zerodoc/pb/metric.proto
+	sed -i '6,10s/^...//' vendor/${LIBS}/datatype/pb/flow_log.proto
 	cd vendor/${MESSAGE} && go generate ./...
+	cd vendor/${LIBS} && go generate ./...
 
 .PHONY: cli
 cli: vendor
-	go build ${FLAGS} -o bin/metaflow-ctl${BINARY_SUFFIX} cmd/ctl/main.go
-
+	go build -mod vendor ${FLAGS} -o bin/metaflow-ctl${BINARY_SUFFIX} cmd/ctl/main.go
 
 .PHONY: clean
 clean:
