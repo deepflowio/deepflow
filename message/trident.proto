@@ -13,6 +13,7 @@ service Synchronizer {
     rpc Query (NtpRequest) returns (NtpResponse) {}
     rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
+    rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
 }
 
 enum State {
@@ -542,4 +543,12 @@ message KubernetesAPISyncRequest {
 
 message KubernetesAPISyncResponse {
     optional uint64 version = 1;
+}
+
+message KubernetesClusterIDRequest {
+    optional string ca_md5 = 1; // md5 of /run/secrets/[kubernetes.io/serviceaccount/ca.crt
+}
+
+message KubernetesClusterIDResponse {
+    optional string cluster_id = 1;
 }
