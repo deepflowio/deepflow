@@ -11,10 +11,11 @@ import (
 )
 
 type service struct {
-	vTapEvent    *VTapEvent
-	tsdbEvent    *TSDBEvent
-	ntpEvent     *NTPEvent
-	upgradeEvent *UpgradeEvent
+	vTapEvent                *VTapEvent
+	tsdbEvent                *TSDBEvent
+	ntpEvent                 *NTPEvent
+	upgradeEvent             *UpgradeEvent
+	kubernetesClusterIDEvent *KubernetesClusterIDEvent
 }
 
 func init() {
@@ -60,16 +61,16 @@ func (s *service) Query(ctx context.Context, in *api.NtpRequest) (*api.NtpRespon
 	return s.ntpEvent.Query(ctx, in)
 }
 
+func (s *service) GetKubernetesClusterID(ctx context.Context, in *api.KubernetesClusterIDRequest) (*api.KubernetesClusterIDResponse, error) {
+	return s.kubernetesClusterIDEvent.GetKubernetesClusterID(ctx, in)
+}
+
 func (s *service) GenesisSync(ctx context.Context, in *api.GenesisSyncRequest) (*api.GenesisSyncResponse, error) {
 	return genesis.Synchronizer.GenesisSync(ctx, in)
 }
 
 func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISyncRequest) (*api.KubernetesAPISyncResponse, error) {
 	return genesis.Synchronizer.KubernetesAPISync(ctx, in)
-}
-
-func (s *service) GetKubernetesClusterID(ctx context.Context, in *api.KubernetesClusterIDRequest) (*api.KubernetesClusterIDResponse, error) {
-	return &api.KubernetesClusterIDResponse{}, nil
 }
 
 func (s *service) GenesisSharingK8S(ctx context.Context, in *api.GenesisSharingK8SRequest) (*api.GenesisSharingK8SResponse, error) {
