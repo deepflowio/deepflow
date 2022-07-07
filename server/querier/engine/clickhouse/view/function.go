@@ -439,6 +439,9 @@ type PercentageFunction struct {
 }
 
 func (f *PercentageFunction) Init() {
+	if len(f.Fields) < 2 {
+		f.Fields = append(f.Fields, &Field{Value: "1"})
+	}
 	f.divFunction = &DivFunction{
 		DefaultFunction: DefaultFunction{
 			Name:   FUNCTION_DIV,
