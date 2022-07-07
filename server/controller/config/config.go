@@ -33,10 +33,19 @@ type Specification struct {
 	DataSourceRetentionTimeMax int `default:"1000" yaml:"data_source_retention_time_max"`
 }
 
+type DFWebService struct {
+	Enabled bool   `default:"true" yaml:"enabled"`
+	Host    string `default:"df-web" yaml:"host"`
+	Port    int    `default:"20106" yaml:"port"`
+	Timeout int    `default:"30" yaml:"timeout"`
+}
+
 type ControllerConfig struct {
 	LogFile              string `default:"/var/log/controller.log" yaml:"log-file"`
 	LogLevel             string `default:"info" yaml:"log-level"`
 	MasterControllerName string `default:"" yaml:"master-controller-name"`
+
+	DFWebService DFWebService `yaml:"df-web-service"`
 
 	MySqlCfg      mysql.MySqlConfig           `yaml:"mysql"`
 	RedisCfg      redis.RedisConfig           `yaml:"redis"`
