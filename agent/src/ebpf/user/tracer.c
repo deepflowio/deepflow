@@ -3,6 +3,7 @@
 #include "libbpf/include/linux/err.h"
 #include <sched.h>
 #include <sys/utsname.h>
+#include <sys/prctl.h>
 #include "probe.h"
 #include "table.h"
 #include "common.h"
@@ -699,6 +700,7 @@ __always_inline uint64_t clib_cpu_time_now(void)
 
 static void poller(void *t)
 {
+	prctl(PR_SET_NAME,"perf-reader");	
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	for (;;) {
 #ifndef PERFORMANCE_TEST
@@ -765,8 +767,10 @@ int register_extra_waiting_op(const char *name, extra_waiting_fun_t f, int type)
 	return ETR_OK;
 }
 
+// Receive command line management tool requests.
 static void ctrl_main(__unused void *arg)
 {
+	prctl(PR_SET_NAME,"ctrl-main");
 	while (all_probes_ready == 0)
 		usleep(LOOP_DELAY_US);
 
@@ -895,6 +899,7 @@ static int boot_time_update(void)
 
 static void period_process_main(__unused void *arg)
 {
+	prctl(PR_SET_NAME,"period-process");
 	// 确保所有tracer都运行了，之后触发kick内核操作
 	while (all_probes_ready == 0)
 		usleep(LOOP_DELAY_US);
@@ -917,6 +922,7 @@ static void period_process_main(__unused void *arg)
  */
 static void process_datas(void *queue)
 {
+	prctl(PR_SET_NAME,"queue-worker");
 	int nr;
 	struct queue *q = (struct queue *)queue;
 	struct ring *r = q->r;
