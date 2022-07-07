@@ -11,18 +11,16 @@ func GetGroup(name string, asTagMap map[string]string, db, table string) (Statem
 		return nil, nil
 	}
 	var stmt Statement
-	// group的tag的翻译暂不支持
-	// tag, ok := tag.GetTag(name, db, table, "default")
-	// if ok {
-	// 	if tag.TagTranslator != "" {
-	// 		stmt = &GroupTag{Value: tag.TagTranslator, Alias: name}
-	// 	} else {
-	// 		stmt = &GroupTag{Value: name}
-	// 	}
-	// } else {
-	// 	stmt = &GroupTag{Value: name}
-	// }
-	stmt = &GroupTag{Value: name}
+	tag, ok := tag.GetTag(name, db, table, "default")
+	if ok {
+		if tag.TagTranslator != "" {
+			stmt = &GroupTag{Value: tag.TagTranslator, Alias: name}
+		} else {
+			stmt = &GroupTag{Value: name}
+		}
+	} else {
+		stmt = &GroupTag{Value: name}
+	}
 	return stmt, nil
 }
 
