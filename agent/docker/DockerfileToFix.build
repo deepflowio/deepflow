@@ -9,7 +9,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
 # 安装自定义软件
-RUN yum install make -y
+RUN yum install make epel-release -y && yum -y install jq
 
 # 安装基础依赖#
 RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfutils-libelf-devel-static glibc-static zlib-static git  -y && \
