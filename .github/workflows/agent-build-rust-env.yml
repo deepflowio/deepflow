@@ -36,3 +36,4 @@ jobs:
           platforms: linux/amd64
           tags: |
             "ghcr.io/${{ github.repository_owner }}/rust-build:1.2"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:1.3"
