@@ -44,6 +44,7 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 				break
 			}
 		}
+		end += (m.Time.WindowSize - 1) * m.Time.Interval
 		// 补点后切片长度
 		intervalLength := (end-start)/m.Time.Interval + 1
 		if intervalLength < 1 {

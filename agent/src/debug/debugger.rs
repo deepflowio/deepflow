@@ -135,7 +135,11 @@ impl Debugger {
                             .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                     }
                     Err(e) => {
-                        warn!("receive udp packet error: kind=({}) detail={}", e.kind(), e);
+                        warn!(
+                            "receive udp packet error: kind=({:?}) detail={}",
+                            e.kind(),
+                            e
+                        );
                         continue;
                     }
                 }

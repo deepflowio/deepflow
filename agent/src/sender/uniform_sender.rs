@@ -12,7 +12,7 @@ use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
-use super::{SendItem, SendMessageType, FILE_PATH, MAX_FILE_SIZE, PRE_FILE_PATH};
+use super::{SendItem, SendMessageType, MAX_FILE_SIZE, PRE_FILE_SUFFIX};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::{Exception, SocketType};
@@ -227,6 +227,8 @@ pub struct UniformSender {
     stats_registered: bool,
     exception_handler: ExceptionHandler,
     buf_writer: Option<BufWriter<File>>,
+    file_path: String,
+    pre_file_path: String,
     written_size: usize,
 }
 
@@ -258,6 +260,8 @@ impl UniformSender {
             stats_registered: false,
             exception_handler,
             buf_writer: None,
+            file_path: String::new(),
+            pre_file_path: String::new(),
             written_size: 0,
         }
     }
@@ -421,13 +425,17 @@ impl UniformSender {
         if kv_string.is_empty() {
             return Ok(());
         }
+        if self.file_path.is_empty() {
+            self.file_path = format!("{}/{}", &self.config.load().log_dir, send_item.file_name());
+            self.pre_file_path = format!("{}{}", &self.file_path, PRE_FILE_SUFFIX);
+        }
 
         if self.buf_writer.is_none() {
             self.check_or_register_counterable(send_item.message_type());
             let f = OpenOptions::new()
                 .create(true)
                 .write(true)
-                .open(FILE_PATH)?;
+                .open(&self.file_path)?;
             self.buf_writer = Some(BufWriter::new(f));
         }
 
@@ -441,7 +449,7 @@ impl UniformSender {
         if self.written_size > MAX_FILE_SIZE {
             self.buf_writer.as_mut().unwrap().flush()?;
             self.buf_writer.take();
-            rename(FILE_PATH, PRE_FILE_PATH)?;
+            rename(&self.file_path, &self.pre_file_path)?;
             self.written_size = 0;
         }
 

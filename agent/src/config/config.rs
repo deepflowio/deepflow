@@ -158,8 +158,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             controller_ips: vec![],
-            controller_port: 20035,
-            controller_tls_port: 20135,
+            controller_port: 30035,
+            controller_tls_port: 30135,
             controller_cert_file_prefix: "".into(),
             log_file: DEFAULT_LOG_FILE.into(),
             kubernetes_cluster_id: "".into(),

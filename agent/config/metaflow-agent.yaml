@@ -3,9 +3,9 @@ controller-ips:
   - 127.0.0.1
 
 ## controller listen port
-#controller-port: 20035
+#controller-port: 30035
 ## controller security authenticate port
-#controller-tls-port: 20135
+#controller-tls-port: 30135
 
 ## controller certificate file prefix, contain path
 ## if certificate file exists, do certificate; or no
@@ -17,7 +17,7 @@ controller-ips:
 #controller-cert-file-prefix: ""
 
 ## logfile path
-#log-file: /var/log/trident/trident.log
+#log-file: /var/log/metaflow-agent/metaflow-agent.log
 
 ## kubernetes-cluster-id，在对接kubernetes/openshift时需要配置
 # kubernetes-cluster-id:
