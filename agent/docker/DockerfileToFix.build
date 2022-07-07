@@ -11,7 +11,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 # 安装自定义软件
 RUN yum install make -y
 
-# 安装基础依赖
+# 安装基础依赖#
 RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfutils-libelf-devel-static glibc-static zlib-static git  -y && \
      curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y && \
      curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
