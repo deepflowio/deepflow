@@ -487,7 +487,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 },
             )?,
         };
-        info!("ctrl_ip {}", ctrl_ip);
 
         let dest_ip = conf
             .analyzer_ip
