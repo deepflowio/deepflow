@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,8 @@ var archDict = map[string]int{
 	"arm":   ARCH_ARM,
 }
 
+var letterRunes = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
 func GetOsType(os string) int {
 	for key, value := range osDict {
 		if strings.Contains(strings.ToLower(os), key) {
@@ -60,12 +63,33 @@ func GenerateUUID(str string) string {
 }
 
 func GenerateShortUUID() string {
-	var letterRunes = []rune("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	b := make([]rune, 10)
 	for i := range b {
 		b[i] = letterRunes[rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(letterRunes))]
 	}
 	return string(b)
+}
+
+func GenerateKuberneteClusterIDByMD5(md5 string) (string, error) {
+
+	if len(md5) != 32 {
+		errMsg := fmt.Sprintf("md5 (%s) is invaild", md5)
+		return "", errors.New(errMsg)
+	}
+
+	b2 := make([]rune, 2)
+	b8 := make([]rune, 8)
+	for i := range b2 {
+		randSourceStr := "0x" + md5[i*16:i*16+16]
+		randSourceInt, _ := strconv.ParseInt(randSourceStr, 0, 64)
+		b2[i] = letterRunes[rand.New(rand.NewSource(randSourceInt)).Intn(len(letterRunes))]
+	}
+	for i := range b8 {
+		randSourceStr := "0x" + md5[i*4:i*4+4]
+		randSourceInt, _ := strconv.ParseInt(randSourceStr, 0, 64)
+		b8[i] = letterRunes[rand.New(rand.NewSource(randSourceInt)).Intn(len(letterRunes))]
+	}
+	return "d-" + string(b2) + string(b8), nil
 }
 
 // 功能：获取用于API调用的IP地址

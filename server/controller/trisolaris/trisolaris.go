@@ -5,6 +5,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/metaflowys/metaflow/server/controller/trisolaris/kubernetes"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/node"
 	grpcserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/grpc"
@@ -16,11 +17,12 @@ import (
 var log = logging.MustGetLogger("trisolaris")
 
 type Trisolaris struct {
-	config   *config.Config
-	dbConn   *gorm.DB
-	metaData *metadata.MetaData
-	vTapInfo *vtap.VTapInfo
-	nodeInfo *node.NodeInfo
+	config         *config.Config
+	dbConn         *gorm.DB
+	metaData       *metadata.MetaData
+	vTapInfo       *vtap.VTapInfo
+	nodeInfo       *node.NodeInfo
+	kubernetesInfo *kubernetes.KubernetesInfo
 }
 
 var trisolaris *Trisolaris
@@ -31,6 +33,10 @@ func GetGVTapInfo() *vtap.VTapInfo {
 
 func GetGNodeInfo() *node.NodeInfo {
 	return trisolaris.nodeInfo
+}
+
+func GetGKubernetesInfo() *kubernetes.KubernetesInfo {
+	return trisolaris.kubernetesInfo
 }
 
 func GetConfig() *config.Config {
@@ -73,11 +79,12 @@ func NewTrisolaris(cfg *config.Config, db *gorm.DB) *Trisolaris {
 		cfg.Convert()
 		metaData := metadata.NewMetaData(db, cfg)
 		trisolaris = &Trisolaris{
-			config:   cfg,
-			dbConn:   db,
-			metaData: metaData,
-			vTapInfo: vtap.NewVTapInfo(db, metaData, cfg),
-			nodeInfo: node.NewNodeInfo(db, metaData, cfg),
+			config:         cfg,
+			dbConn:         db,
+			metaData:       metaData,
+			vTapInfo:       vtap.NewVTapInfo(db, metaData, cfg),
+			nodeInfo:       node.NewNodeInfo(db, metaData, cfg),
+			kubernetesInfo: kubernetes.NewKubernetesInfo(db),
 		}
 	} else {
 		return trisolaris
