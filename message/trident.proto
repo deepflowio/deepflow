@@ -553,7 +553,8 @@ message KubernetesClusterIDRequest {
 }
 
 message KubernetesClusterIDResponse {
-    optional string cluster_id = 1;
+    optional string error_msg = 1;
+    optional string cluster_id = 2;
 }
 message GenesisSharingK8SRequest {
     optional string cluster_id = 1;
