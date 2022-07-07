@@ -204,13 +204,8 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       "deepflow",
 	}
-	err := chClient.Init("")
-	if err != nil {
-		return nil, err
-	}
-	defer chClient.Close()
 	sql := "SELECT key FROM k8s_label_map GROUP BY key"
-	rst, err := chClient.DoQuery(sql, nil)
+	rst, err := chClient.DoQuery(sql, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -240,18 +235,13 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       db,
 	}
-	err = externalChClient.Init("")
-	if err != nil {
-		return nil, err
-	}
-	defer externalChClient.Close()
 	externalSql := ""
 	if db == "ext_metrics" {
 		externalSql = fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s WHERE %s) GROUP BY tag_name", table, whereSql)
 	} else {
 		externalSql = fmt.Sprintf("SELECT arrayJoin(attribute_names) AS attribute_name FROM (SELECT attribute_names FROM %s WHERE %s) GROUP BY attribute_name", table, whereSql)
 	}
-	externalRst, err := externalChClient.DoQuery(externalSql, nil)
+	externalRst, err := externalChClient.DoQuery(externalSql, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -332,11 +322,6 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
-	err := chClient.Init("")
-	if err != nil {
-		return nil, err
-	}
-	defer chClient.Close()
 	var sql string
 	var dictTag = "''"
 	var whereSql string
@@ -357,7 +342,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				resourceName := resourceKey + "_name"
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql)
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(sql, nil)
+				rst, err := chClient.DoQuery(sql, nil, "")
 				if err != nil {
 					return nil, err
 				}
@@ -380,7 +365,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				}
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql)
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(sql, nil)
+				rst, err := chClient.DoQuery(sql, nil, "")
 				if err != nil {
 					return nil, err
 				}
@@ -429,7 +414,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			}
 		}
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(sql, nil)
+		rst, err := chClient.DoQuery(sql, nil, "")
 		if err != nil {
 			return nil, err
 		}
@@ -477,7 +462,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
 		}
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(sql, nil)
+		rst, err := chClient.DoQuery(sql, nil, "")
 		if err != nil {
 			return nil, err
 		}
@@ -515,11 +500,6 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 		}
 
 	}
-	err := chClient.Init("")
-	if err != nil {
-		return nil, err
-	}
-	defer chClient.Close()
 	var sql string
 	if db == "ext_metrics" {
 		sql = fmt.Sprintf("WITH arrayJoin(tag_names) AS tag_name SELECT arrayJoin(tag_values) AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", table, whereSql)
@@ -528,7 +508,7 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 	}
 
 	log.Debug(sql)
-	rst, err := chClient.DoQuery(sql, nil)
+	rst, err := chClient.DoQuery(sql, nil, "")
 	if err != nil {
 		return nil, err
 	}

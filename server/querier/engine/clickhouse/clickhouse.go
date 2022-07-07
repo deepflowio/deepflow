@@ -69,13 +69,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		DB:       e.DB,
 		Debug:    debug,
 	}
-	err = chClient.Init(query_uuid)
-	if err != nil {
-		log.Error(err)
-		return nil, debug.Get(), err
-	}
-	defer chClient.Close()
-	rst, err := chClient.DoQuery(chSql, callbacks)
+	rst, err := chClient.DoQuery(chSql, callbacks, query_uuid)
 	if err != nil {
 		log.Error(chClient.Debug)
 		return nil, debug.Get(), err
