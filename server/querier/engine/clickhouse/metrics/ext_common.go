@@ -20,20 +20,14 @@ func GetExtMetrics(db, table string) (map[string]*Metrics, error) {
 			Password: config.Cfg.Clickhouse.Password,
 			DB:       db,
 		}
-		err = externalChClient.Init("")
-		if err != nil {
-			log.Error(err)
-			return nil, err
-		}
-		defer externalChClient.Close()
 		externalMetricIntSql := fmt.Sprintf("SELECT arrayJoin(metrics_int_names) AS metrics_int_name FROM (SELECT metrics_int_names FROM %s LIMIT 1) GROUP BY metrics_int_name", table)
 		externalMetricFloatSql := fmt.Sprintf("SELECT arrayJoin(metrics_float_names) AS metrics_float_name FROM (SELECT metrics_float_names FROM %s LIMIT 1) GROUP BY metrics_float_name", table)
-		externalMetricIntRst, err := externalChClient.DoQuery(externalMetricIntSql, nil)
+		externalMetricIntRst, err := externalChClient.DoQuery(externalMetricIntSql, nil, "")
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
-		externalMetricFloatRst, err := externalChClient.DoQuery(externalMetricFloatSql, nil)
+		externalMetricFloatRst, err := externalChClient.DoQuery(externalMetricFloatSql, nil, "")
 		if err != nil {
 			log.Error(err)
 			return nil, err

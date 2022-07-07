@@ -144,14 +144,8 @@ func GetExtTables(db string) (values []interface{}) {
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       db,
 	}
-	err := chClient.Init("")
-	if err != nil {
-		log.Error(err)
-		return nil
-	}
-	defer chClient.Close()
 	sql := "show tables"
-	rst, err := chClient.DoQuery(sql, nil)
+	rst, err := chClient.DoQuery(sql, nil, "")
 	if err != nil {
 		log.Error(err)
 		return nil
