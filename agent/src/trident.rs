@@ -23,6 +23,7 @@ use crate::handler::PacketHandlerBuilder;
 use crate::integration_collector::MetricServer;
 use crate::pcap::WorkerManager;
 use crate::utils::cgroups::Cgroups;
+use crate::utils::environment::K8S_NODE_IP_FOR_METAFLOW;
 use crate::utils::environment::{free_memory_check, get_k8s_local_node_ip};
 use crate::utils::guard::Guard;
 use crate::utils::net::get_mac_by_ip;
@@ -181,10 +182,8 @@ impl Trident {
             exception_handler.clone(),
         ));
 
-        if config.kubernetes_cluster_id.is_empty() {
-            if let Some(id) = Config::get_k8s_cluster_id(&session) {
-                config.kubernetes_cluster_id = id;
-            }
+        if env::var(K8S_NODE_IP_FOR_METAFLOW).is_ok() && config.kubernetes_cluster_id.is_empty() {
+            config.kubernetes_cluster_id = Config::get_k8s_cluster_id(&session);
         }
 
         let default_runtime_config = RuntimeConfig::default();

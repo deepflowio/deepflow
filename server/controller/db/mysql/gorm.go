@@ -23,16 +23,27 @@ type MySqlConfig struct {
 }
 
 func Gorm(cfg MySqlConfig) *gorm.DB {
+	dsn := getDSN(cfg, cfg.Database, cfg.TimeOut, false)
+	return getGormDB(dsn)
+}
+
+func getDSN(cfg MySqlConfig, database string, timeout uint32, multiStatements bool) string {
 	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=%ds",
 		cfg.UserName,
 		cfg.UserPassword,
 		cfg.Host,
 		cfg.Port,
-		cfg.Database,
-		cfg.TimeOut,
+		database,
+		timeout,
 	)
+	if multiStatements {
+		dsn += "&multiStatements=true"
+	}
+	return dsn
+}
 
+func getGormDB(dsn string) *gorm.DB {
 	Db, err := gorm.Open(mysql.New(mysql.Config{
 		DSN:                       dsn,   // DSN data source name
 		DefaultStringSize:         256,   // string 类型字段的默认长度

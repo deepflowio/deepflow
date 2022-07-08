@@ -1,8 +1,8 @@
-use std::env;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
+use std::thread;
 use std::time::Duration;
 
 use log::{error, info, warn};
@@ -21,7 +21,6 @@ use crate::proto::{
     trident::{self, KubernetesClusterIdRequest},
 };
 use crate::rpc::Session;
-use crate::utils::environment::K8S_NODE_IP_FOR_METAFLOW;
 
 const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
@@ -92,31 +91,28 @@ impl Config {
     // It is found that the K8S_NODE_IP_FOR_METAFLOW environment variable exists, and the kubernetes-cluster-id in the
     // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
     // after 1 minute of sleep until it succeeds
-    pub fn get_k8s_cluster_id(session: &Session) -> Option<String> {
-        if env::var(K8S_NODE_IP_FOR_METAFLOW).is_err() {
-            error!(
-                "cannot get K8S_NODE_IP_FOR_METAFLOW value,  maybe that is not set 
-                or the agent is not running in the k8s environment"
-            );
-            return None;
-        }
-
-        let ca_md5 = match fs::read_to_string(K8S_CA_CRT_PATH) {
-            Ok(c) => {
-                let mut hasher = Md5::new();
-                hasher.update(c.as_bytes());
-                Some(
-                    hasher
-                        .finalize_reset()
-                        .into_iter()
-                        .map(|c| format!("{:02x}", c))
-                        .collect::<Vec<_>>()
-                        .join(""),
-                )
-            }
-            Err(e) => {
-                error!("failed to read {} error: {}", K8S_CA_CRT_PATH, e);
-                return None;
+    pub fn get_k8s_cluster_id(session: &Session) -> String {
+        let ca_md5 = loop {
+            match fs::read_to_string(K8S_CA_CRT_PATH) {
+                Ok(c) => {
+                    let mut hasher = Md5::new();
+                    hasher.update(c.as_bytes());
+                    break Some(
+                        hasher
+                            .finalize_reset()
+                            .into_iter()
+                            .map(|c| format!("{:02x}", c))
+                            .collect::<Vec<_>>()
+                            .join(""),
+                    );
+                }
+                Err(e) => {
+                    error!(
+                        "get kubernetes_cluster_id error: failed to read {} error: {}",
+                        K8S_CA_CRT_PATH, e
+                    );
+                    thread::sleep(MINUTE);
+                }
             }
         };
         let runtime = Runtime::new().unwrap();
@@ -137,15 +133,26 @@ impl Config {
                 };
 
                 match client.get_kubernetes_cluster_id(request).await {
-                    Ok(response) => match response.into_inner().cluster_id {
-                        Some(id) => {
-                            info!("set kubernetes_cluster_id to {}", id);
-                            return Some(id);
+                    Ok(response) => {
+                        let cluster_id_response = response.into_inner();
+                        if !cluster_id_response.error_msg().is_empty() {
+                            error!(
+                                "failed to get kubernetes_cluster_id from server error: {}",
+                                cluster_id_response.error_msg()
+                            );
+                            tokio::time::sleep(MINUTE).await;
+                            continue;
                         }
-                        None => {
-                            error!("call get_kubernetes_cluster_id return response is none")
+                        match cluster_id_response.cluster_id {
+                            Some(id) => {
+                                info!("set kubernetes_cluster_id to {}", id);
+                                return id;
+                            }
+                            None => {
+                                error!("call get_kubernetes_cluster_id return response is none")
+                            }
                         }
-                    },
+                    }
                     Err(e) => error!("failed to call get_kubernetes_cluster_id error: {}", e),
                 }
                 tokio::time::sleep(MINUTE).await;

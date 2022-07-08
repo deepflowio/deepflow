@@ -2,6 +2,7 @@ package tagrecorder
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
@@ -20,8 +21,11 @@ type IconKey struct {
 func (c *TagRecorder) UpdateIconInfo() (map[string]int, map[IconKey]int, error) {
 	domainToIconID := make(map[string]int)
 	resourceToIconID := make(map[IconKey]int)
+	if !c.cfg.DFWebService.Enabled {
+		return domainToIconID, resourceToIconID, nil
+	}
 	body := make(map[string]interface{})
-	response, err := common.CURLPerform("GET", "http://df-web:20825/v1/icons", body)
+	response, err := common.CURLPerform("GET", fmt.Sprintf("http://%s:%d/v1/icons", c.cfg.DFWebService.Host, c.cfg.DFWebService.Port), body)
 	if err != nil {
 		log.Error(err)
 		return domainToIconID, resourceToIconID, err

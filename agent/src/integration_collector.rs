@@ -253,7 +253,7 @@ impl MetricServer {
                                 sleep(Duration::from_secs(1));
                                 continue;
                             }
-                            error!("integration collector error: {}", e);
+                            error!("integration collector error: {} with addr={}", e, addr);
                             exception_handler.set(Exception::IntegrationSocketError);
                             sleep(Duration::from_secs(1));
                             continue;

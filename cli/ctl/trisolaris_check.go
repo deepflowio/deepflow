@@ -80,16 +80,23 @@ func regiterCommand() []*cobra.Command {
 			initCmd([]CmdExecute{configData})
 		},
 	}
+	skipInterfaceCmd := &cobra.Command{
+		Use:   "skipInterface",
+		Short: "get skipInterface from controller",
+		Run: func(cmd *cobra.Command, args []string) {
+			initCmd([]CmdExecute{skipInterface})
+		},
+	}
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "get all data from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, vpcIP, configData})
+			initCmd([]CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, vpcIP, configData, skipInterface})
 		},
 	}
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
-		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, allCmd}
+		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd, allCmd}
 	return commands
 }
 
@@ -206,15 +213,18 @@ func Uint64ToMac(v uint64) net.HardwareAddr {
 
 func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
-	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d LaunchServer: %s LaunchServerId: %d RegionId: %d SkipTapInterface: %t "
+	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
+		" LaunchServer: %s LaunchServerId: %d RegionId: %d AzId: %d, PodGroupId: %d, PodNsId: %d, PodId: %d PodClusterId: %d "
 	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(data.GetMac()), data.GetEpcId(),
 		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
-		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(), data.GetSkipTapInterface()))
+		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(),
+		data.GetAzId(), data.GetPodGroupId(), data.GetPodNsId(), data.GetPodId(),
+		data.GetPodClusterId()))
 	if data.GetPodNodeId() > 0 {
 		buffer.WriteString(fmt.Sprintf("PodNodeId: %d ", data.GetPodNodeId()))
 	}
 	if len(data.GetIpResources()) > 0 {
-		buffer.WriteString(fmt.Sprintf("IpResources: %v", data.GetIpResources()))
+		buffer.WriteString(fmt.Sprintf("IpResources: %s", data.GetIpResources()))
 	}
 	return buffer.String()
 }
@@ -241,6 +251,14 @@ func configData(response *trident.SyncResponse) {
 	fmt.Println("config:")
 	config := response.GetConfig()
 	fmt.Println(proto.MarshalTextString(config))
+}
+
+func skipInterface(response *trident.SyncResponse) {
+	fmt.Println("SkipInterface:")
+	for index, skipInterface := range response.GetSkipInterface() {
+		JsonFormat(index+1,
+			fmt.Sprintf("mac: %s", Uint64ToMac(skipInterface.GetMac())))
+	}
 }
 
 func tapTypes(response *trident.SyncResponse) {

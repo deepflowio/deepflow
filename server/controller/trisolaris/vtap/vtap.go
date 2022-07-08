@@ -481,6 +481,18 @@ func (v *VTapInfo) GetTapTypes() []*trident.TapType {
 	return v.metaData.GetTapTypes()
 }
 
+func (v *VTapInfo) GetSkipInterface(c *VTapCache) []*trident.SkipInterface {
+	if c.GetVTapType() == VTAP_TYPE_KVM {
+		launchServer := c.GetLaunchServer()
+		rawData := v.metaData.GetPlatformDataOP().GetRawData()
+		if rawData != nil {
+			return rawData.GetSkipInterface(launchServer)
+		}
+	}
+
+	return nil
+}
+
 func (v *VTapInfo) GetConfigTSDBIP() string {
 	return v.config.TsdbIP
 }

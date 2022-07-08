@@ -6,6 +6,13 @@ controller:
   # controller http listenport
   listen-port: 20417
 
+  # deepflow web service config
+  df-web-service:
+    enabled: true
+    host: df-web
+    port: 20825
+    timeout: 30
+
   # mysql相关配置
   mysql:
     database: deepflow
