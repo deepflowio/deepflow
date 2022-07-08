@@ -21,7 +21,7 @@ type Client struct {
 	Debug      *Debug
 }
 
-func (c *Client) Init(query_uuid string) error {
+func (c *Client) init(query_uuid string) error {
 	if c.Debug == nil {
 		c.Debug = &Debug{
 			QueryUUID: query_uuid,
@@ -44,7 +44,12 @@ func (c *Client) Close() error {
 	return c.connection.Close()
 }
 
-func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, values []interface{}) []interface{}) (map[string][]interface{}, error) {
+func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, values []interface{}) []interface{}, query_uuid string) (map[string][]interface{}, error) {
+	err := c.init(query_uuid)
+	if err != nil {
+		return nil, err
+	}
+	defer c.Close()
 	rows, err := c.connection.Queryx(sql)
 	c.Debug.Sql = sql
 	if err != nil {

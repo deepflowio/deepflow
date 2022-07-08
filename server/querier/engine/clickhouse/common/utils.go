@@ -109,6 +109,8 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
 			tsdbType = "app"
 		}
+	default:
+		return 1, nil
 	}
 	client := &http.Client{}
 	url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?name=%s&type=%s", name, tsdbType)
@@ -142,14 +144,8 @@ func GetExtTables(db string) (values []interface{}) {
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       db,
 	}
-	err := chClient.Init("")
-	if err != nil {
-		log.Error(err)
-		return nil
-	}
-	defer chClient.Close()
 	sql := "show tables"
-	rst, err := chClient.DoQuery(sql, nil)
+	rst, err := chClient.DoQuery(sql, nil, "")
 	if err != nil {
 		log.Error(err)
 		return nil
