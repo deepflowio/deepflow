@@ -530,6 +530,7 @@ impl PlatformSynchronizer {
             nat_ip: None,
         };
 
+        info!("zhicong push platform msg {:?}", msg);
         rt.block_on(Self::genesis_sync(&process_args.session, msg))
             .map(|r| r.into_inner().version())
     }
@@ -588,6 +589,7 @@ impl PlatformSynchronizer {
                     nat_ip: None,
                 };
 
+                info!("zhicong process msg {:?}", msg);
                 match rt.block_on(Self::genesis_sync(&args.session, msg)) {
                     Ok(res) => {
                         let res = res.into_inner();
