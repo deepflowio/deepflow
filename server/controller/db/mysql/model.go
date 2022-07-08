@@ -978,6 +978,8 @@ type VTapGroupConfiguration struct {
 	HTTPLogXRequestID             *string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled *int    `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    *int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	AnalyzerPort                  *int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
+	ProxyControllerPort           *int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	YamlConfig                    *string `gorm:"column:yaml_config;type:text;default:null" json:"yaml_config"`
 }
 
@@ -1042,6 +1044,8 @@ type RVTapGroupConfiguration struct {
 	HTTPLogXRequestID             string  `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled int     `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    int     `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	AnalyzerPort                  int     `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
+	ProxyControllerPort           int     `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	YamlConfig                    *string `gorm:"column:yaml_config;type:text;default:null" json:"yaml_config"`
 }
 
