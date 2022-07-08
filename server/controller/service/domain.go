@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"gorm.io/gorm/clause"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
@@ -139,7 +140,7 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	log.Infof("create domain (%v)", domainCreate)
 
 	domain := mysql.Domain{}
-	displayName := common.GetUUID("", uuid.Nil)
+	displayName := common.GetUUID(domainCreate.KubernetesClusterID, uuid.Nil)
 	lcuuid := common.GetUUID(displayName, uuid.Nil)
 	domain.Lcuuid = lcuuid
 	domain.Name = domainCreate.Name
@@ -148,12 +149,18 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	domain.IconID = domainCreate.IconID
 	// TODO: controller_ip拿到config外面，直接作为domain的一级参数
 	domain.ControllerIP = domainCreate.Config["controller_ip"].(string)
-	if domainCreate.Type == common.KUBERNETES {
-		domain.ClusterID = "d-" + common.GenerateShortUUID()
-	}
 	configStr, _ := json.Marshal(domainCreate.Config)
 	domain.Config = string(configStr)
-	mysql.Db.Create(&domain)
+
+	if domainCreate.Type == common.KUBERNETES {
+		// support specify cluster_id
+		if domainCreate.KubernetesClusterID != "" {
+			domain.ClusterID = domainCreate.KubernetesClusterID
+		} else {
+			domain.ClusterID = "d-" + common.GenerateShortUUID()
+		}
+	}
+	mysql.Db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain)
 
 	// TODO: K8s云平台额外优先添加region和az数据库表，后续考虑放到exchange中
 
