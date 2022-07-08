@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
 	"github.com/spf13/cobra"
+	"github.com/vishvananda/netlink"
 )
 
 // 功能：调用其他模块API并获取返回结果
@@ -69,6 +71,26 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	}
 
 	return response, nil
+}
+
+func GetDefaultRouteIP() string {
+	defaultRouteIP := "127.0.0.1"
+	routeList, _ := netlink.RouteList(nil, netlink.FAMILY_V4)
+	for _, route := range routeList {
+		// a nil Dst means that this is the default route.
+		if route.Dst == nil {
+			i, err := net.InterfaceByIndex(route.LinkIndex)
+			if err != nil {
+				continue
+			}
+			addresses, _ := i.Addrs()
+			for _, address := range addresses {
+				defaultRouteIP = strings.Split(address.String(), "/")[0]
+				break
+			}
+		}
+	}
+	return defaultRouteIP
 }
 
 type Server struct {

@@ -3,8 +3,10 @@ package ctl
 import (
 	"os"
 
-	"github.com/metaflowys/metaflow/server/ingester/ingesterctl/cmd"
 	"github.com/spf13/cobra"
+
+	"github.com/metaflowys/metaflow/cli/ctl/common"
+	"github.com/metaflowys/metaflow/server/ingester/ingesterctl/cmd"
 )
 
 type Ctl struct{}
@@ -16,7 +18,7 @@ func Execute() {
 		TraverseChildren: true,
 	}
 
-	root.PersistentFlags().StringP("ip", "i", "127.0.0.1", "metaflow-server service ip")
+	root.PersistentFlags().StringP("ip", "i", common.GetDefaultRouteIP(), "metaflow-server service ip")
 	root.PersistentFlags().Uint32P("port", "p", 30417, "metaflow-server service port")
 
 	root.AddCommand(RegisterAgentCommand())
