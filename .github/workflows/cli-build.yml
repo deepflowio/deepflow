@@ -38,6 +38,7 @@ jobs:
         uses: arduino/setup-protoc@v1
         with:
           version: '3.6.1'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: build cli
         run: |
@@ -80,7 +81,7 @@ jobs:
           ossutil cp -rf cli/bin/metaflow-ctl.linux-amd64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/metaflow-ctl
           ossutil cp -rf cli/bin/metaflow-ctl.linux-arm64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/metaflow-ctl
           ossutil cp -rf cli/bin/metaflow-ctl.darwin-amd64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/amd64/metaflow-ctl
-          ossutil cp -rf cli/bin/metaflow-ctl.darwin-arm64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/arm64/metaflow-ctl
+          # ossutil cp -rf cli/bin/metaflow-ctl.darwin-arm64 oss://metaflow/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/osx/arm64/metaflow-ctl
 
       # - name: Prepare for upload package
       #   shell: bash

@@ -25,7 +25,8 @@ jobs:
         uses: arduino/setup-protoc@v1
         with:
           version: '3.6.1'
-      
+          repo-token: ${{ secrets.GITHUB_TOKEN }}      
+
       - name: verify cli
         run: |
           sudo apt-get install tmpl
