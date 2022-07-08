@@ -84,7 +84,7 @@ func NewTrisolaris(cfg *config.Config, db *gorm.DB) *Trisolaris {
 			metaData:       metaData,
 			vTapInfo:       vtap.NewVTapInfo(db, metaData, cfg),
 			nodeInfo:       node.NewNodeInfo(db, metaData, cfg),
-			kubernetesInfo: kubernetes.NewKubernetesInfo(db),
+			kubernetesInfo: kubernetes.NewKubernetesInfo(db, cfg),
 		}
 	} else {
 		return trisolaris
