@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/deepflowys/deepflow/server/ingester/ckmonitor"
@@ -29,6 +30,7 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/debug"
 	"github.com/deepflowys/deepflow/server/libs/logger"
+	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
 	"github.com/deepflowys/deepflow/server/libs/stats"
 
@@ -81,6 +83,15 @@ func Start(configPath string) []io.Closer {
 		runtime.GOMAXPROCS(cfg.MaxCPUs)
 	}
 
+	pool.SetCounterRegisterCallback(func(counter *pool.Counter) {
+		tags := stats.OptionStatTags{
+			"name":                counter.Name,
+			"object_size":         strconv.Itoa(int(counter.ObjectSize)),
+			"pool_size_per_cpu":   strconv.Itoa(int(counter.PoolSizePerCPU)),
+			"init_full_pool_size": strconv.Itoa(int(counter.InitFullPoolSize)),
+		}
+		stats.RegisterCountable("pool", counter, tags)
+	})
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
 	if cfg.InfluxdbWriterEnabled {

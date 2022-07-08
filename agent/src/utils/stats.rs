@@ -29,10 +29,16 @@ use cadence::{
     Counted, Metric, MetricBuilder, MetricError, MetricResult, MetricSink, StatsdClient,
 };
 use log::{debug, info, warn};
+use prost::Message;
 
 use crate::common::DEFAULT_INGESTER_PORT;
+use crate::proto::stats;
+use crate::sender::SendItem;
+use crate::utils::queue::{bounded, Receiver, Sender};
 
+const STATS_PREFIX: &'static str = "deepflow_agent";
 const TICK_CYCLE: Duration = Duration::from_secs(5);
+pub const DFSTATS_SENDER_ID: usize = 100;
 
 #[derive(Clone, Copy, Debug)]
 pub enum CounterType {
@@ -40,7 +46,7 @@ pub enum CounterType {
     Gauged,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CounterValue {
     Signed(i64),
     Unsigned(u64),
@@ -130,11 +136,64 @@ impl fmt::Display for Source {
 }
 
 #[derive(Debug)]
-struct Batch {
+pub struct Batch {
     module: &'static str,
     tags: Vec<(&'static str, String)>,
     points: Vec<Counter>,
     timestamp: SystemTime,
+}
+
+impl Batch {
+    pub fn encode(&self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let pb_stats: stats::Stats = self.to_stats();
+        pb_stats.encode(buf).map(|_| pb_stats.encoded_len())
+    }
+
+    fn to_stats(&self) -> stats::Stats {
+        let mut tag_names = vec![];
+        let mut tag_values = vec![];
+        let mut metrics_int_names = vec![];
+        let mut metrics_int_values = vec![];
+        let mut metrics_float_names = vec![];
+        let mut metrics_float_values = vec![];
+
+        for t in self.tags.iter() {
+            tag_names.push(t.0.to_string());
+            tag_values.push(t.1.clone());
+        }
+
+        for p in self.points.iter() {
+            match p.2 {
+                CounterValue::Signed(i) => {
+                    metrics_int_names.push(p.0.to_string());
+                    metrics_int_values.push(i)
+                }
+                CounterValue::Unsigned(u) => {
+                    metrics_int_names.push(p.0.to_string());
+                    metrics_int_values.push(u as i64)
+                }
+                CounterValue::Float(f) => {
+                    metrics_float_names.push(p.0.to_string());
+                    metrics_float_values.push(f)
+                }
+            }
+        }
+
+        stats::Stats {
+            name: format!("{}_{}", STATS_PREFIX, self.module).replace("-", "_"),
+            timestamp: self
+                .timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            tag_names,
+            tag_values,
+            metrics_int_names,
+            metrics_int_values,
+            metrics_float_names,
+            metrics_float_values,
+        }
+    }
 }
 
 pub struct Collector {
@@ -148,16 +207,18 @@ pub struct Collector {
 
     running: Arc<(Mutex<bool>, Condvar)>,
     thread: Mutex<Option<JoinHandle<()>>>,
+
+    sender: Arc<Sender<SendItem>>,
+    receiver: Arc<Receiver<SendItem>>,
 }
 
 impl Collector {
-    const STATS_PREFIX: &'static str = "deepflow_agent";
-
     pub fn new(remotes: &Vec<String>) -> Self {
         Self::with_min_interval(remotes, TICK_CYCLE)
     }
 
     pub fn with_min_interval(remotes: &Vec<String>, interval: Duration) -> Self {
+        let (stats_queue_sender, stats_queue_receiver, counter) = bounded(1000);
         let min_interval = if interval <= TICK_CYCLE {
             TICK_CYCLE
         } else {
@@ -170,7 +231,7 @@ impl Collector {
             .iter()
             .filter_map(|x| x.parse::<IpAddr>().ok())
             .collect();
-        Self {
+        let s = Self {
             hostname: Arc::new(Mutex::new(
                 hostname::get()
                     .ok()
@@ -183,7 +244,20 @@ impl Collector {
             min_interval: Arc::new(AtomicU64::new(min_interval.as_secs())),
             running: Arc::new((Mutex::new(false), Condvar::new())),
             thread: Mutex::new(None),
-        }
+            sender: Arc::new(stats_queue_sender),
+            receiver: Arc::new(stats_queue_receiver),
+        };
+        Self::register_countable(
+            &s,
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![StatsOption::Tag("module", "0-stats-to-sender".to_string())],
+        );
+        return s;
+    }
+
+    pub fn get_receiver(&self) -> Arc<Receiver<SendItem>> {
+        self.receiver.clone()
     }
 
     pub fn register_countable(
@@ -261,7 +335,7 @@ impl Collector {
     fn new_statsd_client<A: ToSocketAddrs>(addr: A) -> MetricResult<StatsdClient> {
         let socket = UdpSocket::bind("0.0.0.0:0")?;
         let sink = DropletSink::from(addr, socket)?;
-        Ok(StatsdClient::from_sink(Self::STATS_PREFIX, sink))
+        Ok(StatsdClient::from_sink(STATS_PREFIX, sink))
     }
 
     fn send_metrics<'a, T: Metric + From<String>>(
@@ -298,6 +372,7 @@ impl Collector {
         let pre_hooks = self.pre_hooks.clone();
         let hostname = self.hostname.clone();
         let min_interval = self.min_interval.clone();
+        let sender = self.sender.clone();
         *self.thread.lock().unwrap() = Some(thread::spawn(move || {
             let mut statsd_clients = vec![];
             let mut old_remotes = vec![];
@@ -325,12 +400,19 @@ impl Collector {
                                 as i64;
                             let points = source.countable.get_counters();
                             if !points.is_empty() {
-                                batches.push(Batch {
+                                let batch = Arc::new(Batch {
                                     module: source.module,
                                     tags: source.tags.clone(),
                                     points,
                                     timestamp: now,
                                 });
+                                if let Err(_) = sender.send(SendItem::DeepflowStats(batch.clone()))
+                                {
+                                    debug!(
+                                        "stats to send queue failed because queue have terminated"
+                                    );
+                                }
+                                batches.push(batch);
                             }
                         }
                     }

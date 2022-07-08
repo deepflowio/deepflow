@@ -183,7 +183,7 @@ pub struct UniformSenderThread {
 impl UniformSenderThread {
     pub fn new(
         id: usize,
-        input: Receiver<SendItem>,
+        input: Arc<Receiver<SendItem>>,
         config: SenderAccess,
         stats: Arc<Collector>,
         exception_handler: ExceptionHandler,
@@ -191,7 +191,7 @@ impl UniformSenderThread {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
-            input: Arc::new(input),
+            input,
             config,
             thread_handle: None,
             running,
