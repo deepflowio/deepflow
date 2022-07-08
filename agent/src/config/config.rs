@@ -122,6 +122,7 @@ impl Config {
                 let client = match session.get_client() {
                     Some(c) => c,
                     None => {
+                        session.set_request_failed(true);
                         warn!("rpc client not connected");
                         tokio::time::sleep(MINUTE).await;
                         continue;
