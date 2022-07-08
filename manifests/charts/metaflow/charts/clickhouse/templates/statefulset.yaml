@@ -1,0 +1,121 @@
+{{- if and (not $.Values.global.allInOneLocalStorage ) (eq ( tpl $.Values.storageConfig.generateType . ) "hostPath") (not $.Values.nodeAffinityLabelSelector)  }}
+{{- fail "You must set nodeAffinityLabelSelector"  -}}
+{{- end}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.fullname" . }}
+  labels:
+    {{- include "clickhouse.labels" . | nindent 4 }}
+spec:
+spec:
+  replicas: {{ tpl .Values.replicas . }}
+  podManagementPolicy: {{ tpl .Values.podManagementPolicy . }}
+  serviceName: {{ include "clickhouse.fullname" . }}-headless
+  selector:
+    matchLabels:
+      {{- include "clickhouse.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "clickhouse.selectorLabels" . | nindent 8 }}
+  selector:
+    matchLabels:
+      {{- include "clickhouse.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "clickhouse.selectorLabels" . | nindent 8 }}
+    spec:
+      hostNetwork: {{ tpl .Values.hostNetwork . }}
+      dnsPolicy: {{ tpl .Values.dnsPolicy . }}
+      imagePullSecrets:
+      {{- with .Values.imagePullSecrets }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: clickhouse-init
+          image: "{{ tpl .Values.image.repository . }}:{{ tpl .Values.image.tag . }}"
+          volumeMounts:
+          - name: clickhouse-path
+            mountPath: /var/lib/clickhouse/
+          - name: clickhouse-storage-path
+            mountPath: /var/lib/clickhouse_storage/
+          command: ['sh', '-c', 'chown clickhouse:clickhouse /var/lib/clickhouse_storage;chown clickhouse:clickhouse /var/lib/clickhouse/']
+      containers:
+        - name: clickhouse
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ tpl .Values.image.repository . }}:{{ tpl .Values.image.tag . }}"
+          imagePullPolicy: {{ tpl .Values.image.pullPolicy . }}
+          env:
+            - name: TZ
+              value: "{{ tpl .Values.timezone . }}"
+          ports:
+            - name: tcp
+              containerPort: 9000
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: clickhouse-config
+            mountPath: /etc/clickhouse-server/
+          - name: clickhouse-path
+            mountPath: /var/lib/clickhouse/
+          - name: clickhouse-storage-path
+            mountPath: /var/lib/clickhouse_storage/
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+      {{- include "nodeaffinity" . | indent 6 }}
+      {{- include "podAffinity" . | indent 6 }}
+      {{- include "podAntiAffinity" . | indent 6 }}
+      {{- if or .Values.global.tolerations .Values.tolerations }}
+      tolerations:
+      {{- if .Values.global.tolerations }}
+      {{- toYaml .Values.global.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      volumes:
+        - name: clickhouse-config
+          configMap:
+            name: {{ include "clickhouse.fullname" . }}-config
+      {{- if eq ( tpl .Values.storageConfig.generateType . ) "hostPath" }}
+        - name: clickhouse-path
+          hostPath:
+            path: {{ tpl .Values.storageConfig.hostPath . }}/clickhouse
+            type: DirectoryOrCreate
+        - name: clickhouse-storage-path
+          hostPath:
+            path: {{ tpl .Values.storageConfig.hostPath . }}/clickhouse-storage
+            type: DirectoryOrCreate
+      {{- end }}
+  {{- if eq ( tpl $.Values.storageConfig.generateType . )  "persistentVolumeClaim" }}
+  volumeClaimTemplates:
+  {{- include "persistentVolumeClaim" . | indent 2 }}
+  {{- end }}

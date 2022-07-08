@@ -1,0 +1,31 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "mysql.fullname" . }}
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+data:
+  my.cnf: |-
+    [client]
+    default-character-set=utf8
+
+    [mysqld]
+    default-authentication-plugin=mysql_native_password
+
+    # Network related
+    bind-address=::
+    port=30130
+
+    # Enable query cache
+    innodb_buffer_pool_size=20M
+    max_connections=1000
+    wait_timeout=60
+
+    # Replication related
+    slave_skip_errors=all
+  init.sql: |-
+    ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '{{ tpl $.Values.password . }}';
+    CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED WITH mysql_native_password BY '{{ tpl $.Values.password . }}';
+    GRANT ALL ON *.* TO 'root'@'%' WITH GRANT OPTION;
+    CREATE USER IF NOT EXISTS 'grafana'@'%' IDENTIFIED WITH mysql_native_password BY '{{ tpl $.Values.password . }}';
+    GRANT ALL ON *.* TO 'grafana'@'%' WITH GRANT OPTION;
