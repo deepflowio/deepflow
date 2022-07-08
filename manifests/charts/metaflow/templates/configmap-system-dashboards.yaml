@@ -1,0 +1,18 @@
+{{- if or (and .Values.grafana.enabled .Values.grafana.defaultDashboardsEnabled) .Values.grafana.forceDeployDashboards }}
+{{- $files := .Files.Glob "dashboards-system/*.json" }}
+{{- if $files }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "metaflow.name" $ }}-dashboards-system
+  labels:
+    {{ $.Values.grafana.sidecar.dashboards.label }}: "metaflow-system"
+    app: {{ template "metaflow.name" $ }}-grafana
+{{ include "metaflow.labels" $ | nindent 4 }}
+data:
+{{- range $path, $fileContents := $files }}
+{{- $dashboardName := regexReplaceAll "(^.*/)(.*)\\.json$" $path "${2}" }}
+  {{ $dashboardName }}.json: {{ $.Files.Get $path | toJson }}
+{{- end }}
+{{- end }}
+{{- end }}

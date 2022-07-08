@@ -1,0 +1,28 @@
+apiVersion: v2
+description: An automated observability platform for cloud-native developers.
+name: metaflow
+engine: gotpl
+type: application
+version: 0.1.000
+appVersion: "6.1.1"
+kubeVersion: ">=1.16.0-0"
+sources:
+  - https://github.com/metaflowys/metaflow
+home: https://github.com/metaflowys/metaflow
+keywords:
+  - metaflow
+dependencies:
+- name: metaflow-agent
+  repository: ""
+  version: '*.*.*'
+  condition: metaflow-agent.enabled
+- name: clickhouse
+  repository: ""
+  version: '*.*.*'
+- name: mysql
+  repository: ""
+  version: '*.*.*'
+- name: grafana
+  version: "6.31.1"
+  repository: https://grafana.github.io/helm-charts
+  condition: grafana.enabled

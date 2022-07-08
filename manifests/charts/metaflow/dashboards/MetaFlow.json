@@ -1,0 +1,200 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "grafana",
+            "uid": "-- Grafana --"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "target": {
+            "limit": 100,
+            "matchAny": false,
+            "tags": [],
+            "type": "dashboard"
+          },
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": 5,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+      {
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 6,
+        "targets": [
+          {
+            "datasource": {
+              "type": "metaflow-querier-datasource",
+              "uid": "P685C713A23B37E1B"
+            },
+            "queryText": "{\"appType\":\"appTrace\",\"db\":\"flow_log\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"e57ea0e3-8d97-d643-132d-2a719f81a4c8\"}],\"where\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"25e53af9-ca16-5b6c-e0ae-e7978e83c663\"}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"487ff775-a8e2-90c1-7744-9d6c384b49eb\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"281ec793-a3b5-5e31-dcf0-035775e5c482\"}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"c8fb6a59-8eb5-0d61-dbe5-673df8daf0f1\",\"sort\":\"asc\"}],\"interval\":\"\",\"limit\":\"100\",\"offset\":\"\",\"resultGroupBy\":false}",
+            "refId": "A"
+          }
+        ],
+        "title": "APP trace",
+        "type": "metaflow-apptracing-panel"
+      },
+      {
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "id": 4,
+        "targets": [
+          {
+            "datasource": {
+              "type": "metaflow-querier-datasource",
+              "uid": "P685C713A23B37E1B"
+            },
+            "queryText": "{\"appType\":\"accessRelationship\",\"db\":\"flow_log\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"metric\",\"key\":\"request\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"8872efe6-76a6-859f-969f-b84384453077\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"25e53af9-ca16-5b6c-e0ae-e7978e83c663\"}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"487ff775-a8e2-90c1-7744-9d6c384b49eb\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"pod_0\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"a1eb7933-b032-489b-0b61-9bc262443cb2\",\"sideType\":\"from\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"az_0\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"94d68055-87f5-1040-a9cd-b8fb75693030\",\"subFuncs\":[],\"sideType\":\"from\"},{\"type\":\"tag\",\"key\":\"pod_1\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"fbf9d206-4b79-2f95-9086-1d0abdc1e6b0\",\"sideType\":\"to\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"az_1\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"731ccb5a-2626-a855-6ee4-ed1edb886c8b\",\"subFuncs\":[],\"sideType\":\"to\"}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"c8fb6a59-8eb5-0d61-dbe5-673df8daf0f1\",\"sort\":\"asc\"}],\"interval\":\"\",\"limit\":\"\",\"offset\":\"\",\"resultGroupBy\":false}",
+            "refId": "A"
+          }
+        ],
+        "title": "Pod(az) visit topo",
+        "type": "metaflow-topo-panel"
+      },
+      {
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "id": 2,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "pluginVersion": "9.0.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "metaflow-querier-datasource",
+              "uid": "P685C713A23B37E1B"
+            },
+            "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_log\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"metric\",\"key\":\"request\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"49432047-3b8e-41e5-6528-ce7815884ae1\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"25e53af9-ca16-5b6c-e0ae-e7978e83c663\"}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"487ff775-a8e2-90c1-7744-9d6c384b49eb\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"281ec793-a3b5-5e31-dcf0-035775e5c482\"}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"c8fb6a59-8eb5-0d61-dbe5-673df8daf0f1\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"resultGroupBy\":true}",
+            "refId": "A"
+          }
+        ],
+        "title": "L7 requests per minute",
+        "transformations": [
+          {
+            "id": "convertFieldType",
+            "options": {
+              "conversions": [
+                {
+                  "destinationType": "number",
+                  "targetField": "Avg(请求)"
+                }
+              ],
+              "fields": {}
+            }
+          }
+        ],
+        "type": "timeseries"
+      }
+    ],
+    "refresh": "",
+    "schemaVersion": 36,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+      "list": []
+    },
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "MetaFlow",
+    "uid": "hYo7cr37k",
+    "version": 12,
+    "weekStart": ""
+  }
