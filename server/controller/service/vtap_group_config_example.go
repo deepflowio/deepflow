@@ -63,6 +63,10 @@ output_vlan: 0
 nat_ip_enabled: 0
 # 日志存储时长，单位：天，默认值：30，值域[7, 365]
 log_retention: 300
+# 控制器通信端口，默认值：30035，可选值：1-65535
+proxy_controller_port: 30035
+# 数据节点通信端口，默认值：30033，可选值：1-65535
+analyzer_port: 30033
 
 # 全景图配置参数
 # 数据套接字，默认值: TCP，可选值：TCP/UDP/FILE
@@ -137,12 +141,8 @@ static_config:
   kubernetes-namespace:
   # ingress的类型，填写为kubernetes or openshift，默认kubernetes
   ingress-flavour: kubernetes
-  # proxy controller listen port
-  proxy-controller-port: 30035
   # 配置后会使用配置文件中的analyzer-ip分别替换控制器下发的analyzer-ip
   analyzer-ip: ""
-  # analyzer listen port
-  analyzer-port: 30033
   # loglevel: "debug/info/warn/error"
   log-level: info
   # profiler
