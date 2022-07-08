@@ -40,7 +40,8 @@ import (
 )
 
 const (
-	RECV_BUFSIZE              = datatype.MESSAGE_FRAME_SIZE_MAX
+	RECV_BUFSIZE_MAX          = datatype.MESSAGE_FRAME_SIZE_MAX * 2
+	RECV_BUFSIZE              = 10 << 10
 	RECV_TIMEOUT              = 30 * time.Second
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	DROP_DETECT_WINDOW_SIZE   = 1024
@@ -82,8 +83,12 @@ var recvBufferPool = pool.NewLockFreePool(
 	pool.OptionInitFullPoolSize(8),
 )
 
-func AcquireRecvBuffer() *RecvBuffer {
-	return recvBufferPool.Get().(*RecvBuffer)
+func AcquireRecvBuffer(length int) *RecvBuffer {
+	buf := recvBufferPool.Get().(*RecvBuffer)
+	if len(buf.Buffer) < length {
+		buf.Buffer = make([]byte, length)
+	}
+	return buf
 }
 
 func ReleaseRecvBuffer(b *RecvBuffer) {
@@ -618,7 +623,7 @@ func (r *Receiver) ProcessUDPServer() {
 	flowHeader := &datatype.FlowHeader{}
 	r.setUDPTimeout()
 	for !r.exit {
-		recvBuffer := AcquireRecvBuffer()
+		recvBuffer := AcquireRecvBuffer(RECV_BUFSIZE)
 		size, remoteAddr, err := r.UDPConn.ReadFromUDP(recvBuffer.Buffer)
 		if err != nil || size < datatype.MESSAGE_HEADER_LEN {
 			ReleaseRecvBuffer(recvBuffer)
@@ -818,11 +823,11 @@ func (r *Receiver) handleTCPConnection(conn net.Conn) {
 		}
 
 		dataLen := int(baseHeader.FrameSize) - headerLen
-		if dataLen > RECV_BUFSIZE {
+		if dataLen > RECV_BUFSIZE_MAX {
 			r.logTCPReceiveInvalidData(fmt.Sprintf("TCP client(%s) wrong frame size(%d)", conn.RemoteAddr().String(), baseHeader.FrameSize))
 			return
 		}
-		recvBuffer := AcquireRecvBuffer()
+		recvBuffer := AcquireRecvBuffer(dataLen)
 		if err := ReadN(conn, recvBuffer.Buffer[:dataLen]); err != nil {
 			atomic.AddUint64(&r.counter.Invalid, 1)
 			ReleaseRecvBuffer(recvBuffer)

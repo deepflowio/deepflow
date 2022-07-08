@@ -42,16 +42,18 @@ const (
 )
 
 type ExtMetrics struct {
-	Config     *config.Config
-	Telegraf   *Metricsor
-	Prometheus *Metricsor
+	Config        *config.Config
+	Telegraf      *Metricsor
+	Prometheus    *Metricsor
+	MetaflowStats *Metricsor
 }
 
 type Metricsor struct {
-	Config        *config.Config
-	Decoders      []*decoder.Decoder
-	PlatformDatas []*grpc.PlatformInfoTable
-	Writer        *dbwriter.ExtMetricsWriter
+	Config              *config.Config
+	Decoders            []*decoder.Decoder
+	PlatformDataEnabled bool
+	PlatformDatas       []*grpc.PlatformInfoTable
+	Writer              *dbwriter.ExtMetricsWriter
 }
 
 func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics, error) {
@@ -64,16 +66,18 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics,
 		}
 	}
 
-	telegraf := NewMetricsor(datatype.MESSAGE_TYPE_TELEGRAF, config, controllers, manager, recv)
-	prometheus := NewMetricsor(datatype.MESSAGE_TYPE_PROMETHEUS, config, controllers, manager, recv)
+	telegraf := NewMetricsor(datatype.MESSAGE_TYPE_TELEGRAF, config, controllers, manager, recv, true)
+	prometheus := NewMetricsor(datatype.MESSAGE_TYPE_PROMETHEUS, config, controllers, manager, recv, true)
+	deepflowStats := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, config, controllers, manager, recv, false)
 	return &ExtMetrics{
-		Config:     config,
-		Telegraf:   telegraf,
-		Prometheus: prometheus,
+		Config:        config,
+		Telegraf:      telegraf,
+		Prometheus:    prometheus,
+		MetaflowStats: deepflowStats,
 	}, nil
 }
 
-func NewMetricsor(msgType datatype.MessageType, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver) *Metricsor {
+func NewMetricsor(msgType datatype.MessageType, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) *Metricsor {
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+msgType.String(),
@@ -88,9 +92,11 @@ func NewMetricsor(msgType datatype.MessageType, config *config.Config, controlle
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
-		if i == 0 {
-			debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
+		if platformDataEnabled {
+			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+			if i == 0 {
+				debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
+			}
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
@@ -102,15 +108,18 @@ func NewMetricsor(msgType datatype.MessageType, config *config.Config, controlle
 		)
 	}
 	return &Metricsor{
-		Config:        config,
-		Decoders:      decoders,
-		PlatformDatas: platformDatas,
+		Config:              config,
+		Decoders:            decoders,
+		PlatformDataEnabled: platformDataEnabled,
+		PlatformDatas:       platformDatas,
 	}
 }
 
 func (m *Metricsor) Start() {
-	for _, platformData := range m.PlatformDatas {
-		platformData.Start()
+	if m.PlatformDataEnabled {
+		for _, platformData := range m.PlatformDatas {
+			platformData.Start()
+		}
 	}
 
 	for _, decoder := range m.Decoders {
@@ -127,10 +136,12 @@ func (m *Metricsor) Close() {
 func (s *ExtMetrics) Start() {
 	s.Telegraf.Start()
 	s.Prometheus.Start()
+	s.MetaflowStats.Start()
 }
 
 func (s *ExtMetrics) Close() error {
 	s.Telegraf.Close()
 	s.Prometheus.Close()
+	s.MetaflowStats.Close()
 	return nil
 }

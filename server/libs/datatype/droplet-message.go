@@ -43,7 +43,7 @@ const (
 	MESSAGE_TYPE_TELEGRAF
 	MESSAGE_TYPE_PACKETSEQUENCE
 
-	MESSAGE_TYPE_DFSTATSD
+	MESSAGE_TYPE_DFSTATS
 	MESSAGE_TYPE_MAX
 )
 
@@ -59,7 +59,7 @@ var MessageTypeString = [MESSAGE_TYPE_MAX]string{
 	MESSAGE_TYPE_PROMETHEUS:    "prometheus",
 	MESSAGE_TYPE_TELEGRAF:      "telegraf",
 
-	MESSAGE_TYPE_DFSTATSD: "df_statsd",
+	MESSAGE_TYPE_DFSTATS: "deepflow_stats",
 }
 
 func (m MessageType) String() string {
@@ -93,7 +93,7 @@ var MessageHeaderTypes = [MESSAGE_TYPE_MAX]MessageHeaderType{
 	MESSAGE_TYPE_PROMETHEUS:    HEADER_TYPE_LT_VTAP,
 	MESSAGE_TYPE_TELEGRAF:      HEADER_TYPE_LT_VTAP,
 
-	MESSAGE_TYPE_DFSTATSD: HEADER_TYPE_LT_NOCHECK,
+	MESSAGE_TYPE_DFSTATS: HEADER_TYPE_LT_VTAP,
 }
 
 func (m MessageType) HeaderType() MessageHeaderType {
