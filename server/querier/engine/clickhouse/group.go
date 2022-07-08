@@ -73,6 +73,7 @@ func (g *GroupTag) Format(m *view.Model) {
 				subnetTag := fmt.Sprintf("if(%s=0,%s,0)", resourceIDSuffix, subnetIDSuffix)
 				m.AddTag(&view.Tag{Value: ipTag, Alias: "ip" + suffix})
 				m.AddTag(&view.Tag{Value: subnetTag, Alias: subnetIDSuffix})
+				m.AddTag(&view.Tag{Value: resourceTypeSuffix})
 				m.AddGroup(&view.Group{Value: "ip" + suffix})
 				m.AddGroup(&view.Group{Value: subnetIDSuffix})
 				m.AddGroup(&view.Group{Value: resourceTypeSuffix})
