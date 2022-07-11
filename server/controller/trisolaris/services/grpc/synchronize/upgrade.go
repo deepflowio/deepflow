@@ -68,7 +68,7 @@ func (e *UpgradeEvent) GetUpgradeFile(os uint32) (*UpgradeData, error) {
 }
 
 func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_UpgradeServer) error {
-	upgradeData, err := e.GetUpgradeFile(r.GetTridentOs())
+	upgradeData, err := e.GetUpgradeFile(TRIDENT_LINUX)
 	if err != nil {
 		log.Error(err)
 		return sendFailed(in)
