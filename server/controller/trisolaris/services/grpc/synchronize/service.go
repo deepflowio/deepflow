@@ -17,10 +17,11 @@
 package synchronize
 
 import (
-	context "golang.org/x/net/context"
-	"google.golang.org/grpc"
+	"strings"
 
 	api "github.com/metaflowys/metaflow/message/trident"
+	context "golang.org/x/net/context"
+	"google.golang.org/grpc"
 
 	"github.com/metaflowys/metaflow/server/controller/genesis"
 	grpcserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/grpc"
@@ -57,7 +58,8 @@ func (s *service) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRespo
 }
 
 func (s *service) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error {
-	if r.GetProcessName() == "trident" {
+	processName := r.GetProcessName()
+	if strings.HasPrefix(processName, "trident") || strings.HasPrefix(processName, "metaflow-agent") {
 		s.vTapEvent.Push(r, in)
 	} else {
 		s.tsdbEvent.Push(r, in)
