@@ -70,7 +70,7 @@ impl L7FlowPerf for DnsPerfData {
                 self.decode_payload(payload, packet.lookup_key.timestamp, flow_id)?;
             }
             IpProtocol::Tcp => {
-                if payload.len() < DNS_TCP_PAYLOAD_OFFSET {
+                if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
                     return Err(Error::DNSPerfParseFailed("dns payload length error"));
                 }
 

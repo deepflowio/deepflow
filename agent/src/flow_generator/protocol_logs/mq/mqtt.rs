@@ -311,11 +311,7 @@ pub fn parse_connect(input: &[u8], error: Error) -> Result<(u8, String), Error> 
     msg_len = read_u16_be(&input[offset..]);
     offset += 2;
 
-    let mut client_id_end = msg_len as usize + offset;
-    if client_id_end > input.len() {
-        client_id_end = input.len();
-    }
-
+    let client_id_end = input.len().min(msg_len as usize + offset);
     let client_id = String::from_utf8_lossy(&input[offset..client_id_end]).into_owned();
     Ok((proto_version, client_id))
 }

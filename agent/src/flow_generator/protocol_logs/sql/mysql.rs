@@ -270,7 +270,7 @@ impl MysqlHeader {
             return HEADER_LEN as isize;
         }
         let offset = len as usize + HEADER_LEN;
-        if offset > payload.len() {
+        if offset >= payload.len() {
             return 0;
         }
         let offset = offset as isize;
@@ -284,7 +284,7 @@ impl MysqlHeader {
         payload: &[u8],
         l7_proto: L7Protocol,
     ) -> Option<LogMessageType> {
-        if offset > payload.len() || self.length == 0 {
+        if offset >= payload.len() || self.length == 0 {
             return None;
         }
         if self.number != 0 && l7_proto == L7Protocol::Unknown {
@@ -346,11 +346,7 @@ pub fn mysql_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
             return context.is_ascii();
         }
         n if 8 <= n && n <= 20 => {
-            let max_len = if payload.len() > offset + 8 {
-                offset + 8
-            } else {
-                payload.len()
-            };
+            let max_len = payload.len().min(offset + 8);
             let context = mysql_string(&payload[offset + 1..max_len]);
             let regex = Regex::new("^[0-9\\.]{3,}").unwrap();
             return regex.is_match(context.as_str());
