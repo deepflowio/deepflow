@@ -119,6 +119,13 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 
 		domainResp.Config = make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &domainResp.Config)
+		for _, key := range []string{
+			"admin_password", "secret_key", "password", "boss_secret_key",
+		} {
+			if _, ok := domainResp.Config[key]; ok {
+				domainResp.Config[key] = common.DEFAULT_ENCRYPTION_PASSWORD
+			}
+		}
 
 		response = append(response, domainResp)
 	}
