@@ -3,12 +3,13 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"gorm.io/gorm/clause"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
-	// "gorm.io/gorm/clause"
+	"gorm.io/gorm/clause"
 
+	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
+	k8s "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather"
 	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/model"
@@ -166,13 +167,40 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 		} else {
 			domain.ClusterID = "d-" + common.GenerateShortUUID()
 		}
+		regionLcuuid := domainCreate.Config["region_uuid"].(string)
+		createKubernetesRelatedResources(domain, regionLcuuid)
 	}
 	mysql.Db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain)
 
-	// TODO: K8s云平台额外优先添加region和az数据库表，后续考虑放到exchange中
-
 	response, _ := GetDomains(map[string]interface{}{"lcuuid": lcuuid})
 	return &response[0], nil
+}
+
+func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) {
+	if regionLcuuid == "" {
+		regionLcuuid = common.DEFAULT_REGION
+	}
+	az := mysql.AZ{}
+	az.Lcuuid = cloudcommon.GetAZLcuuidFromUUIDGenerate(domain.DisplayName)
+	az.Name = domain.Name
+	az.Domain = domain.Lcuuid
+	az.Region = regionLcuuid
+	az.CreateMethod = common.CREATE_METHOD_LEARN
+	err := mysql.Db.Create(&az).Error
+	if err != nil {
+		log.Errorf("create az failed: %s", err)
+	}
+	vpc := mysql.VPC{}
+	vpc.Lcuuid = k8s.GetVPCLcuuidFromUUIDGenerate(domain.DisplayName)
+	vpc.Name = domain.Name
+	vpc.Domain = domain.Lcuuid
+	vpc.Region = regionLcuuid
+	vpc.CreateMethod = common.CREATE_METHOD_LEARN
+	err = mysql.Db.Create(&vpc).Error
+	if err != nil {
+		log.Errorf("create vpc failed: %s", err)
+	}
+	return
 }
 
 func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Domain, error) {

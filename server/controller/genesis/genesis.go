@@ -192,8 +192,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		mysql.Db.Find(&controllers)
 		retFlag := false
 		for _, controller := range controllers {
-			// FIXME: read from config file
-			grpcServer := net.JoinHostPort(controller.IP, "30035")
+			grpcServer := net.JoinHostPort(controller.IP, g.cfg.GRPCServerPort)
 			conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 			if err != nil {
 				log.Error("create grpc connection faild:" + err.Error())

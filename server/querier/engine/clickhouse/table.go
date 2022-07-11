@@ -25,11 +25,15 @@ func GetTables(db string) map[string][]interface{} {
 		values = append(values, common.GetExtTables(db)...)
 	} else {
 		for _, table := range tables {
-			values = append(values, []string{table})
+			datasource, err := common.GetDatasources(db, table)
+			if err != nil {
+				log.Error(err)
+			}
+			values = append(values, []interface{}{table, datasource})
 		}
 	}
 	return map[string][]interface{}{
-		"columns": []interface{}{"name"},
+		"columns": []interface{}{"name", "datasources"},
 		"values":  values,
 	}
 }

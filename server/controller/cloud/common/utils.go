@@ -19,6 +19,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/mikioh/ipaddr"
 	logging "github.com/op/go-logging"
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/metaflowys/metaflow/server/controller/cloud/config"
 	"github.com/metaflowys/metaflow/server/controller/cloud/model"
@@ -533,4 +534,9 @@ func GetHostIPByName(name string) (string, error) {
 
 	// TODO hash实现
 	return "", nil
+}
+
+func GetAZLcuuidFromUUIDGenerate(uuidGenerate string) string {
+	lcuuid := common.GetUUID(uuidGenerate, uuid.Nil)
+	return lcuuid[:len(lcuuid)-2] + "ff"
 }

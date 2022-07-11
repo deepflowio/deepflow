@@ -15,7 +15,7 @@ const (
 )
 
 // if database not exist, create database and tables;
-// if database exsits, check whether db version is lastest, execute issu if it is not lastest
+// if database exsits, execute issue if version table not exists or db version not equal lastest version
 func Migrate(cfg MySqlConfig) bool {
 	dsn := getDSN(cfg, "", cfg.TimeOut, false)
 	db := getGormDB(dsn)
@@ -35,13 +35,22 @@ func Migrate(cfg MySqlConfig) bool {
 			return false
 		}
 	} else {
+		var versionTable string
+		db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", cfg.Database, DB_VERSION_TABLE)).Scan(&versionTable)
+		if versionTable != DB_VERSION_TABLE {
+			err = db.Exec(migrate.CREATE_TABLE_DB_VERSION).Error
+			if err != nil {
+				log.Errorf("create table db_version failed: %v", err)
+				return false
+			}
+		}
 		var version string
 		err = db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
 		if err != nil {
 			log.Errorf("check db version failed: %v", err)
 			return false
 		}
-		if version != "" && version != DB_VERSION_EXPECT {
+		if versionTable != DB_VERSION_TABLE || (version != "" && version != DB_VERSION_EXPECT) {
 			err = executeIssu(db, DB_VERSION_EXPECT)
 			if err != nil {
 				return false

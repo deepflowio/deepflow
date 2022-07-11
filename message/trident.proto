@@ -449,7 +449,7 @@ message SyncResponse {
 
 message UpgradeRequest  {
     optional string ctrl_ip = 1;
-    optional uint32 trident_os = 2; // 0:linux, 1:windows
+    optional string ctrl_mac = 3;
 }
 message UpgradeResponse  {
     optional Status status = 1;     // 调用是否成功
