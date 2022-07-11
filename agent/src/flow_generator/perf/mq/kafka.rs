@@ -275,7 +275,7 @@ impl KafkaPerfData {
 
         let api_key = (req_timestmp_nanos & KAFKA_API_KEY_MASK_VALUE) >> KAFKA_API_KEY_OFFSET;
         // 只支持对fetch命令解析返回码
-        if api_key as i16 == KAFKA_FETCH && payload.len() >= KAFKA_FETCH_STATUS_CODE_OFFSET {
+        if api_key as i16 == KAFKA_FETCH && payload.len() > KAFKA_FETCH_STATUS_CODE_OFFSET {
             self.status_code = bytes::read_u16_be(&payload[12..]);
             if self.status_code == 0 {
                 self.status = L7ResponseStatus::Ok;

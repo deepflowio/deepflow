@@ -266,7 +266,7 @@ impl MysqlPerfData {
         self.msg_type = LogMessageType::Response;
         self.has_log_data = true;
         let error_code: u16 = if payload[RESPONSE_CODE_OFFSET] == MYSQL_RESPONSE_CODE_ERR
-            && payload.len() > ERROR_CODE_OFFSET + 2
+            && payload.len() >= ERROR_CODE_OFFSET + 2
         {
             bytes::read_u16_le(&payload[ERROR_CODE_OFFSET..])
         } else {
