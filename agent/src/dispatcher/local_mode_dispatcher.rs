@@ -14,7 +14,7 @@ use crate::{
     common::{
         decapsulate::TunnelType,
         enums::{EthernetType, TapType},
-        MetaPacket, PlatformData, TapPort, FIELD_OFFSET_ETH_TYPE, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
+        MetaPacket, TapPort, FIELD_OFFSET_ETH_TYPE, MAC_ADDR_LEN, VLAN_HEADER_SIZE,
     },
     config::DispatcherConfig,
     flow_generator::FlowMap,
@@ -241,18 +241,18 @@ impl LocalModeDispatcherListener {
         interfaces: &Vec<Link>,
         if_mac_source: IfMacSource,
         trident_type: TridentType,
-        blacklist: &Vec<PlatformData>,
+        blacklist: &Vec<u64>,
     ) {
         let mut interfaces = interfaces.to_vec();
         if !blacklist.is_empty() {
             // 当虚拟机内的容器节点已部署采集器时，宿主机采集器需要排除容器节点的接口，避免采集双份重复流量
             let mut blackset = HashSet::with_capacity(blacklist.len());
-            for entry in blacklist {
-                blackset.insert(entry.mac);
+            for mac in blacklist {
+                blackset.insert(*mac & 0xffffffff);
             }
             let mut rejected = vec![];
             interfaces.retain(|iface| {
-                if blackset.contains(&iface.mac_addr.into()) {
+                if blackset.contains(&(u64::from(iface.mac_addr) & 0xffffffff)) {
                     rejected.push(iface.mac_addr);
                     false
                 } else {
