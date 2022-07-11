@@ -904,6 +904,8 @@ type VTap struct {
 	LicenseType        int       `gorm:"column:license_type;type:int;default:null" json:"LICENSE_TYPE"`   // 1: A类 2: B类 3: C类
 	LicenseFunctions   string    `gorm:"column:license_functions;type:char(64)" json:"LICENSE_FUNCTIONS"` // separated by ,; 1: 流量分发 2: 网络监控 3: 应用监控
 	TapMode            int       `gorm:"column:tap_mode;type:int;default:null" json:"TAP_MODE"`
+	ExpectedRevision   string    `gorm:"column:expected_revision;type:text;default null" json:"EXPECTED_REVISION"`
+	UpgradePackage     string    `gorm:"column:upgrade_package;type:text;default null" json:"UPGRADE_PACKAGE"`
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 

@@ -128,10 +128,11 @@ type VTapCache struct {
 	enabledNetworkMonitoring     atomicbool.Bool
 	enabledApplicationMonitoring atomicbool.Bool
 
-	cachedAt        time.Time
-	upgradeRevision *string
-	region          *string
-	domain          *string
+	cachedAt         time.Time
+	expectedRevision *string
+	upgradePackage   *string
+	region           *string
+	domain           *string
 
 	// vtap group config
 	config *atomic.Value //*VTapConfig
@@ -209,6 +210,8 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.podClusterID = 0
 	vTapCache.VPCID = 0
 	vTapCache.PlatformData = &atomic.Value{}
+	vTapCache.expectedRevision = proto.String(vtap.ExpectedRevision)
+	vTapCache.upgradePackage = proto.String(vtap.UpgradePackage)
 	vTapCache.convertLicenseFunctions()
 	return vTapCache
 }
@@ -570,14 +573,23 @@ func (c *VTapCache) updateRegion(region string) {
 	c.region = &region
 }
 
-func (c *VTapCache) UpdateUpgradeRevision(revision string) {
-	c.upgradeRevision = &revision
+func (c *VTapCache) UpdateUpgradeInfo(expectedRevision string, upgradePackage string) {
+	c.expectedRevision = &expectedRevision
+	c.upgradePackage = &upgradePackage
 }
 
-func (c *VTapCache) GetUpgradeRevision() string {
-	if c.upgradeRevision != nil {
-		return *c.upgradeRevision
+func (c *VTapCache) GetExpectedRevision() string {
+	if c.expectedRevision != nil {
+		return *c.expectedRevision
 	}
+	return ""
+}
+
+func (c *VTapCache) GetUpgradePackage() string {
+	if c.upgradePackage != nil {
+		return *c.upgradePackage
+	}
+
 	return ""
 }
 

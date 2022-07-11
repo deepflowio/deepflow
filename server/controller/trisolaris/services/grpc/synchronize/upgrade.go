@@ -26,7 +26,6 @@ import (
 	api "github.com/metaflowys/metaflow/message/trident"
 
 	"github.com/metaflowys/metaflow/server/controller/trisolaris"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
 )
 
 type UpgradeEvent struct{}
@@ -54,20 +53,13 @@ func sendFailed(in api.Synchronizer_UpgradeServer) error {
 	return err
 }
 
-func (e *UpgradeEvent) GetUpgradeFile(os uint32) (*UpgradeData, error) {
-	config := trisolaris.GetConfig()
-	var tridentPath string
-	if os == TRIDENT_LINUX {
-		tridentPath = config.TridentLinuxPath
-	} else if os == TRIDENT_WINDOWS {
-		tridentPath = config.TridentWindowsPath
+func (e *UpgradeEvent) GetUpgradeFile(upgradePackage string) (*UpgradeData, error) {
+	if upgradePackage == "" {
+		return nil, fmt.Errorf("upgradePackage(%s) file does not exist", upgradePackage)
 	}
-	if tridentPath == "" {
-		return nil, fmt.Errorf("trident(%s) file does not exist", tridentPath)
-	}
-	content, err := ioutil.ReadFile(tridentPath)
+	content, err := ioutil.ReadFile(upgradePackage)
 	if err != nil {
-		return nil, fmt.Errorf("trident(%s) file does not exist, err: %s", tridentPath, err)
+		return nil, fmt.Errorf("trident(%s) file does not exist, err: %s", upgradePackage, err)
 	}
 	totalLen := uint64(len(content))
 	step := uint64(1024 * 1024)
@@ -84,7 +76,15 @@ func (e *UpgradeEvent) GetUpgradeFile(os uint32) (*UpgradeData, error) {
 }
 
 func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_UpgradeServer) error {
-	upgradeData, err := e.GetUpgradeFile(TRIDENT_LINUX)
+	vtapCacheKey := r.GetCtrlIp() + "-" + r.GetCtrlMac()
+	log.Infof("vtap(%s) starts to upgrade", vtapCacheKey)
+	gVTapInfo := trisolaris.GetGVTapInfo()
+	vtapCache := gVTapInfo.GetVTapCache(vtapCacheKey)
+	if vtapCache == nil {
+		log.Errorf("vtap(%s) cache not found", vtapCacheKey)
+		return sendFailed(in)
+	}
+	upgradeData, err := e.GetUpgradeFile(vtapCache.GetUpgradePackage())
 	if err != nil {
 		log.Error(err)
 		return sendFailed(in)
@@ -108,6 +108,6 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		}
 	}
 
-	log.Infof("vtap(%s) end upgrade trident", r.GetCtrlIp())
+	log.Infof("vtap(%s) finishes the upgrade", vtapCacheKey)
 	return err
 }
