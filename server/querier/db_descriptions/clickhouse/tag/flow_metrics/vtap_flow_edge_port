@@ -6,7 +6,6 @@ az                         , az_0                      , az_1                   
 host                       , host_0                    , host_1                    , 宿主机                     , resource      ,                    , 知识图谱    , 100        ,
 chost                      , chost_0                   , chost_1                   , 云服务器                   , resource      ,                    , 知识图谱    , 111        ,
 vpc                        , vpc_0                     , vpc_1                     , VPC                        , resource      ,                    , 知识图谱    , 111        ,
-l2_vpc                     , l2_vpc_0                  , l2_vpc_1                  , 网卡VPC                    , resource      ,                    , 知识图谱    , 110        ,
 subnet                     , subnet_0                  , subnet_1                  , 子网                       , resource      ,                    , 知识图谱    , 111        ,
 router                     , router_0                  , router_1                  , 路由器                     , resource      ,                    , 知识图谱    , 110        ,
 dhcpgw                     , dhcpgw_0                  , dhcpgw_1                  , DHCP网关                   , resource      ,                    , 知识图谱    , 110        ,
