@@ -98,6 +98,46 @@ func ParseResponse(response *http.Response) (map[string]interface{}, error) {
 	return result, err
 }
 
+func GetDatasources(db string, table string) ([]string, error) {
+	var datasources []string
+	switch db {
+	case "flow_metrics":
+		var tsdbType string
+		if table == "vtap_flow_port" || table == "vtap_flow_edge_port" {
+			tsdbType = "flow"
+		} else if table == "vtap_app_port" || table == "vtap_app_edge_port" {
+			tsdbType = "app"
+		}
+		client := &http.Client{}
+		url := fmt.Sprintf("http://localhost:20417/v1/data-sources/?type=%s", tsdbType)
+		reqest, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return datasources, err
+		}
+		response, err := client.Do(reqest)
+		if err != nil {
+			return datasources, err
+		}
+		defer response.Body.Close()
+		if response.StatusCode != 200 {
+			return datasources, errors.New(fmt.Sprintf("get datasource error, url: %s, code '%d'", url, response.StatusCode))
+		}
+		body, err := ParseResponse(response)
+		if err != nil {
+			return datasources, err
+		}
+		if body["DATA"] == nil || len(body["DATA"].([]interface{})) < 1 {
+			return datasources, errors.New(fmt.Sprintf("get datasources error, url: %s, response: '%v'", url, body))
+		}
+		for _, datasource := range body["DATA"].([]interface{}) {
+			datasources = append(datasources, datasource.(map[string]interface{})["NAME"].(string))
+		}
+	default:
+		return datasources, nil
+	}
+	return datasources, nil
+}
+
 func GetDatasourceInterval(db string, table string, name string) (int, error) {
 	var tsdbType string
 	switch db {
@@ -153,7 +193,8 @@ func GetExtTables(db string) (values []interface{}) {
 	for _, _table := range rst["values"] {
 		table := _table.([]interface{})[0].(string)
 		if !strings.HasSuffix(table, "_local") {
-			values = append(values, []string{table})
+			datasources, _ := GetDatasources(db, table)
+			values = append(values, []interface{}{table, datasources})
 		}
 	}
 	return values
