@@ -34,8 +34,8 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, platform_data::PlatformData, tagged_flow::TaggedFlow, tap_types::TapTyper,
-        DEFAULT_LOG_RETENTION, DROPLET_PORT, FREE_SPACE_REQUIREMENT,
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DEFAULT_LOG_RETENTION,
+        DROPLET_PORT, FREE_SPACE_REQUIREMENT,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig},
@@ -69,13 +69,13 @@ const MINUTE: Duration = Duration::from_secs(60);
 
 pub enum State {
     Running,
-    ConfigChanged((RuntimeConfig, Vec<PlatformData>)),
+    ConfigChanged((RuntimeConfig, Vec<u64>)),
     Terminated,
     Disabled, // 禁用状态
 }
 
 impl State {
-    fn unwrap_config(self) -> (RuntimeConfig, Vec<PlatformData>) {
+    fn unwrap_config(self) -> (RuntimeConfig, Vec<u64>) {
         match self {
             Self::ConfigChanged(c) => c,
             _ => panic!("not config type"),
@@ -321,7 +321,7 @@ impl Trident {
 fn dispatcher_listener_callback(
     conf: &DispatcherConfig,
     components: &Components,
-    blacklist: Vec<PlatformData>,
+    blacklist: Vec<u64>,
 ) {
     if conf.tap_mode == TapMode::Local {
         let if_mac_source = conf.if_mac_source;

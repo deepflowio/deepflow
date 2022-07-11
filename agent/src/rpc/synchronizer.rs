@@ -30,7 +30,7 @@ use crate::rpc::session::Session;
 use crate::trident::{self, TridentState};
 use crate::utils::{
     self,
-    environment::{is_tt_pod, is_tt_process},
+    environment::is_tt_pod,
     net::{is_unicast_link_local, MacAddr},
 };
 
@@ -211,10 +211,9 @@ impl Status {
         return false;
     }
 
-    fn modify_platform(&mut self, macs: &Vec<MacAddr>, config: &RuntimeConfig) -> Vec<VInterface> {
-        let mut black_list = Vec::new();
+    fn modify_platform(&mut self, macs: &Vec<MacAddr>, config: &RuntimeConfig) {
         if config.yaml_config.tap_mode == TapMode::Analyzer {
-            return black_list;
+            return;
         }
         let mut local_mac_map = HashMap::new();
         for mac in macs {
@@ -235,13 +234,6 @@ impl Status {
                 viface.skip_mac = !is_tap_interface;
             }
 
-            // vm为k8s node场景，k8s node流量由k8s内的采集器来采集，不在这里采集避免采集重复的流量
-            if viface.skip_tap_interface
-                && is_tt_process(config.trident_type)
-                && viface.region_id == region_id
-            {
-                black_list.push(viface.clone());
-            }
             if let Some(v) = local_mac_map.get(&viface.mac) {
                 viface.is_local = *v;
             }
@@ -250,7 +242,6 @@ impl Status {
 
         self.interfaces = vinterfaces;
         // TODO：bridge fdb
-        return black_list;
     }
 
     pub fn get_flow_acls(&mut self, resp: &tp::SyncResponse) -> bool {
@@ -322,6 +313,10 @@ impl Status {
             }
         }
         return false;
+    }
+
+    pub fn get_blacklist(&mut self, resp: &tp::SyncResponse) -> Vec<u64> {
+        return resp.skip_interface.iter().map(|i| i.mac.unwrap()).collect();
     }
 
     fn trigger_flow_acl(&self, trident_type: TridentType, listener: &mut Box<dyn FlowAclListener>) {
@@ -575,7 +570,6 @@ impl Synchronizer {
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
-        let mut blacklist = vec![];
         let (_, macs) = Self::parse_segment(yaml_config.tap_mode, &resp);
 
         let mut status = status.write();
@@ -584,7 +578,7 @@ impl Synchronizer {
         status.ntp_enabled = runtime_config.ntp_enabled;
         let updated_platform = status.get_platform_data(&resp);
         if updated_platform {
-            blacklist = status.modify_platform(&macs, &runtime_config);
+            status.modify_platform(&macs, &runtime_config);
         }
         let mut updated = status.get_ip_groups(&resp) || updated_platform;
         updated = status.get_flow_acls(&resp) || updated;
@@ -620,7 +614,7 @@ impl Synchronizer {
         // TODO: check trisolaris
         // TODO: segments
         // TODO: modify platform
-
+        let blacklist = status.get_blacklist(&resp);
         let (trident_state, cvar) = &**trident_state;
         if !runtime_config.enabled {
             *trident_state.lock().unwrap() = trident::State::Disabled;

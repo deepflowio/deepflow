@@ -27,7 +27,7 @@ use recv_engine::{
 };
 
 use crate::{
-    common::{enums::TapType, PlatformData, TaggedFlow, TapTyper},
+    common::{enums::TapType, TaggedFlow, TapTyper},
     config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
@@ -144,7 +144,7 @@ impl DispatcherListener {
         interfaces: &Vec<Link>,
         if_mac_source: IfMacSource,
         trident_type: TridentType,
-        blacklist: &Vec<PlatformData>,
+        blacklist: &Vec<u64>,
     ) {
         match self {
             Self::Local(l) => {
