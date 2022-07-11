@@ -30,7 +30,7 @@ resource_gl2               , resource_gl2_0            , resource_gl2_1         
 is_internet                , is_internet_0             , is_internet_1             , Internet标志               , bool          ,                    ,             , 111        ,
 
 is_key_service             , is_key_service            , is_key_service            , 是否属于关键服务           , bool          ,                    ,             , 111        ,
-protocol                   , protocol                  , protocol                  , 网络协议                   , int_enum      , protocol           , 传输层      , 111        ,
+protocol                   , protocol                  , protocol                  , 网络协议                   , int_enum      , protocol           , 网络层      , 111        ,
 server_port                , server_port               , server_port               , 服务端口                   , int_enum      , server_port        , 传输层      , 111        ,
 
 tap_port_type              , tap_port_type             , tap_port_type             , 采集位置类型               , int_enum      , tap_port_type      , 流信息      , 111        ,
