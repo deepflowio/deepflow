@@ -1404,6 +1404,8 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     log_file_size             INTEGER DEFAULT NULL COMMENT 'unit: MB',
     external_agent_http_proxy_enabled  TINYINT(1) COMMENT '0: disabled 1:enabled',
     external_agent_http_proxy_port     INTEGER DEFAULT NULL,
+    proxy_controller_port     INTEGER DEFAULT NULL,
+    analyzer_port             INTEGER DEFAULT NULL,
     yaml_config               TEXT,
     lcuuid                    CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
