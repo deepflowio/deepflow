@@ -66,7 +66,7 @@ impl DnsLog {
         let mut index = g_offset;
         let mut buffer = String::new();
 
-        if payload.len() < l_offset {
+        if payload.len() <= l_offset {
             let err_msg = format!("payload too short: {}", payload.len());
             return Err(Error::DNSLogParseFailed(err_msg));
         }
@@ -83,8 +83,8 @@ impl DnsLog {
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
                 DNS_NAME_COMPRESS_POINTER => {
-                    if index + 2 >= payload.len() {
-                        let err_msg = format!("dns name invalid index: {}", index - 2);
+                    if index + 2 > payload.len() {
+                        let err_msg = format!("dns name invalid index: {}", index);
                         return Err(Error::DNSLogParseFailed(err_msg));
                     }
                     let index_ptr = read_u16_be(&payload[index..]) as usize & 0x3fff;
@@ -156,7 +156,7 @@ impl DnsLog {
     fn decode_resource_record(&mut self, payload: &[u8], g_offset: usize) -> Result<usize> {
         let (_, offset) = self.decode_name(payload, g_offset)?;
 
-        if offset > payload.len() {
+        if payload.len() <= offset {
             let err_msg = format!("payload length error: {}", payload.len());
             return Err(Error::DNSLogParseFailed(err_msg));
         }
