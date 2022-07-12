@@ -329,8 +329,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		l3EPCIDSuffix := "l3_epc_id" + suffix
 		tagResourceMap[isInternetSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"1",
-				l3EPCIDSuffix+"=-2",
+				"if("+l3EPCIDSuffix+"=-2,1,0",
+				"",
 				l3EPCIDSuffix+" %s -2",
 				"",
 			),

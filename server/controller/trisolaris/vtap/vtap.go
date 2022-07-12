@@ -184,7 +184,7 @@ func (v *VTapInfo) UpdateVTapCache(key string, vtap *models.VTap) {
 
 func (v *VTapInfo) loadRegion() string {
 	if v.config.NodeIP == "" {
-		log.Error("config NodeIP is empty")
+		log.Error("config NodeIP is null")
 		return ""
 	}
 	ctrlIP := v.config.NodeIP

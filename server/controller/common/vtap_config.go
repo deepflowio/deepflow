@@ -73,6 +73,8 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	HTTPLogXRequestID:             &HTTPLogXRequestID,
 	ExternalAgentHTTPProxyEnabled: &ExternalAgentHTTPProxyEnabled,
 	ExternalAgentHTTPProxyPort:    &ExternalAgentHTTPProxyPort,
+	AnalyzerPort:                  &AnalyzerPort,
+	ProxyControllerPort:           &ProxyControllerPort,
 }
 
 var (
@@ -128,4 +130,6 @@ var (
 	HTTPLogXRequestID             = "关闭"
 	ExternalAgentHTTPProxyEnabled = 0
 	ExternalAgentHTTPProxyPort    = 38086
+	AnalyzerPort                  = 30033
+	ProxyControllerPort           = 30035
 )

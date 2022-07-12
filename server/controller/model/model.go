@@ -370,6 +370,8 @@ type VTapGroupConfiguration struct {
 	HTTPLogXRequestID             *string      `json:"HTTP_LOG_X_REQUEST_ID" yaml:"http_log_x_request_id,omitempty"`
 	ExternalAgentHTTPProxyEnabled *int         `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED" yaml:"external_agent_http_proxy_enabled,omitempty"`
 	ExternalAgentHTTPProxyPort    *int         `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT" yaml:"external_agent_http_proxy_port,omitempty"`
+	AnalyzerPort                  *int         `json:"ANALYZER_PORT" yaml:"analyzer_port,omitempty"`
+	ProxyControllerPort           *int         `json:"PROXY_CONTROLLER_PORT" yaml:"proxy_controller_port,omitempty"`
 	YamlConfig                    StaticConfig `yaml:"static_config,omitempty"`
 }
 
@@ -440,6 +442,8 @@ type VTapGroupConfigurationResponse struct {
 	HTTPLogXRequestID             *string       `json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	AnalyzerPort                  *int          `json:"ANALYZER_PORT"`
+	ProxyControllerPort           *int          `json:"PROXY_CONTROLLER_PORT"`
 }
 
 type DetailedConfig struct {
