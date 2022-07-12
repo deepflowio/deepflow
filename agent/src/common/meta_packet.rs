@@ -33,6 +33,7 @@ use super::{
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
     enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TapType, TcpFlags},
+    flow::L7Protocol,
     lookup_key::LookupKey,
     policy::PolicyData,
     tap_port::TapPort,
@@ -104,6 +105,7 @@ pub struct MetaPacket<'a> {
 
     pub socket_id: u64,
     pub cap_seq: u64,
+    pub l7_protocol_from_ebpf: L7Protocol,
 
     pub process_id: u32,
     pub thread_id: u32,
@@ -824,6 +826,7 @@ impl<'a> MetaPacket<'a> {
             .to_string();
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
+        packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocal_hint as u8);
         return Ok(packet);
     }
 }
