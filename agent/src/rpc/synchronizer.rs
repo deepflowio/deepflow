@@ -1,12 +1,19 @@
 use std::collections::HashMap;
+use std::env;
+use std::fs::{self, File};
+use std::io::{BufWriter, Write};
+use std::mem;
 use std::net::IpAddr;
-use std::process;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::process::{self, Command};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{self, Arc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, error, info, warn};
+use md5::{Digest, Md5};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
 use rand::RngCore;
@@ -30,7 +37,7 @@ use crate::rpc::session::Session;
 use crate::trident::{self, TridentState};
 use crate::utils::{
     self,
-    environment::is_tt_pod,
+    environment::{get_executable_path, is_tt_pod, running_in_container},
     net::{is_unicast_link_local, MacAddr},
 };
 
@@ -38,6 +45,7 @@ const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
 const SECOND: Duration = Duration::from_secs(1);
+const NORMAL_EXIT_WITH_RESTART: i32 = 3;
 
 pub struct StaticConfig {
     pub revision: &'static str,
@@ -536,7 +544,6 @@ impl Synchronizer {
         exception_handler: &ExceptionHandler,
         escape_tx: &UnboundedSender<Duration>,
     ) {
-        // TODO: 把cleaner UpdatePcapDataRetention挪到别的地方
         Self::parse_upgrade(&resp, static_config, status);
 
         match resp.status() {
@@ -722,7 +729,6 @@ impl Synchronizer {
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
                         // 1. 如果仅是停用系统无法回收全部的内存资源
                         // 2. 控制器地址可能是通过域明解析的，如果域明解析发生变更需要重启来触发重新解析
-                        const NORMAL_EXIT_WITH_RESTART: i32 = 3;
                         process::exit(NORMAL_EXIT_WITH_RESTART);
                     }
                 }
@@ -837,6 +843,143 @@ impl Synchronizer {
         });
     }
 
+    async fn upgrade(
+        running: &AtomicBool,
+        session: &Session,
+        new_revision: &str,
+        ctrl_ip: &str,
+        ctrl_mac: &str,
+    ) -> Result<(), String> {
+        if running_in_container() {
+            info!("running in a container, exit directly and try to recreate myself using a new version docker image...");
+            return Ok(());
+        }
+
+        session.update_current_server().await;
+        let client = session.get_client();
+        if client.is_none() {
+            return Err("client not connected".to_owned());
+        }
+        let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
+
+        let response = client
+            .upgrade(tp::UpgradeRequest {
+                ctrl_ip: Some(ctrl_ip.to_owned()),
+                ctrl_mac: Some(ctrl_mac.to_owned()),
+            })
+            .await;
+        if let Err(m) = response {
+            return Err(format!("rpc error {:?}", m));
+        }
+
+        let binary_path = get_executable_path()
+            .map_err(|_| format!("Cannot get metaflow-agent path for this OS"))?;
+        let mut temp_path = binary_path.clone();
+        temp_path.set_extension("test");
+        let mut backup_path = binary_path.clone();
+        backup_path.set_extension("bak");
+
+        let mut first_message = true;
+        let mut md5_sum = String::new();
+        let mut bytes = 0;
+        let mut total_bytes = 0;
+        let mut count = 0usize;
+        let mut total_count = 0;
+        let fp = File::create(&temp_path)
+            .map_err(|e| format!("File {} creation failed: {:?}", temp_path.display(), e))?;
+        #[cfg(unix)]
+        if let Ok(m) = fp.metadata() {
+            m.permissions().set_mode(0o755);
+        }
+        let mut writer = BufWriter::new(fp);
+        let mut checksum = Md5::new();
+
+        let mut stream = response.unwrap().into_inner();
+        while let Some(message) = stream
+            .message()
+            .await
+            .map_err(|e| format!("RPC error {:?}", e))?
+        {
+            if !running.load(Ordering::SeqCst) {
+                return Err("Upgrade terminated".to_owned());
+            }
+            if message.status() != tp::Status::Success {
+                return Err("Upgrade failed in server response".to_owned());
+            }
+            if first_message {
+                first_message = false;
+                md5_sum = message.md5().to_owned();
+                total_bytes = message.total_len() as usize;
+                total_count = message.pkt_count() as usize;
+            }
+            checksum.update(&message.content());
+            if let Err(e) = writer.write_all(&message.content()) {
+                return Err(format!(
+                    "Write to file {} failed: {:?}",
+                    temp_path.display(),
+                    e
+                ));
+            }
+            bytes += message.content().len() as usize;
+            count += 1;
+        }
+
+        if bytes != total_bytes {
+            return Err(format!(
+                "Binary truncated, received {}/{} messages, {}/{} bytes",
+                count, total_count, bytes, total_bytes
+            ));
+        }
+
+        let checksum = checksum
+            .finalize()
+            .into_iter()
+            .fold(String::new(), |s, c| s + &format!("{:02x}", c));
+        if checksum != md5_sum {
+            return Err(format!(
+                "Binary checksum mismatch, expected: {}, received: {}",
+                md5_sum, checksum
+            ));
+        }
+
+        writer
+            .flush()
+            .map_err(|e| format!("Flush {} failed: {:?}", temp_path.display(), e))?;
+        mem::drop(writer);
+
+        let version_info = Command::new(&temp_path)
+            .arg("-v")
+            .output()
+            .map_err(|e| format!("Binary execution failed: {:?}", e))?
+            .stdout;
+        if !version_info.starts_with(new_revision.as_bytes()) {
+            return Err("Binary version mismatch".to_owned());
+        }
+
+        // ignore file not exist and other errors
+        let _ = fs::remove_file(&backup_path);
+
+        if let Err(e) = fs::rename(&binary_path, &backup_path) {
+            return Err(format!("Backup old binary failed: {:?}", e));
+        }
+        if let Err(e) = fs::rename(&temp_path, &binary_path) {
+            let err_string = format!(
+                "Copy new binary to {} failed: {:?}",
+                &binary_path.display(),
+                e
+            );
+            if let Err(ee) = fs::rename(&backup_path, &binary_path) {
+                return Err(format!("{}, restoring backup failed: {:?}", err_string, ee));
+            }
+            return Err(err_string);
+        }
+
+        // ignore failure as upgrade succeeded anyway
+        let _ = fs::remove_file(backup_path);
+
+        Ok(())
+    }
+
     fn run(&self, escape_tx: UnboundedSender<Duration>) {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
@@ -941,8 +1084,22 @@ impl Synchronizer {
                         status.sync_interval,
                     )
                 };
-                if new_revision.is_some() {
-                    // TODO: upgrade
+                if let Some(revision) = new_revision {
+                    match Self::upgrade(&running, &session, &revision, &static_config.ctrl_ip, &static_config.ctrl_mac).await {
+                        Ok(_) => {
+                            let (ts, cvar) = &*trident_state;
+                            *ts.lock().unwrap() = trident::State::Terminated;
+                            cvar.notify_one();
+                            warn!("trident upgrade is successful and restarts normally, trident restart...");
+                            time::sleep(Duration::from_secs(1)).await;
+                            process::exit(NORMAL_EXIT_WITH_RESTART);
+                        },
+                        Err(e) => {
+                            exception_handler.set(Exception::ControllerSocketError);
+                            error!("upgrade failed: {:?}", e);
+                        },
+                    }
+                    status.write().new_revision = None;
                 }
                 match (proxy_ip, session.get_proxy_server()) {
                     (Some(proxy), Some(ip)) if &ip == &proxy => (),

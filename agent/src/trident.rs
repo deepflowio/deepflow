@@ -16,17 +16,6 @@ use flexi_logger::{
 };
 use log::{info, warn};
 
-use crate::common::DropletMessageType;
-use crate::debug::QueueDebugger;
-use crate::exception::ExceptionHandler;
-use crate::handler::PacketHandlerBuilder;
-use crate::integration_collector::MetricServer;
-use crate::pcap::WorkerManager;
-use crate::utils::cgroups::Cgroups;
-use crate::utils::environment::K8S_NODE_IP_FOR_METAFLOW;
-use crate::utils::environment::{free_memory_check, get_k8s_local_node_ip};
-use crate::utils::guard::Guard;
-use crate::utils::net::get_mac_by_ip;
 use crate::{
     collector::Collector,
     collector::{
@@ -34,31 +23,38 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DEFAULT_LOG_RETENTION,
-        DROPLET_PORT, FREE_SPACE_REQUIREMENT,
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
+        DEFAULT_LOG_RETENTION, DROPLET_PORT, FREE_SPACE_REQUIREMENT,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig},
         Config, RuntimeConfig, YamlConfig,
     },
-    debug::{ConstructDebugCtx, Debugger},
+    debug::{ConstructDebugCtx, Debugger, QueueDebugger},
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
     ebpf_collector::EbpfCollector,
+    exception::ExceptionHandler,
     flow_generator::AppProtoLogsParser,
+    handler::PacketHandlerBuilder,
+    integration_collector::MetricServer,
     monitor::Monitor,
+    pcap::WorkerManager,
     platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
     policy::{Policy, PolicyGetter},
     proto::trident::TapMode,
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
+        cgroups::Cgroups,
         environment::{
-            check, controller_ip_check, free_space_checker, kernel_check, trident_process_check,
+            check, controller_ip_check, free_memory_check, free_space_checker,
+            get_k8s_local_node_ip, kernel_check, running_in_container, trident_process_check,
         },
+        guard::Guard,
         logger::{RemoteLogConfig, RemoteLogWriter},
-        net::{get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex},
+        net::{get_mac_by_ip, get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex},
         queue,
         stats::{self, Countable, RefCountable, StatsOption},
         LeakyBucket,
@@ -182,7 +178,7 @@ impl Trident {
             exception_handler.clone(),
         ));
 
-        if env::var(K8S_NODE_IP_FOR_METAFLOW).is_ok() && config.kubernetes_cluster_id.is_empty() {
+        if running_in_container() && config.kubernetes_cluster_id.is_empty() {
             config.kubernetes_cluster_id = Config::get_k8s_cluster_id(&session);
         }
 
