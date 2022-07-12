@@ -16,10 +16,9 @@ import (
 )
 
 const (
-	K8S_POD_IPV4_NETMASK = 16
-	K8S_POD_IPV6_NETMASK = 64
-	// TODO: golang不支持 ?=( 的语法,此处的regex暂时置空，等待后续更新
-	K8S_VINTERFACE_NAME_REGEX = ""
+	K8S_POD_IPV4_NETMASK      = 16
+	K8S_POD_IPV6_NETMASK      = 64
+	K8S_VINTERFACE_NAME_REGEX = "^(cni|flannel|cali|vxlan.calico|tunl|en[ospx])"
 	K8S_VPC_NAME              = "kubernetes_vpc"
 	K8S_VERSION_PREFIX        = "Kubernetes"
 )
