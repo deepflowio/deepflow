@@ -844,6 +844,22 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 	return true;
 }
 
+// Update offsets tables for all cpus
+static int update_offsets_table(struct bpf_tracer *t, struct bpf_offset_param *offset)
+{
+	struct bpf_offset_param offs[MAX_CPU_NR];
+	int i;
+	memset(&offs, 0, sizeof(offs));
+	for (i = 0; i < MAX_CPU_NR; i++) {
+		offs[i] = *offset;
+	}
+
+	if (!bpf_table_set_value(t, MAP_MEMBERS_OFFSET_NAME, 0, (void *)&offs))
+		return ETR_UPDATE_MAP_FAILD;
+
+	return ETR_OK;
+}
+
 static bool is_adapt_success(struct bpf_tracer *t)
 {
 	bool is_success = false;
@@ -869,11 +885,13 @@ static bool is_adapt_success(struct bpf_tracer *t)
 		for (i = 0; i < sys_cpus_count; i++) {
 			if (!cpu_online[i])
 				continue;
-			if (offset[i].ready != 1) {
-				is_success = false;
+			if (offset[i].ready == 1) {
+				if (update_offsets_table(t, &offset[i]) == ETR_OK)
+					is_success = true;
+				else
+					is_success = false;
 				break;
-			} else
-				is_success = true;
+			}
 		}
 
 		free(array);
