@@ -12,7 +12,7 @@ all: server
 generate_sources = $(shell find -not -path './vendor/*' -name '*.go.tmpl' -or -name '*.tmpldata')
 generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test.go \
 		 libs/hmap/lru/ubig_lru.go libs/hmap/lru/ubig_lru_test.go \
-		 libs/zerodoc/pooled_meters.go
+		 libs/zerodoc/pooled_meters.go libs/geo/ip_info.go
 
 proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go
 
@@ -48,7 +48,7 @@ libs/zerodoc/pb/metric.proto: vendor
 libs/zerodoc/pb/metric.pb.go: libs/zerodoc/pb/metric.proto
 	cd libs/zerodoc/pb && go generate ./...
 
-libs/geo/ip_info.go: ip_info_mini.json ip_info.py
+libs/geo/ip_info.go: libs/geo/ip_info_mini.json libs/geo/ip_info.py
 	go generate ./...
 
 vendor:
