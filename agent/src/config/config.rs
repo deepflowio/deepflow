@@ -84,26 +84,21 @@ impl Config {
     }
 
     // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
-    // 发现存在K8S_NODE_IP_FOR_METAFLOW环境变量、且ConfigMap中kubernetes-cluster-id为空,
+    // 如果agent在容器中运行且ConfigMap中kubernetes-cluster-id为空,
     // 调用GetKubernetesClusterID RPC，获取cluster-id, 如果RPC调用失败，sleep 1分钟后再次调用，直到成功
     // ======================================================================================================
     // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
-    // It is found that the K8S_NODE_IP_FOR_METAFLOW environment variable exists, and the kubernetes-cluster-id in the
+    // If agent is running in container and the kubernetes-cluster-id in the
     // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
     // after 1 minute of sleep until it succeeds
     pub fn get_k8s_cluster_id(session: &Session) -> String {
         let ca_md5 = loop {
             match fs::read_to_string(K8S_CA_CRT_PATH) {
                 Ok(c) => {
-                    let mut hasher = Md5::new();
-                    hasher.update(c.as_bytes());
                     break Some(
-                        hasher
-                            .finalize_reset()
+                        Md5::digest(c.as_bytes())
                             .into_iter()
-                            .map(|c| format!("{:02x}", c))
-                            .collect::<Vec<_>>()
-                            .join(""),
+                            .fold(String::new(), |s, c| s + &format!("{:02x}", c)),
                     );
                 }
                 Err(e) => {
