@@ -79,13 +79,15 @@ func Start(configPath string) {
 	}
 
 	// 初始化Redis
-	err := redis.InitRedis(cfg.RedisCfg)
-	if err != nil {
-		log.Error("connect redis failed")
+	if cfg.RedisCfg.Enabled {
+		err := redis.InitRedis(cfg.RedisCfg)
+		if err != nil {
+			log.Error("connect redis failed")
+		}
 	}
 
 	// start statsd
-	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
+	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
 		log.Error("cloud statsd connect telegraf failed")
 		return

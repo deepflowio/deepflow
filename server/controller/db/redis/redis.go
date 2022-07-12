@@ -30,6 +30,7 @@ type RedisConfig struct {
 	Port                      uint32 `default:"6379" yaml:"port"`
 	Password                  string `default:"metaflow" yaml:"password"`
 	TimeOut                   uint32 `default:"30" yaml:"timeout"`
+	Enabled                   bool   `default:"true" yaml:"enabled"`
 }
 
 func InitRedis(cfg RedisConfig) (err error) {
