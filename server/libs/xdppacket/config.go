@@ -1,6 +1,22 @@
 //go:build linux && xdp
 // +build linux,xdp
 
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 // XDP socket配置文件，主要记录当前在哪个网卡的哪些队列上创建的XDP socket
 // 配置文件根目录在XDPCONFIGFILEPATH中指定，每个配置文件按照网卡名称命名,
 // 存储内容详见结构体IfaceConfig
