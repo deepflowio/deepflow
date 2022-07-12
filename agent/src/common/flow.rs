@@ -632,6 +632,8 @@ const L7_PROTOCOL_UNKNOWN: u8 = 0;
 const L7_PROTOCOL_OTHER: u8 = 1;
 const L7_PROTOCOL_HTTP1: u8 = 20;
 const L7_PROTOCOL_HTTP2: u8 = 21;
+const L7_PROTOCOL_HTTP1_TLS: u8 = 22;
+const L7_PROTOCOL_HTTP2_TLS: u8 = 23;
 const L7_PROTOCOL_DUBBO: u8 = 40;
 const L7_PROTOCOL_MYSQL: u8 = 60;
 const L7_PROTOCOL_REDIS: u8 = 80;
@@ -647,6 +649,8 @@ pub enum L7Protocol {
     Other = L7_PROTOCOL_OTHER,
     Http1 = L7_PROTOCOL_HTTP1,
     Http2 = L7_PROTOCOL_HTTP2,
+    Http1TLS = L7_PROTOCOL_HTTP1_TLS,
+    Http2TLS = L7_PROTOCOL_HTTP2_TLS,
     Dubbo = L7_PROTOCOL_DUBBO,
     Mysql = L7_PROTOCOL_MYSQL,
     Redis = L7_PROTOCOL_REDIS,
@@ -668,6 +672,8 @@ impl From<u8> for L7Protocol {
             L7_PROTOCOL_OTHER => L7Protocol::Other,
             L7_PROTOCOL_HTTP1 => L7Protocol::Http1,
             L7_PROTOCOL_HTTP2 => L7Protocol::Http2,
+            L7_PROTOCOL_HTTP1_TLS => L7Protocol::Http1TLS,
+            L7_PROTOCOL_HTTP2_TLS => L7Protocol::Http2TLS,
             L7_PROTOCOL_DUBBO => L7Protocol::Dubbo,
             L7_PROTOCOL_MYSQL => L7Protocol::Mysql,
             L7_PROTOCOL_REDIS => L7Protocol::Redis,
@@ -685,6 +691,8 @@ impl From<L7Protocol> for u8 {
             L7Protocol::Other => L7_PROTOCOL_OTHER,
             L7Protocol::Http1 => L7_PROTOCOL_HTTP1,
             L7Protocol::Http2 => L7_PROTOCOL_HTTP2,
+            L7Protocol::Http1TLS => L7_PROTOCOL_HTTP1_TLS,
+            L7Protocol::Http2TLS => L7_PROTOCOL_HTTP2_TLS,
             L7Protocol::Dubbo => L7_PROTOCOL_DUBBO,
             L7Protocol::Mysql => L7_PROTOCOL_MYSQL,
             L7Protocol::Redis => L7_PROTOCOL_REDIS,

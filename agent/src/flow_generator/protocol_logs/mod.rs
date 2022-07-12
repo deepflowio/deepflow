@@ -362,6 +362,7 @@ pub enum AppProtoLogsInfo {
     Dubbo(DubboInfo),
     HttpV1(HttpInfo),
     HttpV2(HttpInfo),
+    HttpV1TLS(HttpInfo),
 }
 
 impl AppProtoLogsInfo {
@@ -385,6 +386,7 @@ impl AppProtoLogsInfo {
             (Self::Dubbo(m), Self::Dubbo(o)) => m.merge(o),
             (Self::HttpV1(m), Self::HttpV1(o)) => m.merge(o),
             (Self::HttpV2(m), Self::HttpV2(o)) => m.merge(o),
+            (Self::HttpV1TLS(m), Self::HttpV1TLS(o)) => m.merge(o),
             _ => unreachable!(),
         }
     }
@@ -401,6 +403,7 @@ impl fmt::Display for AppProtoLogsInfo {
             Self::Mqtt(l) => write!(f, "{:?}", l),
             Self::HttpV1(l) => write!(f, "{:?}", l),
             Self::HttpV2(l) => write!(f, "{:?}", l),
+            Self::HttpV1TLS(l) => write!(f, "{:?}", l),
         }
     }
 }
@@ -440,6 +443,7 @@ impl AppProtoLogsData {
             AppProtoLogsInfo::Dubbo(t) => pb_proto_logs_data.dubbo = Some(t.into()),
             AppProtoLogsInfo::HttpV1(t) => pb_proto_logs_data.http = Some(t.into()),
             AppProtoLogsInfo::HttpV2(t) => pb_proto_logs_data.http = Some(t.into()),
+            AppProtoLogsInfo::HttpV1TLS(t) => pb_proto_logs_data.http = Some(t.into()),
         };
 
         pb_proto_logs_data
