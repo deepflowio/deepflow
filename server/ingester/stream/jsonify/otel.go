@@ -111,6 +111,7 @@ func getValueString(value *v11.AnyValue) string {
 
 func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue) {
 	h.IsIPv4 = true
+	sw8SegmentId := ""
 	attributeNames, attributeValues := []string{}, []string{}
 	for i, attr := range append(spanAttributes, resAttributes...) {
 		key := attr.GetKey()
@@ -155,7 +156,10 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 						h.IP61 = ip
 					}
 				}
+			case "sw8.trace_id":
+				h.TraceId = hex.EncodeToString([]byte(getValueString(value)))
 			}
+
 		} else {
 			switch key {
 			case "net.transport":
@@ -204,10 +208,20 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 			case "http.response_content_length":
 				h.responseLength = value.GetIntValue()
 				h.ResponseLength = &h.responseLength
+			case "sw8.span_id":
+				h.SpanId = getValueString(value)
+			case "sw8.parent_span_id":
+				h.ParentSpanId = getValueString(value)
+			case "sw8.segment_id":
+				sw8SegmentId = hex.EncodeToString([]byte(getValueString(value)))
 			default:
 				// nothing
 			}
 		}
+	}
+	if sw8SegmentId != "" {
+		h.SpanId = sw8SegmentId + "-" + h.SpanId
+		h.ParentSpanId = sw8SegmentId + "-" + h.ParentSpanId
 	}
 
 	if len(h.L7ProtocolStr) > 0 {

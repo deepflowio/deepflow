@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/metaflowys/metaflow/server/libs/ckdb"
@@ -451,7 +452,13 @@ func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 	h.HttpProxyClient = info.ClientIp
 	h.XRequestId = info.XRequestId
 	h.TraceId = base64ToHexString(info.TraceId)
-	h.SpanId = base64ToHexString(info.SpanId)
+	// sw8 SpanID has 2 parts as: SEGMENTID-3
+	segs := strings.Split(info.SpanId, "-")
+	if len(segs) == 2 {
+		h.SpanId = base64ToHexString(segs[0]) + "-" + segs[1]
+	} else {
+		h.SpanId = base64ToHexString(info.SpanId)
+	}
 
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
@@ -545,7 +552,7 @@ func (h *L7Logger) fillDubbo(l *pb.AppProtoLogsData) {
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
 		h.ResponseException = GetDubboExceptionDesc(uint16(l.Base.Head.Code))
 	}
-	h.TraceId = info.TraceId
+	h.TraceId = base64ToHexString(info.TraceId)
 
 	if info.ReqBodyLen != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
 		h.requestLength = int64(info.ReqBodyLen)
