@@ -294,10 +294,6 @@ message Interface {
     optional uint32 pod_cluster_id = 26;
 
     optional bool is_vip_interface = 100 [default = false]; // 目前仅微软MUX设配为true
-    // 若该接口对应的虚拟机内已经部署采集器:
-    // 1. 发送给虚拟机所在宿主机采集器时该字段为true
-    // 2. 发送给其他采集器为false
-    optional bool skip_tap_interface = 101 [default = false];
 }
 
 enum GroupType {
@@ -453,7 +449,7 @@ message SyncResponse {
 
 message UpgradeRequest  {
     optional string ctrl_ip = 1;
-    optional uint32 trident_os = 2; // 0:linux, 1:windows
+    optional string ctrl_mac = 3;
 }
 message UpgradeResponse  {
     optional Status status = 1;     // 调用是否成功

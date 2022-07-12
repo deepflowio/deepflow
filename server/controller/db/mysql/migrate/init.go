@@ -1,6 +1,14 @@
 package migrate
 
 const (
+	CREATE_TABLE_DB_VERSION = `CREATE TABLE IF NOT EXISTS db_version (
+		version             CHAR(64),
+		created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)ENGINE=innodb DEFAULT CHARSET=utf8;`
+)
+
+const (
 	DROP_PROCEDURE  = `DROP PROCEDURE IF EXISTS init_auto_increment`
 	CREATE_PROCDURE = `CREATE PROCEDURE init_auto_increment()
 		BEGIN /* call this procedure in sql_restart_cmd after mysql restart */

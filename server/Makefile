@@ -32,22 +32,20 @@ vendor/${MESSAGE}/trident.proto: vendor
 	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/trident.proto vendor/${MESSAGE}/
 
 
-vendor/${MESSAGE}/flow_log.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/flow_log.proto vendor/${MESSAGE}/
-
-libs/datatype/pb/flow_log.pb.go: vendor/${MESSAGE}/flow_log.proto
-	cp vendor/${MESSAGE}/flow_log.proto libs/datatype/pb/flow_log.proto
+libs/datatype/pb/flow_log.proto: vendor
+	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/flow_log.proto libs/datatype/pb/
 	# delete first 3 char of line 6-10 for go language
 	sed -i '6,10s/^...//' libs/datatype/pb/flow_log.proto
+
+libs/datatype/pb/flow_log.pb.go: libs/datatype/pb/flow_log.proto
 	cd libs/datatype/pb && go generate ./...
 
-vendor/${MESSAGE}/metric.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/metric.proto vendor/${MESSAGE}/
-
-libs/zerodoc/pb/metric.pb.go: vendor/${MESSAGE}/metric.proto
-	cp vendor/${MESSAGE}/metric.proto libs/zerodoc/pb/metric.proto
+libs/zerodoc/pb/metric.proto: vendor
+	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/metric.proto libs/zerodoc/pb
 	# delete first 3 char of line 6-10 for go language
 	sed -i '6,10s/^...//' libs/zerodoc/pb/metric.proto
+
+libs/zerodoc/pb/metric.pb.go: libs/zerodoc/pb/metric.proto
 	cd libs/zerodoc/pb && go generate ./...
 
 libs/geo/ip_info.go: ip_info_mini.json ip_info.py

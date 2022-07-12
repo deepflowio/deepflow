@@ -5,7 +5,6 @@ go 1.18
 replace (
 	cloud.google.com/go => cloud.google.com/go v0.103.0
 	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
-	github.com/metaflowys/metaflow/message => ../message
 )
 
 require (
@@ -32,7 +31,7 @@ require (
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
-	github.com/metaflowys/metaflow/message v0.0.0-20220701060022-016d806f5466
+	github.com/metaflowys/metaflow/message v0.0.0-20220711071947-65195061cadf
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7

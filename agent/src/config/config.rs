@@ -122,6 +122,7 @@ impl Config {
                 let client = match session.get_client() {
                     Some(c) => c,
                     None => {
+                        session.set_request_failed(true);
                         warn!("rpc client not connected");
                         tokio::time::sleep(MINUTE).await;
                         continue;
@@ -145,6 +146,11 @@ impl Config {
                         }
                         match cluster_id_response.cluster_id {
                             Some(id) => {
+                                if id.is_empty() {
+                                    error!("call get_kubernetes_cluster_id return cluster_id is empty string");
+                                    tokio::time::sleep(MINUTE).await;
+                                    continue;
+                                }
                                 info!("set kubernetes_cluster_id to {}", id);
                                 return id;
                             }
