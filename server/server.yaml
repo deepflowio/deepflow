@@ -24,6 +24,7 @@ controller:
 
   # redis相关配置
   redis:
+    enabled: true
     dimension_resource_database: 2
     password: metaflow
     host: redis
