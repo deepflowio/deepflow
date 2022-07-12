@@ -28,7 +28,6 @@ resource_gl1               , resource_gl1              , resource_gl1           
 resource_gl2_type          , resource_gl2_type         , resource_gl2_type         , 类型-服务优先              , int_enum      , resource_gl2_type  , 知识图谱    , 111        ,
 resource_gl2               , resource_gl2              , resource_gl2              , 资源-服务优先              , resource      ,                    , 知识图谱    , 111        ,
 
-is_key_service             , is_key_service            , is_key_service            , 是否属于关键服务           , bool          ,                    ,             , 111        ,
 l7_protocol                , l7_protocol               , l7_protocol               , 应用协议                   , int_enum      , l7_protocol        , 应用层      , 111        ,
 protocol                   , protocol                  , protocol                  , 网络协议                   , int_enum      , protocol           , 网络层      , 111        ,
 server_port                , server_port               , server_port               , 服务端口                   , int_enum      , server_port        , 传输层      , 111        ,
