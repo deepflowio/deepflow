@@ -48,8 +48,8 @@ var log = logging.MustGetLogger("ext_metrics.decoder")
 
 const (
 	BUFFER_SIZE         = 1024
-	TELEGRAF_POD        = "pod"
-	PROMETHEUS_POD      = "pod_name"
+	TELEGRAF_POD        = "pod_name"
+	PROMETHEUS_POD      = "pod"
 	PROMETHEUS_INSTANCE = "instance"
 )
 
