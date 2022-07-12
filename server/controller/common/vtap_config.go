@@ -69,7 +69,7 @@ var (
 	RsyslogEnabled                = 1
 	MaxTxBandwidth                = int64(0)
 	BandwidthProbeInterval        = 10
-	TapInterfaceRegex             = "^(tap|cali|veth|eth).*"
+	TapInterfaceRegex             = "^(tap|cali|veth|eth|en[ospx]).*"
 	MaxEscapeSeconds              = 3600
 	Mtu                           = 1500
 	OutputVlan                    = 0
@@ -111,5 +111,5 @@ var (
 	LogFileSize                   = 1000
 	HTTPLogXRequestID             = "关闭"
 	ExternalAgentHTTPProxyEnabled = 0
-	ExternalAgentHTTPProxyPort    = 8086
+	ExternalAgentHTTPProxyPort    = 38086
 )
