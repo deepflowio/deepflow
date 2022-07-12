@@ -15,7 +15,7 @@
  */
 
 use std::io::Read;
-use std::net::{IpAddr, Ipv6Addr};
+use std::net::{IpAddr, Ipv6Addr, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -31,7 +31,7 @@ use hyper::{
     Body, Method, Request, Response, Server, StatusCode,
 };
 use log::{error, info, warn};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinHandle;
 
 use crate::config::handler::MetricServerAccess;
@@ -223,7 +223,11 @@ impl MetricServer {
     ) -> Self {
         Self {
             running: Arc::new(AtomicBool::new(false)),
-            rt: Runtime::new().unwrap(),
+            rt: Builder::new_multi_thread()
+                .enable_all()
+                .thread_name("integration collector thread")
+                .build()
+                .unwrap(),
             thread: Arc::new(Mutex::new(None)),
             otel_sender,
             prometheus_sender,
@@ -297,6 +301,7 @@ impl MetricServer {
                 });
 
                 let server = server_builder.serve(service);
+
                 info!("integration collector started");
                 info!("integration collector listening on http://{}", addr);
                 if let Err(e) = server.await {
@@ -317,6 +322,10 @@ impl MetricServer {
 
         info!("integration collector stopped");
     }
+}
+
+pub fn check_listen_port_alive(port: u16) -> bool {
+    TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok()
 }
 
 #[cfg(test)]
