@@ -75,7 +75,7 @@ func syncInfo(cmd *cobra.Command, resType string) {
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetAutoWrapText(false)
-	table.SetAutoFormatHeaders(true)
+	table.SetAutoFormatHeaders(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetCenterSeparator("")
@@ -83,7 +83,7 @@ func syncInfo(cmd *cobra.Command, resType string) {
 	table.SetRowSeparator("")
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
-	table.SetTablePadding("\t")
+	table.SetTablePadding("  ")
 	table.SetNoWhiteSpace(true)
 
 	switch resType {
@@ -152,7 +152,7 @@ func k8sInfo(cmd *cobra.Command, args []string, resType string) {
 }
 
 func tableVm(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"NAME", "LABEL", "LAUNCH_SERVER", "STATE", "VTAP_ID"})
+	table.SetHeader([]string{"NAME", "LABEL", "LAUNCH_SERVER", "STATE"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -161,33 +161,31 @@ func tableVm(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem = append(tableItem, data.Get("NAME").MustString())
 		tableItem = append(tableItem, data.Get("LABEL").MustString())
 		tableItem = append(tableItem, data.Get("LAUNCH_SERVER").MustString())
-		tableItem = append(tableItem, data.Get("STATE").MustString())
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
+		tableItem = append(tableItem, strconv.Itoa(data.Get("STATE").MustInt()))
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }
 
 func tableVpc(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"NAME", "VTAP_ID"})
+	table.SetHeader([]string{"NAME"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
 		data := response.Get("DATA").GetIndex(i)
 		tableItem := []string{}
 		tableItem = append(tableItem, data.Get("NAME").MustString())
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }
 
 func tableHost(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"HOSTNAME", "IP", "VTAP_ID"})
+	table.SetHeader([]string{"HOSTNAME", "IP"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -195,16 +193,15 @@ func tableHost(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem := []string{}
 		tableItem = append(tableItem, data.Get("HOSTNAME").MustString())
 		tableItem = append(tableItem, data.Get("IP").MustString())
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }
 
 func tableLldp(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"SYSTEM_NAME", "HOST_IP", "HOST_INTERFACE", "MANAGEMENT_ADDRESS", "VINTERFACE_DESCRIPTION", "VTAP_ID"})
+	table.SetHeader([]string{"SYSTEM_NAME", "HOST_IP", "HOST_INTERFACE", "MANAGEMENT_ADDRESS", "VINTERFACE_DESCRIPTION"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -215,16 +212,15 @@ func tableLldp(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem = append(tableItem, data.Get("HOST_INTERFACE").MustString())
 		tableItem = append(tableItem, data.Get("MANAGEMENT_ADDRESS").MustString())
 		tableItem = append(tableItem, data.Get("VINTERFACE_DESCRIPTION").MustString())
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }
 
 func tablePort(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"MAC", "TYPE", "DEVICETYPE", "VTAP_ID"})
+	table.SetHeader([]string{"MAC", "TYPE", "DEVICETYPE"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -233,16 +229,15 @@ func tablePort(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem = append(tableItem, data.Get("MAC").MustString())
 		tableItem = append(tableItem, strconv.Itoa(data.Get("TYPE").MustInt()))
 		tableItem = append(tableItem, strconv.Itoa(data.Get("DEVICETYPE").MustInt()))
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }
 
 func tableNetwork(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"NAME", "EXTERNAL", "SEGMENTATION_ID", "NET_TYPE", "VTAP_ID"})
+	table.SetHeader([]string{"NAME", "EXTERNAL", "SEGMENTATION_ID", "NET_TYPE"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -252,16 +247,15 @@ func tableNetwork(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem = append(tableItem, strconv.FormatBool(data.Get("EXTERNAL").MustBool()))
 		tableItem = append(tableItem, strconv.Itoa(data.Get("SEGMENTATION_ID").MustInt()))
 		tableItem = append(tableItem, strconv.Itoa(data.Get("NET_TYPE").MustInt()))
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }
 
 func tableIp(response *simplejson.Json, table *tablewriter.Table) {
-	table.SetHeader([]string{"IP", "MASKLEN", "VTAP_ID"})
+	table.SetHeader([]string{"IP", "MASKLEN"})
 
 	tableItems := [][]string{}
 	for i := range response.Get("DATA").MustArray() {
@@ -269,11 +263,10 @@ func tableIp(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem := []string{}
 		tableItem = append(tableItem, data.Get("IP").MustString())
 		tableItem = append(tableItem, strconv.Itoa(data.Get("MASKLEN").MustInt()))
-		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }
 
@@ -294,8 +287,8 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 		tableItem = append(tableItem, strconv.Itoa(data.Get("VTAP_ID").MustInt()))
 		tableItem = append(tableItem, data.Get("IPS").MustString())
 		tableItems = append(tableItems, tableItem)
-		table.AppendBulk(tableItems)
 	}
 
+	table.AppendBulk(tableItems)
 	table.Render()
 }

@@ -19,6 +19,7 @@ package common
 import (
 	"testing"
 
+	"github.com/deepflowys/deepflow/server/controller/common"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -52,6 +53,163 @@ func TestParseIPOutput(t *testing.T) {
 			So(parseInterface[6].IPs[0].MaskLen, ShouldEqual, 64)
 			So(parseInterface[6].IPs[0].Scope, ShouldEqual, "link")
 			So(parseInterface[6].IPs[0].Address, ShouldEqual, "fe80::4cf8:5cff:fe4c:3126")
+		})
+	})
+}
+
+func TestParseCSV(t *testing.T) {
+	CSVStr := "_uuid,name,interfaces\n9f4ca795-6f71-40c7-890a-3601755bd1e5,br-p1p2,\n0dda1b31-75e2-4218-a935-784e14a79133,br-int,\nc911fefb-0185-4650-8543-d6c7e6d5be89,br-em2,3e878ea4-e494-43f5-adc0-969b4479ed83 5b92773a-6781-4364-8497-ff28773e3ae4"
+	Convey("TestParseCSV-1", t, func() {
+		csv, _ := ParseCSV(CSVStr)
+		Convey("ParseCSV-1 items should be equal", func() {
+			So(len(csv), ShouldEqual, 3)
+			So(csv[0]["name"], ShouldEqual, "br-p1p2")
+			So(csv[0]["_uuid"], ShouldEqual, "9f4ca795-6f71-40c7-890a-3601755bd1e5")
+			So(csv[0]["interfaces"], ShouldEqual, "")
+			So(csv[1]["name"], ShouldEqual, "br-int")
+			So(csv[1]["_uuid"], ShouldEqual, "0dda1b31-75e2-4218-a935-784e14a79133")
+			So(csv[1]["interfaces"], ShouldEqual, "")
+			So(csv[2]["name"], ShouldEqual, "br-em2")
+			So(csv[2]["_uuid"], ShouldEqual, "c911fefb-0185-4650-8543-d6c7e6d5be89")
+			So(csv[2]["interfaces"], ShouldEqual, "3e878ea4-e494-43f5-adc0-969b4479ed83 5b92773a-6781-4364-8497-ff28773e3ae4")
+		})
+	})
+	Convey("TestParseCSV-2", t, func() {
+		csv, _ := ParseCSV(CSVStr, "name")
+		Convey("ParseCSV-2 items should be equal", func() {
+			So(len(csv), ShouldEqual, 3)
+			So(csv[0]["name"], ShouldEqual, "br-p1p2")
+			So(csv[1]["name"], ShouldEqual, "br-int")
+			So(csv[2]["name"], ShouldEqual, "br-em2")
+		})
+	})
+}
+
+func TestParseCSVWithKey(t *testing.T) {
+	CSVStr := "_uuid,name,interfaces\n9f4ca795-6f71-40c7-890a-3601755bd1e5,br-p1p2,\n0dda1b31-75e2-4218-a935-784e14a79133,br-int,\nc911fefb-0185-4650-8543-d6c7e6d5be89,br-em2,3e878ea4-e494-43f5-adc0-969b4479ed83 5b92773a-6781-4364-8497-ff28773e3ae4"
+	Convey("TestParseCSVWithKey-1", t, func() {
+		csv, _ := ParseCSVWithKey(CSVStr, "name")
+		Convey("ParseCSVWithKey-1 items should be equal", func() {
+			So(len(csv), ShouldEqual, 3)
+			So(csv["br-p1p2"]["name"], ShouldEqual, "br-p1p2")
+			So(csv["br-p1p2"]["_uuid"], ShouldEqual, "9f4ca795-6f71-40c7-890a-3601755bd1e5")
+			So(csv["br-p1p2"]["interfaces"], ShouldEqual, "")
+			So(csv["br-int"]["name"], ShouldEqual, "br-int")
+			So(csv["br-int"]["_uuid"], ShouldEqual, "0dda1b31-75e2-4218-a935-784e14a79133")
+			So(csv["br-int"]["interfaces"], ShouldEqual, "")
+			So(csv["br-em2"]["name"], ShouldEqual, "br-em2")
+			So(csv["br-em2"]["_uuid"], ShouldEqual, "c911fefb-0185-4650-8543-d6c7e6d5be89")
+			So(csv["br-em2"]["interfaces"], ShouldEqual, "3e878ea4-e494-43f5-adc0-969b4479ed83 5b92773a-6781-4364-8497-ff28773e3ae4")
+		})
+	})
+	Convey("TestParseCSVWithKey-2", t, func() {
+		csv, _ := ParseCSVWithKey(CSVStr, "name", "name")
+		Convey("ParseCSVWithKey-2 items should be equal", func() {
+			So(len(csv), ShouldEqual, 3)
+			So(csv["br-p1p2"]["name"], ShouldEqual, "br-p1p2")
+			So(csv["br-int"]["name"], ShouldEqual, "br-int")
+			So(csv["br-em2"]["name"], ShouldEqual, "br-em2")
+		})
+	})
+}
+
+func TestParseKVString(t *testing.T) {
+	KVStr := "attached-mac=fa:16:3e:a8:7d:f1 iface-id=46176ea6-b476-4ccf-be60-b579e32393b5 iface-status=active vm-uuid=1db6d632-67ef-4dc1-8b0a-5be33497650f novalue"
+	Convey("TestParseKVString", t, func() {
+		options, _ := ParseKVString(KVStr)
+		Convey("ParseKVString items should be equal", func() {
+			So(len(options), ShouldEqual, 5)
+			So(options["attached-mac"], ShouldEqual, "fa:16:3e:a8:7d:f1")
+			So(options["novalue"], ShouldEqual, "")
+		})
+	})
+}
+
+func TestParseBrctlShow(t *testing.T) {
+	BrStr := "bridge name\tbridge id\t\tSTP enabled\tinterfaces\nbr0\t\t8000.000af75ef9e2\tno\t\tp5p2\n\t\t\t\t\t\tvnet0\n\t\t\t\t\t\tvnet12\n\t\t\t\t\t\tvnet18\n\t\t\t\t\t\tvnet3\n\t\t\t\t\t\tvnet6\n\t\t\t\t\t\tvnet9\nbr1\t\t8000.fe54005d366d\tno\t\tvnet1\n\t\t\t\t\t\tvnet10\n\t\t\t\t\t\tvnet13\n\t\t\t\t\t\tvnet19\n\t\t\t\t\t\tvnet4\n\t\t\t\t\t\tvnet7\nbr2\t\t8000.fe54001f3304\tno\t\tvnet11\n\t\t\t\t\t\tvnet14\n\t\t\t\t\t\tvnet2\n\t\t\t\t\t\tvnet20\n\t\t\t\t\t\tvnet5\n\t\t\t\t\t\tvnet8\ndocker0\t\t8000.02426b7d5755\tno\t\t\n"
+	Convey("TestParseBrctlShow", t, func() {
+		brs, _ := ParseBrctlShow(BrStr)
+		Convey("ParseBrctlShow items should be equal", func() {
+			So(len(brs), ShouldEqual, 4)
+			So(len(brs["br0"]), ShouldEqual, 7)
+			So(brs["br0"][0], ShouldEqual, "p5p2")
+			So(brs["br0"][3], ShouldEqual, "vnet18")
+			So(brs["br0"][6], ShouldEqual, "vnet9")
+			So(len(brs["br1"]), ShouldEqual, 6)
+			So(brs["br1"][0], ShouldEqual, "vnet1")
+			So(brs["br1"][2], ShouldEqual, "vnet13")
+			So(brs["br1"][5], ShouldEqual, "vnet7")
+			So(len(brs["br2"]), ShouldEqual, 6)
+			So(brs["br2"][0], ShouldEqual, "vnet11")
+			So(brs["br2"][2], ShouldEqual, "vnet2")
+			So(brs["br2"][5], ShouldEqual, "vnet8")
+			So(len(brs["docker0"]), ShouldEqual, 0)
+		})
+	})
+}
+
+func TestParseVLANConfig(t *testing.T) {
+	vlanStr := "VLAN Dev name    | VLAN ID\nName-Type: VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD\np7p1.259       | 259  | p7p1\np7p1.260       | 260  | p7p1\np7p1.261       | 261  | p7p1\np7p1.262       | 262  | p7p1\np7p1.263       | 263  | p7p1\np7p1.264       | 264  | p7p1\np7p1.265       | 265  | p7p1\np7p1.266       | 266  | p7p1\np4p1.770       | 770  | p4p1\np4p1.771       | 771  | p4p1\np4p1.772       | 772  | p4p1\np4p1.773       | 773  | p4p1\np4p1.774       | 774  | p4p1\np4p1.775       | 775  | p4p1\np4p1.776       | 776  | p4p1\np4p1.777       | 777  | p4p1\np4p1.778       | 778  | p4p1\n"
+	Convey("TestParseVLANConfig", t, func() {
+		vlans, _ := ParseVLANConfig(vlanStr)
+		Convey("ParseVLANConfig items should be equal", func() {
+			So(len(vlans), ShouldEqual, 17)
+			So(vlans["p7p1.259"], ShouldEqual, 259)
+			So(vlans["p7p1.260"], ShouldEqual, 260)
+			So(vlans["p7p1.261"], ShouldEqual, 261)
+			So(vlans["p7p1.262"], ShouldEqual, 262)
+			So(vlans["p7p1.263"], ShouldEqual, 263)
+			So(vlans["p7p1.264"], ShouldEqual, 264)
+			So(vlans["p7p1.265"], ShouldEqual, 265)
+			So(vlans["p7p1.266"], ShouldEqual, 266)
+			So(vlans["p4p1.770"], ShouldEqual, 770)
+			So(vlans["p4p1.771"], ShouldEqual, 771)
+			So(vlans["p4p1.772"], ShouldEqual, 772)
+			So(vlans["p4p1.773"], ShouldEqual, 773)
+			So(vlans["p4p1.774"], ShouldEqual, 774)
+			So(vlans["p4p1.775"], ShouldEqual, 775)
+			So(vlans["p4p1.776"], ShouldEqual, 776)
+			So(vlans["p4p1.777"], ShouldEqual, 777)
+			So(vlans["p4p1.778"], ShouldEqual, 778)
+		})
+	})
+}
+
+func TestParseVMStates(t *testing.T) {
+	VMStr := " Id    名称                         状态\n----------------------------------------------------\n 1     instance-00000033              关闭\n 3     instance-00000023              running\n 4     instance-00000022              关闭\n 32    instance-00000076              running\n 34    instance-00000025              shut off\n 46    instance-00000086              running\n 49    instance-00000099              running\n 50    instance-0000009a              running\n 58    instance-000000a8              running\n 59    instance-000000a9              running\n 61    instance-000000b1              running\n 62    instance-000000b3              running\n"
+	Convey("TestParseVMStates", t, func() {
+		states, _ := ParseVMStates(VMStr)
+		Convey("ParseVMStates items should be equal", func() {
+			So(len(states), ShouldEqual, 12)
+			So(states["instance-00000033"], ShouldEqual, common.VM_STATE_STOPPED)
+			So(states["instance-00000025"], ShouldEqual, common.VM_STATE_STOPPED)
+			So(states["instance-00000076"], ShouldEqual, common.VM_STATE_RUNNING)
+		})
+	})
+}
+
+func TestParseVMXml(t *testing.T) {
+	XMLStr := `<domains>\n<domain type='kvm'>\n  <name>instance-00000064</name>\n  <uuid>a51e6527-bd5e-42c2-81be-fee17d814706</uuid>\n  <metadata>\n    <nova:instance xmlns:nova="http://openstack.org/xmlns/libvirt/nova/1.0">\n      <nova:name>test-vm-liqian</nova:name>\n      <nova:owner>\n        <nova:user uuid="417a8402bfc64f4abb67f68a8a0fdcff">bangongfuwu</nova:user>\n        <nova:project uuid="7e39057dbe2042e4b3b188678f22648e">NSLS</nova:project>\n      </nova:owner>\n    </nova:instance>\n  </metadata>\n  <devices>\n    <interface type='bridge'>\n      <mac address='fa:16:3e:59:b5:10'/>\n      <source bridge='qbr155abd89-91'/>\n      <target dev='tap155abd89-91'/>\n      <model type='virtio'/>\n      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>\n    </interface>\n  </devices>\n</domain>\n<!--\nWARNING: THIS IS AN AUTO-GENERATED FILE. CHANGES TO IT ARE LIKELY TO BE\nOVERWRITTEN AND LOST. Changes to this xml configuration should be made using:\n  virsh edit instance-00000065\nor other application using the libvirt API.\n-->\n<domain type='kvm'>\n  <name>instance-00000065</name>\n  <uuid>75e9bb32-09c8-48e9-93bc-0330686702f3</uuid>\n  <metadata>\n    <nova:instance xmlns:nova="http://openstack.org/xmlns/libvirt/nova/1.0">\n      <nova:name>lbq-vm-vxlan-1</nova:name>\n      <nova:owner>\n        <nova:user uuid="417a8402bfc64f4abb67f68a8a0fdcff">bangongfuwu</nova:user>\n        <nova:project uuid="7e39057dbe2042e4b3b188678f22648e">NSLS</nova:project>\n      </nova:owner>\n    </nova:instance>\n  </metadata>\n  <devices>\n    <interface type='bridge'>\n      <mac address='fa:16:3e:38:a5:48'/>\n      <source bridge='qbr717a30a1-db'/>\n      <target dev='tap717a30a1-db'/>\n      <model type='virtio'/>\n      <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>\n    </interface>\n    <interface type='bridge'>\n      <mac address='fa:16:3e:8f:78:2b'/>\n      <source bridge='qbr27e9b93c-93'/>\n      <target dev='tap27e9b93c-93'/>\n      <model type='virtio'/>\n      <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>\n    </interface>\n  </devices>\n</domain>\n</domains>\n`
+	Convey("TestParseVMXml", t, func() {
+		xmls, _ := ParseVMXml(XMLStr)
+		Convey("ParseVMXml items should be equal", func() {
+			So(len(xmls), ShouldEqual, 2)
+			So(xmls[0].UUID, ShouldEqual, "a51e6527-bd5e-42c2-81be-fee17d814706")
+			So(xmls[0].Label, ShouldEqual, "instance-00000064")
+			So(xmls[0].Name, ShouldEqual, "test-vm-liqian")
+			So(xmls[0].VPC.UUID, ShouldEqual, "7e39057d-be20-42e4-b3b1-88678f22648e")
+			So(xmls[0].VPC.Name, ShouldEqual, "NSLS")
+			So(xmls[0].Interfaces[0].Target, ShouldEqual, "tap155abd89-91")
+			So(xmls[0].Interfaces[0].Mac, ShouldEqual, "fa:16:3e:59:b5:10")
+			So(xmls[1].UUID, ShouldEqual, "75e9bb32-09c8-48e9-93bc-0330686702f3")
+			So(xmls[1].Label, ShouldEqual, "instance-00000065")
+			So(xmls[1].Name, ShouldEqual, "lbq-vm-vxlan-1")
+			So(xmls[1].VPC.UUID, ShouldEqual, "7e39057d-be20-42e4-b3b1-88678f22648e")
+			So(xmls[1].VPC.Name, ShouldEqual, "NSLS")
+			So(xmls[1].Interfaces[0].Target, ShouldEqual, "tap717a30a1-db")
+			So(xmls[1].Interfaces[0].Mac, ShouldEqual, "fa:16:3e:38:a5:48")
+			So(xmls[1].Interfaces[1].Target, ShouldEqual, "tap27e9b93c-93")
+			So(xmls[1].Interfaces[1].Mac, ShouldEqual, "fa:16:3e:8f:78:2b")
 		})
 	})
 }
