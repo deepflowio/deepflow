@@ -46,7 +46,7 @@ func NewCKConnection(addr, username, password string) (*sql.DB, error) {
 }
 
 func RegisterCountableForIngester(module string, countable stats.Countable, opts ...stats.Option) error {
-	return stats.RegisterCountableWithMoudlePrefix("ingester.", module, countable, opts)
+	return stats.RegisterCountableWithMoudlePrefix("ingester.", module, countable, opts...)
 }
 
 // 如果通过MAC匹配平台信息失败，则需要通过IP再获取, 解决工单122/126问题
