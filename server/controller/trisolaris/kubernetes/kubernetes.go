@@ -89,7 +89,7 @@ func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, er
 		"region_uuid":                azConn.Region,
 	}
 	domainCreate := model.DomainCreate{
-		Name:                "METAFLOW_K8S_CLUSTER-" + k.cfg.NodeIP,
+		Name:                "k8s-" + clusterID,
 		Type:                KUBERNETES,
 		KubernetesClusterID: clusterID,
 		ControllerIP:        k.cfg.NodeIP,
