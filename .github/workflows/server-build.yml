@@ -49,6 +49,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install tmpl
           pip install ujson
+          export LANG=en_US.UTF-8
           GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
           GO111MODULE="off" go get github.com/gogo/protobuf/proto
           GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
@@ -68,6 +69,13 @@ jobs:
           name: build results
           path: |
             server-artifact.tar
+
+      - name: Archive code
+        uses: actions/upload-artifact@v3
+        with:
+          name: build results info
+          path: |
+            server/libs/geo/ip_info.go
 
   build_server_image:
     name: build server image
