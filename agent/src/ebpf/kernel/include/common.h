@@ -24,6 +24,10 @@ enum message_type {
 	MSG_REQUEST,
 	// L7协议推断数据类型是回应
 	MSG_RESPONSE,
+
+	MSG_REQUEST_END,
+	MSG_RESPONSE_END,
+
 	// 无法推断协议类型，先在map中存储等下一次的数据
 	// 获取后两者合并，再进行判断。主要场景用于MySQL，Kafka
 	// 读数据的行为先读取4字节数据后再读取剩下的数据，要想进行
@@ -47,7 +51,8 @@ enum traffic_protocol {
 	PROTO_ORTHER = 1,
 	PROTO_HTTP1 = 20,
 	PROTO_HTTP2 = 21,
-	PROTO_GO_TLS_HTTP1 = 22,
+	PROTO_TLS_HTTP1 = 22,
+	PROTO_TLS_HTTP2 = 23,
 	PROTO_DUBBO = 40,
 	PROTO_MYSQL = 60,
 	PROTO_REDIS = 80,
