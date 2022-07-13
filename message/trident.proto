@@ -564,6 +564,7 @@ message GenesisSharingK8SRequest {
 }
 
 message GenesisSharingK8SResponse {
-    optional string error_msg = 1;
-    repeated KubernetesAPIInfo entries = 2;
+    optional string epoch = 1;
+    optional string error_msg = 2;
+    repeated KubernetesAPIInfo entries = 3;
 }
