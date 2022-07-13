@@ -173,6 +173,12 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	domain.IconID = domainCreate.IconID
 
 	// set region and controller ip if not specified
+	if domainCreate.Config == nil {
+		domainCreate.Config = map[string]interface{}{
+			"region_uuid":   "",
+			"controller_ip": "",
+		}
+	}
 	var regionLcuuid string
 	confRegion, ok := domainCreate.Config["region_uuid"]
 	if !ok || confRegion.(string) == "" {

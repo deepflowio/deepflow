@@ -277,7 +277,7 @@ type DomainCreate struct {
 	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required
-	Config              map[string]interface{} `json:"CONFIG" binding:"required"`
+	Config              map[string]interface{} `json:"CONFIG"`
 }
 
 type DomainUpdate struct {

@@ -64,12 +64,9 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	resp, err := client.Do(req)
 	if err != nil {
 		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, err))
-	} else if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, resp))
 	}
-	defer resp.Body.Close()
 
+	defer resp.Body.Close()
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return errResponse, errors.New(fmt.Sprintf("read (%s) body failed, (%v)", url, err))
@@ -81,9 +78,9 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	}
 
 	optStatus := response.Get("OPT_STATUS").MustString()
-	if optStatus != "" && optStatus != SUCCESS {
+	if resp.StatusCode != http.StatusOK || (optStatus != "" && optStatus != SUCCESS) {
 		description := response.Get("DESCRIPTION").MustString()
-		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%s)", url, description))
+		return response, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, description))
 	}
 
 	return response, nil
