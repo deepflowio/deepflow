@@ -20,7 +20,7 @@ var YamlDomainQingCloud = []byte(`
 # 名称
 NAME: qingcloud
 # 云平台类型
-TYPE: 14
+TYPE: qingcloud
 CONFIG:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff

@@ -20,7 +20,7 @@ var YamlDomainAliYun = []byte(`
 # 名称
 NAME: aliyun
 # 云平台类型
-TYPE: 9
+TYPE: aliyun
 CONFIG:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff

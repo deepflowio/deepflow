@@ -18,9 +18,9 @@ package example
 
 var YamlDomainGenesis = []byte(`
 # 名称
-NAME: genesis
+NAME: agent_sync
 # 云平台类型
-TYPE: 23
+TYPE: agent_sync
 CONFIG:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff

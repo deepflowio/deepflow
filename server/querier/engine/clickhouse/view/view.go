@@ -49,19 +49,21 @@ type Model struct {
 	Callbacks []func(columns []interface{}, values []interface{}) []interface{}
 	//Havings Havings
 	MetricsLevelFlag int //Metrics是否需要拆层的标识
+	HasAggFunc       bool
 }
 
 func NewModel() *Model {
 	return &Model{
-		Time:      NewTime(),
-		Tags:      &Tags{},
-		Groups:    &Groups{},
-		From:      &Tables{},
-		Filters:   &Filters{},
-		Havings:   &Filters{},
-		Orders:    &Orders{},
-		Limit:     &Limit{},
-		Callbacks: []func(columns []interface{}, values []interface{}) []interface{}{},
+		Time:       NewTime(),
+		Tags:       &Tags{},
+		Groups:     &Groups{},
+		From:       &Tables{},
+		Filters:    &Filters{},
+		Havings:    &Filters{},
+		Orders:     &Orders{},
+		Limit:      &Limit{},
+		Callbacks:  []func(columns []interface{}, values []interface{}) []interface{}{},
+		HasAggFunc: false,
 	}
 }
 
