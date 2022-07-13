@@ -61,7 +61,7 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 			switch t.Status {
 			case common.RESOURCE_NOT_FOUND, common.INVALID_POST_DATA, common.RESOURCE_NUM_EXCEEDED,
 				common.SELECTED_RESOURCES_NUM_EXCEEDED, common.RESOURCE_ALREADY_EXIST,
-				common.PARAMETER_ILLEGAL:
+				common.PARAMETER_ILLEGAL, common.INVALID_PARAMETERS:
 				BadRequestResponse(c, t.Status, t.Message)
 			case common.SERVER_ERROR:
 				InternalErrorResponse(c, data, t.Status, t.Message)

@@ -173,8 +173,9 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	domain.IconID = domainCreate.IconID
 
 	// set region and controller ip if not specified
-	regionLcuuid := domainCreate.Config["region_uuid"].(string)
-	if regionLcuuid == "" {
+	var regionLcuuid string
+	confRegion, ok := domainCreate.Config["region_uuid"]
+	if !ok || confRegion.(string) == "" {
 		var region mysql.Region
 		res := mysql.Db.Find(&region)
 		if res.RowsAffected != int64(1) {
@@ -182,10 +183,13 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 		}
 		domainCreate.Config["region_uuid"] = region.Lcuuid
 		regionLcuuid = region.Lcuuid
+	} else {
+		regionLcuuid = confRegion.(string)
 	}
 	// TODO: controller_ip拿到config外面，直接作为domain的一级参数
-	controllerIP := domainCreate.Config["controller_ip"].(string)
-	if controllerIP == "" {
+	var controllerIP string
+	confControllerIP, ok := domainCreate.Config["controller_ip"]
+	if !ok || confControllerIP.(string) == "" {
 		var azConn mysql.AZControllerConnection
 		res := mysql.Db.Where("region = ?", regionLcuuid).First(&azConn)
 		if res.RowsAffected != int64(1) {
@@ -193,6 +197,8 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 		}
 		domainCreate.Config["controller_ip"] = azConn.ControllerIP
 		controllerIP = azConn.ControllerIP
+	} else {
+		controllerIP = confControllerIP.(string)
 	}
 	domain.ControllerIP = controllerIP
 	configStr, _ := json.Marshal(domainCreate.Config)
