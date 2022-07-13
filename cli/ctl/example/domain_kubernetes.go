@@ -20,7 +20,7 @@ var YamlDomainKubernetes = []byte(`
 # 名称
 NAME: kubernetes
 # 云平台类型
-TYPE: 11
+TYPE: kubernetes
 CONFIG:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
