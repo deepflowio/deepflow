@@ -158,27 +158,40 @@ impl DubboLog {
             n += 1;
         }
 
-        if self.l7_log_dynamic_config.trace_id_origin.is_empty() || para_index >= payload.len() {
+        if self.l7_log_dynamic_config.trace_types.is_empty() || para_index >= payload.len() {
             return;
         }
         let payload_str = String::from_utf8_lossy(&payload[para_index..]);
         let mut offset = 0;
-        if let Some(index) = payload_str.find(&self.l7_log_dynamic_config.trace_id_origin) {
-            offset += index + self.l7_log_dynamic_config.trace_id_origin.len();
-            // sw8匹配 以'1-'开头'-'结尾的部分
-            if let Some(begin_index) = payload_str[offset..offset + 20].find("1-") {
-                offset += begin_index + 2;
-                if let Some(end_index) = payload_str[offset..].find("-") {
-                    self.info.trace_id = payload_str[offset..offset + end_index].to_string();
+
+        let trace_id_tags = self
+            .l7_log_dynamic_config
+            .trace_types
+            .iter()
+            .map(|trace_type| trace_type.to_string())
+            .collect::<Vec<String>>();
+
+        for tag in &trace_id_tags {
+            if let Some(index) = payload_str.find(tag.as_str()) {
+                offset += index + tag.len();
+                // sw8匹配 以'1-'开头'-'结尾的部分
+                if let Some(begin_index) = payload_str[offset..offset + 20].find("1-") {
+                    offset += begin_index + 2;
+                    if let Some(end_index) = payload_str[offset..].find("-") {
+                        self.info.trace_id = payload_str[offset..offset + end_index].to_string();
+                        break;
+                    }
+                // logId匹配到'.'
+                } else if let Some(end_index) = payload_str[offset..].find(".") {
+                    self.info.trace_id =
+                        payload_str[offset..offset + TRACE_ID_MAX_LEN.min(end_index)].to_string();
+                    break;
+                } else {
+                    self.info.trace_id = payload_str
+                        [offset..payload_str.len().min(offset + TRACE_ID_MAX_LEN)]
+                        .to_string();
+                    break;
                 }
-            // logId匹配到'.'
-            } else if let Some(end_index) = payload_str[offset..].find(".") {
-                self.info.trace_id =
-                    payload_str[offset..offset + TRACE_ID_MAX_LEN.min(end_index)].to_string();
-            } else {
-                self.info.trace_id = payload_str
-                    [offset..payload_str.len().min(offset + TRACE_ID_MAX_LEN)]
-                    .to_string();
             }
         }
     }

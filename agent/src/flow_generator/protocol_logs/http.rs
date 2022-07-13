@@ -230,30 +230,18 @@ impl HttpLog {
             let value = str::from_utf8(&body_line[col_index + 1..])?.trim();
             if &key == "content-length" {
                 content_length = Some(value.parse::<u64>().unwrap_or_default());
-            } else if !self.l7_log_dynamic_config.trace_id_origin.is_empty()
-                && key == self.l7_log_dynamic_config.trace_id_lower
-            {
-                if let Some(id) =
-                    Self::decode_id(value, self.l7_log_dynamic_config.trace_type, Self::TRACE_ID)
-                {
+            } else if self.l7_log_dynamic_config.is_trace_id(key.as_str()) {
+                if let Some(id) = Self::decode_id(value, key.as_str(), Self::TRACE_ID) {
                     self.info.trace_id = id;
                 }
                 // 存在配置相同字段的情况，如“sw8”
-                if self.l7_log_dynamic_config.trace_id_origin
-                    == self.l7_log_dynamic_config.span_id_origin
-                {
-                    if let Some(id) =
-                        Self::decode_id(value, self.l7_log_dynamic_config.span_type, Self::SPAN_ID)
-                    {
+                if self.l7_log_dynamic_config.is_span_id(key.as_str()) {
+                    if let Some(id) = Self::decode_id(value, key.as_str(), Self::SPAN_ID) {
                         self.info.span_id = id;
                     }
                 }
-            } else if !self.l7_log_dynamic_config.span_id_origin.is_empty()
-                && key == self.l7_log_dynamic_config.span_id_lower
-            {
-                if let Some(id) =
-                    Self::decode_id(value, self.l7_log_dynamic_config.span_type, Self::SPAN_ID)
-                {
+            } else if self.l7_log_dynamic_config.is_span_id(key.as_str()) {
+                if let Some(id) = Self::decode_id(value, key.as_str(), Self::SPAN_ID) {
                     self.info.span_id = id;
                 }
             } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
@@ -385,34 +373,35 @@ impl HttpLog {
                         _ => {}
                     }
 
-                    if !self.l7_log_dynamic_config.trace_id_origin.is_empty()
-                        && header.0 == self.l7_log_dynamic_config.trace_id_lower.as_bytes()
-                    {
+                    if !header.0.is_ascii() {
+                        continue;
+                    }
+
+                    let key = String::from_utf8_lossy(header.0.as_ref()).into_owned();
+                    let key = key.as_str();
+
+                    if self.l7_log_dynamic_config.is_trace_id(key) {
                         if let Some(id) = Self::decode_id(
                             &String::from_utf8_lossy(header.1.as_ref()),
-                            self.l7_log_dynamic_config.trace_type,
+                            key,
                             Self::TRACE_ID,
                         ) {
                             self.info.trace_id = id;
                         }
                         // 存在配置相同字段的情况，如“sw8”
-                        if self.l7_log_dynamic_config.trace_id_origin
-                            == self.l7_log_dynamic_config.span_id_origin
-                        {
+                        if self.l7_log_dynamic_config.is_span_id(key) {
                             if let Some(id) = Self::decode_id(
                                 &String::from_utf8_lossy(header.1.as_ref()),
-                                self.l7_log_dynamic_config.span_type,
+                                key,
                                 Self::SPAN_ID,
                             ) {
                                 self.info.span_id = id;
                             }
                         }
-                    } else if !self.l7_log_dynamic_config.span_id_origin.is_empty()
-                        && header.0 == self.l7_log_dynamic_config.span_id_lower.as_bytes()
-                    {
+                    } else if self.l7_log_dynamic_config.is_span_id(key) {
                         if let Some(id) = Self::decode_id(
                             &String::from_utf8_lossy(header.1.as_ref()),
-                            self.l7_log_dynamic_config.span_type,
+                            key,
                             Self::SPAN_ID,
                         ) {
                             self.info.span_id = id;
@@ -559,9 +548,12 @@ impl HttpLog {
         None
     }
 
-    fn decode_id(payload: &str, trace_type: TraceType, id_type: u8) -> Option<String> {
+    fn decode_id(payload: &str, trace_type: &str, id_type: u8) -> Option<String> {
+        let trace_type = TraceType::from(trace_type);
         match trace_type {
-            TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span => Some(payload.to_owned()),
+            TraceType::Disabled | TraceType::XB3 | TraceType::XB3Span | TraceType::Customize(_) => {
+                Some(payload.to_owned())
+            }
             TraceType::Uber => Self::decode_uber_id(payload, id_type),
             TraceType::Sw6 | TraceType::Sw8 => Self::decode_skywalking_id(payload, id_type),
             TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
@@ -809,14 +801,8 @@ mod tests {
                 x_request_id_origin: "".to_string(),
                 x_request_id_lower: "".to_string(),
                 x_request_id_with_colon: "".to_string(),
-                trace_id_origin: "sw8".to_string(),
-                trace_id_lower: "sw8".to_string(),
-                trace_id_with_colon: "sw8: ".to_string(),
-                trace_type: TraceType::Sw8,
-                span_id_origin: "sw8".to_string(),
-                span_id_lower: "sw8".to_string(),
-                span_id_with_colon: "sw8: ".to_string(),
-                span_type: TraceType::Sw8,
+                trace_types: vec![TraceType::Sw8],
+                span_types: vec![TraceType::Sw8],
             };
             let _ = http.parse(payload, packet.lookup_key.proto, packet.direction);
             let mut is_http = http1_check_protocol(&mut bitmap, packet);
