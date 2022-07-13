@@ -18,9 +18,9 @@ package example
 
 var YamlDomainBaiduBce = []byte(`
 # 名称
-NAME: baidubce
+NAME: baidu_bce
 # 云平台类型
-TYPE: 25
+TYPE: baidu_bce
 CONFIG:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff

@@ -511,7 +511,7 @@ do { \
 
 static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				   struct conn_info_t* conn_info,
-				   __u64 conn_key, __u64 pid_tgid,
+				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
 				   struct trace_uid_t *trace_uid,
 				   struct trace_stats *trace_stats,
@@ -581,7 +581,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				trace_info.peer_fd = socket_info_ptr->peer_fd;
 		}
 		trace_info.update_time = time_stamp / NS_PER_SEC;
-		trace_info.conn_key = conn_key;
+		trace_info.socket_id = socket_id;
 		trace_map__update(&pid_tgid, &trace_info);
 		if (!trace_info_ptr)
 			trace_stats->trace_map_count++;
@@ -590,10 +590,11 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			/*
 			 * 追踪在不同socket之间进行，而对于在同一个socket的情况进行忽略。
 			 */
-			if (conn_key != trace_info_ptr->conn_key)
+			if (socket_id != trace_info_ptr->socket_id) {
 				*thread_trace_id = trace_info_ptr->thread_trace_id;
-			else
+			} else {
 				*thread_trace_id = 0;
+			}
 
 			trace_stats->trace_map_count--;
 		}
@@ -756,9 +757,17 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 				trace_map__lookup(&pid_tgid);
 
 	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
+	// 'socket_id' used to resolve non-tracing between the same socket
+	__u64 socket_id = 0;
+	if (!is_socket_info_valid(socket_info_ptr)) {
+		socket_id = ++trace_uid->socket_id;
+	} else {
+		socket_id = socket_info_ptr->uid;
+	}
+
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM)
-		trace_process(socket_info_ptr, conn_info, conn_key, pid_tgid, trace_info_ptr,
+		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid, trace_info_ptr,
 			      trace_uid, trace_stats, &thread_trace_id, time_stamp);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
@@ -767,7 +776,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
-		sk_info.uid = ++trace_uid->socket_id;
+		sk_info.uid = socket_id;
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = conn_info->role;

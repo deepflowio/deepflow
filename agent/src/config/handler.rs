@@ -43,6 +43,7 @@ use crate::{
     dispatcher::recv_engine::{self, OptTpacketVersion},
     ebpf::CAP_LEN_MAX,
     flow_generator::{FlowTimeout, TcpTimeout},
+    integration_collector::check_listen_port_alive,
     proto::trident::{self, CaptureSocketType},
     proto::{
         common::TridentType,
@@ -1389,6 +1390,30 @@ impl ConfigHandler {
                 candidate_config.metric_server, new_config.metric_server
             );
             candidate_config.metric_server = new_config.metric_server;
+        }
+
+        //FIXME: 现在integration collector 在K8S环境下，会概率性出现监听端口一段时间后会失去监听。所以先探测下发的端口是否监听，
+        // 没监听的话重启collector再监听。等找到根因后再去掉下面的代码
+        // =============================================
+        //FIXME: Now, in the K8S environment, the integration collector will probabilistically appear on the listening port and
+        // lose monitoring after a period of time. So first detect whether the issued port is listening,
+        // If not listening, restart the collector and listen again. After finding the root cause, remove the following code
+        let port = candidate_config.metric_server.port;
+        if !check_listen_port_alive(port) {
+            fn metric_server_restart_callback(
+                handler: &ConfigHandler,
+                components: &mut Components,
+            ) {
+                if handler.candidate_config.metric_server.enabled {
+                    components.external_metrics_server.stop();
+                    components.external_metrics_server.start();
+                }
+            }
+            callbacks.push(metric_server_restart_callback);
+            warn!(
+                "the port=({}) listen by the intregration collector lost, restart the collector",
+                candidate_config.metric_server.port
+            );
         }
 
         if restart_dispatcher && candidate_config.dispatcher.enabled {
