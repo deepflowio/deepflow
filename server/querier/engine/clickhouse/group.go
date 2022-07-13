@@ -65,6 +65,19 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 	return &view.Expr{Value: filter}, true
 }
 
+func FormatInnerTime(m *view.Model) {
+	if m.Time.Interval == 0 && m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && m.HasAggFunc == true {
+		withValue := fmt.Sprintf(
+			"toStartOfInterval(time, toIntervalSecond(%d))",
+			m.Time.DatasourceInterval,
+		)
+		withAlias := "_time"
+		withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
+		m.AddTag(&view.Tag{Value: withAlias, Withs: withs, Flag: view.NODE_FLAG_METRICS_INNER})
+		m.AddGroup(&view.Group{Value: withAlias, Flag: view.GROUP_FLAG_METRICS_INNTER})
+	}
+}
+
 type GroupTag struct {
 	Value string
 	Alias string
