@@ -148,8 +148,10 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
             proto_tag.push_str("HTTP1");
         } else if sk_proto_safe(sd) == SOCK_DATA_HTTP2 {
             proto_tag.push_str("HTTP2");
-        } else if sk_proto_safe(sd) == SOCK_DATA_GO_TLS_HTTP1 {
-            proto_tag.push_str("GO_TLS_HTTP1");
+        } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
+            proto_tag.push_str("TLS_HTTP1");
+        } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP2 {
+		proto_tag.push_str("TLS_HTTP2");
         } else if sk_proto_safe(sd) == SOCK_DATA_DNS {
             proto_tag.push_str("DNS");
         } else if sk_proto_safe(sd) == SOCK_DATA_MYSQL {
@@ -167,7 +169,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         println!("+ --------------------------------- +");
         if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             let data = sk_data_str_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}\n{}", 
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -176,6 +178,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).process_id,
                      (*sd).thread_id,
                      (*sd).coroutine_id,
+                     (*sd).source,
                      process_name_safe(sd),
                      flow_info(sd),
                      (*sd).cap_len,
@@ -188,7 +191,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      data);
         } else {
             let data: Vec<u8> = sk_data_bytes_safe(sd);
-            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
+            println!("{} <{}> RECONFIRM {} DIR {} TYPE {} PID {} THREAD_ID {} COROUTINE_ID {} SOURCE {} COMM {} {} LEN {} SYSCALL_LEN {} SOCKET_ID 0x{:x} TRACE_ID 0x{:x} TCP_SEQ {} DATA_SEQ {} TimeStamp {}",
                      date_time((*sd).timestamp),
                      proto_tag,
                      (*sd).need_reconfirm,
@@ -197,6 +200,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).process_id,
                      (*sd).thread_id,
                      (*sd).coroutine_id,
+                     (*sd).source,
                      process_name_safe(sd),
                      flow_info(sd),
                      (*sd).cap_len,
@@ -210,6 +214,10 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                 print_dns_info((*sd).cap_data, (*sd).cap_len);
             } else {
                 for x in data.into_iter() {
+                    if x < 32 || x > 126 {
+                        print!(".");
+                        continue;
+                    }
                     let b = x as char;
                     print!("{0}", b);
                 }

@@ -40,7 +40,9 @@ pub const SOCK_DATA_HTTP1: u16 = 20;
 #[allow(dead_code)]
 pub const SOCK_DATA_HTTP2: u16 = 21;
 #[allow(dead_code)]
-pub const SOCK_DATA_GO_TLS_HTTP1: u16 = 22;
+pub const SOCK_DATA_TLS_HTTP1: u16 = 22;
+#[allow(dead_code)]
+pub const SOCK_DATA_TLS_HTTP2: u16 = 23;
 #[allow(dead_code)]
 pub const SOCK_DATA_DUBBO: u16 = 40;
 #[allow(dead_code)]
@@ -107,6 +109,7 @@ pub struct SK_BPF_DATA {
     pub process_id: u32,   // tgid in kernel struct task_struct
     pub thread_id: u32,    // pid in kernel struct task_struct, main thread iff pid==tgid
     pub coroutine_id: u64, // CoroutineID, i.e., golang goroutine id
+    pub source: u8,        // SYSCALL,GO_TLS_UPROBE,GO_HTTP2_UPROBE
 
     pub process_name: [u8; 16usize], //进程或线程名字，占用16bytes
 

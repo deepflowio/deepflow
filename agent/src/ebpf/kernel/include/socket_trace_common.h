@@ -38,6 +38,7 @@ struct __socket_data {
 	__u32 pid;  // 表示线程号 如果'pid == tgid'表示一个进程, 否则是线程
 	__u32 tgid; // 进程号
 	__u64 coroutine_id; // CoroutineID, i.e., golang goroutine id
+	__u8 source; // SYSCALL,GO_TLS_UPROBE,GO_HTTP2_UPROBE
 	__u8  comm[16]; // 进程或线程名
 
 	/* 连接（socket）信息 */
@@ -123,18 +124,33 @@ struct trace_info_t {
 	__u64 socket_id; // Records the socket associated when tracing was created (记录创建追踪时关联的socket)
 };
 
-// struct member_offsets -> data[]  arrays index.
+// struct ebpf_proc_info -> offsets[]  arrays index.
 enum offsets_index {
-	runtime_g_goid_offset = 0,
-	crypto_tls_conn_conn_offset,
-	net_poll_fd_sysfd,
-	offsets_num,
+	OFFSET_IDX_GOID_RUNTIME_G,
+	OFFSET_IDX_CONN_TLS_CONN,
+	OFFSET_IDX_SYSFD_POLL_FD,
+	OFFSET_IDX_CONN_HTTP2_SERVER_CONN,
+	OFFSET_IDX_TCONN_HTTP2_CLIENT_CONN,
+	OFFSET_IDX_CC_HTTP2_CLIENT_CONN_READ_LOOP,
+	OFFSET_IDX_CONN_GRPC_HTTP2_CLIENT,
+	OFFSET_IDX_CONN_GRPC_HTTP2_SERVER,
+	OFFSET_IDX_FRAMER_GRPC_TRANSPORT_LOOPY_WRITER,
+	OFFSET_IDX_WRITER_GRPC_TRANSPORT_FRAMER,
+	OFFSET_IDX_CONN_GRPC_TRANSPORT_BUFWRITER,
+	OFFSET_IDX_SIDE_GRPC_TRANSPORT_LOOPY_WRITER,
+	OFFSET_IDX_FIELDS_HTTP2_META_HEADERS_FRAME,
+	OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN,
+	OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER,
+	OFFSET_IDX_MAX,
 };
 
-// Store the member_offsets to eBPF Map.
-struct member_offsets {
+// Store the ebpf_proc_info to eBPF Map.
+struct ebpf_proc_info {
 	__u32 version;
-	__u16 data[offsets_num];
+	__u16 offsets[OFFSET_IDX_MAX];
+	__u64 net_TCPConn_itab;
+	__u64 crypto_tls_Conn_itab;
+	__u64 credentials_syscallConn_itab;
 };
 
 enum {
