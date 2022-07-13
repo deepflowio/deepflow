@@ -450,8 +450,8 @@ func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
 
 	h.HttpProxyClient = info.ClientIp
 	h.XRequestId = info.XRequestId
-	h.TraceId = base64ToHexString(info.TraceId)
-	h.SpanId = base64ToHexString(info.SpanId)
+	h.TraceId = info.TraceId
+	h.SpanId = info.SpanId
 
 	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
@@ -545,6 +545,7 @@ func (h *L7Logger) fillDubbo(l *pb.AppProtoLogsData) {
 		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
 		h.ResponseException = GetDubboExceptionDesc(uint16(l.Base.Head.Code))
 	}
+	// FIXME: Confirm the format of Dubbo traceID?
 	h.TraceId = info.TraceId
 
 	if info.ReqBodyLen != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
