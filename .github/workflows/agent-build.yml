@@ -144,8 +144,7 @@ jobs:
 
       - name: build binary package  
         run: |
-          mkdir -p agent/bin-package/depends
-          cp -raf agent/output/src/ebpf/data/* agent/bin-package/depends
+          mkdir -p agent/bin-package
           cp -raf agent/output/target/release/metaflow-agent agent/bin-package/
           cd agent/bin-package/
           tar -czvf metaflow-agent.tar.gz *

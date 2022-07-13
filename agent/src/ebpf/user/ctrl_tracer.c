@@ -90,7 +90,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	struct bpf_tracer_param *btp = param;
 	struct rx_queue_info *rx_q;
 	printf("%-18s %s\n", "Tracer", btp->name);	//, sizeof(btp->name), "%s", t->name);
-	printf("%-18s %s\n", "Bpf File", btp->bpf_file);
+	printf("%-18s %s\n", "Bpf buffer", btp->bpf_load_name);
 	printf("%-18s %d\n", "Workers", btp->dispatch_workers_nr);
 	printf("%-18s %d\n", "Perf-Pages-Count", btp->perf_pg_cnt);
 	printf("%-18s %" PRIu64 "\n", "Events Lost", btp->lost);

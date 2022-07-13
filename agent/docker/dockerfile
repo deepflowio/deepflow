@@ -14,8 +14,7 @@ RUN --mount=target=/tmp-mount \
     echo "metaflow:x:1000:1000::/home/metaflow:/bin/bash" >> /etc/passwd; \
     echo "root:root" | chpasswd; \
     chmod 000 /etc/passwd; \
-    mkdir -p /lib64 /usr/share/metaflow-agent && \
-    cp -raf /tmp-mount/output/src/ebpf/data/* /usr/share/metaflow-agent && \
+    mkdir -p /lib64 && \
     cp -raf /tmp-mount/output/target/release/metaflow-agent /bin/  && \
     cp -raf /tmp-mount/output/target/release/metaflow-agent-ctl /bin/  && \
     cp -raf /tmp-mount/output/src/ebpf/metaflow-ebpfctl /bin/  && \
