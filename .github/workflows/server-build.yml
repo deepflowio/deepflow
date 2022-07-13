@@ -69,6 +69,13 @@ jobs:
           path: |
             server-artifact.tar
 
+      - name: Archive code
+        uses: actions/upload-artifact@v3
+        with:
+          name: build results info
+          path: |
+            server/libs/geo/ip_info.go
+
   build_server_image:
     name: build server image
     needs: [build_server]
