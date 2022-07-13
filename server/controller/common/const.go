@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package common
 
 import (
@@ -166,7 +182,7 @@ const (
 	APSARA_STACK      = 19
 	TENCENT_TCE       = 20
 	KINGSOFT_PRIVATE  = 22
-	GENESIS           = 23
+	AGENT_SYNC        = 23
 	MICROSOFT_ACS     = 24
 	BAIDU_BCE         = 25
 
@@ -192,7 +208,7 @@ const (
 	TENCENT_TCE_EN       = "tencent_tce"
 	QINGCLOUD_K8S_EN     = "qingcloud_k8s"
 	KINGSOFT_PRIVATE_EN  = "kingsoft_private"
-	GENESIS_EN           = "genesis"
+	AGENT_SYNC_EN        = "genesis"
 	MICROSOFT_ACS_EN     = "microsoft_acs"
 	BAIDU_BCE_EN         = "baidu_bce"
 

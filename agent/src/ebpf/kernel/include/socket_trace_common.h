@@ -104,7 +104,7 @@ struct trace_info_t {
 	__u32 update_time; // 从系统开机开始到创建/更新时的间隔时间单位是秒
 	__u32 peer_fd;	   // 用于socket之间的关联
 	__u64 thread_trace_id; // 线程追踪ID
-	__u64 conn_key; // 链接记录哈希表(socket_info_map)中的key值。
+	__u64 socket_id; // Records the socket associated when tracing was created (记录创建追踪时关联的socket)
 };
 
 // struct member_offsets -> data[]  arrays index.

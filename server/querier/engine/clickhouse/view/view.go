@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package view
 
 import (
@@ -33,19 +49,21 @@ type Model struct {
 	Callbacks []func(columns []interface{}, values []interface{}) []interface{}
 	//Havings Havings
 	MetricsLevelFlag int //Metrics是否需要拆层的标识
+	HasAggFunc       bool
 }
 
 func NewModel() *Model {
 	return &Model{
-		Time:      NewTime(),
-		Tags:      &Tags{},
-		Groups:    &Groups{},
-		From:      &Tables{},
-		Filters:   &Filters{},
-		Havings:   &Filters{},
-		Orders:    &Orders{},
-		Limit:     &Limit{},
-		Callbacks: []func(columns []interface{}, values []interface{}) []interface{}{},
+		Time:       NewTime(),
+		Tags:       &Tags{},
+		Groups:     &Groups{},
+		From:       &Tables{},
+		Filters:    &Filters{},
+		Havings:    &Filters{},
+		Orders:     &Orders{},
+		Limit:      &Limit{},
+		Callbacks:  []func(columns []interface{}, values []interface{}) []interface{}{},
+		HasAggFunc: false,
 	}
 }
 

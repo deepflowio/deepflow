@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ctl
 
 import (
@@ -13,6 +29,24 @@ import (
 	"github.com/metaflowys/metaflow/cli/ctl/common"
 	"github.com/metaflowys/metaflow/cli/ctl/example"
 )
+
+var domainTypeIntToStr = map[int]string{
+	common.TENCENT:    common.TENCENT_EN,
+	common.ALIYUN:     common.ALIYUN_EN,
+	common.KUBERNETES: common.KUBERNETES_EN,
+	common.QINGCLOUD:  common.QINGCLOUD_EN,
+	common.AGENT_SYNC: common.AGENT_SYNC_EN,
+	common.BAIDU_BCE:  common.BAIDU_BCE_EN,
+}
+
+var domainTypeStrToInt = map[string]int{
+	common.TENCENT_EN:    common.TENCENT,
+	common.ALIYUN_EN:     common.ALIYUN,
+	common.KUBERNETES_EN: common.KUBERNETES,
+	common.QINGCLOUD_EN:  common.QINGCLOUD,
+	common.AGENT_SYNC_EN: common.AGENT_SYNC,
+	common.BAIDU_BCE_EN:  common.BAIDU_BCE,
+}
 
 func RegisterDomainCommand() *cobra.Command {
 	Domain := &cobra.Command{
@@ -70,8 +104,8 @@ func RegisterDomainCommand() *cobra.Command {
 	exampleCmd := &cobra.Command{
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
-		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.ALIYUN_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.GENESIS_EN}, ",")),
-		Example: "metaflow-ctl domain example genesis",
+		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.ALIYUN_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.AGENT_SYNC_EN}, ",")),
+		Example: "metaflow-ctl domain example agent_sync",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
 		},
@@ -108,18 +142,17 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		yData, _ := yaml.JSONToYAML(jData)
 		fmt.Printf(string(yData))
 	} else {
-		format := "%-46s %-14s %-6s %-14s %-10s %-40s %-22s %-22s %-8s %s\n"
+		format := "%-46s %-14s %-14s %-40s %-22s %-22s %-8s %s\n"
 		fmt.Printf(
-			format, "NAME", "ID", "TYPE", "REGION_COUNT", "AZ_COUNT", "CONTROLLER_NAME", "CREATED_AT",
-			"SYNCED_AT", "ENABLED", "STATE",
+			format, "NAME", "ID", "TYPE", "CONTROLLER_NAME", "CREATED_AT", "SYNCED_AT", "ENABLED", "STATE",
 		)
 		for i := range response.Get("DATA").MustArray() {
 			d := response.Get("DATA").GetIndex(i)
+			domainTypeStr, _ := domainTypeIntToStr[d.Get("TYPE").MustInt()]
 			fmt.Printf(
-				format, d.Get("NAME").MustString(), d.Get("CLUSTER_ID").MustString(), strconv.Itoa(d.Get("TYPE").MustInt()),
-				strconv.Itoa(d.Get("REGION_COUNT").MustInt()), strconv.Itoa(d.Get("AZ_COUNT").MustInt()), d.Get("CONTROLLER_NAME").MustString(),
-				d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(), strconv.Itoa(d.Get("ENABLED").MustInt()),
-				strconv.Itoa(d.Get("STATE").MustInt()),
+				format, d.Get("NAME").MustString(), d.Get("CLUSTER_ID").MustString(), domainTypeStr,
+				d.Get("CONTROLLER_NAME").MustString(), d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
+				strconv.Itoa(d.Get("ENABLED").MustInt()), strconv.Itoa(d.Get("STATE").MustInt()),
 			)
 		}
 	}
@@ -131,9 +164,24 @@ func createDomain(cmd *cobra.Command, args []string, createFilename string) {
 	yamlFile, err := ioutil.ReadFile(createFilename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		return
 	}
+
 	var body map[string]interface{}
 	yaml.Unmarshal(yamlFile, &body)
+
+	if domainTypeStr, ok := body["TYPE"]; ok {
+		domainTypeInt, ok := domainTypeStrToInt[domainTypeStr.(string)]
+		if !ok {
+			fmt.Fprintln(os.Stderr, fmt.Sprintf("domain type (%s) not supported", domainTypeStr))
+			return
+		}
+		body["TYPE"] = domainTypeInt
+	} else {
+		fmt.Fprintln(os.Stderr, "domain type must specify")
+		return
+	}
+
 	resp, err := common.CURLPerform("POST", url, body, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -159,6 +207,7 @@ func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
 
 	if len(response.Get("DATA").MustArray()) > 0 {
 		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+		domainTypeInt := response.Get("DATA").GetIndex(9).Get("TYPE").MustInt()
 		url := fmt.Sprintf("http://%s:%d/v1/domains/%s/", server.IP, server.Port, lcuuid)
 		yamlFile, err := ioutil.ReadFile(updateFilename)
 		if err != nil {
@@ -166,6 +215,7 @@ func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
 		}
 		var body map[string]interface{}
 		yaml.Unmarshal(yamlFile, &body)
+		body["TYPE"] = domainTypeInt
 		resp, err := common.CURLPerform("PATCH", url, body, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -218,7 +268,7 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		fmt.Printf(string(example.YamlDomainQingCloud))
 	case common.BAIDU_BCE_EN:
 		fmt.Printf(string(example.YamlDomainBaiduBce))
-	case common.GENESIS_EN:
+	case common.AGENT_SYNC_EN:
 		fmt.Printf(string(example.YamlDomainGenesis))
 	default:
 		err := fmt.Sprintf("domain_type %s not supported", args[0])

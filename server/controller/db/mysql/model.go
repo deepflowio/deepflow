@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package mysql
 
 import (
@@ -978,6 +994,8 @@ type VTapGroupConfiguration struct {
 	HTTPLogXRequestID             *string `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled *int    `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    *int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	AnalyzerPort                  *int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
+	ProxyControllerPort           *int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	YamlConfig                    *string `gorm:"column:yaml_config;type:text;default:null" json:"yaml_config"`
 }
 
@@ -1042,6 +1060,8 @@ type RVTapGroupConfiguration struct {
 	HTTPLogXRequestID             string  `gorm:"column:http_log_x_request_id;type:char(64);default:null" json:"HTTP_LOG_X_REQUEST_ID"`
 	ExternalAgentHTTPProxyEnabled int     `gorm:"column:external_agent_http_proxy_enabled;type:tinyint(1);default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_ENABLED"`
 	ExternalAgentHTTPProxyPort    int     `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
+	AnalyzerPort                  int     `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
+	ProxyControllerPort           int     `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
 	YamlConfig                    *string `gorm:"column:yaml_config;type:text;default:null" json:"yaml_config"`
 }
 

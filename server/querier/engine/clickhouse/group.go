@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package clickhouse
 
 import (
@@ -47,6 +63,19 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 	}
 	filter := "(" + tagItem.NotNullFilter + ")"
 	return &view.Expr{Value: filter}, true
+}
+
+func FormatInnerTime(m *view.Model) {
+	if m.Time.Interval == 0 && m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && m.HasAggFunc == true {
+		withValue := fmt.Sprintf(
+			"toStartOfInterval(time, toIntervalSecond(%d))",
+			m.Time.DatasourceInterval,
+		)
+		withAlias := "_time"
+		withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
+		m.AddTag(&view.Tag{Value: withAlias, Withs: withs, Flag: view.NODE_FLAG_METRICS_INNER})
+		m.AddGroup(&view.Group{Value: withAlias, Flag: view.GROUP_FLAG_METRICS_INNTER})
+	}
 }
 
 type GroupTag struct {

@@ -6,7 +6,7 @@ require (
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.5.2
-	github.com/metaflowys/metaflow/server v0.0.0-20220706115907-3510e3d2db3b
+	github.com/metaflowys/metaflow/server v0.0.0-20220712121624-15ae7614fd42
 	github.com/spf13/cobra v1.5.0
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e

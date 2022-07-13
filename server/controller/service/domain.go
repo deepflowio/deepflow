@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package service
 
 import (
@@ -155,8 +171,30 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	domain.DisplayName = displayName
 	domain.Type = domainCreate.Type
 	domain.IconID = domainCreate.IconID
+
+	// set region and controller ip if not specified
+	regionLcuuid := domainCreate.Config["region_uuid"].(string)
+	if regionLcuuid == "" {
+		var region mysql.Region
+		res := mysql.Db.Find(&region)
+		if res.RowsAffected != int64(1) {
+			return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("can not find region, please specify or create one"))
+		}
+		domainCreate.Config["region_uuid"] = region.Lcuuid
+		regionLcuuid = region.Lcuuid
+	}
 	// TODO: controller_ip拿到config外面，直接作为domain的一级参数
-	domain.ControllerIP = domainCreate.Config["controller_ip"].(string)
+	controllerIP := domainCreate.Config["controller_ip"].(string)
+	if controllerIP == "" {
+		var azConn mysql.AZControllerConnection
+		res := mysql.Db.Where("region = ?", regionLcuuid).First(&azConn)
+		if res.RowsAffected != int64(1) {
+			return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("can not find controller ip, please specify or create one"))
+		}
+		domainCreate.Config["controller_ip"] = azConn.ControllerIP
+		controllerIP = azConn.ControllerIP
+	}
+	domain.ControllerIP = controllerIP
 	configStr, _ := json.Marshal(domainCreate.Config)
 	domain.Config = string(configStr)
 
@@ -167,7 +205,6 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 		} else {
 			domain.ClusterID = "d-" + common.GenerateShortUUID()
 		}
-		regionLcuuid := domainCreate.Config["region_uuid"].(string)
 		createKubernetesRelatedResources(domain, regionLcuuid)
 	}
 	mysql.Db.Clauses(clause.Insert{Modifier: "IGNORE"}).Create(&domain)
