@@ -31,7 +31,7 @@ require (
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
-	github.com/metaflowys/metaflow/message v0.0.0-20220711071947-65195061cadf
+	github.com/metaflowys/metaflow/message v0.0.0-20220713085756-2550f87ce445
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
