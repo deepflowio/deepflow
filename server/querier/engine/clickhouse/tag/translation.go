@@ -329,21 +329,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		l3EPCIDSuffix := "l3_epc_id" + suffix
 		tagResourceMap[isInternetSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"if("+l3EPCIDSuffix+"=-2,1,0",
+				"if("+l3EPCIDSuffix+"=-2,1,0)",
 				"",
 				l3EPCIDSuffix+" %s -2",
-				"",
-			),
-			"node_type": NewTag(
-				"'internet'",
-				"",
-				"",
-				"",
-			),
-			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))",
-				"",
-				"",
 				"",
 			),
 		}
