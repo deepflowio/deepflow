@@ -60,7 +60,7 @@ func (a *ChAZ) generateNewData() (map[IDKey]mysql.ChAZ, bool) {
 		if az.DeletedAt.Valid {
 			keyToItem[IDKey{ID: az.ID}] = mysql.ChAZ{
 				ID:     az.ID,
-				Name:   az.Name + "(已删除)",
+				Name:   az.Name + "(deleted)",
 				IconID: iconID,
 			}
 		} else {

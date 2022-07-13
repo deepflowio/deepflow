@@ -49,7 +49,7 @@ func (p *ChPodNode) generateNewData() (map[IDKey]mysql.ChPodNode, bool) {
 		if podNode.DeletedAt.Valid {
 			keyToItem[IDKey{ID: podNode.ID}] = mysql.ChPodNode{
 				ID:     podNode.ID,
-				Name:   podNode.Name + "(已删除)",
+				Name:   podNode.Name + "(deleted)",
 				IconID: p.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
 			}
 		} else {
