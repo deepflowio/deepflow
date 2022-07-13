@@ -18,7 +18,21 @@ MetaFlow is a highly automated observability platform open sourced by [YUNSHAN N
 
 # Documentation
 
-Detailed information is on [our website](https://deepflow.yunshan.net/metaflow-docs/).
+For more information, please visit [GitHub](https://github.com/metaflowys/docs), or [the documentation website](https://deepflow.yunshan.net/metaflow-docs/).
+
+# Quick start
+
+## Deploy MetaFlow
+
+Please refer to the deployment documentation: [GitHub](https://github.com/metaflowys/docs/tree/main/02-install), or [the documentation website](https://deepflow.yunshan.net/metaflow-docs/install/all-in-one/).
+
+## Explore MetaFlow Demo
+
+We are building a [MetaFlow Demo](https://demo.metaflow.yunshan.net/), welcome to experience it.
+
+## Using DeepFlow Cloud
+
+[DeepFlow Cloud](https://deepflow.yunshan.net/) is the fully-managed service of MetaFlow, currently in beta and only supports Chinese.
 
 # Software Architecture
 
@@ -28,35 +42,7 @@ MetaFlow consists of two processes, Agent and Server. An Agent runs in each K8s 
 
 # Milestones
 
-MetaFlow was born from DeepFlow, a commercial product of Yunshan Networks, which has now developed to v6.1.0. There is still some code refactor work to be done. We plan to release the first downloadable version in June 2022, with the following features:
-- [x] AutoMetrics capability based on eBPF, BPF+AF\_PACKET
-- [x] HTTP 1/2/S, Dubbo, MySQL, Redis, Kafka, DNS application protocol parsing capabilities based on eBPF
-- [x] AutoTracing distributed span tracing capability based on eBPF, supports synchronous concurrency model and Native thread scheduling model
-- [x] AutoTagging capability to automatically synchronize K8s apiserver and inject resource and service tags
-- [x] High-performance SmartEncoding tag injection capability
-- [x] Integration capabilities for Prometheus and OpenTelemetry
-- [x] Use ClickHouse as default database
-- [x] Use Grafana as default visualization component
-
-There are many exciting features waiting for us to develop together with the community, including:
-- AutoMetrics & AutoTracing
-  - [ ] Support parsing more application protocols
-  - [ ] Enhanced integration with OpenTelemetry, plugged into OTel Tracer API via eBPF
-  - [ ] Support more automated AutoTracing capabilities, explore support for asynchronous concurrency models and coroutine scheduling models
-  - [ ] AutoMetrics capability based on BPF+Winpcap
-  - [ ] Support Agent to actively dial test to obtain Metrics
-  - [ ] Supports the use of eBPF to collect On/Off CPU flame graphs, providing zero-intrusion Continue Profile capability
-- AutoTagging & SmartEncoding
-  - [ ] Automatically synchronize and inject process label information in a non-container environment
-  - [ ] Synchronize service registry, automatically inject service and API property information
-- Agent
-  - [ ] Programmable application protocol parsing capability that supports WASM
-  - [ ] Integrate SkyWalking, Sentry, Telegraf, Loki and more data sources
-  - [ ] Support running on Android operating system (smart car scene)
-  - [ ] Support Agent running in Serverless Pod in the form of Sidecar
-- Server
-  - [ ] Support for more analytical databases
-  - [ ] Support for more QL dialects
+Here is our [future feature plan](https://github.com/metaflowys/docs/blob/main/01-about/04-milestone.md). Issues and Pull Requests are welcome.
 
 # Acknowledgments
 
