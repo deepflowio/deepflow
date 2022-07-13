@@ -228,7 +228,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	for _, _key := range rst["values"] {
 		key := _key.([]interface{})[0]
 		labelKey := "label." + key.(string)
-		if db == "vtap_flow_port" || db == "vtap_app_port" || db == "ext_metrics" {
+		if db == "ext_metrics" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response["values"] = append(response["values"], []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "label",
 				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
