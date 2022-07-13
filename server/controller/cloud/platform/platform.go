@@ -47,7 +47,7 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) 
 	switch domain.Type {
 	case common.ALIYUN:
 		platform, err = aliyun.NewAliyun(domain)
-	case common.GENESIS:
+	case common.AGENT_SYNC:
 		platform, err = genesis.NewGenesis(domain, cfg)
 	case common.QINGCLOUD:
 		platform, err = qingcloud.NewQingCloud(domain)

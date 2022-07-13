@@ -71,6 +71,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 	for _, stmt := range e.Statements {
 		stmt.Format(e.Model)
 	}
+	FormatInnerTime(e.Model)
 	// 使用Model生成View
 	e.View = view.NewView(e.Model)
 	chSql := e.ToSQLString()
@@ -246,6 +247,7 @@ func (e *CHEngine) ToSQLString() string {
 		for _, stmt := range e.Statements {
 			stmt.Format(e.Model)
 		}
+		FormatInnerTime(e.Model)
 		// 使用Model生成View
 		e.View = view.NewView(e.Model)
 	}
@@ -518,6 +520,7 @@ func (e *CHEngine) SetLevelFlag(flag int) {
 	if flag > e.Model.MetricsLevelFlag {
 		e.Model.MetricsLevelFlag = flag
 	}
+	e.Model.HasAggFunc = true
 }
 
 func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view.Node, error) {
