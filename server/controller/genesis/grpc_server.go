@@ -26,6 +26,7 @@ import (
 
 	tridentcommon "github.com/metaflowys/metaflow/message/common"
 	"github.com/metaflowys/metaflow/message/trident"
+	controllercommon "github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/genesis/common"
 	"github.com/metaflowys/metaflow/server/controller/genesis/config"
 	"github.com/metaflowys/metaflow/server/libs/queue"
@@ -249,7 +250,9 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *tri
 	k8sDatas := GenesisService.GetKubernetesData()
 
 	if k8sData, ok := k8sDatas[clusterID]; ok {
+		epochStr := k8sData.Epoch.Format(controllercommon.GO_BIRTHDAY)
 		return &trident.GenesisSharingK8SResponse{
+			Epoch:    &epochStr,
 			ErrorMsg: &k8sData.ErrorMSG,
 			Entries:  k8sData.Entries,
 		}, nil

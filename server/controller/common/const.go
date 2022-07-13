@@ -389,11 +389,12 @@ const (
 )
 
 const (
-	METAFLOW_STATSD_PREFIX       = "metaflow.server.controller"
-	CLOUD_METRIC_NAME_TASK_COST  = "cloud.task.cost"
-	CLOUD_METRIC_NAME_INFO_COUNT = "cloud.info.count"
-	CLOUD_METRIC_NAME_API_COUNT  = "cloud.api.count"
-	CLOUD_METRIC_NAME_API_COST   = "cloud.api.cost"
+	METAFLOW_STATSD_PREFIX            = "metaflow.server.controller"
+	CLOUD_METRIC_NAME_TASK_COST       = "cloud.task.cost"
+	CLOUD_METRIC_NAME_INFO_COUNT      = "cloud.info.count"
+	CLOUD_METRIC_NAME_API_COUNT       = "cloud.api.count"
+	CLOUD_METRIC_NAME_API_COST        = "cloud.api.cost"
+	GENESIS_METRIC_NAME_K8SINFO_DELAY = "genesis.k8sinfo.delay"
 )
 
 var ProtocolMap = map[string]int{
