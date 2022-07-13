@@ -18,7 +18,21 @@ MetaFlow是[云杉网络](https://yunshan.net)开源的一款**高度自动化**
 
 # 文档
 
-详细信息请访问[我们的网站](https://deepflow.yunshan.net/metaflow-docs/zh/)。
+详细信息请访问 [GitHub](https://github.com/metaflowys/docs/tree/main/zh/)，或者[文档站点](https://deepflow.yunshan.net/metaflow-docs/zh/)。
+
+# 快速上手
+
+## 部署 MetaFlow
+
+请参考部署文档 [GitHub](https://github.com/metaflowys/docs/tree/main/zh/02-install)，[文档站点](https://deepflow.yunshan.net/metaflow-docs/zh/install/all-in-one/)。
+
+## 体验 MetaFlow Demo
+
+我们正在搭建了一个完整的 [MetaFlow Demo](https://demo.metaflow.yunshan.net/)，欢迎体验。
+
+## 使用 DeepFlow Cloud
+
+[DeepFlow Cloud](https://deepflow.yunshan.net/) 是我们的 MetaFlow 托管服务，目前处于测试阶段，仅支持中文。
 
 # 软件架构
 
@@ -28,35 +42,7 @@ MetaFlow由Agent和Server两个进程组成。每个K8s容器节点、虚拟机�
 
 # 里程碑
 
-MetaFlow诞生于云杉网络的商业产品DeepFlow，后者目前已经发展到了v6.1.0。目前还有一些代码整理的工作需要进行，我们计划在2022年6月发布首个可下载使用的版本，具备如下特性：
-- [x] 基于eBPF、BPF+AF\_PACKET的AutoMetrics能力
-- [x] 基于eBPF的HTTP 1/2/S、Dubbo、MySQL、Redis、Kafka、DNS应用协议解析能力
-- [x] 基于eBPF的AutoTracing分布式链路追踪能力，支持同步并发模型、kernel-level threading调度模型
-- [x] 自动同步K8s apiserver并注入资源和服务标签的AutoTagging能力
-- [x] 高性能的SmartEncoding标签注入能力
-- [x] Prometheus和OpenTelemetry数据的集成能力
-- [x] 使用ClickHouse作为默认分析数据库
-- [x] 使用Grafana作为默认可视化组件
-
-MetaFlow未来还有很多激动人心的特性等待我们和社区一起开发，包括：
-- AutoMetrics & AutoTracing
-  - [ ] 支持解析更多的应用协议
-  - [ ] 增强和OpenTelemetry的集成能力，通过eBPF插入OTel Tracer API
-  - [ ] 支持更加自动化的AutoTracing能力，探索对异步并发模型、hybrid threading调度模型的支持
-  - [ ] 基于BPF+Winpcap的AutoMetrics能力
-  - [ ] 支持Agent主动拨测获取Metrics
-  - [ ] 支持使用eBPF采集On/Off CPU火焰图，提供零侵扰的Continue Profile能力
-- AutoTagging & SmartEncoding
-  - [ ] 非容器环境下自动同步并注入进程标签信息
-  - [ ] 同步服务注册中心，自动注入服务和API属性信息
-- Agent
-  - [ ] 支持WASM的可编程应用协议解析能力
-  - [ ] 集成SkyWalking、Sentry、Telegraf、Loki等更多数据源
-  - [ ] 支持运行于Andriod操作系统中（智能汽车场景）
-  - [ ] 支持Agent以Sidecar形式运行于Serverless Pod中
-- Server
-  - [ ] 支持更多的分析数据库
-  - [ ] 支持更多的QL方言
+这里有我们[未来的 Feature 规划](https://github.com/metaflowys/docs/blob/main/zh/01-about/04-milestone.md)。欢迎 Issue 和 Pull Request。
 
 # 致谢
 
