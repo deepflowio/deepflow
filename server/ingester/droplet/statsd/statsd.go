@@ -18,6 +18,7 @@ package statsd
 
 import (
 	"net"
+	"strconv"
 
 	logging "github.com/op/go-logging"
 
@@ -28,6 +29,7 @@ import (
 var log = logging.MustGetLogger("droplet.statsd")
 
 const (
+	TELEGRAF_SVC     = "telegraf"
 	TELEGRAF_PORT    = 20040
 	QUEUE_BATCH_SIZE = 1024
 )
@@ -75,8 +77,13 @@ func (w *statsdWriter) run() {
 }
 
 func NewStatsdWriter(in queue.QueueReader) *statsdWriter {
+	addrResolved, err := net.ResolveUDPAddr("udp", net.JoinHostPort(TELEGRAF_SVC, strconv.Itoa(TELEGRAF_PORT)))
+	if err != nil {
+		log.Warningf("stats can not find addr %s, err: %s ", net.JoinHostPort(TELEGRAF_SVC, strconv.Itoa(TELEGRAF_PORT)), err)
+		addrResolved = &net.UDPAddr{net.ParseIP("127.0.0.1"), TELEGRAF_PORT, ""}
+	}
 	writer := &statsdWriter{
-		remote: &net.UDPAddr{net.ParseIP("127.0.0.1"), TELEGRAF_PORT, ""},
+		remote: addrResolved,
 		in:     in,
 	}
 	go writer.run()
