@@ -1094,7 +1094,8 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	 * If extra->tls is true, the datas is obtained by the uprobe.
 	 * The obtained datas is unencrypted, not filtered.
 	 */
-	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) && !extra->tls) {
+	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) &&
+	    extra->source == DATA_SOURCE_SYSCALL) {
 		return inferred_message;
 	}
 
