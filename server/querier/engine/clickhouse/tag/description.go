@@ -228,10 +228,18 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	for _, _key := range rst["values"] {
 		key := _key.([]interface{})[0]
 		labelKey := "label." + key.(string)
-		response["values"] = append(response["values"], []interface{}{
-			labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
-			"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
-		})
+		if db == "vtap_flow_port" || db == "vtap_app_port" || db == "ext_metrics" {
+			response["values"] = append(response["values"], []interface{}{
+				labelKey, labelKey, labelKey, labelKey, "label",
+				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
+			})
+		} else {
+			response["values"] = append(response["values"], []interface{}{
+				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
+				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
+			})
+		}
+
 	}
 
 	// 查询外部字段
