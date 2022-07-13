@@ -1,5 +1,27 @@
-use std::env::VarError;
-use std::{env, net::IpAddr, path::Path, process::exit, thread, time::Duration};
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+use std::{
+    env::{self, VarError},
+    fs, io,
+    net::IpAddr,
+    path::{Path, PathBuf},
+    process, thread,
+    time::Duration,
+};
 
 use bytesize::ByteSize;
 use log::{error, warn};
@@ -183,7 +205,7 @@ pub fn controller_ip_check(ips: &[String]) {
     );
 
     thread::sleep(Duration::from_secs(1));
-    exit(-1);
+    process::exit(-1);
 }
 
 pub fn trident_process_check() {
@@ -207,7 +229,7 @@ pub fn trident_process_check() {
                     num, TRIDENT_PROCESS_LIMIT
                 );
                 thread::sleep(Duration::from_secs(1));
-                exit(-1);
+                process::exit(-1);
             }
         }
         Err(e) => {
@@ -246,6 +268,29 @@ pub fn get_k8s_local_node_ip() -> Option<IpAddr> {
         }
     }
     None
+}
+
+pub fn running_in_container() -> bool {
+    // Environment variable "IN_CONTAINTER" is set in dockerfile
+    env::var_os("IN_CONTAINER").is_some()
+}
+
+pub fn get_executable_path() -> Result<PathBuf, io::Error> {
+    let possible_paths = vec![
+        "/proc/self/exe".to_owned(),
+        "/proc/curproc/exe".to_owned(),
+        "/proc/curproc/file".to_owned(),
+        format!("/proc/{}/path/a.out", process::id()),
+    ];
+    for path in possible_paths {
+        if let Ok(path) = fs::read_link(path) {
+            return Ok(path);
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "executable path not found",
+    ))
 }
 
 //TODO Windows 相关

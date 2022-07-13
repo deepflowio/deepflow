@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package jsonify
 
 import (
@@ -113,16 +129,6 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 				h.ServiceName = getValueString(value)
 			case "service.instance.id":
 				h.ServiceInstanceId = getValueString(value)
-			}
-		} else {
-			switch key {
-			case "net.transport":
-				protocol := value.GetStringValue()
-				if strings.Contains(protocol, "tcp") {
-					h.Protocol = uint8(layers.IPProtocolTCP)
-				} else if strings.Contains(protocol, "udp") {
-					h.Protocol = uint8(layers.IPProtocolUDP)
-				}
 			// 通过一个[k8sattributesprocessor插件](https://pkg.go.dev/github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor#section-readme)
 			// 获取当前应用(otel-agent)对应上一级（即Span的来源）的IP地址，例如：Span为POD产生，则获取POD的IP；Span为部署在虚拟机上的进程产生，则获取虚拟机的IP
 			//   - 限制：因为获取的为当前应用的上一级IP，因此如果Span所在的应用发送数据给otel-agent是通过LB过来，则获取的为LB的IP
@@ -148,6 +154,16 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 					} else {
 						h.IP61 = ip
 					}
+				}
+			}
+		} else {
+			switch key {
+			case "net.transport":
+				protocol := value.GetStringValue()
+				if strings.Contains(protocol, "tcp") {
+					h.Protocol = uint8(layers.IPProtocolTCP)
+				} else if strings.Contains(protocol, "udp") {
+					h.Protocol = uint8(layers.IPProtocolUDP)
 				}
 			// https://github.com/open-telemetry/opentelemetry-go/blob/db7fd1bb51ce6ed1171cac15eeecb6871dbbb80a/semconv/internal/http.go#L79
 			case "net.peer.ip":
