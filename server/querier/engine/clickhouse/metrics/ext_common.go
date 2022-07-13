@@ -25,7 +25,7 @@ import (
 
 var EXT_METRICS = map[string]*Metrics{}
 
-func GetExtMetrics(db, table string) (map[string]*Metrics, error) {
+func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
 	var err error
 	if db == "ext_metrics" {
@@ -36,8 +36,14 @@ func GetExtMetrics(db, table string) (map[string]*Metrics, error) {
 			Password: config.Cfg.Clickhouse.Password,
 			DB:       db,
 		}
-		externalMetricIntSql := fmt.Sprintf("SELECT arrayJoin(metrics_int_names) AS metrics_int_name FROM (SELECT metrics_int_names FROM %s LIMIT 1) GROUP BY metrics_int_name", table)
-		externalMetricFloatSql := fmt.Sprintf("SELECT arrayJoin(metrics_float_names) AS metrics_float_name FROM (SELECT metrics_float_names FROM %s LIMIT 1) GROUP BY metrics_float_name", table)
+		var whereSql string
+		if where != "" {
+			whereSql = where
+		} else {
+			whereSql = "time>(now()-100000)"
+		}
+		externalMetricIntSql := fmt.Sprintf("SELECT arrayJoin(metrics_int_names) AS metrics_int_name FROM (SELECT metrics_int_names FROM %s WHERE %s) GROUP BY metrics_int_name", table, whereSql)
+		externalMetricFloatSql := fmt.Sprintf("SELECT arrayJoin(metrics_float_names) AS metrics_float_name FROM (SELECT metrics_float_names FROM %s WHERE %s) GROUP BY metrics_float_name", table, whereSql)
 		externalMetricIntRst, err := externalChClient.DoQuery(externalMetricIntSql, nil, "")
 		if err != nil {
 			log.Error(err)
@@ -57,7 +63,8 @@ func GetExtMetrics(db, table string) (map[string]*Metrics, error) {
 				"原始Tag", []bool{true, true, true}, externalTag,
 				table,
 			)
-			loadMetrics[externalTag] = lm
+			metricName := fmt.Sprintf("%s.%s", "int", externalTag)
+			loadMetrics[metricName] = lm
 		}
 		for i, _tagName := range externalMetricFloatRst["values"] {
 			tagName := _tagName.([]interface{})[0]
@@ -67,7 +74,8 @@ func GetExtMetrics(db, table string) (map[string]*Metrics, error) {
 				i+len(externalMetricIntRst["values"]), dbField, externalTag, "", METRICS_TYPE_COUNTER,
 				"原始Tag", []bool{true, true, true}, externalTag, table,
 			)
-			loadMetrics[externalTag] = lm
+			metricName := fmt.Sprintf("%s.%s", "float", externalTag)
+			loadMetrics[metricName] = lm
 		}
 	}
 	return loadMetrics, err
