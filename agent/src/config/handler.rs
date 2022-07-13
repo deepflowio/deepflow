@@ -396,7 +396,7 @@ impl EbpfConfig {
 }
 
 // Span/Trace 共用一套TypeMap
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TraceType {
     Disabled, // 业务表示关闭
     XB3,
@@ -405,18 +405,76 @@ pub enum TraceType {
     Sw6,
     Sw8,
     TraceParent,
+    Customize(String),
 }
 
+const TRACE_TYPE_XB3: &str = "X-B3-TraceId";
+const TRACE_TYPE_XB3SPAN: &str = "X-B3-SpanId";
+const TRACE_TYPE_UBER: &str = "uber-trace-id";
+const TRACE_TYPE_SW6: &str = "sw6";
+const TRACE_TYPE_SW8: &str = "sw8";
+const TRACE_TYPE_TRACE_PARENT: &str = "traceparent";
+
 impl From<&str> for TraceType {
+    // 参数支持如下两种格式：
+    // 示例1：" sw8"
+    // 示例2："sw8"
+    // ==================================================
+    // The parameter supports the following two formats:
+    // Example 1: "sw8"
+    // Example 2: " sw8"
     fn from(t: &str) -> TraceType {
+        let t = Self::format_str(t);
         match t {
-            "x-b3-trace-id" => TraceType::XB3,
-            "x-b3-parentspanid" => TraceType::XB3Span,
-            "uber-trace-id" => TraceType::Uber,
-            "sw6" => TraceType::Sw6,
-            "sw8" => TraceType::Sw8,
-            "traceparent" => TraceType::TraceParent,
+            TRACE_TYPE_XB3 => TraceType::XB3,
+            TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
+            TRACE_TYPE_UBER => TraceType::Uber,
+            TRACE_TYPE_SW6 => TraceType::Sw6,
+            TRACE_TYPE_SW8 => TraceType::Sw8,
+            TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
+            _ if t.len() > 0 => TraceType::Customize(t.to_string()),
             _ => TraceType::Disabled,
+        }
+    }
+}
+
+impl TraceType {
+    // 删除有效位前的所有空格
+    // ============================================
+    // Remove all spaces before significant digits
+    fn format_str(t: &str) -> &str {
+        let bytes = t.as_bytes();
+        for i in 0..bytes.len() {
+            if bytes[i] != b' ' as u8 {
+                return &t[i..];
+            }
+        }
+        return t;
+    }
+
+    fn check(&self, context: &str) -> bool {
+        match &*self {
+            TraceType::XB3 => context.to_lowercase() == TRACE_TYPE_XB3.to_lowercase(),
+            TraceType::XB3Span => context.to_lowercase() == TRACE_TYPE_XB3SPAN.to_lowercase(),
+            TraceType::Uber => context == TRACE_TYPE_UBER,
+            TraceType::Sw6 => context == TRACE_TYPE_SW6,
+            TraceType::Sw8 => context == TRACE_TYPE_SW8,
+            TraceType::TraceParent => context == TRACE_TYPE_TRACE_PARENT,
+            TraceType::Customize(tag) => context == tag.as_str(),
+            _ => false,
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match &*self {
+            TraceType::XB3 => TRACE_TYPE_XB3.to_string(),
+            TraceType::XB3Span => TRACE_TYPE_XB3SPAN.to_string(),
+            TraceType::Uber => TRACE_TYPE_UBER.to_string(),
+            TraceType::Sw6 => TRACE_TYPE_SW6.to_string(),
+            TraceType::Sw8 => TRACE_TYPE_SW8.to_string(),
+            TraceType::TraceParent => TRACE_TYPE_TRACE_PARENT.to_string(),
+            TraceType::Customize(tag) => tag.to_string(),
+            _ => "".to_string(),
         }
     }
 }
@@ -435,14 +493,29 @@ pub struct L7LogDynamicConfig {
     pub x_request_id_origin: String,
     pub x_request_id_lower: String,
     pub x_request_id_with_colon: String,
-    pub trace_id_origin: String,
-    pub trace_id_lower: String,
-    pub trace_id_with_colon: String,
-    pub trace_type: TraceType,
-    pub span_id_origin: String,
-    pub span_id_lower: String,
-    pub span_id_with_colon: String,
-    pub span_type: TraceType,
+
+    pub trace_types: Vec<TraceType>,
+    pub span_types: Vec<TraceType>,
+}
+
+impl L7LogDynamicConfig {
+    pub fn is_trace_id(&self, context: &str) -> bool {
+        for trace in &self.trace_types {
+            if trace.check(context) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    pub fn is_span_id(&self, context: &str) -> bool {
+        for span in &self.span_types {
+            if span.check(context) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -629,15 +702,16 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     x_request_id_lower: conf.http_log_x_request_id.to_string().to_lowercase(),
                     x_request_id_with_colon: format!("{}: ", conf.http_log_x_request_id),
 
-                    trace_id_origin: conf.http_log_trace_id.to_string(),
-                    trace_id_lower: conf.http_log_trace_id.to_string().to_lowercase(),
-                    trace_id_with_colon: format!("{}: ", conf.http_log_trace_id),
-                    trace_type: conf.http_log_trace_id.as_str().into(),
-
-                    span_id_origin: conf.http_log_span_id.to_string(),
-                    span_id_lower: conf.http_log_span_id.to_string().to_lowercase(),
-                    span_id_with_colon: format!("{}: ", conf.http_log_span_id),
-                    span_type: conf.http_log_span_id.as_str().into(),
+                    trace_types: conf
+                        .http_log_trace_id
+                        .split(',')
+                        .map(|item| TraceType::from(item))
+                        .collect(),
+                    span_types: conf
+                        .http_log_span_id
+                        .split(',')
+                        .map(|item| TraceType::from(item))
+                        .collect(),
                 },
             },
             debug: DebugConfig {
