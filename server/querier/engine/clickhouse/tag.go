@@ -72,7 +72,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 }
 
 func GetMetricsTag(name string, alias string, db string, table string) (Statement, error) {
-	metricStruct, ok := metrics.GetMetrics(name, db, table)
+	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), db, table)
 	if !ok {
 		return nil, nil
 	}

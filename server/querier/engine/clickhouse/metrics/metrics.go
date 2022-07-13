@@ -19,6 +19,7 @@ package metrics
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	ckcommon "github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
 
@@ -86,15 +87,35 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 }
 
 func GetMetrics(field string, db string, table string) (*Metrics, bool) {
-	allMetrics, err := GetMetricsByDBTable(db, table)
+	allMetrics, err := GetMetricsByDBTable(db, table, "")
 	if err != nil {
 		return nil, false
 	}
 	metric, ok := allMetrics[field]
+	if !ok {
+		if db == "ext_metrics" {
+			fieldSplit := strings.Split(field, ".")
+			if len(fieldSplit) > 1 {
+				if fieldSplit[0] == "int" {
+					return NewMetrics(
+						0, fmt.Sprintf("metrics_int_values[indexOf(metrics_int_names, '%s')]", fieldSplit[1]),
+						field, "", METRICS_TYPE_COUNTER,
+						"原始Tag", []bool{true, true, true}, field, table,
+					), true
+				} else if fieldSplit[0] == "float" {
+					return NewMetrics(
+						0, fmt.Sprintf("metrics_float_values[indexOf(metrics_float_names, '%s')]", fieldSplit[1]),
+						field, "", METRICS_TYPE_COUNTER,
+						"原始Tag", []bool{true, true, true}, field, table,
+					), true
+				}
+			}
+		}
+	}
 	return metric, ok
 }
 
-func GetMetricsByDBTable(db string, table string) (map[string]*Metrics, error) {
+func GetMetricsByDBTable(db string, table string, where string) (map[string]*Metrics, error) {
 	var err error
 	switch db {
 	case "flow_log":
@@ -116,13 +137,13 @@ func GetMetricsByDBTable(db string, table string) (map[string]*Metrics, error) {
 			return GetVtapAppEdgePortMetrics(), err
 		}
 	case "ext_metrics":
-		return GetExtMetrics(db, table)
+		return GetExtMetrics(db, table, where)
 	}
 	return nil, err
 }
 
-func GetMetricsDescriptionsByDBTable(db string, table string) ([]interface{}, error) {
-	allMetrics, err := GetMetricsByDBTable(db, table)
+func GetMetricsDescriptionsByDBTable(db string, table string, where string) ([]interface{}, error) {
+	allMetrics, err := GetMetricsByDBTable(db, table, where)
 	if allMetrics == nil || err != nil {
 		// TODO: metrics not found
 		return nil, err
@@ -140,7 +161,7 @@ func GetMetricsDescriptionsByDBTable(db string, table string) ([]interface{}, er
 	return values, nil
 }
 
-func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, error) {
+func GetMetricsDescriptions(db string, table string, where string) (map[string][]interface{}, error) {
 	var values []interface{}
 	if table == "" {
 		var tables []interface{}
@@ -158,14 +179,14 @@ func GetMetricsDescriptions(db string, table string) (map[string][]interface{}, 
 			}
 		}
 		for _, dbTable := range tables {
-			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string))
+			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where)
 			if err != nil {
 				return nil, err
 			}
 			values = append(values, metrics...)
 		}
 	} else {
-		metrics, err := GetMetricsDescriptionsByDBTable(db, table)
+		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where)
 		if err != nil {
 			return nil, err
 		}
