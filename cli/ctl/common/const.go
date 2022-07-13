@@ -27,8 +27,15 @@ const (
 	ALIYUN_EN     = "aliyun"
 	KUBERNETES_EN = "kubernetes"
 	QINGCLOUD_EN  = "qingcloud"
-	GENESIS_EN    = "genesis"
+	AGENT_SYNC_EN = "agent_sync"
 	BAIDU_BCE_EN  = "baidu_bce"
+
+	TENCENT    = 4
+	ALIYUN     = 9
+	KUBERNETES = 11
+	QINGCLOUD  = 14
+	AGENT_SYNC = 23
+	BAIDU_BCE  = 25
 )
 
 const (
