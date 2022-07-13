@@ -167,6 +167,17 @@ out:
 	uprobe_sym->rets_count = cnt;
 }
 
+static struct bcc_symbol_option default_option = {
+	.use_debug_file = 1,
+	.check_debug_file_crc = 1,
+	.lazy_symbolize = 1,
+#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
+	.use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
+#else
+	.use_symbol_type = BCC_SYM_ALL_TYPES,
+#endif
+};
+
 /**
  * resolve_and_gen_uprobe_symbol -- 完成二进制文件中对给定符号的解析并生成uprobe_symbol
  * @bin_file: 二进制文件，如果是可执行文件需要指定文件的全路径,
@@ -183,18 +194,6 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    const uint64_t addr,
 						    int pid)
 {
-	static struct bcc_symbol_option default_option = {
-		.use_debug_file = 1,
-		.check_debug_file_crc = 1,
-		.lazy_symbolize = 1,
-#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-		.use_symbol_type =
-		    BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
-#else
-		.use_symbol_type = BCC_SYM_ALL_TYPES,
-#endif
-	};
-
 	if (bin_file == NULL) {
 		ebpf_warning("bin_file == NULL, failed.\n");
 		return NULL;
@@ -318,4 +317,19 @@ char *get_elf_path_by_pid(int pid)
 void *nd_memset(void *s, int c, ND_SIZET n)
 {
 	return memset(s, c, n);
+}
+
+uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
+{
+	if (!bin) {
+		return 0;
+	}
+
+	struct symbol_uprobe tmp = {
+		.name = symname,
+	};
+
+	bcc_elf_foreach_sym(bin, find_sym, &default_option, &tmp);
+	ebpf_info("%s: %p\n", symname, tmp.entry);
+	return tmp.entry;
 }

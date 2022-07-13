@@ -329,6 +329,10 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (get_go_version()) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
@@ -1097,7 +1101,8 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	 * If extra->tls is true, the datas is obtained by the uprobe.
 	 * The obtained datas is unencrypted, not filtered.
 	 */
-	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) && !extra->tls) {
+	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) &&
+	    extra->source == DATA_SOURCE_SYSCALL) {
 		return inferred_message;
 	}
 

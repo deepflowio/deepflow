@@ -47,13 +47,13 @@
 #include "symbol.h"
 #include "socket.h"
 
-#define MAP_GO_OFFSETS_MAP_NAME	"uprobe_offsets_map"
+#define MAP_PROC_INFO_MAP_NAME	"proc_info_map"
 #define PROCFS_CHECK_PERIOD  60	// 60 seconds
 static uint64_t procfs_check_count;
 
 static char build_info_magic[] = "\xff Go buildinf:";
 
-struct list_head proc_offsets_head;	// For pid-offsets correspondence lists.
+struct list_head proc_info_head;	// For pid-offsets correspondence lists.
 
 struct list_head proc_events_head;     // For process execute/exit events list.
 #define PROC_EVENT_DELAY_HANDLE_DEF	120 // execute/exit events delayed processing time, unit: second
@@ -65,13 +65,13 @@ struct data_members offsets[] = {
 	{
 		.structure = "runtime.g",
 		.field_name = "goid",
-		.idx = runtime_g_goid_offset,
+		.idx = OFFSET_IDX_GOID_RUNTIME_G,
 		.default_offset = 152,
 	},
 	{
 		.structure = "crypto/tls.Conn",
 		.field_name = "conn",
-		.idx = crypto_tls_conn_conn_offset,
+		.idx = OFFSET_IDX_CONN_TLS_CONN,
 		.default_offset = 0,
 	},
 	{
@@ -79,9 +79,81 @@ struct data_members offsets[] = {
 		// is the same as on go 1.7, so a default offset is given
 		.structure = "internal/poll.FD",
 		.field_name = "Sysfd",
-		.idx = net_poll_fd_sysfd,
+		.idx = OFFSET_IDX_SYSFD_POLL_FD,
 		.default_offset = 16,
 	},
+	{
+		.structure = "net/http.http2serverConn",
+		.field_name = "conn",
+		.idx = OFFSET_IDX_CONN_HTTP2_SERVER_CONN,
+		.default_offset = 16,
+	},
+	{
+		.structure = "net/http.http2ClientConn",
+		.field_name = "tconn",
+		.idx = OFFSET_IDX_TCONN_HTTP2_CLIENT_CONN,
+		.default_offset = 8,
+	},
+	{
+		.structure = "net/http.http2clientConnReadLoop",
+		.field_name = "cc",
+		.idx = OFFSET_IDX_CC_HTTP2_CLIENT_CONN_READ_LOOP,
+		.default_offset = 0,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.http2Client",
+		.field_name = "conn",
+		.idx = OFFSET_IDX_CONN_GRPC_HTTP2_CLIENT,
+		.default_offset = 64,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.http2Server",
+		.field_name = "conn",
+		.idx = OFFSET_IDX_CONN_GRPC_HTTP2_SERVER,
+		.default_offset = 32,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.loopyWriter",
+		.field_name = "framer",
+		.idx = OFFSET_IDX_FRAMER_GRPC_TRANSPORT_LOOPY_WRITER,
+		.default_offset = 40,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.framer",
+		.field_name = "writer",
+		.idx = OFFSET_IDX_WRITER_GRPC_TRANSPORT_FRAMER,
+		.default_offset = 0,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.bufWriter",
+		.field_name = "conn",
+		.idx = OFFSET_IDX_CONN_GRPC_TRANSPORT_BUFWRITER,
+		.default_offset = 40,
+	},
+	{
+		.structure = "google.golang.org/grpc/internal/transport.loopyWriter",
+		.field_name = "side",
+		.idx = OFFSET_IDX_SIDE_GRPC_TRANSPORT_LOOPY_WRITER,
+		.default_offset = 0,
+	},
+	{
+		.structure = "net/http.http2MetaHeadersFrame",
+		.field_name = "Fields",
+		.idx = OFFSET_IDX_FIELDS_HTTP2_META_HEADERS_FRAME,
+		.default_offset = 8,
+	},
+	{
+		.structure = "net/http.http2ClientConn",
+		.field_name = "nextStreamID",
+		.idx = OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN,
+		.default_offset = 176,
+	},
+	{
+		.structure = "net/http.http2FrameHeader",
+		.field_name = "StreamID",
+		.idx = OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER,
+		.default_offset = 8,
+	}
 };
 
 static struct symbol syms[] = {
@@ -114,6 +186,86 @@ static struct symbol syms[] = {
 		.symbol = "crypto/tls.(*Conn).Read",
 		.probe_func = "uprobe_go_tls_read_exit",
 		.is_probe_ret = true,
+	},
+	// HTTP2
+	{
+		.type = GO_UPROBE,
+		.symbol = "net/http.(*http2serverConn).writeHeaders",
+		.probe_func = "uprobe_go_http2serverConn_writeHeaders",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*serverConn).writeHeaders",
+		.probe_func = "uprobe_go_http2serverConn_writeHeaders",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "net/http.(*http2serverConn).processHeaders",
+		.probe_func = "uprobe_go_http2serverConn_processHeaders",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*serverConn).processHeaders",
+		.probe_func = "uprobe_go_http2serverConn_processHeaders",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "net/http.(*http2clientConnReadLoop).handleResponse",
+		.probe_func = "uprobe_go_http2clientConnReadLoop_handleResponse",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*clientConnReadLoop).handleResponse",
+		.probe_func = "uprobe_go_http2clientConnReadLoop_handleResponse",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "net/http.(*http2ClientConn).writeHeader",
+		.probe_func = "uprobe_go_http2ClientConn_writeHeader",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*ClientConn).writeHeader",
+		.probe_func = "uprobe_go_http2ClientConn_writeHeader",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "net/http.(*http2ClientConn).writeHeaders",
+		.probe_func = "uprobe_go_http2ClientConn_writeHeaders",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "golang.org/x/net/http2.(*ClientConn).writeHeaders",
+		.probe_func = "uprobe_go_http2ClientConn_writeHeaders",
+		.is_probe_ret = false,
+	},
+	// gRPC
+	{
+		.type = GO_UPROBE,
+		.symbol = "google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader",
+		.probe_func = "uprobe_go_loopyWriter_writeHeader",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders",
+		.probe_func = "uprobe_go_http2Client_operateHeaders",
+		.is_probe_ret = false,
+	},
+	{
+		.type = GO_UPROBE,
+		.symbol = "google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders",
+		.probe_func = "uprobe_go_http2Server_operateHeaders",
+		.is_probe_ret = false,
 	},
 };
 /* *INDENT-ON* */
@@ -249,28 +401,28 @@ exit:
 
 }
 
-static struct proc_offsets *find_offset_by_pid(int pid)
+static struct proc_info *find_proc_info_by_pid(int pid)
 {
-	struct proc_offsets *p_off;
-	list_for_each_entry(p_off, &proc_offsets_head, list) {
-		if (p_off->pid == pid)
-			return p_off;
+	struct proc_info *p_info;
+	list_for_each_entry(p_info, &proc_info_head, list) {
+		if (p_info->pid == pid)
+			return p_info;
 	}
 
 	return NULL;
 }
 
-static struct proc_offsets *alloc_offset_by_pid(void)
+static struct proc_info *alloc_proc_info_by_pid(void)
 {
-	struct proc_offsets *offs;
-	offs = calloc(1, sizeof(struct proc_offsets));
-	if (offs == NULL) {
+	struct proc_info *info;
+	info = calloc(1, sizeof(struct proc_info));
+	if (info == NULL) {
 		ebpf_warning
-		    ("calloc() size:sizeof(struct proc_offsets) error.\n");
+		    ("calloc() size:sizeof(struct proc_info) error.\n");
 		return NULL;
 	}
 
-	return offs;
+	return info;
 }
 
 static int resolve_bin_file(const char *path, int pid,
@@ -279,7 +431,7 @@ static int resolve_bin_file(const char *path, int pid,
 {
 	int ret = ETR_OK;
 	struct symbol *sym;
-	struct symbol_uprobe *probe_sym;
+	struct symbol_uprobe *probe_sym = NULL;
 	struct data_members *off;
 	char *binary_path = NULL;
 	int syms_count = 0;
@@ -304,17 +456,16 @@ static int resolve_bin_file(const char *path, int pid,
 			for (j = 0; j < probe_sym->rets_count; j++) {
 				addr = probe_sym->rets[j];
 				sub_probe_sym =
-				    malloc(sizeof(struct symbol_uprobe));
+					malloc(sizeof(struct symbol_uprobe));
 				if (sub_probe_sym == NULL) {
 					ebpf_warning("malloc() error.\n");
 					ret = ETR_NOMEM;
 					goto faild;
 				}
 
-				if ((ret =
-				     copy_uprobe_symbol(probe_sym,
-							sub_probe_sym))
-				    != ETR_OK) {
+				if ((ret = copy_uprobe_symbol(probe_sym,
+							      sub_probe_sym)) !=
+				    ETR_OK) {
 					free((void *)sub_probe_sym);
 					goto faild;
 				}
@@ -326,42 +477,41 @@ static int resolve_bin_file(const char *path, int pid,
 		} else
 			add_uprobe_symbol(pid, probe_sym, conf);
 
-		ebpf_info
-		    ("Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
-		     probe_sym->binary_path, probe_sym->pid,
-		     probe_sym->ver.major, probe_sym->ver.minor,
-		     probe_sym->ver.revision, probe_sym->entry, probe_sym->size,
-		     probe_sym->name, probe_sym->probe_func,
-		     probe_sym->rets_count);
+		ebpf_info(
+			"Uprobe [%s] pid:%d go%d.%d.%d entry:0x%lx size:%ld symname:%s probe_func:%s rets_count:%d\n",
+			probe_sym->binary_path, probe_sym->pid,
+			probe_sym->ver.major, probe_sym->ver.minor,
+			probe_sym->ver.revision, probe_sym->entry,
+			probe_sym->size, probe_sym->name, probe_sym->probe_func,
+			probe_sym->rets_count);
 
 		if (probe_sym->isret)
-			free_uprobe_symbol(probe_sym, conf);
+			free_uprobe_symbol(probe_sym, NULL);
 
 		syms_count++;
 	}
 
-
-	struct proc_offsets *p_offs = NULL;
-	if (binary_path) {
-		bool is_new_offset = false;
-		p_offs = find_offset_by_pid(pid);
-		if (p_offs == NULL) {
-			p_offs = alloc_offset_by_pid();
-			if (p_offs == NULL)
+	struct proc_info *p_info = NULL;
+	if (binary_path){
+		bool is_new_info = false;
+		p_info = find_proc_info_by_pid(pid);
+		if (p_info == NULL) {
+			p_info = alloc_proc_info_by_pid();
+			if (p_info == NULL)
 				goto offset_faild;
-			is_new_offset = true;
+			is_new_info = true;
 		}
 
-		p_offs->offs.version = GO_VERSION(go_ver->major, go_ver->minor,
+		p_info->info.version = GO_VERSION(go_ver->major, go_ver->minor,
 						  go_ver->revision);
-		p_offs->pid = pid;
+		p_info->pid = pid;
 
-		if (p_offs->path != NULL) {
-			free(p_offs->path);
-			p_offs->path = NULL;
+		if (p_info->path != NULL) {
+			free(p_info->path);
+			p_info->path = NULL;
 		}
-		p_offs->path = strdup(binary_path);
-		if (p_offs->path == NULL) {
+		p_info->path = strdup(binary_path);
+		if (p_info->path == NULL) {
 			goto offset_faild;
 		}
 		// resolve all offsets.
@@ -374,13 +524,22 @@ static int resolve_bin_file(const char *path, int pid,
 			if (offset == ETR_INVAL)
 				offset = off->default_offset;
 
-			p_offs->offs.data[off->idx] = offset;
+			p_info->info.offsets[off->idx] = offset;
 		}
 
-		p_offs->has_updated = false;
+		p_info->has_updated = false;
 
-		if (is_new_offset)
-			list_add_tail(&p_offs->list, &proc_offsets_head);
+		if (is_new_info)
+			list_add_tail(&p_info->list, &proc_info_head);
+
+		p_info->info.net_TCPConn_itab = get_symbol_addr_from_binary(
+			binary_path, "go.itab.*net.TCPConn,net.Conn");
+		p_info->info.crypto_tls_Conn_itab = get_symbol_addr_from_binary(
+			binary_path, "go.itab.*crypto/tls.Conn,net.Conn");
+		p_info->info
+			.credentials_syscallConn_itab = get_symbol_addr_from_binary(
+			binary_path,
+			"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
 
 		free(binary_path);
 	}
@@ -397,7 +556,7 @@ static int resolve_bin_file(const char *path, int pid,
 faild:
 	*resolve_num = syms_count;
 	if (probe_sym->isret) {
-		free_uprobe_symbol(probe_sym, conf);
+		free_uprobe_symbol(probe_sym, NULL);
 	}
 
 	if (binary_path) {
@@ -407,8 +566,8 @@ faild:
 
 offset_faild:
 	*resolve_num = syms_count;
-	if (p_offs != NULL) {
-		free(p_offs);
+	if (p_info != NULL) {
+		free(p_info);
 	}
 	if (binary_path) {
 		free(binary_path);
@@ -500,7 +659,7 @@ int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	DIR *fddir = NULL;
 
 	INIT_LIST_HEAD(&proc_events_head);
-	INIT_LIST_HEAD(&proc_offsets_head);
+	INIT_LIST_HEAD(&proc_info_head);
 	pthread_mutex_init(&mutex_proc_events_lock, NULL);
 
 	fddir = opendir("/proc/");
@@ -587,12 +746,12 @@ static bool __attribute__ ((unused)) pid_exist_in_probes_without_stime(struct bp
 	return false;
 }
 
-static struct proc_offsets *find_go_offsets(int pid)
+static struct proc_info *find_proc_info(int pid)
 {
-	struct proc_offsets *p_off = NULL;
-	list_for_each_entry(p_off, &proc_offsets_head, list) {
-		if (p_off->pid == pid)
-			return p_off;
+	struct proc_info *p_info = NULL;
+	list_for_each_entry(p_info, &proc_info_head, list) {
+		if (p_info->pid == pid)
+			return p_info;
 	}
 
 	return NULL;
@@ -609,10 +768,10 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 	struct list_head *p, *n;
 	struct symbol_uprobe *sym_uprobe;
 
-	struct proc_offsets *p_off = find_go_offsets(pid);
-	if (p_off) {
-		list_head_del(&p_off->list);
-		free(p_off);
+	struct proc_info *p_info = find_proc_info(pid);
+	if (p_info) {
+		list_head_del(&p_info->list);
+		free(p_info);
 	}
 
 	list_for_each_safe(p, n, &tracer->probes_head) {
@@ -722,38 +881,37 @@ static int __attribute__ ((unused)) period_update_procfs(void)
 	closedir(fddir);
 	tracer_uprobes_update(tracer);
 	tracer_hooks_process(tracer, HOOK_ATTACH, NULL);
-	update_go_offsets_to_map(tracer);
+	update_proc_info_to_map(tracer);
 	return ETR_OK;
 }
 
-void update_go_offsets_to_map(struct bpf_tracer *tracer)
+void update_proc_info_to_map(struct bpf_tracer *tracer)
 {
-	struct proc_offsets *p_off;
+	struct proc_info *p_info;
 	char buff[4096];
-	struct member_offsets *offs;
+	struct ebpf_proc_info *info;
 	int len, i;
 
-	list_for_each_entry(p_off, &proc_offsets_head, list) {
-		if (p_off->has_updated)
+	list_for_each_entry(p_info, &proc_info_head, list) {
+		if (p_info->has_updated)
 			continue;
-		offs = &p_off->offs;
-		int pid = p_off->pid;
+		info = &p_info->info;
+		int pid = p_info->pid;
 		if (!bpf_table_set_value
-		    (tracer, MAP_GO_OFFSETS_MAP_NAME, pid, (void *)offs))
+		    (tracer, MAP_PROC_INFO_MAP_NAME, pid, (void *)info))
 			continue;
 		len =
-		    snprintf(buff, sizeof(buff), "go%d.%d.%d offsets:",
-			     offs->version >> 16, ((offs->version >> 8) & 0xff),
-			     (uint8_t) offs->version);
-		for (i = 0; i < offsets_num; i++) {
+		    snprintf(buff, sizeof(buff), "go%d.%d offsets:",
+			     info->version >> 16, ((info->version >> 8) & 0xff));
+		for (i = 0; i < OFFSET_IDX_MAX; i++) {
 			len +=
 			    snprintf(buff + len, sizeof(buff) - len, "%d:%d ",
-				     i, offs->data[i]);
+				     i, info->offsets[i]);
 		}
 
-		p_off->has_updated = true;
+		p_info->has_updated = true;
 		ebpf_info("Udpate map %s, key(pid):%d, value:%s",
-			  MAP_GO_OFFSETS_MAP_NAME, p_off->pid, buff);
+			  MAP_PROC_INFO_MAP_NAME, p_info->pid, buff);
 	}
 }
 
@@ -777,7 +935,7 @@ static void process_execute_handle(int pid, struct bpf_tracer *tracer)
 		if (tracer_hooks_process(tracer, HOOK_ATTACH, &count) == ETR_OK) {
 			if (count > 0)
 				// Update offsets map
-				update_go_offsets_to_map(tracer);
+				update_proc_info_to_map(tracer);
 		}
 	}
 	pthread_mutex_unlock(&tracer->mutex_probes_lock);
