@@ -92,11 +92,13 @@ compressor_socket_type: TCP
 # HTTP日志代理客户端，默认值: X-Forwarded-For，可选值：关闭/X-Forwarded-For
 http_log_proxy_client: X-Forwarded-For
 # HTTP日志XRequestID，默认值: 关闭，可选值：关闭/X-Request-ID
-http_log_x_request_id: 关闭
-# 应用流日志TraceID，默认值: 关闭，可选值：关闭/X-B3-TraceId/uber-trace-id/sw6/sw8
-http_log_trace_id: 关闭
-# 应用流日志SpanID，默认值：关闭，可选值：关闭/X-B3-ParentSpanId/uber-trace-id/sw6/sw8
-http_log_span_id: 关闭
+http_log_x_request_id: X-Request-ID
+# 应用流日志TraceID，默认值: traceparent,sw8，可选值：关闭/traceparent/X-B3-TraceId/uber-trace-id/sw6/sw8
+# 支持输入自定义值，支持输入逗号分隔的多个值（除关闭外）
+http_log_trace_id: traceparent, sw8
+# 应用流日志SpanID，默认值：traceparent,sw8，可选值：关闭/traceparent/X-B3-SpanId/uber-trace-id/sw6/sw8
+# 支持输入自定义值，支持输入逗号分隔的多个值（除关闭外）
+http_log_span_id: traceparent, sw8
 # 应用日志解析包长，默认值: 256，值域[256, 1500]
 # 说明：采集HTTP、DNS日志时的解析的包长，注意不要超过采集包长参数
 l7_log_packet_size: 256
