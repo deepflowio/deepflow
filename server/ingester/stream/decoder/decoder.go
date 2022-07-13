@@ -126,13 +126,9 @@ func (d *Decoder) GetCounter() interface{} {
 }
 
 func (d *Decoder) Run() {
-	msgType := "l4"
-	if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
-		msgType = "l7"
-	}
 	stats.RegisterCountable("decoder", d, stats.OptionStatTags{
 		"thread":   strconv.Itoa(d.index),
-		"msg_type": msgType})
+		"msg_type": d.msgType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
 	decoder := &codec.SimpleDecoder{}
 	pbTaggedFlow := pb.NewTaggedFlow()
