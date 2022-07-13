@@ -241,7 +241,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			} else {
 				retFlag = true
 				epochStr := ret.GetEpoch()
-				epoch, err := time.Parse(common.GO_BIRTHDAY, epochStr)
+				epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
 				if err != nil {
 					log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
 					return k8sResp, err
