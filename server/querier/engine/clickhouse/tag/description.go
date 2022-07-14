@@ -52,10 +52,10 @@ var tagTypeToOperators = map[string][]string{
 	"string":      []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"string_enum": []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"time":        []string{"=", "!=", ">=", "<="},
 	"mac":         []string{"=", "!=", "IN", "NOT IN"},
 	"id":          []string{"=", "!=", "IN", "NOT IN"},
-	"time":        []string{"=", "!=", ">=", "<="},
-	"default":     []string{"=", "!="},
+	"default":     []string{"=", "!=", "IN", "NOT IN"},
 }
 var TAG_RESOURCE_TYPE_DEVICE_MAP = map[string]int{
 	"chost":       VIF_DEVICE_TYPE_VM,
