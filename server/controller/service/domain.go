@@ -286,7 +286,7 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Do
 
 	// config
 	// 注意：密码相关字段因为返回是****，所以不能直接把页面更新入库
-	if _, ok := domainUpdate["CONFIG"]; ok {
+	if _, ok := domainUpdate["CONFIG"]; ok && domainUpdate["CONFIG"] != nil {
 		config := make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &config)
 
@@ -307,8 +307,8 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Do
 			}
 		}
 		// 如果修改region，则清理掉云平台下所有软删除的数据
-		if region, ok := configUpdate["region"]; ok {
-			if region != config["region"] {
+		if region, ok := configUpdate["region_uuid"]; ok {
+			if region != config["region_uuid"] {
 				log.Infof("delete domain (%s) soft deleted resource", domain.Name)
 				deleteSoftDeletedResource(lcuuid)
 			}
