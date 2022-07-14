@@ -20,13 +20,13 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::mem;
 use std::net::IpAddr;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
 use std::process::{self, Command};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{self, Arc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+#[cfg(unix)]
+use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 use log::{debug, error, info, warn};
 use md5::{Digest, Md5};
@@ -891,7 +891,10 @@ impl Synchronizer {
         let binary_path = get_executable_path()
             .map_err(|_| format!("Cannot get metaflow-agent path for this OS"))?;
         let mut temp_path = binary_path.clone();
+        #[cfg(unix)]
         temp_path.set_extension("test");
+        #[cfg(windows)]
+        temp_path.set_extension("test.exe");
         let mut backup_path = binary_path.clone();
         backup_path.set_extension("bak");
 
@@ -903,10 +906,6 @@ impl Synchronizer {
         let mut total_count = 0;
         let fp = File::create(&temp_path)
             .map_err(|e| format!("File {} creation failed: {:?}", temp_path.display(), e))?;
-        #[cfg(unix)]
-        if let Ok(m) = fp.metadata() {
-            m.permissions().set_mode(0o755);
-        }
         let mut writer = BufWriter::new(fp);
         let mut checksum = Md5::new();
 
@@ -962,6 +961,15 @@ impl Synchronizer {
             .flush()
             .map_err(|e| format!("Flush {} failed: {:?}", temp_path.display(), e))?;
         mem::drop(writer);
+
+        #[cfg(unix)]
+        if let Err(e) = fs::set_permissions(&temp_path, Permissions::from_mode(0o755)) {
+            return Err(format!(
+                "Set file {} permissions failed: {:?}",
+                temp_path.display(),
+                e
+            ));
+        }
 
         let version_info = Command::new(&temp_path)
             .arg("-v")
