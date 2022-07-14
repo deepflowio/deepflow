@@ -247,7 +247,7 @@ type VTapLicenseConsumption struct {
 }
 
 type Domain struct {
-	ID             int                    `json:"ID"`
+	ID             string                 `json:"ID"`
 	Name           string                 `json:"NAME"`
 	DisplayName    string                 `json:"DISPLAY_NAME"`
 	ClusterID      string                 `json:"CLUSTER_ID"`
