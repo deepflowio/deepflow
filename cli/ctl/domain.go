@@ -170,19 +170,25 @@ func createDomain(cmd *cobra.Command, args []string, createFilename string) {
 	var body map[string]interface{}
 	yaml.Unmarshal(yamlFile, &body)
 
-	if domainTypeStr, ok := body["TYPE"]; ok {
+	upperBody := make(map[string]interface{})
+	for k, v := range body {
+		upperK := strings.ToUpper(k)
+		upperBody[upperK] = v
+	}
+
+	if domainTypeStr, ok := upperBody["TYPE"]; ok {
 		domainTypeInt, ok := domainTypeStrToInt[domainTypeStr.(string)]
 		if !ok {
 			fmt.Fprintln(os.Stderr, fmt.Sprintf("domain type (%s) not supported", domainTypeStr))
 			return
 		}
-		body["TYPE"] = domainTypeInt
+		upperBody["TYPE"] = domainTypeInt
 	} else {
 		fmt.Fprintln(os.Stderr, "domain type must specify")
 		return
 	}
 
-	resp, err := common.CURLPerform("POST", url, body, "")
+	resp, err := common.CURLPerform("POST", url, upperBody, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -192,7 +198,7 @@ func createDomain(cmd *cobra.Command, args []string, createFilename string) {
 
 func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name. Example: %s", cmd.Example)
+		fmt.Fprintf(os.Stderr, "must specify name.\nExample: %s\n", cmd.Example)
 		return
 	}
 
@@ -215,8 +221,14 @@ func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
 		}
 		var body map[string]interface{}
 		yaml.Unmarshal(yamlFile, &body)
-		body["TYPE"] = domainTypeInt
-		resp, err := common.CURLPerform("PATCH", url, body, "")
+
+		upperBody := make(map[string]interface{})
+		for k, v := range body {
+			upperK := strings.ToUpper(k)
+			upperBody[upperK] = v
+		}
+		upperBody["TYPE"] = domainTypeInt
+		resp, err := common.CURLPerform("PATCH", url, upperBody, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -227,7 +239,7 @@ func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
 
 func deleteDomain(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name. Example: %s", cmd.Example)
+		fmt.Fprintf(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
 		return
 	}
 
@@ -255,7 +267,7 @@ func deleteDomain(cmd *cobra.Command, args []string) {
 
 func exampleDomainConfig(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify domain_type. Use: %s", cmd.Use)
+		fmt.Fprintf(os.Stderr, "must specify domain_type.\nExample: %s\n%s\n", cmd.Example, cmd.Long)
 		return
 	}
 
@@ -271,7 +283,7 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 	case common.AGENT_SYNC_EN:
 		fmt.Printf(string(example.YamlDomainGenesis))
 	default:
-		err := fmt.Sprintf("domain_type %s not supported", args[0])
+		err := fmt.Sprintf("domain_type %s not supported\n", args[0])
 		fmt.Fprintln(os.Stderr, err)
 	}
 }

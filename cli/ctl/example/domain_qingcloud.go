@@ -18,10 +18,10 @@ package example
 
 var YamlDomainQingCloud = []byte(`
 # 名称
-NAME: qingcloud
+name: qingcloud
 # 云平台类型
-TYPE: qingcloud
-CONFIG:
+type: qingcloud
+config:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
   # 资源同步控制器
