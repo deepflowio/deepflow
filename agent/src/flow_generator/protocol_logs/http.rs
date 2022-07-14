@@ -97,6 +97,8 @@ pub struct HttpLog {
 
     info: HttpInfo,
 
+    is_https: bool,
+
     l7_log_dynamic_config: L7LogDynamicConfig,
 }
 
@@ -125,10 +127,31 @@ impl HttpLog {
     const TRACE_ID: u8 = 0;
     const SPAN_ID: u8 = 1;
 
-    pub fn new(config: &LogParserAccess) -> Self {
+    pub fn new(config: &LogParserAccess, is_https: bool) -> Self {
         Self {
             l7_log_dynamic_config: config.load().l7_log_dynamic.clone(),
+            is_https,
             ..Default::default()
+        }
+    }
+
+    fn get_l7_protocol(&self) -> L7Protocol {
+        match self.proto {
+            L7Protocol::Http1 => {
+                if self.is_https {
+                    L7Protocol::Http1TLS
+                } else {
+                    L7Protocol::Http1
+                }
+            }
+            L7Protocol::Http2 => {
+                if self.is_https {
+                    L7Protocol::Http2TLS
+                } else {
+                    L7Protocol::Http1
+                }
+            }
+            _ => L7Protocol::Unknown,
         }
     }
 
@@ -562,7 +585,7 @@ impl L7LogParse for HttpLog {
             .or(self.parse_http_v2(payload, direction))?;
 
         Ok(AppProtoHead {
-            proto: self.proto,
+            proto: self.get_l7_protocol(),
             msg_type: self.msg_type,
             status: self.status,
             code: self.status_code,
@@ -574,6 +597,9 @@ impl L7LogParse for HttpLog {
     fn info(&self) -> AppProtoLogsInfo {
         if self.info.version == "2" {
             return AppProtoLogsInfo::HttpV2(self.info.clone());
+        }
+        if self.is_https {
+            return AppProtoLogsInfo::HttpV1TLS(self.info.clone());
         }
         AppProtoLogsInfo::HttpV1(self.info.clone())
     }

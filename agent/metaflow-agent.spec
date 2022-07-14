@@ -27,16 +27,11 @@ mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
 cp %pwd/metaflow-agent.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/config/metaflow-agent.yaml $RPM_BUILD_ROOT/etc/
-mkdir -p $RPM_BUILD_ROOT/usr/share/metaflow-agent/
-cp -r %pwd/output/src/ebpf/data/* $RPM_BUILD_ROOT/usr/share/metaflow-agent/
 
 %files
 /usr/sbin/metaflow-agent
 /lib/systemd/system/metaflow-agent.service
 %config(noreplace) /etc/metaflow-agent.yaml
-/usr/share/metaflow-agent/linux-5.2/socket_trace.elf
-/usr/share/metaflow-agent/linux-common/socket_trace.elf
-/usr/share/metaflow-agent/linux-core/socket_trace.elf
 
 %preun
 # sles: suse linux

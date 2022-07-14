@@ -12,9 +12,9 @@ STATIC_OBJDIR := $(OBJDIR)/staticobjs
 
 define compile_socket_trace_elf
 	@echo "  COMPILE ELF kernel version $(1)"
-	@mkdir -p data/linux-$(strip $1)
 	@cd kernel && make clean --no-print-directory && make socket_trace.elf $(2) --no-print-directory && cd ../
-	@cp kernel/socket_trace.elf data/linux-$(strip $1)/
+	@echo "  Generate file user/socket_trace_bpf_$(strip $1).c"
+	@./tools/ebpftobuffer kernel/socket_trace.elf user/socket_trace_bpf_$(strip $1).c socket_trace_$(strip $1)_ebpf_data
 endef
 
 CURRDIR := $(PWD)
@@ -70,8 +70,10 @@ $(ELFFILES):
                 echo "  check llvm-clang fail. expect Clang/LLVM 10+" && exit 1; \
         fi
 	@rm -rf data
+	$(call msg,Tools,,tools/ebpftobuffer)
+	@gcc tools/ebpftobuffer.c -o tools/ebpftobuffer
 	$(call compile_socket_trace_elf, common)
-	$(call compile_socket_trace_elf, 5.2, LINUX_VER_5_2=1)
+	$(call compile_socket_trace_elf, 5_2, LINUX_VER_5_2=1)
 	$(call compile_socket_trace_elf, core, CORE=1)
 	@touch $(ELFFILES)
 
@@ -92,10 +94,6 @@ $(LIBBPF_DIR):
 	@cd ../../../ && git submodule update --init --recursive && cd $(CURRDIR)
 	
 build: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
-install:
-	rm -rf /usr/share/metaflow-agent
-	mkdir -p /usr/share/metaflow-agent
-	cp data/* /usr/share/metaflow-agent/ -raf
 
 tools: $(LIBBPF_DIR) $(LIBTRACE)
 	$(call msg,TOOLS,metaflow-ebpfctl)
@@ -118,5 +116,5 @@ clean:
 test: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 	$(Q)$(MAKE) -C test --no-print-directory
 
-.PHONY: all build clean install tools test
+.PHONY: all build clean tools test
 
