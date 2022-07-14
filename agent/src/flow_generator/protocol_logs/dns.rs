@@ -26,7 +26,10 @@ use crate::{
         meta_packet::MetaPacket,
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
-    flow_generator::error::{Error, Result},
+    flow_generator::{
+        error::{Error, Result},
+        perf::DNS_PORT,
+    },
     utils::{bytes::read_u16_be, net::parse_ip_slice},
 };
 
@@ -349,10 +352,18 @@ impl L7LogParse for DnsLog {
 
 // 通过请求来识别DNS
 pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
+    if packet.lookup_key.dst_port != DNS_PORT {
+        if packet.lookup_key.src_port != DNS_PORT {
+            *bitmap &= !(1 << u8::from(L7Protocol::Dns));
+        }
+        return false;
+    }
+
     let payload = packet.get_l4_payload();
     if payload.is_none() {
         return false;
     }
+
     let payload = payload.unwrap();
     let mut dns = DnsLog::default();
     let ret = dns.parse(payload, packet.lookup_key.proto, packet.direction);

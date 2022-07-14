@@ -58,6 +58,8 @@ use {
 pub use l7_rrt::L7RrtCache;
 pub use stats::FlowPerfCounter;
 
+pub use dns::DNS_PORT;
+
 const ART_MAX: Duration = Duration::from_secs(30);
 
 #[enum_dispatch(L4FlowPerfTable)]

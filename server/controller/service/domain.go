@@ -89,7 +89,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 			syncedAt = domain.SyncedAt.Format(common.GO_BIRTHDAY)
 		}
 		domainResp := model.Domain{
-			ID:           domain.ID,
+			ID:           domain.ClusterID,
 			Name:         domain.Name,
 			DisplayName:  domain.DisplayName,
 			ClusterID:    domain.ClusterID,
@@ -173,6 +173,12 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 	domain.IconID = domainCreate.IconID
 
 	// set region and controller ip if not specified
+	if domainCreate.Config == nil {
+		domainCreate.Config = map[string]interface{}{
+			"region_uuid":   "",
+			"controller_ip": "",
+		}
+	}
 	var regionLcuuid string
 	confRegion, ok := domainCreate.Config["region_uuid"]
 	if !ok || confRegion.(string) == "" {
