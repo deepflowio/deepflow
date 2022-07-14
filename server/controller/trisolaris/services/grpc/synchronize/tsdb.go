@@ -128,7 +128,7 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		}
 	}
 	if versionPlatformData != in.GetVersionPlatformData() {
-		log.Infof("ctrl_ip is %s, (platform data version %d -> %d), NAME:%s",
+		log.Infof("push ctrl_ip is %s, (platform data version %d -> %d), NAME:%s",
 			tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
 			processName)
 	}

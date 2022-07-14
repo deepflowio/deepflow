@@ -38,6 +38,7 @@ func Execute() {
 	root.PersistentFlags().Uint32P("port", "p", 30417, "metaflow-server service port")
 
 	root.AddCommand(RegisterAgentCommand())
+	root.AddCommand(RegisterAgentUpgradeCommand())
 	root.AddCommand(RegisterAgentGroupCommand())
 	root.AddCommand(RegisterAgentGroupConfigCommand())
 	root.AddCommand(RegisterDomainCommand())

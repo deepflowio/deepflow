@@ -235,7 +235,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	}
 
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
-	if versionPlatformData != in.GetVersionPlatformData() {
+	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 {
 		log.Infof("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
 			"(platform data version  %d -> %d), NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData,
@@ -248,9 +248,9 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	}
 
-	// trident上报的revision与yaml文件中trident_revision一致后，则取消预期的`config_revision`
-	if vtapCache.GetUpgradeRevision() == in.GetRevision() {
-		vtapCache.UpdateUpgradeRevision("")
+	// trident上报的revision与升级trident_revision一致后，则取消预期的`expected_revision`
+	if vtapCache.GetExpectedRevision() == in.GetRevision() {
+		vtapCache.UpdateUpgradeInfo("", "")
 	}
 	if uint32(vtapCache.GetBootTime()) != in.GetBootTime() {
 		vtapCache.UpdateBootTime(in.GetBootTime())
@@ -305,7 +305,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	}
 	localSegments := vtapCache.GetVTapLocalSegments()
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
-	upgradeRevision := vtapCache.GetUpgradeRevision()
+	upgradeRevision := vtapCache.GetExpectedRevision()
 	skipInterface := gVTapInfo.GetSkipInterface(vtapCache)
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
@@ -410,18 +410,18 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	if vtapCache == nil {
 		return e.noVTapResponse(in), fmt.Errorf("no find vtap(%s %s) cache", ctrlIP, ctrlMac)
 	}
-
-	versionPlatformData := vtapCache.GetPushVersionPlatformData()
-	if versionPlatformData != in.GetVersionPlatformData() {
+	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
+	pushVersionPlatformData := vtapCache.GetPushVersionPlatformData()
+	if versionPlatformData != pushVersionPlatformData {
 		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
 			"(platform data version  %d -> %d), NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData,
-			in.GetVersionPlatformData(), in.GetProcessName(), in.GetRevision(),
+			pushVersionPlatformData, in.GetProcessName(), in.GetRevision(),
 			in.GetBootTime())
 	} else {
 		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
 			"(platform data version  %d -> %d), NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData, in.GetVersionPlatformData(),
+			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData, pushVersionPlatformData,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	}
 

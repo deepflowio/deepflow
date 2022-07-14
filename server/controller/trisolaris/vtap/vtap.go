@@ -811,7 +811,7 @@ func (v *VTapInfo) updateCacheToDB() {
 	}
 	config := v.config
 	if config.NodeIP == "" {
-		log.Error("config no NodeIP address")
+		log.Error("config NodeIP is null")
 		return
 	}
 	hostIP := config.NodeIP
@@ -879,6 +879,8 @@ func (v *VTapInfo) updateCacheToDB() {
 			dbVTap.Exceptions = int64(controllerException | tridentExceptions)
 			cacheVTap.UpdateCurControllerIP(hostIP)
 			dbVTap.CurControllerIP = cacheVTap.GetCurControllerIP()
+			dbVTap.ExpectedRevision = cacheVTap.GetExpectedRevision()
+			dbVTap.UpgradePackage = cacheVTap.GetUpgradePackage()
 			filterFlag = true
 		}
 
