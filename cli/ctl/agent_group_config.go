@@ -171,7 +171,7 @@ func createAgentGroupConfig(cmd *cobra.Command, args []string, createFilename st
 
 func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name. Use: %s", cmd.Use)
+		fmt.Fprintf(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
 		return
 	}
 
@@ -185,7 +185,7 @@ func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename st
 	}
 
 	if len(response.Get("DATA").MustArray()) == 0 {
-		fmt.Fprintln(os.Stderr, "agent-group (%s) not exist")
+		fmt.Fprintln(os.Stderr, "agent-group (%s) not exist\n")
 	}
 	group := response.Get("DATA").GetIndex(0)
 	lcuuid := group.Get("LCUUID").MustString()
@@ -205,12 +205,15 @@ func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename st
 
 func deleteAgentGroupConfig(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "must specify agent-group ID. Use: %s", cmd.Use)
+		fmt.Fprintln(os.Stderr, "must specify agent-group ID.\nExample: %s", cmd.Example)
 		return
 	}
 
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, args[0])
+	url := fmt.Sprintf(
+		"http://%s:%d/v1/vtap-group-configuration/filter/?vtap_group_id=%s",
+		server.IP, server.Port, args[0],
+	)
 	_, err := common.CURLPerform("DELETE", url, nil, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

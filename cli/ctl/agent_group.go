@@ -104,7 +104,7 @@ func listAgentGroup(cmd *cobra.Command, args []string, output string) {
 
 func createAgentGroup(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "must specify name. Use: %s", cmd.Use)
+		fmt.Fprintln(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
 		return
 	}
 
@@ -122,7 +122,7 @@ func createAgentGroup(cmd *cobra.Command, args []string) {
 
 func deleteAgentGroup(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "must specify name. Use: %s", cmd.Use)
+		fmt.Fprintln(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
 		return
 	}
 

@@ -47,10 +47,12 @@ import (
 var log = logging.MustGetLogger("ext_metrics.decoder")
 
 const (
-	BUFFER_SIZE         = 1024
-	TELEGRAF_POD        = "pod_name"
-	PROMETHEUS_POD      = "pod"
-	PROMETHEUS_INSTANCE = "instance"
+	BUFFER_SIZE             = 1024
+	TELEGRAF_POD            = "pod_name"
+	PROMETHEUS_POD          = "pod"
+	PROMETHEUS_INSTANCE     = "instance"
+	TABLE_PREFIX_TELEGRAF   = "telegraf_"
+	TABLE_PREFIX_PROMETHEUS = "prometheus_"
 )
 
 type Counter struct {
@@ -212,14 +214,14 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 }
 
 // return the index of the character in 'str', which is the 'n' th same as 'c'
-func findNthChar(str string, c byte, n int) int {
-	if n <= 0 {
+func findNthChar(str string, c byte, nth int) int {
+	if nth <= 0 {
 		return -1
 	}
 	for i := 0; i < len(str); i++ {
 		if str[i] == c {
-			n--
-			if n == 0 {
+			nth--
+			if nth == 0 {
 				return i
 			}
 		}
@@ -228,7 +230,10 @@ func findNthChar(str string, c byte, n int) int {
 }
 
 func (d *Decoder) prometheusSplitMetricNameLabel(label string) (string, string) {
-	index := findNthChar(label, '_', d.config.PrometheusSeparatePos)
+	if !strings.HasPrefix(label, TABLE_PREFIX_PROMETHEUS[:len(TABLE_PREFIX_PROMETHEUS)-1]) {
+		label = TABLE_PREFIX_PROMETHEUS + label
+	}
+	index := findNthChar(label, '_', d.config.PrometheusSeparatePos+1)
 	if index > 0 && index < len(label)-1 {
 		return label[:index], label[index+1:]
 	}
@@ -369,7 +374,11 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(point.Time().Unix())
 	tableName := string(point.Name())
-	m.TableName = tableName
+	if strings.HasPrefix(tableName, TABLE_PREFIX_TELEGRAF[:len(TABLE_PREFIX_TELEGRAF)-1]) {
+		m.TableName = tableName
+	} else {
+		m.TableName = TABLE_PREFIX_TELEGRAF + tableName
+	}
 	podName := ""
 	for _, tag := range point.Tags() {
 		tagName := string(tag.Key)
