@@ -89,7 +89,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 			syncedAt = domain.SyncedAt.Format(common.GO_BIRTHDAY)
 		}
 		domainResp := model.Domain{
-			ID:           domain.ID,
+			ID:           domain.ClusterID,
 			Name:         domain.Name,
 			DisplayName:  domain.DisplayName,
 			ClusterID:    domain.ClusterID,

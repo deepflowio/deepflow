@@ -49,7 +49,7 @@ func (l *ChLbListener) generateNewData() (map[IDKey]mysql.ChLBListener, bool) {
 		if lbListener.DeletedAt.Valid {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
 				ID:   lbListener.ID,
-				Name: lbListener.Name + "(deleted)",
+				Name: lbListener.Name + " (deleted)",
 			}
 		} else {
 			keyToItem[IDKey{ID: lbListener.ID}] = mysql.ChLBListener{
