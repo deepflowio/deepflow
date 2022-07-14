@@ -119,7 +119,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 
 func deleteAgent(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name. Example: %s", cmd.Example)
+		fmt.Fprintf(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
 		return
 	}
 

@@ -18,10 +18,10 @@ package example
 
 var YamlDomainKubernetes = []byte(`
 # 名称
-NAME: kubernetes
+name: kubernetes
 # 云平台类型
-TYPE: kubernetes
-CONFIG:
+type: kubernetes
+config:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
   # 资源同步控制器
