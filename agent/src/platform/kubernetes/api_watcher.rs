@@ -495,6 +495,7 @@ impl ApiWatcher {
             }
         };
 
+        info!("zhicong send one msg {:?}", msg);
         match context
             .runtime
             .block_on(Self::kubernetes_api_sync(session, msg.clone()))
@@ -540,6 +541,7 @@ impl ApiWatcher {
 
         msg.entries = total_entries;
 
+        info!("zhicong send one msg quanliang {:?}", msg);
         if let Err(e) = context
             .runtime
             .block_on(Self::kubernetes_api_sync(session, msg))
@@ -590,13 +592,16 @@ impl ApiWatcher {
     ) -> Vec<KubernetesApiInfo> {
         entries
             .into_iter()
-            .map(|entry| KubernetesApiInfo {
-                r#type: Some(kind.clone()),
-                compressed_info: {
-                    encoder.write_all(entry.as_bytes()).unwrap();
-                    encoder.reset(vec![]).ok()
-                },
-                info: None,
+            .map(|entry| {
+                info!("zhicong entry {:?}", entry);
+                KubernetesApiInfo {
+                    r#type: Some(kind.clone()),
+                    compressed_info: {
+                        encoder.write_all(entry.as_bytes()).unwrap();
+                        encoder.reset(vec![]).ok()
+                    },
+                    info: None,
+                }
             })
             .collect::<Vec<_>>()
     }

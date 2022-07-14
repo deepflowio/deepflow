@@ -180,6 +180,11 @@ where
         let mut last_update = SystemTime::now();
         let mut last_refresh = SystemTime::now();
 
+        info!(
+            "zhicong last_update {:?} last_refresh {:?} with {} watcher",
+            last_update, last_refresh, kind
+        );
+
         let mut event_counter = EventCounter::default();
 
         loop {
@@ -212,6 +217,10 @@ where
                     Self::get_list_entry(&entries, &version, kind, &api, &err_msg).await;
                 }
             }
+            info!(
+                "zhicong last_update {:?} last_refresh {:?} with {} watcher",
+                last_update, last_refresh, kind
+            );
         }
     }
 
