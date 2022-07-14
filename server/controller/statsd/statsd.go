@@ -30,10 +30,18 @@ import (
 var MetaStatsd *StatsdMonitor
 
 type StatsdMonitor struct {
+	enable bool
 	client statsd.Statter
 }
 
 func NewStatsdMonitor(cfg config.StatsdConfig) error {
+	if !cfg.Enable {
+		MetaStatsd = &StatsdMonitor{
+			enable: cfg.Enable,
+		}
+		return nil
+	}
+
 	statsdServer := net.JoinHostPort(cfg.Host, cfg.Port)
 	config := &statsd.ClientConfig{
 		Address:       statsdServer,
@@ -47,12 +55,17 @@ func NewStatsdMonitor(cfg config.StatsdConfig) error {
 		return err
 	}
 	MetaStatsd = &StatsdMonitor{
+		enable: cfg.Enable,
 		client: client,
 	}
 	return nil
 }
 
 func (s *StatsdMonitor) RegisterStatsdTable(statter Statsdtable) {
+	if !s.enable {
+		return
+	}
+
 	gTags := []statsd.Tag{}
 	keys := []string{}
 	for key := range statter.GetStatter().GlobalTags {
