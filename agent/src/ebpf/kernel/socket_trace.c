@@ -264,13 +264,14 @@ static __inline bool get_socket_info(struct __socket_data *v,
 				     struct conn_info_t* conn_info)
 {
 	/*
-	 * 下面两行在linux5.2版本会出现指令超限问题
+	 * 下面if判断在linux5.2版本会出现指令超限问题
 	 * 而去掉下面两个行linux5.13，Linux5.3版本（也可能有其他版本）的内核则会出现指令超限问题。
 	 * 目前的解决方案: 保留判断, 为linux5.2内核单独编译。
 	 */
-	
+#ifndef LINUX_VER_5_2 	
 	if (v == NULL || sk == NULL)
 		return false;
+#endif
 
 #ifdef BPF_USE_CORE
 	struct sock *__sk = sk;
