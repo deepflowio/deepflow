@@ -236,7 +236,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			}
 			ret, err := client.GenesisSharingK8S(context.Background(), &req)
 			if err != nil {
-				log.Error("request grpc api faild:" + err.Error())
+				log.Warning(err.Error())
 				continue
 			} else {
 				retFlag = true
