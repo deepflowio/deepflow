@@ -18,10 +18,10 @@ package example
 
 var YamlDomainAliYun = []byte(`
 # 名称
-NAME: aliyun
+name: aliyun
 # 云平台类型
-TYPE: aliyun
-CONFIG:
+type: aliyun
+config:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
   # 资源同步控制器
