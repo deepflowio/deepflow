@@ -45,7 +45,6 @@
 #define BPF_PERF_READER_PAGE_CNT  64
 
 #define NAME_LEN 64
-#define TRACER_PATH_LEN 1024
 
 #define TYPE_KPROBE     0
 #define TYPE_UPROBE     1
@@ -75,8 +74,6 @@ enum probe_type {
 
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_PORT 54583
-
-#define ELF_PATH_PREFIX  "/usr/share/metaflow-agent/"
 
 static inline unsigned int min_log2(unsigned int x)
 {
@@ -230,7 +227,10 @@ struct bpf_tracer {
 	 * tracer info
 	 */
 	char name[NAME_LEN];	// tracer name
-	char bpf_file[TRACER_PATH_LEN];	// tracer bpf binary file path.
+	char bpf_load_name[NAME_LEN];	// Tracer bpf load buffer name.
+					// Used to identify which eBPF buffer is loaded by the kernel
+	void *buffer_ptr;		// eBPF bytecodes buffer pointer
+	int buffer_sz;			// eBPF buffer size
 	struct bpf_object *pobj;	// libbpf define bpf object
 
 	/*
@@ -319,7 +319,7 @@ struct rx_queue_info {
 
 struct bpf_tracer_param {
 	char name[NAME_LEN];
-	char bpf_file[TRACER_PATH_LEN];
+	char bpf_load_name[NAME_LEN];
 	int dispatch_workers_nr;
 	unsigned int perf_pg_cnt;
 	struct rx_queue_info rx_queues[MAX_CPU_NR];
@@ -405,7 +405,9 @@ int register_extra_waiting_op(const char *name,
 			      extra_waiting_fun_t f, int type);
 void bpf_tracer_finish(void);
 struct bpf_tracer *create_bpf_tracer(const char *name,
-				     char *bpf_file,
+				     char *load_name,
+				     void *bpf_bin_buffer,
+				     int buffer_sz,
 				     struct tracer_probes_conf *tps,
 				     int workers_nr,
 				     void *handle, unsigned int perf_pages_cnt);

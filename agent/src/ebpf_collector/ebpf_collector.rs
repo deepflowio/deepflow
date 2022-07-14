@@ -894,10 +894,7 @@ impl EbpfCollector {
                 std::thread::sleep(Duration::from_secs(1));
                 retry_count = retry_count + 1;
                 if retry_count >= RETRY_MAX {
-                    error!(
-                        "The tracer_start() error. Kernel offset adapt failed. \
-                         Check for 'bpf.elf' has been updated at \"/usr/share/metaflow-agent\".\n"
-                    );
+                    error!("The tracer_start() error. Kernel offset adapt failed.\n");
                 }
             }
         }

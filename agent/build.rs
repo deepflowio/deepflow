@@ -58,7 +58,7 @@ fn set_build_info() -> Result<(), Box<dyn Error>> {
 fn set_build_libebpf() -> Result<(), Box<dyn Error>> {
     Command::new("sh")
         .arg("-c")
-        .arg("cd src/ebpf && make clean && make -j --no-print-directory && make tools -j --no-print-directory")
+        .arg("cd src/ebpf && make clean && make --no-print-directory && make tools --no-print-directory")
         .output()
         .expect("compile libebpf.a error!");
     let library_name = "ebpf";
