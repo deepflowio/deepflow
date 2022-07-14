@@ -134,7 +134,7 @@ func (d *ChDevice) generateHostData(keyToItem map[DeviceKey]mysql.ChDevice) bool
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_HOST,
 				DeviceID:   host.ID,
-				Name:       host.Name + "(已删除)",
+				Name:       host.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_HOST, SubType: host.HType}],
 			}
 		} else {
@@ -168,7 +168,7 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_VM,
 				DeviceID:   vm.ID,
-				Name:       vm.Name + "(已删除)",
+				Name:       vm.Name + " (deleted)",
 				UID:        vm.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VM, SubType: vm.HType}],
 			}
@@ -226,7 +226,7 @@ func (d *ChDevice) generateDHCPPortData(keyToItem map[DeviceKey]mysql.ChDevice) 
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_DHCP_PORT,
 				DeviceID:   dhcpPort.ID,
-				Name:       dhcpPort.Name + "(已删除)",
+				Name:       dhcpPort.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_DHCP_PORT}],
 			}
 		} else {
@@ -259,7 +259,7 @@ func (d *ChDevice) generateNATGatewayData(keyToItem map[DeviceKey]mysql.ChDevice
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 				DeviceID:   natGateway.ID,
-				Name:       natGateway.Name + "(已删除)",
+				Name:       natGateway.Name + " (deleted)",
 				UID:        natGateway.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_NAT_GATEWAY}],
 			}
@@ -294,7 +294,7 @@ func (d *ChDevice) generateLBData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_LB,
 				DeviceID:   lb.ID,
-				Name:       lb.Name + "(已删除)",
+				Name:       lb.Name + " (deleted)",
 				UID:        lb.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_LB}],
 			}
@@ -329,7 +329,7 @@ func (d *ChDevice) generateRDSInstanceData(keyToItem map[DeviceKey]mysql.ChDevic
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 				DeviceID:   rdsInstance.ID,
-				Name:       rdsInstance.Name + "(已删除)",
+				Name:       rdsInstance.Name + " (deleted)",
 				UID:        rdsInstance.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_RDS}],
 			}
@@ -364,7 +364,7 @@ func (d *ChDevice) generateRedisInstanceData(keyToItem map[DeviceKey]mysql.ChDev
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_REDIS_INSTANCE,
 				DeviceID:   redisInstance.ID,
-				Name:       redisInstance.Name + "(已删除)",
+				Name:       redisInstance.Name + " (deleted)",
 				UID:        redisInstance.UID,
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_REDIS}],
 			}
@@ -399,7 +399,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 			keyToItem[podServiceKey] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_POD_SERVICE,
 				DeviceID:   podService.ID,
-				Name:       podService.Name + "(已删除)",
+				Name:       podService.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
 			}
 
@@ -411,7 +411,7 @@ func (d *ChDevice) generatePodServiceData(keyToItem map[DeviceKey]mysql.ChDevice
 			keyToItem[serviceKey] = mysql.ChDevice{
 				DeviceType: CH_DEVICE_TYPE_SERVICE,
 				DeviceID:   podService.ID,
-				Name:       podService.Name + "(已删除)",
+				Name:       podService.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_SERVICE}],
 			}
 		} else {
@@ -460,7 +460,7 @@ func (d *ChDevice) generatePodData(keyToItem map[DeviceKey]mysql.ChDevice) bool 
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_POD,
 				DeviceID:   pod.ID,
-				Name:       pod.Name + "(已删除)",
+				Name:       pod.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD}],
 			}
 		} else {
@@ -492,7 +492,7 @@ func (d *ChDevice) generatePodGroupData(keyToItem map[DeviceKey]mysql.ChDevice) 
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: CH_DEVICE_TYPE_POD_GROUP,
 				DeviceID:   podGroup.ID,
-				Name:       podGroup.Name + "(已删除)",
+				Name:       podGroup.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_GROUP}],
 			}
 		} else {
@@ -524,7 +524,7 @@ func (d *ChDevice) generatePodNodeData(keyToItem map[DeviceKey]mysql.ChDevice) b
 			keyToItem[key] = mysql.ChDevice{
 				DeviceType: common.VIF_DEVICE_TYPE_POD_NODE,
 				DeviceID:   podNode.ID,
-				Name:       podNode.Name + "(已删除)",
+				Name:       podNode.Name + " (deleted)",
 				IconID:     d.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_POD_NODE}],
 			}
 		} else {

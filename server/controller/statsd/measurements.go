@@ -121,3 +121,18 @@ func GetResCount[T model.Resource | k8sgathermodel.KubernetesGatherResource](res
 	}
 	return resCount
 }
+
+type GenesisStatsd struct {
+	K8SInfoDelay map[string][]int
+}
+
+func GetGenesisStatsd(genesis GenesisStatsd) []StatsdElement {
+	k8sInfoDelay := StatsdElement{
+		MetricType:             MetricTiming,
+		MetricName:             common.GENESIS_METRIC_NAME_K8SINFO_DELAY,
+		UseGlobalTag:           false,
+		PrivateTagKey:          "cluster-id",
+		PrivateTagValueToCount: genesis.K8SInfoDelay,
+	}
+	return []StatsdElement{k8sInfoDelay}
+}

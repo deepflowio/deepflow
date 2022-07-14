@@ -1473,15 +1473,10 @@ impl ConfigHandler {
         // lose monitoring after a period of time. So first detect whether the issued port is listening,
         // If not listening, restart the collector and listen again. After finding the root cause, remove the following code
         let port = candidate_config.metric_server.port;
-        if !check_listen_port_alive(port) {
-            fn metric_server_restart_callback(
-                handler: &ConfigHandler,
-                components: &mut Components,
-            ) {
-                if handler.candidate_config.metric_server.enabled {
-                    components.external_metrics_server.stop();
-                    components.external_metrics_server.start();
-                }
+        if candidate_config.metric_server.enabled && !check_listen_port_alive(port) {
+            fn metric_server_restart_callback(_: &ConfigHandler, components: &mut Components) {
+                components.external_metrics_server.stop();
+                components.external_metrics_server.start();
             }
             callbacks.push(metric_server_restart_callback);
             warn!(

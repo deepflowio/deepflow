@@ -93,7 +93,7 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 		if region.DeletedAt.Valid {
 			keyToItem[IDKey{ID: region.ID}] = mysql.ChRegion{
 				ID:     region.ID,
-				Name:   region.Name + "(已删除)",
+				Name:   region.Name + " (deleted)",
 				IconID: iconID,
 			}
 		} else {

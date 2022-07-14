@@ -247,6 +247,7 @@ struct FlowItem {
     remote_epc: i32,
 
     // 应用识别
+    protocol_bitmap_image: u128,
     protocol_bitmap: u128,
     l4_protocol: IpProtocol,
     l7_protocol: L7Protocol,
@@ -270,8 +271,9 @@ impl FlowItem {
     ) -> Option<Box<dyn L7LogParse>> {
         match protocol {
             L7Protocol::Dns => Some(Box::from(DnsLog::default())),
-            L7Protocol::Http1 => Some(Box::from(HttpLog::new(log_parser_config))),
-            L7Protocol::Http2 => Some(Box::from(HttpLog::new(log_parser_config))),
+            L7Protocol::Http1 => Some(Box::from(HttpLog::new(log_parser_config, false))),
+            L7Protocol::Http2 => Some(Box::from(HttpLog::new(log_parser_config, false))),
+            L7Protocol::Http1TLS => Some(Box::from(HttpLog::new(log_parser_config, true))),
             L7Protocol::Mysql => Some(Box::from(MysqlLog::default())),
             L7Protocol::Redis => Some(Box::from(RedisLog::default())),
             L7Protocol::Kafka => Some(Box::from(KafkaLog::default())),
@@ -286,10 +288,29 @@ impl FlowItem {
         l4_protocol: IpProtocol,
         l7_protocol: Option<(L7Protocol, bool)>,
         remote_epc: i32,
+        l7_protocol_from_ebpf: L7Protocol,
         log_parser_config: &LogParserAccess,
     ) -> Self {
         let is_from_app = l7_protocol.is_some();
         let (l7_protocol, is_local_service) = l7_protocol.unwrap_or((L7Protocol::Unknown, false));
+        let mut protocol_bitmap = if l4_protocol == IpProtocol::Tcp {
+            1 << u8::from(L7Protocol::Http1)
+                | 1 << u8::from(L7Protocol::Http2)
+                | 1 << u8::from(L7Protocol::Dns)
+                | 1 << u8::from(L7Protocol::Mysql)
+                | 1 << u8::from(L7Protocol::Redis)
+                | 1 << u8::from(L7Protocol::Dubbo)
+                | 1 << u8::from(L7Protocol::Kafka)
+                | 1 << u8::from(L7Protocol::Mqtt)
+        } else {
+            1 << u8::from(L7Protocol::Dns)
+        };
+
+        if l7_protocol_from_ebpf == L7Protocol::Http1TLS {
+            protocol_bitmap |= 1 << u8::from(L7Protocol::Http1TLS);
+            protocol_bitmap &= !(1 << u8::from(L7Protocol::Http1));
+        }
+
         FlowItem {
             last_policy: time_in_sec,
             last_packet: time_in_sec,
@@ -300,18 +321,8 @@ impl FlowItem {
             is_local_service,
             is_from_app,
             is_skip: false,
-            protocol_bitmap: if l4_protocol == IpProtocol::Tcp {
-                1 << u8::from(L7Protocol::Http1)
-                    | 1 << u8::from(L7Protocol::Http2)
-                    | 1 << u8::from(L7Protocol::Dns)
-                    | 1 << u8::from(L7Protocol::Mysql)
-                    | 1 << u8::from(L7Protocol::Redis)
-                    | 1 << u8::from(L7Protocol::Dubbo)
-                    | 1 << u8::from(L7Protocol::Kafka)
-                    | 1 << u8::from(L7Protocol::Mqtt)
-            } else {
-                1 << u8::from(L7Protocol::Dns)
-            },
+            protocol_bitmap,
+            protocol_bitmap_image: protocol_bitmap,
             parser: Self::get_parser(l7_protocol, log_parser_config),
         }
     }
@@ -326,6 +337,7 @@ impl FlowItem {
             L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Http2 => http2_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Http1TLS => http1_check_protocol(&mut self.protocol_bitmap, packet),
             _ => false,
         }
     }
@@ -342,6 +354,7 @@ impl FlowItem {
         }
 
         let protocols = [
+            L7Protocol::Http1TLS,
             L7Protocol::Http1,
             L7Protocol::Http2,
             L7Protocol::Dubbo,
@@ -426,17 +439,7 @@ impl FlowItem {
         self.is_local_service = false;
         self.is_from_app = false;
         self.l4_protocol = l4_protocol;
-        self.protocol_bitmap = if l4_protocol == IpProtocol::Tcp {
-            1 << u8::from(L7Protocol::Http1)
-                | 1 << u8::from(L7Protocol::Http2)
-                | 1 << u8::from(L7Protocol::Dns)
-                | 1 << u8::from(L7Protocol::Mysql)
-                | 1 << u8::from(L7Protocol::Redis)
-                | 1 << u8::from(L7Protocol::Dubbo)
-                | 1 << u8::from(L7Protocol::Kafka)
-        } else {
-            1 << u8::from(L7Protocol::Dns)
-        };
+        self.protocol_bitmap = self.protocol_bitmap_image;
         self.parser = None;
     }
 
@@ -661,6 +664,16 @@ impl OwnedCountable for SyncEbpfCounter {
                 CounterType::Counted,
                 CounterValue::Unsigned(ebpf_counter.tracer_state as u64),
             ),
+            (
+                "boot_time_update_diff",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.boot_time_update_diff as u64),
+            ),
+            (
+                "probes_count",
+                CounterType::Counted,
+                CounterValue::Unsigned(ebpf_counter.probes_count as u64),
+            ),
         ]
     }
     // EbpfCollector不会重复创建，这里都是false
@@ -760,6 +773,7 @@ impl EbpfRunner {
                             remote_epc,
                         ),
                         remote_epc,
+                        packet.l7_protocol_from_ebpf,
                         &self.log_parser_config,
                     ),
                 );
