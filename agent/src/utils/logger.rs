@@ -254,3 +254,23 @@ impl stats::OwnedCountable for LogLevelCounter {
         self.0.strong_count() == 0
     }
 }
+
+pub struct LogWriterAdapter(Vec<Box<dyn LogWriter>>);
+
+impl LogWriterAdapter {
+    pub fn new(writers: Vec<Box<dyn LogWriter>>) -> Self {
+        Self(writers)
+    }
+}
+
+impl LogWriter for LogWriterAdapter {
+    fn write(&self, now: &mut DeferredNow, record: &Record<'_>) -> Result<()> {
+        self.0
+            .iter()
+            .fold(Ok(()), |r, w| r.or(w.write(now, record)))
+    }
+
+    fn flush(&self) -> Result<()> {
+        self.0.iter().fold(Ok(()), |r, w| r.or(w.flush()))
+    }
+}

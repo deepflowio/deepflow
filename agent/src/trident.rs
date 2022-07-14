@@ -69,7 +69,7 @@ use crate::{
             get_k8s_local_node_ip, kernel_check, running_in_container, trident_process_check,
         },
         guard::Guard,
-        logger::{LogLevelWriter, RemoteLogConfig, RemoteLogWriter},
+        logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
         net::{get_mac_by_ip, get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex},
         queue,
         stats::{self, Countable, RefCountable, StatsOption},
@@ -121,23 +121,17 @@ impl Trident {
             vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
         );
 
-        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
-        stats_collector.start();
-
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
-        stats_collector.register_countable(
-            "log_counter",
-            stats::Countable::Owned(Box::new(log_level_counter)),
-            Default::default(),
-        );
         let mut logger = Logger::try_with_str("info")
             .unwrap()
             .format(colored_opt_format)
             .log_to_file_and_writer(
                 FileSpec::try_from(&config.log_file)?,
-                Box::new(remote_log_writer),
+                Box::new(LogWriterAdapter::new(vec![
+                    Box::new(remote_log_writer),
+                    Box::new(log_level_writer),
+                ])),
             )
-            .log_to_writer(Box::new(log_level_writer))
             .rotate(
                 Criterion::Age(Age::Day),
                 Naming::Timestamps,
@@ -149,6 +143,14 @@ impl Trident {
             logger = logger.duplicate_to_stderr(Duplicate::All);
         }
         let logger_handle = logger.start()?;
+
+        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
+        stats_collector.start();
+        stats_collector.register_countable(
+            "log_counter",
+            stats::Countable::Owned(Box::new(log_level_counter)),
+            Default::default(),
+        );
 
         info!("static_config {:#?}", config);
         let handle = Some(thread::spawn(move || {
