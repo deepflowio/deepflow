@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package stats;
+
+// rust 不支持以下import和option, 先删除，用于ingester时，需要加回
+// import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+// option (gogoproto.unmarshaler_all) = true;
+// option (gogoproto.sizer_all) = true;
+
+option go_package = "pb";
+
+message Stats {
+    uint64 timestamp = 1;
+    string name = 2;
+    repeated string tag_names = 3;
+    repeated string tag_values = 4;
+    repeated string metrics_int_names = 5;
+    repeated int64  metrics_int_values = 6;
+    repeated string metrics_float_names = 7;
+    repeated double metrics_float_values = 8;
+}

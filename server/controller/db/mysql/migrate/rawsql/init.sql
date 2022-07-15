@@ -301,9 +301,6 @@ CREATE TABLE IF NOT EXISTS `user` (
   INDEX email (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE `user`;
-INSERT INTO `user` (`id`, `username`, `password`, `authority`, `description`, `company`, `state`, `user_type`, `phone_num`, `resource_list`, `cloud_max`, `vm_max`, `vdc_max`, `frozen`, `gateway_resource`, `bandwidth`, `email`, `is_expired`, `useruuid`, `created_at`, `updated_at`) VALUES (1, 'admin', '$2y$10$7ZSQomJWAbsJy5Xce8bufOlbwjDUQnWMoGS/wPObcdWukw2fOWxZa', 1, 'Administrator', 'admin', '1', '1', '', '', '0', '0', '0', '0', '0', '0', 'x@yunshan.net.cn', 0, 1, now(), now());
-INSERT INTO `user` (`id`, `username`, `password`, `authority`, `description`, `company`, `state`, `user_type`, `phone_num`, `resource_list`, `cloud_max`, `vm_max`, `vdc_max`, `frozen`, `gateway_resource`, `bandwidth`, `email`, `is_expired`, `useruuid`, `created_at`, `updated_at`) VALUES (3, 'Cloud', '$2y$10$7ZSQomJWAbsJy5Xce8bufOlbwjDUQnWMoGS/wPObcdWukw2fOWxZa', 2, 'Cloud', 'Cloud', '1', '4', '', '', '0', '0', '0', '0', '0', '0', 'cloud@yunshan.net.cn', 0, 2, now(), now());
-INSERT INTO `user` (`id`, `username`, `password`, `authority`, `description`, `company`, `state`, `user_type`, `phone_num`, `resource_list`, `cloud_max`, `vm_max`, `vdc_max`, `frozen`, `gateway_resource`, `bandwidth`, `email`, `is_expired`, `useruuid`, `created_at`, `updated_at`) VALUES (4, 'visitor', '$2y$10$NReokCLDgsM0BLVTNj6G7ukj3j0ZDvLTZ5gYdukYqv0v.0bbCFTvi', 3, 'visitor', 'visitor', '1', '3', '', '', '0', '0', '0', '0', '0', '0', 'visitor@yunshan.net.cn', 0, 3, now(), now());
 
 CREATE TABLE IF NOT EXISTS ip_resource (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
