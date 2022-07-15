@@ -41,6 +41,10 @@ func NewChIPResource() *ChIPResource {
 
 func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, bool) {
 	keyToItem := make(map[IPResourceKey]mysql.ChIPResource)
+
+	if redis.Redisdb == nil {
+		return keyToItem, true
+	}
 	res, err := redis.Redisdb.HGetAll("ip").Result()
 	if err != nil {
 		log.Error(err)
