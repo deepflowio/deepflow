@@ -279,6 +279,13 @@ impl AppTable {
     ) -> bool {
         let is_c2s = packet.direction == PacketDirection::ClientToServer;
         let (ip, _, port) = Self::get_ip_epc_port(packet, is_c2s);
+        // 在容器环境中相同回环地址和端口可能对应不同的应用，这里不做记录
+        // ====================================================================================
+        // In a container environment, the same loopback ip address and port may correspond to
+        // different applications, which are not recorded here.
+        if ip.is_loopback() {
+            return false;
+        }
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         let epc = if is_c2s == packet.lookup_key.l2_end_1 {
             local_epc

@@ -99,3 +99,7 @@ harness = false
 [[bench]]
 name = "labeler"
 harness = false
+
+[profile.release]
+panic = 'abort'
+
