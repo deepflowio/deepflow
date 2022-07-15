@@ -260,6 +260,24 @@ struct FlowItem {
     parser: Option<Box<dyn L7LogParse>>,
 }
 
+impl From<IpProtocol> for u128 {
+    fn from(protocol: IpProtocol) -> Self {
+        let bitmap = if protocol == IpProtocol::Tcp {
+            1 << u8::from(L7Protocol::Http1)
+                | 1 << u8::from(L7Protocol::Http2)
+                | 1 << u8::from(L7Protocol::Dns)
+                | 1 << u8::from(L7Protocol::Mysql)
+                | 1 << u8::from(L7Protocol::Redis)
+                | 1 << u8::from(L7Protocol::Dubbo)
+                | 1 << u8::from(L7Protocol::Kafka)
+                | 1 << u8::from(L7Protocol::Mqtt)
+        } else {
+            1 << u8::from(L7Protocol::Dns)
+        };
+        return bitmap;
+    }
+}
+
 impl FlowItem {
     const POLICY_INTERVAL: u64 = 10;
     const PROTOCOL_CHECK_LIMIT: usize = 2;
@@ -284,31 +302,27 @@ impl FlowItem {
     }
 
     fn new(
-        time_in_sec: u64,
-        l4_protocol: IpProtocol,
-        l7_protocol: Option<(L7Protocol, bool)>,
+        app_table: &mut AppTable,
+        packet: &MetaPacket,
+        local_epc: i32,
         remote_epc: i32,
-        l7_protocol_from_ebpf: L7Protocol,
         log_parser_config: &LogParserAccess,
     ) -> Self {
-        let is_from_app = l7_protocol.is_some();
-        let (l7_protocol, is_local_service) = l7_protocol.unwrap_or((L7Protocol::Unknown, false));
-        let mut protocol_bitmap = if l4_protocol == IpProtocol::Tcp {
-            1 << u8::from(L7Protocol::Http1)
-                | 1 << u8::from(L7Protocol::Http2)
-                | 1 << u8::from(L7Protocol::Dns)
-                | 1 << u8::from(L7Protocol::Mysql)
-                | 1 << u8::from(L7Protocol::Redis)
-                | 1 << u8::from(L7Protocol::Dubbo)
-                | 1 << u8::from(L7Protocol::Kafka)
-                | 1 << u8::from(L7Protocol::Mqtt)
-        } else {
-            1 << u8::from(L7Protocol::Dns)
-        };
-
-        if l7_protocol_from_ebpf == L7Protocol::Http1TLS {
+        let time_in_sec = packet.lookup_key.timestamp.as_secs();
+        let l4_protocol = packet.lookup_key.proto;
+        let l7_protocol = app_table.get_protocol_from_ebpf(packet, local_epc, remote_epc);
+        let mut is_from_app = l7_protocol.is_some();
+        let (mut l7_protocol, is_local_service) =
+            l7_protocol.unwrap_or((L7Protocol::Unknown, false));
+        let mut protocol_bitmap = u128::from(l4_protocol);
+        if packet.l7_protocol_from_ebpf == L7Protocol::Http1TLS {
             protocol_bitmap |= 1 << u8::from(L7Protocol::Http1TLS);
             protocol_bitmap &= !(1 << u8::from(L7Protocol::Http1));
+        }
+
+        if packet.lookup_key.is_loopback_packet() {
+            is_from_app = true;
+            l7_protocol = packet.l7_protocol_from_ebpf;
         }
 
         FlowItem {
@@ -765,15 +779,10 @@ impl EbpfRunner {
                 flow_map.put(
                     key,
                     FlowItem::new(
-                        packet.lookup_key.timestamp.as_secs(),
-                        packet.lookup_key.proto,
-                        self.app_table.get_protocol_from_ebpf(
-                            packet,
-                            self.config.epc_id as i32,
-                            remote_epc,
-                        ),
+                        &mut self.app_table,
+                        packet,
+                        self.config.epc_id as i32,
                         remote_epc,
-                        packet.l7_protocol_from_ebpf,
                         &self.log_parser_config,
                     ),
                 );
@@ -791,7 +800,6 @@ impl EbpfRunner {
                     self.config.vtap_id,
                 ) {
                     // 应用日志聚合
-                    debug!("\n{}", data);
                     aggr.handle(data);
                 }
                 Some(())
