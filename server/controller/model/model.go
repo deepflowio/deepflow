@@ -101,6 +101,15 @@ type Analyzer struct {
 	Lcuuid            string       `json:"LCUUID"`
 }
 
+type VtapCreate struct {
+	Name            string `json:"NAME" binding:"required"`
+	Type            int    `json:"TYPE" binding:"required"`
+	CtrlIP          string `json:"CTRL_IP" binding:"required"`
+	AZ              string `json:"AZ" binding:"required"`
+	Region          string `json:"REGION" binding:"required"`
+	VtapGroupLcuuid string `json:"VTAP_GROUP_LCUUID" binding:"required"`
+}
+
 type VtapUpdate struct {
 	Lcuuid           string `json:"LCUUID"`
 	Enable           int    `json:"ENABLE"`
@@ -132,8 +141,8 @@ type Vtap struct {
 	Exceptions         []int64 `json:"EXCEPTIONS"`
 	VtapGroupLcuuid    string  `json:"VTAP_GROUP_LCUUID"`
 	VtapGroupName      string  `json:"VTAP_GROUP_NAME"`
-	Az                 string  `json:"AZ"`
-	AzName             string  `json:"AZ_NAME"`
+	AZ                 string  `json:"AZ"`
+	AZName             string  `json:"AZ_NAME"`
 	Region             string  `json:"REGION"`
 	RegionName         string  `json:"REGION_NAME"`
 	CPUNum             int     `json:"CPU_NUM"`

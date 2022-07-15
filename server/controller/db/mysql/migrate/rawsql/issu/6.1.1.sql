@@ -251,5 +251,9 @@ UPDATE vtap_group_configuration SET external_agent_http_proxy_port=8086 where id
 UPDATE vtap_group_configuration SET stats_interval=60 WHERE id=-1;
 
 ALTER TABLE vtap
-    ADD COLUMN process_name VARCHAR(256),
-    ADD COLUMN tap_mode     INTEGER;
+    ADD COLUMN process_name            VARCHAR(256),
+    ADD COLUMN tap_mode                INTEGER,
+    ADD COLUMN expected_revision       TEXT,
+    ADD COLUMN upgrade_package         TEXT;
+
+UPDATE vtap_group SET name="default" WHERE id=1;
