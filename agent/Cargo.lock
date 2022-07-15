@@ -563,6 +563,7 @@ dependencies = [
  "nix",
  "num_enum",
  "openshift-openapi",
+ "packet_sequence_block",
  "page_size",
  "parking_lot",
  "pcap",
@@ -1609,6 +1610,15 @@ name = "os_str_bytes"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e22443d1643a904602595ba1cd8f7d896afe56d26712531c5ff73a15b2fbf64"
+
+[[package]]
+name = "packet_sequence_block"
+version = "0.1.0"
+dependencies = [
+ "log 0.4.14",
+ "prost",
+ "varint-rs",
+]
 
 [[package]]
 name = "page_size"
@@ -2786,6 +2796,12 @@ dependencies = [
  "matches",
  "percent-encoding",
 ]
+
+[[package]]
+name = "varint-rs"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f54a172d0620933a27a4360d3db3e2ae0dd6cceae9730751a036bbf182c4b23"
 
 [[package]]
 name = "version_check"

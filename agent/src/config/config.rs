@@ -249,6 +249,10 @@ pub struct YamlConfig {
     pub external_metrics_sender_queue_size: usize,
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
+    pub packet_sequence_block_size: usize, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_queue_size: usize, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_queue_count: usize, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_flag: u8,          // Enterprise Edition Feature: packet-sequence
 }
 
 impl YamlConfig {
@@ -327,6 +331,25 @@ impl YamlConfig {
             c.l7_protocol_inference_ttl = L7_PROTOCOL_INFERENCE_TTL;
         }
 
+        // Enterprise Edition Feature: packet-sequence
+        if c.packet_sequence_block_size <= 0 || c.packet_sequence_block_size >= 1024 {
+            c.packet_sequence_block_size = 64;
+        }
+
+        // Enterprise Edition Feature: packet-sequence
+        if c.packet_sequence_queue_size == 0 {
+            if c.tap_mode == trident::TapMode::Analyzer {
+                c.packet_sequence_queue_size = 8 << 20;
+            } else {
+                c.packet_sequence_queue_size = 1 << 16;
+            }
+        }
+
+        // Enterprise Edition Feature: packet-sequence
+        if c.packet_sequence_queue_count == 0 {
+            c.packet_sequence_queue_count = 1;
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -388,6 +411,10 @@ impl Default for YamlConfig {
             external_metrics_sender_queue_size: 0,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
+            packet_sequence_block_size: 64, // Enterprise Edition Feature: packet-sequence
+            packet_sequence_queue_size: 0,  // Enterprise Edition Feature: packet-sequence
+            packet_sequence_queue_count: 1, // Enterprise Edition Feature: packet-sequence
+            packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
         }
     }
 }

@@ -243,6 +243,10 @@ pub struct FlowConfig {
 
     pub l7_protocol_inference_max_fail_count: usize,
     pub l7_protocol_inference_ttl: usize,
+
+    // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_flag: u8,
+    pub packet_sequence_block_size: usize,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -271,6 +275,8 @@ impl From<&RuntimeConfig> for FlowConfig {
                 .yaml_config
                 .l7_protocol_inference_max_fail_count,
             l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
+            packet_sequence_flag: conf.yaml_config.packet_sequence_flag, // Enterprise Edition Feature: packet-sequence
+            packet_sequence_block_size: conf.yaml_config.packet_sequence_block_size, // Enterprise Edition Feature: packet-sequence
         }
     }
 }
