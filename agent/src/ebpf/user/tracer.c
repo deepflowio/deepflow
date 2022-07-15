@@ -102,8 +102,25 @@ struct bpf_tracer *find_bpf_tracer(const char *name)
 	return NULL;
 }
 
+/**
+ * create_bpf_tracer - create a eBPF tracer
+ *
+ * @name Tracer name
+ * @load_name eBPF load buffer name
+ * @bpf_bin_buffer load eBPF buffer address
+ * @buffer_sz eBPF buffer size
+ * @tps Tracer configuration information
+ * @workers_nr How many threads process the queues
+ * @handle The upper callback function address
+ * @perf_pages_cnt How many memory pages are used for ring-buffer
+ *
+ * @returns
+ *      Return struct bpf_tracer pointer on success, NULL otherwise.
+ */
 struct bpf_tracer *create_bpf_tracer(const char *name,
-				     char *bpf_file,
+				     char *load_name,
+				     void *bpf_bin_buffer,
+				     int buffer_sz,
 				     struct tracer_probes_conf *tps,
 				     int workers_nr,
 				     void *handle, unsigned int perf_pages_cnt)
@@ -126,8 +143,10 @@ struct bpf_tracer *create_bpf_tracer(const char *name,
 	for (i = 0; i < PROTO_NUM; i++)
 		atomic64_init(&bt->proto_status[i]);
 
-	snprintf(bt->bpf_file, sizeof(bt->bpf_file), "%s", bpf_file);
+	snprintf(bt->bpf_load_name, sizeof(bt->bpf_load_name), "%s", load_name);
 	bt->tps = tps;
+	bt->buffer_ptr = bpf_bin_buffer;
+	bt->buffer_sz = buffer_sz;
 
 	snprintf(bt->name, sizeof(bt->name), "%s", name);
 	bt->dispatch_workers_nr = workers_nr;
@@ -166,11 +185,12 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 {
 	struct bpf_object *pobj;
 	int ret;
-
-	pobj = bpf_object__open(tracer->bpf_file);
+	pobj = bpf_object__open_buffer(tracer->buffer_ptr,
+				       tracer->buffer_sz,
+				       tracer->bpf_load_name);
 	if (IS_ERR_OR_NULL(pobj)) {
-		ebpf_info("bpf_object__open \"%s\" failed, error:%s\n",
-			  tracer->bpf_file, strerror(errno));
+		ebpf_info("bpf_object__open_buffer \"%s\" failed, error:%s\n",
+			  tracer->bpf_load_name, strerror(errno));
 		return -ENOENT;
 	}
 
@@ -186,12 +206,12 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 	ret = bpf_object__load(pobj);
 	if (ret != 0) {
 		ebpf_info("bpf load \"%s\" failed, error:%s\n",
-			  tracer->bpf_file, strerror(errno));
+			  tracer->bpf_load_name, strerror(errno));
 		return ret;
 	}
 
 	tracer->pobj = pobj;
-	ebpf_info("bpf load \"%s\" succeed.\n", tracer->bpf_file);
+	ebpf_info("bpf load \"%s\" succeed.\n", tracer->bpf_load_name);
 	return ETR_OK;
 }
 
@@ -1051,8 +1071,8 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		t = tracers[i];
 		btp = btp + i;
 		snprintf(btp->name, sizeof(btp->name), "%s", t->name);
-		snprintf(btp->bpf_file, sizeof(btp->bpf_file), "%s",
-			 t->bpf_file);
+		snprintf(btp->bpf_load_name, sizeof(btp->bpf_load_name), "%s",
+			 t->bpf_load_name);
 		btp->dispatch_workers_nr = t->dispatch_workers_nr;
 		btp->perf_pg_cnt = t->perf_pages_cnt;
 		btp->lost = atomic64_read(&t->lost);

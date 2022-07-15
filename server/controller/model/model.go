@@ -146,6 +146,8 @@ type Vtap struct {
 	ProcessName        string  `json:"PROCESS_NAME"`
 	LicenseType        int     `json:"LICENSE_TYPE"`
 	LicenseFunctions   []int   `json:"LICENSE_FUNCTIONS"`
+	ExpectedRevision   string  `json:"EXPECTED_REVISION"`
+	UpgradePackage     string  `json:"UPGRADE_PACKAGE"`
 	Lcuuid             string  `json:"LCUUID"`
 	// TODO: format_state
 	// TODO: format_type
@@ -247,7 +249,7 @@ type VTapLicenseConsumption struct {
 }
 
 type Domain struct {
-	ID             int                    `json:"ID"`
+	ID             string                 `json:"ID"`
 	Name           string                 `json:"NAME"`
 	DisplayName    string                 `json:"DISPLAY_NAME"`
 	ClusterID      string                 `json:"CLUSTER_ID"`
@@ -277,7 +279,7 @@ type DomainCreate struct {
 	KubernetesClusterID string                 `json:"KUBERNETES_CLUSTER_ID"`
 	IconID              int                    `json:"ICON_ID"`       // TODO: 修改为required
 	ControllerIP        string                 `json:"CONTROLLER_IP"` // TODO: 修改为required
-	Config              map[string]interface{} `json:"CONFIG" binding:"required"`
+	Config              map[string]interface{} `json:"CONFIG"`
 }
 
 type DomainUpdate struct {

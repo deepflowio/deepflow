@@ -18,10 +18,10 @@ package example
 
 var YamlDomainGenesis = []byte(`
 # 名称
-NAME: agent_sync
+name: agent_sync
 # 云平台类型
-TYPE: agent_sync
-CONFIG:
+type: agent_sync
+config:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
   # 资源同步控制器

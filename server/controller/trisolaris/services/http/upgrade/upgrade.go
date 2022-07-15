@@ -41,8 +41,9 @@ func NewUpgradeService() *UpgradeService {
 	return &UpgradeService{}
 }
 
-type Version struct {
-	Revision string `json:"REVISION" binding:"required"`
+type UpgradeInfo struct {
+	ExpectedRevision string `json:"expected_revision" binding:"required"`
+	UpgradePackage   string `json:"upgrade_package" binding:"required"`
 }
 
 func Upgrade(c *gin.Context) {
@@ -51,8 +52,8 @@ func Upgrade(c *gin.Context) {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, "not find lcuuid param"))
 		return
 	}
-	version := Version{}
-	err := c.BindJSON(&version)
+	upgradeInfo := UpgradeInfo{}
+	err := c.BindJSON(&upgradeInfo)
 	if err != nil {
 		log.Error(err)
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, fmt.Sprintf("%s", err)))
@@ -70,11 +71,11 @@ func Upgrade(c *gin.Context) {
 		common.Response(c, nil, common.NewReponse("FAILED", "", nil, "not found vtap cache"))
 		return
 	}
-	vTapCache.UpdateUpgradeRevision(version.Revision)
-	log.Infof("%+v", version)
+	vTapCache.UpdateUpgradeInfo(upgradeInfo.ExpectedRevision, upgradeInfo.UpgradePackage)
+	log.Infof("vtap(%s, %s) upgrade:%+v", vtap.Name, key, upgradeInfo)
 	common.Response(c, nil, common.NewReponse("SUCCESS", "", nil, ""))
 }
 
 func (*UpgradeService) Register(mux *gin.Engine) {
-	mux.PATCH("v1/deepflow/vtaps/:lcuuid/", Upgrade)
+	mux.PATCH("v1/upgrade/vtap/:lcuuid/", Upgrade)
 }

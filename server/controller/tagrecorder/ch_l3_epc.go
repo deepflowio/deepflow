@@ -49,7 +49,7 @@ func (v *ChVPC) generateNewData() (map[IDKey]mysql.ChVPC, bool) {
 		if vpc.DeletedAt.Valid {
 			keyToItem[IDKey{ID: vpc.ID}] = mysql.ChVPC{
 				ID:     vpc.ID,
-				Name:   vpc.Name + "(已删除)",
+				Name:   vpc.Name + " (deleted)",
 				UID:    vpc.UID,
 				IconID: v.resourceTypeToIconID[IconKey{NodeType: RESOURCE_TYPE_VPC}],
 			}

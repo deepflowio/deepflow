@@ -19,14 +19,16 @@ use std::io::Result;
 use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::process;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
-    Arc, Mutex,
+    atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering},
+    Arc, Mutex, Weak,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Local};
-use flexi_logger::{writers::LogWriter, DeferredNow, Record};
+use flexi_logger::{writers::LogWriter, DeferredNow, Level, Record};
 use hostname;
+
+use super::stats;
 
 pub struct RemoteLogConfig {
     enabled: Arc<AtomicBool>,
@@ -192,5 +194,83 @@ impl LogWriter for RemoteLogWriter {
 
     fn flush(&self) -> Result<()> {
         Ok(())
+    }
+}
+
+#[derive(Default)]
+struct Counter {
+    error: AtomicU64,
+    warning: AtomicU64,
+}
+
+// A writer calculating log count by level without actually writing log
+pub struct LogLevelWriter(Arc<Counter>);
+
+impl LogLevelWriter {
+    pub fn new() -> (Self, LogLevelCounter) {
+        let c = Arc::new(Counter::default());
+        (Self(c.clone()), LogLevelCounter(Arc::downgrade(&c)))
+    }
+}
+
+impl LogWriter for LogLevelWriter {
+    fn write(&self, _: &mut DeferredNow, record: &Record<'_>) -> Result<()> {
+        match record.level() {
+            Level::Error => &self.0.error,
+            Level::Warn => &self.0.warning,
+            _ => return Ok(()),
+        }
+        .fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
+}
+
+pub struct LogLevelCounter(Weak<Counter>);
+
+impl stats::OwnedCountable for LogLevelCounter {
+    fn get_counters(&self) -> Vec<stats::Counter> {
+        match self.0.upgrade() {
+            Some(counters) => vec![
+                (
+                    "error",
+                    stats::CounterType::Counted,
+                    stats::CounterValue::Unsigned(counters.error.swap(0, Ordering::Relaxed)),
+                ),
+                (
+                    "warning",
+                    stats::CounterType::Counted,
+                    stats::CounterValue::Unsigned(counters.warning.swap(0, Ordering::Relaxed)),
+                ),
+            ],
+            None => vec![],
+        }
+    }
+
+    fn closed(&self) -> bool {
+        self.0.strong_count() == 0
+    }
+}
+
+pub struct LogWriterAdapter(Vec<Box<dyn LogWriter>>);
+
+impl LogWriterAdapter {
+    pub fn new(writers: Vec<Box<dyn LogWriter>>) -> Self {
+        Self(writers)
+    }
+}
+
+impl LogWriter for LogWriterAdapter {
+    fn write(&self, now: &mut DeferredNow, record: &Record<'_>) -> Result<()> {
+        self.0
+            .iter()
+            .fold(Ok(()), |r, w| r.or(w.write(now, record)))
+    }
+
+    fn flush(&self) -> Result<()> {
+        self.0.iter().fold(Ok(()), |r, w| r.or(w.flush()))
     }
 }

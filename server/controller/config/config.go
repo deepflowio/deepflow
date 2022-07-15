@@ -50,7 +50,7 @@ type Specification struct {
 }
 
 type DFWebService struct {
-	Enabled bool   `default:"true" yaml:"enabled"`
+	Enabled bool   `default:"false" yaml:"enabled"`
 	Host    string `default:"df-web" yaml:"host"`
 	Port    int    `default:"20106" yaml:"port"`
 	Timeout int    `default:"30" yaml:"timeout"`

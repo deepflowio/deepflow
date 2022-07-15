@@ -24,6 +24,7 @@ controller:
 
   # redis相关配置
   redis:
+    enabled: true
     dimension_resource_database: 2
     password: metaflow
     host: redis
@@ -94,19 +95,8 @@ controller:
       port: 123
       timeout: 1
 
-    # 默认使用grpc进行trident升级
-    # 若需使用HTTP需修改配置如下所示
-    # self_update_url: http://x.x.x.x:23333/yum/trident
-    self-update-url: "grpc"
-    listen-port: 20014
     trident-port: 20035
-    max-escape-seconds: 3600
-    trident-revision:
     trident-type-for-unkonw-vtap: 0
-
-    # trident path
-    trident-linux-path: "/usr/local/deepflow/yum/trident"
-    trident-windows-path: "/usr/local/deepflow/yum/trident.exe"
 
     platform-vips:
     #  - 55.11.135.18

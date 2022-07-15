@@ -23,15 +23,18 @@ import (
 	"errors"
 	"net"
 	"sync/atomic"
+	"time"
 
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
 	"github.com/metaflowys/metaflow/message/trident"
 	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/genesis/config"
 	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/metaflowys/metaflow/server/controller/statsd"
 	"github.com/metaflowys/metaflow/server/libs/queue"
 )
 
@@ -52,6 +55,7 @@ type Genesis struct {
 	vinterfaces    atomic.Value
 	iplastseens    atomic.Value
 	kubernetesData atomic.Value
+	genesisStatsd  statsd.GenesisStatsd
 }
 
 func NewGenesis(cfg config.GenesisConfig) *Genesis {
@@ -90,6 +94,9 @@ func NewGenesis(cfg config.GenesisConfig) *Genesis {
 		vinterfaces:    vData,
 		iplastseens:    lData,
 		kubernetesData: kData,
+		genesisStatsd: statsd.GenesisStatsd{
+			K8SInfoDelay: make(map[string][]int),
+		},
 	}
 	return GenesisService
 }
@@ -125,6 +132,12 @@ func (g *Genesis) Start() {
 		kUpdater := NewKubernetesRpcUpdater(kStorage, kQueue, ctx)
 		kUpdater.Start()
 	}()
+}
+
+func (g *Genesis) GetStatter() statsd.StatsdStatter {
+	return statsd.StatsdStatter{
+		Element: statsd.GetGenesisStatsd(g.genesisStatsd),
+	}
 }
 
 func (g *Genesis) receivePlatformData(pChan chan PlatformData) {
@@ -200,6 +213,7 @@ func (g *Genesis) GetKubernetesData() map[string]KubernetesInfo {
 
 func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, error) {
 	k8sResp := map[string][]string{}
+	g.genesisStatsd.K8SInfoDelay = map[string][]int{}
 
 	localK8sDatas := g.GetKubernetesData()
 	k8sInfo, ok := localK8sDatas[clusterID]
@@ -222,16 +236,23 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			}
 			ret, err := client.GenesisSharingK8S(context.Background(), &req)
 			if err != nil {
-				log.Error("request grpc api faild:" + err.Error())
+				log.Warning(err.Error())
 				continue
 			} else {
 				retFlag = true
+				epochStr := ret.GetEpoch()
+				epoch, err := time.ParseInLocation(common.GO_BIRTHDAY, epochStr, time.Local)
+				if err != nil {
+					log.Error("genesis api sharing k8s format timestr faild:" + err.Error())
+					return k8sResp, err
+				}
 				entries := ret.GetEntries()
 				errorMsg := ret.GetErrorMsg()
 				if errorMsg != "" {
 					log.Warningf("cluster id (%s) Error: %s", clusterID, errorMsg)
 				}
 				k8sInfo = KubernetesInfo{
+					Epoch:    epoch,
 					Entries:  entries,
 					ErrorMSG: errorMsg,
 				}
@@ -242,6 +263,8 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			return k8sResp, errors.New("no vtap report cluster id:" + clusterID)
 		}
 	}
+
+	g.genesisStatsd.K8SInfoDelay[clusterID] = []int{int(time.Now().Sub(k8sInfo.Epoch).Milliseconds())}
 
 	for _, e := range k8sInfo.Entries {
 		eType := e.GetType()
@@ -260,5 +283,6 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			k8sResp[eType] = []string{string(out.Bytes())}
 		}
 	}
+	statsd.MetaStatsd.RegisterStatsdTable(g)
 	return k8sResp, nil
 }

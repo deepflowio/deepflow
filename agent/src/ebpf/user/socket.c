@@ -12,7 +12,9 @@
 #include "log.h"
 #include "go_tracer.h"
 
-#define TRACER_ELF_NAME	"socket_trace.elf"
+#include "socket_trace_bpf_common.c"
+#include "socket_trace_bpf_5_2.c"
+#include "socket_trace_bpf_core.c"
 
 // eBPF Map Name
 #define MAP_MEMBERS_OFFSET_NAME		"__members_offset"
@@ -618,8 +620,10 @@ int running_socket_tracer(l7_handle_fn handle,
 			  uint32_t socket_map_max_reclaim)
 {
 	int ret;
-	char bpf_path[TRACER_PATH_LEN];
-	char *bpf_file_name = TRACER_ELF_NAME;
+	// Used to record which eBPF buffer was loaded.
+	char bpf_load_buffer_name[NAME_LEN];
+	void *bpf_bin_buffer;
+	int buffer_sz;
 
 	if (check_kernel_version(4, 14) != 0) {
 		ebpf_warning
@@ -629,17 +633,22 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 	}
 
-	if (is_core_kernel())
-		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s/linux-core/%s", ELF_PATH_PREFIX, bpf_file_name);
-	else if (major == 5 && minor == 2)
-		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s/linux-%d.%d/%s", ELF_PATH_PREFIX,
-			 major, minor, bpf_file_name);
-
-	else
-		snprintf(bpf_path, TRACER_PATH_LEN,
-			 "%s/linux-common/%s", ELF_PATH_PREFIX, bpf_file_name);
+	if (is_core_kernel()) {
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "socket-trace-bpf-linux-core");
+		bpf_bin_buffer = (void *)socket_trace_core_ebpf_data; 
+		buffer_sz = sizeof(socket_trace_core_ebpf_data);
+	} else if (major == 5 && minor == 2) {
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "socket-trace-bpf-linux-5.2");
+		bpf_bin_buffer = (void *)socket_trace_5_2_ebpf_data; 
+		buffer_sz = sizeof(socket_trace_5_2_ebpf_data);
+	} else {
+		snprintf(bpf_load_buffer_name, NAME_LEN,
+			 "socket-trace-bpf-linux-common");
+		bpf_bin_buffer = (void *)socket_trace_common_ebpf_data;
+		buffer_sz = sizeof(socket_trace_common_ebpf_data);
+	}
 
 	struct tracer_probes_conf *tps =
 	    malloc(sizeof(struct tracer_probes_conf));
@@ -651,7 +660,8 @@ int running_socket_tracer(l7_handle_fn handle,
 	INIT_LIST_HEAD(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
-	    create_bpf_tracer(SK_TRACER_NAME, bpf_path, tps,
+	    create_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
+			      bpf_bin_buffer, buffer_sz, tps,
 			      thread_nr, (void *)handle, perf_pages_cnt);
 	if (tracer == NULL)
 		return -EINVAL;

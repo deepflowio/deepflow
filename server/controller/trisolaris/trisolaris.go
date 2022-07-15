@@ -25,7 +25,6 @@ import (
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/node"
 	grpcserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/grpc"
-	httpserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris/vtap"
 )
@@ -87,7 +86,6 @@ func (t *Trisolaris) Start() {
 	go t.vTapInfo.TimedRefreshVTapCache()
 	go t.nodeInfo.TimedRefreshNodeCache()
 	go grpcserver.Run(ctx, t.config)
-	go httpserver.Run(ctx, t.config)
 }
 
 func NewTrisolaris(cfg *config.Config, db *gorm.DB) *Trisolaris {

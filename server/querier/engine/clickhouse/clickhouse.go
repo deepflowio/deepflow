@@ -104,10 +104,14 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 		return nil, false, nil
 	}
 	var table string
+	var where string
 	for i, item := range sqlSplit {
 		if strings.ToLower(item) == "from" {
 			table = sqlSplit[i+1]
 			break
+		}
+		if strings.ToLower(item) == "where" {
+			where = strings.Join(sqlSplit[i+1:], " ")
 		}
 	}
 	switch strings.ToLower(sqlSplit[1]) {
@@ -116,7 +120,7 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, err
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, true, err
 		} else {
-			metrics, err := metrics.GetMetricsDescriptions(e.DB, table)
+			metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where)
 			return metrics, true, err
 		}
 	case "tag":

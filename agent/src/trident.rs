@@ -44,7 +44,7 @@ use crate::{
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig},
-        Config, RuntimeConfig, YamlConfig,
+        Config, ConfigError, RuntimeConfig, YamlConfig,
     },
     debug::{ConstructDebugCtx, Debugger, QueueDebugger},
     dispatcher::{
@@ -69,7 +69,7 @@ use crate::{
             get_k8s_local_node_ip, kernel_check, running_in_container, trident_process_check,
         },
         guard::Guard,
-        logger::{RemoteLogConfig, RemoteLogWriter},
+        logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
         net::{get_mac_by_ip, get_route_src_ip, get_route_src_ip_and_mac, links_by_name_regex},
         queue,
         stats::{self, Countable, RefCountable, StatsOption},
@@ -102,12 +102,32 @@ pub struct Trident {
     handle: Option<JoinHandle<()>>,
 }
 
+#[cfg(unix)]
+pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
+#[cfg(windows)]
+pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "C:\\DeepFlow\\trident\\trident-windows.yaml";
+
 impl Trident {
     pub fn start<P: AsRef<Path>>(config_path: P, revision: &'static str) -> Result<Trident> {
         let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
         let state_thread = state.clone();
 
-        let config = Config::load_from_file(config_path.as_ref())?;
+        let config = match Config::load_from_file(config_path.as_ref()) {
+            Ok(conf) => conf,
+            Err(e) => {
+                if let ConfigError::YamlConfigInvalid(_) = e {
+                    // try to load config file from trident.yaml to support upgrading from trident
+                    if let Ok(conf) = Config::load_from_file(DEFAULT_TRIDENT_CONF_FILE) {
+                        conf
+                    } else {
+                        // return the original error instead of loading trident conf
+                        return Err(e.into());
+                    }
+                } else {
+                    return Err(e.into());
+                }
+            }
+        };
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
@@ -121,12 +141,16 @@ impl Trident {
             vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
         );
 
+        let (log_level_writer, log_level_counter) = LogLevelWriter::new();
         let mut logger = Logger::try_with_str("info")
             .unwrap()
             .format(colored_opt_format)
             .log_to_file_and_writer(
                 FileSpec::try_from(&config.log_file)?,
-                Box::new(remote_log_writer),
+                Box::new(LogWriterAdapter::new(vec![
+                    Box::new(remote_log_writer),
+                    Box::new(log_level_writer),
+                ])),
             )
             .rotate(
                 Criterion::Age(Age::Day),
@@ -140,6 +164,14 @@ impl Trident {
         }
         let logger_handle = logger.start()?;
 
+        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
+        stats_collector.start();
+        stats_collector.register_countable(
+            "log_counter",
+            stats::Countable::Owned(Box::new(log_level_counter)),
+            Default::default(),
+        );
+
         info!("static_config {:#?}", config);
         let handle = Some(thread::spawn(move || {
             if let Err(e) = Self::run(
@@ -148,6 +180,7 @@ impl Trident {
                 revision,
                 logger_handle,
                 remote_log_config,
+                stats_collector,
             ) {
                 warn!("metaflow-agent exited: {}", e);
                 process::exit(1);
@@ -163,6 +196,7 @@ impl Trident {
         revision: &'static str,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
+        stats_collector: Arc<stats::Collector>,
     ) -> Result<()> {
         info!("========== MetaFlowAgent start! ==========");
 
@@ -180,9 +214,6 @@ impl Trident {
                 .context("failed getting control ip and mac")?,
         };
         info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
-
-        let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
-        stats_collector.start();
 
         let exception_handler = ExceptionHandler::default();
         let session = Arc::new(Session::new(

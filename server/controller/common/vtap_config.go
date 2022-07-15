@@ -109,7 +109,7 @@ var (
 	LogLevel                      = "INFO"
 	LogRetention                  = 30
 	HTTPLogProxyClient            = "X-Forwarded-For"
-	HTTPLogTraceID                = "关闭"
+	HTTPLogTraceID                = "traceparent, sw8"
 	L7LogPacketSize               = 256
 	L4LogCollectNpsThreshold      = 10000
 	L7LogCollectNpsThreshold      = 10000
@@ -124,10 +124,10 @@ var (
 	PodClusterInternalIP          = 0
 	Domains                       = "0"
 	DecapType                     = "0"
-	HTTPLogSpanID                 = "关闭"
+	HTTPLogSpanID                 = "traceparent, sw8"
 	SysFreeMemoryLimit            = 0
 	LogFileSize                   = 1000
-	HTTPLogXRequestID             = "关闭"
+	HTTPLogXRequestID             = "X-Request-ID"
 	ExternalAgentHTTPProxyEnabled = 0
 	ExternalAgentHTTPProxyPort    = 38086
 	AnalyzerPort                  = 30033

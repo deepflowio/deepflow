@@ -431,7 +431,7 @@ struct AppLogs {
 impl AppLogs {
     pub fn new(config: &LogParserAccess) -> Self {
         Self {
-            http: HttpLog::new(config),
+            http: HttpLog::new(config, false),
             dubbo: DubboLog::new(config),
             ..Default::default()
         }

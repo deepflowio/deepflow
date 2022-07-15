@@ -222,11 +222,11 @@ message Config {
 
     // 新增全景图配置参数
     optional string  http_log_proxy_client = 301 [default = 'X-Forwarded-For'];
-    optional string  http_log_trace_id    = 302 [default = 'X-B3-TraceId'];
+    optional string  http_log_trace_id    = 302 [default = 'traceparent, sw8'];
     optional uint32  l7_log_packet_size   = 303 [default = 256];
     optional uint64  l4_log_collect_nps_threshold = 304 [default = 10000];
     optional uint64  l7_log_collect_nps_threshold = 305 [default = 10000];
-    optional string  http_log_span_id      = 306 [default = 'X-B3-ParentSpanId'];
+    optional string  http_log_span_id      = 306 [default = 'traceparent, sw8'];
     optional string  http_log_x_request_id = 307 [default = 'X-Request-ID'];
 
     // 新增全景图功能开关
@@ -564,6 +564,7 @@ message GenesisSharingK8SRequest {
 }
 
 message GenesisSharingK8SResponse {
-    optional string error_msg = 1;
-    repeated KubernetesAPIInfo entries = 2;
+    optional string epoch = 1;
+    optional string error_msg = 2;
+    repeated KubernetesAPIInfo entries = 3;
 }

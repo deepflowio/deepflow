@@ -29,6 +29,7 @@ cli: vendor
 
 .PHONY: clean
 clean:
-	rm -rf bin
+	touch vendor
 	chmod -R 777 vendor
 	rm -rf vendor
+	rm -rf bin

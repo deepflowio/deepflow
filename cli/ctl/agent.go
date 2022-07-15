@@ -19,6 +19,7 @@ package ctl
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -57,9 +58,74 @@ func RegisterAgentCommand() *cobra.Command {
 		},
 	}
 
+	upgrade := &cobra.Command{
+		Use:     "upgrade [name] --package=xxxxxx",
+		Short:   "upgrade agent",
+		Example: "metaflow-ctl agent upgrade vtap-1 --package=/usr/sbin/trident",
+		Run: func(cmd *cobra.Command, args []string) {
+			upgadeAgent(cmd, args)
+		},
+	}
+
+	upgrade.Flags().StringVarP(&upgradePackage, "package", "c", "", "")
+	upgrade.MarkFlagRequired("package")
+
 	agent.AddCommand(list)
 	agent.AddCommand(delete)
+	agent.AddCommand(upgrade)
 	return agent
+}
+
+func RegisterAgentUpgradeCommand() *cobra.Command {
+	agentUpgrade := &cobra.Command{
+		Use:   "agent-upgrade",
+		Short: "agent upgrade operation commands",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("please run with 'list'.\n")
+		},
+	}
+	list := &cobra.Command{
+		Use:     "list",
+		Short:   "list agent-upgrade info",
+		Example: "metaflow-ctl agent-upgrade list metaflow-agent -o yaml",
+		Run: func(cmd *cobra.Command, args []string) {
+			listAgentUpgrade(cmd, args)
+		},
+	}
+
+	agentUpgrade.AddCommand(list)
+
+	return agentUpgrade
+}
+
+func listAgentUpgrade(cmd *cobra.Command, args []string) {
+
+	// 生成URL
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtaps/", server.IP, server.Port)
+
+	// 调用采集器API，并输出返回结果
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	cmdFormat := "%-40s%-48s%-48s%-50s\n"
+	fmt.Printf(cmdFormat, "NAME", "REVISION", "EXPECTED_REVISION", "UPGRADE_PACKAGE")
+	for i := range response.Get("DATA").MustArray() {
+		vtap := response.Get("DATA").GetIndex(i)
+		revision := vtap.Get("REVISION").MustString()
+		completeRevision := vtap.Get("COMPLETE_REVISION").MustString()
+		oldRevision := revision + "-" + completeRevision
+		expectedRevision := vtap.Get("EXPECTED_REVISION").MustString()
+		if expectedRevision != "" {
+			fmt.Printf(
+				cmdFormat, vtap.Get("NAME").MustString(), oldRevision,
+				expectedRevision, vtap.Get("UPGRADE_PACKAGE").MustString(),
+			)
+		}
+	}
 }
 
 func listAgent(cmd *cobra.Command, args []string, output string) {
@@ -119,7 +185,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 
 func deleteAgent(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name. Example: %s", cmd.Example)
+		fmt.Fprintf(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
 		return
 	}
 
@@ -142,4 +208,103 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 			return
 		}
 	}
+}
+
+func executeCommand(command string) (string, error) {
+	cmd := exec.Command("/usr/bin/bash", "-c", command)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("command(%v) failed; result: %v, error:%v", command, string(output), err)
+	}
+
+	return string(output), err
+}
+
+var upgradePackage string
+
+func upgadeAgent(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify name and package. Example: %s", cmd.Example)
+		return
+	}
+	vtapName := args[0]
+	command := upgradePackage + " -v"
+	output, err := executeCommand(command)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	splitStr := strings.Split(output, " ")
+	if len(splitStr) < 2 {
+		fmt.Printf("get expectedVersion faild, exec: %s, output: %s", command, output)
+		return
+	}
+	expectedVersion := splitStr[0]
+	if expectedVersion == "" {
+		fmt.Printf("get expectedVersion faild, exec: %s, output: %s", command, output)
+		return
+	}
+
+	server := common.GetServerInfo(cmd)
+	serverURL := fmt.Sprintf("http://%s:%d/v1/controllers/", server.IP, server.Port)
+	response, err := common.CURLPerform("GET", serverURL, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	controllerArray := response.Get("DATA").MustArray()
+	hosts := map[string]struct{}{
+		server.IP: struct{}{},
+	}
+	if len(controllerArray) > 0 {
+		for index, _ := range controllerArray {
+			nodeType := response.Get("DATA").GetIndex(index).Get("NODE_TYPE").MustInt()
+			ip := response.Get("DATA").GetIndex(index).Get("IP").MustString()
+			if nodeType == 1 && ip != "" {
+				hosts[ip] = struct{}{}
+			}
+		}
+	} else {
+		fmt.Printf("get server info failed, url: %s\n", serverURL)
+		return
+	}
+
+	vtapURL := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, vtapName)
+	response, err = common.CURLPerform("GET", vtapURL, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	var (
+		vtapController string
+		vtapLcuuid     string
+	)
+
+	if len(response.Get("DATA").MustArray()) > 0 {
+		vtapLcuuid = response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+		vtapController = response.Get("DATA").GetIndex(0).Get("CONTROLLER_IP").MustString()
+	} else {
+		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
+		return
+	}
+	if vtapController == "" || vtapLcuuid == "" {
+		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
+		return
+	}
+	url_format := "http://%s:%d/v1/upgrade/vtap/%s/"
+	body := map[string]interface{}{
+		"expected_revision": expectedVersion,
+		"upgrade_package":   upgradePackage,
+	}
+	for host, _ := range hosts {
+		url := fmt.Sprintf(url_format, host, server.Port, vtapLcuuid)
+		_, err := common.CURLPerform("PATCH", url, body, "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			fmt.Printf("upgrade agent %s failed\n", vtapName)
+			return
+		}
+	}
+	fmt.Printf("set agent %s revision(%s) success\n", vtapName, expectedVersion)
 }
