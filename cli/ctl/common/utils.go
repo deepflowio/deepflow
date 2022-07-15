@@ -107,12 +107,14 @@ func GetDefaultRouteIP() string {
 }
 
 type Server struct {
-	IP   string
-	Port uint32
+	IP      string
+	Port    uint32
+	RpcPort uint32
 }
 
 func GetServerInfo(cmd *cobra.Command) *Server {
 	ip, _ := cmd.Flags().GetString("ip")
-	port, _ := cmd.Flags().GetUint32("port")
-	return &Server{ip, port}
+	port, _ := cmd.Flags().GetUint32("api-port")
+	rpcPort, _ := cmd.Flags().GetUint32("rpc-port")
+	return &Server{ip, port, rpcPort}
 }

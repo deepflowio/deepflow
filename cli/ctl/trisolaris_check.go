@@ -24,20 +24,23 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strconv"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/metaflowys/metaflow/message/trident"
 	"github.com/spf13/cobra"
 	_ "golang.org/x/net/context"
 	"google.golang.org/grpc"
+
+	"github.com/metaflowys/metaflow/cli/ctl/common"
 )
 
 type ParamData struct {
-	CtrlIP     string
-	CtrlMac    string
-	RemoteIP   string
-	RemotePort string
-	Type       string
+	CtrlIP  string
+	CtrlMac string
+	RpcIP   string
+	RpcPort string
+	Type    string
 }
 
 type SortedAcls []*trident.FlowAcl
@@ -49,65 +52,65 @@ type CmdExecute func(response *trident.SyncResponse)
 func regiterCommand() []*cobra.Command {
 	platformDataCmd := &cobra.Command{
 		Use:   "platformData",
-		Short: "get platformData from controller",
+		Short: "get platformData from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{platformData})
+			initCmd(cmd, []CmdExecute{platformData})
 		},
 	}
 	ipGroupsCmd := &cobra.Command{
 		Use:   "ipGroups",
-		Short: "get ipGroups from controller",
+		Short: "get ipGroups from metaflow-servmetaflow-servee",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{ipGroups})
+			initCmd(cmd, []CmdExecute{ipGroups})
 		},
 	}
 	flowAclsCmd := &cobra.Command{
 		Use:   "flowAcls",
-		Short: "get flowAcls from controller",
+		Short: "get flowAcls from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{flowAcls})
+			initCmd(cmd, []CmdExecute{flowAcls})
 		},
 	}
 	tapTypesCmd := &cobra.Command{
 		Use:   "tapTypes",
-		Short: "get tapTypes from controller",
+		Short: "get tapTypes from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{tapTypes})
+			initCmd(cmd, []CmdExecute{tapTypes})
 		},
 	}
 	segmentsCmd := &cobra.Command{
 		Use:   "segments",
-		Short: "get segments from controller",
+		Short: "get segments from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{segments})
+			initCmd(cmd, []CmdExecute{segments})
 		},
 	}
 	vpcIPCmd := &cobra.Command{
 		Use:   "vpcIP",
-		Short: "get vpcIP from controller",
+		Short: "get vpcIP from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{vpcIP})
+			initCmd(cmd, []CmdExecute{vpcIP})
 		},
 	}
 	configCmd := &cobra.Command{
 		Use:   "config",
-		Short: "get config from controller",
+		Short: "get config from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{configData})
+			initCmd(cmd, []CmdExecute{configData})
 		},
 	}
 	skipInterfaceCmd := &cobra.Command{
 		Use:   "skipInterface",
-		Short: "get skipInterface from controller",
+		Short: "get skipInterface from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{skipInterface})
+			initCmd(cmd, []CmdExecute{skipInterface})
 		},
 	}
 	allCmd := &cobra.Command{
 		Use:   "all",
-		Short: "get all data from controller",
+		Short: "get all data from metaflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd([]CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, vpcIP, configData, skipInterface})
+			initCmd(cmd, []CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, vpcIP, configData, skipInterface})
 		},
 	}
 
@@ -119,13 +122,11 @@ func regiterCommand() []*cobra.Command {
 func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd := &cobra.Command{
 		Use:   "trisolaris.check",
-		Short: "pull rpc data from controller",
+		Short: "pull grpc data from metaflow-server",
 	}
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "采集器控制IP")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "采集器控制MAC")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.RemoteIP, "rip", "", "127.0.0.1", "控制器IP")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.RemotePort, "rport", "", "20035", "控制器PORT")
-	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "请求类型trdient/analyzer")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "vtap ctrl ip")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "vtap ctrl mac")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
 		trisolarisCmd.AddCommand(handler)
@@ -134,8 +135,11 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	return trisolarisCmd
 }
 
-func initCmd(cmds []CmdExecute) {
-	addr := net.JoinHostPort(paramData.RemoteIP, paramData.RemotePort)
+func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
+	server := common.GetServerInfo(cmd)
+	paramData.RpcIP = server.IP
+	paramData.RpcPort = strconv.Itoa(int(server.RpcPort))
+	addr := net.JoinHostPort(paramData.RpcIP, paramData.RpcPort)
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
 		fmt.Println(err)
