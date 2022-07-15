@@ -45,6 +45,7 @@ const (
 	FUNCTION_UNIQ_EXACT  = "UniqExact"
 	FUNCTION_PERSECOND   = "PerSecond"
 	FUNCTION_PERCENTAG   = "Percentage"
+	FUCNTION_HISTOGRAM   = "Histogram"
 )
 
 // 对外提供的算子与数据库实际算子转换
@@ -68,7 +69,7 @@ var FUNC_NAME_MAP map[string]string = map[string]string{
 
 var MATH_FUNCTIONS = []string{
 	FUNCTION_DIV, FUNCTION_PLUS, FUNCTION_MINUS, FUNCTION_MULTIPLY,
-	FUNCTION_PERCENTAG, FUNCTION_PERSECOND,
+	FUNCTION_PERCENTAG, FUNCTION_PERSECOND, FUCNTION_HISTOGRAM,
 }
 
 func GetFunc(name string) Function {
@@ -87,6 +88,8 @@ func GetFunc(name string) Function {
 		return &PercentageFunction{DefaultFunction: DefaultFunction{Name: name}}
 	case FUNCTION_PERSECOND:
 		return &PerSecondFunction{DefaultFunction: DefaultFunction{Name: name}}
+	case FUCNTION_HISTOGRAM:
+		return &HistogramFunction{DefaultFunction: DefaultFunction{Name: name}}
 	default:
 		return &DefaultFunction{Name: name}
 	}
@@ -477,6 +480,22 @@ func (f *PercentageFunction) WriteTo(buf *bytes.Buffer) {
 
 func (f *PercentageFunction) GetWiths() []Node {
 	return f.divFunction.GetWiths()
+}
+
+type HistogramFunction struct {
+	DefaultFunction
+}
+
+func (f *HistogramFunction) WriteTo(buf *bytes.Buffer) {
+	buf.WriteString("histogram(")
+	f.Fields[1].WriteTo(buf)
+	buf.WriteString(")(")
+	f.Fields[0].WriteTo(buf)
+	buf.WriteString(")")
+	if f.Alias != "" {
+		buf.WriteString(" AS ")
+		buf.WriteString(f.Alias)
+	}
 }
 
 type PerSecondFunction struct {
