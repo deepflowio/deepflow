@@ -324,13 +324,15 @@ static int resolve_bin_file(const char *path, int pid,
 		syms_count++;
 	}
 
-	if (binary_path){
+
+	struct proc_offsets *p_offs = NULL;
+	if (binary_path) {
 		bool is_new_offset = false;
-		struct proc_offsets *p_offs = find_offset_by_pid(pid);
+		p_offs = find_offset_by_pid(pid);
 		if (p_offs == NULL) {
 			p_offs = alloc_offset_by_pid();
 			if (p_offs == NULL)
-				goto faild;
+				goto offset_faild;
 			is_new_offset = true;
 		}
 
@@ -344,8 +346,7 @@ static int resolve_bin_file(const char *path, int pid,
 		}
 		p_offs->path = strdup(binary_path);
 		if (p_offs->path == NULL) {
-			free(p_offs);
-			goto faild;
+			goto offset_faild;
 		}
 		// resolve all offsets.
 		for (int k = 0; k < NELEMS(offsets); k++) {
@@ -387,6 +388,17 @@ faild:
 		free(binary_path);
 	}
 	return ret;
+
+offset_faild:
+	*resolve_num = syms_count;
+	if (p_offs != NULL) {
+		free(p_offs);
+	}
+	if (binary_path) {
+		free(binary_path);
+	}
+
+	return ETR_INVAL;
 }
 
 static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
