@@ -45,7 +45,13 @@ var (
 	syslogBackend   logging.Backend
 	rsyslogBackends []logging.Backend
 	rsyslogWriters  []*RSyslogWriter
+	customBackends  []ClosableBackend
 )
+
+type ClosableBackend interface {
+	logging.Backend
+	io.Closer
+}
 
 func EnableStdoutLog() {
 	if stdoutBackend != nil {
@@ -126,6 +132,14 @@ func EnableFileLog(logPath string) error {
 	return EnableFileLogWithMaxAge(logPath, LOG_MAX_AGE)
 }
 
+func EnableCustomBackends(backends ...ClosableBackend) {
+	for _, b := range customBackends {
+		b.Close()
+	}
+	customBackends = append(customBackends[:0], backends...)
+	applyBackendChange()
+}
+
 func applyBackendChange() {
 	var backends []logging.Backend
 	if stdoutBackend != nil {
@@ -138,6 +152,9 @@ func applyBackendChange() {
 		backends = append(backends, syslogBackend)
 	}
 	backends = append(backends, rsyslogBackends...)
+	for _, b := range customBackends {
+		backends = append(backends, b)
+	}
 	level := logging.GetLevel("")
 	logging.SetBackend(backends...)
 	logging.SetLevel(level, "")
