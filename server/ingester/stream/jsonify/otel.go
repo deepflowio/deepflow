@@ -246,6 +246,8 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 }
 
 func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) {
+	// OTel data net protocol always set to TCP
+	h.Protocol = uint8(layers.IPProtocolTCP)
 	h.Type = uint8(datatype.MSG_T_SESSION)
 	h.TapPortType = datatype.TAPPORT_FROM_OTEL
 	h.TraceId = hex.EncodeToString(l.TraceId)
