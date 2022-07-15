@@ -18,13 +18,13 @@ MetaFlow is a highly automated observability platform open sourced by [YUNSHAN N
 
 # Documentation
 
-For more information, please visit [GitHub](https://github.com/metaflowys/docs), or [the documentation website](https://deepflow.yunshan.net/metaflow-docs/).
+For more information, please visit [the documentation website](https://deepflow.yunshan.net/metaflow-docs/).
 
 # Quick start
 
 ## Deploy MetaFlow
 
-Please refer to the deployment documentation: [GitHub](https://github.com/metaflowys/docs/tree/main/02-install), or [the documentation website](https://deepflow.yunshan.net/metaflow-docs/install/all-in-one/).
+Please refer to [the deployment documentation](https://deepflow.yunshan.net/metaflow-docs/install/all-in-one/).
 
 ## Explore MetaFlow Demo
 
