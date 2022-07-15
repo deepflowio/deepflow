@@ -58,21 +58,8 @@ func RegisterAgentCommand() *cobra.Command {
 		},
 	}
 
-	upgrade := &cobra.Command{
-		Use:     "upgrade [name] --package=xxxxxx",
-		Short:   "upgrade agent",
-		Example: "metaflow-ctl agent upgrade vtap-1 --package=/usr/sbin/trident",
-		Run: func(cmd *cobra.Command, args []string) {
-			upgadeAgent(cmd, args)
-		},
-	}
-
-	upgrade.Flags().StringVarP(&upgradePackage, "package", "c", "", "")
-	upgrade.MarkFlagRequired("package")
-
 	agent.AddCommand(list)
 	agent.AddCommand(delete)
-	agent.AddCommand(upgrade)
 	return agent
 }
 
@@ -80,26 +67,29 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 	agentUpgrade := &cobra.Command{
 		Use:   "agent-upgrade",
 		Short: "agent upgrade operation commands",
+		Example: "metaflow-ctl agent-upgrade list\n" +
+			"metaflow-ctl agent-upgrade vtap-name --package=/usr/sbin/trident\n",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("please run with 'list'.\n")
-		},
-	}
-	list := &cobra.Command{
-		Use:     "list",
-		Short:   "list agent-upgrade info",
-		Example: "metaflow-ctl agent-upgrade list metaflow-agent -o yaml",
-		Run: func(cmd *cobra.Command, args []string) {
-			listAgentUpgrade(cmd, args)
-		},
-	}
+			if len(args) == 1 {
+				if args[0] == "list" {
+					listAgentUpgrade(cmd, args)
+				} else if upgradePackage != "" {
+					upgadeAgent(cmd, args)
+				} else {
+					fmt.Println(cmd.Example)
+				}
 
-	agentUpgrade.AddCommand(list)
+			} else {
+				fmt.Println(cmd.Example)
+			}
+		},
+	}
+	agentUpgrade.Flags().StringVarP(&upgradePackage, "package", "c", "", "")
 
 	return agentUpgrade
 }
 
 func listAgentUpgrade(cmd *cobra.Command, args []string) {
-
 	// 生成URL
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/vtaps/", server.IP, server.Port)
@@ -224,7 +214,7 @@ var upgradePackage string
 
 func upgadeAgent(cmd *cobra.Command, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name and package. Example: %s", cmd.Example)
+		fmt.Fprintf(os.Stderr, "must specify name and package. Examples: \n%s", cmd.Example)
 		return
 	}
 	vtapName := args[0]

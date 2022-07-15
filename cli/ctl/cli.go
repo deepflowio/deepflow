@@ -35,7 +35,8 @@ func Execute() {
 	}
 
 	root.PersistentFlags().StringP("ip", "i", common.GetDefaultRouteIP(), "metaflow-server service ip")
-	root.PersistentFlags().Uint32P("port", "p", 30417, "metaflow-server service port")
+	root.PersistentFlags().Uint32P("api-port", "", 30417, "metaflow-server service http port")
+	root.PersistentFlags().Uint32P("rpc-port", "", 30035, "metaflow-server service grpc port")
 
 	root.AddCommand(RegisterAgentCommand())
 	root.AddCommand(RegisterAgentUpgradeCommand())
