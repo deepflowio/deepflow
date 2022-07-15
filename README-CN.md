@@ -18,13 +18,13 @@ MetaFlow是[云杉网络](https://yunshan.net)开源的一款**高度自动化**
 
 # 文档
 
-详细信息请访问 [GitHub](https://github.com/metaflowys/docs/tree/main/zh/)，或者[文档站点](https://deepflow.yunshan.net/metaflow-docs/zh/)。
+详细信息请访问[文档站点](https://deepflow.yunshan.net/metaflow-docs/zh/)。
 
 # 快速上手
 
 ## 部署 MetaFlow
 
-请参考部署文档 [GitHub](https://github.com/metaflowys/docs/tree/main/zh/02-install)，[文档站点](https://deepflow.yunshan.net/metaflow-docs/zh/install/all-in-one/)。
+请参考[部署文档](https://deepflow.yunshan.net/metaflow-docs/zh/install/all-in-one/)。
 
 ## 体验 MetaFlow Demo
 
