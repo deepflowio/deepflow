@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/metaflowys/metaflow/server/controller/common"
 	"github.com/metaflowys/metaflow/server/controller/db/mysql"
 	"github.com/metaflowys/metaflow/server/controller/model"
@@ -137,9 +139,9 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			vtapResp.LicenseFunctions = append(vtapResp.LicenseFunctions, functionInt)
 		}
 		// az
-		vtapResp.Az = vtap.AZ
+		vtapResp.AZ = vtap.AZ
 		if azName, ok := lcuuidToAz[vtap.AZ]; ok {
-			vtapResp.AzName = azName
+			vtapResp.AZName = azName
 		}
 		// vtap_group
 		vtapResp.VtapGroupLcuuid = vtap.VtapGroupLcuuid
@@ -174,6 +176,45 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 		response = append(response, vtapResp)
 	}
 	return response, nil
+}
+
+func CreateVtap(vtapCreate model.VtapCreate) (model.Vtap, error) {
+	var vtap mysql.VTap
+	var err error
+
+	if ret := mysql.Db.Where("ctrl_ip = ?", vtapCreate.CtrlIP).First(&vtap); ret.Error == nil {
+		return model.Vtap{}, NewError(
+			common.RESOURCE_ALREADY_EXIST,
+			fmt.Sprintf("vtap (ctrl_ip: %s) already exist", vtapCreate.CtrlIP),
+		)
+	}
+
+	if ret := mysql.Db.Where("name = ?", vtapCreate.Name).First(&vtap); ret.Error == nil {
+		return model.Vtap{}, NewError(
+			common.RESOURCE_ALREADY_EXIST,
+			fmt.Sprintf("vtap (%s) already exist", vtapCreate.Name),
+		)
+	}
+
+	// vtap name not support space && :
+	vtapName := vtapCreate.Name
+	strings.Replace(vtapName, ":", "-", -1)
+	strings.Replace(vtapName, " ", "-", -1)
+
+	vtap = mysql.VTap{}
+	lcuuid := uuid.New().String()
+	vtap.Lcuuid = lcuuid
+	vtap.Name = vtapName
+	vtap.Type = vtapCreate.Type
+	vtap.Enable = common.VTAP_ENABLE_TRUE
+	vtap.CtrlIP = vtapCreate.CtrlIP
+	vtap.LaunchServer = vtapCreate.CtrlIP
+	vtap.AZ = vtapCreate.AZ
+	vtap.VtapGroupLcuuid = vtapCreate.VtapGroupLcuuid
+	mysql.Db.Create(&vtap)
+
+	response, _ := GetVtaps(map[string]interface{}{"lcuuid": lcuuid})
+	return response[0], err
 }
 
 func UpdateVtap(lcuuid, name string, vtapUpdate map[string]interface{}) (resp model.Vtap, err error) {

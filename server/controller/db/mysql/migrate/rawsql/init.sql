@@ -949,6 +949,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     arch                    VARCHAR(256),
     os                      VARCHAR(256),
     kernel_version          VARCHAR(256),
+    process_name            VARCHAR(256),
     license_type            INTEGER COMMENT '1: A类 2: B类 3: C类',
     license_functions       CHAR(64) COMMENT 'separated by ,; 1: 流量分发 2: 网络监控 3: 应用监控',
     tap_mode                INTEGER,
@@ -1988,7 +1989,7 @@ INSERT INTO vl2(state, name, net_type, isp, lcuuid, domain) values(0, 'PublicNet
 
 set @lcuuid = (select uuid());
 set @short_uuid = (select substr(replace(uuid(),'-',''), 1, 10));
-INSERT INTO vtap_group(lcuuid, id, name, short_uuid) values(@lcuuid, 1, "默认", @short_uuid);
+INSERT INTO vtap_group(lcuuid, id, name, short_uuid) values(@lcuuid, 1, "default", @short_uuid);
 INSERT INTO vtap_system_configuration(lcuuid, vtap_group_lcuuid, max_collect_pps, max_npb_bps, max_cpus, max_memory, sync_interval, bandwidth_probe_interval, tap_interface_regex) values(@lcuuid, @lcuuid, 200000, 1000000000, 1, 768, 60, 10, 'tap.*');
 INSERT INTO vtap_group_configuration(lcuuid) values(@lcuuid);
 set @lcuuid = (select uuid());

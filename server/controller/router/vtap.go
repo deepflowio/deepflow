@@ -31,14 +31,17 @@ import (
 func VtapRouter(e *gin.Engine) {
 	e.GET("/v1/vtaps/:lcuuid/", getVtap)
 	e.GET("/v1/vtaps/", getVtaps)
+	e.POST("/v1/vtaps/", createVtap)
 	e.PATCH("/v1/vtaps/:lcuuid/", updateVtap)
 	e.PATCH("/v1/vtaps-by-name/:name/", updateVtap)
+	e.DELETE("/v1/vtaps/:lcuuid/", deleteVtap)
 	e.POST("/v1/vtaps/batch/", batchUpdateVtap)
+	e.DELETE("/v1/vtaps/batch/", batchDeleteVtap)
+
+	e.POST("/v1/rebalance-vtap/", rebalanceVtap)
+
 	e.PATCH("/v1/vtaps-license-type/:lcuuid/", updateVtapLicenseType)
 	e.PATCH("/v1/vtaps-license-type/", batchUpdateVtapLicenseType)
-	e.DELETE("/v1/vtaps/:lcuuid/", deleteVtap)
-	e.DELETE("/v1/vtaps/batch/", batchDeleteVtap)
-	e.POST("/v1/rebalance-vtap/", rebalanceVtap)
 }
 
 func getVtap(c *gin.Context) {
@@ -64,6 +67,21 @@ func getVtaps(c *gin.Context) {
 		args["analyzer_ip"] = value
 	}
 	data, err := service.GetVtaps(args)
+	JsonResponse(c, data, err)
+}
+
+func createVtap(c *gin.Context) {
+	var err error
+	var vtapCreate model.VtapCreate
+
+	// 参数校验
+	err = c.ShouldBindBodyWith(&vtapCreate, binding.JSON)
+	if err != nil {
+		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		return
+	}
+
+	data, err := service.CreateVtap(vtapCreate)
 	JsonResponse(c, data, err)
 }
 
