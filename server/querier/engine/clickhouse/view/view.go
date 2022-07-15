@@ -356,7 +356,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.From.WriteTo(buf)
 	}
 	if !sv.Filters.IsNull() {
-		if strings.HasPrefix(sv.From.ToString(), "deepflow") {
+		if strings.HasPrefix(sv.From.ToString(), "flow_tag") {
 			buf.WriteString(" WHERE ")
 		} else {
 			buf.WriteString(" PREWHERE ")
