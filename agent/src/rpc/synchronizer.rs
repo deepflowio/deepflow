@@ -43,7 +43,7 @@ use super::ntp::{NtpMode, NtpPacket, NtpTime};
 
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
-use crate::common::{FlowAclListener, PlatformData as VInterface};
+use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::policy::PolicySetter;
@@ -70,8 +70,7 @@ pub struct StaticConfig {
     pub tap_mode: tp::TapMode,
     pub vtap_group_id_request: String,
     pub kubernetes_cluster_id: String,
-    pub ctrl_mac: String,
-    pub ctrl_ip: String,
+
     pub controller_ip: String,
 
     pub env: RuntimeEnvironment,
@@ -85,10 +84,22 @@ impl Default for StaticConfig {
             tap_mode: Default::default(),
             vtap_group_id_request: Default::default(),
             kubernetes_cluster_id: Default::default(),
-            ctrl_ip: Default::default(),
-            ctrl_mac: Default::default(),
             controller_ip: Default::default(),
             env: Default::default(),
+        }
+    }
+}
+
+pub struct RunningConfig {
+    pub ctrl_mac: String,
+    pub ctrl_ip: String,
+}
+
+impl Default for RunningConfig {
+    fn default() -> Self {
+        Self {
+            ctrl_ip: Default::default(),
+            ctrl_mac: Default::default(),
         }
     }
 }
@@ -103,6 +114,7 @@ pub struct Status {
     pub new_revision: Option<String>,
 
     pub proxy_ip: Option<IpAddr>,
+    pub proxy_port: u16,
     pub sync_interval: Duration,
     pub ntp_enabled: bool,
 
@@ -130,6 +142,7 @@ impl Default for Status {
             new_revision: None,
 
             proxy_ip: None,
+            proxy_port: DEFAULT_CONTROLLER_PORT,
             sync_interval: Default::default(),
             ntp_enabled: false,
 
@@ -356,6 +369,7 @@ impl Status {
 
 pub struct Synchronizer {
     pub static_config: Arc<StaticConfig>,
+    pub running_config: Arc<RwLock<RunningConfig>>,
     pub status: Arc<RwLock<Status>>,
 
     trident_state: TridentState,
@@ -395,11 +409,10 @@ impl Synchronizer {
                 tap_mode: tp::TapMode::Local,
                 vtap_group_id_request,
                 kubernetes_cluster_id,
-                ctrl_mac,
-                ctrl_ip,
                 controller_ip,
                 env: RuntimeEnvironment::new(),
             }),
+            running_config: Arc::new(RwLock::new(RunningConfig { ctrl_mac, ctrl_ip })),
             trident_state,
             status: Default::default(),
             session,
@@ -412,6 +425,14 @@ impl Synchronizer {
             max_memory: Default::default(),
             ntp_diff: Default::default(),
         }
+    }
+
+    pub fn reset_session(&self, controller_ips: Vec<String>, ctrl_ip: String, ctrl_mac: String) {
+        self.session.reset_server_ip(controller_ips);
+
+        let mut running_config = self.running_config.write();
+        running_config.ctrl_ip = ctrl_ip;
+        running_config.ctrl_mac = ctrl_mac;
     }
 
     pub fn add_flow_acl_listener(&mut self, module: Box<dyn FlowAclListener>) {
@@ -429,6 +450,7 @@ impl Synchronizer {
     }
 
     pub fn generate_sync_request(
+        running_config: &Arc<RwLock<RunningConfig>>,
         static_config: &Arc<StaticConfig>,
         status: &Arc<RwLock<Status>>,
         time_diff: i64,
@@ -454,6 +476,8 @@ impl Synchronizer {
             }
         }
 
+        let running_config = running_config.read();
+
         tp::SyncRequest {
             boot_time: Some(boot_time as u32),
             config_accepted: Some(status.config_accepted),
@@ -464,8 +488,8 @@ impl Synchronizer {
             revision: Some(static_config.revision.to_owned()),
             exception: Some(exception_handler.take()),
             process_name: Some(env!("AGENT_NAME").into()),
-            ctrl_mac: Some(static_config.ctrl_mac.clone()),
-            ctrl_ip: Some(static_config.ctrl_ip.clone()),
+            ctrl_mac: Some(running_config.ctrl_mac.clone()),
+            ctrl_ip: Some(running_config.ctrl_ip.clone()),
             tap_mode: Some(static_config.tap_mode.into()),
             host: Some(status.hostname.clone()),
             host_ips: utils::net::addr_list().map_or(vec![], |xs| {
@@ -597,6 +621,7 @@ impl Synchronizer {
 
         let mut status = status.write();
         status.proxy_ip = runtime_config.proxy_controller_ip.parse().ok();
+        status.proxy_port = runtime_config.proxy_controller_port;
         status.sync_interval = runtime_config.sync_interval;
         status.ntp_enabled = runtime_config.ntp_enabled;
         let updated_platform = status.get_platform_data(&resp);
@@ -652,6 +677,7 @@ impl Synchronizer {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
+        let running_config = self.running_config.clone();
         let status = self.status.clone();
         let running = self.running.clone();
         let max_memory = self.max_memory.clone();
@@ -660,7 +686,7 @@ impl Synchronizer {
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
-                session.update_current_server().await;
+                session.update_triggered_current_server().await;
                 let client = session.get_client();
                 if client.is_none() {
                     info!("rpc trigger not running, client not connected");
@@ -672,6 +698,7 @@ impl Synchronizer {
 
                 let response = client
                     .push(Synchronizer::generate_sync_request(
+                        &running_config,
                         &static_config,
                         &status,
                         ntp_diff.load(Ordering::Relaxed),
@@ -685,10 +712,11 @@ impl Synchronizer {
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
+
                 let mut stream = response.unwrap().into_inner();
                 while running.load(Ordering::SeqCst) {
                     let message = stream.message().await;
-                    if session.get_version() != version {
+                    if session.get_version() != version || session.reset_triggered() {
                         info!("grpc server changed");
                         break;
                     }
@@ -758,7 +786,7 @@ impl Synchronizer {
     }
 
     fn run_ntp_sync(&self) {
-        let static_config = self.static_config.clone();
+        let running_config = self.running_config.clone();
         let session = self.session.clone();
         let status = self.status.clone();
         let running = self.running.clone();
@@ -792,9 +820,10 @@ impl Synchronizer {
                 ntp_msg.ts_xmit = rand::thread_rng().next_u64();
                 let send_time = SystemTime::now();
 
+                let ctrl_ip = running_config.read().ctrl_ip.clone();
                 let response = client
                     .query(tp::NtpRequest {
-                        ctrl_ip: Some(static_config.ctrl_ip.clone()),
+                        ctrl_ip: Some(ctrl_ip),
                         request: Some(ntp_msg.to_vec()),
                     })
                     .await;
@@ -1008,6 +1037,7 @@ impl Synchronizer {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
         let static_config = self.static_config.clone();
+        let running_config = self.running_config.clone();
         let status = self.status.clone();
         let mut sync_interval = DEFAULT_SYNC_INTERVAL;
         let running = self.running.clone();
@@ -1032,12 +1062,13 @@ impl Synchronizer {
                     Err(e) => warn!("refresh hostname failed: {}", e),
                 }
                 if session.get_request_failed() {
+                    let running_config = running_config.read();
                     let status = status.read();
                     info!(
                         "TapMode: {:?}, CtrlMac: {}, CtrlIp: {}, Hostname: {}",
                         static_config.tap_mode,
-                        static_config.ctrl_mac,
-                        static_config.ctrl_ip,
+                        running_config.ctrl_mac,
+                        running_config.ctrl_ip,
                         status.hostname,
                     )
                 }
@@ -1045,6 +1076,7 @@ impl Synchronizer {
                 let changed = session.update_current_server().await;
 
                 let request = Synchronizer::generate_sync_request(
+                    &running_config,
                     &static_config,
                     &status,
                     ntp_diff.load(Ordering::Relaxed),
@@ -1060,6 +1092,7 @@ impl Synchronizer {
                         time::sleep(Duration::new(1, 0)).await;
                         continue;
                     }
+
                     client = Some(tp::synchronizer_client::SynchronizerClient::new(
                         inner_client.unwrap(),
                     ));
@@ -1087,6 +1120,7 @@ impl Synchronizer {
                         "grpc sync new rpc server {} available",
                         session.get_current_server()
                     );
+                    client = None;
                 }
 
                 Self::on_response(
@@ -1100,16 +1134,21 @@ impl Synchronizer {
                     &exception_handler,
                     &escape_tx,
                 );
-                let (new_revision, proxy_ip, new_sync_interval) = {
+                let (new_revision, proxy_ip, proxy_port, new_sync_interval) = {
                     let status = status.read();
                     (
                         status.new_revision.clone(),
                         status.proxy_ip.clone(),
+                        status.proxy_port,
                         status.sync_interval,
                     )
                 };
                 if let Some(revision) = new_revision {
-                    match Self::upgrade(&running, &session, &revision, &static_config.ctrl_ip, &static_config.ctrl_mac).await {
+                    let (ctrl_ip, ctrl_mac) = {
+                        let running_config = running_config.read();
+                        (running_config.ctrl_ip.clone(), running_config.ctrl_mac.clone())
+                    };
+                    match Self::upgrade(&running, &session, &revision, &ctrl_ip, &ctrl_mac).await {
                         Ok(_) => {
                             let (ts, cvar) = &*trident_state;
                             *ts.lock().unwrap() = trident::State::Terminated;
@@ -1125,14 +1164,12 @@ impl Synchronizer {
                     }
                     status.write().new_revision = None;
                 }
-                match (proxy_ip, session.get_proxy_server()) {
-                    (Some(proxy), Some(ip)) if &ip == &proxy => (),
-                    (Some(proxy), _) => {
-                        info!("proxy_controller_ip update to {}", proxy);
-                        session.set_proxy_server(proxy);
-                    }
-                    _ => (),
+                let (current_proxy_ip, current_proxy_port) = session.get_proxy_server();
+                if proxy_ip != current_proxy_ip || proxy_port != current_proxy_port {
+                    info!("ProxyController update to {:?}:{:?}", proxy_ip, proxy_port);
+                    session.set_proxy_server(proxy_ip, proxy_port);
                 }
+
                 if sync_interval != new_sync_interval {
                     sync_interval = new_sync_interval;
                     info!("sync interval set to {:?}", sync_interval);
@@ -1149,7 +1186,7 @@ impl Synchronizer {
         }
         self.run_ntp_sync();
         let esc_tx = self.run_escape_timer();
-        self.run_triggered_session(esc_tx.clone());
+        //self.run_triggered_session(esc_tx.clone());
         self.run(esc_tx);
     }
 

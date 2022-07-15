@@ -30,7 +30,7 @@ use cadence::{
 };
 use log::{debug, info, warn};
 
-use crate::common::DROPLET_PORT;
+use crate::common::DEFAULT_INGESTER_PORT;
 
 const TICK_CYCLE: Duration = Duration::from_secs(5);
 
@@ -342,7 +342,7 @@ impl Collector {
                         Some(remotes) => {
                             statsd_clients.clear();
                             for remote in remotes.iter() {
-                                match Self::new_statsd_client((*remote, DROPLET_PORT)) {
+                                match Self::new_statsd_client((*remote, DEFAULT_INGESTER_PORT)) {
                                     Ok(client) => statsd_clients.push(Some(client)),
                                     Err(e) => {
                                         warn!("create client to remote {} failed: {}", remote, e);
@@ -357,7 +357,10 @@ impl Collector {
                                 if client.is_some() {
                                     continue;
                                 }
-                                match Self::new_statsd_client((old_remotes[i], DROPLET_PORT)) {
+                                match Self::new_statsd_client((
+                                    old_remotes[i],
+                                    DEFAULT_INGESTER_PORT,
+                                )) {
                                     Ok(s) => {
                                         client.replace(s);
                                     }

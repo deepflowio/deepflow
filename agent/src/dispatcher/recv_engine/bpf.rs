@@ -17,7 +17,7 @@
 use std::net::IpAddr;
 
 use crate::common::{
-    enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III, DROPLET_PORT, NPB_VXLAN_FLAGS,
+    enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III, DEFAULT_INGESTER_PORT, NPB_VXLAN_FLAGS,
 };
 
 pub(crate) struct Builder {
@@ -47,11 +47,11 @@ impl Builder {
         // 不采集和TSDB通信的流量
         conditions.push(format!(
             "not ({} and src host {} and dst port {})",
-            ip_version, self.analyzer_source_ip, DROPLET_PORT
+            ip_version, self.analyzer_source_ip, DEFAULT_INGESTER_PORT
         ));
         conditions.push(format!(
             "not ({} and dst host {} and src port {})",
-            ip_version, self.analyzer_source_ip, DROPLET_PORT
+            ip_version, self.analyzer_source_ip, DEFAULT_INGESTER_PORT
         ));
 
         // 不采集分发的VXLAN流量

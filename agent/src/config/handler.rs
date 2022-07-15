@@ -29,6 +29,7 @@ use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
 
+use super::config::PortConfig;
 use super::{
     config::{Config, PcapConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
@@ -92,6 +93,8 @@ pub type EbpfAccess = Access<EbpfConfig>;
 
 pub type MetricServerAccess = Access<MetricServerConfig>;
 
+pub type PortAccess = Access<PortConfig>;
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct CollectorConfig {
     pub enabled: bool,
@@ -150,6 +153,7 @@ pub struct SenderConfig {
     pub mtu: u32,
     pub dest_ip: IpAddr,
     pub vtap_id: u16,
+    pub dest_port: u16,
     pub npb_vlan_mode: trident::VlanMode,
     pub npb_dedup_enabled: bool,
     pub npb_bps_threshold: u64,
@@ -545,6 +549,7 @@ pub struct ModuleConfig {
     pub ebpf: EbpfConfig,
     pub trident_type: TridentType,
     pub metric_server: MetricServerConfig,
+    pub port_config: PortConfig,
 }
 
 impl Default for ModuleConfig {
@@ -638,6 +643,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 mtu: conf.mtu,
                 dest_ip,
                 vtap_id: conf.vtap_id as u16,
+                dest_port: conf.analyzer_port,
                 npb_vlan_mode: conf.npb_vlan_mode,
                 npb_dedup_enabled: conf.npb_dedup_enabled,
                 npb_bps_threshold: conf.npb_bps_threshold,
@@ -750,6 +756,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 port: conf.external_agent_http_proxy_port as u16,
             },
             trident_type: conf.trident_type,
+            port_config: PortConfig {
+                analyzer_port: conf.analyzer_port,
+                proxy_controller_port: conf.proxy_controller_port,
+            },
         };
         Ok(config)
     }
@@ -880,6 +890,12 @@ impl ConfigHandler {
             self.current_config.clone(),
             |config| -> &MetricServerConfig { &config.metric_server },
         )
+    }
+
+    pub fn port(&self) -> PortAccess {
+        Map::new(self.current_config.clone(), |config| -> &PortConfig {
+            &config.port_config
+        })
     }
 
     pub fn on_config(

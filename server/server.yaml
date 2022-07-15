@@ -8,7 +8,7 @@ controller:
 
   # deepflow web service config
   df-web-service:
-    enabled: true
+    enabled: false
     host: df-web
     port: 20825
     timeout: 30
@@ -33,7 +33,7 @@ controller:
 
   # clickhouse相关配置
   clickhouse:
-    database: deepflow
+    database: flow_tag
     user-name: default
     port: 9000
     # user-password:

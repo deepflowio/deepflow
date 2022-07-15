@@ -20,7 +20,7 @@ use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering},
-    Arc, Mutex, Weak,
+    Arc, Mutex, RwLock, Weak,
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -30,10 +30,12 @@ use hostname;
 
 use super::stats;
 
+#[derive(Clone)]
 pub struct RemoteLogConfig {
     enabled: Arc<AtomicBool>,
     threshold: Arc<AtomicU32>,
     hostname: Arc<Mutex<String>>,
+    remotes: Arc<RwLock<Vec<SocketAddr>>>,
 }
 
 impl RemoteLogConfig {
@@ -48,12 +50,20 @@ impl RemoteLogConfig {
     pub fn set_hostname(&self, hostname: String) {
         *self.hostname.lock().unwrap() = hostname;
     }
+
+    pub fn set_remotes<S: AsRef<str>>(&self, addrs: &[S], port: u16) {
+        let remotes = addrs
+            .iter()
+            .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
+            .collect();
+        *self.remotes.write().unwrap() = remotes;
+    }
 }
 
 pub struct RemoteLogWriter {
-    remotes: Vec<SocketAddr>,
     socket: UdpSocket,
 
+    remotes: Arc<RwLock<Vec<SocketAddr>>>,
     enabled: Arc<AtomicBool>,
     threshold: Arc<AtomicU32>,
     hostname: Arc<Mutex<String>>,
@@ -80,12 +90,15 @@ impl RemoteLogWriter {
                 .and_then(|c| c.into_string().ok())
                 .unwrap_or_default(),
         ));
+        let remotes = Arc::new(RwLock::new(
+            addrs
+                .iter()
+                .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
+                .collect(),
+        ));
         (
             Self {
-                remotes: addrs
-                    .iter()
-                    .map(|addr| SocketAddr::new(addr.as_ref().parse().unwrap(), port))
-                    .collect(),
+                remotes: remotes.clone(),
                 socket: UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).unwrap(),
                 enabled: enabled.clone(),
                 threshold: threshold.clone(),
@@ -103,6 +116,7 @@ impl RemoteLogWriter {
                 enabled,
                 threshold,
                 hostname,
+                remotes,
             },
         )
     }
@@ -163,7 +177,8 @@ impl RemoteLogWriter {
             buffer.push('\n' as u8);
         }
         let mut result = Ok(());
-        for remote in self.remotes.iter() {
+        let remotes = self.remotes.read().unwrap();
+        for remote in remotes.iter() {
             match self.socket.send_to(buffer.as_slice(), remote) {
                 Err(e) => result = Err(e),
                 _ => (),

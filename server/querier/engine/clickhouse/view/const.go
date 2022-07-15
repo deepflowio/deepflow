@@ -26,6 +26,7 @@ const (
 const (
 	METRICS_FLAG_INNER int = iota // METRICS专用FLAG，仅在计算层内层
 	METRICS_FLAG_OUTER            // METRICS专用FLAG，仅在计算层外层
+	METRICS_FLAG_TOP              // METRICS专用FLAG，在整体sql外再增加一层，仅包含该FLAG的字段
 )
 
 const (

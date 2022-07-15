@@ -134,6 +134,17 @@ func (f *BinaryFunction) Trans(m *view.Model) view.Node {
 		fieldFunc := field.Trans(m)
 		fields = append(fields, fieldFunc)
 	}
+	if f.Name == view.FUCNTION_HISTOGRAM {
+		hisInnerName := fields[0].(view.Function).GetDefaultAlias(true)
+		fields[0].(view.Function).SetAlias(hisInnerName, true)
+		fields[0].(view.Function).SetFlag(view.METRICS_FLAG_OUTER)
+		m.AddTag(fields[0])
+		histogram := view.GetFunc(f.Name)
+		histogram.SetFields([]view.Node{&view.Field{Value: hisInnerName}, fields[1]})
+		histogram.SetFlag(view.METRICS_FLAG_TOP)
+		histogram.Init()
+		return histogram
+	}
 	function := view.GetFunc(f.Name)
 	function.SetFields(fields)
 	function.SetFlag(view.METRICS_FLAG_OUTER)

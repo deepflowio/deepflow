@@ -168,9 +168,9 @@ func (v *View) GetCallbacks() (callbacks []func(columns []interface{}, values []
 func (v *View) trans() {
 	var tagsLevelInner []Node
 	var tagsLevelMetrics []Node
-	var tagsLevelOuter []Node
 	var metricsLevelInner []Node
 	var metricsLevelMetrics []Node
+	var metricsLevelTop []Node
 	var groupsLevelInner []Node
 	var groupsLevelMetrics []Node
 	var tagsAliasInner []string
@@ -191,9 +191,6 @@ func (v *View) trans() {
 				}
 				tagsLevelMetrics = append(tagsLevelMetrics, metricTag)
 				tagsAliasInner = append(tagsAliasInner, metricTag.Value)
-			} else if node.Flag == NODE_FLAG_TRANS {
-				// 需要放入最外层的tag
-				tagsLevelOuter = append(tagsLevelOuter, tag)
 			} else if node.Flag == NODE_FLAG_METRICS_INNER {
 				metricsLevelInner = append(metricsLevelInner, tag)
 				tagsAliasInner = append(tagsAliasInner, node.Alias)
@@ -208,6 +205,8 @@ func (v *View) trans() {
 				metricsLevelInner = append(metricsLevelInner, tag)
 			} else if flag == METRICS_FLAG_OUTER {
 				metricsLevelMetrics = append(metricsLevelMetrics, tag)
+			} else if flag == METRICS_FLAG_TOP {
+				metricsLevelTop = append(metricsLevelTop, tag)
 			}
 		}
 	}
@@ -276,13 +275,13 @@ func (v *View) trans() {
 		}
 		v.SubViewLevels = append(v.SubViewLevels, &svMetrics)
 	}
-	if tagsLevelOuter != nil {
-		// 翻译层
+	if metricsLevelTop != nil {
+		// 顶层，只保留指定tag，比如histogram
 		svOuter := SubView{
-			Tags:    &Tags{tags: tagsLevelOuter}, // 所有翻译层tag
-			Groups:  &Groups{},                   // 空group
-			From:    &Tables{},                   // 空table
-			Filters: &Filters{},                  //空filter
+			Tags:    &Tags{tags: metricsLevelTop}, // 所有翻译层tag
+			Groups:  &Groups{},                    // 空group
+			From:    &Tables{},                    // 空table
+			Filters: &Filters{},                   //空filter
 			Havings: &Filters{},
 			Orders:  &Orders{},
 			Limit:   &Limit{},
@@ -357,7 +356,7 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.From.WriteTo(buf)
 	}
 	if !sv.Filters.IsNull() {
-		if strings.HasPrefix(sv.From.ToString(), "deepflow") {
+		if strings.HasPrefix(sv.From.ToString(), "flow_tag") {
 			buf.WriteString(" WHERE ")
 		} else {
 			buf.WriteString(" PREWHERE ")

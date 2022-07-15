@@ -43,7 +43,7 @@ use super::{
 use crate::{
     config::handler::DebugAccess,
     platform::{ApiWatcher, GenericPoller},
-    rpc::{Session, StaticConfig, Status},
+    rpc::{RunningConfig, Session, StaticConfig, Status},
 };
 
 struct ModuleDebuggers {
@@ -65,6 +65,7 @@ pub struct ConstructDebugCtx {
     pub poller: Arc<GenericPoller>,
     pub session: Arc<Session>,
     pub static_config: Arc<StaticConfig>,
+    pub running_config: Arc<RwLock<RunningConfig>>,
     pub status: Arc<RwLock<Status>>,
 }
 
@@ -245,7 +246,12 @@ impl Debugger {
     pub fn new(context: ConstructDebugCtx) -> Self {
         let debuggers = ModuleDebuggers {
             platform: PlatformDebugger::new(context.api_watcher, context.poller),
-            rpc: RpcDebugger::new(context.session, context.static_config, context.status),
+            rpc: RpcDebugger::new(
+                context.session,
+                context.static_config,
+                context.running_config,
+                context.status,
+            ),
             queue: Arc::new(QueueDebugger::new()),
         };
 
