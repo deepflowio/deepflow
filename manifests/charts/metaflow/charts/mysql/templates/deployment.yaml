@@ -1,0 +1,128 @@
+{{- if not .Values.externalMySQL.enabled }}
+{{- if and (not $.Values.global.allInOneLocalStorage ) (eq ( tpl $.Values.storageConfig.generateType . ) "hostPath") (not $.Values.nodeAffinityLabelSelector)  }}
+{{- fail "You must set nodeAffinityLabelSelector"  -}}
+{{- end}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mysql.fullname" . }}
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "mysql.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mysql.selectorLabels" . | nindent 8 }}
+    spec:
+      hostNetwork: {{ tpl .Values.hostNetwork . }}
+      dnsPolicy: {{ tpl .Values.dnsPolicy . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if and (eq ( tpl $.Values.storageConfig.generateType . ) "hostPath") ($.Values.storageConfig.hostPathChownContainerEnabled) }}
+      initContainers:
+      - name: hostpath-chown
+        image: "{{ tpl .Values.image.repository . }}:{{ tpl .Values.image.tag . }}"
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+        command:
+        - chown
+        - 27:27
+        - /var/lib/mysql
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: data-path
+      {{- end }}
+      containers:
+        - name: mysql
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ tpl .Values.image.repository . }}:{{ tpl .Values.image.tag . }}"
+          imagePullPolicy: {{ tpl .Values.image.pullPolicy . }}
+          ports:
+            - name: tcp
+              containerPort: 30130
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ tpl .Values.password . }}
+            - name: MYSQL_DATABASE
+              value: grafana
+            - name: TZ
+              value: "{{ tpl .Values.timezone . }}"
+          volumeMounts:
+          - name: mysql-config
+            mountPath: /etc/my.cnf
+            subPath: my.cnf
+          - name: mysql-config-init-sql
+            mountPath: /docker-entrypoint-initdb.d/init.sql
+            subPath: init.sql
+          - mountPath: /var/lib/mysql
+            name: data-path
+      volumes:
+        - name: mysql-config
+          configMap:
+            name: {{ include "mysql.fullname" . }}
+            items:
+            - key: my.cnf
+              path: my.cnf
+        - name: mysql-config-init-sql
+          configMap:
+            name: {{ include "mysql.fullname" . }}
+            items:
+            - key: init.sql
+              path: init.sql
+        - name: data-path
+          {{- if eq ( tpl .Values.storageConfig.generateType . )  "persistentVolumeClaim" }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.storageConfig.persistence.existingClaim | default (printf "%s-data-pvc" (include "mysql.fullname" . )) }}
+          {{- end }}
+          {{- if eq ( tpl .Values.storageConfig.generateType . )  "hostPath" }}
+          hostPath:
+            type: DirectoryOrCreate
+            path: {{ tpl .Values.storageConfig.hostPath . }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+      {{- include "nodeaffinity" . | indent 6 }}
+      {{- include "podAffinity" . | indent 6 }}
+      {{- include "podAntiAffinity" . | indent 6 }}
+      {{- if or .Values.global.tolerations .Values.tolerations }}
+      tolerations:
+      {{- if .Values.global.tolerations }}
+      {{- toYaml .Values.global.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- end }}
+{{- end }}

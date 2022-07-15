@@ -1,0 +1,322 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 40,
+  "iteration": 1657880942856,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "metaflow-querier-datasource",
+        "uid": "P685C713A23B37E1B"
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "content": "[English doc](https://deepflow.yunshan.net/metaflow-docs/auto-tracing/tracing-without-instrumentation/?from=metaflow_grafana) | [中文文档](https://deepflow.yunshan.net/metaflow-docs/zh/auto-tracing/tracing-without-instrumentation/?from=metaflow_grafana) \n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.0.1",
+      "title": "Help doc",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "metaflow-querier-datasource",
+        "uid": "P685C713A23B37E1B"
+      },
+      "gridPos": {
+        "h": 26,
+        "w": 24,
+        "x": 0,
+        "y": 2
+      },
+      "id": 2,
+      "targets": [
+        {
+          "datasource": {
+            "type": "metaflow-querier-datasource",
+            "uid": "P685C713A23B37E1B"
+          },
+          "queryText": "{\"appType\":\"appTracing\",\"db\":\"flow_log\",\"sources\":\"\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"tag\",\"key\":\"resource_gl0_0\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"99f97606-ded4-a1f4-deee-249f33199602\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"resource_gl0_1\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"95f7a0fa-5a01-f187-e20e-f7a1dbba689f\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"start_time\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"6ce24d7e-d79e-41f7-e001-c965c8ab106e\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"tap_port_type\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"6518d2b9-dd58-5f59-715c-bebc692f48a8\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"l7_protocol\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"129cd243-f547-37aa-644c-e255b4cbb355\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_type\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"a43b9027-2b37-0eb9-ba41-fff284fd7625\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_domain\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"15998d0b-0e1d-9b58-72dc-f83fe97429bc\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_resource\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"bf1853d3-d4b4-bbe8-67b9-259ca07dbf34\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"e7e86fc2-641d-d84d-32b0-f539954612fb\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"response_code\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"57d0e758-ea57-1199-1e23-294b8fe4787c\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"response_exception\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"381f5cc9-0d06-fd54-265d-f4e2bd251617\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"trace_id\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"5084117b-5ab6-a54d-b83b-80641c6e4968\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"span_id\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"f98dc733-ec00-4a00-b9b0-b56d9795d874\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"server_port\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"e02d6fdf-9c63-eb0e-eb16-c200151a2e38\",\"subFuncs\":[]},{\"type\":\"metric\",\"key\":\"response_duration\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"1ca8cf35-2264-6e15-4753-9852ffda888f\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"tap_port_type\",\"func\":\"\",\"op\":\"IN\",\"val\":[{\"label\":\"eBPF\",\"value\":7},{\"label\":\"OTel\",\"value\":8}],\"as\":\"\",\"params\":[],\"uuid\":\"dbdf76ff-4247-3f52-ac19-95f9aede0847\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"68084bee-6c97-7cbe-fd7f-19f14837990e\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"f4cee59f-b541-4ccf-bb31-04c8c5a9d5ee\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"bb5cab64-7946-944f-061a-9bdb195633ea\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"chost\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$vm\",\"value\":\"vm\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"e92ec533-e7aa-c8c0-c5e8-47d85db5ec0e\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"trace_id\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$trace_id\",\"label\":\"$trace_id\"}],\"as\":\"\",\"params\":[],\"uuid\":\"08dfe596-8f06-964c-2f67-3f67f3292b44\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"span_id\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$span_id\",\"label\":\"$span_id\"}],\"as\":\"\",\"params\":[],\"uuid\":\"5441c84b-8c80-b91b-f4ee-7156de93434b\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_resource\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_resource\",\"label\":\"$request_resource\"}],\"as\":\"\",\"params\":[],\"uuid\":\"30431513-5c41-154d-2389-f1a96606ee49\",\"subFuncs\":[]}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"2f6dc781-615c-8afe-2b7a-cf14da4dd600\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"198f5bc6-8b33-8f45-4972-83072443e2a9\"}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"5ed382d7-5c9b-232c-eac8-96538075de1e\",\"sort\":\"asc\"}],\"interval\":\"\",\"limit\":\"100\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Request List",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "_id": false,
+              "resource_gl0_id_0": true,
+              "resource_gl0_id_1": true,
+              "resource_gl1_id_1": true,
+              "response_code": true,
+              "response_exception": true,
+              "tap_port_type": false
+            },
+            "indexByName": {
+              "_id": 15,
+              "l7_protocol": 7,
+              "request_domain": 9,
+              "request_resource": 10,
+              "request_type": 8,
+              "resource_gl0_0": 1,
+              "resource_gl0_1": 2,
+              "resource_gl0_id_0": 16,
+              "resource_gl0_id_1": 17,
+              "response_code": 12,
+              "response_exception": 13,
+              "response_status": 11,
+              "server_port": 3,
+              "span_id": 6,
+              "start_time": 0,
+              "tap_port_type": 4,
+              "trace_id": 5,
+              "响应时延": 14
+            },
+            "renameByName": {
+              "l7_protocol": "Protocol",
+              "request_domain": "Request domain",
+              "request_resource": "Request resource",
+              "request_type": "Request type",
+              "resource_gl0_0": "Client",
+              "resource_gl0_1": "Server",
+              "resource_gl1_1": "Server",
+              "response_code": "Request code",
+              "response_status": "Request status",
+              "start_time": "Start time",
+              "tap_port_type": "",
+              "响应时延": "latency"
+            }
+          }
+        }
+      ],
+      "type": "metaflow-apptracing-panel"
+    }
+  ],
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag pod_cluster values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag pod_cluster values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag pod_ns values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag pod_ns values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag pod_group values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "workload",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag pod_group values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag chost values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "vm",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag chost values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "*",
+          "value": "*"
+        },
+        "hide": 0,
+        "name": "trace_id",
+        "options": [
+          {
+            "selected": true,
+            "text": "*",
+            "value": "*"
+          }
+        ],
+        "query": "*",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "*",
+          "value": "*"
+        },
+        "hide": 0,
+        "name": "span_id",
+        "options": [
+          {
+            "selected": true,
+            "text": "*",
+            "value": "*"
+          }
+        ],
+        "query": "*",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "*",
+          "value": "*"
+        },
+        "hide": 0,
+        "name": "request_resource",
+        "options": [
+          {
+            "selected": true,
+            "text": "*",
+            "value": "*"
+          }
+        ],
+        "query": "*",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Distributed Tracing",
+  "uid": "a3x57qenk",
+  "version": 22,
+  "weekStart": ""
+}

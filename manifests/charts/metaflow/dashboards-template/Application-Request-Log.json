@@ -1,0 +1,789 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 33,
+  "iteration": 1657880913345,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "metaflow-querier-datasource",
+        "uid": "P685C713A23B37E1B"
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "content": "[English doc](https://deepflow.yunshan.net/metaflow-docs/auto-metrics/request-log/?from_metaflow_grafana) | [中文文档](https://deepflow.yunshan.net/metaflow-docs/zh/auto-metrics/request-log/?from_metaflow_grafana) \n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.0.1",
+      "title": "Help doc",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "metaflow-querier-datasource",
+        "uid": "P685C713A23B37E1B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 2
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "metaflow-querier-datasource",
+            "uid": "P685C713A23B37E1B"
+          },
+          "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_log\",\"sources\":\"\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"metric\",\"key\":\"log_count\",\"func\":\"Sum\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"baf6fa96-e59c-f572-7486-ce275a28f4e3\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"request_type\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_type\",\"label\":\"$request_type\"}],\"as\":\"\",\"params\":[],\"uuid\":\"0e5ed5ea-1b2b-7beb-ec92-64d44af65de7\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_resource\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_resource\",\"label\":\"$request_resource\"}],\"as\":\"\",\"params\":[],\"uuid\":\"baa9e9d0-babd-8e27-5255-f4967774ca18\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"41004d35-a477-e1d7-40d1-1537189f3164\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"f2ebec22-6c8d-f681-3842-d94c34873dba\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"8dd5d666-bb06-8e31-88f5-1ddd8898d2f0\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"chost\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$vm\",\"value\":\"vm\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"b76452b2-fc34-de28-a1f7-819995835d40\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"IN\",\"val\":[{\"label\":\"$status\",\"value\":\"status\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"7145be3f-04f1-2e0e-da28-63950b186cb3\",\"subFuncs\":[],\"whereOnly\":false}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"fb7a5836-a9aa-8d6c-24c5-7ebc741939e0\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"ba1f0f84-a5ce-18d7-ea9d-fdf2a2bcbc28\"}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"9a18fb31-d9d6-2269-6e92-971a0970cde1\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Summary count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "metaflow-querier-datasource",
+        "uid": "P685C713A23B37E1B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "客户端异常-Sum(日志总量)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "服务端异常-Sum(日志总量)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 2
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "metaflow-querier-datasource",
+            "uid": "P685C713A23B37E1B"
+          },
+          "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_log\",\"sources\":\"\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"metric\",\"key\":\"log_count\",\"func\":\"Sum\",\"op\":\"\",\"val\":\"\",\"as\":\"客户端异常-Sum(日志总量)\",\"params\":[],\"uuid\":\"baf6fa96-e59c-f572-7486-ce275a28f4e3\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"IN\",\"val\":[{\"label\":\"客户端异常\",\"value\":4}],\"as\":\"\",\"params\":[],\"uuid\":\"7bf0189d-5a77-39f1-2cc1-155fa4ded60e\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_type\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_type\",\"label\":\"$request_type\"}],\"as\":\"\",\"params\":[],\"uuid\":\"0cbf1257-60bc-b97e-a34f-ba9279a6eb88\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_resource\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_resource\",\"label\":\"$request_resource\"}],\"as\":\"\",\"params\":[],\"uuid\":\"9a84caea-973f-b1e3-7f89-cf8979108ad2\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"33186dbe-0e65-13f0-6eae-d7b66833f87b\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"aaa10cee-3317-5a62-6a73-438c1e07ccdb\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"0094850f-488f-2a42-2514-f8c0bf3cafcb\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"chost\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$vm\",\"value\":\"vm\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"316cacf2-0423-405b-198c-a6c71ea665d6\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"IN\",\"val\":[{\"label\":\"$status\",\"value\":\"status\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"4d166911-2326-4061-453e-f70e65e6865c\",\"subFuncs\":[],\"whereOnly\":false}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"fb7a5836-a9aa-8d6c-24c5-7ebc741939e0\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"b5c331ad-afde-bd6d-b79e-4315f4fc6cf7\",\"subFuncs\":[]}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"9a18fb31-d9d6-2269-6e92-971a0970cde1\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "metaflow-querier-datasource",
+            "uid": "P685C713A23B37E1B"
+          },
+          "hide": false,
+          "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_log\",\"sources\":\"\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"metric\",\"key\":\"log_count\",\"func\":\"Sum\",\"op\":\"\",\"val\":\"\",\"as\":\"服务端异常-Sum(日志总量)\",\"params\":[],\"uuid\":\"baf6fa96-e59c-f572-7486-ce275a28f4e3\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"IN\",\"val\":[{\"label\":\"服务端异常\",\"value\":3}],\"as\":\"\",\"params\":[],\"uuid\":\"7bf0189d-5a77-39f1-2cc1-155fa4ded60e\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_cluster_0\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"372efb6f-7fd6-49f6-b196-49248badf859\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_cluster_1\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"617b4f5d-dffb-ad3d-917b-ed02db85de2e\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_ns_0\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"1c1bd3d4-1fae-512e-96b8-5f90772f2951\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_ns_1\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"cdc9783b-f610-1458-82ca-9a688f883111\",\"subFuncs\":[]}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"fb7a5836-a9aa-8d6c-24c5-7ebc741939e0\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"b5c331ad-afde-bd6d-b79e-4315f4fc6cf7\",\"subFuncs\":[]}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"9a18fb31-d9d6-2269-6e92-971a0970cde1\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
+          "refId": "B"
+        }
+      ],
+      "title": "Error count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "metaflow-querier-datasource",
+        "uid": "P685C713A23B37E1B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "µs"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "响应时延"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 2
+      },
+      "id": 4,
+      "options": {
+        "bucketOffset": 0,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "pluginVersion": "9.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "metaflow-querier-datasource",
+            "uid": "P685C713A23B37E1B"
+          },
+          "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_log\",\"sources\":\"\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"metric\",\"key\":\"response_duration\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"a5065067-fd9d-a262-ec4a-195a7460c837\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"request_type\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_type\",\"label\":\"$request_type\"}],\"as\":\"\",\"params\":[],\"uuid\":\"4a51be5a-de57-1470-1fca-e6e7ac937b41\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_resource\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_resource\",\"label\":\"$request_resource\"}],\"as\":\"\",\"params\":[],\"uuid\":\"4fe7f293-e9b3-55ac-2cec-8a047db42a3f\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"7a92dc1a-9e49-2245-13d7-7da19e002571\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"ef0ecb40-8dda-d04a-1c15-69be4273558c\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"1cc4e032-f49b-10b6-6b1f-ae6f3acbbbf7\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"chost\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$vm\",\"value\":\"vm\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"5d529ff3-5350-5aeb-dff2-f0c351bf0caf\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"IN\",\"val\":[{\"label\":\"$status\",\"value\":\"status\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"2b4a2635-6748-ae47-9658-ce4214f40e0d\",\"subFuncs\":[],\"whereOnly\":false}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"fb7a5836-a9aa-8d6c-24c5-7ebc741939e0\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"ba1f0f84-a5ce-18d7-ea9d-fdf2a2bcbc28\"}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"9a18fb31-d9d6-2269-6e92-971a0970cde1\",\"sort\":\"asc\"}],\"interval\":\"\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Latency histogram",
+      "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "metaflow-querier-datasource",
+        "uid": "P685C713A23B37E1B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "noValue": "--",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Response Status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "color": "green",
+                        "index": 0,
+                        "text": "正常"
+                      },
+                      "2": {
+                        "index": 1,
+                        "text": "未知"
+                      },
+                      "3": {
+                        "color": "dark-red",
+                        "index": 2,
+                        "text": "服务端异常"
+                      },
+                      "4": {
+                        "color": "orange",
+                        "index": 3,
+                        "text": "客户端异常"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-text"
+              },
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Latency"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "µs"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "color-text"
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1000000
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Protocol"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "0": {
+                        "index": 7,
+                        "text": "Unknow"
+                      },
+                      "1": {
+                        "index": 8,
+                        "text": "Rest"
+                      },
+                      "20": {
+                        "index": 0,
+                        "text": "HTTP"
+                      },
+                      "21": {
+                        "index": 1,
+                        "text": "HTTP2"
+                      },
+                      "40": {
+                        "index": 2,
+                        "text": "Dubbo"
+                      },
+                      "60": {
+                        "index": 3,
+                        "text": "MySQL"
+                      },
+                      "80": {
+                        "index": 4,
+                        "text": "Redis"
+                      },
+                      "100": {
+                        "index": 5,
+                        "text": "Kafka"
+                      },
+                      "120": {
+                        "index": 6,
+                        "text": "DNS"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "custom.filterable",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 19,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Protocol"
+          }
+        ]
+      },
+      "pluginVersion": "9.0.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "metaflow-querier-datasource",
+            "uid": "P685C713A23B37E1B"
+          },
+          "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_log\",\"sources\":\"\",\"from\":\"l7_flow_log\",\"select\":[{\"type\":\"tag\",\"key\":\"start_time\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"54447727-0443-817d-ba0b-1f6f87126e7e\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"resource_gl0_0\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"6c0790e1-e1f7-0726-50fa-638a20357f45\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"resource_gl0_1\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"b5e4c33c-7627-a95f-fba0-007c9054fd7b\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"l7_protocol\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"ccc64c9e-5b42-b77d-e836-8da6926e3b08\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_type\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0db10a0e-94f7-1585-0132-9a93ed9aacad\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_domain\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"7d4ea1ee-122d-cb46-dfae-a59c3074fa3f\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_resource\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"7627d817-282d-b982-b507-ac9df21d48dc\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"b12c4bd4-09fb-8cf0-4475-6c2d9cc37a9c\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"response_code\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"9ca6471b-055e-9155-ca34-52b9b824649b\",\"subFuncs\":[]},{\"type\":\"metric\",\"key\":\"response_duration\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"d2389025-7e9e-5200-e45f-255117987b86\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"request_type\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_type\",\"label\":\"$request_type\"}],\"as\":\"\",\"params\":[],\"uuid\":\"ce2f7fb2-77fd-cdb4-6597-c6bc13486c9c\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"request_resource\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"value\":\"$request_resource\",\"label\":\"$request_resource\"}],\"as\":\"\",\"params\":[],\"uuid\":\"e81dc89a-ea8e-7908-467a-d1400e84d300\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"12fa6c20-0cd9-ef8c-5089-59ef0b005151\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"99b642c7-b640-7dea-482f-9094e3737364\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"8766e075-187a-265b-ce99-21a90d8bb484\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"chost\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$vm\",\"value\":\"vm\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"7e95f22c-0f14-1713-c7ac-28161fccfe47\",\"subFuncs\":[],\"whereOnly\":true},{\"type\":\"tag\",\"key\":\"response_status\",\"func\":\"\",\"op\":\"IN\",\"val\":[{\"label\":\"$status\",\"value\":\"status\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"facc1670-bc8c-24ca-0be4-c06627ec3892\",\"subFuncs\":[],\"whereOnly\":false}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"fb7a5836-a9aa-8d6c-24c5-7ebc741939e0\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"ba1f0f84-a5ce-18d7-ea9d-fdf2a2bcbc28\"}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"9a18fb31-d9d6-2269-6e92-971a0970cde1\",\"sort\":\"asc\"}],\"interval\":\"\",\"limit\":\"1000\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "Summary count",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "resource_gl0_id_0": true,
+              "resource_gl0_id_1": true
+            },
+            "indexByName": {
+              "l7_protocol": 3,
+              "request_domain": 5,
+              "request_resource": 6,
+              "request_type": 4,
+              "resource_gl0_0": 1,
+              "resource_gl0_1": 2,
+              "resource_gl0_id_0": 10,
+              "resource_gl0_id_1": 11,
+              "response_code": 8,
+              "response_status": 7,
+              "start_time": 0,
+              "响应时延": 9
+            },
+            "renameByName": {
+              "l7_protocol": "Protocol",
+              "request_domain": "Request domain",
+              "request_resource": "Request resource",
+              "request_type": "Request type",
+              "resource_gl0_0": "Client",
+              "resource_gl0_1": "Server",
+              "response_code": "Resonse Code",
+              "response_status": "Response Status",
+              "start_time": "Start time",
+              "响应时延": "Latency"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag pod_cluster values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag pod_cluster values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"sql\":\"show tag pod_ns values from l7_flow_log\",\"database\":\"flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag pod_ns values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag pod_group values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "workload",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag pod_group values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag chost values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "vm",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag chost values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "*",
+          "value": "*"
+        },
+        "hide": 0,
+        "name": "request_type",
+        "options": [
+          {
+            "selected": true,
+            "text": "*",
+            "value": "*"
+          }
+        ],
+        "query": "*",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "*",
+          "value": "*"
+        },
+        "hide": 0,
+        "name": "request_resource",
+        "options": [
+          {
+            "selected": true,
+            "text": "*",
+            "value": "*"
+          }
+        ],
+        "query": "*",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "metaflow-querier-datasource",
+          "uid": "P685C713A23B37E1B"
+        },
+        "definition": "{\"database\":\"flow_log\",\"sql\":\"show tag response_status values from l7_flow_log\"}",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "status",
+        "options": [],
+        "query": {
+          "database": "flow_log",
+          "sql": "show tag response_status values from l7_flow_log"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Application - Request Log",
+  "uid": "JimNq_67z",
+  "version": 45,
+  "weekStart": ""
+}
