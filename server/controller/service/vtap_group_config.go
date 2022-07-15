@@ -281,30 +281,44 @@ func convertToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConf
 	if len(sData.L4LogTapTypes) > 0 {
 		cL4LogTapTypes := convertIntSliceToString(sData.L4LogTapTypes)
 		tData.L4LogTapTypes = &cL4LogTapTypes
+	} else {
+		tData.L4LogTapTypes = nil
 	}
 	if len(sData.L7LogStoreTapTypes) > 0 {
 		cL7LogStoreTapTypes := convertIntSliceToString(sData.L7LogStoreTapTypes)
 		tData.L7LogStoreTapTypes = &cL7LogStoreTapTypes
+	} else {
+		tData.L7LogStoreTapTypes = nil
 	}
 	if len(sData.DecapType) > 0 {
 		cDecapType := convertIntSliceToString(sData.DecapType)
 		tData.DecapType = &cDecapType
+	} else {
+		tData.DecapType = nil
 	}
 	if len(sData.Domains) > 0 {
 		cDomains := strings.Join(sData.Domains, ",")
 		tData.Domains = &cDomains
+	} else {
+		tData.Domains = nil
 	}
 	if sData.MaxCollectPps != nil {
 		cMaxCollectPps := *sData.MaxCollectPps * 1000
 		tData.MaxCollectPps = &cMaxCollectPps
+	} else {
+		tData.MaxCollectPps = nil
 	}
 	if sData.MaxNpbBps != nil {
 		cMaxNpbBps := *sData.MaxNpbBps * 1000000
 		tData.MaxNpbBps = &cMaxNpbBps
+	} else {
+		tData.MaxNpbBps = nil
 	}
 	if sData.MaxTxBandwidth != nil {
 		cMaxTxBandwidth := *sData.MaxTxBandwidth * 1000000
 		tData.MaxTxBandwidth = &cMaxTxBandwidth
+	} else {
+		tData.MaxTxBandwidth = nil
 	}
 }
 

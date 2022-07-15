@@ -40,11 +40,11 @@ import (
 	"github.com/metaflowys/metaflow/server/controller/statsd"
 	"github.com/metaflowys/metaflow/server/controller/tagrecorder"
 	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	trouter "github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
 
 	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/grpc/synchronize"
 	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/http/cache"
-	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/http/health"
 	_ "github.com/metaflowys/metaflow/server/controller/trisolaris/services/http/upgrade"
 )
 
@@ -79,13 +79,15 @@ func Start(configPath string) {
 	}
 
 	// 初始化Redis
-	err := redis.InitRedis(cfg.RedisCfg)
-	if err != nil {
-		log.Error("connect redis failed")
+	if cfg.RedisCfg.Enabled {
+		err := redis.InitRedis(cfg.RedisCfg)
+		if err != nil {
+			log.Error("connect redis failed")
+		}
 	}
 
 	// start statsd
-	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
+	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
 		log.Error("cloud statsd connect telegraf failed")
 		return
@@ -164,6 +166,7 @@ func Start(configPath string) {
 	router.DomainRouter(r)
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
+	trouter.RegistRouter(r)
 	if err := r.Run(":20417"); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
 		os.Exit(0)

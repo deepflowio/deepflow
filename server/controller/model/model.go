@@ -146,6 +146,8 @@ type Vtap struct {
 	ProcessName        string  `json:"PROCESS_NAME"`
 	LicenseType        int     `json:"LICENSE_TYPE"`
 	LicenseFunctions   []int   `json:"LICENSE_FUNCTIONS"`
+	ExpectedRevision   string  `json:"EXPECTED_REVISION"`
+	UpgradePackage     string  `json:"UPGRADE_PACKAGE"`
 	Lcuuid             string  `json:"LCUUID"`
 	// TODO: format_state
 	// TODO: format_type

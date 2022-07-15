@@ -40,13 +40,8 @@ type Config struct {
 	Chrony                   Chrony   `yaml:"chrony"`
 	SelfUpdateUrl            string   `default:"grpc" yaml:"self-update-url"`
 	TridentPort              string   `default:"20035" yaml:"trident-port"`
-	StatsdPort               string   `default:"20040" yaml:"statsd-port"`
 	RemoteApiTimeout         uint16   `default:"30" yaml:"remote-api-timeout"`
-	MaxEscapeSeconds         uint16   `default:"3600" yaml:"max-escape-seconds"`
-	TridentRevision          string   `yaml:"trident-revision"`
 	TridentTypeForUnkonwVtap uint16   `default:"0" yaml:"trident-type-for-unkonw-vtap"`
-	TridentLinuxPath         string   `default:"/usr/local/deepflow/yum/trident" yaml:"trident-linux-path"`
-	TridentWindowsPath       string   `default:"/usr/local/deepflow/yum/trident.exe" yaml:"trident-windows-path"`
 	PlatformVips             []string `yaml:"platform-vips"`
 	NodeType                 string   `default:"master" yaml:"node-type"`
 	GrpcMaxMessageLength     int      `default:"104857600" yaml:"grpc-max-message-length"`

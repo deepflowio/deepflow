@@ -52,10 +52,10 @@ var tagTypeToOperators = map[string][]string{
 	"string":      []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"string_enum": []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
 	"ip":          []string{"=", "!=", "IN", "NOT IN", ">=", "<="},
+	"time":        []string{"=", "!=", ">=", "<="},
 	"mac":         []string{"=", "!=", "IN", "NOT IN"},
 	"id":          []string{"=", "!=", "IN", "NOT IN"},
-	"time":        []string{"=", "!=", ">=", "<="},
-	"default":     []string{"=", "!="},
+	"default":     []string{"=", "!=", "IN", "NOT IN"},
 }
 var TAG_RESOURCE_TYPE_DEVICE_MAP = map[string]int{
 	"chost":       VIF_DEVICE_TYPE_VM,
@@ -246,12 +246,6 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	if (db != "ext_metrics" && db != "flow_log") || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
-	var whereSql string
-	if strings.Contains(rawSql, "WHERE") {
-		whereSql = strings.Split(rawSql, "WHERE")[1]
-	} else {
-		whereSql = "time>(now()-1000)"
-	}
 	externalChClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -261,9 +255,9 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	}
 	externalSql := ""
 	if db == "ext_metrics" {
-		externalSql = fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s WHERE %s) GROUP BY tag_name", table, whereSql)
+		externalSql = fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s) GROUP BY tag_name", table)
 	} else {
-		externalSql = fmt.Sprintf("SELECT arrayJoin(attribute_names) AS attribute_name FROM (SELECT attribute_names FROM %s WHERE %s) GROUP BY attribute_name", table, whereSql)
+		externalSql = fmt.Sprintf("SELECT arrayJoin(attribute_names) AS attribute_name FROM (SELECT attribute_names FROM %s) GROUP BY attribute_name", table)
 	}
 	externalRst, err := externalChClient.DoQuery(externalSql, nil, "")
 	if err != nil {
@@ -280,7 +274,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "attribute",
+				externalTag, externalTag + "_0", externalTag + "_1", externalTag, "attribute",
 				"原始Attribute", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		}
