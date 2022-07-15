@@ -18,9 +18,9 @@ package view
 
 const (
 	NODE_FLAG_METRICS       int = iota // 仅在计算层
-	NODE_FLAG_TRANS                    // 仅在翻译层
 	NODE_FLAG_METRICS_INNER            // 仅在计算层内层
 	NODE_FLAG_METRICS_OUTER            // 仅在计算层外层
+	NODE_FLAG_METRICS_TOP              // 仅在最外层
 )
 
 const (

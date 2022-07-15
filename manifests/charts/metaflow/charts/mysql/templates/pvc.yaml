@@ -1,0 +1,19 @@
+{{- if and (eq .Values.storageConfig.type "persistentVolumeClaim") (not .Values.storageConfig.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mysql.fullname" . }}-data-pvc
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.storageConfig.persistence.annotations | nindent 4 }}
+spec:
+  {{- if (tpl  .Values.storageConfig.persistence.storageClass .) }}
+  storageClassName: {{ tpl .Values.storageConfig.persistence.storageClass . | quote }}
+  {{- end }}
+  accessModes:
+  - {{ .Values.storageConfig.persistence.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.storageConfig.persistence.size | quote }}
+{{- end -}}

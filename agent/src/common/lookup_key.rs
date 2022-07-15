@@ -143,6 +143,10 @@ impl LookupKey {
     pub fn has_feature_flag(&self, feature_flag: FeatureFlags) -> bool {
         self.feature_flag & feature_flag == feature_flag
     }
+
+    pub fn is_loopback_packet(&self) -> bool {
+        self.src_ip.is_loopback() || self.dst_ip.is_loopback()
+    }
 }
 
 impl fmt::Display for LookupKey {

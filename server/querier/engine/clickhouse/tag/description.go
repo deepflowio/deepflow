@@ -504,25 +504,20 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 	var whereSql string
 	if strings.Contains(rawSql, "WHERE") {
 		whereSql = strings.Split(rawSql, "WHERE")[1]
-		if db == "ext_metrics" {
-			whereSql = whereSql + fmt.Sprintf("AND tag_name='%s'", tag)
-		} else {
-			whereSql = whereSql + fmt.Sprintf("AND attribute_name='%s'", tag)
-		}
-
-	} else {
-		if db == "ext_metrics" {
-			whereSql = fmt.Sprintf("tag_name='%s'", tag)
-		} else {
-			whereSql = fmt.Sprintf("attribute_name='%s'", tag)
-		}
-
 	}
 	var sql string
 	if db == "ext_metrics" {
-		sql = fmt.Sprintf("WITH arrayJoin(tag_names) AS tag_name SELECT arrayJoin(tag_values) AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", table, whereSql)
+		if whereSql != "" {
+			sql = fmt.Sprintf("SELECT tag_values[indexOf(tag_names,'%s')] AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", tag, table, whereSql)
+		} else {
+			sql = fmt.Sprintf("SELECT tag_values[indexOf(tag_names,'%s')] AS value, value AS display_name FROM %s GROUP BY value, display_name ORDER BY value ASC", tag, table)
+		}
 	} else {
-		sql = fmt.Sprintf("WITH arrayJoin(attribute_names) AS attribute_name SELECT arrayJoin(attribute_values) AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", table, whereSql)
+		if whereSql != "" {
+			sql = fmt.Sprintf("SELECT attribute_values[indexOf(attribute_names,'%s')] AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", tag, table, whereSql)
+		} else {
+			sql = fmt.Sprintf("SELECT attribute_values[indexOf(attribute_names,'%s')] AS value, value AS display_name FROM %s GROUP BY value, display_name ORDER BY value ASC", tag, table)
+		}
 	}
 
 	log.Debug(sql)
