@@ -91,33 +91,59 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				filter := ""
 				switch preAsTag {
 				case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
-					valueStr := strings.Trim(t.Value, "'")
-					mac, err := net.ParseMAC(valueStr)
-					if err != nil {
-						return nil, err
-					}
-					valueUInt64 := utils.Mac2Uint64(mac)
-					filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
-				case "tap_port":
-					valueStr := strings.Trim(t.Value, "'")
-					ip := net.ParseIP(valueStr)
-					if ip != nil {
-						ip4 := ip.To4()
-						if ip4 != nil {
-							ipUint32 := utils.IpToUint32(ip4)
-							filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
-						} else {
-							return nil, errors.New("invalid ipv4 mac")
-						}
-					} else {
-						valueStr = "00:00:" + valueStr
+					macValue := strings.TrimLeft(t.Value, "(")
+					macValue = strings.TrimRight(macValue, ")")
+					macSlice := strings.Split(macValue, ",")
+					macs := []string{}
+					for _, valueStr := range macSlice {
+						valueStr = strings.Trim(valueStr, "'")
 						mac, err := net.ParseMAC(valueStr)
 						if err != nil {
-							filter = fmt.Sprintf("%s %s %v", t.Tag, op, t.Value)
-						} else {
-							valueUInt64 := utils.Mac2Uint64(mac)
-							filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+							return nil, err
 						}
+						valueUInt64 := utils.Mac2Uint64(mac)
+						macs = append(macs, fmt.Sprintf("'%v'", valueUInt64))
+					}
+					if len(macs) != 0 {
+						macsStr := strings.Join(macs, ",")
+						if op == "in" || op == "not in" {
+							macsStr = "(" + macsStr + ")"
+						}
+						filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
+					}
+				case "tap_port":
+					macValue := strings.TrimLeft(t.Value, "(")
+					macValue = strings.TrimRight(macValue, ")")
+					macSlice := strings.Split(macValue, ",")
+					macs := []string{}
+					for _, valueStr := range macSlice {
+						valueStr = strings.Trim(valueStr, "'")
+						ip := net.ParseIP(valueStr)
+						if ip != nil {
+							ip4 := ip.To4()
+							if ip4 != nil {
+								ipUint32 := utils.IpToUint32(ip4)
+								macs = append(macs, fmt.Sprintf("'%v'", ipUint32))
+							} else {
+								return nil, errors.New(fmt.Sprintf("invalid ipv4 mac: %s", valueStr))
+							}
+						} else {
+							valueStr = "00:00:" + valueStr
+							mac, err := net.ParseMAC(valueStr)
+							if err != nil {
+								macs = append(macs, fmt.Sprintf("'%v'", t.Value))
+							} else {
+								valueUInt64 := utils.Mac2Uint64(mac)
+								macs = append(macs, fmt.Sprintf("'%v'", valueUInt64))
+							}
+						}
+					}
+					if len(macs) != 0 {
+						macsStr := strings.Join(macs, ",")
+						if op == "in" || op == "not in" {
+							macsStr = "(" + macsStr + ")"
+						}
+						filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 					}
 				default:
 					preAsTag = strings.Trim(preAsTag, "`")
@@ -190,33 +216,59 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			filter := ""
 			switch t.Tag {
 			case "mac_0", "mac_1", "tunnel_tx_mac_0", "tunnel_tx_mac_1", "tunnel_rx_mac_0", "tunnel_rx_mac_1":
-				valueStr := strings.Trim(t.Value, "'")
-				mac, err := net.ParseMAC(valueStr)
-				if err != nil {
-					return nil, err
-				}
-				valueUInt64 := utils.Mac2Uint64(mac)
-				filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
-			case "tap_port":
-				valueStr := strings.Trim(t.Value, "'")
-				ip := net.ParseIP(valueStr)
-				if ip != nil {
-					ip4 := ip.To4()
-					if ip4 != nil {
-						ipUint32 := utils.IpToUint32(ip4)
-						filter = fmt.Sprintf("%s %s %v", t.Tag, op, ipUint32)
-					} else {
-						return nil, errors.New("invalid ipv4 mac")
-					}
-				} else {
-					valueStr = "00:00:" + valueStr
+				macValue := strings.TrimLeft(t.Value, "(")
+				macValue = strings.TrimRight(macValue, ")")
+				macSlice := strings.Split(macValue, ",")
+				macs := []string{}
+				for _, valueStr := range macSlice {
+					valueStr = strings.Trim(valueStr, "'")
 					mac, err := net.ParseMAC(valueStr)
 					if err != nil {
-						filter = fmt.Sprintf("%s %s %v", t.Tag, op, t.Value)
-					} else {
-						valueUInt64 := utils.Mac2Uint64(mac)
-						filter = fmt.Sprintf("%s %s %v", t.Tag, op, valueUInt64)
+						return nil, err
 					}
+					valueUInt64 := utils.Mac2Uint64(mac)
+					macs = append(macs, fmt.Sprintf("'%v'", valueUInt64))
+				}
+				if len(macs) != 0 {
+					macsStr := strings.Join(macs, ",")
+					if op == "in" || op == "not in" {
+						macsStr = "(" + macsStr + ")"
+					}
+					filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
+				}
+			case "tap_port":
+				macValue := strings.TrimLeft(t.Value, "(")
+				macValue = strings.TrimRight(macValue, ")")
+				macSlice := strings.Split(macValue, ",")
+				macs := []string{}
+				for _, valueStr := range macSlice {
+					valueStr = strings.Trim(valueStr, "'")
+					ip := net.ParseIP(valueStr)
+					if ip != nil {
+						ip4 := ip.To4()
+						if ip4 != nil {
+							ipUint32 := utils.IpToUint32(ip4)
+							macs = append(macs, fmt.Sprintf("'%v'", ipUint32))
+						} else {
+							return nil, errors.New(fmt.Sprintf("invalid ipv4 mac: %s", valueStr))
+						}
+					} else {
+						valueStr = "00:00:" + valueStr
+						mac, err := net.ParseMAC(valueStr)
+						if err != nil {
+							macs = append(macs, fmt.Sprintf("'%v'", t.Value))
+						} else {
+							valueUInt64 := utils.Mac2Uint64(mac)
+							macs = append(macs, fmt.Sprintf("'%v'", valueUInt64))
+						}
+					}
+				}
+				if len(macs) != 0 {
+					macsStr := strings.Join(macs, ",")
+					if op == "in" || op == "not in" {
+						macsStr = "(" + macsStr + ")"
+					}
+					filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
 				}
 			default:
 				t.Tag = strings.Trim(t.Tag, "`")
@@ -290,26 +342,80 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 	if whereFilter != "" {
 		switch whereTag {
 		case "ip_version":
-			ipVersion := "0"
-			if t.Value == "4" {
-				ipVersion = "1"
+			versionValue := strings.TrimLeft(t.Value, "(")
+			versionValue = strings.TrimRight(versionValue, ")")
+			versionSlice := strings.Split(versionValue, ",")
+			versions := []string{}
+			for _, valueStr := range versionSlice {
+				ipVersion := "0"
+				if valueStr == "4" {
+					ipVersion = "1"
+				}
+				versions = append(versions, ipVersion)
 			}
-			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, ipVersion)
+			if len(versions) != 0 {
+				versionsStr := strings.Join(versions, ",")
+				if op == "in" || op == "not in" {
+					versionsStr = "(" + versionsStr + ")"
+				}
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, versionsStr)
+			}
 		case "is_internet", "is_internet_0", "is_internet_1":
-			if (t.Value == "0" && op == "=") || (t.Value == "1" && op == "!=") {
-				newOP := "!="
-				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, newOP)
+			internetValue := strings.TrimLeft(t.Value, "(")
+			internetValue = strings.TrimRight(internetValue, ")")
+			internetSlice := strings.Split(internetValue, ",")
+			hasTrue := false
+			hasFalse := false
+			newOP := ""
+			for _, valueStr := range internetSlice {
+				if valueStr == "1" {
+					hasTrue = true
+				} else {
+					hasFalse = true
+				}
+			}
+			if hasTrue == true && hasFalse == true {
+				whereFilter = "1=1"
+			} else if hasTrue == true {
+				if op == "=" || op == "in" {
+					newOP = "="
+				} else {
+					newOP = "!="
+				}
 			} else {
-				newOP := "="
-				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, newOP)
+				if op == "=" || op == "in" {
+					newOP = "!="
+				} else {
+					newOP = "="
+				}
 			}
+			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, newOP)
 		case "_id":
-			valueStr := strings.Trim(t.Value, "'")
-			valueInt, err := strconv.Atoi(valueStr)
-			if err != nil {
-				return nil, err
+			idValue := strings.TrimLeft(t.Value, "(")
+			idValue = strings.TrimRight(idValue, ")")
+			idSlice := strings.Split(idValue, ",")
+			whereFilters := []string{}
+			for _, valueStr := range idSlice {
+				valueStr = strings.Trim(t.Value, "'")
+				valueInt, err := strconv.Atoi(valueStr)
+				if err != nil {
+					return nil, err
+				}
+				idFilter := fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt)
+				whereFilters = append(whereFilters, "("+idFilter+")")
 			}
-			whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, valueInt)
+			if len(whereFilters) != 0 {
+				equalFilter := "(" + strings.Join(whereFilters, " OR ") + ")"
+				switch op {
+				case "not in":
+					whereFilter = "not(" + equalFilter + ")"
+				case "!=":
+					whereFilter = "not(" + equalFilter + ")"
+				default:
+					whereFilter = equalFilter
+				}
+			}
+
 		case "ip", "ip_0", "ip_1", "tunnel_tx_ip_0", "tunnel_tx_ip_1", "tunnel_rx_ip_0", "tunnel_rx_ip_1":
 			equalFilter := ""
 			ipValues := strings.TrimLeft(t.Value, "(")

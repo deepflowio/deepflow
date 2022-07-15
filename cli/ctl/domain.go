@@ -17,6 +17,7 @@
 package ctl
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -72,24 +73,24 @@ func RegisterDomainCommand() *cobra.Command {
 	create := &cobra.Command{
 		Use:     "create",
 		Short:   "create domain",
-		Example: "metaflow-ctl domain create deepflow-domain",
+		Example: "metaflow-ctl domain create -f -",
 		Run: func(cmd *cobra.Command, args []string) {
 			createDomain(cmd, args, createFilename)
 		},
 	}
-	create.Flags().StringVarP(&createFilename, "filename", "f", "", "file to use create domain")
+	create.Flags().StringVarP(&createFilename, "filename", "f", "", "create domain from file or stdin")
 	create.MarkFlagRequired("filename")
 
 	var updateFilename string
 	update := &cobra.Command{
 		Use:     "update",
 		Short:   "update domain",
-		Example: "metaflow-ctl domain update deepflow-domain",
+		Example: "metaflow-ctl domain update deepflow-domain -f k8s.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			updateDomain(cmd, args, updateFilename)
 		},
 	}
-	update.Flags().StringVarP(&updateFilename, "filename", "f", "", "file to use update domain")
+	update.Flags().StringVarP(&updateFilename, "filename", "f", "", "update domain from file or stdin")
 	update.MarkFlagRequired("filename")
 
 	delete := &cobra.Command{
@@ -158,37 +159,25 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 	}
 }
 
-func createDomain(cmd *cobra.Command, args []string, createFilename string) {
+func createDomain(cmd *cobra.Command, args []string, filename string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/domains/", server.IP, server.Port)
-	yamlFile, err := ioutil.ReadFile(createFilename)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
 
-	var body map[string]interface{}
-	yaml.Unmarshal(yamlFile, &body)
+	body := formatBody(filename)
 
-	upperBody := make(map[string]interface{})
-	for k, v := range body {
-		upperK := strings.ToUpper(k)
-		upperBody[upperK] = v
-	}
-
-	if domainTypeStr, ok := upperBody["TYPE"]; ok {
+	if domainTypeStr, ok := body["TYPE"]; ok {
 		domainTypeInt, ok := domainTypeStrToInt[domainTypeStr.(string)]
 		if !ok {
 			fmt.Fprintln(os.Stderr, fmt.Sprintf("domain type (%s) not supported", domainTypeStr))
 			return
 		}
-		upperBody["TYPE"] = domainTypeInt
+		body["TYPE"] = domainTypeInt
 	} else {
 		fmt.Fprintln(os.Stderr, "domain type must specify")
 		return
 	}
 
-	resp, err := common.CURLPerform("POST", url, upperBody, "")
+	resp, err := common.CURLPerform("POST", url, body, "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -196,7 +185,7 @@ func createDomain(cmd *cobra.Command, args []string, createFilename string) {
 	fmt.Println(resp)
 }
 
-func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
+func updateDomain(cmd *cobra.Command, args []string, filename string) {
 	if len(args) == 0 {
 		fmt.Fprintf(os.Stderr, "must specify name.\nExample: %s\n", cmd.Example)
 		return
@@ -215,20 +204,11 @@ func updateDomain(cmd *cobra.Command, args []string, updateFilename string) {
 		lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
 		domainTypeInt := response.Get("DATA").GetIndex(9).Get("TYPE").MustInt()
 		url := fmt.Sprintf("http://%s:%d/v1/domains/%s/", server.IP, server.Port, lcuuid)
-		yamlFile, err := ioutil.ReadFile(updateFilename)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-		}
-		var body map[string]interface{}
-		yaml.Unmarshal(yamlFile, &body)
 
-		upperBody := make(map[string]interface{})
-		for k, v := range body {
-			upperK := strings.ToUpper(k)
-			upperBody[upperK] = v
-		}
-		upperBody["TYPE"] = domainTypeInt
-		resp, err := common.CURLPerform("PATCH", url, upperBody, "")
+		body := formatBody(filename)
+
+		body["TYPE"] = domainTypeInt
+		resp, err := common.CURLPerform("PATCH", url, body, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -286,4 +266,34 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		err := fmt.Sprintf("domain_type %s not supported\n", args[0])
 		fmt.Fprintln(os.Stderr, err)
 	}
+}
+
+func upperBodyKey(body map[string]interface{}) map[string]interface{} {
+	upperBody := make(map[string]interface{})
+	for k, v := range body {
+		upperK := strings.ToUpper(k)
+		upperBody[upperK] = v
+	}
+	return upperBody
+}
+
+func formatBody(filename string) map[string]interface{} {
+	var body map[string]interface{}
+	if filename == "-" {
+		scanner := bufio.NewScanner(os.Stdin)
+		var strContent string
+		for scanner.Scan() {
+			strContent += scanner.Text() + "\n"
+		}
+		yaml.Unmarshal([]byte(strContent), &body)
+	} else {
+		yamlFile, err := ioutil.ReadFile(filename)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return nil
+		}
+		yaml.Unmarshal(yamlFile, &body)
+	}
+	body = upperBodyKey(body)
+	return body
 }

@@ -40,6 +40,9 @@ var (
 		input:  "select byte from l4_flow_log",
 		output: "SELECT byte_tx+byte_rx AS byte FROM flow_log.l4_flow_log",
 	}, {
+		input:  "select Histogram(byte_tx,10) AS bytes, ip from vtap_flow_port where time>=1657483500 AND time<=1657505100 group by ip limit 5",
+		output: "",
+	}, {
 		input:  "select Sum(byte)/Time_interval as sum_byte, time(time, 120) as time_120 from l4_flow_log group by time_120 having Sum(byte)>=0 limit 10 offset 20",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS _time_120 SELECT toUnixTimestamp(_time_120) AS time_120, divide(SUM(byte_tx+byte_rx), 120) AS sum_byte FROM flow_log.l4_flow_log GROUP BY time_120 HAVING SUM(byte_tx+byte_rx) >= 0 LIMIT 20, 10",
 	}, {
