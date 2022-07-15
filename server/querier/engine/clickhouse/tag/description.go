@@ -218,7 +218,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
-		DB:       "deepflow",
+		DB:       "flow_tag",
 	}
 	sql := "SELECT key FROM k8s_label_map GROUP BY key"
 	rst, err := chClient.DoQuery(sql, nil, "")
