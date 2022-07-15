@@ -85,6 +85,17 @@ func (c *TagRecorder) UpdateChDictionary() {
 			connect.Close()
 			continue
 		}
+
+		// drop database deepflow
+		log.Info("drop database deepflow")
+		sql := "DROP DATABASE IF EXISTS deepflow"
+		_, err = connect.Exec(sql)
+		if err != nil {
+			log.Error(err)
+			connect.Close()
+			continue
+		}
+
 		sort.Strings(databases)
 		databaseIndex := sort.SearchStrings(databases, c.cfg.ClickHouseCfg.Database)
 		if len(databases) == 0 || databaseIndex == len(databases) || databases[databaseIndex] != c.cfg.ClickHouseCfg.Database {

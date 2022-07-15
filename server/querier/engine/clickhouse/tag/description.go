@@ -341,7 +341,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
-		DB:       "deepflow",
+		DB:       "flow_tag",
 	}
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
@@ -358,9 +358,9 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				// 增加资源ID
 				switch resourceKey {
 				case "chost", "rds", "redis", "lb", "natgw":
-					dictTag = fmt.Sprintf("dictGet(deepflow.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(resourceType))
+					dictTag = fmt.Sprintf("dictGet(flow_tag.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(resourceType))
 				case "vpc":
-					dictTag = fmt.Sprintf("dictGet(deepflow.l3_epc_map, ('uid'), toUInt64(value)))")
+					dictTag = fmt.Sprintf("dictGet(flow_tag.l3_epc_map, ('uid'), toUInt64(value)))")
 				}
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
@@ -405,11 +405,11 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 		case "chost", "rds", "redis", "lb", "natgw":
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
-			dictTag = fmt.Sprintf("dictGet(deepflow.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(AutoMap[tag]))
+			dictTag = fmt.Sprintf("dictGet(flow_tag.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(AutoMap[tag]))
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, dictTag, whereSql)
 
 		case "vpc":
-			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(deepflow.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", whereSql)
+			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(flow_tag.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", whereSql)
 
 		case "router", "host", "dhcpgw", "pod_service", "ip", "l2_vpc", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
@@ -446,9 +446,9 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	} else {
 		deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
 		if ok {
-			sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM deepflow.device_map WHERE devicetype=%d", deviceType)
+			sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM device_map WHERE devicetype=%d", deviceType)
 		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
-			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM deepflow.%s", tag+"_map")
+			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s", tag+"_map")
 		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
 			var autoDeviceTypes []string
 			for _, deviceType := range AutoMap {
@@ -463,21 +463,21 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				autoDeviceTypes = append(autoDeviceTypes, strconv.Itoa(deviceType))
 			}
 			sql = fmt.Sprintf(
-				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM deepflow.device_map WHERE devicetype in (%s)",
+				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map WHERE devicetype in (%s)",
 				strings.Join(autoDeviceTypes, ","),
 			)
 		} else if tag == "vpc" {
-			sql = "SELECT id as value,name AS display_name,uid FROM deepflow.l3_epc_map"
+			sql = "SELECT id as value,name AS display_name,uid FROM l3_epc_map"
 		} else if tag == "ip" {
-			sql = "SELECT ip as value,ip AS display_name FROM deepflow.ip_relation_map"
+			sql = "SELECT ip as value,ip AS display_name FROM ip_relation_map"
 		} else if tag == "tap" {
-			sql = "SELECT value, name AS display_name FROM deepflow.tap_type_map"
+			sql = "SELECT value, name AS display_name FROM tap_type_map"
 		} else if tag == "vtap" {
-			sql = "SELECT id as value, name AS display_name FROM deepflow.vtap_map"
+			sql = "SELECT id as value, name AS display_name FROM vtap_map"
 		} else if tag == "lb_listener" {
-			sql = "SELECT id as value, name AS display_name FROM deepflow.lb_listener_map"
+			sql = "SELECT id as value, name AS display_name FROM lb_listener_map"
 		} else if tag == "pod_ingress" {
-			sql = "SELECT id as value, name AS display_name FROM deepflow.pod_ingress_map"
+			sql = "SELECT id as value, name AS display_name FROM pod_ingress_map"
 		} else if strings.HasPrefix(tag, "label.") {
 			labelTag := strings.TrimPrefix(tag, "label.")
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map WHERE key='%s' GROUP BY value, display_name ORDER BY value ASC", labelTag)
