@@ -53,10 +53,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			}
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(deepflow."+resourceStr+"_map, 'name', (toUInt64("+resourceIDSuffix+")))",
+					"dictGet(flow_tag."+resourceStr+"_map, 'name', (toUInt64("+resourceIDSuffix+")))",
 					resourceIDSuffix+"!=0",
-					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE name %s %s)",
-					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM deepflow."+resourceStr+"_map WHERE %s(name,%s))",
+					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE name %s %s)",
+					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE %s(name,%s))",
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
@@ -65,7 +65,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"",
 				),
 				"icon_id": NewTag(
-					"dictGet(deepflow."+resourceStr+"_map, 'icon_id', (toUInt64("+resourceIDSuffix+")))",
+					"dictGet(flow_tag."+resourceStr+"_map, 'icon_id', (toUInt64("+resourceIDSuffix+")))",
 					"",
 					"",
 					"",
@@ -90,10 +90,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			)}
 		tagResourceMap[vpcNameSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow.l3_epc_map, 'name', (toUInt64("+l3EPCIDSuffix+")))",
+				"dictGet(flow_tag.l3_epc_map, 'name', (toUInt64("+l3EPCIDSuffix+")))",
 				l3EPCIDSuffix+"!=-2",
-				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
+				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
+				"toUInt64("+l3EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
 				"'vpc'",
@@ -102,7 +102,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.l3_epc_map, 'icon_id', (toUInt64("+l3EPCIDSuffix+")))",
+				"dictGet(flow_tag.l3_epc_map, 'icon_id', (toUInt64("+l3EPCIDSuffix+")))",
 				"",
 				"",
 				"",
@@ -121,10 +121,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			)}
 		tagResourceMap[l2VpcNameSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow.l3_epc_map, 'name', (toUInt64("+l2EPCIDSuffix+")))",
+				"dictGet(flow_tag.l3_epc_map, 'name', (toUInt64("+l2EPCIDSuffix+")))",
 				l2EPCIDSuffix+"!=-2",
-				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE name %s %s)",
-				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM deepflow.l3_epc_map WHERE %s(name,%s))",
+				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE name %s %s)",
+				"toUInt64("+l2EPCIDSuffix+") IN (SELECT id FROM flow_tag.l3_epc_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
 				"'l2_vpc'",
@@ -133,7 +133,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.l3_epc_map, 'icon_id', (toUInt64("+l2EPCIDSuffix+")))",
+				"dictGet(flow_tag.l3_epc_map, 'icon_id', (toUInt64("+l2EPCIDSuffix+")))",
 				"",
 				"",
 				"",
@@ -155,10 +155,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			)}
 		tagResourceMap[hostNameSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow.device_map, 'name', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
+				"dictGet(flow_tag.device_map, 'name', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
 				hostIDSuffix+"!=0",
-				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s)",
+				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s))",
 			),
 			"node_type": NewTag(
 				"'host'",
@@ -167,7 +167,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+hostIDSuffix+")))",
+				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+hostIDSuffix+")))",
 				"",
 				"",
 				"",
@@ -196,10 +196,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				)}
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(deepflow.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					"dictGet(flow_tag.device_map, 'name', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 					deviceIDSuffix+"!=0 AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
-					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
+					"toUInt64("+deviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s)) AND "+deviceTypeSuffix+"="+deviceTypeValueStr,
 				),
 				"node_type": NewTag(
 					"'"+resourceStr+"'",
@@ -208,7 +208,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"",
 				),
 				"icon_id": NewTag(
-					"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+					"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 					"",
 					"",
 					"",
@@ -220,10 +220,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 采集器名称
 	tagResourceMap["vtap"] = map[string]*Tag{
 		"default": NewTag(
-			"dictGet(deepflow.vtap_map, 'name', toUInt64(vtap_id))",
+			"dictGet(flow_tag.vtap_map, 'name', toUInt64(vtap_id))",
 			"",
-			"toUInt64(vtap_id) IN (SELECT id FROM deepflow.vtap_map WHERE name %s %s)",
-			"toUInt64(vtap_id) IN (SELECT id FROM deepflow.vtap_map WHERE %s(name,%s))",
+			"toUInt64(vtap_id) IN (SELECT id FROM flow_tag.vtap_map WHERE name %s %s)",
+			"toUInt64(vtap_id) IN (SELECT id FROM flow_tag.vtap_map WHERE %s(name,%s))",
 		),
 	}
 
@@ -261,17 +261,17 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
 				}
 			}
-			internetIconDictGet := "dictGet(deepflow.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
-			ipIconDictGet := "dictGet(deepflow.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
-			autoIconDictGet := fmt.Sprintf("dictGet(deepflow.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
+			internetIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
+			ipIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
+			autoIconDictGet := fmt.Sprintf("dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
 			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
 			nodeTypeStrSuffix = "multiIf(" + nodeTypeStrSuffix
 			tagResourceMap[autoNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(deepflow.device_map, 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
+					"dictGet(flow_tag.device_map, 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
 					"",
-					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE name %s %s)",
-					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM deepflow.device_map WHERE %s(name,%s))",
+					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s)",
+					"toUInt64("+autoIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s))",
 				),
 				"node_type": NewTag(
 					nodeTypeStrSuffix,
@@ -314,7 +314,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(deepflow.device_map, 'icon_id', (toUInt64(0),toUInt64(0)))",
+				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(0),toUInt64(0)))",
 				"",
 				"",
 				"",
@@ -356,7 +356,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
 			if common.IsValueInSliceString(relatedResourceStr, []string{"natgw", "lb"}) {
 				idTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + "," + deviceIDSuffix + ", 0)"
-				nameTagTranslator = "dictGet(deepflow.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
+				nameTagTranslator = "dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
 				notNullFilter = deviceIDSuffix + "!=0 AND " + deviceTypeSuffix + "=" + deviceTypeValueStr
 				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
 					"node_type": NewTag(
@@ -366,7 +366,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						"",
 					),
 					"icon_id": NewTag(
-						"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+						"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 						"",
 						"",
 						"",
@@ -374,21 +374,21 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						nameTagTranslator,
 						notNullFilter,
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
 					),
 				}
 				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
 					"default": NewTag(
 						idTagTranslator,
 						notNullFilter,
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
 						"",
 					),
 				}
 			} else if relatedResourceStr == "pod_service" {
 				idTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + "," + deviceIDSuffix + ", 0)"
-				nameTagTranslator = "dictGet(deepflow.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
+				nameTagTranslator = "dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
 				notNullFilter = deviceIDSuffix + "!=0 AND " + deviceTypeSuffix + "=" + deviceTypeValueStr
 				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
 					"node_type": NewTag(
@@ -398,7 +398,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						"",
 					),
 					"icon_id": NewTag(
-						"dictGet(deepflow.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+						"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
 						"",
 						"",
 						"",
@@ -406,8 +406,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						nameTagTranslator,
 						notNullFilter,
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
 					),
 				}
 				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
@@ -425,7 +425,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s))",
 						"",
 					),
 				}
@@ -433,8 +433,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
-						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s))",
+						"((if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))) OR (toUInt64(service_id"+suffix+") IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s)))",
 					),
 				}
 			} else {
@@ -442,7 +442,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE "+relatedResourceID+" %s %s)",
 						"",
 					),
 				}
@@ -450,8 +450,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					"default": NewTag(
 						"",
 						"",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
-						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from deepflow.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE "+relatedResourceName+" %s %s)",
+						"(if(is_ipv4=1,IPv4NumToString("+ip4Suffix+"),IPv6NumToString("+ip6Suffix+")),toUInt64("+l3EPCIDSuffix+")) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE %s("+relatedResourceName+",%s))",
 					),
 				}
 			}
@@ -460,7 +460,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 
 	// vtap对应资源
 	vtapResource := "'device_type','device_id','device_name','icon_id','host_id','host_name'"
-	gwDictGet := fmt.Sprintf("dictGet(deepflow.vtap_port_map, (%s),(toUInt64(vtap_id),toUInt64(tap_port)))", vtapResource)
+	gwDictGet := fmt.Sprintf("dictGet(flow_tag.vtap_port_map, (%s),(toUInt64(vtap_id),toUInt64(tap_port)))", vtapResource)
 	tagResourceMap["resource_from_vtap"] = map[string]*Tag{
 		"default": NewTag(
 			gwDictGet,
@@ -477,10 +477,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		podIDSuffix := "pod_id" + suffix
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(deepflow.k8s_label_map, 'value', (toUInt64("+podIDSuffix+"),'%s'))",
+				"dictGet(flow_tag.k8s_label_map, 'value', (toUInt64("+podIDSuffix+"),'%s'))",
 				"",
-				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE value %s %s and key='%s')",
-				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM deepflow.k8s_label_map WHERE %s(value,%s) and key='%s')",
+				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value %s %s and key='%s')",
+				"toUInt64("+podIDSuffix+") IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE %s(value,%s) and key='%s')",
 			),
 		}
 	}
@@ -531,10 +531,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 采集点
 	tagResourceMap["tap"] = map[string]*Tag{
 		"default": NewTag(
-			"dictGet(deepflow.tap_type_map, 'name', toUInt64(tap_type))",
+			"dictGet(flow_tag.tap_type_map, 'name', toUInt64(tap_type))",
 			"",
-			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE name %s %s)",
-			"toUInt64(tap_type) IN (SELECT value FROM deepflow.tap_type_map WHERE %s(name,%s))",
+			"toUInt64(tap_type) IN (SELECT value FROM flow_tag.tap_type_map WHERE name %s %s)",
+			"toUInt64(tap_type) IN (SELECT value FROM flow_tag.tap_type_map WHERE %s(name,%s))",
 		)}
 
 	// 响应码
@@ -564,10 +564,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// 采集位置名称
 	tagResourceMap["tap_port_name"] = map[string]*Tag{
 		"default": NewTag(
-			"if(tap_port_type in (0,1,2),dictGet(deepflow.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port))),'')",
+			"if(tap_port_type in (0,1,2),dictGet(flow_tag.vtap_port_map, 'name', (toUInt64(vtap_id),toUInt64(tap_port))),'')",
 			"",
-			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE name %s %s)",
-			"toUInt64(tap_port) IN (SELECT tap_port FROM deepflow.vtap_port_map WHERE %s(name,%s))",
+			"toUInt64(tap_port) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE name %s %s)",
+			"toUInt64(tap_port) IN (SELECT tap_port FROM flow_tag.vtap_port_map WHERE %s(name,%s))",
 		)}
 	// Tunnel IP
 	tagResourceMap["tunnel_tx_ip_0"] = map[string]*Tag{
