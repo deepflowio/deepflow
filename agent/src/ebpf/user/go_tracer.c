@@ -265,6 +265,7 @@ static int resolve_bin_file(const char *path, int pid,
 	struct symbol *sym;
 	struct symbol_uprobe *probe_sym;
 	struct data_members *off;
+	char *binary_path = NULL;
 	int syms_count = 0;
 
 	for (int i = 0; i < NELEMS(syms); i++) {
@@ -274,41 +275,9 @@ static int resolve_bin_file(const char *path, int pid,
 			continue;
 		}
 
-		bool is_new_offset = false;
-		struct proc_offsets *p_offs = find_offset_by_pid(pid);
-		if (p_offs == NULL) {
-			p_offs = alloc_offset_by_pid();
-			if (p_offs == NULL)
-				goto faild;
-			is_new_offset = true;
+		if (!binary_path){
+			binary_path = strdup(probe_sym->binary_path);
 		}
-		// resolve all offsets.
-		for (int k = 0; k < NELEMS(offsets); k++) {
-			off = &offsets[k];
-			int offset =
-			    struct_member_offset_analyze(probe_sym->binary_path,
-							 off->structure,
-							 off->field_name);
-			if (offset == ETR_INVAL)
-				offset = off->default_offset;
-
-			p_offs->offs.data[off->idx] = offset;
-
-			p_offs->offs.version =
-			    GO_VERSION(go_ver->major, go_ver->minor,
-				       go_ver->revision);
-			p_offs->pid = pid;
-			p_offs->path = strdup(probe_sym->binary_path);
-			if (p_offs->path == NULL) {
-				free(p_offs);
-				goto faild;
-			}
-		}
-
-		p_offs->has_updated = false;
-
-		if (is_new_offset)
-			list_add_tail(&p_offs->list, &proc_offsets_head);
 
 		probe_sym->ver = *go_ver;
 
@@ -355,6 +324,49 @@ static int resolve_bin_file(const char *path, int pid,
 		syms_count++;
 	}
 
+	if (binary_path){
+		bool is_new_offset = false;
+		struct proc_offsets *p_offs = find_offset_by_pid(pid);
+		if (p_offs == NULL) {
+			p_offs = alloc_offset_by_pid();
+			if (p_offs == NULL)
+				goto faild;
+			is_new_offset = true;
+		}
+
+		p_offs->offs.version = GO_VERSION(go_ver->major, go_ver->minor,
+						  go_ver->revision);
+		p_offs->pid = pid;
+
+		if (p_offs->path != NULL) {
+			free(p_offs->path);
+			p_offs->path = NULL;
+		}
+		p_offs->path = strdup(binary_path);
+		if (p_offs->path == NULL) {
+			free(p_offs);
+			goto faild;
+		}
+		// resolve all offsets.
+		for (int k = 0; k < NELEMS(offsets); k++) {
+			off = &offsets[k];
+			int offset =
+			    struct_member_offset_analyze(binary_path,
+							 off->structure,
+							 off->field_name);
+			if (offset == ETR_INVAL)
+				offset = off->default_offset;
+
+			p_offs->offs.data[off->idx] = offset;
+		}
+
+		p_offs->has_updated = false;
+
+		if (is_new_offset)
+			list_add_tail(&p_offs->list, &proc_offsets_head);
+
+		free(binary_path);
+	}
 	if (syms_count == 0) {
 		ret = ETR_NOSYMBOL;
 		ebpf_warning
@@ -367,9 +379,13 @@ static int resolve_bin_file(const char *path, int pid,
 
 faild:
 	*resolve_num = syms_count;
-	if (probe_sym->isret)
+	if (probe_sym->isret) {
 		free_uprobe_symbol(probe_sym, conf);
+	}
 
+	if (binary_path) {
+		free(binary_path);
+	}
 	return ret;
 }
 

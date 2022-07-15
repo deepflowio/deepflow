@@ -16,7 +16,7 @@ struct data_members {
 struct proc_offsets {
 	struct list_head list;
 	int pid;
-	const char *path;
+	char *path;
 	unsigned long long starttime;	// The time the process started after system boot.
 	struct member_offsets offs;
 	bool has_updated;		// if update eBPF map ?
