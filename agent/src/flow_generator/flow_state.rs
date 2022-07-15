@@ -773,6 +773,7 @@ mod tests {
             next_tcp_seq1: 0,
             packet_in_tick: false,
             policy_in_tick: [false; 2],
+            packet_sequence_block: Some(packet_sequence_block::PacketSequenceBlock::new()), // Enterprise Edition Feature: packet-sequence
         };
 
         let peers = &mut flow_node.tagged_flow.flow.flow_metrics_peers;
