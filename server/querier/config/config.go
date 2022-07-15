@@ -41,7 +41,7 @@ type QuerierConfig struct {
 type Clickhouse struct {
 	User           string `default:"default" yaml:"user"`
 	Password       string `default:"" yaml:"password"`
-	Host           string `default:"querier" yaml:"host"`
+	Host           string `default:"clickhouse" yaml:"host"`
 	Port           int    `default:"9000" yaml:"port"`
 	Timeout        int    `default:"60" yaml:"timeout"`
 	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`

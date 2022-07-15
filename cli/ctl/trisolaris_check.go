@@ -59,7 +59,7 @@ func regiterCommand() []*cobra.Command {
 	}
 	ipGroupsCmd := &cobra.Command{
 		Use:   "ipGroups",
-		Short: "get ipGroups from deepflow-servdeepflow-servee",
+		Short: "get ipGroups from deepflow-servr",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{ipGroups})
 		},
