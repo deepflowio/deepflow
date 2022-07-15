@@ -168,6 +168,7 @@ func (v *View) GetCallbacks() (callbacks []func(columns []interface{}, values []
 func (v *View) trans() {
 	var tagsLevelInner []Node
 	var tagsLevelMetrics []Node
+	var tagsLevelTop []Node
 	var metricsLevelInner []Node
 	var metricsLevelMetrics []Node
 	var metricsLevelTop []Node
@@ -196,6 +197,8 @@ func (v *View) trans() {
 				tagsAliasInner = append(tagsAliasInner, node.Alias)
 			} else if node.Flag == NODE_FLAG_METRICS_OUTER {
 				metricsLevelMetrics = append(metricsLevelMetrics, tag)
+			} else if node.Flag == NODE_FLAG_METRICS_TOP {
+				tagsLevelTop = append(tagsLevelTop, tag)
 			}
 		case Function:
 			flag := node.GetFlag()
@@ -209,6 +212,11 @@ func (v *View) trans() {
 				metricsLevelTop = append(metricsLevelTop, tag)
 			}
 		}
+	}
+	if len(metricsLevelTop) > 0 {
+		metricsLevelTop = append(metricsLevelTop, tagsLevelTop...)
+	} else {
+		metricsLevelMetrics = append(metricsLevelMetrics, tagsLevelTop...)
 	}
 	// 计算层拆层的情况下，默认类型的group中with只放在最里层
 	for _, node := range v.Model.Groups.groups {
