@@ -588,6 +588,7 @@ static struct proc_offsets *find_go_offsets(int pid)
 static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 				struct tracer_probes_conf *conf)
 {
+	bool info_print = false;
 	struct probe *probe;
 	struct list_head *p, *n;
 	struct symbol_uprobe *sym_uprobe;
@@ -604,16 +605,17 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 			continue;
 		sym_uprobe = probe->private_data;
 		if (sym_uprobe->pid == pid) {
-			if (probe_detach(probe) != 0)
+			if (probe_detach(probe) != 0) {
 				ebpf_warning
 				    ("path:%s, symbol name:%s probe_detach() faild.\n",
 				     sym_uprobe->binary_path, sym_uprobe->name);
-			else
-				ebpf_info
-				    ("%s path:%s, symbol name:%s probe_detach() success.\n",
-				     __func__, sym_uprobe->binary_path,
-				     sym_uprobe->name);
+			}
 
+			if (!info_print) {
+				ebpf_info("Clear process PID %d\n", pid);
+				info_print = true;
+			}
+				
 			free_probe_from_tracer(probe);
 		}
 	}

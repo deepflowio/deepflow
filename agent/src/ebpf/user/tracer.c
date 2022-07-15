@@ -550,11 +550,13 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 		if (type == HOOK_DETACH && error == ETR_NOTEXIST)
 			continue;
 
-		ebpf_info("%s %s %s: '%s', %s!",
-			  type == HOOK_ATTACH ? "attach" : "detach",
-			  p->isret ? "exit" : "enter",
-			  p->type == KPROBE ? "kprobe" : "uprobe", p->name,
-			  error ? "failed" : "success");
+		if (p->type == KPROBE) {
+			ebpf_info("%s %s %s: '%s', %s!",
+				  type == HOOK_ATTACH ? "attach" : "detach",
+				  p->isret ? "exit" : "enter",
+				  p->type == KPROBE ? "kprobe" : "uprobe", p->name,
+				  error ? "failed" : "success");
+		}
 
 		if (error) {
 			free_probe_from_tracer(p);

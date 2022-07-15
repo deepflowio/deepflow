@@ -78,7 +78,7 @@ void _ebpf_error(int how_to_die,
 	struct tm *p;
 	time(&timep);
 	p = localtime(&timep);
-	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d \033[0;33;m",
+	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d \033[0;33;m [eBPF] ",
 			(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
 			p->tm_hour, p->tm_min, p->tm_sec);
 
@@ -121,7 +121,7 @@ void _ebpf_info(char *fmt, ...)
 	p = localtime(&timep);
 	va_list va;
 
-	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d ",
+	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d [eBPF] INFO ",
 			(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
 			p->tm_hour, p->tm_min, p->tm_sec);
 
