@@ -145,7 +145,7 @@ querier:
 
   # clickhouse相关配置
   clickhouse:
-    database: deepflow
+    database: flow_tag
     user: default
     host: clickhouse
     port: 9000
