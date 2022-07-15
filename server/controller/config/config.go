@@ -59,6 +59,7 @@ type DFWebService struct {
 type ControllerConfig struct {
 	LogFile              string `default:"/var/log/controller.log" yaml:"log-file"`
 	LogLevel             string `default:"info" yaml:"log-level"`
+	ListenPort           int    `default:"20417" yaml:"listen-port"`
 	MasterControllerName string `default:"" yaml:"master-controller-name"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`
