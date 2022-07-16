@@ -1665,10 +1665,10 @@
         "current": {
           "selected": true,
           "text": [
-            "metaflow"
+            "All"
           ],
           "value": [
-            "8"
+            "$__all"
           ]
         },
         "datasource": {
