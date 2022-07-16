@@ -28,7 +28,7 @@ MetaFlow是[云杉网络](https://yunshan.net)开源的一款**高度自动化**
 
 ## 体验 MetaFlow Demo
 
-我们正在搭建了一个完整的 [MetaFlow Demo](https://demo.metaflow.yunshan.net/)，欢迎体验。
+我们搭建了一个完整的 [MetaFlow Online Demo](https://demo.metaflow.yunshan.net/)，欢迎体验。登录账号 / 密码：metaflow / metaflow。
 
 ## 使用 DeepFlow Cloud
 
