@@ -28,7 +28,7 @@ Please refer to [the deployment documentation](https://deepflow.yunshan.net/meta
 
 ## Explore MetaFlow Demo
 
-We are building a [MetaFlow Demo](https://demo.metaflow.yunshan.net/), welcome to experience it.
+We have built a complete [MetaFlow Online Demo](https://demo.metaflow.yunshan.net/), welcome to experience it. Login account/password: metaflow/metaflow.
 
 ## Using DeepFlow Cloud
 
