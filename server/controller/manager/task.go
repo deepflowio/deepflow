@@ -67,7 +67,10 @@ func (t *Task) Start() {
 		for {
 			select {
 			case <-ticker.C:
-				t.Recorder.Refresh(t.Cloud.GetResource())
+				cd := t.Cloud.GetResource()
+				log.Debugf("domain (%s) cloud data: %v", t.DomainName, cd)
+				log.Infof("%s %v", t.DomainName, cd.Regions)
+				t.Recorder.Refresh(cd)
 			case <-t.tCtx.Done():
 				break LOOP
 			}
