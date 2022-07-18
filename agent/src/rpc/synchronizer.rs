@@ -57,7 +57,7 @@ use crate::utils::{
     net::{is_unicast_link_local, MacAddr},
 };
 
-const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(10);
+const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
 const SECOND: Duration = Duration::from_secs(1);
@@ -143,7 +143,7 @@ impl Default for Status {
 
             proxy_ip: None,
             proxy_port: DEFAULT_CONTROLLER_PORT,
-            sync_interval: Default::default(),
+            sync_interval: DEFAULT_SYNC_INTERVAL,
             ntp_enabled: false,
 
             version_platform_data: 0,
