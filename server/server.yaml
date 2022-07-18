@@ -83,7 +83,7 @@ controller:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟
         cache_refresh_interval: 3600
         # 软删除资源数据清理时间间隔，单位：小时
-        # 此值应小于 soft_deleted_resource_expire_interval 
+        # 此值应小于 soft_deleted_resource_expire_interval
         deleted_resource_clean_interval: 24
         # 软删除资源数据保留时间，单位：小时，默认：7 * 24
         deleted_resource_retention_time: 168
@@ -112,18 +112,14 @@ controller:
 
     # 采集器是否自动注册
     vtap-auto-register: True
- 
+
     default-tap-mode:
 
   genesis:
-    # 平台数据老化时间，单位秒
+    # 平台数据老化时间，单位：秒
     aging_time: 86400
     # 采集器接口数据老化时间，单位：秒
     vinterface_aging_time: 300
-    # 内网IP网段范围配置，配置的IP所在网络会被作为内网进行学习
-    local_ip_ranges:
-    # 排除IP范围
-    exclude_ip_ranges:
     # 无子网IP的最大掩码长度
     ipv4_cidr_max_mask: 24
     ipv6_cidr_max_mask: 64
@@ -131,9 +127,16 @@ controller:
     # 采集器上报数据处理的队列长度
     queue_length: 1000
 
-    # genesis的grpc通信端口，后续会删除
-    grpc_server_host: genesis
-    grpc_server_port: 20036
+    # 数据持久化检测间隔，单位：秒
+    data_persistence_interval: 60
+
+    # genesis的grpc通信端口
+    grpc_server_port: 30035
+
+    # 内网IP网段范围配置，配置的IP所在网络会被作为内网进行学习
+    local_ip_ranges:
+    # 排除IP范围
+    exclude_ip_ranges:
 
 querier:
   # logfile path
@@ -161,7 +164,7 @@ ingester:
   ## trisolaris的ips, 默认值为空
   #controller-ips:
   #  - x.x.x.x
- 
+
   ## controller listening port
   #controller-port: 20035
 
@@ -194,83 +197,83 @@ ingester:
   #influxdb:
   #  host: influxdb
   #  port: 20044
- 
+
   #metrics-replica-enabled: false
   #flowlog-replica-enabled: false
- 
+
   ## 遥测数据写入配置
   #metrics-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 1000000 # 数据队列长度
   #  batch-size: 512000  # 多少行数据同时写入
   #  flush-timeout: 10   # 超时写入时间
- 
+
   ## 流日志写入配置
   #flowlog-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 1000000 # 数据队列长度
   #  batch-size: 512000  # 多少行数据同时写入
   #  flush-timeout: 10   # 超时写入时间
- 
+
   ## ext metrics写入配置
   #ext-metrics-ck-writer:
   #  queue-count: 1      # 每个表并行写数量
   #  queue-size: 100000  # 数据队列长度
   #  batch-size: 51200   # 多少行数据同时写入
   #  flush-timeout: 10   # 超时写入时间
- 
+
   ## ext metrics数据的保留的时长(单位: 天)
   #ext-metrics-ttl: 7
 
   ## split prometheus metrics name lable to table name and metrics name, on the nth position of '_'
   # prometheus-separate-pos: 1
- 
+
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
- 
+
   ## clickhouse数据磁盘空间不足时，同时满足磁盘占用率>used-percent和磁盘空闲<free-space时，开始清理老数据
   #ck-disk-monitor:
   #  check-interval: 600 # 检查时间间隔(单位: 秒)
   #  used-percent: 90    # 磁盘占用率阈值
   #  free-space: 50      # 磁盘空闲阈值(单位: GB)
- 
+
   ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #stream-roze-enabled: true
- 
+
   ## syslog存储位置
   #syslog-directory: /var/log/metaflow-agent
- 
+
   ## syslog是否写入elasticsearch，默认启用
   #es-syslog: true
- 
+
   ## logfile path
   #log-file: /var/log/ingester/ingester.log
- 
+
   ## loglevel: "debug/info/warn/error"
   #log-level: info
- 
+
   ## profiler
   #profiler: false
- 
+
   ## maximum usage of cpu cores, 0 means no limit
   #max-cpus: 0
- 
+
   ## udp socket receiver buffer: 64M
   #udp-read-buffer: 67108864
- 
+
   ## tcp socket receiver buffer: 4M
   #tcp-read-buffer: 4194304
- 
+
   ## ########################## droplet config ##########################################
   ## Rpc synchronization timeout default 8s
   #rpc-timeout: 8
- 
+
   #adapter:
   #  ## cache size (#) for resuming the order of received trident traffic,
   #  ## default value is 64,
   #  ## 64 <= value <= 1024, value is 1024 when value > 1024
   #  ordering-cache-size: 64
- 
+
   ## internal queues conf
   #queue:
   #  ## ----------- 并行度 -----------
@@ -288,7 +291,7 @@ ingester:
   #
   #  ## 压缩包头接收队列长度, 默认为65536
   #  compressed-queue-size: 65536
- 
+
   #labeler:
   #  ## whether to use first-path processing only
   #  fast-path-disable: false
@@ -299,7 +302,7 @@ ingester:
   #  map-size-limit: 1048576
   #  ## 值越大策略Firstpath表内存使用越少性能越低，取值范围为[1,16]，其他非法值使用默认值8
   #  level: 0
- 
+
   #pcap:
   #  ## 计算TCP/IP checksum，默认不计算
   #  tcpip-checksum: false
@@ -324,35 +327,35 @@ ingester:
   #
   #  ## pcap文件存储的文件夹
   #  file-directory: /var/lib/pcap
- 
+
   ## ########################### roze config #############################################
- 
+
   ## 是否不写入秒级数据: 默认: false(写入)
   #disable-second-write: false
- 
+
   ## 是否不写秒级数据的replica: 默认: true(不写)
   #disable-second-write-replica: true
- 
+
   ## parallelism of unmarshall, defaults to 4
   #unmarshall-queue-count: 4
- 
+
   ## size of unmarshall queue, defaults to 10240
   #unmarshall-queue-size: 10240
- 
+
   ## ########################## stream config ############################################
   ## 用来保证全集群流日志_id的唯一性
   #shard-id: 0
- 
+
   ## writer all queue limit max size
   #throttle: 50000
- 
+
   ## 分别控制l4流日志, l7流日志，默认值为0，表示使用throttle的设置值.若非0，则使用设置值
   #l4-throttle: 0
   #l7-throttle: 0
- 
+
   #decoder-queue-count: 2
   #decoder-queue-size: 10000
- 
+
   #flow-log-disabled:
   #  l4: false
   #  l7: false
@@ -363,4 +366,3 @@ ingester:
   #  dubbo: false
   #  kafka: false
   #  mqtt: false
- 
