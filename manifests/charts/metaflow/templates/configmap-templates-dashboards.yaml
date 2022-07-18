@@ -4,12 +4,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "metaflow.name" $ }}-dashboards-template
+  name: {{ include "metaflow.fullname" . }}-dashboards-template
   labels:
     {{- if $.Values.grafana.sidecar.dashboards.label }}
     {{ $.Values.grafana.sidecar.dashboards.label }}: {{ ternary $.Values.grafana.sidecar.dashboards.labelValue "1" (not (empty $.Values.grafana.sidecar.dashboards.labelValue)) | quote }}
     {{- end }}
-    app: {{ template "metaflow.name" $ }}-grafana
+    app: {{ include "metaflow.fullname" . }}-grafana
 {{ include "metaflow.labels" $ | nindent 4 }}
 data:
 {{- range $path, $fileContents := $files }}
