@@ -969,6 +969,7 @@ type VTapGroupConfiguration struct {
 	NatIPEnabled                  *int    `gorm:"column:nat_ip_enabled;type:tinyint(1);default:null" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	CapturePacketSize             *int    `gorm:"column:capture_packet_size;type:int;default:null" json:"CAPTURE_PACKET_SIZE"`
 	InactiveServerPortEnabled     *int    `gorm:"column:inactive_server_port_enabled;type:tinyint(1);default:null" json:"INACTIVE_SERVER_PORT_ENABLED"` // 0: disabled 1:enabled
+	InactiveIPEnabled             *int    `gorm:"column:inactive_ip_enabled;type:tinyint(1);default:null" json:"INACTIVE_IP_ENABLED"`                   // 0: disabled 1:enabled
 	VTapGroupLcuuid               *string `gorm:"column:vtap_group_lcuuid;type:char(64);default:null" json:"VTAP_GROUP_LCUUID"`
 	LogThreshold                  *int    `gorm:"column:log_threshold;type:int;default:null" json:"LOG_THRESHOLD"`
 	LogLevel                      *string `gorm:"column:log_level;type:char(64);default:null" json:"LOG_LEVEL"`
@@ -1035,6 +1036,7 @@ type RVTapGroupConfiguration struct {
 	NatIPEnabled                  int     `gorm:"column:nat_ip_enabled;type:tinyint(1);default:null" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	CapturePacketSize             int     `gorm:"column:capture_packet_size;type:int;default:null" json:"CAPTURE_PACKET_SIZE"`
 	InactiveServerPortEnabled     int     `gorm:"column:inactive_server_port_enabled;type:tinyint(1);default:null" json:"INACTIVE_SERVER_PORT_ENABLED"` // 0: disabled 1:enabled
+	InactiveIPEnabled             int     `gorm:"column:inactive_ip_enabled;type:tinyint(1);default:null" json:"INACTIVE_IP_ENABLED"`                   // 0: disabled 1:enabled
 	VTapGroupLcuuid               string  `gorm:"column:vtap_group_lcuuid;type:char(64);default:null" json:"VTAP_GROUP_LCUUID"`
 	LogThreshold                  int     `gorm:"column:log_threshold;type:int;default:null" json:"LOG_THRESHOLD"`
 	LogLevel                      string  `gorm:"column:log_level;type:char(64);default:null" json:"LOG_LEVEL"`

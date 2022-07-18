@@ -48,6 +48,7 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	NatIPEnabled:                  &NatIPEnabled,
 	CapturePacketSize:             &CapturePacketSize,
 	InactiveServerPortEnabled:     &InactiveServerPortEnabled,
+	InactiveIPEnabled:             &InactiveIPEnabled,
 	LogThreshold:                  &LogThreshold,
 	LogLevel:                      &LogLevel,
 	LogRetention:                  &LogRetention,
@@ -105,6 +106,7 @@ var (
 	NatIPEnabled                  = 0
 	CapturePacketSize             = 65535
 	InactiveServerPortEnabled     = 1
+	InactiveIPEnabled             = 1
 	LogThreshold                  = 300
 	LogLevel                      = "INFO"
 	LogRetention                  = 30
@@ -117,7 +119,7 @@ var (
 	L7LogStoreTapTypes            = "0"
 	CaptureSocketType             = 0
 	CaptureBpf                    = ""
-	ThreadThreshold               = 100
+	ThreadThreshold               = 500
 	ProcessThreshold              = 10
 	NtpEnabled                    = 1
 	L4PerformanceEnabled          = 1

@@ -4,10 +4,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ template "metaflow.name" $ }}-dashboards-system
+  name: {{ include "metaflow.fullname" . }}-dashboards-system
   labels:
     {{ $.Values.grafana.sidecar.dashboards.label }}: "metaflow-system"
-    app: {{ template "metaflow.name" $ }}-grafana
+    app: {{ include "metaflow.fullname" . }}-grafana
 {{ include "metaflow.labels" $ | nindent 4 }}
 data:
 {{- range $path, $fileContents := $files }}

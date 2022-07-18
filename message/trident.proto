@@ -205,13 +205,14 @@ message Config {
     optional uint32 capture_packet_size   = 52 [default = 65535];
     optional bool inactive_server_port_enabled = 53 [default = true];
     optional string capture_bpf           = 54 [default = ""];
+    optional bool inactive_ip_enabled     = 55 [default = true];
 
     optional string libvirt_xml_path      = 60 [default = "/etc/libvirt/qemu"];
 
     // 新增资源限制
     optional uint32  log_threshold        = 101 [default = 300];
     optional string  log_level            = 102 [default = "INFO"];
-    optional uint32  thread_threshold     = 103 [default = 100]; // 限制采集器运行环境中trident进程内线程数量
+    optional uint32  thread_threshold     = 103 [default = 500]; // 限制采集器运行环境中trident进程内线程数量
     optional uint32  process_threshold    = 104 [default = 10]; // 限制采集器运行环境中trident进程启动的其他子进程数量
 
 

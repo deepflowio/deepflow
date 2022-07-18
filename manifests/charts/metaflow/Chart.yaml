@@ -3,7 +3,7 @@ description: An automated observability platform for cloud-native developers.
 name: metaflow
 engine: gotpl
 type: application
-version: 0.1.001
+version: 0.1.002
 appVersion: "6.1.1"
 kubeVersion: ">=1.16.0-0"
 sources:
@@ -23,6 +23,6 @@ dependencies:
   repository: ""
   version: '*.*.*'
 - name: grafana
-  version: "6.31.1"
+  version: "6.32.*"
   repository: https://grafana.github.io/helm-charts
   condition: grafana.enabled

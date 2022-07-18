@@ -131,7 +131,7 @@ func GetGenesisStatsd(genesis GenesisStatsd) []StatsdElement {
 		MetricType:             MetricTiming,
 		MetricName:             common.GENESIS_METRIC_NAME_K8SINFO_DELAY,
 		UseGlobalTag:           false,
-		PrivateTagKey:          "cluster-id",
+		PrivateTagKey:          "cluster_id",
 		PrivateTagValueToCount: genesis.K8SInfoDelay,
 	}
 	return []StatsdElement{k8sInfoDelay}
