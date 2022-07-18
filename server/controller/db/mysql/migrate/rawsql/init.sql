@@ -1378,6 +1378,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     nat_ip_enabled            TINYINT(1) COMMENT '0: disabled 1:enabled',
     capture_packet_size       INTEGER,
     inactive_server_port_enabled   TINYINT(1) COMMENT '0: disabled 1:enabled',
+    inactive_ip_enabled       TINYINT(1) COMMENT '0: disabled 1:enabled',
     vtap_group_lcuuid         CHAR(64) DEFAULT NULL,
     log_threshold             INTEGER,
     log_level                 CHAR(64),
