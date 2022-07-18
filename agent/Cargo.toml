@@ -33,7 +33,7 @@ humantime-serde = "1.0"
 hyper = { version = "0.14", features = ["full"] }
 ipnet = "2.4.0"
 k8s-openapi = { version = "^0.13", features = ["v1_19"] }
-kube = { version = "0.64", features = ["derive", "runtime"] }
+kube = { version = "0.64", default-features = false, features = ["client", "derive", "runtime", "rustls-tls"] }
 libc = "0.2.103"
 log = "0.4"
 lru = "0.7.5"
@@ -49,7 +49,6 @@ pnet = "^0.29"
 prost = "0.8.0"
 rand = "0.8.5"
 regex = "1"
-reqwest = "0.11.7"
 ring = "0.16.20"
 roxmltree = "0.14.1"
 serde = { version = "1.0", features = ["derive"] }

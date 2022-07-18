@@ -862,11 +862,16 @@ impl TryFrom<trident::Config> for RuntimeConfig {
 
 // resolve domain name (without port) to ip address
 fn resolve_domain(addr: &str) -> Option<String> {
-    format!("{}:1", addr)
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut iter| iter.next())
-        .map(|addr| addr.ip().to_string())
+    match format!("{}:1", addr).to_socket_addrs() {
+        Ok(mut addr) => match addr.next() {
+            Some(addr) => Some(addr.ip().to_string()),
+            None => None,
+        },
+        Err(e) => {
+            eprintln!("{:?}", e);
+            None
+        }
+    }
 }
 
 #[cfg(test)]
