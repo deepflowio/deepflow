@@ -43,8 +43,8 @@ log_threshold: 300
 log_level: INFO
 # 日志文件大小，单位：M字节，默认值：1000，值域[10, 10000]
 log_file_size: 1000
-# 线程数限制，单位：个，默认值：100，值域[1， 1000]
-thread_threshold: 100
+# 线程数限制，单位：个，默认值：500，值域[1， 1000]
+thread_threshold: 500
 # 进程数限制，单位：个，默认值：10，值域[1， 100]
 process_threshold: 10
 
