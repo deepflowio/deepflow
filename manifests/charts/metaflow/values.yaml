@@ -628,7 +628,7 @@ metaflow-agent:
 
   imagePullSecrets: []
   nameOverride: ""
-  fullnameOverride: "metaflow-agent"
+  agentFullnameOverride: "metaflow-agent"
 
   podAnnotations: {}
   nodeIPInjection: true
@@ -676,8 +676,8 @@ metaflow-agent:
     ##
     type: ClusterIP
 
-  metaflowServerNodeIps:
-  - metaflow-server
+  metaflowServerNodeIPS:
+  - "{{ include "metaflow.fullname" . }}-server"
   kubernetesClusterId: 
   agentGroupId: 
   ## This command takes effect when agent-group-config external_agent_http_proxy_enabled=1 is configured using metaflow-ctl
