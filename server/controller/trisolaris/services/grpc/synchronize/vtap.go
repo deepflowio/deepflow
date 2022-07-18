@@ -117,6 +117,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 		VtapFlow_1SEnabled:            proto.Bool(Int2Bool(vtapConfig.VTapFlow1sEnabled)),
 		CapturePacketSize:             proto.Uint32(uint32(vtapConfig.CapturePacketSize)),
 		InactiveServerPortEnabled:     proto.Bool(Int2Bool(vtapConfig.InactiveServerPortEnabled)),
+		InactiveIpEnabled:             proto.Bool(Int2Bool(vtapConfig.InactiveIPEnabled)),
 		LibvirtXmlPath:                proto.String(vtapConfig.VMXMLPath),
 		LogThreshold:                  proto.Uint32(uint32(vtapConfig.LogThreshold)),
 		LogLevel:                      proto.String(vtapConfig.LogLevel),
