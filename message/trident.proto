@@ -205,6 +205,7 @@ message Config {
     optional uint32 capture_packet_size   = 52 [default = 65535];
     optional bool inactive_server_port_enabled = 53 [default = true];
     optional string capture_bpf           = 54 [default = ""];
+    optional bool inactive_ip_enabled     = 55 [default = true];
 
     optional string libvirt_xml_path      = 60 [default = "/etc/libvirt/qemu"];
 
