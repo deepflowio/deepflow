@@ -117,7 +117,7 @@ var (
 	L7LogStoreTapTypes            = "0"
 	CaptureSocketType             = 0
 	CaptureBpf                    = ""
-	ThreadThreshold               = 100
+	ThreadThreshold               = 500
 	ProcessThreshold              = 10
 	NtpEnabled                    = 1
 	L4PerformanceEnabled          = 1
