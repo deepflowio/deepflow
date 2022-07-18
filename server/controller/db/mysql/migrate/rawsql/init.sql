@@ -267,41 +267,6 @@ CREATE TABLE IF NOT EXISTS vinterface_ip (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 DELETE FROM vinterface_ip;
 
-CREATE TABLE IF NOT EXISTS `user` (
-  `id` int(10) NOT NULL AUTO_INCREMENT COMMENT 'user id',
-  `username` varchar(64) COLLATE utf8_bin NOT NULL DEFAULT '',
-  `password` varchar(256) COLLATE utf8_bin NOT NULL DEFAULT '',
-  `authority` int(11) DEFAULT NULL COMMENT 'user authority',
-  `description` varchar(256) CHARACTER SET utf8 DEFAULT NULL COMMENT 'user description',
-  `company` varchar(256) COLLATE utf8_bin DEFAULT NULL,
-  `state` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 open,3 forbidden,4 freeze,5 remove exception',
-  `user_type` tinyint(1) NOT NULL DEFAULT 2 COMMENT '1 super admin 2.admin 3.report visitor 4.reserved ,5 tenant,10 readonly admin, 101 ungrouped',
-  `auth_type` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 local,2 ldap,3 authing，cmb_china,4 radius,5 saas,7 lianruan tenant ,8 lianruan op,9 tce',
-  `phone_num` varchar(20) COLLATE utf8_bin DEFAULT NULL,
-  `resource_list` varchar(256) CHARACTER SET utf8 DEFAULT NULL,
-  `cloud_max` int(10) DEFAULT NULL,
-  `vm_max` int(10) DEFAULT NULL,
-  `vdc_max` int(10) DEFAULT NULL,
-  `frozen` int(11) DEFAULT NULL,
-  `gateway_resource` int(11) DEFAULT NULL,
-  `bandwidth` int(11) DEFAULT NULL COMMENT 'deprecated',
-  `email` varchar(64) COLLATE utf8_bin NOT NULL DEFAULT '',
-  `is_expired` int(11) DEFAULT '0',
-  `useruuid` varchar(64) COLLATE utf8_bin NOT NULL DEFAULT '',
-  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP,
-  `updated_pwd` datetime DEFAULT CURRENT_TIMESTAMP,
-  `login_key` tinyint(1) NOT NULL DEFAULT '1',
-  `login_time` int(10) unsigned NOT NULL DEFAULT '0',
-  `deleted`    TINYINT(1) DEFAULT 0,
-  `created_source` CHAR(20) DEFAULT '',
-  `source_id` CHAR(64) DEFAULT '',
-  PRIMARY KEY (`id`),
-  INDEX username (`username`),
-  INDEX email (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-TRUNCATE TABLE `user`;
-
 CREATE TABLE IF NOT EXISTS ip_resource (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     ip                  CHAR(64),
