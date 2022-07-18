@@ -42,6 +42,7 @@ const (
 	DefaultInfluxdbHost      = "influxdb"
 	DefaultInfluxdbPort      = "20044"
 	EnvK8sNodeIP             = "K8S_NODE_IP_FOR_METAFLOW"
+	EnvK8sPodName            = "K8S_POD_NAME_FOR_METAFLOW"
 	DefaultCKDBServicePrefix = "clickhouse"
 	DefaultCKDBServicePort   = 9000
 )
@@ -121,17 +122,17 @@ func (c *Config) Validate() error {
 	}
 
 	if c.CKDB.Primary == "" {
-		hostName, err := os.Hostname()
-		if err != nil {
-			panic(fmt.Sprintf("get hostname failed. err: %s", err))
+		podName, exist := os.LookupEnv(EnvK8sPodName)
+		if !exist {
+			panic(fmt.Sprintf("Can't get pod name env %s", EnvK8sPodName))
 		}
-		index := strings.LastIndex(hostName, "-")
-		if index == -1 || index >= len(hostName)-1 {
-			panic(fmt.Sprintf("host name is %s,  should cantains '-'", hostName))
+		index := strings.LastIndex(podName, "-")
+		if index == -1 || index >= len(podName)-1 {
+			panic(fmt.Sprintf("pod name is %s,  should cantains '-'", podName))
 		}
-		indexInt, err := strconv.Atoi(hostName[index+1:])
+		indexInt, err := strconv.Atoi(podName[index+1:])
 		if err != nil {
-			panic(fmt.Sprintf("host name is %s,  should have digit subfix", hostName))
+			panic(fmt.Sprintf("pod name is %s,  should have digit subfix", podName))
 		}
 		if c.ShardID == 0 {
 			c.ShardID = indexInt
