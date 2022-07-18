@@ -164,11 +164,14 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 	url := fmt.Sprintf("http://%s:%d/v1/domains/", server.IP, server.Port)
 
 	body := formatBody(filename)
+	if !validateBody(body) {
+		return
+	}
 
 	if domainTypeStr, ok := body["TYPE"]; ok {
 		domainTypeInt, ok := domainTypeStrToInt[domainTypeStr.(string)]
 		if !ok {
-			fmt.Fprintln(os.Stderr, fmt.Sprintf("domain type (%s) not supported", domainTypeStr))
+			fmt.Fprintln(os.Stderr, fmt.Sprintf("domain type (%s) not supported, use example to see supported types", domainTypeStr))
 			return
 		}
 		body["TYPE"] = domainTypeInt
@@ -206,6 +209,9 @@ func updateDomain(cmd *cobra.Command, args []string, filename string) {
 		url := fmt.Sprintf("http://%s:%d/v1/domains/%s/", server.IP, server.Port, lcuuid)
 
 		body := formatBody(filename)
+		if !validateBody(body) {
+			return
+		}
 
 		body["TYPE"] = domainTypeInt
 		resp, err := common.CURLPerform("PATCH", url, body, "")
@@ -277,7 +283,7 @@ func upperBodyKey(body map[string]interface{}) map[string]interface{} {
 	return upperBody
 }
 
-func formatBody(filename string) map[string]interface{} {
+func loadBody(filename string) map[string]interface{} {
 	var body map[string]interface{}
 	if filename == "-" {
 		scanner := bufio.NewScanner(os.Stdin)
@@ -294,6 +300,33 @@ func formatBody(filename string) map[string]interface{} {
 		}
 		yaml.Unmarshal(yamlFile, &body)
 	}
+	return body
+}
+
+func formatBody(filename string) map[string]interface{} {
+	body := loadBody(filename)
 	body = upperBodyKey(body)
 	return body
+}
+
+func validateBody(body map[string]interface{}) bool {
+	n, ok := body["NAME"]
+	if ok {
+		switch n.(type) {
+		case string:
+		default:
+			fmt.Println("invalid type (NAME), please specify as string")
+			return false
+		}
+	}
+	t, ok := body["TYPE"]
+	if ok {
+		switch t.(type) {
+		case string:
+		default:
+			fmt.Println("invalid type (TYPE), please specify as string")
+			return false
+		}
+	}
+	return true
 }
