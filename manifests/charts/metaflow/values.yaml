@@ -239,6 +239,7 @@ tolerations: []
 
 
 config:
+  tridentTypeForUnkonwVtap: 0
   ## no blank lines
   ## 不要有空行
   server.yaml: |
@@ -310,7 +311,7 @@ config:
         # - 127.0.0.1
         trident-port: 20035
         max-escape-seconds: 3600
-        trident-type-for-unkonw-vtap: 0
+        trident-type-for-unkonw-vtap: {{ .Values.config.tridentTypeForUnkonwVtap }}
         platform-vips:
         #  - 55.11.135.18
         node-type: "master"
