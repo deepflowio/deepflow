@@ -247,6 +247,7 @@ config:
       log-file: /var/log/metaflow/server.log
       ## loglevel: "debug/info/warn/error"
       log-level: info
+      listen-port: 20417
       ## mysql config
       mysql:
         database: deepflow
@@ -307,18 +308,9 @@ config:
           port: 123
           timeout: 1
         # - 127.0.0.1
-        ## GRPC is used for upgrade by default
-        ## If HTTP is used, modify the configuration as follows
-        ## self_update_url: http://x.x.x.x:23333/yum/trident
-        self-update-url: "grpc"
-        listen-port: 20014
         trident-port: 20035
         max-escape-seconds: 3600
-        trident-revision: ""
         trident-type-for-unkonw-vtap: 0
-        # trident path
-        trident-linux-path: "/usr/local/deepflow/yum/trident"
-        trident-windows-path: "/usr/local/deepflow/yum/trident.exe"
         platform-vips:
         #  - 55.11.135.18
         node-type: "master"
@@ -328,10 +320,9 @@ config:
       genesis:
         aging_time: 86400
         vinterface_aging_time: 300
-        grpc_server_host: "genesis"
-        grpc_server_port: 20036
+        grpc_server_port: {{ .Values.global.nodePort.metaflowServerGrpc }}
         exclude_ip_ranges: []
-        queue_length: 60
+        queue_length: 1000
         data_persistence_interval: 60
     querier:
       # logfile path
