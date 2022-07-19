@@ -116,6 +116,7 @@ type PlatformRawData struct {
 	domainIpToHostID    map[DomainIPKey]int
 	podServiceIDToPorts map[int]mapset.Set
 	idToPodNode         map[int]*models.PodNode
+	idToPodService      map[int]*models.PodService
 
 	vmIDToVifs            map[int]mapset.Set
 	vRouterIDToVifs       map[int]mapset.Set
@@ -188,6 +189,7 @@ func NewPlatformRawData() *PlatformRawData {
 		vInterfaceIDToIP:       make(map[int][]*trident.IpResource),
 		vInterfaceIDToSimpleIP: make(map[int][]*trident.IpResource),
 		idToPodNode:            make(map[int]*models.PodNode),
+		idToPodService:         make(map[int]*models.PodService),
 
 		vmIDToVifs:                    make(map[int]mapset.Set),
 		vRouterIDToVifs:               make(map[int]mapset.Set),
@@ -666,6 +668,7 @@ func (r *PlatformRawData) ConvertDBPodService(dbDataCache *DBDataCache) {
 		return
 	}
 	for _, ps := range podServices {
+		r.idToPodService[ps.ID] = ps
 		r.podServiceIDs.Add(ps.ID)
 		typeIDKey := TypeIDKey{
 			Type: VIF_DEVICE_TYPE_POD_SERVICE,

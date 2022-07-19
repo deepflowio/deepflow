@@ -18,6 +18,7 @@ package metadata
 
 import (
 	"net"
+	"strings"
 )
 
 func netmask2masklen(netmask string) (length int) {
@@ -32,7 +33,7 @@ func netmask2masklen(netmask string) (length int) {
 	return
 }
 
-func judgNet(prefix string, netmask int) bool {
+func judgeNet(prefix string, netmask int) bool {
 	if prefix == "" || netmask == 0 {
 		return false
 	}
@@ -43,4 +44,16 @@ func judgNet(prefix string, netmask int) bool {
 	}
 
 	return true
+}
+
+func ConvertToCIDR(ips []string) {
+	for index, _ := range ips {
+		if strings.Contains(ips[index], "/") {
+			continue
+		} else if strings.Contains(ips[index], ":") {
+			ips[index] = ips[index] + "/128"
+		} else {
+			ips[index] = ips[index] + "/32"
+		}
+	}
 }

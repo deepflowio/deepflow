@@ -61,6 +61,9 @@ type DBDataCache struct {
 	vmPodNodeConns          []*models.VMPodNodeConnection
 	vipDomains              []*models.Domain
 	tapTypes                []*models.TapType
+	resourceGroups          []*models.ResourceGroup
+	resourceGroupExtraInfos []*models.ResourceGroupExtraInfo
+	acls                    []*models.ACL
 }
 
 func newDBDataCache() *DBDataCache {
@@ -210,6 +213,18 @@ func (d *DBDataCache) GetPeerConnections() []*models.PeerConnection {
 func (d *DBDataCache) GetSkipVTaps() []*models.VTap {
 
 	return d.skipVTaps
+}
+
+func (d *DBDataCache) GetResourceGroups() []*models.ResourceGroup {
+	return d.resourceGroups
+}
+
+func (d *DBDataCache) GetResourceGroupExtraInfos() []*models.ResourceGroupExtraInfo {
+	return d.resourceGroupExtraInfos
+}
+
+func (d *DBDataCache) GetACLs() []*models.ACL {
+	return d.acls
 }
 
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
@@ -466,6 +481,27 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		VTAP_TYPE_KVM, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_POD_VM})
 	if err == nil {
 		d.skipVTaps = skipVTaps
+	} else {
+		log.Error(err)
+	}
+
+	resourceGroups, err := dbmgr.DBMgr[models.ResourceGroup](db).Gets()
+	if err == nil {
+		d.resourceGroups = resourceGroups
+	} else {
+		log.Error(err)
+	}
+
+	resourceGroupExtraInfos, err := dbmgr.DBMgr[models.ResourceGroupExtraInfo](db).Gets()
+	if err == nil {
+		d.resourceGroupExtraInfos = resourceGroupExtraInfos
+	} else {
+		log.Error(err)
+	}
+
+	acls, err := dbmgr.DBMgr[models.ACL](db).Gets()
+	if err == nil {
+		d.acls = acls
 	} else {
 		log.Error(err)
 	}

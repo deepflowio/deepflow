@@ -18,7 +18,6 @@ package node
 
 import (
 	"errors"
-	"hash/fnv"
 	"strconv"
 	"time"
 
@@ -209,7 +208,6 @@ func (n *NodeInfo) initTSDBInfo() {
 	n.tsdbToNATIP = tsdbToNATIP
 	n.generateTSDBRegion()
 	n.generatesysConfiguration()
-	n.generateGroups()
 }
 
 func (n *NodeInfo) generateTSDBRegion() {
@@ -410,25 +408,12 @@ func (n *NodeInfo) isRegisterController() {
 	}
 }
 
-func (n *NodeInfo) generateGroups() {
-	services := n.metaData.GetServiceDataOP().GetServiceData()
-	groups := &trident.Groups{
-		Groups: nil,
-		Svcs:   services,
-	}
-	groupBytes, err := groups.Marshal()
-	if err == nil {
-		n.groups = groupBytes
-		h64 := fnv.New64()
-		h64.Write(groupBytes)
-		n.groupHash = h64.Sum64()
-	} else {
-		log.Error(err)
-	}
+func (n *NodeInfo) GetGroups() []byte {
+	return n.metaData.GetDropletGroups()
 }
 
-func (n *NodeInfo) GetGroups() []byte {
-	return n.groups
+func (n *NodeInfo) GetGroupsVersion() uint64 {
+	return n.metaData.GetDropletGroupsVersion()
 }
 
 func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
@@ -488,12 +473,10 @@ func (n *NodeInfo) TimedRefreshNodeCache() {
 			log.Info("start generate node cache data from timed")
 			n.isRegisterController()
 			n.generateNodeCache()
-			n.generateGroups()
 			log.Info("end generate node cache data from timed")
 		case <-n.chNodeInfo:
 			log.Info("start generate node cache data from rpc")
 			n.generateNodeCache()
-			n.generateGroups()
 			pushmanager.Broadcast()
 			log.Info("end generate node cache data from rpc")
 		}
