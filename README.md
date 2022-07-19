@@ -33,7 +33,7 @@ The DeepFlow Community Edition consists of the core components of the Enterprise
 
 Please refer to [the deployment documentation](https://deepflow.yunshan.net/deepflow-docs/install/all-in-one/).
 
-At the same time, we have also built a complete [DeepFlow Community Demo](https://demo.deepflow.yunshan.net/), welcome to experience it. Login account/password: deepflow/deepflow.
+At the same time, we have also built a complete [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/), welcome to experience it. Login account/password: deepflow/deepflow.
 
 ## DeepFlow Cloud
 

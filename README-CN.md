@@ -33,7 +33,7 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 请参考[文档](https://deepflow.yunshan.net/deepflow-docs/zh/install/all-in-one/)部署 DeepFlow Community。
 
-同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://demo.deepflow.yunshan.net/)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
+同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
 
 ## 体验 DeepFlow Cloud
 
