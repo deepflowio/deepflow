@@ -1,7 +1,7 @@
-# MetaFlow Helm Charts
+# DeepFlow Helm Charts
 
 
-This repository contains [Helm](https://helm.sh/) charts for MetaFlow project.
+This repository contains [Helm](https://helm.sh/) charts for DeepFlow project.
 
 ## Usage
 

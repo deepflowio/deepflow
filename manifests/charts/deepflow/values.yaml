@@ -770,7 +770,7 @@ grafana:
       ##
       annotations: {}
       provider:
-        folder: 'MetaFlow Templates'
+        folder: 'DeepFlow Templates'
         allowUiUpdates: false
   dashboardProviders:
     dashboardproviders.yaml:
@@ -778,7 +778,7 @@ grafana:
       providers:
       - name: 'metaflow-system'
         orgId: 1
-        folder: 'MetaFlow System'
+        folder: 'DeepFlow System'
         type: file
         disableDeletion: false
         allowUiUpdates: false
@@ -832,7 +832,7 @@ grafana:
    datasources.yaml:
       apiVersion: 1
       datasources:
-      - name: MetaFlow
+      - name: DeepFlow
         type: metaflow-querier-datasource
         url: 
         access: proxy
@@ -840,7 +840,7 @@ grafana:
         jsonData:
           requestUrl: http://{{ include "metaflow.fullname" . }}-server:20416
           traceUrl: http://{{ include "metaflow.fullname" . }}-app:20418
-      - name: "MetaFlow ClickHouse"
+      - name: "DeepFlow ClickHouse"
         type: grafana-clickhouse-datasource
         jsonData:
           port: 9000
@@ -848,7 +848,7 @@ grafana:
           username: default
         secureJsonData:
           password: ""
-      - name: "MetaFlow MySQL"
+      - name: "DeepFlow MySQL"
         type: mysql
         url: "{{ $.Release.Name }}-mysql:30130"
         database: deepflow
