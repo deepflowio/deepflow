@@ -240,6 +240,7 @@ tolerations: []
 
 config:
   tridentTypeForUnkonwVtap: 0
+configmap:
   ## no blank lines
   ## 不要有空行
   server.yaml: |
