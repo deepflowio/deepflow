@@ -14,7 +14,7 @@ DeepFlow 是[云杉网络](https://yunshan.net)开源的一款**高度自动化*
 - **高性能**：DeepFlow 创新的 **SmartEncoding** 标签注入机制，能够将标签数据的存储性能提升 10 倍，从此告别高基标签和数据采样焦虑。DeepFlow 使用 Rust 实现 Agent，拥有极致处理性能的同时保证内存安全。DeepFlow 使用 Golang 实现 Server，重写了 Golang 的 map、pool 基础库，数据查询和内存申请均有近 10 倍的性能提升。
 - **可编程**：DeepFlow 目前支持了对 HTTP 1/2/S、Dubbo、MySQL、Redis、Kafka、MQTT、DNS 协议的解析，并将保持迭代增加更多的应用协议支持。除此之外，DeepFlow 基于 WASM 技术提供了可编程接口，让开发者可以快速具备对私有协议的解析能力，并可用于构建特定场景的业务分析能力，例如 5GC 信令分析、金融交易分析、车机通信分析等。
 - **开放接口**：DeepFlow 拥抱开源社区，支持接收广泛的可观测数据源，并利用 AutoTagging 和 SmartEncoding 提供高性能、统一的标签注入能力。DeepFlow 支持插件式的数据库接口，开发者可自由增加和替换最合适的数据库。DeepFlow 向上为所有观测数据提供统一的标准 SQL 查询能力，便于使用者快速集成到自己的可观测性平台中，也提供了在此基础上继续开发方言 QL 的可能性。
-- **易于维护**：DeepFlow 仅由 Agent、Server 两个组件构成，将复杂度隐藏在进程内部，将维护难度降低至极致。DeepFlow Server 集群可对多资源池、异构资源池、跨 Region/AZ 资源池中的 Agent 进行统一管理，且无需依赖任何外部组件即可实现水平扩展与负载均衡。
+- **易于维护**：DeepFlow 的内核仅由 Agent、Server 两个组件构成，将复杂度隐藏在进程内部，将维护难度降低至极致。DeepFlow Server 集群可对多资源池、异构资源池、跨 Region/AZ 资源池中的 Agent 进行统一管理，且无需依赖任何外部组件即可实现水平扩展与负载均衡。
 
 # 文档
 
@@ -22,21 +22,30 @@ DeepFlow 是[云杉网络](https://yunshan.net)开源的一款**高度自动化*
 
 # 快速上手
 
-## 部署 DeepFlow
+DeepFlow 共有三种版本：
+- DeepFlow Community：DeepFlow 社区版，面向开发人员
+- DeepFlow Enterprise：DeepFlow 企业版，面向组织、解决团队协作的问题
+- DeepFlow Cloud：DeepFlow SaaS 服务，目前处于测试阶段
 
-请参考[部署文档](https://deepflow.yunshan.net/metaflow-docs/zh/install/all-in-one/)。
+DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希望让观测更自动，让全世界的开发者更自由。
 
-## 体验 DeepFlow Demo
+## 部署 DeepFlow Community
 
-我们搭建了一个完整的 [DeepFlow Online Demo](https://demo.metaflow.yunshan.net/)，欢迎体验。登录账号 / 密码：metaflow / metaflow。
+请参考[文档](https://deepflow.yunshan.net/metaflow-docs/zh/install/all-in-one/)部署 DeepFlow Community。
 
-## 使用 DeepFlow Cloud
+同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://demo.metaflow.yunshan.net/)，欢迎体验。登录账号 / 密码：metaflow / metaflow。
 
-[DeepFlow Cloud](https://deepflow.yunshan.net/) 是我们的 DeepFlow 托管服务，目前处于测试阶段，仅支持中文。
+## 体验 DeepFlow Cloud
+
+[DeepFlow Cloud](https://deepflow.yunshan.net/) 是 DeepFlow 的全托管 SaaS 服务，目前处于测试阶段，仅支持中文。
+
+## 体验 DeepFlow Enterprise
+
+[DeepFlow Enterprise](https://www.yunshan.net/products/deepflow.html) 支持对混合云的全栈、全链路监控，覆盖容器、云服务器、宿主机、NFV网关，目前仅支持中文，欢迎联系我们进行体验。
 
 # 软件架构
 
-DeepFlow 由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、虚拟机或物理裸机中运行一个 Agent ，负责该服务器上所有应用进程的 AutoMetrics 和 AutoTracing 数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、数据标签注入、数据写入、数据查询服务。
+DeepFlow Community 主要由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、虚拟机或物理裸机中运行一个 Agent ，负责该服务器上所有应用进程的 AutoMetrics 和 AutoTracing 数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、数据标签注入、数据写入、数据查询服务。
 
 ![DeepFlow 软件架构](./docs/metaflow-architecture.png)
 
