@@ -17,19 +17,20 @@
 package router
 
 import (
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/service"
-	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 )
 
-func DomainRouter(e *gin.Engine) {
+func DomainRouter(e *gin.Engine, grpcServerPort string) {
 	// TODO: 后续统一为v2
 	e.GET("/v2/domains/:lcuuid/", getDomain)
 	e.GET("/v2/domains/", getDomains)
-	e.POST("/v1/domains/", createDomain)
-	e.PATCH("/v1/domains/:lcuuid/", updateDomain)
+	e.POST("/v1/domains/", createDomain(grpcServerPort))
+	e.PATCH("/v1/domains/:lcuuid/", updateDomain(grpcServerPort))
 	e.DELETE("/v1/domains/:lcuuid/", deleteDomain)
 
 	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain)
@@ -55,40 +56,43 @@ func getDomains(c *gin.Context) {
 	JsonResponse(c, data, err)
 }
 
-func createDomain(c *gin.Context) {
-	var err error
-	var domainCreate model.DomainCreate
+func createDomain(grpcServerPort string) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		var err error
+		var domainCreate model.DomainCreate
 
-	// 参数校验
-	err = c.ShouldBindBodyWith(&domainCreate, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
-		return
-	}
+		// message validation
+		err = c.ShouldBindBodyWith(&domainCreate, binding.JSON)
+		if err != nil {
+			BadRequestResponse(c, common.INVALID_POST_DATA, err.Error())
+			return
+		}
 
-	data, err := service.CreateDomain(domainCreate)
-	JsonResponse(c, data, err)
+		data, err := service.CreateDomain(domainCreate, grpcServerPort)
+		JsonResponse(c, data, err)
+	})
 }
 
-func updateDomain(c *gin.Context) {
-	var err error
-	var domainUpdate model.DomainUpdate
+func updateDomain(grpcServerPort string) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		var err error
+		var domainUpdate model.DomainUpdate
 
-	// 参数校验
-	err = c.ShouldBindBodyWith(&domainUpdate, binding.JSON)
-	if err != nil {
-		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
-		return
-	}
+		// message validation
+		err = c.ShouldBindBodyWith(&domainUpdate, binding.JSON)
+		if err != nil {
+			BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+			return
+		}
 
-	// 接收参数
-	// 避免struct会有默认值，这里转为map作为函数入参
-	patchMap := map[string]interface{}{}
-	c.ShouldBindBodyWith(&patchMap, binding.JSON)
+		// transfer json format to map
+		patchMap := map[string]interface{}{}
+		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
-	lcuuid := c.Param("lcuuid")
-	data, err := service.UpdateDomain(lcuuid, patchMap)
-	JsonResponse(c, data, err)
+		lcuuid := c.Param("lcuuid")
+		data, err := service.UpdateDomain(lcuuid, patchMap, grpcServerPort)
+		JsonResponse(c, data, err)
+	})
 }
 
 func deleteDomain(c *gin.Context) {

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/deepflowys/deepflow/message/common"
-	api "github.com/deepflowys/deepflow/message/trident"
 	"github.com/golang/protobuf/proto"
 	context "golang.org/x/net/context"
 
+	"github.com/deepflowys/deepflow/message/common"
+	api "github.com/deepflowys/deepflow/message/trident"
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"

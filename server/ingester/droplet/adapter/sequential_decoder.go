@@ -21,8 +21,9 @@ import (
 	"net"
 	"time"
 
-	. "github.com/deepflowys/deepflow/server/libs/datatype"
 	. "github.com/google/gopacket/layers"
+
+	. "github.com/deepflowys/deepflow/server/libs/datatype"
 )
 
 const (

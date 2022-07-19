@@ -33,6 +33,7 @@ type service struct {
 	ntpEvent                 *NTPEvent
 	upgradeEvent             *UpgradeEvent
 	kubernetesClusterIDEvent *KubernetesClusterIDEvent
+	encryptKeyEvent          *EncryptKeyEvent
 }
 
 func init() {
@@ -41,10 +42,11 @@ func init() {
 
 func newService() *service {
 	return &service{
-		vTapEvent:    NewVTapEvent(),
-		tsdbEvent:    NewTSDBEvent(),
-		ntpEvent:     NewNTPEvent(),
-		upgradeEvent: NewUpgradeEvent(),
+		vTapEvent:       NewVTapEvent(),
+		tsdbEvent:       NewTSDBEvent(),
+		ntpEvent:        NewNTPEvent(),
+		upgradeEvent:    NewUpgradeEvent(),
+		encryptKeyEvent: NewEncryptKeyEvent(),
 	}
 }
 
@@ -81,6 +83,10 @@ func (s *service) Query(ctx context.Context, in *api.NtpRequest) (*api.NtpRespon
 
 func (s *service) GetKubernetesClusterID(ctx context.Context, in *api.KubernetesClusterIDRequest) (*api.KubernetesClusterIDResponse, error) {
 	return s.kubernetesClusterIDEvent.GetKubernetesClusterID(ctx, in)
+}
+
+func (s *service) GetEncryptKey(ctx context.Context, in *api.EncryptKeyRequest) (*api.EncryptKeyResponse, error) {
+	return s.encryptKeyEvent.Get(ctx, in)
 }
 
 func (s *service) GenesisSync(ctx context.Context, in *api.GenesisSyncRequest) (*api.GenesisSyncResponse, error) {

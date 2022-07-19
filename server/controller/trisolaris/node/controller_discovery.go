@@ -19,12 +19,12 @@ package node
 import (
 	"os"
 
-	"github.com/deepflowys/deepflow/server/libs/utils"
 	"github.com/google/uuid"
 
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 type ControllerDiscovery struct {

@@ -22,10 +22,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/golang/protobuf/proto"
 	"gorm.io/gorm"
 
+	"github.com/deepflowys/deepflow/message/trident"
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"

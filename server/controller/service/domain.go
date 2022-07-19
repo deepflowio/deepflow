@@ -31,6 +31,8 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
+var DOMAIN_PASSWORD_KEYS = []string{"admin_password", "secret_key", "password", "boss_secret_key"}
+
 func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) {
 	var response []model.Domain
 	var domains []mysql.Domain
@@ -135,9 +137,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 
 		domainResp.Config = make(map[string]interface{})
 		json.Unmarshal([]byte(domain.Config), &domainResp.Config)
-		for _, key := range []string{
-			"admin_password", "secret_key", "password", "boss_secret_key",
-		} {
+		for _, key := range DOMAIN_PASSWORD_KEYS {
 			if _, ok := domainResp.Config[key]; ok {
 				domainResp.Config[key] = common.DEFAULT_ENCRYPTION_PASSWORD
 			}
@@ -148,7 +148,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 	return response, nil
 }
 
-func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
+func CreateDomain(domainCreate model.DomainCreate, grpcServerPort string) (*model.Domain, error) {
 	var count int64
 
 	mysql.Db.Model(&mysql.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)
@@ -179,6 +179,7 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 			"controller_ip": "",
 		}
 	}
+
 	var regionLcuuid string
 	confRegion, ok := domainCreate.Config["region_uuid"]
 	if !ok || confRegion.(string) == "" {
@@ -207,6 +208,21 @@ func CreateDomain(domainCreate model.DomainCreate) (*model.Domain, error) {
 		controllerIP = confControllerIP.(string)
 	}
 	domain.ControllerIP = controllerIP
+
+	// encrypt password/access_key
+	for _, key := range DOMAIN_PASSWORD_KEYS {
+		if _, ok := domainCreate.Config[key]; ok {
+			encryptKey, err := common.GetEncryptKey(
+				domain.ControllerIP, grpcServerPort, domainCreate.Config[key].(string),
+			)
+			if err != nil {
+				log.Error("get encrypt key failed (%s)", err.Error())
+				return nil, NewError(common.SERVER_ERROR, err.Error())
+			}
+
+			domainCreate.Config[key] = encryptKey
+		}
+	}
 	configStr, _ := json.Marshal(domainCreate.Config)
 	domain.Config = string(configStr)
 
@@ -252,7 +268,7 @@ func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) 
 	return
 }
 
-func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Domain, error) {
+func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServerPort string) (*model.Domain, error) {
 	var domain mysql.Domain
 	var dbUpdateMap = make(map[string]interface{})
 
@@ -282,6 +298,7 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Do
 	// 控制器IP
 	if _, ok := domainUpdate["CONTROLLER_IP"]; ok {
 		dbUpdateMap["controller_ip"] = domainUpdate["CONTROLLER_IP"]
+		domain.ControllerIP = domainUpdate["CONTROLLER_IP"].(string)
 	}
 
 	// config
@@ -291,19 +308,14 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Do
 		json.Unmarshal([]byte(domain.Config), &config)
 
 		configUpdate := domainUpdate["CONFIG"].(map[string]interface{})
-		for _, key := range []string{
-			"admin_password", "secret_key", "password", "boss_secret_key",
-		} {
-			if _, ok := configUpdate[key]; ok {
-				if configUpdate[key] == common.DEFAULT_ENCRYPTION_PASSWORD {
-					configUpdate[key] = config[key]
-				}
-			}
-		}
+		configStr, _ := json.Marshal(domainUpdate["CONFIG"])
+		dbUpdateMap["config"] = string(configStr)
+
 		// 如果存在资源同步控制器IP的修改，则需要更新controller_ip字段
 		if controllerIP, ok := configUpdate["controller_ip"]; ok {
 			if controllerIP != domain.ControllerIP {
 				dbUpdateMap["controller_ip"] = controllerIP
+				domain.ControllerIP = controllerIP.(string)
 			}
 		}
 		// 如果修改region，则清理掉云平台下所有软删除的数据
@@ -313,8 +325,25 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}) (*model.Do
 				deleteSoftDeletedResource(lcuuid)
 			}
 		}
-		configStr, _ := json.Marshal(domainUpdate["CONFIG"])
-		dbUpdateMap["config"] = string(configStr)
+
+		// transfer password/access_key
+		for _, key := range DOMAIN_PASSWORD_KEYS {
+			if _, ok := configUpdate[key]; ok {
+				if configUpdate[key] == common.DEFAULT_ENCRYPTION_PASSWORD {
+					configUpdate[key] = config[key]
+				} else {
+					// encrypt password/access_key
+					encryptKey, err := common.GetEncryptKey(
+						domain.ControllerIP, grpcServerPort, configUpdate[key].(string),
+					)
+					if err != nil {
+						log.Error(err)
+						return nil, NewError(common.SERVER_ERROR, err.Error())
+					}
+					configUpdate[key] = encryptKey
+				}
+			}
+		}
 	}
 
 	// 更新domain DB
