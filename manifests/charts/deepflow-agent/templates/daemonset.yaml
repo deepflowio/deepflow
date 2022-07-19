@@ -52,7 +52,7 @@ spec:
           #   periodSeconds: 10
           {{- if .Values.nodeIPInjection }}
           env:
-          - name: K8S_NODE_IP_FOR_METAFLOW
+          - name: K8S_NODE_IP_FOR_DEEPFLOW
             valueFrom:
               fieldRef:
                 fieldPath: status.hostIP

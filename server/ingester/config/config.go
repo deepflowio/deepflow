@@ -41,8 +41,8 @@ const (
 	DefaultCKDBS3TTLTimes    = 3 // 对象存储的保留时长是本地存储的3倍
 	DefaultInfluxdbHost      = "influxdb"
 	DefaultInfluxdbPort      = "20044"
-	EnvK8sNodeIP             = "K8S_NODE_IP_FOR_METAFLOW"
-	EnvK8sPodName            = "K8S_POD_NAME_FOR_METAFLOW"
+	EnvK8sNodeIP             = "K8S_NODE_IP_FOR_DEEPFLOW"
+	EnvK8sPodName            = "K8S_POD_NAME_FOR_DEEPFLOW"
 	DefaultCKDBServicePrefix = "clickhouse"
 	DefaultCKDBServicePort   = 9000
 )

@@ -27,7 +27,7 @@ use clap::{ArgEnum, Parser, Subcommand};
 
 use metaflow_agent::debug::{
     Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, BEACON_PORT,
-    DEBUG_QUEUE_IDLE_TIMEOUT, METAFLOW_AGENT_BEACON,
+    DEBUG_QUEUE_IDLE_TIMEOUT, DEEPFLOW_AGENT_BEACON,
 };
 
 const ERR_PORT_MSG: &str = "error: The following required arguments were not provided:
@@ -257,10 +257,10 @@ impl Controller {
                     }
 
                     // 过滤trident的beacon包
-                    let length = METAFLOW_AGENT_BEACON.as_bytes().len();
+                    let length = DEEPFLOW_AGENT_BEACON.as_bytes().len();
                     if buf
                         .get(..length)
-                        .filter(|&s| s == METAFLOW_AGENT_BEACON.as_bytes())
+                        .filter(|&s| s == DEEPFLOW_AGENT_BEACON.as_bytes())
                         .is_none()
                     {
                         continue;

@@ -45,7 +45,7 @@ func NewStatsdMonitor(cfg config.StatsdConfig) error {
 	statsdServer := net.JoinHostPort(cfg.Host, cfg.Port)
 	config := &statsd.ClientConfig{
 		Address:       statsdServer,
-		Prefix:        common.METAFLOW_STATSD_PREFIX,
+		Prefix:        common.DEEPFLOW_STATSD_PREFIX,
 		UseBuffered:   true,
 		FlushInterval: time.Duration(cfg.FlushInterval),
 		TagFormat:     statsd.InfixComma,

@@ -570,7 +570,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
         let (static_config, conf) = conf;
-        // Directlly use env.K8S_NODE_IP_FOR_METAFLOW as the ctrl_ip reported by metaflow-agent if available
+        // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by metaflow-agent if available
         let ctrl_ip = match get_k8s_local_node_ip() {
             Some(ip) => ip,
             None => get_route_src_ip(&static_config.controller_ips[0].parse().unwrap()).map_err(

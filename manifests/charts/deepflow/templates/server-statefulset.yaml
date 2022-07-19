@@ -71,11 +71,11 @@ spec:
             readOnly: {{ .readOnly }}
         {{- end }}
           env:
-          - name: K8S_NODE_IP_FOR_METAFLOW
+          - name: K8S_NODE_IP_FOR_DEEPFLOW
             valueFrom:
               fieldRef:
                 fieldPath: status.hostIP
-          - name: K8S_POD_NAME_FOR_METAFLOW
+          - name: K8S_POD_NAME_FOR_DEEPFLOW
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
