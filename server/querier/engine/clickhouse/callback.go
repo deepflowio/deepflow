@@ -112,6 +112,7 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 		newValues = make([]interface{}, len(values))
 		var macIndex int
 		var macTypeIndex int
+		macTypeIndex = -1
 		for i, column := range columns {
 			if column.(string) == args[1].(string) {
 				macIndex = i
@@ -132,7 +133,7 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 			switch newValueSlice[macIndex].(type) {
 			case int:
 				newMac := utils.Uint64ToMac(uint64((newValueSlice[macIndex]).(int))).String()
-				if args[0].(string) == "tap_port" {
+				if args[0].(string) == "tap_port" && macTypeIndex != -1 {
 					newMac = strings.TrimPrefix(newMac, "00:00:")
 					if newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_0 || newValueSlice[macTypeIndex].(uint8) == tag.TAP_PORT_MAC_1 {
 						newValueSlice[macIndex] = newMac

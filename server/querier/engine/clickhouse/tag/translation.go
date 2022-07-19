@@ -361,6 +361,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			nameTagTranslator := ""
 			notNullFilter := ""
 			deviceIDSuffix := "l3_device_id" + suffix
+			serviceIDSuffix := "service_id" + suffix
 			deviceTypeSuffix := "l3_device_type" + suffix
 			deviceTypeValueStr := strconv.Itoa(DEVICE_MAP[relatedResourceStr])
 			if common.IsValueInSliceString(relatedResourceStr, []string{"natgw", "lb"}) {
@@ -396,9 +397,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					),
 				}
 			} else if relatedResourceStr == "pod_service" {
-				idTagTranslator = "if(" + deviceTypeSuffix + "=" + deviceTypeValueStr + "," + deviceIDSuffix + ", 0)"
-				nameTagTranslator = "dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + deviceIDSuffix + ")))"
-				notNullFilter = deviceIDSuffix + "!=0 AND " + deviceTypeSuffix + "=" + deviceTypeValueStr
+				nameTagTranslator = "dictGet(flow_tag.device_map, 'name', (toUInt64(" + deviceTypeValueStr + "),toUInt64(" + serviceIDSuffix + ")))"
+				notNullFilter = serviceIDSuffix + "!=0"
 				tagResourceMap[relatedResourceNameSuffix] = map[string]*Tag{
 					"node_type": NewTag(
 						"'"+relatedResourceStr+"'",
@@ -407,7 +407,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 						"",
 					),
 					"icon_id": NewTag(
-						"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+deviceIDSuffix+")))",
+						"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+deviceTypeValueStr+"),toUInt64("+serviceIDSuffix+")))",
 						"",
 						"",
 						"",
@@ -421,7 +421,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				}
 				tagResourceMap[relatedResourceIDSuffix] = map[string]*Tag{
 					"default": NewTag(
-						idTagTranslator,
+						serviceIDSuffix,
 						notNullFilter,
 						"service_id"+suffix+" %s %s",
 						"",
