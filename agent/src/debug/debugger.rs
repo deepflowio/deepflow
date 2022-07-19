@@ -37,7 +37,7 @@ use super::{
     platform::{PlatformDebugger, PlatformMessage},
     queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
-    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, MAX_BUF_SIZE, METAFLOW_AGENT_BEACON,
+    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, MAX_BUF_SIZE, DEEPFLOW_AGENT_BEACON,
 };
 
 use crate::{
@@ -124,7 +124,7 @@ impl Debugger {
                     for &ip in conf.load().controller_ips.iter() {
                         if let Err(e) = sock_clone.send_to(
                             [
-                                METAFLOW_AGENT_BEACON.as_bytes(),
+                                DEEPFLOW_AGENT_BEACON.as_bytes(),
                                 serialized_beacon.as_slice(),
                             ]
                             .concat()

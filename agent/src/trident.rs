@@ -107,11 +107,11 @@ pub struct Trident {
 }
 
 fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
-    // Directlly use env.K8S_NODE_IP_FOR_METAFLOW as the ctrl_ip reported by metaflow-agent if available
+    // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by metaflow-agent if available
     match get_k8s_local_node_ip() {
         Some(ip) => {
             info!(
-                "use K8S_NODE_IP_FOR_METAFLOW env ip as destination_ip({})",
+                "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
                 ip
             );
             let ctrl_mac = get_mac_by_ip(ip);

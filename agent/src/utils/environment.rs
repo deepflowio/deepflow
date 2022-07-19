@@ -38,7 +38,7 @@ use super::process::{get_memory_rss, get_process_num_by_name};
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
 // K8S environment node ip environment variable
-pub const K8S_NODE_IP_FOR_METAFLOW: &str = "K8S_NODE_IP_FOR_METAFLOW";
+pub const K8S_NODE_IP_FOR_DEEPFLOW: &str = "K8S_NODE_IP_FOR_DEEPFLOW";
 
 pub fn check(f: Checker) {
     let mut logged = false;
@@ -251,17 +251,17 @@ pub fn is_tt_workload(trident_type: TridentType) -> bool {
 }
 
 pub fn get_k8s_local_node_ip() -> Option<IpAddr> {
-    match env::var(K8S_NODE_IP_FOR_METAFLOW) {
+    match env::var(K8S_NODE_IP_FOR_DEEPFLOW) {
         Ok(v) => match v.parse::<IpAddr>() {
             Ok(ip) => {
                 return Some(ip);
             }
-            Err(e) => warn!("parse K8S_NODE_IP_FOR_METAFLOW string to ip failed: {}", e),
+            Err(e) => warn!("parse K8S_NODE_IP_FOR_DEEPFLOW string to ip failed: {}", e),
         },
         Err(e) => {
             if let VarError::NotUnicode(_) = &e {
                 warn!(
-                    "parse K8S_NODE_IP_FOR_METAFLOW environment variable failed: {}",
+                    "parse K8S_NODE_IP_FOR_DEEPFLOW environment variable failed: {}",
                     e
                 );
             }
