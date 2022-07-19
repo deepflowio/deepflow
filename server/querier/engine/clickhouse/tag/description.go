@@ -274,7 +274,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
-				externalTag, externalTag + "_0", externalTag + "_1", externalTag, "attribute",
+				externalTag, externalTag, externalTag, externalTag, "attribute",
 				"原始Attribute", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		}
