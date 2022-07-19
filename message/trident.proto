@@ -15,6 +15,7 @@ service Synchronizer {
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
     rpc GenesisSharingK8S (GenesisSharingK8SRequest) returns (GenesisSharingK8SResponse) {}
+    rpc GetEncryptKey (EncryptKeyRequest) returns (EncryptKeyResponse) {}
 }
 
 enum State {
@@ -560,6 +561,7 @@ message KubernetesClusterIDResponse {
     optional string error_msg = 1;
     optional string cluster_id = 2;
 }
+
 message GenesisSharingK8SRequest {
     optional string cluster_id = 1;
 }
@@ -568,4 +570,13 @@ message GenesisSharingK8SResponse {
     optional string epoch = 1;
     optional string error_msg = 2;
     repeated KubernetesAPIInfo entries = 3;
+}
+
+message EncryptKeyRequest {
+    optional string key = 1;
+}
+
+message EncryptKeyResponse {
+    optional string error_msg = 1;
+    optional string encrypt_key = 2;
 }

@@ -23,11 +23,11 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/google/uuid"
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
+	"github.com/deepflowys/deepflow/message/trident"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"

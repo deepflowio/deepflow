@@ -22,9 +22,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/influxdata/influxdb/client/v2"
+
 	"github.com/deepflowys/deepflow/server/libs/stats"
 	"github.com/deepflowys/deepflow/server/libs/utils"
-	"github.com/influxdata/influxdb/client/v2"
 )
 
 const (

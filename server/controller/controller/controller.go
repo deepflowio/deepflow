@@ -163,7 +163,7 @@ func Start(configPath string) {
 	router.VtapRouter(r)
 	router.VtapGroupRouter(r, cfg)
 	router.DataSourceRouter(r, cfg)
-	router.DomainRouter(r)
+	router.DomainRouter(r, cfg.GenesisCfg.GRPCServerPort)
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
 	trouter.RegistRouter(r)

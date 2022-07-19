@@ -89,6 +89,11 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 		log.Error("secret_key must be specified")
 		return nil, err
 	}
+	decryptSecretKey, err := common.DecryptSecretKey(secretKey)
+	if err != nil {
+		log.Error("decrypt secret_key failed (%s)", err.Error())
+		return nil, err
+	}
 
 	url := config.Get("url").MustString()
 	if url == "" {
@@ -103,7 +108,7 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 		RegionUuid:   config.Get("region_uuid").MustString(),
 		url:          url,
 		secretID:     secretID,
-		secretKey:    secretKey,
+		secretKey:    decryptSecretKey,
 
 		defaultVPCName:            domain.Name + "_default_vpc",
 		defaultVxnetName:          "vxnet-0",

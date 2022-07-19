@@ -23,8 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 	"github.com/influxdata/influxdb/client/v2"
+
+	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 )
 
 const (

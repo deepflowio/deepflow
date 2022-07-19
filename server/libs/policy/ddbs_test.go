@@ -19,8 +19,9 @@ package policy
 import (
 	"testing"
 
-	. "github.com/deepflowys/deepflow/server/libs/datatype"
 	. "github.com/google/gopacket/layers"
+
+	. "github.com/deepflowys/deepflow/server/libs/datatype"
 )
 
 func TestDdbsSimple(t *testing.T) {

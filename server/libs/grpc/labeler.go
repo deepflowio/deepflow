@@ -22,13 +22,14 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/google/gopacket/layers"
+
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/hmap/idmap"
 	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/policy"
 	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
 	"github.com/deepflowys/deepflow/server/libs/utils"
-	"github.com/google/gopacket/layers"
 )
 
 const (

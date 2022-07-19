@@ -20,8 +20,9 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
@@ -58,6 +59,11 @@ func NewBaiduBce(domain mysql.Domain) (*BaiduBce, error) {
 		log.Error("secret_key must be specified")
 		return nil, err
 	}
+	decryptSecretKey, err := common.DecryptSecretKey(secretKey)
+	if err != nil {
+		log.Error("decrypt secret_key failed (%s)", err.Error())
+		return nil, err
+	}
 
 	endpoint, err := config.Get("endpoint").String()
 	if err != nil {
@@ -71,7 +77,7 @@ func NewBaiduBce(domain mysql.Domain) (*BaiduBce, error) {
 		uuidGenerate: domain.DisplayName,
 		regionUuid:   config.Get("region_uuid").MustString(),
 		secretID:     secretID,
-		secretKey:    secretKey,
+		secretKey:    decryptSecretKey,
 		endpoint:     endpoint,
 
 		regionLcuuidToResourceNum: make(map[string]int),
@@ -182,8 +188,8 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 		return resource, err
 	}
 
-	resource.Regions = common.EliminateEmptyRegions(regions, b.regionLcuuidToResourceNum)
-	resource.AZs = common.EliminateEmptyAZs(azs, b.azLcuuidToResourceNum)
+	resource.Regions = cloudcommon.EliminateEmptyRegions(regions, b.regionLcuuidToResourceNum)
+	resource.AZs = cloudcommon.EliminateEmptyAZs(azs, b.azLcuuidToResourceNum)
 	resource.VPCs = vpcs
 	resource.Networks = networks
 	resource.Subnets = subnets

@@ -23,6 +23,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/gopacket/layers"
+
+	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/stream/geo"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
@@ -31,9 +34,6 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/grpc"
 	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
-
-	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/google/gopacket/layers"
 )
 
 const (
