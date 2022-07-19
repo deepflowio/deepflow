@@ -588,15 +588,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 			trace_stats->trace_map_count++;
 	} else { /* direction == T_EGRESS */
 		if (trace_info_ptr) {
-			/*
-			 * 追踪在不同socket之间进行，而对于在同一个socket的情况进行忽略。
-			 */
-			if (socket_id != trace_info_ptr->socket_id) {
-				*thread_trace_id = trace_info_ptr->thread_trace_id;
-			} else {
-				*thread_trace_id = 0;
-			}
-
+			*thread_trace_id = trace_info_ptr->thread_trace_id;
 			trace_stats->trace_map_count--;
 		}
 
