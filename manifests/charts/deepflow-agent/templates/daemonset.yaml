@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "metaflow-agent.fullname" . }}
+  name: {{ include "deepflow-agent.fullname" . }}
   labels:
-    {{- include "metaflow-agent.labels" . | nindent 4 }}
+    {{- include "deepflow-agent.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "metaflow-agent.selectorLabels" . | nindent 6 }}
+      {{- include "deepflow-agent.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        checksum/customConfig: {{ sha256sum (print .Values.metaflowAgentConfig) }}
-        container.apparmor.security.beta.kubernetes.io/metaflow-agent: unconfined
+        checksum/customConfig: {{ sha256sum (print .Values.deepflowAgentConfig) }}
+        container.apparmor.security.beta.kubernetes.io/deepflow-agent: unconfined
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "metaflow-agent.selectorLabels" . | nindent 8 }}
+        {{- include "deepflow-agent.selectorLabels" . | nindent 8 }}
     spec:
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: {{ tpl .Values.hostNetwork . }}
@@ -27,7 +27,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "metaflow-agent.fullname" . }}
+      serviceAccountName: {{ include "deepflow-agent.fullname" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -63,15 +63,15 @@ spec:
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
               readOnly: false ## attach/detach ebpf kprobe/uprobe to kernel
-            - name: metaflow-agent-conf
-              mountPath: /etc/metaflow-agent
+            - name: deepflow-agent-conf
+              mountPath: /etc/deepflow-agent
       volumes:
         - name: sys-kernel-debug
           hostPath:
             path: /sys/kernel/debug
-        - name: metaflow-agent-conf
+        - name: deepflow-agent-conf
           configMap:
-            name: {{ include "metaflow-agent.fullname" . }}
+            name: {{ include "deepflow-agent.fullname" . }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

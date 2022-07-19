@@ -52,63 +52,63 @@ type CmdExecute func(response *trident.SyncResponse)
 func regiterCommand() []*cobra.Command {
 	platformDataCmd := &cobra.Command{
 		Use:   "platformData",
-		Short: "get platformData from metaflow-server",
+		Short: "get platformData from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{platformData})
 		},
 	}
 	ipGroupsCmd := &cobra.Command{
 		Use:   "ipGroups",
-		Short: "get ipGroups from metaflow-servmetaflow-servee",
+		Short: "get ipGroups from deepflow-servdeepflow-servee",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{ipGroups})
 		},
 	}
 	flowAclsCmd := &cobra.Command{
 		Use:   "flowAcls",
-		Short: "get flowAcls from metaflow-server",
+		Short: "get flowAcls from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{flowAcls})
 		},
 	}
 	tapTypesCmd := &cobra.Command{
 		Use:   "tapTypes",
-		Short: "get tapTypes from metaflow-server",
+		Short: "get tapTypes from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{tapTypes})
 		},
 	}
 	segmentsCmd := &cobra.Command{
 		Use:   "segments",
-		Short: "get segments from metaflow-server",
+		Short: "get segments from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{segments})
 		},
 	}
 	vpcIPCmd := &cobra.Command{
 		Use:   "vpcIP",
-		Short: "get vpcIP from metaflow-server",
+		Short: "get vpcIP from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{vpcIP})
 		},
 	}
 	configCmd := &cobra.Command{
 		Use:   "config",
-		Short: "get config from metaflow-server",
+		Short: "get config from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{configData})
 		},
 	}
 	skipInterfaceCmd := &cobra.Command{
 		Use:   "skipInterface",
-		Short: "get skipInterface from metaflow-server",
+		Short: "get skipInterface from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{skipInterface})
 		},
 	}
 	allCmd := &cobra.Command{
 		Use:   "all",
-		Short: "get all data from metaflow-server",
+		Short: "get all data from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
 			initCmd(cmd, []CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, vpcIP, configData, skipInterface})
 		},
@@ -122,7 +122,7 @@ func regiterCommand() []*cobra.Command {
 func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd := &cobra.Command{
 		Use:   "trisolaris.check",
-		Short: "pull grpc data from metaflow-server",
+		Short: "pull grpc data from deepflow-server",
 	}
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "vtap ctrl ip")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "vtap ctrl mac")

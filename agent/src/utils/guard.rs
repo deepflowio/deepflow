@@ -130,7 +130,7 @@ impl Guard {
                             if memory_usage >= memory_limit {
                                 if over_memory_limit {
                                     error!(
-                                    "memory usage over memory limit twice, current={}, memory_limit={}, metaflow-agent restart...",
+                                    "memory usage over memory limit twice, current={}, memory_limit={}, deepflow-agent restart...",
                                     ByteSize::b(memory_usage).to_string_as(true), ByteSize::b(memory_limit).to_string_as(true)
                                     );
                                     thread::sleep(Duration::from_secs(1));
@@ -160,7 +160,7 @@ impl Guard {
                     if current_sys_free_memory_percentage < sys_free_memory_limit {
                         if under_sys_free_memory_limit {
                             error!(
-                                    "current system free memory percentage is less than sys_free_memory_limit twice, current system free memory percentage={}%, sys_free_memory_limit={}%, metaflow-agent restart...",
+                                    "current system free memory percentage is less than sys_free_memory_limit twice, current system free memory percentage={}%, sys_free_memory_limit={}%, deepflow-agent restart...",
                                     current_sys_free_memory_percentage, sys_free_memory_limit
                                     );
                             thread::sleep(Duration::from_secs(1));
@@ -184,7 +184,7 @@ impl Guard {
                                 process_num, process_limit
                             );
                             if process_num > process_limit * 2 {
-                                error!("the number of process exceeds the limit by 2 times, metaflow-agent restart...");
+                                error!("the number of process exceeds the limit by 2 times, deepflow-agent restart...");
                                 thread::sleep(Duration::from_secs(1));
                                 exit(NORMAL_EXIT_WITH_RESTART);
                             }

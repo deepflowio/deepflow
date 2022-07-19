@@ -1,20 +1,20 @@
-# Default values for metaflow-server.
+# Default values for deepflow-server.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 global:
   image:
-    ## ghcr Image repository address: ghcr.io/metaflowys
-    ## Dockerhub Image repository address: metaflowys
-    ## AliyunYun Image repository address: registry.cn-beijing.aliyuncs.com/metaflowys
-    repository: metaflowys
+    ## ghcr Image repository address: ghcr.io/deepflowys
+    ## Dockerhub Image repository address: deepflowys
+    ## AliyunYun Image repository address: registry.cn-beijing.aliyuncs.com/deepflowys
+    repository: deepflowys
     pullPolicy: Always
   hostNetwork: false
   dnsPolicy: ClusterFirst
   password:
-    mysql: metaflow
-    #grafana: metaflow 
+    mysql: deepflow
+    #grafana: deepflow 
   podManagementPolicy: "OrderedReady"
-  replicas: 1  ## replicas for metaflow-server and clickhouse
+  replicas: 1  ## replicas for deepflow-server and clickhouse
   podAntiAffinityLabelSelector: []
   podAntiAffinityTermLabelSelector: []
   podAffinityLabelSelector: []
@@ -24,10 +24,10 @@ global:
   timezone: "Asia/Shanghai"
   nodePort: 
     clickhouse: 30900
-    metaflowServerIngester: 30033
-    metaflowServerGrpc: 30035
-    metaflowServerSslGrpc: 30135
-    metaflowServerhealthCheck: 30417
+    deepflowServerIngester: 30033
+    deepflowServerGrpc: 30035
+    deepflowServerSslGrpc: 30135
+    deepflowServerhealthCheck: 30417
   ntpServer: ntp.aliyun.com
   ## Whether to enable allInone local storage, if enabled, the local /opt directory is used to store data by default, ignoring the node affinity check, and is not responsible for any data persistence
   allInOneLocalStorage: false 
@@ -35,7 +35,7 @@ global:
 
 image:
   server:
-    repository: "{{ .Values.global.image.repository }}/metaflow-server"
+    repository: "{{ .Values.global.image.repository }}/deepflow-server"
     tag: latest
     pullPolicy: "{{ .Values.global.image.pullPolicy }}"
   elector:
@@ -43,7 +43,7 @@ image:
     tag: latest
     pullPolicy: "{{ .Values.global.image.pullPolicy }}"
   app:
-    repository:  "{{ .Values.global.image.repository }}/metaflow-app"
+    repository:  "{{ .Values.global.image.repository }}/deepflow-app"
     tag: latest
     pullPolicy: "{{ .Values.global.image.pullPolicy }}"
 
@@ -89,7 +89,7 @@ server:
     - name: health-check
       port: 20417
       targetPort: 20417
-      nodePort: "{{ .Values.global.nodePort.metaflowServerhealthCheck }}"
+      nodePort: "{{ .Values.global.nodePort.deepflowServerhealthCheck }}"
       protocol: TCP
     - name: grpc
       port: 20035
@@ -99,17 +99,17 @@ server:
     - name: grpc-30035
       port: 30035
       targetPort: 20035
-      nodePort: "{{ .Values.global.nodePort.metaflowServerGrpc }}"
+      nodePort: "{{ .Values.global.nodePort.deepflowServerGrpc }}"
       protocol: TCP
     - name: grpc-30035-udp
       port: 30035
       targetPort: 20035
-      nodePort: "{{ .Values.global.nodePort.metaflowServerGrpc }}"
+      nodePort: "{{ .Values.global.nodePort.deepflowServerGrpc }}"
       protocol: UDP
     - name: ssl-grpc
       port: 20135
       targetPort: 20135
-      nodePort: "{{ .Values.global.nodePort.metaflowServerSslGrpc }}"
+      nodePort: "{{ .Values.global.nodePort.deepflowServerSslGrpc }}"
       protocol: TCP
     - name: ingester
       port: 20033
@@ -119,12 +119,12 @@ server:
     - name: ingester-30033
       port: 30033
       targetPort: 20033
-      nodePort: "{{ .Values.global.nodePort.metaflowServerIngester }}"
+      nodePort: "{{ .Values.global.nodePort.deepflowServerIngester }}"
       protocol: TCP
     - name: ingester-30033-udp
       port: 30033
       targetPort: 20033
-      nodePort: "{{ .Values.global.nodePort.metaflowServerIngester }}"
+      nodePort: "{{ .Values.global.nodePort.deepflowServerIngester }}"
       protocol: UDP
     ## Additional ports to open for server service
     additionalPorts: []
@@ -159,17 +159,17 @@ server:
     - labelSelector:
       - key: app
         operator: In
-        values: metaflow
+        values: deepflow
       - key: component
         operator: In
-        values: metaflow-server
+        values: deepflow-server
       topologyKey: "kubernetes.io/hostname"
   podAntiAffinityTermLabelSelector: []
   podAffinityLabelSelector:
     - labelSelector:
       - key: app
         operator: In
-        values: metaflow
+        values: deepflow
       - key: component
         operator: In
         values: clickhouse
@@ -246,7 +246,7 @@ configmap:
   server.yaml: |
     controller:
       ## logfile path
-      log-file: /var/log/metaflow/server.log
+      log-file: /var/log/deepflow/server.log
       ## loglevel: "debug/info/warn/error"
       log-level: info
       listen-port: 20417
@@ -322,13 +322,13 @@ configmap:
       genesis:
         aging_time: 86400
         vinterface_aging_time: 300
-        grpc_server_port: {{ .Values.global.nodePort.metaflowServerGrpc }}
+        grpc_server_port: {{ .Values.global.nodePort.deepflowServerGrpc }}
         exclude_ip_ranges: []
         queue_length: 1000
         data_persistence_interval: 60
     querier:
       # logfile path
-      log-file: /var/log/metaflow/server.log
+      log-file: /var/log/deepflow/server.log
       # loglevel: "debug/info/warn/error"
       log-level: info
       # querier http listenport
@@ -345,7 +345,7 @@ configmap:
   app.yaml: |
     app:
       # logfile path
-      log-file: /var/log/metaflow/app.log
+      log-file: /var/log/deepflow/app.log
       # loglevel: "debug/info/warn/error"
       log-level: info
       # app http listenport
@@ -354,11 +354,11 @@ configmap:
       http_request_timeout: 600
       http_response_timeout: 600
       querier:
-        host: {{ include "metaflow.fullname" . }}-server
+        host: {{ include "deepflow.fullname" . }}-server
         port: 20416
         timeout: 60
       controller:
-        host: {{ include "metaflow.fullname" . }}-server
+        host: {{ include "deepflow.fullname" . }}-server
         port: 20417
         timeout: 60
       spec:
@@ -402,7 +402,7 @@ clickhouse:
     ## 如果使用hostPath存储clickhouse数据，则必须配置nodeAffinityLabelSelector，避免pod漂移导致数据丢失，allInOneLocalStorage=true 时忽略
     type: persistentVolumeClaim
     generateType: "{{ if $.Values.global.allInOneLocalStorage }}hostPath{{ else }}{{$.Values.storageConfig.type}}{{end}}" #Please ignore this
-    hostPath: /opt/metaflow-clickhouse
+    hostPath: /opt/deepflow-clickhouse
     persistence:
       - name: clickhouse-path
         accessModes:
@@ -497,7 +497,7 @@ clickhouse:
     - labelSelector:
       - key: app
         operator: In
-        values: metaflow
+        values: deepflow
       - key: component
         operator: In
         values: clickhouse
@@ -543,7 +543,7 @@ mysql:
     ## 如果使用hostPath存储mysql数据，则必须配置nodeAffinityLabelSelector，避免pod漂移导致数据丢失
     type: persistentVolumeClaim
     generateType: "{{ if $.Values.global.allInOneLocalStorage }}hostPath{{ else }}{{$.Values.storageConfig.type}}{{end}}" #Please ignore this
-    hostPath: /opt/metaflow-mysql
+    hostPath: /opt/deepflow-mysql
     hostPathChownContainerEnabled: true
     persistence:
       storageClass: "{{ .Values.global.storageClass }}"
@@ -620,17 +620,17 @@ mysql:
   nodeAffinityTermLabelSelector: []
 
 
-metaflow-agent:
+deepflow-agent:
   enabled: true
   image:
-    repository: "{{ .Values.global.image.repository }}/metaflow-agent"
+    repository: "{{ .Values.global.image.repository }}/deepflow-agent"
     pullPolicy: "{{ .Values.global.image.pullPolicy }}"
     # Overrides the image tag whose default is the chart appVersion.
     tag: latest
 
   imagePullSecrets: []
   nameOverride: ""
-  agentFullnameOverride: "metaflow-agent"
+  agentFullnameOverride: "deepflow-agent"
 
   podAnnotations: {}
   nodeIPInjection: true
@@ -678,11 +678,11 @@ metaflow-agent:
     ##
     type: ClusterIP
 
-  metaflowServerNodeIPS:
-  - '{{ include "metaflow.fullname" . }}-server'
+  deepflowServerNodeIPS:
+  - '{{ include "deepflow.fullname" . }}-server'
   kubernetesClusterId: 
   agentGroupId: 
-  ## This command takes effect when agent-group-config external_agent_http_proxy_enabled=1 is configured using metaflow-ctl
+  ## This command takes effect when agent-group-config external_agent_http_proxy_enabled=1 is configured using deepflow-ctl
   ## Set the port to the agent-group-config port
   externalAgentHttpProxyPort: 38086
 
@@ -731,7 +731,7 @@ grafana:
   ## Other options are: browser or a specific timezone, i.e. Europe/Luxembourg
   ##
   defaultDashboardsTimezone: utc
-  adminPassword: metaflow
+  adminPassword: deepflow
 
   service:
     enabled: true
@@ -758,13 +758,13 @@ grafana:
       user: root
       password: "{{ .Values.global.password.mysql }}"
     plugins:
-      allow_loading_unsigned_plugins: metaflow-querier-datasource,metaflow-apptracing-panel,metaflow-topo-panel
+      allow_loading_unsigned_plugins: deepflow-querier-datasource,deepflow-apptracing-panel,deepflow-topo-panel
   sidecar:
     skipTlsVerify: true
     dashboards:
       enabled: true
       label: grafana_dashboard
-      labelValue: "metaflow-templates"
+      labelValue: "deepflow-templates"
 
       ## Annotations for Grafana dashboard configmaps
       ##
@@ -776,7 +776,7 @@ grafana:
     dashboardproviders.yaml:
       apiVersion: 1
       providers:
-      - name: 'metaflow-system'
+      - name: 'deepflow-system'
         orgId: 1
         folder: 'DeepFlow System'
         type: file
@@ -785,7 +785,7 @@ grafana:
         updateIntervalSeconds: 30
         options:
           foldersFromFilesStructure: false
-          path: /tmp/metaflow-system-dashboards
+          path: /tmp/deepflow-system-dashboards
   extraContainers: |
     - env:
       - name: METHOD
@@ -793,9 +793,9 @@ grafana:
       - name: LABEL
         value: grafana_dashboard
       - name: LABEL_VALUE
-        value: "metaflow-system"
+        value: "deepflow-system"
       - name: FOLDER
-        value: /tmp/metaflow-system-dashboards
+        value: /tmp/deepflow-system-dashboards
       - name: RESOURCE
         value: both
       - name: SKIP_TLS_VERIFY
@@ -806,18 +806,18 @@ grafana:
       image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
       {{- end }}
       imagePullPolicy: {{ .Values.sidecar.imagePullPolicy }}
-      name: metaflow-system-dashboard-providers
+      name: deepflow-system-dashboard-providers
       volumeMounts:
-      - mountPath: /tmp/metaflow-system-dashboards
-        name: metaflow-system-dashboards
+      - mountPath: /tmp/deepflow-system-dashboards
+        name: deepflow-system-dashboards
   extraInitContainers:
     - name: init-custom-plugins
-      image: "{{ .Values.global.image.repository }}/metaflow-init-grafana:latest"
+      image: "{{ .Values.global.image.repository }}/deepflow-init-grafana:latest"
       imagePullPolicy: "{{ tpl .Values.global.image.pullPolicy . }}"
       command: ['sh']
       args:  
       - '-c'
-      - "cp -raf /metaflow-plugins/* /var/lib/grafana/plugins/"
+      - "cp -raf /deepflow-plugins/* /var/lib/grafana/plugins/"
       volumeMounts:
       - mountPath: /var/lib/grafana/plugins/
         name: custom-plugins
@@ -825,21 +825,21 @@ grafana:
   extraEmptyDirMounts: 
     - name: custom-plugins
       mountPath: /var/lib/grafana/plugins
-    - name: metaflow-system-dashboards
-      mountPath: /tmp/metaflow-system-dashboards
+    - name: deepflow-system-dashboards
+      mountPath: /tmp/deepflow-system-dashboards
 
   datasources: 
    datasources.yaml:
       apiVersion: 1
       datasources:
       - name: DeepFlow
-        type: metaflow-querier-datasource
+        type: deepflow-querier-datasource
         url: 
         access: proxy
         isDefault: true
         jsonData:
-          requestUrl: http://{{ include "metaflow.fullname" . }}-server:20416
-          traceUrl: http://{{ include "metaflow.fullname" . }}-app:20418
+          requestUrl: http://{{ include "deepflow.fullname" . }}-server:20416
+          traceUrl: http://{{ include "deepflow.fullname" . }}-app:20418
       - name: "DeepFlow ClickHouse"
         type: grafana-clickhouse-datasource
         jsonData:
@@ -853,7 +853,7 @@ grafana:
         url: "{{ $.Release.Name }}-mysql:30130"
         database: deepflow
         user: root
-        password: metaflow
+        password: deepflow
         jsonData:
           maxOpenConns: 5
           maxIdleConns: 5

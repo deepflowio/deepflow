@@ -414,7 +414,7 @@ impl BaseDispatcherListener {
     fn on_afpacket_change(&mut self, config: &DispatcherConfig) {
         if self.options.af_packet_version != config.capture_socket_type.into() {
             // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
-            info!("Afpacket version update, metaflow-agent restart...");
+            info!("Afpacket version update, deepflow-agent restart...");
             process::exit(1);
         }
     }

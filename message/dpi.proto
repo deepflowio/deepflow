@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 package DPI;
-option java_package = "cn.net.metaflow.message";
+option java_package = "cn.net.deepflow.message";
 option java_outer_classname = "DPIMessage";
 
 enum RequestType {

@@ -1,4 +1,4 @@
-# Default values for metaflow-agent.
+# Default values for deepflow-agent.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 global:
@@ -11,14 +11,14 @@ global:
 
 
 image:
-  repository: registry.cn-beijing.aliyuncs.com/metaflowys/metaflow-agent
+  repository: registry.cn-beijing.aliyuncs.com/deepflowys/deepflow-agent
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: latest
 
 imagePullSecrets: []
 nameOverride: ""
-agentFullnameOverride: "metaflow-agent"
+agentFullnameOverride: "deepflow-agent"
 
 podAnnotations: {}
 
@@ -68,20 +68,20 @@ service:
   ##
   type: ClusterIP
 
-metaflowServerNodeIPS:
-- metaflow-server
-metaflowK8sClusterID: 
+deepflowServerNodeIPS:
+- deepflow-server
+deepflowK8sClusterID: 
 agentGroupID:
-## This command takes effect when agent-group-config external_agent_http_proxy_enabled=1 is configured using metaflow-ctl
+## This command takes effect when agent-group-config external_agent_http_proxy_enabled=1 is configured using deepflow-ctl
 ## Set the port to the agent-group-config port
 externalAgentHttpProxyPort: 38086
 
-metaflowAgentConfig: 
-  metaflow-agent.yaml: |
+deepflowAgentConfig: 
+  deepflow-agent.yaml: |
     controller-ips:
-    {{- tpl (toYaml $.Values.metaflowServerNodeIPS ) .| nindent 4 }}
+    {{- tpl (toYaml $.Values.deepflowServerNodeIPS ) .| nindent 4 }}
     {{ if .Values.agentGroupID }}vtap-group-id-request: {{ .Values.agentGroupID }}{{ end }}
-    {{ if .Values.metaflowK8sClusterID }}kubernetes-cluster-id: {{ .Values.metaflowK8sClusterID }}{{ end }}
+    {{ if .Values.deepflowK8sClusterID }}kubernetes-cluster-id: {{ .Values.deepflowK8sClusterID }}{{ end }}
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious

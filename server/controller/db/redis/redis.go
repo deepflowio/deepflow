@@ -28,7 +28,7 @@ type RedisConfig struct {
 	DimensionResourceDatabase int    `default:"2" yaml:"dimension_resource_database"`
 	Host                      string `default:"redis" yaml:"host"`
 	Port                      uint32 `default:"6379" yaml:"port"`
-	Password                  string `default:"metaflow" yaml:"password"`
+	Password                  string `default:"deepflow" yaml:"password"`
 	TimeOut                   uint32 `default:"30" yaml:"timeout"`
 	Enabled                   bool   `default:"false" yaml:"enabled"`
 }

@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "metaflow-agent.name" -}}
+{{- define "deepflow-agent.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "metaflow-agent.fullname" -}}
+{{- define "deepflow-agent.fullname" -}}
 {{- if .Values.agentFullnameOverride }}
 {{- .Values.agentFullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "metaflow-agent.chart" -}}
+{{- define "deepflow-agent.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "metaflow-agent.labels" -}}
-helm.sh/chart: {{ include "metaflow-agent.chart" . }}
-{{ include "metaflow-agent.selectorLabels" . }}
+{{- define "deepflow-agent.labels" -}}
+helm.sh/chart: {{ include "deepflow-agent.chart" . }}
+{{ include "deepflow-agent.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -45,19 +45,19 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "metaflow-agent.selectorLabels" -}}
-app: metaflow
-component: metaflow-agent
-app.kubernetes.io/name: {{ include "metaflow-agent.name" . }}
+{{- define "deepflow-agent.selectorLabels" -}}
+app: deepflow
+component: deepflow-agent
+app.kubernetes.io/name: {{ include "deepflow-agent.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "metaflow-agent.serviceAccountName" -}}
+{{- define "deepflow-agent.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "metaflow-agent.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "deepflow-agent.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

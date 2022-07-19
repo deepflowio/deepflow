@@ -29,14 +29,14 @@ type Ctl struct{}
 
 func Execute() {
 	root := &cobra.Command{
-		Use:              "metaflow-ctl",
-		Short:            "metaflow server tool",
+		Use:              "deepflow-ctl",
+		Short:            "deepflow server tool",
 		TraverseChildren: true,
 	}
 
-	root.PersistentFlags().StringP("ip", "i", common.GetDefaultRouteIP(), "metaflow-server service ip")
-	root.PersistentFlags().Uint32P("api-port", "", 30417, "metaflow-server service http port")
-	root.PersistentFlags().Uint32P("rpc-port", "", 30035, "metaflow-server service grpc port")
+	root.PersistentFlags().StringP("ip", "i", common.GetDefaultRouteIP(), "deepflow-server service ip")
+	root.PersistentFlags().Uint32P("api-port", "", 30417, "deepflow-server service http port")
+	root.PersistentFlags().Uint32P("rpc-port", "", 30035, "deepflow-server service grpc port")
 
 	root.AddCommand(RegisterAgentCommand())
 	root.AddCommand(RegisterAgentUpgradeCommand())

@@ -1,11 +1,11 @@
 [Unit]
-Description=metaflow-agent.service
+Description=deepflow-agent.service
 After=syslog.target network-online.target
 
 [Service]
 Environment=GOTRACEBACK=single
 LimitCORE=1G
-ExecStart=/usr/sbin/metaflow-agent
+ExecStart=/usr/sbin/deepflow-agent
 Restart=always
 RestartSec=10
 LimitNOFILE=1024:4096

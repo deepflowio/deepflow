@@ -1,4 +1,4 @@
-FROM alpine:latest as metaflow-server
+FROM alpine:latest as deepflow-server
 
 MAINTAINER songzhen@yunshan.net
 
@@ -12,6 +12,6 @@ COPY ./querier/db_descriptions /etc/db_descriptions/
 ARG TARGETARCH 
 
 RUN --mount=target=/tmp-mount \
-    cp -a /tmp-mount/bin/metaflow-server.${TARGETARCH} /bin/metaflow-server
+    cp -a /tmp-mount/bin/deepflow-server.${TARGETARCH} /bin/deepflow-server
 
-CMD /bin/metaflow-server
+CMD /bin/deepflow-server

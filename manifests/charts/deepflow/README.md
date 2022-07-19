@@ -16,22 +16,22 @@ Please refer to Helm's [documentation](https://helm.sh/docs/) to get started.
 Once Helm is set up properly, add the repo as follows:
 
 ```console
-helm repo add metaflow https://metaflowys.github.io/metaflow
-helm repo udpate metaflow
+helm repo add deepflow https://deepflowys.github.io/deepflow
+helm repo udpate deepflow
 ```
 
 ## Helm Charts
 
-You can then run `helm search repo metaflow` to see the charts.
+You can then run `helm search repo deepflow` to see the charts.
 
 _See [helm repo](https://helm.sh/docs/helm/helm_repo/) for command documentation._
 
 ## Installing the Chart
 
-To install the chart with the release name `metaflow`:
+To install the chart with the release name `deepflow`:
 
 ```console
-helm install metaflow -n metaflow metaflow/metaflow --create-namespace
+helm install deepflow -n deepflow deepflow/deepflow --create-namespace
 ```
 
 ## Uninstalling the Chart
@@ -39,7 +39,7 @@ helm install metaflow -n metaflow metaflow/metaflow --create-namespace
 To uninstall/delete the my-release deployment:
 
 ```console
-helm delete metaflow -n metaflow
+helm delete deepflow -n deepflow
 ```
 
 The command removes all the Kubernetes components associated with the chart and deletes the release.
@@ -58,15 +58,15 @@ By default this chart installs additional, dependent charts:
 
 ```yaml
   password: 
-    mysql: metaflow ## mysql root account password
-    grafana: metaflow ## grafana admin account password
-  replicas: 1 ## Number of replicas for metaflow-server and clickhouse
+    mysql: deepflow ## mysql root account password
+    grafana: deepflow ## grafana admin account password
+  replicas: 1 ## Number of replicas for deepflow-server and clickhouse
   nodePort: ## NodePort that requires a fixed port
     clickhouse: 30900
-    metaflowServerIngester: 30033
-    metaflowServerGrpc: 30035
-    metaflowServerSslGrpc: 30135
-    metaflowServerhealthCheck: 30417
+    deepflowServerIngester: 30033
+    deepflowServerGrpc: 30035
+    deepflowServerSslGrpc: 30135
+    deepflowServerhealthCheck: 30417
   ntpServer: ntp.aliyun.com ## ntp server address, you need to ensure that udp 123 port is available
   allInOneLocalStorage: false   ## Whether to enable allInone local storage, if enabled, the local /opt directory is used to store data by default, ignoring the node affinity check, and is not responsible for any data persistence
 ```
@@ -83,10 +83,10 @@ The affinity of component. Combine `global.affinity` by 'OR'.
       - labelSelector:
         - key: app #your label key
           operator: In # In、NotIn、Exists、 DoesNotExist
-          values: metaflow #your label value, Multiple values separated by commas
+          values: deepflow #your label value, Multiple values separated by commas
         - key: component 
           operator: In
-          values: metaflow-server,metaflowys
+          values: deepflow-server,deepflowys
         topologyKey: "kubernetes.io/hostname"
   ```
 
@@ -97,10 +97,10 @@ The affinity of component. Combine `global.affinity` by 'OR'.
       - labelSelector:
         - key: app # your label key
           operator: In # In、NotIn、Exists、 DoesNotExist
-          values: metaflow # your label value, Multiple values separated by commas
+          values: deepflow # your label value, Multiple values separated by commas
         - key: component 
           operator: In
-          values: metaflow-server,metaflowys
+          values: deepflow-server,deepflowys
         topologyKey: "kubernetes.io/hostname"
   ```
 
@@ -111,7 +111,7 @@ The affinity of component. Combine `global.affinity` by 'OR'.
       - labelSelector:
         - key: app
           operator: In
-          values: metaflow
+          values: deepflow
         - key: component
           operator: In
           values: clickhouse
@@ -127,7 +127,7 @@ The affinity of component. Combine `global.affinity` by 'OR'.
         labelSelector:
           - key: app
             operator: In
-            values: metaflow,metaflowys
+            values: deepflow,deepflowys
   ```
 
 - nodeAffinityLabelSelector: affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
@@ -137,7 +137,7 @@ The affinity of component. Combine `global.affinity` by 'OR'.
       - matchExpressions:
           - key: app
             operator: In
-            values: metaflow,metaflowys
+            values: deepflow,deepflowys
   ```
 
 - nodeAffinityTermLabelSelector: affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution
@@ -148,7 +148,7 @@ The affinity of component. Combine `global.affinity` by 'OR'.
         matchExpressions:
         - key: app
           operator: In
-          values: metaflow,metaflowys
+          values: deepflow,deepflowys
   ```
 
 ### Storage config
@@ -157,7 +157,7 @@ The affinity of component. Combine `global.affinity` by 'OR'.
   storageConfig:
     type: persistentVolumeClaim  ## persistentVolumeClaim or hostPath,If you use hostPath, you must configure nodeAffinityLabelSelector, otherwise your data will be lost when Pod drifts
     generateType: "{{ if $.Values.global.allInOneLocalStorage }}hostPath{{ else }}{{$.Values.storageConfig.type}}{{end}}" #Please ignore this
-    hostPath: /opt/metaflow-clickhouse ## your hostPath path
+    hostPath: /opt/deepflow-clickhouse ## your hostPath path
     persistence: ## volumeClaimTemplates configuration
       - name: clickhouse-path
         accessModes:

@@ -1,8 +1,8 @@
 [package]
-name = "metaflow-agent"
+name = "deepflow-agent"
 version = "0.1.0"
 edition = "2021"
-default-run = "metaflow-agent"
+default-run = "deepflow-agent"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -64,7 +64,7 @@ tonic = "0.5.2"
 ipnetwork = "0.18.0"
 
 [patch.crates-io]
-openshift-openapi = { git = "https://github.com/metaflowys/openshift-openapi.git" }
+openshift-openapi = { git = "https://github.com/deepflowys/openshift-openapi.git" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = {version = "0.30", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_System_ProcessStatus"]}

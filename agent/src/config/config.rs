@@ -653,7 +653,7 @@ impl RuntimeConfig {
         }
 
         // 虽然RFC 791里最低MTU是68，但是此时compressor会崩溃，
-        // 所以MTU最低限定到200以确保metaflow-agent能够成功运行
+        // 所以MTU最低限定到200以确保deepflow-agent能够成功运行
         if self.mtu < 200 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "MTU({}) specified smaller than 200",
@@ -881,7 +881,7 @@ mod tests {
     #[test]
     fn read_yaml_file() {
         // TODO: improve test cases
-        let c = Config::load_from_file("config/metaflow-agent.yaml")
+        let c = Config::load_from_file("config/deepflow-agent.yaml")
             .expect("failed loading config file");
         assert_eq!(c.controller_ips.len(), 1);
         assert_eq!(&c.controller_ips[0], "127.0.0.1");

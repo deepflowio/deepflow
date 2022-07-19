@@ -1,6 +1,6 @@
 controller:
   # logfile path
-  log-file: /var/log/metaflow/server.log
+  log-file: /var/log/deepflow/server.log
   # loglevel: "debug/info/warn/error"
   log-level: info
   # controller http listenport
@@ -17,7 +17,7 @@ controller:
   mysql:
     database: deepflow
     user-name: root
-    user-password: metaflow
+    user-password: deepflow
     host: mysql
     port: 30130
     timeout: 30
@@ -26,7 +26,7 @@ controller:
   redis:
     enabled: true
     dimension_resource_database: 2
-    password: metaflow
+    password: deepflow
     host: redis
     port: 6379
     timeout: 30
@@ -140,7 +140,7 @@ controller:
 
 querier:
   # logfile path
-  log-file: /var/log/metaflow/server.log
+  log-file: /var/log/deepflow/server.log
   # loglevel: "debug/info/warn/error"
   log-level: info
   # querier http listenport
@@ -241,7 +241,7 @@ ingester:
   #stream-roze-enabled: true
 
   ## syslog存储位置
-  #syslog-directory: /var/log/metaflow-agent
+  #syslog-directory: /var/log/deepflow-agent
 
   ## syslog是否写入elasticsearch，默认启用
   #es-syslog: true

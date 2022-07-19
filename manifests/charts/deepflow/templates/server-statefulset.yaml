@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "metaflow.fullname" . }}-server
+  name: {{ include "deepflow.fullname" . }}-server
   labels:
-    {{- include "metaflow-server.labels" . | nindent 4 }}
+    {{- include "deepflow-server.labels" . | nindent 4 }}
 spec:
   replicas: {{ tpl .Values.server.replicas . }}
   podManagementPolicy: {{ tpl .Values.server.podManagementPolicy . }}
-  serviceName: {{ include "metaflow.fullname" . }}-server-headless
+  serviceName: {{ include "deepflow.fullname" . }}-server-headless
   selector:
     matchLabels:
-      {{- include "metaflow-server.selectorLabels" . | nindent 6 }}
+      {{- include "deepflow-server.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,7 +18,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "metaflow-server.selectorLabels" . | nindent 8 }}
+        {{- include "deepflow-server.selectorLabels" . | nindent 8 }}
     spec:
       hostNetwork: {{ tpl .Values.server.hostNetwork . }}
       dnsPolicy: {{ tpl .Values.server.dnsPolicy . }}
@@ -28,9 +28,9 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      serviceAccountName: {{ include "metaflow.fullname" . }}-server
+      serviceAccountName: {{ include "deepflow.fullname" . }}-server
       containers:
-        - name: metaflow-server
+        - name: deepflow-server
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ tpl .Values.image.server.repository . }}:{{ tpl .Values.image.server.tag . }}"
@@ -85,7 +85,7 @@ spec:
           imagePullPolicy: "{{ tpl .Values.image.elector.pullPolicy . }}"
           name: elector
           args:
-          - --election=metaflow-server ## Service Name
+          - --election=deepflow-server ## Service Name
           - --election-namespace={{- .Release.Namespace }}
           - --http=localhost:4040
           env:
@@ -103,7 +103,7 @@ spec:
       volumes:
         - name: server-config
           configMap:
-            name: {{ include "metaflow.fullname" . }}
+            name: {{ include "deepflow.fullname" . }}
             items:
             - key: server.yaml
               path: server.yaml

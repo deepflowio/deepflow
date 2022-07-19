@@ -1,4 +1,4 @@
-![DeepFlow](./docs/metaflow-logo.svg)
+![DeepFlow](./docs/deepflow-logo.svg)
 =====================================
 
 English | [简体中文](./README-CN.md)
@@ -18,7 +18,7 @@ DeepFlow is a highly automated observability platform open sourced by [YUNSHAN N
 
 # Documentation
 
-For more information, please visit [the documentation website](https://deepflow.yunshan.net/metaflow-docs/).
+For more information, please visit [the documentation website](https://deepflow.yunshan.net/deepflow-docs/).
 
 # Quick start
 
@@ -31,9 +31,9 @@ The DeepFlow Community Edition consists of the core components of the Enterprise
 
 ## DeepFlow Community
 
-Please refer to [the deployment documentation](https://deepflow.yunshan.net/metaflow-docs/install/all-in-one/).
+Please refer to [the deployment documentation](https://deepflow.yunshan.net/deepflow-docs/install/all-in-one/).
 
-At the same time, we have also built a complete [DeepFlow Community Demo](https://demo.metaflow.yunshan.net/), welcome to experience it. Login account/password: metaflow/metaflow.
+At the same time, we have also built a complete [DeepFlow Community Demo](https://demo.deepflow.yunshan.net/), welcome to experience it. Login account/password: deepflow/deepflow.
 
 ## DeepFlow Cloud
 
@@ -47,11 +47,11 @@ At the same time, we have also built a complete [DeepFlow Community Demo](https:
 
 DeepFlow Community consists of two processes, Agent and Server. An Agent runs in each K8s node, virtual machine and physical bare metal, and is responsible for AutoMetrics and AutoTracing data collection of all application processes on the server. Server runs in a K8s cluster and provides Agent management, data tag injection, data writing and data query services.
 
-![DeepFlow Architecture](./docs/metaflow-architecture.png)
+![DeepFlow Architecture](./docs/deepflow-architecture.png)
 
 # Milestones
 
-Here is our [future feature plan](https://github.com/metaflowys/docs/blob/main/01-about/04-milestone.md). Issues and Pull Requests are welcome.
+Here is our [future feature plan](https://github.com/deepflowys/docs/blob/main/01-about/04-milestone.md). Issues and Pull Requests are welcome.
 
 # Acknowledgments
 

@@ -20,7 +20,7 @@ use std::time::Instant;
 
 use criterion::*;
 
-use metaflow_agent::{
+use deepflow_agent::{
     _FlowPerfCounter as FlowPerfCounter, _TcpFlags as TcpFlags, _TcpPerf as TcpPerf,
     _TridentType as TridentType, _benchmark_report as benchmark_report,
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,

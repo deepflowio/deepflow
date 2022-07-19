@@ -1,6 +1,6 @@
 apiVersion: v2
 description: An automated observability platform for cloud-native developers.
-name: metaflow
+name: deepflow
 engine: gotpl
 type: application
 version: 0.1.003
@@ -10,12 +10,12 @@ sources:
   - https://github.com/deepflowys/deepflow
 home: https://github.com/deepflowys/deepflow
 keywords:
-  - metaflow
+  - deepflow
 dependencies:
-- name: metaflow-agent
+- name: deepflow-agent
   repository: ""
   version: '*.*.*'
-  condition: metaflow-agent.enabled
+  condition: deepflow-agent.enabled
 - name: clickhouse
   repository: ""
   version: '*.*.*'

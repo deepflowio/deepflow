@@ -146,7 +146,7 @@ static int create_probe_event(char *buf, const char *ev_name,
 		return -1;
 	}
 	res =
-	    snprintf(ev_alias, sizeof(ev_alias), "%s_metaflow_%d_%d", ev_name,
+	    snprintf(ev_alias, sizeof(ev_alias), "%s_deepflow_%d_%d", ev_name,
 		     getpid(), attach_type);
 	if (res < 0 || res >= sizeof(ev_alias)) {
 		ebpf_info("Event name (%s) is too long for buffer\n", ev_name);
@@ -380,10 +380,10 @@ static int bpf_detach_probe(enum bpf_probe_attach_type attach_type,
 	 *  ev_name : p___sys_sendmsg
 	 *  getpid() : 11723
 	 *  attach_type : 0
-	 * buf  "p___sys_sendmsg_metaflow_11723_0"
+	 * buf  "p___sys_sendmsg_deepflow_11723_0"
 	 */
 	res =
-	    snprintf(buf, sizeof(buf), "%s_metaflow_%d_%d", ev_name,
+	    snprintf(buf, sizeof(buf), "%s_deepflow_%d_%d", ev_name,
 		     getpid(), attach_type);
 
 	if (res < 0 || res >= sizeof(buf)) {
@@ -414,7 +414,7 @@ static int bpf_detach_probe(enum bpf_probe_attach_type attach_type,
 	}
 
 	res =
-	    snprintf(buf, sizeof(buf), "-:%s_metaflow_%d_%d", ev_name,
+	    snprintf(buf, sizeof(buf), "-:%s_deepflow_%d_%d", ev_name,
 		     getpid(), attach_type);
 
 	if (res < 0 || res >= sizeof(buf)) {

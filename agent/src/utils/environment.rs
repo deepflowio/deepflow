@@ -210,7 +210,7 @@ pub fn controller_ip_check(ips: &[String]) {
 
 pub fn trident_process_check() {
     let process_num = if cfg!(target_os = "windows") {
-        get_process_num_by_name("metaflow-agent.exe")
+        get_process_num_by_name("deepflow-agent.exe")
     } else {
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()

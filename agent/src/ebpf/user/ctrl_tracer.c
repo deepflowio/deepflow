@@ -6,7 +6,7 @@
 #include "socket.h"
 #include "../libbpf/src/libbpf_internal.h"
 
-#define MFBPF_NAME           "metaflow-ebpfctl"
+#define MFBPF_NAME           "deepflow-ebpfctl"
 #define MFBPF_VERSION        "v1.0.0"
 #define LINUX_VER_LEN        128
 

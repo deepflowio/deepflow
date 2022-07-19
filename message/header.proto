@@ -7,7 +7,7 @@
 syntax = "proto2";
 
 package Header;
-option java_package = "cn.net.metaflow.message";
+option java_package = "cn.net.deepflow.message";
 option java_outer_classname = "HeaderProtos";
 
 enum Module {

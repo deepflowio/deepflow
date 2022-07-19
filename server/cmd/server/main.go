@@ -51,7 +51,7 @@ func main() {
 		fmt.Printf(
 			"%s %s %s\n%s\n%s\n",
 			RevCount, Revision, CommitDate,
-			"metaflow-server community edition",
+			"deepflow-server community edition",
 			goVersion,
 		)
 		os.Exit(0)

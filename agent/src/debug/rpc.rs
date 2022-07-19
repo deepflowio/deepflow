@@ -267,7 +267,7 @@ impl RpcDebugger {
 
         if resp.local_segments.is_empty() {
             return Err(Error::NotFound(
-                "local segments data is empty, maybe metaflow-agent is not properly configured"
+                "local segments data is empty, maybe deepflow-agent is not properly configured"
                     .into(),
             ));
         }

@@ -1,13 +1,13 @@
-Name:       metaflow-agent
+Name:       deepflow-agent
 Version:    1.0
 Release:    %(git rev-list --count HEAD)%{?dist}
-Summary:    deepflow metaflow agent
+Summary:    deepflow deepflow agent
 
 Group:      Applications/File
 Vendor:     Yunshan Networks
 License:    Copyright (c) 2012-2016 Yunshan Netwoks
 URL:        http://yunshan.net
-Source:     metaflow-agent.spec
+Source:     deepflow-agent.spec
 
 Requires(post): %{_sbindir}/update-alternatives
 Requires(postun): %{_sbindir}/update-alternatives
@@ -20,18 +20,18 @@ Deepflow DeepFlow Agent
 
 %prep
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
-cp %pwd/output/target/release/metaflow-agent $RPM_BUILD_ROOT/usr/sbin/
-cp %pwd/output/target/release/metaflow-agent-ctl $RPM_BUILD_ROOT/usr/sbin/
-cp %pwd/output/src/ebpf/metaflow-ebpfctl $RPM_BUILD_ROOT/usr/sbin/
+cp %pwd/output/target/release/deepflow-agent $RPM_BUILD_ROOT/usr/sbin/
+cp %pwd/output/target/release/deepflow-agent-ctl $RPM_BUILD_ROOT/usr/sbin/
+cp %pwd/output/src/ebpf/deepflow-ebpfctl $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
-cp %pwd/metaflow-agent.service $RPM_BUILD_ROOT/lib/systemd/system/
+cp %pwd/deepflow-agent.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
-cp %pwd/config/metaflow-agent.yaml $RPM_BUILD_ROOT/etc/
+cp %pwd/config/deepflow-agent.yaml $RPM_BUILD_ROOT/etc/
 
 %files
-/usr/sbin/metaflow-agent
-/lib/systemd/system/metaflow-agent.service
-%config(noreplace) /etc/metaflow-agent.yaml
+/usr/sbin/deepflow-agent
+/lib/systemd/system/deepflow-agent.service
+%config(noreplace) /etc/deepflow-agent.yaml
 
 %preun
 # sles: suse linux
@@ -42,8 +42,8 @@ if [ -n "`grep sles /etc/os-release`" ]; then
     fi
 else
     if [ $1 == 0 ]; then # uninstall
-        systemctl stop metaflow-agent
-        systemctl disable metaflow-agent
+        systemctl stop deepflow-agent
+        systemctl disable deepflow-agent
     fi
 fi
 
@@ -54,13 +54,13 @@ if [ -n "`grep sles /etc/os-release`" ]; then
         echo 'inittab entry "trid" already exists!'
         exit 1
     fi
-    sed -i '/:\/usr\/sbin\/metaflow\-agent/d' /etc/inittab
-    echo 'trid:2345:respawn:/usr/sbin/metaflow-agent' >>/etc/inittab
+    sed -i '/:\/usr\/sbin\/deepflow\-agent/d' /etc/inittab
+    echo 'trid:2345:respawn:/usr/sbin/deepflow-agent' >>/etc/inittab
     init q
 else
     systemctl daemon-reload
-    systemctl try-restart metaflow-agent
-    [ -f /etc/metaflow-agent.yaml.sample ] || cp /etc/metaflow-agent.yaml{,.sample}
+    systemctl try-restart deepflow-agent
+    [ -f /etc/deepflow-agent.yaml.sample ] || cp /etc/deepflow-agent.yaml{,.sample}
 fi
 
 %postun
@@ -72,11 +72,11 @@ fi
 %changelog
 
 %package -n %{name}-tools
-Summary:    metaflow-agent tools
+Summary:    deepflow-agent tools
 
 %description -n %{name}-tools
 Deepflow DeepFlow Agent debug tools
 
 %files -n %{name}-tools
-/usr/sbin/metaflow-agent-ctl
-/usr/sbin/metaflow-ebpfctl
+/usr/sbin/deepflow-agent-ctl
+/usr/sbin/deepflow-ebpfctl
