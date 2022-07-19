@@ -28,14 +28,14 @@ import (
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
-	"github.com/metaflowys/metaflow/message/trident"
-	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/genesis/config"
-	"github.com/metaflowys/metaflow/server/controller/model"
-	"github.com/metaflowys/metaflow/server/controller/statsd"
-	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/deepflowys/deepflow/message/trident"
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/genesis/config"
+	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/statsd"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("genesis")

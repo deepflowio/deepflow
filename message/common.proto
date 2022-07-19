@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 package common;
-option go_package = "github.com/metaflowys/metaflow/message/common";
+option go_package = "github.com/deepflowys/deepflow/message/common";
 
 enum TridentType {
     // 1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod

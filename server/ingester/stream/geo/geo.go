@@ -17,7 +17,7 @@
 package geo
 
 import (
-	"github.com/metaflowys/metaflow/server/libs/geo"
+	"github.com/deepflowys/deepflow/server/libs/geo"
 )
 
 var geoTree geo.GeoTree

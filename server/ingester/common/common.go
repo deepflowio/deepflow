@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/grpc"
-	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/grpc"
+	"github.com/deepflowys/deepflow/server/libs/stats"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	logging "github.com/op/go-logging"

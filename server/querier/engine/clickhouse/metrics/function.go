@@ -17,7 +17,7 @@
 package metrics
 
 import (
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
 type Function struct {

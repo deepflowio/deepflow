@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"github.com/metaflowys/metaflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
 )
 
 const (

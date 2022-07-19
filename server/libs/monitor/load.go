@@ -19,8 +19,8 @@ package monitor
 import (
 	"github.com/shirou/gopsutil/load"
 
-	"github.com/metaflowys/metaflow/server/libs/stats"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 type LoadMonitor struct {

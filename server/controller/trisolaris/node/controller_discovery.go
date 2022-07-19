@@ -20,11 +20,11 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 
-	. "github.com/metaflowys/metaflow/server/controller/common"
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	. "github.com/deepflowys/deepflow/server/controller/common"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
 )
 
 type ControllerDiscovery struct {

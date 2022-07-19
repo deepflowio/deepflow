@@ -24,9 +24,9 @@ import (
 
 	"github.com/google/gopacket/layers"
 
-	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
-	"github.com/metaflowys/metaflow/server/libs/pool"
-	. "github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowys/deepflow/server/libs/pool"
+	. "github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 type CloseType uint8

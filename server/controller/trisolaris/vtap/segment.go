@@ -17,11 +17,11 @@
 package vtap
 
 import (
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 
-	. "github.com/metaflowys/metaflow/server/controller/common"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	. "github.com/deepflowys/deepflow/server/controller/common"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
 /*

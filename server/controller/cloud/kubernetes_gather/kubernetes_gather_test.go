@@ -26,11 +26,11 @@ import (
 	"github.com/agiledragon/gomonkey/v2"
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/genesis"
-	"github.com/metaflowys/metaflow/server/controller/genesis/config"
-	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
+	"github.com/deepflowys/deepflow/server/controller/genesis/config"
+	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
 func TestKubernetes(t *testing.T) {

@@ -26,7 +26,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
-	"github.com/metaflowys/metaflow/cli/ctl/common"
+	"github.com/deepflowys/deepflow/cli/ctl/common"
 )
 
 func RegisterAgentCommand() *cobra.Command {

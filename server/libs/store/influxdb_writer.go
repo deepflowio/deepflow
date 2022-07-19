@@ -32,11 +32,11 @@ import (
 	// 需要从github.com获取新的写入接口，然后在Makefile中拷贝到vendor/github.com/influxdata/influxdb/client/v2
 	// _ "github.com/platform/influxdb/client/v2"
 
-	"github.com/metaflowys/metaflow/server/libs/pool"
-	"github.com/metaflowys/metaflow/server/libs/queue"
-	"github.com/metaflowys/metaflow/server/libs/stats"
-	"github.com/metaflowys/metaflow/server/libs/utils"
-	"github.com/metaflowys/metaflow/server/libs/zerodoc"
+	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("store")

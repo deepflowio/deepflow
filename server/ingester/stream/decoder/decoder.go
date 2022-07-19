@@ -24,17 +24,17 @@ import (
 	logging "github.com/op/go-logging"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
-	"github.com/metaflowys/metaflow/server/ingester/stream/config"
-	"github.com/metaflowys/metaflow/server/ingester/stream/jsonify"
-	"github.com/metaflowys/metaflow/server/ingester/stream/throttler"
-	"github.com/metaflowys/metaflow/server/libs/codec"
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
-	"github.com/metaflowys/metaflow/server/libs/grpc"
-	"github.com/metaflowys/metaflow/server/libs/queue"
-	"github.com/metaflowys/metaflow/server/libs/receiver"
-	"github.com/metaflowys/metaflow/server/libs/stats"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/ingester/stream/config"
+	"github.com/deepflowys/deepflow/server/ingester/stream/jsonify"
+	"github.com/deepflowys/deepflow/server/ingester/stream/throttler"
+	"github.com/deepflowys/deepflow/server/libs/codec"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowys/deepflow/server/libs/grpc"
+	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowys/deepflow/server/libs/receiver"
+	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("stream.decoder")

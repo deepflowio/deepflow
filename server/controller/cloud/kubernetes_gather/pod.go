@@ -17,9 +17,9 @@
 package kubernetes_gather
 
 import (
-	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"strings"
 	"time"
 

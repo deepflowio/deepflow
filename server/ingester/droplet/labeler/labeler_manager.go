@@ -21,16 +21,16 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/message/trident"
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/debug"
-	"github.com/metaflowys/metaflow/server/libs/dropletpb"
-	"github.com/metaflowys/metaflow/server/libs/policy"
-	"github.com/metaflowys/metaflow/server/libs/queue"
+	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/debug"
+	"github.com/deepflowys/deepflow/server/libs/dropletpb"
+	"github.com/deepflowys/deepflow/server/libs/policy"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 
-	"github.com/metaflowys/metaflow/server/ingester/common"
-	. "github.com/metaflowys/metaflow/server/ingester/droplet/common"
-	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
+	"github.com/deepflowys/deepflow/server/ingester/common"
+	. "github.com/deepflowys/deepflow/server/ingester/droplet/common"
+	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
 )
 
 var log = logging.MustGetLogger("labeler")

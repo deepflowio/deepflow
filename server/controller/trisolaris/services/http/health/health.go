@@ -19,8 +19,8 @@ package health
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http/common"
 )
 
 func init() {

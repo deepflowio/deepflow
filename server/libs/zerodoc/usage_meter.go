@@ -19,8 +19,8 @@ package zerodoc
 import (
 	"strconv"
 
-	"github.com/metaflowys/metaflow/server/libs/ckdb"
-	"github.com/metaflowys/metaflow/server/libs/zerodoc/pb"
+	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
 )
 
 type UsageMeter struct {

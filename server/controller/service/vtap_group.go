@@ -22,10 +22,10 @@ import (
 	"github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/config"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
 func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err error) {

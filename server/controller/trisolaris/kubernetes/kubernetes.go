@@ -23,12 +23,12 @@ import (
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	. "github.com/metaflowys/metaflow/server/controller/common"
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/model"
-	"github.com/metaflowys/metaflow/server/controller/service"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
+	. "github.com/deepflowys/deepflow/server/controller/common"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/service"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
 )
 
 var log = logging.MustGetLogger("trisolaris.kubernetes")

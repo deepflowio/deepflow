@@ -19,8 +19,8 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/metaflowys/metaflow/server/controller/config"
-	"github.com/metaflowys/metaflow/server/controller/service"
+	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/service"
 )
 
 func VTapInterface(e *gin.Engine, cfg *config.ControllerConfig) {

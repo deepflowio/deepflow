@@ -1,4 +1,4 @@
-MESSAGE = github.com/metaflowys/metaflow/message
+MESSAGE = github.com/deepflowys/deepflow/message
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)

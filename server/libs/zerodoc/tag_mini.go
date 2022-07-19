@@ -23,10 +23,10 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"github.com/metaflowys/metaflow/server/libs/codec"
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/pool"
-	"github.com/metaflowys/metaflow/server/libs/zerodoc/pb"
+	"github.com/deepflowys/deepflow/server/libs/codec"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
 )
 
 const (

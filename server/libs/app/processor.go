@@ -16,7 +16,7 @@
 
 package app
 
-import "github.com/metaflowys/metaflow/server/libs/datatype"
+import "github.com/deepflowys/deepflow/server/libs/datatype"
 
 type MeteringProcessor interface {
 	GetName() string

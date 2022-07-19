@@ -18,13 +18,13 @@ package clickhouse
 
 import (
 	//"github.com/k0kubun/pp"
-	//"github.com/metaflowys/metaflow/server/querier/common"
-	//"github.com/metaflowys/metaflow/server/querier/parse"
-	//"github.com/metaflowys/metaflow/server/querier/querier"
+	//"github.com/deepflowys/deepflow/server/querier/common"
+	//"github.com/deepflowys/deepflow/server/querier/parse"
+	//"github.com/deepflowys/deepflow/server/querier/querier"
 	"reflect"
 	"testing"
 
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
 func TestTimeFill(t *testing.T) {

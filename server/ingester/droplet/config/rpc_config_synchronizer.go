@@ -26,8 +26,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/context"
 
-	"github.com/metaflowys/metaflow/message/trident"
-	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/libs/grpc"
 )
 
 const (

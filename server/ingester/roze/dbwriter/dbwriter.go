@@ -19,12 +19,12 @@ package dbwriter
 import (
 	logging "github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/ingester/common"
-	"github.com/metaflowys/metaflow/server/ingester/pkg/ckwriter"
-	"github.com/metaflowys/metaflow/server/ingester/roze/config"
-	"github.com/metaflowys/metaflow/server/libs/app"
-	"github.com/metaflowys/metaflow/server/libs/ckdb"
-	"github.com/metaflowys/metaflow/server/libs/zerodoc"
+	"github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
+	"github.com/deepflowys/deepflow/server/ingester/roze/config"
+	"github.com/deepflowys/deepflow/server/libs/app"
+	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 )
 
 var log = logging.MustGetLogger("roze.dbwriter")

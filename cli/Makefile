@@ -1,6 +1,6 @@
-MESSAGE = github.com/metaflowys/metaflow/message
-LIBS = github.com/metaflowys/metaflow/server/libs
-SERVER = github.com/metaflowys/metaflow/server
+MESSAGE = github.com/deepflowys/deepflow/message
+LIBS = github.com/deepflowys/deepflow/server/libs
+SERVER = github.com/deepflowys/deepflow/server
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)

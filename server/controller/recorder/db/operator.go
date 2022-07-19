@@ -19,9 +19,9 @@ package db
 import (
 	"github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/recorder/constraint"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 )
 
 var log = logging.MustGetLogger("recorder.db")

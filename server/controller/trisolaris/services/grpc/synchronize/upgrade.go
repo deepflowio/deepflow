@@ -23,9 +23,9 @@ import (
 	"math"
 
 	"github.com/golang/protobuf/proto"
-	api "github.com/metaflowys/metaflow/message/trident"
+	api "github.com/deepflowys/deepflow/message/trident"
 
-	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 )
 
 type UpgradeEvent struct{}

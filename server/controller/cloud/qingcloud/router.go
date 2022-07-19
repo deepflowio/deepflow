@@ -17,8 +17,8 @@
 package qingcloud
 
 import (
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 )
 
 func (q *QingCloud) getRouterAndTables() (

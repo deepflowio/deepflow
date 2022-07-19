@@ -23,12 +23,12 @@ import (
 	"strings"
 
 	"github.com/google/gopacket/layers"
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/hmap/idmap"
-	"github.com/metaflowys/metaflow/server/libs/logger"
-	"github.com/metaflowys/metaflow/server/libs/policy"
-	api "github.com/metaflowys/metaflow/server/libs/reciter-api"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/hmap/idmap"
+	"github.com/deepflowys/deepflow/server/libs/logger"
+	"github.com/deepflowys/deepflow/server/libs/policy"
+	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const (

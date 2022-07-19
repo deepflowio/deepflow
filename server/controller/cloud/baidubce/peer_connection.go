@@ -19,8 +19,8 @@ package baidubce
 import (
 	"github.com/baidubce/bce-sdk-go/services/vpc"
 
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 )
 
 func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[string]string) ([]model.PeerConnection, error) {

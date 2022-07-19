@@ -7,8 +7,8 @@ version: 0.1.003
 appVersion: "6.1.1"
 kubeVersion: ">=1.16.0-0"
 sources:
-  - https://github.com/metaflowys/metaflow
-home: https://github.com/metaflowys/metaflow
+  - https://github.com/deepflowys/deepflow
+home: https://github.com/deepflowys/deepflow
 keywords:
   - metaflow
 dependencies:

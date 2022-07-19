@@ -21,10 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
 )
 
 var log = logging.MustGetLogger("trisolaris/metadata")

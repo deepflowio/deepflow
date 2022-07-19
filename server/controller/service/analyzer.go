@@ -22,11 +22,11 @@ import (
 	"github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/config"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/model"
-	"github.com/metaflowys/metaflow/server/controller/monitor"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/monitor"
 )
 
 func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err error) {

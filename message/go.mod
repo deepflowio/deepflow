@@ -1,4 +1,4 @@
-module github.com/metaflowys/metaflow/message
+module github.com/deepflowys/deepflow/message
 
 go 1.18
 

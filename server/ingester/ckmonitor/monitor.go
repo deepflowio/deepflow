@@ -25,8 +25,8 @@ import (
 
 	"database/sql"
 
-	"github.com/metaflowys/metaflow/server/ingester/common"
-	"github.com/metaflowys/metaflow/server/ingester/config"
+	"github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/ingester/config"
 )
 
 var log = logging.MustGetLogger("monitor")

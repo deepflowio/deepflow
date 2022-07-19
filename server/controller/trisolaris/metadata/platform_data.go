@@ -22,7 +22,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 )
 
 var offsetInterval uint64 = 1000000

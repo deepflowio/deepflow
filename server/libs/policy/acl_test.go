@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	. "github.com/deepflowys/deepflow/server/libs/datatype"
 )
 
 func TestAclSimple(t *testing.T) {

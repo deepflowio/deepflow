@@ -33,13 +33,13 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/context"
 
-	"github.com/metaflowys/metaflow/message/trident"
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/hmap/lru"
-	"github.com/metaflowys/metaflow/server/libs/logger"
-	"github.com/metaflowys/metaflow/server/libs/receiver"
-	api "github.com/metaflowys/metaflow/server/libs/reciter-api"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/hmap/lru"
+	"github.com/deepflowys/deepflow/server/libs/logger"
+	"github.com/deepflowys/deepflow/server/libs/receiver"
+	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const (

@@ -18,9 +18,9 @@ package clickhouse
 
 import (
 	//"github.com/k0kubun/pp"
-	"github.com/metaflowys/metaflow/server/querier/common"
-	"github.com/metaflowys/metaflow/server/querier/parse"
-	//"github.com/metaflowys/metaflow/server/querier/querier"
+	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowys/deepflow/server/querier/parse"
+	//"github.com/deepflowys/deepflow/server/querier/querier"
 	"testing"
 )
 

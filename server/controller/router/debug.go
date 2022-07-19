@@ -19,9 +19,9 @@ package router
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	"github.com/metaflowys/metaflow/server/controller/genesis"
-	"github.com/metaflowys/metaflow/server/controller/manager"
-	"github.com/metaflowys/metaflow/server/controller/service"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
+	"github.com/deepflowys/deepflow/server/controller/manager"
+	"github.com/deepflowys/deepflow/server/controller/service"
 )
 
 func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {

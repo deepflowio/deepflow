@@ -24,11 +24,11 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm/clause"
 
-	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
-	k8s "github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/model"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	k8s "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
 func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) {

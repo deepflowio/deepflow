@@ -23,9 +23,9 @@ import (
 	"github.com/bxcodec/faker/v3"
 	"github.com/google/uuid"
 
-	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	rcommon "github.com/metaflowys/metaflow/server/controller/recorder/common"
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	rcommon "github.com/deepflowys/deepflow/server/controller/recorder/common"
 )
 
 func RandID() int {

@@ -35,10 +35,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/metaflowys/metaflow/message/trident"
-	"github.com/metaflowys/metaflow/server/ingester/droplet/config"
-	"github.com/metaflowys/metaflow/server/ingester/ingesterctl"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/ingester/droplet/config"
+	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 type CmdExecute func(response *trident.SyncResponse)

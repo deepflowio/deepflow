@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/metaflowys/metaflow/message/trident"
-	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/deepflowys/deepflow/message/trident"
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
 type VIFRPCMessage struct {

@@ -26,7 +26,7 @@ import (
 
 	"github.com/shirou/gopsutil/process"
 
-	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	. "github.com/deepflowys/deepflow/server/libs/datatype"
 )
 
 type link6 struct {

@@ -19,12 +19,12 @@ package synchronize
 import (
 	"strings"
 
-	api "github.com/metaflowys/metaflow/message/trident"
+	api "github.com/deepflowys/deepflow/message/trident"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/metaflowys/metaflow/server/controller/genesis"
-	grpcserver "github.com/metaflowys/metaflow/server/controller/trisolaris/server/grpc"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
+	grpcserver "github.com/deepflowys/deepflow/server/controller/trisolaris/server/grpc"
 )
 
 type service struct {

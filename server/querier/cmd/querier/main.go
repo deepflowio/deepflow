@@ -22,8 +22,8 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/libs/logger"
-	"github.com/metaflowys/metaflow/server/querier/querier"
+	"github.com/deepflowys/deepflow/server/libs/logger"
+	"github.com/deepflowys/deepflow/server/querier/querier"
 )
 
 func execName() string {

@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/db/redis"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/db/redis"
 )
 
 type ChIPResource struct {

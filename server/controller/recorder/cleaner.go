@@ -20,8 +20,8 @@ package recorder
 import (
 	"time"
 
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/recorder/constraint"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 )
 
 func delete[MT constraint.MySQLSoftDeleteModel](expiredAt time.Time) {

@@ -26,9 +26,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/metaflowys/metaflow/server/controller/controller"
-	"github.com/metaflowys/metaflow/server/ingester/ingester"
-	"github.com/metaflowys/metaflow/server/querier/querier"
+	"github.com/deepflowys/deepflow/server/controller/controller"
+	"github.com/deepflowys/deepflow/server/ingester/ingester"
+	"github.com/deepflowys/deepflow/server/querier/querier"
 
 	logging "github.com/op/go-logging"
 )

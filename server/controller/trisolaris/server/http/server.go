@@ -25,8 +25,8 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
 func Run(ctx context.Context, cfg *config.Config) {
