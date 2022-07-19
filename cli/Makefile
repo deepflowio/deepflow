@@ -25,7 +25,7 @@ vendor:
 
 .PHONY: cli
 cli: vendor
-	go build -mod vendor ${FLAGS} -o bin/metaflow-ctl${BINARY_SUFFIX} cmd/ctl/main.go
+	go build -mod vendor ${FLAGS} -o bin/deepflow-ctl${BINARY_SUFFIX} cmd/ctl/main.go
 
 .PHONY: clean
 clean:

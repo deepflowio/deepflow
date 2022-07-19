@@ -107,7 +107,7 @@ pub struct Trident {
 }
 
 fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
-    // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by metaflow-agent if available
+    // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
     match get_k8s_local_node_ip() {
         Some(ip) => {
             info!(
@@ -210,7 +210,7 @@ impl Trident {
                 remote_log_config,
                 stats_collector,
             ) {
-                warn!("metaflow-agent exited: {}", e);
+                warn!("deepflow-agent exited: {}", e);
                 process::exit(1);
             }
         }));

@@ -83,7 +83,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	}))
 	streamCmd.AddCommand(debug.ClientRegisterSimple(stream.CMD_PLATFORMDATA, debug.CmdHelper{"platformData [filter]", "show stream platform data statistics"}, nil))
 
-	root.GenBashCompletionFile("/usr/share/bash-completion/completions/metaflow-ctl")
+	root.GenBashCompletionFile("/usr/share/bash-completion/completions/deepflow-ctl")
 }
 
 // 从字符串中解析出所有时间(大于100000000)

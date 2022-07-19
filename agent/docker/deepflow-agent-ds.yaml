@@ -1,53 +1,53 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: metaflow-agent
-  namespace: yunshan-metaflow
+  name: deepflow-agent
+  namespace: yunshan-deepflow
 spec:
   selector:
     matchLabels:
-      app: metaflow-agent
+      app: deepflow-agent
   template:
     metadata:
       annotations:
-        container.apparmor.security.beta.kubernetes.io/metaflow-agent: unconfined
-      name: metaflow-agent
-      namespace: yunshan-metaflow
+        container.apparmor.security.beta.kubernetes.io/deepflow-agent: unconfined
+      name: deepflow-agent
+      namespace: yunshan-deepflow
       labels:
-        app: metaflow-agent
+        app: deepflow-agent
     spec:
       hostNetwork: true
       hostPID: true
       containers:
-        - name: metaflow-agent
-          image: metaflow-agent
+        - name: deepflow-agent
+          image: deepflow-agent
           imagePullPolicy: Never
           securityContext:
             privileged: true
           volumeMounts:
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
-            - name: metaflow-agent-conf
-              mountPath: /etc/metaflow-agent
+            - name: deepflow-agent-conf
+              mountPath: /etc/deepflow-agent
             - name: logs
-              mountPath: /var/log/metaflow-agent/
+              mountPath: /var/log/deepflow-agent/
               subPath: ""
       volumes:
         - name: sys-kernel-debug
           hostPath:
             path: /sys/kernel/debug
-        - name: metaflow-agent-conf
+        - name: deepflow-agent-conf
           configMap:
-            name: metaflow-agent-config
+            name: deepflow-agent-config
         - name: logs
           hostPath:
             type: DirectoryOrCreate
-            path: /var/log/metaflow-agent
+            path: /var/log/deepflow-agent
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: metaflow-agent-role
+  name: deepflow-agent-role
 rules:
 - apiGroups: [""]
   resources:
@@ -75,12 +75,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metaflow-agent-view-binding
+  name: deepflow-agent-view-binding
 subjects:
   - kind: ServiceAccount
     name: default
-    namespace: yunshan-metaflow
+    namespace: yunshan-deepflow
 roleRef:
   kind: ClusterRole
-  name: metaflow-agent-role
+  name: deepflow-agent-role
   apiGroup: rbac.authorization.k8s.io

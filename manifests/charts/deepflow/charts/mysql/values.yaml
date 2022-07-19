@@ -22,7 +22,7 @@ dnsPolicy: ClusterFirst
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-password: metaflow
+password: deepflow
 
 podAnnotations: {}
 
@@ -33,7 +33,7 @@ securityContext: {}
 storageConfig:
   ## persistentVolumeClaim/hostPath
   type: persistentVolumeClaim
-  hostPath: /opt/metaflow-mysql
+  hostPath: /opt/deepflow-mysql
   persistence:
     storageClass: "-"
     annotations:

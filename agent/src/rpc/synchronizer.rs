@@ -769,7 +769,7 @@ impl Synchronizer {
                         let (ts, cvar) = &*trident_state;
                         *ts.lock().unwrap() = trident::State::Disabled;
                         cvar.notify_one();
-                        warn!("metaflow-agent restart, as max escape time expired");
+                        warn!("deepflow-agent restart, as max escape time expired");
                         // 与控制器失联的时间超过设置的逃逸时间，这里直接重启主要有两个原因：
                         // 1. 如果仅是停用系统无法回收全部的内存资源
                         // 2. 控制器地址可能是通过域明解析的，如果域明解析发生变更需要重启来触发重新解析
@@ -918,7 +918,7 @@ impl Synchronizer {
         }
 
         let binary_path = get_executable_path()
-            .map_err(|_| format!("Cannot get metaflow-agent path for this OS"))?;
+            .map_err(|_| format!("Cannot get deepflow-agent path for this OS"))?;
         let mut temp_path = binary_path.clone();
         #[cfg(unix)]
         temp_path.set_extension("test");

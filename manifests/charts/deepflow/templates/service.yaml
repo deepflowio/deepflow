@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "metaflow.fullname" . }}-server
+  name: {{ include "deepflow.fullname" . }}-server
   labels:
-    {{- include "metaflow-server.labels" . | nindent 4 }}
+    {{- include "deepflow-server.labels" . | nindent 4 }}
 {{- if .Values.server.service.annotations }}
   annotations:
 {{ toYaml .Values.server.service.annotations | indent 4 }}
@@ -43,16 +43,16 @@ spec:
 {{ toYaml .Values.server.service.additionalPorts | indent 2 }}
 {{- end }}
   selector:
-    {{- include "metaflow-server.selectorLabels" . | nindent 4 }}
+    {{- include "deepflow-server.selectorLabels" . | nindent 4 }}
   type: "{{ .Values.server.service.type }}"
 {{/* 
 # ---
 # apiVersion: v1
 # kind: Service
 # metadata:
-#   name: {{ include "metaflow.fullname" . }}-server-headless
+#   name: {{ include "deepflow.fullname" . }}-server-headless
 #   labels:
-#     {{- include "metaflow-server.labels" . | nindent 4 }}
+#     {{- include "deepflow-server.labels" . | nindent 4 }}
 # spec:
 #   clusterIP: None
 #   ports:
@@ -61,16 +61,16 @@ spec:
 #     targetPort: 20416
 #     protocol: TCP
 #   selector:
-#     {{- include "metaflow-server.selectorLabels" . | nindent 4 }}
+#     {{- include "deepflow-server.selectorLabels" . | nindent 4 }}
 #   type: ClusterIP
 */}}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "metaflow.fullname" . }}-app
+  name: {{ include "deepflow.fullname" . }}-app
   labels:
-    {{- include "metaflow-app.labels" . | nindent 4 }}
+    {{- include "deepflow-app.labels" . | nindent 4 }}
 {{- if .Values.app.service.annotations }}
   annotations:
 {{ toYaml .Values.app.service.annotations | indent 4 }}
@@ -110,5 +110,5 @@ spec:
 {{ toYaml .Values.app.service.additionalPorts | indent 2 }}
 {{- end }}
   selector:
-    {{- include "metaflow-app.selectorLabels" . | nindent 4 }}
+    {{- include "deepflow-app.selectorLabels" . | nindent 4 }}
   type: "{{ .Values.app.service.type }}"

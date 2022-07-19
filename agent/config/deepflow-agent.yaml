@@ -17,7 +17,7 @@ controller-ips:
 #controller-cert-file-prefix: ""
 
 ## logfile path
-#log-file: /var/log/metaflow-agent/metaflow-agent.log
+#log-file: /var/log/deepflow-agent/deepflow-agent.log
 
 ## kubernetes-cluster-id，在对接kubernetes/openshift时需要配置
 # kubernetes-cluster-id:

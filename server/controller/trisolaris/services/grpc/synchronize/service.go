@@ -59,7 +59,7 @@ func (s *service) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRespo
 
 func (s *service) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error {
 	processName := r.GetProcessName()
-	if strings.HasPrefix(processName, "trident") || strings.HasPrefix(processName, "metaflow-agent") {
+	if strings.HasPrefix(processName, "trident") || strings.HasPrefix(processName, "deepflow-agent") {
 		s.vTapEvent.Push(r, in)
 	} else {
 		s.tsdbEvent.Push(r, in)

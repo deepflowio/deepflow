@@ -13,7 +13,7 @@
 ```bash
 #! /bin/bash
 
-# 生成libebpf.a，ebpf kernel elf文件，命令行工具metaflow-ebpfctl
+# 生成libebpf.a，ebpf kernel elf文件，命令行工具deepflow-ebpfctl
 make clean && make --no-print-directory && make tools --no-print-directory
 
 # rust 样例
@@ -270,7 +270,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
 }
 
 fn main() {
-	let log_file = CString::new("/var/log/metaflow-ebpf.log".as_bytes()).unwrap();
+	let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
 	let log_file_c = log_file.as_c_str();
 	unsafe {
             // 第一个参数空指针传递可以填写std::ptr::null()
@@ -303,12 +303,12 @@ fn main() {
 
 ## 管理工具
 
-`metaflow-ebpfctl` 命令行工具用于管理bpf tracer。
+`deepflow-ebpfctl` 命令行工具用于管理bpf tracer。
 
 ```bash
-$metaflow-ebpfctl
+$deepflow-ebpfctl
 Usage:
-    metaflow-ebpfctl [OPTIONS] OBJECT { COMMAND | help }
+    deepflow-ebpfctl [OPTIONS] OBJECT { COMMAND | help }
 Parameters:
     OBJECT  := { tracer socktrace }
     COMMAND := { show }
@@ -322,9 +322,9 @@ Options:
 例如：
 
 ```bash
-./metaflow-ebpfctl tracer show
+./deepflow-ebpfctl tracer show
 Tracer         socket-tracer
-Bpf File       /usr/share/metaflow-agent//linux-common/socket_trace.elf
+Bpf File       /usr/share/deepflow-agent//linux-common/socket_trace.elf
 Workers        4 # 标识有几个线程处理
 Events Lost    0 # 事件丢失标识应用没有来得及接收而丢失的事件数量。
 
@@ -342,7 +342,7 @@ SUM dequeue 36805 enqueue 36805, lost 0, alloc faild 0 burst count 11
 - Redis      110
 
 
-./metaflow-ebpfctl socktrace show # 列出内核自动推断的偏移量
+./deepflow-ebpfctl socktrace show # 列出内核自动推断的偏移量
 
 Linux Version: 4.15.15-1.el7.x86_64
 

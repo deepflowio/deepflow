@@ -11,16 +11,16 @@ RUN --mount=target=/tmp-mount \
     && apk del tzdata \
     && rm -rf /var/cache/apk/*  && \
     chmod 600 /etc/passwd; \
-    echo "metaflow:x:1000:1000::/home/metaflow:/bin/bash" >> /etc/passwd; \
+    echo "deepflow:x:1000:1000::/home/deepflow:/bin/bash" >> /etc/passwd; \
     echo "root:root" | chpasswd; \
     chmod 000 /etc/passwd; \
     mkdir -p /lib64 && \
-    cp -raf /tmp-mount/output/target/release/metaflow-agent /bin/  && \
-    cp -raf /tmp-mount/output/target/release/metaflow-agent-ctl /bin/  && \
-    cp -raf /tmp-mount/output/src/ebpf/metaflow-ebpfctl /bin/  && \
+    cp -raf /tmp-mount/output/target/release/deepflow-agent /bin/  && \
+    cp -raf /tmp-mount/output/target/release/deepflow-agent-ctl /bin/  && \
+    cp -raf /tmp-mount/output/src/ebpf/deepflow-ebpfctl /bin/  && \
     cp -raf /tmp-mount/docker/require/* /lib64  && \
     chmod 4755 /bin/busybox 
 
 USER root
 
-CMD /bin/metaflow-agent -f /etc/metaflow-agent/metaflow-agent.yaml
+CMD /bin/deepflow-agent -f /etc/deepflow-agent/deepflow-agent.yaml

@@ -31,7 +31,7 @@
   "panels": [
     {
       "datasource": {
-        "type": "metaflow-querier-datasource",
+        "type": "deepflow-querier-datasource",
         "uid": "P685C713A23B37E1B"
       },
       "gridPos": {
@@ -42,7 +42,7 @@
       },
       "id": 15,
       "options": {
-        "content": "[English doc](https://deepflow.yunshan.net/metaflow-docs/auto-metrics/flow-log/?from=metaflow_grafana) | [中文文档](https://deepflow.yunshan.net/metaflow-docs/zh/auto-metrics/flow-log/?from=metaflow_grafana) \n",
+        "content": "[English doc](https://deepflow.yunshan.net/deepflow-docs/auto-metrics/flow-log/?from=deepflow_grafana) | [中文文档](https://deepflow.yunshan.net/deepflow-docs/zh/auto-metrics/flow-log/?from=deepflow_grafana) \n",
         "mode": "markdown"
       },
       "pluginVersion": "9.0.1",
@@ -51,7 +51,7 @@
     },
     {
       "datasource": {
-        "type": "metaflow-querier-datasource",
+        "type": "deepflow-querier-datasource",
         "uid": "P685C713A23B37E1B"
       },
       "fieldConfig": {
@@ -135,7 +135,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "metaflow-querier-datasource",
+            "type": "deepflow-querier-datasource",
             "uid": "P685C713A23B37E1B"
           },
           "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_metrics\",\"sources\":\"1m\",\"from\":\"vtap_flow_port\",\"select\":[{\"type\":\"metric\",\"key\":\"byte\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"bps\",\"params\":[],\"uuid\":\"07bd78bf-ccc2-0a55-077b-eca7d7ed9a47\",\"subFuncs\":[{\"func\":\"Math\",\"op\":\"MULTIPLY\",\"params\":8},{\"func\":\"PerSecond\"}]},{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0c6f49a3-c287-7923-b0dc-f4848e81fd15\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"ac4f699b-1604-af12-4ff7-d80e88acd44b\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"8fe9229f-bfca-a44d-ea9e-747a982e2bad\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"1e79bd70-cdbe-acb7-a95d-8fba654b2395\",\"subFuncs\":[]}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"f4abe24a-c5d0-8470-d973-d90e360b47ca\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"01ba9039-1c67-7e2b-466c-ce88938c6b47\",\"subFuncs\":[]}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0bc3c024-df50-02ca-d17b-9ca5f5886119\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
@@ -147,7 +147,7 @@
     },
     {
       "datasource": {
-        "type": "metaflow-querier-datasource",
+        "type": "deepflow-querier-datasource",
         "uid": "P685C713A23B37E1B"
       },
       "fieldConfig": {
@@ -231,7 +231,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "metaflow-querier-datasource",
+            "type": "deepflow-querier-datasource",
             "uid": "P685C713A23B37E1B"
           },
           "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_metrics\",\"sources\":\"1m\",\"from\":\"vtap_flow_port\",\"select\":[{\"type\":\"metric\",\"key\":\"retrans_ratio\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"1944b0a3-efdd-c54c-55cc-e29cf15c9916\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0c6f49a3-c287-7923-b0dc-f4848e81fd15\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"6c9939a6-8009-f1d1-52e5-3fe74ac6806a\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"c98f4363-94d8-1b1f-d003-03cfe9538863\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"36452a8d-9f41-5192-193a-3801036bf1f0\",\"subFuncs\":[]}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"f4abe24a-c5d0-8470-d973-d90e360b47ca\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"01ba9039-1c67-7e2b-466c-ce88938c6b47\",\"subFuncs\":[]}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0bc3c024-df50-02ca-d17b-9ca5f5886119\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
@@ -243,7 +243,7 @@
     },
     {
       "datasource": {
-        "type": "metaflow-querier-datasource",
+        "type": "deepflow-querier-datasource",
         "uid": "P685C713A23B37E1B"
       },
       "fieldConfig": {
@@ -327,7 +327,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "metaflow-querier-datasource",
+            "type": "deepflow-querier-datasource",
             "uid": "P685C713A23B37E1B"
           },
           "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_metrics\",\"sources\":\"1m\",\"from\":\"vtap_flow_port\",\"select\":[{\"type\":\"metric\",\"key\":\"tcp_establish_fail_ratio\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"be2f0b57-7751-6bca-e0f1-d88cde6e980d\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0c6f49a3-c287-7923-b0dc-f4848e81fd15\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"1e5ae905-cdfa-22a7-4da5-4415355dd84b\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"1b2238b3-3935-d99a-91e7-f8f6fdf08978\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"7b39cc6e-9851-3e2d-9f25-18bf9a06591e\",\"subFuncs\":[]}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"f4abe24a-c5d0-8470-d973-d90e360b47ca\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"01ba9039-1c67-7e2b-466c-ce88938c6b47\",\"subFuncs\":[]}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0bc3c024-df50-02ca-d17b-9ca5f5886119\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
@@ -339,7 +339,7 @@
     },
     {
       "datasource": {
-        "type": "metaflow-querier-datasource",
+        "type": "deepflow-querier-datasource",
         "uid": "P685C713A23B37E1B"
       },
       "fieldConfig": {
@@ -423,7 +423,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "metaflow-querier-datasource",
+            "type": "deepflow-querier-datasource",
             "uid": "P685C713A23B37E1B"
           },
           "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_metrics\",\"sources\":\"1m\",\"from\":\"vtap_flow_port\",\"select\":[{\"type\":\"metric\",\"key\":\"rtt\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"c29bab98-8361-29ab-3a10-1bf7ca9e51b1\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0c6f49a3-c287-7923-b0dc-f4848e81fd15\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"c9e85356-8b22-711b-f7a2-23aa3f54ec48\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"ff031819-278f-dd47-1abb-0541392e6d4d\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"5ca38b1c-d1cf-e18a-091f-f3ff133ff468\",\"subFuncs\":[]}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"f4abe24a-c5d0-8470-d973-d90e360b47ca\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"01ba9039-1c67-7e2b-466c-ce88938c6b47\",\"subFuncs\":[]}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0bc3c024-df50-02ca-d17b-9ca5f5886119\",\"sort\":\"asc\"}],\"interval\":\"60\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"timeSeries\",\"alias\":\"\"}",
@@ -435,7 +435,7 @@
     },
     {
       "datasource": {
-        "type": "metaflow-querier-datasource",
+        "type": "deepflow-querier-datasource",
         "uid": "P685C713A23B37E1B"
       },
       "fieldConfig": {
@@ -659,7 +659,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "metaflow-querier-datasource",
+            "type": "deepflow-querier-datasource",
             "uid": "P685C713A23B37E1B"
           },
           "queryText": "{\"appType\":\"trafficQuery\",\"db\":\"flow_metrics\",\"sources\":\"1m\",\"from\":\"vtap_flow_port\",\"select\":[{\"type\":\"metric\",\"key\":\"byte\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"c3caae88-02f5-c7eb-b5b6-08de63bc2bb5\",\"subFuncs\":[{\"func\":\"Math\",\"op\":\"MULTIPLY\",\"params\":8},{\"func\":\"PerSecond\"}]},{\"type\":\"metric\",\"key\":\"packet\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"70af606d-0625-3c20-833f-65ee31ba1af5\",\"subFuncs\":[{\"func\":\"PerSecond\"}]},{\"type\":\"metric\",\"key\":\"new_flow\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"04e6711f-39e9-fbf1-3aaf-9ac58f42b10c\",\"subFuncs\":[{\"func\":\"PerSecond\"}]},{\"type\":\"metric\",\"key\":\"retrans_ratio\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"7b00dc97-48cd-f519-40d1-ea863ab58d8b\",\"subFuncs\":[]},{\"type\":\"metric\",\"key\":\"tcp_establish_fail_ratio\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"2cd816df-3c0f-0ff4-79d5-07192edc9153\",\"subFuncs\":[]},{\"type\":\"metric\",\"key\":\"rtt\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"81221280-4466-5a76-246c-5d47e569fced\",\"subFuncs\":[]},{\"type\":\"metric\",\"key\":\"art\",\"func\":\"Avg\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"dc8a5917-0306-0df1-a145-b88318ae6ec4\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0c6f49a3-c287-7923-b0dc-f4848e81fd15\",\"subFuncs\":[]}],\"where\":[{\"type\":\"tag\",\"key\":\"pod_cluster\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$cluster\",\"value\":\"cluster\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"3dad4a80-972d-9a63-d63c-ff717514e75b\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_ns\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$namespace\",\"value\":\"namespace\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"35ce9d9e-058e-997b-b72e-676199717c2f\",\"subFuncs\":[]},{\"type\":\"tag\",\"key\":\"pod_group\",\"func\":\"\",\"op\":\"LIKE\",\"val\":[{\"label\":\"$workload\",\"value\":\"workload\",\"isVariable\":true}],\"as\":\"\",\"params\":[],\"uuid\":\"d913aa27-42bf-07c8-cf8b-ad486092214a\",\"subFuncs\":[]}],\"having\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"f4abe24a-c5d0-8470-d973-d90e360b47ca\"}],\"groupBy\":[{\"type\":\"tag\",\"key\":\"pod\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"01ba9039-1c67-7e2b-466c-ce88938c6b47\",\"subFuncs\":[]}],\"orderBy\":[{\"type\":\"metric\",\"key\":\"\",\"func\":\"\",\"op\":\"\",\"val\":\"\",\"as\":\"\",\"params\":[],\"uuid\":\"0bc3c024-df50-02ca-d17b-9ca5f5886119\",\"sort\":\"asc\"}],\"interval\":\"\",\"limit\":\"\",\"offset\":\"\",\"formatAs\":\"table\",\"alias\":\"\"}",
@@ -723,7 +723,7 @@
           ]
         },
         "datasource": {
-          "type": "metaflow-querier-datasource",
+          "type": "deepflow-querier-datasource",
           "uid": "P685C713A23B37E1B"
         },
         "definition": "{\"sql\":\"show tag pod_cluster values from vtap_flow_port\",\"database\":\"flow_metrics\"}",
@@ -753,7 +753,7 @@
           ]
         },
         "datasource": {
-          "type": "metaflow-querier-datasource",
+          "type": "deepflow-querier-datasource",
           "uid": "P685C713A23B37E1B"
         },
         "definition": "{\"sql\":\"show tag pod_ns values from vtap_flow_port\",\"database\":\"flow_metrics\"}",
@@ -783,7 +783,7 @@
           ]
         },
         "datasource": {
-          "type": "metaflow-querier-datasource",
+          "type": "deepflow-querier-datasource",
           "uid": "P685C713A23B37E1B"
         },
         "definition": "{\"sql\":\"show tag pod_group values from vtap_flow_port\",\"database\":\"flow_metrics\"}",

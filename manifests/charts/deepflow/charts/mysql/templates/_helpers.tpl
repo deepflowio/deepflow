@@ -46,7 +46,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "mysql.selectorLabels" -}}
-app: metaflow
+app: deepflow
 component: mysql
 app.kubernetes.io/name: {{ include "mysql.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}

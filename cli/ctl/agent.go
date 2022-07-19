@@ -42,7 +42,7 @@ func RegisterAgentCommand() *cobra.Command {
 	list := &cobra.Command{
 		Use:     "list [name]",
 		Short:   "list agent info",
-		Example: "metaflow-ctl agent list metaflow-agent -o yaml",
+		Example: "deepflow-ctl agent list deepflow-agent -o yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			listAgent(cmd, args, listOutput)
 		},
@@ -52,7 +52,7 @@ func RegisterAgentCommand() *cobra.Command {
 	delete := &cobra.Command{
 		Use:     "delete [name]",
 		Short:   "delete agent",
-		Example: "metaflow-ctl agent delete metaflow-agent",
+		Example: "deepflow-ctl agent delete deepflow-agent",
 		Run: func(cmd *cobra.Command, args []string) {
 			deleteAgent(cmd, args)
 		},
@@ -67,8 +67,8 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 	agentUpgrade := &cobra.Command{
 		Use:   "agent-upgrade",
 		Short: "agent upgrade operation commands",
-		Example: "metaflow-ctl agent-upgrade list\n" +
-			"metaflow-ctl agent-upgrade vtap-name --package=/usr/sbin/trident\n",
+		Example: "deepflow-ctl agent-upgrade list\n" +
+			"deepflow-ctl agent-upgrade vtap-name --package=/usr/sbin/trident\n",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 1 {
 				if args[0] == "list" {

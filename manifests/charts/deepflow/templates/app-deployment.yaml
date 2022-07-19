@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "metaflow.fullname" . }}-app
+  name: {{ include "deepflow.fullname" . }}-app
   labels:
-    {{- include "metaflow-app.labels" . | nindent 4 }}
+    {{- include "deepflow-app.labels" . | nindent 4 }}
 spec:
   replicas: {{ tpl .Values.app.replicas . }}
   selector:
     matchLabels:
-      {{- include "metaflow-app.selectorLabels" . | nindent 6 }}
+      {{- include "deepflow-app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,7 +16,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "metaflow-app.selectorLabels" . | nindent 8 }}
+        {{- include "deepflow-app.selectorLabels" . | nindent 8 }}
     spec:
       hostNetwork: {{ tpl .Values.app.hostNetwork . }}
       dnsPolicy: {{ tpl .Values.app.dnsPolicy . }}
@@ -27,7 +27,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: metaflow-app
+        - name: deepflow-app
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ tpl .Values.image.app.repository . }}:{{ tpl .Values.image.app.tag . }}"
@@ -48,7 +48,7 @@ spec:
             {{- toYaml .Values.app.resources | nindent 12 }}
           volumeMounts:
           - name: app-config
-            mountPath: /etc/metaflow/app.yaml
+            mountPath: /etc/deepflow/app.yaml
             subPath: app.yaml
           env:
           - name: K8S_NODE_IP_FOR_DEEPFLOW
@@ -60,7 +60,7 @@ spec:
       volumes:
         - name: app-config
           configMap:
-            name: {{ include "metaflow.fullname" . }}
+            name: {{ include "deepflow.fullname" . }}
             items:
             - key: app.yaml
               path: app.yaml

@@ -96,8 +96,8 @@ $(LIBBPF_DIR):
 build: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 
 tools: $(LIBBPF_DIR) $(LIBTRACE)
-	$(call msg,TOOLS,metaflow-ebpfctl)
-	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c libebpf.a -o metaflow-ebpfctl -lelf -lz -lpthread
+	$(call msg,TOOLS,deepflow-ebpfctl)
+	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c libebpf.a -o deepflow-ebpfctl -lelf -lz -lpthread
 
 rust-sample: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
@@ -110,7 +110,7 @@ rust-sample: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 clean:
 	$(Q)$(MAKE) -C kernel clean --no-print-directory
 	$(Q)$(MAKE) -C test clean --no-print-directory
-	$(Q)rm -rf $(ELFFILES) data metaflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
+	$(Q)rm -rf $(ELFFILES) data deepflow-ebpfctl $(STATIC_OBJDIR) $(LIBTRACE) *.a
 	$(Q)rm -rf samples/rust/target
 
 test: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)

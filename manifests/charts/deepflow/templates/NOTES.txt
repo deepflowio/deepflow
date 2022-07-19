@@ -11,8 +11,8 @@ An automated observability platform for cloud-native developers.
 
 # Metaflow-agent Port for receiving trace, metrics, and log
 
-metaflow-agent service: metaflow-agent.{{ $.Release.Namespace }}
-metaflow-agent Host listening port: {{ tpl (toString (index .Values "metaflow-agent" "externalAgentHttpProxyPort")) . }}
+deepflow-agent service: deepflow-agent.{{ $.Release.Namespace }}
+deepflow-agent Host listening port: {{ tpl (toString (index .Values "deepflow-agent" "externalAgentHttpProxyPort")) . }}
 
 # Get the Grafana URL to visit by running these commands in the same shell
 {{ if contains "NodePort" .Values.grafana.service.type }}

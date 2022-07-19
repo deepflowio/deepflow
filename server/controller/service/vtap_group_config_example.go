@@ -122,7 +122,7 @@ platform_enabled: 0
 rsyslog_enabled: 1
 # 时钟同步，默认值：1，表示开启，可选值：0表示关闭/1表示开启
 ntp_enabled: 1
-# 云平台资源信息下发，默认值：0，表示全部，可选值（多选）：0表示全部/全部云平台的lcuuid（可通过命令metaflow-ctl get domain获取）
+# 云平台资源信息下发，默认值：0，表示全部，可选值（多选）：0表示全部/全部云平台的lcuuid（可通过命令deepflow-ctl get domain获取）
 domains:
   - 0
 # 容器集群内部IP下发，默认值：0，表示所有集群，可选值：0表示所有集群/1表示采集器所在集群

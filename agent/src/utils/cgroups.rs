@@ -63,7 +63,7 @@ impl Cgroups {
             )));
         }
         let hier = hierarchies::auto();
-        let cg: Cgroup = CgroupBuilder::new("metaflow-agent").build(hier);
+        let cg: Cgroup = CgroupBuilder::new("deepflow-agent").build(hier);
         cgroups.cgroup = Some(cg);
         Ok(cgroups)
     }

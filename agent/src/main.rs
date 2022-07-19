@@ -21,12 +21,12 @@ use clap::{ArgAction, Parser};
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::iterator::Signals;
 
-use ::metaflow_agent::*;
+use ::deepflow_agent::*;
 
 #[derive(Parser)]
 struct Opts {
     /// Specify config file location
-    #[clap(short = 'f', long, default_value = "/etc/metaflow-agent.yaml")]
+    #[clap(short = 'f', long, default_value = "/etc/deepflow-agent.yaml")]
     config_file: String,
 
     /// Display the version
@@ -70,7 +70,7 @@ fn main() -> Result<()> {
     let version = concat!(env!("REV_COUNT"), "-", env!("REVISION"));
     if opts.version {
         println!("{} {}", version, env!("COMMIT_DATE"));
-        println!("metaflow-agent community edition");
+        println!("deepflow-agent community edition");
         println!(env!("RUSTC_VERSION"));
         return Ok(());
     }

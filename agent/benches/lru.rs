@@ -24,7 +24,7 @@ use lru::LruCache;
 use rand::prelude::*;
 use uluru::LRUCache;
 
-use metaflow_agent::_L7RrtCache as L7RrtCache;
+use deepflow_agent::_L7RrtCache as L7RrtCache;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct SmallStruct {

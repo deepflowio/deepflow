@@ -39,7 +39,7 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 	list := &cobra.Command{
 		Use:     "list [agent-group ID]",
 		Short:   "list config",
-		Example: "metaflow-ctl agent-group-config list g-xxxxxx",
+		Example: "deepflow-ctl agent-group-config list g-xxxxxx",
 		Run: func(cmd *cobra.Command, args []string) {
 			listAgentGroupConfig(cmd, args, listOutput)
 		},
@@ -50,7 +50,7 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 	create := &cobra.Command{
 		Use:     "create -f <filename>",
 		Short:   "create config",
-		Example: "metaflow-ctl agent-group-config create -f metaflow-config.yaml",
+		Example: "deepflow-ctl agent-group-config create -f deepflow-config.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			createAgentGroupConfig(cmd, args, createFilename)
 		},
@@ -62,7 +62,7 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 	update := &cobra.Command{
 		Use:     "update <agent-group ID> -f <filename>",
 		Short:   "update agent-group config",
-		Example: "metaflow-ctl agent-group-config update g-xxxxxx -f metaflow-config,yaml",
+		Example: "deepflow-ctl agent-group-config update g-xxxxxx -f deepflow-config,yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			updateAgentGroupConfig(cmd, args, updateFilename)
 		},
@@ -73,7 +73,7 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 	delete := &cobra.Command{
 		Use:     "delete [agent-group ID]",
 		Short:   "delete agent-group config",
-		Example: "metaflow-ctl agent-group-config delete g-xxxxxx",
+		Example: "deepflow-ctl agent-group-config delete g-xxxxxx",
 		Run: func(cmd *cobra.Command, args []string) {
 			deleteAgentGroupConfig(cmd, args)
 		},

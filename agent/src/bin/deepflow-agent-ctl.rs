@@ -25,7 +25,7 @@ use anyhow::{anyhow, Result};
 use bincode::{config, decode_from_std_read};
 use clap::{ArgEnum, Parser, Subcommand};
 
-use metaflow_agent::debug::{
+use deepflow_agent::debug::{
     Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, BEACON_PORT,
     DEBUG_QUEUE_IDLE_TIMEOUT, DEEPFLOW_AGENT_BEACON,
 };
@@ -34,14 +34,14 @@ const ERR_PORT_MSG: &str = "error: The following required arguments were not pro
     \t--port <PORT> required arguments were not provided";
 
 #[derive(Parser)]
-#[clap(name = "metaflow-agent-ctl")]
+#[clap(name = "deepflow-agent-ctl")]
 struct Cmd {
     #[clap(subcommand)]
     command: ControllerCmd,
-    /// remote metaflow-agent listening port
+    /// remote deepflow-agent listening port
     #[clap(short, long, parse(try_from_str))]
     port: Option<u16>,
-    /// remote metaflow-agent host ip
+    /// remote deepflow-agent host ip
     ///
     /// ipv6 format is 'fe80::5054:ff:fe95:c839', ipv4 format is '127.0.0.1'
     #[clap(short, long, parse(try_from_str), default_value_t=IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
@@ -54,9 +54,9 @@ enum ControllerCmd {
     Rpc(RpcCmd),
     /// get information about the k8s platform
     Platform(PlatformCmd),
-    /// monitor various queues of the selected metaflow-agent
+    /// monitor various queues of the selected deepflow-agent
     Queue(QueueCmd),
-    /// get connection information of all metaflow-agents managed under this controller
+    /// get connection information of all deepflow-agents managed under this controller
     List,
 }
 
@@ -66,7 +66,7 @@ struct QueueCmd {
     ///
     /// eg: monitor 1-tagged-flow-to-quadruple-generator queue with 60s
     ///
-    /// metaflow-agent-ctl queue --on 1-tagged-flow-to-quadruple-generator --duration 60
+    /// deepflow-agent-ctl queue --on 1-tagged-flow-to-quadruple-generator --duration 60
     #[clap(long, requires = "monitor")]
     on: Option<String>,
     /// monitoring duration in seconds
@@ -76,17 +76,17 @@ struct QueueCmd {
     ///
     /// eg: turn off 1-tagged-flow-to-quadruple-generator queue monitor
     ///
-    /// metaflow-agent-ctl queue --off 1-tagged-flow-to-quadruple-generator queue
+    /// deepflow-agent-ctl queue --off 1-tagged-flow-to-quadruple-generator queue
     #[clap(long)]
     off: Option<String>,
     /// show queue list
     ///
-    /// eg: metaflow-agent-ctl queue --show
+    /// eg: deepflow-agent-ctl queue --show
     #[clap(long)]
     show: bool,
     /// turn off all queue
     ///
-    /// eg: metaflow-agent-ctl queue --clear
+    /// eg: deepflow-agent-ctl queue --clear
     #[clap(long)]
     clear: bool,
 }
@@ -95,12 +95,12 @@ struct QueueCmd {
 struct PlatformCmd {
     /// get resources with k8s api
     ///
-    /// eg: metaflow-agent-ctl platform --k8s_get node
+    /// eg: deepflow-agent-ctl platform --k8s_get node
     #[clap(short, long, arg_enum)]
     k8s_get: Option<Resource>,
     /// show k8s container mac to global interface index mappings
     ///
-    /// eg: metaflow-agent-ctl platform --mac_mappings
+    /// eg: deepflow-agent-ctl platform --mac_mappings
     #[clap(short, long)]
     mac_mappings: bool,
 }
@@ -171,7 +171,7 @@ struct RpcCmd {
     /// Get data from RPC
     ///
     /// eg: get rpc config data
-    /// metaflow-agent-ctl rpc --get config
+    /// deepflow-agent-ctl rpc --get config
     ///
     #[clap(long, arg_enum)]
     get: RpcData,
@@ -226,8 +226,8 @@ impl Controller {
     }
 
     /*
-    $ metaflow-agent-ctl list
-    metaflow-agent-ctl listening udp port 30035 to find metaflow-agent
+    $ deepflow-agent-ctl list
+    deepflow-agent-ctl listening udp port 30035 to find deepflow-agent
 
     -----------------------------------------------------------------------------------------------------
     VTAP ID        HOSTNAME                     IP                                            PORT
@@ -239,7 +239,7 @@ impl Controller {
         let mut vtap_map = HashSet::new();
 
         println!(
-            "metaflow-agent-ctl listening udp port {} to find metaflow-agent\n",
+            "deepflow-agent-ctl listening udp port {} to find deepflow-agent\n",
             BEACON_PORT
         );
         println!("{:-<100}", "");
@@ -464,7 +464,7 @@ impl Controller {
                     PlatformMessage::MacMappings(e) => {
                         match e {
                             /*
-                            $ metaflow-agent-ctl -p 42700 platform --mac-mappings
+                            $ deepflow-agent-ctl -p 42700 platform --mac-mappings
                             Interface Index          MAC address
                             12                       01:02:03:04:05:06
                             13                       01:02:03:04:05:06
@@ -496,7 +496,7 @@ impl Controller {
                     match res {
                         PlatformMessage::Version(v) => {
                             /*
-                            $ metaflow-agent-ctl -p 54911 platform --k8s-get version
+                            $ deepflow-agent-ctl -p 54911 platform --k8s-get version
                             k8s-api-watcher-version xxx
                             */
                             match v {
@@ -520,7 +520,7 @@ impl Controller {
                 match res {
                     PlatformMessage::Watcher(v) => {
                         /*
-                        $ metaflow-agent-ctl -p 54911 platform --k8s-get node
+                        $ deepflow-agent-ctl -p 54911 platform --k8s-get node
                         nodes entries...
                         */
                         println!("{}", v);

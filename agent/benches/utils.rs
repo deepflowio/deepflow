@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use criterion::*;
 
-use metaflow_agent::{_LeakyBucket as LeakyBucket, _queue_bounded as queue_bounded};
+use deepflow_agent::{_LeakyBucket as LeakyBucket, _queue_bounded as queue_bounded};
 
 fn queue(c: &mut Criterion) {
     c.bench_function("queue_send", |b| {

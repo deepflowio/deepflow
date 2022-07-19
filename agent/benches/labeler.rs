@@ -21,11 +21,11 @@ use std::time::Instant;
 use criterion::*;
 use ipnet::IpNet;
 
-use metaflow_agent::_Cidr as Cidr;
-use metaflow_agent::_Labeler as Labeler;
-use metaflow_agent::_LookupKey as LookupKey;
-use metaflow_agent::_MacAddr as MacAddr;
-use metaflow_agent::{_IpSubnet as IpSubnet, _PlatformData as PlatformData};
+use deepflow_agent::_Cidr as Cidr;
+use deepflow_agent::_Labeler as Labeler;
+use deepflow_agent::_LookupKey as LookupKey;
+use deepflow_agent::_MacAddr as MacAddr;
+use deepflow_agent::{_IpSubnet as IpSubnet, _PlatformData as PlatformData};
 
 fn bench_labeler(c: &mut Criterion) {
     c.bench_function("labeler", |b| {

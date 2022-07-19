@@ -11,7 +11,7 @@
 #include "common.h"
 #include "list_head.h"
 
-#define UNIX_DOMAIN_DEF "/var/run/metaflow_bpf_ctrl"
+#define UNIX_DOMAIN_DEF "/var/run/deepflow_bpf_ctrl"
 
 typedef uint32_t sockoptid_t;
 

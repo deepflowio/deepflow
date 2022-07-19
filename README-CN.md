@@ -1,4 +1,4 @@
-![DeepFlow](./docs/metaflow-logo.svg)
+![DeepFlow](./docs/deepflow-logo.svg)
 =====================================
 
 简体中文 | [English](./README.md)
@@ -18,7 +18,7 @@ DeepFlow 是[云杉网络](https://yunshan.net)开源的一款**高度自动化*
 
 # 文档
 
-详细信息请访问[文档站点](https://deepflow.yunshan.net/metaflow-docs/zh/)。
+详细信息请访问[文档站点](https://deepflow.yunshan.net/deepflow-docs/zh/)。
 
 # 快速上手
 
@@ -31,9 +31,9 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 ## 部署 DeepFlow Community
 
-请参考[文档](https://deepflow.yunshan.net/metaflow-docs/zh/install/all-in-one/)部署 DeepFlow Community。
+请参考[文档](https://deepflow.yunshan.net/deepflow-docs/zh/install/all-in-one/)部署 DeepFlow Community。
 
-同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://demo.metaflow.yunshan.net/)，欢迎体验。登录账号 / 密码：metaflow / metaflow。
+同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://demo.deepflow.yunshan.net/)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
 
 ## 体验 DeepFlow Cloud
 
@@ -47,11 +47,11 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 DeepFlow Community 主要由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、虚拟机或物理裸机中运行一个 Agent ，负责该服务器上所有应用进程的 AutoMetrics 和 AutoTracing 数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、数据标签注入、数据写入、数据查询服务。
 
-![DeepFlow 软件架构](./docs/metaflow-architecture.png)
+![DeepFlow 软件架构](./docs/deepflow-architecture.png)
 
 # 里程碑
 
-这里有我们[未来的 Feature 规划](https://github.com/metaflowys/docs/blob/main/zh/01-about/04-milestone.md)。欢迎 Issue 和 Pull Request。
+这里有我们[未来的 Feature 规划](https://github.com/deepflowys/docs/blob/main/zh/01-about/04-milestone.md)。欢迎 Issue 和 Pull Request。
 
 # 致谢
 

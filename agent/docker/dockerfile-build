@@ -1,10 +1,10 @@
-FROM ghcr.io/metaflowys/rust-build:1.2 as builder
-COPY .  /metaflow/
-WORKDIR /metaflow/agent
+FROM ghcr.io/deepflowys/rust-build:1.2 as builder
+COPY .  /deepflow/
+WORKDIR /deepflow/agent
 RUN cargo build --release && \
-    cargo build --release --bin metaflow-agent-ctl && \
+    cargo build --release --bin deepflow-agent-ctl && \
     ls -alh target/release
 FROM scratch
-COPY --from=builder /metaflow/agent/ /
+COPY --from=builder /deepflow/agent/ /
 
 

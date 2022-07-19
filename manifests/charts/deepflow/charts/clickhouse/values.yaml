@@ -38,7 +38,7 @@ securityContext: {}
 storageConfig:
   ## persistentVolumeClaim/hostPath
   type: persistentVolumeClaim
-  hostPath: /opt/metaflow-clickhouse
+  hostPath: /opt/deepflow-clickhouse
   persistence:
     - name: clickhouse-path
       accessModes:
@@ -132,7 +132,7 @@ podAntiAffinityLabelSelector:
   - labelSelector:
     - key: app
       operator: In
-      values: metaflow
+      values: deepflow
     - key: component
       operator: In
       values: clickhouse

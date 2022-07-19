@@ -39,7 +39,7 @@ func RegisterAgentGroupCommand() *cobra.Command {
 	list := &cobra.Command{
 		Use:     "list [name]",
 		Short:   "list agent-group info",
-		Example: "metaflow-ctl agent-group list deepflow-agent-group",
+		Example: "deepflow-ctl agent-group list deepflow-agent-group",
 		Run: func(cmd *cobra.Command, args []string) {
 			listAgentGroup(cmd, args, listOutput)
 		},
@@ -49,7 +49,7 @@ func RegisterAgentGroupCommand() *cobra.Command {
 	create := &cobra.Command{
 		Use:     "create [name]",
 		Short:   "create agent-group",
-		Example: "metaflow-ctl agent-group create deepflow-agent-group",
+		Example: "deepflow-ctl agent-group create deepflow-agent-group",
 		Run: func(cmd *cobra.Command, args []string) {
 			createAgentGroup(cmd, args)
 		},
@@ -58,7 +58,7 @@ func RegisterAgentGroupCommand() *cobra.Command {
 	delete := &cobra.Command{
 		Use:     "delete [name]",
 		Short:   "delete agent-group",
-		Example: "metaflow-ctl agent-group delete deepflow-agent-group",
+		Example: "deepflow-ctl agent-group delete deepflow-agent-group",
 		Run: func(cmd *cobra.Command, args []string) {
 			deleteAgentGroup(cmd, args)
 		},

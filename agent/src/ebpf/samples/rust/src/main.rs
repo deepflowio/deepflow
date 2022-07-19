@@ -222,7 +222,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
 }
 
 fn main() {
-    let log_file = CString::new("/var/log/metaflow-ebpf.log".as_bytes()).unwrap();
+    let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
         // 第一个参数空指针传递可以填写std::ptr::null()

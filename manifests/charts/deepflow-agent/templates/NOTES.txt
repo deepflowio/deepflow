@@ -11,5 +11,5 @@ An automated observability platform for cloud-native developers.
 
 # Metaflow-agent Port for receiving trace, metrics, and log
 
-metaflow-agent service: {{ include "metaflow-agent.fullname" . }}.{{ $.Release.Namespace }}
-metaflow-agent Host listening port: {{ tpl (toString .Values.externalAgentHttpProxyPort) . }}
+deepflow-agent service: {{ include "deepflow-agent.fullname" . }}.{{ $.Release.Namespace }}
+deepflow-agent Host listening port: {{ tpl (toString .Values.externalAgentHttpProxyPort) . }}

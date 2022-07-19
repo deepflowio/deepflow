@@ -62,7 +62,7 @@ func RegisterDomainCommand() *cobra.Command {
 	list := &cobra.Command{
 		Use:     "list [name]",
 		Short:   "list domain info",
-		Example: "metaflow-ctl domain list deepflow-domain",
+		Example: "deepflow-ctl domain list deepflow-domain",
 		Run: func(cmd *cobra.Command, args []string) {
 			listDomain(cmd, args, listOutput)
 		},
@@ -73,7 +73,7 @@ func RegisterDomainCommand() *cobra.Command {
 	create := &cobra.Command{
 		Use:     "create",
 		Short:   "create domain",
-		Example: "metaflow-ctl domain create -f -",
+		Example: "deepflow-ctl domain create -f -",
 		Run: func(cmd *cobra.Command, args []string) {
 			createDomain(cmd, args, createFilename)
 		},
@@ -85,7 +85,7 @@ func RegisterDomainCommand() *cobra.Command {
 	update := &cobra.Command{
 		Use:     "update",
 		Short:   "update domain",
-		Example: "metaflow-ctl domain update deepflow-domain -f k8s.yaml",
+		Example: "deepflow-ctl domain update deepflow-domain -f k8s.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			updateDomain(cmd, args, updateFilename)
 		},
@@ -96,7 +96,7 @@ func RegisterDomainCommand() *cobra.Command {
 	delete := &cobra.Command{
 		Use:     "delete [name]",
 		Short:   "delete domain",
-		Example: "metaflow-ctl domain delete deepflow-domain",
+		Example: "deepflow-ctl domain delete deepflow-domain",
 		Run: func(cmd *cobra.Command, args []string) {
 			deleteDomain(cmd, args)
 		},
@@ -106,7 +106,7 @@ func RegisterDomainCommand() *cobra.Command {
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
 		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.ALIYUN_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.AGENT_SYNC_EN}, ",")),
-		Example: "metaflow-ctl domain example agent_sync",
+		Example: "deepflow-ctl domain example agent_sync",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
 		},
