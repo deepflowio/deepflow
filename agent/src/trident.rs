@@ -226,7 +226,7 @@ impl Trident {
         remote_log_config: RemoteLogConfig,
         stats_collector: Arc<stats::Collector>,
     ) -> Result<()> {
-        info!("========== MetaFlowAgent start! ==========");
+        info!("========== DeepFlow Agent start! ==========");
 
         let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
         info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
