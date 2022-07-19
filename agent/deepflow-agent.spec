@@ -16,7 +16,7 @@ Autoreq: 0
 %define pwd %(echo $PWD)
 
 %description
-Deepflow MetaFlow Agent
+Deepflow DeepFlow Agent
 
 %prep
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
@@ -75,7 +75,7 @@ fi
 Summary:    metaflow-agent tools
 
 %description -n %{name}-tools
-Deepflow MetaFlow Agent debug tools
+Deepflow DeepFlow Agent debug tools
 
 %files -n %{name}-tools
 /usr/sbin/metaflow-agent-ctl
