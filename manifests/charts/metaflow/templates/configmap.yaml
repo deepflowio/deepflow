@@ -5,4 +5,4 @@ metadata:
   labels:
     {{- include "metaflow.labels" . | nindent 4 }}
 data:
-  {{- tpl (toYaml .Values.config) $ | nindent 2 }}
+  {{- tpl (toYaml .Values.configmap) $ | nindent 2 }}
