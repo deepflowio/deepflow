@@ -221,6 +221,10 @@ func ipGroups(response *trident.SyncResponse) {
 			for index, entry := range groups.Groups {
 				JsonFormat(index+1, entry)
 			}
+			fmt.Println("Services data:")
+			for index, entry := range groups.Svcs {
+				JsonFormat(index+1, entry)
+			}
 		}
 	}
 }

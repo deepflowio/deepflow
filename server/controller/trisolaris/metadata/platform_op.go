@@ -134,7 +134,8 @@ func (p *PlatformDataOP) generateVInterfaces() {
 	rawData := p.GetRawData()
 	dipData := NewDomainInterfaceProto()
 	vifPubIps := []string{}
-	for _, vif := range vifs {
+	for index, _ := range vifs {
+		vif := vifs[index]
 		typeIDKey := TypeIDKey{
 			Type: vif.DeviceType,
 			ID:   vif.DeviceID,
@@ -240,7 +241,7 @@ func (p *PlatformDataOP) generateCIDRs() {
 		}
 		for _, subnet := range subnets {
 			netmask := netmask2masklen(subnet.Netmask)
-			if judgNet(subnet.Prefix, netmask) == false {
+			if judgeNet(subnet.Prefix, netmask) == false {
 				continue
 			}
 			prefix := fmt.Sprintf("%s/%d", subnet.Prefix, netmask)

@@ -53,9 +53,12 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 	processName := in.GetProcessName()
 	nodeInfo := trisolaris.GetGNodeInfo()
 	versionPlatformData := nodeInfo.GetPlatformDataVersion()
-	if versionPlatformData != in.GetVersionPlatformData() {
-		log.Infof("ctrl_ip is %s, (platform data version %d -> %d), NAME:%s",
+	versionGroups := nodeInfo.GetGroupsVersion()
+	if versionPlatformData != in.GetVersionPlatformData() ||
+		versionGroups != in.GetVersionGroups() {
+		log.Infof("ctrl_ip is %s, (platform data version %d -> %d), (groups version %d -> %d), NAME:%s",
 			tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
+			versionGroups, in.GetVersionGroups(),
 			processName)
 	}
 
@@ -79,20 +82,19 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 		}
 		if in.GetCommunicationVtaps() != nil {
 			vTapInfo.UpdateTSDBVTapInfo(in.GetCommunicationVtaps(), tsdbIP)
-			pcapDataMountPath := ""
-			tsdbReportInfo := in.GetTsdbReportInfo()
-			if tsdbReportInfo != nil {
-				pcapDataMountPath = tsdbReportInfo.GetPcapDataMountPath()
-			}
-			tsdbCache.UpdateSystemInfo(
-				int(in.GetCpuNum()),
-				int64(in.GetMemorySize()),
-				in.GetArch(),
-				in.GetOs(),
-				in.GetKernelVersion(),
-				pcapDataMountPath)
-			tsdbCache.UpdateSyncedAt(time.Now())
 		}
+		pcapDataMountPath := ""
+		if in.GetTsdbReportInfo() != nil {
+			pcapDataMountPath = in.GetTsdbReportInfo().GetPcapDataMountPath()
+		}
+		tsdbCache.UpdateSystemInfo(
+			int(in.GetCpuNum()),
+			int64(in.GetMemorySize()),
+			in.GetArch(),
+			in.GetOs(),
+			in.GetKernelVersion(),
+			pcapDataMountPath)
+		tsdbCache.UpdateSyncedAt(time.Now())
 	}
 
 	configure := e.generateConfig(tsdbIP)
@@ -100,7 +102,10 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 	if versionPlatformData != in.GetVersionPlatformData() {
 		platformData = nodeInfo.GetPlatformDataStr()
 	}
-	groups := nodeInfo.GetGroups()
+	groups := []byte{}
+	if versionGroups != in.GetVersionGroups() {
+		groups = nodeInfo.GetGroups()
+	}
 	podIPs := nodeInfo.GetPodIPs()
 	vTapIPs := vTapInfo.GetVTapIPs()
 	return &api.SyncResponse{
@@ -109,7 +114,8 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 		Groups:              groups,
 		PodIps:              podIPs,
 		VtapIps:             vTapIPs,
-		VersionPlatformData: proto.Uint64(uint64(versionPlatformData)),
+		VersionPlatformData: proto.Uint64(versionPlatformData),
+		VersionGroups:       proto.Uint64(versionGroups),
 		Config:              configure,
 	}, nil
 }
@@ -118,7 +124,6 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	tsdbIP := in.GetCtrlIp()
 	processName := in.GetProcessName()
 	nodeInfo := trisolaris.GetGNodeInfo()
-	versionPlatformData := nodeInfo.GetPlatformDataVersion()
 	if processName == TSDB_PROCESS_NAME {
 		tsdbCache := nodeInfo.GetTSDBCache(tsdbIP)
 		if tsdbCache == nil {
@@ -127,9 +132,12 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 			}, fmt.Errorf("no find tsdb(%s) cache", tsdbIP)
 		}
 	}
-	if versionPlatformData != in.GetVersionPlatformData() {
-		log.Infof("push ctrl_ip is %s, (platform data version %d -> %d), NAME:%s",
+	versionPlatformData := nodeInfo.GetPlatformDataVersion()
+	versionGroups := nodeInfo.GetGroupsVersion()
+	if versionPlatformData != in.GetVersionPlatformData() || versionGroups != in.GetVersionGroups() {
+		log.Infof("push ctrl_ip is %s, (platform data version %d -> %d), (groups version %d -> %d), NAME:%s",
 			tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
+			versionGroups, in.GetVersionGroups(),
 			processName)
 	}
 	configure := e.generateConfig(tsdbIP)
@@ -137,7 +145,10 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	if versionPlatformData != in.GetVersionPlatformData() {
 		platformData = nodeInfo.GetPlatformDataStr()
 	}
-	groups := nodeInfo.GetGroups()
+	groups := []byte{}
+	if versionGroups != in.GetVersionGroups() {
+		groups = nodeInfo.GetGroups()
+	}
 	podIPs := nodeInfo.GetPodIPs()
 	vTapIPs := trisolaris.GetGVTapInfo().GetVTapIPs()
 	return &api.SyncResponse{
@@ -146,7 +157,8 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		Groups:              groups,
 		PodIps:              podIPs,
 		VtapIps:             vTapIPs,
-		VersionPlatformData: proto.Uint64(uint64(versionPlatformData)),
+		VersionPlatformData: proto.Uint64(versionPlatformData),
+		VersionGroups:       proto.Uint64(versionGroups),
 		Config:              configure,
 	}, nil
 }

@@ -32,7 +32,7 @@ var log = logging.MustGetLogger("trisolaris/metadata")
 type MetaData struct {
 	dbDataCache    *atomic.Value // *DBDataCache 数据库缓存
 	platformDataOP *PlatformDataOP
-	serviceDataOP  *ServiceDataOP
+	groupDataOP    *GroupDataOP
 	tapType        *TapType
 	chPlatformData chan struct{}
 	chTapType      chan struct{}
@@ -52,7 +52,7 @@ func NewMetaData(db *gorm.DB, cfg *config.Config) *MetaData {
 		db:             db,
 	}
 	metaData.platformDataOP = newPlatformDataOP(db, metaData)
-	metaData.serviceDataOP = newServiceDataOP(metaData)
+	metaData.groupDataOP = newGroupDataOP(metaData)
 	return metaData
 }
 
@@ -88,18 +88,30 @@ func (m *MetaData) GetPlatformDataOP() *PlatformDataOP {
 	return m.platformDataOP
 }
 
-func (m *MetaData) GetServiceDataOP() *ServiceDataOP {
-	return m.serviceDataOP
-}
-
 func (m *MetaData) GetTapTypes() []*trident.TapType {
 	return m.tapType.getTapTypes()
+}
+
+func (m *MetaData) GetTridentGroups() []byte {
+	return m.groupDataOP.getTridentGroups()
+}
+
+func (m *MetaData) GetTridentGroupsVersion() uint64 {
+	return m.groupDataOP.getTridentGroupsVersion()
+}
+
+func (m *MetaData) GetDropletGroups() []byte {
+	return m.groupDataOP.getDropletGroups()
+}
+
+func (m *MetaData) GetDropletGroupsVersion() uint64 {
+	return m.groupDataOP.getDropletGroupsVersion()
 }
 
 func (m *MetaData) InitData() {
 	m.generateDbDataCache()
 	m.platformDataOP.initData()
-	m.serviceDataOP.GenerateServiceData()
+	m.groupDataOP.generateGroupData()
 	m.tapType.generateTapTypes()
 }
 
@@ -112,13 +124,12 @@ func (m *MetaData) TimedRefreshPlatformData() {
 			log.Info("start generate platform data from timed")
 			m.generateDbDataCache()
 			m.platformDataOP.GeneratePlatformData()
-			m.serviceDataOP.GenerateServiceData()
+			m.groupDataOP.generateGroupData()
 			log.Info("end generate platform data from timed")
 		case <-m.chPlatformData:
 			log.Info("start generate platform data from rpc")
 			m.generateDbDataCache()
 			m.platformDataOP.GeneratePlatformData()
-			m.serviceDataOP.GenerateServiceData()
 			log.Info("end generate platform data from rpc")
 		}
 	}

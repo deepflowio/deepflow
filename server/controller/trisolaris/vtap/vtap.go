@@ -66,6 +66,7 @@ type VTapInfo struct {
 	metaData                       *metadata.MetaData
 	config                         *config.Config
 	vTapPlatformData               *VTapPlatformData
+	groupData                      *GroupData
 	azToRegion                     map[string]string
 	azToDomain                     map[string]string
 	domainIdToLcuuid               map[int]string
@@ -116,6 +117,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		kvmVTapCaches:                  NewKvmVTapCacheMap(),
 		metaData:                       metaData,
 		vTapPlatformData:               newVTapPlatformData(),
+		groupData:                      newGroupData(metaData),
 		azToRegion:                     make(map[string]string),
 		azToDomain:                     make(map[string]string),
 		domainIdToLcuuid:               make(map[int]string),
@@ -519,6 +521,14 @@ func (v *VTapInfo) GetSelfUpdateUrl() string {
 
 func (v *VTapInfo) GetTridentTypeForUnkonwVTap() uint16 {
 	return v.config.TridentTypeForUnkonwVtap
+}
+
+func (v *VTapInfo) GetGroupData() []byte {
+	return v.groupData.getGroupData()
+}
+
+func (v *VTapInfo) GetGroupDataVersion() uint64 {
+	return v.groupData.getGroupDataVersion()
 }
 
 func GetKey(vtap *models.VTap) string {

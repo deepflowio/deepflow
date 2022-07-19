@@ -775,6 +775,7 @@ type ResourceGroup struct {
 	PodServiceIDs string    `gorm:"column:pod_service_ids;type:text;default:null" json:"POD_SERVICE_IDS"` // pod service ids separated by ,
 	LBID          int       `gorm:"column:lb_id;type:int;default:null" json:"LB_ID"`
 	LBListenerID  int       `gorm:"column:lb_listener_id;type:int;default:null" json:"LB_LISTENER_ID"`
+	ExtraInfoIDs  string    `gorm:"column:extra_info_ids;type:string;default:null" json:"EXTRA_INFO_IDS"`
 	IconID        int       `gorm:"column:icon_id;type:int;default:-2" json:"ICON_ID"`
 	CreatedAt     time.Time `gorm:"column:created_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
 	UpdatedAt     time.Time `gorm:"column:updated_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
@@ -1105,4 +1106,40 @@ type GoGenesisVInterface struct {
 
 func (GoGenesisVInterface) TableName() string {
 	return "go_genesis_vinterface"
+}
+
+type ACL struct {
+	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	BusinessID   int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
+	Name         string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	Type         int       `gorm:"column:type;type:int;default:null;default:2" json:"TYPE"`         // 1-epc; 2-custom
+	TapType      int       `gorm:"column:tap_type;type:int;default:null;default:3" json:"TAP_TYPE"` // 1-WAN; 3-LAN
+	State        int       `gorm:"column:state;type:int;default:null;default:1" json:"STATE"`       // 0-disable; 1-enable
+	Applications string    `gorm:"column:applications;type:char(64);not null" json:"APPLICATIONS"`  // separated by , (1-performance analysis; 2-backpacking; 6-npb)
+	EpcID        int       `gorm:"column:epc_id;type:int;default:null" json:"EPC_ID"`
+	SrcGroupIDs  string    `gorm:"column:src_group_ids;type:text;default:null" json:"SRC_GROUP_IDS"` // separated by ,
+	DstGroupIDs  string    `gorm:"column:dst_group_ids;type:text;default:null" json:"DST_GROUP_IDS"` // separated by ,
+	Protocol     int       `gorm:"column:protocol;type:int;default:null" json:"PROTOCOL"`
+	SrcPorts     string    `gorm:"column:src_ports;type:text;default:null" json:"SRC_PORTS"` // separated by ,
+	DstPorts     string    `gorm:"column:dst_ports;type:text;default:null" json:"DST_PORTS"` // separated by ,
+	Vlan         int       `gorm:"column:vlan;type:int;default:null" json:"VLAN"`
+	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+	Lcuuid       string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+}
+
+func (ACL) TableName() string {
+	return "acl"
+}
+
+// ResourceGroupExtraInfo [...]
+type ResourceGroupExtraInfo struct {
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	ResourceType int    `gorm:"column:resource_type;type:int;not null" json:"RESOURCE_TYPE"` // 1: epc, 2: vm, 3: pod_group, 4: pod_service
+	ResourceID   int    `gorm:"column:resource_id;type:int;not null" json:"RESOURCE_ID"`
+	ResourceName string `gorm:"column:resource_name;type:char(64);not null" json:"RESOURCE_NAME"`
+}
+
+func (ResourceGroupExtraInfo) TableName() string {
+	return "resource_group_extra_info"
 }

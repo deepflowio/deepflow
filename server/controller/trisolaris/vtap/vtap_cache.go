@@ -146,7 +146,7 @@ type VTapCache struct {
 	// vtap version
 	pushVersionPlatformData uint64
 	//VersionAcls         int
-	//VersionGroups       int
+	pushVersionGroups uint64
 
 	controllerSyncFlag atomicbool.Bool // bool
 	tsdbSyncFlag       atomicbool.Bool // bool
@@ -204,7 +204,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.remoteSegments = []*trident.Segment{}
 	vTapCache.pushVersionPlatformData = 0
 	//vTapCache.VersionAcls = 0
-	//vTapCache.VersionGroups = 0
+	vTapCache.pushVersionGroups = 0
 	vTapCache.controllerSyncFlag = atomicbool.NewBool(false)
 	vTapCache.tsdbSyncFlag = atomicbool.NewBool(false)
 	vTapCache.podClusterID = 0
@@ -289,6 +289,14 @@ func (c *VTapCache) UpdatePushVersionPlatformData(version uint64) {
 
 func (c *VTapCache) GetPushVersionPlatformData() uint64 {
 	return c.pushVersionPlatformData
+}
+
+func (c *VTapCache) UpdatePushVersionGroups(version uint64) {
+	c.pushVersionGroups = version
+}
+
+func (c *VTapCache) GetPushVersionGroups() uint64 {
+	return c.pushVersionGroups
 }
 
 func (c *VTapCache) GetSimplePlatformDataVersion() uint64 {
