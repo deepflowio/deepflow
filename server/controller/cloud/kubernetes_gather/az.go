@@ -17,8 +17,8 @@
 package kubernetes_gather
 
 import (
-	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 )
 
 func (k *KubernetesGather) getAZ() (model.AZ, error) {

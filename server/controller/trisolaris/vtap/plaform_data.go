@@ -21,10 +21,10 @@ import (
 	"strings"
 	"sync"
 
-	. "github.com/metaflowys/metaflow/server/controller/common"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	. "github.com/deepflowys/deepflow/server/controller/common"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
 var ALL_DOMAIMS = []string{"0"}

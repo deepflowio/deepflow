@@ -25,9 +25,9 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
 func convertStrToIntList(convertStr string) ([]int, error) {

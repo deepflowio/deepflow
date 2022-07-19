@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metaflowys/metaflow/server/ingester/stream/geo"
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
-	"github.com/metaflowys/metaflow/server/libs/grpc"
+	"github.com/deepflowys/deepflow/server/ingester/stream/geo"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowys/deepflow/server/libs/grpc"
 )
 
 func TestJsonify(t *testing.T) {

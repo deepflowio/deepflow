@@ -21,8 +21,8 @@ import (
 
 	"github.com/shirou/gopsutil/net"
 
-	"github.com/metaflowys/metaflow/server/libs/stats"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 var (

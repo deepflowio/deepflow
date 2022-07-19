@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 func RandID() int {

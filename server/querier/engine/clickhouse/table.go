@@ -17,7 +17,7 @@
 package clickhouse
 
 import (
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 )
 
 func GetDatabases() map[string][]interface{} {

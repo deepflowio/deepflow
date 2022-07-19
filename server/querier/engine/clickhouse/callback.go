@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/tag"
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
 type Callback struct {

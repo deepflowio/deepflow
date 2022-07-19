@@ -22,15 +22,15 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/controller/cloud/aliyun"
-	"github.com/metaflowys/metaflow/server/controller/cloud/baidubce"
-	"github.com/metaflowys/metaflow/server/controller/cloud/config"
-	"github.com/metaflowys/metaflow/server/controller/cloud/genesis"
-	"github.com/metaflowys/metaflow/server/controller/cloud/kubernetes"
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/cloud/qingcloud"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/cloud/aliyun"
+	"github.com/deepflowys/deepflow/server/controller/cloud/baidubce"
+	"github.com/deepflowys/deepflow/server/controller/cloud/config"
+	"github.com/deepflowys/deepflow/server/controller/cloud/genesis"
+	"github.com/deepflowys/deepflow/server/controller/cloud/kubernetes"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/cloud/qingcloud"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud.platform")

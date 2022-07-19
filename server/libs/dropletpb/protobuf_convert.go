@@ -20,12 +20,12 @@ import (
 	"net"
 	"strings"
 
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 	logging "github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/policy"
-	. "github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/policy"
+	. "github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 var log = logging.MustGetLogger("dropletpb")

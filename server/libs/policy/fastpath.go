@@ -21,10 +21,10 @@ import (
 	"math"
 	"strconv"
 
-	. "github.com/metaflowys/metaflow/server/libs/datatype"
-	"github.com/metaflowys/metaflow/server/libs/hmap/lru"
-	"github.com/metaflowys/metaflow/server/libs/stats"
-	. "github.com/metaflowys/metaflow/server/libs/utils"
+	. "github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/deepflowys/deepflow/server/libs/hmap/lru"
+	"github.com/deepflowys/deepflow/server/libs/stats"
+	. "github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const (

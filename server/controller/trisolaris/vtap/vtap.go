@@ -31,18 +31,18 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/op/go-logging"
 
-	. "github.com/metaflowys/metaflow/server/controller/common"
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils/atomicbool"
+	. "github.com/deepflowys/deepflow/server/controller/common"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 var log = logging.MustGetLogger("trisolaris/vtap")

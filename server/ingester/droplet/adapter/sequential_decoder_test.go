@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/google/gopacket/pcapgo"
-	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	. "github.com/deepflowys/deepflow/server/libs/datatype"
 )
 
 const (

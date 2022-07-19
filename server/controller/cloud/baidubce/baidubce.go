@@ -20,9 +20,9 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/controller/cloud/common"
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("cloud.baidu")

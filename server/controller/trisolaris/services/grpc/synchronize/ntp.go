@@ -21,10 +21,10 @@ import (
 	"strconv"
 	"time"
 
-	api "github.com/metaflowys/metaflow/message/trident"
+	api "github.com/deepflowys/deepflow/message/trident"
 	context "golang.org/x/net/context"
 
-	"github.com/metaflowys/metaflow/server/controller/trisolaris"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 )
 
 type NTPEvent struct{}

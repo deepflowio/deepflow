@@ -1,4 +1,4 @@
-MESSAGE = github.com/metaflowys/metaflow/message
+MESSAGE = github.com/deepflowys/deepflow/message
 
 afpacket-debug:
 	go build -gcflags 'all=-N -l' -o benchTest_afpacket ./afpacket/main.go

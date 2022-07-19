@@ -20,9 +20,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/controller/trisolaris"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/cache")

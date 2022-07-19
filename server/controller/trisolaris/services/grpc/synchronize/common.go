@@ -17,7 +17,7 @@
 package synchronize
 
 import (
-	api "github.com/metaflowys/metaflow/message/trident"
+	api "github.com/deepflowys/deepflow/message/trident"
 )
 
 var (

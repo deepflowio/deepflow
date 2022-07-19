@@ -19,7 +19,7 @@ package datatype
 import (
 	"fmt"
 
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const (

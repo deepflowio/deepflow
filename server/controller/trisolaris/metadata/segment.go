@@ -19,9 +19,9 @@ package metadata
 import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 type MacID struct {

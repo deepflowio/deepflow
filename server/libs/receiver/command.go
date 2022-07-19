@@ -19,7 +19,7 @@ package receiver
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/metaflowys/metaflow/server/libs/debug"
+	"github.com/deepflowys/deepflow/server/libs/debug"
 )
 
 const (

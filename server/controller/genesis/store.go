@@ -25,12 +25,12 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"inet.af/netaddr"
 
-	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	genesiscommon "github.com/metaflowys/metaflow/server/controller/genesis/common"
-	"github.com/metaflowys/metaflow/server/controller/genesis/config"
-	"github.com/metaflowys/metaflow/server/controller/model"
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	genesiscommon "github.com/deepflowys/deepflow/server/controller/genesis/common"
+	"github.com/deepflowys/deepflow/server/controller/genesis/config"
+	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
 type VinterfacesStorage struct {

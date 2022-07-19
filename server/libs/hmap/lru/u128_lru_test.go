@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/metaflowys/metaflow/server/libs/hmap"
+	"github.com/deepflowys/deepflow/server/libs/hmap"
 )
 
 func TestU128LRU(t *testing.T) {

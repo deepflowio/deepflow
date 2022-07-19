@@ -23,10 +23,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/metaflowys/metaflow/server/querier/common"
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/metrics"
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/tag"
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/metrics"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
 const (

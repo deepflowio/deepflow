@@ -23,8 +23,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/recorder/test"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/recorder/test"
 )
 
 func TestDelete(t *testing.T) {

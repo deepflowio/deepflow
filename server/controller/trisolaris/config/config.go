@@ -22,7 +22,7 @@ import (
 
 	"github.com/op/go-logging"
 
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/config")

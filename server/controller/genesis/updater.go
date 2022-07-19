@@ -26,12 +26,12 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 
-	tridentcommon "github.com/metaflowys/metaflow/message/common"
-	"github.com/metaflowys/metaflow/message/trident"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	genesiscommon "github.com/metaflowys/metaflow/server/controller/genesis/common"
-	"github.com/metaflowys/metaflow/server/controller/model"
-	"github.com/metaflowys/metaflow/server/libs/queue"
+	tridentcommon "github.com/deepflowys/deepflow/message/common"
+	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	genesiscommon "github.com/deepflowys/deepflow/server/controller/genesis/common"
+	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type VinterfacesRpcUpdater struct {

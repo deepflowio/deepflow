@@ -32,11 +32,11 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
-	cloudcommon "github.com/metaflowys/metaflow/server/controller/cloud/common"
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/statsd"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud.qingcloud")

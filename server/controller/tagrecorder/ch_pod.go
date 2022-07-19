@@ -17,7 +17,7 @@
 package tagrecorder
 
 import (
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 type ChPod struct {

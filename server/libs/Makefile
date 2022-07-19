@@ -1,4 +1,4 @@
-MESSAGE = github.com/metaflowys/metaflow/message
+MESSAGE = github.com/deepflowys/deepflow/message
 
 vendor:
 	go mod tidy && go mod download && go mod vendor

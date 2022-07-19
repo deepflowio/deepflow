@@ -22,7 +22,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 func forwardMasterController(c *gin.Context, masterControllerName string) {

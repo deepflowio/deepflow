@@ -24,10 +24,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
-	cloudmodel "github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/recorder/cache"
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 )
 
 func newCloudVM() cloudmodel.VM {

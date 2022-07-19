@@ -17,7 +17,7 @@
 package geo
 
 import (
-	tree "github.com/metaflowys/metaflow/server/libs/segmenttree"
+	tree "github.com/deepflowys/deepflow/server/libs/segmenttree"
 )
 
 func DecodeCountry(country uint8) string {

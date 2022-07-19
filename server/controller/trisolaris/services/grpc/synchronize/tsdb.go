@@ -21,13 +21,13 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	api "github.com/metaflowys/metaflow/message/trident"
+	api "github.com/deepflowys/deepflow/message/trident"
 	"github.com/op/go-logging"
 	context "golang.org/x/net/context"
 
-	"github.com/metaflowys/metaflow/server/controller/trisolaris"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
 )
 
 var log = logging.MustGetLogger("trisolaris/synchronize")

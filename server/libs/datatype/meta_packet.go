@@ -25,8 +25,8 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	"github.com/metaflowys/metaflow/server/libs/pool"
-	. "github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/pool"
+	. "github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const VLAN_ID_MASK = uint16((1 << 12) - 1)

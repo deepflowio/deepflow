@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/metaflowys/metaflow/server/querier/common"
+	"github.com/deepflowys/deepflow/server/querier/common"
 )
 
 var TagResoureMap = GenerateTagResoureMap()

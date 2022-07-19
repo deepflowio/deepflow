@@ -20,7 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 func newDBAZ() *mysql.AZ {

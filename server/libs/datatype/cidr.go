@@ -19,7 +19,7 @@ package datatype
 import (
 	"net"
 
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 )
 
 const (

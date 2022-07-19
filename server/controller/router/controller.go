@@ -20,11 +20,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/config"
-	"github.com/metaflowys/metaflow/server/controller/model"
-	"github.com/metaflowys/metaflow/server/controller/monitor"
-	"github.com/metaflowys/metaflow/server/controller/service"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/monitor"
+	"github.com/deepflowys/deepflow/server/controller/service"
 )
 
 func ControllerRouter(e *gin.Engine, m *monitor.ControllerCheck, cfg *config.ControllerConfig) {

@@ -24,7 +24,7 @@ import (
 
 	. "github.com/google/gopacket/layers"
 
-	. "github.com/metaflowys/metaflow/server/libs/utils"
+	. "github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 type LookupKey struct {

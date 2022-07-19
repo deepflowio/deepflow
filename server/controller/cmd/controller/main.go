@@ -17,7 +17,7 @@
 package main
 
 import (
-	"github.com/metaflowys/metaflow/server/controller/controller"
+	"github.com/deepflowys/deepflow/server/controller/controller"
 )
 
 func main() {

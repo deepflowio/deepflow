@@ -20,10 +20,10 @@ import (
 	"errors"
 	"unsafe"
 
-	"github.com/metaflowys/metaflow/server/libs/ckdb"
-	"github.com/metaflowys/metaflow/server/libs/codec"
-	"github.com/metaflowys/metaflow/server/libs/pool"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	"github.com/deepflowys/deepflow/server/libs/codec"
+	"github.com/deepflowys/deepflow/server/libs/pool"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
 const (

@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/metaflowys/metaflow/server/ingester/stream/dbwriter"
+	"github.com/deepflowys/deepflow/server/ingester/stream/dbwriter"
 )
 
 const (

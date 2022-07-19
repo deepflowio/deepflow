@@ -22,7 +22,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/metaflowys/metaflow/server/controller/db/mysql/migrate"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrate"
 )
 
 const (

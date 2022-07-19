@@ -21,7 +21,7 @@ import (
 	"github.com/google/uuid"
 	// "github.com/k0kubun/pp"
 	//logging "github.com/op/go-logging"
-	"github.com/metaflowys/metaflow/server/querier/service"
+	"github.com/deepflowys/deepflow/server/querier/service"
 )
 
 func QueryRouter(e *gin.Engine) {

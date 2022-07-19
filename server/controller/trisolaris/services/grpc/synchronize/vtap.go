@@ -21,15 +21,15 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/metaflowys/metaflow/message/common"
-	api "github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/common"
+	api "github.com/deepflowys/deepflow/message/trident"
 	context "golang.org/x/net/context"
 
-	. "github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/vtap"
+	. "github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/vtap"
 )
 
 var (

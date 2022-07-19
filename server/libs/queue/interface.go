@@ -19,7 +19,7 @@ package queue
 import (
 	"time"
 
-	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/stats"
 )
 
 const MAX_QUEUE_COUNT = 16

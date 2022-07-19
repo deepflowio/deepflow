@@ -27,8 +27,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/metaflowys/metaflow/server/querier/config"
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/client"
+	"github.com/deepflowys/deepflow/server/querier/config"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/client"
 	logging "github.com/op/go-logging"
 	"github.com/xwb1989/sqlparser"
 )

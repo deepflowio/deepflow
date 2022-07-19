@@ -23,15 +23,15 @@ import (
 	logging "github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
 
-	"github.com/metaflowys/metaflow/server/controller/db/clickhouse"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/db/redis"
-	genesis "github.com/metaflowys/metaflow/server/controller/genesis/config"
-	manager "github.com/metaflowys/metaflow/server/controller/manager/config"
-	monitor "github.com/metaflowys/metaflow/server/controller/monitor/config"
-	statsd "github.com/metaflowys/metaflow/server/controller/statsd/config"
-	tagrecorder "github.com/metaflowys/metaflow/server/controller/tagrecorder/config"
-	trisolaris "github.com/metaflowys/metaflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/db/clickhouse"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/db/redis"
+	genesis "github.com/deepflowys/deepflow/server/controller/genesis/config"
+	manager "github.com/deepflowys/deepflow/server/controller/manager/config"
+	monitor "github.com/deepflowys/deepflow/server/controller/monitor/config"
+	statsd "github.com/deepflowys/deepflow/server/controller/statsd/config"
+	tagrecorder "github.com/deepflowys/deepflow/server/controller/tagrecorder/config"
+	trisolaris "github.com/deepflowys/deepflow/server/controller/trisolaris/config"
 )
 
 var log = logging.MustGetLogger("config")

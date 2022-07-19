@@ -17,11 +17,11 @@
 package kubernetes_gather
 
 import (
-	"github.com/metaflowys/metaflow/server/controller/cloud/kubernetes_gather/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/genesis"
-	"github.com/metaflowys/metaflow/server/controller/statsd"
+	"github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
+	"github.com/deepflowys/deepflow/server/controller/statsd"
 
 	"regexp"
 	"time"

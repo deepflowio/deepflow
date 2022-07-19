@@ -26,11 +26,11 @@ import (
 	"github.com/xwb1989/sqlparser"
 	"inet.af/netaddr"
 
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/tag"
-	"github.com/metaflowys/metaflow/server/querier/engine/clickhouse/view"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
+	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
 type Where struct {

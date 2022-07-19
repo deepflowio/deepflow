@@ -17,7 +17,7 @@
 package cloud
 
 import (
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 )
 
 // Kubernetes平台直接使用对应kubernetesgather的resource作为cloud的resource

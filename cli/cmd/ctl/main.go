@@ -17,7 +17,7 @@
 package main
 
 import (
-	"github.com/metaflowys/metaflow/cli/ctl"
+	"github.com/deepflowys/deepflow/cli/ctl"
 )
 
 func main() {

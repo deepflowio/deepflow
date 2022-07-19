@@ -18,12 +18,12 @@ package genesis
 
 import (
 	"errors"
-	"github.com/metaflowys/metaflow/server/controller/cloud/config"
-	"github.com/metaflowys/metaflow/server/controller/cloud/model"
-	"github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/genesis"
-	"github.com/metaflowys/metaflow/server/controller/statsd"
+	"github.com/deepflowys/deepflow/server/controller/cloud/config"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
+	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"time"
 
 	"github.com/bitly/go-simplejson"

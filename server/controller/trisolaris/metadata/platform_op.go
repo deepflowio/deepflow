@@ -23,13 +23,13 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 	"gorm.io/gorm"
 
-	. "github.com/metaflowys/metaflow/server/controller/common"
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/utils"
+	. "github.com/deepflowys/deepflow/server/controller/common"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
 type PlatformDataOP struct {

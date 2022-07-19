@@ -24,16 +24,16 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
-	. "github.com/metaflowys/metaflow/server/controller/trisolaris/common"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/config"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/metadata"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/pushmanager"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
 )
 
 var log = logging.MustGetLogger("trisolaris/node")

@@ -22,11 +22,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/dbmgr"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/server/http/common"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/upgrade")

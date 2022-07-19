@@ -24,7 +24,7 @@ import (
 	. "github.com/google/gopacket/layers"
 	"github.com/op/go-logging"
 
-	"github.com/metaflowys/metaflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/stats"
 )
 
 var log = logging.MustGetLogger("dedup")

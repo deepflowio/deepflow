@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	ckcommon "github.com/metaflowys/metaflow/server/querier/engine/clickhouse/common"
+	ckcommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 
 	logging "github.com/op/go-logging"
 )

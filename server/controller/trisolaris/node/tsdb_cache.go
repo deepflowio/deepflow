@@ -23,8 +23,8 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
 
-	models "github.com/metaflowys/metaflow/server/controller/db/mysql"
-	"github.com/metaflowys/metaflow/server/controller/trisolaris/utils/atomicbool"
+	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 type TSDBCache struct {

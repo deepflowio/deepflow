@@ -19,9 +19,9 @@ package datatype
 import (
 	"fmt"
 
-	"github.com/metaflowys/metaflow/server/libs/codec"
-	"github.com/metaflowys/metaflow/server/libs/datatype/pb"
-	"github.com/metaflowys/metaflow/server/libs/pool"
+	"github.com/deepflowys/deepflow/server/libs/codec"
+	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
+	"github.com/deepflowys/deepflow/server/libs/pool"
 )
 
 const (

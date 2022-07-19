@@ -27,12 +27,12 @@ import (
 	"strconv"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/metaflowys/metaflow/message/trident"
+	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/spf13/cobra"
 	_ "golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/metaflowys/metaflow/cli/ctl/common"
+	"github.com/deepflowys/deepflow/cli/ctl/common"
 )
 
 type ParamData struct {

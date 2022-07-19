@@ -24,12 +24,12 @@ import (
 
 	"google.golang.org/grpc/peer"
 
-	tridentcommon "github.com/metaflowys/metaflow/message/common"
-	"github.com/metaflowys/metaflow/message/trident"
-	controllercommon "github.com/metaflowys/metaflow/server/controller/common"
-	"github.com/metaflowys/metaflow/server/controller/genesis/common"
-	"github.com/metaflowys/metaflow/server/controller/genesis/config"
-	"github.com/metaflowys/metaflow/server/libs/queue"
+	tridentcommon "github.com/deepflowys/deepflow/message/common"
+	"github.com/deepflowys/deepflow/message/trident"
+	controllercommon "github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/genesis/common"
+	"github.com/deepflowys/deepflow/server/controller/genesis/config"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 func isInterestedHost(tType tridentcommon.TridentType) bool {

@@ -19,7 +19,7 @@ package policy
 import (
 	"math"
 
-	. "github.com/metaflowys/metaflow/server/libs/datatype"
+	. "github.com/deepflowys/deepflow/server/libs/datatype"
 )
 
 type InterestTable struct {

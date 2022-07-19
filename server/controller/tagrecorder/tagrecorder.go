@@ -21,8 +21,8 @@ import (
 
 	logging "github.com/op/go-logging"
 
-	// "github.com/metaflowys/metaflow/server/controller/tagrecorder/config"
-	"github.com/metaflowys/metaflow/server/controller/config"
+	// "github.com/deepflowys/deepflow/server/controller/tagrecorder/config"
+	"github.com/deepflowys/deepflow/server/controller/config"
 )
 
 var log = logging.MustGetLogger("tagrecorder")

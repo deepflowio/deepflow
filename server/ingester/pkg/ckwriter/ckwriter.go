@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/metaflowys/metaflow/server/ingester/common"
-	"github.com/metaflowys/metaflow/server/libs/ckdb"
-	"github.com/metaflowys/metaflow/server/libs/queue"
-	"github.com/metaflowys/metaflow/server/libs/stats"
-	"github.com/metaflowys/metaflow/server/libs/utils"
+	"github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/libs/ckdb"
+	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/utils"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	logging "github.com/op/go-logging"

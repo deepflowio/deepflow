@@ -19,7 +19,7 @@ package tagrecorder
 import (
 	"strings"
 
-	"github.com/metaflowys/metaflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 type ChK8sLabel struct {
