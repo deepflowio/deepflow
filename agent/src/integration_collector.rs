@@ -342,6 +342,7 @@ mod tests {
     use crate::debug::QueueDebugger;
     use crate::utils::queue;
 
+    #[ignore]
     #[test]
     fn otel_api() {
         let queue_debugger = QueueDebugger::new();

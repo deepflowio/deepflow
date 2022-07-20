@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"unsafe"
 
-	. "github.com/google/gopacket/layers"
 	pb "github.com/deepflowys/deepflow/message/trident"
 	. "github.com/deepflowys/deepflow/server/libs/utils"
+	. "github.com/google/gopacket/layers"
 )
 
 type TunnelType uint8

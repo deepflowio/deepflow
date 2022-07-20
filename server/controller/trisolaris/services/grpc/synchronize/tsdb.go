@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	api "github.com/deepflowys/deepflow/message/trident"
+	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
 	context "golang.org/x/net/context"
 

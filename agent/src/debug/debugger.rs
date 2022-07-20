@@ -37,7 +37,7 @@ use super::{
     platform::{PlatformDebugger, PlatformMessage},
     queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
-    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, MAX_BUF_SIZE, DEEPFLOW_AGENT_BEACON,
+    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, DEEPFLOW_AGENT_BEACON, MAX_BUF_SIZE,
 };
 
 use crate::{

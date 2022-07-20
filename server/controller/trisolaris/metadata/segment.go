@@ -18,8 +18,8 @@ package metadata
 
 import (
 	mapset "github.com/deckarep/golang-set"
-	"github.com/golang/protobuf/proto"
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/golang/protobuf/proto"
 
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
