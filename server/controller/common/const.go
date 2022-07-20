@@ -389,7 +389,7 @@ const (
 )
 
 const (
-	NODE_IP_KEY = "K8S_NODE_IP_FOR_METAFLOW"
+	NODE_IP_KEY = "K8S_NODE_IP_FOR_DEEPFLOW"
 )
 
 const (
