@@ -27,7 +27,7 @@ import (
 func (g *Genesis) getSubnets() ([]model.Subnet, error) {
 	log.Debug("get subnets starting")
 	subnets := []model.Subnet{}
-	subnetsData := genesis.GenesisService.GetSubnetsData()
+	subnetsData := genesis.GenesisService.GetSubnetsData(false)
 
 	g.cloudStatsd.APICost["subnets"] = []int{0}
 	g.cloudStatsd.APICount["subnets"] = []int{len(subnetsData)}

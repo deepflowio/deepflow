@@ -27,7 +27,7 @@ import (
 func (g *Genesis) getVMs() ([]model.VM, error) {
 	log.Debug("get vms starting")
 	vms := []model.VM{}
-	vmsData := genesis.GenesisService.GetVMsData()
+	vmsData := genesis.GenesisService.GetVMsData(false)
 
 	g.cloudStatsd.APICost["vms"] = []int{0}
 	g.cloudStatsd.APICount["vms"] = []int{len(vmsData)}

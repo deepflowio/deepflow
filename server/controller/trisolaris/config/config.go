@@ -22,7 +22,7 @@ import (
 
 	"github.com/op/go-logging"
 
-	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
+	"github.com/deepflowys/deepflow/server/controller/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/config")
@@ -56,7 +56,7 @@ type Config struct {
 }
 
 func (c *Config) Convert() {
-	nodeIP := os.Getenv(NODE_IP_KEY)
+	nodeIP := os.Getenv(common.NODE_IP_KEY)
 	ip := net.ParseIP(nodeIP)
 	if ip == nil {
 		log.Errorf("IP(%s) address format is incorrect", nodeIP)

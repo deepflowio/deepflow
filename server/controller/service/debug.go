@@ -121,8 +121,8 @@ func GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field string, m *m
 	}
 }
 
-func GetGenesisVinterfacesData(g *genesis.Genesis) ([]model.GenesisVinterface, error) {
-	return g.GetVinterfacesData(), nil
+func GetGenesisVinterfacesData(g *genesis.Genesis, isLocal bool) ([]model.GenesisVinterface, error) {
+	return g.GetVinterfacesData(isLocal), nil
 }
 
 func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string][]string, error) {
@@ -130,38 +130,38 @@ func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string]
 	return data, err
 }
 
-func GetGenesisIPsData(g *genesis.Genesis) ([]cloudmodel.IP, error) {
-	return g.GetIPsData(), nil
+func GetGenesisIPsData(g *genesis.Genesis, isLocal bool) ([]cloudmodel.IP, error) {
+	return g.GetIPsData(isLocal), nil
 }
 
-func GetGenesisSubnetsData(g *genesis.Genesis) ([]cloudmodel.Subnet, error) {
-	return g.GetSubnetsData(), nil
+func GetGenesisSubnetsData(g *genesis.Genesis, isLocal bool) ([]cloudmodel.Subnet, error) {
+	return g.GetSubnetsData(isLocal), nil
 }
 
-func GetGenesisVMsData(g *genesis.Genesis) ([]model.GenesisVM, error) {
-	return g.GetVMsData(), nil
+func GetGenesisVMsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisVM, error) {
+	return g.GetVMsData(isLocal), nil
 }
 
-func GetGenesisVPCsData(g *genesis.Genesis) ([]model.GenesisVpc, error) {
-	return g.GetVPCsData(), nil
+func GetGenesisVPCsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisVpc, error) {
+	return g.GetVPCsData(isLocal), nil
 }
 
-func GetGenesisHostsData(g *genesis.Genesis) ([]model.GenesisHost, error) {
-	return g.GetHostsData(), nil
+func GetGenesisHostsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisHost, error) {
+	return g.GetHostsData(isLocal), nil
 }
 
-func GetGenesisLldpsData(g *genesis.Genesis) ([]model.GenesisLldp, error) {
-	return g.GetLldpsData(), nil
+func GetGenesisLldpsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisLldp, error) {
+	return g.GetLldpsData(isLocal), nil
 }
 
-func GetGenesisPortsData(g *genesis.Genesis) ([]model.GenesisPort, error) {
-	return g.GetPortsData(), nil
+func GetGenesisPortsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisPort, error) {
+	return g.GetPortsData(isLocal), nil
 }
 
-func GetGenesisNetworksData(g *genesis.Genesis) ([]model.GenesisNetwork, error) {
-	return g.GetNetworksData(), nil
+func GetGenesisNetworksData(g *genesis.Genesis, isLocal bool) ([]model.GenesisNetwork, error) {
+	return g.GetNetworksData(isLocal), nil
 }
 
-func GetGenesisIPLastSeensData(g *genesis.Genesis) ([]model.GenesisIP, error) {
-	return g.GetIPLastSeensData(), nil
+func GetGenesisIPLastSeensData(g *genesis.Genesis, isLocal bool) ([]model.GenesisIP, error) {
+	return g.GetIPLastSeensData(isLocal), nil
 }

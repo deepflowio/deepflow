@@ -52,7 +52,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 	portNameRegex, _ := regexp.Compile(k.PortNameRegex)
 
 	// 获取vinterface API返回中host ip与其上所有node ip的对应关系
-	vData := genesis.GenesisService.GetVinterfacesData()
+	vData := genesis.GenesisService.GetVinterfacesData(false)
 	for _, vItem := range vData {
 		if vItem.KubernetesClusterID != k.ClusterID {
 			continue

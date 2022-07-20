@@ -17,12 +17,15 @@
 package genesis
 
 import (
+	"os"
 	"reflect"
 	"sync"
 	"time"
 
 	"github.com/deepflowys/deepflow/message/trident"
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
@@ -88,6 +91,9 @@ func (p *PlatformDataOperation[T]) Fetch() []T {
 }
 
 func (p *PlatformDataOperation[T]) Renew(other []T, timestamp time.Time) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
 	for _, data := range other {
 		tData := reflect.ValueOf(data)
 		dataLcuuid := tData.FieldByName("Lcuuid").String()
@@ -102,6 +108,11 @@ func (p *PlatformDataOperation[T]) Update(other []T, timestamp time.Time) {
 	for _, data := range other {
 		tData := reflect.ValueOf(data)
 		dataLcuuid := tData.FieldByName("Lcuuid").String()
+		tData = reflect.ValueOf(&data).Elem()
+		nodeIP := tData.FieldByName("NodeIP")
+		nodeIPString := os.Getenv(common.NODE_IP_KEY)
+		nodeIP.SetString(nodeIPString)
+		mysql.Db.Create(&data)
 		p.lastSeen[dataLcuuid] = timestamp
 		p.dataDict[dataLcuuid] = data
 	}
@@ -114,14 +125,34 @@ func (p *PlatformDataOperation[T]) Age(timestamp time.Time, timeout time.Duratio
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	for dataLcuuid := range p.dataDict {
+	dataIDs := []int{}
+	for dataLcuuid, data := range p.dataDict {
 		if ageTimestamp.After(p.lastSeen[dataLcuuid]) {
 			removed = true
 			delete(p.dataDict, dataLcuuid)
 			delete(p.lastSeen, dataLcuuid)
+			iData := reflect.ValueOf(data)
+			dataID := iData.FieldByName("id").Int()
+			dataIDs = append(dataIDs, int(dataID))
 		}
 	}
+	var dataType []T
+	mysql.Db.Delete(&dataType, dataIDs)
 	return removed
+}
+
+func (p *PlatformDataOperation[T]) Load() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	var items []T
+	mysql.Db.Where("node_ip = ?", os.Getenv(common.NODE_IP_KEY)).Find(&items)
+	for _, data := range items {
+		iData := reflect.ValueOf(data)
+		dataLcuuid := iData.FieldByName("Lcuuid").String()
+		p.dataDict[dataLcuuid] = data
+		p.lastSeen[dataLcuuid] = time.Now()
+	}
 }
 
 func NewHostPlatformDataOperation(dataList []model.GenesisHost) *PlatformDataOperation[model.GenesisHost] {

@@ -28,7 +28,7 @@ import (
 func (g *Genesis) getNetworks() ([]model.Network, error) {
 	log.Debug("get networks starting")
 	networks := []model.Network{}
-	networksData := genesis.GenesisService.GetNetworksData()
+	networksData := genesis.GenesisService.GetNetworksData(false)
 
 	g.cloudStatsd.APICost["networks"] = []int{0}
 	g.cloudStatsd.APICount["networks"] = []int{len(networksData)}

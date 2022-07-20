@@ -27,7 +27,7 @@ import (
 func (g *Genesis) getHosts() ([]model.Host, error) {
 	log.Debug("get hosts starting")
 	hosts := []model.Host{}
-	hostsData := genesis.GenesisService.GetHostsData()
+	hostsData := genesis.GenesisService.GetHostsData(false)
 
 	g.cloudStatsd.APICost["hosts"] = []int{0}
 	g.cloudStatsd.APICount["hosts"] = []int{len(hostsData)}
