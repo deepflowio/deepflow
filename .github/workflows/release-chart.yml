@@ -25,9 +25,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Copy MetaFlow Agent chart
+      - name: Copy DeepFlow Agent chart
         run: |
-          cp -rf manifests/charts/metaflow-agent manifests/charts/metaflow/charts/
+          cp -rf manifests/charts/deepflow-agent manifests/charts/deepflow/charts/
 
       - name: Configure Git
         run: |

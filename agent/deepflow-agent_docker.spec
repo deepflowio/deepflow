@@ -1,7 +1,7 @@
 Name:       deepflow-agent_docker
 Version:    1.0
 Release:    %(git rev-list --count HEAD)%{?dist}
-Summary:    deepflow deepflow-agent docker
+Summary:    deepflow agent docker
 
 Group:      Applications/File
 Vendor:     Yunshan Networks
@@ -13,7 +13,7 @@ Source:     deepflow-agent_docker.spec
 %define full_version %{version}-%{release}
 
 %description
-deepflow deepflow-agent docker
+deepflow agent docker
 
 %prep
 mkdir -p $RPM_BUILD_ROOT/temp/

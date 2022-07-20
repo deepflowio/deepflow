@@ -1,7 +1,7 @@
 Name:       deepflow-agent
 Version:    1.0
 Release:    %(git rev-list --count HEAD)%{?dist}
-Summary:    deepflow deepflow agent
+Summary:    deepflow agent
 
 Group:      Applications/File
 Vendor:     Yunshan Networks
@@ -16,7 +16,7 @@ Autoreq: 0
 %define pwd %(echo $PWD)
 
 %description
-Deepflow DeepFlow Agent
+Deepflow Agent
 
 %prep
 mkdir -p $RPM_BUILD_ROOT/usr/sbin/
@@ -75,7 +75,7 @@ fi
 Summary:    deepflow-agent tools
 
 %description -n %{name}-tools
-Deepflow DeepFlow Agent debug tools
+Deepflow Agent debug tools
 
 %files -n %{name}-tools
 /usr/sbin/deepflow-agent-ctl
