@@ -23,6 +23,7 @@ import (
 	//"github.com/k0kubun/pp"
 	logging "github.com/op/go-logging"
 	"time"
+	"unsafe"
 )
 
 var log = logging.MustGetLogger("clickhouse.client")
@@ -75,6 +76,7 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 	}
 	defer rows.Close()
 	columns, err := rows.ColumnTypes()
+	resColumns := len(columns)
 	if err != nil {
 		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
@@ -89,6 +91,7 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 	}
 	result["columns"] = columnNames
 	var values []interface{}
+	resSize := 0
 	start := time.Now()
 	for rows.Next() {
 		row, err := rows.SliceScan()
@@ -103,15 +106,19 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 				c.Debug.Error = fmt.Sprintf("%s", err)
 				return nil, err
 			}
+			resSize += int(unsafe.Sizeof(value))
 			record = append(record, value)
 		}
 		values = append(values, record)
 	}
+	resRows := len(values)
 	queryTime := time.Since(start)
 	c.Debug.QueryTime = int64(queryTime)
 	for _, callback := range callbacks {
 		values = callback(columnNames, values)
 	}
 	result["values"] = values
+	log.Debugf("sql: %s, query_uuid: %s", sql, c.Debug.QueryUUID)
+	log.Debugf("res_rows: %v, res_columns: %v, res_size: %v", resRows, resColumns, resSize)
 	return result, nil
 }
