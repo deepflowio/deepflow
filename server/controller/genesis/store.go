@@ -27,7 +27,6 @@ import (
 
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	genesiscommon "github.com/deepflowys/deepflow/server/controller/genesis/common"
 	"github.com/deepflowys/deepflow/server/controller/genesis/config"
 	"github.com/deepflowys/deepflow/server/controller/model"
@@ -38,7 +37,6 @@ type VinterfacesStorage struct {
 	vCtx         context.Context
 	vCancel      context.CancelFunc
 	channel      chan PlatformData
-	dirty        bool
 	mutex        sync.Mutex
 	platformInfo PlatformData
 }
@@ -50,7 +48,6 @@ func NewVinterfacesStorage(cfg config.GenesisConfig, vChan chan PlatformData, ct
 		vCtx:         vCtx,
 		vCancel:      vCancel,
 		channel:      vChan,
-		dirty:        false,
 		mutex:        sync.Mutex{},
 		platformInfo: PlatformData{},
 	}
@@ -115,7 +112,6 @@ func (v *VinterfacesStorage) Update(data PlatformData) {
 		v.platformInfo.Vinterfaces.Update(data.Vinterfaces.Fetch(), now)
 	}
 	v.generateIPsAndSubnets()
-	v.dirty = true
 }
 
 func (v *VinterfacesStorage) generateIPsAndSubnets() {
@@ -285,81 +281,33 @@ func (v *VinterfacesStorage) loadFromDatabase() {
 	var networks []model.GenesisNetwork
 	var vinterfaces []model.GenesisVinterface
 
-	mysql.Db.Find(&vms)
 	v.platformInfo.VMs = NewVMPlatformDataOperation(vms)
+	v.platformInfo.VMs.Load()
 
-	mysql.Db.Find(&vpcs)
 	v.platformInfo.VPCs = NewVpcPlatformDataOperation(vpcs)
+	v.platformInfo.VPCs.Load()
 
-	mysql.Db.Find(&hosts)
 	v.platformInfo.Hosts = NewHostPlatformDataOperation(hosts)
+	v.platformInfo.Hosts.Load()
 
-	mysql.Db.Find(&ports)
 	v.platformInfo.Ports = NewPortPlatformDataOperation(ports)
+	v.platformInfo.Ports.Load()
 
-	mysql.Db.Find(&lldps)
 	v.platformInfo.Lldps = NewLldpInfoPlatformDataOperation(lldps)
+	v.platformInfo.Lldps.Load()
 
-	mysql.Db.Find(&ipLastSeens)
 	v.platformInfo.IPlastseens = NewIPLastSeenPlatformDataOperation(ipLastSeens)
+	v.platformInfo.IPlastseens.Load()
 
-	mysql.Db.Find(&networks)
 	v.platformInfo.Networks = NewNetworkPlatformDataOperation(networks)
+	v.platformInfo.Networks.Load()
 
-	mysql.Db.Find(&vinterfaces)
 	v.platformInfo.Vinterfaces = NewVinterfacePlatformDataOperation(vinterfaces)
+	v.platformInfo.Vinterfaces.Load()
 
 	v.generateIPsAndSubnets()
 
 	v.channel <- v.platformInfo
-}
-
-func (v *VinterfacesStorage) storeToDatabase() {
-	v.mutex.Lock()
-	defer v.mutex.Unlock()
-
-	// 写入新数据前先清空表
-	mysql.Db.Exec("DELETE FROM go_genesis_vm;")
-	mysql.Db.Exec("DELETE FROM go_genesis_ip;")
-	mysql.Db.Exec("DELETE FROM go_genesis_vpc;")
-	mysql.Db.Exec("DELETE FROM go_genesis_host;")
-	mysql.Db.Exec("DELETE FROM go_genesis_port;")
-	mysql.Db.Exec("DELETE FROM go_genesis_lldp;")
-	mysql.Db.Exec("DELETE FROM go_genesis_network;")
-	mysql.Db.Exec("DELETE FROM go_genesis_vinterface;")
-
-	vms := v.platformInfo.VMs.Fetch()
-	if len(vms) > 0 {
-		mysql.Db.Create(&vms)
-	}
-	vpcs := v.platformInfo.VPCs.Fetch()
-	if len(vpcs) > 0 {
-		mysql.Db.Create(&vpcs)
-	}
-	hosts := v.platformInfo.Hosts.Fetch()
-	if len(hosts) > 0 {
-		mysql.Db.Create(&hosts)
-	}
-	ports := v.platformInfo.Ports.Fetch()
-	if len(ports) > 0 {
-		mysql.Db.Create(&ports)
-	}
-	lldps := v.platformInfo.Lldps.Fetch()
-	if len(lldps) > 0 {
-		mysql.Db.Create(&lldps)
-	}
-	ips := v.platformInfo.IPlastseens.Fetch()
-	if len(ips) > 0 {
-		mysql.Db.Create(&ips)
-	}
-	networks := v.platformInfo.Networks.Fetch()
-	if len(networks) > 0 {
-		mysql.Db.Create(&networks)
-	}
-	vinterfaces := v.platformInfo.Vinterfaces.Fetch()
-	if len(vinterfaces) > 0 {
-		mysql.Db.Create(&vinterfaces)
-	}
 }
 
 func (v *VinterfacesStorage) run() {
@@ -381,12 +329,6 @@ func (v *VinterfacesStorage) run() {
 		hasChange = hasChange || v.platformInfo.Vinterfaces.Age(now, ageTime)
 		if hasChange {
 			v.generateIPsAndSubnets()
-		}
-		hasChange = hasChange || v.dirty
-		v.dirty = false
-		v.mutex.Unlock()
-		if hasChange {
-			v.storeToDatabase()
 		}
 		v.channel <- v.platformInfo
 	}

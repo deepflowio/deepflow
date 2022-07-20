@@ -167,44 +167,92 @@ func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
 	}
 }
 
-func (g *Genesis) GetIPsData() []cloudmodel.IP {
+func (g *Genesis) GetIPsData(isLocal bool) []cloudmodel.IP {
 	return g.ips.Load().([]cloudmodel.IP)
 }
 
-func (g *Genesis) GetSubnetsData() []cloudmodel.Subnet {
+func (g *Genesis) GetSubnetsData(isLocal bool) []cloudmodel.Subnet {
 	return g.subnets.Load().([]cloudmodel.Subnet)
 }
 
-func (g *Genesis) GetVMsData() []model.GenesisVM {
-	return g.vms.Load().([]model.GenesisVM)
+func (g *Genesis) GetVMsData(isLocal bool) []model.GenesisVM {
+	if isLocal {
+		return g.vms.Load().([]model.GenesisVM)
+	} else {
+		var vms []model.GenesisVM
+		mysql.Db.Find(&vms)
+		return vms
+	}
 }
 
-func (g *Genesis) GetVPCsData() []model.GenesisVpc {
-	return g.vpcs.Load().([]model.GenesisVpc)
+func (g *Genesis) GetVPCsData(isLocal bool) []model.GenesisVpc {
+	if isLocal {
+		return g.vpcs.Load().([]model.GenesisVpc)
+	} else {
+		var vpcs []model.GenesisVpc
+		mysql.Db.Find(&vpcs)
+		return vpcs
+	}
 }
 
-func (g *Genesis) GetHostsData() []model.GenesisHost {
-	return g.hosts.Load().([]model.GenesisHost)
+func (g *Genesis) GetHostsData(isLocal bool) []model.GenesisHost {
+	if isLocal {
+		return g.hosts.Load().([]model.GenesisHost)
+	} else {
+		var hosts []model.GenesisHost
+		mysql.Db.Find(&hosts)
+		return hosts
+	}
 }
 
-func (g *Genesis) GetLldpsData() []model.GenesisLldp {
-	return g.lldps.Load().([]model.GenesisLldp)
+func (g *Genesis) GetLldpsData(isLocal bool) []model.GenesisLldp {
+	if isLocal {
+		return g.lldps.Load().([]model.GenesisLldp)
+	} else {
+		var lldps []model.GenesisLldp
+		mysql.Db.Find(&lldps)
+		return lldps
+	}
 }
 
-func (g *Genesis) GetPortsData() []model.GenesisPort {
-	return g.ports.Load().([]model.GenesisPort)
+func (g *Genesis) GetPortsData(isLocal bool) []model.GenesisPort {
+	if isLocal {
+		return g.ports.Load().([]model.GenesisPort)
+	} else {
+		var ports []model.GenesisPort
+		mysql.Db.Find(&ports)
+		return ports
+	}
 }
 
-func (g *Genesis) GetNetworksData() []model.GenesisNetwork {
-	return g.networks.Load().([]model.GenesisNetwork)
+func (g *Genesis) GetNetworksData(isLocal bool) []model.GenesisNetwork {
+	if isLocal {
+		return g.networks.Load().([]model.GenesisNetwork)
+	} else {
+		var networks []model.GenesisNetwork
+		mysql.Db.Find(&networks)
+		return networks
+	}
 }
 
-func (g *Genesis) GetVinterfacesData() []model.GenesisVinterface {
-	return g.vinterfaces.Load().([]model.GenesisVinterface)
+func (g *Genesis) GetVinterfacesData(isLocal bool) []model.GenesisVinterface {
+	if isLocal {
+		return g.vinterfaces.Load().([]model.GenesisVinterface)
+	} else {
+		var vinterfaces []model.GenesisVinterface
+		mysql.Db.Find(&vinterfaces)
+		return vinterfaces
+	}
 }
 
-func (g *Genesis) GetIPLastSeensData() []model.GenesisIP {
-	return g.iplastseens.Load().([]model.GenesisIP)
+func (g *Genesis) GetIPLastSeensData(isLocal bool) []model.GenesisIP {
+	if isLocal {
+		return g.iplastseens.Load().([]model.GenesisIP)
+	} else {
+		var ips []model.GenesisIP
+		mysql.Db.Find(&ips)
+		return ips
+	}
 }
 
 func (g *Genesis) GetKubernetesData() map[string]KubernetesInfo {

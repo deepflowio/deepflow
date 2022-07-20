@@ -27,7 +27,7 @@ import (
 func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 	log.Debug("get vinterfaces starting")
 	vinterfaces := []model.VInterface{}
-	vinterfacesData := genesis.GenesisService.GetPortsData()
+	vinterfacesData := genesis.GenesisService.GetPortsData(false)
 
 	g.cloudStatsd.APICost["vinterfaces"] = []int{0}
 	g.cloudStatsd.APICount["vinterfaces"] = []int{len(vinterfacesData)}

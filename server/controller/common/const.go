@@ -389,6 +389,10 @@ const (
 )
 
 const (
+	NODE_IP_KEY = "K8S_NODE_IP_FOR_METAFLOW"
+)
+
+const (
 	DEEPFLOW_STATSD_PREFIX            = "deepflow.server.controller"
 	CLOUD_METRIC_NAME_TASK_COST       = "cloud.task.cost"
 	CLOUD_METRIC_NAME_INFO_COUNT      = "cloud.info.count"

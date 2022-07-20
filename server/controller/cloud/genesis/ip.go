@@ -27,7 +27,7 @@ import (
 func (g *Genesis) getIPs() ([]model.IP, error) {
 	log.Debug("get ips starting")
 	ips := []model.IP{}
-	ipsData := genesis.GenesisService.GetIPsData()
+	ipsData := genesis.GenesisService.GetIPsData(false)
 
 	g.cloudStatsd.APICost["ips"] = []int{0}
 	g.cloudStatsd.APICount["ips"] = []int{len(ipsData)}
