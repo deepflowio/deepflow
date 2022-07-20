@@ -1,4 +1,3 @@
-/* NEXT_VERSION=6.1.2 */
 USE deepflow;
 
 /*RENAME TABLE*/
@@ -257,3 +256,10 @@ ALTER TABLE vtap
     ADD COLUMN upgrade_package         TEXT;
 
 UPDATE vtap_group SET name="default" WHERE id=1;
+
+CREATE TABLE IF NOT EXISTS db_version (
+    version             CHAR(64),
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+INSERT INTO db_version (version) VALUE ('6.1.1.0');
