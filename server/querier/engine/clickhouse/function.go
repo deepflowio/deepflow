@@ -222,6 +222,7 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 				Name:   view.FUNCTION_DIV,
 				Fields: []view.Node{&divField_0, &divField_1},
 			},
+			DivType: view.FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL,
 		}
 		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
