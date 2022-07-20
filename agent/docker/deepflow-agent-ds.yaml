@@ -16,6 +16,7 @@ spec:
       labels:
         app: deepflow-agent
     spec:
+      dnsPolicy: ClusterFirst
       hostNetwork: true
       hostPID: true
       containers:

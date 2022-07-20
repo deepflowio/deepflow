@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"math"
 
-	"github.com/golang/protobuf/proto"
 	api "github.com/deepflowys/deepflow/message/trident"
+	"github.com/golang/protobuf/proto"
 
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 )

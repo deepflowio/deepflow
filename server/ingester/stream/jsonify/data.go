@@ -32,8 +32,8 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 
-	"github.com/google/gopacket/layers"
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/google/gopacket/layers"
 )
 
 const (

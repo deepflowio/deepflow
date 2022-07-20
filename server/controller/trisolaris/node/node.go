@@ -23,8 +23,8 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/google/uuid"
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/google/uuid"
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 

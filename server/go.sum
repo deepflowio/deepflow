@@ -87,6 +87,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/deckarep/golang-set v1.8.0 h1:sk9/l/KqpunDwP7pSjUg0keiOOLEnOBHzykLrsPppp4=
 github.com/deckarep/golang-set v1.8.0/go.mod h1:5nI87KwE7wgsBU1F4GKAw2Qod7p5kyS383rP6+o6qqo=
+github.com/deepflowys/deepflow/message v0.0.0-20220720014739-16fbce7f378a h1:bEEv7il1WLEEsiHF5JncjZGNlaqvt9rSkXSsQjSmKOw=
+github.com/deepflowys/deepflow/message v0.0.0-20220720014739-16fbce7f378a/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
 github.com/dennwc/varint v1.0.0 h1:kGNFFSSw8ToIy3obO/kKr8U9GZYUAxQEVuix4zfDWzE=
 github.com/dennwc/varint v1.0.0/go.mod h1:hnItb35rvZvJrbTALZtY/iQfDs48JKRG1RPpgziApxA=
 github.com/digitalocean/godo v1.80.0 h1:ZULJ/fWDM97YtO7Fa+K6hzJLd7+smCu4N+0n+B/xtj4=
@@ -332,8 +334,6 @@ github.com/mattn/go-sqlite3 v1.14.12/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 h1:I0XW9+e1XWDxdcEniV4rQAIOPUGDq67JSCiRCgGCZLI=
 github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
-github.com/deepflowys/deepflow/message v0.0.0-20220718113154-9379fd8bb898 h1:1ALs6niHB/SOTCUui+n9zsapN9TJ45S6VAdYp6TSrhU=
-github.com/deepflowys/deepflow/message v0.0.0-20220718113154-9379fd8bb898/go.mod h1:1Pzt2cC2NrUib/+2Arwli13APbdHRRas2806utRKFms=
 github.com/miekg/dns v1.1.49 h1:qe0mQU3Z/XpFeE+AEBo2rqaS1IPBJ3anmqZ4XiZJVG8=
 github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721 h1:RlZweED6sbSArvlE924+mUcZuXKLBHA35U7LN621Bws=
 github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721/go.mod h1:Ickgr2WtCLZ2MDGd4Gr0geeCH5HybhRJbonOgQpvSxc=

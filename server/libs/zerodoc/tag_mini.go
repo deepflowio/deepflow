@@ -22,11 +22,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gopacket/layers"
 	"github.com/deepflowys/deepflow/server/libs/codec"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc/pb"
+	"github.com/google/gopacket/layers"
 )
 
 const (

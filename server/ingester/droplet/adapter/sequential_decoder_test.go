@@ -24,8 +24,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/google/gopacket/pcapgo"
 	. "github.com/deepflowys/deepflow/server/libs/datatype"
+	"github.com/google/gopacket/pcapgo"
 )
 
 const (
