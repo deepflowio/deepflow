@@ -343,6 +343,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				l3EPCIDSuffix+" %s -2",
 				"",
 			),
+			"node_type": NewTag(
+				"if("+l3EPCIDSuffix+"=-2,'internet','')",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"if("+l3EPCIDSuffix+"=-2,dictGet(flow_tag.device_map, 'icon_id', (toUInt64(0),toUInt64(0))),0)",
+				"",
+				"",
+				"",
+			),
 		}
 	}
 
