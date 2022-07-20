@@ -1,4 +1,4 @@
-![DeepFlow](./docs/deepflow-logo.svg)
+![DeepFlow](./docs/deepflow-logo.png)
 =====================================
 
 English | [简体中文](./README-CN.md)
