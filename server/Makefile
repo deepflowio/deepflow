@@ -29,7 +29,7 @@ vendor/${MESSAGE}/trident/trident.pb.go: vendor/${MESSAGE}/trident.proto
 	cd vendor/${MESSAGE} && go generate trident/stub.go
 
 vendor/${MESSAGE}/trident.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/trident.proto vendor/${MESSAGE}/
+	cp -r ../message/trident.proto vendor/${MESSAGE}/
 
 
 libs/datatype/pb/flow_log.proto: vendor

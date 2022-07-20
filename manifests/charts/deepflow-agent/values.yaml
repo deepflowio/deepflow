@@ -11,7 +11,7 @@ global:
 
 
 image:
-  repository: registry.cn-beijing.aliyuncs.com/deepflowys/deepflow-agent
+  repository: deepflowce/deepflow-agent
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: latest
