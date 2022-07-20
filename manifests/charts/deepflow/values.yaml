@@ -3,10 +3,10 @@
 # Declare variables to be passed into your templates.
 global:
   image:
-    ## ghcr Image repository address: ghcr.io/deepflowys
-    ## Dockerhub Image repository address: deepflowys
-    ## AliyunYun Image repository address: registry.cn-beijing.aliyuncs.com/deepflowys
-    repository: deepflowys
+    ## ghcr Image repository address: ghcr.io/deepflowys/deepflow-ce
+    ## Dockerhub Image repository address: deepflowce
+    ## AliyunYun Image repository address: registry.cn-beijing.aliyuncs.com/deepflow-ce
+    repository: deepflowce
     pullPolicy: Always
   hostNetwork: false
   dnsPolicy: ClusterFirst
@@ -71,13 +71,13 @@ server:
   dnsPolicy: "{{ .Values.global.dnsPolicy }}"
   podManagementPolicy: "{{ .Values.global.podManagementPolicy }}"
   service:
-    ## Configuration for Metaflow-server service
+    ## Configuration for deepflow-server service
     ##
     annotations: {}
     labels: {}
     clusterIP: ""
 
-    ## Port for Metaflow-server Service to listen on
+    ## Port for deepflow-server Service to listen on
     ##
 
     ports:
@@ -193,13 +193,13 @@ app:
   hostNetwork:  "{{ .Values.global.hostNetwork }}"
   dnsPolicy: "{{ .Values.global.dnsPolicy }}"
   service:
-    ## Configuration for Metaflow querier service
+    ## Configuration for deepflow querier service
     ##
     annotations: {}
     labels: {}
     clusterIP: ""
 
-    ## Port for Metaflow querier service to listen on
+    ## Port for deepflow querier service to listen on
     ##
     ports:
     - name: app
@@ -211,7 +211,7 @@ app:
       nodePort: 
       protocol: TCP
 
-    ## Additional ports to open for Metaflow querier service
+    ## Additional ports to open for deepflow querier service
     additionalPorts: []
 
     externalIPs: []
@@ -759,19 +759,6 @@ grafana:
       password: "{{ .Values.global.password.mysql }}"
     plugins:
       allow_loading_unsigned_plugins: deepflow-querier-datasource,deepflow-apptracing-panel,deepflow-topo-panel
-  sidecar:
-    skipTlsVerify: true
-    dashboards:
-      enabled: true
-      label: grafana_dashboard
-      labelValue: "deepflow-templates"
-
-      ## Annotations for Grafana dashboard configmaps
-      ##
-      annotations: {}
-      provider:
-        folder: 'DeepFlow Templates'
-        allowUiUpdates: false
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1
@@ -785,31 +772,17 @@ grafana:
         updateIntervalSeconds: 30
         options:
           foldersFromFilesStructure: false
-          path: /tmp/deepflow-system-dashboards
-  extraContainers: |
-    - env:
-      - name: METHOD
-        value: WATCH
-      - name: LABEL
-        value: grafana_dashboard
-      - name: LABEL_VALUE
-        value: "deepflow-system"
-      - name: FOLDER
-        value: /tmp/deepflow-system-dashboards
-      - name: RESOURCE
-        value: both
-      - name: SKIP_TLS_VERIFY
-        value: "true"
-      {{- if .Values.sidecar.image.sha }}
-      image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}@sha256:{{ .Values.sidecar.image.sha }}"
-      {{- else }}
-      image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
-      {{- end }}
-      imagePullPolicy: {{ .Values.sidecar.imagePullPolicy }}
-      name: deepflow-system-dashboard-providers
-      volumeMounts:
-      - mountPath: /tmp/deepflow-system-dashboards
-        name: deepflow-system-dashboards
+          path: /tmp/dashboards/system
+      - name: 'deepflow-templates'
+        orgId: 1
+        folder: 'DeepFlow Templates'
+        type: file
+        disableDeletion: false
+        allowUiUpdates: false
+        updateIntervalSeconds: 30
+        options:
+          foldersFromFilesStructure: false
+          path: /tmp/dashboards/templates
   extraInitContainers:
     - name: init-custom-plugins
       image: "{{ .Values.global.image.repository }}/deepflow-init-grafana:latest"
@@ -817,16 +790,18 @@ grafana:
       command: ['sh']
       args:  
       - '-c'
-      - "cp -raf /deepflow-plugins/* /var/lib/grafana/plugins/"
+      - "cp -raf /deepflow-plugins/* /var/lib/grafana/plugins/; cp -raf /dashboards /tmp/"
       volumeMounts:
       - mountPath: /var/lib/grafana/plugins/
         name: custom-plugins
+      - mountPath: /tmp/dashboards
+        name: deepflow-dashboards
 
   extraEmptyDirMounts: 
     - name: custom-plugins
       mountPath: /var/lib/grafana/plugins
-    - name: deepflow-system-dashboards
-      mountPath: /tmp/deepflow-system-dashboards
+    - name: deepflow-dashboards
+      mountPath: /tmp/dashboards
 
   datasources: 
    datasources.yaml:
@@ -837,11 +812,13 @@ grafana:
         url: 
         access: proxy
         isDefault: true
+        uid: "DeepFlow"
         jsonData:
           requestUrl: http://{{ include "deepflow.fullname" . }}-server:20416
           traceUrl: http://{{ include "deepflow.fullname" . }}-app:20418
       - name: "DeepFlow ClickHouse"
         type: grafana-clickhouse-datasource
+        uid: "DeepFlow ClickHouse"
         jsonData:
           port: 9000
           server: "{{ $.Release.Name }}-clickhouse"
@@ -854,6 +831,7 @@ grafana:
         database: deepflow
         user: root
         password: deepflow
+        uid: "DeepFlow MySQL"
         jsonData:
           maxOpenConns: 5
           maxIdleConns: 5
