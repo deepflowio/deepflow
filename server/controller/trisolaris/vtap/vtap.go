@@ -30,8 +30,8 @@ import (
 	"gorm.io/gorm"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/golang/protobuf/proto"
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/golang/protobuf/proto"
 	"github.com/op/go-logging"
 
 	. "github.com/deepflowys/deepflow/server/controller/common"

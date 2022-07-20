@@ -19,8 +19,8 @@ package node
 import (
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/google/uuid"
 
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"

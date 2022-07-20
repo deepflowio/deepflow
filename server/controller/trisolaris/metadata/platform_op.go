@@ -22,8 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/golang/protobuf/proto"
 	"gorm.io/gorm"
 
 	. "github.com/deepflowys/deepflow/server/controller/common"

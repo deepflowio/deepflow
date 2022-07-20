@@ -17,12 +17,12 @@
 package router
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/service"
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 func DataSourceRouter(e *gin.Engine, cfg *config.ControllerConfig) {

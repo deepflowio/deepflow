@@ -19,6 +19,7 @@ require (
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
+	github.com/deepflowys/deepflow/message v0.0.0-20220720014739-16fbce7f378a
 	github.com/docker/go-units v0.4.0
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.8.1
@@ -31,7 +32,6 @@ require (
 	github.com/influxdata/influxdb v1.9.7
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
-	github.com/deepflowys/deepflow/message v0.0.0-20220718113154-9379fd8bb898
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
