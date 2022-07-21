@@ -1502,7 +1502,7 @@ impl ConfigHandler {
             }
             callbacks.push(metric_server_restart_callback);
             warn!(
-                "the port=({}) listen by the intregration collector lost, restart the collector",
+                "the port=({}) listen by the integration collector lost, restart the collector",
                 candidate_config.metric_server.port
             );
         }
