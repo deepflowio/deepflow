@@ -84,11 +84,15 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 		return nil, 0, nil
 	}
 	// 判断算子是否支持单层
-	unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
-	if common.IsValueInSliceString(name, unlayFuns) {
-		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
+	if db == "flow_metrics" {
+		unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]
+		if common.IsValueInSliceString(name, unlayFuns) {
+			levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
+		} else {
+			levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
+		}
 	} else {
-		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_LAYERED
+		levelFlag = view.MODEL_METRICS_LEVEL_FLAG_UNLAY
 	}
 	return &AggFunction{
 		Metrics: metricStruct,
@@ -274,12 +278,17 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_UNLAY {
 		switch f.Metrics.Type {
 		case metrics.METRICS_TYPE_COUNTER:
-			outFunc.SetFillNullAsZero(true)
+			if m.DB == "flow_metrics" {
+				outFunc.SetFillNullAsZero(true)
+			}
 		case metrics.METRICS_TYPE_DELAY:
 			outFunc.SetIgnoreZero(true)
 		case metrics.METRICS_TYPE_PERCENTAGE:
-			outFunc.SetFillNullAsZero(true)
-		case metrics.METRICS_TYPE_TAG:
+			if m.DB == "flow_metrics" {
+				outFunc.SetFillNullAsZero(true)
+			}
+		}
+		if f.Metrics.Condition != "" {
 			outFunc.SetCondition(f.Metrics.Condition)
 		}
 		outFunc.SetFields([]view.Node{&view.Field{Value: f.Metrics.DBField}})
