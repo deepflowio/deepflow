@@ -131,7 +131,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							valueStr = "00:00:" + valueStr
 							mac, err := net.ParseMAC(valueStr)
 							if err != nil {
-								macs = append(macs, fmt.Sprintf("'%v'", t.Value))
+								macs = append(macs, fmt.Sprintf("'%v'", valueStr))
 							} else {
 								valueUInt64 := utils.Mac2Uint64(mac)
 								macs = append(macs, fmt.Sprintf("'%v'", valueUInt64))
@@ -256,7 +256,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						valueStr = "00:00:" + valueStr
 						mac, err := net.ParseMAC(valueStr)
 						if err != nil {
-							macs = append(macs, fmt.Sprintf("'%v'", t.Value))
+							macs = append(macs, fmt.Sprintf("'%v'", valueStr))
 						} else {
 							valueUInt64 := utils.Mac2Uint64(mac)
 							macs = append(macs, fmt.Sprintf("'%v'", valueUInt64))
