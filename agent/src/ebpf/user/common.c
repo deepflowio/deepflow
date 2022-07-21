@@ -16,8 +16,6 @@
 #include <time.h>
 #include <string.h>
 #include <inttypes.h>
-#include <linux/sysinfo.h>	/* for struct sysinfo */
-#include <sys/sysinfo.h>
 #include "list_head.h"
 #include "common.h"
 #include "log.h"
