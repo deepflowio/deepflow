@@ -23,7 +23,7 @@ use std::{
         Arc, Condvar, Mutex,
     },
     thread,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use arc_swap::access::Access;
@@ -115,7 +115,12 @@ impl ApiWatcher {
         Self {
             context: Arc::new(Context {
                 config,
-                version: AtomicU64::new(0),
+                version: AtomicU64::new(
+                    SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs(),
+                ),
                 runtime: Runtime::new().unwrap(),
             }),
             thread: Mutex::new(None),

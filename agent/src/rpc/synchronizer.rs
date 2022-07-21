@@ -149,7 +149,6 @@ impl Default for Status {
             version_platform_data: 0,
             version_acls: 0,
             version_groups: 0,
-
             interfaces: Default::default(),
             peers: Default::default(),
             cidrs: Default::default(),
@@ -690,7 +689,7 @@ impl Synchronizer {
                 let client = session.get_client();
                 if client.is_none() {
                     info!("rpc trigger not running, client not connected");
-                    time::sleep(Duration::new(1, 0)).await;
+                    time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
                 let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
@@ -807,7 +806,7 @@ impl Synchronizer {
                 let inner_client = session.get_client();
                 if inner_client.is_none() {
                     info!("grpc sync client not connected");
-                    time::sleep(Duration::new(1, 0)).await;
+                    time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
                 let mut client =
@@ -1089,7 +1088,7 @@ impl Synchronizer {
                     if inner_client.is_none() {
                         session.set_request_failed(true);
                         info!("grpc sync client not connected");
-                        time::sleep(Duration::new(1, 0)).await;
+                        time::sleep(RPC_RETRY_INTERVAL).await;
                         continue;
                     }
 
