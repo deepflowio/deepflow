@@ -84,7 +84,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 	}
 	keyToItem := make(map[VtapPortKey]mysql.ChVTapPort)
 	if len(vtapVIFs) == 0 {
-		log.Error(errors.New("no data in get vtap-port response"))
+		log.Info("no data in get vtap-port response")
 		return keyToItem, true
 	}
 
@@ -134,17 +134,19 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
 			}
 		} else {
-			keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: tapPort}] = mysql.ChVTapPort{
-				VTapID:     data.VTapID,
-				TapPort:    tapPort,
-				MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
-				Name:       data.TapName,
-				DeviceID:   data.DeviceID,
-				HostID:     data.DeviceHostID,
-				DeviceType: data.DeviceType,
-				DeviceName: data.DeviceName,
-				HostName:   data.DeviceHostName,
-				IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
+			if data.VTapID != 0 || tapPort != 0 {
+				keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: tapPort}] = mysql.ChVTapPort{
+					VTapID:     data.VTapID,
+					TapPort:    tapPort,
+					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
+					Name:       data.TapName,
+					DeviceID:   data.DeviceID,
+					HostID:     data.DeviceHostID,
+					DeviceType: data.DeviceType,
+					DeviceName: data.DeviceName,
+					HostName:   data.DeviceHostName,
+					IconID:     deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}],
+				}
 			}
 		}
 		// 网卡+MAC
