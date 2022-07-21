@@ -66,7 +66,7 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 }
 
 func FormatInnerTime(m *view.Model) {
-	if m.Time.Interval == 0 && m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && m.HasAggFunc == true {
+	if m.DB == "flow_metrics" && m.Time.Interval == 0 && m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && m.HasAggFunc == true {
 		withValue := fmt.Sprintf(
 			"toStartOfInterval(time, toIntervalSecond(%d))",
 			m.Time.DatasourceInterval,

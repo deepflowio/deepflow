@@ -221,7 +221,9 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 	}
 	if sw8SegmentId != "" {
 		h.SpanId = sw8SegmentId + "-" + h.SpanId
-		h.ParentSpanId = sw8SegmentId + "-" + h.ParentSpanId
+		if h.ParentSpanId != "" {
+			h.ParentSpanId = sw8SegmentId + "-" + h.ParentSpanId
+		}
 	}
 
 	if len(h.L7ProtocolStr) > 0 {

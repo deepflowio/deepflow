@@ -14,7 +14,7 @@ hostNetwork: "false"
 dnsPolicy: "ClusterFirst"
 podManagementPolicy: "OrderedReady"
 image:
-  repository: clickhouse/hclickhouse-server
+  repository: clickhouse/clickhouse-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: "21.8.15.7"

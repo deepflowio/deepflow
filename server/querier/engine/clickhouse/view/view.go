@@ -38,6 +38,7 @@ import (
 			NewView.ToString() string 生成df-clickhouse-sql
 */
 type Model struct {
+	DB        string
 	Time      *Time
 	Tags      *Tags
 	Filters   *Filters
