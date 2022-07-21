@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
+#include <sys/sysinfo.h>
 #include <inttypes.h>
 #include "list_head.h"
 #include "common.h"

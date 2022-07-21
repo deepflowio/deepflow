@@ -17,7 +17,7 @@
 #ifndef BPF_USE_CORE
 #include <sys/socket.h>
 #include <stddef.h>
-#include <linux/in.h>
+#include <netinet/in.h>
 
 typedef long unsigned int __kernel_size_t;
 
