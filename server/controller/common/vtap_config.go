@@ -112,7 +112,7 @@ var (
 	LogRetention                  = 30
 	HTTPLogProxyClient            = "X-Forwarded-For"
 	HTTPLogTraceID                = "traceparent, sw8"
-	L7LogPacketSize               = 256
+	L7LogPacketSize               = 1024
 	L4LogCollectNpsThreshold      = 10000
 	L7LogCollectNpsThreshold      = 10000
 	L7MetricsEnabled              = 1
@@ -125,7 +125,7 @@ var (
 	L4PerformanceEnabled          = 1
 	PodClusterInternalIP          = 0
 	Domains                       = "0"
-	DecapType                     = "0"
+	DecapType                     = "1,3"
 	HTTPLogSpanID                 = "traceparent, sw8"
 	SysFreeMemoryLimit            = 0
 	LogFileSize                   = 1000
