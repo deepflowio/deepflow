@@ -60,8 +60,10 @@ capture_packet_size: 65535
 # 流量采集方式，默认值：0，表示自适应，可选值：0表示自适应/2表示AF_PACKET V2/3表示AF_PACKET V3
 # 说明：Linux环境中的流量采集方式
 capture_socket_type: 0
-# 解封装隧道类型，默认值：0，表示无，可选值：0表示无/1表示VXLAN/2表示GRE/3表示IPIP
-decap_type: 0
+# 解封装隧道类型，默认值：[1,3]，表示VXLAN+IPIP，可选值：0表示无/1表示VXLAN/2表示GRE/3表示IPIP
+decap_type:
+- 1
+- 3
 # 虚拟机MAC解析，默认值: 0，表示接口MAC，可选值：0表示接口MAC/1表示接口名称/2表示虚拟机XML
 # 说明：KVM类型采集器获取虚拟机真实MAC地址的方式
 if_mac_source: 0
@@ -99,9 +101,9 @@ http_log_trace_id: traceparent, sw8
 # 应用流日志SpanID，默认值：traceparent,sw8，可选值：关闭/traceparent/X-B3-SpanId/uber-trace-id/sw6/sw8
 # 支持输入自定义值，支持输入逗号分隔的多个值（除关闭外）
 http_log_span_id: traceparent, sw8
-# 应用日志解析包长，默认值: 256，值域[256, 1500]
+# 应用日志解析包长，默认值: 1024，值域[256, 1500]
 # 说明：采集HTTP、DNS日志时的解析的包长，注意不要超过采集包长参数
-l7_log_packet_size: 256
+l7_log_packet_size: 1024
 # 流日志采集速率，默认值: 10000，值域[100, 1000000]
 # 说明：每秒采集的流日志条数，超过以后采样
 l4_log_collect_nps_threshold: 10000
