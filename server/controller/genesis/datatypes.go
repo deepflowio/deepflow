@@ -112,7 +112,11 @@ func (p *PlatformDataOperation[T]) Update(other []T, timestamp time.Time) {
 		nodeIP := tData.FieldByName("NodeIP")
 		nodeIPString := os.Getenv(common.NODE_IP_KEY)
 		nodeIP.SetString(nodeIPString)
-		mysql.Db.Create(&data)
+		if oData, ok := p.dataDict[dataLcuuid]; ok {
+			mysql.Db.Model(&oData).Updates(data)
+		} else {
+			mysql.Db.Create(&data)
+		}
 		p.lastSeen[dataLcuuid] = timestamp
 		p.dataDict[dataLcuuid] = data
 	}
