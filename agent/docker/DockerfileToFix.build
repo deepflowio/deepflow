@@ -25,13 +25,30 @@ RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfut
 
 
 
+# 静态编译
+
+RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.rpm  && \
+    yum -y install musl-libc musl-libc-static musl-clang musl-gcc  && \
+    cd /usr/x86_64-linux-musl/lib64  && \
+    curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libpcap.a --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libz.a --silent -O && \
+    cd /usr/x86_64-linux-musl/include  && \
+    ln -s /usr/include/asm asm  && \
+    ln -s /usr/include/asm-generic asm-generic  && \
+    ln -s /usr/include/bddisasm bddisasm  && \
+    ln -s /usr/include/gelf.h gelf.h  && \
+    ln -s /usr/include/libdwarf-0 libdwarf-0  && \
+    ln -s /usr/include/libelf.h libelf.h  && \
+    ln -s /usr/include/linux linux  && \
+    ln -s /usr/include/zlib.h zlib.h
+
+RUN rustup target add x86_64-unknown-linux-musl
 # 使用依赖缓存
 RUN cargo install sccache && \
-    ln -s  /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
-    ln -s /usr/local/llvm-clang/bin/llc /usr/bin/llc && \
-    ln -s /usr/local/llvm-clang/bin/llvm-strip /usr/bin/llvm-strip && \
-    ln -s /usr/local/llvm-clang/bin/llvm-objdump /usr/bin/llvm-objdump
-
+    ln -sf  /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
+    ln -sf /usr/local/llvm-clang/bin/llc /usr/bin/llc && \
+    ln -sf /usr/local/llvm-clang/bin/llvm-strip /usr/bin/llvm-strip && \
+    ln -sf /usr/local/llvm-clang/bin/llvm-objdump /usr/bin/llvm-objdump
 CMD bash
 
 # 编译说明
