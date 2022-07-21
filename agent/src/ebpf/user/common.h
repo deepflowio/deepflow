@@ -18,6 +18,25 @@
 #define NELEMS(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
+struct sysinfo {
+	long uptime;
+	unsigned long loads[3];
+	unsigned long totalram;
+	unsigned long freeram;
+	unsigned long sharedram;
+	unsigned long bufferram;
+	unsigned long totalswap;
+	unsigned long freeswap;
+	uint16_t procs;
+	uint16_t pad;
+	unsigned long totalhigh;
+	unsigned long freehigh;
+	uint32_t mem_unit;
+	char _f[20-2*sizeof(unsigned long)-sizeof(uint32_t)];
+};
+
+extern int sysinfo (struct sysinfo *__info);
+
 /**
  * Check if a branch is likely to be taken.
  *
