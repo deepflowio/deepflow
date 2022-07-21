@@ -94,6 +94,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
+	e.Model.DB = e.DB
 }
 
 func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, error) {
