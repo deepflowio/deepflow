@@ -128,8 +128,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 								return nil, errors.New(fmt.Sprintf("invalid ipv4 mac: %s", valueStr))
 							}
 						} else {
-							valueStr = "00:00:" + valueStr
-							mac, err := net.ParseMAC(valueStr)
+							macValueStr := "00:00:" + valueStr
+							mac, err := net.ParseMAC(macValueStr)
 							if err != nil {
 								macs = append(macs, fmt.Sprintf("'%v'", valueStr))
 							} else {
@@ -253,8 +253,8 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 							return nil, errors.New(fmt.Sprintf("invalid ipv4 mac: %s", valueStr))
 						}
 					} else {
-						valueStr = "00:00:" + valueStr
-						mac, err := net.ParseMAC(valueStr)
+						macValueStr := "00:00:" + valueStr
+						mac, err := net.ParseMAC(macValueStr)
 						if err != nil {
 							macs = append(macs, fmt.Sprintf("'%v'", valueStr))
 						} else {
