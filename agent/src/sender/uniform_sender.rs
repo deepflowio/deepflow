@@ -128,14 +128,25 @@ impl Encoder {
             self.set_msg_type_and_version(&s);
             self.add_header();
         }
-        // 预留4个字节pb长度
+
         let offset = self.buffer.len();
-        self.buffer.extend_from_slice([0u8; 4].as_slice());
-        match s.encode(&mut self.buffer) {
-            Ok(size) => self.buffer[offset..offset + 4]
-                .copy_from_slice((size as u32).to_le_bytes().as_slice()),
-            Err(e) => debug!("encode failed {}", e),
-        };
+        match s.message_type() {
+            // Enterprise Edition Feature: packet-sequence
+            SendMessageType::PacketSequenceBlock => {
+                if let Err(e) = s.encode(&mut self.buffer) {
+                    debug!("encode failed {}", e);
+                }
+            }
+            _ => {
+                // 预留4个字节pb长度
+                self.buffer.extend_from_slice([0u8; 4].as_slice());
+                match s.encode(&mut self.buffer) {
+                    Ok(size) => self.buffer[offset..offset + 4]
+                        .copy_from_slice((size as u32).to_le_bytes().as_slice()),
+                    Err(e) => debug!("encode failed {}", e),
+                };
+            }
+        }
     }
 
     fn add_header(&mut self) {

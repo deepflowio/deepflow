@@ -20,6 +20,7 @@ mod flow_config;
 pub mod flow_map;
 mod flow_node;
 mod flow_state;
+mod packet_sequence; // Enterprise Edition Feature: packet-sequence
 pub mod perf;
 mod protocol_logs;
 mod service_table;
@@ -30,6 +31,7 @@ pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeo
 pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode, FlowTimeKey};
 pub use flow_state::FlowState;
+pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: packet-sequence
 pub use perf::L7RrtCache;
 pub use protocol_logs::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
