@@ -40,6 +40,7 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
     ln -s /usr/include/libdwarf-0 libdwarf-0  && \
     ln -s /usr/include/libelf.h libelf.h  && \
     ln -s /usr/include/linux linux  && \
+    ln -s /usr/include/sys/queue.h sys/queue.h && \
     ln -s /usr/include/zlib.h zlib.h
 
 RUN rustup target add x86_64-unknown-linux-musl
