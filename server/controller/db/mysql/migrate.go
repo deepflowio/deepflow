@@ -180,29 +180,39 @@ func executeIssu(db *gorm.DB, nextVersion string) error {
 func getAscSortedNextVersions(files []fs.FileInfo, curVersion string) []string {
 	vs := []string{}
 	for _, f := range files {
-		v := trimFilenameExt(f.Name())
-		if v > curVersion {
-			vs = append(vs, v)
-		}
+		vs = append(vs, trimFilenameExt(f.Name()))
 	}
-	// split version by ".", compare each number from first to end
+	// asc sort: split version by ".", compare each number from first to end
 	sort.Slice(vs, func(i, j int) bool {
 		il := strings.Split(vs[i], ".")
 		jl := strings.Split(vs[j], ".")
-		for n := range il {
-			if il[n] == jl[n] {
-				continue
-			} else {
-				in, _ := strconv.Atoi(il[n])
-				jn, _ := strconv.Atoi(jl[n])
-				return in < jn
-			}
-		}
-		return true
+		return !list1GreaterList2(il, jl)
 	})
-	return vs
+
+	nvs := []string{}
+	cvl := strings.Split(curVersion, ".")
+	for _, v := range vs {
+		vl := strings.Split(v, ".")
+		if list1GreaterList2(vl, cvl) {
+			nvs = append(nvs, v)
+		}
+	}
+	return nvs
 }
 
 func trimFilenameExt(filename string) string {
 	return strings.TrimSuffix(filename, filepath.Ext(filename))
+}
+
+func list1GreaterList2(strList1, strList2 []string) bool {
+	for i := range strList1 {
+		if strList1[i] == strList2[i] {
+			continue
+		} else {
+			in, _ := strconv.Atoi(strList1[i])
+			jn, _ := strconv.Atoi(strList2[i])
+			return in > jn
+		}
+	}
+	return false
 }

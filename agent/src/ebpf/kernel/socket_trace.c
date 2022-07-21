@@ -996,13 +996,13 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 		infer_l7_class(conn_info, direction, iov_cpy.iov_base, buf_size, sock_state);
 	}
 
-	if (conn_info->protocol == PROTO_UNKNOWN)
-		return;
-	if (conn_info->message_type == MSG_UNKNOWN)
-		return;
-
-	data_submit(ctx, conn_info, args, extra->vecs, (__u32)bytes_count,
-		    offset, args->enter_ts, extra);
+	// When at least one of protocol or message_type is valid, 
+	// data_submit can be performed, otherwise MySQL data may be lost
+	if (conn_info->protocol != PROTO_UNKNOWN ||
+	    conn_info->message_type != MSG_UNKNOWN) {
+		data_submit(ctx, conn_info, args, extra->vecs,
+			    (__u32)bytes_count, offset, args->enter_ts, extra);
+	}
 }
 
 static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,

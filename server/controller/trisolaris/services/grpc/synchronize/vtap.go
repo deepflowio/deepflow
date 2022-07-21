@@ -236,16 +236,25 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	}
 
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
-	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 {
+	versionGroups := gVTapInfo.GetGroupDataVersion()
+	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
+		versionGroups != in.GetVersionGroups() {
 		log.Infof("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
-			"(platform data version  %d -> %d), NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData,
-			in.GetVersionPlatformData(), in.GetProcessName(), in.GetRevision(),
-			in.GetBootTime())
+			"(platform data version  %d -> %d), "+
+			"(groups version %d -> %d), "+
+			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+			ctrlIP, ctrlMac, in.GetHostIps(),
+			versionPlatformData, in.GetVersionPlatformData(),
+			versionGroups, in.GetVersionGroups(),
+			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
 		log.Debugf("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
-			"(platform data version  %d -> %d), NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData, in.GetVersionPlatformData(),
+			"(platform data version  %d -> %d), "+
+			"(groups version %d -> %d), "+
+			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+			ctrlIP, ctrlMac, in.GetHostIps(),
+			versionPlatformData, in.GetVersionPlatformData(),
+			versionGroups, in.GetVersionGroups(),
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	}
 
@@ -282,9 +291,18 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	} else {
 		vtapCache.UpdatePushVersionPlatformData(versionPlatformData)
 	}
+	if in.GetVersionGroups() != 0 {
+		vtapCache.UpdatePushVersionGroups(in.GetVersionGroups())
+	} else {
+		vtapCache.UpdatePushVersionGroups(versionGroups)
+	}
 	platformData := []byte{}
 	if versionPlatformData != in.GetVersionPlatformData() {
 		platformData = vtapCache.GetSimplePlatformDataStr()
+	}
+	groups := []byte{}
+	if versionGroups != in.GetVersionGroups() {
+		groups = gVTapInfo.GetGroupData()
 	}
 
 	// 只有专属采集器下发tap_types
@@ -314,7 +332,9 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		RemoteSegments:      remoteSegments,
 		Config:              configInfo,
 		PlatformData:        platformData,
+		Groups:              groups,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
+		VersionGroups:       proto.Uint64(versionGroups),
 		TapTypes:            tapTypes,
 		SkipInterface:       skipInterface,
 		SelfUpdateUrl:       proto.String(gVTapInfo.GetSelfUpdateUrl()),
@@ -413,22 +433,35 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	}
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
 	pushVersionPlatformData := vtapCache.GetPushVersionPlatformData()
-	if versionPlatformData != pushVersionPlatformData {
+	versionGroups := gVTapInfo.GetGroupDataVersion()
+	pushVersionGroups := vtapCache.GetPushVersionGroups()
+	if versionPlatformData != pushVersionPlatformData || versionGroups != pushVersionGroups {
 		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
-			"(platform data version  %d -> %d), NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData,
-			pushVersionPlatformData, in.GetProcessName(), in.GetRevision(),
-			in.GetBootTime())
+			"(platform data version  %d -> %d), "+
+			"(groups version %d -> %d), "+
+			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+			ctrlIP, ctrlMac, in.GetHostIps(),
+			versionPlatformData, pushVersionPlatformData,
+			versionGroups, pushVersionGroups,
+			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
 		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
-			"(platform data version  %d -> %d), NAME:%s  REVISION:%s  BOOT_TIME:%d",
-			ctrlIP, ctrlMac, in.GetHostIps(), versionPlatformData, pushVersionPlatformData,
+			"(platform data version  %d -> %d), "+
+			"(groups version %d -> %d), "+
+			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
+			ctrlIP, ctrlMac, in.GetHostIps(),
+			versionPlatformData, pushVersionPlatformData,
+			versionGroups, pushVersionGroups,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	}
 
 	platformData := []byte{}
-	if versionPlatformData != in.GetVersionPlatformData() {
+	if versionPlatformData != pushVersionPlatformData {
 		platformData = vtapCache.GetSimplePlatformDataStr()
+	}
+	groups := []byte{}
+	if versionGroups != pushVersionGroups {
+		groups = gVTapInfo.GetGroupData()
 	}
 
 	// 只有专属采集器下发tap_types
@@ -459,6 +492,8 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		PlatformData:        platformData,
 		SkipInterface:       skipInterface,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
+		Groups:              groups,
+		VersionGroups:       proto.Uint64(versionGroups),
 		TapTypes:            tapTypes,
 	}, nil
 }

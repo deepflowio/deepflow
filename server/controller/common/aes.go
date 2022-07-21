@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/md5"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -59,6 +60,9 @@ func AesDecrypt(cryptedStr, keyStr string) (string, error) {
 		return "", err
 	}
 	blockSize := block.BlockSize()
+	if len(crypted)%blockSize != 0 {
+		return "", errors.New("input is not encrypt key")
+	}
 	blockMode := cipher.NewCBCDecrypter(block, key[:blockSize])
 	origData := make([]byte, len(crypted))
 	blockMode.CryptBlocks(origData, crypted)

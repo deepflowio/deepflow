@@ -14,9 +14,26 @@
  * limitations under the License.
  */
 
-package migrate
+package vtap
 
-const (
-	DB_VERSION_TABLE  = "db_version"
-	DB_VERSION_EXPECT = "6.1.1.11" // TODO add array to implement step-by-step migration
+import (
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
 )
+
+type GroupData struct {
+	metaData *metadata.MetaData
+}
+
+func newGroupData(metaData *metadata.MetaData) *GroupData {
+	return &GroupData{
+		metaData: metaData,
+	}
+}
+
+func (g *GroupData) getGroupData() []byte {
+	return g.metaData.GetTridentGroups()
+}
+
+func (g *GroupData) getGroupDataVersion() uint64 {
+	return g.metaData.GetTridentGroupsVersion()
+}
