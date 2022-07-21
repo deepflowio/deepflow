@@ -119,6 +119,6 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 	}
 	result["values"] = values
 	log.Debugf("sql: %s, query_uuid: %s", sql, c.Debug.QueryUUID)
-	log.Debugf("res_rows: %v, res_columns: %v, res_size: %v", resRows, resColumns, resSize)
+	log.Infof("res_rows: %v, res_columns: %v, res_size: %v", resRows, resColumns, resSize)
 	return result, nil
 }
