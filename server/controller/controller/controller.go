@@ -67,11 +67,19 @@ func Start(configPath string) {
 	log.Infof("controller config:\n%s", string(bytes))
 
 	// 初始化MySQL
-	ok := mysql.Migrate(cfg.MySqlCfg)
-	if !ok {
-		time.Sleep(time.Second) // TODO add sleep before all os.Exit
+	isMasterController, _, err := common.IsMasterController()
+	if err != nil {
+		time.Sleep(time.Second)
 		os.Exit(0)
 	}
+	if isMasterController {
+		ok := mysql.Migrate(cfg.MySqlCfg)
+		if !ok {
+			time.Sleep(time.Second) // TODO add sleep before all os.Exit
+			os.Exit(0)
+		}
+	}
+
 	mysql.Db = mysql.Gorm(cfg.MySqlCfg)
 	if mysql.Db == nil {
 		log.Error("connect mysql failed")
@@ -87,7 +95,7 @@ func Start(configPath string) {
 	}
 
 	// start statsd
-	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
+	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
 		log.Error("cloud statsd connect telegraf failed")
 		return

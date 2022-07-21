@@ -125,7 +125,7 @@ var (
 	L4PerformanceEnabled          = 1
 	PodClusterInternalIP          = 0
 	Domains                       = "0"
-	DecapType                     = "1,3"
+	DecapType                     = "1,2"
 	HTTPLogSpanID                 = "traceparent, sw8"
 	SysFreeMemoryLimit            = 0
 	LogFileSize                   = 1000
