@@ -148,7 +148,7 @@ impl HttpLog {
                 if self.is_https {
                     L7Protocol::Http2TLS
                 } else {
-                    L7Protocol::Http1
+                    L7Protocol::Http2
                 }
             }
             _ => L7Protocol::Unknown,
@@ -164,6 +164,7 @@ impl HttpLog {
     }
 
     fn reset_logs(&mut self) {
+        self.status_code = 0;
         self.info = HttpInfo::default();
     }
 
