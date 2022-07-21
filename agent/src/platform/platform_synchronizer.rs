@@ -22,7 +22,7 @@ use std::{
     },
     thread,
     thread::JoinHandle,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 use arc_swap::access::Access;
@@ -141,7 +141,12 @@ impl PlatformSynchronizer {
 
         Self {
             config,
-            version: Arc::new(AtomicU64::new(0)),
+            version: Arc::new(AtomicU64::new(
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            )),
             kubernetes_poller,
             running: Arc::new(Mutex::new(false)),
             timer: Arc::new(Condvar::new()),
@@ -556,6 +561,7 @@ impl PlatformSynchronizer {
         let mut last_version = 0;
         let mut kubernetes_version = 0;
         let mut last_ip_update_timestamp = Duration::default();
+        let init_version = args.version.load(Ordering::Relaxed);
 
         let mut hash_args = HashArgs::default();
         let mut platform_args = PlatformArgs::default();
@@ -583,7 +589,7 @@ impl PlatformSynchronizer {
             let poll_interval = config_guard.sync_interval;
             drop(config_guard);
 
-            if cur_version == 0 {
+            if cur_version == init_version {
                 // 避免信息同步先于信息采集
                 if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                     break;
