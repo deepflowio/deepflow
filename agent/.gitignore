@@ -14,6 +14,7 @@ src/ebpf/libebpf.a
 src/ebpf/deepflow-ebpfctl
 src/ebpf/kernel/*.elf.tmp
 src/ebpf/kernel/socket_trace.ll
+src/ebpf/tools/ebpftobuffer
 
 *.o
 *.elf

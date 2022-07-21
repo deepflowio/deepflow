@@ -24,7 +24,10 @@ use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
 use crate::error::{Error, Result};
 
 // ioctl ethtool request
+#[cfg(target_env = "gnu")]
 const SIOCETHTOOL: u64 = 0x8946;
+#[cfg(target_env = "musl")]
+const SIOCETHTOOL: i32 = 0x8946;
 
 // ethtool stats related constants.
 const ETH_GSTRING_LEN: usize = 32;
