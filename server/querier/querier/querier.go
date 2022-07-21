@@ -27,6 +27,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowys/deepflow/server/libs/logger"
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/router"
 )
@@ -54,6 +55,7 @@ func Start(configPath string) {
 	// 注册router
 	r := gin.Default()
 	r.Use(LoggerHandle)
+	r.Use(ErrHandle())
 	router.QueryRouter(r)
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
@@ -62,27 +64,40 @@ func Start(configPath string) {
 	}
 }
 
+func ErrHandle() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		startTime := time.Now()
+		defer func() {
+			ip := c.ClientIP()          //请求ip
+			method := c.Request.Method  // Method
+			url := c.Request.RequestURI // url
+			if err := recover(); err != nil {
+				// 记录一个错误的日志
+				log.Errorf("%13v | %15s | %s | %s |",
+					time.Since(startTime), //执行时间
+					ip,
+					method,
+					url,
+				)
+				log.Error(err)
+				// 堆栈信息
+				var buf [4096]byte
+				n := runtime.Stack(buf[:], false)
+				log.Error(string(buf[:n]))
+				router.BadRequestResponse(c, common.SERVER_ERROR, fmt.Sprintf("%v", err))
+				c.JSON(500, err)
+				return
+			}
+		}()
+		c.Next()
+	}
+}
+
 func LoggerHandle(c *gin.Context) {
 	ip := c.ClientIP()          //请求ip
 	method := c.Request.Method  // Method
 	url := c.Request.RequestURI // url
 	startTime := time.Now()
-	defer func() {
-		err := recover()
-		if err != nil {
-			log.Errorf("%13v | %15s | %s | %s |",
-				time.Since(startTime), //执行时间
-				ip,
-				method,
-				url,
-			)
-			log.Error(err)
-			// 堆栈信息
-			var buf [4096]byte
-			n := runtime.Stack(buf[:], false)
-			log.Error(string(buf[:n]))
-		}
-	}()
 	// 处理请求
 	c.Next()
 	endTime := time.Now()
