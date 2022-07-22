@@ -160,7 +160,7 @@ pub struct FlowNode {
     pub packet_in_tick: bool, // 当前统计周期（目前是自然秒）是否有包
 
     // Enterprise Edition Feature: packet-sequence
-    pub packet_sequence_block: Option<Box<packet_sequence_block::PacketSequenceBlock>>,
+    pub packet_sequence_block: Option<packet_sequence_block::PacketSequenceBlock>,
 }
 
 impl FlowNode {
