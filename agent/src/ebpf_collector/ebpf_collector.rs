@@ -25,6 +25,7 @@ use log::{debug, error, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
+use crate::common::endpoint::EPC_FROM_INTERNET;
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
@@ -281,7 +282,7 @@ impl From<IpProtocol> for u128 {
 impl FlowItem {
     const POLICY_INTERVAL: u64 = 10;
     const PROTOCOL_CHECK_LIMIT: usize = 2;
-    const FLOW_ITEM_TIMEOUT: u64 = 30;
+    const FLOW_ITEM_TIMEOUT: u64 = 60;
 
     fn get_parser(
         protocol: L7Protocol,
@@ -443,17 +444,20 @@ impl FlowItem {
         return ret;
     }
 
-    fn reset(&mut self, time_in_sec: u64, l4_protocol: IpProtocol) {
-        self.last_packet = time_in_sec;
+    fn reset(&mut self, l4_protocol: IpProtocol) {
         self.last_packet = 0;
-        self.remote_epc = 0;
+        self.last_policy = 0;
         self.l7_protocol = L7Protocol::Unknown;
         self.is_skip = false;
         self.is_success = false;
         self.is_local_service = false;
         self.is_from_app = false;
+        self.protocol_bitmap = if self.l4_protocol == l4_protocol {
+            self.protocol_bitmap_image
+        } else {
+            u128::from(l4_protocol)
+        };
         self.l4_protocol = l4_protocol;
-        self.protocol_bitmap = self.protocol_bitmap_image;
         self.parser = None;
     }
 
@@ -466,7 +470,7 @@ impl FlowItem {
     ) -> LogResult<AppProtoHead> {
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         if self.last_packet + Self::FLOW_ITEM_TIMEOUT < time_in_sec {
-            self.reset(time_in_sec, packet.lookup_key.proto);
+            self.reset(packet.lookup_key.proto);
         }
         self.last_packet = time_in_sec;
 
@@ -789,6 +793,12 @@ impl EbpfRunner {
                 flow_item = flow_map.get_mut(&key);
             }
 
+            let local_epc = if self.config.epc_id == 0 {
+                EPC_FROM_INTERNET
+            } else {
+                self.config.epc_id as i32
+            };
+
             flow_item.and_then(|flow_item| {
                 // 应用解析
                 if let Some(data) = flow_item.handle(
@@ -796,7 +806,7 @@ impl EbpfRunner {
                     self.policy_getter,
                     &mut self.app_table,
                     &self.log_parser_config,
-                    self.config.epc_id as i32,
+                    local_epc,
                     self.config.vtap_id,
                 ) {
                     // 应用日志聚合
