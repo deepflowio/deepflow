@@ -14,13 +14,7 @@
  * limitations under the License.
  */
 
-use std::{
-    env,
-    error::Error,
-    path::PathBuf,
-    process::Command,
-    str,
-};
+use std::{env, error::Error, path::PathBuf, process::Command, str};
 
 fn generate_protobuf() -> Result<(), Box<dyn Error>> {
     tonic_build::configure()
