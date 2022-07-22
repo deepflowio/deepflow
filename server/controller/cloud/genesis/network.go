@@ -19,7 +19,6 @@ package genesis
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"strconv"
 
 	uuid "github.com/satori/go.uuid"
@@ -28,7 +27,7 @@ import (
 func (g *Genesis) getNetworks() ([]model.Network, error) {
 	log.Debug("get networks starting")
 	networks := []model.Network{}
-	networksData := genesis.GenesisService.GetNetworksData(false)
+	networksData := g.genesisData.Networks
 
 	g.cloudStatsd.APICost["networks"] = []int{0}
 	g.cloudStatsd.APICount["networks"] = []int{len(networksData)}
@@ -45,16 +44,16 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 		}
 		networkName := n.Name
 		if networkName == "" {
-			networkName = "subnet_vni_" + strconv.Itoa(n.SegmentationID)
+			networkName = "subnet_vni_" + strconv.Itoa(int(n.SegmentationID))
 		}
 		network := model.Network{
 			Lcuuid:         n.Lcuuid,
 			Name:           networkName,
-			SegmentationID: n.SegmentationID,
+			SegmentationID: int(n.SegmentationID),
 			VPCLcuuid:      vpcLcuuid,
 			Shared:         false,
 			External:       n.External,
-			NetType:        n.NetType,
+			NetType:        int(n.NetType),
 			RegionLcuuid:   g.regionUuid,
 		}
 		networks = append(networks, network)

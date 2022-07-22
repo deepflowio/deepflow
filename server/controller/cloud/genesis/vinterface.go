@@ -19,7 +19,6 @@ package genesis
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -27,7 +26,7 @@ import (
 func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 	log.Debug("get vinterfaces starting")
 	vinterfaces := []model.VInterface{}
-	vinterfacesData := genesis.GenesisService.GetPortsData(false)
+	vinterfacesData := g.genesisData.Ports
 
 	g.cloudStatsd.APICost["vinterfaces"] = []int{0}
 	g.cloudStatsd.APICount["vinterfaces"] = []int{len(vinterfacesData)}
@@ -44,11 +43,11 @@ func (g *Genesis) getVinterfaces() ([]model.VInterface, error) {
 		}
 		vinterface := model.VInterface{
 			Lcuuid:        v.Lcuuid,
-			Type:          v.Type,
+			Type:          int(v.Type),
 			Mac:           v.Mac,
 			VPCLcuuid:     vpcLcuuid,
 			RegionLcuuid:  g.regionUuid,
-			DeviceType:    v.DeviceType,
+			DeviceType:    int(v.DeviceType),
 			DeviceLcuuid:  v.DeviceLcuuid,
 			NetworkLcuuid: v.NetworkLcuuid,
 		}

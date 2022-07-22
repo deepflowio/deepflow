@@ -19,7 +19,6 @@ package genesis
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -27,7 +26,7 @@ import (
 func (g *Genesis) getVPCs() ([]model.VPC, error) {
 	log.Debug("get vpcs starting")
 	vpcs := []model.VPC{}
-	vpcsData := genesis.GenesisService.GetVPCsData(false)
+	vpcsData := g.genesisData.VPCs
 
 	g.cloudStatsd.APICost["vpcs"] = []int{0}
 	g.cloudStatsd.APICount["vpcs"] = []int{len(vpcsData)}

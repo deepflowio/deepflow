@@ -19,7 +19,6 @@ package genesis
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -27,12 +26,11 @@ import (
 func (g *Genesis) getIPs() ([]model.IP, error) {
 	log.Debug("get ips starting")
 	ips := []model.IP{}
-	ipsData := genesis.GenesisService.GetIPsData(false)
 
 	g.cloudStatsd.APICost["ips"] = []int{0}
-	g.cloudStatsd.APICount["ips"] = []int{len(ipsData)}
+	g.cloudStatsd.APICount["ips"] = []int{len(g.ips)}
 
-	for _, i := range ipsData {
+	for _, i := range g.ips {
 		if i.VInterfaceLcuuid == "" || i.SubnetLcuuid == "" {
 			log.Debug("vinterface lcuuid or subnet lcuuid not found")
 			continue

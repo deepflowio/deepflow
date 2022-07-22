@@ -18,8 +18,6 @@ package common
 
 import (
 	. "encoding/binary"
-	"github.com/mikioh/ipaddr"
-	"inet.af/netaddr"
 	"net"
 	"regexp"
 	"strconv"
@@ -27,7 +25,7 @@ import (
 )
 
 type VifInfo struct {
-	MaskLen int
+	MaskLen uint32
 	Address string
 	Scope   string
 }
@@ -98,7 +96,7 @@ func ParseIPOutput(s string) ([]Iface, error) {
 			iface.IPs = append(iface.IPs, VifInfo{
 				Address: ipMatched[1],
 				Scope:   ipMatched[3],
-				MaskLen: maskLen,
+				MaskLen: uint32(maskLen),
 			})
 		}
 	}
@@ -110,34 +108,4 @@ func Uint64ToMac(v uint64) net.HardwareAddr {
 	bytes := [8]byte{}
 	BigEndian.PutUint64(bytes[:], v)
 	return net.HardwareAddr(bytes[2:])
-}
-
-func AggregateCIDR(ips []netaddr.IPPrefix, maxMask int) (cirds []netaddr.IPPrefix) {
-	CIDRs := []*ipaddr.Prefix{}
-	for _, Prefix := range ips {
-		aggFlag := false
-		ipNet := ipaddr.NewPrefix(Prefix.IPNet())
-		for i, CIDR := range CIDRs {
-			pSlice := []ipaddr.Prefix{*ipNet, *CIDR}
-			aggCIDR := ipaddr.Supernet(pSlice)
-			if aggCIDR == nil {
-				continue
-			}
-			aggCIDRMask, _ := aggCIDR.IPNet.Mask.Size()
-			if aggCIDRMask >= maxMask {
-				CIDRs[i] = aggCIDR
-				aggFlag = true
-				break
-			} else {
-				continue
-			}
-		}
-		if !aggFlag {
-			CIDRs = append(CIDRs, ipNet)
-		}
-	}
-	for _, i := range CIDRs {
-		cirds = append(cirds, netaddr.MustParseIPPrefix(i.String()))
-	}
-	return
 }

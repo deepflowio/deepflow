@@ -18,23 +18,30 @@ package genesis
 
 import (
 	"errors"
-	"github.com/deepflowys/deepflow/server/controller/cloud/config"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
-	"github.com/deepflowys/deepflow/server/controller/statsd"
+	"inet.af/netaddr"
 	"time"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/op/go-logging"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
+
+	"github.com/deckarep/golang-set"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/config"
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
+	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud.genesis")
 
 type Genesis struct {
 	defaultVpc        bool
+	ipV4CIDRMaxMask   int
+	ipV6CIDRMaxMask   int
 	Name              string
 	uuid              string
 	UuidGenerate      string
@@ -42,6 +49,9 @@ type Genesis struct {
 	azLcuuid          string
 	defaultVpcName    string
 	defaultRegionName string
+	ips               []cloudmodel.IP
+	subnets           []cloudmodel.Subnet
+	genesisData       genesis.GenesisSyncData
 	cloudStatsd       statsd.CloudStatsd
 }
 
@@ -51,13 +61,24 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		log.Error(err)
 		return nil, err
 	}
+	ipV4MaxMask := config.Get("ipv4_cidr_max_mask").MustInt()
+	if ipV4MaxMask == 0 {
+		ipV4MaxMask = 16
+	}
+	ipV6MaxMask := config.Get("ipv6_cidr_max_mask").MustInt()
+	if ipV6MaxMask == 0 {
+		ipV6MaxMask = 64
+	}
 	return &Genesis{
+		ipV4CIDRMaxMask:   ipV4MaxMask,
+		ipV6CIDRMaxMask:   ipV6MaxMask,
 		Name:              domain.Name,
 		uuid:              domain.Lcuuid,
 		UuidGenerate:      domain.DisplayName,
 		defaultVpcName:    cfg.GenesisDefaultVpcName,
 		defaultRegionName: cfg.GenesisDefaultRegionName,
 		regionUuid:        config.Get("region_uuid").MustString(),
+		genesisData:       genesis.GenesisSyncData{},
 		cloudStatsd: statsd.CloudStatsd{
 			APICount: make(map[string][]int),
 			APICost:  make(map[string][]int),
@@ -84,7 +105,164 @@ func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	}
 }
 
-func (g *Genesis) GetCloudData() (model.Resource, error) {
+func (g *Genesis) getGenesisData() (genesis.GenesisSyncData, error) {
+	return genesis.GenesisService.GetGenesisSyncResponse()
+}
+
+func (g *Genesis) generateIPsAndSubnets() {
+	g.ips = []cloudmodel.IP{}
+	g.subnets = []cloudmodel.Subnet{}
+	portIDToNetworkID := map[string]string{}
+	portIDToVpcID := map[string]string{}
+	NetworkIDToVpcID := map[string]string{}
+	for _, port := range g.genesisData.Ports {
+		portIDToNetworkID[port.Lcuuid] = port.NetworkLcuuid
+		portIDToVpcID[port.Lcuuid] = port.VPCLcuuid
+		NetworkIDToVpcID[port.NetworkLcuuid] = port.VPCLcuuid
+	}
+	// 这里需要根据trident上报的ip信息中last_seen字段进行去重
+	// 当ip移到别的接口上时，内存中的ip信息可能会出现同一个ip在两个port上
+	// 这时候会保留last_seen比较近的一个port的ip
+	validIPs := []model.GenesisIP{}
+	vpcIDToIPLastSeens := map[string][]model.GenesisIP{}
+	for _, ip := range g.genesisData.IPLastSeens {
+		vpcIDToIPLastSeens[portIDToVpcID[ip.Lcuuid]] = append(vpcIDToIPLastSeens[portIDToVpcID[ip.Lcuuid]], ip)
+	}
+	for _, ips := range vpcIDToIPLastSeens {
+		ipToPorts := map[string][]model.GenesisIP{}
+		for _, ip := range ips {
+			ipToPorts[ip.IP] = append(ipToPorts[ip.IP], ip)
+		}
+		for _, ipLastSeens := range ipToPorts {
+			ipFlag := ipLastSeens[0]
+			timeFlag := ipFlag.LastSeen
+			for _, ipLastSeen := range ipLastSeens[1:] {
+				if ipLastSeen.LastSeen.After(timeFlag) {
+					ipFlag = ipLastSeen
+					timeFlag = ipLastSeen.LastSeen
+				}
+			}
+			validIPs = append(validIPs, ipFlag)
+		}
+	}
+
+	networkIDToIPLastSeens := map[string][]model.GenesisIP{}
+	for _, ip := range validIPs {
+		networkIDToIPLastSeens[portIDToNetworkID[ip.VinterfaceLcuuid]] = append(networkIDToIPLastSeens[portIDToNetworkID[ip.Lcuuid]], ip)
+	}
+
+	// 由于目前没获取dhcp信息，所以在这里用一个子网内所有ip计算出一个最小网段
+	for networkID, ipLastSeens := range networkIDToIPLastSeens {
+		ipsWithMasklen := []model.GenesisIP{}
+		ipsWithoutMasklen := []model.GenesisIP{}
+		for _, ip := range ipLastSeens {
+			if ip.Masklen != 0 {
+				ipsWithMasklen = append(ipsWithMasklen, ip)
+			} else {
+				ipsWithoutMasklen = append(ipsWithoutMasklen, ip)
+			}
+		}
+		knownCIDRs := mapset.NewSet()
+		subnetMap := map[string]string{}
+		for _, ip := range ipsWithMasklen {
+			var cidr netaddr.IPPrefix
+			ipNet, err := netaddr.ParseIP(ip.IP)
+			if err != nil {
+				log.Error(err.Error())
+				continue
+			}
+			if ipNet.Is4() {
+				cidr = netaddr.IPPrefixFrom(ipNet, uint8(ip.Masklen))
+			} else if ipNet.Is6() {
+				cidr = netaddr.IPPrefixFrom(ipNet, uint8(ip.Masklen))
+			} else {
+				continue
+			}
+			knownCIDRs.Add(cidr.Masked())
+			if _, ok := subnetMap[cidr.Masked().String()]; !ok {
+				subnet := cloudmodel.Subnet{
+					Lcuuid:        common.GetUUID(networkID+cidr.Masked().String(), uuid.Nil),
+					CIDR:          cidr.Masked().String(),
+					NetworkLcuuid: networkID,
+					VPCLcuuid:     NetworkIDToVpcID[networkID],
+				}
+				g.subnets = append(g.subnets, subnet)
+				subnetMap[cidr.Masked().String()] = subnet.Lcuuid
+			}
+			modelIP := cloudmodel.IP{
+				IP:               ip.IP,
+				Lcuuid:           ip.Lcuuid,
+				SubnetLcuuid:     subnetMap[cidr.Masked().String()],
+				VInterfaceLcuuid: ip.VinterfaceLcuuid,
+			}
+			g.ips = append(g.ips, modelIP)
+		}
+
+		deducedCIDRs := []netaddr.IPPrefix{}
+		prefixV4 := []netaddr.IPPrefix{}
+		prefixV6 := []netaddr.IPPrefix{}
+		for _, ip := range ipsWithoutMasklen {
+			ipNet, err := netaddr.ParseIP(ip.IP)
+			if err != nil {
+				log.Warning(err.Error())
+				continue
+			}
+			if ipNet.Is4() {
+				prefixV4 = append(prefixV4, netaddr.IPPrefixFrom(ipNet, 32))
+			} else if ipNet.Is6() {
+				prefixV6 = append(prefixV6, netaddr.IPPrefixFrom(ipNet, 128))
+			} else {
+				log.Warningf("parse ip error: ip is (%s)", ipNet.String())
+				continue
+			}
+		}
+		aggreateV4CIDR := cloudcommon.GenerateCIDR(prefixV4, g.ipV4CIDRMaxMask)
+		deducedCIDRs = append(deducedCIDRs, aggreateV4CIDR...)
+		aggreateV6CIDR := cloudcommon.GenerateCIDR(prefixV6, g.ipV6CIDRMaxMask)
+		deducedCIDRs = append(deducedCIDRs, aggreateV6CIDR...)
+		for _, ip := range ipsWithoutMasklen {
+			ipNet, err := netaddr.ParseIP(ip.IP)
+			if err != nil {
+				log.Warning(err.Error())
+				continue
+			}
+			for _, cidr := range knownCIDRs.ToSlice() {
+				if cidr.(netaddr.IPPrefix).Contains(ipNet) {
+					modelIP := cloudmodel.IP{
+						IP:               ip.IP,
+						Lcuuid:           ip.Lcuuid,
+						VInterfaceLcuuid: ip.VinterfaceLcuuid,
+						SubnetLcuuid:     subnetMap[cidr.(netaddr.IPPrefix).String()],
+					}
+					g.ips = append(g.ips, modelIP)
+				}
+			}
+			for _, cidr := range deducedCIDRs {
+				if cidr.Contains(ipNet) {
+					if _, ok := subnetMap[cidr.String()]; !ok {
+						subnet := cloudmodel.Subnet{
+							Lcuuid:        common.GetUUID(networkID+cidr.String(), uuid.Nil),
+							NetworkLcuuid: networkID,
+							CIDR:          cidr.String(),
+							VPCLcuuid:     NetworkIDToVpcID[networkID],
+						}
+						g.subnets = append(g.subnets, subnet)
+						subnetMap[cidr.String()] = subnet.Lcuuid
+					}
+					modelIP := cloudmodel.IP{
+						Lcuuid:           ip.Lcuuid,
+						IP:               ip.IP,
+						VInterfaceLcuuid: ip.VinterfaceLcuuid,
+						SubnetLcuuid:     subnetMap[cidr.String()],
+					}
+					g.ips = append(g.ips, modelIP)
+				}
+			}
+		}
+	}
+}
+
+func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	g.azLcuuid = ""
 	g.defaultVpc = false
 	g.cloudStatsd.APICount = map[string][]int{}
@@ -94,55 +272,63 @@ func (g *Genesis) GetCloudData() (model.Resource, error) {
 	startTime := time.Now()
 
 	if genesis.GenesisService == nil {
-		return model.Resource{}, errors.New("genesis service is nil")
+		return cloudmodel.Resource{}, errors.New("genesis service is nil")
 	}
+
+	genesisData, err := g.getGenesisData()
+	if err != nil {
+		return cloudmodel.Resource{}, errors.New("get genesis data faild")
+	}
+	g.genesisData = genesisData
+
+	g.generateIPsAndSubnets()
 
 	regions, err := g.getRegion()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	az, err := g.getAZ()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	vpcs, err := g.getVPCs()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	hosts, err := g.getHosts()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	networks, err := g.getNetworks()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	subnets, err := g.getSubnets()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	vms, err := g.getVMs()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	vinterfaces, err := g.getVinterfaces()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 
 	ips, err := g.getIPs()
 	if err != nil {
-		return model.Resource{}, err
+		return cloudmodel.Resource{}, err
 	}
 	if g.defaultVpc {
-		vpc := model.VPC{
+		vpc := cloudmodel.VPC{
 			Lcuuid:       common.GetUUID(g.defaultVpcName, uuid.Nil),
 			Name:         g.defaultVpcName,
 			RegionLcuuid: g.regionUuid,
@@ -150,7 +336,7 @@ func (g *Genesis) GetCloudData() (model.Resource, error) {
 		vpcs = append(vpcs, vpc)
 	}
 
-	resource := model.Resource{
+	resource := cloudmodel.Resource{
 		IPs:         ips,
 		VMs:         vms,
 		VPCs:        vpcs,
@@ -159,7 +345,7 @@ func (g *Genesis) GetCloudData() (model.Resource, error) {
 		Subnets:     subnets,
 		Networks:    networks,
 		VInterfaces: vinterfaces,
-		AZs:         []model.AZ{az},
+		AZs:         []cloudmodel.AZ{az},
 	}
 	g.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	g.cloudStatsd.TaskCost[g.UuidGenerate] = []int{int(time.Now().Sub(startTime).Milliseconds())}
