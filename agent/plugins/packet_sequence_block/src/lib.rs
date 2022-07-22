@@ -17,22 +17,18 @@
 //! Enterprise Edition Feature: packet-sequence
 use std::time::Duration;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct PacketData {}
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct PacketSequenceBlock {}
 
 impl PacketSequenceBlock {
-    pub fn new() -> Box<Self> {
-        Box::new(PacketSequenceBlock {})
-    }
-
     pub fn check(&self, _: usize) -> bool {
         false
     }
 
-    pub fn convert_duration_to_timestamp(&self, _: usize, _: Duration) -> u64 {
+    pub fn convert_duration_to_timestamp(_: usize, _: Duration) -> u64 {
         0
     }
 

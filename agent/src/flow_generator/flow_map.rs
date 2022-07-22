@@ -197,7 +197,7 @@ impl FlowMap {
                 // flush the packet_sequence_block at the regular time
                 if let Err(_) = self
                     .packet_sequence_queue
-                    .send(node.packet_sequence_block.take().unwrap())
+                    .send(Box::new(node.packet_sequence_block.take().unwrap()))
                 {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
                 }
@@ -327,16 +327,16 @@ impl FlowMap {
                     // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
                     if let Err(_) = self
                         .packet_sequence_queue
-                        .send(node.packet_sequence_block.take().unwrap())
+                        .send(Box::new(node.packet_sequence_block.take().unwrap()))
                     {
                         warn!("packet sequence block to queue failed maybe queue have terminated");
                     }
                     node.packet_sequence_block =
-                        Some(packet_sequence_block::PacketSequenceBlock::new());
+                        Some(packet_sequence_block::PacketSequenceBlock::default());
                 }
             } else {
                 node.packet_sequence_block =
-                    Some(packet_sequence_block::PacketSequenceBlock::new());
+                    Some(packet_sequence_block::PacketSequenceBlock::default());
             }
 
             let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
@@ -773,7 +773,8 @@ impl FlowMap {
         }
         // Enterprise Edition Feature: packet-sequence
         if self.config.load().packet_sequence_flag > 0 {
-            node.packet_sequence_block = Some(packet_sequence_block::PacketSequenceBlock::new());
+            node.packet_sequence_block =
+                Some(packet_sequence_block::PacketSequenceBlock::default());
             let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
                 node.tagged_flow.flow.flow_id,
                 meta_packet.direction as u8,
@@ -956,7 +957,7 @@ impl FlowMap {
         {
             if let Err(_) = self
                 .packet_sequence_queue
-                .send(node.packet_sequence_block.take().unwrap())
+                .send(Box::new(node.packet_sequence_block.take().unwrap()))
             {
                 warn!("packet sequence block to queue failed maybe queue have terminated");
             }
