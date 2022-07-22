@@ -577,9 +577,11 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table)
-			if ok {
-				whereTag = metricStruct.DBField
+			if e.DB == "ext_metrics" && strings.Contains(whereTag, ".") {
+				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table)
+				if ok {
+					whereTag = metricStruct.DBField
+				}
 			}
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)
