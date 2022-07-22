@@ -102,7 +102,7 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	table := s.GenCKTable(w.ttl)
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddr, "", w.ckdbUsername, w.ckdbPassword,
-		s.TableName, table, false, w.writerConfig.QueueCount, w.writerConfig.QueueCount, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
+		s.TableName, table, false, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
 	if err != nil {
 		return nil, err
 	}
