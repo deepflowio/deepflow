@@ -96,6 +96,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					macSlice := strings.Split(macValue, ",")
 					macs := []string{}
 					for _, valueStr := range macSlice {
+						valueStr = strings.TrimSpace(valueStr)
 						valueStr = strings.Trim(valueStr, "'")
 						mac, err := net.ParseMAC(valueStr)
 						if err != nil {
@@ -222,6 +223,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				macSlice := strings.Split(macValue, ",")
 				macs := []string{}
 				for _, valueStr := range macSlice {
+					valueStr = strings.TrimSpace(valueStr)
 					valueStr = strings.Trim(valueStr, "'")
 					mac, err := net.ParseMAC(valueStr)
 					if err != nil {
