@@ -472,9 +472,12 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		}
 		if fieldFunc != nil {
 			return fieldFunc, nil
-		} else {
-			return &Field{Value: sqlparser.String(expr)}, nil
 		}
+		metricStruct, ok := metrics.GetMetrics(field, e.DB, e.Table)
+		if ok {
+			return &Field{Value: metricStruct.DBField}, nil
+		}
+		return &Field{Value: sqlparser.String(expr)}, nil
 	default:
 		// TODO: 报错
 		return nil, nil
@@ -574,6 +577,10 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
+			metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table)
+			if ok {
+				whereTag = metricStruct.DBField
+			}
 			whereValue := sqlparser.String(node.Right)
 			stmt := GetWhere(whereTag, whereValue)
 			return stmt.Trans(node, w, e.asTagMap, e.DB, e.Table)
