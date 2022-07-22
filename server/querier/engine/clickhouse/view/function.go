@@ -374,6 +374,7 @@ func (f *SpreadFunction) Init() {
 		IgnoreZero:   f.IgnoreZero,
 		Nest:         true,
 		IsGroupArray: f.IsGroupArray,
+		Condition:    f.Condition,
 	}
 	minFunc := MinFunction{
 		DefaultFunction: DefaultFunction{
@@ -419,6 +420,7 @@ func (f *RspreadFunction) Init() {
 		IgnoreZero:   f.IgnoreZero,
 		Nest:         true,
 		IsGroupArray: f.IsGroupArray,
+		Condition:    f.Condition,
 	}
 	minFunc := MinFunction{
 		DefaultFunction: DefaultFunction{
