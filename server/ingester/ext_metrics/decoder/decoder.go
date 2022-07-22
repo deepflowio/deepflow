@@ -240,20 +240,19 @@ func (d *Decoder) handleMetaflowStats(vtapID uint16, decoder *codec.SimpleDecode
 		if d.debugEnabled {
 			log.Debugf("decoder %d vtap %d recv deepflow stats: %v", d.index, vtapID, pbStats)
 		}
-		d.extMetricsWriter.Write(StatsToExtMetrics(pbStats))
+		d.extMetricsWriter.Write(StatsToExtMetrics(vtapID, pbStats))
 		d.counter.OutCount++
 	}
 }
 
-func StatsToExtMetrics(s *pb.Stats) *dbwriter.ExtMetrics {
+func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(s.Timestamp)
+	m.Tag.GlobalThreadID = uint8(vtapID)
 	m.Database = DEEPFLOW_SYSTEM_DB
 	m.TableName = s.Name
 	m.TagNames = s.TagNames
 	m.TagValues = s.TagValues
-	m.MetricsIntNames = s.MetricsIntNames
-	m.MetricsIntValues = s.MetricsIntValues
 	m.MetricsFloatNames = s.MetricsFloatNames
 	m.MetricsFloatValues = s.MetricsFloatValues
 	return m
@@ -339,6 +338,7 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	t := &m.Tag
 	t.Code = zerodoc.AZID | zerodoc.HostID | zerodoc.IP | zerodoc.L3Device | zerodoc.L3EpcID | zerodoc.PodClusterID | zerodoc.PodGroupID | zerodoc.PodID | zerodoc.PodNodeID | zerodoc.PodNSID | zerodoc.RegionID | zerodoc.SubnetID | zerodoc.VTAPID | zerodoc.ServiceID | zerodoc.Resource
 	t.VTAPID = vtapID
+	t.GlobalThreadID = uint8(vtapID)
 	t.L3EpcID = datatype.EPC_FROM_INTERNET
 	var ip net.IP
 	if podName != "" {
@@ -459,16 +459,16 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 				dbwriter.ReleaseExtMetrics(m)
 				return nil, fmt.Errorf("table %s  unable to unmarshal field %s: %s", tableName, string(iter.FieldKey()), err)
 			}
-			m.MetricsIntNames = append(m.MetricsIntNames, string(iter.FieldKey()))
-			m.MetricsIntValues = append(m.MetricsIntValues, v)
+			m.MetricsFloatNames = append(m.MetricsFloatNames, string(iter.FieldKey()))
+			m.MetricsFloatValues = append(m.MetricsFloatValues, float64(v))
 		case models.Unsigned:
 			v, err := iter.UnsignedValue()
 			if err != nil {
 				dbwriter.ReleaseExtMetrics(m)
 				return nil, fmt.Errorf("table %s unable to unmarshal field %s: %s", tableName, string(iter.FieldKey()), err)
 			}
-			m.MetricsIntNames = append(m.MetricsIntNames, string(iter.FieldKey()))
-			m.MetricsIntValues = append(m.MetricsIntValues, int64(v))
+			m.MetricsFloatNames = append(m.MetricsFloatNames, string(iter.FieldKey()))
+			m.MetricsFloatValues = append(m.MetricsFloatValues, float64(v))
 		case models.String, models.Boolean:
 			if d.counter.DropUnsupportedMetrics&0xff == 0 {
 				log.Warningf("table %s drop unsupported metrics name: %s type: %v. total drop %d", tableName, string(iter.FieldKey()), iter.Type(), d.counter.DropUnsupportedMetrics)

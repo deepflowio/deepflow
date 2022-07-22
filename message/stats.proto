@@ -15,8 +15,6 @@ message Stats {
     string name = 2;
     repeated string tag_names = 3;
     repeated string tag_values = 4;
-    repeated string metrics_int_names = 5;
-    repeated int64  metrics_int_values = 6;
     repeated string metrics_float_names = 7;
     repeated double metrics_float_values = 8;
 }

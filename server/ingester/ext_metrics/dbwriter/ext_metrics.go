@@ -33,9 +33,6 @@ type ExtMetrics struct {
 	TagNames  []string
 	TagValues []string
 
-	MetricsIntNames  []string
-	MetricsIntValues []int64
-
 	MetricsFloatNames  []string
 	MetricsFloatValues []float64
 }
@@ -49,12 +46,6 @@ func (m *ExtMetrics) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteArrayString(m.TagValues); err != nil {
-		return err
-	}
-	if err := block.WriteArrayString(m.MetricsIntNames); err != nil {
-		return err
-	}
-	if err := block.WriteArrayInt64(m.MetricsIntValues); err != nil {
 		return err
 	}
 	if err := block.WriteArrayString(m.MetricsFloatNames); err != nil {
@@ -72,8 +63,6 @@ func (m *ExtMetrics) Columns() []*ckdb.Column {
 	columns = append(columns,
 		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("额外的tag"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("额外的tag对应的值"),
-		ckdb.NewColumn("metrics_int_names", ckdb.ArrayString).SetComment("额外的int类型metrics"),
-		ckdb.NewColumn("metrics_int_values", ckdb.ArrayInt64).SetComment("额外的int metrics值"),
 		ckdb.NewColumn("metrics_float_names", ckdb.ArrayString).SetComment("额外的float类型metrics"),
 		ckdb.NewColumn("metrics_float_values", ckdb.ArrayFloat64).SetComment("额外的float metrics值"),
 	)
@@ -121,8 +110,6 @@ var extMetricsPool = pool.NewLockFreePool(func() interface{} {
 		},
 		TagNames:           make([]string, 0, 4),
 		TagValues:          make([]string, 0, 4),
-		MetricsIntNames:    make([]string, 0, 4),
-		MetricsIntValues:   make([]int64, 0, 4),
 		MetricsFloatNames:  make([]string, 0, 4),
 		MetricsFloatValues: make([]float64, 0, 4),
 	}
@@ -137,8 +124,6 @@ func ReleaseExtMetrics(m *ExtMetrics) {
 	m.Tag.Code = 0
 	m.TagNames = m.TagNames[:0]
 	m.TagValues = m.TagValues[:0]
-	m.MetricsIntNames = m.MetricsIntNames[:0]
-	m.MetricsIntValues = m.MetricsIntValues[:0]
 	m.MetricsFloatNames = m.MetricsFloatNames[:0]
 	m.MetricsFloatValues = m.MetricsFloatValues[:0]
 	extMetricsPool.Put(m)
