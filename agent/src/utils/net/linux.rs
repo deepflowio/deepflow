@@ -607,7 +607,7 @@ pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>> {
             rtm_protocol: Rtprot::Unspec,
             rtm_scope: RtScope::Universe,
             rtm_type: Rtn::Unspec,
-            rtm_flags: RtmFFlags::new(&[RtmF::LookupTable]),
+            rtm_flags: RtmFFlags::empty(),
             rtattrs: vec![Rtattr::new(None, Rta::Dst, buf)?]
                 .into_iter()
                 .collect(),
