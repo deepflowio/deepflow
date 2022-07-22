@@ -1,9 +1,9 @@
-FROM ghcr.io/deepflowys/rust-build:1.2 as builder
+FROM ghcr.io/deepflowys/rust-build:1.4 as builder
 COPY .  /deepflow/
 WORKDIR /deepflow/agent
-RUN cargo build --release && \
-    cargo build --release --bin deepflow-agent-ctl && \
-    ls -alh target/release
+RUN cargo build --release --target=x86_64-unknown-linux-musl && \
+    cargo build --release --bin deepflow-agent-ctl --target=x86_64-unknown-linux-musl && \
+    ls -alh target/x86_64-unknown-linux-musl/release
 FROM scratch
 COPY --from=builder /deepflow/agent/ /
 

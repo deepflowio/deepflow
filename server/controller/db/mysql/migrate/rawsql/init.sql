@@ -1517,7 +1517,8 @@ CREATE TABLE IF NOT EXISTS go_genesis_host (
     id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     lcuuid      CHAR(64),
     hostname    VARCHAR(256),
-    ip          CHAR(64)
+    ip          CHAR(64),
+    node_ip     CHAR(48)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_host;
 
@@ -1528,6 +1529,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_vm (
     label           CHAR(64),
     vpc_lcuuid      CHAR(64),
     launch_server   CHAR(64),
+    node_ip         CHAR(48),
     state           INTEGER,
     created_at      DATETIME
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
@@ -1536,6 +1538,7 @@ TRUNCATE TABLE go_genesis_vm;
 CREATE TABLE IF NOT EXISTS go_genesis_vpc (
     id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     lcuuid          CHAR(64),
+    node_ip         CHAR(48),
     name            VARCHAR(256)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_vpc;
@@ -1547,7 +1550,8 @@ CREATE TABLE IF NOT EXISTS go_genesis_network (
     segmentation_id INTEGER,
     net_type        INTEGER,
     external        TINYINT(1),
-    vpc_lcuuid      CHAR(64)
+    vpc_lcuuid      CHAR(64),
+    node_ip         CHAR(48)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_network;
 
@@ -1559,7 +1563,8 @@ CREATE TABLE IF NOT EXISTS go_genesis_port (
     mac             CHAR(32),
     device_lcuuid   CHAR(64),
     network_lcuuid  CHAR(64),
-    vpc_lcuuid      CHAR(64)
+    vpc_lcuuid      CHAR(64),
+    node_ip         CHAR(48)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_port;
 
@@ -1568,6 +1573,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_ip (
     lcuuid              CHAR(64),
     ip                  CHAR(64),
     vinterface_lcuuid   CHAR(64),
+    node_ip             CHAR(48),
     last_seen           DATETIME,
     masklen             INTEGER DEFAULT 0
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
@@ -1578,6 +1584,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_lldp (
     lcuuid                  CHAR(64),
     host_ip                 CHAR(48),
     host_interface          CHAR(64),
+    node_ip                 CHAR(48),
     system_name             VARCHAR(512),
     management_address      VARCHAR(512),
     vinterface_lcuuid       VARCHAR(512),
@@ -1598,6 +1605,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_vinterface (
     device_name           VARCHAR(512),
     device_type           CHAR(64),
     host_ip               CHAR(48),
+    node_ip               CHAR(48),
     last_seen             DATETIME,
     vtap_id               INTEGER,
     kubernetes_cluster_id CHAR(64)

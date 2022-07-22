@@ -101,11 +101,6 @@ server:
       targetPort: 20035
       nodePort: "{{ .Values.global.nodePort.deepflowServerGrpc }}"
       protocol: TCP
-    - name: grpc-30035-udp
-      port: 30035
-      targetPort: 20035
-      nodePort: "{{ .Values.global.nodePort.deepflowServerGrpc }}"
-      protocol: UDP
     - name: ssl-grpc
       port: 20135
       targetPort: 20135

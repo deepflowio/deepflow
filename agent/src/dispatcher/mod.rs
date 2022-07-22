@@ -308,6 +308,8 @@ pub struct DispatcherBuilder {
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
     flow_output_queue: Option<DebugSender<TaggedFlow>>,
     log_output_queue: Option<DebugSender<MetaAppProto>>,
+    packet_sequence_output_queue:
+        Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
     policy_getter: Option<PolicyGetter>,
@@ -383,6 +385,15 @@ impl DispatcherBuilder {
 
     pub fn log_output_queue(mut self, v: DebugSender<MetaAppProto>) -> Self {
         self.log_output_queue = Some(v);
+        self
+    }
+
+    // Enterprise Edition Feature: packet-sequence
+    pub fn packet_sequence_output_queue(
+        mut self,
+        v: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>,
+    ) -> Self {
+        self.packet_sequence_output_queue = Some(v);
         self
     }
 
@@ -536,6 +547,11 @@ impl DispatcherBuilder {
                 .ntp_diff
                 .take()
                 .ok_or(Error::ConfigIncomplete("no ntp_diff".into()))?,
+            // Enterprise Edition Feature: packet-sequence
+            packet_sequence_output_queue: self
+                .packet_sequence_output_queue
+                .take()
+                .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
         };
         collector.register_countable(
             "dispatcher",

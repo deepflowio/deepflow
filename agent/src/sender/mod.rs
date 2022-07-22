@@ -36,6 +36,7 @@ const METRICS_VERSION: u32 = 20220117;
 const OPEN_TELEMETRY: u32 = 20220607;
 const PROMETHEUS: u32 = 20220613;
 const TELEGRAF: u32 = 20220613;
+const PACKET_SEQUENCE_BLOCK: u32 = 20220712; // Enterprise Edition Feature: packet-sequence
 
 const PRE_FILE_SUFFIX: &str = ".pre";
 const MAX_FILE_SIZE: usize = 1_000_000_000;
@@ -47,6 +48,7 @@ pub enum SendItem {
     ExternalOtel(OpenTelemetry),
     ExternalProm(PrometheusMetric),
     ExternalTelegraf(TelegrafMetric),
+    PacketSequenceBlock(Box<packet_sequence_block::PacketSequenceBlock>), // Enterprise Edition Feature: packet-sequence
 }
 
 impl SendItem {
@@ -58,6 +60,7 @@ impl SendItem {
             Self::ExternalOtel(o) => o.encode(buf),
             Self::ExternalProm(p) => p.encode(buf),
             Self::ExternalTelegraf(p) => p.encode(buf),
+            Self::PacketSequenceBlock(p) => p.encode(buf), // Enterprise Edition Feature: packet-sequence
         }
     }
 
@@ -83,6 +86,7 @@ impl SendItem {
             Self::ExternalOtel(_) => SendMessageType::OpenTelemetry,
             Self::ExternalProm(_) => SendMessageType::Prometheus,
             Self::ExternalTelegraf(_) => SendMessageType::Telegraf,
+            Self::PacketSequenceBlock(_) => SendMessageType::PacketSequenceBlock, // Enterprise Edition Feature: packet-sequence
         }
     }
 
@@ -94,6 +98,7 @@ impl SendItem {
             Self::ExternalOtel(_) => OPEN_TELEMETRY,
             Self::ExternalProm(_) => PROMETHEUS,
             Self::ExternalTelegraf(_) => TELEGRAF,
+            Self::PacketSequenceBlock(_) => PACKET_SEQUENCE_BLOCK, // Enterprise Edition Feature: packet-sequence
         }
     }
 }
@@ -107,6 +112,7 @@ impl fmt::Display for SendItem {
             Self::ExternalOtel(o) => write!(f, "open_telemetry: {:?}", o),
             Self::ExternalProm(p) => write!(f, "prometheus: {:?}", p),
             Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
+            Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
         }
     }
 }
@@ -120,6 +126,7 @@ impl fmt::Debug for SendItem {
             Self::ExternalOtel(o) => write!(f, "open_telemetry: {:?}", o),
             Self::ExternalProm(p) => write!(f, "prometheus: {:?}", p),
             Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
+            Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
         }
     }
 }
@@ -136,6 +143,7 @@ pub enum SendMessageType {
     OpenTelemetry = 6,
     Prometheus = 7,
     Telegraf = 8,
+    PacketSequenceBlock = 9, // Enterprise Edition Feature: packet-sequence
 }
 
 impl fmt::Display for SendMessageType {
@@ -150,6 +158,7 @@ impl fmt::Display for SendMessageType {
             Self::OpenTelemetry => write!(f, "open_telemetry"),
             Self::Prometheus => write!(f, "prometheus"),
             Self::Telegraf => write!(f, "telegraf"),
+            Self::PacketSequenceBlock => write!(f, "packet_sequence_block"), // Enterprise Edition Feature: packet-sequence
         }
     }
 }

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -175,7 +176,7 @@ func Start(configPath string) {
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
 	trouter.RegistRouter(r)
-	if err := r.Run(":20417"); err != nil {
+	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
 		os.Exit(0)
 	}
