@@ -138,6 +138,7 @@ impl fmt::Display for Source {
 #[derive(Debug)]
 pub struct Batch {
     module: &'static str,
+    hostname: String,
     tags: Vec<(&'static str, String)>,
     points: Vec<Counter>,
     timestamp: SystemTime,
@@ -152,30 +153,28 @@ impl Batch {
     fn to_stats(&self) -> stats::Stats {
         let mut tag_names = vec![];
         let mut tag_values = vec![];
-        let mut metrics_int_names = vec![];
-        let mut metrics_int_values = vec![];
         let mut metrics_float_names = vec![];
         let mut metrics_float_values = vec![];
 
+        let mut has_host = false;
         for t in self.tags.iter() {
+            if t.0 == "host" {
+                has_host = true;
+            }
             tag_names.push(t.0.to_string());
             tag_values.push(t.1.clone());
         }
+        if !has_host {
+            tag_names.push("host".to_string());
+            tag_values.push(self.hostname.clone());
+        }
 
         for p in self.points.iter() {
+            metrics_float_names.push(p.0.to_string());
             match p.2 {
-                CounterValue::Signed(i) => {
-                    metrics_int_names.push(p.0.to_string());
-                    metrics_int_values.push(i)
-                }
-                CounterValue::Unsigned(u) => {
-                    metrics_int_names.push(p.0.to_string());
-                    metrics_int_values.push(u as i64)
-                }
-                CounterValue::Float(f) => {
-                    metrics_float_names.push(p.0.to_string());
-                    metrics_float_values.push(f)
-                }
+                CounterValue::Signed(i) => metrics_float_values.push(i as f64),
+                CounterValue::Unsigned(u) => metrics_float_values.push(u as f64),
+                CounterValue::Float(f) => metrics_float_values.push(f),
             }
         }
 
@@ -188,8 +187,6 @@ impl Batch {
                 .as_secs(),
             tag_names,
             tag_values,
-            metrics_int_names,
-            metrics_int_values,
             metrics_float_names,
             metrics_float_values,
         }
@@ -377,6 +374,7 @@ impl Collector {
             let mut statsd_clients = vec![];
             let mut old_remotes = vec![];
             loop {
+                let host = hostname.lock().unwrap().clone();
                 // for early exit
                 loop {
                     {
@@ -402,6 +400,7 @@ impl Collector {
                             if !points.is_empty() {
                                 let batch = Arc::new(Batch {
                                     module: source.module,
+                                    hostname: host.clone(),
                                     tags: source.tags.clone(),
                                     points,
                                     timestamp: now,
@@ -461,7 +460,6 @@ impl Collector {
                     }
 
                     debug!("collected: {:?}", batches);
-                    let host = hostname.lock().unwrap().clone();
                     for batch in batches.into_iter() {
                         for client in statsd_clients.iter() {
                             if client.is_none() {
