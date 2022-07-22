@@ -182,14 +182,15 @@ pub struct EndpointStore {
 }
 
 impl From<EndpointData> for EndpointStore {
-    fn from(mut e: EndpointData) -> Self {
+    fn from(e: EndpointData) -> Self {
         let mut store = EndpointStore::default();
 
         for i in 0..L3L2End::Max as usize {
             for j in 0..L3L2End::Max as usize {
-                e.src_info.set_l3_l2_end(L3L2End::from(i));
-                e.dst_info.set_l3_l2_end(L3L2End::from(j));
-                store.datas[i][j] = Arc::new(e);
+                let mut item = e;
+                item.src_info.set_l3_l2_end(L3L2End::from(i));
+                item.dst_info.set_l3_l2_end(L3L2End::from(j));
+                store.datas[i][j] = Arc::new(item);
             }
         }
 
