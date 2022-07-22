@@ -106,7 +106,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					}
 					if len(macs) != 0 {
 						macsStr := strings.Join(macs, ",")
-						if op == "in" || op == "not in" {
+						if strings.ToLower(op) == "in" || strings.ToLower(op) == "not in" {
 							macsStr = "(" + macsStr + ")"
 						}
 						filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
@@ -117,6 +117,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					macSlice := strings.Split(macValue, ",")
 					macs := []string{}
 					for _, valueStr := range macSlice {
+						valueStr = strings.Trim(valueStr, " ")
 						valueStr = strings.Trim(valueStr, "'")
 						ip := net.ParseIP(valueStr)
 						if ip != nil {
@@ -140,7 +141,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 					}
 					if len(macs) != 0 {
 						macsStr := strings.Join(macs, ",")
-						if op == "in" || op == "not in" {
+						if strings.ToLower(op) == "in" || strings.ToLower(op) == "not in" {
 							macsStr = "(" + macsStr + ")"
 						}
 						filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
@@ -231,7 +232,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				}
 				if len(macs) != 0 {
 					macsStr := strings.Join(macs, ",")
-					if op == "in" || op == "not in" {
+					if strings.ToLower(op) == "in" || strings.ToLower(op) == "not in" {
 						macsStr = "(" + macsStr + ")"
 					}
 					filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
@@ -242,6 +243,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				macSlice := strings.Split(macValue, ",")
 				macs := []string{}
 				for _, valueStr := range macSlice {
+					valueStr = strings.Trim(valueStr, " ")
 					valueStr = strings.Trim(valueStr, "'")
 					ip := net.ParseIP(valueStr)
 					if ip != nil {
@@ -265,7 +267,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				}
 				if len(macs) != 0 {
 					macsStr := strings.Join(macs, ",")
-					if op == "in" || op == "not in" {
+					if strings.ToLower(op) == "in" || strings.ToLower(op) == "not in" {
 						macsStr = "(" + macsStr + ")"
 					}
 					filter = fmt.Sprintf("%s %s %s", t.Tag, op, macsStr)
@@ -355,7 +357,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			}
 			if len(versions) != 0 {
 				versionsStr := strings.Join(versions, ",")
-				if op == "in" || op == "not in" {
+				if strings.ToLower(op) == "in" || strings.ToLower(op) == "not in" {
 					versionsStr = "(" + versionsStr + ")"
 				}
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, versionsStr)
@@ -377,13 +379,13 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			if hasTrue == true && hasFalse == true {
 				whereFilter = "1=1"
 			} else if hasTrue == true {
-				if op == "=" || op == "in" {
+				if op == "=" || strings.ToLower(op) == "in" {
 					newOP = "="
 				} else {
 					newOP = "!="
 				}
 			} else {
-				if op == "=" || op == "in" {
+				if op == "=" || strings.ToLower(op) == "in" {
 					newOP = "!="
 				} else {
 					newOP = "="
@@ -406,7 +408,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			}
 			if len(whereFilters) != 0 {
 				equalFilter := "(" + strings.Join(whereFilters, " OR ") + ")"
-				switch op {
+				switch strings.ToLower(op) {
 				case "not in":
 					whereFilter = "not(" + equalFilter + ")"
 				case "!=":
