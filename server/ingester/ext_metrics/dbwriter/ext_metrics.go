@@ -27,6 +27,7 @@ type ExtMetrics struct {
 
 	Tag zerodoc.Tag
 
+	Database  string
 	TableName string
 
 	TagNames  []string
@@ -88,11 +89,18 @@ func (m *ExtMetrics) GenCKTable(ttl int) *ckdb.Table {
 	cluster := ckdb.DF_CLUSTER
 	engine := ckdb.MergeTree
 
-	orderKeys := []string{"l3_epc_id", "ip4", "ip6"}
+	orderKeys := []string{}
+	if m.Tag.Code&zerodoc.L3EpcID != 0 {
+		orderKeys = append(orderKeys, "l3_epc_id")
+	}
+	if m.Tag.Code&zerodoc.IP != 0 {
+		orderKeys = append(orderKeys, "ip4")
+		orderKeys = append(orderKeys, "ip6")
+	}
 	orderKeys = append(orderKeys, timeKey)
 
 	return &ckdb.Table{
-		Database:        EXT_METRICS_DB,
+		Database:        m.Database,
 		LocalName:       m.TableName + ckdb.LOCAL_SUBFFIX,
 		GlobalName:      m.TableName,
 		Columns:         m.Columns(),
@@ -126,6 +134,7 @@ func AcquireExtMetrics() *ExtMetrics {
 
 func ReleaseExtMetrics(m *ExtMetrics) {
 	*m.Tag.Field = zerodoc.Field{}
+	m.Tag.Code = 0
 	m.TagNames = m.TagNames[:0]
 	m.TagValues = m.TagValues[:0]
 	m.MetricsIntNames = m.MetricsIntNames[:0]

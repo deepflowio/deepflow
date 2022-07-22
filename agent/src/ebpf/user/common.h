@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <emmintrin.h>
+#include <time.h>
 
 #define NS_IN_SEC       1000000000ULL
 #define TIME_TYPE_NAN   1
@@ -34,7 +35,7 @@ struct sysinfo {
 	char _f[20-2*sizeof(unsigned long)-sizeof(uint32_t)];
 };
 
-extern int sysinfo (struct sysinfo *__info) __THROW;
+extern int sysinfo (struct sysinfo *__info);
 
 /**
  * Check if a branch is likely to be taken.

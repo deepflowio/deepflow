@@ -14,7 +14,7 @@ generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test
 		 libs/hmap/lru/ubig_lru.go libs/hmap/lru/ubig_lru_test.go \
 		 libs/zerodoc/pooled_meters.go
 
-proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go
+proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
 
 $(generated_libs): $(generate_sources)
 	go generate ./...
@@ -48,6 +48,15 @@ libs/zerodoc/pb/metric.proto: vendor
 libs/zerodoc/pb/metric.pb.go: libs/zerodoc/pb/metric.proto
 	cd libs/zerodoc/pb && go generate ./...
 
+vendor/${MESSAGE}/stats.proto: vendor
+	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/stats.proto vendor/${MESSAGE}/
+
+libs/stats/pb/stats.pb.go: vendor/${MESSAGE}/stats.proto
+	cp vendor/${MESSAGE}/stats.proto libs/stats/pb/stats.proto
+	# delete first 3 char of line 6-10 for go language
+	sed -i '6,10s/^...//' libs/stats/pb/stats.proto
+	cd libs/stats/pb && go generate ./...
+
 libs/geo/ip_info.go: libs/geo/ip_info_mini.json libs/geo/ip_info.py
 	go generate ./...
 
@@ -76,3 +85,4 @@ clean:
 	rm -f $(generated_libs)
 	rm -f libs/datatype/pb/flow_log.proto
 	rm -f libs/zerodoc/pb/metric.proto
+	rm -f libs/stats/pb/stats.proto

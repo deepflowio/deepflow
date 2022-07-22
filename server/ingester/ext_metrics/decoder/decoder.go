@@ -40,6 +40,7 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
 	"github.com/deepflowys/deepflow/server/libs/stats"
+	"github.com/deepflowys/deepflow/server/libs/stats/pb"
 	"github.com/deepflowys/deepflow/server/libs/utils"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 )
@@ -53,6 +54,8 @@ const (
 	PROMETHEUS_INSTANCE     = "instance"
 	TABLE_PREFIX_TELEGRAF   = "telegraf_"
 	TABLE_PREFIX_PROMETHEUS = "prometheus_"
+	EXT_METRICS_DB          = "ext_metrics"
+	DEEPFLOW_SYSTEM_DB      = "deepflow_system"
 )
 
 type Counter struct {
@@ -125,6 +128,8 @@ func (d *Decoder) Run() {
 				d.handleTelegraf(recvBytes.VtapID, decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_PROMETHEUS {
 				d.handlePrometheus(recvBytes.VtapID, decoder)
+			} else if d.msgType == datatype.MESSAGE_TYPE_DFSTATS {
+				d.handleMetaflowStats(recvBytes.VtapID, decoder)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
@@ -213,6 +218,47 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 	d.counter.OutCount++
 }
 
+func (d *Decoder) handleMetaflowStats(vtapID uint16, decoder *codec.SimpleDecoder) {
+	for !decoder.IsEnd() {
+		pbStats := &pb.Stats{}
+		bytes := decoder.ReadBytes()
+		if decoder.Failed() {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("deepflow stats decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+			}
+			d.counter.ErrorCount++
+			return
+		}
+		if err := pbStats.Unmarshal(bytes); err != nil {
+			if d.counter.ErrorCount == 0 {
+				log.Warningf("deepflow stats parse failed, err msg: %s", err)
+			}
+			d.counter.ErrorCount++
+			continue
+		}
+
+		if d.debugEnabled {
+			log.Debugf("decoder %d vtap %d recv deepflow stats: %v", d.index, vtapID, pbStats)
+		}
+		d.extMetricsWriter.Write(StatsToExtMetrics(pbStats))
+		d.counter.OutCount++
+	}
+}
+
+func StatsToExtMetrics(s *pb.Stats) *dbwriter.ExtMetrics {
+	m := dbwriter.AcquireExtMetrics()
+	m.Timestamp = uint32(s.Timestamp)
+	m.Database = DEEPFLOW_SYSTEM_DB
+	m.TableName = s.Name
+	m.TagNames = s.TagNames
+	m.TagValues = s.TagValues
+	m.MetricsIntNames = s.MetricsIntNames
+	m.MetricsIntValues = s.MetricsIntValues
+	m.MetricsFloatNames = s.MetricsFloatNames
+	m.MetricsFloatValues = s.MetricsFloatValues
+	return m
+}
+
 // return the index of the character in 'str', which is the 'n' th same as 'c'
 func findNthChar(str string, c byte, nth int) int {
 	if nth <= 0 {
@@ -269,6 +315,7 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 		m := dbwriter.AcquireExtMetrics()
 
 		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
+		m.Database = EXT_METRICS_DB
 		m.TableName = tableName
 
 		m.TagNames = tagNames
@@ -373,6 +420,7 @@ func parseIPFromInstance(instance string) net.IP {
 func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwriter.ExtMetrics, error) {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(point.Time().Unix())
+	m.Database = EXT_METRICS_DB
 	tableName := string(point.Name())
 	if strings.HasPrefix(tableName, TABLE_PREFIX_TELEGRAF[:len(TABLE_PREFIX_TELEGRAF)-1]) {
 		m.TableName = tableName

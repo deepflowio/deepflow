@@ -21,12 +21,14 @@ pub(crate) mod uniform_sender;
 use num_enum::IntoPrimitive;
 
 use std::fmt;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::common::tagged_flow::TaggedFlow;
 use crate::flow_generator::AppProtoLogsData;
 use crate::integration_collector::{OpenTelemetry, PrometheusMetric, TelegrafMetric};
 use crate::metric::document::Document;
+use crate::utils::stats::Batch;
 
 const SEQUENCE_OFFSET: usize = 8;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
@@ -49,6 +51,7 @@ pub enum SendItem {
     ExternalProm(PrometheusMetric),
     ExternalTelegraf(TelegrafMetric),
     PacketSequenceBlock(Box<packet_sequence_block::PacketSequenceBlock>), // Enterprise Edition Feature: packet-sequence
+    DeepflowStats(Arc<Batch>),
 }
 
 impl SendItem {
@@ -61,6 +64,7 @@ impl SendItem {
             Self::ExternalProm(p) => p.encode(buf),
             Self::ExternalTelegraf(p) => p.encode(buf),
             Self::PacketSequenceBlock(p) => p.encode(buf), // Enterprise Edition Feature: packet-sequence
+            Self::DeepflowStats(b) => b.encode(buf),
         }
     }
 
@@ -87,6 +91,7 @@ impl SendItem {
             Self::ExternalProm(_) => SendMessageType::Prometheus,
             Self::ExternalTelegraf(_) => SendMessageType::Telegraf,
             Self::PacketSequenceBlock(_) => SendMessageType::PacketSequenceBlock, // Enterprise Edition Feature: packet-sequence
+            Self::DeepflowStats(_) => SendMessageType::DeepflowStats,
         }
     }
 
@@ -99,6 +104,7 @@ impl SendItem {
             Self::ExternalProm(_) => PROMETHEUS,
             Self::ExternalTelegraf(_) => TELEGRAF,
             Self::PacketSequenceBlock(_) => PACKET_SEQUENCE_BLOCK, // Enterprise Edition Feature: packet-sequence
+            _ => 0,
         }
     }
 }
@@ -113,6 +119,7 @@ impl fmt::Display for SendItem {
             Self::ExternalProm(p) => write!(f, "prometheus: {:?}", p),
             Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
             Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
+            Self::DeepflowStats(s) => write!(f, "deepflow_stats: {:?}", s),
         }
     }
 }
@@ -127,6 +134,7 @@ impl fmt::Debug for SendItem {
             Self::ExternalProm(p) => write!(f, "prometheus: {:?}", p),
             Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
             Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
+            Self::DeepflowStats(s) => write!(f, "deepflow_stats: {:?}", s),
         }
     }
 }
@@ -144,6 +152,7 @@ pub enum SendMessageType {
     Prometheus = 7,
     Telegraf = 8,
     PacketSequenceBlock = 9, // Enterprise Edition Feature: packet-sequence
+    DeepflowStats = 10,
 }
 
 impl fmt::Display for SendMessageType {
@@ -159,6 +168,7 @@ impl fmt::Display for SendMessageType {
             Self::Prometheus => write!(f, "prometheus"),
             Self::Telegraf => write!(f, "telegraf"),
             Self::PacketSequenceBlock => write!(f, "packet_sequence_block"), // Enterprise Edition Feature: packet-sequence
+            Self::DeepflowStats => write!(f, "deepflow_stats"),
         }
     }
 }

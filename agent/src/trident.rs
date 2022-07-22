@@ -262,6 +262,15 @@ impl Trident {
             remote_log_config.clone(),
         );
 
+        let mut stats_sender = UniformSenderThread::new(
+            stats::DFSTATS_SENDER_ID,
+            stats_collector.get_receiver(),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
+        stats_sender.start();
+
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             state.clone(),
@@ -772,7 +781,7 @@ impl Components {
             l4_flow_aggr_sender = Some(sender);
             l4_flow_uniform_sender = Some(UniformSenderThread::new(
                 sender_id,
-                l4_flow_aggr_receiver,
+                Arc::new(l4_flow_aggr_receiver),
                 config_handler.sender(),
                 stats_collector.clone(),
                 exception_handler.clone(),
@@ -795,7 +804,7 @@ impl Components {
         );
         let metrics_uniform_sender = UniformSenderThread::new(
             sender_id,
-            metrics_receiver,
+            Arc::new(metrics_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -817,7 +826,7 @@ impl Components {
         );
         let l7_flow_uniform_sender = UniformSenderThread::new(
             sender_id,
-            proto_log_receiver,
+            Arc::new(proto_log_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -871,7 +880,7 @@ impl Components {
         );
         let packet_sequence_uniform_sender = UniformSenderThread::new(
             sender_id,
-            packet_sequence_uniform_input,
+            Arc::new(packet_sequence_uniform_input),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -1049,7 +1058,7 @@ impl Components {
         );
         let otel_uniform_sender = UniformSenderThread::new(
             sender_id,
-            otel_receiver,
+            Arc::new(otel_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -1071,7 +1080,7 @@ impl Components {
         );
         let prometheus_uniform_sender = UniformSenderThread::new(
             sender_id,
-            prometheus_receiver,
+            Arc::new(prometheus_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -1093,7 +1102,7 @@ impl Components {
         );
         let telegraf_uniform_sender = UniformSenderThread::new(
             sender_id,
-            telegraf_receiver,
+            Arc::new(telegraf_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),

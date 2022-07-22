@@ -60,7 +60,7 @@ func NewUDPClient(conf UDPConfig) (*UDPClient, error) {
 	}
 
 	h := datatype.BaseHeader{
-		Type: datatype.MESSAGE_TYPE_DFSTATSD,
+		Type: datatype.MESSAGE_TYPE_DFSTATS,
 	}
 	header := make([]byte, datatype.MESSAGE_HEADER_LEN)
 	h.Encode(header)
