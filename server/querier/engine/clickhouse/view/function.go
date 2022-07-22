@@ -384,6 +384,7 @@ func (f *SpreadFunction) Init() {
 			FillNullAsZero: f.FillNullAsZero,
 			Time:           f.Time,
 			IsGroupArray:   f.IsGroupArray,
+			Condition:      f.Condition,
 		},
 	}
 	f.minusFunction = &DefaultFunction{
@@ -428,6 +429,7 @@ func (f *RspreadFunction) Init() {
 			FillNullAsZero: f.FillNullAsZero,
 			Time:           f.Time,
 			IsGroupArray:   f.IsGroupArray,
+			Condition:      f.Condition,
 		},
 	}
 	f.divFunction = &DivFunction{
