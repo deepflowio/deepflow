@@ -108,5 +108,11 @@ func (g *GroupTag) Format(m *view.Model) {
 				m.AddGroup(&view.Group{Value: resourceTypeSuffix})
 			}
 		}
+		// internet增加epc分组
+		internetSuffix := "is_internet" + suffix
+		epcSuffix := "l3_epc" + suffix
+		if g.Value == internetSuffix {
+			m.AddGroup(&view.Group{Value: epcSuffix})
+		}
 	}
 }

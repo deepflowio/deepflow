@@ -36,7 +36,6 @@ import (
 var log = logging.MustGetLogger("ext_metrics.dbwriter")
 
 const (
-	EXT_METRICS_DB   = "ext_metrics"
 	QUEUE_BATCH_SIZE = 1024
 )
 
@@ -112,7 +111,7 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 
 	ckwriter.Run()
 	if w.ttl != config.DefaultExtMetricsTTL {
-		w.setTTL(s.TableName)
+		w.setTTL(s.Database, s.TableName)
 	}
 
 	w.tablesLock.Lock()
@@ -171,9 +170,9 @@ func (w *ExtMetricsWriter) GetCounter() interface{} {
 	return counter
 }
 
-func (w *ExtMetricsWriter) setTTL(tableName string) error {
+func (w *ExtMetricsWriter) setTTL(database, tableName string) error {
 	sql := fmt.Sprintf("ALTER TABLE %s.%s MODIFY TTL time +  toIntervalDay(%d)",
-		EXT_METRICS_DB, tableName+ckdb.LOCAL_SUBFFIX, w.ttl)
+		database, tableName+ckdb.LOCAL_SUBFFIX, w.ttl)
 	log.Info(sql)
 	_, err := w.ckdbConn.Exec(sql)
 	return err

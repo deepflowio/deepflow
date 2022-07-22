@@ -96,6 +96,10 @@ pub(super) struct BaseDispatcher {
     pub(super) policy_getter: PolicyGetter,
     pub(super) exception_handler: ExceptionHandler,
     pub(super) ntp_diff: Arc<AtomicI64>,
+
+    // Enterprise Edition Feature: packet-sequence
+    pub(super) packet_sequence_output_queue:
+        DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>,
 }
 
 impl BaseDispatcher {

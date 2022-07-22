@@ -54,7 +54,7 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 			dbField := fmt.Sprintf("metrics_int_values[indexOf(metrics_int_names, '%s')]", externalTag)
 			lm := NewMetrics(
 				i, dbField, externalTag, "", METRICS_TYPE_COUNTER,
-				"原始Tag", []bool{true, true, true}, externalTag,
+				"原始Tag", []bool{true, true, true}, "",
 				table,
 			)
 			metricName := fmt.Sprintf("%s.%s", "int", externalTag)
@@ -66,7 +66,7 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 			dbField := fmt.Sprintf("metrics_float_values[indexOf(metrics_float_names, '%s')]", externalTag)
 			lm := NewMetrics(
 				i+len(externalMetricIntRst["values"]), dbField, externalTag, "", METRICS_TYPE_COUNTER,
-				"原始Tag", []bool{true, true, true}, externalTag, table,
+				"原始Tag", []bool{true, true, true}, "", table,
 			)
 			metricName := fmt.Sprintf("%s.%s", "float", externalTag)
 			loadMetrics[metricName] = lm

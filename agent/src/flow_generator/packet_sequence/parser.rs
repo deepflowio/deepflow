@@ -1,0 +1,87 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+//! Enterprise Edition Feature: packet-sequence
+use crate::{
+    sender::SendItem,
+    utils::queue::{DebugSender, Error, Receiver},
+};
+
+use crate::flow_generator::packet_sequence::consts;
+use log::{info, warn};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
+};
+
+pub struct PacketSequenceParser {
+    input_queue: Arc<Receiver<Box<packet_sequence_block::PacketSequenceBlock>>>,
+    output_queue: DebugSender<SendItem>,
+    id: u32,
+    running: Arc<AtomicBool>,
+    thread: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl PacketSequenceParser {
+    pub fn new(
+        input_queue: Receiver<Box<packet_sequence_block::PacketSequenceBlock>>,
+        output_queue: DebugSender<SendItem>,
+        id: u32,
+    ) -> Self {
+        PacketSequenceParser {
+            input_queue: Arc::new(input_queue),
+            output_queue,
+            id,
+            running: Default::default(),
+            thread: Mutex::new(None),
+        }
+    }
+
+    pub fn start(&self) {
+        if self.running.swap(true, Ordering::Relaxed) {
+            return;
+        }
+
+        let running = self.running.clone();
+        let input_queue = self.input_queue.clone();
+        let output_queue = self.output_queue.clone();
+
+        let thread = thread::spawn(move || {
+            while running.load(Ordering::Relaxed) {
+                match input_queue.recv_n(consts::QUEUE_BATCH_SIZE, Some(consts::RCV_TIMEOUT)) {
+                    Ok(packet_sequence_blocks) => {
+                        let v = packet_sequence_blocks
+                            .into_iter()
+                            .map(|item| SendItem::PacketSequenceBlock(item))
+                            .collect();
+                        if let Err(_) = output_queue.send_all(v) {
+                            warn!(
+                                "packet sequence block to queue failed maybe queue have terminated"
+                            );
+                        }
+                    }
+                    Err(Error::Timeout) => continue,
+                    Err(Error::Terminated(..)) => break,
+                };
+            }
+        });
+        self.thread.lock().unwrap().replace(thread);
+        info!("packet sequence parser (id={}) started", self.id);
+    }
+}

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-pub(crate) mod common;
-pub(crate) mod flow_log;
-pub(crate) mod metric;
-pub(crate) mod stats;
-pub(crate) mod trident;
+//! Enterprise Edition Feature: packet-sequence
+use std::time::Duration;
+
+pub const QUEUE_BATCH_SIZE: usize = 1024;
+pub const RCV_TIMEOUT: Duration = Duration::from_secs(1);

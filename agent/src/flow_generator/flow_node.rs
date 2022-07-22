@@ -143,8 +143,10 @@ pub struct FlowNode {
 
     pub tagged_flow: TaggedFlow,
     pub min_arrived_time: Duration,
-    pub recent_time: Duration, // 最近一个Packet的时间戳
-    pub timeout: Duration,     // 相对超时时间
+    pub recent_time: Duration,
+    // 最近一个Packet的时间戳
+    pub timeout: Duration,
+    // 相对超时时间
     pub flow_state: FlowState,
     pub meta_flow_perf: Option<FlowPerf>,
 
@@ -153,8 +155,12 @@ pub struct FlowNode {
 
     pub next_tcp_seq0: u32,
     pub next_tcp_seq1: u32,
-    pub policy_in_tick: [bool; 2], // 当前统计周期（目前是自然秒）是否更新策略
-    pub packet_in_tick: bool,      // 当前统计周期（目前是自然秒）是否有包
+    pub policy_in_tick: [bool; 2],
+    // 当前统计周期（目前是自然秒）是否更新策略
+    pub packet_in_tick: bool, // 当前统计周期（目前是自然秒）是否有包
+
+    // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_block: Option<packet_sequence_block::PacketSequenceBlock>,
 }
 
 impl FlowNode {

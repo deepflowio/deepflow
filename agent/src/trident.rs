@@ -54,7 +54,7 @@ use crate::{
     },
     ebpf_collector::EbpfCollector,
     exception::ExceptionHandler,
-    flow_generator::AppProtoLogsParser,
+    flow_generator::{AppProtoLogsParser, PacketSequenceParser},
     handler::PacketHandlerBuilder,
     integration_collector::MetricServer,
     monitor::Monitor,
@@ -261,6 +261,15 @@ impl Trident {
             logger_handle,
             remote_log_config.clone(),
         );
+
+        let mut stats_sender = UniformSenderThread::new(
+            stats::DFSTATS_SENDER_ID,
+            stats_collector.get_receiver(),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
+        stats_sender.start();
 
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
@@ -554,6 +563,8 @@ pub struct Components {
     pub otel_uniform_sender: UniformSenderThread,
     pub prometheus_uniform_sender: UniformSenderThread,
     pub telegraf_uniform_sender: UniformSenderThread,
+    pub packet_sequence_parsers: Vec<PacketSequenceParser>, // Enterprise Edition Feature: packet-sequence
+    pub packet_sequence_uniform_sender: UniformSenderThread, // Enterprise Edition Feature: packet-sequence
     pub exception_handler: ExceptionHandler,
     pub domain_name_listener: DomainNameListener,
     max_memory: u64,
@@ -576,6 +587,12 @@ impl Components {
 
         if let Some(l4_sender) = self.l4_flow_uniform_sender.as_mut() {
             l4_sender.start();
+        }
+
+        // Enterprise Edition Feature: packet-sequence
+        self.packet_sequence_uniform_sender.start();
+        for packet_sequence_parser in self.packet_sequence_parsers.iter() {
+            packet_sequence_parser.start();
         }
 
         match self.tap_mode {
@@ -731,6 +748,7 @@ impl Components {
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
         let mut log_parsers = vec![];
+        let mut packet_sequence_parsers = vec![]; // Enterprise Edition Feature: packet-sequence
 
         // Sender/Collector
         info!(
@@ -763,7 +781,7 @@ impl Components {
             l4_flow_aggr_sender = Some(sender);
             l4_flow_uniform_sender = Some(UniformSenderThread::new(
                 sender_id,
-                l4_flow_aggr_receiver,
+                Arc::new(l4_flow_aggr_receiver),
                 config_handler.sender(),
                 stats_collector.clone(),
                 exception_handler.clone(),
@@ -786,7 +804,7 @@ impl Components {
         );
         let metrics_uniform_sender = UniformSenderThread::new(
             sender_id,
-            metrics_receiver,
+            Arc::new(metrics_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -808,7 +826,7 @@ impl Components {
         );
         let l7_flow_uniform_sender = UniformSenderThread::new(
             sender_id,
-            proto_log_receiver,
+            Arc::new(proto_log_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -842,6 +860,31 @@ impl Components {
         let l7_log_rate = Arc::new(LeakyBucket::new(Some(
             candidate_config.log_parser.l7_log_collect_nps_threshold,
         )));
+
+        // Enterprise Edition Feature: packet-sequence
+        let sender_id = 6; // TODO sender_id should be generated automatically
+        let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
+            queue::bounded_with_debug(
+                yaml_config.packet_sequence_queue_size,
+                "packet_sequence_block-to-sender",
+                &queue_debugger,
+            );
+
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "packet_sequence_block-to-sender".to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let packet_sequence_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            Arc::new(packet_sequence_uniform_input),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
 
         let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
         for i in 0..dispatcher_num {
@@ -888,6 +931,33 @@ impl Components {
             );
             log_parsers.push(app_proto_log_parser);
 
+            // Enterprise Edition Feature: packet-sequence
+            // create and start packet sequence
+            let (packet_sequence_sender, packet_sequence_receiver, counter) =
+                queue::bounded_with_debug(
+                    yaml_config.packet_sequence_queue_size,
+                    "1-packet-sequence-block-to-uniform-collect-sender",
+                    &queue_debugger,
+                );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag(
+                        "module",
+                        "1-packet-sequence-block-to-uniform-collect-sender".to_string(),
+                    ),
+                    StatsOption::Tag("index", i.to_string()),
+                ],
+            );
+
+            let packet_sequence_parser = PacketSequenceParser::new(
+                packet_sequence_receiver,
+                packet_sequence_uniform_output.clone(),
+                i as u32,
+            );
+            packet_sequence_parsers.push(packet_sequence_parser);
+
             let dispatcher = DispatcherBuilder::new()
                 .id(i)
                 .ctrl_mac(ctrl_mac)
@@ -916,6 +986,7 @@ impl Components {
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
                 .flow_output_queue(flow_sender)
                 .log_output_queue(log_sender)
+                .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
                 .stats_collector(stats_collector.clone())
                 .flow_map_config(config_handler.flow())
                 .policy_getter(policy_getter)
@@ -987,7 +1058,7 @@ impl Components {
         );
         let otel_uniform_sender = UniformSenderThread::new(
             sender_id,
-            otel_receiver,
+            Arc::new(otel_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -1009,7 +1080,7 @@ impl Components {
         );
         let prometheus_uniform_sender = UniformSenderThread::new(
             sender_id,
-            prometheus_receiver,
+            Arc::new(prometheus_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -1031,7 +1102,7 @@ impl Components {
         );
         let telegraf_uniform_sender = UniformSenderThread::new(
             sender_id,
-            telegraf_receiver,
+            Arc::new(telegraf_receiver),
             config_handler.sender(),
             stats_collector.clone(),
             exception_handler.clone(),
@@ -1081,6 +1152,8 @@ impl Components {
             prometheus_uniform_sender,
             telegraf_uniform_sender,
             tap_mode,
+            packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
+            packet_sequence_parsers,        // Enterprise Edition Feature: packet-sequence
             domain_name_listener,
         })
     }
@@ -1271,6 +1344,7 @@ impl Components {
         self.otel_uniform_sender.stop();
         self.prometheus_uniform_sender.stop();
         self.telegraf_uniform_sender.stop();
+        self.packet_sequence_uniform_sender.stop(); // Enterprise Edition Feature: packet-sequence
         self.domain_name_listener.stop();
 
         info!("Stopped components.")

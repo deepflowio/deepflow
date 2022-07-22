@@ -21,6 +21,8 @@
 /cli/bin/
 /server/libs/zerodoc/pb/metric.proto
 /server/libs/datatype/pb/flow_log.proto
+/server/libs/stats/pb/stats.proto
+/server/libs/stats/pb/stats.pb.go
 /agent/src/ebpf/user/socket_trace_bpf_5_2.c
 /agent/src/ebpf/user/socket_trace_bpf_core.c
 /agent/src/ebpf/user/socket_trace_bpf_common.c

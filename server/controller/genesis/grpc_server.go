@@ -260,3 +260,7 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *tri
 
 	return &trident.GenesisSharingK8SResponse{}, errors.New("GenesisSharingK8s api not found k8s data")
 }
+
+func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *trident.GenesisSharingSyncRequest) (*trident.GenesisSharingSyncResponse, error) {
+	return &trident.GenesisSharingSyncResponse{}, nil
+}

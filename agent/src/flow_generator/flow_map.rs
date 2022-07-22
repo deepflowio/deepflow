@@ -88,6 +88,7 @@ pub struct FlowMap {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
+    packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
 }
 
 impl FlowMap {
@@ -98,6 +99,7 @@ impl FlowMap {
         app_proto_log_queue: DebugSender<MetaAppProto>,
         ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
+        packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
     ) -> (Self, Arc<FlowPerfCounter>) {
         let counter = Arc::new(FlowPerfCounter::default());
 
@@ -127,6 +129,7 @@ impl FlowMap {
                 rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
                 counter: counter.clone(),
                 ntp_diff,
+                packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
             },
             counter,
         )
@@ -189,6 +192,17 @@ impl FlowMap {
             }
             // 未超时Flow的统计信息发送到队列下游
             self.node_updated_aftercare(&mut node, timeout, None);
+            // Enterprise Edition Feature: packet-sequence
+            if self.config.load().packet_sequence_flag > 0 && node.packet_sequence_block.is_some() {
+                // flush the packet_sequence_block at the regular time
+                if let Err(_) = self
+                    .packet_sequence_queue
+                    .send(Box::new(node.packet_sequence_block.take().unwrap()))
+                {
+                    warn!("packet sequence block to queue failed maybe queue have terminated");
+                }
+            }
+
             // 若流统计信息已输出，将节点移动至最终超时的时间
             let updated_time = if timeout > timestamp + TIME_MAX_INTERVAL {
                 (timestamp + TIME_MAX_INTERVAL).as_nanos() as u64
@@ -300,6 +314,51 @@ impl FlowMap {
             let direction = meta_packet.direction == PacketDirection::ClientToServer;
             self.collect_metric(&mut node, &meta_packet, direction);
         }
+
+        // Enterprise Edition Feature: packet-sequence
+        if self.config.load().packet_sequence_flag > 0 {
+            if node.packet_sequence_block.is_some() {
+                if !node
+                    .packet_sequence_block
+                    .as_ref()
+                    .unwrap()
+                    .check(self.config.load().packet_sequence_block_size)
+                {
+                    // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
+                    if let Err(_) = self
+                        .packet_sequence_queue
+                        .send(Box::new(node.packet_sequence_block.take().unwrap()))
+                    {
+                        warn!("packet sequence block to queue failed maybe queue have terminated");
+                    }
+                    node.packet_sequence_block =
+                        Some(packet_sequence_block::PacketSequenceBlock::default());
+                }
+            } else {
+                node.packet_sequence_block =
+                    Some(packet_sequence_block::PacketSequenceBlock::default());
+            }
+
+            let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
+                node.tagged_flow.flow.flow_id,
+                meta_packet.direction as u8,
+                timestamp.clone(),
+                meta_packet.payload_len,
+                meta_packet.tcp_data.seq,
+                meta_packet.tcp_data.ack,
+                meta_packet.tcp_data.win_size,
+                meta_packet.tcp_data.mss,
+                meta_packet.tcp_data.flags.bits(),
+                meta_packet.tcp_data.win_scale,
+                meta_packet.tcp_data.sack_permitted,
+                &meta_packet.tcp_data.sack,
+            );
+            node.packet_sequence_block
+                .as_mut()
+                .unwrap()
+                .append_packet(mini_meta_packet, self.config.load().packet_sequence_flag);
+        }
+
         if flow_closed {
             time_set.remove(&time_key);
             self.node_removed_aftercare(node, timestamp, Some(&mut meta_packet));
@@ -590,6 +649,7 @@ impl FlowMap {
                     is_local_ip: false,
                 },
             },
+            packet_sequence_block: None, // Enterprise Edition Feature: packet-sequence
         };
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize);
@@ -710,6 +770,29 @@ impl FlowMap {
 
         if self.config.load().collector_enabled {
             self.collect_metric(&mut node, &meta_packet, !reverse);
+        }
+        // Enterprise Edition Feature: packet-sequence
+        if self.config.load().packet_sequence_flag > 0 {
+            node.packet_sequence_block =
+                Some(packet_sequence_block::PacketSequenceBlock::default());
+            let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
+                node.tagged_flow.flow.flow_id,
+                meta_packet.direction as u8,
+                meta_packet.lookup_key.timestamp.clone(),
+                meta_packet.payload_len,
+                meta_packet.tcp_data.seq,
+                meta_packet.tcp_data.ack,
+                meta_packet.tcp_data.win_size,
+                meta_packet.tcp_data.mss,
+                meta_packet.tcp_data.flags.bits(),
+                meta_packet.tcp_data.win_scale,
+                meta_packet.tcp_data.sack_permitted,
+                &meta_packet.tcp_data.sack,
+            );
+            node.packet_sequence_block
+                .as_mut()
+                .unwrap()
+                .append_packet(mini_meta_packet, self.config.load().packet_sequence_flag);
         }
         node
     }
@@ -865,6 +948,19 @@ impl FlowMap {
                     self.l7_metrics_enabled(),
                 )
             });
+        }
+
+        // Enterprise Edition Feature: packet-sequence
+        if self.config.load().packet_sequence_flag > 0
+            && flow.flow_key.proto == IpProtocol::Tcp
+            && node.packet_sequence_block.is_some()
+        {
+            if let Err(_) = self
+                .packet_sequence_queue
+                .send(Box::new(node.packet_sequence_block.take().unwrap()))
+            {
+                warn!("packet sequence block to queue failed maybe queue have terminated");
+            }
         }
 
         self.push_to_flow_stats_queue(node.tagged_flow);
@@ -1028,6 +1124,13 @@ impl FlowMap {
         if let Some(meta_flow_perf) = node.meta_flow_perf.as_mut() {
             meta_flow_perf.reverse(None);
         }
+        // Enterprise Edition Feature: packet-sequence
+        if node.packet_sequence_block.is_some() {
+            node.packet_sequence_block
+                .as_mut()
+                .unwrap()
+                .reverse_needed_for_new_packet();
+        }
     }
 
     fn update_endpoint_and_policy_data(
@@ -1121,6 +1224,7 @@ pub fn _new_flow_map_and_receiver(trident_type: TridentType) -> (FlowMap, Receiv
     let (output_queue_sender, output_queue_receiver, _) =
         queue::bounded_with_debug(256, "", &queue_debugger);
     let (app_proto_log_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
+    let (packet_sequence_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger); // Enterprise Edition Feature: packet-sequence
     let mut config = ModuleConfig {
         flow: FlowConfig {
             trident_type,
@@ -1145,6 +1249,7 @@ pub fn _new_flow_map_and_receiver(trident_type: TridentType) -> (FlowMap, Receiv
         Map::new(current_config.clone(), |config| -> &FlowConfig {
             &config.flow
         }),
+        packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
     );
 
     (flow_map, output_queue_receiver)

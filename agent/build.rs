@@ -14,10 +14,7 @@
  * limitations under the License.
  */
 
-use std::error::Error;
-use std::process::Command;
-extern crate dunce;
-use std::{env, path::PathBuf};
+use std::{env, error::Error, path::PathBuf, process::Command, str};
 
 fn generate_protobuf() -> Result<(), Box<dyn Error>> {
     tonic_build::configure()
@@ -29,6 +26,7 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
                 "src/proto/message/trident.proto",
                 "src/proto/message/metric.proto",
                 "src/proto/message/flow_log.proto",
+                "src/proto/message/stats.proto",
             ],
             &["src/proto/message"],
         )?;
@@ -56,30 +54,59 @@ fn set_build_info() -> Result<(), Box<dyn Error>> {
 }
 
 fn set_build_libebpf() -> Result<(), Box<dyn Error>> {
-    Command::new("sh")
-        .arg("-c")
-        .arg("cd src/ebpf && make clean && make --no-print-directory && make tools --no-print-directory")
-        .output()
-        .expect("compile libebpf.a error!");
+    let output = match env::var("CARGO_CFG_TARGET_ENV")?.as_str() {
+        "gnu" => Command::new("sh").arg("-c")
+            .arg("cd src/ebpf && make clean && make --no-print-directory && make tools --no-print-directory")
+            .output()?,
+        "musl" => Command::new("sh").arg("-c")
+            .arg("cd src/ebpf && make clean && CC=musl-gcc CLANG=musl-clang make --no-print-directory && CC=musl-gcc CLANG=musl-clang make tools --no-print-directory")
+            .output()?,
+        _ => panic!("Unsupported target"),
+    };
+    if !output.status.success() {
+        eprintln!("{}", str::from_utf8(&output.stderr)?);
+        panic!("compile libebpf.a error!");
+    }
     let library_name = "ebpf";
-    let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let library_dir = dunce::canonicalize(root.join("src/ebpf/")).unwrap();
+    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
+    let library_dir = dunce::canonicalize(root.join("src/ebpf/"))?;
     println!("cargo:rustc-link-lib=static={}", library_name);
     println!(
         "cargo:rustc-link-search=native={}",
-        env::join_paths(&[library_dir]).unwrap().to_str().unwrap()
+        env::join_paths(&[library_dir])?.to_str().unwrap()
     );
     Ok(())
 }
 
 fn set_linkage() -> Result<(), Box<dyn Error>> {
+    let target_env = env::var("CARGO_CFG_TARGET_ENV")?;
+    if target_env.as_str() == "musl" {
+        println!("cargo:rustc-link-search=native=/usr/x86_64-linux-musl/lib64");
+    }
     println!("cargo:rustc-link-search=native=/usr/lib");
     println!("cargo:rustc-link-search=native=/usr/lib64");
+
     println!("cargo:rustc-link-lib=static=bddisasm");
     println!("cargo:rustc-link-lib=static=dwarf");
-    println!("cargo:rustc-link-lib=dylib=pthread");
-    println!("cargo:rustc-link-lib=dylib=elf");
-    println!("cargo:rustc-link-lib=dylib=z");
+
+    match target_env.as_str() {
+        "gnu" => {
+            println!("cargo:rustc-link-lib=dylib=pthread");
+            println!("cargo:rustc-link-lib=dylib=elf");
+            println!("cargo:rustc-link-lib=dylib=z");
+        }
+        "musl" => {
+            println!("cargo:rustc-link-lib=static=c");
+            println!("cargo:rustc-link-lib=static=elf");
+            println!("cargo:rustc-link-lib=static=pcap");
+            println!("cargo:rustc-link-lib=static=m");
+            println!("cargo:rustc-link-lib=static=z");
+            println!("cargo:rustc-link-lib=static=pthread");
+            println!("cargo:rustc-link-lib=static=rt");
+            println!("cargo:rustc-link-lib=static=dl");
+        }
+        _ => panic!("Unsupported target"),
+    }
     Ok(())
 }
 

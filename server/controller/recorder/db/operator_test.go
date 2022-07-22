@@ -28,6 +28,7 @@ func (t *SuiteTest) TestformatDBItemsToAdd() {
 	vifs := []*mysql.VInterface{newDBVInterface(), newDBVInterface()}
 	vif1 := vifs[0]
 	vif2 := vifs[1]
+	vifs = append(vifs, vifs[1])
 	mysql.Db.Create(&vif1)
 
 	vifsToAdd, lcuuidsToAdd, ok := operator.formatDBItemsToAdd(vifs)

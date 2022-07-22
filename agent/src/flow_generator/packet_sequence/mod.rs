@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-pub(crate) mod common;
-pub(crate) mod flow_log;
-pub(crate) mod metric;
-pub(crate) mod stats;
-pub(crate) mod trident;
+//! Enterprise Edition Feature: packet-sequence
+mod consts;
+mod parser;
+
+pub use parser::PacketSequenceParser;

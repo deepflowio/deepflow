@@ -703,6 +703,8 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 }
 #endif
 
+#include "go_base_bpf.c" // get_go_version
+
 static __inline void
 data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
@@ -766,8 +768,9 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		socket_id = socket_info_ptr->uid;
 	}
 
+	// (jiping) set thread_trace_id = 0 for go process
 	if (conn_info->message_type != MSG_PRESTORE &&
-	    conn_info->message_type != MSG_RECONFIRM)
+	    conn_info->message_type != MSG_RECONFIRM && !get_go_version())
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid, trace_info_ptr,
 			      trace_uid, trace_stats, &thread_trace_id, time_stamp);
 
@@ -885,8 +888,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	if (extra->use_tcp_seq)
 		v->tcp_seq = extra->tcp_seq;
 
-	if (extra->go)
-		v->coroutine_id = extra->coroutine_id;
+	v->coroutine_id = extra->coroutine_id;
 	/*
 	 * the bitwise AND operation will set the range of possible values for
 	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
@@ -1479,7 +1481,6 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 }
 
 //Refer to the eBPF programs here
-#include "go_base_bpf.c"
 #include "go_tls_bpf.c"
 
 char _license[] SEC("license") = "GPL";

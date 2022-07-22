@@ -100,3 +100,7 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 func (s *service) GenesisSharingK8S(ctx context.Context, in *api.GenesisSharingK8SRequest) (*api.GenesisSharingK8SResponse, error) {
 	return genesis.Synchronizer.GenesisSharingK8S(ctx, in)
 }
+
+func (s *service) GenesisSharingSync(ctx context.Context, in *api.GenesisSharingSyncRequest) (*api.GenesisSharingSyncResponse, error) {
+	return genesis.Synchronizer.GenesisSharingSync(ctx, in)
+}
