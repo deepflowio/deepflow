@@ -19,7 +19,6 @@ package genesis
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -27,12 +26,11 @@ import (
 func (g *Genesis) getSubnets() ([]model.Subnet, error) {
 	log.Debug("get subnets starting")
 	subnets := []model.Subnet{}
-	subnetsData := genesis.GenesisService.GetSubnetsData(false)
 
 	g.cloudStatsd.APICost["subnets"] = []int{0}
-	g.cloudStatsd.APICount["subnets"] = []int{len(subnetsData)}
+	g.cloudStatsd.APICount["subnets"] = []int{len(g.subnets)}
 
-	for _, s := range subnetsData {
+	for _, s := range g.subnets {
 		if s.NetworkLcuuid == "" {
 			log.Debug("network lcuuid not found")
 			continue

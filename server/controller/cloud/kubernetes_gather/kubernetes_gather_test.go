@@ -30,7 +30,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/genesis/config"
-	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
 func TestKubernetes(t *testing.T) {
@@ -83,17 +82,11 @@ func TestKubernetes(t *testing.T) {
 		defer k8sInfoPatch.Reset()
 
 		g := genesis.NewGenesis(config.GenesisConfig{})
-		type VDataResp struct {
-			Desc   string                    `json:"DESCRIPTION"`
-			Status string                    `json:"OPT_STATUS"`
-			Type   string                    `json:"TYPE"`
-			Data   []model.GenesisVinterface `json:"DATA"`
-		}
 		vJsonData, _ := ioutil.ReadFile("./testfiles/vinterfaces.json")
-		var vData VDataResp
+		var vData genesis.GenesisSyncData
 		json.Unmarshal(vJsonData, &vData)
-		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetVinterfacesData", func(_ *genesis.Genesis) []model.GenesisVinterface {
-			return vData.Data
+		vinterfacesInfoPatch := gomonkey.ApplyMethod(reflect.TypeOf(g), "GetGenesisSyncResponse", func(_ *genesis.Genesis) (genesis.GenesisSyncData, error) {
+			return vData, nil
 		})
 		defer vinterfacesInfoPatch.Reset()
 

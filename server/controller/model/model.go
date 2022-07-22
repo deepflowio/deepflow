@@ -486,6 +486,7 @@ type VTapInterface struct {
 // 这里为了保持一致性和泛型方便添加一个参考的lcuuid，可以使用common.GetUUID(Hostname)来获得
 type GenesisHost struct {
 	ID       int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	VtapID   uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid   string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Hostname string `gorm:"column:hostname;type:varchar(256);default:null" json:"HOSTNAME"`
 	IP       string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
@@ -498,7 +499,8 @@ func (GenesisHost) TableName() string {
 
 type GenesisIP struct {
 	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Masklen          int       `gorm:"column:masklen;type:int;default:null;default:0" json:"MASKLEN"`
+	Masklen          uint32    `gorm:"column:masklen;type:int;default:null;default:0" json:"MASKLEN"`
+	VtapID           uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	IP               string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
 	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	VinterfaceLcuuid string    `gorm:"column:vinterface_lcuuid;type:char(64);default:null" json:"VINTERFACE_LCUUID"`
@@ -512,6 +514,7 @@ func (GenesisIP) TableName() string {
 
 type GenesisLldp struct {
 	ID                    int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	VtapID                uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid                string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	HostIP                string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
 	HostInterface         string    `gorm:"column:host_interface;type:char(64);default:null" json:"HOST_INTERFACE"`
@@ -529,8 +532,9 @@ func (GenesisLldp) TableName() string {
 
 type GenesisNetwork struct {
 	ID             int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	SegmentationID int    `gorm:"column:segmentation_id;type:int;default:null" json:"SEGMENTATION_ID"`
-	NetType        int    `gorm:"column:net_type;type:int;default:null" json:"NET_TYPE"`
+	SegmentationID uint32 `gorm:"column:segmentation_id;type:int;default:null" json:"SEGMENTATION_ID"`
+	NetType        uint32 `gorm:"column:net_type;type:int;default:null" json:"NET_TYPE"`
+	VtapID         uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	External       bool   `gorm:"column:external;type:tinyint(1);default:null" json:"EXTERNAL"`
 	Name           string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 	Lcuuid         string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
@@ -544,8 +548,9 @@ func (GenesisNetwork) TableName() string {
 
 type GenesisPort struct {
 	ID            int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Type          int    `gorm:"column:type;type:int;default:null" json:"TYPE"`
-	DeviceType    int    `gorm:"column:device_type;type:int;default:null" json:"DEVICETYPE"`
+	Type          uint32 `gorm:"column:type;type:int;default:null" json:"TYPE"`
+	DeviceType    uint32 `gorm:"column:device_type;type:int;default:null" json:"DEVICETYPE"`
+	VtapID        uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid        string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Mac           string `gorm:"column:mac;type:char(32);default:null" json:"MAC"`
 	DeviceLcuuid  string `gorm:"column:device_lcuuid;type:char(64);default:null" json:"DEVICE_LCUUID"`
@@ -560,7 +565,7 @@ func (GenesisPort) TableName() string {
 
 type GenesisVinterface struct {
 	ID                  int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	VtapID              int       `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	VtapID              uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid              string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Name                string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
 	IPs                 string    `gorm:"column:ips;type:text;default:null" json:"IPS"`
@@ -582,7 +587,8 @@ func (GenesisVinterface) TableName() string {
 
 type GenesisVM struct {
 	ID           int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	State        int       `gorm:"column:state;type:int;default:null" json:"STATE"`
+	State        uint32    `gorm:"column:state;type:int;default:null" json:"STATE"`
+	VtapID       uint32    `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid       string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Name         string    `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 	Label        string    `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
@@ -598,6 +604,7 @@ func (GenesisVM) TableName() string {
 
 type GenesisVpc struct {
 	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	VtapID uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	Lcuuid string `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
 	Name   string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 	NodeIP string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
@@ -605,4 +612,14 @@ type GenesisVpc struct {
 
 func (GenesisVpc) TableName() string {
 	return "go_genesis_vpc"
+}
+
+type GenesisStorage struct {
+	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	VtapID uint32 `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
+	NodeIP string `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
+}
+
+func (GenesisStorage) TableName() string {
+	return "go_genesis_storage"
 }

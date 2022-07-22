@@ -19,7 +19,6 @@ package genesis
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -27,7 +26,7 @@ import (
 func (g *Genesis) getHosts() ([]model.Host, error) {
 	log.Debug("get hosts starting")
 	hosts := []model.Host{}
-	hostsData := genesis.GenesisService.GetHostsData(false)
+	hostsData := g.genesisData.Hosts
 
 	g.cloudStatsd.APICost["hosts"] = []int{0}
 	g.cloudStatsd.APICount["hosts"] = []int{len(hostsData)}

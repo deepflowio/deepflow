@@ -24,7 +24,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/manager"
-	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 )
 
@@ -121,47 +120,15 @@ func GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field string, m *m
 	}
 }
 
-func GetGenesisVinterfacesData(g *genesis.Genesis, isLocal bool) ([]model.GenesisVinterface, error) {
-	return g.GetVinterfacesData(isLocal), nil
+func GetGenesisData(g *genesis.Genesis) (genesis.GenesisSyncData, error) {
+	return g.GetGenesisSyncData(), nil
+}
+
+func GetGenesisSyncData(g *genesis.Genesis) (genesis.GenesisSyncData, error) {
+	return g.GetGenesisSyncResponse()
 }
 
 func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string][]string, error) {
 	data, err := g.GetKubernetesResponse(clusterID)
 	return data, err
-}
-
-func GetGenesisIPsData(g *genesis.Genesis, isLocal bool) ([]cloudmodel.IP, error) {
-	return g.GetIPsData(isLocal), nil
-}
-
-func GetGenesisSubnetsData(g *genesis.Genesis, isLocal bool) ([]cloudmodel.Subnet, error) {
-	return g.GetSubnetsData(isLocal), nil
-}
-
-func GetGenesisVMsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisVM, error) {
-	return g.GetVMsData(isLocal), nil
-}
-
-func GetGenesisVPCsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisVpc, error) {
-	return g.GetVPCsData(isLocal), nil
-}
-
-func GetGenesisHostsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisHost, error) {
-	return g.GetHostsData(isLocal), nil
-}
-
-func GetGenesisLldpsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisLldp, error) {
-	return g.GetLldpsData(isLocal), nil
-}
-
-func GetGenesisPortsData(g *genesis.Genesis, isLocal bool) ([]model.GenesisPort, error) {
-	return g.GetPortsData(isLocal), nil
-}
-
-func GetGenesisNetworksData(g *genesis.Genesis, isLocal bool) ([]model.GenesisNetwork, error) {
-	return g.GetNetworksData(isLocal), nil
-}
-
-func GetGenesisIPLastSeensData(g *genesis.Genesis, isLocal bool) ([]model.GenesisIP, error) {
-	return g.GetIPLastSeensData(isLocal), nil
 }

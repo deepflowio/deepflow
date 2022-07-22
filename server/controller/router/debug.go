@@ -30,10 +30,8 @@ func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {
 	e.GET("/v1/tasks/", getCloudBasicInfos(m))
 	e.GET("/v1/tasks/:lcuuid/", getCloudBasicInfo(m))
 	e.GET("/v1/info/:lcuuid/", getCloudResource(m))
-	e.GET("/v1/genesis-sync/:type/", getGenesisData(g, false))
-	e.GET("/debug/genesis-sync/:type/", getGenesisData(g, true))
-	e.GET("/v1/vinterfaces/", getGenesisVinterfacesData(g, false))
-	e.GET("/debug/vinterfaces/", getGenesisVinterfacesData(g, true))
+	e.GET("/v1/genesis/:type/", getGenesisSyncData(g, true))
+	e.GET("/v1/sync/:type/", getGenesisSyncData(g, false))
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(m))
 	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(m))
@@ -141,9 +139,40 @@ func getRecorderCacheToolMap(m *manager.Manager) gin.HandlerFunc {
 	})
 }
 
-func getGenesisVinterfacesData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
+func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
-		data, err := service.GetGenesisVinterfacesData(g, isLocal)
+		dataType := c.Param("type")
+		var ret genesis.GenesisSyncData
+		var err error
+
+		if isLocal {
+			ret, err = service.GetGenesisData(g)
+		} else {
+			ret, err = service.GetGenesisSyncData(g)
+		}
+
+		var data interface{}
+
+		switch dataType {
+		case "vm":
+			data = ret.VMs
+		case "vpc":
+			data = ret.VPCs
+		case "host":
+			data = ret.Hosts
+		case "lldp":
+			data = ret.Lldps
+		case "port":
+			data = ret.Ports
+		case "network":
+			data = ret.Networks
+		case "iplastseen":
+			data = ret.IPLastSeens
+		case "vinterface":
+			data = ret.Vinterfaces
+		default:
+			err = errors.New("not found " + dataType + " data")
+		}
 		JsonResponse(c, data, err)
 	})
 }
@@ -151,37 +180,6 @@ func getGenesisVinterfacesData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc
 func getGenesisKubernetesData(g *genesis.Genesis) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		data, err := service.GetGenesisKubernetesData(g, c.Param("clusterID"))
-		JsonResponse(c, data, err)
-	})
-}
-
-func getGenesisData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
-	return gin.HandlerFunc(func(c *gin.Context) {
-		dataType := c.Param("type")
-		var data interface{}
-		var err error
-		switch dataType {
-		case "ip":
-			data, err = service.GetGenesisIPsData(g, isLocal)
-		case "subnet":
-			data, err = service.GetGenesisSubnetsData(g, isLocal)
-		case "vm":
-			data, err = service.GetGenesisVMsData(g, isLocal)
-		case "vpc":
-			data, err = service.GetGenesisVPCsData(g, isLocal)
-		case "host":
-			data, err = service.GetGenesisHostsData(g, isLocal)
-		case "lldp":
-			data, err = service.GetGenesisLldpsData(g, isLocal)
-		case "port":
-			data, err = service.GetGenesisPortsData(g, isLocal)
-		case "network":
-			data, err = service.GetGenesisNetworksData(g, isLocal)
-		case "iplastseen":
-			data, err = service.GetGenesisIPLastSeensData(g, isLocal)
-		default:
-			err = errors.New("not found " + dataType + " data")
-		}
 		JsonResponse(c, data, err)
 	})
 }

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/deepflowys/deepflow/message/trident"
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
@@ -60,195 +59,211 @@ type KubernetesInfo struct {
 	Entries   []*trident.KubernetesAPIInfo
 }
 
-type PlatformData struct {
-	IPs         []cloudmodel.IP
-	Subnets     []cloudmodel.Subnet
-	IPlastseens *PlatformDataOperation[model.GenesisIP]
-	VMs         *PlatformDataOperation[model.GenesisVM]
-	VPCs        *PlatformDataOperation[model.GenesisVpc]
-	Hosts       *PlatformDataOperation[model.GenesisHost]
-	Lldps       *PlatformDataOperation[model.GenesisLldp]
-	Ports       *PlatformDataOperation[model.GenesisPort]
-	Networks    *PlatformDataOperation[model.GenesisNetwork]
-	Vinterfaces *PlatformDataOperation[model.GenesisVinterface]
+type GenesisSyncData struct {
+	IPLastSeens []model.GenesisIP
+	VMs         []model.GenesisVM
+	VPCs        []model.GenesisVpc
+	Hosts       []model.GenesisHost
+	Lldps       []model.GenesisLldp
+	Ports       []model.GenesisPort
+	Networks    []model.GenesisNetwork
+	Vinterfaces []model.GenesisVinterface
+}
+type GenesisSyncDataOperation struct {
+	IPlastseens *GenesisSyncTypeOperation[model.GenesisIP]
+	VMs         *GenesisSyncTypeOperation[model.GenesisVM]
+	VPCs        *GenesisSyncTypeOperation[model.GenesisVpc]
+	Hosts       *GenesisSyncTypeOperation[model.GenesisHost]
+	Lldps       *GenesisSyncTypeOperation[model.GenesisLldp]
+	Ports       *GenesisSyncTypeOperation[model.GenesisPort]
+	Networks    *GenesisSyncTypeOperation[model.GenesisNetwork]
+	Vinterfaces *GenesisSyncTypeOperation[model.GenesisVinterface]
 }
 
-type PlatformDataOperation[T model.GenesisVinterface | model.GenesisVpc | model.GenesisHost | model.GenesisVM | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP] struct {
+type GenesisSyncTypeOperation[T model.GenesisVinterface | model.GenesisVpc | model.GenesisHost | model.GenesisVM | model.GenesisNetwork | model.GenesisPort | model.GenesisLldp | model.GenesisIP] struct {
 	mutex    sync.Mutex
 	lastSeen map[string]time.Time
 	dataDict map[string]T
 }
 
-func (p *PlatformDataOperation[T]) Fetch() []T {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+func (g *GenesisSyncTypeOperation[T]) Fetch() []T {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
 
 	data := []T{}
-	for _, d := range p.dataDict {
+	for _, d := range g.dataDict {
 		data = append(data, d)
 	}
 	return data
 }
 
-func (p *PlatformDataOperation[T]) Renew(other []T, timestamp time.Time) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+func (g *GenesisSyncTypeOperation[T]) Renew(other []T, timestamp time.Time) {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
 
 	for _, data := range other {
 		tData := reflect.ValueOf(data)
 		dataLcuuid := tData.FieldByName("Lcuuid").String()
-		p.lastSeen[dataLcuuid] = timestamp
+		g.lastSeen[dataLcuuid] = timestamp
 	}
 }
 
-func (p *PlatformDataOperation[T]) Update(other []T, timestamp time.Time) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+func (g *GenesisSyncTypeOperation[T]) Update(other []T, timestamp time.Time) {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
 
 	for _, data := range other {
 		tData := reflect.ValueOf(data)
 		dataLcuuid := tData.FieldByName("Lcuuid").String()
-		tData = reflect.ValueOf(&data).Elem()
-		nodeIP := tData.FieldByName("NodeIP")
-		nodeIPString := os.Getenv(common.NODE_IP_KEY)
-		nodeIP.SetString(nodeIPString)
-		if oData, ok := p.dataDict[dataLcuuid]; ok {
-			mysql.Db.Model(&oData).Updates(data)
-		} else {
-			mysql.Db.Create(&data)
-		}
-		p.lastSeen[dataLcuuid] = timestamp
-		p.dataDict[dataLcuuid] = data
+		g.lastSeen[dataLcuuid] = timestamp
+		g.dataDict[dataLcuuid] = data
 	}
 }
 
-func (p *PlatformDataOperation[T]) Age(timestamp time.Time, timeout time.Duration) bool {
+func (g *GenesisSyncTypeOperation[T]) Age(timestamp time.Time, timeout time.Duration) bool {
 	ageTimestamp := timestamp.Add(-timeout)
 	removed := false
 
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
 
-	dataIDs := []int{}
-	for dataLcuuid, data := range p.dataDict {
-		if ageTimestamp.After(p.lastSeen[dataLcuuid]) {
+	for dataLcuuid := range g.dataDict {
+		if ageTimestamp.After(g.lastSeen[dataLcuuid]) {
 			removed = true
-			delete(p.dataDict, dataLcuuid)
-			delete(p.lastSeen, dataLcuuid)
-			iData := reflect.ValueOf(data)
-			dataID := iData.FieldByName("id").Int()
-			dataIDs = append(dataIDs, int(dataID))
+			delete(g.dataDict, dataLcuuid)
+			delete(g.lastSeen, dataLcuuid)
 		}
 	}
-	var dataType []T
-	mysql.Db.Delete(&dataType, dataIDs)
 	return removed
 }
 
-func (p *PlatformDataOperation[T]) Load() {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+func (g *GenesisSyncTypeOperation[T]) Load() {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
 
 	var items []T
 	mysql.Db.Where("node_ip = ?", os.Getenv(common.NODE_IP_KEY)).Find(&items)
 	for _, data := range items {
 		iData := reflect.ValueOf(data)
 		dataLcuuid := iData.FieldByName("Lcuuid").String()
-		p.dataDict[dataLcuuid] = data
-		p.lastSeen[dataLcuuid] = time.Now()
+		g.dataDict[dataLcuuid] = data
+		g.lastSeen[dataLcuuid] = time.Now()
 	}
 }
 
-func NewHostPlatformDataOperation(dataList []model.GenesisHost) *PlatformDataOperation[model.GenesisHost] {
+func (g *GenesisSyncTypeOperation[T]) Save() {
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	nodeIP := os.Getenv(common.NODE_IP_KEY)
+	// delete db old data
+	var dataType T
+	mysql.Db.Where("node_ip = ?", nodeIP).Delete(&dataType)
+
+	// write current memory data
+	var items []T
+	for _, data := range g.dataDict {
+		tData := reflect.ValueOf(&data).Elem()
+		nodeIP := tData.FieldByName("NodeIP")
+		nodeIPString := os.Getenv(common.NODE_IP_KEY)
+		nodeIP.SetString(nodeIPString)
+		items = append(items, data)
+	}
+	if len(items) > 0 {
+		mysql.Db.Create(&items)
+	}
+}
+
+func NewHostPlatformDataOperation(dataList []model.GenesisHost) *GenesisSyncTypeOperation[model.GenesisHost] {
 	vMap := map[string]model.GenesisHost{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisHost]{
+	return &GenesisSyncTypeOperation[model.GenesisHost]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
 	}
 }
 
-func NewVMPlatformDataOperation(dataList []model.GenesisVM) *PlatformDataOperation[model.GenesisVM] {
+func NewVMPlatformDataOperation(dataList []model.GenesisVM) *GenesisSyncTypeOperation[model.GenesisVM] {
 	vMap := map[string]model.GenesisVM{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisVM]{
+	return &GenesisSyncTypeOperation[model.GenesisVM]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
 	}
 }
 
-func NewVpcPlatformDataOperation(dataList []model.GenesisVpc) *PlatformDataOperation[model.GenesisVpc] {
+func NewVpcPlatformDataOperation(dataList []model.GenesisVpc) *GenesisSyncTypeOperation[model.GenesisVpc] {
 	vMap := map[string]model.GenesisVpc{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisVpc]{
+	return &GenesisSyncTypeOperation[model.GenesisVpc]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
 	}
 }
 
-func NewPortPlatformDataOperation(dataList []model.GenesisPort) *PlatformDataOperation[model.GenesisPort] {
+func NewPortPlatformDataOperation(dataList []model.GenesisPort) *GenesisSyncTypeOperation[model.GenesisPort] {
 	vMap := map[string]model.GenesisPort{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisPort]{
+	return &GenesisSyncTypeOperation[model.GenesisPort]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
 	}
 }
 
-func NewNetworkPlatformDataOperation(dataList []model.GenesisNetwork) *PlatformDataOperation[model.GenesisNetwork] {
+func NewNetworkPlatformDataOperation(dataList []model.GenesisNetwork) *GenesisSyncTypeOperation[model.GenesisNetwork] {
 	vMap := map[string]model.GenesisNetwork{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisNetwork]{
+	return &GenesisSyncTypeOperation[model.GenesisNetwork]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
 	}
 }
 
-func NewVinterfacePlatformDataOperation(dataList []model.GenesisVinterface) *PlatformDataOperation[model.GenesisVinterface] {
+func NewVinterfacePlatformDataOperation(dataList []model.GenesisVinterface) *GenesisSyncTypeOperation[model.GenesisVinterface] {
 	vMap := map[string]model.GenesisVinterface{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisVinterface]{
+	return &GenesisSyncTypeOperation[model.GenesisVinterface]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
 	}
 }
 
-func NewIPLastSeenPlatformDataOperation(dataList []model.GenesisIP) *PlatformDataOperation[model.GenesisIP] {
+func NewIPLastSeenPlatformDataOperation(dataList []model.GenesisIP) *GenesisSyncTypeOperation[model.GenesisIP] {
 	vMap := map[string]model.GenesisIP{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisIP]{
+	return &GenesisSyncTypeOperation[model.GenesisIP]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,
 	}
 }
 
-func NewLldpInfoPlatformDataOperation(dataList []model.GenesisLldp) *PlatformDataOperation[model.GenesisLldp] {
+func NewLldpInfoPlatformDataOperation(dataList []model.GenesisLldp) *GenesisSyncTypeOperation[model.GenesisLldp] {
 	vMap := map[string]model.GenesisLldp{}
 	for _, data := range dataList {
 		vMap[data.Lcuuid] = data
 	}
-	return &PlatformDataOperation[model.GenesisLldp]{
+	return &GenesisSyncTypeOperation[model.GenesisLldp]{
 		mutex:    sync.Mutex{},
 		lastSeen: map[string]time.Time{},
 		dataDict: vMap,

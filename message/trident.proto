@@ -574,94 +574,86 @@ message GenesisSharingK8SResponse {
 }
 
 message GenesisSyncIP {
-    optional uint64 id = 1;
-    optional uint32 masklen = 2;
-    optional string ip = 3;
-    optional string lcuuid = 4;
-    optional string vinterface_lcuuid = 5;
-    optional string node_ip = 6;
-    optional string last_seen = 7;
+    optional uint32 masklen = 1;
+    optional string ip = 2;
+    optional string lcuuid = 3;
+    optional string vinterface_lcuuid = 4;
+    optional string node_ip = 5;
+    optional string last_seen = 6;
 }
 
 message GenesisSyncHost {
-    optional uint64 id = 1;
-    optional string lcuuid = 2;
-    optional string hostname = 3;
-    optional string ip = 4;
-    optional string node_ip = 5;
+    optional string lcuuid = 1;
+    optional string hostname = 2;
+    optional string ip = 3;
+    optional string node_ip = 4;
 }
 
 message GenesisSyncLldp {
-    optional uint64 id = 1;
-    optional string lcuuid = 2;
-    optional string host_ip = 3;
-    optional string host_interface = 4;
-    optional string system_name = 5;
-    optional string management_address = 6;
-    optional string vinterface_lcuuid = 7;
-    optional string vinterface_description = 8;
-    optional string node_ip = 9;
-    optional string last_seen = 10;
+    optional string lcuuid = 1;
+    optional string host_ip = 2;
+    optional string host_interface = 3;
+    optional string system_name = 4;
+    optional string management_address = 5;
+    optional string vinterface_lcuuid = 6;
+    optional string vinterface_description = 7;
+    optional string node_ip = 8;
+    optional string last_seen = 9;
 }
 
 message GenesisSyncNetwork {
-    optional uint64 id = 1;
-    optional uint32 segmentation_id = 2;
-    optional uint32 net_type = 3;
-    optional bool external = 4;
-    optional string name = 5;
-    optional string lcuuid = 6;
+    optional uint32 segmentation_id = 1;
+    optional uint32 net_type = 2;
+    optional bool external = 3;
+    optional string name = 4;
+    optional string lcuuid = 5;
+    optional string vpc_lcuuid = 6;
+    optional string node_ip = 7;
+}
+
+message GenesisSyncPort {
+    optional uint32 type = 1;
+    optional uint32 device_type = 2;
+    optional string lcuuid = 3;
+    optional string mac = 4;
+    optional string device_lcuuid = 5;
+    optional string network_lcuuid = 6;
     optional string vpc_lcuuid = 7;
     optional string node_ip = 8;
 }
 
-message GenesisSyncPort {
-    optional uint64 id = 1;
-    optional uint32 type = 2;
-    optional uint32 device_type = 3;
-    optional string lcuuid = 4;
-    optional string mac = 5;
-    optional string device_lcuuid = 6;
-    optional string network_lcuuid = 7;
-    optional string vpc_lcuuid = 8;
-    optional string node_ip = 9;
-}
-
 message GenesisSyncVm {
-    optional uint64 id = 1;
-    optional uint32 state = 2;
-    optional string lcuuid = 3;
-    optional string name = 4;
-    optional string label = 5;
-    optional string vpc_lcuuid = 6;
-    optional string launch_server = 7;
-    optional string node_ip = 8;
-    optional string created_at = 9;
+    optional uint32 state = 1;
+    optional string lcuuid = 2;
+    optional string name = 3;
+    optional string label = 4;
+    optional string vpc_lcuuid = 5;
+    optional string launch_server = 6;
+    optional string node_ip = 7;
+    optional string created_at = 8;
 }
 
 message GenesisSyncVpc {
-    optional uint64 id = 1;
-    optional string lcuuid = 2;
-    optional string name = 3;
-    optional string node_ip = 4;
+    optional string lcuuid = 1;
+    optional string name = 2;
+    optional string node_ip = 3;
 }
 
 message GenesisSyncVinterface {
-    optional uint64 id = 1;
-    optional uint32 vtap_id = 2;
-    optional string lcuuid = 3;
-    optional string name = 4;
-    optional string ips = 5;
-    optional string mac = 6;
-    optional string tap_name = 7;
-    optional string tap_mac = 8;
-    optional string device_lcuuid = 9;
-    optional string device_name = 10;
-    optional string device_type = 11;
-    optional string host_ip = 12;
-    optional string kubernetes_cluster_id = 13;
-    optional string node_ip = 14;
-    optional string last_seen = 15;
+    optional uint32 vtap_id = 1;
+    optional string lcuuid = 2;
+    optional string name = 3;
+    optional string ips = 4;
+    optional string mac = 5;
+    optional string tap_name = 6;
+    optional string tap_mac = 7;
+    optional string device_lcuuid = 8;
+    optional string device_name = 9;
+    optional string device_type = 10;
+    optional string host_ip = 11;
+    optional string kubernetes_cluster_id = 12;
+    optional string node_ip = 13;
+    optional string last_seen = 14;
 }
 
 message GenesisSyncData{
@@ -676,6 +668,7 @@ message GenesisSyncData{
 }
 
 message GenesisSharingSyncRequest {
+    repeated uint32 vtap_ids = 1;
 }
 
 message GenesisSharingSyncResponse {
