@@ -575,10 +575,11 @@ func (f *ApdexFunction) Init() {
 			f.Args[0], f.Args[0], f.Fields[0].ToString(),
 		)
 		// count(arrayFilter(x -> (x <= arg), _grouparray_rtt))
+		countSatisfyAlias := FormatField(fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]))
 		countSatisfy := DefaultFunction{
 			Name:         FUNCTION_COUNT,
 			Fields:       []Node{&Field{Value: satisfy}},
-			Alias:        fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+			Alias:        countSatisfyAlias,
 			Nest:         true,
 			IsGroupArray: true,
 		}
@@ -590,11 +591,12 @@ func (f *ApdexFunction) Init() {
 			IsGroupArray: true,
 		}
 		// countToler / 2
+		divTolerAlias := FormatField(fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]))
 		divToler := DivFunction{
 			DefaultFunction: DefaultFunction{
 				Name:   FUNCTION_DIV,
 				Fields: []Node{&countToler, &Field{Value: "2"}},
-				Alias:  fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+				Alias:  divTolerAlias,
 				Nest:   true,
 			},
 			DivType: FUNCTION_DIV_TYPE_DEFAULT,
@@ -627,16 +629,18 @@ func (f *ApdexFunction) Init() {
 			"if(%s<%s AND %s<=%s*4,0.5,0)",
 			f.Args[0], f.Fields[0].ToString(), f.Fields[0].ToString(), f.Args[0],
 		)
+		sumSatisfyAlias := FormatField(fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]))
 		sumSatisfy := DefaultFunction{
 			Name:   FUNCTION_SUM,
 			Fields: []Node{&Field{Value: satisfy}},
-			Alias:  fmt.Sprintf("apdex_satisfy_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+			Alias:  sumSatisfyAlias,
 			Nest:   true,
 		}
+		sumTolerAlias := FormatField(fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]))
 		sumToler := DefaultFunction{
 			Name:   FUNCTION_SUM,
 			Fields: []Node{&Field{Value: toler}},
-			Alias:  fmt.Sprintf("apdex_toler_%s_%s", f.Fields[0].ToString(), f.Args[0]),
+			Alias:  sumTolerAlias,
 			Nest:   true,
 		}
 		plus := DefaultFunction{
