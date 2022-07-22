@@ -89,16 +89,29 @@ func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) bool {
 	return true
 }
 
-// 在插入DB前检查是否有lcuuid重复的数据，
-// 若资源有软删除需求，将lcuuid存在的数据ID赋值给新数据，删除旧数据，新数据入库；
-// 若资源无软删除需求，记录lcuuid重复异常，筛掉异常数据，剩余数据入库。
+// 在插入DB前检查是否有lcuuid重复的数据：
+// 待入库数据本身有lcuuid重复：仅取1条数据入库。
+// 与DB已存数据lcuuid重复：
+// 		若资源有软删除需求，将lcuuid存在的数据ID赋值给新数据，删除旧数据，新数据入库；
+// 		若资源无软删除需求，记录lcuuid重复异常，筛掉异常数据，剩余数据入库。
 func (o *OperatorBase[MT]) formatDBItemsToAdd(dbItems []*MT) (dbItemsToAdd []*MT, lcuuidsToAdd []string, ok bool) {
+	dupCloudLcuuids := []string{}
 	lcuuids := make([]string, 0, len(dbItems))
 	lcuuidToDBItem := make(map[string]*MT)
+	dedupItems := []*MT{}
 	for _, dbItem := range dbItems {
 		lcuuid := (*dbItem).GetLcuuid()
-		lcuuids = append(lcuuids, lcuuid)
-		lcuuidToDBItem[lcuuid] = dbItem
+		if common.Contains(lcuuids, lcuuid) && !common.Contains(dupCloudLcuuids, lcuuid) {
+			dupCloudLcuuids = append(dupCloudLcuuids, lcuuid)
+		} else {
+			lcuuids = append(lcuuids, lcuuid)
+			lcuuidToDBItem[lcuuid] = dbItem
+			dedupItems = append(dedupItems, dbItem)
+		}
+	}
+	if len(dupCloudLcuuids) != 0 {
+		log.Errorf("%s data is duplicated in cloud data (lcuuids: %v)", o.resourceTypeName, dupCloudLcuuids)
+		dbItems = dedupItems
 	}
 
 	var dupLcuuidDBItems []*MT
@@ -114,7 +127,7 @@ func (o *OperatorBase[MT]) formatDBItemsToAdd(dbItems []*MT) (dbItemsToAdd []*MT
 			for _, dupLcuuidDBItem := range dupLcuuidDBItems {
 				dupLcuuids = append(dupLcuuids, (*dupLcuuidDBItem).GetLcuuid())
 			}
-			log.Errorf("%s data is duplicated (lcuuids: %v)", o.resourceTypeName, dupLcuuids)
+			log.Errorf("%s data is duplicated with db data (lcuuids: %v)", o.resourceTypeName, dupLcuuids)
 
 			num := len(dbItems) - len(dupLcuuidDBItems)
 			dbItemsToAdd := make([]*MT, 0, num)
