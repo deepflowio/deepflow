@@ -410,7 +410,7 @@ impl FlowItem {
             return Err(LogError::L7ProtocolParseLimit);
         }
 
-        let direction = if !self.is_success {
+        let direction = if !self.is_success && !self.is_from_app {
             PacketDirection::ClientToServer
         } else {
             packet.direction
@@ -431,7 +431,9 @@ impl FlowItem {
                     self.remote_epc,
                 );
                 self.is_success = true;
-                self.is_local_service = packet.lookup_key.l2_end_1;
+                if !self.is_from_app {
+                    self.is_local_service = packet.lookup_key.l2_end_1;
+                }
             } else {
                 self.is_skip = app_table.set_protocol_from_ebpf(
                     packet,
@@ -514,27 +516,14 @@ impl FlowItem {
         local_epc: i32,
         vtap_id: u16,
     ) -> Option<AppProtoLogsData> {
-        // 判断哪一端是服务端
-        packet.direction = if packet.lookup_key.l2_end_0 == self.is_local_service {
-            PacketDirection::ServerToClient
-        } else {
-            PacketDirection::ClientToServer
-        };
-
         // 策略EPC
         self.lookup_epc(packet, policy_getter, local_epc);
         // 应用解析
         if let Ok(head) = self.parse(packet, local_epc, app_table, log_parser_config) {
             // 获取日志信息
             let info = self.get_info();
-            let base = AppProtoLogsBaseInfo::from_ebpf(
-                &packet,
-                head,
-                vtap_id,
-                local_epc,
-                self.remote_epc,
-                self.is_local_service,
-            );
+            let base =
+                AppProtoLogsBaseInfo::from_ebpf(&packet, head, vtap_id, local_epc, self.remote_epc);
             return Some(AppProtoLogsData {
                 base_info: base,
                 special_info: info,
@@ -773,8 +762,7 @@ impl EbpfRunner {
             let packet = packet.as_mut().unwrap();
             packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
 
-            // FIXME: 仅用socket_id不够
-            let key = packet.socket_id;
+            let key = packet.ebpf_flow_id();
 
             // 流聚合
             let mut flow_item = flow_map.get_mut(&key);

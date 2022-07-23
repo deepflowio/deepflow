@@ -225,14 +225,9 @@ impl AppProtoLogsBaseInfo {
         vtap_id: u16,
         local_epc: i32,
         remote_epc: i32,
-        is_local_service: bool,
     ) -> Self {
         let is_src = packet.lookup_key.l2_end_0;
-        let direction = if packet.lookup_key.l2_end_1 == is_local_service {
-            PacketDirection::ClientToServer
-        } else {
-            PacketDirection::ServerToClient
-        };
+        let direction = packet.direction;
         let mut info = Self {
             start_time: packet.lookup_key.timestamp,
             end_time: packet.lookup_key.timestamp,
