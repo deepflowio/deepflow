@@ -154,6 +154,9 @@ impl AppTable {
         local_epc: i32,
         remote_epc: i32,
     ) -> Option<(L7Protocol, bool)> {
+        if packet.lookup_key.is_loopback_packet() {
+            return None;
+        }
         let (ip, _, port) = Self::get_ip_epc_port(packet, true);
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         let epc = if packet.lookup_key.l2_end_0 {
