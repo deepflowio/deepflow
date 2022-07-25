@@ -503,6 +503,9 @@ func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, er
 						}
 					}
 				}
+				if macVIF == nil {
+					continue
+				}
 				vtapVIF.DeviceType = macVIF.DeviceType
 				vtapVIF.DeviceID = macVIF.DeviceID
 				if vtapVIF.DeviceType == common.VIF_DEVICE_TYPE_HOST {
