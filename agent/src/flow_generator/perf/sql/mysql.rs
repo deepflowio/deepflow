@@ -106,6 +106,7 @@ impl L7FlowPerf for MysqlPerfData {
         match msg_type {
             LogMessageType::Request if self.l7_proto == L7Protocol::Mysql => {
                 self.parse_request(packet.lookup_key.timestamp, flow_id);
+                self.l7_proto = L7Protocol::Mysql;
                 self.decode_response = true;
                 self.has_response = false;
                 Ok(())
