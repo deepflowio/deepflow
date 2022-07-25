@@ -109,7 +109,38 @@ func getValueString(value *v11.AnyValue) string {
 	}
 }
 
-func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue) {
+func skywalkingGetParentSpanIdFromLinks(links []*v1.Span_Link) string {
+	for _, link := range links {
+		refTypeValid := false
+		parentSpanId := ""
+		parentSegmentId := ""
+		for _, attr := range link.GetAttributes() {
+			key := attr.GetKey()
+			value := attr.GetValue()
+			if value == nil {
+				continue
+			}
+
+			switch key {
+			case "refType":
+				valueStr := getValueString(value)
+				if valueStr == "CrossProcess" || valueStr == "CrossThread" {
+					refTypeValid = true
+				}
+			case "sw8.parent_span_id":
+				parentSpanId = getValueString(value)
+			case "sw8.parent_segment_id":
+				parentSegmentId = getValueString(value)
+			}
+		}
+		if refTypeValid && parentSpanId != "" && parentSegmentId != "" {
+			return parentSegmentId + "-" + parentSpanId
+		}
+	}
+	return ""
+}
+
+func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link) {
 	h.IsIPv4 = true
 	sw8SegmentId := ""
 	attributeNames, attributeValues := []string{}, []string{}
@@ -223,6 +254,8 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue)
 		h.SpanId = sw8SegmentId + "-" + h.SpanId
 		if h.ParentSpanId != "" {
 			h.ParentSpanId = sw8SegmentId + "-" + h.ParentSpanId
+		} else {
+			h.ParentSpanId = skywalkingGetParentSpanIdFromLinks(links)
 		}
 	}
 
@@ -263,7 +296,7 @@ func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformD
 		h.ResponseDuration = uint64(h.L7Base.EndTime - h.StartTime)
 	}
 
-	h.fillAttributes(l.GetAttributes(), resAttributes)
+	h.fillAttributes(l.GetAttributes(), resAttributes, l.GetLinks())
 	// 优先匹配http的响应码
 	if h.responseCode != 0 {
 		h.ResponseStatus = httpCodeToResponseStatus(h.responseCode)
