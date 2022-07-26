@@ -27,9 +27,11 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowys/deepflow/server/libs/logger"
+	"github.com/deepflowys/deepflow/server/libs/stats"
 	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/router"
+	"github.com/deepflowys/deepflow/server/querier/statsd"
 )
 
 var log = logging.MustGetLogger("querier")
@@ -52,6 +54,11 @@ func Start(configPath string) {
 		log.Error(err)
 		os.Exit(0)
 	}
+	// statsd
+	stats.SetMinInterval(10 * time.Second)
+	statsd.QuerierCounter = statsd.NewCounter()
+	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
+
 	// 注册router
 	r := gin.Default()
 	r.Use(LoggerHandle)
@@ -60,6 +67,7 @@ func Start(configPath string) {
 	// TODO: 增加router
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
+		statsd.QuerierCounter.Close()
 		os.Exit(0)
 	}
 }
