@@ -103,8 +103,9 @@ impl L7FlowPerf for MysqlPerfData {
         let msg_type = header
             .check(packet.direction, offset, payload, self.l7_proto)
             .ok_or(Error::MysqlPerfParseFailed)?;
+
         match msg_type {
-            LogMessageType::Request if self.l7_proto == L7Protocol::Mysql => {
+            LogMessageType::Request => {
                 self.parse_request(packet.lookup_key.timestamp, flow_id);
                 self.l7_proto = L7Protocol::Mysql;
                 self.decode_response = true;
@@ -291,16 +292,6 @@ impl MysqlPerfData {
         };
         self.calc_response(timestamp, flow_id, error_code)
     }
-
-    fn reset(&mut self) {
-        self.stats = None;
-        self.l7_proto = L7Protocol::default();
-        self.msg_type = LogMessageType::default();
-        self.active = 0;
-        self.status = L7ResponseStatus::default();
-        self.has_log_data = false;
-        self.decode_response = false;
-    }
 }
 
 #[cfg(test)]
@@ -383,7 +374,26 @@ mod test {
             ),
             (
                 "171-mysql.pcap",
-                MysqlPerfData::new(Rc::new(RefCell::new(L7RrtCache::new(100)))),
+                MysqlPerfData {
+                    stats: Some(PerfStats {
+                        req_count: 390,
+                        resp_count: 390,
+                        req_err_count: 0,
+                        resp_err_count: 0,
+                        rrt_count: 390,
+                        rrt_max: Duration::from_nanos(5355000),
+                        rrt_sum: Duration::from_nanos(127090000),
+                        rrt_last: Duration::from_nanos(692000),
+                    }),
+                    l7_proto: L7Protocol::Mysql,
+                    msg_type: LogMessageType::Response,
+                    active: 0,
+                    status: L7ResponseStatus::Ok,
+                    has_log_data: true,
+                    decode_response: true,
+                    has_response: false,
+                    rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
+                },
             ),
         ];
 

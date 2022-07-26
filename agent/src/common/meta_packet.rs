@@ -777,15 +777,10 @@ impl<'a> MetaPacket<'a> {
             )
         };
 
-        let (src_port, dst_port) = if data.direction == SOCK_DIR_SND {
-            (data.tuple.lport, data.tuple.rport)
+        let (src_ip, dst_ip, src_port, dst_port) = if data.direction == SOCK_DIR_SND {
+            (local_ip, remote_ip, data.tuple.lport, data.tuple.rport)
         } else {
-            (data.tuple.rport, data.tuple.lport)
-        };
-        let (src_ip, dst_ip) = if data.direction == SOCK_DIR_SND {
-            (local_ip, remote_ip)
-        } else {
-            (remote_ip, local_ip)
+            (remote_ip, local_ip, data.tuple.rport, data.tuple.lport)
         };
 
         let mut packet = MetaPacket::default();
@@ -839,6 +834,15 @@ impl<'a> MetaPacket<'a> {
         let protocol = u8::from(self.l7_protocol_from_ebpf) as u64;
 
         self.socket_id | protocol << 56
+    }
+
+    pub fn set_loopback_mac(&mut self, mac: MacAddr) {
+        if self.lookup_key.src_ip.is_loopback() {
+            self.lookup_key.src_mac = mac;
+        }
+        if self.lookup_key.dst_ip.is_loopback() {
+            self.lookup_key.dst_mac = mac;
+        }
     }
 }
 

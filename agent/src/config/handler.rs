@@ -35,25 +35,23 @@ use super::{
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 
-use crate::common::{decapsulate::TunnelTypeBitmap, enums::TapType, DEFAULT_CPU_CFS_PERIOD_US};
-use crate::exception::ExceptionHandler;
-use crate::proto::trident::IfMacSource;
-use crate::utils::cgroups::Cgroups;
-use crate::utils::environment::{free_memory_check, get_k8s_local_node_ip};
 use crate::{
+    common::{decapsulate::TunnelTypeBitmap, enums::TapType, DEFAULT_CPU_CFS_PERIOD_US},
     dispatcher::recv_engine::{self, OptTpacketVersion},
     ebpf::CAP_LEN_MAX,
+    exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
     integration_collector::check_listen_port_alive,
     proto::trident::{self, CaptureSocketType},
     proto::{
         common::TridentType,
-        trident::{Exception, SocketType, TapMode},
+        trident::{Exception, IfMacSource, SocketType, TapMode},
     },
     trident::Components,
-    utils::environment::is_tt_pod,
+    utils::cgroups::Cgroups,
+    utils::environment::{free_memory_check, is_tt_pod, is_tt_workload},
     utils::logger::RemoteLogConfig,
-    utils::net::{get_route_src_ip, MacAddr},
+    utils::net::{get_ctrl_ip_and_mac, MacAddr},
 };
 
 const MB: u64 = 1048576;
@@ -363,6 +361,7 @@ pub struct EbpfConfig {
     pub l7_protocol_inference_ttl: usize,
     pub log_path: String,
     pub l7_log_tap_types: [bool; 256],
+    pub ctrl_mac: MacAddr,
 }
 
 impl fmt::Debug for EbpfConfig {
@@ -576,19 +575,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
         let (static_config, conf) = conf;
-        // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
-        let ctrl_ip = match get_k8s_local_node_ip() {
-            Some(ip) => ip,
-            None => get_route_src_ip(&static_config.controller_ips[0].parse().unwrap()).map_err(
-                |_| {
-                    ConfigError::YamlConfigInvalid(format!(
-                        "no route to controller {}",
-                        static_config.controller_ips[0]
-                    ))
-                },
-            )?,
-        };
-
+        let (ctrl_ip, ctrl_mac) =
+            get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
         let dest_ip = conf
             .analyzer_ip
             .parse::<IpAddr>()
@@ -756,6 +744,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .yaml_config
                     .l7_protocol_inference_max_fail_count,
                 l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
+                ctrl_mac: if is_tt_workload(conf.trident_type) {
+                    ctrl_mac
+                } else {
+                    MacAddr::ZERO
+                },
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
