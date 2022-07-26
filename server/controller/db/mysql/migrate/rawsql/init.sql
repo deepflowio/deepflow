@@ -1518,6 +1518,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_host (
     lcuuid      CHAR(64),
     hostname    VARCHAR(256),
     ip          CHAR(64),
+    vtap_id     INTEGER,
     node_ip     CHAR(48)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_host;
@@ -1531,6 +1532,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_vm (
     launch_server   CHAR(64),
     node_ip         CHAR(48),
     state           INTEGER,
+    vtap_id         INTEGER,
     created_at      DATETIME
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_vm;
@@ -1539,6 +1541,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_vpc (
     id              INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     lcuuid          CHAR(64),
     node_ip         CHAR(48),
+    vtap_id         INTEGER,
     name            VARCHAR(256)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_vpc;
@@ -1551,6 +1554,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_network (
     net_type        INTEGER,
     external        TINYINT(1),
     vpc_lcuuid      CHAR(64),
+    vtap_id         INTEGER,
     node_ip         CHAR(48)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_network;
@@ -1564,6 +1568,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_port (
     device_lcuuid   CHAR(64),
     network_lcuuid  CHAR(64),
     vpc_lcuuid      CHAR(64),
+    vtap_id         INTEGER,
     node_ip         CHAR(48)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_port;
@@ -1575,6 +1580,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_ip (
     vinterface_lcuuid   CHAR(64),
     node_ip             CHAR(48),
     last_seen           DATETIME,
+    vtap_id             INTEGER,
     masklen             INTEGER DEFAULT 0
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_ip;
@@ -1589,6 +1595,7 @@ CREATE TABLE IF NOT EXISTS go_genesis_lldp (
     management_address      VARCHAR(512),
     vinterface_lcuuid       VARCHAR(512),
     vinterface_description  VARCHAR(512),
+    vtap_id                 INTEGER,
     last_seen               DATETIME
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_lldp;
@@ -1611,6 +1618,13 @@ CREATE TABLE IF NOT EXISTS go_genesis_vinterface (
     kubernetes_cluster_id CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8mb4 AUTO_INCREMENT=1;
 TRUNCATE TABLE go_genesis_vinterface;
+
+CREATE TABLE IF NOT EXISTS go_genesis_storage (
+    id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    vtap_id     INTEGER,
+    node_ip     CHAR(48)
+) ENGINE = innodb DEFAULT CHARSET = utf8mb4 AUTO_INCREMENT = 1;
+TRUNCATE TABLE go_genesis_storage;
 
 CREATE TABLE IF NOT EXISTS controller (
     id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
