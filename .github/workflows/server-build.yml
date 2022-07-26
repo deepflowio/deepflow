@@ -127,7 +127,7 @@ jobs:
           echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
           echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
-      - name: Build and push deepflow agent images
+      - name: Build and push deepflow server images
         uses: docker/build-push-action@v2
         with:
           context: server
