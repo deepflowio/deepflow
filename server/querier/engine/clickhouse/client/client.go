@@ -21,6 +21,7 @@ import (
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/jmoiron/sqlx"
 	//"github.com/k0kubun/pp"
+	"github.com/deepflowys/deepflow/server/querier/statsd"
 	logging "github.com/op/go-logging"
 	"time"
 	"unsafe"
@@ -112,6 +113,13 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 		values = append(values, record)
 	}
 	resRows := len(values)
+	statsd.QuerierCounter.WriteCk(
+		&statsd.ClickhouseCounter{
+			ResponseSize: uint64(resSize),
+			RowCount:     uint64(resRows),
+			ColumnCount:  uint64(resColumns),
+		},
+	)
 	queryTime := time.Since(start)
 	c.Debug.QueryTime = int64(queryTime)
 	for _, callback := range callbacks {
