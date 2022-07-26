@@ -111,13 +111,11 @@ func (g *Genesis) GetGenesisSyncData() GenesisSyncData {
 }
 
 func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
-	retGenesisSyncData := GenesisSyncData{}
+	retGenesisSyncData := g.GetGenesisSyncData()
 
 	var controllers []mysql.Controller
-	mysql.Db.Find(&controllers)
+	mysql.Db.Where("ip <> ?", os.Getenv(common.NODE_IP_KEY)).Find(&controllers)
 	for _, controller := range controllers {
-		var storages []model.GenesisStorage
-		mysql.Db.Where("node_ip = ?", controller.IP).Find(&storages)
 		grpcServer := net.JoinHostPort(controller.IP, g.cfg.GRPCServerPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 		if err != nil {
@@ -127,14 +125,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 		defer conn.Close()
 
 		client := trident.NewSynchronizerClient(conn)
-		vtapIDs := []uint32{}
-		for _, s := range storages {
-			vtapIDs = append(vtapIDs, s.VtapID)
-		}
-		req := &trident.GenesisSharingSyncRequest{
-			VtapIds: vtapIDs,
-		}
-		ret, err := client.GenesisSharingSync(context.Background(), req)
+		ret, err := client.GenesisSharingSync(context.Background(), &trident.GenesisSharingSyncRequest{})
 		if err != nil {
 			log.Info(err.Error())
 			continue
