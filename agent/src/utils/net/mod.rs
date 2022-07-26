@@ -22,6 +22,9 @@ use std::{
 };
 
 use bitflags::bitflags;
+use log::{error, info};
+
+use super::environment::get_k8s_local_node_ip;
 
 pub mod h2pack;
 
@@ -267,6 +270,30 @@ pub fn get_mac_by_ip(ip: IpAddr) -> Result<MacAddr> {
         )))?;
 
     Ok(mac)
+}
+
+pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
+    // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
+    match get_k8s_local_node_ip() {
+        Some(ip) => {
+            info!(
+                "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
+                ip
+            );
+            let ctrl_mac = get_mac_by_ip(ip);
+            if ctrl_mac.is_err() {
+                error!("failed getting ctrl_mac from {}: {:?}", ip, ctrl_mac);
+            }
+            (ip, ctrl_mac.unwrap())
+        }
+        None => {
+            let tuple = get_route_src_ip_and_mac(&dest);
+            if tuple.is_err() {
+                error!("failed getting control ip and mac");
+            }
+            tuple.unwrap()
+        }
+    }
 }
 
 #[cfg(test)]

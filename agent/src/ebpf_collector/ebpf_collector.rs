@@ -25,7 +25,6 @@ use log::{debug, error, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
-use crate::common::endpoint::EPC_FROM_INTERNET;
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
@@ -761,6 +760,7 @@ impl EbpfRunner {
 
             let packet = packet.as_mut().unwrap();
             packet.timestamp_adjust(self.time_diff.load(Ordering::Relaxed));
+            packet.set_loopback_mac(self.config.ctrl_mac);
 
             let key = packet.ebpf_flow_id();
 
@@ -781,11 +781,9 @@ impl EbpfRunner {
                 flow_item = flow_map.get_mut(&key);
             }
 
-            let local_epc = if self.config.epc_id == 0 {
-                EPC_FROM_INTERNET
-            } else {
-                self.config.epc_id as i32
-            };
+            if self.config.epc_id == 0 {
+                continue;
+            }
 
             flow_item.and_then(|flow_item| {
                 // 应用解析
@@ -794,7 +792,7 @@ impl EbpfRunner {
                     self.policy_getter,
                     &mut self.app_table,
                     &self.log_parser_config,
-                    local_epc,
+                    self.config.epc_id as i32,
                     self.config.vtap_id,
                 ) {
                     // 应用日志聚合

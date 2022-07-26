@@ -575,13 +575,16 @@ impl Labeler {
         l3_epc_id_dst: i32,
     ) -> EndpointData {
         let src_info = EndpointInfo {
+            is_device: l3_epc_id_src > 0,
             l3_epc_id: l3_epc_id_src,
-            l2_end: true,
+            l2_end: l3_epc_id_src > 0,
             l3_end: l3_epc_id_src > 0,
             ..Default::default()
         };
         let dst_info = EndpointInfo {
+            is_device: l3_epc_id_dst > 0,
             l3_epc_id: l3_epc_id_dst,
+            l2_end: l3_epc_id_dst > 0,
             l3_end: l3_epc_id_dst > 0,
             ..Default::default()
         };
