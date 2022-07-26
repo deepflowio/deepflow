@@ -111,7 +111,7 @@ func (g *GroupTag) Format(m *view.Model) {
 		// internet增加epc分组
 		internetSuffix := "is_internet" + suffix
 		epcSuffix := "l3_epc" + suffix
-		if g.Value == internetSuffix {
+		if g.Alias == internetSuffix {
 			m.AddGroup(&view.Group{Value: epcSuffix})
 		}
 	}
