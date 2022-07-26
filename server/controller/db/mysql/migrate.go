@@ -28,6 +28,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrate"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrate/rawsql"
 )
 
 // if database not exist, create database and tables;
@@ -139,6 +140,9 @@ func initTables(db *gorm.DB) error {
 		return err
 	}
 	log.Info("init db tables success")
+
+	// only for generate dependencies
+	rawsql.RawSQL()
 	return err
 }
 
