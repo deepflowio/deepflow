@@ -22,6 +22,7 @@ pub(crate) mod guard;
 pub(crate) mod hasher;
 pub(crate) mod leaky_bucket;
 pub(crate) mod logger;
+pub(crate) mod lru;
 pub(crate) mod net;
 pub(crate) mod possible_host;
 pub(crate) mod process;
