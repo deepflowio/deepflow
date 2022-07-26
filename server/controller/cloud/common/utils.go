@@ -232,6 +232,36 @@ func AggregateCIDR(ips []netaddr.IPPrefix, maxMask int) (cirdsString []string) {
 	return
 }
 
+func GenerateCIDR(ips []netaddr.IPPrefix, maxMask int) (cirds []netaddr.IPPrefix) {
+	CIDRs := []*ipaddr.Prefix{}
+	for _, Prefix := range ips {
+		aggFlag := false
+		ipNet := ipaddr.NewPrefix(Prefix.IPNet())
+		for i, CIDR := range CIDRs {
+			pSlice := []ipaddr.Prefix{*ipNet, *CIDR}
+			aggCIDR := ipaddr.Supernet(pSlice)
+			if aggCIDR == nil {
+				continue
+			}
+			aggCIDRMask, _ := aggCIDR.IPNet.Mask.Size()
+			if aggCIDRMask >= maxMask {
+				CIDRs[i] = aggCIDR
+				aggFlag = true
+				break
+			} else {
+				continue
+			}
+		}
+		if !aggFlag {
+			CIDRs = append(CIDRs, ipNet)
+		}
+	}
+	for _, i := range CIDRs {
+		cirds = append(cirds, netaddr.MustParseIPPrefix(i.String()))
+	}
+	return
+}
+
 func IsIPInCIDR(ip, cidr string) bool {
 	if strings.Contains(cidr, "/") {
 		_, nCIDR, err := net.ParseCIDR(cidr)

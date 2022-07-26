@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"sync/atomic"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/deepflowys/deepflow/message/trident"
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/genesis/config"
@@ -43,57 +43,21 @@ var GenesisService *Genesis
 var Synchronizer *SynchronizerServer
 
 type Genesis struct {
-	cfg            config.GenesisConfig
-	ips            atomic.Value
-	subnets        atomic.Value
-	vms            atomic.Value
-	vpcs           atomic.Value
-	hosts          atomic.Value
-	lldps          atomic.Value
-	ports          atomic.Value
-	networks       atomic.Value
-	vinterfaces    atomic.Value
-	iplastseens    atomic.Value
-	kubernetesData atomic.Value
-	genesisStatsd  statsd.GenesisStatsd
+	cfg             config.GenesisConfig
+	genesisSyncData atomic.Value
+	kubernetesData  atomic.Value
+	genesisStatsd   statsd.GenesisStatsd
 }
 
 func NewGenesis(cfg config.GenesisConfig) *Genesis {
-	var ipData atomic.Value
-	ipData.Store([]cloudmodel.IP{})
-	var subnetData atomic.Value
-	subnetData.Store([]cloudmodel.Subnet{})
-	var vmData atomic.Value
-	vmData.Store([]model.GenesisVM{})
-	var vpcData atomic.Value
-	vpcData.Store([]model.GenesisVpc{})
-	var hostData atomic.Value
-	hostData.Store([]model.GenesisHost{})
-	var lldpData atomic.Value
-	lldpData.Store([]model.GenesisLldp{})
-	var portData atomic.Value
-	portData.Store([]model.GenesisPort{})
-	var networkData atomic.Value
-	networkData.Store([]model.GenesisNetwork{})
-	var vData atomic.Value
-	vData.Store([]model.GenesisVinterface{})
-	var lData atomic.Value
-	lData.Store([]model.GenesisIP{})
+	var sData atomic.Value
+	sData.Store(GenesisSyncData{})
 	var kData atomic.Value
 	kData.Store(map[string]KubernetesInfo{})
 	GenesisService = &Genesis{
-		cfg:            cfg,
-		ips:            ipData,
-		subnets:        subnetData,
-		vms:            vmData,
-		vpcs:           vpcData,
-		hosts:          hostData,
-		lldps:          lldpData,
-		ports:          portData,
-		networks:       networkData,
-		vinterfaces:    vData,
-		iplastseens:    lData,
-		kubernetesData: kData,
+		cfg:             cfg,
+		genesisSyncData: sData,
+		kubernetesData:  kData,
 		genesisStatsd: statsd.GenesisStatsd{
 			K8SInfoDelay: make(map[string][]int),
 		},
@@ -101,30 +65,23 @@ func NewGenesis(cfg config.GenesisConfig) *Genesis {
 	return GenesisService
 }
 
-// 迁移genesis
-// 功能梳理：
-//   1.获取trident上报的数据，进行解析，目前先解析原来vinterface和kubernetes-info接口的内容供cloud使用
-//     - trisolaris已经启动了与采集器通信的grpc server，故通过该server获取数据
-//   2.由于进度问题暂时无法取消原有的genesis模块，trident的信息还需要通过grpc service提供给原来的genesis模块
-//   3.数据的重载和持久化，通过mysql对数据进行持久化，以及进程重启后的数据恢复
-
 func (g *Genesis) Start() {
 	ctx := context.Context(context.Background())
-	platformDataChan := make(chan PlatformData)
+	genesisSyncDataChan := make(chan GenesisSyncData)
 	kubernetesDataChan := make(chan map[string]KubernetesInfo)
-	vQueue := queue.NewOverwriteQueue("genesis platfrom data", g.cfg.QueueLengths)
-	kQueue := queue.NewOverwriteQueue("genesis kubernetes info", g.cfg.QueueLengths)
+	sQueue := queue.NewOverwriteQueue("genesis sync data", g.cfg.QueueLengths)
+	kQueue := queue.NewOverwriteQueue("genesis k8s data", g.cfg.QueueLengths)
 
 	// 由于可能需要从数据库恢复数据，这里先启动监听
-	go g.receivePlatformData(platformDataChan)
+	go g.receiveGenesisSyncData(genesisSyncDataChan)
 	go g.receiveKubernetesData(kubernetesDataChan)
 
 	go func() {
-		Synchronizer = NewGenesisSynchronizerServer(g.cfg, vQueue, kQueue)
+		Synchronizer = NewGenesisSynchronizerServer(g.cfg, sQueue, kQueue)
 
-		vStorage := NewVinterfacesStorage(g.cfg, platformDataChan, ctx)
+		vStorage := NewSyncStorage(g.cfg, genesisSyncDataChan, ctx)
 		vStorage.Start()
-		vUpdater := NewVinterfacesRpcUpdater(vStorage, vQueue, g.cfg.LocalIPRanges, g.cfg.ExcludeIPRanges, ctx)
+		vUpdater := NewGenesisSyncRpcUpdater(vStorage, sQueue, g.cfg.LocalIPRanges, g.cfg.ExcludeIPRanges, ctx)
 		vUpdater.Start()
 
 		kStorage := NewKubernetesStorage(g.cfg, kubernetesDataChan, ctx)
@@ -140,22 +97,174 @@ func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	}
 }
 
-func (g *Genesis) receivePlatformData(pChan chan PlatformData) {
+func (g *Genesis) receiveGenesisSyncData(sChan chan GenesisSyncData) {
 	for {
 		select {
-		case p := <-pChan:
-			g.ips.Store(p.IPs)
-			g.subnets.Store(p.Subnets)
-			g.vms.Store(p.VMs.Fetch())
-			g.vpcs.Store(p.VPCs.Fetch())
-			g.hosts.Store(p.Hosts.Fetch())
-			g.lldps.Store(p.Lldps.Fetch())
-			g.ports.Store(p.Ports.Fetch())
-			g.networks.Store(p.Networks.Fetch())
-			g.vinterfaces.Store(p.Vinterfaces.Fetch())
-			g.iplastseens.Store(p.IPlastseens.Fetch())
+		case s := <-sChan:
+			g.genesisSyncData.Store(s)
 		}
 	}
+}
+
+func (g *Genesis) GetGenesisSyncData() GenesisSyncData {
+	return g.genesisSyncData.Load().(GenesisSyncData)
+}
+
+func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
+	retGenesisSyncData := GenesisSyncData{}
+
+	var controllers []mysql.Controller
+	mysql.Db.Find(&controllers)
+	for _, controller := range controllers {
+		var storages []model.GenesisStorage
+		mysql.Db.Where("node_ip = ?", controller.IP).Find(&storages)
+		grpcServer := net.JoinHostPort(controller.IP, g.cfg.GRPCServerPort)
+		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
+		if err != nil {
+			log.Error("create grpc connection faild:" + err.Error())
+			continue
+		}
+		defer conn.Close()
+
+		client := trident.NewSynchronizerClient(conn)
+		vtapIDs := []uint32{}
+		for _, s := range storages {
+			vtapIDs = append(vtapIDs, s.VtapID)
+		}
+		req := &trident.GenesisSharingSyncRequest{
+			VtapIds: vtapIDs,
+		}
+		ret, err := client.GenesisSharingSync(context.Background(), req)
+		if err != nil {
+			log.Info(err.Error())
+			continue
+		} else {
+			genesisSyncData := ret.GetData()
+			genesisSyncIPs := genesisSyncData.GetIp()
+			for _, ip := range genesisSyncIPs {
+				ipLastSeenStr := ip.GetLastSeen()
+				ipLastSeen, _ := time.ParseInLocation(common.GO_BIRTHDAY, ipLastSeenStr, time.Local)
+				gIP := model.GenesisIP{
+					Masklen:          ip.GetMasklen(),
+					IP:               ip.GetIp(),
+					Lcuuid:           ip.GetLcuuid(),
+					VinterfaceLcuuid: ip.GetVinterfaceLcuuid(),
+					NodeIP:           ip.GetNodeIp(),
+					LastSeen:         ipLastSeen,
+				}
+				retGenesisSyncData.IPLastSeens = append(retGenesisSyncData.IPLastSeens, gIP)
+			}
+
+			genesisSyncHosts := genesisSyncData.GetHost()
+			for _, host := range genesisSyncHosts {
+				gHost := model.GenesisHost{
+					Lcuuid:   host.GetLcuuid(),
+					Hostname: host.GetHostname(),
+					IP:       host.GetIp(),
+					NodeIP:   host.GetNodeIp(),
+				}
+				retGenesisSyncData.Hosts = append(retGenesisSyncData.Hosts, gHost)
+			}
+
+			genesisSyncLldps := genesisSyncData.GetLldp()
+			for _, l := range genesisSyncLldps {
+				lLastSeenStr := l.GetLastSeen()
+				lLastSeen, _ := time.ParseInLocation(common.GO_BIRTHDAY, lLastSeenStr, time.Local)
+				gLldp := model.GenesisLldp{
+					Lcuuid:                l.GetLcuuid(),
+					HostIP:                l.GetHostIp(),
+					HostInterface:         l.GetHostInterface(),
+					SystemName:            l.GetSystemName(),
+					ManagementAddress:     l.GetManagementAddress(),
+					VinterfaceLcuuid:      l.GetVinterfaceLcuuid(),
+					VinterfaceDescription: l.GetVinterfaceDescription(),
+					NodeIP:                l.GetNodeIp(),
+					LastSeen:              lLastSeen,
+				}
+				retGenesisSyncData.Lldps = append(retGenesisSyncData.Lldps, gLldp)
+			}
+
+			genesisSyncNetworks := genesisSyncData.GetNetwork()
+			for _, network := range genesisSyncNetworks {
+				gNetwork := model.GenesisNetwork{
+					SegmentationID: network.GetSegmentationId(),
+					NetType:        network.GetNetType(),
+					External:       network.GetExternal(),
+					Name:           network.GetName(),
+					Lcuuid:         network.GetLcuuid(),
+					VPCLcuuid:      network.GetVpcLcuuid(),
+					NodeIP:         network.GetNodeIp(),
+				}
+				retGenesisSyncData.Networks = append(retGenesisSyncData.Networks, gNetwork)
+			}
+
+			genesisSyncPorts := genesisSyncData.GetPort()
+			for _, port := range genesisSyncPorts {
+				gPort := model.GenesisPort{
+					Type:          port.GetType(),
+					DeviceType:    port.GetDeviceType(),
+					Lcuuid:        port.GetLcuuid(),
+					Mac:           port.GetMac(),
+					DeviceLcuuid:  port.GetDeviceLcuuid(),
+					NetworkLcuuid: port.GetNetworkLcuuid(),
+					VPCLcuuid:     port.GetVpcLcuuid(),
+					NodeIP:        port.GetNodeIp(),
+				}
+				retGenesisSyncData.Ports = append(retGenesisSyncData.Ports, gPort)
+			}
+
+			genesisSyncVms := genesisSyncData.GetVm()
+			for _, vm := range genesisSyncVms {
+				vCreatedAtStr := vm.GetCreatedAt()
+				vCreatedAt, _ := time.ParseInLocation(common.GO_BIRTHDAY, vCreatedAtStr, time.Local)
+				gVm := model.GenesisVM{
+					State:        vm.GetState(),
+					Lcuuid:       vm.GetLcuuid(),
+					Name:         vm.GetName(),
+					Label:        vm.GetLabel(),
+					VPCLcuuid:    vm.GetVpcLcuuid(),
+					LaunchServer: vm.GetLaunchServer(),
+					NodeIP:       vm.GetNodeIp(),
+					CreatedAt:    vCreatedAt,
+				}
+				retGenesisSyncData.VMs = append(retGenesisSyncData.VMs, gVm)
+			}
+
+			genesisSyncVpcs := genesisSyncData.GetVpc()
+			for _, vpc := range genesisSyncVpcs {
+				gVpc := model.GenesisVpc{
+					Lcuuid: vpc.GetLcuuid(),
+					Name:   vpc.GetName(),
+					NodeIP: vpc.GetNodeIp(),
+				}
+				retGenesisSyncData.VPCs = append(retGenesisSyncData.VPCs, gVpc)
+			}
+
+			genesisSyncVinterfaces := genesisSyncData.GetVinterface()
+			for _, v := range genesisSyncVinterfaces {
+				vLastSeenStr := v.GetLastSeen()
+				vpLastSeen, _ := time.ParseInLocation(common.GO_BIRTHDAY, vLastSeenStr, time.Local)
+				gVinterface := model.GenesisVinterface{
+					VtapID:              v.GetVtapId(),
+					Lcuuid:              v.GetLcuuid(),
+					Name:                v.GetName(),
+					IPs:                 v.GetIps(),
+					Mac:                 v.GetMac(),
+					TapName:             v.GetTapName(),
+					TapMac:              v.GetTapMac(),
+					DeviceLcuuid:        v.GetDeviceLcuuid(),
+					DeviceName:          v.GetDeviceName(),
+					DeviceType:          v.GetDeviceType(),
+					HostIP:              v.GetHostIp(),
+					KubernetesClusterID: v.GetKubernetesClusterId(),
+					NodeIP:              v.GetNodeIp(),
+					LastSeen:            vpLastSeen,
+				}
+				retGenesisSyncData.Vinterfaces = append(retGenesisSyncData.Vinterfaces, gVinterface)
+			}
+		}
+	}
+	return retGenesisSyncData, nil
 }
 
 func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
@@ -164,94 +273,6 @@ func (g *Genesis) receiveKubernetesData(kChan chan map[string]KubernetesInfo) {
 		case k := <-kChan:
 			g.kubernetesData.Store(k)
 		}
-	}
-}
-
-func (g *Genesis) GetIPsData(isLocal bool) []cloudmodel.IP {
-	return g.ips.Load().([]cloudmodel.IP)
-}
-
-func (g *Genesis) GetSubnetsData(isLocal bool) []cloudmodel.Subnet {
-	return g.subnets.Load().([]cloudmodel.Subnet)
-}
-
-func (g *Genesis) GetVMsData(isLocal bool) []model.GenesisVM {
-	if isLocal {
-		return g.vms.Load().([]model.GenesisVM)
-	} else {
-		var vms []model.GenesisVM
-		mysql.Db.Find(&vms)
-		return vms
-	}
-}
-
-func (g *Genesis) GetVPCsData(isLocal bool) []model.GenesisVpc {
-	if isLocal {
-		return g.vpcs.Load().([]model.GenesisVpc)
-	} else {
-		var vpcs []model.GenesisVpc
-		mysql.Db.Find(&vpcs)
-		return vpcs
-	}
-}
-
-func (g *Genesis) GetHostsData(isLocal bool) []model.GenesisHost {
-	if isLocal {
-		return g.hosts.Load().([]model.GenesisHost)
-	} else {
-		var hosts []model.GenesisHost
-		mysql.Db.Find(&hosts)
-		return hosts
-	}
-}
-
-func (g *Genesis) GetLldpsData(isLocal bool) []model.GenesisLldp {
-	if isLocal {
-		return g.lldps.Load().([]model.GenesisLldp)
-	} else {
-		var lldps []model.GenesisLldp
-		mysql.Db.Find(&lldps)
-		return lldps
-	}
-}
-
-func (g *Genesis) GetPortsData(isLocal bool) []model.GenesisPort {
-	if isLocal {
-		return g.ports.Load().([]model.GenesisPort)
-	} else {
-		var ports []model.GenesisPort
-		mysql.Db.Find(&ports)
-		return ports
-	}
-}
-
-func (g *Genesis) GetNetworksData(isLocal bool) []model.GenesisNetwork {
-	if isLocal {
-		return g.networks.Load().([]model.GenesisNetwork)
-	} else {
-		var networks []model.GenesisNetwork
-		mysql.Db.Find(&networks)
-		return networks
-	}
-}
-
-func (g *Genesis) GetVinterfacesData(isLocal bool) []model.GenesisVinterface {
-	if isLocal {
-		return g.vinterfaces.Load().([]model.GenesisVinterface)
-	} else {
-		var vinterfaces []model.GenesisVinterface
-		mysql.Db.Find(&vinterfaces)
-		return vinterfaces
-	}
-}
-
-func (g *Genesis) GetIPLastSeensData(isLocal bool) []model.GenesisIP {
-	if isLocal {
-		return g.iplastseens.Load().([]model.GenesisIP)
-	} else {
-		var ips []model.GenesisIP
-		mysql.Db.Find(&ips)
-		return ips
 	}
 }
 
@@ -267,7 +288,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 	k8sInfo, ok := localK8sDatas[clusterID]
 	if !ok {
 		var controllers []mysql.Controller
-		mysql.Db.Find(&controllers)
+		mysql.Db.Where("ip <> ?", os.Getenv(common.NODE_IP_KEY)).Find(&controllers)
 		retFlag := false
 		for _, controller := range controllers {
 			grpcServer := net.JoinHostPort(controller.IP, g.cfg.GRPCServerPort)
@@ -279,12 +300,12 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			defer conn.Close()
 
 			client := trident.NewSynchronizerClient(conn)
-			req := trident.GenesisSharingK8SRequest{
+			req := &trident.GenesisSharingK8SRequest{
 				ClusterId: &clusterID,
 			}
-			ret, err := client.GenesisSharingK8S(context.Background(), &req)
+			ret, err := client.GenesisSharingK8S(context.Background(), req)
 			if err != nil {
-				log.Warning(err.Error())
+				log.Info(err.Error())
 				continue
 			} else {
 				retFlag = true

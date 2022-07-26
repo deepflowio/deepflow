@@ -19,7 +19,6 @@ package genesis
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/genesis"
 
 	uuid "github.com/satori/go.uuid"
 )
@@ -27,7 +26,7 @@ import (
 func (g *Genesis) getVMs() ([]model.VM, error) {
 	log.Debug("get vms starting")
 	vms := []model.VM{}
-	vmsData := genesis.GenesisService.GetVMsData(false)
+	vmsData := g.genesisData.VMs
 
 	g.cloudStatsd.APICost["vms"] = []int{0}
 	g.cloudStatsd.APICount["vms"] = []int{len(vmsData)}
@@ -47,7 +46,7 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 			Name:         v.Name,
 			Label:        v.Label,
 			VPCLcuuid:    vpcLcuuid,
-			State:        v.State,
+			State:        int(v.State),
 			LaunchServer: launchServer,
 			CreatedAt:    v.CreatedAt,
 			AZLcuuid:     g.azLcuuid,
