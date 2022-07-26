@@ -577,7 +577,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			if e.DB == "ext_metrics" && strings.Contains(whereTag, ".") {
+			if e.DB == "ext_metrics" && strings.HasPrefix(whereTag, "metrics.") {
 				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table)
 				if ok {
 					whereTag = metricStruct.DBField
