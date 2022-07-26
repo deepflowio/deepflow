@@ -668,7 +668,6 @@ message GenesisSyncData{
 }
 
 message GenesisSharingSyncRequest {
-    repeated uint32 vtap_ids = 1;
 }
 
 message GenesisSharingSyncResponse {

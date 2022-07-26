@@ -86,14 +86,30 @@ type GenesisSyncTypeOperation[T model.GenesisVinterface | model.GenesisVpc | mod
 	dataDict map[string]T
 }
 
-func (g *GenesisSyncTypeOperation[T]) Fetch() []T {
+func (g *GenesisSyncTypeOperation[T]) Fetch(vtapIDs ...uint32) []T {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
-	data := []T{}
-	for _, d := range g.dataDict {
-		data = append(data, d)
+	vtapIDsMap := map[uint32]int{0: 0}
+	for _, v := range vtapIDs {
+		vtapIDsMap[v] = 0
 	}
+
+	data := []T{}
+	if len(vtapIDs) > 0 {
+		for _, d := range g.dataDict {
+			tData := reflect.ValueOf(d)
+			vtapID := tData.FieldByName("VtapID").Uint()
+			if _, ok := vtapIDsMap[uint32(vtapID)]; ok {
+				data = append(data, d)
+			}
+		}
+	} else {
+		for _, d := range g.dataDict {
+			data = append(data, d)
+		}
+	}
+
 	return data
 }
 

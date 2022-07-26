@@ -119,7 +119,7 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		updateFlag = true
 		s.genesisSyncInfo.Vinterfaces.Update(data.Vinterfaces.Fetch(), now)
 	}
-	if updateFlag {
+	if updateFlag && vtapID != 0 {
 		var storages []model.GenesisStorage
 		mysql.Db.Where("vtap_id = ?", vtapID).Find(&storages)
 		if len(storages) > 0 {
@@ -129,6 +129,29 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		}
 	}
 	s.dirty = true
+}
+
+func (s *SyncStorage) fetch() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var storages []model.GenesisStorage
+	mysql.Db.Where("node_ip = ?", os.Getenv(common.NODE_IP_KEY)).Find(&storages)
+	vtapIDs := []uint32{}
+	for _, v := range storages {
+		vtapIDs = append(vtapIDs, v.VtapID)
+	}
+
+	s.channel <- GenesisSyncData{
+		VMs:         s.genesisSyncInfo.VMs.Fetch(vtapIDs...),
+		VPCs:        s.genesisSyncInfo.VPCs.Fetch(vtapIDs...),
+		Hosts:       s.genesisSyncInfo.Hosts.Fetch(vtapIDs...),
+		Ports:       s.genesisSyncInfo.Ports.Fetch(vtapIDs...),
+		Lldps:       s.genesisSyncInfo.Lldps.Fetch(vtapIDs...),
+		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(vtapIDs...),
+		Networks:    s.genesisSyncInfo.Networks.Fetch(vtapIDs...),
+		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(vtapIDs...),
+	}
 }
 
 func (s *SyncStorage) loadFromDatabase() {
@@ -169,16 +192,7 @@ func (s *SyncStorage) loadFromDatabase() {
 	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(vinterfaces)
 	s.genesisSyncInfo.Vinterfaces.Load()
 
-	s.channel <- GenesisSyncData{
-		VMs:         s.genesisSyncInfo.VMs.Fetch(),
-		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
-		Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
-		Ports:       s.genesisSyncInfo.Ports.Fetch(),
-		Lldps:       s.genesisSyncInfo.Lldps.Fetch(),
-		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
-		Networks:    s.genesisSyncInfo.Networks.Fetch(),
-		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
-	}
+	s.fetch()
 }
 
 func (s *SyncStorage) storeToDatabase() {
@@ -217,17 +231,7 @@ func (s *SyncStorage) run() {
 		s.mutex.Unlock()
 		if hasChange {
 			s.storeToDatabase()
-		}
-
-		s.channel <- GenesisSyncData{
-			VMs:         s.genesisSyncInfo.VMs.Fetch(),
-			VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
-			Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
-			Ports:       s.genesisSyncInfo.Ports.Fetch(),
-			Lldps:       s.genesisSyncInfo.Lldps.Fetch(),
-			IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
-			Networks:    s.genesisSyncInfo.Networks.Fetch(),
-			Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
+			s.fetch()
 		}
 	}
 }

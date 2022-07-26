@@ -262,155 +262,133 @@ func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *tri
 }
 
 func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *trident.GenesisSharingSyncRequest) (*trident.GenesisSharingSyncResponse, error) {
-	vtapIDs := request.GetVtapIds()
-	vtapIDsMap := map[uint32]int{}
-	for _, v := range vtapIDs {
-		vtapIDsMap[v] = 0
-	}
-
 	gSyncData := GenesisService.GetGenesisSyncData()
 
 	gSyncIPs := []*trident.GenesisSyncIP{}
 	for _, ip := range gSyncData.IPLastSeens {
 		ipData := ip
-		if _, ok := vtapIDsMap[ip.VtapID]; ok {
-			ipLastSeen := ipData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
-			gIP := &trident.GenesisSyncIP{
-				Masklen:          &ipData.Masklen,
-				Ip:               &ipData.IP,
-				Lcuuid:           &ipData.Lcuuid,
-				VinterfaceLcuuid: &ipData.VinterfaceLcuuid,
-				NodeIp:           &ipData.NodeIP,
-				LastSeen:         &ipLastSeen,
-			}
-			gSyncIPs = append(gSyncIPs, gIP)
+		ipLastSeen := ipData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
+		gIP := &trident.GenesisSyncIP{
+			Masklen:          &ipData.Masklen,
+			Ip:               &ipData.IP,
+			Lcuuid:           &ipData.Lcuuid,
+			VinterfaceLcuuid: &ipData.VinterfaceLcuuid,
+			NodeIp:           &ipData.NodeIP,
+			LastSeen:         &ipLastSeen,
 		}
+		gSyncIPs = append(gSyncIPs, gIP)
 	}
 
 	gSyncHosts := []*trident.GenesisSyncHost{}
 	for _, host := range gSyncData.Hosts {
 		hostData := host
-		if _, ok := vtapIDsMap[host.VtapID]; ok {
-			gHost := &trident.GenesisSyncHost{
-				Lcuuid:   &hostData.Lcuuid,
-				Hostname: &hostData.Hostname,
-				Ip:       &hostData.IP,
-				NodeIp:   &hostData.NodeIP,
-			}
-			gSyncHosts = append(gSyncHosts, gHost)
+		gHost := &trident.GenesisSyncHost{
+			Lcuuid:   &hostData.Lcuuid,
+			Hostname: &hostData.Hostname,
+			Ip:       &hostData.IP,
+			NodeIp:   &hostData.NodeIP,
 		}
+		gSyncHosts = append(gSyncHosts, gHost)
 	}
 
 	gSyncLldps := []*trident.GenesisSyncLldp{}
 	for _, l := range gSyncData.Lldps {
 		lData := l
-		if _, ok := vtapIDsMap[l.VtapID]; ok {
-			lLastSeen := lData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
-			gLldp := &trident.GenesisSyncLldp{
-				Lcuuid:                &lData.Lcuuid,
-				HostIp:                &lData.HostIP,
-				HostInterface:         &lData.HostInterface,
-				SystemName:            &lData.SystemName,
-				ManagementAddress:     &lData.ManagementAddress,
-				VinterfaceLcuuid:      &lData.VinterfaceLcuuid,
-				VinterfaceDescription: &lData.VinterfaceDescription,
-				NodeIp:                &lData.NodeIP,
-				LastSeen:              &lLastSeen,
-			}
-			gSyncLldps = append(gSyncLldps, gLldp)
+		lLastSeen := lData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
+		gLldp := &trident.GenesisSyncLldp{
+			Lcuuid:                &lData.Lcuuid,
+			HostIp:                &lData.HostIP,
+			HostInterface:         &lData.HostInterface,
+			SystemName:            &lData.SystemName,
+			ManagementAddress:     &lData.ManagementAddress,
+			VinterfaceLcuuid:      &lData.VinterfaceLcuuid,
+			VinterfaceDescription: &lData.VinterfaceDescription,
+			NodeIp:                &lData.NodeIP,
+			LastSeen:              &lLastSeen,
 		}
+		gSyncLldps = append(gSyncLldps, gLldp)
 	}
 
 	gSyncNetworks := []*trident.GenesisSyncNetwork{}
 	for _, network := range gSyncData.Networks {
 		networkData := network
-		if _, ok := vtapIDsMap[network.VtapID]; ok {
-			gNetwork := &trident.GenesisSyncNetwork{
-				SegmentationId: &networkData.SegmentationID,
-				NetType:        &networkData.NetType,
-				External:       &networkData.External,
-				Name:           &networkData.Name,
-				Lcuuid:         &networkData.Lcuuid,
-				VpcLcuuid:      &networkData.VPCLcuuid,
-				NodeIp:         &networkData.NodeIP,
-			}
-			gSyncNetworks = append(gSyncNetworks, gNetwork)
+		gNetwork := &trident.GenesisSyncNetwork{
+			SegmentationId: &networkData.SegmentationID,
+			NetType:        &networkData.NetType,
+			External:       &networkData.External,
+			Name:           &networkData.Name,
+			Lcuuid:         &networkData.Lcuuid,
+			VpcLcuuid:      &networkData.VPCLcuuid,
+			NodeIp:         &networkData.NodeIP,
 		}
+		gSyncNetworks = append(gSyncNetworks, gNetwork)
 	}
 
 	gSyncPorts := []*trident.GenesisSyncPort{}
 	for _, port := range gSyncData.Ports {
 		portData := port
-		if _, ok := vtapIDsMap[port.VtapID]; ok {
-			gPort := &trident.GenesisSyncPort{
-				Type:          &portData.Type,
-				DeviceType:    &portData.DeviceType,
-				Lcuuid:        &portData.Lcuuid,
-				Mac:           &portData.Mac,
-				DeviceLcuuid:  &portData.DeviceLcuuid,
-				NetworkLcuuid: &portData.NetworkLcuuid,
-				VpcLcuuid:     &portData.VPCLcuuid,
-				NodeIp:        &portData.NodeIP,
-			}
-			gSyncPorts = append(gSyncPorts, gPort)
+		gPort := &trident.GenesisSyncPort{
+			Type:          &portData.Type,
+			DeviceType:    &portData.DeviceType,
+			Lcuuid:        &portData.Lcuuid,
+			Mac:           &portData.Mac,
+			DeviceLcuuid:  &portData.DeviceLcuuid,
+			NetworkLcuuid: &portData.NetworkLcuuid,
+			VpcLcuuid:     &portData.VPCLcuuid,
+			NodeIp:        &portData.NodeIP,
 		}
+		gSyncPorts = append(gSyncPorts, gPort)
 	}
 
 	gSyncVms := []*trident.GenesisSyncVm{}
 	for _, vm := range gSyncData.VMs {
 		vmData := vm
-		if _, ok := vtapIDsMap[vm.VtapID]; ok {
-			vCreateAt := vmData.CreatedAt.Format(controllercommon.GO_BIRTHDAY)
-			gVm := &trident.GenesisSyncVm{
-				State:        &vmData.State,
-				Lcuuid:       &vmData.Lcuuid,
-				Name:         &vmData.Name,
-				Label:        &vmData.Label,
-				VpcLcuuid:    &vmData.VPCLcuuid,
-				LaunchServer: &vmData.LaunchServer,
-				NodeIp:       &vmData.NodeIP,
-				CreatedAt:    &vCreateAt,
-			}
-			gSyncVms = append(gSyncVms, gVm)
+		vCreateAt := vmData.CreatedAt.Format(controllercommon.GO_BIRTHDAY)
+		gVm := &trident.GenesisSyncVm{
+			State:        &vmData.State,
+			Lcuuid:       &vmData.Lcuuid,
+			Name:         &vmData.Name,
+			Label:        &vmData.Label,
+			VpcLcuuid:    &vmData.VPCLcuuid,
+			LaunchServer: &vmData.LaunchServer,
+			NodeIp:       &vmData.NodeIP,
+			CreatedAt:    &vCreateAt,
 		}
+		gSyncVms = append(gSyncVms, gVm)
 	}
 
 	gSyncVpcs := []*trident.GenesisSyncVpc{}
 	for _, vpc := range gSyncData.VPCs {
 		vpcData := vpc
-		if _, ok := vtapIDsMap[vpc.VtapID]; ok {
-			gVpc := &trident.GenesisSyncVpc{
-				Lcuuid: &vpcData.Lcuuid,
-				Name:   &vpcData.Name,
-				NodeIp: &vpcData.NodeIP,
-			}
-			gSyncVpcs = append(gSyncVpcs, gVpc)
+		gVpc := &trident.GenesisSyncVpc{
+			Lcuuid: &vpcData.Lcuuid,
+			Name:   &vpcData.Name,
+			NodeIp: &vpcData.NodeIP,
 		}
+		gSyncVpcs = append(gSyncVpcs, gVpc)
 	}
 
 	gSyncVinterfaces := []*trident.GenesisSyncVinterface{}
 	for _, v := range gSyncData.Vinterfaces {
 		vData := v
-		if _, ok := vtapIDsMap[v.VtapID]; ok {
-			vLastSeen := vData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
-			gVinterface := &trident.GenesisSyncVinterface{
-				VtapId:              &vData.VtapID,
-				Lcuuid:              &vData.Lcuuid,
-				Name:                &vData.Name,
-				Ips:                 &vData.IPs,
-				Mac:                 &vData.Mac,
-				TapName:             &vData.TapName,
-				TapMac:              &vData.TapMac,
-				DeviceLcuuid:        &vData.DeviceLcuuid,
-				DeviceName:          &vData.DeviceName,
-				DeviceType:          &vData.DeviceType,
-				HostIp:              &vData.HostIP,
-				KubernetesClusterId: &vData.KubernetesClusterID,
-				NodeIp:              &vData.NodeIP,
-				LastSeen:            &vLastSeen,
-			}
-			gSyncVinterfaces = append(gSyncVinterfaces, gVinterface)
+		vLastSeen := vData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
+		gVinterface := &trident.GenesisSyncVinterface{
+			VtapId:              &vData.VtapID,
+			Lcuuid:              &vData.Lcuuid,
+			Name:                &vData.Name,
+			Ips:                 &vData.IPs,
+			Mac:                 &vData.Mac,
+			TapName:             &vData.TapName,
+			TapMac:              &vData.TapMac,
+			DeviceLcuuid:        &vData.DeviceLcuuid,
+			DeviceName:          &vData.DeviceName,
+			DeviceType:          &vData.DeviceType,
+			HostIp:              &vData.HostIP,
+			KubernetesClusterId: &vData.KubernetesClusterID,
+			NodeIp:              &vData.NodeIP,
+			LastSeen:            &vLastSeen,
 		}
+		gSyncVinterfaces = append(gSyncVinterfaces, gVinterface)
 	}
 
 	return &trident.GenesisSharingSyncResponse{
