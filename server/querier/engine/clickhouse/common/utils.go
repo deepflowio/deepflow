@@ -64,7 +64,7 @@ func ParseAlias(node sqlparser.SQLNode) string {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	// 外部字段带上``
-	if strings.HasPrefix(alias, "tag.") || strings.HasPrefix(alias, "attribute.") || strings.HasPrefix(alias, "int.") || strings.HasPrefix(alias, "float.") {
+	if strings.HasPrefix(alias, "tag.") || strings.HasPrefix(alias, "attribute.") || strings.HasPrefix(alias, "metrics.") {
 		return fmt.Sprintf("`%s`", alias)
 	}
 	return alias

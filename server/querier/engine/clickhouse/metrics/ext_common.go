@@ -50,7 +50,8 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 				i, dbField, externalTag, "", METRICS_TYPE_COUNTER,
 				"原始Tag", []bool{true, true, true}, "", table,
 			)
-			loadMetrics[externalTag] = lm
+			metricName := fmt.Sprintf("%s.%s", "metrics", externalTag)
+			loadMetrics[metricName] = lm
 		}
 	}
 	return loadMetrics, err
