@@ -27,7 +27,6 @@ use arc_swap::access::Access;
 use thread::JoinHandle;
 
 use log::{debug, info, warn};
-use lru::LruCache;
 
 use super::acc_flow::{AccumulatedFlow, U16Set};
 use super::consts::*;
@@ -45,6 +44,7 @@ use crate::metric::meter::{
 };
 use crate::rpc::get_timestamp;
 use crate::utils::{
+    lru::Lru,
     possible_host::PossibleHost,
     queue::{DebugSender, Error, Receiver},
     stats::{Counter, CounterType, CounterValue, RefCountable},
@@ -113,15 +113,15 @@ impl QuadrupleConnections {
 }
 
 struct ConcurrentConnection {
-    v4_connections: LruCache<[u8; IPV4_LRU_KEY_SIZE], QuadrupleConnections>,
-    v6_connections: LruCache<[u8; IPV6_LRU_KEY_SIZE], QuadrupleConnections>,
+    v4_connections: Lru<[u8; IPV4_LRU_KEY_SIZE], QuadrupleConnections>,
+    v6_connections: Lru<[u8; IPV6_LRU_KEY_SIZE], QuadrupleConnections>,
 }
 
 impl ConcurrentConnection {
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            v4_connections: LruCache::new(capacity),
-            v6_connections: LruCache::new(capacity),
+            v4_connections: Lru::with_capacity(capacity >> 5, capacity),
+            v6_connections: Lru::with_capacity(capacity >> 5, capacity),
         }
     }
 
