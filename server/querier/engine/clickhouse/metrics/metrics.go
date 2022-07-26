@@ -87,32 +87,19 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 }
 
 func GetMetrics(field string, db string, table string) (*Metrics, bool) {
+	if db == "ext_metrics" {
+		field = strings.Trim(field, "`")
+		return NewMetrics(
+			0, fmt.Sprintf("metrics_float_values[indexOf(metrics_float_names, '%s')]", field),
+			field, "", METRICS_TYPE_COUNTER,
+			"原始Tag", []bool{true, true, true}, "", table,
+		), true
+	}
 	allMetrics, err := GetMetricsByDBTable(db, table, "")
 	if err != nil {
 		return nil, false
 	}
 	metric, ok := allMetrics[field]
-	if !ok {
-		if db == "ext_metrics" {
-			field = strings.Trim(field, "`")
-			fieldSplit := strings.Split(field, ".")
-			if len(fieldSplit) > 1 {
-				if fieldSplit[0] == "int" {
-					return NewMetrics(
-						0, fmt.Sprintf("metrics_int_values[indexOf(metrics_int_names, '%s')]", fieldSplit[1]),
-						field, "", METRICS_TYPE_COUNTER,
-						"原始Tag", []bool{true, true, true}, field, table,
-					), true
-				} else if fieldSplit[0] == "float" {
-					return NewMetrics(
-						0, fmt.Sprintf("metrics_float_values[indexOf(metrics_float_names, '%s')]", fieldSplit[1]),
-						field, "", METRICS_TYPE_COUNTER,
-						"原始Tag", []bool{true, true, true}, field, table,
-					), true
-				}
-			}
-		}
-	}
 	return metric, ok
 }
 
