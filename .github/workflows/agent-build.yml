@@ -53,7 +53,7 @@ jobs:
 
       - name: Package code build results
         run: |
-          tar cvf agent-artifact.tar agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+          tar cvf agent-artifact.tar agent/output/target/release/deepflow-agent agent/output/target/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
 
       - name: Archive code build results
         uses: actions/upload-artifact@v3
@@ -169,7 +169,7 @@ jobs:
       - name: build binary package  
         run: |
           mkdir -p agent/bin-package
-          cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
+          cp -raf agent/output/target/release/deepflow-agent agent/bin-package/
           cd agent/bin-package/
           tar -czvf deepflow-agent.tar.gz *
  
@@ -195,7 +195,6 @@ jobs:
 
       - name: upload agent artifacts
         run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
+          ossutil cp -rf agent/artifacts.zip oss://deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/output/target/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
           ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent.tar.gz

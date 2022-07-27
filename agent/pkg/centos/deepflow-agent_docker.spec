@@ -22,6 +22,7 @@ cp %pwd/config/deepflow-agent.yaml $RPM_BUILD_ROOT/temp/
 cp %pwd/docker/dockerfile $RPM_BUILD_ROOT/temp/
 cp %pwd/docker/deepflow-agent-cm.yaml $RPM_BUILD_ROOT/temp/
 mkdir -p $RPM_BUILD_ROOT/temp/docker/
+cp -r %pwd/docker/require $RPM_BUILD_ROOT/temp/docker/
 (cd $RPM_BUILD_ROOT/temp/ &&
     docker build -t deepflow-agent:%full_version . --load &&
     docker save -o deepflow-agent-%full_version.tar deepflow-agent:%full_version &&
