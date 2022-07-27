@@ -96,7 +96,7 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 	for _, analyzer := range analyzers {
 		// analyzer name = ${DomainPrefix}-${Name}
 		name := analyzer.Name
-		if domainPrefix, ok := ipToDomainPrefix[analyzer.IP]; ok {
+		if domainPrefix, ok := ipToDomainPrefix[analyzer.IP]; ok && domainPrefix != "" {
 			name = domainPrefix + "-" + name
 		}
 		analyzerResp := model.Analyzer{
