@@ -93,7 +93,7 @@ func GetMetrics(field string, db string, table string) (*Metrics, bool) {
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
 				return NewMetrics(
-					0, fmt.Sprintf("metrics_float_values[indexOf(metrics_float_names, '%s')]", fieldSplit[1]),
+					0, fmt.Sprintf("if(indexOf(metrics_float_names, '%s')=0,null,metrics_float_values[indexOf(metrics_float_names, '%s')])", fieldSplit[1], fieldSplit[1]),
 					field, "", METRICS_TYPE_COUNTER,
 					"原始Tag", []bool{true, true, true}, "", table,
 				), true

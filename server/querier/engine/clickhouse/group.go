@@ -18,6 +18,8 @@ package clickhouse
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
@@ -50,10 +52,13 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				return &view.Expr{}, false
 			}
 			filter := tagItem.NotNullFilter
+			if strings.HasPrefix(preAsTag, "`metrics.") {
+				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
+			}
 			if filter == "" {
 				return &view.Expr{}, false
 			}
-			return &view.Expr{Value: filter}, true
+			return &view.Expr{Value: "(" + filter + ")"}, true
 		} else {
 			return &view.Expr{}, false
 		}
@@ -61,8 +66,11 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 	if tagItem.NotNullFilter == "" {
 		return &view.Expr{}, false
 	}
-	filter := "(" + tagItem.NotNullFilter + ")"
-	return &view.Expr{Value: filter}, true
+	filter := tagItem.NotNullFilter
+	if strings.HasPrefix(name, "`metrics.") {
+		filter = fmt.Sprintf(tagItem.NotNullFilter, name)
+	}
+	return &view.Expr{Value: "(" + filter + ")"}, true
 }
 
 func FormatInnerTime(m *view.Model) {

@@ -119,7 +119,7 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		updateFlag = true
 		s.genesisSyncInfo.Vinterfaces.Update(data.Vinterfaces.Fetch(), now)
 	}
-	if updateFlag {
+	if updateFlag && vtapID != 0 {
 		var storages []model.GenesisStorage
 		mysql.Db.Where("vtap_id = ?", vtapID).Find(&storages)
 		if len(storages) > 0 {
@@ -129,6 +129,22 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		}
 	}
 	s.dirty = true
+}
+
+func (s *SyncStorage) fetch() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.channel <- GenesisSyncData{
+		VMs:         s.genesisSyncInfo.VMs.Fetch(),
+		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
+		Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
+		Ports:       s.genesisSyncInfo.Ports.Fetch(),
+		Lldps:       s.genesisSyncInfo.Lldps.Fetch(),
+		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
+		Networks:    s.genesisSyncInfo.Networks.Fetch(),
+		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
+	}
 }
 
 func (s *SyncStorage) loadFromDatabase() {
@@ -169,16 +185,7 @@ func (s *SyncStorage) loadFromDatabase() {
 	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(vinterfaces)
 	s.genesisSyncInfo.Vinterfaces.Load()
 
-	s.channel <- GenesisSyncData{
-		VMs:         s.genesisSyncInfo.VMs.Fetch(),
-		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
-		Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
-		Ports:       s.genesisSyncInfo.Ports.Fetch(),
-		Lldps:       s.genesisSyncInfo.Lldps.Fetch(),
-		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
-		Networks:    s.genesisSyncInfo.Networks.Fetch(),
-		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
-	}
+	s.fetch()
 }
 
 func (s *SyncStorage) storeToDatabase() {
@@ -217,17 +224,7 @@ func (s *SyncStorage) run() {
 		s.mutex.Unlock()
 		if hasChange {
 			s.storeToDatabase()
-		}
-
-		s.channel <- GenesisSyncData{
-			VMs:         s.genesisSyncInfo.VMs.Fetch(),
-			VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
-			Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
-			Ports:       s.genesisSyncInfo.Ports.Fetch(),
-			Lldps:       s.genesisSyncInfo.Lldps.Fetch(),
-			IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
-			Networks:    s.genesisSyncInfo.Networks.Fetch(),
-			Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
+			s.fetch()
 		}
 	}
 }

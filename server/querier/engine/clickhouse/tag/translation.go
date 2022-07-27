@@ -541,6 +541,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+	// 外部指标量
+	tagResourceMap["metrics"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"%s is not null",
+			"",
+			"",
+		),
+	}
 	// 采集点ID
 	tagResourceMap["tap_id"] = map[string]*Tag{
 		"default": NewTag(
