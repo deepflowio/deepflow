@@ -336,6 +336,10 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		e.Statements = append(e.Statements, binFunction)
 		return nil
 	case *sqlparser.ColName, *sqlparser.SQLVal:
+		err := e.AddTag(chCommon.ParseAlias(expr), as)
+		if err != nil {
+			return err
+		}
 		whereStmt := Where{}
 		notNullExpr, ok := GetNotNullFilter(as, e.asTagMap, e.DB, e.Table)
 		if !ok {
@@ -344,10 +348,6 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		filter := view.Filters{Expr: notNullExpr}
 		whereStmt.filter = &filter
 		e.Statements = append(e.Statements, &whereStmt)
-		err := e.AddTag(chCommon.ParseAlias(expr), as)
-		if err != nil {
-			return err
-		}
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
 		// 二级运算符
