@@ -53,6 +53,12 @@ DeepFlow Community consists of two processes, Agent and Server. An Agent runs in
 
 Here is our [future feature plan](https://github.com/deepflowys/docs/blob/main/01-about/04-milestone.md). Issues and Pull Requests are welcome.
 
+# Join DeepFlow WeChat Group
+
+Join the WeChat group，you can communicate with other users (in Chinese):
+
+![WeChat Group](./docs/wechat-group-keeper.png)
+
 # Acknowledgments
 
 - Thanks [eBPF](https://ebpf.io/), a revolutionary Linux kernel technology.
