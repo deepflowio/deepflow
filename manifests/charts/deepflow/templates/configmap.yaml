@@ -1,8 +1,0 @@
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: {{ include "deepflow.fullname" . }}
-  labels:
-    {{- include "deepflow.labels" . | nindent 4 }}
-data:
-  {{- tpl (toYaml .Values.configmap) $ | nindent 2 }}
