@@ -397,8 +397,8 @@ func (v *GenesisSyncRpcUpdater) run() {
 		genesisSyncDataOper := GenesisSyncDataOperation{}
 		info := v.outputQueue.Get().(VIFRPCMessage)
 		if info.msgType == genesiscommon.TYPE_EXIT {
-			continue
 			log.Warningf("from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
+			continue
 		}
 		log.Debugf("from (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message)
 		if info.msgType == genesiscommon.TYPE_RENEW {
