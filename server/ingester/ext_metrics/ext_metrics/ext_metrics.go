@@ -66,9 +66,9 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics,
 		}
 	}
 
-	telegraf := NewMetricsor(datatype.MESSAGE_TYPE_TELEGRAF, config, controllers, manager, recv, true)
-	prometheus := NewMetricsor(datatype.MESSAGE_TYPE_PROMETHEUS, config, controllers, manager, recv, true)
-	deepflowStats := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, config, controllers, manager, recv, false)
+	telegraf := NewMetricsor(datatype.MESSAGE_TYPE_TELEGRAF, dbwriter.EXT_METRICS_DB, config, controllers, manager, recv, true)
+	prometheus := NewMetricsor(datatype.MESSAGE_TYPE_PROMETHEUS, dbwriter.EXT_METRICS_DB, config, controllers, manager, recv, true)
+	deepflowStats := NewMetricsor(datatype.MESSAGE_TYPE_DFSTATS, dbwriter.DEEPFLOW_SYSTEM_DB, config, controllers, manager, recv, false)
 	return &ExtMetrics{
 		Config:        config,
 		Telegraf:      telegraf,
@@ -77,7 +77,7 @@ func NewExtMetrics(config *config.Config, recv *receiver.Receiver) (*ExtMetrics,
 	}, nil
 }
 
-func NewMetricsor(msgType datatype.MessageType, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) *Metricsor {
+func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, platformDataEnabled bool) *Metricsor {
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+msgType.String(),
@@ -88,7 +88,7 @@ func NewMetricsor(msgType datatype.MessageType, config *config.Config, controlle
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
 	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
-	metricsWriter := dbwriter.NewExtMetricsWriter(msgType, config)
+	metricsWriter := dbwriter.NewExtMetricsWriter(msgType, db, config)
 	decoders := make([]*decoder.Decoder, queueCount)
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
@@ -129,7 +129,9 @@ func (m *Metricsor) Start() {
 
 func (m *Metricsor) Close() {
 	for _, platformData := range m.PlatformDatas {
-		platformData.Close()
+		if m.PlatformDataEnabled {
+			platformData.Close()
+		}
 	}
 }
 
