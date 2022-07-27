@@ -49,27 +49,33 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 		if ok {
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
-				return &view.Expr{}, false
+				if strings.HasPrefix(preAsTag, "`metrics.") {
+					tagItem, ok = tag.GetTag("metrics", db, table, "default")
+					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else {
+					return &view.Expr{}, false
+				}
 			}
 			filter := tagItem.NotNullFilter
-			if strings.HasPrefix(preAsTag, "`metrics.") {
-				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
-			}
 			if filter == "" {
 				return &view.Expr{}, false
 			}
 			return &view.Expr{Value: "(" + filter + ")"}, true
 		} else {
-			return &view.Expr{}, false
+			if strings.HasPrefix(preAsTag, "`metrics.") {
+				tagItem, ok = tag.GetTag("metrics", db, table, "default")
+				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else {
+				return &view.Expr{}, false
+			}
 		}
 	}
 	if tagItem.NotNullFilter == "" {
 		return &view.Expr{}, false
 	}
 	filter := tagItem.NotNullFilter
-	if strings.HasPrefix(name, "`metrics.") {
-		filter = fmt.Sprintf(tagItem.NotNullFilter, name)
-	}
 	return &view.Expr{Value: "(" + filter + ")"}, true
 }
 
