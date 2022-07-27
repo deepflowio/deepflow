@@ -18,7 +18,6 @@ package clickhouse
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
@@ -49,13 +48,7 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 		if ok {
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
-				if strings.HasPrefix(preAsTag, "`metrics.") {
-					tagItem, ok = tag.GetTag("metrics", db, table, "default")
-					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
-					return &view.Expr{Value: "(" + filter + ")"}, true
-				} else {
-					return &view.Expr{}, false
-				}
+				return &view.Expr{}, false
 			}
 			filter := tagItem.NotNullFilter
 			if filter == "" {
@@ -63,13 +56,7 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 			}
 			return &view.Expr{Value: "(" + filter + ")"}, true
 		} else {
-			if strings.HasPrefix(preAsTag, "`metrics.") {
-				tagItem, ok = tag.GetTag("metrics", db, table, "default")
-				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
-				return &view.Expr{Value: "(" + filter + ")"}, true
-			} else {
-				return &view.Expr{}, false
-			}
+			return &view.Expr{}, false
 		}
 	}
 	if tagItem.NotNullFilter == "" {
