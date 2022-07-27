@@ -20,8 +20,8 @@ import (
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/ingester/config"
 	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
-	"github.com/deepflowys/deepflow/server/ingester/roze/config"
 	"github.com/deepflowys/deepflow/server/libs/app"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"

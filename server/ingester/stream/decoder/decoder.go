@@ -24,6 +24,7 @@ import (
 	logging "github.com/op/go-logging"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
+	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowys/deepflow/server/ingester/stream/config"
 	"github.com/deepflowys/deepflow/server/ingester/stream/jsonify"
 	"github.com/deepflowys/deepflow/server/ingester/stream/throttler"
@@ -68,13 +69,14 @@ type Counter struct {
 }
 
 type Decoder struct {
-	index        int
-	msgType      datatype.MessageType
-	shardID      int
-	platformData *grpc.PlatformInfoTable
-	inQueue      queue.QueueReader
-	throttler    *throttler.ThrottlingQueue
-	debugEnabled bool
+	index         int
+	msgType       datatype.MessageType
+	shardID       int
+	platformData  *grpc.PlatformInfoTable
+	inQueue       queue.QueueReader
+	throttler     *throttler.ThrottlingQueue
+	flowTagWriter *flow_tag.FlowTagWriter
+	debugEnabled  bool
 
 	l7Disableds [L7_PROTO_MAX]bool
 	l7Disabled  bool
@@ -89,20 +91,22 @@ func NewDecoder(
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
+	flowTagWriter *flow_tag.FlowTagWriter,
 	flowLogDisabled *config.FlowLogDisabled,
 ) *Decoder {
 	return &Decoder{
-		index:        index,
-		msgType:      msgType,
-		shardID:      shardID,
-		platformData: platformData,
-		inQueue:      inQueue,
-		throttler:    throttler,
-		debugEnabled: log.IsEnabledFor(logging.DEBUG),
-		counter:      &Counter{},
-		l7Disableds:  getL7Disables(flowLogDisabled),
-		l7Disabled:   flowLogDisabled.L7,
-		l4Disabled:   flowLogDisabled.L4,
+		index:         index,
+		msgType:       msgType,
+		shardID:       shardID,
+		platformData:  platformData,
+		inQueue:       inQueue,
+		throttler:     throttler,
+		flowTagWriter: flowTagWriter,
+		debugEnabled:  log.IsEnabledFor(logging.DEBUG),
+		counter:       &Counter{},
+		l7Disableds:   getL7Disables(flowLogDisabled),
+		l7Disabled:    flowLogDisabled.L7,
+		l4Disabled:    flowLogDisabled.L4,
 	}
 }
 
@@ -218,8 +222,12 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 	d.counter.OTelCount++
 	ls := jsonify.OTelTracesDataToL7Loggers(vtapID, tracesData, d.shardID, d.platformData)
 	for _, l := range ls {
+		l.AddReferenceCount()
 		if !d.throttler.Send(l) {
 			d.counter.OTelDropCount++
+		} else {
+			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7LoggerToFlowTagInterfaces(l))
+			l.Release()
 		}
 	}
 }

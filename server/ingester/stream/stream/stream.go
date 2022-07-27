@@ -25,6 +25,7 @@ import (
 	_ "google.golang.org/grpc"
 
 	dropletqueue "github.com/deepflowys/deepflow/server/ingester/droplet/queue"
+	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowys/deepflow/server/ingester/stream/common"
 	"github.com/deepflowys/deepflow/server/ingester/stream/config"
@@ -75,7 +76,11 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	}
 	flowLogger := NewFlowLogger(config, controllers, manager, recv, flowLogWriter)
 	protoLogger := NewProtoLogger(config, controllers, manager, recv, flowLogWriter)
-	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, dbwriter.DefaultDayForTTL, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+	if err != nil {
+		return nil, err
+	}
+	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
 	return &Stream{
 		StreamConfig: config,
 		FlowLogger:   flowLogger,
@@ -84,7 +89,7 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	}, nil
 }
 
-func NewLogger(msgType datatype.MessageType, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowLogId common.FlowLogID) *Logger {
+func NewLogger(msgType datatype.MessageType, config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowLogId common.FlowLogID, flowTagWriter *flow_tag.FlowTagWriter) *Logger {
 	queueCount := config.DecoderQueueCount
 	decodeQueues := manager.NewQueues(
 		"1-receive-to-decode-"+datatype.MessageTypeString[msgType],
@@ -116,6 +121,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
+			flowTagWriter,
 			&config.FlowLogDisabled,
 		)
 	}
@@ -166,6 +172,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
+			nil,
 			&config.FlowLogDisabled,
 		)
 	}
@@ -215,6 +222,7 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
+			nil,
 			&config.FlowLogDisabled,
 		)
 	}

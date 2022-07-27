@@ -19,9 +19,9 @@ package dbwriter
 import (
 	logging "github.com/op/go-logging"
 
+	"github.com/deepflowys/deepflow/server/ingester/config"
 	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowys/deepflow/server/ingester/stream/common"
-	"github.com/deepflowys/deepflow/server/ingester/stream/config"
 	"github.com/deepflowys/deepflow/server/ingester/stream/jsonify"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 )
@@ -29,7 +29,9 @@ import (
 var log = logging.MustGetLogger("stream.dbwriter")
 
 const (
-	CACHE_SIZE = 10240
+	CACHE_SIZE       = 10240
+	DefaultDayForTTL = 3
+	DefaultPartition = ckdb.TimeFuncHour
 )
 
 type FlowLogWriter struct {
@@ -51,8 +53,8 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 		Columns:         columns,
 		TimeKey:         id.TimeKey(),
 		Engine:          engine,
-		PartitionFunc:   ckdb.TimeFuncHour,
-		TTL:             3,
+		PartitionFunc:   DefaultPartition,
+		TTL:             DefaultDayForTTL,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 	}

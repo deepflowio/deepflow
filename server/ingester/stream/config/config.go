@@ -35,13 +35,6 @@ const (
 	DefaultBrokerQueueSize   = 10000
 )
 
-type CKWriterConfig struct {
-	QueueCount   int `yaml:"queue-count"`
-	QueueSize    int `yaml:"queue-size"`
-	BatchSize    int `yaml:"batch-size"`
-	FlushTimeout int `yaml:"flush-timeout"`
-}
-
 type FlowLogDisabled struct {
 	L4    bool `yaml:"l4"`
 	L7    bool `yaml:"l7"`
@@ -56,14 +49,14 @@ type FlowLogDisabled struct {
 
 type Config struct {
 	Base              *config.Config
-	ReplicaEnabled    bool            `yaml:"flowlog-replica-enabled"`
-	CKWriterConfig    CKWriterConfig  `yaml:"flowlog-ck-writer"`
-	Throttle          int             `yaml:"throttle"`
-	L4Throttle        int             `yaml:"l4-throttle"`
-	L7Throttle        int             `yaml:"l7-throttle"`
-	FlowLogDisabled   FlowLogDisabled `yaml:"flow-log-disabled"`
-	DecoderQueueCount int             `yaml:"decoder-queue-count"`
-	DecoderQueueSize  int             `yaml:"decoder-queue-size"`
+	ReplicaEnabled    bool                  `yaml:"flowlog-replica-enabled"`
+	CKWriterConfig    config.CKWriterConfig `yaml:"flowlog-ck-writer"`
+	Throttle          int                   `yaml:"throttle"`
+	L4Throttle        int                   `yaml:"l4-throttle"`
+	L7Throttle        int                   `yaml:"l7-throttle"`
+	FlowLogDisabled   FlowLogDisabled       `yaml:"flow-log-disabled"`
+	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
+	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
 }
 type StreamConfig struct {
 	Stream Config `yaml:"ingester"`
@@ -84,7 +77,7 @@ func Load(base *config.Config, path string) *Config {
 			Throttle:          DefaultThrottle,
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
-			CKWriterConfig:    CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

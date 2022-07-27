@@ -54,8 +54,6 @@ const (
 	PROMETHEUS_INSTANCE     = "instance"
 	TABLE_PREFIX_TELEGRAF   = "telegraf_"
 	TABLE_PREFIX_PROMETHEUS = "prometheus_"
-	EXT_METRICS_DB          = "ext_metrics"
-	DEEPFLOW_SYSTEM_DB      = "deepflow_system"
 )
 
 type Counter struct {
@@ -249,7 +247,7 @@ func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(s.Timestamp)
 	m.Tag.GlobalThreadID = uint8(vtapID)
-	m.Database = DEEPFLOW_SYSTEM_DB
+	m.Database = dbwriter.DEEPFLOW_SYSTEM_DB
 	m.TableName = s.Name
 	m.TagNames = s.TagNames
 	m.TagValues = s.TagValues
@@ -314,7 +312,7 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 		m := dbwriter.AcquireExtMetrics()
 
 		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
-		m.Database = EXT_METRICS_DB
+		m.Database = dbwriter.EXT_METRICS_DB
 		m.TableName = tableName
 
 		m.TagNames = tagNames
@@ -420,7 +418,7 @@ func parseIPFromInstance(instance string) net.IP {
 func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwriter.ExtMetrics, error) {
 	m := dbwriter.AcquireExtMetrics()
 	m.Timestamp = uint32(point.Time().Unix())
-	m.Database = EXT_METRICS_DB
+	m.Database = dbwriter.EXT_METRICS_DB
 	tableName := string(point.Name())
 	if strings.HasPrefix(tableName, TABLE_PREFIX_TELEGRAF[:len(TABLE_PREFIX_TELEGRAF)-1]) {
 		m.TableName = tableName

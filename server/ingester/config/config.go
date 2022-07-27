@@ -74,6 +74,13 @@ type Auth struct {
 	Password string `yaml:"password"`
 }
 
+type CKWriterConfig struct {
+	QueueCount   int `yaml:"queue-count"`
+	QueueSize    int `yaml:"queue-size"`
+	BatchSize    int `yaml:"batch-size"`
+	FlushTimeout int `yaml:"flush-timeout"`
+}
+
 type Config struct {
 	ControllerIPs         []string      `yaml:"controller-ips,flow"`
 	ControllerPort        uint16        `yaml:"controller-port"`

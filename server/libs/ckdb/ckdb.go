@@ -430,6 +430,8 @@ const (
 	ReplicatedMergeTree
 	AggregatingMergeTree
 	ReplicatedAggregatingMergeTree
+	ReplacingMergeTree
+	SummingMergeTree
 )
 
 var engineTypeString = []string{
@@ -438,6 +440,8 @@ var engineTypeString = []string{
 	ReplicatedMergeTree:            "ReplicatedMergeTree('/clickhouse/tables/{shard}/%s/%s', '{replica}')", // 字符串参数表示zk的路径，shard和replica自动从clickhouse的macros读取, %s/%s分别指代数据库名和表名
 	AggregatingMergeTree:           "AggregatingMergeTree()",
 	ReplicatedAggregatingMergeTree: "ReplicatedAggregatingMergeTree('/clickhouse/tables/{shard}/%s/%s', '{replica}')",
+	ReplacingMergeTree:             "ReplacingMergeTree(%s)",
+	SummingMergeTree:               "SummingMergeTree(%s)",
 }
 
 func (t EngineType) String() string {
