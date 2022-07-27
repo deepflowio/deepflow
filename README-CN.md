@@ -33,7 +33,7 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 请参考[文档](https://deepflow.yunshan.net/docs/zh/install/all-in-one/?from=github)部署 DeepFlow Community。
 
-同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
+同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
 
 ## 体验 DeepFlow Cloud
 
@@ -51,7 +51,7 @@ DeepFlow Community 主要由 Agent 和 Server 两个进程组成。每个 K8s �
 
 # 里程碑
 
-这里有我们[未来的 Feature 规划](https://github.com/deepflowys/docs/blob/main/zh/01-about/04-milestone.md)。欢迎 Issue 和 Pull Request。
+这里有我们[未来的 Feature 规划](https://deepflow.yunshan.net/docs/zh/about/milestone/?from=github)。欢迎 Issue 和 Pull Request。
 
 # 加入技术交流群
 
