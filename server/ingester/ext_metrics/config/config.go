@@ -34,20 +34,13 @@ const (
 	DefaultExtMetricsTTL     = 7
 )
 
-type CKWriterConfig struct {
-	QueueCount   int `yaml:"queue-count"`
-	QueueSize    int `yaml:"queue-size"`
-	BatchSize    int `yaml:"batch-size"`
-	FlushTimeout int `yaml:"flush-timeout"`
-}
-
 type Config struct {
 	Base                  *config.Config
-	CKWriterConfig        CKWriterConfig `yaml:"ext-metrics-ck-writer"`
-	DecoderQueueCount     int            `yaml:"decoder-queue-count"`
-	DecoderQueueSize      int            `yaml:"decoder-queue-size"`
-	TTL                   int            `yaml:"ext-metrics-ttl"`
-	PrometheusSeparatePos int            `yaml:"prometheus-separate-pos"`
+	CKWriterConfig        config.CKWriterConfig `yaml:"ext-metrics-ck-writer"`
+	DecoderQueueCount     int                   `yaml:"decoder-queue-count"`
+	DecoderQueueSize      int                   `yaml:"decoder-queue-size"`
+	TTL                   int                   `yaml:"ext-metrics-ttl"`
+	PrometheusSeparatePos int                   `yaml:"prometheus-separate-pos"`
 }
 
 type ExtMetricsConfig struct {
@@ -71,7 +64,7 @@ func Load(base *config.Config, path string) *Config {
 			Base:                  base,
 			DecoderQueueCount:     DefaultDecoderQueueCount,
 			DecoderQueueSize:      DefaultDecoderQueueSize,
-			CKWriterConfig:        CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 10},
+			CKWriterConfig:        config.CKWriterConfig{QueueCount: 1, QueueSize: 100000, BatchSize: 51200, FlushTimeout: 10},
 			TTL:                   DefaultExtMetricsTTL,
 			PrometheusSeparatePos: 1,
 		},

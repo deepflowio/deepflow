@@ -25,7 +25,9 @@ import (
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowys/deepflow/server/ingester/common"
+	baseconfig "github.com/deepflowys/deepflow/server/ingester/config"
 	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/config"
+	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
@@ -36,7 +38,9 @@ import (
 var log = logging.MustGetLogger("ext_metrics.dbwriter")
 
 const (
-	QUEUE_BATCH_SIZE = 1024
+	QUEUE_BATCH_SIZE   = 1024
+	EXT_METRICS_DB     = "ext_metrics"
+	DEEPFLOW_SYSTEM_DB = "deepflow_system"
 )
 
 type ClusterNode struct {
@@ -60,13 +64,14 @@ type ExtMetricsWriter struct {
 	ckdbUsername string
 	ckdbPassword string
 	ttl          int
-	writerConfig config.CKWriterConfig
+	writerConfig baseconfig.CKWriterConfig
 
 	ckdbConn *sql.DB
 
-	createTable sync.Mutex
-	tablesLock  sync.RWMutex
-	tables      map[string]*tableInfo
+	createTable   sync.Mutex
+	tablesLock    sync.RWMutex
+	tables        map[string]*tableInfo
+	flowTagWriter *flow_tag.FlowTagWriter
 
 	counter *Counter
 	utils.Closable
@@ -188,20 +193,27 @@ func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 		return
 	}
 	atomic.AddInt64(&w.counter.MetricsCount, 1)
+	w.flowTagWriter.WriteFieldsAndFieldValues(m.ToFlowTags())
 	ckwriter.Put(m)
 }
 
 func NewExtMetricsWriter(
 	msgType datatype.MessageType,
+	db string,
 	config *config.Config) *ExtMetricsWriter {
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(msgType.String(), db, config.TTL, DefaultPartition, config.Base, &config.CKWriterConfig)
+	if err != nil {
+		return nil
+	}
 	writer := &ExtMetricsWriter{
-		msgType:      msgType,
-		ckdbAddr:     config.Base.CKDB.Primary,
-		ckdbUsername: config.Base.CKDBAuth.Username,
-		ckdbPassword: config.Base.CKDBAuth.Password,
-		tables:       make(map[string]*tableInfo),
-		ttl:          config.TTL,
-		writerConfig: config.CKWriterConfig,
+		msgType:       msgType,
+		ckdbAddr:      config.Base.CKDB.Primary,
+		ckdbUsername:  config.Base.CKDBAuth.Username,
+		ckdbPassword:  config.Base.CKDBAuth.Password,
+		tables:        make(map[string]*tableInfo),
+		ttl:           config.TTL,
+		writerConfig:  config.CKWriterConfig,
+		flowTagWriter: flowTagWriter,
 
 		counter: &Counter{},
 	}

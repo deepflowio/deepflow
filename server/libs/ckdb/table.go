@@ -34,6 +34,7 @@ type Table struct {
 	GlobalName      string       // 全局表名
 	Columns         []*Column    // 表列结构
 	TimeKey         string       // 时间字段名，用来设置partition和ttl
+	SummingKey      string       // When using SummingMergeEngine, this field is used for Summing aggregation
 	TTL             int          // 数据默认保留时长。 单位:天
 	PartitionFunc   TimeFuncType // partition函数作用于Time,
 	Cluster         ClusterType  // 高可用和非高可用表，对应的cluster不同
@@ -67,6 +68,19 @@ func (t *Table) MakeLocalTableCreateSQL() string {
 	engine := t.Engine.String()
 	if t.Engine == ReplicatedMergeTree || t.Engine == ReplicatedAggregatingMergeTree {
 		engine = fmt.Sprintf(t.Engine.String(), t.Database, t.LocalName)
+	} else if t.Engine == ReplacingMergeTree {
+		engine = fmt.Sprintf(t.Engine.String(), t.TimeKey)
+	} else if t.Engine == SummingMergeTree {
+		engine = fmt.Sprintf(t.Engine.String(), t.SummingKey)
+	}
+
+	partition := ""
+	if t.PartitionFunc != TimeFuncNone {
+		partition = fmt.Sprintf("PARTITION BY %s", t.PartitionFunc.String(t.TimeKey))
+	}
+	ttl := ""
+	if t.TTL > 0 {
+		ttl = fmt.Sprintf("TTL %s +  toIntervalDay(%d)", t.TimeKey, t.TTL)
 	}
 
 	createTable := fmt.Sprintf(`
@@ -75,16 +89,16 @@ CREATE TABLE IF NOT EXISTS %s.%s
 ENGINE = %s
 PRIMARY KEY (%s)
 ORDER BY (%s)
-PARTITION BY %s
-TTL %s +  toIntervalDay(%d)
+%s
+%s
 SETTINGS storage_policy = '%s'`,
 		t.Database, fmt.Sprintf("`%s`", t.LocalName),
 		strings.Join(columns, ",\n"),
 		engine,
 		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
 		strings.Join(t.OrderKeys, ","),
-		t.PartitionFunc.String(t.TimeKey),
-		t.TimeKey, t.TTL,
+		partition,
+		ttl,
 		DF_STORAGE_POLICY)
 	return createTable
 }

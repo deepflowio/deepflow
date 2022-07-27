@@ -17,9 +17,14 @@
 package dbwriter
 
 import (
+	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
+)
+
+const (
+	DefaultPartition = ckdb.TimeFuncTwelveHour
 )
 
 type ExtMetrics struct {
@@ -95,12 +100,25 @@ func (m *ExtMetrics) GenCKTable(ttl int) *ckdb.Table {
 		Columns:         m.Columns(),
 		TimeKey:         timeKey,
 		TTL:             ttl,
-		PartitionFunc:   ckdb.TimeFuncTwelveHour,
+		PartitionFunc:   DefaultPartition,
 		Engine:          engine,
 		Cluster:         cluster,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 	}
+}
+
+func (m *ExtMetrics) ToFlowTags() ([]interface{}, []interface{}) {
+	fields := make([]interface{}, len(m.TagNames)+len(m.MetricsFloatNames))
+	fieldValues := make([]interface{}, len(m.TagNames))
+	for i, name := range m.TagNames {
+		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.TableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
+		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, m.TableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
+	}
+	for _, name := range m.MetricsFloatNames {
+		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.TableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
+	}
+	return fields, fieldValues
 }
 
 var extMetricsPool = pool.NewLockFreePool(func() interface{} {
