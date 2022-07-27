@@ -18,7 +18,7 @@ DeepFlow is a highly automated observability platform open sourced by [YUNSHAN N
 
 # Documentation
 
-For more information, please visit [the documentation website](https://deepflow.yunshan.net/deepflow-docs/).
+For more information, please visit [the documentation website](https://deepflow.yunshan.net/docs/?from=github).
 
 # Quick start
 
@@ -31,7 +31,7 @@ The DeepFlow Community Edition consists of the core components of the Enterprise
 
 ## DeepFlow Community
 
-Please refer to [the deployment documentation](https://deepflow.yunshan.net/deepflow-docs/install/all-in-one/).
+Please refer to [the deployment documentation](https://deepflow.yunshan.net/docs/install/all-in-one/?from=github).
 
 At the same time, we have also built a complete [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/), welcome to experience it. Login account/password: deepflow/deepflow.
 
