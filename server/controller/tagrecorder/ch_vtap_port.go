@@ -93,24 +93,32 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 			continue
 		}
 		tapMacSlice := strings.Split(data.TapMAC, ":")
+		if len(tapMacSlice) < 3 {
+			log.Debugf("invalid tap mac %s", data.TapMAC)
+			continue
+		}
 		tapMacSlice = tapMacSlice[2:]
 		tapMacStr := strings.Join(tapMacSlice, "")
 		tapPort, err := strconv.ParseInt(tapMacStr, 16, 64)
 		if err != nil {
 			log.Error(err)
-			return nil, false
+			continue
 		}
 		var macPort int64
 		if data.MAC == "" {
 			macPort = 0
 		} else {
 			macSlice := strings.Split(data.MAC, ":")
+			if len(macSlice) < 3 {
+				log.Debugf("invalid mac %s", data.MAC)
+				continue
+			}
 			macSlice = macSlice[2:]
 			macStr := strings.Join(macSlice, "")
 			macPort, err = strconv.ParseInt(macStr, 16, 64)
 			if err != nil {
 				log.Error(err)
-				return nil, false
+				continue
 			}
 		}
 		// 采集网卡+MAC
@@ -225,12 +233,16 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		for _, vInterface := range vInterfaces {
 			if host.ID == vInterface.DeviceID {
 				macSlice := strings.Split(vInterface.Mac, ":")
+				if len(macSlice) < 3 {
+					log.Debugf("invalid vinterface mac: %s", vInterface.Mac)
+					continue
+				}
 				macSlice = macSlice[2:]
 				macStr := strings.Join(macSlice, "")
 				tapPort, err := strconv.ParseInt(macStr, 16, 64)
 				if err != nil {
 					log.Error(err)
-					return nil, false
+					continue
 				}
 				for _, vTap := range vTaps {
 					if vTap.AZ == host.AZ {

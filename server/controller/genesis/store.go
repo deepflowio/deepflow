@@ -132,9 +132,6 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 }
 
 func (s *SyncStorage) fetch() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	s.channel <- GenesisSyncData{
 		VMs:         s.genesisSyncInfo.VMs.Fetch(),
 		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),

@@ -53,6 +53,12 @@ DeepFlow Community 主要由 Agent 和 Server 两个进程组成。每个 K8s �
 
 这里有我们[未来的 Feature 规划](https://github.com/deepflowys/docs/blob/main/zh/01-about/04-milestone.md)。欢迎 Issue 和 Pull Request。
 
+# 加入技术交流群
+
+DeepFlow 官方社群对外开放，欢迎加入讨论：
+
+![微信技术交流群](./docs/wechat-group-keeper.png)
+
 # 致谢
 
 - 感谢 [eBPF](https://ebpf.io/)，革命性的 Linux 内核技术
