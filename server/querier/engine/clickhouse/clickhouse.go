@@ -341,14 +341,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		whereStmt := Where{}
-		var notNullExpr view.Node
-		ok := true
-		if as == "" {
-			notNullExpr, ok = GetSelectNotNullFilter(chCommon.ParseAlias(expr), e.asTagMap, e.DB, e.Table)
-		} else {
-			notNullExpr, ok = GetSelectNotNullFilter(as, e.asTagMap, e.DB, e.Table)
-
-		}
+		notNullExpr, ok := GetSelectNotNullFilter(chCommon.ParseAlias(expr), as, e.DB, e.Table)
 		if !ok {
 			return nil
 		}
