@@ -948,6 +948,14 @@ func (k *KnowledgeGraph) fill(
 	// 对于本地的流量，也需要使用MAC来匹配
 	if tapSide == uint32(zerodoc.Local) {
 		lookupByMac0, lookupByMac1 = true, true
+	} else if tapSide == uint32(zerodoc.ClientProcess) || tapSide == uint32(zerodoc.ServerProcess) {
+		// For ebpf traffic, if MAC is valid, MAC lookup is preferred
+		if mac0 != 0 {
+			lookupByMac0 = true
+		}
+		if mac1 != 0 {
+			lookupByMac1 = true
+		}
 	}
 	l3EpcMac0, l3EpcMac1 := mac0|uint64(l3EpcID0)<<48, mac1|uint64(l3EpcID1)<<48 // 使用l3EpcID和mac查找，防止跨AZ mac冲突
 
