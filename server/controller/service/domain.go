@@ -308,8 +308,6 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServer
 		json.Unmarshal([]byte(domain.Config), &config)
 
 		configUpdate := domainUpdate["CONFIG"].(map[string]interface{})
-		configStr, _ := json.Marshal(domainUpdate["CONFIG"])
-		dbUpdateMap["config"] = string(configStr)
 
 		// 如果存在资源同步控制器IP的修改，则需要更新controller_ip字段
 		if controllerIP, ok := configUpdate["controller_ip"]; ok {
@@ -344,6 +342,8 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServer
 				}
 			}
 		}
+		configStr, _ := json.Marshal(configUpdate)
+		dbUpdateMap["config"] = string(configStr)
 	}
 
 	// 更新domain DB
