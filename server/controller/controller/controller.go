@@ -69,11 +69,7 @@ func Start(configPath string) {
 
 	// 初始化MySQL
 	isMasterController, _, err := common.IsMasterController()
-	if err != nil {
-		time.Sleep(time.Second)
-		os.Exit(0)
-	}
-	if isMasterController {
+	if err == nil && isMasterController {
 		ok := mysql.Migrate(cfg.MySqlCfg)
 		if !ok {
 			time.Sleep(time.Second) // TODO add sleep before all os.Exit
