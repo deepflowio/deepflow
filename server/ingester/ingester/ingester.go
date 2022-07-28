@@ -38,6 +38,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowys/deepflow/server/ingester/ckissu"
+	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/config"
 	dropletcfg "github.com/deepflowys/deepflow/server/ingester/droplet/config"
 	"github.com/deepflowys/deepflow/server/ingester/droplet/droplet"
@@ -90,7 +91,7 @@ func Start(configPath string) []io.Closer {
 			"pool_size_per_cpu":   strconv.Itoa(int(counter.PoolSizePerCPU)),
 			"init_full_pool_size": strconv.Itoa(int(counter.InitFullPoolSize)),
 		}
-		stats.RegisterCountable("pool", counter, tags)
+		common.RegisterCountableForIngester("pool", counter, tags)
 	})
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)

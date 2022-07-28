@@ -23,6 +23,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/grpc"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 	"github.com/deepflowys/deepflow/server/libs/stats"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
@@ -30,6 +31,11 @@ import (
 )
 
 var log = logging.MustGetLogger("common")
+
+const (
+	MOUDLE_INGESTER             = "ingester."
+	QUEUE_STATS_MOUDLE_INGESTER = queue.OptionMoudle(MOUDLE_INGESTER)
+)
 
 func NewCKConnection(addr, username, password string) (*sql.DB, error) {
 	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s?username=%s&password=%s", addr, username, password))
@@ -45,8 +51,8 @@ func NewCKConnection(addr, username, password string) (*sql.DB, error) {
 	return connect, nil
 }
 
-func RegisterCountableForIngester(module string, countable stats.Countable, opts ...stats.Option) error {
-	return stats.RegisterCountableWithMoudlePrefix("ingester.", module, countable, opts...)
+func RegisterCountableForIngester(name string, countable stats.Countable, opts ...stats.Option) error {
+	return stats.RegisterCountableWithMoudlePrefix(MOUDLE_INGESTER, name, countable, opts...)
 }
 
 // 如果通过MAC匹配平台信息失败，则需要通过IP再获取, 解决工单122/126问题
