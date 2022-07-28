@@ -158,7 +158,8 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 	dataQueues := queue.NewOverwriteQueues(
 		name, queue.HashKey(queueCount), queueSize,
 		queue.OptionFlushIndicator(time.Second),
-		queue.OptionRelease(func(p interface{}) { p.(CKItem).Release() }))
+		queue.OptionRelease(func(p interface{}) { p.(CKItem).Release() }),
+		common.QUEUE_STATS_MOUDLE_INGESTER)
 
 	return &CKWriter{
 		primaryAddr:   primaryAddr,
