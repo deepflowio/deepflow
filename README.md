@@ -57,7 +57,7 @@ Here is our [future feature plan](https://deepflow.yunshan.net/docs/about/milest
 
 Join the WeChat group，you can communicate with other users (in Chinese):
 
-![WeChat Group](./docs/wechat-group-keeper.png)
+<img src=./docs/wechat-group-keeper.png width=30% />
 
 # Acknowledgments
 
