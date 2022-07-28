@@ -60,19 +60,20 @@ const MAX_BATCH_GET_SIZE = 1 << 16
 
 var nilArrayForInit [MAX_BATCH_GET_SIZE]interface{}
 
-func NewOverwriteQueue(module string, size int, options ...Option) *OverwriteQueue {
+func NewOverwriteQueue(name string, size int, options ...Option) *OverwriteQueue {
 	queue := &OverwriteQueue{}
-	queue.Init(module, size, options...)
+	queue.Init(name, size, options...)
 	return queue
 }
 
-func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
+func (q *OverwriteQueue) Init(name string, size int, options ...Option) {
 	if q.size != 0 {
 		return
 	}
 
 	var flushIndicator time.Duration
-	statOptions := []stats.Option{stats.OptionStatTags{"module": module}}
+	statOptions := []stats.Option{stats.OptionStatTags{"module": name}}
+	var moudle string
 	for _, option := range options {
 		switch option.(type) {
 		case OptionRelease:
@@ -81,6 +82,8 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 			flushIndicator = option.(OptionFlushIndicator)
 		case OptionStatsOption: // XXX: interface{}类型，必须放在最后
 			statOptions = append(statOptions, option.(OptionStatsOption))
+		case OptionMoudle:
+			moudle = option.(OptionMoudle)
 		default:
 			panic(fmt.Sprintf("Unknown option %v", option))
 		}
@@ -95,7 +98,7 @@ func (q *OverwriteQueue) Init(module string, size int, options ...Option) {
 	q.items = make([]interface{}, size)
 	q.size = uint(size)
 	q.counter = &Counter{}
-	stats.RegisterCountable("queue", q, statOptions...)
+	stats.RegisterCountableWithMoudlePrefix(moudle, "queue", q, statOptions...)
 
 	if flushIndicator > 0 {
 		go func() {

@@ -144,6 +144,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 		1,
 		libqueue.OptionFlushIndicator(3*time.Second),
 		libqueue.OptionRelease(func(p interface{}) { receiver.ReleaseRecvBuffer(p.(*receiver.RecvBuffer)) }))
+
 	recv.RegistHandler(msgType, decodeQueues, queueCount)
 
 	throttle := config.Throttle / queueCount
