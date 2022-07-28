@@ -71,25 +71,18 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	return stmt, nil
 }
 
-func GetSelectNotNullFilter(name string, asTagMap map[string]string, db, table string) (view.Node, bool) {
+func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
-		preAsTag, ok := asTagMap[name]
-		if ok {
-			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
-			if !ok {
-				if strings.HasPrefix(preAsTag, "`metrics.") {
-					tagItem, ok = tag.GetTag("metrics", db, table, "default")
-					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
-					return &view.Expr{Value: "(" + filter + ")"}, true
-				}
+		if strings.HasPrefix(name, "`metrics.") {
+			tagItem, ok = tag.GetTag("metrics", db, table, "default")
+			filter := ""
+			if as == "" {
+				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
+			} else {
+				filter = fmt.Sprintf(tagItem.NotNullFilter, as)
 			}
-		} else {
-			if strings.HasPrefix(name, "`metrics.") {
-				tagItem, ok = tag.GetTag("metrics", db, table, "default")
-				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
-				return &view.Expr{Value: "(" + filter + ")"}, true
-			}
+			return &view.Expr{Value: "(" + filter + ")"}, true
 		}
 	}
 	return &view.Expr{}, false
