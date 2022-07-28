@@ -601,17 +601,9 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				}
 				vinterfaceLcuuid := ""
 				if nMAC == common.VIF_DEFAULT_MAC {
-					if hostip.Is4() {
-						vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC+hostip.String(), uuid.Nil)
-					} else {
-						vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC+nodeSubnetLcuuid+hostip.String(), uuid.Nil)
-					}
+					vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC+hostip.String(), uuid.Nil)
 				} else {
-					if hostip.Is4() {
-						vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC, uuid.Nil)
-					} else {
-						vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC+nodeSubnetLcuuid, uuid.Nil)
-					}
+					vinterfaceLcuuid = common.GetUUID(k.UuidGenerate+nMAC, uuid.Nil)
 				}
 				if !nodeVinterfaceLcuuids.Contains(vinterfaceLcuuid) {
 					vinterface := model.VInterface{
