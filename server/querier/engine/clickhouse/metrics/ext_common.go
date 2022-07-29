@@ -37,7 +37,7 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 			DB:       db,
 		}
 		externalMetricFloatSql := fmt.Sprintf("SELECT arrayJoin(metrics_float_names) AS metrics_float_name FROM (SELECT metrics_float_names FROM %s) GROUP BY metrics_float_name", table)
-		externalMetricFloatRst, err := externalChClient.DoQuery(externalMetricFloatSql, nil, "")
+		externalMetricFloatRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalMetricFloatSql})
 		if err != nil {
 			log.Error(err)
 			return nil, err

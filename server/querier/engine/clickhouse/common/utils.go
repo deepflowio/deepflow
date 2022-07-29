@@ -201,7 +201,7 @@ func GetExtTables(db string) (values []interface{}) {
 		DB:       db,
 	}
 	sql := "show tables"
-	rst, err := chClient.DoQuery(sql, nil, "")
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
 		log.Error(err)
 		return nil
