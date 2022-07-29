@@ -8,6 +8,7 @@ require (
 	github.com/deepflowys/deepflow/server v0.0.0-20220720062824-d20b2b766bc7
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.5.2
+	github.com/olekukonko/tablewriter v0.0.5
 	github.com/spf13/cobra v1.5.0
 	github.com/vishvananda/netlink v1.1.0
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
@@ -50,6 +51,7 @@ require (
 require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
+	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

@@ -43,6 +43,7 @@ func Execute() {
 	root.AddCommand(RegisterAgentGroupCommand())
 	root.AddCommand(RegisterAgentGroupConfigCommand())
 	root.AddCommand(RegisterDomainCommand())
+	root.AddCommand(RegisterGenesisCommand())
 	root.AddCommand(RegisterTrisolarisCommand())
 
 	cmd.RegisterIngesterCommand(root)
