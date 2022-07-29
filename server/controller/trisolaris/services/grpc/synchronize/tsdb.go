@@ -54,10 +54,13 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 	nodeInfo := trisolaris.GetGNodeInfo()
 	versionPlatformData := nodeInfo.GetPlatformDataVersion()
 	versionGroups := nodeInfo.GetGroupsVersion()
+	versionPolicy := nodeInfo.GetPolicyVersion()
 	if versionPlatformData != in.GetVersionPlatformData() ||
-		versionGroups != in.GetVersionGroups() {
-		log.Infof("ctrl_ip is %s, (platform data version %d -> %d), (groups version %d -> %d), NAME:%s",
+		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
+		log.Infof("ctrl_ip is %s, (platform data version %d -> %d), "+
+			"(acl version %d -> %d), (groups version %d -> %d), NAME:%s",
 			tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
+			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
 			processName)
 	}
@@ -106,16 +109,22 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 	if versionGroups != in.GetVersionGroups() {
 		groups = nodeInfo.GetGroups()
 	}
+	acls := []byte{}
+	if versionPolicy != in.GetVersionAcls() {
+		acls = nodeInfo.GetPolicy()
+	}
 	podIPs := nodeInfo.GetPodIPs()
 	vTapIPs := vTapInfo.GetVTapIPs()
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		PlatformData:        platformData,
 		Groups:              groups,
+		FlowAcls:            acls,
 		PodIps:              podIPs,
 		VtapIps:             vTapIPs,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		VersionGroups:       proto.Uint64(versionGroups),
+		VersionAcls:         proto.Uint64(versionPolicy),
 		Config:              configure,
 	}, nil
 }
@@ -134,9 +143,13 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	}
 	versionPlatformData := nodeInfo.GetPlatformDataVersion()
 	versionGroups := nodeInfo.GetGroupsVersion()
-	if versionPlatformData != in.GetVersionPlatformData() || versionGroups != in.GetVersionGroups() {
-		log.Infof("push ctrl_ip is %s, (platform data version %d -> %d), (groups version %d -> %d), NAME:%s",
+	versionPolicy := nodeInfo.GetPolicyVersion()
+	if versionPlatformData != in.GetVersionPlatformData() ||
+		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
+		log.Infof("push ctrl_ip is %s, (platform data version %d -> %d), "+
+			"(acl version %d -> %d), (groups version %d -> %d), NAME:%s",
 			tsdbIP, versionPlatformData, in.GetVersionPlatformData(),
+			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
 			processName)
 	}
@@ -149,16 +162,22 @@ func (e *TSDBEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	if versionGroups != in.GetVersionGroups() {
 		groups = nodeInfo.GetGroups()
 	}
+	acls := []byte{}
+	if versionPolicy != in.GetVersionAcls() {
+		acls = nodeInfo.GetPolicy()
+	}
 	podIPs := nodeInfo.GetPodIPs()
 	vTapIPs := trisolaris.GetGVTapInfo().GetVTapIPs()
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		PlatformData:        platformData,
 		Groups:              groups,
+		FlowAcls:            acls,
 		PodIps:              podIPs,
 		VtapIps:             vTapIPs,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		VersionGroups:       proto.Uint64(versionGroups),
+		VersionAcls:         proto.Uint64(versionPolicy),
 		Config:              configure,
 	}, nil
 }
