@@ -31,7 +31,9 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/model"
 )
 
-var DOMAIN_PASSWORD_KEYS = []string{"admin_password", "secret_key", "password", "boss_secret_key"}
+var DOMAIN_PASSWORD_KEYS = []string{
+	"admin_password", "secret_key", "password", "boss_secret_key", "manage_one_password",
+}
 
 func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) {
 	var response []model.Domain
