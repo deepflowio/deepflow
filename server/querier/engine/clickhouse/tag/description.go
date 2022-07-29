@@ -251,13 +251,17 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
-		DB:       db,
+		DB:       "flow_tag",
+	}
+	var whereSql string
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
 	}
 	externalSql := ""
-	if db == "ext_metrics" {
-		externalSql = fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s) GROUP BY tag_name", table)
+	if whereSql != "" {
+		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM %s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name ORDER BY tag_name ASC", db, table, whereSql)
 	} else {
-		externalSql = fmt.Sprintf("SELECT arrayJoin(attribute_names) AS attribute_name FROM (SELECT attribute_names FROM %s) GROUP BY attribute_name", table)
+		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM %s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
 	}
 	externalRst, err := externalChClient.DoQuery(externalSql, nil, "")
 	if err != nil {
@@ -494,7 +498,7 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
-		DB:       db,
+		DB:       "flow_tag",
 	}
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
@@ -506,18 +510,10 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 		whereSql = strings.Split(rawSql, "WHERE")[1]
 	}
 	var sql string
-	if db == "ext_metrics" {
-		if whereSql != "" {
-			sql = fmt.Sprintf("SELECT tag_values[indexOf(tag_names,'%s')] AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", tag, table, whereSql)
-		} else {
-			sql = fmt.Sprintf("SELECT tag_values[indexOf(tag_names,'%s')] AS value, value AS display_name FROM %s GROUP BY value, display_name ORDER BY value ASC", tag, table)
-		}
+	if whereSql != "" {
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE table='%s' AND field_type='tag' AND field_name='%s' AND (%s) GROUP BY value, display_name ORDER BY sum(count) DESC limit 10000", db, table, tag, whereSql)
 	} else {
-		if whereSql != "" {
-			sql = fmt.Sprintf("SELECT attribute_values[indexOf(attribute_names,'%s')] AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", tag, table, whereSql)
-		} else {
-			sql = fmt.Sprintf("SELECT attribute_values[indexOf(attribute_names,'%s')] AS value, value AS display_name FROM %s GROUP BY value, display_name ORDER BY value ASC", tag, table)
-		}
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE table='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY sum(count) DESC limit 10000", db, table, tag)
 	}
 
 	log.Debug(sql)
