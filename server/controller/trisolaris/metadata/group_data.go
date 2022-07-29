@@ -35,30 +35,44 @@ import (
 )
 
 type GroupRawData struct {
-	dropletGroups []*models.ResourceGroup
-	tridentGroups []*models.ResourceGroup
-	pgidToVifIDs  map[int][]int
-	groupIDToIPs  map[int]*GroupIP
+	idToGroup              map[int]*models.ResourceGroup
+	dropletGroups          []*models.ResourceGroup
+	tridentGroups          []*models.ResourceGroup
+	pgidToVifIDs           map[int][]int
+	groupIDToIPs           map[int]*GroupIP
+	groupIDToPodServiceIDs map[int][]int
 }
 
 func newGroupRawData() *GroupRawData {
 	return &GroupRawData{
-		dropletGroups: make([]*models.ResourceGroup, 0),
-		tridentGroups: make([]*models.ResourceGroup, 0),
-		pgidToVifIDs:  make(map[int][]int),
-		groupIDToIPs:  make(map[int]*GroupIP),
+		idToGroup:              make(map[int]*models.ResourceGroup),
+		dropletGroups:          make([]*models.ResourceGroup, 0),
+		tridentGroups:          make([]*models.ResourceGroup, 0),
+		pgidToVifIDs:           make(map[int][]int),
+		groupIDToIPs:           make(map[int]*GroupIP),
+		groupIDToPodServiceIDs: make(map[int][]int),
 	}
 }
 
 type GroupProto struct {
 	groupVersion uint64
-	groups       []byte
+	groups       *atomic.Value // []byte
 	groupHash    uint64
+}
+
+func newGroupProto() *GroupProto {
+	groups := &atomic.Value{}
+	groups.Store([]byte{})
+	return &GroupProto{
+		groupVersion: 0,
+		groups:       groups,
+		groupHash:    0,
+	}
 }
 
 func (g *GroupProto) String() string {
 	return fmt.Sprintf("groupVersion: %d, groupHash: %d, dataLen: %d", g.groupVersion,
-		g.groupHash, len(g.groups))
+		g.groupHash, len(g.getGroups()))
 }
 
 func (g *GroupProto) checkVersion(groupHash uint64) {
@@ -77,6 +91,14 @@ func (g *GroupProto) getVersion() uint64 {
 	return atomic.LoadUint64(&g.groupVersion)
 }
 
+func (g *GroupProto) getGroups() []byte {
+	return g.groups.Load().([]byte)
+}
+
+func (g *GroupProto) updateGroups(groups []byte) {
+	g.groups.Store(groups)
+}
+
 func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*trident.Service) {
 	groups := &trident.Groups{
 		Groups: groupsProto,
@@ -84,7 +106,7 @@ func (g *GroupProto) generateGroupProto(groupsProto []*trident.Group, svcs []*tr
 	}
 	groupBytes, err := groups.Marshal()
 	if err == nil {
-		g.groups = groupBytes
+		g.updateGroups(groupBytes)
 		h64 := fnv.New64()
 		h64.Write(groupBytes)
 		g.checkVersion(h64.Sum64())
@@ -106,8 +128,8 @@ func newGroupDataOP(metaData *MetaData) *GroupDataOP {
 		groupRawData:      newGroupRawData(),
 		serviceDataOP:     newServiceDataOP(metaData),
 		metaData:          metaData,
-		tridentGroupProto: new(GroupProto),
-		dropletGroupProto: new(GroupProto),
+		tridentGroupProto: newGroupProto(),
+		dropletGroupProto: newGroupProto(),
 	}
 }
 
@@ -118,8 +140,16 @@ type GroupIP struct {
 	ipRanges []string
 }
 
+func (g *GroupDataOP) GetIDToGroup() map[int]*models.ResourceGroup {
+	return g.groupRawData.idToGroup
+}
+
+func (g *GroupDataOP) GetGroupIDToPodServiceIDs() map[int][]int {
+	return g.groupRawData.groupIDToPodServiceIDs
+}
+
 func (g *GroupDataOP) getTridentGroups() []byte {
-	return g.tridentGroupProto.groups
+	return g.tridentGroupProto.getGroups()
 }
 
 func (g *GroupDataOP) getTridentGroupsVersion() uint64 {
@@ -127,7 +157,7 @@ func (g *GroupDataOP) getTridentGroupsVersion() uint64 {
 }
 
 func (g *GroupDataOP) getDropletGroups() []byte {
-	return g.dropletGroupProto.groups
+	return g.dropletGroupProto.getGroups()
 }
 
 func (g *GroupDataOP) getDropletGroupsVersion() uint64 {
@@ -183,7 +213,9 @@ func (g *GroupDataOP) generateGroupRawData() {
 	resourceGroups := dbDatCache.GetResourceGroups()
 	tridentGroups := make([]*models.ResourceGroup, 0, len(resourceGroups))
 	dropletGroups := make([]*models.ResourceGroup, 0, len(resourceGroups))
+	idToGroup := make(map[int]*models.ResourceGroup)
 	for _, resourceGroup := range resourceGroups {
+		idToGroup[resourceGroup.ID] = resourceGroup
 		if Find[int](tridentGroup, resourceGroup.BusinessID) || groupIDsUsedByNpbPcap.Contains(resourceGroup.ID) {
 			tridentGroups = append(tridentGroups, resourceGroup)
 		}
@@ -429,6 +461,8 @@ func (g *GroupDataOP) generateGroupRawData() {
 	groupRawData.groupIDToIPs = groupIDToIPs
 	groupRawData.dropletGroups = dropletGroups
 	groupRawData.tridentGroups = tridentGroups
+	groupRawData.idToGroup = idToGroup
+	groupRawData.groupIDToPodServiceIDs = groupIDToPodServiceIDs
 	g.groupRawData = groupRawData
 }
 

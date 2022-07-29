@@ -67,6 +67,7 @@ type VTapInfo struct {
 	config                         *config.Config
 	vTapPlatformData               *VTapPlatformData
 	groupData                      *GroupData
+	vTapPolicyData                 *VTapPolicyData
 	azToRegion                     map[string]string
 	azToDomain                     map[string]string
 	domainIdToLcuuid               map[int]string
@@ -118,6 +119,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		metaData:                       metaData,
 		vTapPlatformData:               newVTapPlatformData(),
 		groupData:                      newGroupData(metaData),
+		vTapPolicyData:                 newVTapPolicyData(metaData),
 		azToRegion:                     make(map[string]string),
 		azToDomain:                     make(map[string]string),
 		domainIdToLcuuid:               make(map[int]string),
@@ -529,6 +531,14 @@ func (v *VTapInfo) GetGroupData() []byte {
 
 func (v *VTapInfo) GetGroupDataVersion() uint64 {
 	return v.groupData.getGroupDataVersion()
+}
+
+func (v *VTapInfo) GetVTapPolicyData(vtapID int, functions mapset.Set) []byte {
+	return v.vTapPolicyData.getVTapPolicyData(vtapID, functions)
+}
+
+func (v *VTapInfo) GetVTapPolicyVersion(vtapID int, functions mapset.Set) uint64 {
+	return v.vTapPolicyData.getVTapPolicyVersion(vtapID, functions)
 }
 
 func GetKey(vtap *models.VTap) string {

@@ -21,9 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/deepflowys/deepflow/message/trident"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/op/go-logging"
 
+	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
 )
 
@@ -34,6 +35,7 @@ type MetaData struct {
 	platformDataOP *PlatformDataOP
 	groupDataOP    *GroupDataOP
 	tapType        *TapType
+	policyDataOP   *PolicyDataOP
 	chPlatformData chan struct{}
 	chTapType      chan struct{}
 	config         *config.Config
@@ -53,6 +55,7 @@ func NewMetaData(db *gorm.DB, cfg *config.Config) *MetaData {
 	}
 	metaData.platformDataOP = newPlatformDataOP(db, metaData)
 	metaData.groupDataOP = newGroupDataOP(metaData)
+	metaData.policyDataOP = newPolicyDaTaOP(metaData, cfg.BillingMethod)
 	return metaData
 }
 
@@ -88,6 +91,10 @@ func (m *MetaData) GetPlatformDataOP() *PlatformDataOP {
 	return m.platformDataOP
 }
 
+func (m *MetaData) GetGroupDataOP() *GroupDataOP {
+	return m.groupDataOP
+}
+
 func (m *MetaData) GetTapTypes() []*trident.TapType {
 	return m.tapType.getTapTypes()
 }
@@ -108,24 +115,42 @@ func (m *MetaData) GetDropletGroupsVersion() uint64 {
 	return m.groupDataOP.getDropletGroupsVersion()
 }
 
+func (m *MetaData) GetDropletPolicyVersion() uint64 {
+	return m.policyDataOP.getDropletPolicyVersion()
+}
+
+func (m *MetaData) GetDropletPolicyStr() []byte {
+	return m.policyDataOP.getDropletPolicyStr()
+}
+
+func (m *MetaData) GetVTapPolicyVersion(vtapID int, functions mapset.Set) uint64 {
+	return m.policyDataOP.getVTapPolicyVersion(vtapID, functions)
+}
+
+func (m *MetaData) GetVTapPolicyString(vtapID int, functions mapset.Set) []byte {
+	return m.policyDataOP.getVTapPolicyString(vtapID, functions)
+}
+
 func (m *MetaData) InitData() {
 	m.generateDbDataCache()
 	m.platformDataOP.initData()
 	m.groupDataOP.generateGroupData()
 	m.tapType.generateTapTypes()
+	m.policyDataOP.generatePolicyData()
 }
 
-func (m *MetaData) TimedRefreshPlatformData() {
+func (m *MetaData) timedRefreshMetaData() {
 	interval := time.Duration(m.config.MetaDataRefreshInterval)
 	ticker := time.NewTicker(interval * time.Second).C
 	for {
 		select {
 		case <-ticker:
-			log.Info("start generate platform data from timed")
+			log.Info("start generate metaData from timed")
 			m.generateDbDataCache()
 			m.platformDataOP.GeneratePlatformData()
 			m.groupDataOP.generateGroupData()
-			log.Info("end generate platform data from timed")
+			m.policyDataOP.generatePolicyData()
+			log.Info("end generate metaData from timed")
 		case <-m.chPlatformData:
 			log.Info("start generate platform data from rpc")
 			m.generateDbDataCache()
@@ -135,7 +160,7 @@ func (m *MetaData) TimedRefreshPlatformData() {
 	}
 }
 
-func (m *MetaData) TimedRefreshTapType() {
+func (m *MetaData) timedRefreshTapType() {
 	interval := time.Duration(m.config.MetaDataRefreshInterval)
 	ticker := time.NewTicker(interval * time.Second).C
 	for {
@@ -153,6 +178,6 @@ func (m *MetaData) TimedRefreshTapType() {
 }
 
 func (m *MetaData) TimedRefreshMetaData() {
-	go m.TimedRefreshPlatformData()
-	go m.TimedRefreshTapType()
+	go m.timedRefreshMetaData()
+	go m.timedRefreshTapType()
 }

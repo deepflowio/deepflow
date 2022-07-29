@@ -192,13 +192,15 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 	localConfig := gVTapInfo.GetVTapLocalConfig(c.GetVTapGroupLcuuid())
 	configure.LocalConfig = &localConfig
 
-	if c.EnabledApplicationMonitoring() == false {
-		configure.L7MetricsEnabled = proto.Bool(false)
-		configure.L7LogStoreTapTypes = nil
-	}
-	if c.EnabledNetworkMonitoring() == false {
-		configure.L4PerformanceEnabled = proto.Bool(false)
-		configure.L4LogTapTypes = nil
+	if trisolaris.GetBillingMethod() == BILLING_METHOD_LICENSE {
+		if c.EnabledApplicationMonitoring() == false {
+			configure.L7MetricsEnabled = proto.Bool(false)
+			configure.L7LogStoreTapTypes = nil
+		}
+		if c.EnabledNetworkMonitoring() == false {
+			configure.L4PerformanceEnabled = proto.Bool(false)
+			configure.L4LogTapTypes = nil
+		}
 	}
 
 	return configure
@@ -235,25 +237,32 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		return e.noVTapResponse(in), nil
 	}
 
+	vtapID := int(vtapCache.GetVTapID())
+	functions := vtapCache.GetFunctions()
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
 	versionGroups := gVTapInfo.GetGroupDataVersion()
+	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
 	if versionPlatformData != in.GetVersionPlatformData() || versionPlatformData == 0 ||
-		versionGroups != in.GetVersionGroups() {
+		versionGroups != in.GetVersionGroups() || versionPolicy != in.GetVersionAcls() {
 		log.Infof("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
 			"(platform data version  %d -> %d), "+
+			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(),
 			versionPlatformData, in.GetVersionPlatformData(),
+			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
 		log.Debugf("ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
 			"(platform data version  %d -> %d), "+
+			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(),
 			versionPlatformData, in.GetVersionPlatformData(),
+			versionPolicy, in.GetVersionAcls(),
 			versionGroups, in.GetVersionGroups(),
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	}
@@ -296,6 +305,11 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	} else {
 		vtapCache.UpdatePushVersionGroups(versionGroups)
 	}
+	if in.GetVersionAcls() != 0 {
+		vtapCache.UpdatePushVersionPolicy(in.GetVersionGroups())
+	} else {
+		vtapCache.UpdatePushVersionPolicy(versionPolicy)
+	}
 	platformData := []byte{}
 	if versionPlatformData != in.GetVersionPlatformData() {
 		platformData = vtapCache.GetSimplePlatformDataStr()
@@ -303,6 +317,10 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	groups := []byte{}
 	if versionGroups != in.GetVersionGroups() {
 		groups = gVTapInfo.GetGroupData()
+	}
+	acls := []byte{}
+	if versionPolicy != in.GetVersionAcls() {
+		acls = gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	}
 
 	// 只有专属采集器下发tap_types
@@ -333,8 +351,10 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		Config:              configInfo,
 		PlatformData:        platformData,
 		Groups:              groups,
+		FlowAcls:            acls,
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		VersionGroups:       proto.Uint64(versionGroups),
+		VersionAcls:         proto.Uint64(versionPolicy),
 		TapTypes:            tapTypes,
 		SkipInterface:       skipInterface,
 		SelfUpdateUrl:       proto.String(gVTapInfo.GetSelfUpdateUrl()),
@@ -431,26 +451,35 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	if vtapCache == nil {
 		return e.noVTapResponse(in), fmt.Errorf("no find vtap(%s %s) cache", ctrlIP, ctrlMac)
 	}
+	vtapID := int(vtapCache.GetVTapID())
+	functions := vtapCache.GetFunctions()
 	versionPlatformData := vtapCache.GetSimplePlatformDataVersion()
 	pushVersionPlatformData := vtapCache.GetPushVersionPlatformData()
 	versionGroups := gVTapInfo.GetGroupDataVersion()
 	pushVersionGroups := vtapCache.GetPushVersionGroups()
-	if versionPlatformData != pushVersionPlatformData || versionGroups != pushVersionGroups {
+	versionPolicy := gVTapInfo.GetVTapPolicyVersion(vtapID, functions)
+	pushVersionPolicy := vtapCache.GetPushVersionPolicy()
+	if versionPlatformData != pushVersionPlatformData ||
+		versionGroups != pushVersionGroups || versionPolicy != pushVersionPolicy {
 		log.Infof("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s, "+
 			"(platform data version  %d -> %d), "+
+			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(),
 			versionPlatformData, pushVersionPlatformData,
+			versionPolicy, pushVersionPolicy,
 			versionGroups, pushVersionGroups,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	} else {
 		log.Debugf("push data ctrl_ip is %s, ctrl_mac is %s, host_ips is %s,"+
 			"(platform data version  %d -> %d), "+
+			"(acls version %d -> %d), "+
 			"(groups version %d -> %d), "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(),
 			versionPlatformData, pushVersionPlatformData,
+			versionPolicy, pushVersionPolicy,
 			versionGroups, pushVersionGroups,
 			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 	}
@@ -462,6 +491,10 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 	groups := []byte{}
 	if versionGroups != pushVersionGroups {
 		groups = gVTapInfo.GetGroupData()
+	}
+	acls := []byte{}
+	if versionPolicy != in.GetVersionAcls() {
+		acls = gVTapInfo.GetVTapPolicyData(vtapID, functions)
 	}
 
 	// 只有专属采集器下发tap_types
@@ -494,6 +527,8 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		VersionPlatformData: proto.Uint64(versionPlatformData),
 		Groups:              groups,
 		VersionGroups:       proto.Uint64(versionGroups),
+		FlowAcls:            acls,
+		VersionAcls:         proto.Uint64(versionPolicy),
 		TapTypes:            tapTypes,
 	}, nil
 }

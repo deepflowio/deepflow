@@ -122,6 +122,7 @@ type VTapCache struct {
 	licenseType        int
 	lcuuid             *string
 	licenseFunctions   *string
+	licenseFunctionSet mapset.Set
 	//above db Data
 
 	enabledTrafficDistribution   atomicbool.Bool
@@ -145,8 +146,8 @@ type VTapCache struct {
 
 	// vtap version
 	pushVersionPlatformData uint64
-	//VersionAcls         int
-	pushVersionGroups uint64
+	pushVersionPolicy       uint64
+	pushVersionGroups       uint64
 
 	controllerSyncFlag atomicbool.Bool // bool
 	tsdbSyncFlag       atomicbool.Bool // bool
@@ -193,6 +194,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.licenseType = vtap.LicenseType
 	vTapCache.lcuuid = proto.String(vtap.Lcuuid)
 	vTapCache.licenseFunctions = proto.String(vtap.LicenseFunctions)
+	vTapCache.licenseFunctionSet = mapset.NewSet()
 	vTapCache.enabledTrafficDistribution = atomicbool.NewBool(false)
 	vTapCache.enabledNetworkMonitoring = atomicbool.NewBool(false)
 	vTapCache.enabledApplicationMonitoring = atomicbool.NewBool(false)
@@ -203,7 +205,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.localSegments = []*trident.Segment{}
 	vTapCache.remoteSegments = []*trident.Segment{}
 	vTapCache.pushVersionPlatformData = 0
-	//vTapCache.VersionAcls = 0
+	vTapCache.pushVersionPolicy = 0
 	vTapCache.pushVersionGroups = 0
 	vTapCache.controllerSyncFlag = atomicbool.NewBool(false)
 	vTapCache.tsdbSyncFlag = atomicbool.NewBool(false)
@@ -243,7 +245,7 @@ func (c *VTapCache) unsetLicenseFunctionEnable() {
 func (c *VTapCache) convertLicenseFunctions() {
 	c.unsetLicenseFunctionEnable()
 	if c.licenseFunctions == nil || *c.licenseFunctions == "" {
-		log.Warningf("vtap(%s) no license functins", c.GetKey())
+		log.Warningf("vtap(%s) no license functions", c.GetKey())
 		return
 	}
 	licenseFunctionsInt, err := ConvertStrToIntList(*c.licenseFunctions)
@@ -251,6 +253,13 @@ func (c *VTapCache) convertLicenseFunctions() {
 		log.Errorf("convert licence functions failed err :%s", err)
 		return
 	}
+
+	functionSet := mapset.NewSet()
+	for _, function := range licenseFunctionsInt {
+		functionSet.Add(function)
+	}
+	c.licenseFunctionSet = functionSet
+
 	if Find[int](licenseFunctionsInt, VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING) {
 		c.enabledApplicationMonitoring.Set()
 	}
@@ -291,6 +300,14 @@ func (c *VTapCache) GetPushVersionPlatformData() uint64 {
 	return c.pushVersionPlatformData
 }
 
+func (c *VTapCache) UpdatePushVersionPolicy(version uint64) {
+	c.pushVersionPolicy = version
+}
+
+func (c *VTapCache) GetPushVersionPolicy() uint64 {
+	return c.pushVersionPolicy
+}
+
 func (c *VTapCache) UpdatePushVersionGroups(version uint64) {
 	c.pushVersionGroups = version
 }
@@ -317,6 +334,10 @@ func (c *VTapCache) GetSimplePlatformDataStr() []byte {
 
 func (c *VTapCache) GetVTapID() uint32 {
 	return uint32(c.id)
+}
+
+func (c *VTapCache) GetFunctions() mapset.Set {
+	return c.licenseFunctionSet
 }
 
 func (c *VTapCache) GetVTapType() int {
@@ -670,27 +691,27 @@ func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
 	if vTapType == VTAP_TYPE_POD_HOST || vTapType == VTAP_TYPE_POD_VM {
 		c.podClusterID, ok = v.lcuuidToPodClusterID[c.GetLcuuid()]
 		if ok == false {
-			log.Errorf("vtap(%s) not found podClusterID", c.GetVTapHost())
+			log.Warningf("vtap(%s) not found podClusterID", c.GetVTapHost())
 		}
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {
-			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
 		}
 	} else if vTapType == VTAP_TYPE_WORKLOAD_V || vTapType == VTAP_TYPE_WORKLOAD_P {
 		c.VPCID, ok = v.lcuuidToVPCID[c.GetLcuuid()]
 		if ok == false {
-			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
 		}
 	} else if vTapType == VTAP_TYPE_HYPER_V && v.hypervNetworkHostIds.Contains(c.GetLaunchServerID()) {
 		c.vTapType = VTAP_TYPE_HYPER_V_NETWORK
 		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
 		if ok == false {
-			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
 		}
 	} else if vTapType == VTAP_TYPE_KVM || vTapType == VTAP_TYPE_HYPER_V {
 		c.VPCID, ok = v.hostIDToVPCID[c.GetLaunchServerID()]
 		if ok == false {
-			log.Errorf("vtap(%s) not found VPCID", c.GetVTapHost())
+			log.Warningf("vtap(%s) not found VPCID", c.GetVTapHost())
 		}
 	}
 }

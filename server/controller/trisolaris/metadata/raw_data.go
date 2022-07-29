@@ -79,34 +79,35 @@ type PlatformRawData struct {
 	vmIDToPodNodeID        map[int]int
 	idToVPC                map[int]*models.VPC
 
-	idToHost                    map[int]*models.Host
-	idToVM                      map[int]*models.VM
-	vmIDs                       mapset.Set
-	vRouterIDs                  mapset.Set
-	dhcpPortIDs                 mapset.Set
-	podIDs                      mapset.Set
-	vpcIDs                      mapset.Set
-	tunnelIDs                   mapset.Set
-	vifIDsOfLANIP               mapset.Set
-	vifIDsOfWANIP               mapset.Set
-	ipsOfLANIP                  mapset.Set
-	ipsOfWANIP                  mapset.Set
-	vmIDsOfFIP                  mapset.Set
-	regionUUIDs                 mapset.Set
-	azUUIDs                     mapset.Set
-	peerConnIDs                 mapset.Set
-	podServiceIDs               mapset.Set
-	redisInstanceIDs            mapset.Set
-	rdsInstanceIDs              mapset.Set
-	podNodeIDs                  mapset.Set
-	lbIDs                       mapset.Set
-	natIDs                      mapset.Set
-	podServicePortIDs           mapset.Set
-	subnetPrefix                []string
-	subnetMask                  []string
-	serverToVmIDs               map[string]mapset.Set
-	floatingIPs                 map[int]*IPData
-	podServiceIDToPodGroupPorts map[int]mapset.Set
+	idToHost                      map[int]*models.Host
+	idToVM                        map[int]*models.VM
+	vmIDs                         mapset.Set
+	vRouterIDs                    mapset.Set
+	dhcpPortIDs                   mapset.Set
+	podIDs                        mapset.Set
+	vpcIDs                        mapset.Set
+	tunnelIDs                     mapset.Set
+	vifIDsOfLANIP                 mapset.Set
+	vifIDsOfWANIP                 mapset.Set
+	ipsOfLANIP                    mapset.Set
+	ipsOfWANIP                    mapset.Set
+	vmIDsOfFIP                    mapset.Set
+	regionUUIDs                   mapset.Set
+	azUUIDs                       mapset.Set
+	peerConnIDs                   mapset.Set
+	podServiceIDs                 mapset.Set
+	redisInstanceIDs              mapset.Set
+	rdsInstanceIDs                mapset.Set
+	podNodeIDs                    mapset.Set
+	lbIDs                         mapset.Set
+	natIDs                        mapset.Set
+	podServicePortIDs             mapset.Set
+	subnetPrefix                  []string
+	subnetMask                    []string
+	serverToVmIDs                 map[string]mapset.Set
+	floatingIPs                   map[int]*IPData
+	podServiceIDToPodGroupPortIDs map[int]mapset.Set
+	podServiceIDToPodGroupPorts   map[int][]*models.PodGroupPort
 
 	vpcIDToDeviceIPs    map[int]map[TypeIDKey]mapset.Set
 	podNodeIDtoPodIDs   map[int]mapset.Set
@@ -114,7 +115,7 @@ type PlatformRawData struct {
 	VInterfaceIDToLANIP map[int][]*models.LANIP
 	vpcIDToVmidFips     map[int]map[int][]string
 	domainIpToHostID    map[DomainIPKey]int
-	podServiceIDToPorts map[int]mapset.Set
+	podServiceIDToPorts map[int][]*models.PodServicePort
 	idToPodNode         map[int]*models.PodNode
 	idToPodService      map[int]*models.PodService
 
@@ -142,34 +143,35 @@ type PlatformRawData struct {
 
 func NewPlatformRawData() *PlatformRawData {
 	return &PlatformRawData{
-		idToHost:                    make(map[int]*models.Host),
-		idToVM:                      make(map[int]*models.VM),
-		vmIDs:                       mapset.NewSet(),
-		vRouterIDs:                  mapset.NewSet(),
-		dhcpPortIDs:                 mapset.NewSet(),
-		podIDs:                      mapset.NewSet(),
-		vpcIDs:                      mapset.NewSet(),
-		tunnelIDs:                   mapset.NewSet(),
-		vifIDsOfLANIP:               mapset.NewSet(),
-		vifIDsOfWANIP:               mapset.NewSet(),
-		ipsOfLANIP:                  mapset.NewSet(),
-		ipsOfWANIP:                  mapset.NewSet(),
-		vmIDsOfFIP:                  mapset.NewSet(),
-		regionUUIDs:                 mapset.NewSet(),
-		azUUIDs:                     mapset.NewSet(),
-		peerConnIDs:                 mapset.NewSet(),
-		podServiceIDs:               mapset.NewSet(),
-		redisInstanceIDs:            mapset.NewSet(),
-		rdsInstanceIDs:              mapset.NewSet(),
-		podNodeIDs:                  mapset.NewSet(),
-		lbIDs:                       mapset.NewSet(),
-		natIDs:                      mapset.NewSet(),
-		podServicePortIDs:           mapset.NewSet(),
-		serverToVmIDs:               make(map[string]mapset.Set),
-		floatingIPs:                 make(map[int]*IPData),
-		podServiceIDToPodGroupPorts: make(map[int]mapset.Set),
-		subnetPrefix:                []string{},
-		subnetMask:                  []string{},
+		idToHost:                      make(map[int]*models.Host),
+		idToVM:                        make(map[int]*models.VM),
+		vmIDs:                         mapset.NewSet(),
+		vRouterIDs:                    mapset.NewSet(),
+		dhcpPortIDs:                   mapset.NewSet(),
+		podIDs:                        mapset.NewSet(),
+		vpcIDs:                        mapset.NewSet(),
+		tunnelIDs:                     mapset.NewSet(),
+		vifIDsOfLANIP:                 mapset.NewSet(),
+		vifIDsOfWANIP:                 mapset.NewSet(),
+		ipsOfLANIP:                    mapset.NewSet(),
+		ipsOfWANIP:                    mapset.NewSet(),
+		vmIDsOfFIP:                    mapset.NewSet(),
+		regionUUIDs:                   mapset.NewSet(),
+		azUUIDs:                       mapset.NewSet(),
+		peerConnIDs:                   mapset.NewSet(),
+		podServiceIDs:                 mapset.NewSet(),
+		redisInstanceIDs:              mapset.NewSet(),
+		rdsInstanceIDs:                mapset.NewSet(),
+		podNodeIDs:                    mapset.NewSet(),
+		lbIDs:                         mapset.NewSet(),
+		natIDs:                        mapset.NewSet(),
+		podServicePortIDs:             mapset.NewSet(),
+		serverToVmIDs:                 make(map[string]mapset.Set),
+		floatingIPs:                   make(map[int]*IPData),
+		podServiceIDToPodGroupPortIDs: make(map[int]mapset.Set),
+		podServiceIDToPodGroupPorts:   make(map[int][]*models.PodGroupPort),
+		subnetPrefix:                  []string{},
+		subnetMask:                    []string{},
 
 		idToNetwork:            make(map[int]*models.Network),
 		networkIDToSubnets:     make(map[int][]*models.Subnet),
@@ -182,7 +184,7 @@ func NewPlatformRawData() *PlatformRawData {
 		uuidToRegion:           make(map[string]*models.Region),
 		uuidToAZ:               make(map[string]*models.AZ),
 		domainIpToHostID:       make(map[DomainIPKey]int),
-		podServiceIDToPorts:    make(map[int]mapset.Set),
+		podServiceIDToPorts:    make(map[int][]*models.PodServicePort),
 		vmIDToPodNodeID:        make(map[int]int),
 		podNodeIDToVmID:        make(map[int]int),
 		vipDomainLcuuids:       mapset.NewSet(),
@@ -693,10 +695,11 @@ func (r *PlatformRawData) ConvertDBPodServicePort(dbDataCache *DBDataCache) {
 	}
 	for _, psPort := range podServicePorts {
 		r.podServicePortIDs.Add(psPort.ID)
-		if ports, ok := r.podServiceIDToPorts[psPort.PodServiceID]; ok {
-			ports.Add(psPort)
+		if _, ok := r.podServiceIDToPorts[psPort.PodServiceID]; ok {
+			r.podServiceIDToPorts[psPort.PodServiceID] = append(
+				r.podServiceIDToPorts[psPort.PodServiceID], psPort)
 		} else {
-			r.podServiceIDToPorts[psPort.PodServiceID] = mapset.NewSet(psPort)
+			r.podServiceIDToPorts[psPort.PodServiceID] = []*models.PodServicePort{psPort}
 		}
 	}
 }
@@ -774,11 +777,20 @@ func (r *PlatformRawData) ConvertDBPodGroupPort(dbDataCache *DBDataCache) {
 		return
 	}
 	for _, podGroupPort := range podGroupPorts {
-		ports, ok := r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID]
+		portIDs, ok := r.podServiceIDToPodGroupPortIDs[podGroupPort.PodServiceID]
 		if ok {
-			ports.Add(podGroupPort.ID)
+			portIDs.Add(podGroupPort.ID)
 		} else {
-			r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID] = mapset.NewSet(podGroupPort.ID)
+			r.podServiceIDToPodGroupPortIDs[podGroupPort.PodServiceID] = mapset.NewSet(podGroupPort.ID)
+		}
+
+		_, ok = r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID]
+		if ok {
+			r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID] = append(
+				r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID], podGroupPort)
+			portIDs.Add(podGroupPort.ID)
+		} else {
+			r.podServiceIDToPodGroupPorts[podGroupPort.PodServiceID] = []*models.PodGroupPort{podGroupPort}
 		}
 	}
 }
@@ -1398,13 +1410,13 @@ func (r *PlatformRawData) equal(o *PlatformRawData) bool {
 		return false
 	}
 
-	if len(r.podServiceIDToPodGroupPorts) != len(o.podServiceIDToPodGroupPorts) {
+	if len(r.podServiceIDToPodGroupPortIDs) != len(o.podServiceIDToPodGroupPortIDs) {
 		log.Info("platform pod service pod group ports changed")
 		return false
 	} else {
-		for podServiceID, rpodGroupPorts := range r.podServiceIDToPodGroupPorts {
-			if opodGroupPorts, ok := o.podServiceIDToPodGroupPorts[podServiceID]; ok {
-				if !rpodGroupPorts.Equal(opodGroupPorts) {
+		for podServiceID, rpodGroupPortIDs := range r.podServiceIDToPodGroupPortIDs {
+			if opodGroupPortIDs, ok := o.podServiceIDToPodGroupPortIDs[podServiceID]; ok {
+				if !rpodGroupPortIDs.Equal(opodGroupPortIDs) {
 					log.Info("platform pod service pod group ports changed")
 					return false
 				}

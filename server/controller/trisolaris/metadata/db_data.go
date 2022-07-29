@@ -64,6 +64,9 @@ type DBDataCache struct {
 	resourceGroups          []*models.ResourceGroup
 	resourceGroupExtraInfos []*models.ResourceGroupExtraInfo
 	acls                    []*models.ACL
+	npbTunnels              []*models.NpbTunnel
+	npbPolicies             []*models.NpbPolicy
+	pcapPolicies            []*models.PcapPolicy
 }
 
 func newDBDataCache() *DBDataCache {
@@ -225,6 +228,18 @@ func (d *DBDataCache) GetResourceGroupExtraInfos() []*models.ResourceGroupExtraI
 
 func (d *DBDataCache) GetACLs() []*models.ACL {
 	return d.acls
+}
+
+func (d *DBDataCache) GetNpbTunnels() []*models.NpbTunnel {
+	return d.npbTunnels
+}
+
+func (d *DBDataCache) GetNpbPolicies() []*models.NpbPolicy {
+	return d.npbPolicies
+}
+
+func (d *DBDataCache) GetPcapPolicies() []*models.PcapPolicy {
+	return d.pcapPolicies
 }
 
 func GetTapTypesFromDB(db *gorm.DB) []*models.TapType {
@@ -502,6 +517,27 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 	acls, err := dbmgr.DBMgr[models.ACL](db).Gets()
 	if err == nil {
 		d.acls = acls
+	} else {
+		log.Error(err)
+	}
+
+	npbTunnels, err := dbmgr.DBMgr[models.NpbTunnel](db).Gets()
+	if err == nil {
+		d.npbTunnels = npbTunnels
+	} else {
+		log.Error(err)
+	}
+
+	npbPolicies, err := dbmgr.DBMgr[models.NpbPolicy](db).Gets()
+	if err == nil {
+		d.npbPolicies = npbPolicies
+	} else {
+		log.Error(err)
+	}
+
+	pcapPolicies, err := dbmgr.DBMgr[models.PcapPolicy](db).Gets()
+	if err == nil {
+		d.pcapPolicies = pcapPolicies
 	} else {
 		log.Error(err)
 	}
