@@ -278,6 +278,18 @@ func IsIPInCIDR(ip, cidr string) bool {
 	}
 }
 
+func ContainsIP(cidrs []string, ip string) bool {
+	if len(cidrs) == 0 {
+		return false
+	}
+	for _, cidr := range cidrs {
+		if IsIPInCIDR(ip, cidr) {
+			return true
+		}
+	}
+	return false
+}
+
 // 针对各私有云平台，每个区域生成一个基础VPC和子网
 // 宿主机及管理节点的接口和IP属于基础VPC和子网
 func GetBasicVPCLcuuid(uuidGenerate, regionLcuuid string) string {
