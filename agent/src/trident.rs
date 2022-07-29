@@ -110,7 +110,11 @@ pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
 pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "C:\\DeepFlow\\trident\\trident-windows.yaml";
 
 impl Trident {
-    pub fn start<P: AsRef<Path>>(config_path: P, revision: &'static str) -> Result<Trident> {
+    pub fn start<P: AsRef<Path>>(
+        config_path: P,
+        agent_ident: &'static str,
+        revision: &'static str,
+    ) -> Result<Trident> {
         let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
         let state_thread = state.clone();
 
@@ -179,6 +183,7 @@ impl Trident {
             if let Err(e) = Self::run(
                 state_thread,
                 config,
+                agent_ident,
                 revision,
                 logger_handle,
                 remote_log_config,
@@ -195,6 +200,7 @@ impl Trident {
     fn run(
         state: TridentState,
         mut config: Config,
+        agent_ident: &'static str,
         revision: &'static str,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
@@ -248,7 +254,8 @@ impl Trident {
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             state.clone(),
-            revision.clone(),
+            agent_ident,
+            revision,
             ctrl_ip.to_string(),
             ctrl_mac.to_string(),
             config_handler.static_config.controller_ips[0].clone(),
