@@ -29,6 +29,13 @@ import (
 
 var log = logging.MustGetLogger("clickhouse.client")
 
+type QueryParams struct {
+	Sql             string
+	Callbacks       []func(columns []interface{}, values []interface{}) []interface{}
+	QueryUUID       string
+	ColumnSchemaMap map[string]*ColumnSchema
+}
+
 type Client struct {
 	Host       string
 	Port       int
@@ -62,7 +69,8 @@ func (c *Client) Close() error {
 	return c.connection.Close()
 }
 
-func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, values []interface{}) []interface{}, query_uuid string) (map[string][]interface{}, error) {
+func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) {
+	sql, callbacks, query_uuid, columnSchemaMap := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap
 	err := c.init(query_uuid)
 	if err != nil {
 		return nil, err
@@ -85,12 +93,19 @@ func (c *Client) DoQuery(sql string, callbacks []func(columns []interface{}, val
 	result := make(map[string][]interface{})
 	var columnNames []interface{}
 	var columnTypes []string
+	var columnSchemas []interface{}
 	// 获取列名和列类型
 	for _, column := range columns {
 		columnNames = append(columnNames, column.Name())
 		columnTypes = append(columnTypes, column.DatabaseTypeName())
+		if schema, ok := columnSchemaMap[column.Name()]; ok {
+			columnSchemas = append(columnSchemas, schema.ToMap())
+		} else {
+			columnSchemas = append(columnSchemas, NewColumnSchema(column.Name()).ToMap())
+		}
 	}
 	result["columns"] = columnNames
+	result["schemas"] = columnSchemas
 	var values []interface{}
 	resSize := 0
 	start := time.Now()

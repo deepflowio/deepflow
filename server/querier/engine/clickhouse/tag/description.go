@@ -221,7 +221,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		DB:       "flow_tag",
 	}
 	sql := "SELECT key FROM k8s_label_map GROUP BY key"
-	rst, err := chClient.DoQuery(sql, nil, "")
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	} else {
 		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM %s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
 	}
-	externalRst, err := externalChClient.DoQuery(externalSql, nil, "")
+	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql})
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +364,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				resourceName := resourceKey + "_name"
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql)
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(sql, nil, "")
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 				if err != nil {
 					return nil, err
 				}
@@ -387,7 +387,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				}
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql)
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(sql, nil, "")
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 				if err != nil {
 					return nil, err
 				}
@@ -436,7 +436,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			}
 		}
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(sql, nil, "")
+		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 		if err != nil {
 			return nil, err
 		}
@@ -484,7 +484,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
 		}
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(sql, nil, "")
+		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 		if err != nil {
 			return nil, err
 		}
@@ -517,7 +517,7 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 	}
 
 	log.Debug(sql)
-	rst, err := chClient.DoQuery(sql, nil, "")
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
 		return nil, err
 	}
