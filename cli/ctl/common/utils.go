@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -86,6 +87,47 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	return response, nil
 }
 
+func CURLResponseRawJson(method string, url string) (*simplejson.Json, error) {
+	errResponse, _ := simplejson.NewJson([]byte("{}"))
+
+	// TODO: 通过配置文件获取API超时时间
+	client := &http.Client{Timeout: time.Second * 30}
+
+	var err error
+	req := &http.Request{}
+	req, err = http.NewRequest(method, url, nil)
+
+	if err != nil {
+		return errResponse, err
+	}
+	req.Header.Set("Accept", "application/json, text/plain")
+	req.Header.Set("X-User-Id", "1")
+	req.Header.Set("X-User-Type", "1")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, err))
+	}
+
+	defer resp.Body.Close()
+	respBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errResponse, errors.New(fmt.Sprintf("read (%s) body failed, (%v)", url, err))
+	}
+
+	response, err := simplejson.NewJson(respBytes)
+	if resp.StatusCode != http.StatusOK {
+		var description string
+		_, ok := response.CheckGet("DESCRIPTION")
+		if ok {
+			description = response.Get("DESCRIPTION").MustString()
+		}
+		return response, errors.New(fmt.Sprintf("curl (%s) failed, (%v %v)", url, resp.StatusCode, description))
+	}
+
+	return response, nil
+}
+
 func GetDefaultRouteIP() string {
 	defaultRouteIP := "127.0.0.1"
 	routeList, _ := netlink.RouteList(nil, netlink.FAMILY_V4)
@@ -117,4 +159,12 @@ func GetServerInfo(cmd *cobra.Command) *Server {
 	port, _ := cmd.Flags().GetUint32("api-port")
 	rpcPort, _ := cmd.Flags().GetUint32("rpc-port")
 	return &Server{ip, port, rpcPort}
+}
+
+func PrettyPrint(data interface{}) {
+	val, err := json.MarshalIndent(data, "", "    ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	fmt.Println(string(val))
 }
