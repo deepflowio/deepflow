@@ -74,7 +74,8 @@ fn main() -> Result<()> {
         println!(env!("RUSTC_VERSION"));
         return Ok(());
     }
-    let mut t = trident::Trident::start(&Path::new(&opts.config_file), version)?;
+    let mut t =
+        trident::Trident::start(&Path::new(&opts.config_file), env!("AGENT_NAME"), version)?;
     wait_on_signals();
     t.stop();
 
