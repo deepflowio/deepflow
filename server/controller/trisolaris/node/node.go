@@ -416,6 +416,14 @@ func (n *NodeInfo) GetGroupsVersion() uint64 {
 	return n.metaData.GetDropletGroupsVersion()
 }
 
+func (n *NodeInfo) GetPolicy() []byte {
+	return n.metaData.GetDropletPolicyStr()
+}
+
+func (n *NodeInfo) GetPolicyVersion() uint64 {
+	return n.metaData.GetDropletPolicyVersion()
+}
+
 func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 	log.Infof("resiter controller(%+v)", data)
 	err := dbmgr.DBMgr[models.Controller](n.db).Insert(data)

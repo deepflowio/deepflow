@@ -62,6 +62,10 @@ func GetDB() *gorm.DB {
 	return trisolaris.dbConn
 }
 
+func GetBillingMethod() string {
+	return trisolaris.config.BillingMethod
+}
+
 func PutPlatformData() {
 	trisolaris.metaData.PutChPlatformData()
 }
