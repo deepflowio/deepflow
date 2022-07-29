@@ -15,7 +15,6 @@
  */
 
 use std::collections::HashMap;
-use std::env;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::mem;
@@ -64,6 +63,7 @@ const SECOND: Duration = Duration::from_secs(1);
 const NORMAL_EXIT_WITH_RESTART: i32 = 3;
 
 pub struct StaticConfig {
+    pub agent_ident: &'static str,
     pub revision: &'static str,
     pub boot_time: SystemTime,
 
@@ -79,6 +79,7 @@ pub struct StaticConfig {
 impl Default for StaticConfig {
     fn default() -> Self {
         Self {
+            agent_ident: "",
             revision: "",
             boot_time: SystemTime::now(),
             tap_mode: Default::default(),
@@ -392,6 +393,7 @@ impl Synchronizer {
     pub fn new(
         session: Arc<Session>,
         trident_state: TridentState,
+        agent_ident: &'static str,
         revision: &'static str,
         ctrl_ip: String,
         ctrl_mac: String,
@@ -403,6 +405,7 @@ impl Synchronizer {
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
+                agent_ident,
                 revision,
                 boot_time: SystemTime::now(),
                 tap_mode: tp::TapMode::Local,
@@ -486,7 +489,7 @@ impl Synchronizer {
             state: Some(tp::State::Running.into()),
             revision: Some(static_config.revision.to_owned()),
             exception: Some(exception_handler.take()),
-            process_name: Some(env!("AGENT_NAME").into()),
+            process_name: Some(static_config.agent_ident.to_owned()),
             ctrl_mac: Some(running_config.ctrl_mac.clone()),
             ctrl_ip: Some(running_config.ctrl_ip.clone()),
             tap_mode: Some(static_config.tap_mode.into()),

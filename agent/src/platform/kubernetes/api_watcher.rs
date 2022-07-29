@@ -30,7 +30,7 @@ use arc_swap::access::Access;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use k8s_openapi::apimachinery::pkg::version::Info;
-use kube::Client;
+use kube::{Client, Config};
 use log::{debug, error, info, warn};
 use tokio::{runtime::Runtime, task::JoinHandle};
 
@@ -219,7 +219,11 @@ impl ApiWatcher {
         err_msgs: &Arc<Mutex<Vec<String>>>,
         namespace: Option<&str>,
     ) -> Result<(HashMap<String, GenericResourceWatcher>, Vec<JoinHandle<()>>)> {
-        let client = match Client::try_default().await {
+        let config = Config::infer().await.map_err(|e| {
+            Error::KubernetesApiWatcher(format!("failed to infer kubernetes config: {}", e))
+        })?;
+        info!("api server url is: {}", config.cluster_url);
+        let client = match Client::try_from(config) {
             Ok(c) => c,
             Err(e) => {
                 let err_msg = format!("failed to create kubernetes client: {}", e);
