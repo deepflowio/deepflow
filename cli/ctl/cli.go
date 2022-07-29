@@ -44,6 +44,8 @@ func Execute() {
 	root.AddCommand(RegisterAgentGroupConfigCommand())
 	root.AddCommand(RegisterDomainCommand())
 	root.AddCommand(RegisterGenesisCommand())
+	root.AddCommand(RegisterCloudCommand())
+	root.AddCommand(RegisterRecorderCommand())
 	root.AddCommand(RegisterTrisolarisCommand())
 
 	cmd.RegisterIngesterCommand(root)

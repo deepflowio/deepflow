@@ -51,3 +51,13 @@ const (
 	VTAP_STATE_DISABLE_STR       = "DISABLE"
 	VTAP_STATE_PENDING_STR       = "PENDING"
 )
+
+var RESOURCE_TYPES = []string{
+	"SubDomains", "Regions", "AZs", "Hosts", "VMs", "VPCs", "Networks", "Subnets", "VRouters",
+	"RoutingTables", "DHCPPorts", "SecurityGroups", "SecurityGroupRules", "VMSecurityGroups",
+	"NATGateways", "NATRules", "NATVMConnections", "LBs", "LBListeners", "LBTargetServers",
+	"LBVMConnections", "PeerConnections", "CENs", "RedisInstances", "RDSInstances", "VInterfaces",
+	"IPs", "FloatingIPs", "PodClusters", "PodNodes", "VMPodNodeConnections", "PodNamespaces",
+	"PodGroups", "PodReplicaSets", "Pods", "PodServices", "PodServicePorts", "PodGroupPorts",
+	"PodIngresses", "PodIngressRules", "PodIngressRuleBackends",
+}
