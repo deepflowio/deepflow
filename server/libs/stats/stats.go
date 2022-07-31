@@ -27,7 +27,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/influxdata/influxdb/client/v2"
 	"github.com/influxdata/influxdb/models"
@@ -36,6 +35,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/libs/codec"
 	. "github.com/deepflowys/deepflow/server/libs/datastructure"
+	"github.com/deepflowys/deepflow/server/libs/stats/pb"
 )
 
 var log = logging.MustGetLogger("stats")
@@ -190,12 +190,14 @@ func newStatsdClient(remote string) *statsd.Client {
 
 func sendStatsd(bp client.BatchPoints) {
 	encoder := new(codec.SimpleEncoder)
-	for i, remote := range remotes {
-		if len(statsdClients) <= i {
-			statsdClients = append(statsdClients, newStatsdClient(remote))
-		}
-		if statsdClients[i] == nil {
-			statsdClients[i] = newStatsdClient(remote)
+	if remoteType&REMOTE_TYPE_STATSD != 0 {
+		for i, remote := range remotes {
+			if len(statsdClients) <= i {
+				statsdClients = append(statsdClients, newStatsdClient(remote))
+			}
+			if statsdClients[i] == nil {
+				statsdClients[i] = newStatsdClient(remote)
+			}
 		}
 	}
 	if dfstatsdClient == nil && dfRemote != "" {
@@ -213,56 +215,67 @@ func sendStatsd(bp client.BatchPoints) {
 			tagsOption = append(tagsOption, "host", hostname)
 		}
 		fields, _ := point.Fields()
-		for _, statsdClient := range statsdClients {
-			if statsdClient == nil {
-				continue
-			}
-			statsdClient = statsdClient.Clone(
-				statsd.Prefix(strings.Replace(module, "-", "_", -1)),
-				statsd.Tags(tagsOption...),
-			)
-			for key, value := range fields {
-				name := strings.Replace(key, "-", "_", -1)
-				statsdClient.Count(name, value)
+		if remoteType&REMOTE_TYPE_STATSD != 0 {
+			for _, statsdClient := range statsdClients {
+				if statsdClient == nil {
+					continue
+				}
+				statsdClient = statsdClient.Clone(
+					statsd.Prefix(strings.Replace(module, "-", "_", -1)),
+					statsd.Tags(tagsOption...),
+				)
+				for key, value := range fields {
+					name := strings.Replace(key, "-", "_", -1)
+					statsdClient.Count(name, value)
+				}
 			}
 		}
 
 		if dfstatsdClient != nil {
-			dfStats := AcquireDFStats()
-			dfStats.Time = uint32(point.Time().Unix())
-			module = strings.ReplaceAll(module, ".", "_")
-			dfStats.TableName = strings.ReplaceAll(module, "-", "_")
-			for k, v := range point.Tags() {
-				dfStats.Tags = append(dfStats.Tags, Tag{k, v})
+			dfStats := pb.AcquireDFStats()
+			dfStats.Timestamp = uint64(point.Time().Unix())
+			dfStats.Name = strings.ReplaceAll(module, "-", "_")
+			for k := range point.Tags() {
+				dfStats.TagNames = append(dfStats.TagNames, k)
 			}
-			sort.Slice(dfStats.Tags, func(i, j int) bool {
-				return dfStats.Tags[i].Key < dfStats.Tags[j].Key
+			sort.Slice(dfStats.TagNames, func(i, j int) bool {
+				return dfStats.TagNames[i] < dfStats.TagNames[j]
 			})
+			for _, v := range dfStats.TagNames {
+				dfStats.TagValues = append(dfStats.TagValues, point.Tags()[v])
+			}
 
-			for k, v := range fields {
-				name := strings.Replace(k, "-", "_", -1)
-				valueType := TypeInt64
-				var value int64
+			for k := range fields {
+				dfStats.MetricsFloatNames = append(dfStats.MetricsFloatNames, k)
+			}
+			sort.Slice(dfStats.MetricsFloatNames, func(i, j int) bool {
+				return dfStats.MetricsFloatNames[i] < dfStats.MetricsFloatNames[j]
+			})
+			for i, k := range dfStats.MetricsFloatNames {
+				v := fields[k]
+				var value float64
 				switch v.(type) {
 				case float64:
-					valueType = TypeFloat64
-					vfloat := v.(float64)
-					value = *((*int64)(unsafe.Pointer(&vfloat)))
-				default:
-					value = v.(int64)
+					value = v.(float64)
+				case uint:
+					value = float64(v.(uint))
+				case uint64:
+					value = float64(v.(uint64))
+				case int:
+					value = float64(v.(int))
+				case int64:
+					value = float64(v.(int64))
 				}
-				dfStats.Fields = append(dfStats.Fields, Field{name, valueType, value})
+				dfStats.MetricsFloatValues = append(dfStats.MetricsFloatValues, value)
+				dfStats.MetricsFloatNames[i] = strings.Replace(k, "-", "_", -1)
 			}
-			sort.Slice(dfStats.Fields, func(i, j int) bool {
-				return dfStats.Fields[i].Key < dfStats.Fields[j].Key
-			})
 
 			if dfstatsdClient != nil {
 				dfStats.Encode(encoder)
 				dfstatsdClient.Write(encoder.Bytes())
 				encoder.Reset()
 			}
-			ReleaseDFStats(dfStats)
+			pb.ReleaseDFStats(dfStats)
 		}
 	}
 }
@@ -280,16 +293,17 @@ func nextRemote() error {
 func runOnce() {
 	bp := collectBatchPoints()
 
-	if len(remotes) == 0 {
+	if len(remotes) == 0 && len(dfRemote) == 0 {
 		return
 	}
 
-	// FIXME: deprecated statsd
-	if remoteType == REMOTE_TYPE_STATSD {
+	if remoteType&REMOTE_TYPE_STATSD != 0 || remoteType&REMOTE_TYPE_DFSTATSD != 0 {
 		sendStatsd(bp)
-		return
 	}
 
+	if remoteType&REMOTE_TYPE_INFLUXDB == 0 {
+		return
+	}
 	for i := 0; i < len(remotes); i++ {
 		if connection == nil {
 			goto next_server

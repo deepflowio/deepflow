@@ -21,7 +21,7 @@ require (
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
-	github.com/deepflowys/deepflow/message v0.0.0-20220728021535-54333a7dafb6
+	github.com/deepflowys/deepflow/message v0.0.0-20220801081713-147df8c43710
 	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/docker/go-units v0.4.0
