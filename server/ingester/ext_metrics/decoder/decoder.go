@@ -127,7 +127,7 @@ func (d *Decoder) Run() {
 			} else if d.msgType == datatype.MESSAGE_TYPE_PROMETHEUS {
 				d.handlePrometheus(recvBytes.VtapID, decoder)
 			} else if d.msgType == datatype.MESSAGE_TYPE_DFSTATS {
-				d.handleMetaflowStats(recvBytes.VtapID, decoder)
+				d.handleDeepflowStats(recvBytes.VtapID, decoder)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
@@ -216,7 +216,7 @@ func (d *Decoder) sendTelegraf(vtapID uint16, point models.Point) {
 	d.counter.OutCount++
 }
 
-func (d *Decoder) handleMetaflowStats(vtapID uint16, decoder *codec.SimpleDecoder) {
+func (d *Decoder) handleDeepflowStats(vtapID uint16, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
 		pbStats := &pb.Stats{}
 		bytes := decoder.ReadBytes()

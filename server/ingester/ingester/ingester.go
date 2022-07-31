@@ -95,9 +95,12 @@ func Start(configPath string) []io.Closer {
 	})
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
+	stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD)
 	if cfg.InfluxdbWriterEnabled {
+		stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD | stats.REMOTE_TYPE_INFLUXDB)
 		stats.SetRemotes(net.JoinHostPort(cfg.Influxdb.Host, cfg.Influxdb.Port))
 	}
+	stats.SetDFRemote(net.JoinHostPort("127.0.0.1", strconv.Itoa(datatype.DROPLET_PORT)))
 
 	dropletConfig := dropletcfg.Load(configPath)
 	bytes, _ = yaml.Marshal(dropletConfig)

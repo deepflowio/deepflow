@@ -87,8 +87,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/deckarep/golang-set v1.8.0 h1:sk9/l/KqpunDwP7pSjUg0keiOOLEnOBHzykLrsPppp4=
 github.com/deckarep/golang-set v1.8.0/go.mod h1:5nI87KwE7wgsBU1F4GKAw2Qod7p5kyS383rP6+o6qqo=
-github.com/deepflowys/deepflow/message v0.0.0-20220728021535-54333a7dafb6 h1:/C7SiEM6Cuj/ShO3/9X6hYIZuzbTgN0MzZ2hJH7GQWw=
-github.com/deepflowys/deepflow/message v0.0.0-20220728021535-54333a7dafb6/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
+github.com/deepflowys/deepflow/message v0.0.0-20220801081713-147df8c43710 h1:Er21VgTV3PZKCzHtJQaLT5WaJ8/F+qDtiN9hRu13gRE=
+github.com/deepflowys/deepflow/message v0.0.0-20220801081713-147df8c43710/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
 github.com/dennwc/varint v1.0.0 h1:kGNFFSSw8ToIy3obO/kKr8U9GZYUAxQEVuix4zfDWzE=
 github.com/dennwc/varint v1.0.0/go.mod h1:hnItb35rvZvJrbTALZtY/iQfDs48JKRG1RPpgziApxA=
 github.com/digitalocean/godo v1.80.0 h1:ZULJ/fWDM97YtO7Fa+K6hzJLd7+smCu4N+0n+B/xtj4=
