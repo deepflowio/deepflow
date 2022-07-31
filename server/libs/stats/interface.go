@@ -24,12 +24,16 @@ var (
 	MinInterval = TICK_CYCLE
 )
 
-type RemoteType = bool
+type RemoteType = uint8
 
 const (
-	REMOTE_TYPE_STATSD   = true
-	REMOTE_TYPE_INFLUXDB = false
-	TICK_CYCLE           = 5 * time.Second
+	REMOTE_TYPE_INFLUXDB RemoteType = 1 << iota
+	REMOTE_TYPE_STATSD
+	REMOTE_TYPE_DFSTATSD
+)
+
+const (
+	TICK_CYCLE = 5 * time.Second
 )
 
 type Option = interface{}
