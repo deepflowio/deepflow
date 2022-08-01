@@ -558,6 +558,23 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 }
 
 func (f *TagFunction) Format(m *view.Model) {
+	if strings.HasPrefix(f.Name, TAG_FUNCTION_TOPK) {
+		if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
+			var outAlias string
+			innerAlias := fmt.Sprintf("_%s", f.Alias)
+			outAlias, f.Alias = f.Alias, innerAlias
+			node := f.Trans(m)
+			node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_INNER
+			m.AddTag(node)
+			grouparrayNode := &view.Tag{
+				Value: fmt.Sprintf("groupUniqArrayArray(%s)", innerAlias),
+				Alias: outAlias,
+				Flag:  view.NODE_FLAG_METRICS_OUTER,
+			}
+			m.AddTag(grouparrayNode)
+			return
+		}
+	}
 	node := f.Trans(m)
 	m.AddTag(node)
 	// metric分层的情况下 function需加入metric外层group
