@@ -47,3 +47,5 @@ jobs:
           git diff
           go fmt ./...; [[ -z $(git status -s --ignore-submodule) ]] || exit -1
           make
+          cd querier/engine/clickhouse
+          go test
