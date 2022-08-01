@@ -34,10 +34,16 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 			Port:     config.Cfg.Clickhouse.Port,
 			UserName: config.Cfg.Clickhouse.User,
 			Password: config.Cfg.Clickhouse.Password,
-			DB:       db,
+			DB:       "flow_tag",
 		}
-		externalMetricFloatSql := fmt.Sprintf("SELECT arrayJoin(metrics_float_names) AS metrics_float_name FROM (SELECT metrics_float_names FROM %s) GROUP BY metrics_float_name", table)
-		externalMetricFloatRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalMetricFloatSql})
+		var externalMetricSql string
+		if where != "" {
+			externalMetricSql = fmt.Sprintf("SELECT field_name FROM %s_custom_field WHERE table='%s' AND field_type='metrics' AND (%s) GROUP BY field_name ORDER BY field_name ASC", db, table, where)
+		} else {
+			externalMetricSql = fmt.Sprintf("SELECT field_name FROM %s_custom_field WHERE table='%s' AND field_type='metrics' GROUP BY field_name ORDER BY field_name ASC", db, table)
+		}
+
+		externalMetricFloatRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalMetricSql})
 		if err != nil {
 			log.Error(err)
 			return nil, err
