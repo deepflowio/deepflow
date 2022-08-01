@@ -22,13 +22,13 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
         .out_dir("src/proto")
         .compile(
             &[
-                "src/proto/message/common.proto",
-                "src/proto/message/trident.proto",
-                "src/proto/message/metric.proto",
-                "src/proto/message/flow_log.proto",
-                "src/proto/message/stats.proto",
+                "../message/common.proto",
+                "../message/trident.proto",
+                "../message/metric.proto",
+                "../message/flow_log.proto",
+                "../message/stats.proto",
             ],
-            &["src/proto/message"],
+            &["../message"],
         )?;
     Ok(())
 }
@@ -113,7 +113,10 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 fn main() -> Result<(), Box<dyn Error>> {
     generate_protobuf()?;
     set_build_info()?;
-    set_build_libtrace()?;
-    set_linkage()?;
+    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    if target_os.as_str() == "linux" {
+        set_build_libtrace()?;
+        set_linkage()?;
+    }
     Ok(())
 }

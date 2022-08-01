@@ -32,6 +32,7 @@ use crate::error::{Error, Result};
 use crate::exception::ExceptionHandler;
 use crate::proto::{common::TridentType, trident::Exception};
 
+#[cfg(target_os = "linux")]
 use super::net::get_link_enabled_features;
 use super::process::{get_memory_rss, get_process_num_by_name};
 
@@ -60,22 +61,25 @@ pub fn kernel_check() {
         return;
     }
 
-    use nix::sys::utsname::uname;
-    const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
-    // kernel_version 形如 5.4.0-13格式
-    let sys_uname = uname();
-    if sys_uname
-        .release()
-        .trim()
-        .split_once('-') // `-` 后面数字是修改版本号的次数，可以用 `-` 分隔
-        .unwrap_or_default()
-        .0
-        .ne(RECOMMENDED_KERNEL_VERSION)
+    #[cfg(target_os = "linux")]
     {
-        warn!(
-            "kernel version is not recommended({})",
-            RECOMMENDED_KERNEL_VERSION
-        );
+        use nix::sys::utsname::uname;
+        const RECOMMENDED_KERNEL_VERSION: &str = "4.19.17";
+        // kernel_version 形如 5.4.0-13格式
+        let sys_uname = uname();
+        if sys_uname
+            .release()
+            .trim()
+            .split_once('-') // `-` 后面数字是修改版本号的次数，可以用 `-` 分隔
+            .unwrap_or_default()
+            .0
+            .ne(RECOMMENDED_KERNEL_VERSION)
+        {
+            warn!(
+                "kernel version is not recommended({})",
+                RECOMMENDED_KERNEL_VERSION
+            );
+        }
     }
 }
 
@@ -88,6 +92,7 @@ pub fn tap_interface_check(tap_interfaces: &[String]) {
         return error!("static-config: tap-interfaces is none in analyzer-mode");
     }
 
+    #[cfg(target_os = "linux")]
     for name in tap_interfaces {
         let features = match get_link_enabled_features(name) {
             Ok(f) => f,

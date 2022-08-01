@@ -21,6 +21,7 @@ use std::fmt;
 use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
+#[cfg(target_os = "linux")]
 use super::super::ebpf::{MSG_REQUEST, MSG_RESPONSE};
 use super::flow::FlowMetricsPeer;
 
@@ -246,22 +247,6 @@ pub enum IfType {
     Ieee1394 = 144,
 }
 
-impl fmt::Display for IfType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IfType::Other => write!(f, "other"),
-            IfType::Ethernet => write!(f, "ethernet"),
-            IfType::TokenRing => write!(f, "tokenping"),
-            IfType::Ppp => write!(f, "ppp"),
-            IfType::Loopback => write!(f, "loopback"),
-            IfType::Atm => write!(f, "atm"),
-            IfType::Ieee80211 => write!(f, "ieee80211"),
-            IfType::Tunnel => write!(f, "tunnel"),
-            IfType::Ieee1394 => write!(f, "ieee1394"),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum HeaderType {
@@ -409,6 +394,7 @@ impl Default for PacketDirection {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl From<u8> for PacketDirection {
     fn from(msg_type: u8) -> Self {
         match msg_type {

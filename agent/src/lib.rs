@@ -21,7 +21,9 @@ mod common;
 mod config;
 pub mod debug;
 pub mod dispatcher;
+#[cfg(target_os = "linux")]
 mod ebpf;
+#[cfg(target_os = "linux")]
 mod ebpf_collector;
 mod error;
 mod exception;

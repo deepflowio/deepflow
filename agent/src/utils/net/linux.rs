@@ -53,6 +53,7 @@ use pnet::{
 };
 use regex::Regex;
 
+use super::parse_ip_slice;
 use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
 use super::{Error, Result};
 
@@ -532,16 +533,6 @@ pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
 
 pub fn link_list() -> Result<Vec<Link>> {
     request_link_info(None)
-}
-
-pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
-    if let Ok(s) = <&[u8; 4]>::try_from(bs) {
-        Some(IpAddr::from(*s))
-    } else if let Ok(s) = <&[u8; 16]>::try_from(bs) {
-        Some(IpAddr::from(*s))
-    } else {
-        None
-    }
 }
 
 pub fn addr_list() -> Result<Vec<Addr>> {
