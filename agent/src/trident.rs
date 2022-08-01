@@ -1142,7 +1142,7 @@ impl Components {
     fn new_collector(
         id: usize,
         stats_collector: &Arc<stats::Collector>,
-        flow_receiver: queue::Receiver<TaggedFlow>,
+        flow_receiver: queue::Receiver<Box<TaggedFlow>>,
         l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
         metrics_sender: queue::DebugSender<SendItem>,
         metrics_type: MetricsType,

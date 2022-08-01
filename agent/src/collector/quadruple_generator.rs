@@ -256,7 +256,7 @@ fn round_to_minute(t: Duration) -> Duration {
 struct SubQuadGen {
     id: usize,
 
-    output: DebugSender<AccumulatedFlow>,
+    output: DebugSender<Box<AccumulatedFlow>>,
 
     counter: QgCounter,
     metrics_type: MetricsType,
@@ -362,7 +362,7 @@ impl SubQuadGen {
     }
 
     fn set_connection(
-        flows: &mut Vec<AccumulatedFlow>,
+        flows: &mut Vec<Box<AccumulatedFlow>>,
         connection: &mut ConcurrentConnection,
         possible_host: &mut PossibleHost,
     ) {
@@ -403,7 +403,8 @@ impl SubQuadGen {
         self.stashs.push_back(QuadrupleStash::new());
         let stash = self.stashs.swap_remove_back(stash_index).unwrap();
         if !stash.v4_flows.is_empty() {
-            let mut v4_flows: Vec<AccumulatedFlow> = stash.v4_flows.into_values().collect();
+            let mut v4_flows: Vec<Box<AccumulatedFlow>> =
+                stash.v4_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v4_flows, connection, possible_host);
             if let Err(_) = self.output.send_all(v4_flows) {
                 debug!("qg push v4 flows to queue failed maybe queue have terminated");
@@ -411,7 +412,8 @@ impl SubQuadGen {
         }
 
         if !stash.v6_flows.is_empty() {
-            let mut v6_flows: Vec<AccumulatedFlow> = stash.v6_flows.into_values().collect();
+            let mut v6_flows: Vec<Box<AccumulatedFlow>> =
+                stash.v6_flows.into_values().map(Box::new).collect();
             Self::set_connection(&mut v6_flows, connection, possible_host);
             if let Err(_) = self.output.send_all(v6_flows) {
                 debug!("qg push v6 flows to queue failed maybe queue have terminated");
@@ -542,9 +544,9 @@ impl SubQuadGen {
 
 pub struct QuadrupleGeneratorThread {
     id: usize,
-    input: Arc<Receiver<TaggedFlow>>,
-    second_output: DebugSender<AccumulatedFlow>,
-    minute_output: DebugSender<AccumulatedFlow>,
+    input: Arc<Receiver<Box<TaggedFlow>>>,
+    second_output: DebugSender<Box<AccumulatedFlow>>,
+    minute_output: DebugSender<Box<AccumulatedFlow>>,
     flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
     connection_lru_capacity: usize,
     metrics_type: MetricsType,
@@ -565,9 +567,9 @@ pub struct QuadrupleGeneratorThread {
 impl QuadrupleGeneratorThread {
     pub fn new(
         id: usize,
-        input: Receiver<TaggedFlow>,
-        second_output: DebugSender<AccumulatedFlow>,
-        minute_output: DebugSender<AccumulatedFlow>,
+        input: Receiver<Box<TaggedFlow>>,
+        second_output: DebugSender<Box<AccumulatedFlow>>,
+        minute_output: DebugSender<Box<AccumulatedFlow>>,
         flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
@@ -675,7 +677,7 @@ impl QuadrupleGeneratorThread {
 
 pub struct QuadrupleGenerator {
     id: usize,
-    input: Arc<Receiver<TaggedFlow>>,
+    input: Arc<Receiver<Box<TaggedFlow>>>,
     name: String,
 
     second_quad_gen: Option<SubQuadGen>,
@@ -699,9 +701,9 @@ pub struct QuadrupleGenerator {
 impl QuadrupleGenerator {
     pub fn new(
         id: usize,
-        input: Arc<Receiver<TaggedFlow>>,
-        second_output: DebugSender<AccumulatedFlow>,
-        minute_output: DebugSender<AccumulatedFlow>,
+        input: Arc<Receiver<Box<TaggedFlow>>>,
+        second_output: DebugSender<Box<AccumulatedFlow>>,
+        minute_output: DebugSender<Box<AccumulatedFlow>>,
         flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
@@ -1098,7 +1100,7 @@ impl QuadrupleGenerator {
         while self.running.load(Ordering::Relaxed) {
             match self.input.recv(Some(Duration::from_secs(3))) {
                 Ok(tagged_flow) => {
-                    let tagged_flow = Arc::new(tagged_flow);
+                    let tagged_flow = Arc::new(*tagged_flow);
                     if let Some(output) = self.output_flow.as_mut() {
                         if let Err(_) = output.send(tagged_flow.clone()) {
                             debug!("qg push tagged flows to l4_flow queue failed maybe queue have terminated");
