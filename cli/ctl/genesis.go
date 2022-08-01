@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ctl
 
 import (
@@ -31,7 +32,7 @@ func RegisterGenesisCommand() *cobra.Command {
 		Use:   "genesis",
 		Short: "genesis operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("please run with 'sync'.")
+			fmt.Println("please run with 'sync | k8s'.")
 		},
 	}
 
@@ -46,7 +47,19 @@ func RegisterGenesisCommand() *cobra.Command {
 	}
 	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type")
 
+	var k8sType string
+	k8sInfo := &cobra.Command{
+		Use:     "k8s",
+		Short:   "genesis k8s info",
+		Example: "deepflow-ctl genesis k8s cluster_id",
+		Run: func(cmd *cobra.Command, args []string) {
+			k8sInfo(cmd, args, k8sType)
+		},
+	}
+	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type")
+
 	genesis.AddCommand(syncInfo)
+	genesis.AddCommand(k8sInfo)
 	return genesis
 }
 
@@ -90,6 +103,51 @@ func syncInfo(cmd *cobra.Command, resType string) {
 		tableIp(response, table)
 	case "vinterface":
 		tableVinterface(response, table)
+	}
+}
+
+func k8sInfo(cmd *cobra.Command, args []string, resType string) {
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "must specify cluster_id.\nExample: %s\n", cmd.Example)
+		return
+	}
+
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/kubernetes-info/%s/", server.IP, server.Port, args[0])
+
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	respData := response.Get("DATA")
+	if resType != "" {
+		typeData, ok := respData.CheckGet(resType)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "not found k8s resource type: %s\n", resType)
+			return
+		}
+		for i := range typeData.MustArray() {
+			tDataStr := typeData.GetIndex(i).MustString()
+			formatStr, err := common.JsonFormat(tDataStr)
+			if err != nil {
+				fmt.Println("format json str faild: " + err.Error())
+				continue
+			}
+			fmt.Println(formatStr)
+		}
+		return
+	}
+	for _, v := range respData.MustMap() {
+		for _, item := range v.([]interface{}) {
+			formatStr, err := common.JsonFormat(item.(string))
+			if err != nil {
+				fmt.Println("format json str faild: " + err.Error())
+				continue
+			}
+			fmt.Println(formatStr)
+		}
 	}
 }
 

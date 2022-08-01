@@ -166,7 +166,7 @@ func getGenesisSyncData(g *genesis.Genesis, isLocal bool) gin.HandlerFunc {
 			data = ret.Ports
 		case "network":
 			data = ret.Networks
-		case "iplastseen":
+		case "ip":
 			data = ret.IPLastSeens
 		case "vinterface":
 			data = ret.Vinterfaces

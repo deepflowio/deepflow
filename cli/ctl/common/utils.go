@@ -168,3 +168,12 @@ func PrettyPrint(data interface{}) {
 	}
 	fmt.Println(string(val))
 }
+
+func JsonFormat(jsonStr string) (string, error) {
+	var str bytes.Buffer
+	err := json.Indent(&str, []byte(jsonStr), "", "    ")
+	if err != nil {
+		return "", err
+	}
+	return str.String(), nil
+}
