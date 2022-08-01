@@ -199,7 +199,7 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 		for _, lcuuid := range delVtapLcuuids.ToSlice() {
 			vtap := lcuuidToOldVtap[lcuuid.(string)]
 			// TODO：记录操作日志
-			mysql.Db.Model(vtap).Update("vtap_group_lcuuid", common.DEFAULT_VTAP_GROUP_ID)
+			mysql.Db.Model(vtap).Update("vtap_group_id", common.DEFAULT_VTAP_GROUP_ID)
 		}
 
 		for _, lcuuid := range addVtapLcuuids.ToSlice() {
