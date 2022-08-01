@@ -30,6 +30,7 @@ use cadence::{
 };
 use log::{debug, info, warn};
 use prost::Message;
+pub use public::counter::*;
 
 use crate::common::DEFAULT_INGESTER_PORT;
 use crate::proto::stats;
@@ -39,73 +40,6 @@ use crate::utils::queue::{bounded, Receiver, Sender};
 const STATS_PREFIX: &'static str = "deepflow_agent";
 const TICK_CYCLE: Duration = Duration::from_secs(5);
 pub const DFSTATS_SENDER_ID: usize = 100;
-
-#[derive(Clone, Copy, Debug)]
-pub enum CounterType {
-    Counted,
-    Gauged,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum CounterValue {
-    Signed(i64),
-    Unsigned(u64),
-    Float(f64),
-}
-
-impl ToCounterValue for CounterValue {
-    fn try_to_value(self) -> MetricResult<MetricValue> {
-        Ok(match self {
-            CounterValue::Signed(v) => MetricValue::Signed(v),
-            // convert unsigned and float to signed for compatibility
-            CounterValue::Unsigned(v) => MetricValue::Signed(v as i64),
-            CounterValue::Float(v) => MetricValue::Signed(v as i64),
-        })
-    }
-}
-
-impl ToGaugeValue for CounterValue {
-    fn try_to_value(self) -> MetricResult<MetricValue> {
-        Ok(match self {
-            CounterValue::Signed(v) => MetricValue::Signed(v),
-            // convert unsigned and float to signed for compatibility
-            CounterValue::Unsigned(v) => MetricValue::Signed(v as i64),
-            CounterValue::Float(v) => MetricValue::Signed(v as i64),
-        })
-    }
-}
-
-pub type Counter = (&'static str, CounterType, CounterValue);
-
-pub trait RefCountable: Send + Sync {
-    fn get_counters(&self) -> Vec<Counter>;
-}
-
-pub trait OwnedCountable: Send + Sync {
-    fn get_counters(&self) -> Vec<Counter>;
-    fn closed(&self) -> bool;
-}
-
-pub enum Countable {
-    Owned(Box<dyn OwnedCountable>),
-    Ref(Weak<dyn RefCountable>),
-}
-
-impl Countable {
-    fn get_counters(&self) -> Vec<Counter> {
-        match self {
-            Countable::Owned(c) => c.get_counters(),
-            Countable::Ref(c) => c.upgrade().map(|c| c.get_counters()).unwrap_or_default(),
-        }
-    }
-
-    fn closed(&self) -> bool {
-        match self {
-            Countable::Owned(c) => c.closed(),
-            Countable::Ref(c) => c.strong_count() == 0,
-        }
-    }
-}
 
 pub enum StatsOption {
     Tag(&'static str, String),

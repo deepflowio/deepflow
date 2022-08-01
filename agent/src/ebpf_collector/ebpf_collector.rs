@@ -41,9 +41,9 @@ use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
 use crate::utils::{
     queue::{bounded, DebugSender, Receiver, Sender},
-    stats::{Counter, CounterType, CounterValue, OwnedCountable},
     LeakyBucket,
 };
+use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
 
 type LoggerItem = (L7Protocol, Box<dyn L7LogParse>);
 

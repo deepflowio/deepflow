@@ -23,6 +23,7 @@ mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
 mod mirror_mode_dispatcher;
 
+use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     Arc, Mutex, Weak,
@@ -30,6 +31,7 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+#[cfg(target_os = "linux")]
 use libc::c_int;
 use log::{debug, error, info, warn};
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
@@ -39,23 +41,18 @@ use base_dispatcher::{BaseDispatcher, TapTypeHandler};
 use error::{Error, Result};
 use local_mode_dispatcher::LocalModeDispatcher;
 use mirror_mode_dispatcher::MirrorModeDispatcher;
-use recv_engine::{
-    af_packet::{self, bpf, BpfSyntax, OptTpacketVersion, Tpacket},
-    RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
-};
 
+#[cfg(target_os = "linux")]
+use crate::platform::GenericPoller;
 use crate::{
     common::{enums::TapType, TaggedFlow, TapTyper},
     config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
-    platform::{GenericPoller, LibvirtXmlExtractor},
+    platform::LibvirtXmlExtractor,
     policy::PolicyGetter,
-    proto::{
-        common::TridentType,
-        trident::{IfMacSource, TapMode},
-    },
+    proto::{common::TridentType, trident::IfMacSource, trident::TapMode},
     utils::{
         net::{Link, MacAddr},
         queue::DebugSender,
@@ -63,10 +60,18 @@ use crate::{
         LeakyBucket,
     },
 };
-
-use self::{
-    local_mode_dispatcher::LocalModeDispatcherListener, recv_engine::af_packet::RawInstruction,
+use recv_engine::{af_packet::bpf::*, bpf, RecvEngine};
+#[cfg(target_os = "linux")]
+use recv_engine::{
+    af_packet::{self, BpfSyntax, OptTpacketVersion, Tpacket},
+    DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
+#[cfg(target_os = "windows")]
+use windows_recv_engine::WinPacket;
+
+use self::local_mode_dispatcher::LocalModeDispatcherListener;
+#[cfg(target_os = "linux")]
+use self::recv_engine::af_packet::RawInstruction;
 
 enum DispatcherFlavor {
     Analyzer(AnalyzerModeDispatcher),
@@ -94,6 +99,14 @@ impl DispatcherFlavor {
     fn listener(&self) -> DispatcherListener {
         match self {
             DispatcherFlavor::Local(d) => DispatcherListener::Local(d.listener()),
+            _ => todo!(),
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
+        match self {
+            DispatcherFlavor::Local(d) => d.switch_recv_engine(pcap_interfaces),
             _ => todo!(),
         }
     }
@@ -141,6 +154,24 @@ impl Dispatcher {
     pub fn is_running(&self) -> bool {
         self.running.load(Ordering::Relaxed)
     }
+
+    #[cfg(target_os = "windows")]
+    pub fn switch_recv_engine(&self, pcap_interfaces: Vec<Link>) {
+        self.stop();
+        if let Err(e) = self
+            .flavor
+            .lock()
+            .unwrap()
+            .as_mut()
+            .ok_or(Error::DispatcherFlavorEmpty)
+            .and_then(|d| d.switch_recv_engine(pcap_interfaces))
+        {
+            error!("switch RecvEngine error: {}, deepflow-agent restart...", e);
+            thread::sleep(Duration::from_secs(1));
+            process::exit(-1);
+        }
+        self.start();
+    }
 }
 
 #[derive(Clone)]
@@ -183,38 +214,45 @@ pub struct DpdkRingPortConf {
 
 pub struct BpfOptions {
     pub capture_bpf: String,
+    #[cfg(target_os = "linux")]
     pub bpf_syntax: Vec<BpfSyntax>,
+    #[cfg(target_os = "windows")]
+    pub bpf_syntax_str: String,
 }
 
 impl Default for BpfOptions {
     fn default() -> Self {
         Self {
             capture_bpf: "".to_string(),
+            #[cfg(target_os = "linux")]
             bpf_syntax: Vec::new(),
+            #[cfg(target_os = "windows")]
+            bpf_syntax_str: "".to_string(),
         }
     }
 }
 
+#[cfg(target_os = "linux")]
 impl BpfOptions {
     fn skip_tap_interface(&self, tap_interfaces: &Vec<Link>) -> Vec<BpfSyntax> {
         let mut bpf_syntax = self.bpf_syntax.clone();
 
-        bpf_syntax.push(BpfSyntax::LoadExtension(bpf::LoadExtension {
-            num: bpf::Extension::ExtInterfaceIndex,
+        bpf_syntax.push(BpfSyntax::LoadExtension(LoadExtension {
+            num: Extension::ExtInterfaceIndex,
         }));
 
         let total = tap_interfaces.len();
         for (i, iface) in tap_interfaces.iter().enumerate() {
-            bpf_syntax.push(BpfSyntax::JumpIf(bpf::JumpIf {
-                cond: bpf::JumpTest::JumpEqual,
+            bpf_syntax.push(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpEqual,
                 val: iface.if_index,
                 skip_true: (total - i) as u8,
                 ..Default::default()
             }));
         }
 
-        bpf_syntax.push(BpfSyntax::RetConstant(bpf::RetConstant { val: 0 }));
-        bpf_syntax.push(BpfSyntax::RetConstant(bpf::RetConstant { val: 65535 }));
+        bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 0 }));
+        bpf_syntax.push(BpfSyntax::RetConstant(RetConstant { val: 65535 }));
 
         return bpf_syntax;
     }
@@ -262,10 +300,7 @@ impl BpfOptions {
         unsafe {
             let pcap_ins =
                 Vec::from_raw_parts(prog.bf_insns, prog.bf_len as usize, prog.bf_len as usize);
-            return pcap_ins
-                .iter()
-                .map(|&x| bpf::RawInstruction::from(x))
-                .collect();
+            return pcap_ins.iter().map(|&x| RawInstruction::from(x)).collect();
         }
     }
 }
@@ -273,7 +308,11 @@ impl BpfOptions {
 #[derive(Default)]
 pub struct Options {
     pub handler_builders: Vec<PacketHandlerBuilder>,
+    #[cfg(target_os = "windows")]
+    pub win_packet_blocks: usize,
+    #[cfg(target_os = "linux")]
     pub af_packet_blocks: usize,
+    #[cfg(target_os = "linux")]
     pub af_packet_version: OptTpacketVersion,
     pub snap_len: usize,
     pub tap_mode: TapMode,
@@ -400,9 +439,12 @@ pub struct DispatcherBuilder {
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
     policy_getter: Option<PolicyGetter>,
+    #[cfg(target_os = "linux")]
     platform_poller: Option<Arc<GenericPoller>>,
     exception_handler: Option<ExceptionHandler>,
     ntp_diff: Option<Arc<AtomicI64>>,
+    #[cfg(target_os = "windows")]
+    pcap_interfaces: Option<Vec<Link>>,
 }
 
 impl DispatcherBuilder {
@@ -499,8 +541,15 @@ impl DispatcherBuilder {
         self
     }
 
+    #[cfg(target_os = "linux")]
     pub fn platform_poller(mut self, v: Arc<GenericPoller>) -> Self {
         self.platform_poller = Some(v);
+        self
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn pcap_interfaces(mut self, v: Vec<Link>) -> Self {
+        self.pcap_interfaces = Some(v);
         self
     }
 
@@ -533,26 +582,54 @@ impl DispatcherBuilder {
                 "cpu arch s390x does not support DPDK!".into(),
             ));
         } else {
-            let afp = af_packet::Options {
-                frame_size: if options.tap_mode == TapMode::Analyzer {
-                    FRAME_SIZE_MIN as u32
-                } else {
-                    FRAME_SIZE_MAX as u32
-                },
-                block_size: DEFAULT_BLOCK_SIZE as u32,
-                num_blocks: options.af_packet_blocks as u32,
-                poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
-                version: options.af_packet_version,
-                iface: self.src_interface.take().unwrap_or("".to_string()),
-                ..Default::default()
+            #[cfg(target_os = "windows")]
+            let engine = if tap_mode == TapMode::Local {
+                if self.pcap_interfaces.is_none()
+                    || self.pcap_interfaces.as_ref().unwrap().is_empty()
+                {
+                    return Err(error::Error::WinPcap(
+                        "windows pcap capture must give interface to capture packet".into(),
+                    ));
+                }
+                let src_ifaces = self
+                    .pcap_interfaces
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
+                    .collect();
+                let win_packet =
+                    WinPacket::new(src_ifaces, options.win_packet_blocks, options.snap_len)
+                        .map_err(|e| error::Error::WinPcap(e.to_string()))?;
+                info!("WinPacket init");
+                RecvEngine::WinPcap(Some(win_packet))
+            } else {
+                todo!()
             };
-            info!("Afpacket init with {:?}", afp);
-            RecvEngine::AfPacket(Tpacket::new(afp).unwrap())
+            #[cfg(target_os = "linux")]
+            let engine = {
+                let afp = af_packet::Options {
+                    frame_size: if options.tap_mode == TapMode::Analyzer {
+                        FRAME_SIZE_MIN as u32
+                    } else {
+                        FRAME_SIZE_MAX as u32
+                    },
+                    block_size: DEFAULT_BLOCK_SIZE as u32,
+                    num_blocks: options.af_packet_blocks as u32,
+                    poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
+                    version: options.af_packet_version,
+                    iface: self.src_interface.take().unwrap_or("".to_string()),
+                    ..Default::default()
+                };
+                info!("Afpacket init with {:?}", afp);
+                RecvEngine::AfPacket(Tpacket::new(afp).unwrap())
+            };
+            engine
         };
         let kernel_counter = engine.get_counter_handle();
         let id = self.id.ok_or(Error::ConfigIncomplete("no id".into()))?;
         let terminated = Arc::new(AtomicBool::new(false));
-        let counter = Arc::new(PacketCounter::new(terminated.clone(), kernel_counter));
+        let stat_counter = Arc::new(PacketCounter::new(terminated.clone(), kernel_counter));
         let collector = self
             .stats_collector
             .ok_or(Error::StatsCollector("no stats collector"))?;
@@ -612,7 +689,7 @@ impl DispatcherBuilder {
                 .take()
                 .ok_or(Error::ConfigIncomplete("no log_output_queue".into()))?,
 
-            counter: counter.clone(),
+            counter: stat_counter.clone(),
             terminated: terminated.clone(),
             stats: collector.clone(),
             flow_map_config: self
@@ -622,6 +699,7 @@ impl DispatcherBuilder {
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,
+            #[cfg(target_os = "linux")]
             platform_poller: self
                 .platform_poller
                 .take()
@@ -642,7 +720,7 @@ impl DispatcherBuilder {
         };
         collector.register_countable(
             "dispatcher",
-            stats::Countable::Ref(Arc::downgrade(&counter) as Weak<dyn stats::RefCountable>),
+            stats::Countable::Ref(Arc::downgrade(&stat_counter) as Weak<dyn stats::RefCountable>),
             vec![stats::StatsOption::Tag("id", base.id.to_string())],
         );
         let mut dispatcher = match tap_mode {

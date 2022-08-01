@@ -31,7 +31,8 @@ use log::{debug, info, log_enabled, warn, Level};
 use nix::errno::Errno;
 use nix::sched::{setns, CloneFlags};
 
-use super::{ls_ns_net, InterfaceInfo, Poller};
+use super::{ls_ns_net, Poller};
+use crate::platform::InterfaceInfo;
 use crate::utils::net::{addr_list, link_list};
 
 #[derive(Debug)]

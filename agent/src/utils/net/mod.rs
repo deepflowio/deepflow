@@ -43,7 +43,7 @@ pub use linux::*;
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
-pub use windows::*;
+pub use self::windows::*;
 
 #[derive(Debug)]
 pub struct NeighborEntry {
@@ -99,8 +99,13 @@ impl From<u32> for LinkFlags {
 pub struct Link {
     pub if_index: u32,
     pub mac_addr: MacAddr,
+    #[cfg(target_os = "windows")]
+    pub adapter_id: String,
+    #[cfg(target_os = "windows")]
+    pub device_name: String,
     pub name: String,
     pub flags: LinkFlags,
+    #[cfg(target_os = "linux")]
     pub if_type: Option<String>,
     pub parent_index: Option<u32>,
 }
@@ -155,7 +160,14 @@ impl MacAddr {
         self.0
     }
 
+    #[cfg(target_os = "linux")]
     pub fn is_multicast(octets: &[u8]) -> bool {
+        assert!(octets.len() > MAC_ADDR_LEN);
+        octets[0] & 0x1 == 1
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn is_multicast(octets: &Vec<u8>) -> bool {
         assert!(octets.len() > MAC_ADDR_LEN);
         octets[0] & 0x1 == 1
     }
@@ -289,6 +301,16 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
             }
             tuple.unwrap()
         }
+    }
+}
+
+pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
+    if let Ok(s) = <&[u8; 4]>::try_from(bs) {
+        Some(IpAddr::from(*s))
+    } else if let Ok(s) = <&[u8; 16]>::try_from(bs) {
+        Some(IpAddr::from(*s))
+    } else {
+        None
     }
 }
 

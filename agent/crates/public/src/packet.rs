@@ -14,14 +14,22 @@
  * limitations under the License.
  */
 
-mod process;
-pub use process::*;
+use std::time::Duration;
 
 #[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "linux")]
-pub use linux::*;
+#[derive(Debug)]
+pub struct Packet<'a> {
+    pub timestamp: Duration,
+    pub if_index: isize,
+    pub capture_length: isize,
+    pub data: &'a mut [u8],
+}
+
 #[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "windows")]
-pub use self::windows::*;
+#[derive(Debug)]
+pub struct Packet {
+    pub timestamp: Duration,
+    pub if_index: isize,
+    pub capture_length: isize,
+    pub data: Vec<u8>,
+}

@@ -223,7 +223,12 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
 
 extern "C" fn process_event_handle(p: *mut PROCESS_EVENT) {
     unsafe {
-	println!("TYPE {} PID {} NAME {}", (*p).event_type, (*p).pid, String::from_utf8_lossy(&(*p).name).to_string());
+        println!(
+            "TYPE {} PID {} NAME {}",
+            (*p).event_type,
+            (*p).pid,
+            String::from_utf8_lossy(&(*p).name).to_string()
+        );
     }
 }
 
@@ -237,8 +242,11 @@ fn main() {
             ::std::process::exit(1);
         }
 
-	if register_event_handle(EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
-                                 process_event_handle) != 0 {
+        if register_event_handle(
+            EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
+            process_event_handle,
+        ) != 0
+        {
             println!("register_event_handle() faild");
             ::std::process::exit(1);
         }
