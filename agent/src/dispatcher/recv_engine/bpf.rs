@@ -16,6 +16,7 @@
 
 use std::net::IpAddr;
 
+#[cfg(target_os = "linux")]
 use super::af_packet::bpf::*;
 use crate::common::{
     enums::EthernetType, enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III, ETH_TYPE_LEN,
@@ -27,14 +28,17 @@ use crate::common::{
     VLAN_HEADER_SIZE, VXLAN6_FLAGS_OFFSET, VXLAN_FLAGS_OFFSET,
 };
 
+#[cfg(target_os = "linux")]
 type JumpModifier = fn(jumpIf: JumpIf, index: usize, total: usize) -> JumpIf;
 
+#[cfg(target_os = "linux")]
 #[derive(Default)]
 struct BpfBuilder {
     ins: Vec<BpfSyntax>,
     modifiers: Vec<Option<JumpModifier>>,
 }
 
+#[cfg(target_os = "linux")]
 impl BpfBuilder {
     fn appends(&mut self, syntaxs: &mut Vec<BpfSyntax>) -> &mut Self {
         for syntax in syntaxs {
@@ -82,6 +86,7 @@ pub(crate) struct Builder {
     pub analyzer_source_ip: IpAddr,
 }
 
+#[cfg(target_os = "linux")]
 impl Builder {
     fn drop_modifier(mut jump_if: JumpIf, index: usize, total: usize) -> JumpIf {
         let remain = total - (index + 1);
@@ -662,53 +667,57 @@ impl Builder {
             return self.build_ipv4_syntax(&mut bpf_builder);
         }
     }
-
-    // pub fn build_pcap_syntax(self) -> Vec<BpfSyntax> {
-    //     let mut conditions = vec![];
-    //     let ip_version = if self.is_ipv6 { "ip6" } else { "ip" };
-
-    //     // 不采集和控制器通信的流量
-    //     conditions.push(format!(
-    //         "not ({} and src host {} and tcp and (src port {} or {}))",
-    //         ip_version, self.proxy_controller_ip, self.controller_port, self.controller_tls_port
-    //     ));
-    //     conditions.push(format!(
-    //         "not ({} and dst host {} and tcp and (dst port {} or {}))",
-    //         ip_version, self.proxy_controller_ip, self.controller_port, self.controller_tls_port
-    //     ));
-
-    //     // 不采集和TSDB通信的流量
-    //     conditions.push(format!(
-    //         "not ({} and src host {} and dst port {})",
-    //         ip_version, self.analyzer_source_ip, DROPLET_PORT
-    //     ));
-    //     conditions.push(format!(
-    //         "not ({} and dst host {} and src port {})",
-    //         ip_version, self.analyzer_source_ip, DROPLET_PORT
-    //     ));
-
-    //     // 不采集分发的VXLAN流量
-    //     conditions.push(format!(
-    //         "not (udp and dst port {} and udp[8:1]={:#x})",
-    //         self.vxlan_port, NPB_VXLAN_FLAGS
-    //     ));
-
-    //     // 不采集分发的ERSPANIII
-    //     conditions.push(format!(
-    //         "not (ip[9:1]={:#x} and ip[22:2]={:#x})",
-    //         u8::from(IpProtocol::Gre),
-    //         GRE_PROTO_ERSPAN_III
-    //     ));
-    //     conditions.push(format!(
-    //         "not (ip6[6:1]={:#x} and ip6[42:2]={:#x})",
-    //         u8::from(IpProtocol::Gre),
-    //         GRE_PROTO_ERSPAN_III
-    //     ));
-
-    //     conditions.join(" and ")
-    // }
 }
 
+#[cfg(target_os = "windows")]
+impl Builder {
+    pub fn build_pcap_syntax_to_str(self) -> String {
+        let mut conditions = vec![];
+        let ip_version = if self.is_ipv6 { "ip6" } else { "ip" };
+
+        // 不采集和控制器通信的流量
+        conditions.push(format!(
+            "not ({} and tcp and (src port {} or {} or {}))",
+            ip_version, self.controller_port, self.controller_tls_port, self.proxy_controller_port
+        ));
+        conditions.push(format!(
+            "not ({} and tcp and (dst port {} or {} or {}))",
+            ip_version, self.controller_port, self.controller_tls_port, self.proxy_controller_port
+        ));
+
+        // 不采集和TSDB通信的流量
+        conditions.push(format!(
+            "not ({} and src host {} and dst port {})",
+            ip_version, self.analyzer_source_ip, self.analyzer_port
+        ));
+        conditions.push(format!(
+            "not ({} and dst host {} and src port {})",
+            ip_version, self.analyzer_source_ip, self.analyzer_port
+        ));
+
+        // 不采集分发的VXLAN流量
+        conditions.push(format!(
+            "not (udp and dst port {} and udp[8:1]={:#x})",
+            self.vxlan_port, NPB_VXLAN_FLAGS
+        ));
+
+        // 不采集分发的ERSPANIII
+        conditions.push(format!(
+            "not (ip[9:1]={:#x} and ip[22:2]={:#x})",
+            u8::from(IpProtocol::Gre),
+            GRE_PROTO_ERSPAN_III
+        ));
+        conditions.push(format!(
+            "not (ip6[6:1]={:#x} and ip6[42:2]={:#x})",
+            u8::from(IpProtocol::Gre),
+            GRE_PROTO_ERSPAN_III
+        ));
+
+        conditions.join(" and ")
+    }
+}
+
+#[cfg(target_os = "linux")]
 #[cfg(test)]
 mod tests {
     use super::*;

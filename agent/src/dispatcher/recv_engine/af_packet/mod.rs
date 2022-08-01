@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 pub mod bpf;
+#[cfg(target_os = "linux")]
 mod header;
 pub mod options;
+#[cfg(target_os = "linux")]
 pub mod tpacket;
 
 pub use bpf::*;
 pub use options::{OptSocketType, OptTpacketVersion, Options};
-pub use tpacket::{Packet, Tpacket};
+#[cfg(target_os = "linux")]
+pub use tpacket::Tpacket;
 
 /* example
 
@@ -60,19 +62,3 @@ pub use tpacket::{Packet, Tpacket};
 ```
 
  */
-
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("invalid tpacket version: {0}")]
-    InvalidTpVersion(isize),
-    #[error("IO error")]
-    IoError(#[from] std::io::Error),
-    #[error("link error: {0}")]
-    LinkError(String),
-    #[error("option invalid: {0}")]
-    InvalidOption(&'static str),
-}
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;

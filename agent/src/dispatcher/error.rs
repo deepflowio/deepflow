@@ -27,6 +27,10 @@ pub enum Error {
     PacketInvalid(String),
     #[error("dispatcher stats collector: {0}")]
     StatsCollector(&'static str),
+    #[error("dispatcher winpcap: {0}")]
+    WinPcap(String), // Enterprise Edition Feature: windows-dispatcher
+    #[error("flavor dispatcher is empty")]
+    DispatcherFlavorEmpty, // Enterprise Edition Feature: windows-dispatcher
 }
 
 impl<T: TryFromPrimitive> From<TryFromPrimitiveError<T>> for Error {

@@ -16,7 +16,7 @@
 
 use page_size;
 
-use super::{Error, Result};
+pub use public::error::af_packet::{Error, Result};
 
 use crate::proto::trident::CaptureSocketType;
 

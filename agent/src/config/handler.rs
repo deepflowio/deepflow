@@ -15,15 +15,18 @@
  */
 
 use std::cmp::{max, min};
+use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
+use std::process;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{fmt, process};
 
 use arc_swap::{access::Map, ArcSwap};
 use bytesize::ByteSize;
+#[cfg(target_os = "linux")]
 use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
@@ -36,9 +39,8 @@ use super::{
 };
 
 use crate::{
-    common::{decapsulate::TunnelTypeBitmap, enums::TapType, DEFAULT_CPU_CFS_PERIOD_US},
-    dispatcher::recv_engine::{self, OptTpacketVersion},
-    ebpf::CAP_LEN_MAX,
+    common::decapsulate::TunnelTypeBitmap,
+    dispatcher::recv_engine,
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
     proto::trident::{self, CaptureSocketType},
@@ -47,10 +49,18 @@ use crate::{
         trident::{Exception, IfMacSource, SocketType, TapMode},
     },
     trident::Components,
-    utils::cgroups::Cgroups,
-    utils::environment::{free_memory_check, is_tt_pod, is_tt_workload},
-    utils::logger::RemoteLogConfig,
-    utils::net::{get_ctrl_ip_and_mac, MacAddr},
+    utils::{
+        environment::{free_memory_check, get_k8s_local_node_ip, is_tt_workload},
+        logger::RemoteLogConfig,
+        net::{get_ctrl_ip_and_mac, get_route_src_ip, links_by_name_regex, MacAddr},
+    },
+};
+#[cfg(target_os = "linux")]
+use crate::{
+    common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US},
+    dispatcher::recv_engine::af_packet::OptTpacketVersion,
+    ebpf::CAP_LEN_MAX,
+    utils::{cgroups::Cgroups, environment::is_tt_pod},
 };
 
 const MB: u64 = 1048576;
@@ -86,6 +96,7 @@ pub type DebugAccess = Access<DebugConfig>;
 
 pub type SynchronizerAccess = Access<SynchronizerConfig>;
 
+#[cfg(target_os = "linux")]
 pub type EbpfAccess = Access<EbpfConfig>;
 
 pub type MetricServerAccess = Access<MetricServerConfig>;
@@ -207,6 +218,7 @@ pub struct DispatcherConfig {
     pub capture_bpf: String,
     pub max_memory: u64,
     pub af_packet_blocks: usize,
+    #[cfg(target_os = "linux")]
     pub af_packet_version: OptTpacketVersion,
     pub tap_mode: TapMode,
     pub region_id: u32,
@@ -350,6 +362,7 @@ pub struct SynchronizerConfig {
     pub output_vlan: u16,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, PartialEq, Eq)]
 pub struct EbpfConfig {
     // 动态配置
@@ -367,6 +380,7 @@ pub struct EbpfConfig {
     pub ctrl_mac: MacAddr,
 }
 
+#[cfg(target_os = "linux")]
 impl fmt::Debug for EbpfConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EbpfConfig")
@@ -396,6 +410,7 @@ impl fmt::Debug for EbpfConfig {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl EbpfConfig {
     pub fn l7_log_enabled(&self) -> bool {
         // Afpacket应用日志依赖l7_metrics_enabled和collector_enabled，这里统一逻辑
@@ -555,6 +570,7 @@ pub struct ModuleConfig {
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
+    #[cfg(target_os = "linux")]
     pub ebpf: EbpfConfig,
     pub trident_type: TridentType,
     pub metric_server: MetricServerConfig,
@@ -633,6 +649,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 capture_bpf: conf.capture_bpf.to_string(),
                 max_memory: conf.max_memory,
                 af_packet_blocks: conf.yaml_config.get_af_packet_blocks(conf.max_memory),
+                #[cfg(target_os = "linux")]
                 af_packet_version: conf.capture_socket_type.into(),
                 tap_mode: conf.yaml_config.tap_mode,
                 region_id: conf.region_id,
@@ -738,6 +755,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 rsyslog_enabled: conf.rsyslog_enabled,
                 host: conf.host.clone(),
             },
+            #[cfg(target_os = "linux")]
             ebpf: EbpfConfig {
                 collector_enabled: conf.collector_enabled,
                 l7_metrics_enabled: conf.l7_metrics_enabled,
@@ -885,6 +903,7 @@ impl ConfigHandler {
         )
     }
 
+    #[cfg(target_os = "linux")]
     pub fn ebpf(&self) -> EbpfAccess {
         Map::new(self.current_config.clone(), |config| -> &EbpfConfig {
             &config.ebpf
@@ -915,7 +934,6 @@ impl ConfigHandler {
         let yaml_config = &candidate_config.yaml_config;
         let mut new_config: ModuleConfig = (static_config.clone(), new_config).try_into().unwrap();
         let mut callbacks: Vec<fn(&ConfigHandler, &mut Components)> = vec![];
-        //TODO dispatcher on_config_change 要迁移过来
         let mut restart_dispatcher = false;
 
         // Check and send out exceptions in time
@@ -931,6 +949,28 @@ impl ConfigHandler {
                         new_config.dispatcher.if_mac_source
                     );
                 }
+            }
+
+            #[cfg(target_os = "windows")]
+            if yaml_config.tap_mode == TapMode::Local
+                && candidate_config.dispatcher.tap_interface_regex
+                    != new_config.dispatcher.tap_interface_regex
+            {
+                fn switch_recv_engine(handler: &ConfigHandler, comp: &mut Components) {
+                    let pcap_interfaces = match links_by_name_regex(
+                        &handler.candidate_config.dispatcher.tap_interface_regex,
+                    ) {
+                        Err(e) => {
+                            warn!("get interfaces by name regex failed: {}", e);
+                            vec![]
+                        }
+                        Ok(links) => links,
+                    };
+                    for dispatcher in comp.dispatchers.iter() {
+                        dispatcher.switch_recv_engine(pcap_interfaces.clone());
+                    }
+                }
+                callbacks.push(switch_recv_engine);
             }
 
             if candidate_config.dispatcher.capture_packet_size
@@ -1122,10 +1162,7 @@ impl ConfigHandler {
         }
 
         if candidate_config.environment != new_config.environment {
-            let mut max_memory_change = false;
-            let mut max_cpus_change = false;
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                max_memory_change = true;
                 if yaml_config.tap_mode != TapMode::Analyzer {
                     // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                     info!(
@@ -1138,81 +1175,101 @@ impl ConfigHandler {
                     candidate_config.environment.max_memory = 0;
                 }
             }
-            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
-                max_cpus_change = true;
-            }
-            if max_memory_change || max_cpus_change {
-                if static_config.kubernetes_cluster_id.is_empty() {
-                    // 非容器类型采集器才做资源限制
-                    fn cgroup_callback(handler: &ConfigHandler, components: &mut Components) {
-                        if components.cgroups_controller.cgroup.is_none() {
-                            match Cgroups::new() {
-                                Ok(cc) => {
-                                    if let Some(_) = &cc.cgroup {
-                                        match cc.init(process::id() as u64) {
-                                            Ok(cgroup) => {
-                                                components.cgroups_controller = Arc::new(cgroup);
-                                            }
-                                            Err(e) => {
-                                                warn!("{}", e);
+            #[cfg(target_os = "linux")]
+            {
+                let max_memory_change =
+                    candidate_config.environment.max_memory != new_config.environment.max_memory;
+                let max_cpu_change =
+                    candidate_config.environment.max_cpus != new_config.environment.max_cpus;
+                if max_memory_change || max_cpu_change {
+                    if static_config.kubernetes_cluster_id.is_empty() {
+                        // 非容器类型采集器才做资源限制
+                        fn cgroup_callback(handler: &ConfigHandler, components: &mut Components) {
+                            if components.cgroups_controller.cgroup.is_none() {
+                                match Cgroups::new() {
+                                    Ok(cc) => {
+                                        if let Some(_) = &cc.cgroup {
+                                            match cc.init(process::id() as u64) {
+                                                Ok(cgroup) => {
+                                                    components.cgroups_controller =
+                                                        Arc::new(cgroup);
+                                                }
+                                                Err(e) => {
+                                                    warn!("{}", e);
+                                                }
                                             }
                                         }
                                     }
-                                }
-                                Err(e) => {
-                                    warn!("{:?}", e);
-                                }
-                            };
-                        }
+                                    Err(e) => {
+                                        warn!("{:?}", e);
+                                    }
+                                };
+                            }
 
-                        let mut resources = Resources {
-                            memory: Default::default(),
-                            pid: Default::default(),
-                            cpu: Default::default(),
-                            devices: Default::default(),
-                            network: Default::default(),
-                            hugepages: Default::default(),
-                            blkio: Default::default(),
-                        };
-                        if handler.candidate_config.environment.max_memory != 0 {
-                            let memory_resources = MemoryResources {
-                                kernel_memory_limit: None,
-                                memory_hard_limit: Some(
-                                    handler.candidate_config.environment.max_memory as i64,
-                                ),
-                                memory_soft_limit: None,
-                                kernel_tcp_memory_limit: None,
-                                memory_swap_limit: None,
-                                swappiness: None,
-                                attrs: Default::default(),
+                            let mut resources = Resources {
+                                memory: Default::default(),
+                                pid: Default::default(),
+                                cpu: Default::default(),
+                                devices: Default::default(),
+                                network: Default::default(),
+                                hugepages: Default::default(),
+                                blkio: Default::default(),
                             };
-                            resources.memory = memory_resources.clone();
-                        }
-                        if handler.candidate_config.environment.max_cpus != 0 {
-                            let cpu_quota = handler.candidate_config.environment.max_cpus
-                                * DEFAULT_CPU_CFS_PERIOD_US;
-                            let cpu_resources = CpuResources {
-                                cpus: None,
-                                mems: None,
-                                shares: None,
-                                quota: Some(cpu_quota as i64),
-                                period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
-                                realtime_runtime: None,
-                                realtime_period: None,
-                                attrs: Default::default(),
-                            };
-                            resources.cpu = cpu_resources.clone();
-                        }
-                        match components.cgroups_controller.apply(&resources) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                warn!("set cgroups failed: {}", e);
+                            if handler.candidate_config.environment.max_memory != 0 {
+                                let memory_resources = MemoryResources {
+                                    kernel_memory_limit: None,
+                                    memory_hard_limit: Some(
+                                        handler.candidate_config.environment.max_memory as i64,
+                                    ),
+                                    memory_soft_limit: None,
+                                    kernel_tcp_memory_limit: None,
+                                    memory_swap_limit: None,
+                                    swappiness: None,
+                                    attrs: Default::default(),
+                                };
+                                resources.memory = memory_resources.clone();
+                            }
+                            if handler.candidate_config.environment.max_cpus != 0 {
+                                let cpu_quota = handler.candidate_config.environment.max_cpus
+                                    * DEFAULT_CPU_CFS_PERIOD_US;
+                                let cpu_resources = CpuResources {
+                                    cpus: None,
+                                    mems: None,
+                                    shares: None,
+                                    quota: Some(cpu_quota as i64),
+                                    period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
+                                    realtime_runtime: None,
+                                    realtime_period: None,
+                                    attrs: Default::default(),
+                                };
+                                resources.cpu = cpu_resources.clone();
+                            }
+                            match components.cgroups_controller.apply(&resources) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    warn!("set cgroups failed: {}", e);
+                                }
                             }
                         }
+                        callbacks.push(cgroup_callback);
                     }
-                    callbacks.push(cgroup_callback);
                 }
             }
+
+            if candidate_config.environment.max_memory != new_config.environment.max_memory {
+                if yaml_config.tap_mode != TapMode::Analyzer {
+                    // TODO policy.SetMemoryLimit(cfg.MaxMemory)
+                    info!(
+                        "memory limit set to {}",
+                        ByteSize::b(new_config.environment.max_memory).to_string_as(true)
+                    );
+                    candidate_config.environment.max_memory = new_config.environment.max_memory;
+                } else {
+                    info!("memory set ulimit when tap_mode=analyzer");
+                    candidate_config.environment.max_memory = 0;
+                }
+            }
+
             if candidate_config.environment.sys_free_memory_limit
                 != new_config.environment.sys_free_memory_limit
             {
@@ -1229,10 +1286,6 @@ impl ConfigHandler {
             );
 
             candidate_config.environment = new_config.environment;
-        }
-
-        if cfg!(target_os = "windows") && yaml_config.tap_mode != TapMode::Analyzer {
-            todo!();
         }
 
         if candidate_config.flow != new_config.flow {
@@ -1303,6 +1356,8 @@ impl ConfigHandler {
                 candidate_config.platform, new_config.platform
             );
             candidate_config.platform = new_config.platform;
+
+            #[cfg(target_os = "linux")]
             fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                 if is_tt_pod(handler.candidate_config.platform.trident_type) {
                     components.platform_synchronizer.start_kubernetes_poller();
@@ -1315,6 +1370,7 @@ impl ConfigHandler {
                     components.api_watcher.stop();
                 }
             }
+            #[cfg(target_os = "linux")]
             callbacks.push(platform_callback);
         }
 
@@ -1381,6 +1437,7 @@ impl ConfigHandler {
                     for log_parser in components.log_parsers.iter().as_ref() {
                         log_parser.l7_log_dynamic_config_updated();
                     }
+                    #[cfg(target_os = "linux")]
                     if let Some(ebpf_collector) = components.ebpf_collector.as_mut() {
                         ebpf_collector.l7_log_dynamic_config_updated();
                     }
@@ -1422,6 +1479,7 @@ impl ConfigHandler {
             candidate_config.synchronizer = new_config.synchronizer;
         }
 
+        #[cfg(target_os = "linux")]
         if candidate_config.ebpf != new_config.ebpf {
             info!(
                 "ebpf config change from {:#?} to {:#?}",
@@ -1434,7 +1492,6 @@ impl ConfigHandler {
                     ebpf_collector.on_config_change(&handler.candidate_config.ebpf);
                 }
             }
-
             callbacks.push(ebpf_callback);
         }
 

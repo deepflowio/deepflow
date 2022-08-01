@@ -27,6 +27,8 @@ mod resource_watcher;
 pub use active_poller::ActivePoller;
 pub use api_watcher::ApiWatcher;
 
+use super::InterfaceInfo;
+
 #[enum_dispatch]
 pub enum GenericPoller {
     ActivePoller,
@@ -61,58 +63,6 @@ impl Poller for PassivePoller {
     fn stop(&self) {}
 }
 //END
-
-#[derive(Debug, Clone)]
-pub struct InterfaceInfo {
-    pub tap_idx: u32,
-    pub mac: MacAddr,
-    pub ips: Vec<IpAddr>,
-    pub name: String,
-    pub device_id: String,
-}
-
-impl fmt::Display for InterfaceInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ips_str = self
-            .ips
-            .iter()
-            .map(|ip| ip.to_string())
-            .collect::<Vec<String>>()
-            .as_slice()
-            .join(",");
-        write!(
-            f,
-            "{}: {}: {} [{}] device {}",
-            self.tap_idx, self.name, self.mac, ips_str, self.device_id
-        )
-    }
-}
-
-impl PartialEq for InterfaceInfo {
-    fn eq(&self, other: &Self) -> bool {
-        self.tap_idx.eq(&other.tap_idx) && self.mac.eq(&other.mac)
-    }
-}
-
-impl Eq for InterfaceInfo {}
-
-impl PartialOrd for InterfaceInfo {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (
-            self.tap_idx.partial_cmp(&other.tap_idx),
-            self.mac.partial_cmp(&other.mac),
-        ) {
-            (Some(std::cmp::Ordering::Equal), mac) => mac,
-            (tap, _) => tap,
-        }
-    }
-}
-
-impl Ord for InterfaceInfo {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
 
 fn ls_ns_net() -> io::Result<Vec<Vec<u32>>> {
     let mut seen = HashMap::new();

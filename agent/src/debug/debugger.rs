@@ -32,21 +32,26 @@ use bincode::{
 use log::{error, info, warn};
 use parking_lot::RwLock;
 
+#[cfg(target_os = "linux")]
+use super::platform::{PlatformDebugger, PlatformMessage};
+
 use super::{
     error::{Error, Result},
-    platform::{PlatformDebugger, PlatformMessage},
     queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
     Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, DEEPFLOW_AGENT_BEACON, MAX_BUF_SIZE,
 };
 
+#[cfg(target_os = "linux")]
+use crate::platform::{ApiWatcher, GenericPoller};
+
 use crate::{
     config::handler::DebugAccess,
-    platform::{ApiWatcher, GenericPoller},
     rpc::{RunningConfig, Session, StaticConfig, Status},
 };
 
 struct ModuleDebuggers {
+    #[cfg(target_os = "linux")]
     pub platform: PlatformDebugger,
     pub rpc: RpcDebugger,
     pub queue: Arc<QueueDebugger>,
@@ -61,7 +66,9 @@ pub struct Debugger {
 
 pub struct ConstructDebugCtx {
     pub config: DebugAccess,
+    #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
+    #[cfg(target_os = "linux")]
     pub poller: Arc<GenericPoller>,
     pub session: Arc<Session>,
     pub static_config: Arc<StaticConfig>,
@@ -178,6 +185,7 @@ impl Debugger {
         let module = Module::try_from(m).unwrap_or_default();
 
         match module {
+            #[cfg(target_os = "linux")]
             Module::Platform => {
                 let req: Message<PlatformMessage> =
                     decode_from_std_read(&mut payload, serialize_conf)?;
@@ -247,6 +255,7 @@ impl Debugger {
     /// 传入构造上下文
     pub fn new(context: ConstructDebugCtx) -> Self {
         let debuggers = ModuleDebuggers {
+            #[cfg(target_os = "linux")]
             platform: PlatformDebugger::new(context.api_watcher, context.poller),
             rpc: RpcDebugger::new(
                 context.session,

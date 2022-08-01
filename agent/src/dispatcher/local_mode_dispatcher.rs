@@ -24,8 +24,11 @@ use log::{debug, info, log_enabled, warn};
 use regex::Regex;
 
 use super::base_dispatcher::{BaseDispatcher, BaseDispatcherListener};
+#[cfg(target_os = "windows")]
+use super::error::Result;
 
-use crate::utils::stats::{Countable, RefCountable, StatsOption};
+#[cfg(target_os = "linux")]
+use crate::platform::{GenericPoller, Poller};
 use crate::{
     common::{
         decapsulate::TunnelType,
@@ -34,9 +37,10 @@ use crate::{
     },
     config::DispatcherConfig,
     flow_generator::FlowMap,
-    platform::{GenericPoller, LibvirtXmlExtractor, Poller},
+    platform::LibvirtXmlExtractor,
     proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
+    utils::stats::{Countable, RefCountable, StatsOption},
     utils::{
         bytes::read_u16_be,
         net::{link_list, Link, MacAddr},
@@ -91,7 +95,7 @@ impl LocalModeDispatcher {
                 base.check_and_update_bpf();
                 continue;
             }
-            let (packet, mut timestamp) = recved.unwrap();
+            let (mut packet, mut timestamp) = recved.unwrap();
 
             let pipeline = {
                 let pipelines = base.pipelines.lock().unwrap();
@@ -125,6 +129,7 @@ impl LocalModeDispatcher {
             pipeline.timestamp = timestamp;
 
             // compare 4 low bytes
+            #[cfg(target_os = "linux")]
             let (src_local, dst_local) = if pipeline.vm_mac.octets()[2..]
                 == packet.data[MAC_ADDR_LEN + 2..MAC_ADDR_LEN + MAC_ADDR_LEN]
             {
@@ -139,11 +144,43 @@ impl LocalModeDispatcher {
                 (false, false)
             };
 
+            #[cfg(target_os = "windows")]
+            let (src_local, dst_local) = if pipeline.vm_mac.octets()[2..]
+                == packet.data[MAC_ADDR_LEN + 2..MAC_ADDR_LEN + MAC_ADDR_LEN]
+            {
+                // src mac
+                (true, false)
+            } else if pipeline.vm_mac.octets()[2..] == packet.data[2..MAC_ADDR_LEN]
+                || MacAddr::is_multicast(&packet.data)
+            {
+                // dst mac
+                (false, true)
+            } else {
+                (false, false)
+            };
+
             // LOCAL模式L2END使用underlay网络的MAC地址，实际流量解析使用overlay
 
             let tunnel_type_bitmap = base.tunnel_type_bitmap.lock().unwrap().clone();
+
+            #[cfg(target_os = "linux")]
             let decap_length = match BaseDispatcher::decap_tunnel(
                 packet.data,
+                &base.tap_type_handler,
+                &mut base.tunnel_info,
+                tunnel_type_bitmap,
+            ) {
+                Ok((l, _)) => l,
+                Err(e) => {
+                    base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                    warn!("decap_tunnel failed: {:?}", e);
+                    continue;
+                }
+            };
+
+            #[cfg(target_os = "windows")]
+            let decap_length = match BaseDispatcher::decap_tunnel(
+                &mut packet.data,
                 &base.tap_type_handler,
                 &mut base.tunnel_info,
                 tunnel_type_bitmap,
@@ -229,6 +266,12 @@ impl LocalModeDispatcher {
     pub(super) fn listener(&self) -> LocalModeDispatcherListener {
         LocalModeDispatcherListener::new(self.base.listener(), self.extractor.clone())
     }
+
+    /// Enterprise Edition Feature: windows-dispatcher
+    #[cfg(target_os = "windows")]
+    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
+        self.base.switch_recv_engine(pcap_interfaces)
+    }
 }
 
 #[derive(Clone)]
@@ -304,6 +347,10 @@ impl LocalModeDispatcherListener {
         tap_mac_script: &str,
     ) -> Vec<MacAddr> {
         let mut macs = vec![];
+
+        #[cfg(target_os = "windows")]
+        let index_to_mac_map = Self::get_if_index_to_inner_mac_map();
+        #[cfg(target_os = "linux")]
         let index_to_mac_map = Self::get_if_index_to_inner_mac_map(&self.base.platform_poller);
         let name_to_mac_map = self.get_if_name_to_mac_map(tap_mac_script);
 
@@ -343,6 +390,29 @@ impl LocalModeDispatcherListener {
         macs
     }
 
+    #[cfg(target_os = "windows")]
+    fn get_if_index_to_inner_mac_map() -> HashMap<u32, MacAddr> {
+        let mut result = HashMap::new();
+
+        match link_list() {
+            Ok(links) => {
+                if result.len() == 0 {
+                    debug!("Poller Mac:");
+                }
+                for link in links {
+                    if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
+                        debug!("\tif_index: {}, mac: {}", link.if_index, link.mac_addr);
+                        result.insert(link.if_index, link.mac_addr);
+                    }
+                }
+            }
+            Err(e) => warn!("failed getting link list: {:?}", e),
+        }
+
+        result
+    }
+
+    #[cfg(target_os = "linux")]
     fn get_if_index_to_inner_mac_map(poller: &GenericPoller) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 

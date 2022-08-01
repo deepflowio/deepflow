@@ -18,8 +18,8 @@ use std::path::Path;
 
 use anyhow::Result;
 use clap::{ArgAction, Parser};
-use signal_hook::consts::TERM_SIGNALS;
-use signal_hook::iterator::Signals;
+#[cfg(target_os = "linux")]
+use signal_hook::{consts::TERM_SIGNALS, iterator::Signals};
 
 use ::deepflow_agent::*;
 

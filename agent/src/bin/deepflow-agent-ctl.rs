@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
+use std::fmt;
 use std::{
     collections::HashSet,
-    fmt,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket},
     time::Duration,
 };
@@ -25,8 +26,10 @@ use anyhow::{anyhow, Result};
 use bincode::{config, decode_from_std_read};
 use clap::{ArgEnum, Parser, Subcommand};
 
+#[cfg(target_os = "linux")]
+use deepflow_agent::debug::PlatformMessage;
 use deepflow_agent::debug::{
-    Beacon, Client, Message, Module, PlatformMessage, QueueMessage, RpcMessage, BEACON_PORT,
+    Beacon, Client, Message, Module, QueueMessage, RpcMessage, BEACON_PORT,
     DEBUG_QUEUE_IDLE_TIMEOUT, DEEPFLOW_AGENT_BEACON,
 };
 
@@ -52,6 +55,7 @@ struct Cmd {
 enum ControllerCmd {
     /// get information about the rpc synchronizer
     Rpc(RpcCmd),
+    #[cfg(target_os = "linux")]
     /// get information about the k8s platform
     Platform(PlatformCmd),
     /// monitor various queues of the selected deepflow-agent
@@ -91,6 +95,7 @@ struct QueueCmd {
     clear: bool,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Parser)]
 struct PlatformCmd {
     /// get resources with k8s api
@@ -105,6 +110,7 @@ struct PlatformCmd {
     mac_mappings: bool,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Copy, ArgEnum, Debug)]
 enum Resource {
     Version,
@@ -140,6 +146,7 @@ enum Resource {
     Replicasets,
 }
 
+#[cfg(target_os = "linux")]
 impl fmt::Display for Resource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -207,6 +214,7 @@ impl Controller {
 
     fn dispatch(&mut self) -> Result<()> {
         match self.cmd.take().unwrap().command {
+            #[cfg(target_os = "linux")]
             ControllerCmd::Platform(c) => self.platform(c),
             ControllerCmd::Rpc(c) => self.rpc(c),
             ControllerCmd::List => self.list(),
@@ -445,6 +453,7 @@ impl Controller {
         Ok(())
     }
 
+    #[cfg(target_os = "linux")]
     fn platform(&self, c: PlatformCmd) -> Result<()> {
         if self.port.is_none() {
             return Err(anyhow!(ERR_PORT_MSG));
