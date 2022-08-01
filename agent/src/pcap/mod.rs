@@ -54,7 +54,7 @@ pub struct Packet {
 
 #[derive(Debug)]
 pub enum PcapPacket {
-    Packet(Packet),
+    Packet(Box<Packet>),
     Terminated,
 }
 

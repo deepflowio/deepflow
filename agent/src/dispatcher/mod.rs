@@ -306,8 +306,8 @@ pub struct DispatcherBuilder {
     tap_typer: Option<Arc<TapTyper>>,
     analyzer_dedup_disabled: Option<bool>,
     libvirt_xml_extractor: Option<Arc<LibvirtXmlExtractor>>,
-    flow_output_queue: Option<DebugSender<TaggedFlow>>,
-    log_output_queue: Option<DebugSender<MetaAppProto>>,
+    flow_output_queue: Option<DebugSender<Box<TaggedFlow>>>,
+    log_output_queue: Option<DebugSender<Box<MetaAppProto>>>,
     packet_sequence_output_queue:
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     stats_collector: Option<Arc<Collector>>,
@@ -378,12 +378,12 @@ impl DispatcherBuilder {
         self
     }
 
-    pub fn flow_output_queue(mut self, v: DebugSender<TaggedFlow>) -> Self {
+    pub fn flow_output_queue(mut self, v: DebugSender<Box<TaggedFlow>>) -> Self {
         self.flow_output_queue = Some(v);
         self
     }
 
-    pub fn log_output_queue(mut self, v: DebugSender<MetaAppProto>) -> Self {
+    pub fn log_output_queue(mut self, v: DebugSender<Box<MetaAppProto>>) -> Self {
         self.log_output_queue = Some(v);
         self
     }

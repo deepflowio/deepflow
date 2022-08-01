@@ -80,8 +80,8 @@ pub struct FlowMap {
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
 
-    output_queue: DebugSender<TaggedFlow>,
-    out_log_queue: DebugSender<MetaAppProto>,
+    output_queue: DebugSender<Box<TaggedFlow>>,
+    out_log_queue: DebugSender<Box<MetaAppProto>>,
     output_buffer: Vec<TaggedFlow>,
     last_queue_flush: Duration,
     config: FlowAccess,
@@ -94,9 +94,9 @@ pub struct FlowMap {
 impl FlowMap {
     pub fn new(
         id: u32,
-        output_queue: DebugSender<TaggedFlow>,
+        output_queue: DebugSender<Box<TaggedFlow>>,
         policy_getter: PolicyGetter,
-        app_proto_log_queue: DebugSender<MetaAppProto>,
+        app_proto_log_queue: DebugSender<Box<MetaAppProto>>,
         ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
         packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
@@ -863,7 +863,11 @@ impl FlowMap {
     fn flush_queue(&mut self, now: Duration) {
         if now - self.last_queue_flush > self.config.load().flush_interval {
             if self.output_buffer.len() > 0 {
-                let flows = self.output_buffer.drain(..).collect::<Vec<_>>();
+                let flows = self
+                    .output_buffer
+                    .drain(..)
+                    .map(Box::new)
+                    .collect::<Vec<_>>();
                 if let Err(_) = self.output_queue.send_all(flows) {
                     warn!(
                         "flow-map push tagged flows to queue failed because queue have terminated"
@@ -907,7 +911,11 @@ impl FlowMap {
         }
         self.output_buffer.push(tagged_flow);
         if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            let flows = self.output_buffer.drain(..).collect::<Vec<_>>();
+            let flows = self
+                .output_buffer
+                .drain(..)
+                .map(Box::new)
+                .collect::<Vec<_>>();
             if let Err(_) = self.output_queue.send_all(flows) {
                 warn!("flow-map push tagged flows to queue failed because queue have terminated");
             }
@@ -1034,7 +1042,7 @@ impl FlowMap {
         if let Some(app_proto) =
             MetaAppProto::new(&node.tagged_flow, meta_packet, head, offset, pkt_size)
         {
-            if let Err(_) = self.out_log_queue.send(app_proto) {
+            if let Err(_) = self.out_log_queue.send(Box::new(app_proto)) {
                 warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
             }
         }
@@ -1217,7 +1225,9 @@ pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
     }
 }
 
-pub fn _new_flow_map_and_receiver(trident_type: TridentType) -> (FlowMap, Receiver<TaggedFlow>) {
+pub fn _new_flow_map_and_receiver(
+    trident_type: TridentType,
+) -> (FlowMap, Receiver<Box<TaggedFlow>>) {
     let (_, mut policy_getter) = Policy::new(1, 0, 1 << 10, false);
     policy_getter.disable();
     let queue_debugger = QueueDebugger::new();
