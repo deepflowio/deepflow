@@ -711,7 +711,7 @@ impl Stash {
             .map(|(_, mut doc)| {
                 doc.timestamp = self.start_time.as_secs() as u32;
                 doc.flags |= self.doc_flag;
-                SendItem::Metrics(doc)
+                SendItem::Metrics(Box::new(doc))
             })
             .collect::<Vec<_>>();
         let mut index = 0;
@@ -744,7 +744,7 @@ pub struct Collector {
     counter: Arc<CollectorCounter>,
     running: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
-    receiver: Arc<Receiver<AccumulatedFlow>>,
+    receiver: Arc<Receiver<Box<AccumulatedFlow>>>,
     sender: DebugSender<SendItem>,
 
     context: Context,
@@ -753,7 +753,7 @@ pub struct Collector {
 impl Collector {
     pub fn new(
         id: u32,
-        receiver: Receiver<AccumulatedFlow>,
+        receiver: Receiver<Box<AccumulatedFlow>>,
         sender: DebugSender<SendItem>,
         metric_type: MetricsType,
         delay_seconds: u32,
@@ -820,7 +820,7 @@ impl Collector {
                     Ok(acc_flows) => {
                         for flow in acc_flows {
                             let time_in_second = flow.tagged_flow.flow.flow_stat_time.as_secs();
-                            stash.collect(Some(flow), time_in_second);
+                            stash.collect(Some(*flow), time_in_second);
                         }
                     }
                     Err(Error::Timeout) => {

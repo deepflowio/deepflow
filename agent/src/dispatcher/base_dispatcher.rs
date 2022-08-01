@@ -85,8 +85,8 @@ pub(super) struct BaseDispatcher {
 
     pub(super) analyzer_dedup_disabled: bool,
 
-    pub(super) flow_output_queue: DebugSender<TaggedFlow>,
-    pub(super) log_output_queue: DebugSender<MetaAppProto>,
+    pub(super) flow_output_queue: DebugSender<Box<TaggedFlow>>,
+    pub(super) log_output_queue: DebugSender<Box<MetaAppProto>>,
 
     pub(super) counter: Arc<PacketCounter>,
     pub(super) terminated: Arc<AtomicBool>,

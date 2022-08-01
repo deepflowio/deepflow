@@ -19,7 +19,6 @@ cadence = "0.27.0"
 cgroups-rs = "0.2.9"
 chrono = "0.4.19"
 clap = { version = "3.2.8", features = ["derive"] }
-crossbeam = "0.8.1"
 dashmap = "5.3.3"
 dns-lookup = "1.0.8"
 enum_dispatch = "0.3.7"
