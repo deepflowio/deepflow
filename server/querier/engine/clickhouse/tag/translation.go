@@ -168,7 +168,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64("+hostIDSuffix+")))",
+				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
 				"",
 				"",
 				"",
