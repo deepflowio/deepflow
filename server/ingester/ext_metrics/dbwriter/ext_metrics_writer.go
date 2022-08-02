@@ -77,6 +77,18 @@ type ExtMetricsWriter struct {
 	utils.Closable
 }
 
+func (w *ExtMetricsWriter) InitDatabase() error {
+	if w.ckdbConn == nil {
+		conn, err := common.NewCKConnection(w.ckdbAddr, w.ckdbUsername, w.ckdbPassword)
+		if err != nil {
+			return err
+		}
+		w.ckdbConn = conn
+	}
+	_, err := w.ckdbConn.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", EXT_METRICS_DB))
+	return err
+}
+
 func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWriter, error) {
 	w.tablesLock.RLock()
 	if info, ok := w.tables[s.TableName]; ok {
@@ -200,10 +212,10 @@ func (w *ExtMetricsWriter) Write(m *ExtMetrics) {
 func NewExtMetricsWriter(
 	msgType datatype.MessageType,
 	db string,
-	config *config.Config) *ExtMetricsWriter {
+	config *config.Config) (*ExtMetricsWriter, error) {
 	flowTagWriter, err := flow_tag.NewFlowTagWriter(msgType.String(), db, config.TTL, DefaultPartition, config.Base, &config.CKWriterConfig)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	writer := &ExtMetricsWriter{
 		msgType:       msgType,
@@ -217,6 +229,9 @@ func NewExtMetricsWriter(
 
 		counter: &Counter{},
 	}
+	if err := writer.InitDatabase(); err != nil {
+		return nil, err
+	}
 	common.RegisterCountableForIngester("ext_metrics_writer", writer, stats.OptionStatTags{"msg": msgType.String()})
-	return writer
+	return writer, nil
 }
