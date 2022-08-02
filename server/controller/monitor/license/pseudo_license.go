@@ -54,10 +54,13 @@ func (v *VTapLicenseAllocation) Start() {
 
 func (v *VTapLicenseAllocation) allocLicense() {
 	log.Info("alloc license starting")
-	mysql.Db.Model(&mysql.VTap{}).Where("license_type IS NULL").Updates(
+
+	whereSQL := "license_type IS NULL OR license_functions != ?"
+	licenseFunctions := strings.Join(VTAP_LICENSE_FUNCTIONS, ",")
+	mysql.Db.Model(&mysql.VTap{}).Where(whereSQL, licenseFunctions).Updates(
 		map[string]interface{}{
 			"license_type":      VTAP_LICENSE_TYPE_DEFAULT,
-			"license_functions": strings.Join(VTAP_LICENSE_FUNCTIONS, ","),
+			"license_functions": licenseFunctions,
 		},
 	)
 	log.Info("alloc license complete")
