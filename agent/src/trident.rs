@@ -45,7 +45,7 @@ use crate::{
         DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
     },
     config::{
-        handler::{ConfigHandler, DispatcherConfig, PortAccess},
+        handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
         Config, ConfigError, RuntimeConfig, YamlConfig,
     },
     debug::{ConstructDebugCtx, Debugger, QueueDebugger},
@@ -319,7 +319,8 @@ impl Trident {
                 }
             }
             yaml_conf = Some(new_conf.yaml_config.clone());
-            let callbacks = config_handler.on_config(new_conf, &exception_handler);
+            let callbacks =
+                config_handler.on_config(new_conf, &exception_handler, components.as_mut());
             match components.as_mut() {
                 None => {
                     let mut comp = Components::new(
@@ -343,6 +344,7 @@ impl Trident {
                     components.replace(comp);
                 }
                 Some(components) => {
+                    components.config = config_handler.candidate_config.clone();
                     dispatcher_listener_callback(
                         &config_handler.candidate_config.dispatcher,
                         &components,
@@ -521,6 +523,7 @@ impl DomainNameListener {
 }
 
 pub struct Components {
+    pub config: ModuleConfig,
     pub rx_leaky_bucket: Arc<LeakyBucket>,
     pub l7_log_rate: Arc<LeakyBucket>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
@@ -604,7 +607,9 @@ impl Components {
         self.otel_uniform_sender.start();
         self.prometheus_uniform_sender.start();
         self.telegraf_uniform_sender.start();
-        self.external_metrics_server.start();
+        if self.config.metric_server.enabled {
+            self.external_metrics_server.start();
+        }
         self.domain_name_listener.start();
 
         info!("Started components.");
@@ -1093,7 +1098,7 @@ impl Components {
             otel_sender,
             prometheus_sender,
             telegraf_sender,
-            config_handler.metric_server(),
+            candidate_config.metric_server.port,
             exception_handler.clone(),
         );
 
@@ -1107,6 +1112,7 @@ impl Components {
         );
 
         Ok(Components {
+            config: candidate_config.clone(),
             rx_leaky_bucket,
             l7_log_rate,
             libvirt_xml_extractor,
