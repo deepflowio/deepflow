@@ -102,3 +102,9 @@ host_1                      ,                      ,服务端宿主机个数    
 chost_1                     ,                      ,服务端云服务器个数       , 个   , tag        , 路径属性     , 111        ,
 region_1                    ,                      ,服务端区域个数           , 个   , tag        , 路径属性     , 111        ,
 az_1                        ,                      ,服务端可用区个数         , 个   , tag        , 路径属性     , 111        ,
+
+ip_version                  , is_ipv4              , IP类型            , 个   , tag        , 其他属性   , 111        ,
+tap_type                    , tap_type             , 采集点            , 个   , tag        , 其他属性   , 111        ,
+vtap_id                     , vtap_id              , 采集器            , 个   , tag        , 其他属性   , 111        ,
+procotol                    , procotol             , 网络协议          , 种   , tag        , 其他属性   , 111        ,
+server_port                 , server_port          , 服务端口          , 个   , tag        , 其他属性   , 111        ,
