@@ -221,6 +221,12 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
     }
 }
 
+extern "C" fn process_event_handle(p: *mut PROCESS_EVENT) {
+    unsafe {
+	println!("TYPE {} PID {} NAME {}", (*p).event_type, (*p).pid, String::from_utf8_lossy(&(*p).name).to_string());
+    }
+}
+
 fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
@@ -228,6 +234,12 @@ fn main() {
         // 第一个参数空指针传递可以填写std::ptr::null()
         if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
             println!("bpf_tracer_init() file:{:?} error", log_file);
+            ::std::process::exit(1);
+        }
+
+	if register_event_handle(EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
+                                 process_event_handle) != 0 {
+            println!("register_event_handle() faild");
             ::std::process::exit(1);
         }
 
