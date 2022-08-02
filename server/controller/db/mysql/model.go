@@ -1099,6 +1099,7 @@ type GoGenesisVInterface struct {
 	DeviceName          string    `gorm:"column:device_name;type:char(512);default:null" json:"DEVICE_NAME"`
 	DeviceType          string    `gorm:"column:device_type;type:char(64);default:null" json:"DEVICE_TYPE"`
 	HostIP              string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
+	NodeIP              string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
 	VTapID              int       `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	LastSeen            time.Time `gorm:"column:last_seen;type:datetime;default:NULL" json:"LAST_SEEN"`
 	KubernetesClusterID string    `gorm:"column:kubernetes_cluster_id;type:char(64);default:null" json:"KUBERNETES_CLUSTER_ID"`
