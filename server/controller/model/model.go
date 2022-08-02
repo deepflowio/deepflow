@@ -465,21 +465,23 @@ type DetailedConfig struct {
 }
 
 type VTapInterface struct {
-	Name               string `json:"NAME"`
-	MAC                string `json:"MAC"`
-	TapName            string `json:"TAP_NAME"`
-	TapMAC             string `json:"TAP_MAC"`
-	VTapID             int    `json:"VTAP_ID"`
-	VTapType           int    `json:"VTAP_TYPE"`
-	VTapName           string `json:"VTAP_NAME"`
-	VTapLaunchServer   string `json:"VTAP_LAUNCH_SERVER"`
-	VTapLaunchServerID int    `json:"VTAP_LAUNCH_SERVER_ID"`
-	DeviceName         string `json:"DEVICE_NAME"`
-	DeviceType         int    `json:"DEVICE_TYPE"`
-	DeviceID           int    `json:"DEVICE_ID"`
-	DeviceHostID       int    `json:"DEVICE_HOST_ID"`
-	DeviceHostName     string `json:"DEVICE_HOST_NAME"`
-	HostIP             string `json:"HOST_IP"`
+	Name               string    `json:"NAME"`
+	MAC                string    `json:"MAC"`
+	TapName            string    `json:"TAP_NAME"`
+	TapMAC             string    `json:"TAP_MAC"`
+	VTapID             int       `json:"VTAP_ID"`
+	VTapType           int       `json:"VTAP_TYPE"`
+	VTapName           string    `json:"VTAP_NAME"`
+	VTapLaunchServer   string    `json:"VTAP_LAUNCH_SERVER"`
+	VTapLaunchServerID int       `json:"VTAP_LAUNCH_SERVER_ID"`
+	DeviceName         string    `json:"DEVICE_NAME"`
+	DeviceType         int       `json:"DEVICE_TYPE"`
+	DeviceID           int       `json:"DEVICE_ID"`
+	DeviceHostID       int       `json:"DEVICE_HOST_ID"`
+	DeviceHostName     string    `json:"DEVICE_HOST_NAME"`
+	HostIP             string    `json:"HOST_IP"`
+	NodeIP             string    `json:"NODE_IP"`
+	LastSeen           time.Time `json:"LAST_SEEN"`
 }
 
 // TODO: 因为genesis的功能还未完全迁移完，且数据库字段不相同，所以这里启用了一组新的表来支持，等待完成迁移后将表趋于统一并删除无用表。
