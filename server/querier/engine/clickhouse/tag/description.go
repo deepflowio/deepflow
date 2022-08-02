@@ -406,16 +406,13 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			dictTag = fmt.Sprintf("dictGet(flow_tag.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(AutoMap[tag]))
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, dictTag, whereSql)
 
-		case "vpc":
+		case "vpc", "l2_vpc":
 			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(flow_tag.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", whereSql)
 
-		case "router", "host", "dhcpgw", "pod_service", "ip", "l2_vpc", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
+		case "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
-			if tag == "l2_vpc" {
-				resourceId = "vpc_id"
-				resourceName = "vpc_name"
-			} else if tag == "ip" {
+			if tag == "ip" {
 				resourceId = "ip"
 				resourceName = "ip"
 			}
@@ -464,7 +461,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map WHERE devicetype in (%s)",
 				strings.Join(autoDeviceTypes, ","),
 			)
-		} else if tag == "vpc" {
+		} else if tag == "vpc" || tag == "l2_vpc" {
 			sql = "SELECT id as value,name AS display_name,uid FROM l3_epc_map"
 		} else if tag == "ip" {
 			sql = "SELECT ip as value,ip AS display_name FROM ip_relation_map"
