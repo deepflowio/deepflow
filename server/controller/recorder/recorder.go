@@ -131,6 +131,9 @@ func (r *Recorder) checkCloudData(cloudData cloudmodel.Resource) bool {
 
 func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 	go func() {
+		// 无论是否会更新资源，需先更新domain及subdomain状态
+		r.updateStateInfo(cloudData)
+
 		if !r.checkCloudData(cloudData) {
 			r.canRefresh <- true
 			return
@@ -142,7 +145,7 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 
 		log.Infof("domain (lcuuid: %s, name: %s) refresh started", r.domainLcuuid, r.domainName)
 
-		r.syncDomain(cloudData)
+		r.syncDomain()
 
 		// 指定创建及更新操作的资源顺序
 		// 基本原则：无依赖资源优先；实时性需求高资源优先
@@ -170,7 +173,7 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 			}
 			log.Infof("sub_domain (lcuuid: %s) sync refresh started", subDomainLcuuid)
 
-			r.syncSubDomain(subDomainLcuuid, subDomainResource)
+			r.syncSubDomain(subDomainLcuuid)
 
 			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource)
 			for _, updater := range subDomainUpdatersInUpdateOrder {
@@ -299,8 +302,31 @@ func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (st
 	return
 }
 
+func (r *Recorder) updateStateInfo(cloudData cloudmodel.Resource) {
+	var domain mysql.Domain
+	err := mysql.Db.Where("lcuuid = ?", r.domainLcuuid).First(&domain).Error
+	if err != nil {
+		log.Errorf("get domain (lcuuid: %s) from db failed: %s", r.domainLcuuid, err)
+		return
+	}
+	domain.State, domain.ErrorMsg = r.formatDomainStateInfo(cloudData)
+	mysql.Db.Save(&domain)
+
+	for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
+		var subDomain mysql.SubDomain
+		err := mysql.Db.Where("lcuuid = ?", subDomainLcuuid).First(&subDomain).Error
+		if err != nil {
+			log.Errorf("get sub_domain (lcuuid: %s) from db failed: %s", subDomainLcuuid, err)
+			continue
+		}
+		subDomain.State = subDomainResource.ErrorState
+		subDomain.ErrorMsg = subDomainResource.ErrorMessage
+		mysql.Db.Save(&subDomain)
+	}
+}
+
 // TODO 提供db操作接口
-func (r *Recorder) syncDomain(domainData cloudmodel.Resource) {
+func (r *Recorder) syncDomain() {
 	var domain mysql.Domain
 	err := mysql.Db.Where("lcuuid = ?", r.domainLcuuid).First(&domain).Error
 	if err != nil {
@@ -309,11 +335,10 @@ func (r *Recorder) syncDomain(domainData cloudmodel.Resource) {
 	}
 	now := time.Now()
 	domain.SyncedAt = &now
-	domain.State, domain.ErrorMsg = r.formatDomainStateInfo(domainData)
 	mysql.Db.Save(&domain)
 }
 
-func (r *Recorder) syncSubDomain(lcuuid string, subDomainResource cloudmodel.SubDomainResource) {
+func (r *Recorder) syncSubDomain(lcuuid string) {
 	var subDomain mysql.SubDomain
 	err := mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
@@ -322,7 +347,5 @@ func (r *Recorder) syncSubDomain(lcuuid string, subDomainResource cloudmodel.Sub
 	}
 	now := time.Now()
 	subDomain.SyncedAt = &now
-	subDomain.State = subDomainResource.ErrorState
-	subDomain.ErrorMsg = subDomainResource.ErrorMessage
 	mysql.Db.Save(&subDomain)
 }
