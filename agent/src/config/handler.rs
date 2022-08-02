@@ -97,6 +97,7 @@ pub type PortAccess = Access<PortConfig>;
 pub struct CollectorConfig {
     pub enabled: bool,
     pub inactive_server_port_enabled: bool,
+    pub inactive_ip_enabled: bool,
     pub vtap_flow_1s_enabled: bool,
     pub l4_log_collect_nps_threshold: u64,
     pub l4_log_store_tap_types: [bool; 256],
@@ -114,6 +115,7 @@ impl fmt::Debug for CollectorConfig {
                 "inactive_server_port_enabled",
                 &self.inactive_server_port_enabled,
             )
+            .field("inactive_ip_enabled", &self.inactive_ip_enabled)
             .field("vtap_flow_1s_enabled", &self.vtap_flow_1s_enabled)
             .field(
                 "l4_log_store_tap_types",
@@ -388,6 +390,7 @@ impl fmt::Debug for EbpfConfig {
                     .filter(|&(_, b)| *b)
                     .collect::<Vec<_>>(),
             )
+            .field("ctrl_mac", &self.ctrl_mac)
             .finish()
     }
 }
@@ -657,6 +660,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             collector: CollectorConfig {
                 enabled: conf.collector_enabled,
                 inactive_server_port_enabled: conf.inactive_server_port_enabled,
+                inactive_ip_enabled: conf.inactive_ip_enabled,
                 vtap_flow_1s_enabled: conf.vtap_flow_1s_enabled,
                 l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold,
                 l7_metrics_enabled: conf.l7_metrics_enabled,
