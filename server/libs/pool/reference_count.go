@@ -17,10 +17,14 @@
 package pool
 
 import (
+	"runtime/debug"
 	"sync/atomic"
+	"time"
 )
 
 type ReferenceCount int32
+
+var lastStackDump int64
 
 func (r *ReferenceCount) Reset() {
 	*r = 1
@@ -35,7 +39,12 @@ func (r *ReferenceCount) SubReferenceCount() bool {
 		return true
 	}
 	if *r != 0 {
-		log.Errorf("reference(%d) maybe double released", *r)
+		now := time.Now().Unix()
+		last := atomic.LoadInt64(&lastStackDump)
+		if now-last > int64(time.Hour/time.Second) {
+			log.Errorf("reference(%d) maybe double released\n%s", *r, string(debug.Stack()))
+			atomic.StoreInt64(&lastStackDump, now)
+		}
 	}
 	return false
 }
