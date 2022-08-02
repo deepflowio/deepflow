@@ -158,8 +158,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"default": NewTag(
 				"dictGet(flow_tag.device_map, 'name', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
 				hostIDSuffix+"!=0",
-				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s)",
-				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s))",
+				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=6)",
+				"toUInt64("+hostIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=6)",
 			),
 			"node_type": NewTag(
 				"'host'",
@@ -169,6 +169,42 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 			"icon_id": NewTag(
 				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(6),toUInt64("+hostIDSuffix+")))",
+				"",
+				"",
+				"",
+			),
+		}
+	}
+
+	// 服务
+	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
+	// service
+	// The following tag definitions generate name and ID for single-ended/double-ended -0-ended/double-ended-1-ended respectively
+	for _, suffix := range []string{"", "_0", "_1"} {
+		serviceIDSuffix := "service_id" + suffix
+		serviceNameSuffix := "service" + suffix
+		tagResourceMap[serviceIDSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"",
+				serviceIDSuffix+"!=0",
+				"",
+				"",
+			)}
+		tagResourceMap[serviceNameSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64("+serviceIDSuffix+")))",
+				serviceIDSuffix+"!=0",
+				"toUInt64("+serviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE name %s %s AND devicetype=11)",
+				"toUInt64("+serviceIDSuffix+") IN (SELECT deviceid FROM flow_tag.device_map WHERE %s(name,%s) AND devicetype=11)",
+			),
+			"node_type": NewTag(
+				"'service'",
+				"",
+				"",
+				"",
+			),
+			"icon_id": NewTag(
+				"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(11),toUInt64("+serviceIDSuffix+")))",
 				"",
 				"",
 				"",
