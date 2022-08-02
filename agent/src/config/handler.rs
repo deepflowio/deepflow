@@ -41,7 +41,6 @@ use crate::{
     ebpf::CAP_LEN_MAX,
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
-    integration_collector::check_listen_port_alive,
     proto::trident::{self, CaptureSocketType},
     proto::{
         common::TridentType,
@@ -909,6 +908,7 @@ impl ConfigHandler {
         &mut self,
         new_config: RuntimeConfig,
         exception_handler: &ExceptionHandler,
+        mut components: Option<&mut Components>,
     ) -> Vec<fn(&ConfigHandler, &mut Components)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &mut self.static_config;
@@ -1456,56 +1456,27 @@ impl ConfigHandler {
 
         if candidate_config.metric_server != new_config.metric_server {
             if candidate_config.metric_server.enabled != new_config.metric_server.enabled {
-                fn metric_server_enabled_callback(
-                    handler: &ConfigHandler,
-                    components: &mut Components,
-                ) {
-                    if handler.candidate_config.metric_server.enabled {
-                        components.external_metrics_server.start();
+                if let Some(c) = components.as_mut() {
+                    if new_config.metric_server.enabled {
+                        c.external_metrics_server.start();
                     } else {
-                        components.external_metrics_server.stop();
+                        c.external_metrics_server.stop();
                     }
                 }
-                callbacks.push(metric_server_enabled_callback);
             }
 
             // 当端口更新后，在enabled情况下需要重启服务器重新监听
             if candidate_config.metric_server.port != new_config.metric_server.port {
-                fn metric_server_port_callback(
-                    handler: &ConfigHandler,
-                    components: &mut Components,
-                ) {
-                    if handler.candidate_config.metric_server.enabled {
-                        components.external_metrics_server.stop();
-                        components.external_metrics_server.start();
-                    }
+                if let Some(c) = components.as_mut() {
+                    c.external_metrics_server
+                        .set_port(new_config.metric_server.port);
                 }
-                callbacks.push(metric_server_port_callback);
             }
             info!(
                 "integration collector config change from {:#?} to {:#?}",
                 candidate_config.metric_server, new_config.metric_server
             );
             candidate_config.metric_server = new_config.metric_server;
-        }
-
-        //FIXME: 现在integration collector 在K8S环境下，会概率性出现监听端口一段时间后会失去监听。所以先探测下发的端口是否监听，
-        // 没监听的话重启collector再监听。等找到根因后再去掉下面的代码
-        // =============================================
-        //FIXME: Now, in the K8S environment, the integration collector will probabilistically appear on the listening port and
-        // lose monitoring after a period of time. So first detect whether the issued port is listening,
-        // If not listening, restart the collector and listen again. After finding the root cause, remove the following code
-        let port = candidate_config.metric_server.port;
-        if candidate_config.metric_server.enabled && !check_listen_port_alive(port) {
-            fn metric_server_restart_callback(_: &ConfigHandler, components: &mut Components) {
-                components.external_metrics_server.stop();
-                components.external_metrics_server.start();
-            }
-            callbacks.push(metric_server_restart_callback);
-            warn!(
-                "the port=({}) listen by the integration collector lost, restart the collector",
-                candidate_config.metric_server.port
-            );
         }
 
         if restart_dispatcher && candidate_config.dispatcher.enabled {

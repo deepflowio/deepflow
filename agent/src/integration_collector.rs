@@ -16,12 +16,11 @@
 
 use std::io::Read;
 use std::net::{IpAddr, Ipv6Addr, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
-use arc_swap::access::Access;
 use flate2::read::GzDecoder;
 use http::header::CONTENT_ENCODING;
 use http::HeaderMap;
@@ -31,10 +30,14 @@ use hyper::{
     Body, Method, Request, Response, Server, StatusCode,
 };
 use log::{error, info, warn};
-use tokio::runtime::{Builder, Runtime};
-use tokio::task::JoinHandle;
+use tokio::{
+    runtime::{Builder, Runtime},
+    select,
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+    time,
+};
 
-use crate::config::handler::MetricServerAccess;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::Exception;
 use crate::sender::SendItem;
@@ -209,8 +212,9 @@ pub struct MetricServer {
     otel_sender: DebugSender<SendItem>,
     prometheus_sender: DebugSender<SendItem>,
     telegraf_sender: DebugSender<SendItem>,
-    conf: MetricServerAccess,
+    port: Arc<AtomicU16>,
     exception_handler: ExceptionHandler,
+    server_shutdown_tx: Mutex<Option<mpsc::Sender<()>>>,
 }
 
 impl MetricServer {
@@ -218,7 +222,7 @@ impl MetricServer {
         otel_sender: DebugSender<SendItem>,
         prometheus_sender: DebugSender<SendItem>,
         telegraf_sender: DebugSender<SendItem>,
-        conf: MetricServerAccess,
+        port: u16,
         exception_handler: ExceptionHandler,
     ) -> Self {
         Self {
@@ -232,82 +236,115 @@ impl MetricServer {
             otel_sender,
             prometheus_sender,
             telegraf_sender,
-            conf,
+            port: Arc::new(AtomicU16::new(port)),
             exception_handler,
+            server_shutdown_tx: Default::default(),
+        }
+    }
+
+    pub fn set_port(&self, port: u16) {
+        if self.port.swap(port, Ordering::Release) != port {
+            // port changes, resets server
+            info!("port changes to {}", port);
+            if let Some(tx) = self.server_shutdown_tx.lock().unwrap().as_ref() {
+                let _ = self.rt.block_on(tx.send(()));
+            }
         }
     }
 
     pub fn start(&self) {
-        if !self.conf.load().enabled {
-            return;
-        }
-
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
 
-        let addr = (IpAddr::from(Ipv6Addr::UNSPECIFIED), self.conf.load().port).into();
         let otel_sender = self.otel_sender.clone();
         let prometheus_sender = self.prometheus_sender.clone();
         let telegraf_sender = self.telegraf_sender.clone();
+        let port = self.port.clone();
+        let monitor_port = Arc::new(AtomicU16::new(port.load(Ordering::Acquire)));
+        let (mon_tx, mon_rx) = oneshot::channel();
         let exception_handler = self.exception_handler.clone();
+        let running = self.running.clone();
+        let (tx, mut rx) = mpsc::channel(8);
+        self.rt
+            .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
+        self.server_shutdown_tx.lock().unwrap().replace(tx);
 
         self.thread
             .lock()
             .unwrap()
             .replace(self.rt.spawn(async move {
                 info!("integration collector starting");
-                let mut max_tries = 0;
-                let server_builder = loop {
-                    match Server::try_bind(&addr) {
-                        Ok(s) => break s,
-                        Err(e) => {
-                            // 因为有场景是停止server之后立刻开启server，Server::stop采用丢弃线程的方法会直接返回，而操作系统回收监听端口资源需要时间，
-                            // 为了没有spurious error log，需要睡眠一会等待操作系统完成回收资源。
-                            // =================================================================================================
-                            // Because there is a scenario where the server is started immediately after the server is stopped, Server::stop will return directly
-                            // by discarding the thread, and it takes time for the operating system to recycle the listening port resources.
-                            // In order to have no spurious error log, you need to sleep for a while and wait for the operating system to finish recycling resources.
-                            if max_tries < 2 {
-                                max_tries += 1;
-                                sleep(Duration::from_secs(1));
+
+                while running.load(Ordering::Relaxed) {
+                    let mut max_tries = 0;
+                    let (server_builder, addr) = loop {
+                        if !running.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        while let Ok(_) = rx.try_recv() {} // drain useless messages
+                        let port = port.load(Ordering::Acquire);
+                        let addr = (IpAddr::from(Ipv6Addr::UNSPECIFIED), port).into();
+                        match Server::try_bind(&addr) {
+                            Ok(s) => {
+                                monitor_port.store(port, Ordering::Release);
+                                break (s, addr);
+                            }
+                            Err(e) => {
+                                // 因为有场景是停止server之后立刻开启server，Server::stop采用丢弃线程的方法会直接返回，而操作系统回收监听端口资源需要时间，
+                                // 为了没有spurious error log，需要睡眠一会等待操作系统完成回收资源。
+                                // =================================================================================================
+                                // Because there is a scenario where the server is started immediately after the server is stopped, Server::stop will return directly
+                                // by discarding the thread, and it takes time for the operating system to recycle the listening port resources.
+                                // In order to have no spurious error log, you need to sleep for a while and wait for the operating system to finish recycling resources.
+                                if max_tries < 2 {
+                                    max_tries += 1;
+                                    sleep(Duration::from_secs(1));
+                                    continue;
+                                }
+                                error!("integration collector error: {} with addr={}", e, addr);
+                                exception_handler.set(Exception::IntegrationSocketError);
+                                sleep(Duration::from_secs(60));
                                 continue;
                             }
-                            error!("integration collector error: {} with addr={}", e, addr);
-                            exception_handler.set(Exception::IntegrationSocketError);
-                            sleep(Duration::from_secs(60));
-                            continue;
                         }
-                    }
-                };
+                    };
 
-                let exception_handler_clone = exception_handler.clone();
-                let service = make_service_fn(move |_| {
                     let otel_sender = otel_sender.clone();
                     let prometheus_sender = prometheus_sender.clone();
                     let telegraf_sender = telegraf_sender.clone();
-                    let exception_handler = exception_handler_clone.clone();
-                    async {
-                        Ok::<_, GenericError>(service_fn(move |req| {
-                            handler(
-                                req,
-                                otel_sender.clone(),
-                                prometheus_sender.clone(),
-                                telegraf_sender.clone(),
-                                exception_handler.clone(),
-                            )
-                        }))
+                    let exception_handler_inner = exception_handler.clone();
+                    let service = make_service_fn(move |_| {
+                        let otel_sender = otel_sender.clone();
+                        let prometheus_sender = prometheus_sender.clone();
+                        let telegraf_sender = telegraf_sender.clone();
+                        let exception_handler = exception_handler_inner.clone();
+                        async {
+                            Ok::<_, GenericError>(service_fn(move |req| {
+                                handler(
+                                    req,
+                                    otel_sender.clone(),
+                                    prometheus_sender.clone(),
+                                    telegraf_sender.clone(),
+                                    exception_handler.clone(),
+                                )
+                            }))
+                        }
+                    });
+
+                    let server = server_builder.serve(service).with_graceful_shutdown(async {
+                        let _ = rx.recv().await;
+                    });
+
+                    info!("integration collector started");
+                    info!("integration collector listening on http://{}", addr);
+                    if let Err(e) = server.await {
+                        error!("external metric collector error: {}", e);
+                        exception_handler.set(Exception::IntegrationSocketError);
                     }
-                });
-
-                let server = server_builder.serve(service);
-
-                info!("integration collector started");
-                info!("integration collector listening on http://{}", addr);
-                if let Err(e) = server.await {
-                    error!("external metric collector error: {}", e);
-                    exception_handler.set(Exception::IntegrationSocketError);
                 }
+
+                let _ = mon_tx.send(());
             }));
     }
 
@@ -316,14 +353,43 @@ impl MetricServer {
             return;
         }
 
+        if let Some(tx) = self.server_shutdown_tx.lock().unwrap().take() {
+            let _ = self.rt.block_on(tx.send(()));
+        }
+
         if let Some(t) = self.thread.lock().unwrap().take() {
             t.abort();
         }
 
         info!("integration collector stopped");
     }
-}
 
-pub fn check_listen_port_alive(port: u16) -> bool {
-    TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok()
+    //FIXME: 现在integration collector 在K8S环境下，会概率性出现监听端口一段时间后会失去监听。所以先探测下发的端口是否监听，
+    // 没监听的话重启collector再监听。等找到根因后再去掉下面的代码
+    // =============================================
+    //FIXME: Now, in the K8S environment, the integration collector will probabilistically appear on the listening port and
+    // lose monitoring after a period of time. So first detect whether the issued port is listening,
+    // If not listening, restart the collector and listen again. After finding the root cause, remove the following code
+    async fn alive_check(
+        port: Arc<AtomicU16>,
+        server_shutdown_tx: mpsc::Sender<()>,
+        mut mon_rx: oneshot::Receiver<()>,
+    ) {
+        let mut ticker = time::interval(Duration::from_secs(60));
+        loop {
+            select! {
+                _ = ticker.tick() => {
+                    let p = port.load(Ordering::Relaxed);
+                    if let Err(_) = TcpStream::connect(format!("127.0.0.1:{}", p)) {
+                        warn!(
+                            "the port=({}) listen by the integration collector lost, restart the collector",
+                            p
+                        );
+                        let _ = server_shutdown_tx.send(()).await;
+                    }
+                },
+                _ = &mut mon_rx => return,
+            }
+        }
+    }
 }
