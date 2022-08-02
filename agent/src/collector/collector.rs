@@ -395,7 +395,8 @@ impl Stash {
         }
         let flow = &acc_flow.tagged_flow.flow;
 
-        if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 {
+        let inactive_ip_enabeld = self.context.config.load().inactive_ip_enabled;
+        if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 && !inactive_ip_enabeld {
             self.counter.drop_inactive.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -408,8 +409,13 @@ impl Stash {
         );
         let directions = [src, dst];
 
-        self.fill_stats(&acc_flow, directions, false);
-        self.fill_tracing_stats(&acc_flow, directions, is_extra_tracing_doc);
+        self.fill_stats(&acc_flow, directions, false, inactive_ip_enabeld);
+        self.fill_tracing_stats(
+            &acc_flow,
+            directions,
+            is_extra_tracing_doc,
+            inactive_ip_enabeld,
+        );
     }
 
     fn fill_stats(
@@ -417,6 +423,7 @@ impl Stash {
         acc_flow: &AccumulatedFlow,
         directions: [Direction; 2],
         is_extra_tracing_doc: bool,
+        inactive_ip_enabeld: bool,
     ) {
         for ep in 0..2 {
             // 不统计未知direction的数据
@@ -429,21 +436,33 @@ impl Stash {
                 acc_flow.is_active_host1
             };
             // 单端统计量：不统计非活跃的一端（Internet/不回包的内网IP）；不统计链路追踪额外增加的doc
-            if is_active_host && !is_extra_tracing_doc {
+            if (inactive_ip_enabeld || is_active_host) && !is_extra_tracing_doc {
                 if ep == FLOW_METRICS_PEER_DST {
                     let reversed_meter = acc_flow.flow_meter.to_reversed();
-                    self.fill_single_stats(acc_flow, reversed_meter, ep, directions[ep]);
+                    self.fill_single_stats(
+                        acc_flow,
+                        reversed_meter,
+                        ep,
+                        directions[ep],
+                        inactive_ip_enabeld,
+                    );
                 } else {
                     self.fill_single_stats(
                         acc_flow,
                         acc_flow.flow_meter.clone(),
                         ep,
                         directions[ep],
+                        inactive_ip_enabeld,
                     );
                 }
             }
             // 双端统计量：若某端direction已知，则以该direction（对应的tap-side）记录统计数据，最多记录两次
-            self.fill_edge_stats(acc_flow, directions[ep], is_extra_tracing_doc);
+            self.fill_edge_stats(
+                acc_flow,
+                directions[ep],
+                is_extra_tracing_doc,
+                inactive_ip_enabeld,
+            );
         }
         let flow = &acc_flow.tagged_flow.flow;
         // 双端统计量：若双端direction都未知，则以direction=0（对应tap-side=rest）记录一次统计数据
@@ -451,7 +470,12 @@ impl Stash {
             && directions[0] == Direction::None
             && directions[1] == Direction::None
         {
-            self.fill_edge_stats(acc_flow, Direction::None, is_extra_tracing_doc);
+            self.fill_edge_stats(
+                acc_flow,
+                Direction::None,
+                is_extra_tracing_doc,
+                inactive_ip_enabeld,
+            );
         }
     }
 
@@ -474,6 +498,7 @@ impl Stash {
         flow_meter: FlowMeter,
         ep: usize,
         direction: Direction,
+        inactive_ip_enabeld: bool,
     ) {
         let flow = &acc_flow.tagged_flow.flow;
         let flow_key = &flow.flow_key;
@@ -486,7 +511,7 @@ impl Stash {
         let has_mac = side.is_vip_interface || direction == Direction::LocalToLocal;
         let is_ipv6 = flow.eth_type == EthernetType::Ipv6;
 
-        let ip = if !is_active_host {
+        let ip = if !is_active_host && !inactive_ip_enabeld {
             if is_ipv6 {
                 Ipv6Addr::UNSPECIFIED.into()
             } else {
@@ -564,6 +589,7 @@ impl Stash {
         acc_flow: &AccumulatedFlow,
         direction: Direction,
         is_extra_tracing_doc: bool,
+        inactive_ip_enabeld: bool,
     ) {
         let flow = &acc_flow.tagged_flow.flow;
         let flow_key = &flow.flow_key;
@@ -583,20 +609,23 @@ impl Stash {
                 }
             }
             // 本端IP为云外Internet地址或不活跃时置为0
-            if !acc_flow.is_active_host0 {
-                src_ip = if is_ipv6 {
-                    Ipv6Addr::UNSPECIFIED.into()
-                } else {
-                    Ipv4Addr::UNSPECIFIED.into()
-                };
+            if !inactive_ip_enabeld {
+                if !acc_flow.is_active_host0 {
+                    src_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
+                if !acc_flow.is_active_host1 {
+                    dst_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
             }
-            if !acc_flow.is_active_host1 {
-                dst_ip = if is_ipv6 {
-                    Ipv6Addr::UNSPECIFIED.into()
-                } else {
-                    Ipv4Addr::UNSPECIFIED.into()
-                };
-            }
+
             (src_ip, dst_ip)
         };
 
@@ -681,6 +710,7 @@ impl Stash {
         acc_flow: &AccumulatedFlow,
         directions: [Direction; 2],
         is_extra_tracing_doc: bool,
+        inactive_ip_enabeld: bool,
     ) {
         // 目前有两种场景需要增加追踪数据：
         // VIP场景：
@@ -691,7 +721,7 @@ impl Stash {
         {
             return;
         }
-        self.fill_stats(acc_flow, directions, true)
+        self.fill_stats(acc_flow, directions, true, inactive_ip_enabeld)
     }
 
     fn add(&mut self, key: StashKey, tagger: Tagger, meter: Meter) {
