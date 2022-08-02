@@ -38,6 +38,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/deepflowys/deepflow/server/ingester/ckissu"
+	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/config"
 	dropletcfg "github.com/deepflowys/deepflow/server/ingester/droplet/config"
 	"github.com/deepflowys/deepflow/server/ingester/droplet/droplet"
@@ -90,13 +91,16 @@ func Start(configPath string) []io.Closer {
 			"pool_size_per_cpu":   strconv.Itoa(int(counter.PoolSizePerCPU)),
 			"init_full_pool_size": strconv.Itoa(int(counter.InitFullPoolSize)),
 		}
-		stats.RegisterCountable("pool", counter, tags)
+		common.RegisterCountableForIngester("pool", counter, tags)
 	})
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(10 * time.Second)
+	stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD)
 	if cfg.InfluxdbWriterEnabled {
+		stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD | stats.REMOTE_TYPE_INFLUXDB)
 		stats.SetRemotes(net.JoinHostPort(cfg.Influxdb.Host, cfg.Influxdb.Port))
 	}
+	stats.SetDFRemote(net.JoinHostPort("127.0.0.1", strconv.Itoa(datatype.DROPLET_PORT)))
 
 	dropletConfig := dropletcfg.Load(configPath)
 	bytes, _ = yaml.Marshal(dropletConfig)

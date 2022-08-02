@@ -158,7 +158,8 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 	dataQueues := queue.NewOverwriteQueues(
 		name, queue.HashKey(queueCount), queueSize,
 		queue.OptionFlushIndicator(time.Second),
-		queue.OptionRelease(func(p interface{}) { p.(CKItem).Release() }))
+		queue.OptionRelease(func(p interface{}) { p.(CKItem).Release() }),
+		common.QUEUE_STATS_MOUDLE_INGESTER)
 
 	return &CKWriter{
 		primaryAddr:   primaryAddr,
@@ -203,7 +204,7 @@ func (w *CKWriter) Put(items ...interface{}) {
 }
 
 func (w *CKWriter) queueProcess(queueID int) {
-	common.RegisterCountableForIngester("ckwriter_"+w.counterName, &(w.counters[queueID]), stats.OptionStatTags{"thread": strconv.Itoa(queueID), "table": w.name})
+	common.RegisterCountableForIngester("ckwriter", &(w.counters[queueID]), stats.OptionStatTags{"thread": strconv.Itoa(queueID), "table": w.name, "name": w.counterName})
 	defer w.wg.Done()
 	w.wg.Add(1)
 
