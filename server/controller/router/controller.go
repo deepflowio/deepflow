@@ -50,7 +50,7 @@ func getControllers(c *gin.Context) {
 		args["name"] = value
 	}
 	if value, ok := c.GetQuery("analyzer"); ok {
-		args["analyzer_name"] = value
+		args["analyzer_ip"] = value
 	}
 	if value, ok := c.GetQuery("vtap"); ok {
 		args["vtap_name"] = value
