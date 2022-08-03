@@ -40,7 +40,7 @@ controller:
 
   # roze
   roze:
-    port: 20106
+    port: 30106
     timeout: 60
 
   # 规格相关定义
