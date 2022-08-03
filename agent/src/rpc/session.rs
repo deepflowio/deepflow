@@ -244,7 +244,6 @@ impl ServerIp {
 
     fn update_controller_ips(&mut self, controller_ips: Vec<IpAddr>) {
         self.proxied = false;
-        self.proxy_ip = None;
         self.current_ip = controller_ips[0];
         self.controller_ips = controller_ips;
         self.initialized = false;
