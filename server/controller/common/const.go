@@ -24,6 +24,7 @@ const GO_BIRTHDAY = "2006-01-02 15:04:05"
 
 const (
 	REMOTE_API_TIMEOUT = 30
+	ROZE_PORT          = 30106
 )
 
 const (
