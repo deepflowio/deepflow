@@ -184,7 +184,7 @@ func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Contr
 		if analyzer.NATIPEnabled != 0 {
 			analyzerIP = analyzer.NATIP
 		}
-		if CallRozeAPIAddRP(analyzerIP, dataSource, baseDataSource, cfg) != nil {
+		if CallRozeAPIAddRP(analyzerIP, dataSource, baseDataSource, cfg.Roze.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) add data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
@@ -238,7 +238,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 		if analyzer.NATIPEnabled != 0 {
 			analyzerIP = analyzer.NATIP
 		}
-		if CallRozeAPIModRP(analyzerIP, dataSource, cfg) != nil {
+		if CallRozeAPIModRP(analyzerIP, dataSource, cfg.Roze.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) mod data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
@@ -301,7 +301,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 		if analyzer.NATIPEnabled != 0 {
 			analyzerIP = analyzer.NATIP
 		}
-		if CallRozeAPIDelRP(analyzerIP, dataSource, cfg) != nil {
+		if CallRozeAPIDelRP(analyzerIP, dataSource, cfg.Roze.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) del data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
@@ -325,8 +325,8 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	return map[string]string{"LCUUID": lcuuid}, err
 }
 
-func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, cfg *config.ControllerConfig) error {
-	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), cfg.Roze.Port)
+func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, rozePort int) error {
+	url := fmt.Sprintf("http://%s:%d/v1/rpadd/", common.GetCURLIP(ip), rozePort)
 	body := map[string]interface{}{
 		"name":                  dataSource.Name,
 		"db":                    "vtap_" + dataSource.TsdbType,
@@ -342,8 +342,8 @@ func CallRozeAPIAddRP(ip string, dataSource, baseDataSource mysql.DataSource, cf
 	return err
 }
 
-func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, cfg *config.ControllerConfig) error {
-	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), cfg.Roze.Port)
+func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, rozePort int) error {
+	url := fmt.Sprintf("http://%s:%d/v1/rpmod/", common.GetCURLIP(ip), rozePort)
 	db := "vtap_" + dataSource.TsdbType
 	switch dataSource.TsdbType {
 	case common.DATA_SOURCE_L4_LOG, common.DATA_SOURCE_L7_LOG:
@@ -360,8 +360,8 @@ func CallRozeAPIModRP(ip string, dataSource mysql.DataSource, cfg *config.Contro
 	return err
 }
 
-func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, cfg *config.ControllerConfig) error {
-	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), cfg.Roze.Port)
+func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, rozePort int) error {
+	url := fmt.Sprintf("http://%s:%d/v1/rpdel/", common.GetCURLIP(ip), rozePort)
 	body := map[string]interface{}{
 		"name": dataSource.Name,
 		"db":   "vtap_" + dataSource.TsdbType,
@@ -369,5 +369,54 @@ func CallRozeAPIDelRP(ip string, dataSource mysql.DataSource, cfg *config.Contro
 	log.Debug(url)
 	log.Debug(body)
 	_, err := common.CURLPerform("DELETE", url, body)
+	return err
+}
+
+func ConfigAnalyzerDataSource(ip string) error {
+	var dataSources []mysql.DataSource
+	var err error
+
+	mysql.Db.Find(&dataSources)
+	idToDataSource := make(map[int]mysql.DataSource)
+	for _, dataSource := range dataSources {
+		idToDataSource[dataSource.ID] = dataSource
+	}
+
+	for _, dataSource := range dataSources {
+		// default data_source modify retention policy
+		// custom data_source add retention policy
+		sort.Strings(DEFAULT_DATA_SOURCE_NAMES)
+		index := sort.SearchStrings(DEFAULT_DATA_SOURCE_NAMES, dataSource.Name)
+		if index < len(DEFAULT_DATA_SOURCE_NAMES) && DEFAULT_DATA_SOURCE_NAMES[index] == dataSource.Name {
+			if CallRozeAPIModRP(ip, dataSource, common.ROZE_PORT) != nil {
+				errMsg := fmt.Sprintf(
+					"config analyzer (%s) mod data_source (%s) failed", ip, dataSource.Name,
+				)
+				log.Error(errMsg)
+				err = NewError(common.SERVER_ERROR, errMsg)
+				continue
+			}
+		} else {
+			baseDataSource, ok := idToDataSource[dataSource.BaseDataSourceID]
+			if !ok {
+				errMsg := fmt.Sprintf("base data_source (%d) not exist", dataSource.BaseDataSourceID)
+				log.Error(errMsg)
+				err = NewError(common.SERVER_ERROR, errMsg)
+				continue
+			}
+			if CallRozeAPIAddRP(ip, dataSource, baseDataSource, common.ROZE_PORT) != nil {
+				errMsg := fmt.Sprintf(
+					"config analyzer (%s) add data_source (%s) failed", ip, dataSource.Name,
+				)
+				log.Error(errMsg)
+				err = NewError(common.SERVER_ERROR, errMsg)
+				continue
+			}
+		}
+		log.Infof(
+			"config analyzer (%s) mod data_source (%s) complete", ip, dataSource.Name,
+		)
+	}
+
 	return err
 }
