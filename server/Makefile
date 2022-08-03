@@ -73,6 +73,10 @@ test: vendor $(proto) $(generated_libs)
 server: vendor $(proto) $(generated_libs)
 	go build -mod vendor ${FLAGS} -o bin/deepflow-server${BINARY_SUFFIX} cmd/server/main.go
 
+.PHONY: querier
+querier: vendor $(proto) $(generated_libs)
+	go build -mod vendor ${FLAGS} -o bin/querier${BINARY_SUFFIX} querier/cmd/querier/main.go
+
 .PHONY: clean
 clean:
 	touch vendor
