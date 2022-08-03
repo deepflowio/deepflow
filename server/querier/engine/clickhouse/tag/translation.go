@@ -386,7 +386,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 				"",
 			),
 			"icon_id": NewTag(
-				"if("+l3EPCIDSuffix+"=-2,dictGet(flow_tag.device_map, 'icon_id', (toUInt64(0),toUInt64(0))),0)",
+				"if("+l3EPCIDSuffix+"=-2,dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999))),0)",
 				"",
 				"",
 				"",

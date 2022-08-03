@@ -372,7 +372,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			hasFalse := false
 			newOP := ""
 			for _, valueStr := range internetSlice {
-				if valueStr == "1" {
+				if valueStr == "1" || valueStr == "'1'" {
 					hasTrue = true
 				} else {
 					hasFalse = true
