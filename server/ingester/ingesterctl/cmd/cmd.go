@@ -37,7 +37,8 @@ import (
 )
 
 func RegisterIngesterCommand(root *cobra.Command) {
-	debug.SetIpAndPort(ingesterctl.DEBUG_LISTEN_IP, ingesterctl.DEBUG_LISTEN_PORT)
+	ip, _ := root.Flags().GetString("ip")
+	debug.SetIpAndPort(ip, ingesterctl.DEBUG_LISTEN_PORT)
 	ingesterCmd := &cobra.Command{
 		Use:   "ingester",
 		Short: "ingester debug commands",
