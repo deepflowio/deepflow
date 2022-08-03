@@ -435,6 +435,9 @@ impl Synchronizer {
         let mut running_config = self.running_config.write();
         running_config.ctrl_ip = ctrl_ip;
         running_config.ctrl_mac = ctrl_mac;
+
+        self.status.write().proxy_ip = None;
+        self.status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
     }
 
     pub fn add_flow_acl_listener(&mut self, module: Box<dyn FlowAclListener>) {
@@ -622,7 +625,11 @@ impl Synchronizer {
         let (_, macs) = Self::parse_segment(yaml_config.tap_mode, &resp);
 
         let mut status = status.write();
-        status.proxy_ip = runtime_config.proxy_controller_ip.parse().ok();
+        status.proxy_ip = if runtime_config.proxy_controller_ip.len() > 0 {
+            runtime_config.proxy_controller_ip.parse().ok()
+        } else {
+            static_config.controller_ip.parse().ok()
+        };
         status.proxy_port = runtime_config.proxy_controller_port;
         status.sync_interval = runtime_config.sync_interval;
         status.ntp_enabled = runtime_config.ntp_enabled;
