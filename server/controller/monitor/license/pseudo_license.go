@@ -32,8 +32,8 @@ var log = logging.MustGetLogger("monitor.license")
 
 var VTAP_LICENSE_TYPE_DEFAULT = common.VTAP_LICENSE_TYPE_C
 var VTAP_LICENSE_FUNCTIONS = []string{
-	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING),
 	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_NETWORK_MONITORING),
+	strconv.Itoa(common.VTAP_LICENSE_FUNCTION_APPLICATION_MONITORING),
 }
 
 type VTapLicenseAllocation struct {

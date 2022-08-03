@@ -28,6 +28,7 @@ import (
 
 	"github.com/deepflowys/deepflow/message/trident"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/service"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
@@ -339,6 +340,10 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 			Lcuuid:     uuid.NewString(),
 		}
 		err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).Insert(azConn)
+		if err != nil {
+			log.Error(err)
+		}
+		err = service.ConfigAnalyzerDataSource(tsdb.IP)
 		if err != nil {
 			log.Error(err)
 		}
