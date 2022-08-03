@@ -18,7 +18,6 @@ package clickhouse
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
@@ -52,9 +51,6 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 				return &view.Expr{}, false
 			}
 			filter := tagItem.NotNullFilter
-			if strings.HasPrefix(preAsTag, "`metrics.") {
-				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
-			}
 			if filter == "" {
 				return &view.Expr{}, false
 			}
@@ -67,9 +63,6 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 		return &view.Expr{}, false
 	}
 	filter := tagItem.NotNullFilter
-	if strings.HasPrefix(name, "`metrics.") {
-		filter = fmt.Sprintf(tagItem.NotNullFilter, name)
-	}
 	return &view.Expr{Value: "(" + filter + ")"}, true
 }
 
@@ -118,7 +111,7 @@ func (g *GroupTag) Format(m *view.Model) {
 		}
 		// internet增加epc分组
 		internetSuffix := "is_internet" + suffix
-		epcSuffix := "l3_epc" + suffix
+		epcSuffix := "l3_epc_id" + suffix
 		if g.Alias == internetSuffix {
 			m.AddGroup(&view.Group{Value: epcSuffix})
 		}

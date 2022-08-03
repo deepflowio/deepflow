@@ -18,7 +18,7 @@ DeepFlow 是[云杉网络](https://yunshan.net)开源的一款**高度自动化*
 
 # 文档
 
-详细信息请访问[文档站点](https://deepflow.yunshan.net/deepflow-docs/zh/)。
+详细信息请访问[文档站点](https://deepflow.yunshan.net/docs/zh/?from=github)。
 
 # 快速上手
 
@@ -31,9 +31,9 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 ## 部署 DeepFlow Community
 
-请参考[文档](https://deepflow.yunshan.net/deepflow-docs/zh/install/all-in-one/)部署 DeepFlow Community。
+请参考[文档](https://deepflow.yunshan.net/docs/zh/install/all-in-one/?from=github)部署 DeepFlow Community。
 
-同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
+同时我们也搭建了一个完整的 [DeepFlow Community Demo](https://ce-demo.deepflow.yunshan.net/?from=github)，欢迎体验。登录账号 / 密码：deepflow / deepflow。
 
 ## 体验 DeepFlow Cloud
 
@@ -51,7 +51,13 @@ DeepFlow Community 主要由 Agent 和 Server 两个进程组成。每个 K8s �
 
 # 里程碑
 
-这里有我们[未来的 Feature 规划](https://github.com/deepflowys/docs/blob/main/zh/01-about/04-milestone.md)。欢迎 Issue 和 Pull Request。
+这里有我们[未来的 Feature 规划](https://deepflow.yunshan.net/docs/zh/about/milestone/?from=github)。欢迎 Issue 和 Pull Request。
+
+# 加入技术交流群
+
+DeepFlow 官方社群对外开放，欢迎加入讨论：
+
+<img src=./docs/wechat-group-keeper.png width=30% />
 
 # 致谢
 

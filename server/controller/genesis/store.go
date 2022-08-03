@@ -132,25 +132,15 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 }
 
 func (s *SyncStorage) fetch() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	var storages []model.GenesisStorage
-	mysql.Db.Where("node_ip = ?", os.Getenv(common.NODE_IP_KEY)).Find(&storages)
-	vtapIDs := []uint32{}
-	for _, v := range storages {
-		vtapIDs = append(vtapIDs, v.VtapID)
-	}
-
 	s.channel <- GenesisSyncData{
-		VMs:         s.genesisSyncInfo.VMs.Fetch(vtapIDs...),
-		VPCs:        s.genesisSyncInfo.VPCs.Fetch(vtapIDs...),
-		Hosts:       s.genesisSyncInfo.Hosts.Fetch(vtapIDs...),
-		Ports:       s.genesisSyncInfo.Ports.Fetch(vtapIDs...),
-		Lldps:       s.genesisSyncInfo.Lldps.Fetch(vtapIDs...),
-		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(vtapIDs...),
-		Networks:    s.genesisSyncInfo.Networks.Fetch(vtapIDs...),
-		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(vtapIDs...),
+		VMs:         s.genesisSyncInfo.VMs.Fetch(),
+		VPCs:        s.genesisSyncInfo.VPCs.Fetch(),
+		Hosts:       s.genesisSyncInfo.Hosts.Fetch(),
+		Ports:       s.genesisSyncInfo.Ports.Fetch(),
+		Lldps:       s.genesisSyncInfo.Lldps.Fetch(),
+		IPLastSeens: s.genesisSyncInfo.IPlastseens.Fetch(),
+		Networks:    s.genesisSyncInfo.Networks.Fetch(),
+		Vinterfaces: s.genesisSyncInfo.Vinterfaces.Fetch(),
 	}
 }
 

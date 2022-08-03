@@ -199,7 +199,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
-		if key.DB != db || (key.Table != table && db != "ext_metrics") {
+		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system") {
 			continue
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
@@ -221,7 +221,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		DB:       "flow_tag",
 	}
 	sql := "SELECT key FROM k8s_label_map GROUP BY key"
-	rst, err := chClient.DoQuery(sql, nil, "")
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 				labelKey, labelKey, labelKey, labelKey, "label",
 				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
 			})
-		} else {
+		} else if db != "deepflow_system" {
 			response["values"] = append(response["values"], []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
 				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
@@ -243,7 +243,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	}
 
 	// 查询外部字段
-	if (db != "ext_metrics" && db != "flow_log") || (db == "flow_log" && table != "l7_flow_log") {
+	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system") || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -251,21 +251,25 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
-		DB:       db,
+		DB:       "flow_tag",
+	}
+	var whereSql string
+	if strings.Contains(rawSql, "WHERE") {
+		whereSql = strings.Split(rawSql, "WHERE")[1]
 	}
 	externalSql := ""
-	if db == "ext_metrics" {
-		externalSql = fmt.Sprintf("SELECT arrayJoin(tag_names) AS tag_name FROM (SELECT tag_names FROM %s) GROUP BY tag_name", table)
+	if whereSql != "" {
+		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM %s_custom_field WHERE table='%s' AND field_type='tag' AND (%s) GROUP BY tag_name ORDER BY tag_name ASC", db, table, whereSql)
 	} else {
-		externalSql = fmt.Sprintf("SELECT arrayJoin(attribute_names) AS attribute_name FROM (SELECT attribute_names FROM %s) GROUP BY attribute_name", table)
+		externalSql = fmt.Sprintf("SELECT field_name AS tag_name FROM %s_custom_field WHERE table='%s' AND field_type='tag' GROUP BY tag_name ORDER BY tag_name ASC", db, table)
 	}
-	externalRst, err := externalChClient.DoQuery(externalSql, nil, "")
+	externalRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalSql})
 	if err != nil {
 		return nil, err
 	}
 	for _, _tagName := range externalRst["values"] {
 		tagName := _tagName.([]interface{})[0]
-		if db == "ext_metrics" {
+		if db == "ext_metrics" || db == "deepflow_system" {
 			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
@@ -279,7 +283,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 			})
 		}
 	}
-	if db == "ext_metrics" {
+	if db == "ext_metrics" || db == "deepflow_system" {
 		response["values"] = append(response["values"], []interface{}{
 			"tags", "tags", "tags", "tags", "map",
 			"原始Tag", []string{}, []bool{true, true, true}, "tags",
@@ -360,7 +364,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				resourceName := resourceKey + "_name"
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql)
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(sql, nil, "")
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 				if err != nil {
 					return nil, err
 				}
@@ -383,7 +387,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				}
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql)
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(sql, nil, "")
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 				if err != nil {
 					return nil, err
 				}
@@ -402,16 +406,13 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			dictTag = fmt.Sprintf("dictGet(flow_tag.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(AutoMap[tag]))
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, dictTag, whereSql)
 
-		case "vpc":
+		case "vpc", "l2_vpc":
 			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(flow_tag.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", whereSql)
 
-		case "router", "host", "dhcpgw", "pod_service", "ip", "l2_vpc", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
+		case "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
-			if tag == "l2_vpc" {
-				resourceId = "vpc_id"
-				resourceName = "vpc_name"
-			} else if tag == "ip" {
+			if tag == "ip" {
 				resourceId = "ip"
 				resourceName = "ip"
 			}
@@ -432,7 +433,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			}
 		}
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(sql, nil, "")
+		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 		if err != nil {
 			return nil, err
 		}
@@ -460,7 +461,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map WHERE devicetype in (%s)",
 				strings.Join(autoDeviceTypes, ","),
 			)
-		} else if tag == "vpc" {
+		} else if tag == "vpc" || tag == "l2_vpc" {
 			sql = "SELECT id as value,name AS display_name,uid FROM l3_epc_map"
 		} else if tag == "ip" {
 			sql = "SELECT ip as value,ip AS display_name FROM ip_relation_map"
@@ -480,7 +481,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
 		}
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(sql, nil, "")
+		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 		if err != nil {
 			return nil, err
 		}
@@ -494,7 +495,7 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
-		DB:       db,
+		DB:       "flow_tag",
 	}
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
@@ -506,22 +507,14 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 		whereSql = strings.Split(rawSql, "WHERE")[1]
 	}
 	var sql string
-	if db == "ext_metrics" {
-		if whereSql != "" {
-			sql = fmt.Sprintf("SELECT tag_values[indexOf(tag_names,'%s')] AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", tag, table, whereSql)
-		} else {
-			sql = fmt.Sprintf("SELECT tag_values[indexOf(tag_names,'%s')] AS value, value AS display_name FROM %s GROUP BY value, display_name ORDER BY value ASC", tag, table)
-		}
+	if whereSql != "" {
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE table='%s' AND field_type='tag' AND field_name='%s' AND (%s) GROUP BY value, display_name ORDER BY sum(count) DESC limit 10000", db, table, tag, whereSql)
 	} else {
-		if whereSql != "" {
-			sql = fmt.Sprintf("SELECT attribute_values[indexOf(attribute_names,'%s')] AS value, value AS display_name FROM %s WHERE %s GROUP BY value, display_name ORDER BY value ASC", tag, table, whereSql)
-		} else {
-			sql = fmt.Sprintf("SELECT attribute_values[indexOf(attribute_names,'%s')] AS value, value AS display_name FROM %s GROUP BY value, display_name ORDER BY value ASC", tag, table)
-		}
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE table='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY sum(count) DESC limit 10000", db, table, tag)
 	}
 
 	log.Debug(sql)
-	rst, err := chClient.DoQuery(sql, nil, "")
+	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
 		return nil, err
 	}

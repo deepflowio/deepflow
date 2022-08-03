@@ -359,7 +359,7 @@ impl SessionQueue {
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
             let v = map
                 .into_values()
-                .map(|item| SendItem::L7FlowLog(item))
+                .map(|item| SendItem::L7FlowLog(Box::new(item)))
                 .collect();
             if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
                 warn!("output queue terminated");
@@ -405,7 +405,9 @@ impl SessionQueue {
             return;
         }
 
-        if let Err(Error::Terminated(..)) = self.output_queue.send(SendItem::L7FlowLog(item)) {
+        if let Err(Error::Terminated(..)) =
+            self.output_queue.send(SendItem::L7FlowLog(Box::new(item)))
+        {
             warn!("output queue terminated");
         }
     }
@@ -439,7 +441,7 @@ impl AppLogs {
 }
 
 pub struct AppProtoLogsParser {
-    input_queue: Arc<Receiver<MetaAppProto>>,
+    input_queue: Arc<Receiver<Box<MetaAppProto>>>,
     output_queue: DebugSender<SendItem>,
     id: u32,
     running: Arc<AtomicBool>,
@@ -453,7 +455,7 @@ pub struct AppProtoLogsParser {
 
 impl AppProtoLogsParser {
     pub fn new(
-        input_queue: Receiver<MetaAppProto>,
+        input_queue: Receiver<Box<MetaAppProto>>,
         output_queue: DebugSender<SendItem>,
         id: u32,
         config: LogParserAccess,
@@ -520,7 +522,7 @@ impl AppProtoLogsParser {
                             &mut app_logs,
                         );
                         for app_proto in app_protos {
-                            let proto_log = match Self::parse_log(app_proto, &mut app_logs) {
+                            let proto_log = match Self::parse_log(*app_proto, &mut app_logs) {
                                 Ok(a) => a,
                                 Err(e) => {
                                     debug!("{}", e);

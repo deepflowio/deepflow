@@ -32,8 +32,8 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []interface{} {
-	ret := []interface{}{}
+func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []*L7Logger {
+	ret := []*L7Logger{}
 	for _, resourceSpan := range l.GetResourceSpans() {
 		var resAttributes []*v11.KeyValue
 		resource := resourceSpan.GetResource()
@@ -49,7 +49,7 @@ func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, pla
 	return ret
 }
 
-func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, shardID int, platformData *grpc.PlatformInfoTable) *L7Logger {
 	h := AcquireL7Logger()
 	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7LogCounter, shardID)
 	h.VtapID = vtapID

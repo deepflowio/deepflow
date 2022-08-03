@@ -71,6 +71,23 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 	return stmt, nil
 }
 
+func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
+	tagItem, ok := tag.GetTag(name, db, table, "default")
+	if !ok {
+		if strings.HasPrefix(name, "`metrics.") {
+			tagItem, ok = tag.GetTag("metrics", db, table, "default")
+			filter := ""
+			if as == "" {
+				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
+			} else {
+				filter = fmt.Sprintf(tagItem.NotNullFilter, as)
+			}
+			return &view.Expr{Value: "(" + filter + ")"}, true
+		}
+	}
+	return &view.Expr{}, false
+}
+
 func GetMetricsTag(name string, alias string, db string, table string) (Statement, error) {
 	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), db, table)
 	if !ok {

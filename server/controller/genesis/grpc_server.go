@@ -275,6 +275,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 			VinterfaceLcuuid: &ipData.VinterfaceLcuuid,
 			NodeIp:           &ipData.NodeIP,
 			LastSeen:         &ipLastSeen,
+			VtapId:           &ipData.VtapID,
 		}
 		gSyncIPs = append(gSyncIPs, gIP)
 	}
@@ -287,6 +288,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 			Hostname: &hostData.Hostname,
 			Ip:       &hostData.IP,
 			NodeIp:   &hostData.NodeIP,
+			VtapId:   &hostData.VtapID,
 		}
 		gSyncHosts = append(gSyncHosts, gHost)
 	}
@@ -305,6 +307,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 			VinterfaceDescription: &lData.VinterfaceDescription,
 			NodeIp:                &lData.NodeIP,
 			LastSeen:              &lLastSeen,
+			VtapId:                &lData.VtapID,
 		}
 		gSyncLldps = append(gSyncLldps, gLldp)
 	}
@@ -320,6 +323,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 			Lcuuid:         &networkData.Lcuuid,
 			VpcLcuuid:      &networkData.VPCLcuuid,
 			NodeIp:         &networkData.NodeIP,
+			VtapId:         &networkData.VtapID,
 		}
 		gSyncNetworks = append(gSyncNetworks, gNetwork)
 	}
@@ -336,6 +340,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 			NetworkLcuuid: &portData.NetworkLcuuid,
 			VpcLcuuid:     &portData.VPCLcuuid,
 			NodeIp:        &portData.NodeIP,
+			VtapId:        &portData.VtapID,
 		}
 		gSyncPorts = append(gSyncPorts, gPort)
 	}
@@ -353,6 +358,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 			LaunchServer: &vmData.LaunchServer,
 			NodeIp:       &vmData.NodeIP,
 			CreatedAt:    &vCreateAt,
+			VtapId:       &vmData.VtapID,
 		}
 		gSyncVms = append(gSyncVms, gVm)
 	}
@@ -364,6 +370,7 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 			Lcuuid: &vpcData.Lcuuid,
 			Name:   &vpcData.Name,
 			NodeIp: &vpcData.NodeIP,
+			VtapId: &vpcData.VtapID,
 		}
 		gSyncVpcs = append(gSyncVpcs, gVpc)
 	}

@@ -40,24 +40,17 @@ type PCapConfig struct {
 	FileDirectory string `yaml:"file-directory"`
 }
 
-type CKWriterConfig struct {
-	QueueCount   int `yaml:"queue-count"`
-	QueueSize    int `yaml:"queue-size"`
-	BatchSize    int `yaml:"batch-size"`
-	FlushTimeout int `yaml:"flush-timeout"`
-}
-
 type Config struct {
 	Base                      *config.Config
-	CKReadTimeout             int            `yaml:"ck-read-timeout"`
-	ReplicaEnabled            bool           `yaml:"metrics-replica-enabled"`
-	CKWriterConfig            CKWriterConfig `yaml:"metrics-ck-writer"`
-	Pcap                      PCapConfig     `yaml:"pcap"`
-	DisableSecondWrite        bool           `yaml:"disable-second-write"`
-	DisableSecondWriteReplica bool           `yaml:"disable-second-write-replica"`
-	UnmarshallQueueCount      int            `yaml:"unmarshall-queue-count"`
-	UnmarshallQueueSize       int            `yaml:"unmarshall-queue-size"`
-	ReceiverWindowSize        uint64         `yaml:"receiver-window-size"`
+	CKReadTimeout             int                   `yaml:"ck-read-timeout"`
+	ReplicaEnabled            bool                  `yaml:"metrics-replica-enabled"`
+	CKWriterConfig            config.CKWriterConfig `yaml:"metrics-ck-writer"`
+	Pcap                      PCapConfig            `yaml:"pcap"`
+	DisableSecondWrite        bool                  `yaml:"disable-second-write"`
+	DisableSecondWriteReplica bool                  `yaml:"disable-second-write-replica"`
+	UnmarshallQueueCount      int                   `yaml:"unmarshall-queue-count"`
+	UnmarshallQueueSize       int                   `yaml:"unmarshall-queue-size"`
+	ReceiverWindowSize        uint64                `yaml:"receiver-window-size"`
 }
 
 type RozeConfig struct {
@@ -76,7 +69,7 @@ func Load(base *config.Config, path string) *Config {
 	config := &RozeConfig{
 		Roze: Config{
 			Base:                      base,
-			CKWriterConfig:            CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			CKWriterConfig:            config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
 			CKReadTimeout:             DefaultCKReadTimeout,
 			UnmarshallQueueCount:      DefaultUnmarshallQueueCount,
 			UnmarshallQueueSize:       DefaultUnmarshallQueueSize,

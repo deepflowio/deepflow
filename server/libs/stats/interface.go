@@ -24,12 +24,16 @@ var (
 	MinInterval = TICK_CYCLE
 )
 
-type RemoteType = bool
+type RemoteType = uint8
 
 const (
-	REMOTE_TYPE_STATSD   = true
-	REMOTE_TYPE_INFLUXDB = false
-	TICK_CYCLE           = 5 * time.Second
+	REMOTE_TYPE_INFLUXDB RemoteType = 1 << iota
+	REMOTE_TYPE_STATSD
+	REMOTE_TYPE_DFSTATSD
+)
+
+const (
+	TICK_CYCLE = 5 * time.Second
 )
 
 type Option = interface{}
@@ -89,6 +93,6 @@ func RegisterCountable(module string, countable Countable, opts ...Option) error
 	return registerCountable("", module, countable, opts...)
 }
 
-func RegisterCountableWithMoudlePrefix(moudlePrefix, module string, countable Countable, opts ...Option) error {
-	return registerCountable(moudlePrefix, module, countable, opts...)
+func RegisterCountableWithMoudlePrefix(modulePrefix, module string, countable Countable, opts ...Option) error {
+	return registerCountable(modulePrefix, module, countable, opts...)
 }
