@@ -30,7 +30,9 @@ use std::sync::{
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use log::{info, warn};
+use libc::c_int;
+use log::{debug, error, info, warn};
+use pcap_sys::{bpf_program, pcap_compile_nopcap};
 
 use analyzer_mode_dispatcher::AnalyzerModeDispatcher;
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
@@ -38,7 +40,7 @@ use error::{Error, Result};
 use local_mode_dispatcher::LocalModeDispatcher;
 use mirror_mode_dispatcher::MirrorModeDispatcher;
 use recv_engine::{
-    af_packet::{self, OptTpacketVersion, Tpacket},
+    af_packet::{self, bpf, BpfSyntax, OptTpacketVersion, Tpacket},
     RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 
@@ -62,7 +64,9 @@ use crate::{
     },
 };
 
-use self::local_mode_dispatcher::LocalModeDispatcherListener;
+use self::{
+    local_mode_dispatcher::LocalModeDispatcherListener, recv_engine::af_packet::RawInstruction,
+};
 
 enum DispatcherFlavor {
     Analyzer(AnalyzerModeDispatcher),
@@ -177,10 +181,93 @@ pub struct DpdkRingPortConf {
     pub port_name: String,
 }
 
-#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct BpfOptions {
-    // bpf_instructions
-    pub bpf_syntax: String,
+    pub capture_bpf: String,
+    pub bpf_syntax: Vec<BpfSyntax>,
+}
+
+impl Default for BpfOptions {
+    fn default() -> Self {
+        Self {
+            capture_bpf: "".to_string(),
+            bpf_syntax: Vec::new(),
+        }
+    }
+}
+
+impl BpfOptions {
+    fn skip_tap_interface(&self, tap_interfaces: &Vec<Link>) -> Vec<BpfSyntax> {
+        let mut bpf_syntax = self.bpf_syntax.clone();
+
+        bpf_syntax.push(BpfSyntax::LoadExtension(bpf::LoadExtension {
+            num: bpf::Extension::ExtInterfaceIndex,
+        }));
+
+        let total = tap_interfaces.len();
+        for (i, iface) in tap_interfaces.iter().enumerate() {
+            bpf_syntax.push(BpfSyntax::JumpIf(bpf::JumpIf {
+                cond: bpf::JumpTest::JumpEqual,
+                val: iface.if_index,
+                skip_true: (total - i) as u8,
+                ..Default::default()
+            }));
+        }
+
+        bpf_syntax.push(BpfSyntax::RetConstant(bpf::RetConstant { val: 0 }));
+        bpf_syntax.push(BpfSyntax::RetConstant(bpf::RetConstant { val: 65535 }));
+
+        return bpf_syntax;
+    }
+
+    fn to_pcap_bpf_prog(&self) -> Option<bpf_program> {
+        let mut prog: bpf_program = bpf_program {
+            bf_len: 0,
+            bf_insns: std::ptr::null_mut(),
+        };
+        unsafe {
+            let ret = pcap_compile_nopcap(
+                0xffff as c_int,
+                1,
+                &mut prog,
+                self.capture_bpf.as_ptr() as *const i8,
+                1,
+                0xffffffff,
+            );
+
+            if ret != 0 {
+                return None;
+            }
+        }
+        return Some(prog);
+    }
+
+    pub fn get_bpf_instructions(&self, tap_interfaces: &Vec<Link>) -> Vec<RawInstruction> {
+        if self.capture_bpf.len() == 0 {
+            let syntaxs = self.skip_tap_interface(tap_interfaces);
+            debug!("Capture bpf set to:");
+            for (i, syntax) in syntaxs.iter().enumerate() {
+                debug!("{:3}: {}", i + 1, syntax);
+            }
+            return syntaxs.iter().map(|x| x.to_instruction()).collect();
+        }
+
+        let prog = self.to_pcap_bpf_prog();
+        if prog.is_none() {
+            error!("Capture bpf {} error.", self.capture_bpf);
+            return vec![];
+        }
+        debug!("Capture bpf set to: {}", self.capture_bpf);
+
+        let prog = prog.unwrap();
+        unsafe {
+            let pcap_ins =
+                Vec::from_raw_parts(prog.bf_insns, prog.bf_len as usize, prog.bf_len as usize);
+            return pcap_ins
+                .iter()
+                .map(|&x| bpf::RawInstruction::from(x))
+                .collect();
+        }
+    }
 }
 
 #[derive(Default)]

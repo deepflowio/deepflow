@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{ffi::CStr, io, time::Duration};
+use std::{io, time::Duration};
 
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, size_t, sockaddr,
@@ -22,10 +22,9 @@ use libc::{
     POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
 };
 use log::warn;
-use pcap_sys::{bpf_program, pcap_compile_nopcap};
 use socket::{self, Socket};
 
-use super::{header, options, Error, Result};
+use super::{bpf, header, options, Error, Result};
 
 use crate::utils::{
     net::{self, link_by_name},
@@ -299,24 +298,8 @@ impl Tpacket {
         return None;
     }
 
-    pub fn set_bpf(&self, syntax: &CStr) -> Result<()> {
-        let mut prog: bpf_program = bpf_program {
-            bf_len: 0,
-            bf_insns: std::ptr::null_mut(),
-        };
-        unsafe {
-            let ret = pcap_compile_nopcap(
-                0xffff as c_int,
-                LINKTYPE_ETHERNET,
-                &mut prog,
-                syntax.as_ptr(),
-                1,
-                0xffffffff,
-            );
-            if ret != 0 {
-                return Err(io::Error::last_os_error().into());
-            }
-        }
+    pub fn set_bpf(&self, ins: Vec<bpf::RawInstruction>) -> Result<()> {
+        let prog = bpf::Prog::new(ins);
         self.raw_socket
             .setsockopt(SOL_SOCKET, SO_ATTACH_FILTER, prog)?;
         Ok(())
