@@ -17,6 +17,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"strings"
 
@@ -25,6 +26,8 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/querier/querier"
 )
+
+var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")
 
 func execName() string {
 	splitted := strings.Split(os.Args[0], "/")
@@ -37,9 +40,6 @@ func main() {
 	if os.Getppid() != 1 {
 		logger.EnableStdoutLog()
 	}
-	logger.EnableFileLog("querier.log")
-	logLevel, _ := logging.LogLevel("info")
-	logging.SetLevel(logLevel, "")
 
-	querier.Start()
+	querier.Start(*configPath)
 }
