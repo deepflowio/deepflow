@@ -271,6 +271,7 @@ type L7Logger struct {
 	SpanId            string
 	ParentSpanId      string
 	SpanKind          uint8
+	spanKind          *uint8
 	ServiceName       string
 	ServiceInstanceId string
 
@@ -311,7 +312,7 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("TraceID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
-		ckdb.NewColumn("span_kind", ckdb.UInt8).SetComment("SpanKind"),
+		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),
 		ckdb.NewColumn("service_name", ckdb.LowCardinalityString).SetComment("service name"),
 		ckdb.NewColumn("service_instance_id", ckdb.String).SetComment("service instance id"),
 
@@ -391,7 +392,7 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(h.ParentSpanId); err != nil {
 		return err
 	}
-	if err := block.WriteUInt8(h.SpanKind); err != nil {
+	if err := block.WriteUInt8Nullable(h.spanKind); err != nil {
 		return err
 	}
 	if err := block.WriteString(h.ServiceName); err != nil {
