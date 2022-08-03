@@ -130,6 +130,7 @@ func FormatField(field string) string {
 	field = strings.ReplaceAll(field, ">", "_")
 	field = strings.ReplaceAll(field, "=", "_")
 	field = strings.ReplaceAll(field, "!", "_")
+	field = strings.ReplaceAll(field, ".", "_")
 	return field
 }
 
