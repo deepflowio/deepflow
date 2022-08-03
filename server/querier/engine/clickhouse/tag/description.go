@@ -199,7 +199,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
-		if key.DB != db || (key.Table != table && db != "ext_metrics") {
+		if key.DB != db || (key.Table != table && db != "ext_metrics" && db != "deepflow_system") {
 			continue
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
@@ -233,7 +233,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 				labelKey, labelKey, labelKey, labelKey, "label",
 				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
 			})
-		} else {
+		} else if db != "deepflow_system" {
 			response["values"] = append(response["values"], []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
 				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
@@ -243,7 +243,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	}
 
 	// 查询外部字段
-	if (db != "ext_metrics" && db != "flow_log") || (db == "flow_log" && table != "l7_flow_log") {
+	if (db != "ext_metrics" && db != "flow_log" && db != "deepflow_system") || (db == "flow_log" && table != "l7_flow_log") {
 		return response, nil
 	}
 	externalChClient := client.Client{
@@ -269,7 +269,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	}
 	for _, _tagName := range externalRst["values"] {
 		tagName := _tagName.([]interface{})[0]
-		if db == "ext_metrics" {
+		if db == "ext_metrics" || db == "deepflow_system" {
 			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
@@ -283,7 +283,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 			})
 		}
 	}
-	if db == "ext_metrics" {
+	if db == "ext_metrics" || db == "deepflow_system" {
 		response["values"] = append(response["values"], []interface{}{
 			"tags", "tags", "tags", "tags", "map",
 			"原始Tag", []string{}, []bool{true, true, true}, "tags",

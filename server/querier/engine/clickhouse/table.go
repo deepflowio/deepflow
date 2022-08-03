@@ -37,7 +37,7 @@ func GetTables(db string) map[string][]interface{} {
 	if !ok {
 		return nil
 	}
-	if db == "ext_metrics" {
+	if db == "ext_metrics" || db == "deepflow_system" {
 		values = append(values, common.GetExtTables(db)...)
 	} else {
 		for _, table := range tables {
