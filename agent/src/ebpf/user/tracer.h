@@ -153,6 +153,7 @@ enum {
 struct mem_block_head {
 	uint8_t is_last;
 	void *free_ptr;
+	void (*fn)(void *);
 } __attribute__ ((packed));
 
 typedef void (*l7_handle_fn) (void *sd);
@@ -386,8 +387,13 @@ prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 			PREFETCH(datas_burst[j + PREFETCH_OFFSET],
 				 2 * CACHE_LINE_BYTES, READ);
 		sd = (struct socket_bpf_data *)datas_burst[j];
-		callback(sd);
 		block_head = (struct mem_block_head *)sd - 1;
+		if (block_head->fn != NULL) {
+			block_head->fn(sd);
+		} else {
+			callback(sd);
+		}
+
 		if (block_head->is_last == 1)
 			free(block_head->free_ptr);
 	}

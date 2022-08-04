@@ -703,7 +703,7 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 }
 #endif
 
-#include "go_base_bpf.c" // get_go_version
+#include "uprobe_base_bpf.c" // get_go_version
 
 static __inline void
 data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,

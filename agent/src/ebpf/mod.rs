@@ -74,6 +74,21 @@ pub const MSG_REQUEST: u8 = 1;
 #[allow(dead_code)]
 pub const MSG_RESPONSE: u8 = 2;
 
+//Register event types
+#[allow(dead_code)]
+pub const EVENT_TYPE_PROC_EXEC: u32 = 1 << 5;
+#[allow(dead_code)]
+pub const EVENT_TYPE_PROC_EXIT: u32 = 1 << 6;
+
+//Process exec/exit events
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct PROCESS_EVENT {
+    pub event_type: u32,     // value: EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
+    pub pid: u32,            // Process ID
+    pub name: [u8; 16usize], // Process name
+}
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct tuple_t {
@@ -93,7 +108,7 @@ pub struct SK_BPF_DATA {
     pub thread_id: u32,    // pid in kernel struct task_struct, main thread iff pid==tgid
     pub coroutine_id: u64, // CoroutineID, i.e., golang goroutine id
 
-    pub process_name: [u8; 16usize], //进程名字，占用16bytes
+    pub process_name: [u8; 16usize], //进程或线程名字，占用16bytes
 
     pub tuple: tuple_t, // Socket五元组信息
 
@@ -278,6 +293,15 @@ extern "C" {
 
     // 获取socket_tracer的这种统计数据的接口
     pub fn socket_tracer_stats() -> SK_TRACE_STATS;
+
+    // Register extra event handle for socket tracer
+    // @event_type : register event type, e.g.: EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT ...
+    // @callback : Callback function for event
+    // @return 0 is success, if not 0 is faild
+    pub fn register_event_handle(
+        event_type: c_uint,
+        callback: extern "C" fn(data: *mut PROCESS_EVENT),
+    ) -> c_int;
 
     // 参数说明：
     // callback: 回调接口 rust -> C

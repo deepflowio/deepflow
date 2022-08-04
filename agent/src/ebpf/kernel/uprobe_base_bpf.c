@@ -10,7 +10,7 @@ struct {
 	__type(key, int);
 	__type(value, struct member_offsets);
 	__uint(max_entries, HASH_ENTRIES_MAX);
-} go_offsets_map SEC(".maps");
+} uprobe_offsets_map SEC(".maps");
 
 /*
  * Goroutines Map
@@ -32,7 +32,7 @@ static __inline int get_uprobe_offset(int offset_idx)
 	id = bpf_get_current_pid_tgid();
 	pid = id >> 32;
 	struct member_offsets *offsets;
-	offsets = bpf_map_lookup_elem(&go_offsets_map, &pid);
+	offsets = bpf_map_lookup_elem(&uprobe_offsets_map, &pid);
 	if (offsets) {
 		return offsets->data[offset_idx];
 	}
@@ -48,7 +48,7 @@ static __inline __u32 get_go_version(void)
 	id = bpf_get_current_pid_tgid();
 	pid = id >> 32;
 	struct member_offsets *offsets;
-	offsets = bpf_map_lookup_elem(&go_offsets_map, &pid);
+	offsets = bpf_map_lookup_elem(&uprobe_offsets_map, &pid);
 	if (offsets) {
 		return offsets->version;
 	}
@@ -125,12 +125,13 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 	pid = id >> 32;
 	tid = (__u32)id;
 
-	// If is a process, clear go_offsets_map element and submit event.
+	// If is a process, clear uprobe_offsets_map element and submit event.
 	if (pid == tid) {
-		bpf_map_delete_elem(&go_offsets_map, &pid);
-		struct event_data data;
+		bpf_map_delete_elem(&uprobe_offsets_map, &pid);
+		struct process_event_t data;
 		data.pid = pid;
-		data.event_type = EVENT_TYPE_PROC_EXIT;
+		data.meta.event_type = EVENT_TYPE_PROC_EXIT;
+		bpf_get_current_comm(data.name, sizeof(data.name));
 		int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
 						BPF_F_CURRENT_CPU, &data,
 						sizeof(data));
@@ -151,14 +152,15 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 SEC("tracepoint/sched/sched_process_exec")
 int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
 {
-	struct event_data data;
+	struct process_event_t data;
 	__u64 id = bpf_get_current_pid_tgid();
 	pid_t pid = id >> 32;
 	pid_t tid = (__u32) id;
 
 	if (pid == tid) {
-		data.event_type = EVENT_TYPE_PROC_EXEC;
+		data.meta.event_type = EVENT_TYPE_PROC_EXEC;
 		data.pid = pid;
+		bpf_get_current_comm(data.name, sizeof(data.name));
 		int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
 						BPF_F_CURRENT_CPU, &data,
 						sizeof(data));

@@ -201,6 +201,7 @@ enum {
 	ETR_MSG_DROP = -24,	/* msg callback dropped */
 	ETR_SYSCALL = -26,	/* system call failed */
 	ETR_PROC_FAIL = -27,    /* procfs failed */
+	ETR_NOHANDLE = -28,     /* not find event handle */
 
 	/* positive code for non-error */
 	ETR_INPROGRESS = 2,	/* in progress */
@@ -238,6 +239,7 @@ static struct trace_err_tab err_tab[] = {
 	{ETR_MSG_DROP, "msg dropped"},
 	{ETR_SYSCALL, "system call failed"},
 	{ETR_PROC_FAIL, "procfs failed"},
+	{ETR_NOHANDLE, "not find event handle"},
 
 	{ETR_INPROGRESS, "in progress"},
 };
