@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package migrate
+package migration
 
 const (
 	DB_VERSION_TABLE  = "db_version"

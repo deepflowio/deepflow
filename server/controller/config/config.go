@@ -24,7 +24,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/deepflowys/deepflow/server/controller/db/clickhouse"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	mysql "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
 	"github.com/deepflowys/deepflow/server/controller/db/redis"
 	genesis "github.com/deepflowys/deepflow/server/controller/genesis/config"
 	manager "github.com/deepflowys/deepflow/server/controller/manager/config"
