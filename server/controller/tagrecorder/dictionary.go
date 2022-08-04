@@ -140,7 +140,8 @@ func (c *TagRecorder) UpdateChDictionary() {
 			CH_DICTIONARY_DEVICE_PORT,
 			CH_DICTIONARY_IP_PORT,
 			CH_DICTIONARY_SERVER_PORT,
-			CH_DICTIONARY_LB_LISTENER)
+			CH_DICTIONARY_LB_LISTENER,
+			CH_DICTIONARY_POD_INGRESS)
 		chDicts := mapset.NewSet()
 		for _, dictionary := range dictionaries {
 			chDicts.Add(dictionary)
