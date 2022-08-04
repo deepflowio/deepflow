@@ -235,6 +235,8 @@ const (
 	NETWORK_ISP_LCUUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	NETWORK_TYPE_WAN   = 3
 	NETWORK_TYPE_LAN   = 4
+
+	SUBNET_ISP_LCUUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 )
 
 const (
@@ -298,6 +300,7 @@ const (
 	ROUTING_TABLE_TYPE_NAT_GATEWAY     = "nat-gateway"
 	ROUTING_TABLE_TYPE_PEER_CONNECTION = "peer-connection"
 	ROUTING_TABLE_TYPE_INSTANCE        = "Instance"
+	ROUTING_TABLE_TYPE_IP              = "IP"
 )
 
 const (
@@ -427,3 +430,7 @@ var CloudMonitorExceptionAPI = map[string]string{
 	"tencent_tce":       "DescribeNetworkInterfacesEx,DescribeSecurityGroupPolicy",
 	"qingcloud_private": "DescribeSecurityGroupIPSets,DescribeSecurityGroupRules,DescribeLoadBalancerListeners,DescribeLoadBalancerBackends,DescribeNics,DescribeEips",
 }
+
+const (
+	STRINGS_JOIN_COMMA = ","
+)

@@ -1,0 +1,194 @@
+/*
+ * Copyright (c) 2022 Yunshan VMs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package huawei
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/bitly/go-simplejson"
+	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+)
+
+const (
+	DEVICE_OWNER_VM_PRE       = "compute"
+	DEVICE_OWNER_VM           = "compute:nova"
+	DEVICE_OWNER_ROUTER_GW    = "network:router_gateway"
+	DEVICE_OWNER_ROUTER_IFACE = "network:router_interface"
+	DEVICE_OWNER_FLOATING_IP  = "network:floatingip"
+	DEVICE_OWNER_DHCP         = "network:dhcp"
+)
+
+func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model.IP, []model.FloatingIP, []model.NATRule, error) {
+	var dhcpPorts []model.DHCPPort
+	var vifs []model.VInterface
+	var ips []model.IP
+	var fIPs []model.FloatingIP
+	var natRules []model.NATRule
+	vifRequiredAttrs := []string{"id", "mac_address", "network_id", "device_id", "device_owner"}
+	for project, token := range h.projectTokenMap {
+		jPorts, err := h.getRawData(
+			fmt.Sprintf("https://vpc.%s.%s/v1/%s/ports", project.name, h.config.URLDomain, project.id), token.token, "ports",
+		)
+		if err != nil {
+			log.Errorf("request failed: %v", err)
+			return nil, nil, nil, nil, nil, err
+		}
+
+		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
+		for i := range jPorts {
+			jPort := jPorts[i]
+			if !CheckAttributes(jPort, vifRequiredAttrs) {
+				continue
+			}
+			id := jPort.Get("id").MustString()
+			mac := jPort.Get("mac_address").MustString()
+			network := h.toolDataSet.lcuuidToNetwork[jPort.Get("network_id").MustString()]
+			if network.Lcuuid == "" {
+				log.Infof("exclude vinterface: %s", mac)
+			}
+			deviceOwner := jPort.Get("device_owner").MustString()
+			if !common.Contains([]string{DEVICE_OWNER_DHCP, DEVICE_OWNER_ROUTER_GW, DEVICE_OWNER_VM, DEVICE_OWNER_ROUTER_IFACE}, deviceOwner) && !strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
+				log.Infof("exclude vinterface: %s, %s", mac, deviceOwner)
+				continue
+			}
+			var deviceID string
+			var deviceType int
+			deviceID = jPort.Get("device_id").MustString()
+			if deviceOwner == DEVICE_OWNER_ROUTER_GW {
+				deviceType = common.VIF_DEVICE_TYPE_VROUTER
+			} else if deviceOwner == DEVICE_OWNER_DHCP {
+				deviceType = common.VIF_DEVICE_TYPE_DHCP_PORT
+				name := network.Name + "_DHCP"
+				if len(name) > 256 {
+					name = name[:256]
+				}
+				deviceID = id
+				dhcpPort := model.DHCPPort{
+					Lcuuid:       id,
+					Name:         name,
+					VPCLcuuid:    network.VPCLcuuid,
+					AZLcuuid:     network.AZLcuuid,
+					RegionLcuuid: regionLcuuid,
+				}
+				dhcpPorts = append(dhcpPorts, dhcpPort)
+			} else if deviceOwner == DEVICE_OWNER_VM || strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
+				deviceType = common.VIF_DEVICE_TYPE_VM
+			} else if deviceOwner == DEVICE_OWNER_ROUTER_IFACE {
+				deviceType = common.VIF_DEVICE_TYPE_VROUTER
+			}
+			vif := model.VInterface{
+				Lcuuid:        id,
+				Mac:           mac,
+				Type:          common.VIF_TYPE_LAN,
+				DeviceType:    deviceType,
+				DeviceLcuuid:  deviceID,
+				RegionLcuuid:  regionLcuuid,
+				NetworkLcuuid: network.Lcuuid,
+				VPCLcuuid:     network.VPCLcuuid,
+			}
+			vifs = append(vifs, vif)
+
+			lIPs, fIP, natRule := h.formatIPsAndNATRules(jPort, vif)
+			ips = append(ips, lIPs...)
+			if fIP.Lcuuid != "" {
+				fIPs = append(fIPs, fIP)
+			}
+			if natRule.Lcuuid != "" {
+				natRules = append(natRules, natRule)
+			}
+		}
+
+		h.formatPublicIPs(project, token.token)
+	}
+	return dhcpPorts, vifs, ips, fIPs, natRules, nil
+}
+
+func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterface) (ips []model.IP, fIP model.FloatingIP, natRule model.NATRule) {
+	jIPs, ok := jPort.CheckGet("fixed_ips")
+	if !ok {
+		return
+	}
+	ipRequiredAttrs := []string{"ip_address"}
+	floatingIP := h.toolDataSet.macToFloatingIP[vif.Mac]
+	if floatingIP != "" && vif.DeviceType == common.VIF_DEVICE_TYPE_VM {
+		fIP = model.FloatingIP{
+			Lcuuid:        common.GenerateUUID(vif.Lcuuid + floatingIP),
+			IP:            floatingIP,
+			VMLcuuid:      vif.DeviceLcuuid,
+			NetworkLcuuid: vif.NetworkLcuuid,
+			VPCLcuuid:     vif.VPCLcuuid,
+			RegionLcuuid:  vif.RegionLcuuid,
+		}
+	}
+	for i := range jIPs.MustArray() {
+		jIP := jIPs.GetIndex(i)
+		if !CheckAttributes(jIP, ipRequiredAttrs) {
+			continue
+		}
+		ipAddr := jIP.Get("ip_address").MustString()
+		ips = append(
+			ips,
+			model.IP{
+				Lcuuid:           common.GenerateUUID(vif.Lcuuid + ipAddr),
+				VInterfaceLcuuid: vif.Lcuuid,
+				IP:               ipAddr,
+				SubnetLcuuid:     h.toolDataSet.networkLcuuidToSubnetLcuuid[vif.NetworkLcuuid],
+				RegionLcuuid:     vif.RegionLcuuid,
+			},
+		)
+		if i == 0 && floatingIP != "" {
+			natRule = model.NATRule{
+				Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
+				Type:             NAT_RULE_TYPE_DNAT,
+				Protocol:         PROTOCOL_ALL,
+				FloatingIP:       floatingIP,
+				FixedIP:          ipAddr,
+				VInterfaceLcuuid: vif.Lcuuid,
+			}
+		}
+		if vif.DeviceType == common.VIF_DEVICE_TYPE_VM {
+			h.toolDataSet.keyToVMLcuuid[SubnetIPKey{jIP.Get("subnet_id").MustString(), ipAddr}] = vif.DeviceLcuuid
+		} else if vif.DeviceType == common.VIF_DEVICE_TYPE_NAT_GATEWAY {
+			h.toolDataSet.keyToNATGatewayLcuuid[VPCIPKey{vif.VPCLcuuid, ipAddr}] = vif.DeviceLcuuid
+		}
+	}
+	return
+}
+
+func (h *HuaWei) formatPublicIPs(project Project, token string) error {
+	jIPs, err := h.getRawData(
+		fmt.Sprintf("https://vpc.%s.%s/v1/%s/publicips", project.name, h.config.URLDomain, project.id), token, "publicips",
+	)
+	if err != nil {
+		log.Errorf("request failed: %v", err)
+		return err
+	}
+
+	requiredAttrs := []string{"port_id", "public_ip_address"}
+	for i := range jIPs {
+		jIP := jIPs[i]
+		if !CheckAttributes(jIP, requiredAttrs) {
+			log.Infof("exclude public ip, missing attr")
+			continue
+		}
+		h.toolDataSet.vinterfaceLcuuidToPublicIP[jIP.Get("port_id").MustString()] = jIP.Get("public_ip_address").MustString()
+	}
+	return nil
+}
