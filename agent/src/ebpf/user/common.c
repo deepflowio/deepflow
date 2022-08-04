@@ -98,7 +98,8 @@ static void exec_clear_residual_probes(const char *events_file,
 
 	list_for_each_safe(p, n, &probe_head) {
 		pe = container_of(p, struct probe_elem, list);
-		// 匹配"_deepflow_"，并且不属于当前进程的probe event
+		// Match the [K/U]probe events of "_deepflow_"
+		// 匹配"_deepflow_"的[k/u]probe事件
 		if (strstr(pe->event, "_deepflow_")) {
 			if ((ptr = strchr(pe->event, '/'))) {
 				char *s = ++ptr;

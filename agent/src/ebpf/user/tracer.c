@@ -312,7 +312,7 @@ static struct probe *create_probe(struct bpf_tracer *tracer,
 }
 
 static int get_uprobe_event_name(const char *bin_path, char *ev_name, int size,
-				 size_t addr)
+				 size_t addr, bool isret)
 {
 	char *path = strdup(bin_path);
 	if (path == NULL) {
@@ -327,7 +327,8 @@ static int get_uprobe_event_name(const char *bin_path, char *ev_name, int size,
 			path[i] = '_';
 	}
 
-	if (snprintf(ev_name, size, "p_%s_0x%lx", path, addr) < 0) {
+	if (snprintf(ev_name, size, "%s_%s_0x%lx", isret ? "r" : "p",
+		     path, addr) < 0) {
 		ebpf_warning("snprintf error.\n");
 		return ETR_INVAL;
 	}
@@ -343,7 +344,9 @@ static struct bpf_link *exec_attach_uprobe(struct bpf_program *prog,
 	struct bpf_link *link = NULL;
 	char ev_name[EV_NAME_SIZE];
 	int ret;
-	ret = get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr);
+	ret =
+	    get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr,
+				  isret);
 	if (ret != ETR_OK)
 		return NULL;
 
@@ -369,7 +372,7 @@ static struct bpf_link *exec_attach_kprobe(struct bpf_program *prog, char *name,
 	else
 		fn_name = name + strlen("kprobe/");
 
-	snprintf(ev_name, sizeof(ev_name), "p_%s", fn_name);
+	snprintf(ev_name, sizeof(ev_name), "%s_%s", isret ? "r" : "p", fn_name);
 	ret =
 	    program__attach_kprobe(prog, isret, pid, fn_name, ev_name,
 				   (void **)&link);
@@ -438,7 +441,8 @@ static int exec_detach_uprobe(struct bpf_link *link, const char *bin_path,
 {
 	char ev_name[EV_NAME_SIZE];
 	int ret;
-	ret = get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr);
+	ret = get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr,
+				    isret);
 	if (ret != ETR_OK)
 		return ret;
 
@@ -554,8 +558,8 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 			ebpf_info("%s %s %s: '%s', %s!",
 				  type == HOOK_ATTACH ? "attach" : "detach",
 				  p->isret ? "exit" : "enter",
-				  p->type == KPROBE ? "kprobe" : "uprobe", p->name,
-				  error ? "failed" : "success");
+				  p->type == KPROBE ? "kprobe" : "uprobe",
+				  p->name, error ? "failed" : "success");
 		}
 
 		if (error) {
@@ -722,7 +726,7 @@ __always_inline uint64_t clib_cpu_time_now(void)
 
 static void poller(void *t)
 {
-	prctl(PR_SET_NAME,"perf-reader");	
+	prctl(PR_SET_NAME, "perf-reader");
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
 	for (;;) {
 #ifndef PERFORMANCE_TEST
@@ -792,7 +796,7 @@ int register_extra_waiting_op(const char *name, extra_waiting_fun_t f, int type)
 // Receive command line management tool requests.
 static void ctrl_main(__unused void *arg)
 {
-	prctl(PR_SET_NAME,"ctrl-main");
+	prctl(PR_SET_NAME, "ctrl-main");
 	while (all_probes_ready == 0)
 		usleep(LOOP_DELAY_US);
 
@@ -921,7 +925,7 @@ static int boot_time_update(void)
 
 static void period_process_main(__unused void *arg)
 {
-	prctl(PR_SET_NAME,"period-process");
+	prctl(PR_SET_NAME, "period-process");
 	// 确保所有tracer都运行了，之后触发kick内核操作
 	while (all_probes_ready == 0)
 		usleep(LOOP_DELAY_US);
@@ -944,7 +948,7 @@ static void period_process_main(__unused void *arg)
  */
 static void process_datas(void *queue)
 {
-	prctl(PR_SET_NAME,"queue-worker");
+	prctl(PR_SET_NAME, "queue-worker");
 	int nr;
 	struct queue *q = (struct queue *)queue;
 	struct ring *r = q->r;
