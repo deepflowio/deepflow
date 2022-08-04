@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/db/redis"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/manager"
@@ -42,7 +43,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	trouter "github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
-
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/synchronize"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/http/cache"
@@ -67,19 +67,13 @@ func Start(configPath string) {
 	log.Info("============================== Launching YUNSHAN DeepFlow Controller ==============================")
 	log.Infof("controller config:\n%s", string(bytes))
 
-	// 初始化MySQL
-	isMasterController, _, err := common.IsMasterController()
-	if err == nil && isMasterController {
-		ok := mysql.Migrate(cfg.MySqlCfg)
-		if !ok {
-			time.Sleep(time.Second) // TODO add sleep before all os.Exit
-			os.Exit(0)
-		}
-	}
+	migrateDB(cfg)
 
+	// 初始化MySQL
 	mysql.Db = mysql.Gorm(cfg.MySqlCfg)
 	if mysql.Db == nil {
 		log.Error("connect mysql failed")
+		time.Sleep(time.Second)
 		os.Exit(0)
 	}
 
@@ -92,7 +86,7 @@ func Start(configPath string) {
 	}
 
 	// start statsd
-	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
+	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
 		log.Error("cloud statsd connect telegraf failed")
 		return
@@ -174,6 +168,32 @@ func Start(configPath string) {
 	trouter.RegistRouter(r)
 	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
 		log.Errorf("startup service failed, err:%v\n", err)
+		time.Sleep(time.Second)
 		os.Exit(0)
+	}
+}
+
+// migrate db by master region master controller
+func migrateDB(cfg *config.ControllerConfig) {
+	// exit if not in master region
+	if cfg.TrisolarisCfg.NodeType != "master" {
+		return
+	}
+
+	// try to check whether it is master controller until successful,
+	// migrate if it is master, exit if not.
+	for range time.Tick(time.Second * 5) {
+		isMasterController, _, err := common.IsMasterController()
+		err = nil
+		isMasterController = true
+		if err == nil && isMasterController {
+			ok := migrator.MigrateMySQL(cfg.MySqlCfg)
+			if !ok {
+				log.Error("migrate mysql failed")
+				time.Sleep(time.Second)
+				os.Exit(0)
+			}
+			return
+		}
 	}
 }

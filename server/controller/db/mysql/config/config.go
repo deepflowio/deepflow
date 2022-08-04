@@ -14,20 +14,13 @@
  * limitations under the License.
  */
 
-package mysql
+package config
 
-import (
-	"github.com/op/go-logging"
-	"gorm.io/gorm"
-
-	. "github.com/deepflowys/deepflow/server/controller/db/mysql/common"
-	. "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
-)
-
-var log = logging.MustGetLogger("db.mysql")
-var Db *gorm.DB
-
-func Gorm(cfg MySqlConfig) *gorm.DB {
-	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut, false)
-	return GetGormDB(dsn)
+type MySqlConfig struct {
+	Database     string `default:"deepflow" yaml:"database"`
+	Host         string `default:"mysql" yaml:"host"`
+	Port         uint32 `default:"30130" yaml:"port"`
+	UserName     string `default:"root" yaml:"user-name"`
+	UserPassword string `default:"deepflow" yaml:"user-password"`
+	TimeOut      uint32 `default:"30" yaml:"timeout"`
 }

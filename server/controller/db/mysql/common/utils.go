@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package mysql
+package common
 
 import (
 	"fmt"
@@ -24,90 +24,102 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/op/go-logging"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 
-	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrate"
+	. "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql/migration"
 )
 
-// if database not exist, create database and tables;
-// if database exsits, execute issue if version table not exists or db version not equal lastest version
-func Migrate(cfg MySqlConfig) bool {
-	dsn := getDSN(cfg, "", cfg.TimeOut, false)
-	db := getGormDB(dsn)
-	existed, err := createDatabaseIfNotExists(db, cfg.Database)
-	if err != nil {
-		log.Errorf("database: %s not exists", cfg.Database)
-		return false
-	}
+var log = logging.MustGetLogger("db.mysql.common")
 
-	// set multiStatements=true in dsn only when migrating MySQL
-	dsn = getDSN(cfg, cfg.Database, cfg.TimeOut*2, true)
-	db = getGormDB(dsn)
-	if !existed {
-		err := initTables(db)
-		if err != nil {
-			db.Exec(fmt.Sprintf("DROP DATABASE %s", cfg.Database))
-			return false
-		}
-	} else {
-		var versionTable string
-		db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", cfg.Database, migrate.DB_VERSION_TABLE)).Scan(&versionTable)
-		// db_version table not exists, create table, excute all issus
-		if versionTable != migrate.DB_VERSION_TABLE {
-			err = db.Exec(migrate.CREATE_TABLE_DB_VERSION).Error
-			if err != nil {
-				log.Errorf("create table db_version failed: %v", err)
-				return false
-			}
-			err = executeIssus(db, "")
-			if err != nil {
-				return false
-			}
-		} else {
-			var version string
-			err = db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
-			if err != nil {
-				log.Errorf("check db version failed: %v", err)
-				return false
-			}
-			// version value is not latest, excute issus between current and latest version
-			if version == "" {
-				curVersion := "6.1.1.0"
-				err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", curVersion)).Error
-				if err != nil {
-					log.Errorf("init db version failed: %v", err)
-					return false
-				}
-				err = executeIssus(db, curVersion)
-			} else {
-				err = executeIssus(db, version)
-			}
-			if err != nil {
-				return false
-			}
-		}
-	}
-	return true
+func GetConnectionWithoudDatabase(cfg MySqlConfig) *gorm.DB {
+	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
+	return GetGormDB(dsn)
 }
 
-func createDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
+func GetConnectionWithDatabase(cfg MySqlConfig) *gorm.DB {
+	// set multiStatements=true in dsn only when migrating MySQL
+	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut*2, true)
+	return GetGormDB(dsn)
+}
+
+func GetDSN(cfg MySqlConfig, database string, timeout uint32, multiStatements bool) string {
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=%ds",
+		cfg.UserName,
+		cfg.UserPassword,
+		cfg.Host,
+		cfg.Port,
+		database,
+		timeout,
+	)
+	if multiStatements {
+		dsn += "&multiStatements=true"
+	}
+	return dsn
+}
+
+func GetGormDB(dsn string) *gorm.DB {
+	Db, err := gorm.Open(mysql.New(mysql.Config{
+		DSN:                       dsn,   // DSN data source name
+		DefaultStringSize:         256,   // string 类型字段的默认长度
+		DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
+		DontSupportRenameIndex:    true,  // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引
+		DontSupportRenameColumn:   true,  // 用 `change` 重命名列，MySQL 8 之前的数据库和 MariaDB 不支持重命名列
+		SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
+	}), &gorm.Config{
+		NamingStrategy: schema.NamingStrategy{SingularTable: true}, // 设置全局表名禁用复数
+	})
+	if err != nil {
+		log.Errorf("Mysql Connection failed with error: %v", err.Error())
+		return nil
+	}
+
+	sqlDB, _ := Db.DB()
+	// 限制最大空闲连接数、最大连接数和连接的生命周期
+	sqlDB.SetMaxIdleConns(50)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	return Db
+}
+
+func DropDatabase(db *gorm.DB, database string) error {
+	log.Infof("drop database %s", database)
+	return db.Exec(fmt.Sprintf("DROP DATABASE %s", database)).Error
+}
+
+func CreateDatabase(db *gorm.DB, database string) error {
+	log.Infof("create database %s", database)
+	return db.Exec(fmt.Sprintf("CREATE DATABASE %s", database)).Error
+}
+
+func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
 	var datadbaseName string
 	db.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", database)).Scan(&datadbaseName)
 	if datadbaseName == database {
-		var vmTable string
-		db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", database, "vm")).Scan(&vmTable)
-		if vmTable != "vm" {
-			return false, nil
-		}
 		return true, nil
 	} else {
-		err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", database)).Error
+		err := CreateDatabase(db, database)
 		return false, err
 	}
 }
 
+func RollbackIfInitTablesFailed(db *gorm.DB, database string) bool {
+	err := initTables(db)
+	if err != nil {
+		DropDatabase(db, database)
+		return false
+	}
+	return true
+}
+
 func initTables(db *gorm.DB) error {
+	log.Info("init db tables start")
 	initSQL, err := ioutil.ReadFile("/etc/mysql/init.sql")
 	if err != nil {
 		log.Errorf("read sql file failed: %v", err)
@@ -118,27 +130,27 @@ func initTables(db *gorm.DB) error {
 		log.Errorf("init db tables failed: %v", err)
 		return err
 	}
-	err = db.Exec(migrate.DROP_PROCEDURE).Error
+	err = db.Exec(migration.DROP_PROCEDURE).Error
 	if err != nil {
 		log.Errorf("drop procedure failed: %v", err)
 		return err
 	}
-	err = db.Exec(migrate.CREATE_PROCDURE).Error
+	err = db.Exec(migration.CREATE_PROCDURE).Error
 	if err != nil {
 		log.Errorf("create procedure failed: %v", err)
 		return err
 	}
-	err = db.Exec(migrate.CREATE_TRIGGER_RESOURCE_GROUP).Error
+	err = db.Exec(migration.CREATE_TRIGGER_RESOURCE_GROUP).Error
 	if err != nil {
 		log.Errorf("create trigger failed: %v", err)
 		return err
 	}
-	err = db.Exec(migrate.CREATE_TRIGGER_NPB_TUNNEL).Error
+	err = db.Exec(migration.CREATE_TRIGGER_NPB_TUNNEL).Error
 	if err != nil {
 		log.Errorf("create trigger failed: %v", err)
 		return err
 	}
-	err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migrate.DB_VERSION_EXPECT)).Error
+	err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECT)).Error
 	if err != nil {
 		log.Errorf("init db version failed: %v", err)
 		return err
@@ -147,7 +159,7 @@ func initTables(db *gorm.DB) error {
 	return err
 }
 
-func executeIssus(db *gorm.DB, curVersion string) error {
+func ExecuteIssus(db *gorm.DB, curVersion string) error {
 	issus, err := ioutil.ReadDir("/etc/mysql/issu")
 	if err != nil {
 		log.Errorf("read sql dir faild: %v", err)
