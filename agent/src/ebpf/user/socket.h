@@ -132,6 +132,15 @@ struct bpf_socktrace_params {
 	struct bpf_offset_param_array offset_array;
 };
 
+/*
+ * This structure is used for registration of additional events. 
+ */
+struct extra_event {
+	struct list_head list;
+	uint32_t type;
+	void (*h)(void *);
+};
+
 struct socket_trace_stats socket_tracer_stats(void);
 int running_socket_tracer(l7_handle_fn handle,
 			  int thread_nr,
@@ -140,4 +149,5 @@ int running_socket_tracer(l7_handle_fn handle,
 			  uint32_t max_socket_entries,
 			  uint32_t max_trace_entries,
 			  uint32_t socket_map_max_reclaim);
+int register_event_handle(uint32_t type, void (*fn)(void *));
 #endif /*_USER_SOCKET_H_*/

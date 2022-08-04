@@ -22,7 +22,7 @@ struct __socket_data {
 	__u32 pid;  // 表示线程号 如果'pid == tgid'表示一个进程, 否则是线程
 	__u32 tgid; // 进程号
 	__u64 coroutine_id; // CoroutineID, i.e., golang goroutine id
-	__u8  comm[16]; // 进程名
+	__u8  comm[16]; // 进程或线程名
 
 	/* 连接（socket）信息 */
 	__u64 socket_id;     /* 通信socket唯一ID， 从启动时的时钟开始自增1 */
@@ -110,8 +110,8 @@ struct trace_info_t {
 // struct member_offsets -> data[]  arrays index.
 enum offsets_index {
 	runtime_g_goid_offset = 0,
-	crypto_tls_conn_conn_offset = 1,
-	net_poll_fd_sysfd = 2,
+	crypto_tls_conn_conn_offset,
+	net_poll_fd_sysfd,
 	offsets_num,
 };
 
@@ -122,13 +122,30 @@ struct member_offsets {
 };
 
 enum {
-	EVENT_TYPE_PROC_EXEC = 128,
-	EVENT_TYPE_PROC_EXIT,
+	/*
+	 * 0 ~ 16 for L7 socket event (struct socket_data_buffer),
+	 * indicates the number of socket data in socket_data_buffer.
+	 */
+
+	/*
+	 * For event registrion
+	 */
+	EVENT_TYPE_MIN = 1 << 5,
+	EVENT_TYPE_PROC_EXEC = 1 << 5,
+	EVENT_TYPE_PROC_EXIT = 1 << 6
+	// Add new event type here.
 };
 
-struct event_data {
+// Description Provides basic information about an event 
+struct event_meta {
 	__u32 event_type;
+};
+
+// Process execution or exit event data 
+struct process_event_t {
+	struct event_meta meta;
 	__u32 pid; // process ID
+	__u8 name[16]; // process name
 };
 
 #define GO_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))

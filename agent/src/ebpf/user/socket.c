@@ -31,6 +31,8 @@
 static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
 static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
 
+static struct list_head events_list;		// Use for extra register events
+
 static pthread_t proc_events_pthread;	// Process exec/exit thread
 
 extern int sys_cpus_count;
@@ -318,35 +320,123 @@ static inline bool need_proto_reconfirm(uint16_t l7_proto)
 	return false;
 }
 
-static void process_event(struct event_data *e)
+static void process_event(struct process_event_t *e)
 {
-	if (e->event_type == EVENT_TYPE_PROC_EXEC)
+	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC)
 		go_process_exec(e->pid);
-	else if (e->event_type == EVENT_TYPE_PROC_EXIT)
+	else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT)
 		go_process_exit(e->pid);
 }
 
+static inline int dispatch_queue_index(uint64_t val, int count)
+{
+	return xxhash(val) % count;
+}
+
+// Some event types of data are handled by the user using a separate callback interface,
+// which completes the dispatch logic after reading the data from the Perf-Reader.
+static int register_events_handle(struct event_meta *meta,
+				  int size,
+				  struct bpf_tracer *tracer)
+{
+	// Internal logic processing for process exec/exit.
+	if (meta->event_type == EVENT_TYPE_PROC_EXEC ||
+	    meta->event_type == EVENT_TYPE_PROC_EXIT) {
+		process_event((struct process_event_t *)meta);
+	}
+
+	struct extra_event *e;
+	void (*fn)(void *) = NULL;
+	list_for_each_entry(e, &events_list, list) {
+		if (e->type & meta->event_type) {
+			fn = e->h;
+			break;
+		}
+	}
+
+	if (fn == NULL) {
+		ebpf_warning("Recv eBPF event type %d, but not find associated handle.\n",
+			     meta->event_type);
+
+		return ETR_NOHANDLE;
+	}
+
+	int q_idx;
+	struct queue *q;
+	int nr;
+	struct mem_block_head *block_head;
+
+	q_idx = dispatch_queue_index((uint64_t)meta->event_type,
+				     tracer->dispatch_workers_nr);
+	q = &tracer->queues[q_idx];
+	block_head = malloc(sizeof(struct mem_block_head) + size);
+	if (block_head == NULL) {
+		ebpf_warning("block_head alloc memory faild\n");
+		return ETR_NOMEM;
+	}
+
+	void *data = block_head + 1;
+	memcpy(data, meta, size);
+	nr = ring_sp_enqueue_burst(q->r, (void **)&data, 1, NULL);
+	if (nr < 1) {
+		atomic64_add(&q->enqueue_lost, 1);
+		free(block_head);
+		ebpf_warning("Add ring(q:%d) faild\n", q_idx);
+		return ETR_NOROOM;
+	}
+
+	block_head->free_ptr = block_head;
+	block_head->is_last = 1;
+	block_head->fn = fn;
+
+	pthread_mutex_lock(&q->mutex);
+	pthread_cond_signal(&q->cond);
+	pthread_mutex_unlock(&q->mutex);
+
+	atomic64_add(&q->enqueue_nr, nr);
+
+	return ETR_OK;
+}
+
+// Read datas from perf ring-buffer and dispatch.
 static void reader_raw_cb(void *t, void *raw, int raw_size)
 {
 	struct bpf_tracer *tracer = (struct bpf_tracer *)t;
-	struct __socket_data_buffer *buf = (struct __socket_data_buffer *)raw;
+	struct event_meta *ev_meta = raw;
 
-	if (buf->events_num == 0)
-		return;
-
-	if (buf->events_num >= EVENT_TYPE_PROC_EXEC) {
-		struct event_data *event = raw;
-		process_event(event);
+	/*
+	 * If 0 < ev_meta->event_type < EVENT_TYPE_MIN is 'socket data buffer'
+	 * else if ev_meta->event_type >= EVENT_TYPE_MIN is register events.
+	 *
+	 * If raw is socket data, 'ev_meta->event_type' indicates the number of events sent by
+	 * the kernel in the buffer. The value here must be greater than zero.
+	 */
+	if (ev_meta->event_type <= 0) {
 		return;
 	}
 
+	if (ev_meta->event_type >= EVENT_TYPE_MIN) {
+		register_events_handle(ev_meta, raw_size, tracer);
+		return;
+	}
+
+	/*
+	 * In the following, the socket data buffer is processed.
+	 */
+
+	int q_idx;
+	struct queue *q;
+	int nr;
+	struct mem_block_head *block_head;      // 申请内存块的指针
+
+	struct __socket_data_buffer *buf = (struct __socket_data_buffer *)raw;
 	int i, start = 0;
 	struct __socket_data *sd;
 
 	// 确定分发到哪个队列上，通过第一个socket_data来确定
 	sd = (struct __socket_data *)&buf->data[start];
-	int q_idx = xxhash(sd->socket_id) % tracer->dispatch_workers_nr;
-	struct queue *q = &tracer->queues[q_idx];
+	q_idx = dispatch_queue_index(sd->socket_id, tracer->dispatch_workers_nr);
+	q = &tracer->queues[q_idx];
 
 	if (buf->events_num > MAX_PKT_BURST) {
 		ebpf_info
@@ -376,7 +466,6 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	 */
 	struct socket_bpf_data *submit_data;
 	int len;
-	struct mem_block_head *block_head;	// 申请内存块的指针
 	void *data_buf_ptr;
 
 	// 所有载荷的数据总大小（去掉头）
@@ -402,6 +491,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		block_head = (struct mem_block_head *)data_buf_ptr;
 		block_head->is_last = 0;
 		block_head->free_ptr = socket_data_buff;
+		block_head->fn = NULL;
 
 		data_buf_ptr = block_head + 1;
 		submit_data = data_buf_ptr;
@@ -460,7 +550,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		data_buf_ptr += sizeof(*submit_data) + submit_data->cap_len;
 	}
 
-	int nr = ring_sp_enqueue_burst
+	nr = ring_sp_enqueue_burst
 	    (q->r, (void **)burst_data, buf->events_num, NULL);
 
 	if (nr < buf->events_num) {
@@ -611,6 +701,34 @@ static void process_events_handle_main(__unused void *arg)
 	go_process_events_handle();
 }
 
+/**
+ * Start socket tracer
+ *
+ * Socket-Tracer is used to get all read/write datas on socket.
+ * It also contains some event data related to L7 data, such as process information.
+ * These datas are derived from eBPF Kprobe, Uprobe, Tracepoint and other types.
+ *
+ * Parameters:
+ * @handle
+ *     Callback interface for upper-layer Application.
+ * @thread_nr
+ *     Number of worker threads, which refers to the number of user mode threads involved
+ *     in data processing.
+ * @perf_pages_cnt
+ *     Number of page frames with kernel shared memory footprint, the value is a power of 2.
+ * @queue_size
+ *     Ring cache queue size. The value is a power of 2.
+ * @max_socket_entries
+ *     Sets the maximum number of hash entries for socket tracing, depending on the number of concurrent
+ *     requests in actual scenarios.
+ * @max_trace_entries
+ *     Sets the maximum number of hash entries for thread/coroutine tracing sessions.
+ * @socket_map_max_reclaim
+ *     Indicates the maximum threshold for clearing socket MAP entries.
+ *     If the number of current map entries exceeds this threshold, the MAP will be cleared.
+ *
+ * @return value: 0 on success, if not 0 is faild
+ */
 int running_socket_tracer(l7_handle_fn handle,
 			  int thread_nr,
 			  uint32_t perf_pages_cnt,
@@ -636,12 +754,12 @@ int running_socket_tracer(l7_handle_fn handle,
 	if (is_core_kernel()) {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-core");
-		bpf_bin_buffer = (void *)socket_trace_core_ebpf_data; 
+		bpf_bin_buffer = (void *)socket_trace_core_ebpf_data;
 		buffer_sz = sizeof(socket_trace_core_ebpf_data);
 	} else if (major == 5 && minor == 2) {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-5.2");
-		bpf_bin_buffer = (void *)socket_trace_5_2_ebpf_data; 
+		bpf_bin_buffer = (void *)socket_trace_5_2_ebpf_data;
 		buffer_sz = sizeof(socket_trace_5_2_ebpf_data);
 	} else {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
@@ -697,7 +815,7 @@ int running_socket_tracer(l7_handle_fn handle,
 	if (tracer_probes_init(tracer))
 		return -EINVAL;
 
-	// Update go offsets to eBPF "go_offsets_map" 
+	// Update go offsets to eBPF "uprobe_offsets_map" 
 	update_go_offsets_to_map(tracer);
 
 	if (tracer_hooks_attach(tracer))
@@ -760,7 +878,7 @@ int running_socket_tracer(l7_handle_fn handle,
 			("<%s> proc_events_pthread, pthread_create is error:%s\n",
 			 __func__, strerror(errno));
 		return ret;
-        }
+	}
 
 	return 0;
 }
@@ -790,7 +908,7 @@ static int socket_tracer_stop(void)
 	 * 2. Start/stop tracer need process probes. 
 	 * The above scenario is handled in different threads, so use thread locks for protection.
 	 */
-        pthread_mutex_lock(&t->mutex_probes_lock);
+	pthread_mutex_lock(&t->mutex_probes_lock);
 	if ((ret = tracer_hooks_detach(t)) == 0) {
 		t->state = TRACER_STOP;
 		ebpf_info("Tracer stop success, current state: TRACER_STOP\n");
@@ -956,6 +1074,44 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.boot_time_update_diff = sys_boot_time_ns - prev_sys_boot_time_ns;
 
 	return stats;
+}
+
+/**
+ * Register extra event handle.
+ *
+ * Parameter:
+ * @type Event type
+ * @fn Callback function
+ *
+ * @return 0 is success, if not 0 is faild
+ */
+int register_event_handle(uint32_t type, void (*fn)(void *))
+{
+	if (type < EVENT_TYPE_MIN || fn == NULL) {
+		ebpf_warning("Parameter is invalid, type %d fn %p\n", type, fn);
+		return -1;
+	}
+
+	struct list_head *events_head;
+	events_head = &events_list;
+	// Initialize events_list
+	if (events_head->next == events_head->prev &&
+	    events_head->next == NULL) {
+		INIT_LIST_HEAD(events_head);
+	}
+
+	struct extra_event *event = calloc(1, sizeof(struct extra_event));
+	if (event == NULL) {
+		ebpf_warning("calloc() is faild.\n");
+		return -1;
+	}
+
+	event->type = type;
+	event->h = fn;
+
+	list_add_tail(&event->list, events_head);
+
+	return 0;
 }
 
 // -------------------------------------

@@ -70,11 +70,6 @@ func (c *ControllerCheck) healthCheck() {
 
 	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Find(&controllers)
 	for _, controller := range controllers {
-		checkIP := controller.IP
-		if controller.NATIPEnabled != 0 {
-			checkIP = controller.NATIP
-		}
-
 		// 健康检查过程，为了防止网络抖动，(3 * interval)时间内都正常/异常才进行状态修改
 		// 如果数据库状态是正常，且检查正常
 		// - 检查是否在正常/异常Dict中
@@ -96,7 +91,7 @@ func (c *ControllerCheck) healthCheck() {
 		// - 检查是否在正常/异常Dict中
 		//   - 如果在，则从正常/异常Dict中移除
 		//   - 如果不在，do nothing
-		active := isActive(common.HEALTH_CHECK_URL, checkIP, c.cfg.HealthCheckPort)
+		active := isActive(common.HEALTH_CHECK_URL, controller.IP, c.cfg.HealthCheckPort)
 		if controller.State == common.HOST_STATE_COMPLETE {
 			if active {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {
