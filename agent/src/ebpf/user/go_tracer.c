@@ -31,7 +31,7 @@
 #include "symbol.h"
 #include "socket.h"
 
-#define MAP_GO_OFFSETS_MAP_NAME	"go_offsets_map"
+#define MAP_GO_OFFSETS_MAP_NAME	"uprobe_offsets_map"
 #define PROCFS_CHECK_PERIOD  60	// 60 seconds
 static uint64_t procfs_check_count;
 

@@ -586,7 +586,7 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupCon
 
 func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (string, error) {
 	if createData.VTapGroupID == nil {
-		return "", fmt.Errorf("vtap_group_lcuuid is None")
+		return "", fmt.Errorf("vtap_group_id is None")
 	}
 	shortUUID := createData.VTapGroupID
 	db := mysql.Db
@@ -598,7 +598,7 @@ func CreateVTapGroupAdvancedConfig(createData *model.VTapGroupConfiguration) (st
 	dbConfig := &mysql.VTapGroupConfiguration{}
 	ret = db.Where("vtap_group_lcuuid = ?", vtapGroup.Lcuuid).First(dbConfig)
 	if ret.Error == nil {
-		return "", fmt.Errorf("vtapgroup(short_uuid=%s) configuration already exist", *createData.VTapGroupLcuuid)
+		return "", fmt.Errorf("vtap group(short_uuid=%s) configuration already exist", *shortUUID)
 	}
 	convertYamlToDb(createData, dbConfig)
 	dbConfig.VTapGroupLcuuid = &vtapGroup.Lcuuid

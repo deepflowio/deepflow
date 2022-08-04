@@ -147,6 +147,10 @@ var (
 		input:  "select `metrics.storageclass_annotations` AS `job_info` from prometheus_kube",
 		output: "SELECT if(indexOf(metrics_float_names, 'storageclass_annotations')=0,null,metrics_float_values[indexOf(metrics_float_names, 'storageclass_annotations')]) AS job_info FROM ext_metrics.prometheus_kube PREWHERE (job_info is not null)",
 		db:     "ext_metrics",
+	}, {
+		input:  "select Sum(`metrics.pending`) from `deepflow_server.queue`",
+		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) FROM deepflow_system.`deepflow_server.queue`",
+		db:     "deepflow_system",
 	},
 	}
 )
