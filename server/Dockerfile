@@ -7,7 +7,7 @@ RUN apk add tzdata
 
 COPY ./server.yaml /etc/
 RUN mkdir /etc/mysql
-COPY ./controller/db/mysql/migrate/rawsql /etc/mysql
+COPY ./controller/db/mysql/migration/rawsql /etc/mysql
 COPY ./querier/db_descriptions /etc/db_descriptions/
 ARG TARGETARCH 
 

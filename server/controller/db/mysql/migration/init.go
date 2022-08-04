@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package migrate
+package migration
 
 const (
 	CREATE_TABLE_DB_VERSION = `CREATE TABLE IF NOT EXISTS db_version (
