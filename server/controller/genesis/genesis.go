@@ -153,7 +153,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 		client := api.NewControllerClient(conn)
 		ret, err := client.GenesisSharingSync(context.Background(), &api.GenesisSharingSyncRequest{})
 		if err != nil {
-			log.Infof("get genesis sharing sync faild (%s)", err.Error())
+			log.Warningf("get genesis sharing sync faild (%s)", err.Error())
 			continue
 		}
 
@@ -346,7 +346,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			}
 			ret, err := client.GenesisSharingK8S(context.Background(), req)
 			if err != nil {
-				log.Info(err.Error())
+				log.Warningf("get genesis sharing k8s faild (%s)", err.Error())
 				continue
 			} else {
 				retFlag = true
