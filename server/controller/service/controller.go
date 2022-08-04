@@ -45,10 +45,10 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 		db = db.Where("ip = ?", ip)
 	} else if name, ok := filter["name"]; ok && name != "" {
 		db = db.Where("name = ?", name)
-	} else if analyzerName, ok := filter["analyzer_name"]; ok {
+	} else if analyzerIP, ok := filter["analyzer_ip"]; ok {
 		analyzer := mysql.Analyzer{}
-		mysql.Db.Where("name = ?", analyzerName).First(&analyzer)
-		if ret := mysql.Db.Where("name = ?", analyzerName).First(&analyzer); ret.Error != nil {
+		mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer)
+		if ret := mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer); ret.Error != nil {
 			return []model.Controller{}, nil
 		}
 		azAnalyzerConns := []mysql.AZAnalyzerConnection{}
