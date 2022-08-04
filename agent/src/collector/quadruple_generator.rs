@@ -996,16 +996,7 @@ impl QuadrupleGenerator {
                         request: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
                         response: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
                     },
-                    latency: AppLatency {
-                        rrt_max: stats.tcp.art_max,
-                        rrt_sum: stats.tcp.art_sum as u64,
-                        rrt_count: stats.tcp.art_count,
-                    },
-                    anomaly: AppAnomaly {
-                        client_error: tagged_flow.flow.close_type.is_client_error() as u32,
-                        server_error: tagged_flow.flow.close_type.is_server_error() as u32,
-                        timeout: 0,
-                    },
+                    ..Default::default()
                 }
             }
             _ => {
