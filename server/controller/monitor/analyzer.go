@@ -70,13 +70,8 @@ func (c *AnalyzerCheck) healthCheck() {
 
 	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Find(&analyzers)
 	for _, analyzer := range analyzers {
-		checkIP := analyzer.IP
-		if analyzer.NATIPEnabled != 0 {
-			checkIP = analyzer.NATIP
-		}
-
 		// 检查逻辑同控制器
-		active := isActive(common.HEALTH_CHECK_URL, checkIP, c.cfg.HealthCheckPort)
+		active := isActive(common.HEALTH_CHECK_URL, analyzer.IP, c.cfg.HealthCheckPort)
 		if analyzer.State == common.HOST_STATE_COMPLETE {
 			if active {
 				if _, ok := c.normalAnalyzerDict[analyzer.IP]; ok {
