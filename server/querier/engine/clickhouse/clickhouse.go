@@ -612,7 +612,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		switch comparExpr.(type) {
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
-			if e.DB == "ext_metrics" && strings.Contains(whereTag, "metrics.") {
+			if (e.DB == "ext_metrics" || e.DB == "deepflow_system") && strings.Contains(whereTag, "metrics.") {
 				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table)
 				if ok {
 					whereTag = metricStruct.DBField
@@ -653,7 +653,7 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 	// 加载metric定义
 	if metricData, ok := dbDataMap["metrics"]; ok {
 		for db, tables := range chCommon.DB_TABLE_MAP {
-			if db == "ext_metrics" {
+			if db == "ext_metrics" || db == "deepflow_system" {
 				continue
 			}
 			for _, table := range tables {

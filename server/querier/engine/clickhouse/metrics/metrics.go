@@ -87,7 +87,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 }
 
 func GetMetrics(field string, db string, table string) (*Metrics, bool) {
-	if db == "ext_metrics" {
+	if db == "ext_metrics" || db == "deepflow_system" {
 		field = strings.Trim(field, "`")
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
@@ -129,7 +129,7 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 		case "vtap_app_edge_port":
 			return GetVtapAppEdgePortMetrics(), err
 		}
-	case "ext_metrics":
+	case "ext_metrics", "deepflow_system":
 		return GetExtMetrics(db, table, where)
 	}
 	return nil, err
@@ -158,7 +158,7 @@ func GetMetricsDescriptions(db string, table string, where string) (map[string][
 	var values []interface{}
 	if table == "" {
 		var tables []interface{}
-		if db == "ext_metrics" {
+		if db == "ext_metrics" || db == "deepflow_system" {
 			for _, extTables := range ckcommon.GetExtTables(db) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
@@ -256,7 +256,7 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 			metrics = VTAP_APP_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
 		}
-	case "ext_metrics":
+	case "ext_metrics", "deepflow_system":
 		metrics = EXT_METRICS
 	}
 	if metrics == nil {

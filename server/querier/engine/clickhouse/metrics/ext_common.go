@@ -28,7 +28,7 @@ var EXT_METRICS = map[string]*Metrics{}
 func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
 	var err error
-	if db == "ext_metrics" {
+	if db == "ext_metrics" || db == "deepflow_system" {
 		externalChClient := client.Client{
 			Host:     config.Cfg.Clickhouse.Host,
 			Port:     config.Cfg.Clickhouse.Port,
