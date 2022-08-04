@@ -91,6 +91,7 @@ controller:
         kubernetes_gather_interval: 60
         # 阿里公有云API获取区域列表时，需要指定一个区域
         aliyun_region_name: cn-beijing
+        huawei_domain_name: myhuaweicloud.com
       recorder:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟
         cache_refresh_interval: 60

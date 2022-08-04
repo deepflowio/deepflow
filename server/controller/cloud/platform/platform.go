@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/baidubce"
 	"github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/cloud/genesis"
+	"github.com/deepflowys/deepflow/server/controller/cloud/huawei"
 	"github.com/deepflowys/deepflow/server/controller/cloud/kubernetes"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/cloud/qingcloud"
@@ -55,6 +56,8 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) 
 		platform, err = baidubce.NewBaiduBce(domain)
 	case common.KUBERNETES:
 		platform, err = kubernetes.NewKubernetes(domain)
+	case common.HUAWEI:
+		platform, err = huawei.NewHuaWei(domain, &cfg)
 	// TODO: other platform
 	default:
 		return nil, errors.New(fmt.Sprintf("domain type (%d) not supported", domain.Type))
