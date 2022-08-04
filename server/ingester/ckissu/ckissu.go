@@ -35,6 +35,7 @@ var log = logging.MustGetLogger("issu")
 
 type Issu struct {
 	columnRenames                          []*ColumnRename
+	columnMods                             []*ColumnMod
 	columnAdds                             []*ColumnAdd
 	primaryConnection, SecondaryConnection *sql.DB
 	primaryAddr, secondaryAddr             string
@@ -47,6 +48,14 @@ type ColumnRename struct {
 	Table         string
 	OldColumnName string
 	NewColumnName string
+}
+
+type ColumnMod struct {
+	Db            string
+	Table         string
+	ColumnName    string
+	NewColumnType ckdb.ColumnType
+	DropIndex     bool
 }
 
 type ColumnAdd struct {
@@ -287,13 +296,30 @@ var ColumnAdd611 = []*ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
 		ColumnNames: []string{"span_kind"},
-		ColumnType:  ckdb.UInt8,
+		ColumnType:  ckdb.UInt8Nullable,
 	},
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
 		ColumnNames: []string{"parent_span_id", "service_instance_id"},
 		ColumnType:  ckdb.String,
+	},
+}
+
+var ColumnMod611 = []*ColumnMod{
+	&ColumnMod{
+		Db:            "flow_log",
+		Table:         "l7_flow_log",
+		ColumnName:    "span_kind",
+		NewColumnType: ckdb.UInt8Nullable,
+		DropIndex:     false,
+	},
+	&ColumnMod{
+		Db:            "flow_log",
+		Table:         "l7_flow_log_local",
+		ColumnName:    "span_kind",
+		NewColumnType: ckdb.UInt8Nullable,
+		DropIndex:     true,
 	},
 }
 
@@ -537,6 +563,7 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 	i.columnAdds = columnAdds
+	i.columnMods = ColumnMod611
 	// 610版本无字段名字变更
 	// i.columnRenames = ColumnRename610
 
@@ -597,6 +624,39 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 	return nil
 }
 
+func (i *Issu) modColumn(connect *sql.DB, cm *ColumnMod) error {
+	if cm.DropIndex {
+		sql := fmt.Sprintf("ALTER TABLE %s.%s DROP INDEX %s_idx",
+			cm.Db, cm.Table, cm.ColumnName)
+		log.Info("drop index: ", sql)
+		_, err := connect.Exec(sql)
+		if err != nil {
+			if strings.Contains(err.Error(), "Cannot find index") {
+				log.Infof("db: %s, table: %s error: %s", cm.Db, cm.Table, err)
+			} else {
+				log.Error(err)
+				return err
+			}
+		}
+	}
+	// ALTER TABLE flow_log.l7_flow_log  MODIFY COLUMN span_kind Nullable(UInt8);
+	sql := fmt.Sprintf("ALTER TABLE %s.%s MODIFY COLUMN %s %s",
+		cm.Db, cm.Table, cm.ColumnName, cm.NewColumnType)
+	log.Info("modify column: ", sql)
+	_, err := connect.Exec(sql)
+	if err != nil {
+		//If cannot find column, you need to skip the error
+		// Code: 10. DB::Exception: Received from localhost:9000. DB::Exception: Wrong column name. Cannot find column `span_kind` to modify.
+		if strings.Contains(err.Error(), "Cannot find column") {
+			log.Infof("db: %s, table: %s error: %s", cm.Db, cm.Table, err)
+			return nil
+		}
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+
 func (i *Issu) getTableVersion(connect *sql.DB, db, table string) (string, error) {
 	sql := fmt.Sprintf("SELECT comment FROM system.columns WHERE database='%s' AND table='%s' AND name='time'",
 		db, table)
@@ -635,6 +695,25 @@ func (i *Issu) renameColumns(connect *sql.DB) ([]*ColumnRename, error) {
 			return dones, err
 		}
 		dones = append(dones, renameColumn)
+	}
+
+	return dones, nil
+}
+
+func (i *Issu) modColumns(connect *sql.DB) ([]*ColumnMod, error) {
+	dones := []*ColumnMod{}
+	for _, modColumn := range i.columnMods {
+		version, err := i.getTableVersion(connect, modColumn.Db, modColumn.Table)
+		if err != nil {
+			return dones, err
+		}
+		if version == common.CK_VERSION {
+			continue
+		}
+		if err := i.modColumn(connect, modColumn); err != nil {
+			return dones, err
+		}
+		dones = append(dones, modColumn)
 	}
 
 	return dones, nil
@@ -703,6 +782,10 @@ func (i *Issu) Start() error {
 		if errRenames != nil {
 			return errRenames
 		}
+		mods, errMods := i.modColumns(connect)
+		if errMods != nil {
+			return errMods
+		}
 
 		adds, errAdds := i.addColumns(connect)
 		if errAdds != nil {
@@ -710,6 +793,11 @@ func (i *Issu) Start() error {
 		}
 
 		for _, cr := range renames {
+			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+				return err
+			}
+		}
+		for _, cr := range mods {
 			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
 				return err
 			}

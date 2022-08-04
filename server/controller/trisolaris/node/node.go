@@ -28,6 +28,7 @@ import (
 
 	"github.com/deepflowys/deepflow/message/trident"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/service"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/dbmgr"
@@ -342,6 +343,10 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 		if err != nil {
 			log.Error(err)
 		}
+		err = service.ConfigAnalyzerDataSource(tsdb.IP)
+		if err != nil {
+			log.Error(err)
+		}
 	} else if err != nil {
 		log.Error(err)
 	}
@@ -414,6 +419,14 @@ func (n *NodeInfo) GetGroups() []byte {
 
 func (n *NodeInfo) GetGroupsVersion() uint64 {
 	return n.metaData.GetDropletGroupsVersion()
+}
+
+func (n *NodeInfo) GetPolicy() []byte {
+	return n.metaData.GetDropletPolicyStr()
+}
+
+func (n *NodeInfo) GetPolicyVersion() uint64 {
+	return n.metaData.GetDropletPolicyVersion()
 }
 
 func (n *NodeInfo) registerControllerToDB(data *models.Controller) {

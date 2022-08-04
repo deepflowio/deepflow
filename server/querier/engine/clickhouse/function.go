@@ -72,16 +72,19 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 	}
 }
 
-func GetAggFunc(name string, args []string, alias string, db string, table string) (Statement, int, error) {
+func GetAggFunc(name string, args []string, alias string, db string, table string) (Statement, int, string, error) {
 	var levelFlag int
 	field := args[0]
 	field = strings.Trim(field, "`")
 	metricStruct, ok := metrics.GetMetrics(field, db, table)
 	if !ok {
-		return nil, 0, nil
+		return nil, 0, "", nil
 	}
-	if _, ok := metrics.METRICS_FUNCTIONS_MAP[name]; !ok {
-		return nil, 0, nil
+	var unit string
+	if function, ok := metrics.METRICS_FUNCTIONS_MAP[name]; !ok {
+		return nil, 0, "", nil
+	} else {
+		unit = strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
 	}
 	// 判断算子是否支持单层
 	if db == "flow_metrics" {
@@ -99,8 +102,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 		Name:    name,
 		Args:    args,
 		Alias:   alias,
-	}, levelFlag, nil
-	return nil, levelFlag, nil
+	}, levelFlag, unit, nil
 }
 
 func GetBinaryFunc(name string, args []Function) (*BinaryFunction, error) {
@@ -556,6 +558,23 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 }
 
 func (f *TagFunction) Format(m *view.Model) {
+	if strings.HasPrefix(f.Name, TAG_FUNCTION_TOPK) {
+		if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
+			var outAlias string
+			innerAlias := fmt.Sprintf("_%s", f.Alias)
+			outAlias, f.Alias = f.Alias, innerAlias
+			node := f.Trans(m)
+			node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_INNER
+			m.AddTag(node)
+			grouparrayNode := &view.Tag{
+				Value: fmt.Sprintf("groupUniqArrayArray(%s)", innerAlias),
+				Alias: outAlias,
+				Flag:  view.NODE_FLAG_METRICS_OUTER,
+			}
+			m.AddTag(grouparrayNode)
+			return
+		}
+	}
 	node := f.Trans(m)
 	m.AddTag(node)
 	// metric分层的情况下 function需加入metric外层group

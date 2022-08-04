@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
+	"github.com/deepflowys/deepflow/server/ingester/stream/common"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
@@ -269,6 +271,7 @@ type L7Logger struct {
 	SpanId            string
 	ParentSpanId      string
 	SpanKind          uint8
+	spanKind          *uint8
 	ServiceName       string
 	ServiceInstanceId string
 
@@ -309,7 +312,7 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("trace_id", ckdb.String).SetComment("TraceID"),
 		ckdb.NewColumn("span_id", ckdb.String).SetComment("SpanID"),
 		ckdb.NewColumn("parent_span_id", ckdb.String).SetComment("ParentSpanID"),
-		ckdb.NewColumn("span_kind", ckdb.UInt8).SetComment("SpanKind"),
+		ckdb.NewColumn("span_kind", ckdb.UInt8Nullable).SetComment("SpanKind"),
 		ckdb.NewColumn("service_name", ckdb.LowCardinalityString).SetComment("service name"),
 		ckdb.NewColumn("service_instance_id", ckdb.String).SetComment("service instance id"),
 
@@ -389,7 +392,7 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteString(h.ParentSpanId); err != nil {
 		return err
 	}
-	if err := block.WriteUInt8(h.SpanKind); err != nil {
+	if err := block.WriteUInt8Nullable(h.spanKind); err != nil {
 		return err
 	}
 	if err := block.WriteString(h.ServiceName); err != nil {
@@ -764,9 +767,24 @@ func ReleaseL7Logger(l *L7Logger) {
 
 var L7LogCounter uint32
 
-func ProtoLogToL7Logger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func ProtoLogToL7Logger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) *L7Logger {
 	h := AcquireL7Logger()
 	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7LogCounter, shardID)
 	h.Fill(l, platformData)
 	return h
+}
+
+func L7LoggerToFlowTagInterfaces(l *L7Logger) ([]interface{}, []interface{}) {
+	fields := make([]interface{}, 0, 2*len(l.AttributeNames))
+	fieldValues := make([]interface{}, 0, 2*len(l.AttributeValues))
+	time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
+	db, table := common.FLOW_LOG_DB, common.L7_FLOW_ID.String()
+	for i, name := range l.AttributeNames {
+		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name))
+		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name, l.AttributeValues[i]))
+
+		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name))
+		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name, l.AttributeValues[i]))
+	}
+	return fields, fieldValues
 }

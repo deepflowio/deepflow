@@ -57,7 +57,7 @@ DeepFlow Community 主要由 Agent 和 Server 两个进程组成。每个 K8s �
 
 DeepFlow 官方社群对外开放，欢迎加入讨论：
 
-![微信技术交流群](./docs/wechat-group-keeper.png)
+<img src=./docs/wechat-group-keeper.png width=30% />
 
 # 致谢
 

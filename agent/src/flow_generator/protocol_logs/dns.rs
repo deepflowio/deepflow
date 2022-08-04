@@ -134,6 +134,10 @@ impl DnsLog {
                             return Err(Error::DNSLogParseFailed(err_msg));
                         }
                     }
+                    if buffer.len() > DNS_NAME_MAX_SIZE {
+                        let err_msg = format!("dns name invalid length:{}", buffer.len());
+                        return Err(Error::DNSLogParseFailed(err_msg));
+                    }
                     index = size;
                     if index >= payload.len() {
                         let err_msg = format!("dns name invalid index: {}", index);

@@ -17,6 +17,7 @@
 package queue
 
 import (
+	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
@@ -29,6 +30,7 @@ func (q *Queue) Init(name string, size int, unmarshaller Unmarshaller, options .
 	q.Monitor = &Monitor{}
 	q.Monitor.init(name, unmarshaller)
 	q.OverwriteQueue = &queue.OverwriteQueue{}
+	options = append(options, common.QUEUE_STATS_MOUDLE_INGESTER)
 	q.OverwriteQueue.Init(name, size, options...)
 }
 

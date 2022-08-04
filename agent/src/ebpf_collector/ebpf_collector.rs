@@ -108,7 +108,7 @@ impl SessionAggr {
             self.counter.counter().throttle_drop += 1;
             return;
         }
-        let _ = self.output.send(SendItem::L7FlowLog(log));
+        let _ = self.output.send(SendItem::L7FlowLog(Box::new(log)));
         self.counter.counter().tx += 1;
     }
 
@@ -691,7 +691,7 @@ impl OwnedCountable for SyncEbpfCounter {
 struct EbpfRunner {
     time_diff: Arc<AtomicI64>,
 
-    receiver: Receiver<MetaPacket<'static>>,
+    receiver: Receiver<Box<MetaPacket<'static>>>,
 
     // 应用识别
     app_table: AppTable,
@@ -825,7 +825,7 @@ pub struct EbpfCollector {
 }
 
 static mut SWITCH: bool = false;
-static mut SENDER: Option<Sender<MetaPacket>> = None;
+static mut SENDER: Option<Sender<Box<MetaPacket>>> = None;
 static mut CAPTURE_SIZE: usize = ebpf::CAP_LEN_MAX as usize;
 
 impl EbpfCollector {
@@ -841,13 +841,13 @@ impl EbpfCollector {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
                 return;
             }
-            if let Err(e) = SENDER.as_mut().unwrap().send(packet.unwrap()) {
+            if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet.unwrap())) {
                 warn!("meta packet send ebpf error: {:?}", e);
             }
         }
     }
 
-    fn ebpf_init(config: &EbpfConfig, sender: Sender<MetaPacket<'static>>) -> Result<()> {
+    fn ebpf_init(config: &EbpfConfig, sender: Sender<Box<MetaPacket<'static>>>) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
             let log_file = config.log_path.clone();
@@ -920,7 +920,7 @@ impl EbpfCollector {
         output: DebugSender<SendItem>,
     ) -> Result<Box<Self>> {
         info!("ebpf collector init...");
-        let (sender, receiver, _) = bounded::<MetaPacket>(1024);
+        let (sender, receiver, _) = bounded(1024);
 
         Self::ebpf_init(config, sender)?;
         info!("ebpf collector initialized.");

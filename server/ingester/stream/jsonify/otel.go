@@ -19,6 +19,7 @@ package jsonify
 import (
 	"encoding/hex"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,8 +33,8 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []interface{} {
-	ret := []interface{}{}
+func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []*L7Logger {
+	ret := []*L7Logger{}
 	for _, resourceSpan := range l.GetResourceSpans() {
 		var resAttributes []*v11.KeyValue
 		resource := resourceSpan.GetResource()
@@ -49,7 +50,7 @@ func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, pla
 	return ret
 }
 
-func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, shardID int, platformData *grpc.PlatformInfoTable) interface{} {
+func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, shardID int, platformData *grpc.PlatformInfoTable) *L7Logger {
 	h := AcquireL7Logger()
 	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7LogCounter, shardID)
 	h.VtapID = vtapID
@@ -225,7 +226,8 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 			case "http.flavor":
 				h.Version = value.GetStringValue()
 			case "http.status_code":
-				h.responseCode = int16(value.GetIntValue())
+				v, _ := strconv.Atoi(getValueString(value))
+				h.responseCode = int16(v)
 				h.ResponseCode = &h.responseCode
 			case "http.host", "db.connection_string":
 				h.RequestDomain = value.GetStringValue()
@@ -290,6 +292,7 @@ func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformD
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
 	h.TapSide = spanKindToTapSide(l.Kind)
 	h.SpanKind = uint8(l.Kind)
+	h.spanKind = &h.SpanKind
 	h.StartTime = int64(l.StartTimeUnixNano) / int64(time.Microsecond)
 	h.L7Base.EndTime = int64(l.EndTimeUnixNano) / int64(time.Microsecond)
 	if h.L7Base.EndTime > h.StartTime {

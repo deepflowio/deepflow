@@ -110,7 +110,11 @@ pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
 pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "C:\\DeepFlow\\trident\\trident-windows.yaml";
 
 impl Trident {
-    pub fn start<P: AsRef<Path>>(config_path: P, revision: &'static str) -> Result<Trident> {
+    pub fn start<P: AsRef<Path>>(
+        config_path: P,
+        agent_ident: &'static str,
+        revision: &'static str,
+    ) -> Result<Trident> {
         let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
         let state_thread = state.clone();
 
@@ -179,6 +183,7 @@ impl Trident {
             if let Err(e) = Self::run(
                 state_thread,
                 config,
+                agent_ident,
                 revision,
                 logger_handle,
                 remote_log_config,
@@ -195,6 +200,7 @@ impl Trident {
     fn run(
         state: TridentState,
         mut config: Config,
+        agent_ident: &'static str,
         revision: &'static str,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
@@ -248,7 +254,8 @@ impl Trident {
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             state.clone(),
-            revision.clone(),
+            agent_ident,
+            revision,
             ctrl_ip.to_string(),
             ctrl_mac.to_string(),
             config_handler.static_config.controller_ips[0].clone(),
@@ -807,29 +814,26 @@ impl Components {
         );
 
         // Dispatcher
-        let bpf_syntax = if candidate_config.dispatcher.capture_bpf != "" {
-            candidate_config.dispatcher.capture_bpf.clone()
-        } else {
-            let source_ip = match get_route_src_ip(&candidate_config.dispatcher.analyzer_ip) {
-                Ok(ip) => ip,
-                Err(e) => {
-                    warn!(
-                        "get route to {} failed: {:?}",
-                        candidate_config.dispatcher.analyzer_ip, e
-                    );
-                    Ipv4Addr::UNSPECIFIED.into()
-                }
-            };
-            bpf::Builder {
-                is_ipv6: ctrl_ip.is_ipv6(),
-                vxlan_port: yaml_config.vxlan_port,
-                controller_port: static_config.controller_port,
-                controller_tls_port: static_config.controller_tls_port,
-                proxy_controller_ip: candidate_config.dispatcher.proxy_controller_ip,
-                analyzer_source_ip: source_ip,
+        let source_ip = match get_route_src_ip(&candidate_config.dispatcher.analyzer_ip) {
+            Ok(ip) => ip,
+            Err(e) => {
+                warn!(
+                    "get route to {} failed: {:?}",
+                    candidate_config.dispatcher.analyzer_ip, e
+                );
+                Ipv4Addr::UNSPECIFIED.into()
             }
-            .build_pcap_syntax()
         };
+        let bpf_syntax = bpf::Builder {
+            is_ipv6: ctrl_ip.is_ipv6(),
+            vxlan_port: yaml_config.vxlan_port,
+            controller_port: static_config.controller_port,
+            controller_tls_port: static_config.controller_tls_port,
+            proxy_controller_port: candidate_config.dispatcher.proxy_controller_port,
+            analyzer_source_ip: source_ip,
+            analyzer_port: candidate_config.dispatcher.analyzer_port,
+        }
+        .build_pcap_syntax();
 
         let l7_log_rate = Arc::new(LeakyBucket::new(Some(
             candidate_config.log_parser.l7_log_collect_nps_threshold,
@@ -860,7 +864,10 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let bpf_options = Arc::new(Mutex::new(BpfOptions { bpf_syntax }));
+        let bpf_options = Arc::new(Mutex::new(BpfOptions {
+            capture_bpf: candidate_config.dispatcher.capture_bpf.clone(),
+            bpf_syntax,
+        }));
         for i in 0..dispatcher_num {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1135,7 +1142,7 @@ impl Components {
     fn new_collector(
         id: usize,
         stats_collector: &Arc<stats::Collector>,
-        flow_receiver: queue::Receiver<TaggedFlow>,
+        flow_receiver: queue::Receiver<Box<TaggedFlow>>,
         l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
         metrics_sender: queue::DebugSender<SendItem>,
         metrics_type: MetricsType,

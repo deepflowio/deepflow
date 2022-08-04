@@ -38,13 +38,14 @@ import (
 var log = logging.MustGetLogger("clickhouse")
 
 type CHEngine struct {
-	Model      *view.Model
-	Statements []Statement
-	DB         string
-	Table      string
-	DataSource string
-	asTagMap   map[string]string
-	View       *view.View
+	Model         *view.Model
+	Statements    []Statement
+	DB            string
+	Table         string
+	DataSource    string
+	asTagMap      map[string]string
+	ColumnSchemas []*client.ColumnSchema
+	View          *view.View
 }
 
 func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]interface{}, map[string]interface{}, error) {
@@ -85,7 +86,17 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		DB:       e.DB,
 		Debug:    debug,
 	}
-	rst, err := chClient.DoQuery(chSql, callbacks, query_uuid)
+	ColumnSchemaMap := make(map[string]*client.ColumnSchema)
+	for _, ColumnSchema := range e.ColumnSchemas {
+		ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
+	}
+	params := &client.QueryParams{
+		Sql:             chSql,
+		Callbacks:       callbacks,
+		QueryUUID:       query_uuid,
+		ColumnSchemaMap: ColumnSchemaMap,
+	}
+	rst, err := chClient.DoQuery(params)
 	if err != nil {
 		return nil, debug.Get(), err
 	}
@@ -324,6 +335,11 @@ func (e *CHEngine) parseSelect(tag sqlparser.SelectExpr) error {
 
 func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	as := chCommon.ParseAlias(item.As)
+	if as != "" {
+		e.ColumnSchemas = append(e.ColumnSchemas, client.NewColumnSchema(as))
+	} else {
+		e.ColumnSchemas = append(e.ColumnSchemas, client.NewColumnSchema(chCommon.ParseAlias(item.Expr)))
+	}
 	//var args []string
 	switch expr := item.Expr.(type) {
 	// 普通字符串
@@ -341,14 +357,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		whereStmt := Where{}
-		var notNullExpr view.Node
-		ok := true
-		if as == "" {
-			notNullExpr, ok = GetSelectNotNullFilter(chCommon.ParseAlias(expr), e.asTagMap, e.DB, e.Table)
-		} else {
-			notNullExpr, ok = GetSelectNotNullFilter(as, e.asTagMap, e.DB, e.Table)
-
-		}
+		notNullExpr, ok := GetSelectNotNullFilter(chCommon.ParseAlias(expr), as, e.DB, e.Table)
 		if !ok {
 			return nil
 		}
@@ -372,7 +381,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		name = strings.Trim(name, "`")
-		function, levelFlag, err := GetAggFunc(name, args, as, e.DB, e.Table)
+		function, levelFlag, unit, err := GetAggFunc(name, args, as, e.DB, e.Table)
 		if err != nil {
 			return err
 		}
@@ -380,6 +389,10 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			// 通过metric判断view是否拆层
 			e.SetLevelFlag(levelFlag)
 			e.Statements = append(e.Statements, function)
+			e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = client.COLUMN_SCHEMA_TYPE_METRICS
+			if unit != "" {
+				e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit = unit
+			}
 			return nil
 		}
 		tagFunction, err := GetTagFunction(name, args, as, e.DB, e.Table)
@@ -447,19 +460,26 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 				}
 				args = append(args, arg)
 			}
+			if function, ok := metrics.METRICS_FUNCTIONS_MAP[sqlparser.String(expr.Name)]; ok {
+				e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit = strings.ReplaceAll(function.UnitOverwrite, "$unit", e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit)
+			}
 			return GetBinaryFunc(sqlparser.String(expr.Name), args)
 		}
 		name, args, err := e.parseFunction(expr)
 		if err != nil {
 			return nil, err
 		}
-		aggfunction, levelFlag, err := GetAggFunc(name, args, "", e.DB, e.Table)
+		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table)
 		if err != nil {
 			return nil, err
 		}
 		if aggfunction != nil {
 			// 通过metric判断view是否拆层
 			e.SetLevelFlag(levelFlag)
+			e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = client.COLUMN_SCHEMA_TYPE_METRICS
+			if unit != "" && e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit == "" {
+				e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit = unit
+			}
 			return aggfunction.(Function), nil
 		}
 		tagFunction, err := GetTagFunction(name, args, "", e.DB, e.Table)

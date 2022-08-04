@@ -48,11 +48,12 @@ type Config struct {
 	RegionDomainPrefix       string   `yaml:"region-domain-prefix"`
 	ClearKubernetesTime      int      `default:"600" yaml:"clear-kubernetes-time"`
 	NodeIP                   string
-	VTapCacheRefreshInterval int  `default:"300" yaml:"vtapcache-refresh-interval"`
-	MetaDataRefreshInterval  int  `default:"60" yaml:"metadata-refresh-interval"`
-	NodeRefreshInterval      int  `default:"60" yaml:"node-refresh-interval"`
-	VTapAutoRegister         bool `default:"true" yaml:"vtap-auto-register"`
-	DefaultTapMode           int  `yaml:"default-tap-mode"`
+	VTapCacheRefreshInterval int    `default:"300" yaml:"vtapcache-refresh-interval"`
+	MetaDataRefreshInterval  int    `default:"60" yaml:"metadata-refresh-interval"`
+	NodeRefreshInterval      int    `default:"60" yaml:"node-refresh-interval"`
+	VTapAutoRegister         bool   `default:"true" yaml:"vtap-auto-register"`
+	DefaultTapMode           int    `yaml:"default-tap-mode"`
+	BillingMethod            string `default:"license" yaml:"billing-method"`
 }
 
 func (c *Config) Convert() {

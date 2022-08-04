@@ -1099,6 +1099,7 @@ type GoGenesisVInterface struct {
 	DeviceName          string    `gorm:"column:device_name;type:char(512);default:null" json:"DEVICE_NAME"`
 	DeviceType          string    `gorm:"column:device_type;type:char(64);default:null" json:"DEVICE_TYPE"`
 	HostIP              string    `gorm:"column:host_ip;type:char(48);default:null" json:"HOST_IP"`
+	NodeIP              string    `gorm:"column:node_ip;type:char(48);default:null" json:"NODE_IP"`
 	VTapID              int       `gorm:"column:vtap_id;type:int;default:null" json:"VTAP_ID"`
 	LastSeen            time.Time `gorm:"column:last_seen;type:datetime;default:NULL" json:"LAST_SEEN"`
 	KubernetesClusterID string    `gorm:"column:kubernetes_cluster_id;type:char(64);default:null" json:"KUBERNETES_CLUSTER_ID"`
@@ -1142,4 +1143,60 @@ type ResourceGroupExtraInfo struct {
 
 func (ResourceGroupExtraInfo) TableName() string {
 	return "resource_group_extra_info"
+}
+
+// NpbPolicy [...]
+type NpbPolicy struct {
+	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name             string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	State            int       `gorm:"column:state;type:int;default:null;default:1" json:"STATE"` // 0-disable; 1-enable
+	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
+	Vni              int       `gorm:"column:vni;type:int;default:null" json:"VNI"`
+	NpbTunnelID      int       `gorm:"column:npb_tunnel_id;type:int;default:null" json:"NPB_TUNNEL_ID"`
+	PayloadSlice     int       `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
+	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
+	PolicyACLGroupID int       `gorm:"column:policy_acl_group_id;type:int;default:null" json:"POLICY_ACL_GROUP_ID"`
+	VtapIDs          string    `gorm:"column:vtap_ids;type:text;default:null" json:"VTAP_IDS"` // separated by ,
+	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+}
+
+func (NpbPolicy) TableName() string {
+	return "npb_policy"
+}
+
+// NpbTunnel [...]
+type NpbTunnel struct {
+	ID        int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name      string    `gorm:"column:name;type:char(64);not null" json:"NAME"`
+	IP        string    `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	Type      int       `gorm:"column:type;type:int;default:null" json:"TYPE"` // (0-VXLAN；1-ERSPAN)
+	CreatedAt time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+	Lcuuid    string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+}
+
+func (NpbTunnel) TableName() string {
+	return "npb_tunnel"
+}
+
+// PcapPolicy [...]
+type PcapPolicy struct {
+	ID               int       `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name             string    `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	State            int       `gorm:"column:state;type:int;default:null;default:1" json:"STATE"` // 0-disable; 1-enable
+	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
+	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
+	VtapIDs          string    `gorm:"column:vtap_ids;type:text;default:null" json:"VTAP_IDS"` // separated by ,
+	PayloadSlice     int       `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
+	PolicyACLGroupID int       `gorm:"column:policy_acl_group_id;type:int;default:null" json:"POLICY_ACL_GROUP_ID"`
+	UserID           int       `gorm:"column:user_id;type:int;default:null" json:"USER_ID"`
+	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt        time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
+	Lcuuid           string    `gorm:"column:lcuuid;type:char(64);default:null" json:"LCUUID"`
+}
+
+func (PcapPolicy) TableName() string {
+	return "pcap_policy"
 }

@@ -97,6 +97,7 @@ pub type PortAccess = Access<PortConfig>;
 pub struct CollectorConfig {
     pub enabled: bool,
     pub inactive_server_port_enabled: bool,
+    pub inactive_ip_enabled: bool,
     pub vtap_flow_1s_enabled: bool,
     pub l4_log_collect_nps_threshold: u64,
     pub l4_log_store_tap_types: [bool; 256],
@@ -114,6 +115,7 @@ impl fmt::Debug for CollectorConfig {
                 "inactive_server_port_enabled",
                 &self.inactive_server_port_enabled,
             )
+            .field("inactive_ip_enabled", &self.inactive_ip_enabled)
             .field("vtap_flow_1s_enabled", &self.vtap_flow_1s_enabled)
             .field(
                 "l4_log_store_tap_types",
@@ -200,7 +202,9 @@ pub struct DispatcherConfig {
     pub packet_header_enabled: bool,
     pub if_mac_source: IfMacSource,
     pub analyzer_ip: IpAddr,
+    pub analyzer_port: u16,
     pub proxy_controller_ip: IpAddr,
+    pub proxy_controller_port: u16,
     pub capture_bpf: String,
     pub max_memory: u64,
     pub af_packet_blocks: usize,
@@ -388,6 +392,7 @@ impl fmt::Debug for EbpfConfig {
                     .filter(|&(_, b)| *b)
                     .collect::<Vec<_>>(),
             )
+            .field("ctrl_mac", &self.ctrl_mac)
             .finish()
     }
 }
@@ -623,7 +628,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 packet_header_enabled: conf.packet_header_enabled,
                 if_mac_source: conf.if_mac_source,
                 analyzer_ip: dest_ip,
-                proxy_controller_ip: proxy_controller_ip,
+                analyzer_port: conf.analyzer_port,
+                proxy_controller_ip,
+                proxy_controller_port: conf.proxy_controller_port,
                 capture_bpf: conf.capture_bpf.to_string(),
                 max_memory: conf.max_memory,
                 af_packet_blocks: conf.yaml_config.get_af_packet_blocks(conf.max_memory),
@@ -657,6 +664,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             collector: CollectorConfig {
                 enabled: conf.collector_enabled,
                 inactive_server_port_enabled: conf.inactive_server_port_enabled,
+                inactive_ip_enabled: conf.inactive_ip_enabled,
                 vtap_flow_1s_enabled: conf.vtap_flow_1s_enabled,
                 l4_log_collect_nps_threshold: conf.l4_log_collect_nps_threshold,
                 l7_metrics_enabled: conf.l7_metrics_enabled,

@@ -341,12 +341,12 @@ impl ThrottlingQueue {
 
         self.period_count += 1;
         if self.stashs.len() < self.throttle as usize {
-            self.stashs.push(SendItem::L4FlowLog(f));
+            self.stashs.push(SendItem::L4FlowLog(Box::new(f)));
             true
         } else {
             let r = self.small_rng.gen_range(0..self.period_count);
             if r < self.throttle as usize {
-                self.stashs[r] = SendItem::L4FlowLog(f);
+                self.stashs[r] = SendItem::L4FlowLog(Box::new(f));
             }
             false
         }

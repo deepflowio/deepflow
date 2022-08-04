@@ -87,22 +87,11 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 		analyzerIPToVtapCount[vtap.AnalyzerIP]++
 	}
 
-	// controller ip == analyzer ip
-	ipToDomainPrefix := make(map[string]string)
-	for _, controller := range controllers {
-		ipToDomainPrefix[controller.IP] = controller.RegionDomainPrefix
-	}
-
 	for _, analyzer := range analyzers {
-		// analyzer name = ${DomainPrefix}-${Name}
-		name := analyzer.Name
-		if domainPrefix, ok := ipToDomainPrefix[analyzer.IP]; ok && domainPrefix != "" {
-			name = domainPrefix + "-" + name
-		}
 		analyzerResp := model.Analyzer{
 			ID:                analyzer.ID,
 			IP:                analyzer.IP,
-			Name:              name,
+			Name:              analyzer.Name,
 			State:             analyzer.State,
 			NatIP:             analyzer.NATIP,
 			NatIPEnabled:      analyzer.NATIPEnabled,

@@ -127,7 +127,7 @@ impl Worker {
         // 上层Sender要关闭channel，才调用worker的stop方法
         let thread = thread::spawn(move || loop {
             match packet_receiver.recv(Some(interval)) {
-                Ok(PcapPacket::Packet(pkt)) => Self::write_pkt(pkt, &writers, &config, &counter),
+                Ok(PcapPacket::Packet(pkt)) => Self::write_pkt(*pkt, &writers, &config, &counter),
                 Err(Error::Timeout) => {
                     let now = get_timestamp(ntp_diff.load(Ordering::Relaxed));
                     Self::clean_timeout_file(now, &writers, &config, &counter);

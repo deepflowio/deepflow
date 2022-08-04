@@ -44,9 +44,9 @@ const PRE_FILE_SUFFIX: &str = ".pre";
 const MAX_FILE_SIZE: usize = 1_000_000_000;
 
 pub enum SendItem {
-    L4FlowLog(TaggedFlow),
-    L7FlowLog(AppProtoLogsData),
-    Metrics(Document),
+    L4FlowLog(Box<TaggedFlow>),
+    L7FlowLog(Box<AppProtoLogsData>),
+    Metrics(Box<Document>),
     ExternalOtel(OpenTelemetry),
     ExternalProm(PrometheusMetric),
     ExternalTelegraf(TelegrafMetric),
