@@ -95,6 +95,11 @@ func createDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
 	var datadbaseName string
 	db.Raw(fmt.Sprintf("SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='%s'", database)).Scan(&datadbaseName)
 	if datadbaseName == database {
+		var vmTable string
+		db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", database, "vm")).Scan(&vmTable)
+		if vmTable != "vm" {
+			return false, nil
+		}
 		return true, nil
 	} else {
 		err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", database)).Error
