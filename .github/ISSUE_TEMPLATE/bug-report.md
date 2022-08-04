@@ -16,14 +16,6 @@ labels: kind/bug
 
 # Additional Info
 
-- Kubernetes version:
-
-  **Output of `kubectl version`:**
-
-  ```
-  (paste your output here)
-  ```
-
 -  deepflow version:
 
    **Output of `kubectl exec -it -n deepflow sts/deepflow-server -c deepflow-server -- deepflow-server -v`:**
@@ -35,9 +27,16 @@ labels: kind/bug
   ```
 
 - deepflow agent list:
+
   **Output of `deepflow-ctl agent list`:**
   ```
   (paste your output here)
+  ```
+
+- Kubernetes CNI:
+
+  ```
+  (paste your Kubernetes CNI)
   ```
 
 - operation-system/kernel version:
