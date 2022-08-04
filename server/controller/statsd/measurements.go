@@ -18,6 +18,7 @@ package statsd
 
 import (
 	"reflect"
+	"time"
 
 	k8sgathermodel "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather/model"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
@@ -59,6 +60,35 @@ type CloudStatsd struct {
 	APICount map[string][]int
 	APICost  map[string][]int
 	ResCount map[string][]int
+}
+
+func NewCloudStatsd() CloudStatsd {
+	return CloudStatsd{
+		APICount: make(map[string][]int),
+		APICost:  make(map[string][]int),
+		ResCount: make(map[string][]int),
+	}
+}
+
+func (c *CloudStatsd) RefreshAPICount(key string, count int) {
+	if _, ok := c.APICount[key]; !ok {
+		c.APICount[key] = []int{count}
+	} else {
+		c.APICount[key] = append(c.APICount[key], count)
+	}
+}
+
+func (c *CloudStatsd) RefreshAPICost(key string, start time.Time) {
+	cost := time.Now().Sub(start).Milliseconds()
+	if _, ok := c.APICost[key]; !ok {
+		c.APICost[key] = []int{int(cost)}
+	} else {
+		c.APICost[key] = append(c.APICost[key], int(cost))
+	}
+}
+
+func (c *CloudStatsd) RefreshResCount(resource model.Resource) {
+	c.ResCount = GetResCount(resource)
 }
 
 func GetCloudStatsd(cloud CloudStatsd) []StatsdElement {
