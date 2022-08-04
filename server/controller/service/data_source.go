@@ -180,11 +180,7 @@ func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Contr
 	mysql.Db.Find(&analyzers)
 
 	for _, analyzer := range analyzers {
-		analyzerIP := analyzer.IP
-		if analyzer.NATIPEnabled != 0 {
-			analyzerIP = analyzer.NATIP
-		}
-		if CallRozeAPIAddRP(analyzerIP, dataSource, baseDataSource, cfg.Roze.Port) != nil {
+		if CallRozeAPIAddRP(analyzer.IP, dataSource, baseDataSource, cfg.Roze.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) add data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
@@ -234,11 +230,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	mysql.Db.Find(&analyzers)
 
 	for _, analyzer := range analyzers {
-		analyzerIP := analyzer.IP
-		if analyzer.NATIPEnabled != 0 {
-			analyzerIP = analyzer.NATIP
-		}
-		if CallRozeAPIModRP(analyzerIP, dataSource, cfg.Roze.Port) != nil {
+		if CallRozeAPIModRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) mod data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
@@ -297,11 +289,7 @@ func DeleteDataSource(lcuuid string, cfg *config.ControllerConfig) (map[string]s
 	mysql.Db.Find(&analyzers)
 
 	for _, analyzer := range analyzers {
-		analyzerIP := analyzer.IP
-		if analyzer.NATIPEnabled != 0 {
-			analyzerIP = analyzer.NATIP
-		}
-		if CallRozeAPIDelRP(analyzerIP, dataSource, cfg.Roze.Port) != nil {
+		if CallRozeAPIDelRP(analyzer.IP, dataSource, cfg.Roze.Port) != nil {
 			errMsg := fmt.Sprintf(
 				"config analyzer (%s) del data_source (%s) failed", analyzer.IP, dataSource.Name,
 			)
