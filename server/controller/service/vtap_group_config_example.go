@@ -135,6 +135,8 @@ pod_cluster_internal_ip: 1
 collector_enabled: 1
 # 非活跃端口指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
 inactive_server_port_enabled: 1
+# 非活跃IP指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+inactive_ip_enabled: 1
 # 网络性能指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
 # 说明：关闭时，采集器仅计算最基本的网络层吞吐指标量
 l4_performance_enabled: 1

@@ -25,5 +25,5 @@ config:
   # 所属区域标识
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
   # 资源同步控制器
-  controller_ip: 127.0.0.1
+  #controller_ip: 127.0.0.1
 `)
