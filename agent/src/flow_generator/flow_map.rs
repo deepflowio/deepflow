@@ -79,6 +79,7 @@ pub struct FlowMap {
     policy_getter: PolicyGetter,
     start_time: Duration,    // 时间桶中的最早时间
     start_time_in_unit: u64, // 时间桶中的最早时间，以TIME_SLOT_UNIT为单位
+    total_flow: usize,
 
     output_queue: DebugSender<Box<TaggedFlow>>,
     out_log_queue: DebugSender<Box<MetaAppProto>>,
@@ -121,6 +122,7 @@ impl FlowMap {
                 policy_getter,
                 start_time: Duration::ZERO,
                 start_time_in_unit: 0,
+                total_flow: 0,
                 output_queue,
                 out_log_queue: app_proto_log_queue,
                 output_buffer: vec![],
@@ -241,7 +243,6 @@ impl FlowMap {
                 return;
             }
         };
-        let total_flow = time_set.len();
 
         let pkt_timestamp = meta_packet.lookup_key.timestamp;
         match node_map.get_mut(&pkt_key) {
@@ -258,7 +259,7 @@ impl FlowMap {
                     node.match_node(&mut meta_packet, config_ignore, trident_type)
                 });
                 if index.is_none() {
-                    let node = Box::new(self.new_flow_node(meta_packet, total_flow));
+                    let node = Box::new(self.new_flow_node(meta_packet, self.total_flow));
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                     time_set.insert(time_key);
                     nodes.push(node);
@@ -285,7 +286,8 @@ impl FlowMap {
             }
             // 未找到Flow，需要插入新的节点
             None => {
-                let node = Box::new(self.new_flow_node(meta_packet, total_flow));
+                self.total_flow += 1;
+                let node = Box::new(self.new_flow_node(meta_packet, self.total_flow));
 
                 let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                 time_set.insert(time_key);
