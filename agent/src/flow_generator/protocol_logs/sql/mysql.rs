@@ -142,8 +142,8 @@ impl MysqlLog {
         }
         self.info.command = payload[COMMAND_OFFSET];
         match self.info.command {
-            MYSQL_COMMAND_QUIT | MYSQL_COMMAND_SHOW_FIELD => (),
-            MYSQL_COMMAND_USE_DATABASE | MYSQL_COMMAND_QUERY => {
+            COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_FETCH_AND_CLOSE => (),
+            COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
                 self.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..]);
             }
             _ => return Err(Error::MysqlLogParseFailed),
@@ -357,7 +357,7 @@ pub fn mysql_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
 
     let protocol_version_or_query_type = payload[offset];
     match protocol_version_or_query_type {
-        MYSQL_COMMAND_QUERY => {
+        COM_QUERY => {
             let context = mysql_string(&payload[offset + 1..]);
             return context.is_ascii();
         }
@@ -415,6 +415,7 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
+            ("mysql-statement.pcap", "mysql-statement.result"),
             ("mysql.pcap", "mysql.result"),
             ("mysql-error.pcap", "mysql-error.result"),
             ("mysql-table-desc.pcap", "mysql-table-desc.result"),
