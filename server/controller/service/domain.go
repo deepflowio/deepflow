@@ -117,6 +117,15 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 		if _, ok := controllerIPToName[domain.ControllerIP]; ok {
 			domainResp.ControllerName = controllerIPToName[domain.ControllerIP]
 		}
+
+		domainResp.Config = make(map[string]interface{})
+		json.Unmarshal([]byte(domain.Config), &domainResp.Config)
+		for _, key := range DOMAIN_PASSWORD_KEYS {
+			if _, ok := domainResp.Config[key]; ok {
+				domainResp.Config[key] = common.DEFAULT_ENCRYPTION_PASSWORD
+			}
+		}
+
 		if domain.Type != common.KUBERNETES {
 			domainResp.K8sEnabled = 1
 			if subDomains, ok := domainToSubDomainNames[domain.Lcuuid]; ok {
@@ -132,16 +141,9 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 						domainResp.VTapName = vtap.Name
 						domainResp.VTapCtrlIP = vtap.CtrlIP
 						domainResp.VTapCtrlMAC = vtap.CtrlMac
+						domainResp.Config["vtap_id"] = vtap.Name
 					}
 				}
-			}
-		}
-
-		domainResp.Config = make(map[string]interface{})
-		json.Unmarshal([]byte(domain.Config), &domainResp.Config)
-		for _, key := range DOMAIN_PASSWORD_KEYS {
-			if _, ok := domainResp.Config[key]; ok {
-				domainResp.Config[key] = common.DEFAULT_ENCRYPTION_PASSWORD
 			}
 		}
 
