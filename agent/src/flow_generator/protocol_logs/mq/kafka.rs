@@ -77,6 +77,7 @@ pub struct KafkaLog {
 }
 
 impl KafkaLog {
+    const MSG_LEN_SIZE: usize = 4;
     fn reset_logs(&mut self) {
         self.info.correlation_id = 0;
         self.info.req_msg_size = -1;
@@ -88,10 +89,18 @@ impl KafkaLog {
         self.status_code = 0;
     }
 
-    fn request(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
+    // 协议识别的时候严格检查避免误识别，日志解析的时候不用严格检查因为可能有长度截断
+    // ================================================================================
+    // The protocol identification is strictly checked to avoid misidentification.
+    // The log analysis is not strictly checked because there may be length truncation
+    fn request(&mut self, payload: &[u8], strict: bool) -> Result<AppProtoHead> {
         self.info.req_msg_size = read_u32_be(payload) as i32;
         let client_id_len = read_u16_be(&payload[12..]) as usize;
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
+            return Err(Error::KafkaLogParseFailed);
+        }
+
+        if strict && self.info.req_msg_size as usize != payload.len() - Self::MSG_LEN_SIZE {
             return Err(Error::KafkaLogParseFailed);
         }
 
@@ -143,7 +152,7 @@ impl L7LogParse for KafkaLog {
             return Err(Error::KafkaLogParseFailed);
         }
         match direction {
-            PacketDirection::ClientToServer => self.request(payload),
+            PacketDirection::ClientToServer => self.request(payload, false),
             PacketDirection::ServerToClient => self.response(payload),
         }
     }
@@ -169,7 +178,7 @@ pub fn kafka_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     }
     let mut kafka = KafkaLog::default();
 
-    let ret = kafka.request(payload);
+    let ret = kafka.request(payload, true);
     if ret.is_err() {
         return false;
     }
