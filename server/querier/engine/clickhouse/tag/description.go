@@ -309,6 +309,8 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	}
 	if db == "ext_metrics" {
 		table = "ext_common"
+	} else if db == "deepflow_system" {
+		table = "deepflow_system_common"
 	}
 	tagDescription, ok := TAG_DESCRIPTIONS[TagDescriptionKey{
 		DB: db, Table: table, TagName: tag,
