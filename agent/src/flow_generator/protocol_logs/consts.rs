@@ -157,11 +157,14 @@ pub const MYSQL_RESPONSE_CODE_OK: u8 = 0;
 pub const MYSQL_RESPONSE_CODE_ERR: u8 = 0xff;
 pub const MYSQL_RESPONSE_CODE_EOF: u8 = 0xfe;
 
-pub const MYSQL_COMMAND_QUIT: u8 = 1;
-pub const MYSQL_COMMAND_USE_DATABASE: u8 = 2;
-pub const MYSQL_COMMAND_QUERY: u8 = 3;
-pub const MYSQL_COMMAND_SHOW_FIELD: u8 = 4;
-pub const MYSQL_COMMAND_MAX: u8 = 5;
+pub const COM_QUIT: u8 = 1;
+pub const COM_INIT_DB: u8 = 2;
+pub const COM_QUERY: u8 = 3;
+pub const COM_FIELD_LIST: u8 = 4;
+pub const COM_STMT_PREPARE: u8 = 22;
+pub const COM_STMT_EXECUTE: u8 = 23;
+pub const COM_STMT_FETCH_AND_CLOSE: u8 = 25;
+pub const COM_MAX: u8 = 26;
 
 // dns constants
 use std::time::Duration;
