@@ -1,12 +1,61 @@
-#### What type of this PR
-Examples of user facing changes:
-- Features
-- Bug fixes
-- Docs
-- Tests
-<!-- 
-Describe your changes here, ideally you can get that description straight from your descriptive commit message(s)!
+<!--
+
+Thank you for contributing to DeepFlow!
+Please read this template before submitting pull requests.
+Texts surrounded by `<` and `>` should be replaced accordingly.
+Put an `x` in `[ ]` to mark the item as checked. `[x]`
+
 -->
 
-#### Which issue(s) this PR fixes:
+### This PR is for:
+
+<!--
+One or more of:
+- Agent
+- CLI
+- Server
+- Message
+- Libs
+- Documents
+- Workflow
+-->
+
+<!-- ==== Remove this line WHEN AND ONLY WHEN you're fixing a bug, follow the checklist ====
+### Fixes <bug description, issue number or issue link>
+#### Steps to reproduce the bug
+- <steps here>
+- ...
+#### Changes to fix the bug
+- <changes here>
+- ...
+#### Affected branches
+- main
+#### Checklist
+- [ ] Added unit test to verify the fix.
+     ==== Remove this line WHEN AND ONLY WHEN you're fixing a bug, follow the checklist ==== -->
+
+<!-- ==== Remove this line WHEN AND ONLY WHEN you're improving the performance, follow the checklist ====
+### Improves the performance of <crate, module, class or any description>
+#### Added benchmark
+- <link here>
+#### Benchmark result
+```text
+<Paste benchmark results>
+````
+     ==== Remove this line WHEN AND ONLY WHEN you're improving the performance, follow the checklist ==== -->
+
+<!-- ==== Remove this line WHEN AND ONLY WHEN you're adding a new feature, follow the checklist ====
+### <Feature description (with issue link if any)>
+#### Checklist
+- [ ] Added unit test.
+#### Backport to branches
+- <branch name here>
+     ==== Remove this line WHEN AND ONLY WHEN you're adding a new feature, follow the checklist ==== -->
+
+<!-- ==== Remove this line WHEN AND ONLY WHEN you're updating document or workflow, follow the checklist ====
+### <Description of the change>
+     ==== Remove this line WHEN AND ONLY WHEN you're updating document or workflow, follow the checklist ==== -->
+
+<!-- Uncomment if the PR fixes an issue
 Fixes #(issue-number)
+-->
