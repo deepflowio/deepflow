@@ -103,8 +103,8 @@ func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interfa
 func (b *UpdaterBase[MT, KT]) delete(dbItem MT) {
 	err := mysql.Db.Delete(&dbItem).Error
 	if err != nil {
-		log.Errorf("delete %s failed: %s", b.resourceTypeName, err)
+		log.Errorf("delete %s (%v) failed: %s", b.resourceTypeName, dbItem, err)
 		return
 	}
-	log.Infof("delete %s %v success", b.resourceTypeName, dbItem)
+	log.Infof("delete %s (%v) success", b.resourceTypeName, dbItem)
 }
