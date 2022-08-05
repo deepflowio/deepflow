@@ -18,8 +18,10 @@ vendor:
 	find vendor -type d -exec chmod +w {} \;
 	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/zerodoc/pb
 	cp vendor/${MESSAGE}/flow_log.proto vendor/${LIBS}/datatype/pb
+	cp vendor/${MESSAGE}/stats.proto vendor/${LIBS}/stats/pb
 	sed -i '6,10s/^...//' vendor/${LIBS}/zerodoc/pb/metric.proto
 	sed -i '6,10s/^...//' vendor/${LIBS}/datatype/pb/flow_log.proto
+	sed -i '6,10s/^...//' vendor/${LIBS}/stats/pb/stats.proto
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${LIBS} && go generate ./...
 
