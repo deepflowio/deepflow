@@ -355,9 +355,6 @@ static int register_events_handle(struct event_meta *meta,
 	}
 
 	if (fn == NULL) {
-		ebpf_warning("Recv eBPF event type %d, but not find associated handle.\n",
-			     meta->event_type);
-
 		return ETR_NOHANDLE;
 	}
 
@@ -767,6 +764,9 @@ int running_socket_tracer(l7_handle_fn handle,
 		bpf_bin_buffer = (void *)socket_trace_common_ebpf_data;
 		buffer_sz = sizeof(socket_trace_common_ebpf_data);
 	}
+
+	// Initialize events_list
+	INIT_LIST_HEAD(&events_list);
 
 	struct tracer_probes_conf *tps =
 	    malloc(sizeof(struct tracer_probes_conf));
