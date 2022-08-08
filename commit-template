@@ -1,26 +1,3 @@
-(Title)
+[<MODULE>] <What's in this commit> (#<issue id>)
 
-**Phenomenon and reproduction steps**
-
-(Describe the phenomenon and scenario of the bug)
-
-**Root cause and solution**
-
-(Describe the cause of the bug and corresponding solution)
-
-**Impactions**
-
-(Visible changes after this fix)
-
-**Test method**
-
-(Test method to ensure the bug is fixed)
-
-**Affected branch(es)**
-
-* main
-
-**Checklist**
-
-- [ ] Dependencies update required
-- [ ] Common bug (similar problem in other repo)
+<More descriptions here, or remove this line>
