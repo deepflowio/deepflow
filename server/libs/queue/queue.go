@@ -73,17 +73,17 @@ func (q *OverwriteQueue) Init(name string, size int, options ...Option) {
 
 	var flushIndicator time.Duration
 	statOptions := []stats.Option{stats.OptionStatTags{"module": name}}
-	var moudle string
+	var module string
 	for _, option := range options {
 		switch option.(type) {
 		case OptionRelease:
 			q.release = option.(OptionRelease)
 		case OptionFlushIndicator:
 			flushIndicator = option.(OptionFlushIndicator)
+		case OptionModule:
+			module = option.(OptionModule)
 		case OptionStatsOption: // XXX: interface{}类型，必须放在最后
 			statOptions = append(statOptions, option.(OptionStatsOption))
-		case OptionMoudle:
-			moudle = option.(OptionMoudle)
 		default:
 			panic(fmt.Sprintf("Unknown option %v", option))
 		}
@@ -98,7 +98,7 @@ func (q *OverwriteQueue) Init(name string, size int, options ...Option) {
 	q.items = make([]interface{}, size)
 	q.size = uint(size)
 	q.counter = &Counter{}
-	stats.RegisterCountableWithMoudlePrefix(moudle, "queue", q, statOptions...)
+	stats.RegisterCountableWithModulePrefix(module, "queue", q, statOptions...)
 
 	if flushIndicator > 0 {
 		go func() {
