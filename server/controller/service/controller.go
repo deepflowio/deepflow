@@ -39,17 +39,26 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 	var vtaps []mysql.VTap
 
 	db := mysql.Db
+	analyzerName, analyzerNameOK := filter["analyzer_name"]
+	analyzerIP, analyzerIpOK := filter["analyzer_ip"]
 	if lcuuid, ok := filter["lcuuid"]; ok {
 		db = db.Where("lcuuid = ?", lcuuid)
 	} else if ip, ok := filter["ip"]; ok {
 		db = db.Where("ip = ?", ip)
 	} else if name, ok := filter["name"]; ok && name != "" {
 		db = db.Where("name = ?", name)
-	} else if analyzerIP, ok := filter["analyzer_ip"]; ok {
+	} else if analyzerNameOK || analyzerIpOK {
 		analyzer := mysql.Analyzer{}
-		mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer)
-		if ret := mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer); ret.Error != nil {
-			return []model.Controller{}, nil
+		if analyzerNameOK {
+			mysql.Db.Where("name = ?", analyzerName).First(&analyzer)
+			if ret := mysql.Db.Where("name = ?", analyzerName).First(&analyzer); ret.Error != nil {
+				return []model.Controller{}, nil
+			}
+		} else {
+			mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer)
+			if ret := mysql.Db.Where("ip = ?", analyzerIP).First(&analyzer); ret.Error != nil {
+				return []model.Controller{}, nil
+			}
 		}
 		azAnalyzerConns := []mysql.AZAnalyzerConnection{}
 		mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Find(&azAnalyzerConns)
