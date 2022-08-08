@@ -151,7 +151,7 @@ func (c *ControllerCheck) vtapControllerCheck() {
 
 	log.Info("vtap controller check start")
 
-	mysql.Db.Find(&vtaps)
+	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	for _, vtap := range vtaps {
 		if vtap.ControllerIP == "" {
 			noControllerVtapCount += 1
@@ -176,7 +176,7 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 
 	log.Info("vtap controller alloc start")
 
-	mysql.Db.Find(&vtaps)
+	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&controllers)
 
 	// 获取待分配采集器对应的可用区信息
