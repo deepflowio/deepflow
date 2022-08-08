@@ -38,6 +38,7 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
+	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pebbe/zmq4 v1.2.9
