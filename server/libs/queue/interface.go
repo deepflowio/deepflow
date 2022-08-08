@@ -31,7 +31,7 @@ type Option = interface{}
 type OptionRelease = func(x interface{})
 type OptionStatsOption = stats.Option
 type OptionFlushIndicator = time.Duration // scheduled put nil into queue
-type OptionMoudle = string
+type OptionModule = string
 
 type QueueReader interface {
 	Get() interface{}
