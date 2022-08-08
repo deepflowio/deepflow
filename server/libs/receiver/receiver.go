@@ -868,7 +868,7 @@ func (r *Receiver) Start() {
 		go r.ProcessTCPServer()
 	}
 
-	stats.RegisterCountableWithMoudlePrefix("ingester.", "recviver", r)
+	stats.RegisterCountableWithModulePrefix("ingester.", "recviver", r)
 }
 
 func (r *Receiver) Close() error {

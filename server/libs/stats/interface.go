@@ -93,6 +93,6 @@ func RegisterCountable(module string, countable Countable, opts ...Option) error
 	return registerCountable("", module, countable, opts...)
 }
 
-func RegisterCountableWithMoudlePrefix(modulePrefix, module string, countable Countable, opts ...Option) error {
+func RegisterCountableWithModulePrefix(modulePrefix, module string, countable Countable, opts ...Option) error {
 	return registerCountable(modulePrefix, module, countable, opts...)
 }

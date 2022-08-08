@@ -43,7 +43,7 @@ var log = logging.MustGetLogger("stats")
 var remoteType = REMOTE_TYPE_INFLUXDB
 
 type StatSource struct {
-	moudlePrefix string
+	modulePrefix string
 	module       string
 	interval     time.Duration // use MinInterval when 0
 	countable    Countable
@@ -79,8 +79,8 @@ type StatItem struct {
 	Value interface{}
 }
 
-func registerCountable(moudlePrefix, module string, countable Countable, opts ...Option) error {
-	source := StatSource{moudlePrefix: moudlePrefix, module: module, countable: countable, tags: OptionStatTags{}}
+func registerCountable(modulePrefix, module string, countable Countable, opts ...Option) error {
+	source := StatSource{modulePrefix: modulePrefix, module: module, countable: countable, tags: OptionStatTags{}}
 	for _, opt := range opts {
 		if tags, ok := opt.(OptionStatTags); ok { // 可能有多个
 			for k, v := range tags {
@@ -168,7 +168,7 @@ func collectBatchPoints() client.BatchPoints {
 		statSource.skip = int(max(statSource.interval, MinInterval) / TICK_CYCLE)
 
 		fields := counterToFields(statSource.countable.GetCounter())
-		point, _ := client.NewPoint(processName+"."+statSource.moudlePrefix+statSource.module, statSource.tags, fields, timestamp)
+		point, _ := client.NewPoint(processName+"."+statSource.modulePrefix+statSource.module, statSource.tags, fields, timestamp)
 		bp.AddPoint(point)
 	}
 	lock.Unlock()
