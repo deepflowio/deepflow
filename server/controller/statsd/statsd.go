@@ -35,9 +35,9 @@ type StatsdMonitor struct {
 }
 
 func NewStatsdMonitor(cfg config.StatsdConfig) error {
-	if !cfg.Enable {
+	if !cfg.Enabled {
 		MetaStatsd = &StatsdMonitor{
-			enable: cfg.Enable,
+			enable: cfg.Enabled,
 		}
 		return nil
 	}
@@ -55,7 +55,7 @@ func NewStatsdMonitor(cfg config.StatsdConfig) error {
 		return err
 	}
 	MetaStatsd = &StatsdMonitor{
-		enable: cfg.Enable,
+		enable: cfg.Enabled,
 		client: client,
 	}
 	return nil
