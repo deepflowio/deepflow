@@ -130,7 +130,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	mysql.Db.Create(&vtapGroup)
 
 	var vtaps []mysql.VTap
-	mysql.Db.Where("vtap_group_lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&vtaps)
+	mysql.Db.Where("lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&vtaps)
 	for vtap := range vtaps {
 		mysql.Db.Model(&vtap).Update("vtap_group_lcuuid", lcuuid)
 	}
@@ -196,10 +196,15 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 		delVtapLcuuids = oldVtapLcuuids.Difference(newVtapLcuuids)
 		addVtapLcuuids = newVtapLcuuids.Difference(oldVtapLcuuids)
 
+		var defaultVtapGroup mysql.VTapGroup
+		if ret := mysql.Db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
+			return model.VtapGroup{}, NewError(common.RESOURCE_NOT_FOUND, "default vtap_group not found")
+		}
+
 		for _, lcuuid := range delVtapLcuuids.ToSlice() {
 			vtap := lcuuidToOldVtap[lcuuid.(string)]
 			// TODO：记录操作日志
-			mysql.Db.Model(vtap).Update("vtap_group_id", common.DEFAULT_VTAP_GROUP_ID)
+			mysql.Db.Model(vtap).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
 		}
 
 		for _, lcuuid := range addVtapLcuuids.ToSlice() {
@@ -223,8 +228,14 @@ func DeleteVtapGroup(lcuuid string) (resp map[string]string, err error) {
 		return map[string]string{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap_group (%s) not found", lcuuid))
 	}
 
+	var defaultVtapGroup mysql.VTapGroup
+	if ret := mysql.Db.Where("id = ?", common.DEFAULT_VTAP_GROUP_ID).First(&defaultVtapGroup); ret.Error != nil {
+		return map[string]string{}, NewError(common.RESOURCE_NOT_FOUND, "default vtap_group not found")
+	}
+
 	log.Infof("delete vtap_group (%s)", vtapGroup.Name)
 
+	mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
 	mysql.Db.Delete(&vtapGroup)
 	return map[string]string{"LCUUID": lcuuid}, nil
 }

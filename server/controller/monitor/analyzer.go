@@ -130,7 +130,7 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 
 	log.Info("vtap analyzer check start")
 
-	mysql.Db.Find(&vtaps)
+	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	for _, vtap := range vtaps {
 		if vtap.AnalyzerIP == "" {
 			noAnalyzerVtapCount += 1
@@ -155,7 +155,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 
 	log.Info("vtap analyzer alloc start")
 
-	mysql.Db.Find(&vtaps)
+	mysql.Db.Where("type != ?", common.VTAP_TYPE_TUNNEL_DECAPSULATION).Find(&vtaps)
 	mysql.Db.Where("state = ?", common.HOST_STATE_COMPLETE).Find(&analyzers)
 
 	// 获取待分配采集器对应的可用区信息
