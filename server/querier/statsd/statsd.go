@@ -1,12 +1,13 @@
 package statsd
 
 import (
-	"github.com/deepflowys/deepflow/server/libs/stats"
 	"sync"
+
+	"github.com/deepflowys/deepflow/server/libs/stats"
 )
 
 func RegisterCountableForIngester(module string, countable stats.Countable, opts ...stats.Option) error {
-	return stats.RegisterCountableWithMoudlePrefix("querier.", module, countable, opts...)
+	return stats.RegisterCountableWithModulePrefix("querier.", module, countable, opts...)
 }
 
 type ClickhouseCounter struct {
