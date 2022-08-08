@@ -200,13 +200,14 @@ func convertDBToYaml(sData *mysql.VTapGroupConfiguration, tData *model.VTapGroup
 		"L7LogStoreTapTypes", "DecapType", "Domains", "MaxCollectPps", "MaxNpbBps", "MaxTxBandwidth"}
 	copyStruct(sData, tData, ignoreName)
 	if sData.YamlConfig != nil {
-		yamlConfig := model.StaticConfig{}
-		if err := yaml.Unmarshal([]byte(*sData.YamlConfig), &yamlConfig); err == nil {
+		yamlConfig := &model.StaticConfig{}
+		if err := yaml.Unmarshal([]byte(*sData.YamlConfig), yamlConfig); err == nil {
 			tData.YamlConfig = yamlConfig
 		} else {
 			log.Error(err)
 		}
 	}
+
 	if sData.L4LogTapTypes != nil {
 		cL4LogTapTypes, err := convertStrToIntList(*sData.L4LogTapTypes)
 		if err == nil {
@@ -264,13 +265,18 @@ func convertJsonToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroup
 }
 
 func convertYamlToDb(sData *model.VTapGroupConfiguration, tData *mysql.VTapGroupConfiguration) {
-	b, err := yaml.Marshal(sData.YamlConfig)
-	if err == nil {
-		dbYamlConfig := string(b)
-		tData.YamlConfig = &dbYamlConfig
+	if sData.YamlConfig != nil {
+		b, err := yaml.Marshal(sData.YamlConfig)
+		if err == nil {
+			dbYamlConfig := string(b)
+			tData.YamlConfig = &dbYamlConfig
+		} else {
+			log.Error(err)
+		}
 	} else {
-		log.Error(err)
+		tData.YamlConfig = nil
 	}
+
 	convertToDb(sData, tData)
 }
 
@@ -518,8 +524,9 @@ func GetVTapGroupDetailedConfig(lcuuid string) (*model.DetailedConfig, error) {
 	return response, nil
 }
 
+var emptyData = []byte{123, 125, 10}
+
 func GetVTapGroupAdvancedConfig(lcuuid string) (string, error) {
-	response := &model.VTapGroupConfiguration{}
 	if lcuuid == "" {
 		return "", fmt.Errorf("lcuuid is None")
 	}
@@ -529,10 +536,14 @@ func GetVTapGroupAdvancedConfig(lcuuid string) (string, error) {
 	if ret.Error != nil {
 		return "", fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
 	}
+	response := &model.VTapGroupConfiguration{}
 	convertDBToYaml(dbConfig, response)
 	b, err := yaml.Marshal(response)
 	if err != nil {
 		log.Error(err)
+	}
+	if string(b) == string(emptyData) {
+		b = nil
 	}
 	return string(b), nil
 }
@@ -583,6 +594,9 @@ func UpdateVTapGroupAdvancedConfig(lcuuid string, updateData *model.VTapGroupCon
 	b, err := yaml.Marshal(response)
 	if err != nil {
 		log.Error(err)
+	}
+	if string(b) == string(emptyData) {
+		b = nil
 	}
 	return string(b), nil
 }
