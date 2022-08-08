@@ -50,6 +50,8 @@ func (c *AnalyzerCheck) Start() {
 			c.healthCheck()
 			// 检查没有分配数据节点的采集器，并进行分配
 			c.vtapAnalyzerCheck()
+			// check az_analyzer_connection, delete unused item
+			c.azConnectionCheck()
 		}
 	}()
 
@@ -241,4 +243,29 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 		}
 	}
 	log.Info("vtap analyzer alloc end")
+}
+
+func (c *AnalyzerCheck) azConnectionCheck() {
+	var azs []mysql.AZ
+	var azAnalyzerConns []mysql.AZAnalyzerConnection
+
+	log.Info("az connection check start")
+
+	mysql.Db.Find(&azs)
+	azLcuuidToName := make(map[string]string)
+	for _, az := range azs {
+		azLcuuidToName[az.Lcuuid] = az.Name
+	}
+
+	mysql.Db.Find(&azAnalyzerConns)
+	for _, conn := range azAnalyzerConns {
+		if conn.AZ == "ALL" {
+			continue
+		}
+		if name, ok := azLcuuidToName[conn.AZ]; !ok {
+			mysql.Db.Delete(&conn)
+			log.Infof("delete analyzer (%s) az (%s) connection", conn.AnalyzerIP, name)
+		}
+	}
+	log.Info("az connection check end")
 }
