@@ -209,6 +209,10 @@ impl Trident {
         info!("========== DeepFlow Agent start! ==========");
 
         let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
+        info!(
+            "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
+            ctrl_ip
+        );
         info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
 
         let exception_handler = ExceptionHandler::default();
@@ -503,6 +507,10 @@ impl DomainNameListener {
 
                 if changed {
                     let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(ips[0].parse().unwrap());
+                    info!(
+                        "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
+                        ctrl_ip
+                    );
 
                     synchronizer.reset_session(
                         ips.clone(),
