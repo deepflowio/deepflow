@@ -390,10 +390,6 @@ impl PlatformSynchronizer {
         }
 
         if changed > 0 {
-            info!(
-                "Platform information changed to version {}",
-                process_args.version.load(Ordering::SeqCst)
-            );
             if raw_info_hash != hash_args.raw_info_hash {
                 hash_args.raw_info_hash.copy_from_slice(raw_info_hash);
                 platform_args.raw_hostname = raw_hostname;
@@ -435,7 +431,10 @@ impl PlatformSynchronizer {
                         .copy_from_slice(&xml_interface_hash);
                 }
             }
-            process_args.version.fetch_add(1, Ordering::SeqCst);
+            info!(
+                "Platform information changed to version {}",
+                process_args.version.fetch_add(1, Ordering::SeqCst) + 1
+            );
         }
     }
 
