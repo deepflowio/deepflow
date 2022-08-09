@@ -17,13 +17,12 @@
 package config
 
 import (
-	"errors"
 	"io/ioutil"
-	"net"
 	"os"
 	"time"
 
 	"github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/ingester/config"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
@@ -42,8 +41,7 @@ type ESAuth struct {
 }
 
 type Config struct {
-	ControllerIps   []string      `yaml:"controller-ips,flow"`
-	ControllerPort  uint16        `yaml:"controller-port"`
+	Base            *config.Config
 	ESHostPorts     []string      `yaml:"es-host-port"`
 	ESAuth          ESAuth        `yaml:"es-auth"`
 	Adapter         AdapterConfig `yaml:"adapter"`
@@ -98,16 +96,6 @@ func minPowerOfTwo(v int) int {
 }
 
 func (c *Config) Validate() error {
-	if len(c.ControllerIps) == 0 {
-		log.Warning("controller-ips is empty")
-	}
-
-	for _, ipString := range c.ControllerIps {
-		if net.ParseIP(ipString) == nil {
-			return errors.New("controller-ips invalid")
-		}
-	}
-
 	if c.Adapter.OrderingCacheSize < 64 {
 		c.Adapter.OrderingCacheSize = 64
 	} else if c.Adapter.OrderingCacheSize > 1024 {
@@ -171,14 +159,14 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func Load(path string) *Config {
+func Load(base *config.Config, path string) *Config {
 	configBytes, err := ioutil.ReadFile(path)
 	config := &DropletConfig{
 		Droplet: Config{
-			ControllerPort: 20035,
-			ESHostPorts:    []string{DefaultESHostPort},
-			RpcTimeout:     8,
-			ESSyslog:       true,
+			Base:        base,
+			ESHostPorts: []string{DefaultESHostPort},
+			RpcTimeout:  8,
+			ESSyslog:    true,
 		},
 	}
 	if err != nil {
