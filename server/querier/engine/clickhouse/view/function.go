@@ -116,6 +116,7 @@ type Function interface {
 }
 
 func FormatField(field string) string {
+	field = strings.ReplaceAll(field, "'", "")
 	field = strings.ReplaceAll(field, "+", "_plus_")
 	field = strings.ReplaceAll(field, "-", "_minus_")
 	field = strings.ReplaceAll(field, "*", "_multiply_")
@@ -292,7 +293,7 @@ func (f *DefaultFunction) GetDefaultAlias(inner bool) string {
 
 	for _, arg := range f.Args {
 		buf.WriteString("_")
-		buf.WriteString(strings.ReplaceAll(arg, "'", ""))
+		buf.WriteString(FormatField(arg))
 	}
 	return buf.String()
 }
