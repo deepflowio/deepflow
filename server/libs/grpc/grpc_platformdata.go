@@ -711,6 +711,8 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 		return t.podsString()
 	} else if arg == "peer_conn-" {
 		return t.peerConnectionsString()
+	} else if arg == "comm_vtaps-" {
+		return t.communicationVtapsString()
 	}
 
 	all := t.String()
@@ -894,17 +896,6 @@ func (t *PlatformInfoTable) Reload() error {
 		}
 		t.hostname = hostname
 
-		var communicationVtaps []*trident.CommunicationVtap
-		if t.receiver != nil {
-			status := t.receiver.GetTridentStatus()
-			for _, s := range status {
-				communicationVtaps = append(communicationVtaps, &trident.CommunicationVtap{
-					VtapId:         proto.Uint32(uint32(s.VTAPID)),
-					LastActiveTime: proto.Uint32(s.LastLocalTimestamp),
-				})
-			}
-		}
-
 		request := trident.SyncRequest{
 			BootTime:            proto.Uint32(t.bootTime),
 			VersionPlatformData: proto.Uint64(t.versionPlatformData),
@@ -912,7 +903,7 @@ func (t *PlatformInfoTable) Reload() error {
 			CtrlIp:              proto.String(t.ctlIP),
 			ProcessName:         proto.String(t.moduleName),
 			Host:                proto.String(hostname),
-			CommunicationVtaps:  communicationVtaps,
+			CommunicationVtaps:  t.getCommunicationVtaps(),
 			CpuNum:              proto.Uint32(t.runtimeEnv.CpuNum),
 			MemorySize:          proto.Uint64(t.runtimeEnv.MemorySize),
 			Arch:                proto.String(t.runtimeEnv.Arch),
@@ -1006,6 +997,28 @@ func (t *PlatformInfoTable) Reload() error {
 	t.epcIDBaseMissCount = make(map[int32]*uint64)
 
 	return nil
+}
+
+func (t *PlatformInfoTable) getCommunicationVtaps() []*trident.CommunicationVtap {
+	var communicationVtaps []*trident.CommunicationVtap
+	if t.receiver != nil {
+		status := t.receiver.GetTridentStatus()
+		for _, s := range status {
+			communicationVtaps = append(communicationVtaps, &trident.CommunicationVtap{
+				VtapId:         proto.Uint32(uint32(s.VTAPID)),
+				LastActiveTime: proto.Uint32(s.LastLocalTimestamp),
+			})
+		}
+	}
+	return communicationVtaps
+}
+
+func (t *PlatformInfoTable) communicationVtapsString() string {
+	sb := &strings.Builder{}
+	for _, comm := range t.getCommunicationVtaps() {
+		sb.WriteString(fmt.Sprintf("Vtapid: %d  LastActiveTime: %d %s\n", *comm.VtapId, *comm.LastActiveTime, time.Unix(int64(*comm.LastActiveTime), 0)))
+	}
+	return sb.String()
 }
 
 func isIPV4(ipStr string) bool {
