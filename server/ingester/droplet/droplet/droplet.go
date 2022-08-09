@@ -44,8 +44,8 @@ var log = logging.MustGetLogger("droplet")
 
 func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 
-	controllers := make([]net.IP, len(cfg.ControllerIps))
-	for i, ipString := range cfg.ControllerIps {
+	controllers := make([]net.IP, len(cfg.Base.ControllerIPs))
+	for i, ipString := range cfg.Base.ControllerIPs {
 		ip := net.ParseIP(ipString)
 		if ipv4 := ip.To4(); ipv4 == nil {
 			controllers[i] = ip
@@ -106,7 +106,7 @@ func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 	labelerManager.Start()
 
 	if len(controllers) > 0 {
-		synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
+		synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.Base.ControllerPort, cfg.RpcTimeout)
 		synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
 			log.Debug(response, version)
 			cleaner.UpdatePcapDataRetention(time.Duration(response.Config.GetPcapDataRetention()) * time.Hour * 24)

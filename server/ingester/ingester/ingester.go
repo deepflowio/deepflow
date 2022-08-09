@@ -102,7 +102,7 @@ func Start(configPath string) []io.Closer {
 	}
 	stats.SetDFRemote(net.JoinHostPort("127.0.0.1", strconv.Itoa(datatype.DROPLET_PORT)))
 
-	dropletConfig := dropletcfg.Load(configPath)
+	dropletConfig := dropletcfg.Load(cfg, configPath)
 	bytes, _ = yaml.Marshal(dropletConfig)
 	log.Infof("droplet config:\n%s", string(bytes))
 
