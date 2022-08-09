@@ -1,7 +1,7 @@
 package synchronize
 
 import (
-	api "github.com/deepflowys/deepflow/message/trident"
+	api "github.com/deepflowys/deepflow/message/controller"
 	context "golang.org/x/net/context"
 
 	"github.com/deepflowys/deepflow/server/controller/common"

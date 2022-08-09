@@ -14,9 +14,6 @@ service Synchronizer {
     rpc GenesisSync (GenesisSyncRequest) returns (GenesisSyncResponse) {}
     rpc KubernetesAPISync (KubernetesAPISyncRequest) returns (KubernetesAPISyncResponse) {}
     rpc GetKubernetesClusterID (KubernetesClusterIDRequest) returns (KubernetesClusterIDResponse) {}
-    rpc GenesisSharingK8S (GenesisSharingK8SRequest) returns (GenesisSharingK8SResponse) {}
-    rpc GenesisSharingSync (GenesisSharingSyncRequest) returns (GenesisSharingSyncResponse) {}
-    rpc GetEncryptKey (EncryptKeyRequest) returns (EncryptKeyResponse) {}
 }
 
 enum State {
@@ -535,19 +532,13 @@ message GenesisSyncResponse {
     optional uint64 version = 1 [default = 0];
 }
 
-message KubernetesAPIInfo {
-    optional string type = 1;
-    optional string info = 2;
-    optional bytes compressed_info = 3;
-}
-
 message KubernetesAPISyncRequest {
     optional string cluster_id = 1;
     optional uint64 version = 2;
     optional string error_msg = 3;
     optional uint32 vtap_id = 4;
     optional string source_ip = 5;
-    repeated KubernetesAPIInfo entries = 10;
+    repeated common.KubernetesAPIInfo entries = 10;
 }
 
 message KubernetesAPISyncResponse {
@@ -561,131 +552,4 @@ message KubernetesClusterIDRequest {
 message KubernetesClusterIDResponse {
     optional string error_msg = 1;
     optional string cluster_id = 2;
-}
-
-message GenesisSharingK8SRequest {
-    optional string cluster_id = 1;
-}
-
-message GenesisSharingK8SResponse {
-    optional string epoch = 1;
-    optional string error_msg = 2;
-    repeated KubernetesAPIInfo entries = 3;
-}
-
-message GenesisSyncIP {
-    optional uint32 masklen = 1;
-    optional string ip = 2;
-    optional string lcuuid = 3;
-    optional string vinterface_lcuuid = 4;
-    optional string node_ip = 5;
-    optional string last_seen = 6;
-    optional uint32 vtap_id = 7;
-}
-
-message GenesisSyncHost {
-    optional string lcuuid = 1;
-    optional string hostname = 2;
-    optional string ip = 3;
-    optional string node_ip = 4;
-    optional uint32 vtap_id = 5;
-}
-
-message GenesisSyncLldp {
-    optional string lcuuid = 1;
-    optional string host_ip = 2;
-    optional string host_interface = 3;
-    optional string system_name = 4;
-    optional string management_address = 5;
-    optional string vinterface_lcuuid = 6;
-    optional string vinterface_description = 7;
-    optional string node_ip = 8;
-    optional string last_seen = 9;
-    optional uint32 vtap_id = 10;
-}
-
-message GenesisSyncNetwork {
-    optional uint32 segmentation_id = 1;
-    optional uint32 net_type = 2;
-    optional bool external = 3;
-    optional string name = 4;
-    optional string lcuuid = 5;
-    optional string vpc_lcuuid = 6;
-    optional string node_ip = 7;
-    optional uint32 vtap_id = 8;
-}
-
-message GenesisSyncPort {
-    optional uint32 type = 1;
-    optional uint32 device_type = 2;
-    optional string lcuuid = 3;
-    optional string mac = 4;
-    optional string device_lcuuid = 5;
-    optional string network_lcuuid = 6;
-    optional string vpc_lcuuid = 7;
-    optional string node_ip = 8;
-    optional uint32 vtap_id = 9;
-}
-
-message GenesisSyncVm {
-    optional uint32 state = 1;
-    optional string lcuuid = 2;
-    optional string name = 3;
-    optional string label = 4;
-    optional string vpc_lcuuid = 5;
-    optional string launch_server = 6;
-    optional string node_ip = 7;
-    optional string created_at = 8;
-    optional uint32 vtap_id = 9;
-}
-
-message GenesisSyncVpc {
-    optional string lcuuid = 1;
-    optional string name = 2;
-    optional string node_ip = 3;
-    optional uint32 vtap_id = 4;
-}
-
-message GenesisSyncVinterface {
-    optional uint32 vtap_id = 1;
-    optional string lcuuid = 2;
-    optional string name = 3;
-    optional string ips = 4;
-    optional string mac = 5;
-    optional string tap_name = 6;
-    optional string tap_mac = 7;
-    optional string device_lcuuid = 8;
-    optional string device_name = 9;
-    optional string device_type = 10;
-    optional string host_ip = 11;
-    optional string kubernetes_cluster_id = 12;
-    optional string node_ip = 13;
-    optional string last_seen = 14;
-}
-
-message GenesisSyncData{
-    repeated GenesisSyncIP ip = 1;
-    repeated GenesisSyncHost host = 2;
-    repeated GenesisSyncLldp lldp = 3;
-    repeated GenesisSyncNetwork network = 4;
-    repeated GenesisSyncPort port = 5;
-    repeated GenesisSyncVm vm = 6;
-    repeated GenesisSyncVpc vpc = 7;
-    repeated GenesisSyncVinterface vinterface = 8;
-}
-
-message GenesisSharingSyncRequest {
-}
-
-message GenesisSharingSyncResponse {
-    optional GenesisSyncData data = 1;
-}
-
-message EncryptKeyRequest {
-    optional string key = 1;
-}
-
-message EncryptKeyResponse {
-    optional string error_msg = 1;
-    optional string encrypt_key = 2;
 }

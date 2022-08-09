@@ -14,7 +14,7 @@ generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test
 		 libs/hmap/lru/ubig_lru.go libs/hmap/lru/ubig_lru_test.go \
 		 libs/zerodoc/pooled_meters.go
 
-proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
+proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
 
 $(generated_libs): $(generate_sources)
 	go generate ./...
@@ -23,14 +23,22 @@ vendor/${MESSAGE}/common/common.pb.go: vendor/${MESSAGE}/common.proto
 	cd vendor/${MESSAGE} && go generate common/stub.go
 
 vendor/${MESSAGE}/common.proto: vendor
-	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/common.proto vendor/${MESSAGE}/
+	cp -r ../message/common.proto vendor/${MESSAGE}/
+	cp -r ../message/common vendor/${MESSAGE}/
 
 vendor/${MESSAGE}/trident/trident.pb.go: vendor/${MESSAGE}/trident.proto
 	cd vendor/${MESSAGE} && go generate trident/stub.go
 
 vendor/${MESSAGE}/trident.proto: vendor
 	cp -r ../message/trident.proto vendor/${MESSAGE}/
+	cp -r ../message/trident vendor/${MESSAGE}/
 
+vendor/${MESSAGE}/controller/controller.pb.go: vendor/${MESSAGE}/controller.proto
+	cd vendor/${MESSAGE} && go generate controller/stub.go
+
+vendor/${MESSAGE}/controller.proto: vendor
+	cp -r ../message/controller.proto vendor/${MESSAGE}/
+	cp -r ../message/controller vendor/${MESSAGE}/
 
 libs/datatype/pb/flow_log.proto: vendor
 	cp -r $(shell go list -mod=readonly -e -f '{{.Dir}}' ${MESSAGE})/flow_log.proto libs/datatype/pb/

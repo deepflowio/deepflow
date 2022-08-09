@@ -29,7 +29,7 @@ import (
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
-	"github.com/deepflowys/deepflow/message/trident"
+	api "github.com/deepflowys/deepflow/message/controller"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/genesis/config"
@@ -150,8 +150,8 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 		}
 		defer conn.Close()
 
-		client := trident.NewSynchronizerClient(conn)
-		ret, err := client.GenesisSharingSync(context.Background(), &trident.GenesisSharingSyncRequest{})
+		client := api.NewControllerClient(conn)
+		ret, err := client.GenesisSharingSync(context.Background(), &api.GenesisSharingSyncRequest{})
 		if err != nil {
 			log.Infof("get genesis sharing sync faild (%s)", err.Error())
 			continue
@@ -340,8 +340,8 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			}
 			defer conn.Close()
 
-			client := trident.NewSynchronizerClient(conn)
-			req := &trident.GenesisSharingK8SRequest{
+			client := api.NewControllerClient(conn)
+			req := &api.GenesisSharingK8SRequest{
 				ClusterId: &clusterID,
 			}
 			ret, err := client.GenesisSharingK8S(context.Background(), req)

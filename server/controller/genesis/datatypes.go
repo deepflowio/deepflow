@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	messagecommon "github.com/deepflowys/deepflow/message/common"
 	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -56,7 +57,7 @@ type KubernetesInfo struct {
 	Version   uint64
 	VtapID    uint32
 	Epoch     time.Time
-	Entries   []*trident.KubernetesAPIInfo
+	Entries   []*messagecommon.KubernetesAPIInfo
 }
 
 type GenesisSyncData struct {
