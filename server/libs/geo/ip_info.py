@@ -42,7 +42,7 @@ class Encoder(object):
 		self.item_map = {}
 
 	def encode(self, item):
-		item = item.encode('utf-8')
+		item = item.encode('utf-8').decode('utf-8')
 		if item not in self.item_map:
 			self.item_map[item] = len(self.items)
 			self.items.append(item)
