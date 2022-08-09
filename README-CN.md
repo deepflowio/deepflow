@@ -43,6 +43,10 @@ DeepFlow 社区版由企业版的核心组件构成。通过开源，我们希�
 
 [DeepFlow Enterprise](https://www.yunshan.net/products/deepflow.html) 支持对混合云的全栈、全链路监控，覆盖容器、云服务器、宿主机、NFV网关，目前仅支持中文，欢迎联系我们进行体验。
 
+# 从源码编译 DeepFlow
+
+- [编译 deepflow-agent](./agent/build_cn.md)
+
 # 软件架构
 
 DeepFlow Community 主要由 Agent 和 Server 两个进程组成。每个 K8s 容器节点、虚拟机或物理裸机中运行一个 Agent ，负责该服务器上所有应用进程的 AutoMetrics 和 AutoTracing 数据采集。Server 运行在一个 K8s 集群中，提供 Agent 管理、数据标签注入、数据写入、数据查询服务。
