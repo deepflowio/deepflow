@@ -177,7 +177,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					vTapPort.DeviceName = data.DeviceName
 					vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
 				}
-			} else {
+			} else if data.VTapID != 0 || macPort != 0 {
 				keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: macPort}] = mysql.ChVTapPort{
 					VTapID:     data.VTapID,
 					TapPort:    macPort,
@@ -215,7 +215,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				vTapPort.DeviceName = deviceInfo.DeviceName
 				vTapPort.IconID = deviceInfo.IconID
 			}
-		} else {
+		} else if vTapID != 0 {
 			keyToItem[VtapPortKey{VtapID: vTapID, TapPort: 0}] = mysql.ChVTapPort{
 				VTapID:     vTapID,
 				TapPort:    0,
@@ -245,7 +245,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					continue
 				}
 				for _, vTap := range vTaps {
-					if vTap.AZ == host.AZ {
+					if vTap.AZ == host.AZ && (vTap.ID != 0 || tapPort != 0) {
 						keyToItem[VtapPortKey{VtapID: vTap.ID, TapPort: tapPort}] = mysql.ChVTapPort{
 							VTapID:   vTap.ID,
 							TapPort:  tapPort,

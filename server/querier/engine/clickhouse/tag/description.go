@@ -411,12 +411,15 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 		case "vpc", "l2_vpc":
 			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(flow_tag.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", whereSql)
 
-		case "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
+		case "service", "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
 			if tag == "ip" {
 				resourceId = "ip"
 				resourceName = "ip"
+			} else if tag == "service" {
+				resourceId = "pod_service_id"
+				resourceName = "pod_service_name"
 			}
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name FROM ip_resource_map WHERE %s GROUP BY value, display_name ORDER BY value ASC", resourceId, resourceName, whereSql)
 
