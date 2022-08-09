@@ -758,7 +758,7 @@ func vtapControllerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalance
 			controllerIPToState, ifCheck,
 		)
 		response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
-		response.Details = append(response.Details, azVTapRebalanceResult)
+		response.Details = append(response.Details, azVTapRebalanceResult.Details...)
 	}
 	return &response, nil
 }
@@ -853,7 +853,7 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 			analyzerIPToState, ifCheck,
 		)
 		response.TotalSwitchVTapNum += azVTapRebalanceResult.TotalSwitchVTapNum
-		response.Details = append(response.Details, azVTapRebalanceResult)
+		response.Details = append(response.Details, azVTapRebalanceResult.Details...)
 	}
 	return &response, nil
 }

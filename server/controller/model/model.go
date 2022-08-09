@@ -178,8 +178,8 @@ type AZVTapRebalanceResult struct {
 }
 
 type VTapRebalanceResult struct {
-	TotalSwitchVTapNum int                     `json:"TOTAL_SWITCH_VTAP_NUM"`
-	Details            []AZVTapRebalanceResult `json:"DETAILS"`
+	TotalSwitchVTapNum int                       `json:"TOTAL_SWITCH_VTAP_NUM"`
+	Details            []HostVTapRebalanceResult `json:"DETAILS"`
 }
 
 type VtapGroup struct {
