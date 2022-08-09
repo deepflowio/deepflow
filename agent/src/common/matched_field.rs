@@ -16,6 +16,7 @@
 
 use std::fmt;
 use std::net;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops;
 
 #[derive(Copy, Clone)]
@@ -65,9 +66,9 @@ impl MatchedField {
 
     pub fn set_ip(&mut self, flag: MatchedFlag, value: net::IpAddr) {
         match (self, value) {
-            (Self::V4(f), net::IpAddr::V4(ip)) => f.set_ip(flag, ip),
-            (Self::V6(f), net::IpAddr::V6(ip)) => f.set_ip(flag, ip),
-            _ => panic!("type mismatch"),
+            (Self::V4(f), IpAddr::V4(addr)) => f.set_ip(flag, addr),
+            (Self::V6(f), IpAddr::V6(addr)) => f.set_ip(flag, addr),
+            _ => panic!("The version of MatchedField and IpAddr conflict."),
         }
     }
 
@@ -132,7 +133,7 @@ impl fmt::Display for MatchedField {
 
 // N for Ip address length in bytes
 #[repr(C)]
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct MatchedFieldN<const N: usize> {
     // split up because [u8; 2 * N + 10] is not valid
     src_ip: [u8; N],
@@ -140,17 +141,28 @@ pub struct MatchedFieldN<const N: usize> {
     others: [u8; 10],
 }
 
+const MATCHED_FIELD_OTHER_SIZE: usize = 10;
+
 impl<const N: usize> Default for MatchedFieldN<N> {
     fn default() -> Self {
         Self {
             src_ip: [0; N],
             dst_ip: [0; N],
-            others: [0; 10],
+            others: [0; MATCHED_FIELD_OTHER_SIZE],
         }
     }
 }
 
 impl<const N: usize> MatchedFieldN<N> {
+    const IPV4_ADDR_LEN: usize = 4;
+    pub fn bit_size(&self) -> usize {
+        return (self.src_ip.len() * 2 + MATCHED_FIELD_OTHER_SIZE) * (u8::BITS as usize);
+    }
+
+    pub fn is_ipv6(&self) -> bool {
+        return self.src_ip.len() != Self::IPV4_ADDR_LEN;
+    }
+
     fn offset_of(flag: MatchedFlag) -> usize {
         match flag {
             MatchedFlag::SrcEpc => 0,
@@ -159,7 +171,7 @@ impl<const N: usize> MatchedFieldN<N> {
             MatchedFlag::DstPort => 6,
             MatchedFlag::Proto => 8,
             MatchedFlag::TapType => 9,
-            MatchedFlag::SrcIp | MatchedFlag::DstIp => unimplemented!(),
+            MatchedFlag::SrcIp | MatchedFlag::DstIp => 0,
         }
     }
 
@@ -195,11 +207,12 @@ impl<const N: usize> MatchedFieldN<N> {
         self.set(flag, if is_set { 0xFFFF } else { 0 })
     }
 
-    pub fn set_bits(&mut self, bits: Vec<usize>) {
+    pub fn set_bits(&mut self, bits: &Vec<usize>) {
         self.src_ip = [0; N];
         self.dst_ip = [0; N];
         self.others = [0; 10];
         for b in bits {
+            let b = *b;
             if b < 8 * N {
                 self.src_ip[b >> 3] = 1 << (b & 7);
             } else if b < 8 * 2 * N {
@@ -310,7 +323,7 @@ impl<'a, const N: usize> ops::BitOr for &'a MatchedFieldN<N> {
 pub type MatchedFieldv4 = MatchedFieldN<4>;
 
 impl MatchedFieldv4 {
-    pub fn get_ip(&self, flag: MatchedFlag) -> net::Ipv4Addr {
+    pub fn get_ip(&self, flag: MatchedFlag) -> Ipv4Addr {
         match flag {
             MatchedFlag::SrcIp => self.src_ip.into(),
             MatchedFlag::DstIp => self.dst_ip.into(),
@@ -318,7 +331,7 @@ impl MatchedFieldv4 {
         }
     }
 
-    pub fn set_ip(&mut self, flag: MatchedFlag, value: net::Ipv4Addr) {
+    pub fn set_ip(&mut self, flag: MatchedFlag, value: Ipv4Addr) {
         match flag {
             MatchedFlag::SrcIp => self.src_ip.copy_from_slice(&value.octets()),
             MatchedFlag::DstIp => self.dst_ip.copy_from_slice(&value.octets()),
@@ -339,7 +352,7 @@ impl MatchedFieldv4 {
 pub type MatchedFieldv6 = MatchedFieldN<16>;
 
 impl MatchedFieldv6 {
-    pub fn get_ip(&self, flag: MatchedFlag) -> net::Ipv6Addr {
+    pub fn get_ip(&self, flag: MatchedFlag) -> Ipv6Addr {
         match flag {
             MatchedFlag::SrcIp => self.src_ip.into(),
             MatchedFlag::DstIp => self.dst_ip.into(),
@@ -347,7 +360,7 @@ impl MatchedFieldv6 {
         }
     }
 
-    pub fn set_ip(&mut self, flag: MatchedFlag, value: net::Ipv6Addr) {
+    pub fn set_ip(&mut self, flag: MatchedFlag, value: Ipv6Addr) {
         match flag {
             MatchedFlag::SrcIp => self.src_ip.copy_from_slice(&value.octets()),
             MatchedFlag::DstIp => self.dst_ip.copy_from_slice(&value.octets()),

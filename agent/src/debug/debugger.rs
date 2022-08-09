@@ -37,6 +37,7 @@ use super::platform::{PlatformDebugger, PlatformMessage};
 
 use super::{
     error::{Error, Result},
+    policy::{PolicyDebugger, PolicyMessage},
     queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
     Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, DEEPFLOW_AGENT_BEACON, MAX_BUF_SIZE,
@@ -47,6 +48,7 @@ use crate::platform::{ApiWatcher, GenericPoller};
 
 use crate::{
     config::handler::DebugAccess,
+    policy::PolicySetter,
     rpc::{RunningConfig, Session, StaticConfig, Status},
 };
 
@@ -55,6 +57,7 @@ struct ModuleDebuggers {
     pub platform: PlatformDebugger,
     pub rpc: RpcDebugger,
     pub queue: Arc<QueueDebugger>,
+    pub policy: PolicyDebugger,
 }
 
 pub struct Debugger {
@@ -74,6 +77,7 @@ pub struct ConstructDebugCtx {
     pub static_config: Arc<StaticConfig>,
     pub running_config: Arc<RwLock<RunningConfig>>,
     pub status: Arc<RwLock<Status>>,
+    pub policy_setter: PolicySetter,
 }
 
 impl Debugger {
@@ -244,6 +248,24 @@ impl Debugger {
                     _ => unreachable!(),
                 }
             }
+            Module::Policy => {
+                let req: Message<PolicyMessage> =
+                    decode_from_std_read(&mut payload, serialize_conf)?;
+                let debugger = &debuggers.policy;
+                match req.into_inner() {
+                    PolicyMessage::On => debugger.send(conn.0, conn.1, serialize_conf),
+                    PolicyMessage::Off => {
+                        debugger.turn_off();
+                    }
+                    PolicyMessage::Show => {
+                        debugger.show(conn.0, conn.1, serialize_conf);
+                    }
+                    PolicyMessage::Analyzing(id) => {
+                        debugger.analyzing(conn.0, conn.1, id, serialize_conf);
+                    }
+                    _ => unreachable!(),
+                }
+            }
             _ => warn!("invalid module or invalid request, skip it"),
         }
 
@@ -264,6 +286,7 @@ impl Debugger {
                 context.status,
             ),
             queue: Arc::new(QueueDebugger::new()),
+            policy: PolicyDebugger::new(context.policy_setter),
         };
 
         Self {

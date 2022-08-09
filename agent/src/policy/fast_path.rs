@@ -19,15 +19,16 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use ipnet::{IpNet, Ipv4Net};
-use log::{debug, info};
+use log::{info, warn};
 use lru::LruCache;
 
 use super::UnsafeWrapper;
 use crate::common::endpoint::{EndpointData, EndpointStore};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData as Interface;
-use crate::common::policy::{Acl, Cidr, IpGroupData, NpbAction, PolicyData};
+use crate::common::policy::{Acl, Cidr, IpGroupData};
 use crate::common::port_range::{PortRange, PortRangeList};
+use npb_pcap_policy::{NpbAction, PolicyData};
 
 const MAX_QUEUE_COUNT: usize = 16;
 const MAX_ACL_PROTOCOL: usize = 255;
@@ -46,15 +47,16 @@ struct PolicyTableItem {
 type InterestTable = UnsafeWrapper<Vec<PortRange>>;
 
 pub struct FastPath {
-    mask_from_interface: Vec<u32>,
-    mask_from_ipgroup: Vec<u32>,
-    mask_from_cidr: Vec<u32>,
+    interest_table: InterestTable,
+    policy_table: Vec<Option<TableLruCache>>,
 
     netmask_table: Vec<u32>,
 
-    interest_table: InterestTable,
-    policy_table: Vec<Option<TableLruCache>>,
     policy_table_flush_flags: [bool; MAX_QUEUE_COUNT + 1],
+
+    mask_from_interface: Vec<u32>,
+    mask_from_ipgroup: Vec<u32>,
+    mask_from_cidr: Vec<u32>,
 
     map_size: usize,
     queue_count: usize,
@@ -104,7 +106,7 @@ impl FastPath {
         }
     }
 
-    fn cidr_to_mask(addr: &Ipv4Net, epc_id: u32, table: &mut Vec<u32>) {
+    fn cidr_to_mask(addr: &Ipv4Net, epc_id: u16, table: &mut Vec<u32>) {
         let ipv4 = u32::from(addr.network());
         let mask_len = addr.prefix_len();
         if ipv4 == 0 && epc_id == 0 && mask_len == 0 {
@@ -151,7 +153,7 @@ impl FastPath {
         for cidr in cidrs {
             match cidr.ip {
                 IpNet::V4(addr) => {
-                    Self::cidr_to_mask(&addr, cidr.epc_id as u32, mask_table);
+                    Self::cidr_to_mask(&addr, (cidr.epc_id & 0xffff) as u16, mask_table);
                 }
                 _ => {
                     // TODO IPV6
@@ -190,24 +192,13 @@ impl FastPath {
                 );
             }
             _ => {
-                debug!(
+                warn!(
                     "LookupKey({}) is invalid: ip address version is inconsistent.\n",
                     key
                 );
                 std::process::exit(-1);
             }
         }
-    }
-
-    fn generate_map_key(&self, key: &LookupKey) -> (u64, u64) {
-        let (src_masked_ip, dst_masked_ip) = self.generate_mask_ip(key);
-        let src_port = key.src_port as u64;
-        let dst_port = key.dst_port as u64;
-        let src_mac_suffix = u64::from(key.src_mac) & 0xffff;
-        let dst_mac_suffix = u64::from(key.dst_mac) & 0xffff;
-        let src_key = ((src_masked_ip as u64) << 32) | src_mac_suffix << 16 | src_port;
-        let dst_key = ((dst_masked_ip as u64) << 32) | dst_mac_suffix << 16 | dst_port;
-        return (src_key, dst_key);
     }
 
     pub fn generate_interest_table(&mut self, acls: &Vec<Arc<Acl>>) {
@@ -250,8 +241,9 @@ impl FastPath {
     }
 
     fn interest_table_map(&self, key: &mut LookupKey) {
-        key.src_port = self.interest_table.get()[key.src_port as usize].min();
-        key.dst_port = self.interest_table.get()[key.dst_port as usize].min();
+        let table = self.interest_table.get();
+        key.src_port = table[key.src_port as usize].min();
+        key.dst_port = table[key.dst_port as usize].min();
     }
 
     pub fn update_map_size(&mut self, map_size: usize) {
@@ -313,7 +305,7 @@ impl FastPath {
             for item in &backward.npb_actions {
                 list.push(item.clone());
             }
-            policy.merge_npb_action(list, acl_id, vec![]);
+            policy.merge_npb_action(&list, acl_id, vec![]);
             policy.format_npb_action();
         }
 
@@ -359,8 +351,7 @@ impl FastPath {
         &mut self,
         packet: &mut LookupKey,
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
-        let is_empty = self.table_flush_check(packet);
-        if is_empty {
+        if self.table_flush_check(packet) {
             return None;
         }
         self.interest_table_map(packet);
@@ -384,6 +375,13 @@ impl FastPath {
             }
         }
         return None;
+    }
+
+    // 查询路径调用会影响性能
+    fn generate_map_key(&self, key: &LookupKey) -> (u64, u64) {
+        let (src_masked_ip, dst_masked_ip) = self.generate_mask_ip(key);
+
+        key.fast_key(src_masked_ip, dst_masked_ip)
     }
 
     pub fn new(queue_count: usize, map_size: usize) -> Self {

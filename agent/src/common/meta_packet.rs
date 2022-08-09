@@ -37,7 +37,6 @@ use super::{
     enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TcpFlags},
     flow::L7Protocol,
     lookup_key::LookupKey,
-    policy::PolicyData,
     tap_port::TapPort,
 };
 
@@ -45,6 +44,7 @@ use super::{
 use crate::ebpf::{SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
+use npb_pcap_policy::PolicyData;
 
 #[derive(Debug, Default)]
 pub struct MetaPacket<'a> {
