@@ -1,8 +1,7 @@
 on: 
   push:
     branches:
-      - main
-      - 'feature-**'
+      - debug-agent
     paths:
       - 'agent/**'
       - 'message/**'
@@ -132,7 +131,6 @@ jobs:
             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
-            "deepflowce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
             "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG_PREFIX }}"
 

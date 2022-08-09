@@ -24,4 +24,4 @@ RUN --mount=target=/tmp-mount \
 
 USER root
 
-CMD valgrind --tool=massif --time-unit=B /bin/deepflow-agent -f /etc/deepflow-agent/deepflow-agent.yaml
+CMD /bin/deepflow-agent -f /etc/deepflow-agent/deepflow-agent.yaml
