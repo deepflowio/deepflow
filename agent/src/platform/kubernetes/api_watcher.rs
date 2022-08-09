@@ -40,8 +40,9 @@ use crate::{
     error::{Error, Result},
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
-    proto::trident::{
-        self, Exception, KubernetesApiInfo, KubernetesApiSyncRequest, KubernetesApiSyncResponse,
+    proto::{
+        common::KubernetesApiInfo,
+        trident::{self, Exception, KubernetesApiSyncRequest, KubernetesApiSyncResponse},
     },
     rpc::Session,
 };

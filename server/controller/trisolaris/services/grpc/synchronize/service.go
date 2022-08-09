@@ -19,6 +19,7 @@ package synchronize
 import (
 	"strings"
 
+	"github.com/deepflowys/deepflow/message/controller"
 	api "github.com/deepflowys/deepflow/message/trident"
 	context "golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -85,7 +86,7 @@ func (s *service) GetKubernetesClusterID(ctx context.Context, in *api.Kubernetes
 	return s.kubernetesClusterIDEvent.GetKubernetesClusterID(ctx, in)
 }
 
-func (s *service) GetEncryptKey(ctx context.Context, in *api.EncryptKeyRequest) (*api.EncryptKeyResponse, error) {
+func (s *service) GetEncryptKey(ctx context.Context, in *controller.EncryptKeyRequest) (*controller.EncryptKeyResponse, error) {
 	return s.encryptKeyEvent.Get(ctx, in)
 }
 
@@ -97,10 +98,10 @@ func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISy
 	return genesis.Synchronizer.KubernetesAPISync(ctx, in)
 }
 
-func (s *service) GenesisSharingK8S(ctx context.Context, in *api.GenesisSharingK8SRequest) (*api.GenesisSharingK8SResponse, error) {
+func (s *service) GenesisSharingK8S(ctx context.Context, in *controller.GenesisSharingK8SRequest) (*controller.GenesisSharingK8SResponse, error) {
 	return genesis.Synchronizer.GenesisSharingK8S(ctx, in)
 }
 
-func (s *service) GenesisSharingSync(ctx context.Context, in *api.GenesisSharingSyncRequest) (*api.GenesisSharingSyncResponse, error) {
+func (s *service) GenesisSharingSync(ctx context.Context, in *controller.GenesisSharingSyncRequest) (*controller.GenesisSharingSyncResponse, error) {
 	return genesis.Synchronizer.GenesisSharingSync(ctx, in)
 }
