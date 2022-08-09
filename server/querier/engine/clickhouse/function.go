@@ -289,6 +289,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 			if m.DB == "flow_metrics" {
 				outFunc.SetFillNullAsZero(true)
 			}
+			outFunc.SetMath("*100")
 		}
 		if f.Metrics.Condition != "" {
 			outFunc.SetCondition(f.Metrics.Condition)
