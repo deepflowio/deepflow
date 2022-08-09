@@ -539,6 +539,7 @@ dependencies = [
  "neli",
  "nix 0.23.1",
  "nom",
+ "npb_pcap_policy",
  "num_enum",
  "openshift-openapi",
  "packet_sequence_block",
@@ -1448,6 +1449,14 @@ checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "npb_pcap_policy"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "num_enum",
 ]
 
 [[package]]

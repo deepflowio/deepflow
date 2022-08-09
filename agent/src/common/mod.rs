@@ -22,7 +22,7 @@ pub mod enums;
 mod error;
 pub mod flow;
 pub mod lookup_key;
-mod matched_field;
+pub mod matched_field;
 pub mod meta_packet;
 pub mod platform_data;
 pub mod policy;
@@ -46,6 +46,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::common::policy::Acl;
 use crate::proto::common::TridentType;
 
 use policy::{Cidr, IpGroupData, PeerConnection};
@@ -77,6 +78,7 @@ pub trait FlowAclListener: Send + Sync {
         platform_data: &Vec<Arc<PlatformData>>,
         peers: &Vec<Arc<PeerConnection>>,
         cidrs: &Vec<Arc<Cidr>>,
+        acls: &Vec<Arc<Acl>>,
     );
     fn id(&self) -> usize;
 }

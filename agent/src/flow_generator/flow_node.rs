@@ -25,13 +25,13 @@ use crate::{
         flow::FlowMetricsPeer,
         lookup_key::LookupKey,
         meta_packet::MetaPacket,
-        policy::PolicyData,
         tagged_flow::TaggedFlow,
         TapPort,
     },
     proto::common::TridentType,
     utils::net::MacAddr,
 };
+use npb_pcap_policy::PolicyData;
 
 #[repr(u8)]
 enum MatchMac {

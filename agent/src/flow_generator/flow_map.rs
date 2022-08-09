@@ -54,7 +54,6 @@ use crate::{
         flow::{CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, TunnelField},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
-        policy::PolicyData,
         tagged_flow::TaggedFlow,
         tap_port::TapPort,
     },
@@ -66,6 +65,7 @@ use crate::{
     utils::net::MacAddr,
     utils::queue::{self, DebugSender, Receiver},
 };
+use npb_pcap_policy::PolicyData;
 
 // not thread-safe
 pub struct FlowMap {
@@ -1328,17 +1328,14 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
 // 对应 flow_generator_test.go
 #[cfg(test)]
 mod tests {
-    use std::{ops::Add, time};
+    use std::{net::IpAddr, ops::Add, time};
 
     use crate::{
-        common::{
-            enums::EthernetType,
-            flow::CloseType,
-            policy::{NpbAction, NpbTunnelType, PolicyData, TapSide},
-            tap_port::TapPort,
-        },
+        common::{enums::EthernetType, flow::CloseType, tap_port::TapPort},
         utils::{net::MacAddr, test::Capture},
     };
+
+    use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
 
     use super::*;
 
@@ -1466,15 +1463,29 @@ mod tests {
     #[test]
     fn reverse_new_cycle() {
         let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
-        let npb_action = NpbAction::new(0, 10, NpbTunnelType::VxLan, TapSide::SRC, 123);
+        let npb_action = NpbAction::new(
+            0,
+            10,
+            IpAddr::V4(Ipv4Addr::new(10, 20, 30, 40)),
+            NpbTunnelType::VxLan,
+            TapSide::SRC,
+            123,
+        );
         let mut policy_data0 = PolicyData::default();
-        policy_data0.merge_npb_action(vec![npb_action], 10, vec![]);
+        policy_data0.merge_npb_action(&vec![npb_action], 10, vec![]);
         let mut packet0 = _new_meta_packet();
         packet0.policy_data.replace(Arc::new(policy_data0));
 
-        let npb_action = NpbAction::new(0, 11, NpbTunnelType::VxLan, TapSide::SRC, 123);
+        let npb_action = NpbAction::new(
+            0,
+            11,
+            IpAddr::V4(Ipv4Addr::new(10, 20, 30, 40)),
+            NpbTunnelType::VxLan,
+            TapSide::SRC,
+            123,
+        );
         let mut policy_data1 = PolicyData::default();
-        policy_data1.merge_npb_action(vec![npb_action], 11, vec![]);
+        policy_data1.merge_npb_action(&vec![npb_action], 11, vec![]);
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.flags = TcpFlags::SYN_ACK;
         _reverse_meta_packet(&mut packet1);

@@ -132,7 +132,7 @@ pub struct Status {
     pub peers: Vec<Arc<PeerConnection>>,
     pub cidrs: Vec<Arc<Cidr>>,
     pub ip_groups: Vec<Arc<IpGroupData>>,
-    pub acls: Vec<Acl>,
+    pub acls: Vec<Arc<Acl>>,
 }
 
 impl Default for Status {
@@ -198,8 +198,13 @@ impl Status {
             self.version_acls, version
         );
 
+        let acls = flow_acls
+            .iter()
+            .map(|x| Arc::new(x.clone()))
+            .collect::<Vec<Arc<Acl>>>();
+
         self.version_acls = version;
-        self.acls = flow_acls;
+        self.acls = acls;
     }
 
     pub fn get_platform_data(&mut self, resp: &tp::SyncResponse) -> bool {
@@ -367,6 +372,7 @@ impl Status {
             &self.interfaces,
             &self.peers,
             &self.cidrs,
+            &self.acls,
         );
     }
 }
@@ -672,7 +678,7 @@ impl Synchronizer {
                 status.interfaces.len(),
                 status.peers.len(),
                 status.cidrs.len(),
-                0,
+                status.acls.len(),
             );
         }
 

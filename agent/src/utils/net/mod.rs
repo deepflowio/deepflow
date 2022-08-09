@@ -177,6 +177,10 @@ impl MacAddr {
         let mac_num = u64::from(mac);
         mac_num != Self::BROADCAST && mac_num & Self::MULTICAST != Self::MULTICAST
     }
+
+    pub fn get_suffix(&self) -> u16 {
+        (self.0[4] as u16) << 8 | self.0[5] as u16
+    }
 }
 
 impl fmt::Debug for MacAddr {

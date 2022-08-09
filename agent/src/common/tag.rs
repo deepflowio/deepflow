@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use super::policy::PolicyData;
+use npb_pcap_policy::PolicyData;
 
 #[derive(Debug, Default, Clone)]
 pub struct Tag {

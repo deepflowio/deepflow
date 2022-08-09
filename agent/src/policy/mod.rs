@@ -16,7 +16,7 @@
 
 mod bit;
 mod fast_path;
-mod first_path;
+pub mod first_path;
 mod forward;
 pub mod labeler;
 pub mod policy;
@@ -74,3 +74,13 @@ impl<T> UnsafeWrapper<T> {
         return unsafe { &mut (*self.pointer) };
     }
 }
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("{0}")]
+    CustomError(String),
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
