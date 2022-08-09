@@ -15,6 +15,7 @@
  */
 
 use std::fmt;
+use std::mem::swap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 
@@ -25,6 +26,7 @@ use super::{
 };
 
 use crate::utils::net::MacAddr;
+use npb_pcap_policy::{DedupOperator, TapSide};
 
 #[derive(Debug)]
 pub struct LookupKey {
@@ -53,6 +55,20 @@ pub struct LookupKey {
     pub tunnel_id: u32,
 }
 
+impl DedupOperator for LookupKey {
+    fn is_valid(&self, tap_side: TapSide) -> bool {
+        match tap_side {
+            TapSide::SRC => self.l2_end_0 && self.l3_end_0,
+            TapSide::DST => self.l2_end_1 && self.l3_end_1,
+            _ => false,
+        }
+    }
+
+    fn is_tor(&self) -> bool {
+        self.tap_type == TapType::Tor
+    }
+}
+
 impl Default for LookupKey {
     fn default() -> Self {
         LookupKey {
@@ -74,7 +90,7 @@ impl Default for LookupKey {
             l3_epc_id_1: 0,
             proto: Default::default(),
             tap_type: Default::default(),
-            feature_flag: FeatureFlags::NPB,
+            feature_flag: FeatureFlags::DEDUP,
             forward_matched: None,
             backward_matched: None,
             fast_index: 0,
@@ -133,11 +149,15 @@ impl LookupKey {
             self.proto,
             self.dst_ip,
             self.src_ip,
-            src_epc,
             dst_epc,
+            src_epc,
             self.dst_port,
             self.src_port,
         );
+    }
+
+    pub fn set_feature_flag(&mut self, feature_flag: FeatureFlags) {
+        self.feature_flag |= feature_flag;
     }
 
     pub fn has_feature_flag(&self, feature_flag: FeatureFlags) -> bool {
@@ -146,6 +166,27 @@ impl LookupKey {
 
     pub fn is_loopback_packet(&self) -> bool {
         self.src_ip.is_loopback() || self.dst_ip.is_loopback()
+    }
+
+    pub fn reverse(&mut self) {
+        swap(&mut self.src_mac, &mut self.dst_mac);
+        swap(&mut self.src_ip, &mut self.dst_ip);
+        swap(&mut self.src_port, &mut self.dst_port);
+        swap(&mut self.l2_end_0, &mut self.l2_end_1);
+        swap(&mut self.l3_end_0, &mut self.l3_end_1);
+        swap(&mut self.is_vip_0, &mut self.is_vip_1);
+        swap(&mut self.l3_epc_id_0, &mut self.l3_epc_id_1);
+    }
+
+    pub fn fast_key(&self, src_masked_ip: u32, dst_masked_ip: u32) -> (u64, u64) {
+        let src_port = self.src_port as u64;
+        let dst_port = self.dst_port as u64;
+        let src_mac_suffix = self.src_mac.get_suffix() as u64;
+        let dst_mac_suffix = self.dst_mac.get_suffix() as u64;
+        (
+            (src_masked_ip as u64) | src_mac_suffix << 32 | src_port << 48,
+            (dst_masked_ip as u64) | dst_mac_suffix << 32 | dst_port << 48,
+        )
     }
 }
 

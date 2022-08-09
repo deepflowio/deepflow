@@ -16,275 +16,21 @@
 
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
+use std::sync::Arc;
 
-use bitflags::bitflags;
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
-
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use log::warn;
 
 use super::endpoint::EPC_FROM_DEEPFLOW;
 use super::enums::TapType;
 use super::error::Error;
-use super::matched_field::{MatchedFieldv4, MatchedFieldv6};
+use super::matched_field::{MatchedFieldv4, MatchedFieldv6, MatchedFlag};
 use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
+use npb_pcap_policy::{NpbAction, NpbTunnelType, PolicyData, TapSide};
 
 use crate::proto::trident;
-
-const ACTION_PCAP: u16 = 1;
-
-type ActionFlag = u16;
-
-bitflags! {
-    #[derive(Default)]
-    pub struct TapSide: u8 {
-        const SRC = 0x1;
-        const DST = 0x2;
-        const MASK = Self::SRC.bits | Self::DST.bits;
-        const ALL = Self::SRC.bits | Self::DST.bits;
-    }
-}
-
-impl From<trident::TapSide> for TapSide {
-    fn from(t: trident::TapSide) -> Self {
-        match t {
-            trident::TapSide::Src => TapSide::SRC,
-            trident::TapSide::Dst => TapSide::DST,
-            trident::TapSide::Both => TapSide::ALL,
-        }
-    }
-}
-
-#[derive(TryFromPrimitive, IntoPrimitive, Clone, Copy)]
-#[repr(u8)]
-pub enum DirectionType {
-    NoDirection = 0,
-    Forward = 1,
-    Backward = 2,
-}
-
-impl From<DirectionType> for TapSide {
-    fn from(d: DirectionType) -> Self {
-        match d {
-            DirectionType::Forward => TapSide::SRC,
-            DirectionType::Backward => TapSide::DST,
-            _ => TapSide::empty(),
-        }
-    }
-}
-
-impl Default for DirectionType {
-    fn default() -> Self {
-        Self::NoDirection
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, TryFromPrimitive, IntoPrimitive)]
-#[repr(u8)]
-pub enum NpbTunnelType {
-    VxLan,
-    GreErspan,
-    Pcap,
-}
-
-impl From<trident::TunnelType> for NpbTunnelType {
-    fn from(t: trident::TunnelType) -> Self {
-        match t {
-            trident::TunnelType::GreErspan => Self::GreErspan,
-            trident::TunnelType::Pcap => Self::Pcap,
-            trident::TunnelType::Vxlan => Self::VxLan,
-        }
-    }
-}
-
-// 64              48              32            30          26                      0
-// +---------------+---------------+-------------+-----------+-----------------------+
-// |   acl_gid     | payload_slice | tunnel_type | tap_side  |      tunnel_id        |
-// +---------------+---------------+-------------+-----------+-----------------------+
-#[derive(Debug, Default, Clone)]
-pub struct NpbAction {
-    action: u64,
-    acl_gids: Vec<u16>,
-}
-
-impl From<trident::NpbAction> for NpbAction {
-    fn from(n: trident::NpbAction) -> Self {
-        Self::new(
-            n.npb_acl_group_id(),
-            n.tunnel_id(),
-            n.tunnel_type().into(),
-            n.tap_side().into(),
-            n.payload_slice() as u16,
-        )
-    }
-}
-
-impl NpbAction {
-    const PAYLOAD_SLICE_MASK: u64 = 0xffff;
-    const TUNNEL_ID_MASK: u64 = 0x3ffffff;
-    const TUNNEL_TYPE_MASK: u64 = 0x3;
-
-    pub fn new(
-        acl_gid: u32,
-        id: u32,
-        tunnel_type: NpbTunnelType,
-        tap_side: TapSide,
-        slice: u16,
-    ) -> Self {
-        Self {
-            action: (acl_gid as u64) << 48
-                | (slice as u64 & Self::PAYLOAD_SLICE_MASK) << 32
-                | (u8::from(tunnel_type) as u64) << 30
-                | (tap_side.bits() as u64) << 26
-                | id as u64 & Self::TUNNEL_ID_MASK,
-            acl_gids: vec![],
-        }
-    }
-
-    pub const fn tap_side(&self) -> TapSide {
-        TapSide::from_bits_truncate((self.action >> 26) as u8 & TapSide::MASK.bits)
-    }
-
-    pub const fn tunnel_id(&self) -> u32 {
-        (self.action & Self::TUNNEL_ID_MASK) as u32
-    }
-
-    pub const fn payload_slice(&self) -> u16 {
-        (self.action >> 32 & Self::PAYLOAD_SLICE_MASK) as u16
-    }
-
-    pub fn tunnel_type(&self) -> NpbTunnelType {
-        NpbTunnelType::try_from((self.action >> 30 & Self::TUNNEL_TYPE_MASK) as u8).unwrap()
-    }
-
-    pub fn add_acl_gid(&mut self, acl_gids: &[u16]) {
-        for gid in acl_gids {
-            if self.acl_gids.contains(gid) {
-                continue;
-            }
-            self.acl_gids.push(*gid);
-        }
-    }
-
-    /// Get a reference to the npb actions's acl gids.
-    pub fn acl_gids(&self) -> &[u16] {
-        self.acl_gids.as_ref()
-    }
-
-    pub fn tunnel_ip_id(&self) -> u16 {
-        if self.tunnel_type() == NpbTunnelType::Pcap {
-            return 0;
-        }
-
-        todo!("get tunnel ip id")
-    }
-
-    pub fn set_payload_slice(&mut self, payload_slice: u16) {
-        self.action ^= !(Self::PAYLOAD_SLICE_MASK << 32);
-        self.action |= (payload_slice as u64 & Self::PAYLOAD_SLICE_MASK) << 32;
-    }
-
-    pub fn add_tap_side(&mut self, tap_side: TapSide) {
-        self.action |= (tap_side.bits() as u64) << 26;
-    }
-
-    pub fn set_tap_side(&mut self, tap_side: TapSide) {
-        self.action ^= !((TapSide::MASK.bits() as u64) << 26);
-        self.action |= (tap_side.bits() as u64) << 26;
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct PolicyData {
-    pub npb_actions: Vec<NpbAction>,
-    pub acl_id: u32,
-    pub action_flags: ActionFlag,
-}
-
-impl PolicyData {
-    pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32, action_flags: ActionFlag) -> Self {
-        Self {
-            npb_actions,
-            acl_id,
-            action_flags,
-        }
-    }
-
-    pub fn format_npb_action(&mut self) {
-        for item in &mut self.npb_actions {
-            if item.tap_side() == TapSide::ALL && item.tunnel_type() != NpbTunnelType::Pcap {
-                item.set_tap_side(TapSide::SRC);
-            }
-        }
-    }
-
-    pub fn merge_npb_action(
-        &mut self,
-        actions: Vec<NpbAction>,
-        acl_id: u32,
-        directions: Vec<DirectionType>,
-    ) {
-        if self.acl_id == 0 {
-            self.acl_id = acl_id;
-        }
-
-        for mut candidate_action in actions {
-            let mut repeat = false;
-            for action in self.npb_actions.iter_mut() {
-                if action.action == candidate_action.action {
-                    action.add_acl_gid(candidate_action.acl_gids());
-                    repeat = true;
-                    break;
-                }
-
-                if action.tunnel_ip_id() != candidate_action.tunnel_ip_id()
-                    || action.tunnel_id() != candidate_action.tunnel_id()
-                    || action.tunnel_type() != candidate_action.tunnel_type()
-                {
-                    continue;
-                }
-                // PCAP相同aclgid的合并为一个，不同aclgid的不能合并
-                if candidate_action.tunnel_type() == NpbTunnelType::Pcap {
-                    // 应该有且仅有一个
-                    let mut repeat_pcap_acl_gid = false;
-                    if let Some(acl_gid) = candidate_action.acl_gids().first() {
-                        if action.acl_gids().contains(acl_gid) {
-                            repeat_pcap_acl_gid = true;
-                        }
-                    }
-                    if !repeat_pcap_acl_gid {
-                        continue;
-                    }
-                }
-
-                if candidate_action.payload_slice() == 0
-                    || candidate_action.payload_slice() > action.payload_slice()
-                {
-                    action.set_payload_slice(candidate_action.payload_slice());
-                }
-
-                if directions.is_empty() {
-                    action.add_tap_side(candidate_action.tap_side());
-                } else {
-                    action.set_tap_side(directions[0].into());
-                }
-                action.add_acl_gid(candidate_action.acl_gids());
-                repeat = true;
-            }
-
-            if !repeat {
-                if !directions.is_empty() {
-                    candidate_action.set_tap_side(directions[0].into());
-                }
-                if candidate_action.tunnel_type() == NpbTunnelType::Pcap {
-                    self.action_flags |= ACTION_PCAP;
-                }
-
-                self.npb_actions.push(candidate_action);
-            }
-        }
-    }
-}
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum GroupType {
@@ -303,8 +49,19 @@ impl From<trident::GroupType> for GroupType {
 
 #[derive(Clone, Debug, Default)]
 pub struct IpGroupData {
-    pub epc_id: u32,
+    pub id: u16,
+    pub epc_id: u16,
     pub ips: Vec<IpNet>,
+}
+
+impl IpGroupData {
+    pub fn new(id: u16, epc_id: u16, cidr: &str) -> Self {
+        IpGroupData {
+            id,
+            epc_id,
+            ips: vec![cidr.parse().unwrap()],
+        }
+    }
 }
 
 impl TryFrom<&trident::Group> for IpGroupData {
@@ -347,8 +104,9 @@ impl TryFrom<&trident::Group> for IpGroupData {
         }
 
         Ok(IpGroupData {
-            epc_id: (g.epc_id() & 0xffff) as u32,
+            epc_id: (g.epc_id() & 0xffff) as u16,
             ips,
+            id: (g.id() & 0xffff) as u16,
         })
     }
 }
@@ -448,41 +206,6 @@ pub fn ip_range_convert_to_cidr(start: IpAddr, end: IpAddr) -> Vec<IpNet> {
     }
 }
 
-/*
-#[derive(Debug)]
-pub struct Acl {
-    id: u32,
-    tap_type: TapType,
-    src_groups: Vec<u16>,
-    dst_groups: Vec<u16>,
-    src_port_range: Vec<RangeInclusive<u16>>, // 0仅表示采集端口0
-    dst_port_range: Vec<RangeInclusive<u16>>, // 0仅表示采集端口0
-    proto: IpProtocol,                        // 256表示全采集, 0表示采集采集协议0
-    npb_actions: Vec<NpbAction>,
-    v4_fields: Vec<MatchNodev4>,
-    v6_fields: Vec<MatchNodev6>,
-    policy: PolicyData,
-}
-
-impl From<trident::FlowAcl> for Acl {
-    fn from(mut f: trident::FlowAcl) -> Self {
-        Self {
-            id: f.id(),
-            tap_type: (f.tap_type() as u16).try_into().unwrap_or_default(),
-            src_groups: f.src_group_ids.drain(..).map(|id| id as u16).collect(),
-            dst_groups: f.dst_group_ids.drain(..).map(|id| id as u16).collect(),
-            src_port_range: split_port(f.src_ports()),
-            dst_port_range: split_port(f.dst_ports()),
-            proto: IpProtocol::try_from(f.protocol() as u8).unwrap_or_default(),
-            npb_actions: f.npb_actions.into_iter().map(Into::into).collect(),
-            v4_fields: vec![],
-            v6_fields: vec![],
-            policy: PolicyData::default(),
-        }
-    }
-}
-*/
-
 #[derive(Debug)]
 pub struct MatchNodev4 {
     matched: MatchedFieldv4,
@@ -495,7 +218,211 @@ pub struct MatchNodev6 {
     matched_mask: MatchedFieldv6,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone, PartialEq)]
+pub struct PortSegment {
+    port: u16,
+    mask: u16,
+}
+
+impl PortSegment {
+    pub const ALL: PortSegment = PortSegment { port: 0, mask: 0 };
+
+    fn calc_right_zero(port: u16) -> u16 {
+        let mut count = 0;
+        for i in 0..u16::BITS {
+            if (port >> i) & 0x1 != 0 {
+                return count;
+            }
+            count += 1;
+        }
+        return count;
+    }
+
+    fn calc_mask(port: u16, max_port: u16, count: u16) -> (u16, u16) {
+        for i in 0..count {
+            if max_port >= port + (((1u32 << (count - i)) - 1) as u16) {
+                return (((u16::MAX as u32) << (count - i)) as u16, count - i);
+            }
+        }
+        return (u16::MAX, 0);
+    }
+
+    fn new(port: PortRange) -> Vec<PortSegment> {
+        let mut port_segments = Vec::new();
+
+        let mut i = port.min() as usize;
+        while i < port.max() as usize + 1 {
+            let n = Self::calc_right_zero(i as u16);
+            let (mask, n) = Self::calc_mask(i as u16, port.max(), n);
+
+            port_segments.push(PortSegment {
+                port: i as u16,
+                mask,
+            });
+
+            i += 1 << n;
+            if i == 0 {
+                break;
+            }
+        }
+
+        return port_segments;
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct IpSegment {
+    ip: IpAddr,
+    mask: IpAddr,
+    epc_id: u16,
+}
+
+impl Default for IpSegment {
+    fn default() -> Self {
+        Self {
+            ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            mask: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            epc_id: 0,
+        }
+    }
+}
+
+impl From<IpNet> for IpSegment {
+    fn from(cidr: IpNet) -> Self {
+        IpSegment::from(&cidr)
+    }
+}
+
+impl From<&IpNet> for IpSegment {
+    fn from(cidr: &IpNet) -> Self {
+        match (cidr.network().is_ipv4(), cidr.netmask().is_ipv4()) {
+            (true, true) | (false, false) => IpSegment {
+                ip: cidr.network(),
+                mask: cidr.netmask(),
+                ..Default::default()
+            },
+            _ => {
+                panic!("Cidr network and netmask mismatched")
+            }
+        }
+    }
+}
+
+impl IpSegment {
+    pub const IPV4_ANY: IpSegment = IpSegment::new_zero(false);
+    pub const IPV6_ANY: IpSegment = IpSegment::new_zero(true);
+
+    const fn new_zero(is_ipv6: bool) -> Self {
+        Self {
+            ip: if is_ipv6 {
+                IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+            } else {
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+            },
+            mask: if is_ipv6 {
+                IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+            } else {
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+            },
+            epc_id: 0,
+        }
+    }
+
+    fn new<T: AsRef<str>>(cidr: T, epc_id: u16) -> Option<Self> {
+        let ip_net = IpNet::from_str(cidr.as_ref());
+        if ip_net.is_err() {
+            warn!("Cidr {} EPC {} parse error.", cidr.as_ref(), epc_id);
+            return None;
+        }
+        let mut ip_segment = IpSegment::from(ip_net.unwrap());
+        ip_segment.epc_id = epc_id;
+        return Some(ip_segment);
+    }
+
+    pub fn get_epc_id(&self) -> u16 {
+        return self.epc_id;
+    }
+
+    pub fn set_epc_id(&mut self, epc_id: u16) {
+        self.epc_id = epc_id;
+    }
+
+    pub fn get_ip(&self) -> IpAddr {
+        return self.ip;
+    }
+
+    pub fn get_mask(&self) -> IpAddr {
+        return self.mask;
+    }
+
+    pub fn is_ipv6(&self) -> bool {
+        return self.ip.is_ipv6();
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Fieldv4 {
+    pub field: MatchedFieldv4,
+    pub mask: MatchedFieldv4,
+}
+
+impl fmt::Display for Fieldv4 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "field: {}:{} -> {}:{} epc: {} -> {} proto: {} tap: {}\nmask : {}:{} -> {}:{} epc: {} -> {} proto: {} tap: {}",
+            self.field.get_ip(MatchedFlag::SrcIp),
+            self.field.get(MatchedFlag::SrcPort),
+            self.field.get_ip(MatchedFlag::DstIp),
+            self.field.get(MatchedFlag::DstPort),
+            self.field.get(MatchedFlag::SrcEpc),
+            self.field.get(MatchedFlag::DstEpc),
+            self.field.get(MatchedFlag::Proto),
+            self.field.get(MatchedFlag::TapType),
+            self.mask.get_ip(MatchedFlag::SrcIp),
+            self.mask.get(MatchedFlag::SrcPort),
+            self.mask.get_ip(MatchedFlag::DstIp),
+            self.mask.get(MatchedFlag::DstPort),
+            self.mask.get(MatchedFlag::SrcEpc),
+            self.mask.get(MatchedFlag::DstEpc),
+            self.mask.get(MatchedFlag::Proto),
+            self.mask.get(MatchedFlag::TapType)
+        )
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct Fieldv6 {
+    pub field: MatchedFieldv6,
+    pub mask: MatchedFieldv6,
+}
+
+impl fmt::Display for Fieldv6 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "field: {}:{} -> {}:{} epc: {} -> {} proto: {} tap: {}\nmask : {}:{} -> {}:{} epc: {} -> {} proto: {} tap: {}",
+            self.field.get_ip(MatchedFlag::SrcIp),
+            self.field.get(MatchedFlag::SrcPort),
+            self.field.get_ip(MatchedFlag::DstIp),
+            self.field.get(MatchedFlag::DstPort),
+            self.field.get(MatchedFlag::SrcEpc),
+            self.field.get(MatchedFlag::DstEpc),
+            self.field.get(MatchedFlag::Proto),
+            self.field.get(MatchedFlag::TapType),
+            self.mask.get_ip(MatchedFlag::SrcIp),
+            self.mask.get(MatchedFlag::SrcPort),
+            self.mask.get_ip(MatchedFlag::DstIp),
+            self.mask.get(MatchedFlag::DstPort),
+            self.mask.get(MatchedFlag::SrcEpc),
+            self.mask.get(MatchedFlag::DstEpc),
+            self.mask.get(MatchedFlag::Proto),
+            self.mask.get(MatchedFlag::TapType)
+        )
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct Acl {
     pub id: u32,
     pub tap_type: TapType,
@@ -503,31 +430,226 @@ pub struct Acl {
     pub dst_groups: Vec<u32>,
     pub src_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
     pub dst_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
-    pub proto: u16,                      // 256表示全采集, 0表示采集采集协议0
+    pub src_ports: Vec<u16>,             // 0仅表示采集端口0
+    pub dst_ports: Vec<u16>,             // 0仅表示采集端口0
+
+    pub proto: u16, // 256表示全采集, 0表示采集采集协议0
 
     pub npb_actions: Vec<NpbAction>,
+
+    pub match_field: Vec<Arc<Fieldv4>>,
+    pub match_field6: Vec<Arc<Fieldv6>>,
+
     pub policy: PolicyData,
-    // TODO: DDBS
 }
 
-// 这个函数不安全，仅用于测试和debug
-/*
-impl From<trident::FlowAcl> for Acl {
-    fn from(mut f: trident::FlowAcl) -> Self {
-        Self {
-            id: f.id(),
-            tap_type: (f.tap_type() as u16).try_into().unwrap_or_default(),
-            src_groups: f.src_group_ids.drain(..).map(|id| id as u16).collect(),
-            dst_groups: f.dst_group_ids.drain(..).map(|id| id as u16).collect(),
-            src_port_ranges: PortRangeList::try_from(f.src_ports.unwrap_or_default()).unwrap().element().to_vec(),
-            dst_port_ranges: PortRangeList::try_from(f.dst_ports.unwrap_or_default()).unwrap().element().to_vec(),
-            proto: f.protocol() as u16,
-            npb_actions: f.npb_actions.into_iter().map(Into::into).collect(),
-            policy: PolicyData::default(),
+impl Acl {
+    const PROTOCOL_ANY: u16 = 256;
+    pub fn new(
+        id: u32,
+        src_groups: Vec<u32>,
+        dst_groups: Vec<u32>,
+        src_port_ranges: Vec<PortRange>,
+        dst_port_ranges: Vec<PortRange>,
+        actions: NpbAction,
+    ) -> Self {
+        Acl {
+            id,
+            tap_type: TapType::Tor,
+            src_groups,
+            dst_groups,
+            src_port_ranges,
+            dst_port_ranges,
+            proto: Self::PROTOCOL_ANY,
+            npb_actions: vec![actions],
+            ..Default::default()
+        }
+    }
+
+    pub fn init_policy(&mut self) {
+        self.policy
+            .merge_npb_action(&self.npb_actions, self.id, vec![]);
+    }
+
+    pub fn reset(&mut self) {
+        self.match_field.clear();
+        self.match_field6.clear();
+    }
+
+    fn get_port_range(ports: &Vec<u16>) -> Vec<PortRange> {
+        let mut port_ranges = Vec::new();
+        let mut min = 0;
+        let mut max = 0;
+
+        for (i, port) in ports.iter().enumerate() {
+            if i == 0 {
+                min = *port;
+                max = *port;
+                if ports.len() == i + 1 {
+                    port_ranges.push(PortRange::new(min, max));
+                }
+                continue;
+            }
+
+            if *port == max + 1 {
+                max = *port;
+            } else {
+                port_ranges.push(PortRange::new(min, max));
+            }
+
+            if ports.len() == i + 1 {
+                port_ranges.push(PortRange::new(min, max));
+            }
+        }
+
+        return port_ranges;
+    }
+
+    fn generate_port_segment(&self) -> (Vec<PortSegment>, Vec<PortSegment>) {
+        let mut src_segments = Vec::new();
+        let mut dst_segments = Vec::new();
+
+        for ports in Self::get_port_range(&self.src_ports) {
+            src_segments.append(&mut PortSegment::new(ports));
+        }
+        for ports in Self::get_port_range(&self.dst_ports) {
+            dst_segments.append(&mut PortSegment::new(ports));
+        }
+
+        if src_segments.is_empty() {
+            src_segments.push(PortSegment::ALL);
+        }
+        if dst_segments.is_empty() {
+            dst_segments.push(PortSegment::ALL);
+        }
+        return (src_segments, dst_segments);
+    }
+
+    pub fn generate_match_field(
+        &mut self,
+        src_ip: &IpSegment,
+        dst_ip: &IpSegment,
+        src_ports: &Vec<PortSegment>,
+        dst_ports: &Vec<PortSegment>,
+    ) {
+        if let (
+            IpAddr::V4(src_ip4),
+            IpAddr::V4(dst_ip4),
+            IpAddr::V4(src_mask4),
+            IpAddr::V4(dst_mask4),
+        ) = (
+            src_ip.get_ip(),
+            dst_ip.get_ip(),
+            src_ip.get_mask(),
+            dst_ip.get_mask(),
+        ) {
+            for src_port in src_ports {
+                for dst_port in dst_ports {
+                    let mut item = Fieldv4::default();
+
+                    let field = &mut item.field;
+                    field.set(MatchedFlag::TapType, u16::from(self.tap_type));
+                    field.set_ip(MatchedFlag::SrcIp, src_ip4);
+                    field.set(MatchedFlag::SrcEpc, src_ip.get_epc_id());
+                    field.set_ip(MatchedFlag::DstIp, dst_ip4);
+                    field.set(MatchedFlag::DstEpc, dst_ip.get_epc_id());
+                    field.set(MatchedFlag::SrcPort, src_port.port);
+                    field.set(MatchedFlag::DstPort, dst_port.port);
+
+                    let mask = &mut item.mask;
+                    mask.set_mask(MatchedFlag::TapType, self.tap_type != TapType::Any);
+                    mask.set_ip(MatchedFlag::SrcIp, src_mask4);
+                    mask.set_mask(MatchedFlag::SrcEpc, src_ip.get_epc_id() > 0);
+                    mask.set_ip(MatchedFlag::DstIp, dst_mask4);
+                    mask.set_mask(MatchedFlag::DstEpc, dst_ip.get_epc_id() > 0);
+                    mask.set(MatchedFlag::SrcPort, src_port.mask);
+                    mask.set(MatchedFlag::DstPort, dst_port.mask);
+
+                    if self.proto == Self::PROTOCOL_ANY {
+                        item.field.set(MatchedFlag::Proto, 0);
+                        item.mask.set(MatchedFlag::Proto, 0);
+                    } else {
+                        item.field.set(MatchedFlag::Proto, self.proto);
+                        item.mask.set_mask(MatchedFlag::Proto, true);
+                    }
+
+                    self.match_field.push(Arc::new(item));
+                }
+            }
+        }
+    }
+
+    pub fn generate_match_field6(
+        &mut self,
+        src_ip: &IpSegment,
+        dst_ip: &IpSegment,
+        src_ports: &Vec<PortSegment>,
+        dst_ports: &Vec<PortSegment>,
+    ) {
+        if let (
+            IpAddr::V6(src_ip6),
+            IpAddr::V6(dst_ip6),
+            IpAddr::V6(src_mask6),
+            IpAddr::V6(dst_mask6),
+        ) = (
+            src_ip.get_ip(),
+            dst_ip.get_ip(),
+            src_ip.get_mask(),
+            dst_ip.get_mask(),
+        ) {
+            for src_port in src_ports {
+                for dst_port in dst_ports {
+                    let mut item = Fieldv6::default();
+
+                    let field = &mut item.field;
+                    field.set(MatchedFlag::TapType, u16::from(self.tap_type));
+                    field.set_ip(MatchedFlag::SrcIp, src_ip6);
+                    field.set(MatchedFlag::SrcEpc, src_ip.get_epc_id());
+                    field.set_ip(MatchedFlag::DstIp, dst_ip6);
+                    field.set(MatchedFlag::DstEpc, dst_ip.get_epc_id());
+                    field.set(MatchedFlag::SrcPort, src_port.port);
+                    field.set(MatchedFlag::DstPort, dst_port.port);
+
+                    let mask = &mut item.mask;
+                    mask.set_mask(MatchedFlag::TapType, self.tap_type != TapType::Any);
+                    mask.set_ip(MatchedFlag::SrcIp, src_mask6);
+                    mask.set_mask(MatchedFlag::SrcEpc, src_ip.get_epc_id() > 0);
+                    mask.set_ip(MatchedFlag::DstIp, dst_mask6);
+                    mask.set_mask(MatchedFlag::DstEpc, dst_ip.get_epc_id() > 0);
+                    mask.set(MatchedFlag::SrcPort, src_port.mask);
+                    mask.set(MatchedFlag::DstPort, dst_port.mask);
+
+                    if self.proto == Self::PROTOCOL_ANY {
+                        item.field.set(MatchedFlag::Proto, 0);
+                        item.mask.set(MatchedFlag::Proto, 0);
+                    } else {
+                        item.field.set(MatchedFlag::Proto, self.proto);
+                        item.mask.set_mask(MatchedFlag::Proto, true);
+                    }
+
+                    self.match_field6.push(Arc::new(item));
+                }
+            }
+        }
+    }
+
+    pub fn generate_match(&mut self, src_ips: &Vec<IpSegment>, dst_ips: &Vec<IpSegment>) {
+        let (src_ports, dst_ports) = self.generate_port_segment();
+        for src_ip in src_ips {
+            for dst_ip in dst_ips {
+                match (src_ip.is_ipv6(), dst_ip.is_ipv6()) {
+                    (true, true) => {
+                        self.generate_match_field6(src_ip, dst_ip, &src_ports, &dst_ports)
+                    }
+                    (false, false) => {
+                        self.generate_match_field(src_ip, dst_ip, &src_ports, &dst_ports)
+                    }
+                    _ => continue,
+                }
+            }
         }
     }
 }
-*/
 
 impl TryFrom<trident::FlowAcl> for Acl {
     type Error = String;
@@ -554,6 +676,21 @@ impl TryFrom<trident::FlowAcl> for Acl {
                 dst_ports.unwrap_err()
             ));
         }
+        let npb_actions = a
+            .npb_actions
+            .iter()
+            .map(|n| {
+                NpbAction::new(
+                    n.npb_acl_group_id(),
+                    n.tunnel_id(),
+                    n.tunnel_ip().parse::<IpAddr>().unwrap(),
+                    NpbTunnelType::new(n.tunnel_type.unwrap() as u8),
+                    TapSide::new(n.tap_side.unwrap() as u8),
+                    n.payload_slice() as u16,
+                )
+            })
+            .collect();
+
         Ok(Acl {
             id: a.id.unwrap_or_default(),
             tap_type: tap_type.unwrap(),
@@ -570,6 +707,7 @@ impl TryFrom<trident::FlowAcl> for Acl {
             src_port_ranges: src_ports.unwrap().element().to_vec(),
             dst_port_ranges: dst_ports.unwrap().element().to_vec(),
             proto: (a.protocol.unwrap_or_default() & 0xffff) as u16,
+            npb_actions,
             ..Default::default()
         })
     }
@@ -577,54 +715,10 @@ impl TryFrom<trident::FlowAcl> for Acl {
 
 impl fmt::Display for Acl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Id:{} TapType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:{:?} DstPortRange:{:?} Proto:{} NpbActions:{:?}",
-            self.id, self.tap_type, self.src_groups, self.dst_groups, self.src_port_ranges, self.dst_port_ranges, self.proto, self.npb_actions)
+        write!(f, "Id:{} TapType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:{:?} DstPortRange:{:?} Proto:{} NpbActions:{}",
+            self.id, self.tap_type, self.src_groups, self.dst_groups, self.src_port_ranges, self.dst_port_ranges, self.proto, self.npb_actions.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","))
     }
 }
-
-/*
-pub fn split_port(src: impl AsRef<str>) -> Vec<RangeInclusive<u16>> {
-    fn get_port(src: &str) -> Result<RangeInclusive<u16>, ParseIntError> {
-        let split_src_ports = match src.split_once('-') {
-            Some(p) => p,
-            None => {
-                let port = src.parse::<u32>()?;
-                return Ok(port as u16..=port as u16);
-            }
-        };
-        let min = split_src_ports.0.parse::<u32>()?;
-        let max = split_src_ports.1.parse::<u32>()?;
-
-        Ok(min as u16..=max as u16)
-    }
-
-    let port_ranges = src.as_ref();
-    if port_ranges.len() == 0 {
-        return vec![(0..=65535)];
-    }
-
-    let mut src_ports = port_ranges
-        .split(',')
-        .filter_map(|p| get_port(p).ok())
-        .collect::<Vec<_>>();
-    src_ports.sort_by(|a, b| a.start().cmp(b.start()));
-
-    let mut retain_flags = vec![true; src_ports.len()];
-    for i in 0..src_ports.len() - 1 {
-        // 合并连续的端口号
-        if *src_ports[i].end() + 1 >= *src_ports[i + 1].start() {
-            src_ports[i + 1] =
-                *src_ports[i].start()..=max(*src_ports[i].end(), *src_ports[i + 1].end());
-            retain_flags[i] = false;
-        }
-    }
-
-    // 删除无效数据
-    let mut iter = retain_flags.into_iter();
-    src_ports.retain(|_| iter.next().unwrap());
-    src_ports
-}
-*/
 
 // IsVIP为true时不影响cidr epcid表的建立, 但是会单独建立VIP表
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -717,5 +811,84 @@ impl From<&trident::PeerConnection> for PeerConnection {
             local_epc: (p.local_epc_id() & 0xffff) as i32,
             remote_epc: (p.remote_epc_id() & 0xffff) as i32,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_port_segment() {
+        assert_eq!(PortSegment::calc_right_zero(u16::MAX), 0);
+        assert_eq!(PortSegment::calc_right_zero(0xff00), 8);
+        assert_eq!(PortSegment::calc_right_zero(0), 16);
+
+        assert_eq!(
+            PortSegment::new(PortRange::new(0, 65535)),
+            vec![PortSegment { port: 0, mask: 0 }]
+        );
+
+        assert_eq!(
+            PortSegment::new(PortRange::new(100, 10000)),
+            vec![
+                PortSegment {
+                    port: 100,
+                    mask: 65532
+                },
+                PortSegment {
+                    port: 104,
+                    mask: 65528
+                },
+                PortSegment {
+                    port: 112,
+                    mask: 65520
+                },
+                PortSegment {
+                    port: 128,
+                    mask: 65408
+                },
+                PortSegment {
+                    port: 256,
+                    mask: 65280
+                },
+                PortSegment {
+                    port: 512,
+                    mask: 65024
+                },
+                PortSegment {
+                    port: 1024,
+                    mask: 64512
+                },
+                PortSegment {
+                    port: 2048,
+                    mask: 63488
+                },
+                PortSegment {
+                    port: 4096,
+                    mask: 61440
+                },
+                PortSegment {
+                    port: 8192,
+                    mask: 64512
+                },
+                PortSegment {
+                    port: 9216,
+                    mask: 65024
+                },
+                PortSegment {
+                    port: 9728,
+                    mask: 65280
+                },
+                PortSegment {
+                    port: 9984,
+                    mask: 65520
+                },
+                PortSegment {
+                    port: 10000,
+                    mask: 65535
+                }
+            ]
+        );
     }
 }

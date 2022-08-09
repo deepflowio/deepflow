@@ -29,7 +29,7 @@ use clap::{ArgEnum, Parser, Subcommand};
 #[cfg(target_os = "linux")]
 use deepflow_agent::debug::PlatformMessage;
 use deepflow_agent::debug::{
-    Beacon, Client, Message, Module, QueueMessage, RpcMessage, BEACON_PORT,
+    Beacon, Client, Message, Module, PolicyMessage, QueueMessage, RpcMessage, BEACON_PORT,
     DEBUG_QUEUE_IDLE_TIMEOUT, DEEPFLOW_AGENT_BEACON,
 };
 
@@ -60,7 +60,8 @@ enum ControllerCmd {
     Platform(PlatformCmd),
     /// monitor various queues of the selected deepflow-agent
     Queue(QueueCmd),
-    /// get connection information of all deepflow-agents managed under this controller
+    /// get information about the policy
+    Policy(PolicyCmd),
     List,
 }
 
@@ -108,6 +109,31 @@ struct PlatformCmd {
     /// eg: deepflow-agent-ctl platform --mac_mappings
     #[clap(short, long)]
     mac_mappings: bool,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Parser)]
+struct PolicyCmd {
+    #[clap(subcommand)]
+    subcmd: PolicySubCmd,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Subcommand, Debug)]
+enum PolicySubCmd {
+    Monitor,
+    Show,
+    Analyzing(AnalyzingArgs),
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Parser)]
+struct AnalyzingArgs {
+    /// Set policy id
+    ///
+    /// eg: deepflow-agent-ctl policy analyzing --id 10
+    #[clap(long, parse(try_from_str))]
+    id: Option<u32>,
 }
 
 #[cfg(target_os = "linux")]
@@ -219,6 +245,7 @@ impl Controller {
             ControllerCmd::Rpc(c) => self.rpc(c),
             ControllerCmd::List => self.list(),
             ControllerCmd::Queue(c) => self.queue(c),
+            ControllerCmd::Policy(c) => self.policy(c),
         }
     }
 
@@ -541,6 +568,73 @@ impl Controller {
             }
         }
         Ok(())
+    }
+
+    fn policy(&self, c: PolicyCmd) -> Result<()> {
+        if self.port.is_none() {
+            return Err(anyhow!(ERR_PORT_MSG));
+        }
+
+        let mut client = self.new_client()?;
+        match c.subcmd {
+            PolicySubCmd::Monitor => {
+                client.send_to(Message {
+                    module: Module::Policy,
+                    msg: PolicyMessage::On,
+                })?;
+
+                loop {
+                    let res = client.recv::<PolicyMessage>()?;
+                    match res {
+                        PolicyMessage::Context(c) => println!("{}", c),
+                        PolicyMessage::Done => return Ok(()),
+                        PolicyMessage::Err(e) => {
+                            println!("{}", e);
+                            return Ok(());
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+            }
+            PolicySubCmd::Show => {
+                client.send_to(Message {
+                    module: Module::Policy,
+                    msg: PolicyMessage::Show,
+                })?;
+
+                let mut count = 1;
+                loop {
+                    let res = client.recv::<PolicyMessage>()?;
+                    match res {
+                        PolicyMessage::Title(t) => {
+                            println!("{}", t);
+                            continue;
+                        }
+                        PolicyMessage::Context(c) => println!("\t{}: {}", count, c),
+                        PolicyMessage::Done => return Ok(()),
+                        PolicyMessage::Err(e) => {
+                            println!("{}", e);
+                            return Ok(());
+                        }
+                        _ => unreachable!(),
+                    }
+                    count += 1;
+                }
+            }
+            PolicySubCmd::Analyzing(args) => {
+                client.send_to(Message {
+                    module: Module::Policy,
+                    msg: PolicyMessage::Analyzing(args.id.unwrap_or_default()),
+                })?;
+
+                let res = client.recv::<PolicyMessage>()?;
+                match res {
+                    PolicyMessage::Context(c) => println!("{}", c),
+                    _ => unreachable!(),
+                }
+                Ok(())
+            }
+        }
     }
 }
 

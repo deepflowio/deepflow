@@ -15,7 +15,10 @@
  */
 
 use std::net::IpAddr;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use log::debug;
 use pnet::datalink;
@@ -24,15 +27,42 @@ use super::{
     first_path::FirstPath,
     forward::{Forward, FROM_TRAFFIC_ARP},
     labeler::Labeler,
+    Result as PResult,
 };
 use crate::common::endpoint::EndpointData;
 use crate::common::enums::TapType;
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
-use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection, PolicyData};
+use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
 use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
 use crate::proto::common::TridentType;
+use crate::utils::queue::Sender;
+use npb_pcap_policy::PolicyData;
+
+pub struct PolicyMonitor {
+    sender: Arc<Sender<String>>,
+    enabled: Arc<AtomicBool>,
+}
+
+impl PolicyMonitor {
+    pub fn send(&self, key: &LookupKey, policy: &Arc<PolicyData>, endpoints: &Arc<EndpointData>) {
+        if self.enabled.load(Ordering::Relaxed) {
+            let _ = self
+                .sender
+                .send(format!("{}\n\t{:?}\n\t{:?}", key, endpoints, policy));
+        }
+    }
+
+    pub fn send_ebpf(&self, src_ip: IpAddr, dst_ip: IpAddr, src_epc: i32, dst_epc: i32) {
+        if self.enabled.load(Ordering::Relaxed) {
+            let _ = self.sender.send(format!(
+                "EBPF {}:{} > {}:{}",
+                src_ip, src_epc, dst_ip, dst_epc
+            ));
+        }
+    }
+}
 
 pub struct Policy {
     labeler: Labeler,
@@ -42,6 +72,10 @@ pub struct Policy {
     queue_count: usize,
     first_hit: usize,
     fast_hit: usize,
+
+    monitor: Option<PolicyMonitor>,
+    acls: Vec<Arc<Acl>>,
+    groups: Vec<Arc<IpGroupData>>,
 }
 
 impl Policy {
@@ -58,8 +92,15 @@ impl Policy {
             queue_count,
             first_hit: 0,
             fast_hit: 0,
+            monitor: None,
+            acls: vec![],
+            groups: vec![],
         }));
         return (PolicySetter::from(policy), PolicyGetter::from(policy));
+    }
+
+    pub fn set_monitor(&mut self, sender: Arc<Sender<String>>, enabled: Arc<AtomicBool>) {
+        self.monitor = Some(PolicyMonitor { sender, enabled });
     }
 
     pub fn lookup_l3(&mut self, packet: &mut MetaPacket) {
@@ -112,17 +153,35 @@ impl Policy {
         key.dst_port = dst_port;
     }
 
+    fn send(&self, key: &LookupKey, policy: &Arc<PolicyData>, endpoints: &Arc<EndpointData>) {
+        if self.monitor.is_some() {
+            self.monitor.as_ref().unwrap().send(key, policy, endpoints);
+        }
+    }
+
+    fn send_ebpf(&self, src_ip: IpAddr, dst_ip: IpAddr, src_epc: i32, dst_epc: i32) {
+        if self.monitor.is_some() {
+            self.monitor
+                .as_ref()
+                .unwrap()
+                .send_ebpf(src_ip, dst_ip, src_epc, dst_epc);
+        }
+    }
+
     pub fn lookup_all_by_key(
         &mut self,
         key: &mut LookupKey,
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
         if let Some(x) = self.table.fast_get(key) {
             self.fast_hit += 1;
+            self.send(key, &x.0, &x.1);
             return Some(x);
         }
         self.first_hit += 1;
         let endpoints = self.labeler.get_endpoint_data(key);
-        return self.table.first_get(key, endpoints);
+        let x = self.table.first_get(key, endpoints).unwrap();
+        self.send(key, &x.0, &x.1);
+        return Some(x);
     }
 
     pub fn lookup_all_by_epc(
@@ -136,6 +195,13 @@ impl Policy {
         let endpoints =
             self.labeler
                 .get_endpoint_data_by_epc(src, dst, l3_epc_id_src, l3_epc_id_dst);
+        self.send_ebpf(
+            src,
+            dst,
+            endpoints.src_info.l3_epc_id,
+            endpoints.dst_info.l3_epc_id,
+        );
+
         if l3_epc_id_src > 0 {
             endpoints.dst_info.l3_epc_id
         } else {
@@ -159,6 +225,8 @@ impl Policy {
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
         self.table.update_ip_group(groups);
+
+        self.groups = groups.clone();
     }
 
     pub fn update_peer_connections(&mut self, peers: &Vec<Arc<PeerConnection>>) {
@@ -170,15 +238,27 @@ impl Policy {
         self.labeler.update_cidr_table(cidrs);
     }
 
-    pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) {
-        self.table.update_acl(acls, check);
+    pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
+        self.table.update_acl(acls, check)?;
+
+        self.acls = acls.clone();
+
+        Ok(())
+    }
+
+    pub fn get_acls(&self) -> &Vec<Arc<Acl>> {
+        return &self.acls;
+    }
+
+    pub fn get_groups(&self) -> &Vec<Arc<IpGroupData>> {
+        return &self.groups;
     }
 
     pub fn flush(&mut self) {
         self.table.flush();
     }
 
-    pub fn hit_status(&self) -> (usize, usize) {
+    pub fn get_hits(&self) -> (usize, usize) {
         (self.first_hit, self.fast_hit)
     }
 }
@@ -258,11 +338,13 @@ impl FlowAclListener for PolicySetter {
         platform_data: &Vec<Arc<PlatformData>>,
         peers: &Vec<Arc<PeerConnection>>,
         cidrs: &Vec<Arc<Cidr>>,
+        acls: &Vec<Arc<Acl>>,
     ) {
         self.update_interfaces(trident_type, platform_data);
         self.update_ip_group(ip_groups);
         self.update_peer_connections(peers);
         self.update_cidr(cidrs);
+        let _ = self.update_acl(acls, true);
 
         self.flush();
     }
@@ -302,12 +384,30 @@ impl PolicySetter {
         self.policy().update_cidr(cidrs);
     }
 
-    pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) {
-        self.policy().update_acl(acls, check);
+    pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
+        self.policy().update_acl(acls, check)?;
+
+        Ok(())
     }
 
     pub fn flush(&mut self) {
         self.policy().flush();
+    }
+
+    pub fn set_monitor(&mut self, sender: Arc<Sender<String>>, enabled: Arc<AtomicBool>) {
+        self.policy().set_monitor(sender, enabled);
+    }
+
+    pub fn get_acls(&self) -> &Vec<Arc<Acl>> {
+        self.policy().get_acls()
+    }
+
+    pub fn get_groups(&self) -> &Vec<Arc<IpGroupData>> {
+        self.policy().get_groups()
+    }
+
+    pub fn get_hits(&self) -> (usize, usize) {
+        return self.policy().get_hits();
     }
 }
 
@@ -319,6 +419,7 @@ mod test {
     use ipnet::IpNet;
 
     use super::*;
+    use crate::common::endpoint::FeatureFlags;
     use crate::common::platform_data::IpSubnet;
     use crate::common::policy::{Cidr, CidrType};
     use crate::utils::net::MacAddr;
@@ -352,6 +453,7 @@ mod test {
             dst_ip: IpAddr::from("172.29.20.200".parse::<Ipv4Addr>().unwrap()),
             src_port: 22,
             dst_port: 88,
+            feature_flag: FeatureFlags::NONE,
             ..Default::default()
         };
 

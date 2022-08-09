@@ -18,6 +18,7 @@ mod debugger;
 mod error;
 #[cfg(target_os = "linux")]
 mod platform;
+mod policy;
 mod queue;
 mod rpc;
 
@@ -25,6 +26,7 @@ use bincode::{Decode, Encode};
 pub use debugger::{Client, ConstructDebugCtx, Debugger};
 #[cfg(target_os = "linux")]
 pub use platform::PlatformMessage;
+pub use policy::PolicyMessage;
 pub use queue::{QueueDebugger, QueueMessage};
 pub use rpc::{ConfigResp, RpcMessage};
 
@@ -49,6 +51,7 @@ pub enum Module {
     Platform,
     List,
     Queue,
+    Policy,
 }
 
 impl Default for Module {

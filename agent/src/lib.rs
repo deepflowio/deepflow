@@ -44,10 +44,14 @@ mod utils;
 // for benchmarks
 #[doc(hidden)]
 pub use {
+    common::endpoint::{
+        EndpointData as _EndpointData, EndpointInfo as _EndpointInfo, FeatureFlags as _FeatureFlags,
+    },
     common::enums::TcpFlags as _TcpFlags,
     common::lookup_key::LookupKey as _LookupKey,
     common::platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
-    common::policy::Cidr as _Cidr,
+    common::policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},
+    common::port_range::PortRange as _PortRange,
     flow_generator::flow_map::{
         _new_flow_map_and_receiver, _new_meta_packet, _reverse_meta_packet,
     },
@@ -57,6 +61,10 @@ pub use {
         _meta_flow_perf_update,
     },
     flow_generator::perf::FlowPerfCounter as _FlowPerfCounter,
+    npb_pcap_policy::{
+        NpbAction as _NpbAction, NpbTunnelType as _NpbTunnelType, TapSide as _TapSide,
+    },
+    policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,
     proto::common::TridentType as _TridentType,
     utils::net::MacAddr as _MacAddr,

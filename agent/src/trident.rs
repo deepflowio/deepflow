@@ -68,7 +68,7 @@ use crate::{
     flow_generator::{AppProtoLogsParser, PacketSequenceParser},
     monitor::Monitor,
     platform::LibvirtXmlExtractor,
-    policy::{Policy, PolicyGetter},
+    policy::{Policy, PolicyGetter, PolicySetter},
     proto::trident::TapMode,
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
@@ -351,6 +351,7 @@ impl Trident {
                         stats_collector.clone(),
                         &session,
                         &synchronizer,
+                        policy_setter,
                         policy_getter,
                         exception_handler.clone(),
                         remote_log_config.clone(),
@@ -652,6 +653,7 @@ impl Components {
         stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
+        policy_setter: PolicySetter,
         policy_getter: PolicyGetter,
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
@@ -712,6 +714,7 @@ impl Components {
             running_config: synchronizer.running_config.clone(),
             status: synchronizer.status.clone(),
             config: config_handler.debug(),
+            policy_setter,
         };
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();

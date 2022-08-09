@@ -26,8 +26,8 @@ pub const GROUP_INTERNET: i32 = -2;
 bitflags! {
     #[derive(Default)]
     pub struct FeatureFlags: u32 {
-        const NPM = 0b01;
-        const NPB = 0b10;
+        const NONE = 0;
+        const DEDUP = 0b01;
     }
 }
 
