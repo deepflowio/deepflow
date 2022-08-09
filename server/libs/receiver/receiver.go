@@ -49,6 +49,7 @@ const (
 	LOG_INTERVAL              = 10
 	RECORD_STATUS_TIMEOUT     = 30 // 每30秒记录下trident的活跃信息，platformData模块每分钟会上报trisolaris
 	SOCKET_READ_ERROR         = "maybe trident restart."
+	ONE_HOUR                  = 3600
 )
 
 var log = logging.MustGetLogger("receiver")
@@ -419,7 +420,7 @@ func (r *Receiver) SetServerType(serverType ServerType) {
 }
 
 func (r *Receiver) GetCounter() interface{} {
-	counter := &ReceiverCounter{MaxDelay: -3600, MinDelay: 3600}
+	counter := &ReceiverCounter{MaxDelay: -ONE_HOUR, MinDelay: ONE_HOUR}
 	counter, r.counter = r.counter, counter
 
 	dropCounter := r.DropDetection.GetCounter().(*cache.DropCounter)
@@ -736,11 +737,15 @@ func getIpHash(ip net.IP) uint32 {
 }
 
 func (r *Receiver) getMetricsTimestamp(buffer []byte) uint32 {
+	now := uint32(time.Now().Unix())
 	if len(buffer) >= 4 {
-		return binary.LittleEndian.Uint32(buffer) // doc的前4个字节是时间
-	} else {
-		return uint32(time.Now().Unix())
+		// FIXME metrics time is encoded in probuf, may not be available
+		metricsTime := binary.LittleEndian.Uint32(buffer) // doc的前4个字节是时间
+		if metricsTime > now-ONE_HOUR && metricsTime < now+ONE_HOUR {
+			return metricsTime
+		}
 	}
+	return now
 }
 
 // 固定读取buffer长度的数据
