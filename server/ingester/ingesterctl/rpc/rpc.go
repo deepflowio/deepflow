@@ -36,7 +36,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/deepflowys/deepflow/message/trident"
-	"github.com/deepflowys/deepflow/server/ingester/droplet/config"
+	"github.com/deepflowys/deepflow/server/ingester/config"
+	dropletcfg "github.com/deepflowys/deepflow/server/ingester/droplet/config"
 	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
 	"github.com/deepflowys/deepflow/server/libs/utils"
 )
@@ -89,16 +90,17 @@ func initCmd(cmd CmdExecute) {
 	if ingesterctl.ConfigPath == "" {
 		ingesterctl.ConfigPath = "/etc/server.yaml"
 	}
-	cfg := config.Load(ingesterctl.ConfigPath)
+	base := config.Load(ingesterctl.ConfigPath)
+	cfg := dropletcfg.Load(base, ingesterctl.ConfigPath)
 
-	controllers := make([]net.IP, 0, len(cfg.ControllerIps))
-	for _, ipString := range cfg.ControllerIps {
+	controllers := make([]net.IP, 0, len(cfg.Base.ControllerIPs))
+	for _, ipString := range cfg.Base.ControllerIPs {
 		ip := net.ParseIP(ipString)
 		controllers = append(controllers, ip)
 	}
 
-	synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.ControllerPort, cfg.RpcTimeout)
-	synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
+	synchronizer := dropletcfg.NewRpcConfigSynchronizer(controllers, cfg.Base.ControllerPort, cfg.RpcTimeout)
+	synchronizer.Register(func(response *trident.SyncResponse, version *dropletcfg.RpcInfoVersions) {
 		cmd(response)
 		fmt.Println("press Ctrl^c to end it !!")
 	})
