@@ -22,7 +22,7 @@ use std::{
 };
 
 use bitflags::bitflags;
-use log::{error, info};
+use log::error;
 
 use super::environment::get_k8s_local_node_ip;
 

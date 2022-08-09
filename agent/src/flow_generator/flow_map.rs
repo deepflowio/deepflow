@@ -1328,7 +1328,7 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
 // 对应 flow_generator_test.go
 #[cfg(test)]
 mod tests {
-    use std::{ops::Add, time};
+    use std::{net::IpAddr, ops::Add, time};
 
     use crate::{
         common::{
@@ -1466,13 +1466,27 @@ mod tests {
     #[test]
     fn reverse_new_cycle() {
         let (mut flow_map, _) = _new_flow_map_and_receiver(TridentType::TtProcess);
-        let npb_action = NpbAction::new(0, 10, NpbTunnelType::VxLan, TapSide::SRC, 123);
+        let npb_action = NpbAction::new(
+            0,
+            10,
+            IpAddr::V4(Ipv4Addr::new(10, 20, 30, 40)),
+            NpbTunnelType::VxLan,
+            TapSide::SRC,
+            123,
+        );
         let mut policy_data0 = PolicyData::default();
         policy_data0.merge_npb_action(vec![npb_action], 10, vec![]);
         let mut packet0 = _new_meta_packet();
         packet0.policy_data.replace(Arc::new(policy_data0));
 
-        let npb_action = NpbAction::new(0, 11, NpbTunnelType::VxLan, TapSide::SRC, 123);
+        let npb_action = NpbAction::new(
+            0,
+            11,
+            IpAddr::V4(Ipv4Addr::new(10, 20, 30, 40)),
+            NpbTunnelType::VxLan,
+            TapSide::SRC,
+            123,
+        );
         let mut policy_data1 = PolicyData::default();
         policy_data1.merge_npb_action(vec![npb_action], 11, vec![]);
         let mut packet1 = _new_meta_packet();

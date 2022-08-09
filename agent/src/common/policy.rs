@@ -25,6 +25,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use super::endpoint::EPC_FROM_DEEPFLOW;
 use super::enums::TapType;
 use super::error::Error;
+use super::lookup_key::LookupKey;
 use super::matched_field::{MatchedFieldv4, MatchedFieldv6};
 use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
@@ -101,10 +102,21 @@ impl From<trident::TunnelType> for NpbTunnelType {
 // +---------------+---------------+-------------+-----------+-----------------------+
 // |   acl_gid     | payload_slice | tunnel_type | tap_side  |      tunnel_id        |
 // +---------------+---------------+-------------+-----------+-----------------------+
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct NpbAction {
     action: u64,
+    tunnel_ip: IpAddr,
     acl_gids: Vec<u16>,
+}
+
+impl Default for NpbAction {
+    fn default() -> Self {
+        Self {
+            action: 0,
+            tunnel_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            acl_gids: vec![],
+        }
+    }
 }
 
 impl From<trident::NpbAction> for NpbAction {
@@ -112,6 +124,7 @@ impl From<trident::NpbAction> for NpbAction {
         Self::new(
             n.npb_acl_group_id(),
             n.tunnel_id(),
+            n.tunnel_ip().parse::<IpAddr>().unwrap(),
             n.tunnel_type().into(),
             n.tap_side().into(),
             n.payload_slice() as u16,
@@ -127,17 +140,19 @@ impl NpbAction {
     pub fn new(
         acl_gid: u32,
         id: u32,
+        tunnel_ip: IpAddr,
         tunnel_type: NpbTunnelType,
         tap_side: TapSide,
         slice: u16,
     ) -> Self {
         Self {
+            tunnel_ip,
             action: (acl_gid as u64) << 48
                 | (slice as u64 & Self::PAYLOAD_SLICE_MASK) << 32
                 | (u8::from(tunnel_type) as u64) << 30
                 | (tap_side.bits() as u64) << 26
                 | id as u64 & Self::TUNNEL_ID_MASK,
-            acl_gids: vec![],
+            acl_gids: vec![acl_gid as u16],
         }
     }
 
@@ -171,16 +186,16 @@ impl NpbAction {
         self.acl_gids.as_ref()
     }
 
-    pub fn tunnel_ip_id(&self) -> u16 {
+    pub fn tunnel_ip(&self) -> IpAddr {
         if self.tunnel_type() == NpbTunnelType::Pcap {
-            return 0;
+            return IpAddr::V4(Ipv4Addr::UNSPECIFIED);
         }
 
-        todo!("get tunnel ip id")
+        return self.tunnel_ip;
     }
 
     pub fn set_payload_slice(&mut self, payload_slice: u16) {
-        self.action ^= !(Self::PAYLOAD_SLICE_MASK << 32);
+        self.action &= !(Self::PAYLOAD_SLICE_MASK << 32);
         self.action |= (payload_slice as u64 & Self::PAYLOAD_SLICE_MASK) << 32;
     }
 
@@ -189,7 +204,7 @@ impl NpbAction {
     }
 
     pub fn set_tap_side(&mut self, tap_side: TapSide) {
-        self.action ^= !((TapSide::MASK.bits() as u64) << 26);
+        self.action &= !((TapSide::MASK.bits() as u64) << 26);
         self.action |= (tap_side.bits() as u64) << 26;
     }
 }
@@ -237,7 +252,7 @@ impl PolicyData {
                     break;
                 }
 
-                if action.tunnel_ip_id() != candidate_action.tunnel_ip_id()
+                if action.tunnel_ip() != candidate_action.tunnel_ip()
                     || action.tunnel_id() != candidate_action.tunnel_id()
                     || action.tunnel_type() != candidate_action.tunnel_type()
                 {
@@ -283,6 +298,36 @@ impl PolicyData {
                 self.npb_actions.push(candidate_action);
             }
         }
+    }
+
+    fn dedup_npb_actions(&self, packet: &LookupKey) -> Vec<NpbAction> {
+        if self.npb_actions.len() == 0 || packet.tap_type != TapType::Tor {
+            return self.npb_actions.clone();
+        }
+
+        let mut valid_actions = Vec::new();
+
+        for action in &self.npb_actions {
+            if action.tunnel_type() == NpbTunnelType::Pcap
+                || (action.tap_side() == TapSide::SRC && packet.l2_end_0 && packet.l3_end_0)
+                || (action.tap_side() == TapSide::DST && packet.l2_end_1 && packet.l3_end_1)
+            {
+                valid_actions.push(action.clone());
+            }
+        }
+        return valid_actions;
+    }
+
+    pub fn dedup(&mut self, packet: &LookupKey) {
+        if self.npb_actions.len() == 0 || packet.tap_type != TapType::Tor {
+            return;
+        }
+        let valid_actions = self.dedup_npb_actions(packet);
+        if valid_actions.len() == 0 && self.action_flags == 0 {
+            *self = Self::default();
+            return;
+        }
+        self.npb_actions = valid_actions;
     }
 }
 
@@ -506,8 +551,19 @@ pub struct Acl {
     pub proto: u16,                      // 256表示全采集, 0表示采集采集协议0
 
     pub npb_actions: Vec<NpbAction>,
-    pub policy: PolicyData,
     // TODO: DDBS
+    pub match_field: Vec<MatchedFieldv4>,
+    pub match_field_mask: Vec<MatchedFieldv4>,
+    pub match_field6: Vec<MatchedFieldv6>,
+    pub match_field6_mask: Vec<MatchedFieldv6>,
+
+    pub policy: PolicyData,
+}
+
+impl Acl {
+    pub fn init_policy(&mut self) {
+        //self.policy.merge_npb_action(actions, acl_id, directions)
+    }
 }
 
 // 这个函数不安全，仅用于测试和debug
@@ -717,5 +773,104 @@ impl From<&trident::PeerConnection> for PeerConnection {
             local_epc: (p.local_epc_id() & 0xffff) as i32,
             remote_epc: (p.remote_epc_id() & 0xffff) as i32,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_policy() {
+        // NPB
+        let action_1 = NpbAction::new(
+            10,
+            1,
+            IpAddr::V4(Ipv4Addr::new(10, 10, 20, 20)),
+            NpbTunnelType::VxLan,
+            TapSide::SRC,
+            100,
+        );
+        let action_2 = NpbAction::new(
+            20,
+            1,
+            IpAddr::V4(Ipv4Addr::new(10, 10, 20, 20)),
+            NpbTunnelType::VxLan,
+            TapSide::DST,
+            1000,
+        );
+        let mut policy = PolicyData::new(vec![action_1], 1, 0);
+
+        policy.merge_npb_action(vec![action_2], 20, vec![]);
+
+        assert_eq!(policy.npb_actions[0].payload_slice(), 1000);
+        assert_eq!(policy.npb_actions[0].acl_gids(), &[10, 20]);
+        assert_eq!(policy.npb_actions[0].tap_side(), TapSide::MASK);
+        assert_eq!(policy.acl_id, 1);
+
+        policy.format_npb_action();
+        assert_eq!(policy.npb_actions[0].tap_side(), TapSide::SRC);
+
+        let packet = &LookupKey {
+            tap_type: TapType::Tor,
+            l2_end_0: true,
+            l3_end_0: true,
+            ..Default::default()
+        };
+
+        policy.dedup(packet);
+        assert_eq!(policy.npb_actions.len(), 1);
+
+        let packet = &LookupKey {
+            tap_type: TapType::Tor,
+            l2_end_1: true,
+            l3_end_1: true,
+            ..Default::default()
+        };
+
+        policy.dedup(packet);
+        assert_eq!(policy.npb_actions.len(), 0);
+
+        // PCAP
+        let action_1 = NpbAction::new(
+            10,
+            1,
+            IpAddr::V4(Ipv4Addr::new(10, 10, 20, 20)),
+            NpbTunnelType::Pcap,
+            TapSide::SRC,
+            100,
+        );
+        let action_2 = NpbAction::new(
+            10,
+            1,
+            IpAddr::V4(Ipv4Addr::new(10, 10, 20, 20)),
+            NpbTunnelType::Pcap,
+            TapSide::SRC,
+            100,
+        );
+        let mut policy = PolicyData::new(vec![action_1.clone()], 1, 0);
+
+        policy.merge_npb_action(vec![action_2.clone()], 20, vec![]);
+        assert_eq!(policy.npb_actions[0].acl_gids(), &[10]);
+
+        let packet = &LookupKey {
+            tap_type: TapType::Tor,
+            l2_end_0: true,
+            l3_end_0: true,
+            ..Default::default()
+        };
+
+        policy.dedup(packet);
+        assert_eq!(policy.npb_actions.len(), 1);
+
+        let packet = &LookupKey {
+            tap_type: TapType::Tor,
+            l2_end_1: true,
+            l3_end_1: true,
+            ..Default::default()
+        };
+
+        policy.dedup(packet);
+        assert_eq!(policy.npb_actions.len(), 1);
     }
 }
