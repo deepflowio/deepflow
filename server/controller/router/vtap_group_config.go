@@ -42,9 +42,13 @@ func VTapGroupConfigRouter(e *gin.Engine) {
 
 func createVTapGroupConfig(c *gin.Context) {
 	vTapGroupConfig := &model.VTapGroupConfiguration{}
-	c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
-	data, err := service.CreateVTapGroupConfig(vTapGroupConfig)
-	JsonResponse(c, data, err)
+	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
+	if err == nil {
+		data, err := service.CreateVTapGroupConfig(vTapGroupConfig)
+		JsonResponse(c, data, err)
+	} else {
+		JsonResponse(c, nil, err)
+	}
 }
 
 func deleteVTapGroupConfig(c *gin.Context) {
@@ -56,9 +60,13 @@ func deleteVTapGroupConfig(c *gin.Context) {
 func updateVTapGroupConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
 	vTapGroupConfig := &model.VTapGroupConfiguration{}
-	c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
-	data, err := service.UpdateVTapGroupConfig(lcuuid, vTapGroupConfig)
-	JsonResponse(c, data, err)
+	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.JSON)
+	if err == nil {
+		data, err := service.UpdateVTapGroupConfig(lcuuid, vTapGroupConfig)
+		JsonResponse(c, data, err)
+	} else {
+		JsonResponse(c, nil, err)
+	}
 }
 
 func getVTapGroupConfigs(c *gin.Context) {
@@ -85,16 +93,24 @@ func getVTapGroupAdvancedConfig(c *gin.Context) {
 func updateVTapGroupAdvancedConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
 	vTapGroupConfig := &model.VTapGroupConfiguration{}
-	c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
-	data, err := service.UpdateVTapGroupAdvancedConfig(lcuuid, vTapGroupConfig)
-	JsonResponse(c, data, err)
+	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
+	if err == nil {
+		data, err := service.UpdateVTapGroupAdvancedConfig(lcuuid, vTapGroupConfig)
+		JsonResponse(c, data, err)
+	} else {
+		JsonResponse(c, nil, err)
+	}
 }
 
 func createVTapGroupAdvancedConfig(c *gin.Context) {
 	vTapGroupConfig := &model.VTapGroupConfiguration{}
-	c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
-	data, err := service.CreateVTapGroupAdvancedConfig(vTapGroupConfig)
-	JsonResponse(c, data, err)
+	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
+	if err == nil {
+		data, err := service.CreateVTapGroupAdvancedConfig(vTapGroupConfig)
+		JsonResponse(c, data, err)
+	} else {
+		JsonResponse(c, nil, err)
+	}
 }
 
 func getVTapGroupConfigByFilter(c *gin.Context) {

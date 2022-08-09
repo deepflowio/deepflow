@@ -111,8 +111,8 @@ func (o *OperatorBase[MT]) formatDBItemsToAdd(dbItems []*MT) (dbItemsToAdd []*MT
 	}
 	if len(dupCloudLcuuids) != 0 {
 		log.Errorf("%s data is duplicated in cloud data (lcuuids: %v)", o.resourceTypeName, dupCloudLcuuids)
-		dbItems = dedupItems
 	}
+	dbItems = dedupItems
 
 	var dupLcuuidDBItems []*MT
 	err := mysql.Db.Unscoped().Where("lcuuid IN ?", lcuuids).Find(&dupLcuuidDBItems).Error
@@ -125,11 +125,14 @@ func (o *OperatorBase[MT]) formatDBItemsToAdd(dbItems []*MT) (dbItemsToAdd []*MT
 		if !o.softDelete {
 			dupLcuuids := make([]string, 0, len(dupLcuuidDBItems))
 			for _, dupLcuuidDBItem := range dupLcuuidDBItems {
-				dupLcuuids = append(dupLcuuids, (*dupLcuuidDBItem).GetLcuuid())
+				lcuuid := (*dupLcuuidDBItem).GetLcuuid()
+				if !common.Contains(dupLcuuids, lcuuid) {
+					dupLcuuids = append(dupLcuuids, lcuuid)
+				}
 			}
 			log.Errorf("%s data is duplicated with db data (lcuuids: %v)", o.resourceTypeName, dupLcuuids)
 
-			num := len(dbItems) - len(dupLcuuidDBItems)
+			num := len(lcuuids) - len(dupLcuuids)
 			dbItemsToAdd := make([]*MT, 0, num)
 			lcuuidsToAdd := make([]string, 0, num)
 			for lcuuid, dbItem := range lcuuidToDBItem {

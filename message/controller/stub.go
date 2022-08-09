@@ -14,11 +14,6 @@
  * limitations under the License.
  */
 
-package config
+package controller
 
-type StatsdConfig struct {
-	Enabled       bool   `default:"false" yaml:"enabled"`
-	Host          string `default:"telegraf" yaml:"host"`
-	Port          string `default:"20040" yaml:"port"`
-	FlushInterval int    `default:"30" yaml:"flush_interval"`
-}
+//go:generate protoc --gofast_out=plugins=grpc:. -I.. ../controller.proto

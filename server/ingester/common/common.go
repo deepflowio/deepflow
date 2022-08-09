@@ -33,8 +33,8 @@ import (
 var log = logging.MustGetLogger("common")
 
 const (
-	MOUDLE_INGESTER             = "ingester."
-	QUEUE_STATS_MOUDLE_INGESTER = queue.OptionMoudle(MOUDLE_INGESTER)
+	MODULE_INGESTER             = "ingester."
+	QUEUE_STATS_MODULE_INGESTER = queue.OptionModule(MODULE_INGESTER)
 )
 
 func NewCKConnection(addr, username, password string) (*sql.DB, error) {
@@ -52,7 +52,7 @@ func NewCKConnection(addr, username, password string) (*sql.DB, error) {
 }
 
 func RegisterCountableForIngester(name string, countable stats.Countable, opts ...stats.Option) error {
-	return stats.RegisterCountableWithMoudlePrefix(MOUDLE_INGESTER, name, countable, opts...)
+	return stats.RegisterCountableWithModulePrefix(MODULE_INGESTER, name, countable, opts...)
 }
 
 // 如果通过MAC匹配平台信息失败，则需要通过IP再获取, 解决工单122/126问题

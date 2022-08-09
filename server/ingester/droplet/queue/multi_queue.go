@@ -19,6 +19,7 @@ package queue
 import (
 	"errors"
 
+	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
@@ -35,6 +36,7 @@ type MultiQueue struct {
 func (q *MultiQueue) Init(name string, size, count, userCount int, unmarshaller Unmarshaller, options ...queue.Option) {
 	q.Monitor = &Monitor{}
 	q.Monitor.init(name, unmarshaller)
+	options = append(options, common.QUEUE_STATS_MODULE_INGESTER)
 	q.FixedMultiQueue = queue.NewOverwriteQueues(name, uint8(count), size, options...)
 
 	q.readers = make([]queue.QueueReader, len(q.FixedMultiQueue))
