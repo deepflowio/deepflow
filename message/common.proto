@@ -18,3 +18,9 @@ enum TridentType {
     TT_HYPER_V_COMPUTE = 10;
     TT_HYPER_V_NETWORK = 11;
 }
+
+message KubernetesAPIInfo {
+    optional string type = 1;
+    optional string info = 2;
+    optional bytes compressed_info = 3;
+}
