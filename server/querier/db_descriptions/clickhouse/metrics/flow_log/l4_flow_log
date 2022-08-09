@@ -51,8 +51,8 @@ server_establish_other_rst  ,                      , 建连-服务端其他重�
 client_rst_flow             ,                      , 传输-客户端重置         , 连接 , counter    , 传输层异常   , 111        ,
 server_queue_lack           ,                      , 传输-服务端队列溢出     , 连接 , counter    , 传输层异常   , 111        ,
 server_rst_flow             ,                      , 传输-服务端重置         , 连接 , counter    , 传输层异常   , 111        ,
-client_half_close_flow      ,                      , 传输-客户端半关         , 连接 , counter    , 传输层异常   , 111        ,
-server_half_close_flow      ,                      , 传输-服务端半关         , 连接 , counter    , 传输层异常   , 111        ,
+client_half_close_flow      ,                      , 断连-客户端半关         , 连接 , counter    , 传输层异常   , 111        ,
+server_half_close_flow      ,                      , 断连-服务端半关         , 连接 , counter    , 传输层异常   , 111        ,
 tcp_timeout                 ,                      , 传输-TCP连接超时        , 连接 , counter    , 传输层异常   , 111        ,
 
 rtt_avg                     , rtt                  ,平均TCP建连时延          , 微秒 , delay      , 传输层时延   , 111        ,

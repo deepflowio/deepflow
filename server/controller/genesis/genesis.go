@@ -81,7 +81,7 @@ func (g *Genesis) Start() {
 
 		vStorage := NewSyncStorage(g.cfg, genesisSyncDataChan, ctx)
 		vStorage.Start()
-		vUpdater := NewGenesisSyncRpcUpdater(vStorage, sQueue, g.cfg.LocalIPRanges, g.cfg.ExcludeIPRanges, ctx)
+		vUpdater := NewGenesisSyncRpcUpdater(vStorage, sQueue, g.cfg, ctx)
 		vUpdater.Start()
 
 		kStorage := NewKubernetesStorage(g.cfg, kubernetesDataChan, ctx)
