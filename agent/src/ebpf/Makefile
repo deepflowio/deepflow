@@ -18,8 +18,8 @@ define compile_socket_trace_elf
 endef
 
 CURRDIR := $(PWD)
-CLANG_VER := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}')
-CLANG_VER_MAIN := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{print int($$0)}')
+CLANG_VER := $(shell /usr/bin/clang --version | grep "version" | awk '{if ($$3!="version"){print $$3}else{exit -1}}' || /usr/bin/clang --version | grep "version" | awk '{if ($$4!="version"){print $$4}else{exit -1}}')
+CLANG_VER_MAIN := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || /usr/bin/clang --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
 LIBTRACE := libebpf.a
 LIBBPF_DIR = libbpf/src
 OBJS := $(LIBBPF_DIR)/bpf.o \
