@@ -131,7 +131,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 
 	var vtaps []mysql.VTap
 	mysql.Db.Where("lcuuid IN (?)", vtapGroupCreate.VtapLcuuids).Find(&vtaps)
-	for vtap := range vtaps {
+	for _, vtap := range vtaps {
 		mysql.Db.Model(&vtap).Update("vtap_group_lcuuid", lcuuid)
 	}
 
