@@ -159,6 +159,10 @@ impl Encoder {
         self.buffer[0..4].copy_from_slice(frame_size.to_be_bytes().as_slice());
     }
 
+    pub fn update_header_vtap_id(&mut self, vtap_id: u16) {
+        self.header.vtap_id = vtap_id;
+    }
+
     pub fn buffer_len(&self) -> usize {
         self.buffer.len()
     }
@@ -400,9 +404,9 @@ impl UniformSender {
     }
 
     pub fn process(&mut self) {
-        let socket_type = self.config.load().collector_socket_type;
         let mut kv_string = String::with_capacity(2048);
         while self.running.load(Ordering::Relaxed) {
+            let socket_type = self.config.load().collector_socket_type;
             match self
                 .input
                 .recv(Some(Duration::from_secs(Self::QUEUE_READ_TIMEOUT)))
@@ -493,6 +497,8 @@ impl UniformSender {
         if self.encoder.buffer_len() > Encoder::BUFFER_LEN {
             self.check_or_register_counterable(self.encoder.header.msg_type);
             self.update_dst_ip_and_port();
+            self.encoder
+                .update_header_vtap_id(self.config.load().vtap_id);
             self.flush_encoder();
         }
         Ok(())
