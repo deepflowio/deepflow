@@ -1,3 +1,7 @@
+// Reference:
+// https://github.com/davea42/libdwarf-code/blob/master/src/bin/dwarfexample/simplereader.c
+// https://github.com/davea42/libdwarf-code/blob/master/src/bin/dwarfexample/findfuncbypc.c
+
 #include "offset.h"
 #include "common.h"
 #include <fcntl.h>
@@ -8,17 +12,17 @@
 #include <string.h>
 #include <unistd.h>
 
-static const int OFFSET_ERROR = -1;
+static const int FOUND_TARGET = 12;
+static const int LEVEL_MAX = 3;
 
-struct member_offset {
-	const char *bin;
+struct target_data_s {
 	const char *structure;
 	const char *member;
 	unsigned long long int offset;
 };
 
-static int member_offset_die(struct member_offset *offset, Dwarf_Debug dbg,
-			     Dwarf_Die die)
+static int examine_die_data(Dwarf_Debug dbg, struct target_data_s *td,
+			    Dwarf_Die die, int in_level)
 {
 	Dwarf_Error err = NULL;
 	Dwarf_Die child = NULL;
@@ -29,151 +33,185 @@ static int member_offset_die(struct member_offset *offset, Dwarf_Debug dbg,
 
 	rc = dwarf_tag(die, &tag, &err);
 	if (rc != DW_DLV_OK) {
-		return OFFSET_ERROR;
+		return DW_DLV_ERROR;
 	}
 
 	if (tag != DW_TAG_structure_type)
-		return 0;
+		return DW_DLV_OK;
 
 	rc = dwarf_die_text(die, DW_AT_name, &name, &err);
 	if (rc == DW_DLV_ERROR) {
-		return OFFSET_ERROR;
+		return DW_DLV_ERROR;
 	}
 
-	if (!name || strcmp(name, offset->structure))
-		return 0;
+	if (!name || strcmp(name, td->structure))
+		return DW_DLV_OK;
 
 	rc = dwarf_child(die, &child, &err);
 	if (rc == DW_DLV_ERROR) {
-		return OFFSET_ERROR;
+		return DW_DLV_ERROR;
 	}
 
-	while (1) {
+	for (;;) {
 		rc = dwarf_die_text(child, DW_AT_name, &name, &err);
 		if (rc == DW_DLV_ERROR) {
-			return OFFSET_ERROR;
+			return DW_DLV_ERROR;
 		}
-		if (!strcmp(name, offset->member)) {
+		if (!strcmp(name, td->member)) {
 			rc = dwarf_attr(child, DW_AT_data_member_location,
 					&attr, &err);
 			if (rc == DW_DLV_ERROR) {
-				return OFFSET_ERROR;
+				return DW_DLV_ERROR;
 			}
 
-			rc = dwarf_formudata(attr, &offset->offset, &err);
+			rc = dwarf_formudata(attr, &td->offset, &err);
 			if (rc == DW_DLV_ERROR) {
-				return OFFSET_ERROR;
+				return DW_DLV_ERROR;
 			}
+			return FOUND_TARGET;
 		}
 
 		rc = dwarf_siblingof_b(dbg, child, true, &child, &err);
 		if (rc == DW_DLV_ERROR) {
-			return OFFSET_ERROR;
+			return DW_DLV_ERROR;
 		}
-
-		if (rc == DW_DLV_NO_ENTRY)
-			return 0;
+		if (rc == DW_DLV_NO_ENTRY) {
+			return DW_DLV_OK;
+		}
 	}
 
-	return 0;
+	return DW_DLV_OK;
 }
 
-static int member_offset_dfs(struct member_offset *offset, Dwarf_Debug dbg,
-			     Dwarf_Die die)
+static int get_die_and_siblings(Dwarf_Debug dbg, Dwarf_Die in_die, int is_info,
+				int in_level, int cu_number,
+				struct target_data_s *td, Dwarf_Error *errp)
 {
-	Dwarf_Error err = NULL;
-	Dwarf_Die child = NULL;
-	int rc = 0;
+	int res = DW_DLV_ERROR;
+	Dwarf_Die cur_die = in_die;
+	Dwarf_Die child = 0;
 
-	if (offset->offset != ULLONG_MAX)
-		return 0;
-
-	member_offset_die(offset, dbg, die);
-
-	rc = dwarf_child(die, &child, &err);
-	if (rc == DW_DLV_ERROR) {
-		return OFFSET_ERROR;
-	}
-	if (rc == DW_DLV_OK)
-		member_offset_dfs(offset, dbg, child);
-
-	rc = dwarf_siblingof_b(dbg, die, true, &die, &err);
-	if (rc == DW_DLV_ERROR) {
-		return OFFSET_ERROR;
-	}
-	if (rc == DW_DLV_OK)
-		member_offset_dfs(offset, dbg, die);
-
-	return 0;
-}
-
-static int member_offset_analyze_internal(struct member_offset *offset)
-{
-	Dwarf_Error err = NULL;
-	Dwarf_Debug dbg = NULL;
-	Dwarf_Die die = NULL;
-	int fd = 0;
-	int rc = 0;
-	int error = 0;
-
-	offset->offset = ULLONG_MAX;
-
-	fd = open(offset->bin, O_RDONLY, 0);
-	if (fd < 0) {
-		error = OFFSET_ERROR;
-		goto out;
+	// Limit recursion depth to no more than 3 levels.
+	// Avoid segfaults caused by deep recursion
+	if (in_level > LEVEL_MAX) {
+		return DW_DLV_OK;
 	}
 
-	rc = dwarf_init_b(fd, DW_GROUPNUMBER_ANY, NULL, NULL, &dbg, &err);
-	if (rc != DW_DLV_OK) {
-		error = OFFSET_ERROR;
-		goto out_file;
+	res = examine_die_data(dbg, td, in_die, in_level);
+	if (res == DW_DLV_ERROR) {
+		return DW_DLV_ERROR;
+	}
+	if (res == FOUND_TARGET) {
+		return FOUND_TARGET;
 	}
 
-	while (1) {
-		rc = dwarf_next_cu_header_d(dbg, true, NULL, NULL, NULL, NULL,
-					    NULL, NULL, NULL, NULL, NULL, NULL,
-					    &err);
-		if (rc == DW_DLV_ERROR) {
-			error = OFFSET_ERROR;
-			goto out_dwarf;
+	/*  Now look at the children of the incoming DIE */
+	for (;;) {
+		Dwarf_Die sib_die = 0;
+		res = dwarf_child(cur_die, &child, errp);
+		if (res == DW_DLV_ERROR) {
+			return DW_DLV_ERROR;
 		}
-		if (rc == DW_DLV_NO_ENTRY)
+		if (res == DW_DLV_OK) {
+			int res2 = 0;
+
+			res2 = get_die_and_siblings(dbg, child, is_info,
+						    in_level + 1, cu_number, td,
+						    errp);
+			if (res2 == DW_DLV_ERROR) {
+				return DW_DLV_ERROR;
+			}
+			if (res2 == FOUND_TARGET) {
+				return FOUND_TARGET;
+			}
+			dwarf_dealloc(dbg, child, DW_DLA_DIE);
+			child = 0;
+		}
+		res = dwarf_siblingof_b(dbg, cur_die, is_info, &sib_die, errp);
+		if (res == DW_DLV_ERROR) {
+			return DW_DLV_ERROR;
+		}
+		if (res == DW_DLV_NO_ENTRY) {
+			/* Done at this level. */
 			break;
-		rc = dwarf_siblingof_b(dbg, 0, true, &die, &err);
-		if (rc == DW_DLV_ERROR) {
-			error = OFFSET_ERROR;
-			goto out_dwarf;
+		}
+		/* res == DW_DLV_OK */
+		cur_die = sib_die;
+		res = examine_die_data(dbg, td, cur_die, in_level);
+		if (res == DW_DLV_ERROR) {
+			return DW_DLV_ERROR;
+		}
+		if (res == FOUND_TARGET) {
+			return FOUND_TARGET;
+		}
+	}
+	return DW_DLV_OK;
+}
+
+static int look_for_our_target(Dwarf_Debug dbg, struct target_data_s *td,
+			       Dwarf_Error *errp)
+{
+	Dwarf_Bool is_info = 1;
+	int cu_number = 0;
+
+	for (;; ++cu_number) {
+		Dwarf_Die no_die = 0;
+		Dwarf_Die cu_die = 0;
+		int res = DW_DLV_ERROR;
+		res = dwarf_next_cu_header_d(dbg, is_info, NULL, NULL, NULL,
+					     NULL, NULL, NULL, NULL, NULL, NULL,
+					     NULL, errp);
+		if (res == DW_DLV_ERROR) {
+			return DW_DLV_NO_ENTRY;
+		}
+		if (res == DW_DLV_NO_ENTRY) {
+			return DW_DLV_NO_ENTRY;
+		}
+		/* The CU will have a single sibling, a cu_die. */
+		res = dwarf_siblingof_b(dbg, no_die, is_info, &cu_die, errp);
+		if (res == DW_DLV_ERROR) {
+			return DW_DLV_NO_ENTRY;
+		}
+		if (res == DW_DLV_NO_ENTRY) {
+			return DW_DLV_NO_ENTRY;
 		}
 
-		member_offset_dfs(offset, dbg, die);
+		res = get_die_and_siblings(dbg, cu_die, is_info, 0, cu_number,
+					   td, errp);
+		if (res == FOUND_TARGET) {
+			return DW_DLV_OK;
+		}
 	}
-
-	if (offset->offset == ULLONG_MAX) {
-		error = OFFSET_ERROR;
-	}
-
-out_dwarf:
-	rc = dwarf_finish(dbg);
-	if (rc != DW_DLV_OK) {
-		error = OFFSET_ERROR;
-		goto out_file;
-	}
-
-out_file:
-	close(fd);
-out:
-	return error;
+	return DW_DLV_NO_ENTRY;
 }
 
 int struct_member_offset_analyze(const char *bin, const char *structure,
 				 const char *member)
 {
-	struct member_offset offset = { .bin = bin,
-					.structure = structure,
-					.member = member };
-	if (member_offset_analyze_internal(&offset))
-		return ETR_INVAL;
-	else
-		return (int)offset.offset;
+	Dwarf_Error err = NULL;
+	Dwarf_Debug dbg = NULL;
+	int fd = 0;
+	int rc = 0;
+
+	struct target_data_s td = {
+		.structure = structure,
+		.member = member,
+		.offset = -1,
+	};
+
+	fd = open(bin, O_RDONLY, 0);
+	if (fd < 0)
+		goto out;
+
+	rc = dwarf_init_b(fd, DW_GROUPNUMBER_ANY, NULL, NULL, &dbg, &err);
+	if (rc != DW_DLV_OK)
+		goto out_file;
+
+	look_for_our_target(dbg, &td, &err);
+
+	dwarf_finish(dbg);
+out_file:
+	close(fd);
+out:
+	return (int)td.offset;
 }
