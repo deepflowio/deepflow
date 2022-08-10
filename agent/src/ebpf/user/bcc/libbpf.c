@@ -1140,7 +1140,7 @@ static int create_probe_event(char *buf, const char *ev_name,
 	}
 
 	res =
-	    snprintf(ev_alias, sizeof(ev_alias), "%s_bcc_%d", ev_name,
+	    snprintf(ev_alias, sizeof(ev_alias), "%s_deepflow_%d", ev_name,
 		     getpid());
 	if (res < 0 || res >= sizeof(ev_alias)) {
 		fprintf(stderr, "Event name (%s) is too long for buffer\n",
@@ -1314,7 +1314,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
 	/*
 	 * For [k,u]probe created with perf_event_open (on newer kernel), it is
 	 * not necessary to clean it up in [k,u]probe_events. We first look up
-	 * the %s_bcc_%d line in [k,u]probe_events. If the event is not found,
+	 * the %s_deepflow_%d line in [k,u]probe_events. If the event is not found,
 	 * it is safe to skip the cleaning up process (write -:... to the file).
 	 */
 	snprintf(buf, sizeof(buf), "/sys/kernel/debug/tracing/%s_events",
@@ -1326,7 +1326,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
 	}
 
 	res =
-	    snprintf(buf, sizeof(buf), "%ss/%s_bcc_%d", event_type, ev_name,
+	    snprintf(buf, sizeof(buf), "%ss/%s_deepflow_%d", event_type, ev_name,
 		     getpid());
 	if (res < 0 || res >= sizeof(buf)) {
 		fprintf(stderr, "snprintf(%s): %d\n", ev_name, res);
@@ -1354,7 +1354,7 @@ static int bpf_detach_probe(const char *ev_name, const char *event_type)
 	}
 
 	res =
-	    snprintf(buf, sizeof(buf), "-:%ss/%s_bcc_%d", event_type, ev_name,
+	    snprintf(buf, sizeof(buf), "-:%ss/%s_deepflow_%d", event_type, ev_name,
 		     getpid());
 	if (res < 0 || res >= sizeof(buf)) {
 		fprintf(stderr, "snprintf(%s): %d\n", ev_name, res);
