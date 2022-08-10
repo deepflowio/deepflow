@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/peer"
 
 	tridentcommon "github.com/deepflowys/deepflow/message/common"
+	"github.com/deepflowys/deepflow/message/controller"
 	"github.com/deepflowys/deepflow/message/trident"
 	controllercommon "github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/genesis/common"
@@ -245,30 +246,30 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	}
 }
 
-func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *trident.GenesisSharingK8SRequest) (*trident.GenesisSharingK8SResponse, error) {
+func (g *SynchronizerServer) GenesisSharingK8S(ctx context.Context, request *controller.GenesisSharingK8SRequest) (*controller.GenesisSharingK8SResponse, error) {
 	clusterID := request.GetClusterId()
 	k8sDatas := GenesisService.GetKubernetesData()
 
 	if k8sData, ok := k8sDatas[clusterID]; ok {
 		epochStr := k8sData.Epoch.Format(controllercommon.GO_BIRTHDAY)
-		return &trident.GenesisSharingK8SResponse{
+		return &controller.GenesisSharingK8SResponse{
 			Epoch:    &epochStr,
 			ErrorMsg: &k8sData.ErrorMSG,
 			Entries:  k8sData.Entries,
 		}, nil
 	}
 
-	return &trident.GenesisSharingK8SResponse{}, errors.New("GenesisSharingK8s api not found k8s data")
+	return &controller.GenesisSharingK8SResponse{}, errors.New("GenesisSharingK8s api not found k8s data")
 }
 
-func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *trident.GenesisSharingSyncRequest) (*trident.GenesisSharingSyncResponse, error) {
+func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *controller.GenesisSharingSyncRequest) (*controller.GenesisSharingSyncResponse, error) {
 	gSyncData := GenesisService.GetGenesisSyncData()
 
-	gSyncIPs := []*trident.GenesisSyncIP{}
+	gSyncIPs := []*controller.GenesisSyncIP{}
 	for _, ip := range gSyncData.IPLastSeens {
 		ipData := ip
 		ipLastSeen := ipData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
-		gIP := &trident.GenesisSyncIP{
+		gIP := &controller.GenesisSyncIP{
 			Masklen:          &ipData.Masklen,
 			Ip:               &ipData.IP,
 			Lcuuid:           &ipData.Lcuuid,
@@ -280,10 +281,10 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncIPs = append(gSyncIPs, gIP)
 	}
 
-	gSyncHosts := []*trident.GenesisSyncHost{}
+	gSyncHosts := []*controller.GenesisSyncHost{}
 	for _, host := range gSyncData.Hosts {
 		hostData := host
-		gHost := &trident.GenesisSyncHost{
+		gHost := &controller.GenesisSyncHost{
 			Lcuuid:   &hostData.Lcuuid,
 			Hostname: &hostData.Hostname,
 			Ip:       &hostData.IP,
@@ -293,11 +294,11 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncHosts = append(gSyncHosts, gHost)
 	}
 
-	gSyncLldps := []*trident.GenesisSyncLldp{}
+	gSyncLldps := []*controller.GenesisSyncLldp{}
 	for _, l := range gSyncData.Lldps {
 		lData := l
 		lLastSeen := lData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
-		gLldp := &trident.GenesisSyncLldp{
+		gLldp := &controller.GenesisSyncLldp{
 			Lcuuid:                &lData.Lcuuid,
 			HostIp:                &lData.HostIP,
 			HostInterface:         &lData.HostInterface,
@@ -312,10 +313,10 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncLldps = append(gSyncLldps, gLldp)
 	}
 
-	gSyncNetworks := []*trident.GenesisSyncNetwork{}
+	gSyncNetworks := []*controller.GenesisSyncNetwork{}
 	for _, network := range gSyncData.Networks {
 		networkData := network
-		gNetwork := &trident.GenesisSyncNetwork{
+		gNetwork := &controller.GenesisSyncNetwork{
 			SegmentationId: &networkData.SegmentationID,
 			NetType:        &networkData.NetType,
 			External:       &networkData.External,
@@ -328,10 +329,10 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncNetworks = append(gSyncNetworks, gNetwork)
 	}
 
-	gSyncPorts := []*trident.GenesisSyncPort{}
+	gSyncPorts := []*controller.GenesisSyncPort{}
 	for _, port := range gSyncData.Ports {
 		portData := port
-		gPort := &trident.GenesisSyncPort{
+		gPort := &controller.GenesisSyncPort{
 			Type:          &portData.Type,
 			DeviceType:    &portData.DeviceType,
 			Lcuuid:        &portData.Lcuuid,
@@ -345,11 +346,11 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncPorts = append(gSyncPorts, gPort)
 	}
 
-	gSyncVms := []*trident.GenesisSyncVm{}
+	gSyncVms := []*controller.GenesisSyncVm{}
 	for _, vm := range gSyncData.VMs {
 		vmData := vm
 		vCreateAt := vmData.CreatedAt.Format(controllercommon.GO_BIRTHDAY)
-		gVm := &trident.GenesisSyncVm{
+		gVm := &controller.GenesisSyncVm{
 			State:        &vmData.State,
 			Lcuuid:       &vmData.Lcuuid,
 			Name:         &vmData.Name,
@@ -363,10 +364,10 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncVms = append(gSyncVms, gVm)
 	}
 
-	gSyncVpcs := []*trident.GenesisSyncVpc{}
+	gSyncVpcs := []*controller.GenesisSyncVpc{}
 	for _, vpc := range gSyncData.VPCs {
 		vpcData := vpc
-		gVpc := &trident.GenesisSyncVpc{
+		gVpc := &controller.GenesisSyncVpc{
 			Lcuuid: &vpcData.Lcuuid,
 			Name:   &vpcData.Name,
 			NodeIp: &vpcData.NodeIP,
@@ -375,11 +376,11 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncVpcs = append(gSyncVpcs, gVpc)
 	}
 
-	gSyncVinterfaces := []*trident.GenesisSyncVinterface{}
+	gSyncVinterfaces := []*controller.GenesisSyncVinterface{}
 	for _, v := range gSyncData.Vinterfaces {
 		vData := v
 		vLastSeen := vData.LastSeen.Format(controllercommon.GO_BIRTHDAY)
-		gVinterface := &trident.GenesisSyncVinterface{
+		gVinterface := &controller.GenesisSyncVinterface{
 			VtapId:              &vData.VtapID,
 			Lcuuid:              &vData.Lcuuid,
 			Name:                &vData.Name,
@@ -398,8 +399,8 @@ func (g *SynchronizerServer) GenesisSharingSync(ctx context.Context, request *tr
 		gSyncVinterfaces = append(gSyncVinterfaces, gVinterface)
 	}
 
-	return &trident.GenesisSharingSyncResponse{
-		Data: &trident.GenesisSyncData{
+	return &controller.GenesisSharingSyncResponse{
+		Data: &controller.GenesisSyncData{
 			Ip:         gSyncIPs,
 			Host:       gSyncHosts,
 			Lldp:       gSyncLldps,

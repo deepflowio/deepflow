@@ -14,7 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/message/controller"
 )
 
 const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
@@ -79,10 +79,10 @@ func GetEncryptKey(controllerIP, grpcServerPort, key string) (string, error) {
 	}
 	defer conn.Close()
 
-	client := trident.NewSynchronizerClient(conn)
+	client := controller.NewControllerClient(conn)
 	ret, err := client.GetEncryptKey(
 		context.Background(),
-		&trident.EncryptKeyRequest{Key: &key},
+		&controller.EncryptKeyRequest{Key: &key},
 	)
 	if err != nil {
 		log.Error(err)
