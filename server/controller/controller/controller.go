@@ -43,6 +43,8 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	trouter "github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
+
+	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/controller"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/synchronize"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/http/cache"
