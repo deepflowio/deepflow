@@ -21,22 +21,12 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 func forwardMasterController(c *gin.Context, masterControllerName string) {
-	// 获取masterControllerIP
-	var controller mysql.Controller
-	if ret := mysql.Db.Where("name = ?", masterControllerName).First(&controller); ret.Error != nil {
-		c.String(http.StatusInternalServerError, ret.Error.Error())
-		c.Abort()
-		return
-	}
-
 	requestHosts := strings.Split(c.Request.Host, ":")
 	c.Request.Host = strings.Replace(
-		c.Request.Host, requestHosts[0], controller.IP, 1,
+		c.Request.Host, requestHosts[0], masterControllerName, 1,
 	)
 	c.Request.URL.Scheme = "http"
 	c.Request.URL.Host = c.Request.Host
@@ -48,8 +38,7 @@ func forwardMasterController(c *gin.Context, masterControllerName string) {
 		return
 	}
 	defer req.Body.Close()
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json, text/plain")
+	req.Header = c.Request.Header
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
