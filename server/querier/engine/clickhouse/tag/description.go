@@ -481,6 +481,8 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 		} else if strings.HasPrefix(tag, "label.") {
 			labelTag := strings.TrimPrefix(tag, "label.")
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map WHERE key='%s' GROUP BY value, display_name ORDER BY value ASC", labelTag)
+		} else if tag == "service" {
+			sql = "SELECT deviceid AS value,name AS display_name,uid FROM device_map WHERE devicetype=11"
 		}
 		if sql == "" {
 			return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
