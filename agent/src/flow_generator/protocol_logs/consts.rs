@@ -37,6 +37,8 @@ pub const HTTP_RESP_MIN_LEN: usize = 13; // 响应行："HTTP/1.1 200 "
 pub const HTTP_HOST_OFFSET: usize = 6;
 pub const HTTP_CONTENT_LENGTH_OFFSET: usize = 16;
 
+pub const HTTPV2_CUSTOM_DATA_MIN_LENGTH: usize = 16;
+
 pub const HTTPV2_FRAME_HEADER_LENGTH: usize = 9;
 pub const HTTPV2_MAGIC_LENGTH: usize = 24;
 pub const HTTPV2_MAGIC_PREFIX: &str = "PRI * HTTP";

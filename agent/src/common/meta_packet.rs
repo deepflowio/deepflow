@@ -39,7 +39,9 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::ebpf::{MSG_REQUEST, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
+use crate::ebpf::{
+    EbpfType, MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND,
+};
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
@@ -101,11 +103,15 @@ pub struct MetaPacket<'a> {
     pub source_ip: u32,
 
     // for ebpf
+    pub ebpf_type: EbpfType,
     pub raw_from_ebpf: Vec<u8>,
 
     pub socket_id: u64,
     pub cap_seq: u64,
     pub l7_protocol_from_ebpf: L7Protocol,
+    //  流结束标识, 目前只有 go http2 uprobe 用到
+    pub is_request_end: bool,
+    pub is_response_end: bool,
 
     pub process_id: u32,
     pub thread_id: u32,
@@ -121,7 +127,12 @@ impl<'a> MetaPacket<'a> {
             self.lookup_key.timestamp -= Duration::from_nanos(-time_diff as u64);
         }
     }
-
+    pub fn is_tls(&self) -> bool {
+        match self.l7_protocol_from_ebpf {
+            L7Protocol::Http1TLS | L7Protocol::Http2TLS => true,
+            _ => false,
+        }
+    }
     pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
             offset_mac_0: FIELD_OFFSET_SA,
@@ -821,12 +832,15 @@ impl<'a> MetaPacket<'a> {
             .to_string();
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
-        packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocal_hint as u8);
-        packet.direction = if data.msg_type == MSG_REQUEST {
-            PacketDirection::ClientToServer
-        } else {
-            PacketDirection::ServerToClient
-        };
+        packet.ebpf_type = EbpfType::from(data.source);
+        packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
+        packet.direction = PacketDirection::from(data.msg_type);
+        if data.msg_type == MSG_REQUEST_END {
+            packet.is_request_end = true;
+        }
+        if data.msg_type == MSG_RESPONSE_END {
+            packet.is_response_end = true;
+        }
         return Ok(packet);
     }
 

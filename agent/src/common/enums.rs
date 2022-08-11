@@ -21,7 +21,7 @@ use std::fmt;
 use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use super::super::ebpf::{MSG_REQUEST, MSG_RESPONSE};
+use super::super::ebpf::{MSG_REQUEST, MSG_REQUEST_END, MSG_RESPONSE, MSG_RESPONSE_END};
 use super::flow::FlowMetricsPeer;
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
@@ -412,8 +412,8 @@ impl Default for PacketDirection {
 impl From<u8> for PacketDirection {
     fn from(msg_type: u8) -> Self {
         match msg_type {
-            MSG_REQUEST => Self::ClientToServer,
-            MSG_RESPONSE => Self::ServerToClient,
+            MSG_REQUEST | MSG_REQUEST_END => Self::ClientToServer,
+            MSG_RESPONSE | MSG_RESPONSE_END => Self::ServerToClient,
             _ => panic!("ebpf direction({}) unknown.", msg_type),
         }
     }
