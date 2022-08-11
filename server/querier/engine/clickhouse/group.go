@@ -18,6 +18,7 @@ package clickhouse
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
@@ -48,6 +49,18 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 		if ok {
 			tagItem, ok = tag.GetTag(preAsTag, db, table, "default")
 			if !ok {
+				preAsTag := strings.Trim(preAsTag, "`")
+				if strings.HasPrefix(preAsTag, "label.") {
+					if strings.HasSuffix(preAsTag, "_0") {
+						tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
+					} else if strings.HasSuffix(preAsTag, "_1") {
+						tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+					} else {
+						tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+					}
+					filter := tagItem.NotNullFilter
+					return &view.Expr{Value: "(" + filter + ")"}, true
+				}
 				return &view.Expr{}, false
 			}
 			filter := tagItem.NotNullFilter
@@ -56,6 +69,18 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 			}
 			return &view.Expr{Value: "(" + filter + ")"}, true
 		} else {
+			name := strings.Trim(name, "`")
+			if strings.HasPrefix(name, "label.") {
+				if strings.HasSuffix(name, "_0") {
+					tagItem, ok = tag.GetTag("k8s_label_0", db, table, "default")
+				} else if strings.HasSuffix(name, "_1") {
+					tagItem, ok = tag.GetTag("k8s_label_1", db, table, "default")
+				} else {
+					tagItem, ok = tag.GetTag("k8s_label", db, table, "default")
+				}
+				filter := tagItem.NotNullFilter
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			}
 			return &view.Expr{}, false
 		}
 	}
