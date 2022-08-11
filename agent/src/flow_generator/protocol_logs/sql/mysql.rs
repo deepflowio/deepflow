@@ -21,6 +21,7 @@ use super::super::{
     L7ResponseStatus, LogMessageType,
 };
 
+use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::proto::flow_log;
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
@@ -225,7 +226,7 @@ impl L7LogParse for MysqlLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<AppProtoHead> {
+    ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -249,18 +250,18 @@ impl L7LogParse for MysqlLog {
         };
         self.msg_type = msg_type;
 
-        Ok(AppProtoHead {
+        Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: L7Protocol::Mysql,
             msg_type,
             status: self.status,
             code: self.info.error_code,
             rrt: 0,
             version: 0,
-        })
+        }))
     }
 
-    fn info(&self) -> AppProtoLogsInfo {
-        AppProtoLogsInfo::Mysql(self.info.clone())
+    fn info(&self) -> AppProtoLogsInfoEnum {
+        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Mysql(self.info.clone()))
     }
 }
 

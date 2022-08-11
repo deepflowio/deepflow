@@ -19,9 +19,12 @@ use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
+use log::warn;
+use nom::{bytes::complete::take, Parser};
+
 use crate::{
     common::{
-        enums::{IpProtocol, PacketDirection},
+        enums::IpProtocol,
         flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
     },
@@ -31,8 +34,10 @@ use crate::{
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{
-            consts::*,
-            mqtt::{get_status_code, parse_connect, parse_variable_length},
+            mqtt::{
+                mqtt_fixed_header, parse_connack_packet, parse_connect_packet, parse_status_code,
+                PacketKind,
+            },
             AppProtoHead, L7ResponseStatus, LogMessageType,
         },
     },
@@ -90,13 +95,7 @@ impl L7FlowPerf for MqttPerfData {
         }
 
         let payload = packet.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
-
-        self.parse_mqtt(
-            payload,
-            packet.lookup_key.timestamp,
-            packet.direction,
-            flow_id,
-        )?;
+        self.parse_mqtt(payload, packet.lookup_key.timestamp, flow_id)?;
 
         Ok(())
     }
@@ -168,71 +167,71 @@ impl MqttPerfData {
             msg_type: LogMessageType::default(),
             status: L7ResponseStatus::default(),
             has_log_data: false,
-            rrt_cache: rrt_cache,
+            rrt_cache,
             proto_version: 0,
         }
     }
 
-    fn parse_mqtt(
-        &mut self,
-        payload: &[u8],
-        timestamp: Duration,
-        direction: PacketDirection,
-        flow_id: u64,
-    ) -> Result<()> {
-        let message_type = (payload[0] & 0xf0) >> 4;
-        let message_flag = payload[0] & 0x0f;
-
-        match message_type {
-            0 => {
-                return Err(Error::MqttPerfParseFailed);
-            }
-            MQTT_PUBLISH => {}
-            MQTT_PUBREL | MQTT_SUBSCRIBE | MQTT_UNSUBSCRIBE => {
-                if message_flag != 2 {
-                    return Err(Error::MqttPerfParseFailed);
-                }
-            }
-            _ => {
-                if message_flag != 0 {
-                    return Err(Error::MqttPerfParseFailed);
-                }
-            }
+    fn parse_mqtt(&mut self, mut payload: &[u8], timestamp: Duration, flow_id: u64) -> Result<()> {
+        // 现在只支持 MQTT 3.1.1解析
+        if self.proto_version != 0 && self.proto_version != 4 {
+            warn!("cannot parse packet, perf parser only support to parse MQTT V3.1.1 packet");
+            return Err(Error::MqttPerfParseFailed);
         }
 
-        let (var_len, _) = parse_variable_length(&payload[1..])?;
-        let offset = var_len + 1;
+        loop {
+            let (input, header) =
+                mqtt_fixed_header(payload).map_err(|_| Error::MqttPerfParseFailed)?;
+            match header.kind {
+                PacketKind::Connect => {
+                    let data = take(header.remaining_length as u32);
+                    let (_, (version, _)) = data
+                        .and_then(parse_connect_packet)
+                        .parse(input)
+                        .map_err(|_| Error::MqttPerfParseFailed)?;
+                    self.proto_version = version;
+                    self.msg_type = LogMessageType::Request;
+                    self.calc_request(timestamp, flow_id);
+                }
+                PacketKind::Connack => {
+                    let (_, return_code) =
+                        parse_connack_packet(input).map_err(|_| Error::MqttLogParseFailed)?;
+                    self.status_code = return_code;
+                    self.msg_type = LogMessageType::Response;
+                    self.status = parse_status_code(return_code);
+                    self.calc_response(timestamp, flow_id);
+                }
+                PacketKind::Publish { .. }
+                | PacketKind::Suback
+                | PacketKind::Pingresp
+                | PacketKind::Pubcomp
+                | PacketKind::Pubrec
+                | PacketKind::Puback
+                | PacketKind::Unsuback => {
+                    self.msg_type = LogMessageType::Response;
+                    self.calc_response(timestamp, flow_id);
+                }
+                PacketKind::Subscribe
+                | PacketKind::Unsubscribe
+                | PacketKind::Pingreq
+                | PacketKind::Pubrel => {
+                    self.msg_type = LogMessageType::Request;
+                    self.calc_request(timestamp, flow_id);
+                }
+                PacketKind::Disconnect => {
+                    self.msg_type = LogMessageType::Disconnect;
+                    self.calc_request(timestamp, flow_id);
+                }
+            }
+            if input.len() <= header.remaining_length as usize {
+                break;
+            }
 
-        if message_type == MQTT_CONNECT {
-            let (proto_version, _) = parse_connect(&payload[offset..], Error::MqttPerfParseFailed)?;
-            self.proto_version = proto_version;
-        } else {
-            self.status_code = get_status_code(
-                &payload[var_len..],
-                message_type,
-                self.proto_version,
-                Error::MqttPerfParseFailed,
-            )?;
+            payload = &input[header.remaining_length as usize..];
         }
 
         self.l7_proto = L7Protocol::Mqtt;
         self.has_log_data = true;
-
-        match message_type {
-            MQTT_CONNECT | MQTT_PUBLISH | MQTT_PUBREC | MQTT_SUBSCRIBE | MQTT_UNSUBSCRIBE
-            | MQTT_PINGREQ | MQTT_AUTH | MQTT_DISCONNECT => {
-                self.msg_type = LogMessageType::Request;
-                self.calc_request(timestamp, flow_id);
-            }
-            MQTT_CONNACK | MQTT_PUBACK | MQTT_PUBREL | MQTT_SUBACK | MQTT_UNSUBACK
-            | MQTT_PINGRESP => {
-                self.msg_type = LogMessageType::Response;
-                self.calc_response(timestamp, direction, flow_id);
-            }
-            _ => {
-                self.msg_type = LogMessageType::Other;
-            }
-        }
 
         Ok(())
     }
@@ -246,58 +245,25 @@ impl MqttPerfData {
             .add_req_time(flow_id, None, timestamp);
     }
 
-    fn calc_response(
-        &mut self,
-        timestamp: Duration,
-        direction: PacketDirection,
-        flow_id: u64,
-    ) -> bool {
+    fn calc_response(&mut self, timestamp: Duration, flow_id: u64) {
         let stats = self.stats.get_or_insert(PerfStats::default());
         stats.resp_count += 1;
-
-        if self.proto_version == 5 {
-            match self.status_code {
-                0 | 4 => self.status = L7ResponseStatus::Ok,
-                MQTT_STATUS_FAILED_MIN..=MQTT_STATUS_FAILED_MAX => {
-                    if direction == PacketDirection::ClientToServer {
-                        self.status = L7ResponseStatus::ClientError;
-                    } else {
-                        self.status = L7ResponseStatus::ServerError
-                    }
-                }
-                _ => return false,
-            }
-        } else {
-            match self.status_code {
-                0 => self.status = L7ResponseStatus::Ok,
-                1..=3 => self.status = L7ResponseStatus::ServerError,
-                _ => self.status = L7ResponseStatus::ClientError,
-            }
-        }
-
-        stats.rrt_last = Duration::ZERO;
 
         let req_timestamp = match self
             .rrt_cache
             .borrow_mut()
             .get_and_remove_l7_req_time(flow_id, None)
+            .filter(|t| *t <= timestamp)
         {
             Some(t) => t,
-            None => return true,
+            None => return,
         };
 
-        if timestamp < req_timestamp {
-            return false;
-        }
-
         let rrt = timestamp - req_timestamp;
-        if rrt > stats.rrt_max {
-            stats.rrt_max = rrt;
-        }
+        stats.rrt_max = stats.rrt_max.max(rrt);
         stats.rrt_last = rrt;
         stats.rrt_sum += rrt;
         stats.rrt_count += 1;
-        false
     }
 
     fn reset(&mut self) {
@@ -316,6 +282,7 @@ mod tests {
 
     use super::*;
 
+    use crate::common::enums::PacketDirection;
     use crate::utils::test::Capture;
 
     const FILE_DIR: &str = "resources/test/flow_generator/mqtt";

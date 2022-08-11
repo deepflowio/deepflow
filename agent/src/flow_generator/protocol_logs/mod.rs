@@ -85,6 +85,7 @@ pub enum LogMessageType {
     Session,
     Other,
     Max,
+    Disconnect,
 }
 
 impl Default for LogMessageType {
@@ -524,6 +525,53 @@ pub trait L7LogParse: Send + Sync {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<AppProtoHead>;
-    fn info(&self) -> AppProtoLogsInfo;
+    ) -> Result<AppProtoHeadEnum>;
+    fn info(&self) -> AppProtoLogsInfoEnum;
+}
+
+#[derive(Debug, Clone)]
+pub enum AppProtoHeadEnum {
+    Single(AppProtoHead),
+    Multi(Vec<AppProtoHead>),
+}
+
+#[derive(Debug, Clone)]
+pub enum AppProtoLogsInfoEnum {
+    Single(AppProtoLogsInfo),
+    Multi(Vec<AppProtoLogsInfo>),
+}
+
+impl AppProtoLogsInfoEnum {
+    /// 假设所有应用日志都只携带一个info，如果有多个则不要用该方法
+    /// Assuming that all application logs carry only one info, do not use this method if there are multiple
+    pub fn into_inner(self) -> AppProtoLogsInfo {
+        match self {
+            Self::Single(v) => v,
+            Self::Multi(_) => unreachable!(),
+        }
+    }
+}
+
+impl IntoIterator for AppProtoHeadEnum {
+    type Item = AppProtoHead;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Self::Single(v) => vec![v].into_iter(),
+            Self::Multi(v) => v.into_iter(),
+        }
+    }
+}
+
+impl IntoIterator for AppProtoLogsInfoEnum {
+    type Item = AppProtoLogsInfo;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Self::Single(v) => vec![v].into_iter(),
+            Self::Multi(v) => v.into_iter(),
+        }
+    }
 }

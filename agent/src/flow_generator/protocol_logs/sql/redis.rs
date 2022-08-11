@@ -23,6 +23,7 @@ use super::super::{
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::flow_generator::error::{Error, Result};
+use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::proto::flow_log;
 
 const SEPARATOR_SIZE: usize = 2;
@@ -133,7 +134,7 @@ impl L7LogParse for RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<AppProtoHead> {
+    ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -146,18 +147,18 @@ impl L7LogParse for RedisLog {
             PacketDirection::ClientToServer => self.fill_request(context),
             PacketDirection::ServerToClient => self.fill_response(context, error_response),
         };
-        Ok(AppProtoHead {
+        Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: L7Protocol::Redis,
             msg_type: self.msg_type,
             status: self.status,
             code: 0,
             rrt: 0,
             version: 0,
-        })
+        }))
     }
 
-    fn info(&self) -> AppProtoLogsInfo {
-        AppProtoLogsInfo::Redis(self.info.clone())
+    fn info(&self) -> AppProtoLogsInfoEnum {
+        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Redis(self.info.clone()))
     }
 }
 
@@ -366,7 +367,7 @@ mod tests {
             let mut redis = RedisLog::default();
             let _ = redis.parse(payload, packet.lookup_key.proto, packet.direction);
             let is_redis = redis_check_protocol(&mut bitmap, packet);
-            output.push_str(&format!("{} is_redis: {}\r\n", redis.info(), is_redis));
+            output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output
     }

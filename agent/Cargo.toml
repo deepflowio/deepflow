@@ -40,6 +40,7 @@ lru = "0.7.5"
 md-5 = "0.10.1"
 neli = "0.5.3"
 nix = "0.23"
+nom = "7.1.1"
 num_enum = "0.5.6"
 openshift-openapi = { version = "0.3.1", features = ["v4_6"] }
 packet_sequence_block = { path = "plugins/packet_sequence_block" }

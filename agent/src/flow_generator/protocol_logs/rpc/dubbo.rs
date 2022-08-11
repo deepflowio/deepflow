@@ -26,6 +26,7 @@ use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
+use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::proto::flow_log;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
 
@@ -241,7 +242,7 @@ impl L7LogParse for DubboLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<AppProtoHead> {
+    ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -258,18 +259,18 @@ impl L7LogParse for DubboLog {
                 self.response(&dubbo_header);
             }
         }
-        Ok(AppProtoHead {
+        Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: L7Protocol::Dubbo,
             msg_type: self.msg_type,
             status: self.status,
             code: self.status_code as u16,
             rrt: 0,
             version: 0,
-        })
+        }))
     }
 
-    fn info(&self) -> AppProtoLogsInfo {
-        AppProtoLogsInfo::Dubbo(self.info.clone())
+    fn info(&self) -> AppProtoLogsInfoEnum {
+        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Dubbo(self.info.clone()))
     }
 }
 
