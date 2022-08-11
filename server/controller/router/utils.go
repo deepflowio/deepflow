@@ -17,17 +17,22 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-func forwardMasterController(c *gin.Context, masterControllerName string) {
+func forwardMasterController(c *gin.Context, masterControllerName string, port int) {
 	requestHosts := strings.Split(c.Request.Host, ":")
-	c.Request.Host = strings.Replace(
-		c.Request.Host, requestHosts[0], masterControllerName, 1,
-	)
+	if len(requestHosts) > 1 {
+		c.Request.Host = strings.Replace(
+			c.Request.Host, requestHosts[0], masterControllerName, 1,
+		)
+	} else {
+		c.Request.Host = fmt.Sprintf("%s:%d", masterControllerName, port)
+	}
 	c.Request.URL.Scheme = "http"
 	c.Request.URL.Host = c.Request.Host
 

@@ -64,7 +64,7 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		// 如果不是masterController，将请求转发至是masterController
 		isMasterController, masterControllerName, _ := common.IsMasterController()
 		if !isMasterController {
-			forwardMasterController(c, masterControllerName)
+			forwardMasterController(c, masterControllerName, cfg.ListenPort)
 			return
 		}
 
