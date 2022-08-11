@@ -203,5 +203,9 @@ pub fn get_exec_path() -> Result<PathBuf> {
 /// 返回当前系统的空闲内存数目，单位：%
 pub fn get_current_sys_free_memory_percentage() -> u32 {
     let s = System::new_all();
-    (s.available_memory() / (s.total_memory() / 100)) as u32
+    let total_memory = s.total_memory();
+    if total_memory > 0 {
+        return ((s.available_memory() / total_memory) * 100) as u32;
+    }
+    0
 }
