@@ -226,6 +226,8 @@ impl L7LogParse for MysqlLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        _is_req_end: Option<bool>,
+        _is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -406,7 +408,7 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let _ = mysql.parse(payload, packet.lookup_key.proto, packet.direction);
+            // let _ = mysql.parse(payload, packet.lookup_key.proto, packet.direction);
             let is_mysql = mysql_check_protocol(&mut bitmap, packet);
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
         }

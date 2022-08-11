@@ -15,6 +15,7 @@
  */
 
 extern crate libc;
+pub mod bpf_enum;
 pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; //u8
@@ -25,6 +26,17 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 // 最大长度
 pub const CAP_LEN_MAX: usize = 1024;
+
+//ebpf 上报的数据类型
+#[allow(dead_code)]
+// tracepoint 类型
+pub const SYSCALL: u8 = 0;
+#[allow(dead_code)]
+// hook 在 to tls 库 Read/Write 获取tls加密前数据,是原始协议报文
+pub const GO_TLS_UPROBE: u8 = 1;
+#[allow(dead_code)]
+// hook在 go 的 http2 ReadHeader/WriteHeader 获取原始头信息
+pub const GO_HTTP2_UPROBE: u8 = 2;
 
 //方向
 #[allow(dead_code)]
@@ -75,6 +87,10 @@ pub const TRACER_STOP: u8 = 2;
 pub const MSG_REQUEST: u8 = 1;
 #[allow(dead_code)]
 pub const MSG_RESPONSE: u8 = 2;
+#[allow(dead_code)]
+pub const MSG_REQUEST_END: u8 = 3;
+#[allow(dead_code)]
+pub const MSG_RESPONSE_END: u8 = 4;
 
 //Register event types
 #[allow(dead_code)]
@@ -127,7 +143,7 @@ pub struct SK_BPF_DATA {
      * 上面保证任何时刻启动程序在当前机器下获取的socket_id都是唯一的。
      */
     pub socket_id: u64,
-    pub l7_protocal_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
+    pub l7_protocol_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
     // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
     pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
     pub need_reconfirm: bool, // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
@@ -226,7 +242,7 @@ impl fmt::Display for SK_BPF_DATA {
                 port_dst,
                 self.tcp_seq,
                 self.syscall_trace_id_call,
-                self.l7_protocal_hint,
+                self.l7_protocol_hint,
                 data_bytes
             )
         }

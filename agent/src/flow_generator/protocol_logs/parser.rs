@@ -34,6 +34,8 @@ use super::{
     mqtt::generate_mqtt_id, AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo,
     DnsLog, DubboLog, KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
+use crate::ebpf::bpf_enum::EbpfType;
+use crate::flow_generator::protocol_logs::L7ProtoRawDataType;
 use crate::{
     common::{
         enums::{EthernetType, PacketDirection},
@@ -127,6 +129,7 @@ impl MetaAppProto {
             syscall_trace_id_thread_1: 0,
             syscall_cap_seq_0: 0,
             syscall_cap_seq_1: 0,
+            ebpf_type: EbpfType::None,
         };
         if flow.flow.tap_side == TapSide::Local {
             base_info.mac_src = flow.flow.flow_key.mac_src;
@@ -444,7 +447,7 @@ struct AppLogs {
 impl AppLogs {
     pub fn new(config: &LogParserAccess) -> Self {
         Self {
-            http: HttpLog::new(config, false),
+            http: HttpLog::new(config, false, L7ProtoRawDataType::RawProtocol),
             dubbo: DubboLog::new(config),
             ..Default::default()
         }
@@ -586,6 +589,8 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.dns.info();
                 let base_info = app_proto.base_info;
@@ -596,6 +601,8 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.http.info();
                 let base_info = app_proto.base_info;
@@ -607,6 +614,8 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.dubbo.info();
                 let base_info = app_proto.base_info;
@@ -618,6 +627,8 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.kafka.info();
                 let base_info = app_proto.base_info;
@@ -629,6 +640,8 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
 
                 let special_info = app_logs.mqtt.info();
@@ -650,6 +663,8 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.redis.info();
                 let base_info = app_proto.base_info;
@@ -661,6 +676,8 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.mysql.info();
                 let base_info = app_proto.base_info;
