@@ -1006,7 +1006,7 @@ impl Components {
             // create and start collector
             let collector = Self::new_collector(
                 i,
-                &stats_collector,
+                stats_collector.clone(),
                 flow_receiver,
                 l4_flow_aggr_sender.clone(),
                 metrics_sender.clone(),
@@ -1155,7 +1155,7 @@ impl Components {
 
     fn new_collector(
         id: usize,
-        stats_collector: &Arc<stats::Collector>,
+        stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Box<TaggedFlow>>,
         l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
         metrics_sender: queue::DebugSender<SendItem>,
@@ -1246,6 +1246,7 @@ impl Components {
             1 << 18, // possible_host_size
             config_handler.collector(),
             synchronizer.ntp_diff(),
+            stats_collector.clone(),
         );
 
         let mut l4_flow_aggr = None;
@@ -1266,7 +1267,7 @@ impl Components {
                 metrics_sender.clone(),
                 MetricsType::SECOND,
                 second_quadruple_tolerable_delay as u32,
-                stats_collector,
+                &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
             ));
@@ -1278,7 +1279,7 @@ impl Components {
                 metrics_sender,
                 MetricsType::MINUTE,
                 minute_quadruple_tolerable_delay as u32,
-                stats_collector,
+                &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
             ));

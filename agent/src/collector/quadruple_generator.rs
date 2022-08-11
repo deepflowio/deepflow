@@ -18,7 +18,7 @@ use std::collections::{HashMap, VecDeque};
 use std::net::IpAddr;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
-    Arc,
+    Arc, Weak,
 };
 use std::thread;
 use std::time::Duration;
@@ -47,7 +47,7 @@ use crate::utils::{
     lru::Lru,
     possible_host::PossibleHost,
     queue::{DebugSender, Error, Receiver},
-    stats::{Counter, CounterType, CounterValue, RefCountable},
+    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
 };
 
 #[derive(Debug, Default)]
@@ -258,7 +258,7 @@ struct SubQuadGen {
 
     output: DebugSender<Box<AccumulatedFlow>>,
 
-    counter: QgCounter,
+    counter: Arc<QgCounter>,
     metrics_type: MetricsType,
 
     // time in seconds
@@ -277,29 +277,28 @@ struct SubQuadGen {
     // traffic_setter: TrafficSetter,
 }
 
-// FIXME: counter not registed
-impl RefCountable for SubQuadGen {
+impl RefCountable for QgCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
                 "window-delay",
                 CounterType::Counted,
-                CounterValue::Signed(self.counter.window_delay.swap(0, Ordering::Relaxed)),
+                CounterValue::Signed(self.window_delay.swap(0, Ordering::Relaxed)),
             ),
             (
                 "flow-delay",
                 CounterType::Counted,
-                CounterValue::Signed(self.counter.flow_delay.swap(0, Ordering::Relaxed)),
+                CounterValue::Signed(self.flow_delay.swap(0, Ordering::Relaxed)),
             ),
             (
                 "no-endpoint",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.no_endpoint.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.no_endpoint.swap(0, Ordering::Relaxed)),
             ),
             (
                 "drop-before-window",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.drop_before_window.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.drop_before_window.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
@@ -562,6 +561,8 @@ pub struct QuadrupleGeneratorThread {
     running: Arc<AtomicBool>,
     config: CollectorAccess,
     ntp_diff: Arc<AtomicI64>,
+
+    stats: Arc<Collector>,
 }
 
 impl QuadrupleGeneratorThread {
@@ -578,6 +579,7 @@ impl QuadrupleGeneratorThread {
         possible_host_size: usize,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
+        stats: Arc<Collector>,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -598,6 +600,7 @@ impl QuadrupleGeneratorThread {
             running,
             config,
             ntp_diff,
+            stats,
         }
     }
 
@@ -656,6 +659,7 @@ impl QuadrupleGeneratorThread {
             self.collector_enabled.clone(),
             self.running.clone(),
             self.ntp_diff.clone(),
+            self.stats.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || quadruple_generator.handler_routine()));
         info!("quadruple generator id: {} started", self.id);
@@ -696,6 +700,8 @@ pub struct QuadrupleGenerator {
 
     running: Arc<AtomicBool>,
     ntp_diff: Arc<AtomicI64>,
+
+    stats: Arc<Collector>,
 }
 
 impl QuadrupleGenerator {
@@ -716,6 +722,7 @@ impl QuadrupleGenerator {
         collector_enabled: Arc<AtomicBool>,
         running: Arc<AtomicBool>,
         ntp_diff: Arc<AtomicI64>,
+        stats: Arc<Collector>,
     ) -> Self {
         info!("new quadruple_generator id: {}, second_delay: {}, minute_delay: {}, l7_metrics_enabled: {}, vtap_flow_1s_enabled: {} collector_enabled: {}", id, second_delay_seconds, minute_delay_seconds, l7_metrics_enabled.load(Ordering::Relaxed), vtap_flow_1s_enabled.load(Ordering::Relaxed), collector_enabled.load(Ordering::Relaxed));
         if minute_delay_seconds < SECONDS_IN_MINUTE || minute_delay_seconds >= SECONDS_IN_MINUTE * 2
@@ -741,7 +748,7 @@ impl QuadrupleGenerator {
                 delay_seconds: second_delay_seconds,
                 stashs: VecDeque::with_capacity(second_slots),
                 connections: VecDeque::with_capacity(second_slots),
-                counter: QgCounter::default(),
+                counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
             });
@@ -758,7 +765,12 @@ impl QuadrupleGenerator {
                     .connections
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
-            // register_countable("second_quadruple_generator",vec![StatsOption::Tag("index", id)]);
+            stats.register_countable(
+                "second_quadruple_generator",
+                Countable::Ref(Arc::downgrade(&second_quad_gen.as_ref().unwrap().counter)
+                    as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("index", id.to_string())],
+            );
         }
 
         if metrics_type.contains(MetricsType::MINUTE) {
@@ -772,7 +784,7 @@ impl QuadrupleGenerator {
                 delay_seconds: minute_delay_seconds,
                 stashs: VecDeque::with_capacity(minute_slots),
                 connections: VecDeque::with_capacity(minute_slots),
-                counter: QgCounter::default(),
+                counter: Arc::new(QgCounter::default()),
                 ntp_diff: ntp_diff.clone(),
                 // traffic_setter: traffic_setter,
             });
@@ -789,7 +801,12 @@ impl QuadrupleGenerator {
                     .connections
                     .push_back(ConcurrentConnection::with_capacity(connection_lru_capacity));
             }
-            // register_countable("minute_quadruple_generator",vec![StatsOption::Tag("index", id)]);
+            stats.register_countable(
+                "minute_quadruple_generator",
+                Countable::Ref(Arc::downgrade(&minute_quad_gen.as_ref().unwrap().counter)
+                    as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("index", id.to_string())],
+            );
         }
 
         QuadrupleGenerator {
@@ -816,6 +833,7 @@ impl QuadrupleGenerator {
             collector_enabled,
             running,
             ntp_diff,
+            stats,
         }
     }
 
@@ -1161,7 +1179,7 @@ mod test {
             delay_seconds: slots,
             stashs: VecDeque::with_capacity(slots as usize),
             connections: VecDeque::with_capacity(slots as usize),
-            counter: QgCounter::default(),
+            counter: Arc::new(QgCounter::default()),
             ntp_diff,
         };
         for _ in 0..slots as usize {
