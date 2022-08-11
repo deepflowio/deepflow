@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/platform"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/statsd"
 )
 
 var log = logging.MustGetLogger("cloud")
@@ -41,6 +42,7 @@ type Cloud struct {
 	basicInfo               model.BasicInfo
 	resource                model.Resource
 	platform                platform.Platform
+	taskCost                statsd.CloudTaskStatsd
 	kubernetesGatherTaskMap map[string]*KubernetesGatherTask
 }
 
@@ -65,6 +67,9 @@ func NewCloud(domain mysql.Domain, interval int, cfg config.CloudConfig, ctx con
 		cfg:                     cfg,
 		cCtx:                    cCtx,
 		cCancel:                 cCancel,
+		taskCost: statsd.CloudTaskStatsd{
+			TaskCost: make(map[string][]int),
+		},
 	}
 }
 
@@ -93,6 +98,12 @@ func (c *Cloud) GetResource() model.Resource {
 
 func (c *Cloud) GetKubernetesGatherTaskMap() map[string]*KubernetesGatherTask {
 	return c.kubernetesGatherTaskMap
+}
+
+func (c *Cloud) GetStatter() statsd.StatsdStatter {
+	return statsd.StatsdStatter{
+		Element: statsd.GetCloudTaskStatsd(c.taskCost),
+	}
 }
 
 func (c *Cloud) getCloudData() {
@@ -126,9 +137,15 @@ LOOP:
 	for {
 		select {
 		case <-ticker.C:
+			c.taskCost.TaskCost = map[string][]int{}
+			startTime := time.Now()
+
 			log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name)
 			c.getCloudData()
 			log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
+
+			c.taskCost.TaskCost[c.basicInfo.Lcuuid] = []int{int(time.Now().Sub(startTime).Milliseconds())}
+			statsd.MetaStatsd.RegisterStatsdTable(c)
 		case <-c.cCtx.Done():
 			break LOOP
 		}
