@@ -27,6 +27,13 @@ jobs:
           username: "${{ github.repository_owner }}"
           password: "${{ secrets.GITHUB_TOKEN }}" 
 
+      - name: Log in to ALIYUN Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "${{ secrets.REGISTRY_ALIYUN_ADDR }}"
+          username: "${{ secrets.REGISTRY_ALIYUN_USER }}" 
+          password: "${{ secrets.REGISTRY_PASS }}"
+
       - name: Build and push deepflow agent env images
         uses: docker/build-push-action@v2
         with:
@@ -35,5 +42,5 @@ jobs:
           file: agent/docker/DockerfileToFix.build
           platforms: linux/amd64
           tags: |
-            "ghcr.io/${{ github.repository_owner }}/rust-build:1.4"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:1.5"
+            "ghcr.io/${{ github.repository_owner }}/rust-build:1.6"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:1.6"
