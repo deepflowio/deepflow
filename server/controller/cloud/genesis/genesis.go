@@ -19,7 +19,6 @@ package genesis
 import (
 	"errors"
 	"inet.af/netaddr"
-	"time"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/op/go-logging"
@@ -43,7 +42,7 @@ type Genesis struct {
 	ipV4CIDRMaxMask   int
 	ipV6CIDRMaxMask   int
 	Name              string
-	uuid              string
+	Lcuuid            string
 	UuidGenerate      string
 	regionUuid        string
 	azLcuuid          string
@@ -73,7 +72,7 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 		ipV4CIDRMaxMask:   ipV4MaxMask,
 		ipV6CIDRMaxMask:   ipV6MaxMask,
 		Name:              domain.Name,
-		uuid:              domain.Lcuuid,
+		Lcuuid:            domain.Lcuuid,
 		UuidGenerate:      domain.DisplayName,
 		defaultVpcName:    cfg.GenesisDefaultVpcName,
 		defaultRegionName: cfg.GenesisDefaultRegionName,
@@ -83,7 +82,6 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 			APICount: make(map[string][]int),
 			APICost:  make(map[string][]int),
 			ResCount: make(map[string][]int),
-			TaskCost: make(map[string][]int),
 		},
 	}, nil
 }
@@ -95,7 +93,7 @@ func (g *Genesis) CheckAuth() error {
 func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	globalTags := map[string]string{
 		"domain_name": g.Name,
-		"domain":      g.UuidGenerate,
+		"domain":      g.Lcuuid,
 		"platform":    "genesis",
 	}
 
@@ -268,8 +266,6 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 	g.cloudStatsd.APICount = map[string][]int{}
 	g.cloudStatsd.APICost = map[string][]int{}
 	g.cloudStatsd.ResCount = map[string][]int{}
-	g.cloudStatsd.TaskCost = map[string][]int{}
-	startTime := time.Now()
 
 	if genesis.GenesisService == nil {
 		return cloudmodel.Resource{}, errors.New("genesis service is nil")
@@ -348,7 +344,6 @@ func (g *Genesis) GetCloudData() (cloudmodel.Resource, error) {
 		AZs:         []cloudmodel.AZ{az},
 	}
 	g.cloudStatsd.ResCount = statsd.GetResCount(resource)
-	g.cloudStatsd.TaskCost[g.UuidGenerate] = []int{int(time.Now().Sub(startTime).Milliseconds())}
 	statsd.MetaStatsd.RegisterStatsdTable(g)
 	return resource, nil
 }

@@ -24,7 +24,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 
 	"regexp"
-	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
@@ -43,6 +42,7 @@ var log = logging.MustGetLogger("cloud.kubernetes_gather")
 
 type KubernetesGather struct {
 	Name                         string
+	Lcuuid                       string
 	UuidGenerate                 string
 	ClusterID                    string
 	RegionUuid                   string
@@ -77,17 +77,20 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 	var name string
 	var displayName string
 	var clusterID string
+	var lcuuid string
 	var configJson *simplejson.Json
 	var err error
 
 	// 如果是K8s云平台，转换domain表的config
 	if domain != nil {
 		name = domain.Name
+		lcuuid = domain.Lcuuid
 		displayName = domain.DisplayName
 		clusterID = domain.ClusterID
 		configJson, err = simplejson.NewJson([]byte(domain.Config))
 	} else if subDomain != nil {
 		name = subDomain.Name
+		lcuuid = subDomain.Lcuuid
 		displayName = subDomain.DisplayName
 		clusterID = subDomain.ClusterID
 		configJson, err = simplejson.NewJson([]byte(subDomain.Config))
@@ -123,6 +126,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 	return &KubernetesGather{
 		// TODO: display_name后期需要修改为uuid_generate
 		Name:                  name,
+		Lcuuid:                lcuuid,
 		UuidGenerate:          displayName,
 		ClusterID:             clusterID,
 		RegionUuid:            configJson.Get("region_uuid").MustString(),
@@ -150,7 +154,6 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 			APICount: make(map[string][]int),
 			APICost:  make(map[string][]int),
 			ResCount: make(map[string][]int),
-			TaskCost: make(map[string][]int),
 		},
 	}
 }
@@ -174,7 +177,7 @@ func (k *KubernetesGather) getKubernetesInfo() (map[string][]string, error) {
 func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
 	globalTags := map[string]string{
 		"domain_name": k.Name,
-		"domain":      k.UuidGenerate,
+		"domain":      k.Lcuuid,
 		"platform":    "kubernetes",
 	}
 
@@ -201,8 +204,6 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.cloudStatsd.APICount = map[string][]int{}
 	k.cloudStatsd.APICost = map[string][]int{}
 	k.cloudStatsd.ResCount = map[string][]int{}
-	k.cloudStatsd.TaskCost = map[string][]int{}
-	startTime := time.Now()
 
 	region, err := k.getRegion()
 	if err != nil {
@@ -318,7 +319,6 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 		Pods:                   pods,
 	}
 	k.cloudStatsd.ResCount = statsd.GetResCount(resource)
-	k.cloudStatsd.TaskCost[k.UuidGenerate] = []int{int(time.Now().Sub(startTime).Milliseconds())}
 	statsd.MetaStatsd.RegisterStatsdTable(k)
 	return resource, nil
 }
