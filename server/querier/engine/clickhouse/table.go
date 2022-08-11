@@ -41,6 +41,9 @@ func GetTables(db string) map[string][]interface{} {
 		values = append(values, common.GetExtTables(db)...)
 	} else {
 		for _, table := range tables {
+			if table == "vtap_acl" {
+				continue
+			}
 			datasource, err := common.GetDatasources(db, table)
 			if err != nil {
 				log.Error(err)
