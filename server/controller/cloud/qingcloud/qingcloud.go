@@ -118,7 +118,6 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 			APICount: make(map[string][]int),
 			APICost:  make(map[string][]int),
 			ResCount: make(map[string][]int),
-			TaskCost: make(map[string][]int),
 		},
 	}, nil
 }
@@ -266,7 +265,7 @@ func (q *QingCloud) CheckAuth() error {
 func (q *QingCloud) GetStatter() statsd.StatsdStatter {
 	globalTags := map[string]string{
 		"domain_name": q.Name,
-		"domain":      q.UuidGenerate,
+		"domain":      q.Uuid,
 		"platform":    "qingcloud",
 	}
 
@@ -282,8 +281,6 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	q.cloudStatsd.APICount = map[string][]int{}
 	q.cloudStatsd.APICost = map[string][]int{}
 	q.cloudStatsd.ResCount = map[string][]int{}
-	q.cloudStatsd.TaskCost = map[string][]int{}
-	startTime := time.Now()
 
 	// 区域和可用区
 	regions, azs, err := q.getRegionAndAZs()
@@ -395,7 +392,6 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	resource.SubDomains = subDomains
 	// write monitor
 	q.cloudStatsd.ResCount = statsd.GetResCount(resource)
-	q.cloudStatsd.TaskCost[q.UuidGenerate] = []int{int(time.Now().Sub(startTime).Milliseconds())}
 	// register statsd
 	statsd.MetaStatsd.RegisterStatsdTable(q)
 	return resource, nil
