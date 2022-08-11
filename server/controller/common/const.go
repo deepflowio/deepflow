@@ -159,6 +159,10 @@ const (
 )
 
 const (
+	ACL_STATE_ENABLE = 1
+)
+
+const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
 	DEFAULT_PORT_NAME_REGEX     = "(cni|flannel|vxlan.calico|tunl|en[ospx])"
 
