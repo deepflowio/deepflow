@@ -1,4 +1,4 @@
-FROM ghcr.io/deepflowys/rust-build:1.4 as builder
+FROM ghcr.io/deepflowys/rust-build:1.6 as builder
 COPY .  /deepflow/
 WORKDIR /deepflow/agent
 RUN cargo build --release --target=x86_64-unknown-linux-musl && \
