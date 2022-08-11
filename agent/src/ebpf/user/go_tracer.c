@@ -40,7 +40,7 @@ static char build_info_magic[] = "\xff Go buildinf:";
 struct list_head proc_offsets_head;	// For pid-offsets correspondence lists.
 
 struct list_head proc_events_head;     // For process execute/exit events list.
-#define PROC_EVENT_DELAY_HANDLE_DEF	10 // execute/exit events delayed processing time, unit: second
+#define PROC_EVENT_DELAY_HANDLE_DEF	120 // execute/exit events delayed processing time, unit: second
 pthread_mutex_t mutex_proc_events_lock;
 
 /* *INDENT-OFF* */

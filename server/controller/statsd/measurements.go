@@ -57,7 +57,6 @@ type CloudStatsd struct {
 	APICount map[string][]int
 	APICost  map[string][]int
 	ResCount map[string][]int
-	TaskCost map[string][]int
 }
 
 func GetCloudStatsd(cloud CloudStatsd) []StatsdElement {
@@ -88,6 +87,14 @@ func GetCloudStatsd(cloud CloudStatsd) []StatsdElement {
 		PrivateTagValueToCount: cloud.ResCount,
 	}
 
+	return []StatsdElement{apiCount, apiCost, resCount}
+}
+
+type CloudTaskStatsd struct {
+	TaskCost map[string][]int
+}
+
+func GetCloudTaskStatsd(cloud CloudTaskStatsd) []StatsdElement {
 	// init metric type Timing
 	taskCost := StatsdElement{
 		MetricType:             MetricTiming,
@@ -96,7 +103,8 @@ func GetCloudStatsd(cloud CloudStatsd) []StatsdElement {
 		PrivateTagKey:          "domain",
 		PrivateTagValueToCount: cloud.TaskCost,
 	}
-	return []StatsdElement{apiCount, apiCost, resCount, taskCost}
+
+	return []StatsdElement{taskCost}
 }
 
 func GetResCount[T model.Resource | k8sgathermodel.KubernetesGatherResource](res T) map[string][]int {

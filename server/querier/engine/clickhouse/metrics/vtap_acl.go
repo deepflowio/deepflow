@@ -14,13 +14,16 @@
  * limitations under the License.
  */
 
-package common
+package metrics
 
-const PERMISSION_TYPE_NUM = 3
+var VTAP_ACL_METRICS = map[string]*Metrics{}
 
-var DB_TABLE_MAP = map[string][]string{
-	"flow_log":        []string{"l4_flow_log", "l7_flow_log"},
-	"flow_metrics":    []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port", "vtap_acl"},
-	"ext_metrics":     []string{"ext_common"},
-	"deepflow_system": []string{"deepflow_system_common"},
+var VTAP_ACL_METRICS_REPLACE = map[string]*Metrics{
+	"l3_byte": NewReplaceMetrics("l3_byte_tx+l3_byte_rx", ""),
+	"l4_byte": NewReplaceMetrics("l4_byte_tx+l4_byte_rx", ""),
+}
+
+func GetVtapAclMetrics() map[string]*Metrics {
+	// TODO: 特殊指标量修改
+	return VTAP_ACL_METRICS
 }
