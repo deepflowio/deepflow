@@ -837,7 +837,6 @@ impl Collector {
         let receiver = self.receiver.clone();
         let sender = self.sender.clone();
         let ctx = self.context.clone();
-        let delay_seconds = self.context.delay_seconds;
 
         let thread = thread::spawn(move || {
             let mut stash = Stash::new(ctx, sender, counter);

@@ -33,9 +33,9 @@ use crate::ebpf;
 use crate::flow_generator::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
     kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppTable, DnsLog,
-    DubboLog, Error as LogError, HttpLog, KafkaLog, L7LogParse, LogMessageType, MqttLog, MysqlLog,
-    RedisLog, Result as LogResult,
+    AppProtoHeadEnum, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfoEnum, AppTable,
+    DnsLog, DubboLog, Error as LogError, HttpLog, KafkaLog, L7LogParse, LogMessageType, MqttLog,
+    MysqlLog, RedisLog, Result as LogResult,
 };
 use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
@@ -362,7 +362,7 @@ impl FlowItem {
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
-    ) -> LogResult<AppProtoHead> {
+    ) -> LogResult<AppProtoHeadEnum> {
         if self.is_skip {
             return Err(LogError::L7ProtocolCheckLimit);
         }
@@ -404,7 +404,7 @@ impl FlowItem {
         packet: &MetaPacket,
         local_epc: i32,
         app_table: &mut AppTable,
-    ) -> LogResult<AppProtoHead> {
+    ) -> LogResult<AppProtoHeadEnum> {
         if !self.is_success && self.is_skip {
             return Err(LogError::L7ProtocolParseLimit);
         }
@@ -468,7 +468,7 @@ impl FlowItem {
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
-    ) -> LogResult<AppProtoHead> {
+    ) -> LogResult<AppProtoHeadEnum> {
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         if self.last_packet + Self::FLOW_ITEM_TIMEOUT < time_in_sec {
             self.reset(packet.lookup_key.proto);
@@ -490,7 +490,7 @@ impl FlowItem {
         return self.check(packet, local_epc, app_table, log_parser_config);
     }
 
-    fn get_info(&mut self) -> AppProtoLogsInfo {
+    fn get_info(&mut self) -> AppProtoLogsInfoEnum {
         self.parser.as_ref().unwrap().info()
     }
 
@@ -514,21 +514,30 @@ impl FlowItem {
         log_parser_config: &LogParserAccess,
         local_epc: i32,
         vtap_id: u16,
-    ) -> Option<AppProtoLogsData> {
+    ) -> Option<Vec<AppProtoLogsData>> {
         // 策略EPC
         self.lookup_epc(packet, policy_getter, local_epc);
-        // 应用解析
-        if let Ok(head) = self.parse(packet, local_epc, app_table, log_parser_config) {
-            // 获取日志信息
-            let info = self.get_info();
-            let base =
-                AppProtoLogsBaseInfo::from_ebpf(&packet, head, vtap_id, local_epc, self.remote_epc);
-            return Some(AppProtoLogsData {
-                base_info: base,
-                special_info: info,
-            });
-        }
-        return None;
+        // 应用解析, 获取日志信息
+        let result = self
+            .parse(packet, local_epc, app_table, log_parser_config)
+            .ok()?
+            .into_iter()
+            .zip(self.get_info().into_iter())
+            .map(|(h, i)| {
+                let base = AppProtoLogsBaseInfo::from_ebpf(
+                    &packet,
+                    h,
+                    vtap_id,
+                    local_epc,
+                    self.remote_epc,
+                );
+                AppProtoLogsData {
+                    base_info: base,
+                    special_info: i,
+                }
+            })
+            .collect();
+        Some(result)
     }
 }
 
@@ -795,8 +804,10 @@ impl EbpfRunner {
                     self.config.epc_id as i32,
                     self.config.vtap_id,
                 ) {
-                    // 应用日志聚合
-                    aggr.handle(data);
+                    for d in data {
+                        // 应用日志聚合
+                        aggr.handle(d);
+                    }
                 }
                 Some(())
             });
