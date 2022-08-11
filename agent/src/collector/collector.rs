@@ -858,7 +858,6 @@ impl Collector {
                         stash.collect(
                             None,
                             get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs()
-                                - delay_seconds
                                 - 2,
                         )
                     }
