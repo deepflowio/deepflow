@@ -389,7 +389,6 @@ jobs:
               --reuse-values
 
       - name: check deepflow 
-        if: ${{ env.AGENT_CHANGE == 'true' }}
         run: | 
           sudo curl -o /usr/bin/deepflow-ctl https://deepflow-ce.oss-accelerate.aliyuncs.com/bin/ctl/latest/linux/amd64/deepflow-ctl
           sudo chmod a+x /usr/bin/deepflow-ctl
@@ -415,6 +414,18 @@ jobs:
               done 
             '
             
+      - name: Check agent restart
+        run: |
+          set +e
+          kubectl get pods -n deepflow -l component=deepflow-agent -o jsonpath={.items[*].status.containerStatuses[*].restartCount}|awk -F" " '{for(i=1;i<=NF;i++) print $i}' |grep -v 0
+          if [ $? -eq 0 ] 
+            then
+              kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent  -p
+              kubectl get pods -n deepflow
+              echo "Agent has restart"
+              exit 2
+          fi
+
       - name: logs deepflow
         if: ${{ always() }}
         run: |
@@ -515,6 +526,7 @@ jobs:
                     fi
                   done
             '
+
       - name: upgrade deepflow server
         if: ${{ env.SERVER_CHANGE == 'true' }}
         run: |
@@ -559,6 +571,17 @@ jobs:
                   done
               done 
             '
+      - name: Check agent restart
+        run: |
+          set +e
+          kubectl get pods -n deepflow -l component=deepflow-agent -o jsonpath={.items[*].status.containerStatuses[*].restartCount}|awk -F" " '{for(i=1;i<=NF;i++) print $i}' |grep -v 0
+          if [ $? -eq 0 ] 
+            then
+              kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent  -p
+              kubectl get pods -n deepflow
+              echo "Agent has restart"
+              exit 2
+          fi
 
       - name: logs deepflow
         if: ${{ always() }}
