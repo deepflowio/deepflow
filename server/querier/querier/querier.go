@@ -79,13 +79,19 @@ func ErrHandle() gin.HandlerFunc {
 			ip := c.ClientIP()          //请求ip
 			method := c.Request.Method  // Method
 			url := c.Request.RequestURI // url
+			db := c.PostForm("db")
+			sql := c.PostForm("sql")
+			ds := c.PostForm("datasource")
 			if err := recover(); err != nil {
 				// 记录一个错误的日志
-				log.Errorf("%13v | %15s | %s | %s |",
+				log.Errorf("%13v | %15s | %s | %s | %s | %s | %s |",
 					time.Since(startTime), //执行时间
 					ip,
 					method,
 					url,
+					db,
+					sql,
+					ds,
 				)
 				log.Error(err)
 				// 堆栈信息
