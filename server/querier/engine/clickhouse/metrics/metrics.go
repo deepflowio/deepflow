@@ -128,6 +128,8 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 			return GetVtapAppPortMetrics(), err
 		case "vtap_app_edge_port":
 			return GetVtapAppEdgePortMetrics(), err
+		case "vtap_acl":
+			return GetVtapAclMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
 		return GetExtMetrics(db, table, where)
@@ -255,6 +257,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "vtap_app_edge_port":
 			metrics = VTAP_APP_EDGE_PORT_METRICS
 			replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
+		case "vtap_acl":
+			metrics = VTAP_ACL_METRICS
+			replaceMetrics = VTAP_ACL_METRICS_REPLACE
 		}
 	case "ext_metrics", "deepflow_system":
 		metrics = EXT_METRICS

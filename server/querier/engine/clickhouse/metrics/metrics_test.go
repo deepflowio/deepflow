@@ -69,6 +69,9 @@ func TestCheckDBField(t *testing.T) {
 					case "vtap_app_edge_port":
 						metrics = VTAP_APP_EDGE_PORT_METRICS
 						replaceMetrics = VTAP_APP_EDGE_PORT_METRICS_REPLACE
+					case "vtap_acl":
+						metrics = VTAP_ACL_METRICS
+						replaceMetrics = VTAP_ACL_METRICS_REPLACE
 					}
 				}
 				if metrics == nil {
