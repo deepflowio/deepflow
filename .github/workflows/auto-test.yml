@@ -30,10 +30,6 @@ jobs:
         run: |
           set +e
           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
-          echo $?
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
-          echo $?
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
           if [ $? -eq 0 ] 
             then
               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
@@ -300,7 +296,6 @@ jobs:
     - build_agent
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout
         uses: actions/checkout@v3
         with:
@@ -362,12 +357,12 @@ jobs:
         with:
           version: v3.8.1
 
-      - name: install deepflow
+      - name: add deepflow helm repo
         run: |
           helm repo add deepflow https://deepflowys.github.io/deepflow
           helm repo update deepflow 
 
-      - name: install deepflow
+      - name: install and upgrade deepflow server 
         if: ${{ env.SERVER_CHANGE == 'true' }}
         run: |
           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
@@ -377,7 +372,7 @@ jobs:
               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
               --set-string image.server.tag=${{ github.run_id }}
 
-      - name: upgrade deepflow agent
+      - name: install and upgrade deepflow agent 
         if: ${{ env.AGENT_CHANGE == 'true' }}
         run: |
           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
@@ -387,6 +382,12 @@ jobs:
               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
               --reuse-values
+     
+      - name:  delete agent
+        run: |
+          sleep 10
+          kubectl delete pod -n deepflow -l component=deepflow-agent
+
 
       - name: check deepflow 
         run: | 
@@ -406,11 +407,6 @@ jobs:
                       else 
                         echo "Something Wrong,Next loop " && sleep 2 
                     fi 
-                for errorPod in $(kubectl get pods -n deepflow|grep "CrashLoopBackOff"|awk "{print $1}")
-                  do 
-                    kubectl logs -n deepflow $errorPod
-                    kubectl delete pod -n deepflow $errorPod
-                  done
               done 
             '
             
@@ -548,6 +544,11 @@ jobs:
               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
               --reuse-values
 
+      - name:  delete agent
+        run: |
+          sleep 10
+          kubectl delete pod -n deepflow -l component=deepflow-agent
+
       - name: Check deepflow
         run: |
           timeout 600 bash -c -- \
@@ -564,11 +565,6 @@ jobs:
                       else 
                         echo "Something Wrong,Next loop " && sleep 2 
                     fi 
-                for errorPod in $(kubectl get pods -n deepflow|grep "CrashLoopBackOff"|awk "{print $1}")
-                  do 
-                    kubectl logs -n deepflow $errorPod
-                    kubectl delete pod -n deepflow $errorPod
-                  done
               done 
             '
       - name: Check agent restart
