@@ -69,8 +69,22 @@ func Start(configPath string) {
 	log.Info("============================== Launching YUNSHAN DeepFlow Controller ==============================")
 	log.Infof("controller config:\n%s", string(bytes))
 
+	// register router
+	r := gin.Default()
+	router.HealthRouter(r)
+	go func() {
+		if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
+			log.Errorf("startup service failed, err:%v\n", err)
+			time.Sleep(time.Second)
+			os.Exit(0)
+		}
+	}()
+	defer router.SetInitStageForHealthChecker(router.OK)
+
+	router.SetInitStageForHealthChecker("MySQL migration")
 	migrateDB(cfg)
 
+	router.SetInitStageForHealthChecker("MySQL init")
 	// 初始化MySQL
 	mysql.Db = mysql.Gorm(cfg.MySqlCfg)
 	if mysql.Db == nil {
@@ -79,38 +93,45 @@ func Start(configPath string) {
 		os.Exit(0)
 	}
 
+	router.SetInitStageForHealthChecker("Redis init")
 	// 初始化Redis
 	if cfg.RedisCfg.Enabled {
 		err := redis.InitRedis(cfg.RedisCfg)
 		if err != nil {
 			log.Error("connect redis failed")
+			time.Sleep(time.Second)
+			os.Exit(0)
 		}
 	}
 
+	router.SetInitStageForHealthChecker("Monitor init")
 	// start statsd
 	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
 		log.Error("cloud statsd connect telegraf failed")
-		return
+		time.Sleep(time.Second)
+		os.Exit(0)
 	}
 
+	router.SetInitStageForHealthChecker("Genesis init")
 	// 启动genesis
 	g := genesis.NewGenesis(cfg.GenesisCfg)
 	g.Start()
 
+	router.SetInitStageForHealthChecker("Manager init")
 	// 启动resource manager
 	// 每个云平台启动一个cloud和recorder
 	m := manager.NewManager(cfg.ManagerCfg)
 	m.Start()
 
+	router.SetInitStageForHealthChecker("Trisolaris init")
 	// 启动trisolaris
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
 
-	tr := tagrecorder.NewTagRecorder(*cfg)
+	router.SetInitStageForHealthChecker("Register routers init")
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
-	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
@@ -123,6 +144,8 @@ func Start(configPath string) {
 		if cfg.TrisolarisCfg.NodeType != "master" {
 			return
 		}
+		tr := tagrecorder.NewTagRecorder(*cfg)
+		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
 		for range time.Tick(time.Minute) {
 			isMasterController, curMasterController, err := common.IsMasterController()
@@ -155,10 +178,7 @@ func Start(configPath string) {
 		}
 	}()
 
-	// register router
-	r := gin.Default()
 	router.DebugRouter(r, m, g)
-	router.HealthRouter(r)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
 	router.VtapRouter(r)
@@ -168,11 +188,6 @@ func Start(configPath string) {
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
 	trouter.RegistRouter(r)
-	if err := r.Run(fmt.Sprintf(":%d", cfg.ListenPort)); err != nil {
-		log.Errorf("startup service failed, err:%v\n", err)
-		time.Sleep(time.Second)
-		os.Exit(0)
-	}
 }
 
 // migrate db by master region master controller

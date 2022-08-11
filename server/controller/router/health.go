@@ -17,11 +17,38 @@
 package router
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/gin-gonic/gin"
+	"github.com/op/go-logging"
+
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/service"
 )
+
+var log = logging.MustGetLogger("router.health")
+
+const OK = "ok"
+
+var curStage string
+var curStageStartedAt time.Time
 
 func HealthRouter(e *gin.Engine) {
 	e.GET("/v1/health/", func(c *gin.Context) {
-		JsonResponse(c, make(map[string]string), nil)
+		if curStage == OK {
+			JsonResponse(c, make(map[string]string), nil)
+		} else {
+			JsonResponse(
+				c, make(map[string]string),
+				&service.ServiceError{Status: common.SERVICE_UNAVAILABLE, Message: fmt.Sprintf("in stage: %s now, time cost: %v", curStage, time.Since(curStageStartedAt))},
+			)
+		}
 	})
+}
+
+func SetInitStageForHealthChecker(s string) {
+	log.Infof("stage: %s, time cost: %v", curStage, time.Since(curStageStartedAt))
+	curStage = s
+	curStageStartedAt = time.Now()
 }
