@@ -94,6 +94,13 @@ func (obj *_DBMgr[M]) GetBatchFromIPs(ips []string) (result []*M, err error) {
 	return
 }
 
+// GetBatchFromState
+func (obj *_DBMgr[M]) GetBatchFromState(state int) (result []*M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`state` = ?", state).Find(&result).Error
+
+	return
+}
+
 // GetBatchFromName 查找name相同数据
 func (obj *_DBMgr[M]) GetBatchFromName(name string) (result []*M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`name` = ?", name).Find(&result).Error

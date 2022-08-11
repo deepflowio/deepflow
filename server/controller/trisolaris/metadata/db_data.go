@@ -514,7 +514,7 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(err)
 	}
 
-	acls, err := dbmgr.DBMgr[models.ACL](db).Gets()
+	acls, err := dbmgr.DBMgr[models.ACL](db).GetBatchFromState(ACL_STATE_ENABLE)
 	if err == nil {
 		d.acls = acls
 	} else {
@@ -528,14 +528,14 @@ func (d *DBDataCache) GetDataCacheFromDB(db *gorm.DB) {
 		log.Error(err)
 	}
 
-	npbPolicies, err := dbmgr.DBMgr[models.NpbPolicy](db).Gets()
+	npbPolicies, err := dbmgr.DBMgr[models.NpbPolicy](db).GetBatchFromState(ACL_STATE_ENABLE)
 	if err == nil {
 		d.npbPolicies = npbPolicies
 	} else {
 		log.Error(err)
 	}
 
-	pcapPolicies, err := dbmgr.DBMgr[models.PcapPolicy](db).Gets()
+	pcapPolicies, err := dbmgr.DBMgr[models.PcapPolicy](db).GetBatchFromState(ACL_STATE_ENABLE)
 	if err == nil {
 		d.pcapPolicies = pcapPolicies
 	} else {
