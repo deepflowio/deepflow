@@ -236,7 +236,12 @@ impl RefCountable for SysStatusBroker {
         }
         match system_guard.process(self.pid) {
             Some(process) => {
-                let cpu_usage = process.cpu_usage() as f64 / self.core_count as f64;
+                let cpu_usage = if self.core_count > 0 {
+                    process.cpu_usage() as f64 / self.core_count as f64
+                } else {
+                    warn!("get cpu usage failed");
+                    0.0
+                };
                 let mem_used = process.memory() << 10; // 单位：bytes
 
                 metrics.push((
