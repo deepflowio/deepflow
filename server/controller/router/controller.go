@@ -73,7 +73,7 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		// 如果不是masterController，将请求转发至是masterController
 		isMasterController, masterControllerName, _ := common.IsMasterController()
 		if !isMasterController {
-			forwardMasterController(c, masterControllerName)
+			forwardMasterController(c, masterControllerName, cfg.ListenPort)
 			return
 		}
 
