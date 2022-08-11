@@ -56,27 +56,6 @@ pub const SPAN_ID_TYPE: usize = 1;
 pub const KAFKA_REQ_HEADER_LEN: usize = 14;
 pub const KAFKA_RESP_HEADER_LEN: usize = 8;
 
-// Mqtt constants
-pub const MQTT_FIXED_HEADER_LEN: usize = 2;
-pub const MQTT_VAR_BYTES_MAX_LEN: usize = 4;
-pub const MQTT_STATUS_FAILED_MIN: u8 = 128;
-pub const MQTT_STATUS_FAILED_MAX: u8 = 162;
-pub const MQTT_CONNECT: u8 = 1;
-pub const MQTT_CONNACK: u8 = 2;
-pub const MQTT_PUBLISH: u8 = 3;
-pub const MQTT_PUBACK: u8 = 4;
-pub const MQTT_PUBREC: u8 = 5;
-pub const MQTT_PUBREL: u8 = 6;
-pub const MQTT_PUBCOMP: u8 = 7;
-pub const MQTT_SUBSCRIBE: u8 = 8;
-pub const MQTT_SUBACK: u8 = 9;
-pub const MQTT_UNSUBSCRIBE: u8 = 10;
-pub const MQTT_UNSUBACK: u8 = 11;
-pub const MQTT_PINGREQ: u8 = 12;
-pub const MQTT_PINGRESP: u8 = 13;
-pub const MQTT_DISCONNECT: u8 = 14;
-pub const MQTT_AUTH: u8 = 15;
-
 // dubbo constants
 pub const DUBBO_MAGIC_HIGH: u8 = 0xda;
 pub const DUBBO_MAGIC_LOW: u8 = 0xbb;

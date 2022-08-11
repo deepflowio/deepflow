@@ -19,6 +19,7 @@ use super::super::{
     L7ResponseStatus, LogMessageType,
 };
 
+use crate::flow_generator::protocol_logs::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::proto::flow_log;
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
@@ -143,7 +144,7 @@ impl L7LogParse for KafkaLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<AppProtoHead> {
+    ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -151,14 +152,15 @@ impl L7LogParse for KafkaLog {
         if payload.len() < KAFKA_REQ_HEADER_LEN {
             return Err(Error::KafkaLogParseFailed);
         }
-        match direction {
+        let head = match direction {
             PacketDirection::ClientToServer => self.request(payload, false),
             PacketDirection::ServerToClient => self.response(payload),
-        }
+        }?;
+        Ok(AppProtoHeadEnum::Single(head))
     }
 
-    fn info(&self) -> AppProtoLogsInfo {
-        AppProtoLogsInfo::Kafka(self.info.clone())
+    fn info(&self) -> AppProtoLogsInfoEnum {
+        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Kafka(self.info.clone()))
     }
 }
 
