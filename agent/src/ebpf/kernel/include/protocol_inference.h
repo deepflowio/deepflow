@@ -1051,7 +1051,10 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 							 size_t count,
 							 struct conn_info_t
 							 *conn_info,
-							 __u8 sk_state)
+							 __u8 sk_state,
+							 const struct
+							 process_data_extra
+							 *extra)
 {
 #define DATA_BUF_MAX  32
 
@@ -1064,6 +1067,18 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		return inferred_message;
 
 	if (conn_info->tuple.dport == 0 || conn_info->tuple.num == 0) {
+		return inferred_message;
+	}
+
+	/*
+	 * HTTPS protocol datas cause other L7 protocols inference misjudgment,
+	 * sometimes HTTPS protocol datas is incorrectly inferred as MQTT, DUBBO protocol.
+	 * HTTPS protocol is difficult to identify with features, port 443 is directly filtered out.
+	 *
+	 * If extra->tls is true, the datas is obtained by the uprobe.
+	 * The obtained datas is unencrypted, not filtered.
+	 */
+	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) && !extra->tls) {
 		return inferred_message;
 	}
 

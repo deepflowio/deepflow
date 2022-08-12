@@ -335,13 +335,15 @@ static __inline void connect_submit(struct pt_regs *ctx, struct conn_info_t *v, 
 
 static __inline void infer_l7_class(struct conn_info_t* conn_info,
 				    enum traffic_direction direction, const char* buf,
-				    size_t count, __u8 sk_type) {
+				    size_t count, __u8 sk_type,
+				    const struct process_data_extra *extra) {
 	if (conn_info == NULL) {
 		return;
 	}
 
 	// 推断应用协议
-	struct protocol_message_t inferred_protocol = infer_protocol(buf, count, conn_info, sk_type);
+	struct protocol_message_t inferred_protocol =
+		infer_protocol(buf, count, conn_info, sk_type, extra);
 	if (inferred_protocol.protocol == PROTO_UNKNOWN &&
 	    inferred_protocol.type == MSG_UNKNOWN) {
 		conn_info->protocol = PROTO_UNKNOWN;
@@ -989,13 +991,13 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 	conn_info->direction = direction;
 
 	if (!extra->vecs) {
-		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state);
+		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state, extra);
 	} else {
 		struct iovec iov_cpy;
 		bpf_probe_read(&iov_cpy, sizeof(struct iovec), &args->iov[0]);
 		// Ensure we are not reading beyond the available data.
 		const size_t buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
-		infer_l7_class(conn_info, direction, iov_cpy.iov_base, buf_size, sock_state);
+		infer_l7_class(conn_info, direction, iov_cpy.iov_base, buf_size, sock_state, extra);
 	}
 
 	// When at least one of protocol or message_type is valid, 
