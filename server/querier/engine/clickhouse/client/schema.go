@@ -1,5 +1,9 @@
 package client
 
+import (
+	"strings"
+)
+
 const (
 	COLUMN_SCHEMA_TYPE_TAG = iota
 	COLUMN_SCHEMA_TYPE_METRICS
@@ -19,5 +23,5 @@ func (c *ColumnSchema) ToMap() map[string]interface{} {
 }
 
 func NewColumnSchema(name string) *ColumnSchema {
-	return &ColumnSchema{Name: name}
+	return &ColumnSchema{Name: strings.Trim(name, "`")}
 }
