@@ -524,6 +524,17 @@ func GetSubDomains(filter map[string]interface{}) ([]model.SubDomain, error) {
 				subDomainResp.VPCName = lcuuidToVPCName[vpcLcuuid]
 			}
 		}
+
+		var k8sCluster mysql.KubernetesCluster
+		if err := mysql.Db.Where("cluster_id = ?", subDomain.ClusterID).First(&k8sCluster).Error; err == nil {
+			v := strings.Split(k8sCluster.Value, "-")
+			if len(v) == 2 {
+				var vtap mysql.VTap
+				if err = mysql.Db.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
+					subDomainResp.Config["vtap_id"] = vtap.Name
+				}
+			}
+		}
 		response = append(response, subDomainResp)
 	}
 	return response, nil
