@@ -121,8 +121,10 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				continue
 			}
 		}
+
+		key := VtapPortKey{VtapID: data.VTapID, TapPort: tapPort}
 		// 采集网卡+MAC
-		vTapPort, ok := keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: tapPort}]
+		vTapPort, ok := keyToItem[key]
 		if ok {
 			vTapPort.MacType = CH_VTAP_PORT_TYPE_TAP_MAC
 			nameSlice := strings.Split(vTapPort.Name, ", ")
@@ -141,9 +143,10 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				vTapPort.DeviceName = data.DeviceName
 				vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
 			}
+			keyToItem[key] = vTapPort
 		} else {
 			if data.VTapID != 0 || tapPort != 0 {
-				keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: tapPort}] = mysql.ChVTapPort{
+				keyToItem[key] = mysql.ChVTapPort{
 					VTapID:     data.VTapID,
 					TapPort:    tapPort,
 					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
@@ -159,7 +162,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		}
 		// 网卡+MAC
 		if tapPort != macPort && macPort != 0 {
-			vTapPort, ok := keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: macPort}]
+			vTapPort, ok := keyToItem[key]
 			if ok {
 				nameSlice := strings.Split(vTapPort.Name, ", ")
 				if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
@@ -177,8 +180,9 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					vTapPort.DeviceName = data.DeviceName
 					vTapPort.IconID = deviceKeyToIconID[DeviceKey{DeviceID: data.DeviceID, DeviceType: data.DeviceType}]
 				}
-			} else if data.VTapID != 0 || macPort != 0 {
-				keyToItem[VtapPortKey{VtapID: data.VTapID, TapPort: macPort}] = mysql.ChVTapPort{
+				keyToItem[key] = vTapPort
+			} else {
+				keyToItem[key] = mysql.ChVTapPort{
 					VTapID:     data.VTapID,
 					TapPort:    macPort,
 					MacType:    CH_VTAP_PORT_TYPE_TAP_MAC,
@@ -199,7 +203,8 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 		return nil, false
 	}
 	for vTapID, deviceInfo := range vTapIDToDeviceInfo {
-		vTapPort, ok := keyToItem[VtapPortKey{VtapID: vTapID, TapPort: 0}]
+		key := VtapPortKey{VtapID: vTapID, TapPort: 0}
+		vTapPort, ok := keyToItem[key]
 		if ok {
 			nameSlice := strings.Split(vTapPort.Name, ", ")
 			if len(nameSlice) >= CH_VTAP_PORT_NAME_MAX {
@@ -216,7 +221,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 				vTapPort.IconID = deviceInfo.IconID
 			}
 		} else if vTapID != 0 {
-			keyToItem[VtapPortKey{VtapID: vTapID, TapPort: 0}] = mysql.ChVTapPort{
+			keyToItem[key] = mysql.ChVTapPort{
 				VTapID:     vTapID,
 				TapPort:    0,
 				MacType:    0,
