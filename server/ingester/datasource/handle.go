@@ -457,7 +457,6 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 				Username: m.user,
 				Password: m.password,
 			},
-			Settings: map[string]interface{}{"read_timeout": m.readTimeout},
 		})
 
 		if err != nil {
