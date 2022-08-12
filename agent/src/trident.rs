@@ -1110,6 +1110,10 @@ impl Components {
             exception_handler.clone(),
         );
 
+        remote_log_config.set_enabled(candidate_config.log.rsyslog_enabled);
+        remote_log_config.set_threshold(candidate_config.log.log_threshold);
+        remote_log_config.set_hostname(candidate_config.log.host.clone());
+
         let domain_name_listener = DomainNameListener::new(
             stats_collector.clone(),
             synchronizer.clone(),
