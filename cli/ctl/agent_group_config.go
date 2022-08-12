@@ -62,7 +62,7 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 	update := &cobra.Command{
 		Use:     "update <agent-group ID> -f <filename>",
 		Short:   "update agent-group config",
-		Example: "deepflow-ctl agent-group-config update g-xxxxxx -f deepflow-config,yaml",
+		Example: "deepflow-ctl agent-group-config update g-xxxxxx -f deepflow-config.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			updateAgentGroupConfig(cmd, args, updateFilename)
 		},

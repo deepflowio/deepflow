@@ -93,9 +93,10 @@ func Start(configPath string) {
 		os.Exit(0)
 	}
 
-	router.SetInitStageForHealthChecker("Redis init")
 	// 初始化Redis
-	if cfg.RedisCfg.Enabled {
+	if cfg.RedisCfg.Enabled && cfg.TrisolarisCfg.NodeType == "master" {
+		router.SetInitStageForHealthChecker("Redis init")
+
 		err := redis.InitRedis(cfg.RedisCfg)
 		if err != nil {
 			log.Error("connect redis failed")
