@@ -201,9 +201,11 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 	vmPodNodeConns, err := vmPodNodeConnMgr.GetBatchFromPodNodeIDs(podNodeIDs)
 
 	vmIDToConn := make(map[int]*models.VMPodNodeConnection)
+	podNodeIdToConn := make(map[int]*models.VMPodNodeConnection)
 	vmIDs := make([]int, 0, len(vmPodNodeConns))
 	for _, conn := range vmPodNodeConns {
 		vmIDToConn[conn.VMID] = conn
+		podNodeIdToConn[conn.PodNodeID] = conn
 		vmIDs = append(vmIDs, conn.VMID)
 	}
 
@@ -235,7 +237,11 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 	)
 	if matchVif.DeviceType == VIF_DEVICE_TYPE_POD_NODE {
 		matchPodNode = idToPodNode[matchVif.DeviceID]
-		vTapType = VTAP_TYPE_POD_HOST
+		if _, ok := podNodeIdToConn[matchVif.DeviceID]; ok {
+			vTapType = VTAP_TYPE_POD_VM
+		} else {
+			vTapType = VTAP_TYPE_POD_HOST
+		}
 	} else {
 		if conn, ok := vmIDToConn[matchVif.DeviceID]; ok {
 			matchPodNode = idToPodNode[conn.PodNodeID]
