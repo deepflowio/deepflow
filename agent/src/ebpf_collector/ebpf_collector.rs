@@ -892,10 +892,16 @@ impl EbpfCollector {
     fn ebpf_start() {
         debug!("ebpf collector starting ebpf-kernel.");
         unsafe {
-            const RETRY_MAX: i32 = 20;
+            const RETRY_MAX: i32 = 50;
             let mut retry_count = 0;
+            /*
+             * The eBPF tracer_start() can be executed successfully only after the eBPF
+             * initialization is complete and the eBPF is in the STOP state.Need to wait
+             * for the initialization of tracer and the state transition to complete.
+             * The maximum waiting time is 100 seconds, more than this will throw an error.
+             */
             while ebpf::tracer_start() != 0 && retry_count < RETRY_MAX {
-                std::thread::sleep(Duration::from_secs(1));
+                std::thread::sleep(Duration::from_secs(2));
                 retry_count = retry_count + 1;
                 if retry_count >= RETRY_MAX {
                     error!("The tracer_start() error. Kernel offset adapt failed.\n");
