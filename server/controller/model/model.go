@@ -212,8 +212,8 @@ type DataSource struct {
 	Name                      string `json:"NAME"`
 	TsdbType                  string `json:"TSDB_TYPE"`
 	State                     int    `json:"STATE"`
-	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID`
-	BaseDataSourceName        string `json:"BASE_DATA_SOURCE_NAME`
+	BaseDataSourceID          int    `json:"BASE_DATA_SOURCE_ID"`
+	BaseDataSourceName        string `json:"BASE_DATA_SOURCE_NAME"`
 	Interval                  int    `json:"INTERVAL"`
 	RetentionTime             int    `json:"RETENTION_TIME"`
 	SummableMetricsOperator   string `json:"SUMMABLE_METRICS_OPERATOR"`
