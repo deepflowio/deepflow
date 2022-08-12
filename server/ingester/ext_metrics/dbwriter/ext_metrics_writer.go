@@ -213,7 +213,14 @@ func NewExtMetricsWriter(
 	msgType datatype.MessageType,
 	db string,
 	config *config.Config) (*ExtMetricsWriter, error) {
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(msgType.String(), db, config.TTL, DefaultPartition, config.Base, &config.CKWriterConfig)
+	// one row of ext_metrics will generate multiple rows of flow_tag, so the writer queue of flow tag needs to be longer.
+	flowTagWriterConfig := baseconfig.CKWriterConfig{
+		QueueCount:   config.CKWriterConfig.QueueCount,
+		QueueSize:    config.CKWriterConfig.QueueSize * 10,
+		BatchSize:    config.CKWriterConfig.BatchSize * 10,
+		FlushTimeout: config.CKWriterConfig.FlushTimeout,
+	}
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(msgType.String(), db, config.TTL, DefaultPartition, config.Base, &flowTagWriterConfig)
 	if err != nil {
 		return nil, err
 	}
