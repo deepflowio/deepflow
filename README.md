@@ -43,6 +43,10 @@ At the same time, we have also built a complete [DeepFlow Community Demo](https:
 
 [DeepFlow Enterprise](https://www.yunshan.net/products/deepflow.html) supports full-stack and end-to-end monitoring of hybrid cloud, covering containers, cloud servers, hosts, and NFV gateways, currently only supports Chinese, welcome to contact us for experience.
 
+# Compile DeepFlow from source
+
+- [compile deepflow-agent](./agent/build.md)
+
 # Software Architecture
 
 DeepFlow Community consists of two processes, Agent and Server. An Agent runs in each K8s node, virtual machine and physical bare metal, and is responsible for AutoMetrics and AutoTracing data collection of all application processes on the server. Server runs in a K8s cluster and provides Agent management, data tag injection, data writing and data query services.
