@@ -1,6 +1,6 @@
 # Compile in Linux
 
-Here is the documentation about how to compile in Linux system 
+Here is the documentation about how to compile agent in Linux system
 
 ## Use docker
 
@@ -16,15 +16,15 @@ docker run --privileged --rm -it -v \
 ## Manually compilation
 
 Agent compilation requires the following environments:
-- Clang/LLVM 11 or Clang/LLVM 12
-- rust       1.61 and above
+- Clang/LLVM: 11/12
+- rust: 1.61+
 
 Install basic tools:
-- ubuntu、debian、kali,etc. install use apt:
+- ubuntu, debian, kali, etc.
   ```bash
   apt-get install -y clang-11 gcc llvm-11 llvm-11-dev libpcap0.8-dev libelf-dev make
   ```
-- fedora:
+- fedora
   ```bash
   yum install llvm11 gcc  libpcap-devel glibc-static elfutils-libelf-devel make
   yum --releasever=33 install clang   # install clang11
@@ -44,7 +44,7 @@ Compile static libraries:
 git clone https://github.com/bitdefender/bddisasm
 cd bddisasm
 make && make install && make clean
-ln -s /usr/local/lib/libbddisasm.a /usr/lib/libbddisasm.a # 建立软链接, agent 静态库目录是 /usr/lib/ 和 /usr/lib64
+ln -s /usr/local/lib/libbddisasm.a /usr/lib/libbddisasm.a
 
 # zlib
 wget https://zlib.net/zlib-1.2.12.tar.gz
@@ -63,7 +63,8 @@ make && make install && make clean
 ln -s /usr/local/lib/libdwarf.a /usr/lib/libdwarf.a
 
 # libelf
-# libelf.a in elfutils not include in some Linux distribution default repository. compile elfutils requires a lot of dependencies, please solve it according to your Linux distribution.
+# libelf.a in elfutils not include in some Linux distribution default repository.
+# compile elfutils requires a lot of dependencies, please solve it according to your Linux distribution.
 wget https://sourceware.org/elfutils/ftp/0.187/elfutils-0.187.tar.bz2
 tar -xf elfutils-0.187.tar.bz2
 cd elfutils-0.187
