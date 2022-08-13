@@ -410,7 +410,7 @@ func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.Metri
 	table := getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
-		tableMod = getMetricsTableName(uint8(tableId), dstTable, LOCAL)
+		tableMod = getMetricsTableName(uint8(tableId), "", LOCAL)
 	} else {
 		tableMod = getMetricsTableName(uint8(tableId), dstTable, AGG)
 	}
@@ -457,7 +457,6 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 				Username: m.user,
 				Password: m.password,
 			},
-			Settings: map[string]interface{}{"read_timeout": m.readTimeout},
 		})
 
 		if err != nil {

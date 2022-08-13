@@ -54,6 +54,14 @@ func InternalErrorResponse(c *gin.Context, data interface{}, optStatus string, d
 	})
 }
 
+func ServiceUnavailableResponse(c *gin.Context, data interface{}, optStatus string, description string) {
+	c.JSON(http.StatusServiceUnavailable, Response{
+		OptStatus:   optStatus,
+		Description: description,
+		Data:        data,
+	})
+}
+
 func JsonResponse(c *gin.Context, data interface{}, err error) {
 	if err != nil {
 		switch t := err.(type) {
@@ -65,6 +73,8 @@ func JsonResponse(c *gin.Context, data interface{}, err error) {
 				BadRequestResponse(c, t.Status, t.Message)
 			case common.SERVER_ERROR:
 				InternalErrorResponse(c, data, t.Status, t.Message)
+			case common.SERVICE_UNAVAILABLE:
+				ServiceUnavailableResponse(c, data, t.Status, t.Message)
 			}
 		default:
 			InternalErrorResponse(c, data, common.FAIL, err.Error())
