@@ -25,8 +25,12 @@ import (
 
 func (r *Recorder) GetCache(domainLcuuid, subDomainLcuuid string) cache.Cache {
 	if subDomainLcuuid != "" {
-		subDomainCache, _ := r.cacheMng.SubDomainCacheMap[subDomainLcuuid]
-		return *subDomainCache
+		subDomainCache, exists := r.cacheMng.SubDomainCacheMap[subDomainLcuuid]
+		if exists {
+			return *subDomainCache
+		} else {
+			return cache.Cache{}
+		}
 	} else {
 		return *r.cacheMng.DomainCache
 	}
