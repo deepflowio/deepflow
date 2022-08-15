@@ -409,7 +409,7 @@ func (f *TCPPerfStats) WriteToPB(p *pb.TCPPerfStats, l4Protocol L4Protocol) {
 		}
 		f.TcpPerfCountsPeers[1].WriteToPB(p.CountsPeerRx)
 		p.TotalRetransCount = f.TotalRetransCount
-	} else if l4Protocol == L4_PROTOCOL_UDP {
+	} else {
 		*p = pb.TCPPerfStats{}
 		p.ArtMax = f.ARTMax
 		p.ArtSum = f.ARTSum
