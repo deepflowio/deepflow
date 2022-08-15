@@ -1,0 +1,208 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package monitor
+
+import (
+	"fmt"
+	"regexp"
+	"time"
+
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/monitor/config"
+)
+
+type VTapCheck struct {
+	cfg config.MonitorConfig
+}
+
+func NewVTapCheck(cfg config.MonitorConfig) *VTapCheck {
+	return &VTapCheck{cfg: cfg}
+}
+
+func (v *VTapCheck) Start() {
+	go func() {
+		for range time.Tick(time.Duration(v.cfg.VTapCheckInterval) * time.Second) {
+			// check launch_server resource if exist
+			v.launchServerCheck()
+			// check vtap type
+			v.typeCheck()
+		}
+	}()
+}
+
+func (v *VTapCheck) launchServerCheck() {
+	var vtaps []mysql.VTap
+	var reg = regexp.MustCompile(` |:`)
+
+	log.Debug("vtap launch_server check start")
+
+	mysql.Db.Find(&vtaps)
+	for _, vtap := range vtaps {
+		switch vtap.Type {
+		case common.VTAP_TYPE_WORKLOAD_V:
+			var vm mysql.VM
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&vm); ret.Error != nil {
+				log.Info("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid)
+				mysql.Db.Delete(&vtap)
+			} else {
+				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-W%d", vm.Name, vm.ID), "-")
+				// check and update name
+				if vtap.Name != vtapName {
+					log.Infof(
+						"update vtap (%s) name from %s to %s",
+						vtap.Lcuuid, vtap.Name, vtapName,
+					)
+					mysql.Db.Model(&vtap).Update("name", vtapName)
+				}
+				// check and update launch_server_id
+				if vtap.LaunchServerID != vm.ID {
+					log.Infof(
+						"update vtap (%s) launch_server_id from %d to %d",
+						vtap.Lcuuid, vtap.LaunchServerID, vm.ID,
+					)
+					mysql.Db.Model(&vtap).Update("launch_server_id", vm.ID)
+				}
+			}
+
+		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_EXSI, common.VTAP_TYPE_HYPER_V:
+			var host mysql.Host
+			if ret := mysql.Db.Where("ip = ?", vtap.LaunchServer).Find(&host); ret.Error != nil {
+				log.Info("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
+				mysql.Db.Delete(&vtap)
+			} else {
+				vtapName := reg.ReplaceAllString(fmt.Sprintf("%s-H%d", host.Name, host.ID), "-")
+				// check and update name
+				if vtap.Name != vtapName {
+					log.Infof(
+						"update vtap (%s) name from %s to %s",
+						vtap.Lcuuid, vtap.Name, vtapName,
+					)
+					mysql.Db.Model(&vtap).Update("name", vtapName)
+				}
+				// check and update launch_server_id
+				if vtap.LaunchServerID != host.ID {
+					log.Infof(
+						"update vtap (%s) launch_server_id from %d to %d",
+						vtap.Lcuuid, vtap.LaunchServerID, host.ID,
+					)
+					mysql.Db.Model(&vtap).Update("launch_server_id", host.ID)
+				}
+			}
+		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
+			var podNode mysql.PodNode
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&podNode); ret.Error != nil {
+				log.Info("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
+				mysql.Db.Delete(&vtap)
+			} else {
+				var vtapName string
+				if vtap.Type == common.VTAP_TYPE_POD_HOST {
+					vtapName = reg.ReplaceAllString(fmt.Sprintf("%s-P%d", podNode.Name, podNode.ID), "-")
+				} else {
+					vtapName = reg.ReplaceAllString(fmt.Sprintf("%s-V%d", podNode.Name, podNode.ID), "-")
+				}
+				// check and update name
+				if vtap.Name != vtapName {
+					log.Infof(
+						"update vtap (%s) name from %s to %s",
+						vtap.Lcuuid, vtap.Name, vtapName,
+					)
+					mysql.Db.Model(&vtap).Update("name", vtapName)
+				}
+				// check and update launch_server_id
+				if vtap.LaunchServerID != podNode.ID {
+					log.Infof(
+						"update vtap (%s) launch_server_id from %d to %d",
+						vtap.Lcuuid, vtap.LaunchServerID, podNode.ID,
+					)
+					mysql.Db.Model(&vtap).Update("launch_server_id", podNode.ID)
+				}
+			}
+		}
+	}
+	log.Debug("vtap launch_server check end")
+}
+
+func (v *VTapCheck) typeCheck() {
+	var vtaps []mysql.VTap
+	var podNodes []mysql.PodNode
+	var conns []mysql.VMPodNodeConnection
+
+	log.Debug("vtap type check start")
+
+	mysql.Db.Find(&podNodes)
+	idToPodNode := make(map[int]*mysql.PodNode)
+	for i, podNode := range podNodes {
+		idToPodNode[podNode.ID] = &podNodes[i]
+	}
+
+	mysql.Db.Find(&conns)
+	vmIDToPodNodeID := make(map[int]int)
+	podNodeIDToVMID := make(map[int]int)
+	for _, conn := range conns {
+		vmIDToPodNodeID[conn.VMID] = conn.PodNodeID
+		podNodeIDToVMID[conn.PodNodeID] = conn.VMID
+	}
+
+	mysql.Db.Where(
+		"type IN (?)",
+		[]int{common.VTAP_TYPE_WORKLOAD_V, common.VTAP_TYPE_WORKLOAD_P, common.VTAP_TYPE_POD_HOST},
+	).Find(&vtaps)
+	for _, vtap := range vtaps {
+		if vtap.Type == common.VTAP_TYPE_WORKLOAD_V || vtap.Type == common.VTAP_TYPE_WORKLOAD_P {
+			var vm mysql.VM
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&vm); ret.Error != nil {
+				continue
+			}
+			podNodeID, ok := vmIDToPodNodeID[vm.ID]
+			if !ok {
+				continue
+			}
+			podNode, ok := idToPodNode[podNodeID]
+			if !ok {
+				log.Infof(
+					"pod_node (%s) not found, will not re-discovery vtap (%s), please check db data",
+					podNodeID, vtap.Name,
+				)
+				continue
+			}
+			if vtap.LaunchServer != podNode.IP {
+				log.Infof(
+					"vtap (%s) launch_server (%s) not equal to podNode (%s), will not re-discovery vtap",
+					vtap.Name, vtap.LaunchServer, podNode.IP,
+				)
+				continue
+			}
+		} else {
+			var podNode mysql.PodNode
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&podNode); ret.Error != nil {
+				continue
+			}
+			if _, ok := podNodeIDToVMID[podNode.ID]; !ok {
+				continue
+			}
+		}
+
+		log.Infof(
+			"delete vtap (%s) type (%d), because has vm_pod_node_connection",
+			vtap.Name, vtap.Type,
+		)
+		mysql.Db.Delete(&vtap)
+	}
+
+	log.Debug("vtap type check end")
+}
