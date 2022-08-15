@@ -19,7 +19,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 
 use super::bit::count_trailing_zeros32;
-
+use super::UnsafeWrapper;
 use crate::common::decapsulate::TunnelInfo;
 use crate::common::endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET};
 use crate::common::lookup_key::LookupKey;
@@ -36,19 +36,40 @@ struct EpcIpKey {
     epc_id: i32,
 }
 
-#[derive(Default)]
+type MacTable = UnsafeWrapper<HashMap<u64, Arc<PlatformData>>>;
+type EpcIpTable = UnsafeWrapper<HashMap<EpcIpKey, Arc<PlatformData>>>;
+type PeerTable = UnsafeWrapper<HashMap<i32, Vec<i32>>>;
+type EpcCidrTable = UnsafeWrapper<HashMap<i32, Vec<Arc<Cidr>>>>;
+type TunnelCidrTable = UnsafeWrapper<HashMap<u32, Vec<Arc<Cidr>>>>;
+type IpNetmaskTable = UnsafeWrapper<HashMap<u16, u32>>;
+type IpTable = UnsafeWrapper<HashMap<u128, Arc<PlatformData>>>;
+
 pub struct Labeler {
     // Interface表
-    mac_table: Box<HashMap<u64, Arc<PlatformData>>>,
-    epc_ip_table: Box<HashMap<EpcIpKey, Arc<PlatformData>>>,
+    mac_table: MacTable,
+    epc_ip_table: EpcIpTable,
     // Interface WAN IP表
-    ip_netmask_table: Box<HashMap<u16, u32>>, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
-    ip_table: Box<HashMap<u128, Arc<PlatformData>>>,
+    ip_netmask_table: IpNetmaskTable, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
+    ip_table: IpTable,
     // 对等连接表
-    peer_table: Box<HashMap<i32, Vec<i32>>>,
+    peer_table: PeerTable,
     // CIDR表
-    epc_cidr_table: Box<HashMap<i32, Vec<Arc<Cidr>>>>,
-    tunnel_cidr_table: Box<HashMap<u32, Vec<Arc<Cidr>>>>,
+    epc_cidr_table: EpcCidrTable,
+    tunnel_cidr_table: TunnelCidrTable,
+}
+
+impl Default for Labeler {
+    fn default() -> Self {
+        Self {
+            mac_table: MacTable::from(HashMap::new()),
+            epc_ip_table: EpcIpTable::from(HashMap::new()),
+            ip_netmask_table: IpNetmaskTable::from(HashMap::new()),
+            ip_table: IpTable::from(HashMap::new()),
+            peer_table: PeerTable::from(HashMap::new()),
+            epc_cidr_table: EpcCidrTable::from(HashMap::new()),
+            tunnel_cidr_table: TunnelCidrTable::from(HashMap::new()),
+        }
+    }
 }
 
 fn is_link_local(ip: IpAddr) -> bool {
@@ -68,7 +89,7 @@ fn is_unicast_mac(mac: u64) -> bool {
 
 impl Labeler {
     fn update_mac_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
-        let mut mac_table = Box::new(HashMap::new());
+        let mut mac_table = HashMap::new();
 
         for interface in interfaces {
             let iface = Arc::clone(interface);
@@ -79,11 +100,12 @@ impl Labeler {
                 mac_table.insert(iface.mac, iface);
             }
         }
-        self.mac_table = mac_table;
+
+        self.mac_table.set(mac_table);
     }
 
     fn get_real_ip_by_mac(&self, mac: u64, is_ipv6: bool) -> IpAddr {
-        if let Some(interface) = self.mac_table.get(&mac) {
+        if let Some(interface) = self.mac_table.get().get(&mac) {
             for ip in &(interface.ips) {
                 if ip.raw_ip.is_ipv6() == is_ipv6 {
                     return ip.raw_ip;
@@ -94,11 +116,11 @@ impl Labeler {
     }
 
     fn get_interface_by_mac(&self, mac: u64) -> Option<&Arc<PlatformData>> {
-        self.mac_table.get(&mac)
+        self.mac_table.get().get(&mac)
     }
 
     fn update_epc_ip_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
-        let mut epc_ip_table = Box::new(HashMap::new());
+        let mut epc_ip_table = HashMap::new();
 
         for interface in interfaces {
             let mut epc_id = interface.epc_id;
@@ -119,16 +141,17 @@ impl Labeler {
                 );
             }
         }
-        self.epc_ip_table = epc_ip_table;
+
+        self.epc_ip_table.set(epc_ip_table);
     }
 
     fn get_interface_by_epc_ip(&self, ip: IpAddr, epc_id: i32) -> Option<&Arc<PlatformData>> {
         match ip {
-            IpAddr::V4(ip) => self.epc_ip_table.get(&EpcIpKey {
+            IpAddr::V4(ip) => self.epc_ip_table.get().get(&EpcIpKey {
                 ip: u32::from_be_bytes(ip.octets()) as u128,
                 epc_id,
             }),
-            IpAddr::V6(ip) => self.epc_ip_table.get(&EpcIpKey {
+            IpAddr::V6(ip) => self.epc_ip_table.get().get(&EpcIpKey {
                 ip: u128::from_be_bytes(ip.octets()),
                 epc_id,
             }),
@@ -147,11 +170,12 @@ impl Labeler {
                 .or_default()
                 .push(peer.local_epc);
         }
-        self.peer_table = Box::new(peer_table);
+
+        self.peer_table.set(peer_table);
     }
 
     fn get_epc_by_peer(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) {
-        if let Some(list) = self.peer_table.get(&epc_id) {
+        if let Some(list) = self.peer_table.get().get(&epc_id) {
             for peer_epc in list {
                 if let Some(interface) = self.get_interface_by_epc_ip(ip, *peer_epc) {
                     endpoint.set_l3_data(interface);
@@ -186,14 +210,14 @@ impl Labeler {
             }
         }
         // 排序使用降序是为了CIDR的最长前缀匹配
-        for (_k, v) in &mut epc_table {
+        for (_k, v) in &mut epc_table.iter_mut() {
             v.sort_by(|a, b| {
                 b.netmask_len()
                     .partial_cmp(&Arc::clone(a).netmask_len())
                     .unwrap()
             });
         }
-        for (_k, v) in &mut tunnel_table {
+        for (_k, v) in &mut tunnel_table.iter_mut() {
             v.sort_by(|a, b| {
                 b.netmask_len()
                     .partial_cmp(&Arc::clone(a).netmask_len())
@@ -201,14 +225,14 @@ impl Labeler {
             });
         }
 
-        self.tunnel_cidr_table = Box::new(tunnel_table);
-        self.epc_cidr_table = Box::new(epc_table);
+        self.tunnel_cidr_table.set(tunnel_table);
+        self.epc_cidr_table.set(epc_table);
     }
 
     // 函数通过EPC+IP查询对应的CIDR，获取EPC标记
     // 注意当查询外网时必须给epc参数传递EPC_FROM_DEEPFLOW值，表示在所有WAN CIDR范围内搜索，并返回该CIDR的真实EPC
     fn set_epc_by_cidr(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) -> bool {
-        if let Some(list) = self.epc_cidr_table.get(&epc_id) {
+        if let Some(list) = self.epc_cidr_table.get().get(&epc_id) {
             for cidr in list {
                 if cidr.ip.contains(&ip) {
                     endpoint.l3_epc_id = cidr.epc_id;
@@ -228,7 +252,7 @@ impl Labeler {
         tunnel_id: u32,
         endpoint: &mut EndpointInfo,
     ) -> bool {
-        if let Some(list) = self.tunnel_cidr_table.get(&tunnel_id) {
+        if let Some(list) = self.tunnel_cidr_table.get().get(&tunnel_id) {
             for cidr in list.iter() {
                 if cidr.ip.contains(&ip) {
                     endpoint.l3_epc_id = cidr.epc_id;
@@ -252,7 +276,7 @@ impl Labeler {
     }
 
     fn set_vip_by_cidr(&self, ip: IpAddr, epc: i32, info: &mut EndpointInfo) -> bool {
-        if let Some(list) = self.epc_cidr_table.get(&epc) {
+        if let Some(list) = self.epc_cidr_table.get().get(&epc) {
             for cidr in list {
                 if cidr.ip.contains(&ip) {
                     info.is_vip = cidr.is_vip;
@@ -264,8 +288,8 @@ impl Labeler {
     }
 
     fn update_ip_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
-        let mut ip_netmask_table = Box::new(HashMap::new());
-        let mut ip_table = Box::new(HashMap::new());
+        let mut ip_netmask_table = HashMap::new();
+        let mut ip_table = HashMap::new();
         for interface in interfaces {
             if interface.if_type != IfType::WAN {
                 continue;
@@ -302,21 +326,22 @@ impl Labeler {
                 ip_table.insert(net_addr, Arc::clone(interface));
             }
         }
-        self.ip_netmask_table = ip_netmask_table;
-        self.ip_table = ip_table;
+
+        self.ip_netmask_table.set(ip_netmask_table);
+        self.ip_table.set(ip_table);
     }
 
     fn get_interface_by_ip(&self, ip: IpAddr) -> Option<&Arc<PlatformData>> {
         match ip {
             IpAddr::V4(ipv4) => {
                 let ip_int = u32::from_be_bytes(ipv4.octets());
-                if let Some(netmask) = self.ip_netmask_table.get(&((ip_int >> 16) as u16)) {
+                if let Some(netmask) = self.ip_netmask_table.get().get(&((ip_int >> 16) as u16)) {
                     let mut netmask_temp = *netmask;
                     while netmask_temp > 0 {
                         let count = count_trailing_zeros32(netmask_temp);
                         netmask_temp ^= 1 << count;
                         let net_addr = (ip_int & (0xffff_ffff << count)) as u128;
-                        if let Some(v) = self.ip_table.get(&(net_addr | 0xffff_0000_0000)) {
+                        if let Some(v) = self.ip_table.get().get(&(net_addr | 0xffff_0000_0000)) {
                             return Some(v);
                         }
                     }
@@ -325,7 +350,7 @@ impl Labeler {
             }
             IpAddr::V6(ipv6) => {
                 let net_addr = u128::from_be_bytes(ipv6.octets());
-                return self.ip_table.get(&net_addr);
+                return self.ip_table.get().get(&net_addr);
             }
         }
     }
