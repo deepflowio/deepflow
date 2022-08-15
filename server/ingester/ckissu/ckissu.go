@@ -34,6 +34,7 @@ import (
 var log = logging.MustGetLogger("issu")
 
 type Issu struct {
+	tableRenames                           []*TableRename
 	columnRenames                          []*ColumnRename
 	columnMods                             []*ColumnMod
 	columnAdds                             []*ColumnAdd
@@ -41,6 +42,13 @@ type Issu struct {
 	primaryAddr, secondaryAddr             string
 	username, password                     string
 	exit                                   bool
+}
+
+type TableRename struct {
+	OldDb     string
+	OldTables []string
+	NewDb     string
+	NewTables []string
 }
 
 type ColumnRename struct {
@@ -72,6 +80,39 @@ type ColumnAdds struct {
 	ColumnNames  []string
 	ColumnType   ckdb.ColumnType
 	DefaultValue string
+}
+
+var TableRenames611 = []*TableRename{
+	&TableRename{
+		OldDb:     "vtap_acl",
+		OldTables: []string{"1m_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_acl.1m_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_flow_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_flow_port.1m_local", "vtap_flow_port.1s_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_flow_edge_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_flow_edge_port.1m_local", "vtap_flow_edgeport.1s_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_app_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_app_port.1m_local", "vtap_app_port.1s_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_app_edge_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_app_edge_port.1m_local", "vtap_app_edge_port.1s_local"},
+	},
 }
 
 var ColumnRename572 = []*ColumnRename{
@@ -564,6 +605,7 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	}
 	i.columnAdds = columnAdds
 	i.columnMods = ColumnMod611
+	i.tableRenames = TableRenames611
 	// 610版本无字段名字变更
 	// i.columnRenames = ColumnRename610
 
@@ -581,6 +623,44 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	}
 
 	return i, nil
+}
+
+func (i *Issu) RunRenameTable() error {
+	for _, tableRename := range i.tableRenames {
+		if err := i.renameTable(i.primaryConnection, tableRename); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (i *Issu) renameTable(connect *sql.DB, c *TableRename) error {
+	for i := range c.OldTables {
+		createDb := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", c.NewDb)
+		_, err := connect.Exec(createDb)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+
+		// RENAME TABLE vtap_acl.1m TO flow_metrics."vtap_acl.1m";
+		sql := fmt.Sprintf("RENAME TABLE %s.%s to %s.\"%s\"",
+			c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i])
+		log.Info("rename table: ", sql)
+		_, err = connect.Exec(sql)
+		if err != nil {
+			if strings.Contains(err.Error(), "doesn't exist") {
+				log.Infof("table: %s.%s rename to table: %s.\"%s\" error: %s", c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i], err)
+				continue
+			} else if strings.Contains(err.Error(), "already exists") {
+				log.Infof("table: %s.%s rename to table: %s.\"%s\" error: %s", c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i], err)
+				continue
+			}
+			log.Error(err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
