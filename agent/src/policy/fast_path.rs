@@ -22,6 +22,7 @@ use ipnet::{IpNet, Ipv4Net};
 use log::{debug, info};
 use lru::LruCache;
 
+use super::UnsafeWrapper;
 use crate::common::endpoint::{EndpointData, EndpointStore};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData as Interface;
@@ -42,6 +43,8 @@ struct PolicyTableItem {
     protocol_table: [Option<Arc<PolicyData>>; MAX_ACL_PROTOCOL + 1],
 }
 
+type InterestTable = UnsafeWrapper<Vec<PortRange>>;
+
 pub struct FastPath {
     mask_from_interface: Vec<u32>,
     mask_from_ipgroup: Vec<u32>,
@@ -49,7 +52,7 @@ pub struct FastPath {
 
     netmask_table: Vec<u32>,
 
-    interest_table: Vec<PortRange>,
+    interest_table: InterestTable,
     policy_table: Vec<Option<TableLruCache>>,
     policy_table_flush_flags: [bool; MAX_QUEUE_COUNT + 1],
 
@@ -208,8 +211,10 @@ impl FastPath {
     }
 
     pub fn generate_interest_table(&mut self, acls: &Vec<Arc<Acl>>) {
+        let mut interest_table: Vec<PortRange> = std::iter::repeat(PortRange::new(0, 0))
+            .take(u16::MAX as usize + 1)
+            .collect();
         let mut list = Vec::new();
-        let interest_table = &mut self.interest_table;
 
         for acl in acls.into_iter() {
             list.extend(&acl.src_port_ranges);
@@ -240,11 +245,13 @@ impl FastPath {
                 }
             }
         }
+
+        self.interest_table.set(interest_table);
     }
 
     fn interest_table_map(&self, key: &mut LookupKey) {
-        key.src_port = self.interest_table[key.src_port as usize].min();
-        key.dst_port = self.interest_table[key.dst_port as usize].min();
+        key.src_port = self.interest_table.get()[key.src_port as usize].min();
+        key.dst_port = self.interest_table.get()[key.dst_port as usize].min();
     }
 
     pub fn update_map_size(&mut self, map_size: usize) {
@@ -394,9 +401,11 @@ impl FastPath {
 
             netmask_table: std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
 
-            interest_table: std::iter::repeat(PortRange::new(0, 0))
-                .take(u16::MAX as usize + 1)
-                .collect(),
+            interest_table: InterestTable::from(
+                std::iter::repeat(PortRange::new(0, 0))
+                    .take(u16::MAX as usize + 1)
+                    .collect::<Vec<PortRange>>(),
+            ),
             policy_table: {
                 let mut table = Vec::new();
                 for _i in 0..MAX_FAST_PATH {
