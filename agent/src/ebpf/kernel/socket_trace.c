@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifdef BPF_USE_CORE
 #include "../libbpf/.github/actions/build-selftests/vmlinux.h"
 #endif
@@ -242,7 +258,7 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 	bpf_probe_read(&inet_dport, sizeof(inet_dport), sk + STRUCT_SOCK_DPORT_OFFSET);
 	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + STRUCT_SOCK_SPORT_OFFSET);
 #endif
-	conn_info->tuple.dport = bpf_ntohs(inet_dport);
+	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
 	conn_info->prev_count = 0;
 	conn_info->direction = 0;

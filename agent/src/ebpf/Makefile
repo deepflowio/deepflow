@@ -1,3 +1,17 @@
+# Copyright (c) 2022 Yunshan Networks
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 ifeq ($(V),1)
 	Q =
 	msg =
@@ -20,7 +34,7 @@ endef
 CURRDIR := $(PWD)
 CLANG_VER := $(shell /usr/bin/clang --version | grep "version" | awk '{if ($$3!="version"){print $$3}else{exit -1}}' || /usr/bin/clang --version | grep "version" | awk '{if ($$4!="version"){print $$4}else{exit -1}}')
 CLANG_VER_MAIN := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || /usr/bin/clang --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
-LIBTRACE := libebpf.a
+LIBTRACE := libtrace.a
 LIBBPF_DIR = libbpf/src
 OBJS := $(LIBBPF_DIR)/bpf.o \
 	$(LIBBPF_DIR)/btf.o \
@@ -97,7 +111,7 @@ build: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 
 tools: $(LIBBPF_DIR) $(LIBTRACE)
 	$(call msg,TOOLS,deepflow-ebpfctl)
-	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c libebpf.a -o deepflow-ebpfctl -lelf -lz -lpthread
+	$(Q)$(CC) $(CFLAGS) --static -g -O2 user/ctrl_tracer.c user/ctrl.c $(LIBTRACE) -o deepflow-ebpfctl -lelf -lz -lpthread
 
 rust-sample: $(LIBBPF_DIR) $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))

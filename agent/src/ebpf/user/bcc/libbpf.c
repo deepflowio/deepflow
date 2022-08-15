@@ -1139,6 +1139,7 @@ static int create_probe_event(char *buf, const char *ev_name,
 		return -1;
 	}
 
+	// Change the "_bcc_" keyword to "_deepflow_"
 	res =
 	    snprintf(ev_alias, sizeof(ev_alias), "%s_deepflow_%d", ev_name,
 		     getpid());
