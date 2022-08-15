@@ -32,6 +32,9 @@ func PKCS7Padding(ciphertext []byte, blockSize int) []byte {
 func PKCS7UnPadding(origData []byte) []byte {
 	len := len(origData)
 	unpadding := int(origData[len-1])
+	if (len - unpadding) < 0 {
+		return nil
+	}
 	return origData[:(len - unpadding)]
 }
 
@@ -67,6 +70,9 @@ func AesDecrypt(cryptedStr, keyStr string) (string, error) {
 	origData := make([]byte, len(crypted))
 	blockMode.CryptBlocks(origData, crypted)
 	origData = PKCS7UnPadding(origData)
+	if origData == nil {
+		return "", errors.New("encrypt key failed")
+	}
 	return string(origData), nil
 }
 
