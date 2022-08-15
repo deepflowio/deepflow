@@ -144,7 +144,7 @@ LOOP:
 			c.getCloudData()
 			log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
 
-			c.taskCost.TaskCost[c.basicInfo.Lcuuid] = []int{int(time.Now().Sub(startTime).Milliseconds())}
+			c.taskCost.TaskCost[c.basicInfo.Lcuuid] = []int{int(time.Now().Sub(startTime).Seconds())}
 			statsd.MetaStatsd.RegisterStatsdTable(c)
 		case <-c.cCtx.Done():
 			break LOOP
