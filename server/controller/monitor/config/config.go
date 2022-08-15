@@ -27,5 +27,6 @@ type MonitorConfig struct {
 	HealthCheckPort             int     `default:"30417" yaml:"health_check_port"`
 	HealthCheckHandleChannelLen int     `default:"1000" yaml:"health_check_handle_channel_len"`
 	LicenseCheckInterval        int     `default:"60" yaml:"license_check_interval"`
+	VTapCheckInterval           int     `default:"60" yaml:"vtap_check_interval"`
 	Warrant                     Warrant `yaml:"warrant"`
 }
