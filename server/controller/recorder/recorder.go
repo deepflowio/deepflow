@@ -143,53 +143,22 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 
 		r.cacheMng.UpdateSequence()
 
-		log.Infof("domain (lcuuid: %s, name: %s) refresh started", r.domainLcuuid, r.domainName)
-
-		r.syncDomain()
-
-		// 指定创建及更新操作的资源顺序
-		// 基本原则：无依赖资源优先；实时性需求高资源优先
-		domainUpdatersInUpdateOrder := r.getDomainUpdatersInOrder(cloudData)
-		for _, updater := range domainUpdatersInUpdateOrder {
-			updater.HandleAddAndUpdate()
-		}
-
-		// 删除操作的顺序，是创建的逆序
-		// 特殊资源：VMPodNodeConnection虽然是末序创建，但需要末序删除，序号-1；
-		// 原因：避免数据量大时，此数据删除后，云服务器、容器节点还在，导致采集器类型变化
-		vmPodNodeConnectionUpdater := domainUpdatersInUpdateOrder[len(domainUpdatersInUpdateOrder)-1]
-		// 因VMPodNodeConnection是-1，特殊处理后，逆序删除从-2开始
-		for i := len(domainUpdatersInUpdateOrder) - 2; i >= 0; i-- {
-			domainUpdatersInUpdateOrder[i].HandleDelete()
-		}
-		vmPodNodeConnectionUpdater.HandleDelete()
-
-		log.Infof("domain (lcuuid: %s, name: %s) refresh completed", r.domainLcuuid, r.domainName)
-
-		for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
-			if !subDomainResource.Verified {
-				log.Infof("sub_domain (lcuuid: %s) is not verified, does nothing", subDomainLcuuid)
-				continue
-			}
-			log.Infof("sub_domain (lcuuid: %s) sync refresh started", subDomainLcuuid)
-
-			r.syncSubDomain(subDomainLcuuid)
-
-			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource)
-			for _, updater := range subDomainUpdatersInUpdateOrder {
-				updater.HandleAddAndUpdate()
-			}
-			for i := len(subDomainUpdatersInUpdateOrder) - 2; i >= 0; i-- {
-				subDomainUpdatersInUpdateOrder[i].HandleDelete()
-			}
-
-			log.Infof("sub_domain (lcuuid: %s) sync refresh completed", subDomainLcuuid)
-		}
-
-		log.Infof("recorder (domain lcuuid: %s, name: %s) sync refresh completed", r.domainLcuuid, r.domainName)
+		r.refreshDomain(cloudData)
+		r.refreshSubDomains(cloudData.SubDomainResources)
 
 		r.canRefresh <- true
 	}()
+}
+
+func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
+	log.Infof("domain (lcuuid: %s, name: %s) refresh started", r.domainLcuuid, r.domainName)
+	r.updateDomainSyncedAt()
+
+	// 指定创建及更新操作的资源顺序
+	// 基本原则：无依赖资源优先；实时性需求高资源优先
+	domainUpdatersInUpdateOrder := r.getDomainUpdatersInOrder(cloudData)
+	r.executeUpdators(domainUpdatersInUpdateOrder)
+	log.Infof("domain (lcuuid: %s, name: %s) refresh completed", r.domainLcuuid, r.domainName)
 }
 
 func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []updater.ResourceUpdater {
@@ -234,12 +203,43 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewVInterface(r.cacheMng.DomainCache, cloudData.VInterfaces),
 		updater.NewFloatingIP(r.cacheMng.DomainCache, cloudData.FloatingIPs),
 		updater.NewIP(r.cacheMng.DomainCache, cloudData.IPs),
-		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections),
+		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}
 }
 
-func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData cloudmodel.SubDomainResource) []updater.ResourceUpdater {
-	subDomainCache := r.cacheMng.GetSubDomainCache(subDomainLcuuid)
+func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudmodel.SubDomainResource) {
+	// 遍历cloud中的subdomain资源，与缓存中的subdomain资源对比，根据对比结果增删改
+	for subDomainLcuuid, subDomainResource := range cloudSubDomainResourceMap {
+		if !subDomainResource.Verified {
+			log.Infof("sub_domain (lcuuid: %s) is not verified, does nothing", subDomainLcuuid)
+			continue
+		}
+		log.Infof("sub_domain (lcuuid: %s) sync refresh started", subDomainLcuuid)
+
+		r.updateSubDomainSyncedAt(subDomainLcuuid)
+
+		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil)
+		r.executeUpdators(subDomainUpdatersInUpdateOrder)
+
+		log.Infof("sub_domain (lcuuid: %s) sync refresh completed", subDomainLcuuid)
+	}
+
+	// 遍历缓存中的subdomain cache字典，删除cloud未返回的subdomain资源
+	for subDomainLcuuid, subDomainCache := range r.cacheMng.SubDomainCacheMap {
+		_, ok := cloudSubDomainResourceMap[subDomainLcuuid]
+		if !ok {
+			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, cloudmodel.SubDomainResource{}, subDomainCache)
+			r.executeUpdators(subDomainUpdatersInUpdateOrder)
+		}
+	}
+
+	log.Infof("recorder (domain lcuuid: %s, name: %s) sync refresh completed", r.domainLcuuid, r.domainName)
+}
+
+func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData cloudmodel.SubDomainResource, subDomainCache *cache.Cache) []updater.ResourceUpdater {
+	if subDomainCache == nil {
+		subDomainCache = r.cacheMng.CreateSubDomainCacheIfNotExists(subDomainLcuuid)
+	}
 	return []updater.ResourceUpdater{
 		updater.NewPodCluster(subDomainCache, cloudData.PodClusters),
 		updater.NewPodNode(subDomainCache, cloudData.PodNodes),
@@ -257,8 +257,24 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 		updater.NewSubnet(subDomainCache, cloudData.Subnets),
 		updater.NewVInterface(subDomainCache, cloudData.VInterfaces),
 		updater.NewIP(subDomainCache, cloudData.IPs),
-		updater.NewVMPodNodeConnection(subDomainCache, cloudData.VMPodNodeConnections),
+		updater.NewVMPodNodeConnection(subDomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}
+}
+
+func (r *Recorder) executeUpdators(updatersInUpdateOrder []updater.ResourceUpdater) {
+	for _, updater := range updatersInUpdateOrder {
+		updater.HandleAddAndUpdate()
+	}
+
+	// 删除操作的顺序，是创建的逆序
+	// 特殊资源：VMPodNodeConnection虽然是末序创建，但需要末序删除，序号-1；
+	// 原因：避免数据量大时，此数据删除后，云服务器、容器节点还在，导致采集器类型变化
+	vmPodNodeConnectionUpdater := updatersInUpdateOrder[len(updatersInUpdateOrder)-1]
+	// 因VMPodNodeConnection是-1，特殊处理后，逆序删除从-2开始
+	for i := len(updatersInUpdateOrder) - 2; i >= 0; i-- {
+		updatersInUpdateOrder[i].HandleDelete()
+	}
+	vmPodNodeConnectionUpdater.HandleDelete()
 }
 
 func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (state int, errMsg string) {
@@ -326,7 +342,7 @@ func (r *Recorder) updateStateInfo(cloudData cloudmodel.Resource) {
 }
 
 // TODO 提供db操作接口
-func (r *Recorder) syncDomain() {
+func (r *Recorder) updateDomainSyncedAt() {
 	var domain mysql.Domain
 	err := mysql.Db.Where("lcuuid = ?", r.domainLcuuid).First(&domain).Error
 	if err != nil {
@@ -338,7 +354,7 @@ func (r *Recorder) syncDomain() {
 	mysql.Db.Save(&domain)
 }
 
-func (r *Recorder) syncSubDomain(lcuuid string) {
+func (r *Recorder) updateSubDomainSyncedAt(lcuuid string) {
 	var subDomain mysql.SubDomain
 	err := mysql.Db.Where("lcuuid = ?", lcuuid).First(&subDomain).Error
 	if err != nil {
