@@ -175,6 +175,7 @@ func CreateDomain(domainCreate model.DomainCreate, grpcServerPort string) (*mode
 	domain.DisplayName = displayName
 	domain.Type = domainCreate.Type
 	domain.IconID = domainCreate.IconID
+	domain.State = common.DOMAIN_STATE_NORMAL
 
 	// set region and controller ip if not specified
 	if domainCreate.Config == nil {

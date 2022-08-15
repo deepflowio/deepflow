@@ -216,7 +216,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 			}
 			offset += 1
 		} else {
-			err := errors.New(fmt.Sprintf("get (%s) response (%s) failed", action, resultKey))
+			err := errors.New(fmt.Sprintf("get (%s) response (%s) failed, (%v)", action, resultKey, respJson))
 			log.Error(respJson)
 			return nil, err
 		}

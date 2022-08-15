@@ -157,6 +157,8 @@ const (
 const (
 	DOMAIN_ENABLED_FALSE = 0
 	DOMAIN_ENABLED_TRUE  = 1
+
+	DOMAIN_STATE_NORMAL = 1
 )
 
 const (
