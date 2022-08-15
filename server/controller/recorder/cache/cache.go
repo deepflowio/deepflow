@@ -65,13 +65,15 @@ func (m *CacheManager) UpdateSequence() {
 	}
 }
 
-func (m *CacheManager) GetSubDomainCache(subDomainLcuuid string) *Cache {
+func (m *CacheManager) CreateSubDomainCacheIfNotExists(subDomainLcuuid string) *Cache {
 	cache, exists := m.SubDomainCacheMap[subDomainLcuuid]
 	if exists {
 		return cache
 	}
+	log.Infof("subdomain cache (lcuuid: %s) not exists", subDomainLcuuid)
 	cache = NewCache(m.DomainCache.DomainLcuuid)
 	cache.SubDomainLcuuid = subDomainLcuuid
+	m.SubDomainCacheMap[subDomainLcuuid] = cache
 	return cache
 }
 
