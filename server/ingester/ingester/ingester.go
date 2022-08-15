@@ -123,6 +123,14 @@ func Start(configPath string) []io.Closer {
 		bytes, _ = yaml.Marshal(extMetricsConfig)
 		log.Infof("ext_metrics config:\n%s", string(bytes))
 
+		// clickhouse表结构变更处理
+		issu, err := ckissu.NewCKIssu(rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)
+		checkError(err)
+
+		// If there is a table name change, do the table name update first
+		err = issu.RunRenameTable()
+		checkError(err)
+
 		// 写遥测数据
 		roze, err := roze.NewRoze(rozeConfig, receiver)
 		checkError(err)
@@ -154,9 +162,6 @@ func Start(configPath string) []io.Closer {
 		cm.Start()
 		closers = append(closers, cm)
 
-		// clickhouse表结构变更处理
-		issu, err := ckissu.NewCKIssu(rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)
-		checkError(err)
 		// 等roze,stream初始化建表完成,再执行issu
 		time.Sleep(time.Second)
 		err = issu.Start()
