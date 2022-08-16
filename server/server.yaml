@@ -83,7 +83,7 @@ controller:
         aliyun_region_name: cn-beijing
       recorder:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟
-        cache_refresh_interval: 3600
+        cache_refresh_interval: 60
         # 软删除资源数据清理时间间隔，单位：小时
         # 此值应小于 soft_deleted_resource_expire_interval
         deleted_resource_clean_interval: 24

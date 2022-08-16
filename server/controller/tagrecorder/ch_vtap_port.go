@@ -428,9 +428,9 @@ func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, er
 			VTapID:   gVIF.VTapID,
 			HostIP:   gVIF.HostIP,
 			NodeIP:   gVIF.NodeIP,
-			LastSeen: gVIF.LastSeen,
+			LastSeen: gVIF.LastSeen.Format(common.GO_BIRTHDAY),
 		}
-		vtap, ok := toolDS.idToVTap[vtapVIF.VTapID]
+		vtap, ok := toolDS.idToVTap[gVIF.VTapID]
 		if ok {
 			vtapVIF.VTapLaunchServer = vtap.LaunchServer
 			vtapVIF.VTapLaunchServerID = vtap.LaunchServerID
@@ -494,6 +494,8 @@ func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, er
 					vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
 				}
 			}
+		} else if gVIF.VTapID != 0 {
+			log.Errorf("vtap (%d) not found", gVIF.VTapID)
 		}
 		vtapVIFs = append(vtapVIFs, vtapVIF)
 	}
