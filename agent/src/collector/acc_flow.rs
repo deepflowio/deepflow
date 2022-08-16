@@ -33,7 +33,7 @@ pub struct AccumulatedFlow {
 
     pub policy_ids: [U16Set; 2],
     pub flow_meter: FlowMeter,
-    pub app_meter: Option<AppMeter>,
+    pub app_meter: AppMeter,
     pub key: QgKey,
     pub time_in_second: Duration,
     pub nat_src_ip: IpAddr,
@@ -61,7 +61,7 @@ impl AccumulatedFlow {
         &mut self,
         time_in_second: Duration,
         flow_meter: &FlowMeter,
-        app_meter: Option<&AppMeter>,
+        app_meter: &AppMeter,
         policy_ids: &[U16Set; 2],
         tagged_flow: &Arc<TaggedFlow>,
     ) {
@@ -79,17 +79,9 @@ impl AccumulatedFlow {
                     && other_stats.l7_protocol != L7Protocol::Unknown)
             {
                 self.l7_protocol = other_stats.l7_protocol;
-                if let Some((self_meter, other_meter)) = self.app_meter.as_mut().zip(app_meter) {
-                    *self_meter = *other_meter;
-                } else if let Some(other_meter) = app_meter {
-                    self.app_meter = Some(*other_meter);
-                }
+                self.app_meter = *app_meter;
             } else if other_stats.l7_protocol == self.l7_protocol {
-                if let Some((self_meter, other_meter)) = self.app_meter.as_mut().zip(app_meter) {
-                    self_meter.sequential_merge(other_meter);
-                } else if let Some(other_meter) = app_meter {
-                    self.app_meter = Some(*other_meter);
-                }
+                self.app_meter.sequential_merge(app_meter);
             }
         }
     }

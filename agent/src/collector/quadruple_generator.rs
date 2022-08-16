@@ -474,7 +474,7 @@ impl SubQuadGen {
         &mut self,
         tagged_flow: Arc<TaggedFlow>,
         flow_meter: &FlowMeter,
-        app_meter: Option<&AppMeter>,
+        app_meter: &AppMeter,
         policy_ids: &[U16Set; 2],
         time_in_second: Duration,
         key: &mut QgKey,
@@ -527,11 +527,7 @@ impl SubQuadGen {
                 nat_src_ip: nat_real_ip0,
                 nat_dst_ip: nat_real_ip1,
                 key: key.clone(),
-                app_meter: if let Some(m) = app_meter {
-                    Some(*m)
-                } else {
-                    None
-                },
+                app_meter: *app_meter,
             };
             match key {
                 QgKey::V6(k) => stash.v6_flows.insert(*k, acc_flow),
@@ -690,8 +686,6 @@ pub struct QuadrupleGenerator {
 
     key: QgKey,
     policy_ids: [U16Set; 2],
-    flow_meter: FlowMeter,
-    app_meter: Option<AppMeter>,
     output_flow: Option<DebugSender<Arc<TaggedFlow>>>,
 
     l7_metrics_enabled: Arc<AtomicBool>,
@@ -820,12 +814,6 @@ impl QuadrupleGenerator {
 
             key: QgKey::V6([0; IPV6_LRU_KEY_SIZE]),
             policy_ids: [U16Set::new(), U16Set::new()],
-            flow_meter: FlowMeter::default(),
-            app_meter: if l7_metrics_enabled.load(Ordering::Relaxed) {
-                Some(AppMeter::default())
-            } else {
-                None
-            },
             output_flow: flow_output,
 
             l7_metrics_enabled,
@@ -881,13 +869,14 @@ impl QuadrupleGenerator {
         self.policy_ids[0].clear();
         self.policy_ids[1].clear();
 
-        Self::fill_meter(&tagged_flow, &mut self.flow_meter, self.app_meter.as_mut());
+        let (flow_meter, app_meter) =
+            Self::generate_meter(&tagged_flow, self.l7_metrics_enabled.clone());
 
         if second_inject {
             self.second_quad_gen.as_mut().unwrap().inject_flow(
                 tagged_flow.clone(),
-                &self.flow_meter,
-                self.app_meter.as_ref(),
+                &flow_meter,
+                &app_meter,
                 &self.policy_ids,
                 time_in_second,
                 &mut self.key,
@@ -904,8 +893,8 @@ impl QuadrupleGenerator {
             }
             self.minute_quad_gen.as_mut().unwrap().inject_flow(
                 tagged_flow,
-                &self.flow_meter,
-                self.app_meter.as_ref(),
+                &flow_meter,
+                &app_meter,
                 &self.policy_ids,
                 time_in_second,
                 &mut self.key,
@@ -913,14 +902,14 @@ impl QuadrupleGenerator {
         }
     }
 
-    fn fill_meter(
-        tagged_flow: &Arc<TaggedFlow>,
-        flow_meter: &mut FlowMeter,
-        app_meter: Option<&mut AppMeter>,
-    ) {
+    fn generate_meter(
+        tagged_flow: &TaggedFlow,
+        l7_metrics_enabled: Arc<AtomicBool>,
+    ) -> (FlowMeter, AppMeter) {
+        let (mut flow_meter, mut app_meter) = (FlowMeter::default(), AppMeter::default());
+
         let src = &tagged_flow.flow.flow_metrics_peers[0];
         let dst = &tagged_flow.flow.flow_metrics_peers[1];
-        *flow_meter = FlowMeter::default();
 
         flow_meter.traffic = Traffic {
             packet_tx: src.packet_count,
@@ -957,13 +946,11 @@ impl QuadrupleGenerator {
             }
         }
 
-        if tagged_flow.flow.flow_perf_stats.is_none() {
-            if let Some(app) = app_meter {
-                *app = AppMeter::default();
-            }
-            return;
-        }
-        let stats = tagged_flow.flow.flow_perf_stats.as_ref().unwrap();
+        let stats = match tagged_flow.flow.flow_perf_stats.as_ref() {
+            Some(s) => s,
+            None => return (flow_meter, app_meter),
+        };
+
         if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
             flow_meter.latency = Latency {
                 rtt_max: stats.tcp.rtt,
@@ -1002,14 +989,13 @@ impl QuadrupleGenerator {
             flow_meter.latency.art_count = stats.tcp.art_max;
         }
 
-        if app_meter.is_none() {
-            return;
+        if !l7_metrics_enabled.load(Ordering::Relaxed) {
+            return (flow_meter, app_meter);
         }
-        let app_meter = app_meter.unwrap();
 
         match stats.l7_protocol {
             L7Protocol::Unknown | L7Protocol::Other => {
-                *app_meter = AppMeter {
+                app_meter = AppMeter {
                     traffic: AppTraffic {
                         request: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
                         response: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u32,
@@ -1018,7 +1004,7 @@ impl QuadrupleGenerator {
                 }
             }
             _ => {
-                *app_meter = AppMeter {
+                app_meter = AppMeter {
                     traffic: AppTraffic {
                         request: stats.l7.request_count,
                         response: stats.l7.response_count,
@@ -1044,6 +1030,8 @@ impl QuadrupleGenerator {
                 flow_meter.anomaly.l7_timeout = stats.l7.err_timeout;
             }
         }
+
+        (flow_meter, app_meter)
     }
 
     fn set_key(key: &mut [u8], tagged_flow: &Arc<TaggedFlow>) {
@@ -1153,7 +1141,7 @@ mod test {
             is_active_host1: true,
             policy_ids: [U16Set::new(), U16Set::new()],
             flow_meter: FlowMeter::default(),
-            app_meter: Some(AppMeter::default()),
+            app_meter: AppMeter::default(),
             key: QuadrupleGenerator::get_key(&tagged_flow),
             time_in_second: Duration::from_secs(0),
             nat_src_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
@@ -1195,13 +1183,13 @@ mod test {
         tagged_flow.flow.flow_key.proto = IpProtocol::Tcp;
         let tagged_flow_arc = Arc::new(tagged_flow);
         let flow_meter = FlowMeter::default();
-        let app_meter = Some(AppMeter::default());
+        let app_meter = AppMeter::default();
         let policy_ids = [U16Set::new(), U16Set::new()];
         let mut key = QuadrupleGenerator::get_key(&tagged_flow_arc);
         quad_gen.inject_flow(
             tagged_flow_arc.clone(),
             &flow_meter,
-            app_meter.as_ref(),
+            &app_meter,
             &policy_ids,
             window_start + Duration::from_secs(10),
             &mut key,
@@ -1214,7 +1202,7 @@ mod test {
         quad_gen.inject_flow(
             tagged_flow_arc.clone(),
             &flow_meter,
-            app_meter.as_ref(),
+            &app_meter,
             &policy_ids,
             window_start + Duration::from_secs(15),
             &mut key,
