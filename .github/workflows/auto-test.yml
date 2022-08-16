@@ -63,9 +63,9 @@ jobs:
       - name: build server
         if: ${{ env.SERVER_CHANGE == 'true' }}
         run: |
-          sudo apt-get update
-          sudo apt-get install tmpl
-          pip install ujson
+          # sudo apt-get update
+          # sudo apt-get install tmpl
+          # pip install ujson
           GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
           GO111MODULE="off" go get github.com/gogo/protobuf/proto
           GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
@@ -369,6 +369,9 @@ jobs:
               --set global.allInOneLocalStorage=true \
               --set global.hostNetwork=true \
               --set global.dnsPolicy=ClusterFirstWithHostNet \
+              --set global.nodePort.clickhouse="" \
+              --set global.nodePort.deepflowServerIngester="" \
+              --set global.nodePort.deepflowServerhealthCheck="" \
               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
               --set-string image.server.tag=${{ github.run_id }}
 
@@ -379,6 +382,9 @@ jobs:
               --set global.allInOneLocalStorage=true \
               --set global.hostNetwork=true \
               --set global.dnsPolicy=ClusterFirstWithHostNet \
+              --set global.nodePort.clickhouse="" \
+              --set global.nodePort.deepflowServerIngester="" \
+              --set global.nodePort.deepflowServerhealthCheck="" \
               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
               --reuse-values
@@ -388,6 +394,10 @@ jobs:
           sleep 10
           kubectl delete pod -n deepflow -l component=deepflow-agent
 
+      - name: get nodeport
+        run: |
+          CHECKNODEPORT=$(kubectl get svc -n deepflow deepflow-server -o json |jq '.spec.ports[]|select (.name=="health-check")|.nodePort')
+          echo "CHECKNODEPORT=$CHECKNODEPORT" >> $GITHUB_ENV
 
       - name: check deepflow 
         run: | 
@@ -398,9 +408,9 @@ jobs:
              while true 
                do  
                  kubectl get pods -n deepflow 
-                 deepflow-ctl domain list 
-                 deepflow-ctl agent list||true 
-                 AgentCount=$(deepflow-ctl agent list |wc -l ) 
+                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} domain list 
+                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} agent list||true 
+                 AgentCount=$(deepflow-ctl  --api-port ${{ env.CHECKNODEPORT }}  agent list |wc -l ) 
                     if [ "${AgentCount}" -eq "2" ] 
                       then  
                         echo "All Success." && break 
@@ -504,7 +514,11 @@ jobs:
               --set global.allInOneLocalStorage=true \
               --set global.hostNetwork=true \
               --set global.dnsPolicy=ClusterFirstWithHostNet \
-              --set global.image.repository="ghcr.io/deepflowys/deepflow-ce"
+              --set global.nodePort.clickhouse="" \
+              --set global.nodePort.deepflowServerIngester="" \
+              --set global.nodePort.deepflowServerhealthCheck="" \
+              --set global.image.repository="ghcr.io/deepflowys/deepflow-ce"  \
+              --set-string image.server.tag="latest-6081"
           sudo curl -o /usr/bin/deepflow-ctl https://deepflow-ce.oss-accelerate.aliyuncs.com/bin/ctl/latest/linux/amd64/deepflow-ctl
           sudo chmod a+x /usr/bin/deepflow-ctl
           timeout 300 bash -c -- \
@@ -513,13 +527,15 @@ jobs:
                   do 
                     kubectl get pods -n deepflow 
                     set +e
-                    kubectl exec -it -n deepflow deploy/deepflow-mysql -- mysql -u root -pdeepflow -e "show tables from deepflow;"|grep vtap
+                    kubectl exec -it -n deepflow deploy/deepflow-mysql -- mysql -u root -pdeepflow -e "select * from deepflow.db_version;"
+                    kubectl exec -it -n deepflow deploy/deepflow-mysql -- mysql -u root -pdeepflow -e "select count(*)  from deepflow.db_version;"|grep 1
                     if [ $? -eq 0 ] 
                       then
                         break
                     else
                         continue   
                     fi
+                    sleep 2
                   done
             '
 
@@ -530,6 +546,9 @@ jobs:
               --set global.allInOneLocalStorage=true \
               --set global.hostNetwork=true \
               --set global.dnsPolicy=ClusterFirstWithHostNet \
+              --set global.nodePort.clickhouse="" \
+              --set global.nodePort.deepflowServerIngester="" \
+              --set global.nodePort.deepflowServerhealthCheck="" \
               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
               --set-string image.server.tag=${{ github.run_id }}
 
@@ -540,6 +559,9 @@ jobs:
               --set global.allInOneLocalStorage=true \
               --set global.hostNetwork=true \
               --set global.dnsPolicy=ClusterFirstWithHostNet \
+              --set global.nodePort.clickhouse="" \
+              --set global.nodePort.deepflowServerIngester="" \
+              --set global.nodePort.deepflowServerhealthCheck="" \
               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
               --reuse-values
@@ -549,6 +571,11 @@ jobs:
           sleep 10
           kubectl delete pod -n deepflow -l component=deepflow-agent
 
+      - name: get nodeport
+        run: |
+          CHECKNODEPORT=$(kubectl get svc -n deepflow deepflow-server -o json |jq '.spec.ports[]|select (.name=="health-check")|.nodePort')
+          echo "CHECKNODEPORT=$CHECKNODEPORT" >> $GITHUB_ENV
+
       - name: Check deepflow
         run: |
           timeout 600 bash -c -- \
@@ -556,9 +583,9 @@ jobs:
              while true 
                do  
                  kubectl get pods -n deepflow 
-                 deepflow-ctl domain list 
-                 deepflow-ctl agent list||true 
-                 CrashCount=$(deepflow-ctl agent list |wc -l ) 
+                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} domain list 
+                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} agent list||true 
+                 CrashCount=$(deepflow-ctl  --api-port ${{ env.CHECKNODEPORT }} agent list |wc -l ) 
                     if [ "${CrashCount}" -eq "2" ] 
                       then  
                         echo "All Success." && break 
