@@ -17,6 +17,7 @@
 package controller
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -42,6 +43,8 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	trouter "github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
 
+	"github.com/deepflowys/deepflow/server/controller/grpc"
+
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/controller"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/synchronize"
@@ -53,7 +56,7 @@ var log = logging.MustGetLogger("controller")
 
 type Controller struct{}
 
-func Start(configPath string) {
+func Start(ctx context.Context, configPath string) {
 	flag.Parse()
 
 	serverCfg := config.DefaultConfig()
@@ -187,6 +190,12 @@ func Start(configPath string) {
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
 	trouter.RegistRouter(r)
+
+	grpcStart(ctx, cfg)
+}
+
+func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {
+	go grpc.Run(ctx, cfg)
 }
 
 // migrate db by master region master controller

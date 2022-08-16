@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/deepflowys/deepflow/server/controller/genesis"
-	grpcserver "github.com/deepflowys/deepflow/server/controller/trisolaris/server/grpc"
+	grpcserver "github.com/deepflowys/deepflow/server/controller/grpc"
 )
 
 type service struct {

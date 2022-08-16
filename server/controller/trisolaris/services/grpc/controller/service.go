@@ -19,7 +19,7 @@ package controller
 import (
 	api "github.com/deepflowys/deepflow/message/controller"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
-	grpcserver "github.com/deepflowys/deepflow/server/controller/trisolaris/server/grpc"
+	grpcserver "github.com/deepflowys/deepflow/server/controller/grpc"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
