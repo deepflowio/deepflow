@@ -413,3 +413,23 @@ func (t *SuiteTest) TestDeleteSubDomain() {
 	t.db.Unscoped().Where("sub_domain = ?", lcuuid).Find(&pods)
 	assert.Equal(t.T(), len(pods), 0)
 }
+
+func (t *SuiteTest) TestDeleteSoftDeletedResource() {
+	domainLcuuid := uuid.NewString()
+	t.db.Create(&mysql.AZ{Base: mysql.Base{Lcuuid: uuid.NewString()}, Domain: domainLcuuid})
+	t.db.Create(&mysql.AZ{Base: mysql.Base{Lcuuid: uuid.NewString()}, Domain: uuid.NewString()})
+	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.AZ{})
+	var azs []mysql.AZ
+	t.db.Find(&azs)
+	assert.Equal(t.T(), 0, len(azs))
+	t.db.Unscoped().Find(&azs)
+	assert.Equal(t.T(), 2, len(azs))
+	t.db.Unscoped().Where("domain = ?", domainLcuuid).Find(&azs)
+	assert.Equal(t.T(), 1, len(azs))
+
+	deleteSoftDeletedResource(domainLcuuid)
+	t.db.Unscoped().Find(&azs)
+	assert.Equal(t.T(), 1, len(azs))
+	t.db.Unscoped().Where("domain = ?", domainLcuuid).Find(&azs)
+	assert.Equal(t.T(), 0, len(azs))
+}
