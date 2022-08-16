@@ -93,6 +93,15 @@ func (c *Cloud) GetBasicInfo() model.BasicInfo {
 }
 
 func (c *Cloud) GetResource() model.Resource {
+	if c.basicInfo.Type != common.KUBERNETES {
+		if c.resource.ErrorState != 1 || len(c.resource.VMs) == 0 {
+			return model.Resource{
+				ErrorState:   c.resource.ErrorState,
+				ErrorMessage: c.resource.ErrorMessage,
+			}
+		}
+		c.getSubDomainData()
+	}
 	return c.resource
 }
 
@@ -119,7 +128,6 @@ func (c *Cloud) getCloudData() {
 		} else {
 			c.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
 		}
-		c.getSubDomainData()
 	} else {
 		c.getKubernetesData()
 	}
