@@ -61,6 +61,8 @@ controller:
     health_check_handle_channel_len: 1000
     # License检查的时间间隔，单位: 秒
     license_check_interval: 60
+    # vtap检查的时间间隔，单位: 秒
+    vtap_check_interval: 60
     # warrant
     warrant:
       host: warrant
