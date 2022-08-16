@@ -48,12 +48,8 @@ func newControllerDiscovery(masterIP string, nodeType string, regionDomainPrefix
 
 func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 	envData := utils.GetRuntimeEnv()
-	hostName, err := os.Hostname()
-	if err != nil {
-		log.Error(err)
-	}
 	return &models.Controller{
-		Name:               hostName,
+		Name:               os.Getenv(POD_NAME_KEY),
 		CPUNum:             int(envData.CpuNum),
 		MemorySize:         int64(envData.MemorySize),
 		Arch:               envData.Arch,

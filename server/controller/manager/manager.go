@@ -137,9 +137,9 @@ func (m *Manager) Start() {
 		for range time.Tick(time.Duration(m.cfg.CloudConfigCheckInterval) * time.Second) {
 			// 获取所在控制器的IP
 			var controller mysql.Controller
-			hostName, err := os.Hostname()
-			if err != nil {
-				log.Error(err)
+			hostName := os.Getenv(common.POD_NAME_KEY)
+			if len(hostName) == 0 {
+				log.Error("hostname is null")
 				continue
 			}
 			if ret := mysql.Db.Where("name = ?", hostName).Find(&controller); ret.Error != nil {

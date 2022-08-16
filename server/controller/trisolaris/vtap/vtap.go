@@ -816,9 +816,9 @@ func (v *VTapInfo) putChVTapChangedForPD() {
 
 func (v *VTapInfo) updateCacheToDB() {
 	log.Info("update vtap cache to db")
-	hostName, err := os.Hostname()
-	if err != nil {
-		log.Errorf("get hostname failed. %s", err)
+	hostName := os.Getenv(POD_NAME_KEY)
+	if len(hostName) == 0 {
+		log.Errorf("hostname is null")
 		return
 	}
 
