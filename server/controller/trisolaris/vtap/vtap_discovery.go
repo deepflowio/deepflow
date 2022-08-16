@@ -182,6 +182,13 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 	return dbVTap, result
 }
 
+func isVMofBMHtype(htype int) bool {
+	if Find[int]([]int{VM_HTYPE_BM_C, VM_HTYPE_BM_N, VM_HTYPE_BM_S}, htype) == true {
+		return true
+	}
+	return false
+}
+
 func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 	podNodeMgr := dbmgr.DBMgr[models.PodNode](db)
 	podNodes, err := podNodeMgr.GetBatchFromIPs(r.hostIPs)
@@ -237,15 +244,33 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 	)
 	if matchVif.DeviceType == VIF_DEVICE_TYPE_POD_NODE {
 		matchPodNode = idToPodNode[matchVif.DeviceID]
-		if _, ok := podNodeIdToConn[matchVif.DeviceID]; ok {
-			vTapType = VTAP_TYPE_POD_VM
+		if conn, ok := podNodeIdToConn[matchVif.DeviceID]; ok {
+			vm, err := dbmgr.DBMgr[models.VM](db).GetFromID(conn.VMID)
+			if err != nil {
+				log.Errorf("vtap(%s), vm(id=%d) not in DB, err: %s", r.getKey(), conn.VMID, err)
+				return nil, false
+			}
+			if isVMofBMHtype(vm.HType) == true {
+				vTapType = VTAP_TYPE_POD_HOST
+			} else {
+				vTapType = VTAP_TYPE_POD_VM
+			}
 		} else {
 			vTapType = VTAP_TYPE_POD_HOST
 		}
 	} else {
 		if conn, ok := vmIDToConn[matchVif.DeviceID]; ok {
 			matchPodNode = idToPodNode[conn.PodNodeID]
-			vTapType = VTAP_TYPE_POD_VM
+			vm, err := dbmgr.DBMgr[models.VM](db).GetFromID(matchVif.DeviceID)
+			if err != nil {
+				log.Errorf("vtap(%s), vm(id=%d) not in DB, err: %s", r.getKey(), matchVif.DeviceID, err)
+				return nil, false
+			}
+			if isVMofBMHtype(vm.HType) == true {
+				vTapType = VTAP_TYPE_POD_HOST
+			} else {
+				vTapType = VTAP_TYPE_POD_VM
+			}
 		}
 	}
 	if matchPodNode == nil {
@@ -414,7 +439,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		vTapType     int
 		launchServer string
 	)
-	if Find[int]([]int{VM_HTYPE_BM_C, VM_HTYPE_BM_N, VM_HTYPE_BM_S}, vm.HType) == true {
+	if isVMofBMHtype(vm.HType) == true {
 		vTapType = VTAP_TYPE_WORKLOAD_P
 	} else {
 		vTapType = VTAP_TYPE_WORKLOAD_V
