@@ -185,10 +185,10 @@ func GetUUID(str string, namespace uuid.UUID) string {
 // 功能：判断当前控制器是否为masterController
 func IsMasterController() (bool, string, error) {
 	// 获取本机hostname
-	hostName, err := os.Hostname()
-	if err != nil {
-		log.Error(err)
-		return false, "", err
+	hostName := os.Getenv(POD_NAME_KEY)
+	if len(hostName) == 0 {
+		log.Error("hostname is null")
+		return false, "", errors.New("hostname is null")
 	}
 	// 通过sideCar API获取MasterControllerName
 	url := fmt.Sprintf("http://%s:%d", LOCALHOST, MASTER_CONTROLLER_CHECK_PORT)
