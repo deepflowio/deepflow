@@ -27,7 +27,6 @@ require (
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
 	github.com/docker/go-units v0.4.0
-	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/gogo/protobuf v1.3.2

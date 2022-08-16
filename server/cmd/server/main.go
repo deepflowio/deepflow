@@ -29,6 +29,7 @@ import (
 	"io/ioutil"
 
 	"github.com/deepflowys/deepflow/server/controller/controller"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowys/deepflow/server/ingester/ingester"
 	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/querier/querier"
@@ -86,7 +87,13 @@ func main() {
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
 
-	go controller.Start(*configPath)
+	ctx, cancel := utils.NewWaitGroupCtx()
+	defer func() {
+		cancel()
+		utils.GetWaitGroupInCtx(ctx).Wait() // wait for goroutine cancel
+	}()
+	go controller.Start(ctx, *configPath)
+
 	go querier.Start(*configPath)
 	closers := ingester.Start(*configPath)
 
