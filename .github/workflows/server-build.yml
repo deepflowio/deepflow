@@ -46,9 +46,9 @@ jobs:
 
       - name: build server
         run: |
-          sudo apt-get update
-          sudo apt-get install tmpl
-          pip install ujson
+          # sudo apt-get update
+          # sudo apt-get install tmpl
+          # pip install ujson
           GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
           GO111MODULE="off" go get github.com/gogo/protobuf/proto
           GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
