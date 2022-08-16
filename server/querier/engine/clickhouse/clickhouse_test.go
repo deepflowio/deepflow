@@ -138,10 +138,10 @@ var (
 		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.abc` FROM flow_log.l4_flow_log PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (pod_id_0!=0) GROUP BY `label.abc`",
 	}, {
 		input:  "select `attribute.cc` as `attribute.abc` from l7_flow_log where `attribute.abc`='opensource-loki-0' group by `attribute.abc`",
-		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.l7_flow_log PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' GROUP BY `attribute.abc`",
+		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.l7_flow_log PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' AND (`attribute.cc` != '') GROUP BY `attribute.abc`",
 	}, {
 		input:  "select `tag.cc` as `tag.abc` from cpu where `tag.abc`='opensource-loki-0' group by `tag.abc`",
-		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.cpu PREWHERE tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' GROUP BY `tag.abc`",
+		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.cpu PREWHERE tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' AND (`tag.cc` != '') GROUP BY `tag.abc`",
 		db:     "ext_metrics",
 	}, {
 		input:  "select `metrics.storageclass_annotations` AS `job_info` from prometheus_kube",
