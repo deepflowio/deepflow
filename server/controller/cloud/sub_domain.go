@@ -36,6 +36,7 @@ func (c *Cloud) getSubDomainData() {
 		podNodes, vmPodNodeConnections := c.getSubDomainPodNodes(lcuuid, &kubernetesGatherResource)
 		// 如果当前KubernetesGather数据中没有容器节点，则跳过该集群
 		if len(podNodes) == 0 {
+			log.Info("cloud merge subdomain data: k8s gather resource not found pod node")
 			continue
 		}
 		// 取集群中某个容器节点的az信息作为集群的az，当前不支持附属容器集群跨可用区
@@ -353,6 +354,7 @@ func (c *Cloud) getSubDomainPodReplicaSets(
 		retPodReplicaSets = append(retPodReplicaSets, model.PodReplicaSet{
 			Lcuuid:             podReplicaSet.Lcuuid,
 			Name:               podReplicaSet.Name,
+			Label:              podReplicaSet.Label,
 			PodNum:             podReplicaSet.PodNum,
 			PodGroupLcuuid:     podReplicaSet.PodGroupLcuuid,
 			PodNamespaceLcuuid: podReplicaSet.PodNamespaceLcuuid,
@@ -375,6 +377,7 @@ func (c *Cloud) getSubDomainPods(
 		retPods = append(retPods, model.Pod{
 			Lcuuid:              pod.Lcuuid,
 			Name:                pod.Name,
+			Label:               pod.Label,
 			State:               pod.State,
 			CreatedAt:           pod.CreatedAt,
 			PodReplicaSetLcuuid: pod.PodReplicaSetLcuuid,
