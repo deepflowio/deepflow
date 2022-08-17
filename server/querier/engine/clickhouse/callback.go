@@ -78,6 +78,9 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 			} else {
 				timeIndex = (end - record[timeFieldIndex].(int)) / m.Time.Interval
 			}
+			if timeIndex >= intervalLength || timeIndex < 0 {
+				continue
+			}
 			newValues[timeIndex] = value
 		}
 		var timestamp int
