@@ -174,7 +174,7 @@ func Load(path string) *Config {
 			StreamRozeEnabled: true,
 			UDPReadBuffer:     64 << 20,
 			TCPReadBuffer:     4 << 20,
-			LogFile:           "/var/log/ingester/ingester.log",
+			LogFile:           "/var/log/deepflow/server.log",
 			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
 			CKS3Storage:       CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
 			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
