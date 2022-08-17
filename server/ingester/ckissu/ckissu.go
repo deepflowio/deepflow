@@ -364,8 +364,8 @@ var ColumnMod611 = []*ColumnMod{
 	},
 }
 
-func getTables(connect *sql.DB, tableName string) ([]string, error) {
-	sql := fmt.Sprintf("SHOW TABLES IN %s", ckdb.METRICS_DB)
+func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
+	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -377,12 +377,12 @@ func getTables(connect *sql.DB, tableName string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if strings.HasPrefix(table, tableName) {
+		if strings.HasPrefix(table, tableName) ||
+			len(tableName) == 0 {
 			tables = append(tables, table)
 		}
 	}
 	return tables, nil
-
 }
 
 type DatasourceInfo struct {
@@ -394,8 +394,8 @@ type DatasourceInfo struct {
 	interval   ckdb.TimeFuncType
 }
 
-func getDatasourceInfo(connect *sql.DB, name string) (*DatasourceInfo, error) {
-	sql := fmt.Sprintf("SHOW CREATE TABLE %s.`%s_mv`", ckdb.METRICS_DB, name)
+func getDatasourceInfo(connect *sql.DB, db, name string) (*DatasourceInfo, error) {
+	sql := fmt.Sprintf("SHOW CREATE TABLE %s.`%s_mv`", db, name)
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -449,7 +449,7 @@ func getDatasourceInfo(connect *sql.DB, name string) (*DatasourceInfo, error) {
 	}
 
 	return &DatasourceInfo{
-		db:         ckdb.METRICS_DB,
+		db:         db,
 		baseTable:  baseTable,
 		name:       name,
 		summable:   summable,
@@ -459,10 +459,11 @@ func getDatasourceInfo(connect *sql.DB, name string) (*DatasourceInfo, error) {
 }
 
 // 找出自定义数据源和参数
-func getUserDefinedDatasourceInfos(connect *sql.DB, tableName string) ([]*DatasourceInfo, error) {
-	tables, err := getTables(connect, tableName)
+func getUserDefinedDatasourceInfos(connect *sql.DB, db, tableName string) ([]*DatasourceInfo, error) {
+	tables, err := getTables(connect, db, tableName)
 	if err != nil {
-		return nil, err
+		log.Info(err)
+		return nil, nil
 	}
 
 	aggTables := []string{}
@@ -475,7 +476,7 @@ func getUserDefinedDatasourceInfos(connect *sql.DB, tableName string) ([]*Dataso
 
 	dSInfos := []*DatasourceInfo{}
 	for _, name := range aggTables {
-		ds, err := getDatasourceInfo(connect, name)
+		ds, err := getDatasourceInfo(connect, db, name)
 		if err != nil {
 			return nil, err
 		}
@@ -625,12 +626,17 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	return i, nil
 }
 
-func (i *Issu) RunRenameTable() error {
+func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
 	for _, tableRename := range i.tableRenames {
 		if err := i.renameTable(i.primaryConnection, tableRename); err != nil {
 			return err
 		}
 	}
+
+	if err := i.renameUserDefineDatasource(i.primaryConnection, ds); err != nil {
+		log.Warning(err)
+	}
+
 	return nil
 }
 
@@ -837,7 +843,7 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 	for _, tableName := range []string{
 		zerodoc.VTAP_FLOW_PORT_1M.TableName(), zerodoc.VTAP_FLOW_EDGE_PORT_1M.TableName(),
 		zerodoc.VTAP_APP_PORT_1M.TableName(), zerodoc.VTAP_APP_EDGE_PORT_1M.TableName()} {
-		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, tableName)
+		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, ckdb.METRICS_DB, tableName)
 		if err != nil {
 			return nil, err
 		}
@@ -898,5 +904,34 @@ func (i *Issu) Close() error {
 		}
 		connect.Close()
 	}
+	return nil
+}
+
+func (i *Issu) renameUserDefineDatasource(connect *sql.DB, ds *datasource.DatasourceManager) error {
+	for _, dbGroup := range []string{"vtap_flow", "vtap_app"} {
+		dbName := dbGroup + "_port"
+		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, dbName, "")
+		if err != nil {
+			return err
+		}
+		for _, dsInfo := range datasourceInfos {
+			if err := i.renameTable(connect, &TableRename{
+				OldDb:     dsInfo.db,
+				OldTables: []string{dsInfo.name + "_agg"},
+				NewDb:     ckdb.METRICS_DB,
+				NewTables: []string{fmt.Sprintf("%s.%s_%s", dsInfo.db, dsInfo.baseTable, dsInfo.name+"_agg")},
+			}); err != nil {
+				return err
+			}
+			interval := 60
+			if dsInfo.interval == ckdb.TimeFuncDay {
+				interval = 1440
+			}
+			if err := ds.Handle(dbGroup, "add", dsInfo.baseTable, dsInfo.name, dsInfo.summable, dsInfo.unsummable, interval, 7*24); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
