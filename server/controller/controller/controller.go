@@ -62,9 +62,6 @@ func Start(configPath string) {
 	serverCfg := config.DefaultConfig()
 	serverCfg.Load(configPath)
 	cfg := &serverCfg.ControllerConfig
-	logger.EnableFileLog(cfg.LogFile)
-	logLevel, _ := logging.LogLevel(cfg.LogLevel)
-	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN DeepFlow Controller ==============================")
 	log.Infof("controller config:\n%s", string(bytes))
