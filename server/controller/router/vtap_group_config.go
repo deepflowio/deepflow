@@ -17,6 +17,8 @@
 package router
 
 import (
+	"io"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
@@ -94,7 +96,7 @@ func updateVTapGroupAdvancedConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
 	vTapGroupConfig := &model.VTapGroupConfiguration{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
-	if err == nil {
+	if err == nil || err == io.EOF {
 		data, err := service.UpdateVTapGroupAdvancedConfig(lcuuid, vTapGroupConfig)
 		JsonResponse(c, data, err)
 	} else {
