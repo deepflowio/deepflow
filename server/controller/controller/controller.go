@@ -133,6 +133,7 @@ func Start(configPath string) {
 	router.SetInitStageForHealthChecker("Register routers init")
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
+	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
@@ -165,6 +166,9 @@ func Start(configPath string) {
 
 					// 数据节点检查
 					analyzerCheck.Start()
+
+					// vtap check
+					vtapCheck.Start()
 
 					// license分配和检查
 					vtapLicenseAllocation.Start()
