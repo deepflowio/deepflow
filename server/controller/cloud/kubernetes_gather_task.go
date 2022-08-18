@@ -57,6 +57,9 @@ func NewKubernetesGatherTask(
 			PodNetIPv4CIDRMaxMask: kubernetesGather.PodNetIPv4CIDRMaxMask,
 			PodNetIPv6CIDRMaxMask: kubernetesGather.PodNetIPv6CIDRMaxMask,
 		},
+		resource: kubernetes_gather_model.KubernetesGatherResource{
+			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
+		},
 		kCtx:             kCtx,
 		kCancel:          kCancel,
 		kubernetesGather: kubernetesGather,

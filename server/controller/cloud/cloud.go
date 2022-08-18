@@ -67,6 +67,9 @@ func NewCloud(domain mysql.Domain, interval int, cfg config.CloudConfig, ctx con
 		cfg:                     cfg,
 		cCtx:                    cCtx,
 		cCancel:                 cCancel,
+		resource: model.Resource{
+			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
+		},
 		taskCost: statsd.CloudTaskStatsd{
 			TaskCost: make(map[string][]int),
 		},
