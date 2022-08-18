@@ -37,6 +37,7 @@ type TSDBCache struct {
 	kernelVersion     *string
 	natIP             *string
 	pcapDataMountPath *string
+	name              *string
 	syncFlag          atomicbool.Bool
 }
 
@@ -52,6 +53,7 @@ func newTSDBCache(tsdb *models.Analyzer) *TSDBCache {
 		kernelVersion:     proto.String(tsdb.KernelVersion),
 		natIP:             proto.String(tsdb.NATIP),
 		pcapDataMountPath: proto.String(tsdb.PcapDataMountPath),
+		name:              proto.String(tsdb.Name),
 		syncFlag:          atomicbool.NewBool(false),
 	}
 }
@@ -92,6 +94,14 @@ func (c *TSDBCache) GetPcapDataMountPath() string {
 	return ""
 }
 
+func (c *TSDBCache) GetName() string {
+	if c.name != nil {
+		return *c.name
+	}
+
+	return ""
+}
+
 func (c *TSDBCache) setSyncFlag() {
 	c.syncFlag.Set()
 }
@@ -114,7 +124,7 @@ func (c *TSDBCache) UpdateSyncedAt(syncedAt time.Time) {
 }
 
 func (c *TSDBCache) UpdateSystemInfo(cpuNum int, memorySize int64, arch string, os string,
-	kernelVersion string, pcapDataMountPath string) {
+	kernelVersion string, pcapDataMountPath string, name string) {
 
 	c.cpuNum = cpuNum
 	c.memorySize = memorySize
@@ -122,6 +132,7 @@ func (c *TSDBCache) UpdateSystemInfo(cpuNum int, memorySize int64, arch string, 
 	c.os = &os
 	c.kernelVersion = &kernelVersion
 	c.pcapDataMountPath = &pcapDataMountPath
+	c.name = &name
 }
 
 type TSDBCacheMap struct {
