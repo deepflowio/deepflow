@@ -54,7 +54,7 @@ func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []clo
 	wanCloudData := []cloudmodel.IP{}
 	lanCloudData := []cloudmodel.IP{}
 	for _, cloudItem := range cloudData {
-		vinterface, exists := i.cache.VInterfaces[cloudItem.VInterfaceLcuuid]
+		vt, exists := i.cache.ToolDataSet.GetVInterfaceTypeByLcuuid(cloudItem.VInterfaceLcuuid)
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				rcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
@@ -62,7 +62,7 @@ func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []clo
 			))
 			continue
 		}
-		if vinterface.Type == common.VIF_TYPE_WAN {
+		if vt == common.VIF_TYPE_WAN {
 			wanCloudData = append(wanCloudData, cloudItem)
 		} else {
 			lanCloudData = append(lanCloudData, cloudItem)

@@ -39,16 +39,20 @@ func HealthRouter(e *gin.Engine) {
 		if curStage == OK {
 			JsonResponse(c, make(map[string]string), nil)
 		} else {
+			msg := fmt.Sprintf("server is in stage: %s now, time cost: %v", curStage, time.Since(curStageStartedAt))
+			log.Errorf(msg)
 			JsonResponse(
 				c, make(map[string]string),
-				&service.ServiceError{Status: common.SERVICE_UNAVAILABLE, Message: fmt.Sprintf("in stage: %s now, time cost: %v", curStage, time.Since(curStageStartedAt))},
+				&service.ServiceError{Status: common.SERVICE_UNAVAILABLE, Message: msg},
 			)
 		}
 	})
 }
 
 func SetInitStageForHealthChecker(s string) {
-	log.Infof("stage: %s, time cost: %v", curStage, time.Since(curStageStartedAt))
+	if curStage != "" {
+		log.Infof("stage: %s, time cost: %v", curStage, time.Since(curStageStartedAt))
+	}
 	curStage = s
 	curStageStartedAt = time.Now()
 }

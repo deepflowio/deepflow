@@ -108,6 +108,9 @@ func (i *VInterface) generateUpdateInfo(diffBase *cache.VInterface, cloudItem *c
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
+	if diffBase.Type != cloudItem.Type {
+		updateInfo["iftype"] = cloudItem.Type
+	}
 	return updateInfo, len(updateInfo) > 0
 }
 

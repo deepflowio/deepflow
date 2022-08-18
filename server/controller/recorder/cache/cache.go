@@ -468,14 +468,12 @@ func (c *Cache) refreshNetworks() []int {
 func (c *Cache) AddSubnets(items []*mysql.Subnet) {
 	for _, item := range items {
 		c.DiffBaseDataSet.addSubnet(item, c.Sequence)
-		c.ToolDataSet.addSubnet(item)
 	}
 }
 
 func (c *Cache) DeleteSubnets(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteSubnet(lcuuid)
-		c.ToolDataSet.deleteSubnet(lcuuid)
 	}
 }
 

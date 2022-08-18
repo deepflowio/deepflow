@@ -37,10 +37,6 @@ type ToolDataSet struct {
 	PublicNetworkID   int
 	NetworkLcuuidToID map[string]int
 	NetworkIDToLcuuid map[int]string
-	// TODO 删除subnet index相关代码
-	// NetworkIDToSubnetIndexes map[int][]int
-
-	// SubnetLcuuidToIndex     map[string]int
 
 	VRouterLcuuidToID map[string]int
 
@@ -178,6 +174,7 @@ func NewToolDataSet() ToolDataSet {
 func (t *ToolDataSet) addRegion(item *mysql.Region) {
 	t.RegionLcuuidToID[item.Lcuuid] = item.ID
 	t.RegionIDToLcuuid[item.ID] = item.Lcuuid
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteRegion(lcuuid string) {
@@ -186,27 +183,33 @@ func (t *ToolDataSet) deleteRegion(lcuuid string) {
 	if exists {
 		delete(t.RegionIDToLcuuid, id)
 	}
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_REGION_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addHost(item *mysql.Host) {
 	t.HostLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteHost(lcuuid string) {
 	delete(t.HostLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_HOST_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addVM(item *mysql.VM) {
 	t.VMLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteVM(lcuuid string) {
 	delete(t.VMLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_VM_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addVPC(item *mysql.VPC) {
 	t.VPCLcuuidToID[item.Lcuuid] = item.ID
 	t.VPCIDToLcuuid[item.ID] = item.Lcuuid
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteVPC(lcuuid string) {
@@ -215,11 +218,13 @@ func (t *ToolDataSet) deleteVPC(lcuuid string) {
 		delete(t.VPCIDToLcuuid, id)
 	}
 	delete(t.VPCLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_VPC_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addNetwork(item *mysql.Network) {
 	t.NetworkLcuuidToID[item.Lcuuid] = item.ID
 	t.NetworkIDToLcuuid[item.ID] = item.Lcuuid
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteNetwork(lcuuid string) {
@@ -228,43 +233,27 @@ func (t *ToolDataSet) deleteNetwork(lcuuid string) {
 		delete(t.NetworkIDToLcuuid, id)
 	}
 	delete(t.NetworkLcuuidToID, lcuuid)
-}
-
-func (t *ToolDataSet) addSubnet(item *mysql.Subnet) {
-	// t.SubnetLcuuidToIndex[item.Lcuuid] = item.NetIndex
-	// t.NetworkIDToSubnetIndexes[item.NetworkID] = append(
-	// 	t.NetworkIDToSubnetIndexes[item.NetworkID], item.NetIndex,
-	// )
-}
-
-func (t *ToolDataSet) deleteSubnet(lcuuid string) {
-	// id, exists := t.GetNetworkIDByLcuuid(lcuuid)
-	// if exists {
-	// 	index, exists := t.GetSubnetIndexByLcuuid(lcuuid)
-	// 	if exists {
-	// 		t.NetworkIDToSubnetIndexes[id] = append(
-	// 			t.NetworkIDToSubnetIndexes[id][:index],
-	// 			t.NetworkIDToSubnetIndexes[id][index+1:]...,
-	// 		)
-	// 	}
-	// }
-	// delete(t.SubnetLcuuidToIndex, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addVRouter(item *mysql.VRouter) {
 	t.VRouterLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteVRouter(lcuuid string) {
 	delete(t.VRouterLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_VROUTER_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addDHCPPort(item *mysql.DHCPPort) {
 	t.DHCPPortLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteDHCPPort(lcuuid string) {
 	delete(t.DHCPPortLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
@@ -320,6 +309,7 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 			t.PodIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
 	}
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteVInterface(lcuuid string) {
@@ -329,67 +319,83 @@ func (t *ToolDataSet) deleteVInterface(lcuuid string) {
 	delete(t.VInterfaceLcuuidToDeviceID, lcuuid)
 	delete(t.VInterfaceLcuuidToIndex, lcuuid)
 	delete(t.VInterfaceLcuuidToType, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addSecurityGroup(item *mysql.SecurityGroup) {
 	t.SecurityGroupLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteSecurityGroup(lcuuid string) {
 	delete(t.SecurityGroupLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addNATGateway(item *mysql.NATGateway) {
 	t.NATGatewayLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteNATGateway(lcuuid string) {
 	delete(t.NATGatewayLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addLB(item *mysql.LB) {
 	t.LBLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteLB(lcuuid string) {
 	delete(t.LBLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_LB_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addLBListener(item *mysql.LBListener) {
 	t.LBListenerLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteLBListener(lcuuid string) {
 	delete(t.LBListenerLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addRDSInstance(item *mysql.RDSInstance) {
 	t.RDSInstanceLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteRDSInstance(lcuuid string) {
 	delete(t.RDSInstanceLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addRedisInstance(item *mysql.RedisInstance) {
 	t.RedisInstanceLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteRedisInstance(lcuuid string) {
 	delete(t.RedisInstanceLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPodCluster(item *mysql.PodCluster) {
 	t.PodClusterLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodCluster(lcuuid string) {
 	delete(t.PodClusterLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPodNode(item *mysql.PodNode) {
 	t.PodNodeLcuuidToID[item.Lcuuid] = item.ID
 	t.PodNodeIDToLcuuid[item.ID] = item.Lcuuid
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodNode(lcuuid string) {
@@ -398,19 +404,23 @@ func (t *ToolDataSet) deletePodNode(lcuuid string) {
 		delete(t.PodNodeIDToLcuuid, id)
 	}
 	delete(t.PodNodeLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_NODE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPodNamespace(item *mysql.PodNamespace) {
 	t.PodNamespaceLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodNamespace(lcuuid string) {
 	delete(t.PodNamespaceLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPodIngress(item *mysql.PodIngress) {
 	t.PodIngressLcuuidToID[item.Lcuuid] = item.ID
 	t.PodIngressIDToLcuuid[item.ID] = item.Lcuuid
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodIngress(lcuuid string) {
@@ -419,35 +429,43 @@ func (t *ToolDataSet) deletePodIngress(lcuuid string) {
 		delete(t.PodIngressIDToLcuuid, id)
 	}
 	delete(t.PodIngressLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_INGRESS_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPodIngressRule(item *mysql.PodIngressRule) {
 	t.PodIngressRuleLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodIngressRule(lcuuid string) {
 	delete(t.PodIngressRuleLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPodService(item *mysql.PodService) {
 	t.PodServiceLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodService(lcuuid string) {
 	delete(t.PodServiceLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPodGroup(item *mysql.PodGroup) {
 	t.PodGroupLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePodGroup(lcuuid string) {
 	delete(t.PodGroupLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
 }
 
 func (f *ToolDataSet) addPodReplicaSet(item *mysql.PodReplicaSet) {
 	f.PodReplicaSetLcuuidToID[item.Lcuuid] = item.ID
 	f.PodReplicaSetIDToLcuuid[item.ID] = item.Lcuuid
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (f *ToolDataSet) deletePodReplicaSet(lcuuid string) {
@@ -456,14 +474,17 @@ func (f *ToolDataSet) deletePodReplicaSet(lcuuid string) {
 		delete(f.PodReplicaSetIDToLcuuid, id)
 	}
 	delete(f.PodReplicaSetLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addPod(item *mysql.Pod) {
 	t.PodLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deletePod(lcuuid string) {
 	delete(t.PodLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_POD_EN, lcuuid))
 }
 
 func (t *ToolDataSet) GetRegionIDByLcuuid(lcuuid string) (int, bool) {
@@ -625,36 +646,6 @@ func (t *ToolDataSet) GetNetworkLcuuidByID(id int) (string, bool) {
 	}
 }
 
-// TODO 因为批量添加，应该要在生成id后立刻刷新缓存；并提供批量添加失败的rollback；暂不实现
-// func (t *ToolDataSet) GenerateSubnetIndex(networkID int) int {
-// 	idxes := t.NetworkIDToSubnetIndexes[networkID]
-// 	i := 1
-// 	for _, idx := range idxes {
-// 		if i < idx {
-// 			break
-// 		}
-// 		i = i + 1
-// 	}
-// 	return i
-// }
-
-// func (t *ToolDataSet) GetSubnetIndexByLcuuid(lcuuid string) (int, bool) {
-// 	index, exists := t.SubnetLcuuidToIndex[lcuuid]
-// 	if exists {
-// 		return index, true
-// 	}
-// 	log.Warningf("cache %s index (lcuuid: %s) not found", rcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid)
-// 	var subnet mysql.Subnet
-// 	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&subnet)
-// 	if result.RowsAffected == 1 {
-// 		t.addSubnet(&subnet)
-// 		return subnet.NetIndex, true
-// 	} else {
-// 		log.Error(dbResourceByLcuuidNotFound(rcommon.RESOURCE_TYPE_SUBNET_EN, lcuuid))
-// 		return index, false
-// 	}
-// }
-
 func (t *ToolDataSet) GetVRouterIDByLcuuid(lcuuid string) (int, bool) {
 	id, exists := t.VRouterLcuuidToID[lcuuid]
 	if exists {
@@ -703,6 +694,23 @@ func (t *ToolDataSet) GetVInterfaceIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
 		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetVInterfaceTypeByLcuuid(lcuuid string) (int, bool) {
+	vt, exists := t.VInterfaceLcuuidToType[lcuuid]
+	if exists {
+		return vt, true
+	}
+	log.Warningf("cache %s type (lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+	var vinterface mysql.VInterface
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vinterface)
+	if result.RowsAffected == 1 {
+		t.addVInterface(&vinterface)
+		return vinterface.Type, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
+		return vt, false
 	}
 }
 
