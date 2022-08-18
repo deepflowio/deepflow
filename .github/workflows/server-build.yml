@@ -8,6 +8,8 @@ on:
     paths:
       - 'server/**'
       - 'message/**'
+    tags:
+      - '*'
   workflow_dispatch:
     inputs:
       ref:
