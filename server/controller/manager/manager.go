@@ -142,7 +142,7 @@ func (m *Manager) Start() {
 				log.Error("hostname is null")
 				continue
 			}
-			if ret := mysql.Db.Where("name = ?", hostName).Find(&controller); ret.Error != nil {
+			if ret := mysql.Db.Where("name = ?", hostName).First(&controller); ret.Error != nil {
 				log.Errorf("controller (%s) not in db", hostName)
 				continue
 			}
