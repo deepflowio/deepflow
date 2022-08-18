@@ -96,7 +96,8 @@ func (e *TSDBEvent) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api
 			in.GetArch(),
 			in.GetOs(),
 			in.GetKernelVersion(),
-			pcapDataMountPath)
+			pcapDataMountPath,
+			in.GetHost())
 		tsdbCache.UpdateSyncedAt(time.Now())
 	}
 
