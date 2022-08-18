@@ -60,15 +60,16 @@ func (s *StatSource) String() string {
 }
 
 var (
-	processName string
-	hostname    string
-	lock        sync.Mutex
-	preHooks    []func()
-	statSources = LinkedList{}
-	remotes     = []string{}
-	dfRemote    string
-	remoteIndex = -1
-	connection  client.Client
+	processName       string
+	processNameJoiner string = "."
+	hostname          string
+	lock              sync.Mutex
+	preHooks          []func()
+	statSources       = LinkedList{}
+	remotes           = []string{}
+	dfRemote          string
+	remoteIndex       = -1
+	connection        client.Client
 
 	statsdClients  = make([]*statsd.Client, 2) // could be nil
 	dfstatsdClient *UDPClient                  // could be nil
@@ -168,7 +169,7 @@ func collectBatchPoints() client.BatchPoints {
 		statSource.skip = int(max(statSource.interval, MinInterval) / TICK_CYCLE)
 
 		fields := counterToFields(statSource.countable.GetCounter())
-		point, _ := client.NewPoint(processName+"."+statSource.modulePrefix+statSource.module, statSource.tags, fields, timestamp)
+		point, _ := client.NewPoint(processName+processNameJoiner+statSource.modulePrefix+statSource.module, statSource.tags, fields, timestamp)
 		bp.AddPoint(point)
 	}
 	lock.Unlock()
@@ -373,6 +374,11 @@ func setHostname(name string) {
 func setProcessName(name string) {
 	log.Info("Process name changed to", name)
 	processName = name
+}
+
+func setProcessNameJoiner(joiner string) {
+	log.Info("Process name joiner changed to", joiner)
+	processNameJoiner = joiner
 }
 
 func winBase(path string) string {
