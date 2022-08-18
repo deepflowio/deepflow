@@ -53,7 +53,13 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		log.Errorf("get env(%s) data failed", POD_NAME_KEY)
 		return nil
 	}
-	log.Info("controller host_name:", name)
+	nodeName := os.Getenv(NODE_NAME_KEY)
+	if name == "" {
+		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
+		return nil
+	}
+
+	log.Infof("controller name (%s), node_name (%s)", name, nodeName)
 	return &models.Controller{
 		Name:               name,
 		CPUNum:             int(envData.CpuNum),
@@ -67,5 +73,6 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		VTapMax:            CONTROLLER_VTAP_MAX,
 		Lcuuid:             uuid.NewString(),
 		RegionDomainPrefix: c.regionDomainPrefix,
+		NodeName:           nodeName,
 	}
 }
