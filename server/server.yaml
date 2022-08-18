@@ -1,8 +1,9 @@
+# logfile path
+log-file: /var/log/deepflow/server.log
+# loglevel: "debug/info/warn/error"
+log-level: info
+
 controller:
-  # logfile path
-  log-file: /var/log/deepflow/server.log
-  # loglevel: "debug/info/warn/error"
-  log-level: info
   # controller http listenport
   listen-port: 20417
 
@@ -141,10 +142,6 @@ controller:
     exclude_ip_ranges:
 
 querier:
-  # logfile path
-  log-file: /var/log/deepflow/server.log
-  # loglevel: "debug/info/warn/error"
-  log-level: info
   # querier http listenport
   listen-port: 20416
 
@@ -247,12 +244,6 @@ ingester:
 
   ## syslog是否写入elasticsearch，默认启用
   #es-syslog: true
-
-  ## logfile path
-  #log-file: /var/log/ingester/ingester.log
-
-  ## loglevel: "debug/info/warn/error"
-  #log-level: info
 
   ## profiler
   #profiler: false

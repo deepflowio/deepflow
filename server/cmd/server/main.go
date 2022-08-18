@@ -26,9 +26,14 @@ import (
 	"sync"
 	"syscall"
 
+	"io/ioutil"
+
 	"github.com/deepflowys/deepflow/server/controller/controller"
 	"github.com/deepflowys/deepflow/server/ingester/ingester"
+	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/querier/querier"
+
+	yaml "gopkg.in/yaml.v2"
 
 	logging "github.com/op/go-logging"
 )
@@ -45,6 +50,24 @@ var version = flag.Bool("v", false, "Display the version")
 
 var RevCount, Revision, CommitDate, goVersion string
 
+type Config struct {
+	LogFile  string `default:"/var/log/deepflow/server.log" yaml:"log-file"`
+	LogLevel string `default:"info" yaml:"log-level"`
+}
+
+func loadConfig(path string) *Config {
+	config := &Config{}
+	configBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		panic(fmt.Sprintf("Read config file path: %s, error: %s", err, path))
+	}
+
+	if err = yaml.Unmarshal(configBytes, &config); err != nil {
+		panic(fmt.Sprintf("Unmarshal yaml error: %s", err))
+	}
+	return config
+}
+
 func main() {
 	flag.Parse()
 	if *version {
@@ -56,6 +79,11 @@ func main() {
 		)
 		os.Exit(0)
 	}
+
+	cfg := loadConfig(*configPath)
+	logger.EnableFileLog(cfg.LogFile)
+	logLevel, _ := logging.LogLevel(cfg.LogLevel)
+	logging.SetLevel(logLevel, "")
 
 	go controller.Start(*configPath)
 	go querier.Start(*configPath)
