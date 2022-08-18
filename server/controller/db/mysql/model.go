@@ -824,6 +824,7 @@ type Controller struct {
 	NATIPEnabled       int       `gorm:"column:nat_ip_enabled;default:0" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	NodeType           int       `gorm:"column:node_type;type:int;default:2" json:"NODE_TYPE"`  // region node type 1.master 2.slave
 	RegionDomainPrefix string    `gorm:"column:region_domain_prefix;type:varchar(256);default:''" json:"REGION_DOMAIN_PREFIX"`
+	NodeName           string    `gorm:"column:node_name;type:char(64);default:null" json:"NODE_NAME"`
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 

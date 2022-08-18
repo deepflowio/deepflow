@@ -32,6 +32,8 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("common")
@@ -183,13 +185,44 @@ func GetUUID(str string, namespace uuid.UUID) string {
 }
 
 // 功能：判断当前控制器是否为masterController
-func IsMasterController() (bool, string, error) {
+func IsMasterController() (bool, error) {
+	// 获取本机hostname
+	hostName := os.Getenv(POD_NAME_KEY)
+	if len(hostName) == 0 {
+		log.Error("hostname is null")
+		return false, errors.New("hostname is null")
+	}
+
+	// get node name
+	nodeName := os.Getenv(NODE_NAME_KEY)
+	if len(nodeName) == 0 {
+		log.Error("nodename is null")
+		return false, errors.New("nodename is null")
+	}
+
+	// 通过sideCar API获取MasterControllerName
+	url := fmt.Sprintf("http://%s:%d", LOCALHOST, MASTER_CONTROLLER_CHECK_PORT)
+	response, err := CURLPerform("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+	masterControllerName := response.Get("name").MustString()
+
+	// 比较是否相同返回结果
+	if hostName != masterControllerName && nodeName != masterControllerName {
+		return false, nil
+	}
+	return true, nil
+}
+
+func IsMasterControllerAndReturnName() (bool, string, error) {
 	// 获取本机hostname
 	hostName := os.Getenv(POD_NAME_KEY)
 	if len(hostName) == 0 {
 		log.Error("hostname is null")
 		return false, "", errors.New("hostname is null")
 	}
+
 	// 通过sideCar API获取MasterControllerName
 	url := fmt.Sprintf("http://%s:%d", LOCALHOST, MASTER_CONTROLLER_CHECK_PORT)
 	response, err := CURLPerform("GET", url, nil)
@@ -198,11 +231,18 @@ func IsMasterController() (bool, string, error) {
 	}
 	masterControllerName := response.Get("name").MustString()
 
-	// 比较是否相同返回结果
-	if hostName != masterControllerName {
-		return false, masterControllerName, nil
+	var masterController mysql.Controller
+	if ret := mysql.Db.Where(
+		"node_name = ? OR name = ?", masterControllerName, masterControllerName,
+	).First(&masterController); ret.Error != nil {
+		return false, "", err
 	}
-	return true, masterControllerName, nil
+
+	// 比较是否相同返回结果
+	if hostName != masterController.Name {
+		return false, hostName, nil
+	}
+	return true, hostName, nil
 }
 
 func IsValueInSliceString(value string, list []string) bool {

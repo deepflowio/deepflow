@@ -411,6 +411,10 @@ func (n *NodeInfo) isRegisterController() {
 			dbController.NodeType = data.NodeType
 			changed = true
 		}
+		if dbController.NodeName != data.NodeName {
+			dbController.NodeName = data.NodeName
+			changed = true
+		}
 		if changed {
 			controllerMgr.Save(dbController)
 		}
