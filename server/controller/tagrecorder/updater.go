@@ -46,24 +46,22 @@ type UpdaterBase[MT MySQLChModel, KT ChModelKey] struct {
 func (b *UpdaterBase[MT, KT]) Refresh() {
 	newKeyToDBItem, newOK := b.dataGenerator.generateNewData()
 	oldKeyToDBItem, oldOK := b.generateOldData()
-	log.Infof("newKeyToDBItem: %#v", newKeyToDBItem)
-	log.Infof("oldKeyToDBItem: %#v", oldKeyToDBItem)
 	if newOK && oldOK {
 		for key, newDBItem := range newKeyToDBItem {
 			oldDBItem, exists := oldKeyToDBItem[key]
 			if !exists {
-				b.add(newDBItem)
+				b.add(newDBItem, key)
 			} else {
 				updateInfo, ok := b.dataGenerator.generateUpdateInfo(oldDBItem, newDBItem)
 				if ok {
-					b.update(oldDBItem, updateInfo)
+					b.update(oldDBItem, updateInfo, key)
 				}
 			}
 		}
 		for key, oldDBItem := range oldKeyToDBItem {
 			_, exists := newKeyToDBItem[key]
 			if !exists {
-				b.delete(oldDBItem)
+				b.delete(oldDBItem, key)
 			}
 		}
 	}
@@ -84,29 +82,29 @@ func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 }
 
 // TODO 是否需要批量处理
-func (b *UpdaterBase[MT, KT]) add(dbItem MT) {
+func (b *UpdaterBase[MT, KT]) add(dbItem MT, key KT) {
 	err := mysql.Db.Create(&dbItem).Error
 	if err != nil {
-		log.Errorf("add %s (%v) failed: %s", b.resourceTypeName, dbItem, err)
+		log.Errorf("add %s %v (%+v) failed: %s", b.resourceTypeName, key, dbItem, err)
 		return
 	}
-	log.Infof("add %s (%v) success", b.resourceTypeName, dbItem)
+	log.Infof("add %s %v (%+v) success", b.resourceTypeName, key, dbItem)
 }
 
-func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}) {
+func (b *UpdaterBase[MT, KT]) update(oldDBItem MT, updateInfo map[string]interface{}, key KT) {
 	err := mysql.Db.Model(&oldDBItem).Updates(updateInfo).Error
 	if err != nil {
-		log.Errorf("update %s (%v) failed: %s", b.resourceTypeName, oldDBItem, err)
+		log.Errorf("update %s %v (%+v) failed: %s", b.resourceTypeName, key, oldDBItem, err)
 		return
 	}
-	log.Infof("update %s (%v, %v) success", b.resourceTypeName, oldDBItem, updateInfo)
+	log.Infof("update %s %v (%+v, %v) success", b.resourceTypeName, key, oldDBItem, updateInfo)
 }
 
-func (b *UpdaterBase[MT, KT]) delete(dbItem MT) {
+func (b *UpdaterBase[MT, KT]) delete(dbItem MT, key KT) {
 	err := mysql.Db.Delete(&dbItem).Error
 	if err != nil {
-		log.Errorf("delete %s (%v) failed: %s", b.resourceTypeName, dbItem, err)
+		log.Errorf("delete %s %v (%+v) failed: %s", b.resourceTypeName, key, dbItem, err)
 		return
 	}
-	log.Infof("delete %s (%v) success", b.resourceTypeName, dbItem)
+	log.Infof("delete %s %v (%+v) success", b.resourceTypeName, key, dbItem)
 }
