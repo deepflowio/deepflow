@@ -58,6 +58,10 @@ type Config struct {
 
 func (c *Config) Convert() {
 	nodeIP := os.Getenv(common.NODE_IP_KEY)
+	if nodeIP == "" {
+		log.Errorf("get env(%s) data failed", common.NODE_IP_KEY)
+		return
+	}
 	ip := net.ParseIP(nodeIP)
 	if ip == nil {
 		log.Errorf("IP(%s) address format is incorrect", nodeIP)
