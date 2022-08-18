@@ -1,0 +1,1 @@
+initctl reload-configuration

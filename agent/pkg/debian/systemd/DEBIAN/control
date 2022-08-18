@@ -1,0 +1,8 @@
+Package: deepflow-agent
+Version: 1.0-XXXX
+Section: net
+Priority: optional
+Maintainer: deepflow@yunshan.net
+Provides: Yunshan
+Architecture: amd64
+Description: Deepflow agent
