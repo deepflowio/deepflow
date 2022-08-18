@@ -61,6 +61,9 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 			log.Error(err)
 			return nil, false
 		}
+		if subnetID == 0 {
+			continue
+		}
 		ip := subnetIDIPList[1]
 		itemMap := make(map[string]interface{})
 		itemMap["IP"] = ip
