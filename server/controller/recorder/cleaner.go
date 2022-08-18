@@ -27,7 +27,7 @@ import (
 func delete[MT constraint.MySQLSoftDeleteModel](expiredAt time.Time) {
 	err := mysql.Db.Unscoped().Where("deleted_at < ?", expiredAt).Delete(new(MT)).Error
 	if err != nil {
-		log.Errorf("mysql delete resource: %v failed: %s", new(MT), err)
+		log.Errorf("mysql delete resource failed: %v", err)
 	}
 }
 
