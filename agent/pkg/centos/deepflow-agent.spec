@@ -24,7 +24,7 @@ cp %pwd/output/target/x86_64-unknown-linux-musl/release/deepflow-agent $RPM_BUIL
 cp %pwd/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl $RPM_BUILD_ROOT/usr/sbin/
 cp %pwd/output/src/ebpf/deepflow-ebpfctl $RPM_BUILD_ROOT/usr/sbin/
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system/
-cp %pwd/deepflow-agent.service $RPM_BUILD_ROOT/lib/systemd/system/
+cp %pwd/pkg/deepflow-agent.service $RPM_BUILD_ROOT/lib/systemd/system/
 mkdir -p $RPM_BUILD_ROOT/etc/
 cp %pwd/config/deepflow-agent.yaml $RPM_BUILD_ROOT/etc/
 
