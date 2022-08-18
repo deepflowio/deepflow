@@ -65,7 +65,7 @@ func (r *Recorder) Start() {
 		for {
 			select {
 			case <-ticker.C:
-				r.runNewRefreshCache()
+				r.runNewRefreshCache() // TODO 添加cache与db数据对比，便于发现缓存异常
 			case <-r.ctx.Done():
 				break LOOP
 			}
@@ -278,6 +278,7 @@ func (r *Recorder) executeUpdators(updatersInUpdateOrder []updater.ResourceUpdat
 }
 
 func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (state int, errMsg string) {
+	log.Infof("cloud domain (%s) state info: %s, %s", r.domainName, domainResource.ErrorState, domainResource.ErrorMessage)
 	// 状态优先级 exception > warning > sunccess
 	stateToLevel := map[int]int{
 		common.RESOURCE_STATE_CODE_SUCCESS:   1,
@@ -291,7 +292,8 @@ func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (st
 	errMsg = domainResource.ErrorMessage
 
 	var subDomainErrMsgs []string
-	for _, subDomainResource := range domainResource.SubDomainResources {
+	for subDomainLcuuid, subDomainResource := range domainResource.SubDomainResources {
+		log.Infof("cloud sub_domain (%s) state info: %s, %s", subDomainLcuuid, subDomainResource.ErrorState, subDomainResource.ErrorMessage)
 		if stateToLevel[subDomainResource.ErrorState] > stateToLevel[state] {
 			state = subDomainResource.ErrorState
 		}

@@ -6,6 +6,8 @@ on:
     paths:
       - 'agent/**'
       - 'message/**'
+    tags:
+      - '*'
   workflow_dispatch:
     inputs:
       ref:
