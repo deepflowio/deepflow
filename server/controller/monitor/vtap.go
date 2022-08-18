@@ -56,7 +56,7 @@ func (v *VTapCheck) launchServerCheck() {
 		switch vtap.Type {
 		case common.VTAP_TYPE_WORKLOAD_V:
 			var vm mysql.VM
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&vm); ret.Error != nil {
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
 				log.Infof("delete vtap: %s %s, because no related vm", vtap.Name, vtap.Lcuuid)
 				mysql.Db.Delete(&vtap)
 			} else {
@@ -81,7 +81,7 @@ func (v *VTapCheck) launchServerCheck() {
 
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_EXSI, common.VTAP_TYPE_HYPER_V:
 			var host mysql.Host
-			if ret := mysql.Db.Where("ip = ?", vtap.LaunchServer).Find(&host); ret.Error != nil {
+			if ret := mysql.Db.Where("ip = ?", vtap.LaunchServer).First(&host); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
 				mysql.Db.Delete(&vtap)
 			} else {
@@ -105,7 +105,7 @@ func (v *VTapCheck) launchServerCheck() {
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
 			var podNode mysql.PodNode
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&podNode); ret.Error != nil {
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
 				mysql.Db.Delete(&vtap)
 			} else {
@@ -165,7 +165,7 @@ func (v *VTapCheck) typeCheck() {
 	for _, vtap := range vtaps {
 		if vtap.Type == common.VTAP_TYPE_WORKLOAD_V || vtap.Type == common.VTAP_TYPE_WORKLOAD_P {
 			var vm mysql.VM
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&vm); ret.Error != nil {
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&vm); ret.Error != nil {
 				continue
 			}
 			podNodeID, ok := vmIDToPodNodeID[vm.ID]
@@ -189,7 +189,7 @@ func (v *VTapCheck) typeCheck() {
 			}
 		} else {
 			var podNode mysql.PodNode
-			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).Find(&podNode); ret.Error != nil {
+			if ret := mysql.Db.Where("lcuuid = ?", vtap.Lcuuid).First(&podNode); ret.Error != nil {
 				continue
 			}
 			if _, ok := podNodeIDToVMID[podNode.ID]; !ok {
