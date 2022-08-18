@@ -147,7 +147,7 @@ func Start(configPath string) {
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
 		for range time.Tick(time.Minute) {
-			isMasterController, curMasterController, err := common.IsMasterController()
+			isMasterController, curMasterController, err := common.IsMasterControllerAndReturnName()
 			if err != nil {
 				continue
 			}
@@ -202,7 +202,7 @@ func migrateDB(cfg *config.ControllerConfig) {
 	// try to check whether it is master controller until successful,
 	// migrate if it is master, exit if not.
 	for range time.Tick(time.Second * 5) {
-		isMasterController, _, err := common.IsMasterController()
+		isMasterController, err := common.IsMasterController()
 		err = nil
 		isMasterController = true
 		if err == nil && isMasterController {
