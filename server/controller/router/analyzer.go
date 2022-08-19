@@ -31,7 +31,7 @@ func AnalyzerRouter(e *gin.Engine, m *monitor.AnalyzerCheck, cfg *config.Control
 	e.GET("/v1/analyzers/:lcuuid/", getAnalyzer)
 	e.GET("/v1/analyzers/", getAnalyzers)
 	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(m, cfg))
-	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(m))
+	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(m, cfg))
 }
 
 func getAnalyzer(c *gin.Context) {
@@ -86,8 +86,15 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 	})
 }
 
-func deleteAnalyzer(m *monitor.AnalyzerCheck) gin.HandlerFunc {
+func deleteAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		// if not master controller，should forward to master controller
+		isMasterController, masterControllerName, _ := common.IsMasterControllerAndReturnName()
+		if !isMasterController {
+			forwardMasterController(c, masterControllerName, cfg.ListenPort)
+			return
+		}
+
 		lcuuid := c.Param("lcuuid")
 		data, err := service.DeleteAnalyzer(lcuuid, m)
 		JsonResponse(c, data, err)
