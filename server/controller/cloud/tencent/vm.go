@@ -1,0 +1,93 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package tencent
+
+import (
+	"time"
+
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	uuid "github.com/satori/go.uuid"
+)
+
+func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGroup, error) {
+	log.Debug("get vms starting")
+	var vms []model.VM
+	var vmSGs []model.VMSecurityGroup
+	states := map[string]int{
+		"RUNNING": common.VM_STATE_RUNNING,
+		"STOPPED": common.VM_STATE_STOPPED,
+	}
+
+	attrs := []string{"InstanceId", "InstanceName", "InstanceState", "SecurityGroupIds", "VirtualPrivateCloud", "CreatedTime"}
+	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeInstances", region.name, "InstanceSet", true, map[string]interface{}{})
+	if err != nil {
+		log.Errorf("vm request tencent api error: (%s)", err.Error())
+		return []model.VM{}, []model.VMSecurityGroup{}, nil
+	}
+	for _, vData := range resp {
+		if !t.checkRequiredAttributes(vData, attrs) {
+			continue
+		}
+		vmName := vData.Get("InstanceName").MustString()
+		vpcID := vData.Get("VirtualPrivateCloud").Get("VpcId").MustString()
+		if vpcID == "" {
+			log.Infof("vm (%s) vpc not found", vmName)
+			continue
+		}
+
+		vmID := vData.Get("InstanceId").MustString()
+		vmLcuuid := common.GetUUID(vmID, uuid.Nil)
+
+		vmState := vData.Get("InstanceState").MustString()
+		state, ok := states[vmState]
+		if !ok {
+			state = common.VM_STATE_EXCEPTION
+		}
+
+		vmCteateAt := vData.Get("CreatedTime").MustString()
+		createAt, err := time.ParseInLocation(common.GO_BIRTHDAY, vmCteateAt, time.Local)
+		if err != nil {
+			log.Warningf("vm (%s) created time format error: %s", vmName, err.Error())
+		}
+
+		azID := vData.Get("Placement").Get("Zone").MustString()
+		vms = append(vms, model.VM{
+			Lcuuid:       vmLcuuid,
+			Name:         vmName,
+			Label:        vmID,
+			State:        state,
+			CreatedAt:    createAt,
+			VPCLcuuid:    common.GetUUID(vpcID, uuid.Nil),
+			AZLcuuid:     common.GetUUID(t.uuidGenerate+azID, uuid.Nil),
+			RegionLcuuid: region.lcuuid,
+		})
+
+		sgIDs := vData.Get("SecurityGroupIds")
+		for s := range sgIDs.MustArray() {
+			sgID := sgIDs.GetIndex(s).MustString()
+			vmSGs = append(vmSGs, model.VMSecurityGroup{
+				Lcuuid:              common.GetUUID(vmLcuuid+sgID, uuid.Nil),
+				SecurityGroupLcuuid: common.GetUUID(sgID, uuid.Nil),
+				VMLcuuid:            vmLcuuid,
+				Priority:            s,
+			})
+		}
+	}
+	log.Debug("get vms complete")
+	return vms, vmSGs, nil
+}
