@@ -51,6 +51,7 @@ require (
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.2
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.479
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2

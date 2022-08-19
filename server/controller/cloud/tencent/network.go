@@ -1,0 +1,72 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package tencent
+
+import (
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/satori/go.uuid"
+)
+
+func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.VInterface, error) {
+	log.Debug("get networks starting")
+	var networks []model.Network
+	var netVinterfaces []model.VInterface
+
+	attrs := []string{"SubnetId", "SubnetName", "VpcId", "CidrBlock"}
+	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeSubnets", region.name, "SubnetSet", true, map[string]interface{}{})
+	if err != nil {
+		log.Errorf("network request tencent api error: (%s)", err.Error())
+		return []model.Network{}, []model.VInterface{}, nil
+	}
+	for _, nData := range resp {
+		if !t.checkRequiredAttributes(nData, attrs) {
+			continue
+		}
+		vpcID := nData.Get("VpcId").MustString()
+		subnetID := nData.Get("SubnetId").MustString()
+		azID := nData.Get("Zone").MustString()
+		networkLcuuid := common.GetUUID(subnetID, uuid.Nil)
+		vpcLcuuid := common.GetUUID(vpcID, uuid.Nil)
+		networks = append(networks, model.Network{
+			Lcuuid:         networkLcuuid,
+			Name:           nData.Get("SubnetName").MustString(),
+			SegmentationID: 1,
+			VPCLcuuid:      vpcLcuuid,
+			Shared:         false,
+			External:       false,
+			NetType:        common.NETWORK_TYPE_LAN,
+			AZLcuuid:       common.GetUUID(t.uuidGenerate+"_"+azID, uuid.Nil),
+			RegionLcuuid:   region.lcuuid,
+		})
+		routeTableID := nData.Get("RouteTableId").MustString()
+		if routeTableID != "" {
+			netVinterfaces = append(netVinterfaces, model.VInterface{
+				Lcuuid:        common.GetUUID(subnetID+routeTableID, uuid.Nil),
+				Type:          common.VIF_TYPE_LAN,
+				Mac:           common.VIF_DEFAULT_MAC,
+				DeviceLcuuid:  common.GetUUID(routeTableID, uuid.Nil),
+				DeviceType:    common.VIF_DEVICE_TYPE_VROUTER,
+				NetworkLcuuid: networkLcuuid,
+				VPCLcuuid:     vpcLcuuid,
+				RegionLcuuid:  region.lcuuid,
+			})
+		}
+	}
+	log.Debug("get networks complete")
+	return networks, netVinterfaces, nil
+}
