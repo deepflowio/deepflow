@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
@@ -64,6 +65,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					tagItem, ok = tag.GetTag("tag", db, table, "default")
 					filter := fmt.Sprintf(tagItem.NotNullFilter, preAsTag)
 					return &view.Expr{Value: "(" + filter + ")"}, true
+				} else if common.IsValueInSliceString(preAsTag, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
+					filter := fmt.Sprintf("%s is not null", preAsTag)
+					return &view.Expr{Value: "(" + filter + ")"}, true
 				}
 				return &view.Expr{}, false
 			}
@@ -87,6 +91,9 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 			} else if strings.HasPrefix(name, "tag.") || strings.HasPrefix(name, "attribute.") {
 				tagItem, ok = tag.GetTag("tag", db, table, "default")
 				filter := fmt.Sprintf(tagItem.NotNullFilter, name)
+				return &view.Expr{Value: "(" + filter + ")"}, true
+			} else if common.IsValueInSliceString(name, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
+				filter := fmt.Sprintf("%s is not null", name)
 				return &view.Expr{Value: "(" + filter + ")"}, true
 			}
 			return &view.Expr{}, false
