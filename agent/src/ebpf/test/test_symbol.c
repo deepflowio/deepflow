@@ -35,9 +35,6 @@
 #include <arpa/inet.h>
 #include <memory.h>
 #include "../user/common.h"
-#include "../user/bcc/bcc_proc.h"
-#include "../user/bcc/bcc_elf.h"
-#include "../user/bcc/bcc_syms.h"
 #include "../user/log.h"
 #include "../user/symbol.h"
 #include "../user/tracer.h"

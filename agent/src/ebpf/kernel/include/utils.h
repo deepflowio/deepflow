@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef __UTILS_H__
-#define __UTILS_H__
+#ifndef DF_UTILS_H
+#define DF_UTILS_H
 
-#ifndef BPF_USE_CORE
 #include <arpa/inet.h>
-#endif
 
+#undef __inline
 #define __inline inline __attribute__((__always_inline__))
+
+#define ARRAY_SIZE(a)    (sizeof(a) / sizeof(a[0]))
 #define BPF_LEN_CAP(x, cap) (x < cap ? (x & (cap - 1)) : cap)
 
 #include "bpf_endian.h"
 
-#endif /* __UTILS_H__ */
+#endif /* DF_UTILS_H */

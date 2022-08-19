@@ -31,9 +31,9 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <limits.h>		//PATH_MAX(4096)
-#include "bcc/bcc_proc.h"
-#include "bcc/bcc_elf.h"
-#include "bcc/bcc_syms.h"
+#include <bcc/bcc_proc.h>
+#include <bcc/bcc_elf.h>
+#include <bcc/bcc_syms.h>
 #include "log.h"
 #include "common.h"
 #include "symbol.h"
@@ -191,7 +191,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		.use_symbol_type =
 		    BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
 #else
-		.use_symbol_type = BCC_SYM_ALL_TYPES,
+		.use_symbol_type = 65535,
 #endif
 	};
 

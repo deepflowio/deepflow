@@ -21,24 +21,24 @@
  * key: pid
  * value: struct member_offsets
  */
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, int);
-	__type(value, struct member_offsets);
-	__uint(max_entries, HASH_ENTRIES_MAX);
-} uprobe_offsets_map SEC(".maps");
+struct bpf_map_def SEC("maps") uprobe_offsets_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(int),
+	.value_size = sizeof(struct member_offsets),
+	.max_entries = HASH_ENTRIES_MAX,
+};
 
 /*
  * Goroutines Map
  * key: {tgid, pid}
  * value: goroutine ID
  */
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, __u64);
-	__type(value, __s64);
-	__uint(max_entries, MAX_SYSTEM_THREADS);
-} goroutines_map SEC(".maps");
+struct bpf_map_def SEC("maps") goroutines_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(__u64),
+	.value_size = sizeof(__s64),
+	.max_entries = MAX_SYSTEM_THREADS,
+};
 
 static __inline int get_uprobe_offset(int offset_idx)
 {
@@ -154,7 +154,7 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 
 		if (ret) {
 			bpf_debug
-			    ("bpf_func_sched_process_exit event outputfaild: %d\n",
+			    ("bpf_func_sched_process_exit event output failed: %d\n",
 			     ret);
 		}
 
@@ -183,7 +183,7 @@ int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
 
 		if (ret) {
 			bpf_debug
-			    ("bpf_func_sys_exit_execve event output() faild: %d\n",
+			    ("bpf_func_sys_exit_execve event output() failed: %d\n",
 			     ret);
 		}
 	}

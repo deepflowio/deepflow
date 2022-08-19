@@ -19,13 +19,12 @@
  * key: struct tls_conn_key {process ID, coroutine ID}
  * value: struct tls_conn
  */
-struct {
-	// FIXME: function entry without exit will cause memory leaks
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, struct tls_conn_key);
-	__type(value, struct tls_conn);
-	__uint(max_entries, MAX_SYSTEM_THREADS);
-} tls_conn_map SEC(".maps");
+struct bpf_map_def SEC("maps") tls_conn_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(struct tls_conn_key),
+	.value_size = sizeof(struct tls_conn),
+	.max_entries = MAX_SYSTEM_THREADS,
+};
 
 static int get_fd_from_tls_conn(void *tls_conn)
 {

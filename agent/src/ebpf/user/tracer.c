@@ -16,19 +16,19 @@
 
 #define _GNU_SOURCE
 #include <arpa/inet.h>
-#include "libbpf/include/linux/err.h"
 #include <sched.h>
 #include <sys/utsname.h>
 #include <sys/prctl.h>
+#include <bcc/libbpf.h>
+#include <bcc/perf_reader.h>
 #include "probe.h"
 #include "table.h"
 #include "common.h"
 #include "log.h"
-#include "bcc/libbpf.h"
-#include "bcc/perf_reader.h"
-#include "libbpf/src/libbpf_internal.h"
 #include "symbol.h"
 #include "tracer.h"
+#include "elf.h"
+#include "load.h"
 
 int major, minor;		// Linux kernel主版本，次版本
 
@@ -85,11 +85,10 @@ int check_kernel_version(int maj_limit, int min_limit)
 		return ETR_INVAL;
 	}
 
-	uint32_t ver = get_kernel_version();
 	int patch;
-	major = ver >> 16;
-	minor = (ver & 0xffff) >> 8;
-	patch = ver & 0xff;
+	if (fetch_kernel_version(&major, &minor, &patch) != ETR_OK) {
+		return ETR_INVAL;
+	}
 
 	ebpf_info("%s Linux %d.%d.%d\n", __func__, major, minor, patch);
 
@@ -148,7 +147,7 @@ struct bpf_tracer *create_bpf_tracer(const char *name,
 
 	struct bpf_tracer *bt = malloc(sizeof(struct bpf_tracer));
 	if (bt == NULL) {
-		ebpf_warning("Tracer '%s' faild, no memory!", name);
+		ebpf_warning("Tracer '%s' failed, no memory!", name);
 		return NULL;
 	}
 
@@ -177,56 +176,54 @@ struct bpf_tracer *create_bpf_tracer(const char *name,
 
 	bt->perf_pages_cnt = perf_pages_cnt;
 
-	INIT_LIST_HEAD(&bt->probes_head);
-	INIT_LIST_HEAD(&bt->maps_conf_head);
+	init_list_head(&bt->probes_head);
+	init_list_head(&bt->maps_conf_head);
 
 	pthread_mutex_init(&bt->mutex_probes_lock, NULL);
 
 	return bt;
 }
 
-static int map_resize_set(struct bpf_object *pobj, struct map_config *m_conf)
+static int map_resize_set(struct ebpf_object *obj, struct map_config *m_conf)
 {
-	struct bpf_map *map =
-	    bpf_object__find_map_by_name(pobj, m_conf->map_name);
+	struct ebpf_map *map = ebpf_obj__get_map_by_name(obj, m_conf->map_name);
 	if (!map) {
 		ebpf_info("failed to find \"%s\" map.\n", m_conf->map_name);
-		return -ESRCH;
+		return ETR_NOTEXIST;
 	}
 
-	return bpf_map__resize(map, m_conf->max_entries);
+	ebpf_info("Update map (\"%s\"), set max_entries %d\n", m_conf->map_name,
+		  m_conf->max_entries);
+
+	return ebpf_map_size_adjust(map, m_conf->max_entries);
 }
 
 int tracer_bpf_load(struct bpf_tracer *tracer)
 {
-	struct bpf_object *pobj;
+	struct ebpf_object *obj;
 	int ret;
-	pobj = bpf_object__open_buffer(tracer->buffer_ptr,
-				       tracer->buffer_sz,
-				       tracer->bpf_load_name);
-	if (IS_ERR_OR_NULL(pobj)) {
-		ebpf_info("bpf_object__open_buffer \"%s\" failed, error:%s\n",
+	obj = ebpf_open_buffer(tracer->buffer_ptr,
+			       tracer->buffer_sz, tracer->bpf_load_name);
+	if (IS_NULL(obj)) {
+		ebpf_info("ebpf_open_buffer() \"%s\" failed, error:%s\n",
 			  tracer->bpf_load_name, strerror(errno));
-		return -ENOENT;
+		return ETR_INVAL;
 	}
 
 	struct map_config *m_conf;
 	list_for_each_entry(m_conf, &tracer->maps_conf_head, list) {
-		if ((ret = map_resize_set(pobj, m_conf)))
+		if ((ret = map_resize_set(obj, m_conf)))
 			return ret;
-
-		ebpf_info("map_resize_set \"%s\" map. max_entries:%d\n",
-			  m_conf->map_name, m_conf->max_entries);
 	}
 
-	ret = bpf_object__load(pobj);
+	ret = ebpf_obj_load(obj);
 	if (ret != 0) {
 		ebpf_info("bpf load \"%s\" failed, error:%s\n",
 			  tracer->bpf_load_name, strerror(errno));
 		return ret;
 	}
 
-	tracer->pobj = pobj;
+	tracer->obj = obj;
 	ebpf_info("bpf load \"%s\" succeed.\n", tracer->bpf_load_name);
 	return ETR_OK;
 }
@@ -252,8 +249,8 @@ static struct tracepoint *get_tracepoint_from_tracer(struct bpf_tracer *tracer,
 	if (tp && tp->prog)
 		return tp;
 
-	struct bpf_program *prog;
-	int fd = bpf_get_program_fd(tracer->pobj, tp_name, (void **)&prog);
+	struct ebpf_prog *prog;
+	int fd = bpf_get_program_fd(tracer->obj, tp_name, (void **)&prog);
 	if (fd < 0) {
 		ebpf_info
 		    ("fun: %s, bpf_get_program_fd failed, tracepoint_name:%s.\n",
@@ -299,8 +296,8 @@ static struct probe *create_probe(struct bpf_tracer *tracer,
 				  enum probe_type type, void *private)
 {
 	struct probe *pb;
-	struct bpf_program *prog;
-	int fd = bpf_get_program_fd(tracer->pobj, func_name, (void **)&prog);
+	struct ebpf_prog *prog;
+	int fd = bpf_get_program_fd(tracer->obj, func_name, (void **)&prog);
 	if (fd < 0) {
 		ebpf_warning
 		    ("fun: %s, bpf_get_program_fd failed, func_name:%s.\n",
@@ -353,11 +350,11 @@ static int get_uprobe_event_name(const char *bin_path, char *ev_name, int size,
 	return ETR_OK;
 }
 
-static struct bpf_link *exec_attach_uprobe(struct bpf_program *prog,
-					   const char *bin_path, size_t addr,
-					   bool isret, int pid)
+static struct ebpf_link *exec_attach_uprobe(struct ebpf_prog *prog,
+					    const char *bin_path, size_t addr,
+					    bool isret, int pid)
 {
-	struct bpf_link *link = NULL;
+	struct ebpf_link *link = NULL;
 	char ev_name[EV_NAME_SIZE];
 	int ret;
 	ret =
@@ -376,10 +373,10 @@ static struct bpf_link *exec_attach_uprobe(struct bpf_program *prog,
 	return link;
 }
 
-static struct bpf_link *exec_attach_kprobe(struct bpf_program *prog, char *name,
-					   bool isret, int pid)
+static struct ebpf_link *exec_attach_kprobe(struct ebpf_prog *prog, char *name,
+					    bool isret, int pid)
 {
-	struct bpf_link *link = NULL;
+	struct ebpf_link *link = NULL;
 	char ev_name[EV_NAME_SIZE];
 	char *fn_name;
 	int ret;
@@ -406,7 +403,7 @@ static int probe_attach(struct probe *p)
 		return ETR_EXIST;
 	}
 
-	struct bpf_link *link = NULL;
+	struct ebpf_link *link = NULL;
 	if (p->type == KPROBE) {
 		link = exec_attach_kprobe(p->prog, p->name, p->isret, -1);
 	} else {		/* UPROBE */
@@ -439,7 +436,7 @@ static int probe_attach(struct probe *p)
 	return ETR_OK;
 }
 
-static int exec_detach_kprobe(struct bpf_link *link, char *name, bool isret)
+static int exec_detach_kprobe(struct ebpf_link *link, char *name, bool isret)
 {
 	char ev_name[EV_NAME_SIZE];
 	char *fn_name;
@@ -452,7 +449,7 @@ static int exec_detach_kprobe(struct bpf_link *link, char *name, bool isret)
 	return program__detach_probe(link, isret, ev_name, "kprobe");
 }
 
-static int exec_detach_uprobe(struct bpf_link *link, const char *bin_path,
+static int exec_detach_uprobe(struct ebpf_link *link, const char *bin_path,
 			      size_t addr, bool isret)
 {
 	char ev_name[EV_NAME_SIZE];
@@ -505,11 +502,11 @@ static int tracepoint_attach(struct tracepoint *tp)
 		return ETR_EXIST;
 	}
 
-	struct bpf_link *bl = bpf_program__attach(tp->prog);
+	struct ebpf_link *bl = program__attach_tracepoint(tp->prog);
 	tp->link = bl;
 
-	if (IS_ERR(bl)) {
-		ebpf_warning("bpf_program__attach failed, name:%s.\n",
+	if (bl == NULL) {
+		ebpf_warning("program__attach_tracepoint() failed, name:%s.\n",
 			     tp->name);
 		return ETR_INVAL;
 	}
@@ -523,8 +520,12 @@ static int tracepoint_detach(struct tracepoint *tp)
 		return ETR_NOTEXIST;
 	}
 
-	bpf_link__destroy(tp->link);
+	if (tp->link->detach) {
+		tp->link->detach(tp->link);
+	}
+
 	tp->link = NULL;
+	free(tp->link);
 	return ETR_OK;
 }
 
@@ -542,7 +543,7 @@ int tracer_hooks_process(struct bpf_tracer *tracer, enum tracer_hook_type type,
 	} else
 		return ETR_INVAL;
 
-	if (tracer->pobj == NULL) {
+	if (tracer->obj == NULL) {
 		ebpf_info("fun: %s, not loaded bpf program yet.\n", __func__);
 		return ETR_INVAL;
 	}
@@ -694,12 +695,12 @@ int tracer_hooks_detach(struct bpf_tracer *tracer)
 
 int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name)
 {
-	struct bpf_map *map =
-	    bpf_object__find_map_by_name(tracer->pobj, perf_map_name);
-	int map_fd = bpf_map__fd(map);
-	struct perf_reader *reader;
+	struct ebpf_map *map =
+	    ebpf_obj__get_map_by_name(tracer->obj, perf_map_name);
+	int map_fd = map->fd;
+	void *reader;
 	int perf_fd, ret;
-	int i;
+	int i, reader_idx;
 	int pages_cnt = tracer->perf_pages_cnt;
 	for (i = 0; i < sys_cpus_count; i++) {
 		if (!cpu_online[i])
@@ -710,14 +711,17 @@ int perf_map_init(struct bpf_tracer *tracer, const char *perf_map_name)
 							       (void *)tracer,
 							       -1, i,
 							       pages_cnt);
-		perf_fd = reader->fd;
-		if ((ret = bpf_map_update_elem(map_fd, &i, &perf_fd, BPF_ANY))) {
+		perf_fd = perf_reader_fd(reader);
+		if ((ret = bpf_update_elem(map_fd, &i, &perf_fd, BPF_ANY))) {
 			ebpf_info
 			    ("fun: %s, bpf_map_update_elem reader setting failed.\n",
 			     __func__);
 			return ret;
 		}
-		tracer->readers[tracer->readers_count++] = reader;
+
+		reader_idx = tracer->readers_count++;
+		tracer->reader_fds[reader_idx] = perf_fd;
+		tracer->readers[reader_idx] = reader;
 	}
 
 	tracer->data_map = map;
@@ -759,7 +763,7 @@ static void poller(void *t)
 		    malloc(sizeof(struct socket_bpf_data) + data_len);
 		if (prep_data == NULL) {
 			ebpf_waring("malloc() failed, no memory.\n");
-			atomic64_inc(&q->heap_get_faild);
+			atomic64_inc(&q->heap_get_failed);
 			return;
 		}
 		prep_data->cap_data =
@@ -1034,7 +1038,7 @@ int dispatch_worker(struct bpf_tracer *tracer, unsigned int queue_size)
 		atomic64_init(&tracer->queues[i].enqueue_nr);
 		atomic64_init(&tracer->queues[i].dequeue_nr);
 		atomic64_init(&tracer->queues[i].burst_count);
-		atomic64_init(&tracer->queues[i].heap_get_faild);
+		atomic64_init(&tracer->queues[i].heap_get_failed);
 
 		pthread_mutex_init(&tracer->queues[i].mutex, NULL);
 		pthread_cond_init(&tracer->queues[i].cond, NULL);
@@ -1117,8 +1121,8 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 			    atomic64_read(&t->queues[j].burst_count);
 			rx_q->dequeue_nr =
 			    atomic64_read(&t->queues[j].dequeue_nr);
-			rx_q->heap_get_faild =
-			    atomic64_read(&t->queues[j].heap_get_faild);
+			rx_q->heap_get_failed =
+			    atomic64_read(&t->queues[j].heap_get_failed);
 			rx_q->queue_size = ring_count(t->queues[j].r);
 			rx_q->ring_capacity = t->queues[j].r->capacity;
 		}
@@ -1139,15 +1143,8 @@ static struct tracer_sockopts trace_sockopts = {
 
 int bpf_tracer_init(const char *log_file, bool is_stdout)
 {
-	int err;
-	if (max_locked_memory_set_unlimited() != 0)
-		return ETR_INVAL;
-
-	if (sysfs_write("/proc/sys/net/core/bpf_jit_enable", "1") < 0)
-		return ETR_INVAL;
-
-	INIT_LIST_HEAD(&extra_waiting_head);
-	INIT_LIST_HEAD(&period_events_head);
+	init_list_head(&extra_waiting_head);
+	init_list_head(&period_events_head);
 
 	log_to_stdout = is_stdout;
 	if (log_file) {
@@ -1157,6 +1154,13 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 			return ETR_INVAL;
 		}
 	}
+
+	int err;
+	if (max_locked_memory_set_unlimited() != 0)
+		return ETR_INVAL;
+
+	if (sysfs_write("/proc/sys/net/core/bpf_jit_enable", "1") < 0)
+		return ETR_INVAL;
 
 	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);

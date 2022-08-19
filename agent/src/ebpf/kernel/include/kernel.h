@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __LINUX_KERN_H__
-#define __LINUX_KERN_H__
+#ifndef DF_LINUX_KERN_H
+#define DF_LINUX_KERN_H
 
 /*
  * TODO: start_boottime or real_start_time ?
@@ -38,7 +38,6 @@
 #define STRUCT_SOCK_SKC_STATE_OFFSET    0x12
 #define STRUCT_SOCK_COMMON_IPV6ONLY_OFFSET 0x13
 
-#ifndef BPF_USE_CORE
 typedef __u32 __bitwise __portpair;
 typedef __u64 __bitwise __addrpair;
 
@@ -136,5 +135,4 @@ struct fdtable {
 	unsigned int max_fds;
 	void **fd;      /* current fd array, struct file *  */
 };
-#endif
-#endif /* __LINUX_KERN_H__ */
+#endif /* DF_LINUX_KERN_H */

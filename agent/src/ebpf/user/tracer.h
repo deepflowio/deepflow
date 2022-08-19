@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _USER_TRACER_H_
-#define _USER_TRACER_H_
+#ifndef DF_USER_TRACER_H
+#define DF_USER_TRACER_H
 #include <stdio.h>
 #include <stdbool.h>
 #include <linux/limits.h>	/* ulimit */
@@ -25,7 +25,6 @@
 #include <unistd.h>
 #include <linux/types.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <linux/sched.h>
 #include <inttypes.h>
@@ -38,11 +37,11 @@
 #include "ring.h"
 #include "ctrl.h"
 #include "atomic.h"
-#include "../libbpf/src/libbpf.h"
+#include <bcc/libbpf.h>
 #include "../kernel/include/common.h"
 #include "../kernel/include/xxhash.h"
 #include "../kernel/include/socket_trace_common.h"
-#include "bcc/libbpf.h"
+#include <bcc/libbpf.h>
 #include "symbol.h"
 
 // TODO: 对内存拷贝进行硬件优化。
@@ -50,6 +49,8 @@
 #define LOOP_DELAY_US  100000
 
 #define memcpy_fast(a,b,c) memcpy(a,b,c)
+
+#define IS_NULL(p) ((p) == NULL)
 
 #define RING_SIZE 16384
 #define MAX_BULK 32
@@ -188,8 +189,8 @@ struct probe {
 	struct list_head list;
 	enum probe_type type;
 	char name[PROBE_NAME_SZ];
-	struct bpf_link *link;
-	struct bpf_program *prog;
+	struct ebpf_link *link;
+	struct ebpf_prog *prog;
 	int prog_fd;
 	bool isret;
 	void *private_data;	// Store uprobe information
@@ -199,8 +200,8 @@ struct probe {
 
 struct tracepoint {
 	char name[PROBE_NAME_SZ];
-	struct bpf_link *link;
-	struct bpf_program *prog;
+	struct ebpf_link *link;
+	struct ebpf_prog *prog;
 	int prog_fd;
 };
 
@@ -224,7 +225,7 @@ struct queue {
 	atomic64_t enqueue_nr;
 	atomic64_t burst_count;
 	atomic64_t dequeue_nr;
-	atomic64_t heap_get_faild;	// 从heap上获取内存失败的次数统计
+	atomic64_t heap_get_failed;	// 从heap上获取内存失败的次数统计
 };
 
 /*
@@ -237,7 +238,8 @@ struct map_config {
 };
 
 typedef int (*tracer_ctl_fun_t) (void);
-struct bpf_object;
+struct ebpf_object;
+struct perf_reader;
 
 struct bpf_tracer {
 	/*
@@ -248,7 +250,7 @@ struct bpf_tracer {
 					// Used to identify which eBPF buffer is loaded by the kernel
 	void *buffer_ptr;		// eBPF bytecodes buffer pointer
 	int buffer_sz;			// eBPF buffer size
-	struct bpf_object *pobj;	// libbpf define bpf object
+	struct ebpf_object *obj;	// eBPF object
 
 	/*
 	 * probe, tracepoint
@@ -265,24 +267,25 @@ struct bpf_tracer {
 	 */
 	pthread_t perf_worker[MAX_CPU_NR];	// 用户态接收perf-buffer数据主线程
 	pthread_t dispatch_workers[MAX_CPU_NR];	// 分发线程
-	int dispatch_workers_nr;	// 分发线程数量
+	int dispatch_workers_nr;		// 分发线程数量
 	struct queue queues[MAX_CPU_NR];	// 分发队列，每个分发线程都有其对应的队列。
-	void *process_fn;	// 回调应用传递过来的接口, 进行数据处理
+	void *process_fn;			// 回调应用传递过来的接口, 进行数据处理
 
 	/*
 	 * perf ring-buffer from kernel to user.
 	 */
-	struct bpf_map *data_map;	// perf ring-buffer map
-	struct perf_reader *readers[MAX_CPU_NR];	// percpu reader (read from percpu ring-buffer map)
-	int readers_count;	// readers count       
-	unsigned int perf_pages_cnt;	// ring-buffer set memory size (memory pages count)
-	perf_reader_raw_cb raw_cb;	// 用于perf ring-buffer接收回调
-	perf_reader_lost_cb lost_cb;	// 用于perf ring-buffer数据丢失回调
+	struct ebpf_map *data_map;	 	// perf ring-buffer map
+	struct perf_reader *readers[MAX_CPU_NR];// percpu readers (read from percpu ring-buffer map)
+	int reader_fds[MAX_CPU_NR];	 	// percpu reader fds
+	int readers_count;		 	// readers count       
+	unsigned int perf_pages_cnt;	 	// ring-buffer set memory size (memory pages count)
+	perf_reader_raw_cb raw_cb;	 	// 用于perf ring-buffer接收回调
+	perf_reader_lost_cb lost_cb;		// 用于perf ring-buffer数据丢失回调
 
 	/*
 	 * statistics
 	 */
-	atomic64_t lost;	// 用户态程序来不及接收造成内核丢数据
+	atomic64_t lost;			// 用户态程序来不及接收造成内核丢数据
 	atomic64_t proto_status[PROTO_NUM];	// 分协议类型统计
 
 	/*
@@ -329,7 +332,7 @@ struct rx_queue_info {
 	uint64_t enqueue_nr;
 	uint64_t burst_count;
 	uint64_t dequeue_nr;
-	uint64_t heap_get_faild;
+	uint64_t heap_get_failed;
 	int queue_size;
 	int ring_capacity;
 };

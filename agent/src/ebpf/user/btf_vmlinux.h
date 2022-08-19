@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef DF_BTF_VMLINUX_H_
+#define DF_BTF_VMLINUX_H_
 
-#ifdef HAVE_EXTERNAL_LIBBPF
-#include <bpf/bpf.h>
-#include <bpf/btf.h>
-#include <bpf/libbpf.h>
-#else
-#include "libbpf/src/bpf.h"
-#include "libbpf/src/btf.h"
-#include "libbpf/src/libbpf.h"
-#endif
+#define BTF_MEMBER_BIT_OFFSET(val)      ((val) & 0xffffff)
+#define BTF_INFO_KFLAG(info)    ((info) >> 31)
+#define BTF_MEM_OFFSET(T, O)    (BTF_INFO_KFLAG((T)) ? BTF_MEMBER_BIT_OFFSET((O)) : (O))
+
+int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj);
+int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
+			       const char *field_name);
+
+#endif /* DF_BTF_VMLINUX_H_ */

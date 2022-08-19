@@ -35,9 +35,9 @@
 #include <arpa/inet.h>
 #include <memory.h>
 #include "common.h"
-#include "bcc/bcc_proc.h"
-#include "bcc/bcc_elf.h"
-#include "bcc/bcc_syms.h"
+#include <bcc/bcc_proc.h>
+#include <bcc/bcc_elf.h>
+#include <bcc/bcc_syms.h>
 #include "log.h"
 #include "symbol.h"
 #include "tracer.h"
@@ -46,6 +46,7 @@
 #include "table.h"
 #include "symbol.h"
 #include "socket.h"
+#include "elf.h"
 
 #define MAP_GO_OFFSETS_MAP_NAME	"uprobe_offsets_map"
 #define PROCFS_CHECK_PERIOD  60	// 60 seconds
@@ -175,7 +176,7 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 		goto exit;
 	}
 	Elf_Data *data = NULL;
-	data = get_section_elf_data(e, ".go.buildinfo");
+	data = get_sec_elf_data(e, ".go.buildinfo");
 	if (!data)
 		goto exit;
 
@@ -308,7 +309,7 @@ static int resolve_bin_file(const char *path, int pid,
 				if (sub_probe_sym == NULL) {
 					ebpf_warning("malloc() error.\n");
 					ret = ETR_NOMEM;
-					goto faild;
+					goto failed;
 				}
 
 				if ((ret =
@@ -316,7 +317,7 @@ static int resolve_bin_file(const char *path, int pid,
 							sub_probe_sym))
 				    != ETR_OK) {
 					free((void *)sub_probe_sym);
-					goto faild;
+					goto failed;
 				}
 
 				sub_probe_sym->entry = addr;
@@ -348,7 +349,7 @@ static int resolve_bin_file(const char *path, int pid,
 		if (p_offs == NULL) {
 			p_offs = alloc_offset_by_pid();
 			if (p_offs == NULL)
-				goto offset_faild;
+				goto offset_failed;
 			is_new_offset = true;
 		}
 
@@ -362,7 +363,7 @@ static int resolve_bin_file(const char *path, int pid,
 		}
 		p_offs->path = strdup(binary_path);
 		if (p_offs->path == NULL) {
-			goto offset_faild;
+			goto offset_failed;
 		}
 		// resolve all offsets.
 		for (int k = 0; k < NELEMS(offsets); k++) {
@@ -394,7 +395,7 @@ static int resolve_bin_file(const char *path, int pid,
 	*resolve_num = syms_count;
 	return ret;
 
-faild:
+failed:
 	*resolve_num = syms_count;
 	if (probe_sym->isret) {
 		free_uprobe_symbol(probe_sym, conf);
@@ -405,7 +406,7 @@ faild:
 	}
 	return ret;
 
-offset_faild:
+offset_failed:
 	*resolve_num = syms_count;
 	if (p_offs != NULL) {
 		free(p_offs);
@@ -499,8 +500,8 @@ int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
 
-	INIT_LIST_HEAD(&proc_events_head);
-	INIT_LIST_HEAD(&proc_offsets_head);
+	init_list_head(&proc_events_head);
+	init_list_head(&proc_offsets_head);
 	pthread_mutex_init(&mutex_proc_events_lock, NULL);
 
 	fddir = opendir("/proc/");
@@ -623,7 +624,7 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 		if (sym_uprobe->pid == pid) {
 			if (probe_detach(probe) != 0) {
 				ebpf_warning
-				    ("path:%s, symbol name:%s probe_detach() faild.\n",
+				    ("path:%s, symbol name:%s probe_detach() failed.\n",
 				     sym_uprobe->binary_path, sym_uprobe->name);
 			}
 
@@ -680,7 +681,7 @@ static int __attribute__ ((unused)) period_update_procfs(void)
 		struct symbol_uprobe *sym_uprobe = probe->private_data;
 		if (probe_detach(probe) != 0)
 			ebpf_warning
-			    ("path:%s, symbol name:%s address:0x%x probe_detach() faild.\n",
+			    ("path:%s, symbol name:%s address:0x%x probe_detach() failed.\n",
 			     sym_uprobe->binary_path, sym_uprobe->name,
 			     sym_uprobe->entry);
 		else
