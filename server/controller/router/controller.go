@@ -31,7 +31,7 @@ func ControllerRouter(e *gin.Engine, m *monitor.ControllerCheck, cfg *config.Con
 	e.GET("/v1/controllers/:lcuuid/", getController)
 	e.GET("/v1/controllers/", getControllers)
 	e.PATCH("/v1/controllers/:lcuuid/", updateController(m, cfg))
-	e.DELETE("/v1/controllers/:lcuuid/", deleteController(m))
+	e.DELETE("/v1/controllers/:lcuuid/", deleteController(m, cfg))
 }
 
 func getController(c *gin.Context) {
@@ -95,8 +95,15 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 	})
 }
 
-func deleteController(m *monitor.ControllerCheck) gin.HandlerFunc {
+func deleteController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		// if not master controller，should forward to master controller
+		isMasterController, masterControllerName, _ := common.IsMasterControllerAndReturnName()
+		if !isMasterController {
+			forwardMasterController(c, masterControllerName, cfg.ListenPort)
+			return
+		}
+
 		lcuuid := c.Param("lcuuid")
 		data, err := service.DeleteController(lcuuid, m)
 		JsonResponse(c, data, err)
