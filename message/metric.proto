@@ -101,6 +101,9 @@ message Latency {
     uint32 srt_count = 16;
     uint32 art_count = 17;
     uint32 rrt_count = 18;
+
+    uint32 first_crt = 19;
+    uint32 follow_crt = 20;
 }
 
 message Performance {
@@ -108,6 +111,10 @@ message Performance {
     uint64 retrans_rx = 2;
     uint64 zero_win_tx = 3;
     uint64 zero_win_rx = 4;
+    uint32 syn_tx = 5;
+    uint32 syn_rx = 6;
+    uint32 synack_tx = 7;
+    uint32 synack_rx = 8;
 }
 
 message Anomaly {
