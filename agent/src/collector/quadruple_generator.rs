@@ -973,6 +973,8 @@ impl QuadrupleGenerator {
                 srt_count: stats.tcp.srt_count,
                 art_count: stats.tcp.art_count,
                 rrt_count: 0,
+                first_crt: stats.tcp.first_crt,
+                follow_crt: stats.tcp.follow_crt,
             };
 
             let src_perf = &stats.tcp.counts_peers[0];
@@ -982,6 +984,10 @@ impl QuadrupleGenerator {
                 retrans_rx: dst_perf.retrans_count as u64,
                 zero_win_tx: src_perf.zero_win_count as u64,
                 zero_win_rx: dst_perf.zero_win_count as u64,
+                syn_rx: dst_perf.syn_count,
+                syn_tx: src_perf.syn_count,
+                synack_rx: dst_perf.synack_count,
+                synack_tx: src_perf.synack_count,
             };
         } else {
             flow_meter.latency.art_max = stats.tcp.art_max;
