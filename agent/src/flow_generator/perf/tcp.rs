@@ -396,6 +396,8 @@ struct PerfData {
     rtt_1: TimeStats,
     retrans_sum: u32,
     rtt_full: Option<Duration>,
+    first_crt: u32,
+    follow_crt: u32,
 
     period_data: PeriodPerfData,
 }
@@ -419,6 +421,12 @@ struct PeriodPerfData {
 
     zero_win_count_0: u32,
     zero_win_count_1: u32,
+
+    // SYN SYN_ACK count
+    syn_0: u32,
+    synack_0: u32,
+    syn_1: u32,
+    synack_1: u32,
 
     updated: bool,
 }
@@ -497,6 +505,24 @@ impl PerfData {
         self.period_data.updated = true;
     }
 
+    fn calc_syn(&mut self, fpd: bool) {
+        if fpd {
+            self.period_data.syn_0 += 1;
+        } else {
+            self.period_data.syn_1 += 1;
+        }
+        self.period_data.updated = true;
+    }
+
+    fn calc_synack(&mut self, fpd: bool) {
+        if fpd {
+            self.period_data.synack_0 += 1;
+        } else {
+            self.period_data.synack_1 += 1;
+        }
+        self.period_data.updated = true;
+    }
+
     fn update_perf_stats(&mut self, stats: &mut FlowPerfStats, flow_reversed: bool) {
         let stats = &mut stats.tcp;
 
@@ -518,6 +544,14 @@ impl PerfData {
             self.rtt_1.updated = false;
         }
 
+        if self.first_crt != 0 {
+            stats.first_crt = self.first_crt;
+        }
+
+        if self.follow_crt != 0 {
+            stats.follow_crt = self.follow_crt;
+        }
+
         if !self.period_data.updated {
             return;
         }
@@ -529,6 +563,11 @@ impl PerfData {
         stats.total_retrans_count = self.retrans_sum;
         stats.counts_peers[0].zero_win_count = pd.zero_win_count_0;
         stats.counts_peers[1].zero_win_count = pd.zero_win_count_1;
+
+        stats.counts_peers[0].syn_count = pd.syn_0;
+        stats.counts_peers[1].syn_count = pd.syn_1;
+        stats.counts_peers[0].synack_count = pd.synack_0;
+        stats.counts_peers[1].syn_count = pd.synack_1;
 
         if !flow_reversed {
             if pd.art_1.updated {
@@ -803,6 +842,26 @@ impl TcpPerf {
         if p.tcp_data.flags & TcpFlags::MASK == TcpFlags::PSH_ACK_URG {
             self.perf_data.calc_psh_urg(fpd);
         }
+        // calculate client waiting time
+        if fpd && p.is_psh_ack() {
+            if self.perf_data.first_crt == 0 {
+                // 存在客户端依赖服务端发送包之后才能发起请求，那么需要比较收到服务端包时间戳取最大值
+                // ===================================
+                // If the client relies on the server to send the packet before initiating the request,
+                // it needs to compare the timestamp of the received server packet to take the maximum value.
+                let crt = (p.lookup_key.timestamp - same_dir.timestamp.max(oppo_dir.timestamp))
+                    .as_micros() as u32;
+                self.perf_data.first_crt = crt;
+            }
+            if oppo_dir.payload_len > 1 && self.perf_data.follow_crt == 0 {
+                let crt = (p.lookup_key.timestamp - oppo_dir.timestamp).as_micros() as u32;
+                self.perf_data.follow_crt = crt;
+            }
+        }
+        // reset time between the client request and the last server response
+        if p.is_ack() && oppo_dir.is_reply_packet(p) {
+            self.perf_data.follow_crt = 0;
+        }
     }
 
     // 根据flag, direction, payload_len或PSH, SEQ, ACK重建状态机
@@ -825,6 +884,15 @@ impl TcpPerf {
         // 计算ART
         if !self.handshaking {
             self.flow_established(p, fpd);
+        }
+
+        // calculate syn/synack count
+        if p.is_syn() {
+            self.perf_data.calc_syn(fpd);
+        }
+
+        if p.is_syn_ack() {
+            self.perf_data.calc_synack(fpd);
         }
 
         is_retrans
@@ -896,7 +964,11 @@ impl L4FlowPerf for TcpPerf {
 
     fn data_updated(&self) -> bool {
         let d = &self.perf_data;
-        d.period_data.updated || d.rtt_0.updated || d.rtt_1.updated || d.rtt_full.is_some()
+        d.period_data.updated
+            || d.rtt_0.updated
+            || d.rtt_1.updated
+            || d.rtt_full.is_some()
+            || d.follow_crt != 0
     }
 
     fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats {
@@ -1253,6 +1325,15 @@ mod tests {
             "xiangdao-retrans.result",
             true,
         );
+    }
+
+    #[test]
+    fn client_request_timewait_and_syn_synack_count() {
+        perf_test_helper(
+            &vec!["client_request_timewait_and_syn_synack_count.pcap"],
+            "client_request_timewait_and_syn_synack_count.result",
+            false,
+        )
     }
 
     #[test]

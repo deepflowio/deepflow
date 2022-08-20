@@ -92,6 +92,8 @@ impl Debugger {
                     return;
                 }
             };
+            info!("debugger listening on: {:?}", sock.local_addr().unwrap());
+
             let sock_clone = sock.clone();
             let running_clone = running.clone();
             let serialize_conf = config::standard();

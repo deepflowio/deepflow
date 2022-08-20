@@ -353,6 +353,8 @@ impl From<TunnelField> for flow_log::TunnelField {
 pub struct TcpPerfCountsPeer {
     pub retrans_count: u32,
     pub zero_win_count: u32,
+    pub syn_count: u32,
+    pub synack_count: u32,
 }
 
 impl TcpPerfCountsPeer {
@@ -379,6 +381,8 @@ pub struct TcpPerfStats {
     pub rtt_server_max: u32, // us
     pub srt_max: u32,        // us
     pub art_max: u32,        // us, UDP复用
+    pub first_crt: u32, // us, the time from the first request to the completion of the three-way handshake
+    pub follow_crt: u32, // us, The time between the client request and the last server response (Payload > 1)
 
     pub rtt: u32,            // us, TCP建连过程, 只会计算出一个RTT
     pub rtt_client_sum: u32, // us, 假定一条流在一分钟内的时延加和不会超过u32
