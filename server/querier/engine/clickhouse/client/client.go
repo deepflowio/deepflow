@@ -76,6 +76,7 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 		return nil, err
 	}
 	defer c.Close()
+	start := time.Now()
 	rows, err := c.connection.Queryx(sql)
 	c.Debug.Sql = sql
 	if err != nil {
@@ -108,7 +109,6 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 	result["schemas"] = columnSchemas
 	var values []interface{}
 	resSize := 0
-	start := time.Now()
 	for rows.Next() {
 		row, err := rows.SliceScan()
 		if err != nil {
@@ -127,6 +127,7 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 		}
 		values = append(values, record)
 	}
+	queryTime := time.Since(start)
 	resRows := len(values)
 	statsd.QuerierCounter.WriteCk(
 		&statsd.ClickhouseCounter{
@@ -135,7 +136,6 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 			ColumnCount:  uint64(resColumns),
 		},
 	)
-	queryTime := time.Since(start)
 	c.Debug.QueryTime = int64(queryTime)
 	for _, callback := range callbacks {
 		values = callback(columnNames, values)

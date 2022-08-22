@@ -20,8 +20,8 @@ use arc_swap::access::Access;
 use log::info;
 use regex::Regex;
 
-use super::LogMessageType;
 use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
+use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
@@ -568,7 +568,7 @@ impl L7LogParse for HttpLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<AppProtoHead> {
+    ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -577,24 +577,24 @@ impl L7LogParse for HttpLog {
         self.parse_http_v1(payload, direction)
             .or(self.parse_http_v2(payload, direction))?;
 
-        Ok(AppProtoHead {
+        Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: self.get_l7_protocol(),
             msg_type: self.msg_type,
             status: self.status,
             code: self.status_code,
             rrt: 0,
             version: 0,
-        })
+        }))
     }
 
-    fn info(&self) -> AppProtoLogsInfo {
+    fn info(&self) -> AppProtoLogsInfoEnum {
         if self.info.version == "2" {
-            return AppProtoLogsInfo::HttpV2(self.info.clone());
+            return AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::HttpV2(self.info.clone()));
         }
         if self.is_https {
-            return AppProtoLogsInfo::HttpV1TLS(self.info.clone());
+            return AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::HttpV1TLS(self.info.clone()));
         }
-        AppProtoLogsInfo::HttpV1(self.info.clone())
+        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::HttpV1(self.info.clone()))
     }
 }
 

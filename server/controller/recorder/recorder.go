@@ -278,7 +278,7 @@ func (r *Recorder) executeUpdators(updatersInUpdateOrder []updater.ResourceUpdat
 }
 
 func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (state int, errMsg string) {
-	log.Infof("cloud domain (%s) state info: %s, %s", r.domainName, domainResource.ErrorState, domainResource.ErrorMessage)
+	log.Infof("cloud domain (%s) state info: %d, %s", r.domainName, domainResource.ErrorState, domainResource.ErrorMessage)
 	// 状态优先级 exception > warning > sunccess
 	stateToLevel := map[int]int{
 		common.RESOURCE_STATE_CODE_SUCCESS:   1,
@@ -293,7 +293,7 @@ func (r *Recorder) formatDomainStateInfo(domainResource cloudmodel.Resource) (st
 
 	var subDomainErrMsgs []string
 	for subDomainLcuuid, subDomainResource := range domainResource.SubDomainResources {
-		log.Infof("cloud sub_domain (%s) state info: %s, %s", subDomainLcuuid, subDomainResource.ErrorState, subDomainResource.ErrorMessage)
+		log.Infof("cloud sub_domain (%s) state info: %d, %s", subDomainLcuuid, subDomainResource.ErrorState, subDomainResource.ErrorMessage)
 		if stateToLevel[subDomainResource.ErrorState] > stateToLevel[state] {
 			state = subDomainResource.ErrorState
 		}

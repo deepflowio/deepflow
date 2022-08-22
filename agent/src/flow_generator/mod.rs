@@ -38,9 +38,9 @@ pub use protocol_logs::{
     kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
 };
 pub use protocol_logs::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsParser,
-    DnsLog, DubboLog, HttpLog, KafkaLog, L7LogParse, LogMessageType, MetaAppProto, MqttLog,
-    MysqlLog, RedisLog,
+    AppProtoHead, AppProtoHeadEnum, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo,
+    AppProtoLogsInfoEnum, AppProtoLogsParser, DnsLog, DubboLog, HttpLog, KafkaLog, L7LogParse,
+    LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog,
 };
 
 use std::time::Duration;

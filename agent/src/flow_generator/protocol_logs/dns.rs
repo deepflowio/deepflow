@@ -15,7 +15,8 @@
  */
 
 use super::{
-    consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus, LogMessageType,
+    consts::*, AppProtoHead, AppProtoHeadEnum, AppProtoLogsInfo, AppProtoLogsInfoEnum, L7LogParse,
+    L7ResponseStatus, LogMessageType,
 };
 
 use crate::proto::flow_log;
@@ -326,10 +327,10 @@ impl L7LogParse for DnsLog {
         payload: &[u8],
         proto: IpProtocol,
         _direction: PacketDirection,
-    ) -> Result<AppProtoHead> {
+    ) -> Result<AppProtoHeadEnum> {
         self.reset_logs();
         match proto {
-            IpProtocol::Udp => self.decode_payload(payload),
+            IpProtocol::Udp => Ok(AppProtoHeadEnum::Single(self.decode_payload(payload)?)),
             IpProtocol::Tcp => {
                 if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
                     let err_msg = format!("dns payload length error:{}", payload.len());
@@ -340,7 +341,9 @@ impl L7LogParse for DnsLog {
                     let err_msg = format!("dns payload length error:{}", size);
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
-                self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])
+                Ok(AppProtoHeadEnum::Single(
+                    self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])?,
+                ))
             }
             _ => {
                 let err_msg = format!("dns payload length error:{}", payload.len());
@@ -349,8 +352,8 @@ impl L7LogParse for DnsLog {
         }
     }
 
-    fn info(&self) -> AppProtoLogsInfo {
-        AppProtoLogsInfo::Dns(self.info.clone())
+    fn info(&self) -> AppProtoLogsInfoEnum {
+        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Dns(self.info.clone()))
     }
 }
 
