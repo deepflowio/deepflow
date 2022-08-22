@@ -29,7 +29,6 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/datasource"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/debug"
-	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
 	"github.com/deepflowys/deepflow/server/libs/stats"
@@ -60,12 +59,7 @@ const (
 )
 
 func Start(configPath string) []io.Closer {
-	logger.EnableStdoutLog()
-
 	cfg := config.Load(configPath)
-	logger.EnableFileLog(cfg.LogFile)
-	logLevel, _ := logging.LogLevel(cfg.LogLevel)
-	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN DeepFlow Ingester ==============================")
 	log.Infof("ingester base config:\n%s", string(bytes))
@@ -123,12 +117,18 @@ func Start(configPath string) []io.Closer {
 		bytes, _ = yaml.Marshal(extMetricsConfig)
 		log.Infof("ext_metrics config:\n%s", string(bytes))
 
+		// 创建、修改、删除数据源及其存储时长
+		ds := datasource.NewDatasourceManager([]string{rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary},
+			rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled,
+			cfg.CKS3Storage.Enabled, cfg.CKS3Storage.Volume, cfg.CKS3Storage.TTLTimes)
+		ds.Start()
+		closers = append(closers, ds)
+
 		// clickhouse表结构变更处理
 		issu, err := ckissu.NewCKIssu(rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)
 		checkError(err)
-
 		// If there is a table name change, do the table name update first
-		err = issu.RunRenameTable()
+		err = issu.RunRenameTable(ds)
 		checkError(err)
 
 		// 写遥测数据
@@ -148,13 +148,6 @@ func Start(configPath string) []io.Closer {
 		checkError(err)
 		extMetrics.Start()
 		closers = append(closers, extMetrics)
-
-		// 创建、修改、删除数据源及其存储时长
-		ds := datasource.NewDatasourceManager([]string{rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary},
-			rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password, rozeConfig.CKReadTimeout, rozeConfig.ReplicaEnabled,
-			cfg.CKS3Storage.Enabled, cfg.CKS3Storage.Volume, cfg.CKS3Storage.TTLTimes)
-		ds.Start()
-		closers = append(closers, ds)
 
 		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
 		cm, err := ckmonitor.NewCKMonitor(&cfg.CKDiskMonitor, rozeConfig.Base.CKDB.Primary, rozeConfig.Base.CKDB.Secondary, rozeConfig.Base.CKDBAuth.Username, rozeConfig.Base.CKDBAuth.Password)

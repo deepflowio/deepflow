@@ -48,8 +48,20 @@ func newControllerDiscovery(masterIP string, nodeType string, regionDomainPrefix
 
 func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 	envData := utils.GetRuntimeEnv()
+	name := os.Getenv(POD_NAME_KEY)
+	if name == "" {
+		log.Errorf("get env(%s) data failed", POD_NAME_KEY)
+		return nil
+	}
+	nodeName := os.Getenv(NODE_NAME_KEY)
+	if name == "" {
+		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
+		return nil
+	}
+
+	log.Infof("controller name (%s), node_name (%s)", name, nodeName)
 	return &models.Controller{
-		Name:               os.Getenv(POD_NAME_KEY),
+		Name:               name,
 		CPUNum:             int(envData.CpuNum),
 		MemorySize:         int64(envData.MemorySize),
 		Arch:               envData.Arch,
@@ -61,5 +73,6 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		VTapMax:            CONTROLLER_VTAP_MAX,
 		Lcuuid:             uuid.NewString(),
 		RegionDomainPrefix: c.regionDomainPrefix,
+		NodeName:           nodeName,
 	}
 }

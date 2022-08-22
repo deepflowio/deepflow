@@ -51,10 +51,14 @@ func NewKubernetesGatherTask(
 	return &KubernetesGatherTask{
 		basicInfo: kubernetes_gather_model.KubernetesGatherBasicInfo{
 			Name:                  kubernetesGather.Name,
+			Lcuuid:                kubernetesGather.Lcuuid,
 			ClusterID:             kubernetesGather.ClusterID,
 			PortNameRegex:         kubernetesGather.PortNameRegex,
 			PodNetIPv4CIDRMaxMask: kubernetesGather.PodNetIPv4CIDRMaxMask,
 			PodNetIPv6CIDRMaxMask: kubernetesGather.PodNetIPv6CIDRMaxMask,
+		},
+		resource: kubernetes_gather_model.KubernetesGatherResource{
+			ErrorState: common.RESOURCE_STATE_CODE_SUCCESS,
 		},
 		kCtx:             kCtx,
 		kCancel:          kCancel,

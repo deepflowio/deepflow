@@ -62,9 +62,6 @@ func Start(configPath string) {
 	serverCfg := config.DefaultConfig()
 	serverCfg.Load(configPath)
 	cfg := &serverCfg.ControllerConfig
-	logger.EnableFileLog(cfg.LogFile)
-	logLevel, _ := logging.LogLevel(cfg.LogLevel)
-	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN DeepFlow Controller ==============================")
 	log.Infof("controller config:\n%s", string(bytes))
@@ -133,6 +130,7 @@ func Start(configPath string) {
 	router.SetInitStageForHealthChecker("Register routers init")
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
+	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
@@ -149,7 +147,7 @@ func Start(configPath string) {
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
 		for range time.Tick(time.Minute) {
-			isMasterController, curMasterController, err := common.IsMasterController()
+			isMasterController, curMasterController, err := common.IsMasterControllerAndReturnName()
 			if err != nil {
 				continue
 			}
@@ -165,6 +163,9 @@ func Start(configPath string) {
 
 					// 数据节点检查
 					analyzerCheck.Start()
+
+					// vtap check
+					vtapCheck.Start()
 
 					// license分配和检查
 					vtapLicenseAllocation.Start()
@@ -201,7 +202,7 @@ func migrateDB(cfg *config.ControllerConfig) {
 	// try to check whether it is master controller until successful,
 	// migrate if it is master, exit if not.
 	for range time.Tick(time.Second * 5) {
-		isMasterController, _, err := common.IsMasterController()
+		isMasterController, err := common.IsMasterController()
 		err = nil
 		isMasterController = true
 		if err == nil && isMasterController {

@@ -206,6 +206,15 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 	return configure
 }
 
+func isPodVTap(vtapType int) bool {
+	switch vtapType {
+	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST:
+		return true
+	default:
+		return false
+	}
+}
+
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	gVTapInfo := trisolaris.GetGVTapInfo()
 	ctrlIP := in.GetCtrlIp()
@@ -331,7 +340,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 
 	configInfo := e.generateConfigInfo(vtapCache)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
-	if in.GetKubernetesClusterId() != "" {
+	if in.GetKubernetesClusterId() != "" && isPodVTap(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
 		if value == vtapCacheKey {
 			log.Infof(
@@ -505,7 +514,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 
 	configInfo := e.generateConfigInfo(vtapCache)
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
-	if in.GetKubernetesClusterId() != "" {
+	if in.GetKubernetesClusterId() != "" && isPodVTap(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
 		if value == vtapCacheKey {
 			log.Infof(

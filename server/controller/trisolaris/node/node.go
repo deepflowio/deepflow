@@ -147,6 +147,10 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 			dbTSDB.PcapDataMountPath = cacheTSDB.GetPcapDataMountPath()
 			filter = true
 		}
+		if cacheTSDB.GetName() != "" && dbTSDB.Name != cacheTSDB.GetName() {
+			dbTSDB.Name = cacheTSDB.GetName()
+			filter = true
+		}
 		if filter == true {
 			updateTSDB = append(updateTSDB, dbTSDB)
 		}
@@ -367,10 +371,14 @@ func (n *NodeInfo) isRegisterController() {
 		return
 	}
 	controllerMgr := dbmgr.DBMgr[models.Controller](n.db)
-	option := controllerMgr.WithName(data.Name)
+	option := controllerMgr.WithIP(data.IP)
 	dbController, err := controllerMgr.GetByOption(option)
 	if err == nil {
 		changed := false
+		if data.Name != "" && dbController.Name != data.Name {
+			dbController.Name = data.Name
+			changed = true
+		}
 		if dbController.CPUNum != data.CPUNum {
 			dbController.CPUNum = data.CPUNum
 			changed = true
@@ -401,6 +409,10 @@ func (n *NodeInfo) isRegisterController() {
 		}
 		if dbController.NodeType != data.NodeType {
 			dbController.NodeType = data.NodeType
+			changed = true
+		}
+		if dbController.NodeName != data.NodeName {
+			dbController.NodeName = data.NodeName
 			changed = true
 		}
 		if changed {

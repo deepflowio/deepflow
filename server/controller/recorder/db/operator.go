@@ -49,7 +49,7 @@ type OperatorBase[MT constraint.MySQLModel] struct {
 
 func (o *OperatorBase[MT]) AddBatch(dbItems []*MT) ([]*MT, bool) {
 	dbItemsToAdd, lcuuids, ok := o.formatDBItemsToAdd(dbItems)
-	if !ok {
+	if !ok || len(dbItemsToAdd) == 0 {
 		return nil, false
 	}
 	err := mysql.Db.Create(&dbItemsToAdd).Error
