@@ -65,3 +65,10 @@ func (v *VTapLicenseAllocation) allocLicense() {
 	)
 	log.Info("alloc license complete")
 }
+
+func GetSupportedLicenseType(vtapType int) []int {
+	if vtapType == common.VTAP_TYPE_DEDICATED {
+		return []int{}
+	}
+	return []int{common.VTAP_LICENSE_TYPE_C}
+}
