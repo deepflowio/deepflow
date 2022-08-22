@@ -435,7 +435,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				labelTag := strings.TrimPrefix(tag, "label.")
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map WHERE key='%s' AND %s GROUP BY value, display_name ORDER BY value ASC", labelTag, whereSql)
 			} else {
-				return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
+				return map[string][]interface{}{}, nil
 			}
 		}
 		log.Debug(sql)
@@ -486,7 +486,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			sql = "SELECT deviceid AS value,name AS display_name,uid FROM device_map WHERE devicetype=11"
 		}
 		if sql == "" {
-			return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
+			return map[string][]interface{}{}, nil
 		}
 		log.Debug(sql)
 		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
