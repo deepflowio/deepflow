@@ -95,22 +95,18 @@ func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) bool {
 // 		若资源有软删除需求，将lcuuid存在的数据ID赋值给新数据，删除旧数据，新数据入库；
 // 		若资源无软删除需求，记录lcuuid重复异常，筛掉异常数据，剩余数据入库。
 func (o *OperatorBase[MT]) formatDBItemsToAdd(dbItems []*MT) (dbItemsToAdd []*MT, lcuuidsToAdd []string, ok bool) {
-	dupCloudLcuuids := []string{}
 	lcuuids := make([]string, 0, len(dbItems))
 	lcuuidToDBItem := make(map[string]*MT)
 	dedupItems := []*MT{}
 	for _, dbItem := range dbItems {
 		lcuuid := (*dbItem).GetLcuuid()
-		if common.Contains(lcuuids, lcuuid) && !common.Contains(dupCloudLcuuids, lcuuid) {
-			dupCloudLcuuids = append(dupCloudLcuuids, lcuuid)
+		if common.Contains(lcuuids, lcuuid) {
+			log.Errorf("%s data is duplicated in cloud data (lcuuid: %s)", o.resourceTypeName, lcuuid)
 		} else {
 			lcuuids = append(lcuuids, lcuuid)
 			lcuuidToDBItem[lcuuid] = dbItem
 			dedupItems = append(dedupItems, dbItem)
 		}
-	}
-	if len(dupCloudLcuuids) != 0 {
-		log.Errorf("%s data is duplicated in cloud data (lcuuids: %v)", o.resourceTypeName, dupCloudLcuuids)
 	}
 	dbItems = dedupItems
 
@@ -122,7 +118,21 @@ func (o *OperatorBase[MT]) formatDBItemsToAdd(dbItems []*MT) (dbItemsToAdd []*MT
 	}
 
 	if len(dupLcuuidDBItems) != 0 {
-		if !o.softDelete {
+		if o.softDelete {
+			for _, dupLcuuidDBItem := range dupLcuuidDBItems {
+				dbItem, exists := lcuuidToDBItem[(*dupLcuuidDBItem).GetLcuuid()]
+				if !exists {
+					continue
+				}
+				o.setter.setDBItemID(dbItem, (*dupLcuuidDBItem).GetID())
+			}
+			err = mysql.Db.Unscoped().Delete(&dupLcuuidDBItems).Error
+			if err != nil {
+				log.Errorf("%s lcuuid duplicated (lcuuids:)", o.resourceTypeName)
+				return dbItems, lcuuids, true
+			}
+			log.Infof("soft delete %s (detail: %+v)", o.resourceTypeName, dupLcuuidDBItems)
+		} else {
 			dupLcuuids := make([]string, 0, len(dupLcuuidDBItems))
 			for _, dupLcuuidDBItem := range dupLcuuidDBItems {
 				lcuuid := (*dupLcuuidDBItem).GetLcuuid()
@@ -142,19 +152,6 @@ func (o *OperatorBase[MT]) formatDBItemsToAdd(dbItems []*MT) (dbItemsToAdd []*MT
 				}
 			}
 			return dbItemsToAdd, lcuuidsToAdd, true
-		} else {
-			for _, dupLcuuidDBItem := range dupLcuuidDBItems {
-				dbItem, exists := lcuuidToDBItem[(*dupLcuuidDBItem).GetLcuuid()]
-				if !exists {
-					continue
-				}
-				o.setter.setDBItemID(dbItem, (*dupLcuuidDBItem).GetID())
-			}
-			err = mysql.Db.Unscoped().Delete(&dupLcuuidDBItems).Error
-			if err != nil {
-				log.Errorf("%s lcuuid duplicated (lcuuids:)", o.resourceTypeName)
-				return dbItems, lcuuids, true
-			}
 		}
 	}
 	return dbItems, lcuuids, true

@@ -20,6 +20,7 @@ package recorder
 import (
 	"time"
 
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 )
@@ -32,8 +33,8 @@ func delete[MT constraint.MySQLSoftDeleteModel](expiredAt time.Time) {
 }
 
 func clean(expireInterval int) {
-	log.Info("clean soft deleted resources started")
 	expiredAt := time.Now().Add(time.Duration(-expireInterval) * time.Hour)
+	log.Infof("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(common.GO_BIRTHDAY))
 	delete[mysql.Region](expiredAt)
 	delete[mysql.AZ](expiredAt)
 	delete[mysql.Host](expiredAt)

@@ -17,6 +17,7 @@
 package cache
 
 import (
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	rcommon "github.com/deepflowys/deepflow/server/controller/recorder/common"
@@ -310,6 +311,11 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 		)
 	}
 	log.Info(addToToolMap(item.Lcuuid, item.Lcuuid))
+}
+
+func (t *ToolDataSet) updateVInterface(cloudItem *cloudmodel.VInterface) {
+	t.VInterfaceLcuuidToType[cloudItem.Lcuuid] = cloudItem.Type
+	log.Info(updateToolMap(rcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteVInterface(lcuuid string) {

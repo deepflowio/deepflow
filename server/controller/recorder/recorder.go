@@ -107,7 +107,7 @@ LOOP:
 	}
 }
 
-func (r *Recorder) checkCloudData(cloudData cloudmodel.Resource) bool {
+func (r *Recorder) shouldRefresh(cloudData cloudmodel.Resource) bool {
 	var domain *mysql.Domain
 	result := mysql.Db.Where("lcuuid = ?", r.domainLcuuid).First(&domain)
 	if result.RowsAffected != int64(1) {
@@ -134,7 +134,7 @@ func (r *Recorder) runNewRefreshWhole(cloudData cloudmodel.Resource) {
 		// 无论是否会更新资源，需先更新domain及subdomain状态
 		r.updateStateInfo(cloudData)
 
-		if !r.checkCloudData(cloudData) {
+		if !r.shouldRefresh(cloudData) {
 			r.canRefresh <- true
 			return
 		}
@@ -207,11 +207,22 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 	}
 }
 
+func (r *Recorder) shouldRefreshSubDomain(lcuuid string, cloudData cloudmodel.SubDomainResource) bool {
+	if !cloudData.Verified {
+		log.Infof("sub_domain (lcuuid: %s) is not verified, does nothing", lcuuid)
+		return false
+	}
+	if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 || len(cloudData.Pods) == 0 {
+		log.Infof("sub_domain (lcuuid: %s, name: %s) has no networks or vinterfaces or pods, does nothing", lcuuid)
+		return false
+	}
+	return true
+}
+
 func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudmodel.SubDomainResource) {
 	// 遍历cloud中的subdomain资源，与缓存中的subdomain资源对比，根据对比结果增删改
 	for subDomainLcuuid, subDomainResource := range cloudSubDomainResourceMap {
-		if !subDomainResource.Verified {
-			log.Infof("sub_domain (lcuuid: %s) is not verified, does nothing", subDomainLcuuid)
+		if !r.shouldRefreshSubDomain(subDomainLcuuid, subDomainResource) {
 			continue
 		}
 		log.Infof("sub_domain (lcuuid: %s) sync refresh started", subDomainLcuuid)
@@ -228,12 +239,12 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 	for subDomainLcuuid, subDomainCache := range r.cacheMng.SubDomainCacheMap {
 		_, ok := cloudSubDomainResourceMap[subDomainLcuuid]
 		if !ok {
+			log.Infof("sub_domain (lcuuid: %s) clean refresh started", subDomainLcuuid)
 			subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, cloudmodel.SubDomainResource{}, subDomainCache)
 			r.executeUpdators(subDomainUpdatersInUpdateOrder)
+			log.Infof("sub_domain (lcuuid: %s) clean refresh completed", subDomainLcuuid)
 		}
 	}
-
-	log.Infof("recorder (domain lcuuid: %s, name: %s) sync refresh completed", r.domainLcuuid, r.domainName)
 }
 
 func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData cloudmodel.SubDomainResource, subDomainCache *cache.Cache) []updater.ResourceUpdater {
@@ -329,6 +340,7 @@ func (r *Recorder) updateStateInfo(cloudData cloudmodel.Resource) {
 	}
 	domain.State, domain.ErrorMsg = r.formatDomainStateInfo(cloudData)
 	mysql.Db.Save(&domain)
+	log.Debugf("update domain (%+v)", domain)
 
 	for subDomainLcuuid, subDomainResource := range cloudData.SubDomainResources {
 		var subDomain mysql.SubDomain
@@ -340,6 +352,7 @@ func (r *Recorder) updateStateInfo(cloudData cloudmodel.Resource) {
 		subDomain.State = subDomainResource.ErrorState
 		subDomain.ErrorMsg = subDomainResource.ErrorMessage
 		mysql.Db.Save(&subDomain)
+		log.Debugf("update sub_domain (%+v)", subDomain)
 	}
 }
 
@@ -354,6 +367,7 @@ func (r *Recorder) updateDomainSyncedAt() {
 	now := time.Now()
 	domain.SyncedAt = &now
 	mysql.Db.Save(&domain)
+	log.Debugf("update domain (%+v)", domain)
 }
 
 func (r *Recorder) updateSubDomainSyncedAt(lcuuid string) {
@@ -366,4 +380,5 @@ func (r *Recorder) updateSubDomainSyncedAt(lcuuid string) {
 	now := time.Now()
 	subDomain.SyncedAt = &now
 	mysql.Db.Save(&subDomain)
+	log.Debugf("update sub_domain (%+v)", subDomain)
 }

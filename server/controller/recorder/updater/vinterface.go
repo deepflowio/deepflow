@@ -120,6 +120,7 @@ func (i *VInterface) addCache(dbItems []*mysql.VInterface) {
 
 func (i *VInterface) updateCache(cloudItem *cloudmodel.VInterface, diffBase *cache.VInterface) {
 	diffBase.Update(cloudItem)
+	i.cache.UpdateVInterface(cloudItem)
 }
 
 func (i *VInterface) deleteCache(lcuuids []string) {

@@ -326,7 +326,7 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServer
 		if region, ok := configUpdate["region_uuid"]; ok {
 			if region != config["region_uuid"] {
 				log.Infof("delete domain (%s) soft deleted resource", domain.Name)
-				deleteSoftDeletedResource(lcuuid)
+				cleanSoftDeletedResource(lcuuid)
 			}
 		}
 
@@ -359,8 +359,9 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServer
 	return &response[0], nil
 }
 
-func deleteSoftDeletedResource(lcuuid string) {
+func cleanSoftDeletedResource(lcuuid string) {
 	condition := "domain = ? AND deleted_at IS NOT NULL"
+	log.Infof("clean soft deleted resources (domain = %s AND deleted_at IS NOT NULL) started", lcuuid)
 	forceDelete[mysql.CEN](condition, lcuuid)
 	forceDelete[mysql.PeerConnection](condition, lcuuid)
 	forceDelete[mysql.RedisInstance](condition, lcuuid)
@@ -384,6 +385,7 @@ func deleteSoftDeletedResource(lcuuid string) {
 	forceDelete[mysql.Network](condition, lcuuid)
 	forceDelete[mysql.VPC](condition, lcuuid)
 	forceDelete[mysql.AZ](condition, lcuuid)
+	log.Info("clean soft deleted resources completed")
 }
 
 func DeleteDomain(lcuuid string) (map[string]string, error) {
@@ -395,7 +397,7 @@ func DeleteDomain(lcuuid string) (map[string]string, error) {
 		)
 	}
 
-	log.Infof("delete domain (%s)", domain.Name)
+	log.Infof("delete domain (%s) resources started", domain.Name)
 
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.WANIP{}) // TODO use forceDelete func
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.LANIP{})
@@ -475,6 +477,7 @@ func DeleteDomain(lcuuid string) (map[string]string, error) {
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.AZ{})
 
 	mysql.Db.Delete(&domain)
+	log.Infof("delete domain (%s) resources completed", domain.Name)
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
@@ -603,7 +606,7 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 		)
 	}
 
-	log.Infof("delete sub_domain (%s)", subDomain.Name)
+	log.Infof("delete sub_domain (%s) resources started", subDomain.Name)
 
 	var podCluster mysql.PodCluster
 	mysql.Db.Unscoped().Where("lcuuid = ?", lcuuid).Find(&podCluster)
@@ -611,6 +614,7 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("lcuuid = ?", lcuuid).Delete(&podCluster)
 	log.Info(podCluster)
 	if podCluster.ID != 0 {
+		log.Infof("delete pod_cluster (%+v) resources", podCluster)
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.WANIP{}) // TODO use forceDelete func
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.LANIP{})
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.VInterface{})
@@ -632,6 +636,7 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 	}
 
 	mysql.Db.Delete(&subDomain)
+	log.Infof("delete sub_domain (%s) resources completed", subDomain.Name)
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
