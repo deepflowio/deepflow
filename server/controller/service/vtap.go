@@ -28,11 +28,12 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/monitor/license"
 )
 
 const (
+	VTAP_LICENSE_CHECK_EXCEPTION                = "采集器(%s)不支持修改为指定授权类型"
 	VTAP_LICENSE_CHECK_EXCEPTION_FOR_WORKLOAD_V = "公有云（及无法确定宿主机）的Worload-V类采集器仅支持B类授权"
-	VTAP_LICENSE_CHECK_EXCEPTION_FOR_POD_V      = "公有云（及无法确定宿主机）的容器-V类采集器仅支持A类授权"
 )
 
 func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
@@ -288,10 +289,23 @@ func BatchUpdateVtap(updateMap []map[string]interface{}) (resp map[string][]stri
 
 func checkLicenseType(
 	vtap mysql.VTap, licenseType int, idToVm map[int]*mysql.VM,
-	idToPodNode map[int]*mysql.PodNode, ipToHost map[string]*mysql.Host,
-	nodeIDToConn map[int]*mysql.VMPodNodeConnection,
+	ipToHost map[string]*mysql.Host,
 	lcuuidToDomain map[string]*mysql.Domain,
 ) (err error) {
+
+	// check current vtap if support wanted licenseType
+	supportedLicenseTypes := license.GetSupportedLicenseType(vtap.Type)
+	if len(supportedLicenseTypes) > 0 {
+		sort.Ints(supportedLicenseTypes)
+		index := sort.SearchInts(supportedLicenseTypes, licenseType)
+		if index >= len(supportedLicenseTypes) || supportedLicenseTypes[index] != licenseType {
+			return NewError(common.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
+		}
+	} else {
+		return NewError(common.INVALID_POST_DATA, fmt.Sprintf(VTAP_LICENSE_CHECK_EXCEPTION, vtap.Name))
+	}
+
+	// extra check for WorkLoad-V vtap
 	if vtap.Type == common.VTAP_TYPE_WORKLOAD_V {
 		if vtap.LicenseType != 0 && vtap.LicenseType != common.VTAP_LICENSE_TYPE_B {
 			return nil
@@ -325,53 +339,6 @@ func checkLicenseType(
 				return NewError(common.INVALID_POST_DATA, VTAP_LICENSE_CHECK_EXCEPTION_FOR_WORKLOAD_V)
 			}
 		}
-	} else if vtap.Type == common.VTAP_TYPE_POD_VM {
-		if vtap.LicenseType != 0 && vtap.LicenseType != common.VTAP_LICENSE_TYPE_A {
-			return nil
-		}
-
-		podNode, ok := idToPodNode[vtap.LaunchServerID]
-		if !ok {
-			if licenseType != common.VTAP_LICENSE_TYPE_A {
-				return NewError(common.INVALID_POST_DATA, VTAP_LICENSE_CHECK_EXCEPTION_FOR_POD_V)
-			}
-		}
-
-		vmPodNodeConn, ok := nodeIDToConn[podNode.ID]
-		if !ok {
-			if licenseType != common.VTAP_LICENSE_TYPE_A {
-				return NewError(common.INVALID_POST_DATA, VTAP_LICENSE_CHECK_EXCEPTION_FOR_POD_V)
-			}
-		}
-
-		vm, ok := idToVm[vmPodNodeConn.VMID]
-		if !ok {
-			if licenseType != common.VTAP_LICENSE_TYPE_A {
-				return NewError(common.INVALID_POST_DATA, VTAP_LICENSE_CHECK_EXCEPTION_FOR_POD_V)
-			}
-		}
-
-		host, ok := ipToHost[vm.LaunchServer]
-		if !ok {
-			if licenseType != common.VTAP_LICENSE_TYPE_A {
-				return NewError(common.INVALID_POST_DATA, VTAP_LICENSE_CHECK_EXCEPTION_FOR_POD_V)
-			}
-		}
-
-		domain, ok := lcuuidToDomain[host.Domain]
-		if !ok {
-			if licenseType != common.VTAP_LICENSE_TYPE_A {
-				return NewError(common.INVALID_POST_DATA, VTAP_LICENSE_CHECK_EXCEPTION_FOR_POD_V)
-			}
-		}
-
-		switch domain.Type {
-		case common.TENCENT, common.AWS, common.ALIYUN, common.HUAWEI,
-			common.QINGCLOUD, common.AZURE:
-			if licenseType != common.VTAP_LICENSE_TYPE_A {
-				return NewError(common.INVALID_POST_DATA, VTAP_LICENSE_CHECK_EXCEPTION_FOR_POD_V)
-			}
-		}
 	}
 	return nil
 }
@@ -383,12 +350,9 @@ func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (re
 	var vm mysql.VM
 	var podNode mysql.PodNode
 	var host mysql.Host
-	var vmPodNodeConn mysql.VMPodNodeConnection
 	var domain mysql.Domain
 	var idToVm = make(map[int]*mysql.VM)
-	var idToPodNode = make(map[int]*mysql.PodNode)
 	var ipToHost = make(map[string]*mysql.Host)
-	var nodeIDToConn = make(map[int]*mysql.VMPodNodeConnection)
 	var lcuuidToDomain = make(map[string]*mysql.Domain)
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
@@ -413,26 +377,20 @@ func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (re
 		lcuuidToDomain[domain.Lcuuid] = &domain
 
 		// 检查是否可以修改
-		err := checkLicenseType(vtap, licenseType, idToVm, idToPodNode, ipToHost,
-			nodeIDToConn, lcuuidToDomain)
+		err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
 		if err != nil {
 			return model.Vtap{}, err
 		}
 
 	} else if vtap.Type == common.VTAP_TYPE_POD_VM {
 		mysql.Db.Where("id = ?", vtap.LaunchServerID).First(&podNode)
-		mysql.Db.Where("pod_node_id = ?", podNode.ID).First(&vmPodNodeConn)
-		mysql.Db.Where("id = ?", vmPodNodeConn.VMID).First(&vm)
 		mysql.Db.Where("ip = ?", vm.LaunchServer).First(&host)
 		mysql.Db.Where("lcuuid = ?", host.Domain).First(&domain)
-		idToPodNode[podNode.ID] = &podNode
 		idToVm[vm.ID] = &vm
 		ipToHost[host.IP] = &host
-		nodeIDToConn[vmPodNodeConn.PodNodeID] = &vmPodNodeConn
 		lcuuidToDomain[domain.Lcuuid] = &domain
 		// 检查是否可以修改
-		err := checkLicenseType(vtap, licenseType, idToVm, idToPodNode, ipToHost,
-			nodeIDToConn, lcuuidToDomain)
+		err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
 		if err != nil {
 			return model.Vtap{}, err
 		}
@@ -498,8 +456,7 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 			} else {
 				// 检查是否可以修改
 				licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
-				_err = checkLicenseType(vtap, licenseType, idToVm, idToPodNode, ipToHost,
-					nodeIDToConn, lcuuidToDomain)
+				_err = checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
 				if err == nil {
 					// 更新vtap DB
 					dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
