@@ -171,9 +171,8 @@ impl MqttLog {
                         match self.client_map.get(&key) {
                             Some(v) => Some(v.clone()),
                             None => {
-                                debug!("client id not found, 
-                                    maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed,
-                                    or CONNECT packet not found, or treat other packets as MQTT packets.");
+                                debug!("client id not found, maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed, 
+                                or CONNECT packet not found, or treat other packets as MQTT packets.");
                                 return Err(Error::MqttLogParseFailed);
                             }
                         }
@@ -381,66 +380,97 @@ pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
         return false;
     }
 
-    let input = match packet.get_l4_payload() {
+    let mut payload = match packet.get_l4_payload() {
         Some(p) => p,
         None => return false,
     };
+    loop {
+        let (input, header) = match mqtt_fixed_header(payload) {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
 
-    let (input, header) = match mqtt_fixed_header(input) {
-        Ok(p) => p,
-        Err(_) => return false,
-    };
+        match header.kind {
+            PacketKind::Connect => {
+                let data = bytes::complete::take(header.remaining_length as u32);
+                let version = match data.and_then(parse_connect_packet).parse(input) {
+                    Ok((_, (version, _))) => version,
+                    Err(_) => return false,
+                };
+                if version < 3 || version > 5 {
+                    return false;
+                }
+            }
+            PacketKind::Connack => {
+                let input = match parse_connack_packet(input) {
+                    Ok((input, _)) => input,
+                    Err(_) => return false,
+                };
+                // payload = 0
+                if input.len() != 0 {
+                    return false;
+                }
+            }
+            PacketKind::Publish { dup, qos, .. } => {
+                if dup && qos == QualityOfService::AtMostOnce {
+                    debug!("mqtt publish packet has invalid dup flags={}", dup);
+                    return false;
+                }
+            }
+            PacketKind::Subscribe => {
+                if mqtt_packet_identifier
+                    .and(mqtt_subscription_requests)
+                    .parse(input)
+                    .is_err()
+                {
+                    return false;
+                }
+            }
+            PacketKind::Suback => {
+                if mqtt_packet_identifier
+                    .and(mqtt_subscription_acks)
+                    .parse(input)
+                    .is_err()
+                {
+                    return false;
+                }
+            }
+            PacketKind::Unsubscribe => {
+                if mqtt_packet_identifier
+                    .and(mqtt_unsubscription_requests)
+                    .parse(input)
+                    .is_err()
+                {
+                    return false;
+                }
+            }
+            PacketKind::Pingreq | PacketKind::Pingresp | PacketKind::Disconnect => {
+                // payload = 0
+                if header.remaining_length != 0 {
+                    return false;
+                }
+            }
+            PacketKind::Pubcomp
+            | PacketKind::Pubrec
+            | PacketKind::Puback
+            | PacketKind::Unsuback
+            | PacketKind::Pubrel => {
+                // minus variable header, payload = 0
+                // 减掉可变头部, 有效payload = 0
+                if header.remaining_length - 2 != 0 {
+                    return false;
+                }
+            }
+        }
 
-    match header.kind {
-        PacketKind::Connect => {
-            let data = bytes::complete::take(header.remaining_length as u32);
-            let version = match data.and_then(parse_connect_packet).parse(input) {
-                Ok((_, (version, _))) => version,
-                Err(_) => return false,
-            };
-            if version < 3 || version > 5 {
-                return false;
-            }
-            true
+        let remaining_length = header.remaining_length as usize;
+        if input.len() < remaining_length {
+            return false;
         }
-        PacketKind::Connack => {
-            let input = match parse_connack_packet(input) {
-                Ok((input, _)) => input,
-                Err(_) => return false,
-            };
-            // payload = 0
-            input.len() == 0
+        if input.len() == remaining_length {
+            return true;
         }
-        PacketKind::Publish { dup, qos, .. } => {
-            if dup && qos == QualityOfService::AtMostOnce {
-                debug!("mqtt publish packet has invalid dup flags={}", dup);
-                return false;
-            }
-            true
-        }
-        PacketKind::Subscribe => mqtt_packet_identifier
-            .and(mqtt_subscription_requests)
-            .parse(input)
-            .is_ok(),
-        PacketKind::Suback => mqtt_packet_identifier
-            .and(mqtt_subscription_acks)
-            .parse(input)
-            .is_ok(),
-        PacketKind::Unsubscribe => mqtt_packet_identifier
-            .and(mqtt_unsubscription_requests)
-            .parse(input)
-            .is_ok(),
-        PacketKind::Pingreq | PacketKind::Pingresp | PacketKind::Disconnect => {
-            // payload = 0
-            header.remaining_length == 0
-        }
-        PacketKind::Pubcomp
-        | PacketKind::Pubrec
-        | PacketKind::Puback
-        | PacketKind::Unsuback
-        // minus variable header, payload = 0
-        // 减掉可变头部, 有效payload = 0 
-        | PacketKind::Pubrel => header.remaining_length - 2 == 0,
+        payload = &input[remaining_length..];
     }
 }
 
