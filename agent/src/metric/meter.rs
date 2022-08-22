@@ -208,8 +208,10 @@ pub struct Latency {
     pub srt_count: u32,
     pub art_count: u32,
     pub rrt_count: u32,
-    pub first_crt: u32,
-    pub follow_crt: u32,
+
+    pub cit_max: u32, // us, the max time between the client request and the last server response (Payload > 1)
+    pub cit_sum: u32,
+    pub cit_count: u32,
 }
 
 impl Latency {
@@ -233,12 +235,8 @@ impl Latency {
             self.rrt_max = other.rrt_max;
         }
 
-        if self.first_crt < other.first_crt {
-            self.first_crt = other.first_crt;
-        }
-
-        if self.first_crt < other.follow_crt {
-            self.follow_crt = other.follow_crt;
+        if self.cit_max < other.cit_max {
+            self.cit_max = other.cit_max;
         }
 
         self.rtt_sum += other.rtt_sum;
@@ -247,6 +245,7 @@ impl Latency {
         self.srt_sum += other.srt_sum;
         self.art_sum += other.art_sum;
         self.rrt_sum += other.rrt_sum;
+        self.cit_sum += other.cit_sum;
 
         self.rtt_count += other.rtt_count;
         self.rtt_client_count += other.rtt_client_count;
@@ -254,6 +253,7 @@ impl Latency {
         self.srt_count += other.srt_count;
         self.art_count += other.art_count;
         self.rrt_count += other.rrt_count;
+        self.cit_count += other.cit_count;
     }
 }
 
@@ -266,6 +266,7 @@ impl From<Latency> for metric::Latency {
             srt_max: m.srt_max,
             art_max: m.art_max,
             rrt_max: m.rrt_max,
+            cit_max: m.cit_max,
 
             rtt_sum: m.rtt_sum,
             rtt_client_sum: m.rtt_client_sum,
@@ -273,6 +274,7 @@ impl From<Latency> for metric::Latency {
             srt_sum: m.srt_sum,
             art_sum: m.art_sum,
             rrt_sum: m.rrt_sum,
+            cit_sum: m.cit_sum,
 
             rtt_count: m.rtt_count,
             rtt_client_count: m.rtt_client_count,
@@ -280,8 +282,7 @@ impl From<Latency> for metric::Latency {
             srt_count: m.srt_count,
             art_count: m.art_count,
             rrt_count: m.rrt_count,
-            first_crt: m.first_crt,
-            follow_crt: m.follow_crt,
+            cit_count: m.cit_count,
         }
     }
 }
@@ -292,10 +293,8 @@ pub struct Performance {
     pub retrans_rx: u64,
     pub zero_win_tx: u64,
     pub zero_win_rx: u64,
-    pub syn_rx: u32,
-    pub syn_tx: u32,
-    pub synack_rx: u32,
-    pub synack_tx: u32,
+    pub syn: u32,
+    pub synack: u32,
 }
 
 impl Performance {
@@ -304,10 +303,8 @@ impl Performance {
         self.retrans_rx += other.retrans_rx;
         self.zero_win_tx += other.zero_win_tx;
         self.zero_win_rx += other.zero_win_rx;
-        self.syn_rx += other.syn_rx;
-        self.syn_tx += other.syn_tx;
-        self.synack_rx += other.synack_rx;
-        self.synack_tx += other.synack_tx;
+        self.syn += other.syn;
+        self.synack += other.synack;
     }
 }
 
@@ -318,10 +315,8 @@ impl From<Performance> for metric::Performance {
             retrans_rx: m.retrans_rx,
             zero_win_tx: m.zero_win_tx,
             zero_win_rx: m.zero_win_rx,
-            syn_rx: m.syn_rx,
-            syn_tx: m.syn_tx,
-            synack_rx: m.synack_rx,
-            synack_tx: m.synack_tx,
+            syn: m.syn,
+            synack: m.synack,
         }
     }
 }

@@ -117,6 +117,7 @@ message TCPPerfStats {
     uint32 srt_max = 3;
     uint32 art_max = 4;
 
+
     uint32 rtt = 5;
     uint32 rtt_client_sum = 6;
     uint32 rtt_server_sum = 7;
@@ -131,6 +132,13 @@ message TCPPerfStats {
     TcpPerfCountsPeer counts_peer_rx = 15;
 
     uint32 total_retrans_count = 16;
+
+    uint32 syn_count = 17;
+    uint32 synack_count = 18;
+
+    uint32 cit_max = 19;
+    uint32 cit_sum = 20;
+    uint32 cit_count = 21;
 }
 
 message TcpPerfCountsPeer {

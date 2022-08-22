@@ -394,10 +394,9 @@ struct PerfData {
     // flow数据
     rtt_0: TimeStats,
     rtt_1: TimeStats,
+    cit: TimeStats,
     retrans_sum: u32,
     rtt_full: Option<Duration>,
-    first_crt: u32,
-    follow_crt: u32,
 
     period_data: PeriodPerfData,
 }
@@ -423,10 +422,8 @@ struct PeriodPerfData {
     zero_win_count_1: u32,
 
     // SYN SYN_ACK count
-    syn_0: u32,
-    synack_0: u32,
-    syn_1: u32,
-    synack_1: u32,
+    syn: u32,
+    synack: u32,
 
     updated: bool,
 }
@@ -505,22 +502,18 @@ impl PerfData {
         self.period_data.updated = true;
     }
 
-    fn calc_syn(&mut self, fpd: bool) {
-        if fpd {
-            self.period_data.syn_0 += 1;
-        } else {
-            self.period_data.syn_1 += 1;
-        }
+    fn calc_syn(&mut self) {
+        self.period_data.syn += 1;
         self.period_data.updated = true;
     }
 
-    fn calc_synack(&mut self, fpd: bool) {
-        if fpd {
-            self.period_data.synack_0 += 1;
-        } else {
-            self.period_data.synack_1 += 1;
-        }
+    fn calc_synack(&mut self) {
+        self.period_data.synack += 1;
         self.period_data.updated = true;
+    }
+
+    fn calc_cit(&mut self, d: Duration) {
+        self.cit.update(d);
     }
 
     fn update_perf_stats(&mut self, stats: &mut FlowPerfStats, flow_reversed: bool) {
@@ -544,12 +537,11 @@ impl PerfData {
             self.rtt_1.updated = false;
         }
 
-        if self.first_crt != 0 {
-            stats.first_crt = self.first_crt;
-        }
-
-        if self.follow_crt != 0 {
-            stats.follow_crt = self.follow_crt;
+        if self.cit.updated {
+            stats.cit_max = self.cit.max.as_micros() as u32;
+            stats.cit_sum = self.cit.sum.as_micros() as u32;
+            stats.cit_count = self.cit.count;
+            self.cit.updated = false;
         }
 
         if !self.period_data.updated {
@@ -564,10 +556,8 @@ impl PerfData {
         stats.counts_peers[0].zero_win_count = pd.zero_win_count_0;
         stats.counts_peers[1].zero_win_count = pd.zero_win_count_1;
 
-        stats.counts_peers[0].syn_count = pd.syn_0;
-        stats.counts_peers[1].syn_count = pd.syn_1;
-        stats.counts_peers[0].synack_count = pd.synack_0;
-        stats.counts_peers[1].syn_count = pd.synack_1;
+        stats.syn_count = pd.syn;
+        stats.synack_count = pd.synack;
 
         if !flow_reversed {
             if pd.art_1.updated {
@@ -774,6 +764,10 @@ impl TcpPerf {
             oppo_dir.rtt_calculable = false;
         }
 
+        if Self::is_handshake_ack_packet(same_dir, oppo_dir, p) {
+            same_dir.is_ack_packet = true;
+        }
+
         is_opening
     }
 
@@ -843,24 +837,23 @@ impl TcpPerf {
             self.perf_data.calc_psh_urg(fpd);
         }
         // calculate client waiting time
-        if fpd && p.is_psh_ack() {
-            if self.perf_data.first_crt == 0 {
-                // 存在客户端依赖服务端发送包之后才能发起请求，那么需要比较收到服务端包时间戳取最大值
-                // ===================================
-                // If the client relies on the server to send the packet before initiating the request,
-                // it needs to compare the timestamp of the received server packet to take the maximum value.
-                let crt = (p.lookup_key.timestamp - same_dir.timestamp.max(oppo_dir.timestamp))
-                    .as_micros() as u32;
-                self.perf_data.first_crt = crt;
+        //
+        // 客户端发包 payload > 1（不能等于1，因为有可能是 heartbeat）,
+        // - client前一个包是syn-ack-ack，那么idle_time = current_time - max(previouse_client_packet_time, previouse_server_packet_time)
+        // - idel_time = current_time - previouse_server_packet_time
+        // =================
+        // The client sends the packet payload > 1 (cannot be equal to 1, because it may be heartbeat)
+        // - the previous packet of the client is syn-ack-ack, then idle_time = current_time - max(previouse_client_packet_time, previouse_server_packet_time)
+        // - idel_time = current_time - previouse_server_packet_time
+        if fpd && p.is_psh_ack() && p.payload_len > 1 {
+            if same_dir.is_ack_packet {
+                same_dir.is_ack_packet = false;
+                let d = p.lookup_key.timestamp - same_dir.timestamp.max(oppo_dir.timestamp);
+                self.perf_data.calc_cit(d);
+            } else if oppo_dir.timestamp > same_dir.timestamp && oppo_dir.payload_len > 1 {
+                let d = p.lookup_key.timestamp - oppo_dir.timestamp;
+                self.perf_data.calc_cit(d);
             }
-            if oppo_dir.payload_len > 1 && self.perf_data.follow_crt == 0 {
-                let crt = (p.lookup_key.timestamp - oppo_dir.timestamp).as_micros() as u32;
-                self.perf_data.follow_crt = crt;
-            }
-        }
-        // reset time between the client request and the last server response
-        if p.is_ack() && oppo_dir.is_reply_packet(p) {
-            self.perf_data.follow_crt = 0;
         }
     }
 
@@ -888,11 +881,11 @@ impl TcpPerf {
 
         // calculate syn/synack count
         if p.is_syn() {
-            self.perf_data.calc_syn(fpd);
+            self.perf_data.calc_syn();
         }
 
         if p.is_syn_ack() {
-            self.perf_data.calc_synack(fpd);
+            self.perf_data.calc_synack();
         }
 
         is_retrans
@@ -968,7 +961,7 @@ impl L4FlowPerf for TcpPerf {
             || d.rtt_0.updated
             || d.rtt_1.updated
             || d.rtt_full.is_some()
-            || d.follow_crt != 0
+            || d.cit.updated
     }
 
     fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats {
