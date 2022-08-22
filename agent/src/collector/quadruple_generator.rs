@@ -960,12 +960,14 @@ impl QuadrupleGenerator {
                 art_max: stats.tcp.art_max,
                 rrt_max: 0,
                 rtt_sum: stats.tcp.rtt as u64,
+                cit_max: stats.tcp.cit_max,
 
                 rtt_client_sum: stats.tcp.rtt_client_sum as u64,
                 rtt_server_sum: stats.tcp.rtt_server_sum as u64,
                 srt_sum: stats.tcp.srt_sum as u64,
                 art_sum: stats.tcp.art_sum as u64,
                 rrt_sum: 0,
+                cit_sum: stats.tcp.cit_sum,
 
                 rtt_count: (stats.tcp.rtt > 0) as u32,
                 rtt_client_count: stats.tcp.rtt_client_count,
@@ -973,8 +975,7 @@ impl QuadrupleGenerator {
                 srt_count: stats.tcp.srt_count,
                 art_count: stats.tcp.art_count,
                 rrt_count: 0,
-                first_crt: stats.tcp.first_crt,
-                follow_crt: stats.tcp.follow_crt,
+                cit_count: stats.tcp.cit_count,
             };
 
             let src_perf = &stats.tcp.counts_peers[0];
@@ -984,10 +985,8 @@ impl QuadrupleGenerator {
                 retrans_rx: dst_perf.retrans_count as u64,
                 zero_win_tx: src_perf.zero_win_count as u64,
                 zero_win_rx: dst_perf.zero_win_count as u64,
-                syn_rx: dst_perf.syn_count,
-                syn_tx: src_perf.syn_count,
-                synack_rx: dst_perf.synack_count,
-                synack_tx: src_perf.synack_count,
+                syn: stats.tcp.syn_count,
+                synack: stats.tcp.syn_count,
             };
         } else {
             flow_meter.latency.art_max = stats.tcp.art_max;

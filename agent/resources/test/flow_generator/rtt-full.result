@@ -12,10 +12,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -49,10 +53,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 1,
+        synack: 0,
         updated: true,
     },
 }
@@ -70,10 +72,14 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -107,10 +113,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -128,12 +132,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         225.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -167,10 +175,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -188,12 +194,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         225.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -227,10 +237,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -248,12 +256,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         225.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -287,10 +299,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -308,12 +318,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         225.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -347,10 +361,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -368,12 +380,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         225.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -407,10 +423,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -428,10 +442,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -465,10 +483,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 1,
+        synack: 0,
         updated: true,
     },
 }
@@ -486,10 +502,14 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -523,10 +543,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -544,12 +562,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -583,10 +605,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -604,12 +624,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -643,10 +667,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -664,12 +686,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 816.949ms,
+        max: 816.949ms,
+        updated: true,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 816949,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -703,10 +729,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -724,12 +748,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 816.949ms,
+        max: 816.949ms,
+        updated: true,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 816949,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -763,10 +791,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -784,12 +810,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 816.949ms,
+        max: 816.949ms,
+        updated: true,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 816949,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -823,10 +853,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -844,12 +872,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 816.949ms,
+        max: 816.949ms,
+        updated: true,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 816949,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -883,10 +915,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -904,12 +934,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 816.949ms,
+        max: 816.949ms,
+        updated: true,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 816949,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -943,10 +977,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -964,12 +996,16 @@ PerfData {
         max: 751µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 816.949ms,
+        max: 816.949ms,
+        updated: true,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         825µs,
     ),
-    first_crt: 816949,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1003,10 +1039,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -1024,10 +1058,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1061,10 +1099,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 1,
+        synack: 0,
         updated: true,
     },
 }
@@ -1082,10 +1118,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1119,10 +1159,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 2,
+        synack: 0,
         updated: true,
     },
 }
@@ -1140,10 +1178,14 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1177,10 +1219,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -1198,12 +1238,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: Some(
         325.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1237,10 +1281,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -1258,12 +1300,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: Some(
         325.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1297,10 +1343,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -1318,12 +1362,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: Some(
         325.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1357,10 +1405,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -1378,12 +1424,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: Some(
         325.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1417,10 +1467,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -1438,12 +1486,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: Some(
         325.4ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1477,10 +1529,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -1498,10 +1548,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1535,10 +1589,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 1,
+        synack: 0,
         updated: true,
     },
 }
@@ -1556,10 +1608,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1593,10 +1649,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 2,
+        synack: 0,
         updated: true,
     },
 }
@@ -1614,10 +1668,14 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1651,10 +1709,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -1672,10 +1728,14 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1709,10 +1769,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -1730,12 +1788,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1769,10 +1831,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -1790,12 +1850,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1829,10 +1893,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -1850,12 +1912,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1889,10 +1955,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -1910,12 +1974,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -1949,10 +2017,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -1970,12 +2036,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2009,10 +2079,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -2030,10 +2098,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2067,10 +2139,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 1,
+        synack: 0,
         updated: true,
     },
 }
@@ -2088,10 +2158,14 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2125,10 +2199,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -2146,10 +2218,14 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 1,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2183,10 +2259,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 2,
+        synack: 1,
         updated: true,
     },
 }
@@ -2204,10 +2278,14 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2241,10 +2319,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -2262,12 +2338,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2301,10 +2381,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -2322,12 +2400,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2361,10 +2443,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -2382,12 +2462,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2421,10 +2505,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -2442,12 +2524,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2481,10 +2567,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -2502,12 +2586,16 @@ PerfData {
         max: 216.3ms,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         541.7ms,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2541,10 +2629,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 2,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 2,
+        synack: 2,
         updated: true,
     },
 }
@@ -2562,10 +2648,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2599,10 +2689,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 1,
+        synack: 0,
         updated: true,
     },
 }
@@ -2620,10 +2708,14 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2657,10 +2749,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -2678,12 +2768,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2717,10 +2811,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -2738,12 +2830,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 0,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2777,10 +2873,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -2798,12 +2892,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 1,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2837,10 +2935,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -2858,12 +2954,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 2,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2897,10 +2997,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -2918,12 +3016,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 3,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -2957,10 +3059,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -2978,12 +3078,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 4,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3017,10 +3121,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 1,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -3038,12 +3140,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 5,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3077,10 +3183,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3098,12 +3202,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3137,10 +3245,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3158,12 +3264,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3197,10 +3307,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3218,12 +3326,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3257,10 +3369,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3278,12 +3388,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3317,10 +3431,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3338,12 +3450,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3377,10 +3493,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3398,12 +3512,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3437,10 +3555,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3458,12 +3574,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3497,10 +3617,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3518,12 +3636,16 @@ PerfData {
         max: 941µs,
         updated: true,
     },
+    cit: TimeStats {
+        count: 1,
+        sum: 66µs,
+        max: 66µs,
+        updated: true,
+    },
     retrans_sum: 6,
     rtt_full: Some(
         959µs,
     ),
-    first_crt: 66,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3557,10 +3679,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 1,
-        synack_0: 0,
-        syn_1: 0,
-        synack_1: 2,
+        syn: 1,
+        synack: 2,
         updated: true,
     },
 }
@@ -3578,10 +3698,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3615,10 +3739,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 0,
-        synack_0: 1,
-        syn_1: 0,
-        synack_1: 0,
+        syn: 0,
+        synack: 1,
         updated: true,
     },
 }
@@ -3636,10 +3758,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3673,10 +3799,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 0,
-        synack_0: 1,
-        syn_1: 1,
-        synack_1: 0,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -3694,10 +3818,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3731,10 +3859,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 0,
-        synack_0: 1,
-        syn_1: 1,
-        synack_1: 0,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -3752,10 +3878,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3789,10 +3919,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 0,
-        synack_0: 1,
-        syn_1: 1,
-        synack_1: 0,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -3810,10 +3938,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3847,10 +3979,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 0,
-        synack_0: 1,
-        syn_1: 1,
-        synack_1: 0,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -3868,10 +3998,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3905,10 +4039,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 0,
-        synack_0: 1,
-        syn_1: 1,
-        synack_1: 0,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
@@ -3926,10 +4058,14 @@ PerfData {
         max: 0ns,
         updated: false,
     },
+    cit: TimeStats {
+        count: 0,
+        sum: 0ns,
+        max: 0ns,
+        updated: false,
+    },
     retrans_sum: 0,
     rtt_full: None,
-    first_crt: 0,
-    follow_crt: 0,
     period_data: PeriodPerfData {
         art_0: TimeStats {
             count: 0,
@@ -3963,10 +4099,8 @@ PerfData {
         psh_urg_count_1: 0,
         zero_win_count_0: 0,
         zero_win_count_1: 0,
-        syn_0: 0,
-        synack_0: 1,
-        syn_1: 1,
-        synack_1: 0,
+        syn: 1,
+        synack: 1,
         updated: true,
     },
 }
