@@ -219,7 +219,7 @@ impl MqttPerfData {
                     self.calc_request(timestamp, flow_id);
                 }
                 PacketKind::Disconnect => {
-                    self.msg_type = LogMessageType::Disconnect;
+                    self.msg_type = LogMessageType::Session;
                     self.calc_request(timestamp, flow_id);
                 }
             }

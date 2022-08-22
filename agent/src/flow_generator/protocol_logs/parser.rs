@@ -343,7 +343,7 @@ impl SessionQueue {
                     self.send(item);
                 }
             }
-            LogMessageType::Disconnect => self.send(item),
+            LogMessageType::Session => self.send(item),
             _ => (),
         }
 

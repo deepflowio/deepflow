@@ -303,7 +303,7 @@ impl MqttLog {
                 }
                 PacketKind::Disconnect => {
                     info.pkt_type = header.kind;
-                    self.msg_type = LogMessageType::Disconnect;
+                    self.msg_type = LogMessageType::Session;
                     info.res_msg_size = header.remaining_length;
                     info.version = self.version;
                 }

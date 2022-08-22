@@ -85,7 +85,6 @@ pub enum LogMessageType {
     Session,
     Other,
     Max,
-    Disconnect,
 }
 
 impl Default for LogMessageType {
