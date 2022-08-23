@@ -92,7 +92,7 @@ static __inline void delete_socket_info(__u64 conn_key,
 	socket_info_map__delete(&conn_key);
 	trace_stats->socket_map_count--;
 }
-
+#include "uprobe_base_bpf.c" // get_go_version
 #include "include/protocol_inference.h"
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
@@ -721,8 +721,6 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 }
 #endif
 
-#include "uprobe_base_bpf.c" // get_go_version
-
 static __inline void
 data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
@@ -759,14 +757,15 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		}
 	}
 
+	pid_tgid = bpf_get_current_pid_tgid();
+	tgid = (__u32) (pid_tgid >> 32);
+
 	if (extra->source == DATA_SOURCE_SYSCALL ||
 	    extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
 		if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
 			return;
 		}
 
-		pid_tgid = bpf_get_current_pid_tgid();
-		tgid = (__u32) (pid_tgid >> 32);
 		if (time_stamp == 0)
 			time_stamp = bpf_ktime_get_ns();
 		conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);

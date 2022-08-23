@@ -329,6 +329,10 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (get_go_version()) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
