@@ -118,7 +118,7 @@ impl From<MqttInfo> for flow_log::MqttInfo {
             PacketKind::Publish { .. } => {
                 vec![MqttTopic {
                     name: f.publish_topic.unwrap_or_default(),
-                    qos: None,
+                    qos: -1,
                 }]
             }
             PacketKind::Unsubscribe | PacketKind::Subscribe => {
@@ -256,7 +256,7 @@ impl MqttLog {
                             .into_iter()
                             .map(|(t, qos)| MqttTopic {
                                 name: t.to_string(),
-                                qos: Some(qos as u32),
+                                qos: qos as i32,
                             })
                             .collect(),
                     );
@@ -280,7 +280,7 @@ impl MqttLog {
                         reqs.into_iter()
                             .map(|topic| MqttTopic {
                                 name: topic.to_string(),
-                                qos: None,
+                                qos: -1,
                             })
                             .collect(),
                     );
