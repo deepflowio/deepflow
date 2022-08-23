@@ -699,7 +699,9 @@ func (v *GenesisSyncRpcUpdater) run() {
 			log.Warningf("from (%s) vtap_id (%v) type (%v)", info.peer, info.vtapID, info.msgType)
 			continue
 		}
-		log.Debugf("from (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message)
+
+		log.Debugf("received (%s) vtap_id (%v) type (%v) received (%s)", info.peer, info.vtapID, info.msgType, info.message)
+
 		if info.msgType == genesiscommon.TYPE_RENEW {
 			if info.vtapID != 0 {
 				peerInfo, ok := v.genesisSyncDataByPeer[info.vtapID]
