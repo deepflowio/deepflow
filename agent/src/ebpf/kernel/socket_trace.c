@@ -760,117 +760,122 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	pid_tgid = bpf_get_current_pid_tgid();
 	tgid = (__u32) (pid_tgid >> 32);
 
-	if (extra->source == DATA_SOURCE_SYSCALL ||
-	    extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
-		if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
-			return;
-		}
+	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
+		return;
+	}
 
-		if (time_stamp == 0)
-			time_stamp = bpf_ktime_get_ns();
-		conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
+	if (time_stamp == 0) {
+		time_stamp = bpf_ktime_get_ns();
+	}
 
-		if (conn_info->message_type == MSG_CLEAR) {
-			delete_socket_info(conn_key, conn_info->socket_info_ptr);
-			return;
-		}
+	conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
-		if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+	if (conn_info->message_type == MSG_CLEAR) {
+		delete_socket_info(conn_key, conn_info->socket_info_ptr);
+		return;
+	}
+
+	if (extra->source != DATA_SOURCE_GO_HTTP2_UPROBE) {
+		if (conn_info->direction == T_INGRESS &&
+		    conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 			tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
-		} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		} else if (conn_info->direction == T_EGRESS &&
+			   conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 			tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
 		}
+	}
 
-		trace_uid = trace_uid_map__lookup(&k0);
-		if (trace_uid == NULL)
-			return;
+	trace_uid = trace_uid_map__lookup(&k0);
+	if (trace_uid == NULL)
+		return;
 
-		trace_stats = trace_stats_map__lookup(&k0);
-		if (trace_stats == NULL)
-			return;
+	trace_stats = trace_stats_map__lookup(&k0);
+	if (trace_stats == NULL)
+		return;
 
-		trace_info_ptr = trace_map__lookup(&pid_tgid);
+	trace_info_ptr = trace_map__lookup(&pid_tgid);
 
-		socket_info_ptr = conn_info->socket_info_ptr;
-		// 'socket_id' used to resolve non-tracing between the same socket
-		socket_id = 0;
-		if (!is_socket_info_valid(socket_info_ptr)) {
-			socket_id = ++trace_uid->socket_id;
-		} else {
-			socket_id = socket_info_ptr->uid;
+	socket_info_ptr = conn_info->socket_info_ptr;
+	// 'socket_id' used to resolve non-tracing between the same socket
+	socket_id = 0;
+	if (!is_socket_info_valid(socket_info_ptr)) {
+		socket_id = ++trace_uid->socket_id;
+	} else {
+		socket_id = socket_info_ptr->uid;
+	}
+
+	// (jiping) set thread_trace_id = 0 for go process
+	if (conn_info->message_type != MSG_PRESTORE &&
+	    conn_info->message_type != MSG_RECONFIRM &&
+	    extra->source != DATA_SOURCE_GO_HTTP2_UPROBE && !get_go_version())
+		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
+			      trace_info_ptr, trace_uid, trace_stats,
+			      &thread_trace_id, time_stamp);
+
+	if (!is_socket_info_valid(socket_info_ptr)) {
+		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
+			sk_info.peer_fd = socket_info_ptr->peer_fd;
+			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
-		// (jiping) set thread_trace_id = 0 for go process
-		if (conn_info->message_type != MSG_PRESTORE &&
-		conn_info->message_type != MSG_RECONFIRM && !get_go_version())
-			trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid, trace_info_ptr,
-				trace_uid, trace_stats, &thread_trace_id, time_stamp);
-
-		if (!is_socket_info_valid(socket_info_ptr)) {
-			if (socket_info_ptr && conn_info->direction == T_EGRESS) {
-				sk_info.peer_fd = socket_info_ptr->peer_fd;
-				thread_trace_id = socket_info_ptr->trace_id;
-			}
-
-			sk_info.uid = socket_id;
-			sk_info.l7_proto = conn_info->protocol;
-			sk_info.direction = conn_info->direction;
-			sk_info.role = conn_info->role;
-			sk_info.msg_type = conn_info->message_type;
-			sk_info.update_time = time_stamp / NS_PER_SEC;
-			sk_info.need_reconfirm = conn_info->need_reconfirm;
-			sk_info.correlation_id = conn_info->correlation_id;
-
-			/*
-			* MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
-			*/
-			if (conn_info->message_type == MSG_PRESTORE) {
-				*(__u32 *)sk_info.prev_data = *(__u32 *)conn_info->prev_buf;
-				sk_info.prev_data_len = 4;
-				sk_info.uid = 0;
-			}
-
-			socket_info_map__update(&conn_key, &sk_info);
-			if (socket_info_ptr == NULL)
-				trace_stats->socket_map_count++;
-		}
+		sk_info.uid = socket_id;
+		sk_info.l7_proto = conn_info->protocol;
+		sk_info.direction = conn_info->direction;
+		sk_info.role = conn_info->role;
+		sk_info.msg_type = conn_info->message_type;
+		sk_info.update_time = time_stamp / NS_PER_SEC;
+		sk_info.need_reconfirm = conn_info->need_reconfirm;
+		sk_info.correlation_id = conn_info->correlation_id;
 
 		/*
-		* 对于预先存储数据或socket l7协议类型需要再次确认(适用于长链接)
-		* 的动作只建立socket_info_map项不会发送数据给用户态程序。
+		* MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
 		*/
-		if (conn_info->message_type == MSG_PRESTORE ||
-		conn_info->message_type == MSG_RECONFIRM)
-			return;
+		if (conn_info->message_type == MSG_PRESTORE) {
+			*(__u32 *)sk_info.prev_data = *(__u32 *)conn_info->prev_buf;
+			sk_info.prev_data_len = 4;
+			sk_info.uid = 0;
+		}
 
-		if (is_socket_info_valid(socket_info_ptr)) {
-			sk_info.uid = socket_info_ptr->uid;
+		socket_info_map__update(&conn_key, &sk_info);
+		if (socket_info_ptr == NULL)
+			trace_stats->socket_map_count++;
+	}
 
-			/*
-			* 同方向多个连续请求或回应的场景时，
-			* 保持捕获数据的序列号保持不变。
-			*/
-			if (conn_info->keep_data_seq)
-				sk_info.seq = socket_info_ptr->seq;
-			else
-				sk_info.seq = ++socket_info_ptr->seq;
+	/*
+	* 对于预先存储数据或socket l7协议类型需要再次确认(适用于长链接)
+	* 的动作只建立socket_info_map项不会发送数据给用户态程序。
+	*/
+	if (conn_info->message_type == MSG_PRESTORE ||
+	    conn_info->message_type == MSG_RECONFIRM)
+		return;
 
-			socket_info_ptr->direction = conn_info->direction;
-			socket_info_ptr->msg_type = conn_info->message_type;
-			socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
-			if (socket_info_ptr->peer_fd != 0 && conn_info->direction == T_INGRESS) {
-				peer_conn_key = gen_conn_key_id((__u64)tgid,
-								(__u64)socket_info_ptr->peer_fd);
-				struct socket_info_t *peer_socket_info_ptr =
-								socket_info_map__lookup(&peer_conn_key);
-				if (is_socket_info_valid(peer_socket_info_ptr))
-					peer_socket_info_ptr->trace_id = thread_trace_id;
-			}
+	if (is_socket_info_valid(socket_info_ptr)) {
+		sk_info.uid = socket_info_ptr->uid;
 
-			if (conn_info->direction == T_EGRESS && socket_info_ptr->trace_id != 0) {
-				thread_trace_id = socket_info_ptr->trace_id;
-				socket_info_ptr->trace_id = 0;
-			}
+		/*
+		* 同方向多个连续请求或回应的场景时，
+		* 保持捕获数据的序列号保持不变。
+		*/
+		if (conn_info->keep_data_seq)
+			sk_info.seq = socket_info_ptr->seq;
+		else
+			sk_info.seq = ++socket_info_ptr->seq;
+
+		socket_info_ptr->direction = conn_info->direction;
+		socket_info_ptr->msg_type = conn_info->message_type;
+		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
+		if (socket_info_ptr->peer_fd != 0 && conn_info->direction == T_INGRESS) {
+			peer_conn_key = gen_conn_key_id((__u64)tgid,
+							(__u64)socket_info_ptr->peer_fd);
+			struct socket_info_t *peer_socket_info_ptr =
+							socket_info_map__lookup(&peer_conn_key);
+			if (is_socket_info_valid(peer_socket_info_ptr))
+				peer_socket_info_ptr->trace_id = thread_trace_id;
+		}
+
+		if (conn_info->direction == T_EGRESS && socket_info_ptr->trace_id != 0) {
+			thread_trace_id = socket_info_ptr->trace_id;
+			socket_info_ptr->trace_id = 0;
 		}
 	}
 
