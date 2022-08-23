@@ -689,8 +689,11 @@ func (op *PolicyDataOP) generatePolicies() {
 			// If the protocol is all and the port is filled in, it means that the protocol is tcp+udp,
 			// and if the protocol is empty and the port is empty, it means any
 			for vtapID, npbActions := range vtapIDToNpbActions {
-				vtapPolicy := newPolicy(vtapID, op.billingMethod)
-				vtapIDToPolicy[vtapID] = vtapPolicy
+				vtapPolicy, ok := vtapIDToPolicy[vtapID]
+				if ok == false {
+					vtapPolicy = newPolicy(vtapID, op.billingMethod)
+					vtapIDToPolicy[vtapID] = vtapPolicy
+				}
 				tFlowACL := proto.Clone(flowACL).(*trident.FlowAcl)
 				tFlowACL.Protocol = proto.Uint32(uint32(TCP))
 				tFlowACL.NpbActions = append(tFlowACL.NpbActions, npbActions...)
@@ -715,9 +718,11 @@ func (op *PolicyDataOP) generatePolicies() {
 			}
 		} else {
 			for vtapID, npbActions := range vtapIDToNpbActions {
-				vtapPolicy := newPolicy(vtapID, op.billingMethod)
-				vtapIDToPolicy[vtapID] = vtapPolicy
-
+				vtapPolicy, ok := vtapIDToPolicy[vtapID]
+				if ok == false {
+					vtapPolicy = newPolicy(vtapID, op.billingMethod)
+					vtapIDToPolicy[vtapID] = vtapPolicy
+				}
 				aFlowACL := proto.Clone(flowACL).(*trident.FlowAcl)
 				aFlowACL.NpbActions = append(aFlowACL.NpbActions, npbActions...)
 				aFlowACL.Protocol = proto.Uint32(uint32(protocol))
