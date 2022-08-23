@@ -121,8 +121,6 @@ static __inline int get_fd_from_http2clientConnReadLoop_ctx(struct pt_regs *ctx)
 	return get_fd_from_http2ClientConn(ptr);
 }
 
-// 执行到这个 hook 点的时候可能还在初始化阶段,将产生 tcp_seq 序列号为 0 的值
-// TODO: 屏蔽掉为 0 tcp_seq 的数据还是上报
 static __inline __u32 get_previous_read_tcp_seq(int fd, __u32 seq_end)
 {
 	struct http2_tcp_seq_key key = {
@@ -174,6 +172,10 @@ static void submit_http2_header(struct http2_header_data *data)
 	} else {
 		tcp_seq = get_tcp_write_seq_from_fd(data->fd);
 		direction = T_EGRESS;
+	}
+
+	if (tcp_seq == 0) {
+		return;
 	}
 
 	enum traffic_protocol protocol;
