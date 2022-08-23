@@ -830,10 +830,10 @@ impl<'a> MetaPacket<'a> {
         return Ok(packet);
     }
 
-    pub fn ebpf_flow_id(&self) -> u64 {
-        let protocol = u8::from(self.l7_protocol_from_ebpf) as u64;
+    pub fn ebpf_flow_id(&self) -> u128 {
+        let protocol = u8::from(self.l7_protocol_from_ebpf) as u128;
 
-        self.socket_id | protocol << 56
+        (self.socket_id as u128) | protocol << u64::BITS
     }
 
     pub fn set_loopback_mac(&mut self, mac: MacAddr) {
