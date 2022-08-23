@@ -751,7 +751,7 @@ impl EbpfRunner {
             self.log_rate.clone(),
             self.output.clone(),
         );
-        let mut flow_map: LruCache<u64, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
+        let mut flow_map: LruCache<u128, FlowItem> = LruCache::new(Self::FLOW_MAP_SIZE);
 
         while unsafe { SWITCH } {
             let mut packet = self.receiver.recv(Some(Duration::from_millis(1)));
