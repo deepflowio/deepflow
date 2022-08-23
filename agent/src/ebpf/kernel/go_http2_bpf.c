@@ -20,6 +20,7 @@ static __inline bool is_grpc_syscallConn_interface(void *ptr)
 
 static __inline int get_fd_from_http2serverConn_ctx(struct pt_regs *ctx)
 {
+	update_http2_tls(false);
 	void *ptr = get_the_first_parameter(ctx);
 	ptr += get_uprobe_offset(OFFSET_IDX_CONN_HTTP2_SERVER_CONN);
 	return get_fd_from_tcp_or_tls_conn_interface(ptr);
@@ -27,6 +28,7 @@ static __inline int get_fd_from_http2serverConn_ctx(struct pt_regs *ctx)
 
 static __inline int get_fd_from_http2ClientConn(void *ptr)
 {
+	update_http2_tls(false);
 	ptr += get_uprobe_offset(OFFSET_IDX_TCONN_HTTP2_CLIENT_CONN);
 	return get_fd_from_tcp_or_tls_conn_interface(ptr);
 }
@@ -39,9 +41,11 @@ static __inline int get_fd_from_http2ClientConn_ctx(struct pt_regs *ctx)
 
 static __inline int get_fd_from_grpc_http2Client_ctx(struct pt_regs *ctx)
 {
+	update_http2_tls(false);
 	void *ptr = get_the_first_parameter(ctx);
 	ptr += get_uprobe_offset(OFFSET_IDX_CONN_GRPC_HTTP2_CLIENT);
 	if (is_grpc_syscallConn_interface(ptr)) {
+		update_http2_tls(true);
 		struct go_interface i;
 		bpf_probe_read(&i, sizeof(i), ptr);
 		bpf_probe_read(&i, sizeof(i), i.ptr);
@@ -52,9 +56,11 @@ static __inline int get_fd_from_grpc_http2Client_ctx(struct pt_regs *ctx)
 
 static __inline int get_fd_from_grpc_http2Server_ctx(struct pt_regs *ctx)
 {
+	update_http2_tls(false);
 	void *ptr = get_the_first_parameter(ctx);
 	ptr += get_uprobe_offset(OFFSET_IDX_CONN_GRPC_HTTP2_SERVER);
 	if (is_grpc_syscallConn_interface(ptr)) {
+		update_http2_tls(true);
 		struct go_interface i;
 		bpf_probe_read(&i, sizeof(i), ptr);
 		bpf_probe_read(&i, sizeof(i), i.ptr);
@@ -75,6 +81,7 @@ static __inline int get_side_from_grpc_loopyWriter(struct pt_regs *ctx)
 
 static __inline int get_fd_from_grpc_loopyWriter(struct pt_regs *ctx)
 {
+	update_http2_tls(false);
 	void *ptr = get_the_first_parameter(ctx);
 
 	ptr += get_uprobe_offset(OFFSET_IDX_FRAMER_GRPC_TRANSPORT_LOOPY_WRITER);
@@ -84,6 +91,7 @@ static __inline int get_fd_from_grpc_loopyWriter(struct pt_regs *ctx)
 	ptr += get_uprobe_offset(OFFSET_IDX_CONN_GRPC_TRANSPORT_BUFWRITER);
 
 	if (is_grpc_syscallConn_interface(ptr)) {
+		update_http2_tls(true);
 		struct go_interface i;
 		bpf_probe_read(&i, sizeof(i), ptr);
 		bpf_probe_read(&i, sizeof(i), i.ptr);

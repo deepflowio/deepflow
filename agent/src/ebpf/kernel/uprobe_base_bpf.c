@@ -213,7 +213,6 @@ static __inline int get_fd_from_tcp_or_tls_conn_interface(void *conn)
 	}
 	fd = get_fd_from_tcp_conn_interface(conn);
 	if (fd > 0) {
-		update_http2_tls(false);
 		return fd;
 	}
 	return -1;
