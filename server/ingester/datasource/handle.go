@@ -212,13 +212,14 @@ const (
 
 func getMetricsTableName(id uint8, table string, t TableType) string {
 	tableId := zerodoc.MetricsTableID(id)
+	tablePrefix := strings.Split(tableId.TableName(), ".")[0]
 	if len(table) == 0 {
 		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), t.String())
 	}
 	if len(t.String()) == 0 {
-		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), table)
+		return fmt.Sprintf("%s.`%s.%s`", ckdb.METRICS_DB, tablePrefix, table)
 	}
-	return fmt.Sprintf("%s.`%s_%s_%s`", ckdb.METRICS_DB, tableId.TableName(), table, t.String())
+	return fmt.Sprintf("%s.`%s.%s_%s`", ckdb.METRICS_DB, tablePrefix, table, t.String())
 }
 
 func stringSliceHas(items []string, item string) bool {
