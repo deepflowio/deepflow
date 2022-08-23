@@ -296,5 +296,5 @@ message MqttInfo {
 
 message MqttTopic {
     string name = 1;
-    optional uint32 qos = 2; 
+    int32 qos = 2;  // -1 mean not exist qos
 }
