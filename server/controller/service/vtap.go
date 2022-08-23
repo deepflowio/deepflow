@@ -359,41 +359,48 @@ func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (re
 		return model.Vtap{}, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("vtap (%s) not found", lcuuid))
 	}
 
-	if _, ok := vtapUpdate["LICENSE_TYPE"]; !ok {
-		return model.Vtap{}, NewError(common.INVALID_POST_DATA, "no license_type in body")
+	log.Infof("update vtap (%s) license %v", vtap.Name, vtapUpdate)
+
+	if _, ok := vtapUpdate["LICENSE_TYPE"]; ok {
+		dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
+		licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
+
+		// 查询用于checkLicenseType的资源
+		if vtap.Type == common.VTAP_TYPE_WORKLOAD_V {
+			mysql.Db.Where("id = ?", vtap.LaunchServerID).First(&vm)
+			mysql.Db.Where("ip = ?", vm.LaunchServer).First(&host)
+			mysql.Db.Where("lcuuid = ?", vm.Domain).First(&domain)
+			idToVm[vm.ID] = &vm
+			ipToHost[host.IP] = &host
+			lcuuidToDomain[domain.Lcuuid] = &domain
+
+			// 检查是否可以修改
+			err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
+			if err != nil {
+				return model.Vtap{}, err
+			}
+
+		} else if vtap.Type == common.VTAP_TYPE_POD_VM {
+			mysql.Db.Where("id = ?", vtap.LaunchServerID).First(&podNode)
+			mysql.Db.Where("ip = ?", vm.LaunchServer).First(&host)
+			mysql.Db.Where("lcuuid = ?", host.Domain).First(&domain)
+			idToVm[vm.ID] = &vm
+			ipToHost[host.IP] = &host
+			lcuuidToDomain[domain.Lcuuid] = &domain
+			// 检查是否可以修改
+			err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
+			if err != nil {
+				return model.Vtap{}, err
+			}
+		}
 	}
-	dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
-	licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
 
-	log.Infof("update vtap (%s) license_type %v", vtap.Name, vtapUpdate)
-
-	// 查询用于checkLicenseType的资源
-	if vtap.Type == common.VTAP_TYPE_WORKLOAD_V {
-		mysql.Db.Where("id = ?", vtap.LaunchServerID).First(&vm)
-		mysql.Db.Where("ip = ?", vm.LaunchServer).First(&host)
-		mysql.Db.Where("lcuuid = ?", vm.Domain).First(&domain)
-		idToVm[vm.ID] = &vm
-		ipToHost[host.IP] = &host
-		lcuuidToDomain[domain.Lcuuid] = &domain
-
-		// 检查是否可以修改
-		err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
-		if err != nil {
-			return model.Vtap{}, err
+	if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"].([]interface{}); ok {
+		licenseFunctionStrs := []string{}
+		for _, licenseFunction := range licenseFunctions {
+			licenseFunctionStrs = append(licenseFunctionStrs, strconv.Itoa(int(licenseFunction.(float64))))
 		}
-
-	} else if vtap.Type == common.VTAP_TYPE_POD_VM {
-		mysql.Db.Where("id = ?", vtap.LaunchServerID).First(&podNode)
-		mysql.Db.Where("ip = ?", vm.LaunchServer).First(&host)
-		mysql.Db.Where("lcuuid = ?", host.Domain).First(&domain)
-		idToVm[vm.ID] = &vm
-		ipToHost[host.IP] = &host
-		lcuuidToDomain[domain.Lcuuid] = &domain
-		// 检查是否可以修改
-		err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
-		if err != nil {
-			return model.Vtap{}, err
-		}
+		dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
 	}
 
 	// 更新vtap DB
@@ -457,9 +464,20 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 				// 检查是否可以修改
 				licenseType := int(vtapUpdate["LICENSE_TYPE"].(float64))
 				_err = checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
-				if err == nil {
+				if _err == nil {
 					// 更新vtap DB
 					dbUpdateMap["license_type"] = vtapUpdate["LICENSE_TYPE"]
+
+					if licenseFunctions, ok := vtapUpdate["LICENSE_FUNCTIONS"].([]interface{}); ok {
+						licenseFunctionStrs := []string{}
+						for _, licenseFunction := range licenseFunctions {
+							licenseFunctionStrs = append(
+								licenseFunctionStrs,
+								strconv.Itoa(int(licenseFunction.(float64))),
+							)
+						}
+						dbUpdateMap["license_functions"] = strings.Join(licenseFunctionStrs, ",")
+					}
 					mysql.Db.Model(&vtap).Updates(dbUpdateMap)
 				}
 			}
