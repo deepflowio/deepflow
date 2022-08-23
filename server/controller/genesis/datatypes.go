@@ -103,9 +103,15 @@ func (g *GenesisSyncTypeOperation[T]) Renew(other []T, timestamp time.Time) {
 	defer g.mutex.Unlock()
 
 	for _, data := range other {
-		tData := reflect.ValueOf(data)
+		tData := reflect.ValueOf(&data).Elem()
 		dataLcuuid := tData.FieldByName("Lcuuid").String()
 		g.lastSeen[dataLcuuid] = timestamp
+
+		dataLastTime := tData.FieldByName("LastSeen")
+		if dataLastTime.IsValid() && dataLastTime.CanSet() {
+			dataLastTime.Set(reflect.ValueOf(timestamp))
+			g.dataDict[dataLcuuid] = data
+		}
 	}
 }
 
@@ -114,7 +120,7 @@ func (g *GenesisSyncTypeOperation[T]) Update(other []T, timestamp time.Time) {
 	defer g.mutex.Unlock()
 
 	for _, data := range other {
-		tData := reflect.ValueOf(data)
+		tData := reflect.ValueOf(&data).Elem()
 		dataLcuuid := tData.FieldByName("Lcuuid").String()
 		g.lastSeen[dataLcuuid] = timestamp
 		g.dataDict[dataLcuuid] = data
@@ -138,17 +144,29 @@ func (g *GenesisSyncTypeOperation[T]) Age(timestamp time.Time, timeout time.Dura
 	return removed
 }
 
-func (g *GenesisSyncTypeOperation[T]) Load() {
+func (g *GenesisSyncTypeOperation[T]) Load(timestamp time.Time, timeout time.Duration) {
+	ageTimestamp := timestamp.Add(-timeout)
+
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 
 	var items []T
 	mysql.Db.Where("node_ip = ?", os.Getenv(common.NODE_IP_KEY)).Find(&items)
 	for _, data := range items {
-		iData := reflect.ValueOf(data)
+		iData := reflect.ValueOf(&data).Elem()
 		dataLcuuid := iData.FieldByName("Lcuuid").String()
+		var lastTime time.Time
+		dataTime := iData.FieldByName("LastSeen")
+		if dataTime.IsValid() {
+			lastTime = dataTime.Interface().(time.Time)
+		} else {
+			lastTime = time.Now()
+		}
+		if ageTimestamp.After(lastTime) {
+			continue
+		}
 		g.dataDict[dataLcuuid] = data
-		g.lastSeen[dataLcuuid] = time.Now()
+		g.lastSeen[dataLcuuid] = lastTime
 	}
 }
 
