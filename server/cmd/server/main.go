@@ -81,6 +81,7 @@ func main() {
 	}
 
 	cfg := loadConfig(*configPath)
+	logger.EnableStdoutLog()
 	logger.EnableFileLog(cfg.LogFile)
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")

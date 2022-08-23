@@ -22,8 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/libs/logger"
-
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
@@ -57,7 +55,6 @@ type Controller struct{}
 
 func Start(configPath string) {
 	flag.Parse()
-	logger.EnableStdoutLog()
 
 	serverCfg := config.DefaultConfig()
 	serverCfg.Load(configPath)
