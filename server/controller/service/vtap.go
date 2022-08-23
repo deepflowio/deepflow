@@ -17,6 +17,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -348,7 +349,6 @@ func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (re
 	var dbUpdateMap = make(map[string]interface{})
 
 	var vm mysql.VM
-	var podNode mysql.PodNode
 	var host mysql.Host
 	var domain mysql.Domain
 	var idToVm = make(map[int]*mysql.VM)
@@ -373,25 +373,12 @@ func UpdateVtapLicenseType(lcuuid string, vtapUpdate map[string]interface{}) (re
 			idToVm[vm.ID] = &vm
 			ipToHost[host.IP] = &host
 			lcuuidToDomain[domain.Lcuuid] = &domain
+		}
 
-			// 检查是否可以修改
-			err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
-			if err != nil {
-				return model.Vtap{}, err
-			}
-
-		} else if vtap.Type == common.VTAP_TYPE_POD_VM {
-			mysql.Db.Where("id = ?", vtap.LaunchServerID).First(&podNode)
-			mysql.Db.Where("ip = ?", vm.LaunchServer).First(&host)
-			mysql.Db.Where("lcuuid = ?", host.Domain).First(&domain)
-			idToVm[vm.ID] = &vm
-			ipToHost[host.IP] = &host
-			lcuuidToDomain[domain.Lcuuid] = &domain
-			// 检查是否可以修改
-			err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
-			if err != nil {
-				return model.Vtap{}, err
-			}
+		// 检查是否可以修改
+		err := checkLicenseType(vtap, licenseType, idToVm, ipToHost, lcuuidToDomain)
+		if err != nil {
+			return model.Vtap{}, err
 		}
 	}
 
@@ -415,37 +402,22 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 	var succeedLcuuids []string
 	var failedLcuuids []string
 
-	var vtap mysql.VTap
 	var vms []mysql.VM
-	var podNodes []mysql.PodNode
 	var hosts []mysql.Host
-	var conns []mysql.VMPodNodeConnection
 	var domains []mysql.Domain
 
 	mysql.Db.Select("id, launch_server").Find(&vms)
-	mysql.Db.Select("id").Find(&podNodes)
-	mysql.Db.Select("id, ip").Find(&hosts)
-	mysql.Db.Select("vm_id, pod_node_id").Find(&conns)
-	mysql.Db.Select("lcuuid").Find(&domains)
+	mysql.Db.Select("id, ip, domain").Find(&hosts)
+	mysql.Db.Select("lcuuid, type").Find(&domains)
 
 	idToVm := make(map[int]*mysql.VM)
 	for i, vm := range vms {
 		idToVm[vm.ID] = &vms[i]
 	}
 
-	idToPodNode := make(map[int]*mysql.PodNode)
-	for i, podNode := range podNodes {
-		idToPodNode[podNode.ID] = &podNodes[i]
-	}
-
 	ipToHost := make(map[string]*mysql.Host)
 	for i, host := range hosts {
 		ipToHost[host.IP] = &hosts[i]
-	}
-
-	nodeIDToConn := make(map[int]*mysql.VMPodNodeConnection)
-	for i, conn := range conns {
-		nodeIDToConn[conn.PodNodeID] = &conns[i]
 	}
 
 	var lcuuidToDomain = make(map[string]*mysql.Domain)
@@ -456,6 +428,7 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 	for _, vtapUpdate := range updateMap {
 		if lcuuid, ok := vtapUpdate["LCUUID"].(string); ok {
 			var _err error
+			var vtap mysql.VTap
 			var dbUpdateMap = make(map[string]interface{})
 
 			if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&vtap); ret.Error != nil {
@@ -496,7 +469,9 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 	}
 
 	if description != "" {
-		return response, NewError(common.SERVER_ERROR, description)
+		var serviceErr ServiceError
+		json.Unmarshal([]byte(description), &serviceErr)
+		return response, NewError(serviceErr.Status, description)
 	} else {
 		return response, nil
 	}

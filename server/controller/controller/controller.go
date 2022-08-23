@@ -99,7 +99,7 @@ func Start(configPath string) {
 		}
 	}
 
-	router.SetInitStageForHealthChecker("Monitor init")
+	router.SetInitStageForHealthChecker("Statsd init")
 	// start statsd
 	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
@@ -124,7 +124,6 @@ func Start(configPath string) {
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
 
-	router.SetInitStageForHealthChecker("Register routers init")
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
 	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
@@ -177,6 +176,7 @@ func Start(configPath string) {
 		}
 	}()
 
+	router.SetInitStageForHealthChecker("Register routers init")
 	router.DebugRouter(r, m, g)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
