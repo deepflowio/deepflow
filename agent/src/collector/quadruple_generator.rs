@@ -542,7 +542,7 @@ pub struct QuadrupleGeneratorThread {
     input: Arc<Receiver<Box<TaggedFlow>>>,
     second_output: DebugSender<Box<AccumulatedFlow>>,
     minute_output: DebugSender<Box<AccumulatedFlow>>,
-    flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
+    flow_output: DebugSender<Arc<TaggedFlow>>,
     connection_lru_capacity: usize,
     metrics_type: MetricsType,
     second_delay_seconds: u64,
@@ -567,7 +567,7 @@ impl QuadrupleGeneratorThread {
         input: Receiver<Box<TaggedFlow>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
-        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
+        flow_output: DebugSender<Arc<TaggedFlow>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -686,7 +686,7 @@ pub struct QuadrupleGenerator {
 
     key: QgKey,
     policy_ids: [U16Set; 2],
-    output_flow: Option<DebugSender<Arc<TaggedFlow>>>,
+    output_flow: DebugSender<Arc<TaggedFlow>>,
 
     l7_metrics_enabled: Arc<AtomicBool>,
     vtap_flow_1s_enabled: Arc<AtomicBool>,
@@ -704,7 +704,7 @@ impl QuadrupleGenerator {
         input: Arc<Receiver<Box<TaggedFlow>>>,
         second_output: DebugSender<Box<AccumulatedFlow>>,
         minute_output: DebugSender<Box<AccumulatedFlow>>,
-        flow_output: Option<DebugSender<Arc<TaggedFlow>>>,
+        flow_output: DebugSender<Arc<TaggedFlow>>,
         connection_lru_capacity: usize,
         metrics_type: MetricsType,
         second_delay_seconds: u64,
@@ -1098,10 +1098,8 @@ impl QuadrupleGenerator {
             match self.input.recv(Some(Duration::from_secs(3))) {
                 Ok(tagged_flow) => {
                     let tagged_flow = Arc::new(*tagged_flow);
-                    if let Some(output) = self.output_flow.as_mut() {
-                        if let Err(_) = output.send(tagged_flow.clone()) {
-                            debug!("qg push tagged flows to l4_flow queue failed maybe queue have terminated");
-                        }
+                    if let Err(_) = self.output_flow.send(tagged_flow.clone()) {
+                        debug!("qg push tagged flows to l4_flow queue failed maybe queue have terminated");
                     }
                     if self.collector_enabled.load(Ordering::Relaxed) {
                         self.handle(Some(tagged_flow.clone()), tagged_flow.flow.flow_stat_time);

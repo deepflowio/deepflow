@@ -540,7 +540,7 @@ pub struct Components {
     pub dispatcher_listeners: Vec<DispatcherListener>,
     pub log_parsers: Vec<AppProtoLogsParser>,
     pub collectors: Vec<CollectorThread>,
-    pub l4_flow_uniform_sender: Option<UniformSenderThread>,
+    pub l4_flow_uniform_sender: UniformSenderThread,
     pub metrics_uniform_sender: UniformSenderThread,
     pub l7_flow_uniform_sender: UniformSenderThread,
     pub platform_synchronizer: PlatformSynchronizer,
@@ -576,10 +576,7 @@ impl Components {
         self.debugger.start();
         self.metrics_uniform_sender.start();
         self.l7_flow_uniform_sender.start();
-
-        if let Some(l4_sender) = self.l4_flow_uniform_sender.as_mut() {
-            l4_sender.start();
-        }
+        self.l4_flow_uniform_sender.start();
 
         // Enterprise Edition Feature: packet-sequence
         self.packet_sequence_uniform_sender.start();
@@ -750,37 +747,26 @@ impl Components {
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let sender_id = 0usize;
-        let mut l4_flow_aggr_sender = None;
-        let mut l4_flow_uniform_sender = None;
-        if config_handler
-            .candidate_config
-            .collector
-            .l4_log_store_tap_types
-            .iter()
-            .any(|&t| t)
-        {
-            let (sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_sender_queue_size as usize,
-                "3-flow-to-collector-sender",
-                &queue_debugger,
-            );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "3-flow-to-collector-sender".to_string()),
-                    StatsOption::Tag("index", sender_id.to_string()),
-                ],
-            );
-            l4_flow_aggr_sender = Some(sender);
-            l4_flow_uniform_sender = Some(UniformSenderThread::new(
-                sender_id,
-                Arc::new(l4_flow_aggr_receiver),
-                config_handler.sender(),
-                stats_collector.clone(),
-                exception_handler.clone(),
-            ));
-        }
+        let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.flow_sender_queue_size as usize,
+            "3-flow-to-collector-sender",
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "3-flow-to-collector-sender".to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let l4_flow_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            Arc::new(l4_flow_aggr_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
 
         let sender_id = 1usize;
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
@@ -1161,7 +1147,7 @@ impl Components {
         id: usize,
         stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Box<TaggedFlow>>,
-        l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
+        l4_flow_aggr_sender: queue::DebugSender<SendItem>,
         metrics_sender: queue::DebugSender<SendItem>,
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
@@ -1202,24 +1188,19 @@ impl Components {
             ],
         );
 
-        let (mut l4_log_sender, mut l4_log_receiver) = (None, None);
-        if l4_flow_aggr_sender.is_some() {
-            let (l4_flow_sender, l4_flow_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow.aggr_queue_size as usize,
-                "2-second-flow-to-minute-aggrer",
-                queue_debugger,
-            );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
-            );
-            l4_log_sender = Some(l4_flow_sender);
-            l4_log_receiver = Some(l4_flow_receiver);
-        }
+        let (l4_log_sender, l4_log_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.flow.aggr_queue_size as usize,
+            "2-second-flow-to-minute-aggrer",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
 
         // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
         // QuadrupleGenerator的Delay组成部分：
@@ -1253,15 +1234,12 @@ impl Components {
             stats_collector.clone(),
         );
 
-        let mut l4_flow_aggr = None;
-        if let Some(l4_log_receiver) = l4_log_receiver {
-            l4_flow_aggr = Some(FlowAggrThread::new(
-                id,                                   // id
-                l4_log_receiver,                      // input
-                l4_flow_aggr_sender.unwrap().clone(), // output
-                config_handler.collector(),
-            ));
-        }
+        let l4_flow_aggr = FlowAggrThread::new(
+            id,                          // id
+            l4_log_receiver,             // input
+            l4_flow_aggr_sender.clone(), // output
+            config_handler.collector(),
+        );
 
         let (mut second_collector, mut minute_collector) = (None, None);
         if metrics_type.contains(MetricsType::SECOND) {
@@ -1291,7 +1269,7 @@ impl Components {
 
         CollectorThread::new(
             quadruple_generator,
-            l4_flow_aggr,
+            Some(l4_flow_aggr),
             second_collector,
             minute_collector,
         )
@@ -1319,9 +1297,7 @@ impl Components {
             p.stop();
         }
 
-        if let Some(l4_flow_uniform_sender) = self.l4_flow_uniform_sender.as_mut() {
-            l4_flow_uniform_sender.stop();
-        }
+        self.l4_flow_uniform_sender.stop();
         self.metrics_uniform_sender.stop();
         self.l7_flow_uniform_sender.stop();
 
