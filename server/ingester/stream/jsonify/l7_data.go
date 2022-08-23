@@ -644,7 +644,7 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	switch datatype.L7Protocol(l.Base.Head.Proto) {
-	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS:
 		h.fillHttp(l)
 	case datatype.L7_PROTOCOL_DNS:
 		h.fillDns(l)

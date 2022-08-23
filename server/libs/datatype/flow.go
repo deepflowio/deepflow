@@ -144,16 +144,17 @@ const (
 type L7Protocol uint8
 
 const (
-	L7_PROTOCOL_UNKNOWN L7Protocol = 0
-	L7_PROTOCOL_OTHER   L7Protocol = 1
-	L7_PROTOCOL_HTTP_1  L7Protocol = 20
-	L7_PROTOCOL_HTTP_2  L7Protocol = 21
-	L7_PROTOCOL_DUBBO   L7Protocol = 40
-	L7_PROTOCOL_MYSQL   L7Protocol = 60
-	L7_PROTOCOL_REDIS   L7Protocol = 80
-	L7_PROTOCOL_KAFKA   L7Protocol = 100
-	L7_PROTOCOL_MQTT    L7Protocol = 101
-	L7_PROTOCOL_DNS     L7Protocol = 120
+	L7_PROTOCOL_UNKNOWN    L7Protocol = 0
+	L7_PROTOCOL_OTHER      L7Protocol = 1
+	L7_PROTOCOL_HTTP_1     L7Protocol = 20
+	L7_PROTOCOL_HTTP_2     L7Protocol = 21
+	L7_PROTOCOL_HTTP_1_TLS L7Protocol = 22
+	L7_PROTOCOL_DUBBO      L7Protocol = 40
+	L7_PROTOCOL_MYSQL      L7Protocol = 60
+	L7_PROTOCOL_REDIS      L7Protocol = 80
+	L7_PROTOCOL_KAFKA      L7Protocol = 100
+	L7_PROTOCOL_MQTT       L7Protocol = 101
+	L7_PROTOCOL_DNS        L7Protocol = 120
 )
 
 // size = 9 * 4B = 36B
@@ -582,6 +583,8 @@ func (p L7Protocol) String() string {
 		formatted = "httpv1"
 	case L7_PROTOCOL_HTTP_2:
 		formatted = "httpv2"
+	case L7_PROTOCOL_HTTP_1_TLS:
+		formatted = "httpv1_tls"
 	case L7_PROTOCOL_DNS:
 		formatted = "dns"
 	case L7_PROTOCOL_MYSQL:
@@ -603,16 +606,17 @@ func (p L7Protocol) String() string {
 }
 
 var L7ProtocolStringMap = map[string]L7Protocol{
-	L7_PROTOCOL_HTTP_1.String():  L7_PROTOCOL_HTTP_1,
-	L7_PROTOCOL_HTTP_2.String():  L7_PROTOCOL_HTTP_2,
-	L7_PROTOCOL_DNS.String():     L7_PROTOCOL_DNS,
-	L7_PROTOCOL_MYSQL.String():   L7_PROTOCOL_MYSQL,
-	L7_PROTOCOL_REDIS.String():   L7_PROTOCOL_REDIS,
-	L7_PROTOCOL_DUBBO.String():   L7_PROTOCOL_DUBBO,
-	L7_PROTOCOL_KAFKA.String():   L7_PROTOCOL_KAFKA,
-	L7_PROTOCOL_MQTT.String():    L7_PROTOCOL_MQTT,
-	L7_PROTOCOL_OTHER.String():   L7_PROTOCOL_OTHER,
-	L7_PROTOCOL_UNKNOWN.String(): L7_PROTOCOL_UNKNOWN,
+	L7_PROTOCOL_HTTP_1.String():     L7_PROTOCOL_HTTP_1,
+	L7_PROTOCOL_HTTP_2.String():     L7_PROTOCOL_HTTP_2,
+	L7_PROTOCOL_HTTP_1_TLS.String(): L7_PROTOCOL_HTTP_1_TLS,
+	L7_PROTOCOL_DNS.String():        L7_PROTOCOL_DNS,
+	L7_PROTOCOL_MYSQL.String():      L7_PROTOCOL_MYSQL,
+	L7_PROTOCOL_REDIS.String():      L7_PROTOCOL_REDIS,
+	L7_PROTOCOL_DUBBO.String():      L7_PROTOCOL_DUBBO,
+	L7_PROTOCOL_KAFKA.String():      L7_PROTOCOL_KAFKA,
+	L7_PROTOCOL_MQTT.String():       L7_PROTOCOL_MQTT,
+	L7_PROTOCOL_OTHER.String():      L7_PROTOCOL_OTHER,
+	L7_PROTOCOL_UNKNOWN.String():    L7_PROTOCOL_UNKNOWN,
 }
 
 func (p *L4Protocol) String() string {
