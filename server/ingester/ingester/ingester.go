@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/datasource"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/debug"
+	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/pool"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
 	"github.com/deepflowys/deepflow/server/libs/stats"
@@ -61,6 +62,12 @@ const (
 func Start(configPath string) []io.Closer {
 	cfg := config.Load(configPath)
 	bytes, _ := yaml.Marshal(cfg)
+
+	logger.EnableStdoutLog()
+	logger.EnableFileLog(cfg.LogFile)
+	logLevel, _ := logging.LogLevel(cfg.LogLevel)
+	logging.SetLevel(logLevel, "")
+
 	log.Info("============================== Launching YUNSHAN DeepFlow Ingester ==============================")
 	log.Infof("ingester base config:\n%s", string(bytes))
 

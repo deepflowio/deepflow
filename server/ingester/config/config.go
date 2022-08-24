@@ -91,8 +91,6 @@ type Config struct {
 	StreamRozeEnabled     bool          `yaml:"stream-roze-enabled"`
 	UDPReadBuffer         int           `yaml:"udp-read-buffer"`
 	TCPReadBuffer         int           `yaml:"tcp-read-buffer"`
-	LogFile               string        `yaml:"log-file"`
-	LogLevel              string        `yaml:"log-level"`
 	Profiler              bool          `yaml:"profiler"`
 	MaxCPUs               int           `yaml:"max-cpus"`
 	CKDiskMonitor         CKDiskMonitor `yaml:"ck-disk-monitor"`
@@ -101,10 +99,14 @@ type Config struct {
 	Influxdb              HostPort      `yaml:"influxdb"`
 	NodeIP                string        `yaml:"node-ip"`
 	ShardID               int           `yaml:"shard-id"`
+	LogFile               string
+	LogLevel              string
 }
 
 type BaseConfig struct {
-	Base Config `yaml:"ingester"`
+	LogFile  string `yaml:"log-file"`
+	LogLevel string `yaml:"log-level"`
+	Base     Config `yaml:"ingester"`
 }
 
 func (c *Config) Validate() error {
@@ -166,6 +168,8 @@ func (c *Config) Validate() error {
 func Load(path string) *Config {
 	configBytes, err := ioutil.ReadFile(path)
 	config := BaseConfig{
+		LogFile:  "/var/log/deepflow/server.log",
+		LogLevel: "info",
 		Base: Config{
 			ControllerIPs:     []string{DefaultContrallerIP},
 			ControllerPort:    DefaultControllerPort,
@@ -174,7 +178,6 @@ func Load(path string) *Config {
 			StreamRozeEnabled: true,
 			UDPReadBuffer:     64 << 20,
 			TCPReadBuffer:     4 << 20,
-			LogFile:           "/var/log/deepflow/server.log",
 			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
 			CKS3Storage:       CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
 			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
@@ -193,5 +196,7 @@ func Load(path string) *Config {
 		log.Error(err)
 		os.Exit(1)
 	}
+	config.Base.LogFile = config.LogFile
+	config.Base.LogLevel = config.LogLevel
 	return &config.Base
 }
