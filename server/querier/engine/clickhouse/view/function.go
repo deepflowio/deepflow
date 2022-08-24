@@ -543,6 +543,7 @@ func (f *PerSecondFunction) Init() {
 	if interval <= 0 {
 		interval = f.Time.DatasourceInterval
 	}
+	interval = interval * f.Time.WindowSize
 	f.Fields = append(f.Fields, &Field{Value: strconv.Itoa(interval)})
 	f.divFunction = &DivFunction{
 		DefaultFunction: DefaultFunction{
