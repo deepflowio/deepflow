@@ -46,7 +46,7 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 	} else if ip, ok := filter["ip"]; ok {
 		db = db.Where("ip = ?", ip)
 	} else if name, ok := filter["name"]; ok && name != "" {
-		db = db.Where("name = ?", name)
+		db = db.Where("name = ? OR ip = ?", name, name)
 	} else if analyzerNameOK || analyzerIpOK {
 		analyzer := mysql.Analyzer{}
 		if analyzerNameOK {
