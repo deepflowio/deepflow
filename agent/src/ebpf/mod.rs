@@ -15,6 +15,8 @@
  */
 
 extern crate libc;
+
+use serde::Serialize;
 pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; //u8
@@ -25,6 +27,17 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 // 最大长度
 pub const CAP_LEN_MAX: usize = 1024;
+
+//ebpf 上报的数据类型
+#[allow(dead_code)]
+// tracepoint 类型
+pub const SYSCALL: u8 = 0;
+#[allow(dead_code)]
+// hook 在 to tls 库 Read/Write 获取tls加密前数据,是原始协议报文
+pub const GO_TLS_UPROBE: u8 = 1;
+#[allow(dead_code)]
+// hook在 go 的 http2 ReadHeader/WriteHeader 获取原始头信息
+pub const GO_HTTP2_UPROBE: u8 = 2;
 
 //方向
 #[allow(dead_code)]
@@ -75,6 +88,10 @@ pub const TRACER_STOP: u8 = 2;
 pub const MSG_REQUEST: u8 = 1;
 #[allow(dead_code)]
 pub const MSG_RESPONSE: u8 = 2;
+#[allow(dead_code)]
+pub const MSG_REQUEST_END: u8 = 3;
+#[allow(dead_code)]
+pub const MSG_RESPONSE_END: u8 = 4;
 
 //Register event types
 #[allow(dead_code)]
@@ -127,7 +144,7 @@ pub struct SK_BPF_DATA {
      * 上面保证任何时刻启动程序在当前机器下获取的socket_id都是唯一的。
      */
     pub socket_id: u64,
-    pub l7_protocal_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
+    pub l7_protocol_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
     // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
     pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
     pub need_reconfirm: bool, // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
@@ -226,7 +243,7 @@ impl fmt::Display for SK_BPF_DATA {
                 port_dst,
                 self.tcp_seq,
                 self.syscall_trace_id_call,
-                self.l7_protocal_hint,
+                self.l7_protocol_hint,
                 data_bytes
             )
         }
@@ -335,4 +352,50 @@ extern "C" {
 
     // 注意：eBPF tracer初始化加载运行后进行内核适配，
     // 适配完成后马上进入stop状态，需调用tracer_start()才开始工作。
+}
+
+const EBPF_TYPE_TRACEPOINT: u8 = 0;
+const EBPF_TYPE_TLS_UPROBE: u8 = 1;
+const EBPF_TYPE_GO_HTTP2_UPROBE: u8 = 2;
+const EBPF_TYPE_NONE: u8 = 255;
+
+// ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
+#[derive(Serialize,Debug, PartialEq, Copy, Clone)]
+#[repr(u8)]
+pub enum EbpfType {
+    // 常规 tp, 通过 hook 系统调用 read/write 获取到原始报文, l7_protocol_from_ebpf 不可信,目前通过遍历所有支持的协议判断协议类型
+    TracePoint = EBPF_TYPE_TRACEPOINT,
+    // hook 在 tls 库的 read/write, 获取 tls 加密前的报文, l7_protocol_from_ebpf 不可信,目前通过遍历所有支持的协议判断协议类型
+    TlsUprobe = EBPF_TYPE_TLS_UPROBE,
+    // hook在 go 的 http2 ReadHeader/WriteHeader
+    // l7_protocol_from_ebpf 目前必定是 L7_PROTOCOL_HTTP2 或 L7_PROTOCOL_HTTP2_TLS,数据格式是自定义格式, 可以直接解析,小端编码,数据定义如下:
+    /*
+    fd(4 bytes)
+    stream id (4 bytes)
+    header key len (4 bytes)
+    header value len (4 bytes)
+    header key value (xxx bytes)
+    header value value (xxx bytes)
+    */
+    GoHttp2Uprobe = EBPF_TYPE_GO_HTTP2_UPROBE,
+    None = EBPF_TYPE_NONE, // 非 ebpf 类型.
+}
+
+impl EbpfType {
+    pub fn from(v: u8) -> Self {
+        match v {
+            GO_TLS_UPROBE => Self::TlsUprobe,
+            GO_HTTP2_UPROBE => Self::GoHttp2Uprobe,
+            _ => {
+                // 默认当作tracepoint
+                Self::TracePoint
+            }
+        }
+    }
+}
+
+impl Default for EbpfType {
+    fn default() -> Self {
+        return Self::TracePoint;
+    }
 }
