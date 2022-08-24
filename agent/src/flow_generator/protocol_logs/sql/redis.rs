@@ -164,6 +164,8 @@ impl L7LogParse for RedisLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        _is_req_end: Option<bool>,
+        _is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -395,7 +397,13 @@ mod tests {
             };
 
             let mut redis = RedisLog::default();
-            let _ = redis.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = redis.parse(
+                payload,
+                packet.lookup_key.proto,
+                packet.direction,
+                None,
+                None,
+            );
             let is_redis = redis_check_protocol(&mut bitmap, packet);
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }

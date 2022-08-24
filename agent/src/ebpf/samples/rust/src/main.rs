@@ -95,7 +95,7 @@ fn sk_data_bytes_safe(sd: *mut SK_BPF_DATA) -> Vec<u8> {
 }
 
 fn sk_proto_safe(sd: *mut SK_BPF_DATA) -> u16 {
-    unsafe { (*sd).l7_protocal_hint }
+    unsafe { (*sd).l7_protocol_hint }
 }
 
 //>= Rust 1.34

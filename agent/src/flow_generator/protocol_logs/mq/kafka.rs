@@ -158,6 +158,8 @@ impl L7LogParse for KafkaLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        _is_req_end: Option<bool>,
+        _is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -234,7 +236,13 @@ mod tests {
             };
 
             let mut kafka = KafkaLog::default();
-            let _ = kafka.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = kafka.parse(
+                payload,
+                packet.lookup_key.proto,
+                packet.direction,
+                None,
+                None,
+            );
             let is_kafka = kafka_check_protocol(&mut bitmap, packet);
             output.push_str(&format!("{:?} is_kafka: {}\r\n", kafka.info, is_kafka));
         }

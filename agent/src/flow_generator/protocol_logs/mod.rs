@@ -47,6 +47,7 @@ use std::{
 use prost::Message;
 use serde::{Serialize, Serializer};
 
+use crate::ebpf::EbpfType;
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection, TapType},
@@ -103,7 +104,32 @@ impl From<PacketDirection> for LogMessageType {
     }
 }
 
-#[derive(Serialize, Debug, Default, Clone)]
+// 应用层协议原始数据类型
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[repr(u8)]
+pub enum L7ProtoRawDataType {
+    // 标准协议类型, 从af_packet, ebpf 的 tracepoint 或者 部分 uprobe(read/write等获取原始数据的hook点) 上报的数据都属于这个类型
+    RawProtocol,
+    // ebpf hook 在 go readHeader/writeHeader 获取http2原始未压缩的 header
+    GoHttp2Uprobe,
+}
+
+impl L7ProtoRawDataType {
+    pub fn from_ebpf_type(t: EbpfType) -> Self {
+        match t {
+            EbpfType::TracePoint | EbpfType::TlsUprobe | EbpfType::None => Self::RawProtocol,
+            EbpfType::GoHttp2Uprobe => Self::GoHttp2Uprobe,
+        }
+    }
+}
+
+impl Default for L7ProtoRawDataType {
+    fn default() -> Self {
+        return Self::RawProtocol;
+    }
+}
+
+#[derive(Serialize,Debug, Default, Clone)]
 pub struct AppProtoHead {
     #[serde(rename = "l7_protocol")]
     pub proto: L7Protocol,
@@ -173,6 +199,7 @@ pub struct AppProtoLogsBaseInfo {
     pub resp_tcp_seq: u32,
 
     /* EBPF Info */
+    pub ebpf_type: EbpfType,
     #[serde(skip_serializing_if = "value_is_default")]
     pub process_id_0: u32,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -311,6 +338,7 @@ impl AppProtoLogsBaseInfo {
             port_dst: packet.lookup_key.dst_port,
             protocol: packet.lookup_key.proto,
 
+            ebpf_type: packet.ebpf_type,
             process_id_0: if is_src { packet.process_id } else { 0 },
             process_id_1: if !is_src { packet.process_id } else { 0 },
             process_kname_0: if is_src {
@@ -489,6 +517,37 @@ impl AppProtoLogsData {
         }
     }
 
+    pub fn is_request(&self) -> bool {
+        return self.base_info.head.msg_type == LogMessageType::Request;
+    }
+
+    pub fn is_end(&self) -> bool {
+        match &self.special_info {
+            AppProtoLogsInfo::HttpV2(d) => {
+                return d.is_end;
+            }
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    //是否忽略不发送, 目前仅用于过滤http2 uprobe 收到多余结束标识,导致空数据.
+    pub fn omit_send(&self) -> bool {
+        match &self.special_info {
+            AppProtoLogsInfo::HttpV2(d) => {
+                return d.is_nil();
+            }
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    pub fn is_response(&self) -> bool {
+        return self.base_info.head.msg_type == LogMessageType::Response;
+    }
+
     pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
             base: Some(self.base_info.into()),
@@ -513,6 +572,7 @@ impl AppProtoLogsData {
 
     pub fn ebpf_flow_session_id(&self) -> u64 {
         // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
+        // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
         let flow_id_part =
             (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
         if let Some(session_id) = self.special_info.session_id() {
@@ -531,9 +591,19 @@ impl AppProtoLogsData {
         }
     }
 
-    pub fn session_merge(&mut self, log: AppProtoLogsData) {
+    pub fn session_merge(&mut self, log: Self) {
         self.base_info.merge(log.base_info);
-        self.special_info.merge(log.special_info);
+        self.protocol_merge(log.special_info);
+    }
+
+    pub fn protocol_merge(&mut self, log_info: AppProtoLogsInfo) {
+        self.special_info.merge(log_info);
+    }
+
+    // 是否需要进一步聚合
+    // 目前仅http2 uprobe 需要聚合多个请求
+    pub fn need_protocol_merge(&self) -> bool {
+        return self.base_info.ebpf_type == EbpfType::GoHttp2Uprobe;
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {
@@ -595,6 +665,8 @@ pub trait L7LogParse: Send + Sync {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        is_req_end: Option<bool>,
+        is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum>;
     fn info(&self) -> AppProtoLogsInfoEnum;
 }

@@ -30,9 +30,11 @@ use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
+use crate::ebpf::EbpfType;
 use crate::flow_generator::error::{Error, Result};
+use crate::flow_generator::protocol_logs::L7ProtoRawDataType;
 use crate::proto::flow_log;
-use crate::utils::bytes::read_u32_be;
+use crate::utils::bytes::{read_u32_be, read_u32_le};
 use crate::utils::net::h2pack;
 
 #[derive(Serialize, Debug, Default, Clone)]
@@ -61,6 +63,9 @@ pub struct HttpInfo {
     pub req_content_length: Option<u64>,
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u64>,
+
+    // 流是否结束, 用于 http2 ebpf uprobe 处理
+    pub is_end: bool,
 }
 
 impl HttpInfo {
@@ -75,6 +80,25 @@ impl HttpInfo {
         if self.x_request_id.is_empty() {
             self.x_request_id = other.x_request_id;
         }
+
+        // 下面用于请求合并
+        if self.path.is_empty() {
+            self.path = other.path;
+        }
+        if self.host.is_empty() {
+            self.host = other.host;
+        }
+        if self.method.is_empty() {
+            self.method = other.method;
+        }
+
+        if self.req_content_length.is_none() && other.req_content_length.is_some() {
+            self.req_content_length = other.req_content_length;
+        }
+    }
+
+    pub fn is_nil(&self) -> bool {
+        return self.host.is_empty() && self.method.is_empty() && self.path.is_empty();
     }
 }
 
@@ -106,6 +130,8 @@ impl From<HttpInfo> for flow_log::HttpInfo {
 pub struct HttpLog {
     status_code: u16,
     msg_type: LogMessageType,
+    // 数据原始类型, 标准的协议格式或者是ebpf上报的自定义格式
+    raw_data_type: L7ProtoRawDataType,
     proto: L7Protocol,
     status: L7ResponseStatus,
 
@@ -141,10 +167,15 @@ impl HttpLog {
     const TRACE_ID: u8 = 0;
     const SPAN_ID: u8 = 1;
 
-    pub fn new(config: &LogParserAccess, is_https: bool) -> Self {
+    pub fn new(
+        config: &LogParserAccess,
+        is_https: bool,
+        raw_data_type: L7ProtoRawDataType,
+    ) -> Self {
         Self {
             l7_log_dynamic_config: config.load().l7_log_dynamic.clone(),
             is_https,
+            raw_data_type,
             ..Default::default()
         }
     }
@@ -196,6 +227,61 @@ impl HttpLog {
         } else {
             self.status = L7ResponseStatus::Ok;
         }
+    }
+
+    // 解析由 ebpf probe 上报的自定义数据类型,小端编码,一次只带一个头.
+    // +---------------------------------------------------------------+
+    // |                          fd (32)                              |
+    // +---------------------------------------------------------------+
+    // |                          streadID (32)                        |
+    // +---------------------------------------------------------------+
+    // |                          keyLength (32)                       |
+    // +---------------------------------------------------------------+
+    // |                          valueLength (32)                     |
+    // +---------------------------------------------------------------+
+    // |                          key (keyLength,变长)               ...|
+    // +---------------------------------------------------------------+
+    // |                          value (valueLength,变长)           ...|
+    // +---------------------------------------------------------------+
+    fn parse_http2_go_uprobe(
+        &mut self,
+        payload: &[u8],
+        direction: PacketDirection,
+        check_only: bool,
+        is_end: Option<bool>,
+    ) -> Result<()> {
+        if payload.len() < HTTPV2_CUSTOM_DATA_MIN_LENGTH {
+            return Err(Error::HttpHeaderParseFailed);
+        }
+        let stream_id = read_u32_le(&payload[4..8]);
+        let key_len = read_u32_le(&payload[8..12]) as usize;
+        let val_len = read_u32_le(&payload[12..16]) as usize;
+        if key_len + val_len + HTTPV2_CUSTOM_DATA_MIN_LENGTH != payload.len() {
+            // 长度不够
+            return Err(Error::HttpHeaderParseFailed);
+        }
+        if check_only {
+            return Ok(());
+        }
+
+        let val_offset = HTTPV2_CUSTOM_DATA_MIN_LENGTH + key_len;
+        let key = Vec::from(&payload[HTTPV2_CUSTOM_DATA_MIN_LENGTH..val_offset]);
+        let val = Vec::from(&payload[val_offset..val_offset + val_len]);
+        self.on_http2_header(&key, &val, direction);
+        if key.as_slice() == b"content-length" {
+            self.info.req_content_length = Some(
+                str::from_utf8(val.as_slice())
+                    .unwrap_or_default()
+                    .parse::<u64>()
+                    .unwrap_or_default(),
+            );
+        }
+
+        self.info.is_end = if let Some(end) = is_end { end } else { false };
+        self.info.version = String::from("2");
+        self.info.stream_id = stream_id;
+        self.proto = L7Protocol::Http2;
+        return Ok(());
     }
 
     fn parse_http_v1(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
@@ -353,85 +439,15 @@ impl HttpLog {
                 }
                 let header_list = parse_rst.unwrap();
 
-                for header in header_list.iter() {
-                    match header.0.as_slice() {
-                        b":method" => {
-                            self.msg_type = LogMessageType::Request;
-                            self.info.method =
-                                String::from_utf8_lossy(header.1.as_slice()).into_owned()
-                        }
-                        b":status" => {
-                            self.msg_type = LogMessageType::Response;
-
-                            self.status_code = str::from_utf8(header.1.as_slice())
+                for (key, val) in header_list.iter() {
+                    self.on_http2_header(key, val, direction);
+                    if key.as_slice() == b"content-length" {
+                        content_length = Some(
+                            str::from_utf8(val.as_slice())
                                 .unwrap_or_default()
-                                .parse::<u16>()
-                                .unwrap_or_default();
-                            self.set_status(self.status_code);
-                        }
-                        b"host" | b":authority" => {
-                            self.info.host =
-                                String::from_utf8_lossy(header.1.as_slice()).into_owned()
-                        }
-                        b":path" => {
-                            self.info.path =
-                                String::from_utf8_lossy(header.1.as_slice()).into_owned()
-                        }
-                        b"content-length" => {
-                            content_length = Some(
-                                str::from_utf8(header.1.as_slice())
-                                    .unwrap_or_default()
-                                    .parse::<u64>()
-                                    .unwrap_or_default(),
-                            )
-                        }
-                        _ => {}
-                    }
-
-                    if !header.0.is_ascii() {
-                        continue;
-                    }
-
-                    let key = String::from_utf8_lossy(header.0.as_ref()).into_owned();
-                    let key = key.as_str();
-
-                    if self.l7_log_dynamic_config.is_trace_id(key) {
-                        if let Some(id) = Self::decode_id(
-                            &String::from_utf8_lossy(header.1.as_ref()),
-                            key,
-                            Self::TRACE_ID,
-                        ) {
-                            self.info.trace_id = id;
-                        }
-                        // 存在配置相同字段的情况，如“sw8”
-                        if self.l7_log_dynamic_config.is_span_id(key) {
-                            if let Some(id) = Self::decode_id(
-                                &String::from_utf8_lossy(header.1.as_ref()),
-                                key,
-                                Self::SPAN_ID,
-                            ) {
-                                self.info.span_id = id;
-                            }
-                        }
-                    } else if self.l7_log_dynamic_config.is_span_id(key) {
-                        if let Some(id) = Self::decode_id(
-                            &String::from_utf8_lossy(header.1.as_ref()),
-                            key,
-                            Self::SPAN_ID,
-                        ) {
-                            self.info.span_id = id;
-                        }
-                    } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
-                        && header.0 == self.l7_log_dynamic_config.x_request_id_lower.as_bytes()
-                    {
-                        self.info.x_request_id =
-                            String::from_utf8_lossy(header.1.as_ref()).into_owned();
-                    } else if direction == PacketDirection::ClientToServer
-                        && !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
-                        && header.0 == self.l7_log_dynamic_config.proxy_client_lower.as_bytes()
-                    {
-                        self.info.client_ip =
-                            String::from_utf8_lossy(header.1.as_ref()).into_owned();
+                                .parse::<u64>()
+                                .unwrap_or_default(),
+                        )
                     }
                 }
                 header_frame_parsed = true;
@@ -492,6 +508,74 @@ impl HttpLog {
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
+    }
+
+    fn on_http2_header(&mut self, key: &Vec<u8>, val: &Vec<u8>, direction: PacketDirection) {
+        match key.as_slice() {
+            b":method" => {
+                self.msg_type = LogMessageType::Request;
+                self.info.method = String::from_utf8_lossy(val.as_slice()).into_owned()
+            }
+            b":status" => {
+                self.msg_type = LogMessageType::Response;
+
+                self.status_code = str::from_utf8(val.as_slice())
+                    .unwrap_or_default()
+                    .parse::<u16>()
+                    .unwrap_or_default();
+                self.set_status(self.status_code);
+            }
+            b"host" | b":authority" => {
+                self.info.host = String::from_utf8_lossy(val.as_slice()).into_owned()
+            }
+            b":path" => self.info.path = String::from_utf8_lossy(val.as_slice()).into_owned(),
+            _ => {}
+        }
+
+        if !key.is_ascii() {
+            return;
+        }
+
+        let key = String::from_utf8_lossy(key.as_ref()).into_owned();
+        let key_str = key.as_str();
+        let key_bytes = key.as_bytes();
+
+        if self.l7_log_dynamic_config.is_trace_id(key_str) {
+            if let Some(id) = Self::decode_id(
+                &String::from_utf8_lossy(val.as_ref()),
+                key_str,
+                Self::TRACE_ID,
+            ) {
+                self.info.trace_id = id;
+            }
+            // 存在配置相同字段的情况，如“sw8”
+            if self.l7_log_dynamic_config.is_span_id(key_str) {
+                if let Some(id) = Self::decode_id(
+                    &String::from_utf8_lossy(val.as_ref()),
+                    key_str,
+                    Self::SPAN_ID,
+                ) {
+                    self.info.span_id = id;
+                }
+            }
+        } else if self.l7_log_dynamic_config.is_span_id(key_str) {
+            if let Some(id) = Self::decode_id(
+                &String::from_utf8_lossy(val.as_ref()),
+                key_str,
+                Self::SPAN_ID,
+            ) {
+                self.info.span_id = id;
+            }
+        } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
+            && key_bytes == self.l7_log_dynamic_config.x_request_id_lower.as_bytes()
+        {
+            self.info.x_request_id = String::from_utf8_lossy(val.as_ref()).into_owned();
+        } else if direction == PacketDirection::ClientToServer
+            && !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
+            && key_bytes == self.l7_log_dynamic_config.proxy_client_lower.as_bytes()
+        {
+            self.info.client_ip = String::from_utf8_lossy(val.as_ref()).into_owned();
+        }
     }
 
     // uber-trace-id: TRACEID:SPANID:PARENTSPANID:FLAGS
@@ -582,15 +666,23 @@ impl L7LogParse for HttpLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        _is_req_end: Option<bool>,
+        is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
         self.reset_logs();
 
-        self.parse_http_v1(payload, direction)
-            .or(self.parse_http_v2(payload, direction))?;
-
+        match self.raw_data_type {
+            L7ProtoRawDataType::GoHttp2Uprobe => {
+                self.parse_http2_go_uprobe(payload, direction, false, is_resp_end)?;
+            }
+            _ => {
+                self.parse_http_v1(payload, direction)
+                    .or(self.parse_http_v2(payload, direction))?;
+            }
+        }
         Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: self.get_l7_protocol(),
             msg_type: self.msg_type,
@@ -771,19 +863,33 @@ pub fn http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     }
     let payload = payload.unwrap();
     let mut http2 = HttpLog::default();
-    return http2
-        .parse_http_v2(payload, PacketDirection::ClientToServer)
-        .is_ok();
+
+    match packet.ebpf_type {
+        EbpfType::GoHttp2Uprobe => {
+            return http2
+                .parse_http2_go_uprobe(payload, PacketDirection::ClientToServer, true, None)
+                .is_ok();
+        }
+        _ => {
+            return http2
+                .parse_http_v2(payload, PacketDirection::ClientToServer)
+                .is_ok();
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use regex::bytes::Replacer;
     use std::fs;
+    use std::mem::size_of;
     use std::path::Path;
+    use std::slice::from_raw_parts;
+
+    use crate::metric::document::Direction;
+    use crate::{common::enums::PacketDirection, utils::test::Capture};
 
     use super::*;
-
-    use crate::{common::enums::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
@@ -819,7 +925,13 @@ mod tests {
                 trace_types: vec![TraceType::Sw8],
                 span_types: vec![TraceType::Sw8],
             };
-            let _ = http.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = http.parse(
+                payload,
+                packet.lookup_key.proto,
+                packet.direction,
+                None,
+                None,
+            );
             let mut is_http = http1_check_protocol(&mut bitmap, packet);
             is_http |= http2_check_protocol(&mut bitmap, packet);
 
@@ -849,6 +961,78 @@ mod tests {
                     output_path
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_go_uprobe() {
+        #[derive(Debug)]
+        struct H2CustomHdr {
+            fd: u32,
+            stream_id: u32,
+            k_len: u32,
+            v_len: u32,
+        };
+        impl H2CustomHdr {
+            fn to_bytes(self, key: &str, val: &str) -> Vec<u8> {
+                let hdr_p;
+                unsafe {
+                    hdr_p = from_raw_parts(&self as *const Self as *const u8, size_of::<Self>());
+                }
+                return [hdr_p, key.as_bytes(), val.as_bytes()].concat();
+            }
+        }
+
+        //测试长度不正确
+        {
+            for i in 1..3 {
+                let key = "asd";
+                let val = "asd";
+                let key_len: u32 = key.len() as u32 + (i - 1) % 2;
+                let val_len: u32 = val.len() as u32 + i % 2;
+                let hdr = H2CustomHdr {
+                    fd: 1,
+                    stream_id: 1,
+                    k_len: key_len,
+                    v_len: val_len,
+                };
+                let payload = hdr.to_bytes(key, val);
+                let mut h = HttpLog::default();
+                h.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
+                let res =
+                    h.parse_http2_go_uprobe(&payload, PacketDirection::ClientToServer, true, None);
+                assert_eq!(res.is_ok(), false);
+                println!("{:#?}", res.err().unwrap());
+            }
+        }
+        let headers = [
+            ("content-length", "55"),
+            ("content-length", "dd"),
+            (":method", "GET"),
+            (":status", "202"),
+            (":path", "/asd"),
+            ("host", "a.com"),
+            ("aaa", "bbb"),
+            ("ccc", "ddd"),
+        ];
+        for (key, val) in headers {
+            println!("-----------------------------------");
+            println!("{}:{}", key, val);
+            let key_len: u32 = key.len() as u32;
+            let val_len: u32 = val.len() as u32;
+            let hdr = H2CustomHdr {
+                fd: 1,
+                stream_id: 1,
+                k_len: key_len,
+                v_len: val_len,
+            };
+            let payload = hdr.to_bytes(key, val);
+            let mut h = HttpLog::default();
+            h.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
+            let res =
+                h.parse_http2_go_uprobe(&payload, PacketDirection::ClientToServer, false, None);
+            assert_eq!(res.is_ok(), true);
+            println!("{:#?}", h);
         }
     }
 }
