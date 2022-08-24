@@ -112,6 +112,7 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 			uidToName := map[string]map[string]int{}
 			uidToName[uID] = nameToPort
 			k.nsServiceNameToService[namespace+name] = uidToName
+			log.Infof("nsServiceNameToService: %#v", k.nsServiceNameToService)
 			key := strconv.Itoa(ports.Get("port").MustInt()) + ports.Get("protocol").MustString() + strconv.Itoa(ports.Get("nodePort").MustInt()) + strconv.Itoa(targetPort)
 			servicePort := model.PodServicePort{
 				Lcuuid:           common.GetUUID(uID+key, uuid.Nil),
