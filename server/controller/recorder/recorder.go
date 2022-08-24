@@ -116,7 +116,7 @@ func (r *Recorder) shouldRefresh(cloudData cloudmodel.Resource) bool {
 	}
 	r.domainName = domain.Name
 
-	if !cloudData.Verified {
+	if cloudData.Verified {
 		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 {
 			log.Infof("domain (lcuuid: %s, name: %s) has no networks or vinterfaces, does nothing", r.domainLcuuid, r.domainName)
 			return false
@@ -125,6 +125,9 @@ func (r *Recorder) shouldRefresh(cloudData cloudmodel.Resource) bool {
 			log.Infof("domain (lcuuid: %s, name: %s) has no vms and pods, does nothing", r.domainLcuuid, r.domainName)
 			return false
 		}
+	} else {
+		log.Infof("domain (lcuuid: %s, name: %s) is not verified, does nothing", r.domainLcuuid, r.domainName)
+		return false
 	}
 	return true
 }
@@ -208,12 +211,13 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 }
 
 func (r *Recorder) shouldRefreshSubDomain(lcuuid string, cloudData cloudmodel.SubDomainResource) bool {
-	if !cloudData.Verified {
+	if cloudData.Verified {
+		if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 || len(cloudData.Pods) == 0 {
+			log.Infof("sub_domain (lcuuid: %s, name: %s) has no networks or vinterfaces or pods, does nothing", lcuuid)
+			return false
+		}
+	} else {
 		log.Infof("sub_domain (lcuuid: %s) is not verified, does nothing", lcuuid)
-		return false
-	}
-	if len(cloudData.Networks) == 0 || len(cloudData.VInterfaces) == 0 || len(cloudData.Pods) == 0 {
-		log.Infof("sub_domain (lcuuid: %s, name: %s) has no networks or vinterfaces or pods, does nothing", lcuuid)
 		return false
 	}
 	return true
