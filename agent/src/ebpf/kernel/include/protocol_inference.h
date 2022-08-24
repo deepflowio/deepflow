@@ -618,8 +618,11 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	    first_byte != '$' && first_byte != '*')
 		return MSG_UNKNOWN;
 
-	// redis 中必须包含 crlf
-	if (!is_include_crlf(buf))
+	// The redis message must contain /r/n.
+	// Due to the limitation of eBPF, only the first 20 bytes are checked.
+	// The position where the error type /r/n appears may exceed 20 bytes. 
+	// Therefore, the error type is not checked
+	if (first_byte != '-' && !is_include_crlf(buf))
 		return MSG_UNKNOWN;
 
 	//-ERR unknown command 'foobar'
