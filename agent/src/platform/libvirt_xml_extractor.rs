@@ -15,8 +15,8 @@
  */
 
 use std::{
-    fs::{read_dir, OpenOptions},
-    io::Read,
+    fs,
+    io::{Error, ErrorKind, Read, Result},
     path::{Path, PathBuf},
     process::Command,
     sync::{Arc, Condvar, Mutex, MutexGuard, RwLock},
@@ -24,7 +24,6 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Error, Result};
 use log::{debug, error};
 use roxmltree::Document;
 
@@ -62,7 +61,7 @@ impl LibvirtXmlExtractor {
         drop(path_lock);
         match Self::extract_interface_info_from_xml(path.as_path()) {
             Ok(entries) => *arc_entries.write().unwrap() = entries,
-            Err(_) => error!("cannot extract interface info from xml"),
+            Err(e) => error!("cannot extract interface info from xml, error: {}", e),
         }
     }
 
@@ -166,7 +165,10 @@ impl LibvirtXmlExtractor {
                     continue;
                 }
                 if dev.is_none() {
-                    return Err(Error::msg("no target dev in interface info"));
+                    return Err(Error::new(
+                        ErrorKind::Other,
+                        "no target dev in interface info",
+                    ));
                 }
                 entries.push(InterfaceEntry {
                     name: String::from(dev.unwrap()),
@@ -181,19 +183,11 @@ impl LibvirtXmlExtractor {
     }
 
     fn extract_from<P: AsRef<Path>>(file_path: P) -> Result<Vec<InterfaceEntry>> {
-        let mut f_conf = OpenOptions::new()
-            .read(true)
-            .open(&file_path)
-            .with_context(|| {
-                format!(
-                    "could not open file_path={:?}",
-                    file_path.as_ref().display()
-                )
-            })?;
+        let mut f_conf = fs::OpenOptions::new().read(true).open(&file_path)?;
         let mut buf = String::new();
         f_conf.read_to_string(&mut buf)?;
 
-        let document = Document::parse(&buf)?;
+        let document = Document::parse(&buf).map_err(|e| Error::new(ErrorKind::Other, e))?;
         match Self::extract_interfaces(&document) {
             Ok(entrys) => Ok(entrys),
             Err(e) => {
@@ -212,7 +206,7 @@ impl LibvirtXmlExtractor {
                     .map(String::from);
 
                 if domain_uuid.is_none() {
-                    return Err(Error::msg("cannot parse domain uuid"));
+                    return Err(Error::new(ErrorKind::Other, "cannot parse domain uuid"));
                 }
                 let domain_uuid = domain_uuid.unwrap();
 
@@ -222,7 +216,7 @@ impl LibvirtXmlExtractor {
                     .output()?;
 
                 if !output.status.success() {
-                    return Err(Error::msg("failed to run virsh dumpxml"));
+                    return Err(Error::new(ErrorKind::Other, "failed to run virsh dumpxml"));
                 }
 
                 let bytes = String::from_utf8(output.stdout).unwrap();
@@ -237,36 +231,32 @@ impl LibvirtXmlExtractor {
                             .arg(domain_uuid.as_str())
                             .output()?;
                         if !output.status.success() {
-                            return Err(Error::msg("failed to run virsh domstate"));
+                            return Err(Error::new(
+                                ErrorKind::Other,
+                                "failed to run virsh domstate",
+                            ));
                         }
                         if let Ok(status_msg) = String::from_utf8(output.stdout) {
                             if status_msg.starts_with("running") {
-                                return Err(Error::msg(
+                                return Err(Error::new(
+                                    ErrorKind::Other,
                                     "virsh dumpxml has no target dev in interface info",
                                 ));
                             }
                         }
                         debug!("not running vm {} ignored", file_path.as_ref().display());
-                        return Err(Error::msg(format!(
-                            "Failed to extract interface info {:?}",
-                            e
-                        )));
+                        Err(Error::new(ErrorKind::Other, e))
                     }
                 }
             }
         }
     }
+
     fn extract_interface_info_from_xml<P: AsRef<Path>>(
         directory: P,
     ) -> Result<Vec<InterfaceEntry>> {
         let mut files = vec![];
-        let dir = read_dir(&directory).with_context(|| {
-            format!(
-                "xml directory doesn't exist or lacks permission or a non-directory file path: {}",
-                directory.as_ref().display()
-            )
-        })?;
-        for entry in dir {
+        for entry in fs::read_dir(&directory)? {
             let file = entry?.path();
             if file.to_str().unwrap().ends_with(".xml") {
                 files.push(file);
@@ -281,12 +271,17 @@ impl LibvirtXmlExtractor {
 
         let mut entries = vec![];
         for file in files.into_iter() {
-            let mut single_entries = Self::extract_from(file.as_path()).with_context(|| {
-                format!(
-                    "extract xml interface entry info failed. file path {:?}",
-                    file.as_path().display()
-                )
-            })?;
+            let mut single_entries = match Self::extract_from(file.as_path()) {
+                Ok(p) => p,
+                Err(e) => {
+                    debug!(
+                        "extract xml interface entry info failed with file path {} error: {}",
+                        file.as_path().display(),
+                        e
+                    );
+                    continue;
+                }
+            };
             entries.append(&mut single_entries);
         }
 
