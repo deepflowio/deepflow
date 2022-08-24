@@ -487,9 +487,9 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 		fields.len = ctx->rsi;
 		fields.cap = ctx->r8;
 	} else {
-		// 8 + 8 + 4 + 1
+		// 8 + 8 + 4 + 4
 		bpf_probe_read(&fields, sizeof(fields),
-			       (void *)(ctx->rsp + 21));
+			       (void *)(ctx->rsp + 24));
 	}
 
 	struct http2_headers_data headers = { 0 };
