@@ -105,6 +105,7 @@ func (c *Cloud) GetResource() model.Resource {
 		}
 		c.getSubDomainData()
 	}
+	c.resource.Verified = true
 	return c.resource
 }
 

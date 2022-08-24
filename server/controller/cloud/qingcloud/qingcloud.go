@@ -390,6 +390,7 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	resource.LBVMConnections = lbVMConnections
 	resource.FloatingIPs = floatingIPs
 	resource.SubDomains = subDomains
+
 	// write monitor
 	q.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	// register statsd
