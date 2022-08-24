@@ -368,7 +368,8 @@ GROUP BY (%s)`,
 func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 	tableGlobal := getMetricsTableName(t.ID, dstTable, GLOBAL)
 	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
-	engine := fmt.Sprintf(ckdb.Distributed.String(), t.Cluster, t.Database, dstTable+"_"+LOCAL.String())
+	tablePrefix := strings.Split(t.GlobalName, ".")[0]
+	engine := fmt.Sprintf(ckdb.Distributed.String(), t.Cluster, t.Database, tablePrefix+"."+dstTable+"_"+LOCAL.String())
 
 	createTable := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS %s ENGINE = %s",
 		tableGlobal, tableLocal, engine)
