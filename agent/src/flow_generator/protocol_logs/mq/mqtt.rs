@@ -314,7 +314,9 @@ impl L7LogParse for MqttLog {
         &mut self,
         payload: &[u8],
         proto: IpProtocol,
-        _: PacketDirection,
+        direction: PacketDirection,
+        _is_req_end: Option<bool>,
+        _is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -718,7 +720,13 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let _ = mqtt.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = mqtt.parse(
+                payload,
+                packet.lookup_key.proto,
+                packet.direction,
+                None,
+                None,
+            );
             let is_mqtt = mqtt_check_protocol(&mut bitmap, packet);
             for i in mqtt.info.iter() {
                 output.push_str(&format!("{:?} is_mqtt: {}\r\n", i, is_mqtt));

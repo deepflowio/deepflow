@@ -253,6 +253,8 @@ impl L7LogParse for DubboLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        _is_req_end: Option<bool>,
+        _is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
@@ -406,7 +408,13 @@ mod tests {
             };
 
             let mut dubbo = DubboLog::default();
-            let _ = dubbo.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = dubbo.parse(
+                payload,
+                packet.lookup_key.proto,
+                packet.direction,
+                None,
+                None,
+            );
             let is_dubbo = dubbo_check_protocol(&mut bitmap, packet);
             output.push_str(&format!("{:?} is_dubbo: {}\r\n", dubbo.info, is_dubbo));
         }

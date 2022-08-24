@@ -334,6 +334,8 @@ impl L7LogParse for DnsLog {
         payload: &[u8],
         proto: IpProtocol,
         _direction: PacketDirection,
+        _is_req_end: Option<bool>,
+        _is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         self.reset_logs();
         match proto {
@@ -380,7 +382,13 @@ pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
 
     let payload = payload.unwrap();
     let mut dns = DnsLog::default();
-    let ret = dns.parse(payload, packet.lookup_key.proto, packet.direction);
+    let ret = dns.parse(
+        payload,
+        packet.lookup_key.proto,
+        packet.direction,
+        None,
+        None,
+    );
     if ret.is_err() && packet.lookup_key.proto == IpProtocol::Udp {
         *bitmap &= !(1 << u8::from(L7Protocol::Dns));
         return false;
@@ -421,7 +429,13 @@ mod tests {
             };
 
             let mut dns = DnsLog::default();
-            let _ = dns.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = dns.parse(
+                payload,
+                packet.lookup_key.proto,
+                packet.direction,
+                None,
+                None,
+            );
             let is_dns = dns_check_protocol(&mut bitmap, packet);
             output.push_str(&format!("{:?} is_dns: {}\r\n", dns.info, is_dns));
         }
