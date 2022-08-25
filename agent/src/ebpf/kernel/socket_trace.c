@@ -831,8 +831,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		sk_info.correlation_id = conn_info->correlation_id;
 
 		/*
-		* MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
-		*/
+		 * MSG_PRESTORE 目前只用于MySQL, Kafka协议推断
+		 */
 		if (conn_info->message_type == MSG_PRESTORE) {
 			*(__u32 *)sk_info.prev_data = *(__u32 *)conn_info->prev_buf;
 			sk_info.prev_data_len = 4;
@@ -845,9 +845,9 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	}
 
 	/*
-	* 对于预先存储数据或socket l7协议类型需要再次确认(适用于长链接)
-	* 的动作只建立socket_info_map项不会发送数据给用户态程序。
-	*/
+	 * 对于预先存储数据或socket l7协议类型需要再次确认(适用于长链接)
+	 * 的动作只建立socket_info_map项不会发送数据给用户态程序。
+	 */
 	if (conn_info->message_type == MSG_PRESTORE ||
 	    conn_info->message_type == MSG_RECONFIRM)
 		return;
@@ -856,9 +856,9 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		sk_info.uid = socket_info_ptr->uid;
 
 		/*
-		* 同方向多个连续请求或回应的场景时，
-		* 保持捕获数据的序列号保持不变。
-		*/
+		 * 同方向多个连续请求或回应的场景时，
+		 * 保持捕获数据的序列号保持不变。
+		 */
 		if (conn_info->keep_data_seq)
 			sk_info.seq = socket_info_ptr->seq;
 		else
