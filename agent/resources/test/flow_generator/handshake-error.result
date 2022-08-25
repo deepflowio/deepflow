@@ -55,6 +55,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 0,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -115,6 +117,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 0,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -175,6 +179,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 0,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -235,6 +241,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 0,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -295,6 +303,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 1,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -355,6 +365,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 1,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -415,6 +427,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 1,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -475,6 +489,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 1,
+        retran_syn: 0,
+        retran_synack: 0,
         updated: true,
     },
 }
@@ -535,6 +551,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 2,
+        retran_syn: 0,
+        retran_synack: 1,
         updated: true,
     },
 }
@@ -595,6 +613,8 @@ PerfData {
         zero_win_count_1: 0,
         syn: 1,
         synack: 2,
+        retran_syn: 0,
+        retran_synack: 1,
         updated: true,
     },
 }

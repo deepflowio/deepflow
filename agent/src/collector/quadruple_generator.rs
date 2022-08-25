@@ -911,6 +911,7 @@ impl QuadrupleGenerator {
         let src = &tagged_flow.flow.flow_metrics_peers[0];
         let dst = &tagged_flow.flow.flow_metrics_peers[1];
 
+        let perf_stats = tagged_flow.flow.flow_perf_stats.as_ref();
         flow_meter.traffic = Traffic {
             packet_tx: src.packet_count,
             packet_rx: dst.packet_count,
@@ -924,6 +925,8 @@ impl QuadrupleGenerator {
             closed_flow: (tagged_flow.flow.close_type != CloseType::ForcedReport) as u64,
             l7_request: 0,
             l7_response: 0,
+            syn: perf_stats.map(|s| s.tcp.syn_count).unwrap_or_default(),
+            synack: perf_stats.map(|s| s.tcp.synack_count).unwrap_or_default(),
         };
         if tagged_flow.flow.flow_key.proto == IpProtocol::Tcp {
             match tagged_flow.flow.close_type {
@@ -985,8 +988,8 @@ impl QuadrupleGenerator {
                 retrans_rx: dst_perf.retrans_count as u64,
                 zero_win_tx: src_perf.zero_win_count as u64,
                 zero_win_rx: dst_perf.zero_win_count as u64,
-                syn: stats.tcp.syn_count,
-                synack: stats.tcp.syn_count,
+                retran_syn: stats.tcp.retran_syn_count,
+                retran_synack: stats.tcp.retran_synack_count,
             };
         } else {
             flow_meter.latency.art_max = stats.tcp.art_max;
