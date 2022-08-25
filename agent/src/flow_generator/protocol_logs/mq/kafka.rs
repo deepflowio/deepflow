@@ -98,10 +98,12 @@ impl KafkaLog {
         self.info.req_msg_size = read_u32_be(payload) as i32;
         let client_id_len = read_u16_be(&payload[12..]) as usize;
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
+            self.reset_logs();
             return Err(Error::KafkaLogParseFailed);
         }
 
         if strict && self.info.req_msg_size as usize != payload.len() - Self::MSG_LEN_SIZE {
+            self.reset_logs();
             return Err(Error::KafkaLogParseFailed);
         }
 
@@ -111,6 +113,11 @@ impl KafkaLog {
         self.info.correlation_id = read_u32_be(&payload[8..]);
         self.info.client_id =
             String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
+
+        if !self.info.client_id.is_ascii() {
+            self.reset_logs();
+            return Err(Error::KafkaLogParseFailed);
+        }
 
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,

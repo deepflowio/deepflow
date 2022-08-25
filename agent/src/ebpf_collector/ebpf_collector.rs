@@ -252,9 +252,10 @@ struct FlowItem {
     l4_protocol: IpProtocol,
     l7_protocol: L7Protocol,
 
+    server_port: u16,
+
     is_from_app: bool,
     is_success: bool,
-    is_local_service: bool,
     is_skip: bool,
 
     parser: Option<Box<dyn L7LogParse>>,
@@ -312,8 +313,7 @@ impl FlowItem {
         let l4_protocol = packet.lookup_key.proto;
         let l7_protocol = app_table.get_protocol_from_ebpf(packet, local_epc, remote_epc);
         let mut is_from_app = l7_protocol.is_some();
-        let (mut l7_protocol, is_local_service) =
-            l7_protocol.unwrap_or((L7Protocol::Unknown, false));
+        let (mut l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
         let mut protocol_bitmap = u128::from(l4_protocol);
         if packet.l7_protocol_from_ebpf == L7Protocol::Http1TLS {
             protocol_bitmap |= 1 << u8::from(L7Protocol::Http1TLS);
@@ -332,9 +332,9 @@ impl FlowItem {
             l4_protocol,
             l7_protocol,
             is_success: false,
-            is_local_service,
             is_from_app,
             is_skip: false,
+            server_port,
             protocol_bitmap,
             protocol_bitmap_image: protocol_bitmap,
             parser: Self::get_parser(l7_protocol, log_parser_config),
@@ -358,7 +358,7 @@ impl FlowItem {
 
     fn check(
         &mut self,
-        packet: &MetaPacket,
+        packet: &mut MetaPacket,
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
@@ -385,6 +385,7 @@ impl FlowItem {
             }
             if self._check(i, packet) {
                 self.l7_protocol = i;
+                self.server_port = packet.lookup_key.dst_port;
                 self.parser = Self::get_parser(i, log_parser_config);
                 return self._parse(packet, local_epc, app_table);
             }
@@ -401,7 +402,7 @@ impl FlowItem {
 
     fn _parse(
         &mut self,
-        packet: &MetaPacket,
+        packet: &mut MetaPacket,
         local_epc: i32,
         app_table: &mut AppTable,
     ) -> LogResult<AppProtoHeadEnum> {
@@ -409,16 +410,16 @@ impl FlowItem {
             return Err(LogError::L7ProtocolParseLimit);
         }
 
-        let direction = if !self.is_success && !self.is_from_app {
+        packet.direction = if self.server_port == packet.lookup_key.dst_port {
             PacketDirection::ClientToServer
         } else {
-            packet.direction
+            PacketDirection::ServerToClient
         };
 
         let ret = self.parser.as_mut().unwrap().parse(
             packet.raw_from_ebpf.as_ref(),
             packet.lookup_key.proto,
-            direction,
+            packet.direction,
         );
 
         if !self.is_success {
@@ -430,9 +431,6 @@ impl FlowItem {
                     self.remote_epc,
                 );
                 self.is_success = true;
-                if !self.is_from_app {
-                    self.is_local_service = packet.lookup_key.l2_end_1;
-                }
             } else {
                 self.is_skip = app_table.set_protocol_from_ebpf(
                     packet,
@@ -451,7 +449,6 @@ impl FlowItem {
         self.l7_protocol = L7Protocol::Unknown;
         self.is_skip = false;
         self.is_success = false;
-        self.is_local_service = false;
         self.is_from_app = false;
         self.protocol_bitmap = if self.l4_protocol == l4_protocol {
             self.protocol_bitmap_image
@@ -464,7 +461,7 @@ impl FlowItem {
 
     fn parse(
         &mut self,
-        packet: &MetaPacket,
+        packet: &mut MetaPacket,
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
