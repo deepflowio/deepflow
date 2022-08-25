@@ -49,6 +49,9 @@ func getAnalyzers(c *gin.Context) {
 	if value, ok := c.GetQuery("ip"); ok {
 		args["ip"] = value
 	}
+	if value, ok := c.GetQuery("name"); ok {
+		args["name"] = value
+	}
 	if value, ok := c.GetQuery("region"); ok {
 		args["region"] = value
 	}

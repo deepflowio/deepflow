@@ -17,7 +17,6 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -387,9 +386,7 @@ func BatchUpdateVtapLicenseType(updateMap []map[string]interface{}) (resp map[st
 	}
 
 	if description != "" {
-		var serviceErr ServiceError
-		json.Unmarshal([]byte(description), &serviceErr)
-		return response, NewError(serviceErr.Status, description)
+		return response, NewError(common.SERVER_ERROR, description)
 	} else {
 		return response, nil
 	}
