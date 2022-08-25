@@ -39,7 +39,7 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::ebpf::{MSG_REQUEST, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
+use crate::ebpf::{SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
@@ -822,11 +822,7 @@ impl<'a> MetaPacket<'a> {
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocal_hint as u8);
-        packet.direction = if data.msg_type == MSG_REQUEST {
-            PacketDirection::ClientToServer
-        } else {
-            PacketDirection::ServerToClient
-        };
+        packet.direction = PacketDirection::ClientToServer;
         return Ok(packet);
     }
 
