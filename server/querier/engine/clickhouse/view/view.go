@@ -365,7 +365,10 @@ func (sv *SubView) WriteTo(buf *bytes.Buffer) {
 		sv.From.WriteTo(buf)
 	}
 	if !sv.Filters.IsNull() {
-		if strings.HasPrefix(sv.From.ToString(), "flow_tag") {
+		from := sv.From.ToString()
+		if strings.HasPrefix(from, "flow_tag") {
+			buf.WriteString(" WHERE ")
+		} else if strings.HasPrefix(from, "flow_metrics") && !strings.HasSuffix(from, ".1m`") && !strings.HasSuffix(from, ".1s`") {
 			buf.WriteString(" WHERE ")
 		} else {
 			buf.WriteString(" PREWHERE ")
