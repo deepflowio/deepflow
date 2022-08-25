@@ -491,6 +491,14 @@ static int resolve_bin_file(const char *path, int pid,
 		syms_count++;
 	}
 
+	if (syms_count == 0) {
+		ret = ETR_NOSYMBOL;
+		ebpf_warning(
+			"Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
+			pid, path, go_ver->major, go_ver->minor);
+		goto failed;
+	}
+
 	struct proc_info *p_info = NULL;
 	if (binary_path){
 		bool is_new_info = false;
@@ -527,11 +535,6 @@ static int resolve_bin_file(const char *path, int pid,
 			p_info->info.offsets[off->idx] = offset;
 		}
 
-		p_info->has_updated = false;
-
-		if (is_new_info)
-			list_add_tail(&p_info->list, &proc_info_head);
-
 		p_info->info.net_TCPConn_itab = get_symbol_addr_from_binary(
 			binary_path, "go.itab.*net.TCPConn,net.Conn");
 		p_info->info.crypto_tls_Conn_itab = get_symbol_addr_from_binary(
@@ -541,21 +544,21 @@ static int resolve_bin_file(const char *path, int pid,
 			binary_path,
 			"go.itab.*google.golang.org/grpc/internal/credentials.syscallConn,net.Conn");
 
+		p_info->has_updated = false;
+
+		if (is_new_info)
+			list_add_tail(&p_info->list, &proc_info_head);
+
 		free(binary_path);
-	}
-	if (syms_count == 0) {
-		ret = ETR_NOSYMBOL;
-		ebpf_warning
-		    ("Go process pid %d [path: %s] (version: go%d.%d). Not find any symbols!\n",
-		     pid, path, go_ver->major, go_ver->minor);
+		binary_path = NULL;
 	}
 
 	*resolve_num = syms_count;
 	return ret;
 
-faild:
+failed:
 	*resolve_num = syms_count;
-	if (probe_sym->isret) {
+	if (probe_sym && probe_sym->isret) {
 		free_uprobe_symbol(probe_sym, NULL);
 	}
 
