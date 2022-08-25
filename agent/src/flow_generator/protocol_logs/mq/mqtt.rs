@@ -145,7 +145,6 @@ pub struct MqttLog {
     status: L7ResponseStatus,
     version: u8,
     client_map: HashMap<u64, String>,
-    has_client_id: bool,
 }
 
 impl MqttLog {
@@ -165,20 +164,17 @@ impl MqttLog {
                 PacketKind::Connect => {
                     let client_id = info.client_id.as_ref().unwrap().clone();
                     self.client_map.insert(key, client_id);
-                    self.has_client_id = true;
                 }
                 PacketKind::Disconnect => info.client_id = self.client_map.remove(&key),
                 _ => {
-                    // 没有connect包的情况下，不用拿client_id
-                    // If there is no connect packet, you don't need to take client_id
-                    if self.has_client_id {
-                        info.client_id = {
-                            match self.client_map.get(&key) {
-                                Some(v) => Some(v.to_string()),
-                                None => {
-                                    warn!("client id not found, maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed");
-                                    return Err(Error::MqttLogParseFailed);
-                                }
+                    info.client_id = {
+                        match self.client_map.get(&key) {
+                            Some(v) => Some(v.clone()),
+                            None => {
+                                debug!("client id not found, 
+                                    maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed,
+                                    or CONNECT packet not found, or treat other packets as MQTT packets.");
+                                return Err(Error::MqttLogParseFailed);
                             }
                         }
                     }
