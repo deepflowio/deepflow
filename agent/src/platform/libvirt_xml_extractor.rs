@@ -271,18 +271,16 @@ impl LibvirtXmlExtractor {
 
         let mut entries = vec![];
         for file in files.into_iter() {
-            let mut single_entries = match Self::extract_from(file.as_path()) {
-                Ok(p) => p,
+            match Self::extract_from(file.as_path()) {
+                Ok(mut p) => entries.append(&mut p),
                 Err(e) => {
                     debug!(
                         "extract xml interface entry info failed with file path {} error: {}",
                         file.as_path().display(),
                         e
                     );
-                    continue;
                 }
-            };
-            entries.append(&mut single_entries);
+            }
         }
 
         Ok(entries)
