@@ -43,6 +43,8 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 		db = db.Where("lcuuid = ?", lcuuid)
 	} else if ip, ok := filter["ip"]; ok {
 		db = db.Where("ip = ?", ip)
+	} else if name, ok := filter["name"]; ok && name != "" {
+		db = db.Where("name = ? OR ip = ?", name, name)
 	} else if region, ok := filter["region"]; ok {
 		azConns := []mysql.AZAnalyzerConnection{}
 		ips := []string{}
