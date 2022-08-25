@@ -236,14 +236,12 @@ func (f *AggFunction) FormatInnerTag(m *view.Model) (innerAlias string) {
 		m.AddTag(&innerFunction)
 		return innerAlias
 	case metrics.METRICS_TYPE_TAG:
-		innerAlias := fmt.Sprintf("`_%s`", strings.Trim(f.Alias, "`"))
 		innerFunction := view.DefaultFunction{
 			Name:      view.FUNCTION_GROUP_ARRAY,
 			Fields:    []view.Node{&view.Field{Value: f.Metrics.DBField}},
 			Condition: f.Metrics.Condition,
-			Alias:     innerAlias,
 		}
-		//innerAlias = innerFunction.SetAlias("", true)
+		innerAlias = innerFunction.SetAlias("", true)
 		innerFunction.SetFlag(view.METRICS_FLAG_INNER)
 		innerFunction.Init()
 		m.AddTag(&innerFunction)

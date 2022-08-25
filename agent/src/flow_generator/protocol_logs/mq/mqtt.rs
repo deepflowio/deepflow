@@ -169,9 +169,11 @@ impl MqttLog {
                 _ => {
                     info.client_id = {
                         match self.client_map.get(&key) {
-                            Some(v) => Some(v.to_string()),
+                            Some(v) => Some(v.clone()),
                             None => {
-                                warn!("client id not found, maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed");
+                                debug!("client id not found, 
+                                    maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed,
+                                    or CONNECT packet not found, or treat other packets as MQTT packets.");
                                 return Err(Error::MqttLogParseFailed);
                             }
                         }
