@@ -78,6 +78,8 @@ message Traffic {
     uint64 closed_flow = 10;
     uint32 l7_request = 11;
     uint32 l7_response = 12;
+    uint32 syn = 13;
+    uint32 synack = 14;
 }
 
 message Latency {
@@ -112,8 +114,8 @@ message Performance {
     uint64 retrans_rx = 2;
     uint64 zero_win_tx = 3;
     uint64 zero_win_rx = 4;
-    uint32 syn = 5;
-    uint32 synack = 6;
+    uint32 retran_syn = 5;
+    uint32 retran_synack = 6;
 }
 
 message Anomaly {

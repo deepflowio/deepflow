@@ -398,6 +398,9 @@ pub struct TcpPerfStats {
     pub syn_count: u32,
     pub synack_count: u32,
 
+    pub retran_syn_count: u32,
+    pub retran_synack_count: u32,
+
     pub counts_peers: [TcpPerfCountsPeer; 2],
     pub total_retrans_count: u32,
 }
@@ -410,16 +413,27 @@ impl TcpPerfStats {
         append_key_value(dst, "rtt_server_max", &self.rtt_server_max.to_string());
         append_key_value(dst, "srt_max", &self.srt_max.to_string());
         append_key_value(dst, "art_max", &self.art_max.to_string());
+        append_key_value(dst, "cit_max", &self.cit_max.to_string());
 
         append_key_value(dst, "rtt_client_sum", &self.rtt_client_sum.to_string());
         append_key_value(dst, "rtt_server_sum", &self.rtt_server_sum.to_string());
         append_key_value(dst, "srt_sum", &self.srt_sum.to_string());
         append_key_value(dst, "art_sum", &self.art_sum.to_string());
+        append_key_value(dst, "cit_sum", &self.cit_sum.to_string());
 
         append_key_value(dst, "rtt_client_count", &self.rtt_client_count.to_string());
         append_key_value(dst, "rtt_server_count", &self.rtt_server_count.to_string());
         append_key_value(dst, "srt_count", &self.srt_count.to_string());
         append_key_value(dst, "art_count", &self.art_count.to_string());
+        append_key_value(dst, "cit_count", &self.cit_sum.to_string());
+        append_key_value(dst, "syn_count", &self.syn_count.to_string());
+        append_key_value(dst, "synack_count", &self.synack_count.to_string());
+        append_key_value(dst, "retran_syn_count", &self.retran_syn_count.to_string());
+        append_key_value(
+            dst,
+            "retran_synack_count",
+            &self.retran_synack_count.to_string(),
+        );
 
         append_key_value(
             dst,
@@ -458,15 +472,25 @@ impl TcpPerfStats {
         if self.rtt < other.rtt {
             self.rtt = other.rtt;
         }
+        if self.cit_max < other.cit_max {
+            self.cit_max = other.cit_max;
+        }
+
         self.rtt_client_sum += other.rtt_client_sum;
         self.rtt_server_sum += other.rtt_server_sum;
         self.srt_sum += other.srt_sum;
         self.art_sum += other.art_sum;
+        self.cit_sum += other.cit_sum;
 
         self.rtt_client_count += other.rtt_client_count;
         self.rtt_server_count += other.rtt_server_count;
         self.srt_count += other.srt_count;
         self.art_count += other.art_count;
+        self.syn_count += other.syn_count;
+        self.cit_count += other.cit_count;
+        self.synack_count += other.synack_count;
+        self.retran_syn_count += other.retran_syn_count;
+        self.retran_synack_count += other.retran_synack_count;
         self.counts_peers[0].sequential_merge(&other.counts_peers[0]);
         self.counts_peers[1].sequential_merge(&other.counts_peers[1]);
         self.total_retrans_count += other.total_retrans_count;

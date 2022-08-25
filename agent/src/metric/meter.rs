@@ -139,6 +139,8 @@ pub struct Traffic {
     pub closed_flow: u64,
     pub l7_request: u32,
     pub l7_response: u32,
+    pub syn: u32,
+    pub synack: u32,
 }
 
 impl Traffic {
@@ -155,6 +157,8 @@ impl Traffic {
         self.closed_flow += other.closed_flow;
         self.l7_request += other.l7_request;
         self.l7_response += other.l7_response;
+        self.syn += other.syn;
+        self.synack += other.synack;
     }
 
     pub fn reverse(&mut self) {
@@ -182,6 +186,8 @@ impl From<Traffic> for metric::Traffic {
             closed_flow: m.closed_flow,
             l7_request: m.l7_request,
             l7_response: m.l7_response,
+            syn: m.syn,
+            synack: m.synack,
         }
     }
 }
@@ -293,8 +299,8 @@ pub struct Performance {
     pub retrans_rx: u64,
     pub zero_win_tx: u64,
     pub zero_win_rx: u64,
-    pub syn: u32,
-    pub synack: u32,
+    pub retran_syn: u32,
+    pub retran_synack: u32,
 }
 
 impl Performance {
@@ -303,8 +309,8 @@ impl Performance {
         self.retrans_rx += other.retrans_rx;
         self.zero_win_tx += other.zero_win_tx;
         self.zero_win_rx += other.zero_win_rx;
-        self.syn += other.syn;
-        self.synack += other.synack;
+        self.retran_syn += other.retran_syn;
+        self.retran_synack += other.retran_synack;
     }
 }
 
@@ -315,8 +321,8 @@ impl From<Performance> for metric::Performance {
             retrans_rx: m.retrans_rx,
             zero_win_tx: m.zero_win_tx,
             zero_win_rx: m.zero_win_rx,
-            syn: m.syn,
-            synack: m.synack,
+            retran_syn: m.retran_syn,
+            retran_synack: m.retran_synack,
         }
     }
 }
