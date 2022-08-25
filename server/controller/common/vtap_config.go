@@ -88,7 +88,7 @@ var (
 	RsyslogEnabled                = 1
 	MaxTxBandwidth                = int64(0)
 	BandwidthProbeInterval        = 10
-	TapInterfaceRegex             = "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo)$"
+	TapInterfaceRegex             = "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
 	MaxEscapeSeconds              = 3600
 	Mtu                           = 1500
 	OutputVlan                    = 0
