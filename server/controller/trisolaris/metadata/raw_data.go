@@ -1176,6 +1176,9 @@ func (r *PlatformRawData) generateIpResoureceData(
 		if ips, ok := r.vInterfaceIDToIP[vif.ID]; ok {
 			for _, ipResource := range ips {
 				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif)
+				if ipResource.GetSubnetId() == 0 {
+					ipResource.SubnetId = proto.Uint32(uint32(vif.NetworkID))
+				}
 				ipResources = append(ipResources, ipResource)
 				if vif.Type == VIF_TYPE_WAN {
 					vifPubIps = append(vifPubIps, ipResource.GetIp())

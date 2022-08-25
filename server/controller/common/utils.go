@@ -240,7 +240,7 @@ func IsMasterControllerAndReturnName() (bool, string, error) {
 
 	// 比较是否相同返回结果
 	if hostName != masterController.Name {
-		return false, hostName, nil
+		return false, masterController.Name, nil
 	}
 	return true, hostName, nil
 }

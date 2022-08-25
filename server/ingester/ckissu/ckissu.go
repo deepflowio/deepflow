@@ -919,7 +919,7 @@ func (i *Issu) renameUserDefineDatasource(connect *sql.DB, ds *datasource.Dataso
 				OldDb:     dsInfo.db,
 				OldTables: []string{dsInfo.name + "_agg"},
 				NewDb:     ckdb.METRICS_DB,
-				NewTables: []string{fmt.Sprintf("%s.%s_%s", dsInfo.db, dsInfo.baseTable, dsInfo.name+"_agg")},
+				NewTables: []string{fmt.Sprintf("%s.%s", dsInfo.db, dsInfo.name+"_agg")},
 			}); err != nil {
 				return err
 			}
