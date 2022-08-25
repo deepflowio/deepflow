@@ -153,7 +153,7 @@ impl AppTable {
         packet: &MetaPacket,
         local_epc: i32,
         remote_epc: i32,
-    ) -> Option<(L7Protocol, bool)> {
+    ) -> Option<(L7Protocol, u16)> {
         if packet.lookup_key.is_loopback_packet() {
             return None;
         }
@@ -169,7 +169,7 @@ impl AppTable {
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, port),
         };
         if dst_protocol.is_some() && dst_protocol.unwrap() != L7Protocol::Unknown {
-            return Some((dst_protocol.unwrap(), packet.lookup_key.l2_end_1));
+            return Some((dst_protocol.unwrap(), packet.lookup_key.dst_port));
         }
 
         let (ip, _, port) = Self::get_ip_epc_port(packet, false);
@@ -183,14 +183,14 @@ impl AppTable {
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, port),
         };
         if src_protocol.is_some() && src_protocol.unwrap() != L7Protocol::Unknown {
-            return Some((src_protocol.unwrap(), packet.lookup_key.l2_end_0));
+            return Some((src_protocol.unwrap(), packet.lookup_key.src_port));
         }
         if src_protocol.is_none() && dst_protocol.is_none() {
             return None;
         } else if src_protocol.is_none() {
-            return Some((dst_protocol.unwrap(), packet.lookup_key.l2_end_1));
+            return Some((dst_protocol.unwrap(), packet.lookup_key.dst_port));
         }
-        return Some((src_protocol.unwrap(), packet.lookup_key.l2_end_0));
+        return Some((src_protocol.unwrap(), packet.lookup_key.src_port));
     }
 
     fn set_ipv4_protocol(
