@@ -96,7 +96,7 @@ struct SessionPeer {
     ack_received: bool, // ack_retrans check
     syn_received: bool,
 
-    is_ack_packet: bool,
+    is_handshake_ack_packet: bool,
     srt_calculable: bool,
     rtt_calculable: bool,
     art_calculable: bool,
@@ -783,7 +783,7 @@ impl TcpPerf {
         }
 
         if Self::is_handshake_ack_packet(same_dir, oppo_dir, p) {
-            same_dir.is_ack_packet = true;
+            same_dir.is_handshake_ack_packet = true;
         }
 
         is_opening
@@ -864,11 +864,13 @@ impl TcpPerf {
         // - the previous packet of the client is syn-ack-ack, then idle_time = current_time - max(previouse_client_packet_time, previouse_server_packet_time)
         // - idel_time = current_time - previouse_server_packet_time
         if fpd && p.is_psh_ack() && p.payload_len > 1 {
-            if same_dir.is_ack_packet {
-                same_dir.is_ack_packet = false;
+            if same_dir.is_handshake_ack_packet {
+                same_dir.is_handshake_ack_packet = false;
                 let d = p.lookup_key.timestamp - same_dir.timestamp.max(oppo_dir.timestamp);
                 self.perf_data.calc_cit(d);
-            } else if oppo_dir.timestamp > same_dir.timestamp && oppo_dir.payload_len > 1 {
+            } else if oppo_dir.payload_len > 1
+                && (same_dir.payload_len <= 1 || oppo_dir.timestamp > same_dir.timestamp)
+            {
                 let d = p.lookup_key.timestamp - oppo_dir.timestamp;
                 self.perf_data.calc_cit(d);
             }
