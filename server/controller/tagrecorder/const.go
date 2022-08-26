@@ -79,6 +79,7 @@ const (
 	RESOURCE_TYPE_CH_VTAP          = "ch_vtap"
 	RESOURCE_TYPE_CH_VTAP_PORT     = "ch_vtap_port"
 	RESOURCE_TYPE_CH_LB_LISTENER   = "ch_lb_listener"
+	RESOURCE_TYPE_CH_ENUM          = "ch_enum"
 )
 
 const (
@@ -109,6 +110,8 @@ const (
 
 	CH_DICTIONARY_IP_RELATION = "ip_relation_map"
 	CH_DICTIONARY_IP_RESOURCE = "ip_resource_map"
+
+	CH_DICTIONARY_ENUM = "enum_map"
 )
 
 const (
@@ -361,6 +364,16 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_ENUM_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `tag_name` UInt64,\n" +
+		"    `value` String,\n" +
+		"    `name` Int64\n" +
+		")\n" +
+		"PRIMARY KEY id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
@@ -430,6 +443,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_K8S_LABEL:      CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_K8S_LABELS:     CREATE_K8S_LABELS_DICTIONARY_SQL,
 	CH_DICTIONARY_IP_RESOURCE:    CREATE_IP_RESOURCE_DICTIONARY_SQL,
+	CH_DICTIONARY_ENUM:           CREATE_ENUM_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{

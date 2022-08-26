@@ -286,3 +286,9 @@ type ChK8sLabels struct {
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
+
+type ChEnum struct {
+	TagName string `gorm:"primaryKey;column:tag_name;type:varchar(64);default:null" json:"TAG_NAME"`
+	Value   string `gorm:"primaryKey;column:value;type:varchar(64);default:null" json:"VALUE"`
+	Name    string `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+}

@@ -2121,3 +2121,11 @@ CREATE TABLE IF NOT EXISTS kubernetes_cluster (
     unique (cluster_id)
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE kubernetes_cluster;
+
+CREATE TABLE IF NOT EXISTS ch_enum (
+    tag_name                VARCHAR(256) NOT NULL ,
+    value                   VARCHAR(256) NOT NULL,
+    name                    VARCHAR(256) NOT NULL,
+    PRIMARY KEY  (tag_name,value)
+)ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_enum;
