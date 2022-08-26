@@ -460,14 +460,14 @@ static int resolve_bin_file(const char *path, int pid,
 				if (sub_probe_sym == NULL) {
 					ebpf_warning("malloc() error.\n");
 					ret = ETR_NOMEM;
-					goto faild;
+					goto failed;
 				}
 
 				if ((ret = copy_uprobe_symbol(probe_sym,
 							      sub_probe_sym)) !=
 				    ETR_OK) {
 					free((void *)sub_probe_sym);
-					goto faild;
+					goto failed;
 				}
 
 				sub_probe_sym->entry = addr;
@@ -785,7 +785,7 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 		if (sym_uprobe->pid == pid) {
 			if (probe_detach(probe) != 0) {
 				ebpf_warning
-				    ("path:%s, symbol name:%s probe_detach() faild.\n",
+				    ("path:%s, symbol name:%s probe_detach() failed.\n",
 				     sym_uprobe->binary_path, sym_uprobe->name);
 			}
 
@@ -842,7 +842,7 @@ static int __attribute__ ((unused)) period_update_procfs(void)
 		struct symbol_uprobe *sym_uprobe = probe->private_data;
 		if (probe_detach(probe) != 0)
 			ebpf_warning
-			    ("path:%s, symbol name:%s address:0x%x probe_detach() faild.\n",
+			    ("path:%s, symbol name:%s address:0x%x probe_detach() failed.\n",
 			     sym_uprobe->binary_path, sym_uprobe->name,
 			     sym_uprobe->entry);
 		else
