@@ -20,8 +20,10 @@ use super::super::{
     AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
 };
 
+use crate::flow_generator::protocol_logs::pb_adapter::{
+    ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
+};
 use crate::flow_generator::protocol_logs::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
-use crate::proto::flow_log;
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
     common::meta_packet::MetaPacket,
@@ -47,6 +49,8 @@ pub struct KafkaInfo {
     // reponse
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
     pub resp_msg_size: i32,
+    pub status: L7ResponseStatus,
+    pub status_code: u16,
 }
 
 impl KafkaInfo {
@@ -54,6 +58,12 @@ impl KafkaInfo {
     const API_KEY_MAX: u16 = 67;
     pub fn merge(&mut self, other: Self) {
         self.resp_msg_size = other.resp_msg_size;
+        if other.status != L7ResponseStatus::default() {
+            self.status = other.status;
+        }
+        if other.status_code != 0 {
+            self.status_code = other.status_code;
+        }
     }
     pub fn check(&self) -> bool {
         if self.api_key > Self::API_KEY_MAX {
@@ -63,16 +73,27 @@ impl KafkaInfo {
     }
 }
 
-impl From<KafkaInfo> for flow_log::KafkaInfo {
+impl From<KafkaInfo> for L7ProtocolSendLog {
     fn from(f: KafkaInfo) -> Self {
-        flow_log::KafkaInfo {
-            correlation_id: f.correlation_id,
-            req_msg_size: f.req_msg_size,
-            api_version: f.api_version as u32,
-            api_key: f.api_key as u32,
-            client_id: f.client_id,
-            resp_msg_size: f.resp_msg_size,
-        }
+        let log = L7ProtocolSendLog {
+            req_len: f.req_msg_size as u32,
+            resp_len: f.resp_msg_size as u32,
+            req: L7Request {
+                req_type: f.api_key.to_string(),
+                ..Default::default()
+            },
+            resp: L7Response {
+                status: f.status,
+                code: f.status_code as i32,
+                ..Default::default()
+            },
+            ext_info: Some(ExtendedInfo {
+                request_id: Some(f.correlation_id),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        return log;
     }
 }
 
@@ -80,8 +101,6 @@ impl From<KafkaInfo> for flow_log::KafkaInfo {
 pub struct KafkaLog {
     info: KafkaInfo,
     msg_type: LogMessageType,
-    status: L7ResponseStatus,
-    status_code: u16,
 }
 
 impl KafkaLog {
@@ -93,8 +112,8 @@ impl KafkaLog {
         self.info.api_key = 0;
         self.info.client_id = String::new();
         self.info.resp_msg_size = -1;
-        self.status = L7ResponseStatus::Ok;
-        self.status_code = 0;
+        self.info.status = L7ResponseStatus::Ok;
+        self.info.status_code = 0;
     }
 
     // 协议识别的时候严格检查避免误识别，日志解析的时候不用严格检查因为可能有长度截断
@@ -129,10 +148,8 @@ impl KafkaLog {
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
             msg_type: self.msg_type,
-            status: self.status,
-            code: self.status_code,
             rrt: 0,
-            version: 0,
+            ..Default::default()
         })
     }
 
@@ -144,8 +161,6 @@ impl KafkaLog {
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
             msg_type: self.msg_type,
-            status: L7ResponseStatus::Ok,
-            code: 0,
             rrt: 0,
             version: 0,
         })
