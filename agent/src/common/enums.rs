@@ -20,6 +20,7 @@ use std::fmt;
 
 use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use serde::Serialize;
 
 #[cfg(target_os = "linux")]
 use super::super::ebpf::{MSG_REQUEST, MSG_RESPONSE};
@@ -74,7 +75,9 @@ impl PartialEq<EthernetType> for u16 {
 
 // IPProtocol is an enumeration of IP protocol values, and acts as a decoder
 // for any type it supports.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(
+    Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum IpProtocol {
     Ipv6HopByHop = 0,
@@ -176,7 +179,7 @@ impl PartialEq<LinkType> for u8 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, Ord)]
 #[repr(u16)]
 pub enum TapType {
     Any,

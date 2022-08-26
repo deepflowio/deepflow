@@ -71,6 +71,7 @@ impl SendItem {
     pub fn to_kv_string(&self, kv_string: &mut String) {
         match self {
             Self::L4FlowLog(l4) => l4.to_kv_string(kv_string),
+            Self::L7FlowLog(l7) => l7.to_kv_string(kv_string),
             _ => return,
         }
     }
@@ -78,6 +79,7 @@ impl SendItem {
     pub fn file_name(&self) -> &str {
         match self {
             Self::L4FlowLog(_) => "l4_flow_log",
+            Self::L7FlowLog(_) => "l7_flow_log",
             _ => "other",
         }
     }

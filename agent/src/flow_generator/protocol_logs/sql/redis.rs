@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
+use serde::{Serialize, Serializer};
+
 use std::{fmt, str};
 
 use super::super::{
-    AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
+    value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus,
+    LogMessageType,
 };
 
 use crate::common::enums::{IpProtocol, PacketDirection};
@@ -28,13 +31,40 @@ use crate::proto::flow_log;
 
 const SEPARATOR_SIZE: usize = 2;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct RedisInfo {
-    pub request: Vec<u8>,      // 命令字段包括参数例如："set key value"
+    #[serde(
+        rename = "request_resource",
+        skip_serializing_if = "value_is_default",
+        serialize_with = "vec_u8_to_string"
+    )]
+    pub request: Vec<u8>, // 命令字段包括参数例如："set key value"
+    #[serde(
+        skip_serializing_if = "value_is_default",
+        serialize_with = "vec_u8_to_string"
+    )]
     pub request_type: Vec<u8>, // 命令类型不包括参数例如：命令为"set key value"，命令类型为："set"
-    pub response: Vec<u8>,     // 整数回复 + 批量回复 + 多条批量回复
-    pub status: Vec<u8>,       // '+'
-    pub error: Vec<u8>,        // '-'
+    #[serde(
+        rename = "response_result",
+        skip_serializing_if = "value_is_default",
+        serialize_with = "vec_u8_to_string"
+    )]
+    pub response: Vec<u8>, // 整数回复 + 批量回复 + 多条批量回复
+    #[serde(skip)]
+    pub status: Vec<u8>, // '+'
+    #[serde(
+        rename = "response_expection",
+        skip_serializing_if = "value_is_default",
+        serialize_with = "vec_u8_to_string"
+    )]
+    pub error: Vec<u8>, // '-'
+}
+
+pub fn vec_u8_to_string<S>(v: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&String::from_utf8_lossy(v))
 }
 
 impl RedisInfo {

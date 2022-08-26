@@ -45,6 +45,7 @@ use std::{
 };
 
 use prost::Message;
+use serde::{Serialize, Serializer};
 
 use crate::{
     common::{
@@ -61,7 +62,7 @@ use crate::{
 
 const NANOS_PER_MICRO: u64 = 1000;
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize, Debug, PartialEq, Copy, Clone)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
     Ok,
@@ -77,7 +78,7 @@ impl Default for L7ResponseStatus {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum LogMessageType {
     Request,
@@ -102,13 +103,19 @@ impl From<PacketDirection> for LogMessageType {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct AppProtoHead {
+    #[serde(rename = "l7_protocol")]
     pub proto: L7Protocol,
     pub msg_type: LogMessageType, // HTTP，DNS: request/response
+    #[serde(rename = "response_status")]
     pub status: L7ResponseStatus, // 状态描述：0：正常，1：已废弃使用(先前用于表示异常)，2：不存在，3：服务端异常，4：客户端异常
-    pub code: u16,                // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
-    pub rrt: u64,                 // HTTP，DNS时延: response-request
+    #[serde(rename = "response_code")]
+    pub code: u16, // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
+
+    #[serde(rename = "response_duration")]
+    pub rrt: u64, // HTTP，DNS时延: response-request
+    #[serde(skip)]
     pub version: u8,
 }
 
@@ -124,20 +131,27 @@ impl From<AppProtoHead> for flow_log::AppProtoHead {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct AppProtoLogsBaseInfo {
+    #[serde(serialize_with = "duration_to_micros")]
     pub start_time: Duration,
+    #[serde(serialize_with = "duration_to_micros")]
     pub end_time: Duration,
     pub flow_id: u64,
+    #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
     pub vtap_id: u16,
     pub tap_type: TapType,
+    #[serde(skip)]
     pub is_ipv6: bool,
     pub tap_side: TapSide,
+    #[serde(flatten)]
     pub head: AppProtoHead,
 
     /* L2 */
+    #[serde(serialize_with = "to_string_format")]
     pub mac_src: MacAddr,
+    #[serde(serialize_with = "to_string_format")]
     pub mac_dst: MacAddr,
     /* L3 ipv4 or ipv6 */
     pub ip_src: IpAddr,
@@ -151,21 +165,63 @@ pub struct AppProtoLogsBaseInfo {
     /* First L7 TCP Seq */
     pub req_tcp_seq: u32,
     pub resp_tcp_seq: u32,
+
     /* EBPF Info */
+    #[serde(skip_serializing_if = "value_is_default")]
     pub process_id_0: u32,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub process_id_1: u32,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub process_kname_0: String,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub process_kname_1: String,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_trace_id_request: u64,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_trace_id_response: u64,
+    #[serde(rename = "syscall_thread_0", skip_serializing_if = "value_is_default")]
     pub syscall_trace_id_thread_0: u32,
+    #[serde(rename = "syscall_thread_1", skip_serializing_if = "value_is_default")]
     pub syscall_trace_id_thread_1: u32,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_cap_seq_0: u64,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub syscall_cap_seq_1: u64,
 
     pub protocol: IpProtocol,
+    #[serde(skip)]
     pub is_vip_interface_src: bool,
+    #[serde(skip)]
     pub is_vip_interface_dst: bool,
+}
+
+pub fn duration_to_micros<S>(d: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_u64(d.as_micros() as u64)
+}
+
+pub fn to_string_format<D, S>(d: &D, serializer: S) -> Result<S::Ok, S::Error>
+where
+    D: fmt::Display,
+    S: Serializer,
+{
+    serializer.serialize_str(&d.to_string())
+}
+
+pub fn value_is_default<T>(t: &T) -> bool
+where
+    T: Default + std::cmp::PartialEq,
+{
+    t == &T::default()
+}
+
+pub fn value_is_negative<T>(t: &T) -> bool
+where
+    T: Default + std::cmp::PartialEq + std::cmp::PartialOrd,
+{
+    t < &T::default()
 }
 
 impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
@@ -347,7 +403,8 @@ impl AppProtoLogsBaseInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
+#[serde(untagged)]
 pub enum AppProtoLogsInfo {
     Dns(DnsInfo),
     Mysql(MysqlInfo),
@@ -403,9 +460,11 @@ impl fmt::Display for AppProtoLogsInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct AppProtoLogsData {
+    #[serde(flatten)]
     pub base_info: AppProtoLogsBaseInfo,
+    #[serde(flatten)]
     pub special_info: AppProtoLogsInfo,
 }
 
@@ -469,6 +528,12 @@ impl AppProtoLogsData {
     pub fn session_merge(&mut self, log: AppProtoLogsData) {
         self.base_info.merge(log.base_info);
         self.special_info.merge(log.special_info);
+    }
+
+    pub fn to_kv_string(&self, dst: &mut String) {
+        let json = serde_json::to_string(&self).unwrap();
+        dst.push_str(&json);
+        dst.push('\n');
     }
 }
 

@@ -17,6 +17,8 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
+use serde::Serialize;
+
 use super::decapsulate::TunnelType;
 
 // 64     60         40         32                                    0
@@ -24,7 +26,7 @@ use super::decapsulate::TunnelType;
 // | from | RESERVED | TUN_TYPE |              ip/id/mac              |
 // +------+----------+----------+-------------------------------------+
 // 注意ip/id/mac不能超过32bit，否则数据存储、四元组聚合都会有歧义
-#[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Serialize, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct TapPort(pub u64);
 
 impl TapPort {

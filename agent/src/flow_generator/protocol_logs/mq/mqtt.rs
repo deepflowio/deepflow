@@ -24,10 +24,12 @@ use nom::{
     multi::{many1, many1_count},
     number, sequence, IResult, Parser,
 };
+use serde::{Serialize, Serializer};
 
 use super::super::{
-    AppProtoHead, AppProtoHeadEnum, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo,
-    AppProtoLogsInfoEnum, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
+    value_is_default, value_is_negative, AppProtoHead, AppProtoHeadEnum, AppProtoLogsBaseInfo,
+    AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsInfoEnum, L7LogParse, L7Protocol,
+    L7ResponseStatus, LogMessageType,
 };
 
 use crate::{
@@ -37,16 +39,37 @@ use crate::{
     proto::flow_log::{self, MqttTopic},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct MqttInfo {
+    #[serde(rename = "request_domain", skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub version: u8,
+    #[serde(rename = "request_type")]
     pub pkt_type: PacketKind,
+    #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
     pub req_msg_size: i32,
+    #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
     pub res_msg_size: i32,
+    #[serde(
+        rename = "request_resource",
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "topics_format"
+    )]
     pub subscribe_topics: Option<Vec<MqttTopic>>,
+    #[serde(skip)]
     pub publish_topic: Option<String>,
+    #[serde(skip)]
     pub code: u8, // connect_ack packet return code
+}
+
+pub fn topics_format<S>(t: &Option<Vec<MqttTopic>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let ts = t.as_ref().unwrap();
+    let names = ts.iter().map(|c| c.name.clone()).collect::<Vec<_>>();
+    serializer.serialize_str(&names.join(","))
 }
 
 impl Default for MqttInfo {
@@ -376,7 +399,7 @@ pub struct PacketHeader {
     pub remaining_length: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PacketKind {
     Connect,
     Connack,
@@ -425,7 +448,7 @@ impl Default for PacketKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QualityOfService {
     AtMostOnce,
     AtLeastOnce,

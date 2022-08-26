@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+use serde::Serialize;
+
 use super::super::{
-    consts::*, AppProtoHead, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol,
-    L7ResponseStatus, LogMessageType,
+    consts::*, value_is_default, AppProtoHead, AppProtoLogsData, AppProtoLogsInfo, L7LogParse,
+    L7Protocol, L7ResponseStatus, LogMessageType,
 };
 
 use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
@@ -28,19 +30,31 @@ use crate::{
     utils::bytes,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
     // Server Greeting
+    #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub protocol_version: u8,
+    #[serde(skip)]
     pub server_version: String,
+    #[serde(skip)]
     pub server_thread_id: u32,
     // request
+    #[serde(rename = "request_type")]
     pub command: u8,
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub context: String,
     // response
+    #[serde(skip)]
     pub response_code: u8,
+    #[serde(skip)]
     pub error_code: u16,
+    #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
     pub affected_rows: u64,
+    #[serde(
+        rename = "response_execption",
+        skip_serializing_if = "value_is_default"
+    )]
     pub error_message: String,
 }
 

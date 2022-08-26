@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use serde::Serialize;
 
 use super::super::{
-    consts::KAFKA_REQ_HEADER_LEN, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol,
-    L7ResponseStatus, LogMessageType,
+    consts::KAFKA_REQ_HEADER_LEN, value_is_default, value_is_negative, AppProtoHead,
+    AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
 };
 
 use crate::flow_generator::protocol_logs::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
@@ -28,17 +29,23 @@ use crate::{
     utils::bytes::{read_u16_be, read_u32_be},
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct KafkaInfo {
+    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub correlation_id: u32,
 
     // request
+    #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
     pub req_msg_size: i32,
+    #[serde(skip)]
     pub api_version: u16,
+    #[serde(rename = "request_type")]
     pub api_key: u16,
+    #[serde(skip)]
     pub client_id: String,
 
     // reponse
+    #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
     pub resp_msg_size: i32,
 }
 

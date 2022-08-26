@@ -16,10 +16,11 @@
 
 use arc_swap::access::Access;
 use log::info;
+use serde::Serialize;
 
 use super::super::{
-    consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus,
-    LogMessageType,
+    consts::*, value_is_default, value_is_negative, AppProtoHead, AppProtoLogsInfo, L7LogParse,
+    L7Protocol, L7ResponseStatus, LogMessageType,
 };
 
 use crate::common::enums::{IpProtocol, PacketDirection};
@@ -32,22 +33,32 @@ use crate::utils::bytes::{read_u32_be, read_u64_be};
 
 const TRACE_ID_MAX_LEN: usize = 51;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
     // header
+    #[serde(skip)]
     pub serial_id: u8,
+    #[serde(skip)]
     pub data_type: u8,
+    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub request_id: i64,
 
     // req
+    #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
     pub req_msg_size: i32,
+    #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub dubbo_version: String,
+    #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
     pub service_name: String,
+    #[serde(skip)]
     pub service_version: String,
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub method_name: String,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
 
     // resp
+    #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
     pub resp_msg_size: i32,
 }
 

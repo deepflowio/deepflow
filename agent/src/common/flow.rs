@@ -23,6 +23,7 @@ use std::{
 };
 
 use log::{error, warn};
+use serde::Serialize;
 
 use super::{
     decapsulate::TunnelType,
@@ -682,7 +683,7 @@ const L7_PROTOCOL_MQTT: u8 = 101;
 const L7_PROTOCOL_DNS: u8 = 120;
 const L7_PROTOCOL_MAX: u8 = 255;
 
-#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
 #[repr(u8)]
 pub enum L7Protocol {
     Unknown = L7_PROTOCOL_UNKNOWN,
