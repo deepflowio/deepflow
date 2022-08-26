@@ -144,10 +144,11 @@ func (s *SyncStorage) fetch() {
 	}
 }
 
-func (s *SyncStorage) loadFromDatabase() {
+func (s *SyncStorage) loadFromDatabase(ageTime time.Duration) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	now := time.Now()
 	s.genesisSyncInfo = GenesisSyncDataOperation{}
 	var vms []model.GenesisVM
 	var vpcs []model.GenesisVpc
@@ -159,28 +160,28 @@ func (s *SyncStorage) loadFromDatabase() {
 	var vinterfaces []model.GenesisVinterface
 
 	s.genesisSyncInfo.VMs = NewVMPlatformDataOperation(vms)
-	s.genesisSyncInfo.VMs.Load()
+	s.genesisSyncInfo.VMs.Load(now, ageTime)
 
 	s.genesisSyncInfo.VPCs = NewVpcPlatformDataOperation(vpcs)
-	s.genesisSyncInfo.VPCs.Load()
+	s.genesisSyncInfo.VPCs.Load(now, ageTime)
 
 	s.genesisSyncInfo.Hosts = NewHostPlatformDataOperation(hosts)
-	s.genesisSyncInfo.Hosts.Load()
+	s.genesisSyncInfo.Hosts.Load(now, ageTime)
 
 	s.genesisSyncInfo.Ports = NewPortPlatformDataOperation(ports)
-	s.genesisSyncInfo.Ports.Load()
+	s.genesisSyncInfo.Ports.Load(now, ageTime)
 
 	s.genesisSyncInfo.Lldps = NewLldpInfoPlatformDataOperation(lldps)
-	s.genesisSyncInfo.Lldps.Load()
+	s.genesisSyncInfo.Lldps.Load(now, ageTime)
 
 	s.genesisSyncInfo.IPlastseens = NewIPLastSeenPlatformDataOperation(ipLastSeens)
-	s.genesisSyncInfo.IPlastseens.Load()
+	s.genesisSyncInfo.IPlastseens.Load(now, ageTime)
 
 	s.genesisSyncInfo.Networks = NewNetworkPlatformDataOperation(networks)
-	s.genesisSyncInfo.Networks.Load()
+	s.genesisSyncInfo.Networks.Load(now, ageTime)
 
 	s.genesisSyncInfo.Vinterfaces = NewVinterfacePlatformDataOperation(vinterfaces)
-	s.genesisSyncInfo.Vinterfaces.Load()
+	s.genesisSyncInfo.Vinterfaces.Load(now, ageTime)
 
 	s.fetch()
 }
@@ -199,16 +200,25 @@ func (s *SyncStorage) storeToDatabase() {
 	s.genesisSyncInfo.Vinterfaces.Save()
 }
 
+func (s *SyncStorage) refreshDatabase(ageTime time.Duration) {
+	for {
+		time.Sleep(ageTime)
+		s.dirty = true
+	}
+}
+
 func (s *SyncStorage) run() {
+	ageTime := time.Duration(s.cfg.AgingTime) * time.Second
 	// 启动时先从数据库恢复数据
-	s.loadFromDatabase()
+	s.loadFromDatabase(ageTime)
+	// 每个老化周期刷新一次数据库
+	go s.refreshDatabase(ageTime)
 
 	for {
 		time.Sleep(time.Duration(s.cfg.DataPersistenceInterval) * time.Second)
 		now := time.Now()
 		hasChange := false
 		s.mutex.Lock()
-		ageTime := time.Duration(s.cfg.AgingTime) * time.Second
 		hasChange = hasChange || s.genesisSyncInfo.VMs.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.VPCs.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.Lldps.Age(now, ageTime)

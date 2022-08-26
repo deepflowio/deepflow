@@ -39,7 +39,7 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::ebpf::{MSG_REQUEST, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
+use crate::ebpf::{SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
@@ -822,18 +822,14 @@ impl<'a> MetaPacket<'a> {
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocal_hint as u8);
-        packet.direction = if data.msg_type == MSG_REQUEST {
-            PacketDirection::ClientToServer
-        } else {
-            PacketDirection::ServerToClient
-        };
+        packet.direction = PacketDirection::ClientToServer;
         return Ok(packet);
     }
 
-    pub fn ebpf_flow_id(&self) -> u64 {
-        let protocol = u8::from(self.l7_protocol_from_ebpf) as u64;
+    pub fn ebpf_flow_id(&self) -> u128 {
+        let protocol = u8::from(self.l7_protocol_from_ebpf) as u128;
 
-        self.socket_id | protocol << 56
+        (self.socket_id as u128) | protocol << u64::BITS
     }
 
     pub fn set_loopback_mac(&mut self, mac: MacAddr) {

@@ -118,7 +118,7 @@ impl From<MqttInfo> for flow_log::MqttInfo {
             PacketKind::Publish { .. } => {
                 vec![MqttTopic {
                     name: f.publish_topic.unwrap_or_default(),
-                    qos: None,
+                    qos: -1,
                 }]
             }
             PacketKind::Unsubscribe | PacketKind::Subscribe => {
@@ -169,9 +169,11 @@ impl MqttLog {
                 _ => {
                     info.client_id = {
                         match self.client_map.get(&key) {
-                            Some(v) => Some(v.to_string()),
+                            Some(v) => Some(v.clone()),
                             None => {
-                                warn!("client id not found, maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed");
+                                debug!("client id not found, 
+                                    maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed,
+                                    or CONNECT packet not found, or treat other packets as MQTT packets.");
                                 return Err(Error::MqttLogParseFailed);
                             }
                         }
@@ -256,7 +258,7 @@ impl MqttLog {
                             .into_iter()
                             .map(|(t, qos)| MqttTopic {
                                 name: t.to_string(),
-                                qos: Some(qos as u32),
+                                qos: qos as i32,
                             })
                             .collect(),
                     );
@@ -280,7 +282,7 @@ impl MqttLog {
                         reqs.into_iter()
                             .map(|topic| MqttTopic {
                                 name: topic.to_string(),
-                                qos: None,
+                                qos: -1,
                             })
                             .collect(),
                     );
@@ -303,7 +305,7 @@ impl MqttLog {
                 }
                 PacketKind::Disconnect => {
                     info.pkt_type = header.kind;
-                    self.msg_type = LogMessageType::Disconnect;
+                    self.msg_type = LogMessageType::Session;
                     info.res_msg_size = header.remaining_length;
                     info.version = self.version;
                 }

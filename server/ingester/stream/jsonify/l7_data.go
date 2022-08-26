@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
@@ -598,7 +599,18 @@ func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
 	}
 	info := l.Mqtt
 	h.RequestType = info.MqttType
-	h.RequestResource = info.ClientId
+	h.RequestDomain = info.ClientId
+	if len(info.Topics) == 1 {
+		h.RequestResource = info.Topics[0].Name
+	} else if len(info.Topics) > 1 {
+		var topics_string strings.Builder
+		topics_string.WriteString(info.Topics[0].Name)
+		for i := 1; i < len(info.Topics); i++ {
+			topics_string.WriteByte(',')
+			topics_string.WriteString(info.Topics[i].Name)
+		}
+		h.RequestResource = topics_string.String()
+	}
 
 	switch info.ProtoVersion {
 	case 3:
@@ -644,7 +656,7 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	switch datatype.L7Protocol(l.Base.Head.Proto) {
-	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS:
 		h.fillHttp(l)
 	case datatype.L7_PROTOCOL_DNS:
 		h.fillDns(l)

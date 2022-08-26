@@ -17,6 +17,7 @@
 package cache
 
 import (
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	rcommon "github.com/deepflowys/deepflow/server/controller/recorder/common"
@@ -583,6 +584,10 @@ func (c *Cache) AddVInterfaces(items []*mysql.VInterface) {
 		c.DiffBaseDataSet.addVInterface(item, c.Sequence, &c.ToolDataSet)
 		c.ToolDataSet.addVInterface(item)
 	}
+}
+
+func (c *Cache) UpdateVInterface(cloudItem *cloudmodel.VInterface) {
+	c.ToolDataSet.updateVInterface(cloudItem)
 }
 
 func (c *Cache) DeleteVInterfaces(lcuuids []string) {

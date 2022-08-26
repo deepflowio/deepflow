@@ -427,7 +427,7 @@ func (t *SuiteTest) TestDeleteSoftDeletedResource() {
 	t.db.Unscoped().Where("domain = ?", domainLcuuid).Find(&azs)
 	assert.Equal(t.T(), 1, len(azs))
 
-	deleteSoftDeletedResource(domainLcuuid)
+	cleanSoftDeletedResource(domainLcuuid)
 	t.db.Unscoped().Find(&azs)
 	assert.Equal(t.T(), 1, len(azs))
 	t.db.Unscoped().Where("domain = ?", domainLcuuid).Find(&azs)

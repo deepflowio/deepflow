@@ -22,8 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/libs/logger"
-
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
@@ -57,7 +55,6 @@ type Controller struct{}
 
 func Start(configPath string) {
 	flag.Parse()
-	logger.EnableStdoutLog()
 
 	serverCfg := config.DefaultConfig()
 	serverCfg.Load(configPath)
@@ -102,7 +99,7 @@ func Start(configPath string) {
 		}
 	}
 
-	router.SetInitStageForHealthChecker("Monitor init")
+	router.SetInitStageForHealthChecker("Statsd init")
 	// start statsd
 	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
@@ -127,7 +124,6 @@ func Start(configPath string) {
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
 
-	router.SetInitStageForHealthChecker("Register routers init")
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
 	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
@@ -180,6 +176,7 @@ func Start(configPath string) {
 		}
 	}()
 
+	router.SetInitStageForHealthChecker("Register routers init")
 	router.DebugRouter(r, m, g)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)

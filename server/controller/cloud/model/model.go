@@ -483,7 +483,7 @@ type SubDomainResource struct {
 }
 
 type Resource struct {
-	Verified               bool `json:"verified"`
+	Verified               bool
 	ErrorState             int
 	ErrorMessage           string
 	SubDomains             []SubDomain
