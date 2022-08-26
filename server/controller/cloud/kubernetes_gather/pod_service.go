@@ -133,9 +133,10 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 					return
 				}
 				for i := range labelArray.MustArray() {
-					groupLcuuids := k.nsLabelToGroupLcuuids[namespace+labelArray.GetIndex(i).MustString()]
-					if groupLcuuids.Cardinality() > 0 {
-						podGroupLcuuids.Add(groupLcuuids)
+					if groupLcuuids, ok := k.nsLabelToGroupLcuuids[namespace+labelArray.GetIndex(i).MustString()]; ok {
+						if groupLcuuids.Cardinality() > 0 {
+							podGroupLcuuids.Add(groupLcuuids)
+						}
 					}
 				}
 			}
