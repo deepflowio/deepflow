@@ -19,8 +19,11 @@ use std::str;
 use arc_swap::access::Access;
 use log::info;
 use regex::Regex;
+use serde::Serialize;
 
-use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
+use super::{
+    consts::*, value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus,
+};
 use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
@@ -32,20 +35,31 @@ use crate::proto::flow_log;
 use crate::utils::bytes::read_u32_be;
 use crate::utils::net::h2pack;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
+    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub stream_id: u32,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub version: String,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub trace_id: String,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub span_id: String,
 
+    #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub method: String,
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub path: String,
+    #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
     pub host: String,
+    #[serde(rename = "http_proxy_client", skip_serializing_if = "value_is_default")]
     pub client_ip: String,
+    #[serde(skip_serializing_if = "value_is_default")]
     pub x_request_id: String,
 
+    #[serde(rename = "request_length", skip_serializing_if = "Option::is_none")]
     pub req_content_length: Option<u64>,
+    #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u64>,
 }
 

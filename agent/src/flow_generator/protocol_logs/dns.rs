@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+use serde::Serialize;
 
 use super::{
-    consts::*, AppProtoHead, AppProtoHeadEnum, AppProtoLogsInfo, AppProtoLogsInfoEnum, L7LogParse,
-    L7ResponseStatus, LogMessageType,
+    consts::*, value_is_default, AppProtoHead, AppProtoHeadEnum, AppProtoLogsInfo,
+    AppProtoLogsInfoEnum, L7LogParse, L7ResponseStatus, LogMessageType,
 };
 
 use crate::proto::flow_log;
@@ -34,16 +35,22 @@ use crate::{
     utils::{bytes::read_u16_be, net::parse_ip_slice},
 };
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct DnsInfo {
+    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub trans_id: u16,
+    #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub query_type: u8,
+    #[serde(skip)]
     pub domain_type: u16,
+
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub query_name: String,
     // 根据查询类型的不同而不同，如：
     // A: ipv4/ipv6地址
     // NS: name server
     // SOA: primary name server
+    #[serde(rename = "response_result", skip_serializing_if = "value_is_default")]
     pub answers: String,
 }
 
