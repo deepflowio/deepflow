@@ -23,6 +23,7 @@ use std::{
 
 use bitflags::bitflags;
 use log::error;
+use serde::Serialize;
 
 use super::environment::get_k8s_local_node_ip;
 
@@ -147,7 +148,7 @@ pub struct Route {
 
 pub const MAC_ADDR_LEN: usize = 6;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy, Hash)]
+#[derive(Serialize, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Copy, Hash)]
 // slice is in bigendian
 pub struct MacAddr([u8; 6]);
 
