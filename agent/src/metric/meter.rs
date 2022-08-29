@@ -299,8 +299,8 @@ pub struct Performance {
     pub retrans_rx: u64,
     pub zero_win_tx: u64,
     pub zero_win_rx: u64,
-    pub retran_syn: u32,
-    pub retran_synack: u32,
+    pub retrans_syn: u32,
+    pub retrans_synack: u32,
 }
 
 impl Performance {
@@ -309,8 +309,8 @@ impl Performance {
         self.retrans_rx += other.retrans_rx;
         self.zero_win_tx += other.zero_win_tx;
         self.zero_win_rx += other.zero_win_rx;
-        self.retran_syn += other.retran_syn;
-        self.retran_synack += other.retran_synack;
+        self.retrans_syn += other.retrans_syn;
+        self.retrans_synack += other.retrans_synack;
     }
 }
 
@@ -321,8 +321,8 @@ impl From<Performance> for metric::Performance {
             retrans_rx: m.retrans_rx,
             zero_win_tx: m.zero_win_tx,
             zero_win_rx: m.zero_win_rx,
-            retran_syn: m.retran_syn,
-            retran_synack: m.retran_synack,
+            retrans_syn: m.retrans_syn,
+            retrans_synack: m.retrans_synack,
         }
     }
 }

@@ -34,6 +34,7 @@ jobs:
           make test && \
           make tools && \
           cd ../../ && \
+          RUSTFLAGS="-D warnings" && \
           cargo check && \
           cargo fmt --all -- --check && \
           cargo test"

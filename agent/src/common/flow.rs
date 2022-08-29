@@ -398,8 +398,8 @@ pub struct TcpPerfStats {
     pub syn_count: u32,
     pub synack_count: u32,
 
-    pub retran_syn_count: u32,
-    pub retran_synack_count: u32,
+    pub retrans_syn_count: u32,
+    pub retrans_synack_count: u32,
 
     pub counts_peers: [TcpPerfCountsPeer; 2],
     pub total_retrans_count: u32,
@@ -428,11 +428,15 @@ impl TcpPerfStats {
         append_key_value(dst, "cit_count", &self.cit_sum.to_string());
         append_key_value(dst, "syn_count", &self.syn_count.to_string());
         append_key_value(dst, "synack_count", &self.synack_count.to_string());
-        append_key_value(dst, "retran_syn_count", &self.retran_syn_count.to_string());
         append_key_value(
             dst,
-            "retran_synack_count",
-            &self.retran_synack_count.to_string(),
+            "retrans_syn_count",
+            &self.retrans_syn_count.to_string(),
+        );
+        append_key_value(
+            dst,
+            "retrans_synack_count",
+            &self.retrans_synack_count.to_string(),
         );
 
         append_key_value(
@@ -489,8 +493,8 @@ impl TcpPerfStats {
         self.syn_count += other.syn_count;
         self.cit_count += other.cit_count;
         self.synack_count += other.synack_count;
-        self.retran_syn_count += other.retran_syn_count;
-        self.retran_synack_count += other.retran_synack_count;
+        self.retrans_syn_count += other.retrans_syn_count;
+        self.retrans_synack_count += other.retrans_synack_count;
         self.counts_peers[0].sequential_merge(&other.counts_peers[0]);
         self.counts_peers[1].sequential_merge(&other.counts_peers[1]);
         self.total_retrans_count += other.total_retrans_count;
