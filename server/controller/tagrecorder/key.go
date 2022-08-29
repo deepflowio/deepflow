@@ -65,6 +65,10 @@ type K8sLabelKey struct {
 	Key   string
 }
 
+type K8sLabelsKey struct {
+	PodID int
+}
+
 type TapTypeKey struct {
 	Value int
 }

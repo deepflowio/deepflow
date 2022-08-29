@@ -279,3 +279,10 @@ type ChK8sLabel struct {
 	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
 	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
 }
+
+type ChK8sLabels struct {
+	PodID   int    `gorm:"primaryKey;column:pod_id;type:int;not null" json:"POD_ID"`
+	Labels  string `gorm:"column:labels;type:text;default:null" json:"LABELS"`
+	L3EPCID int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
+	PodNsID int    `gorm:"column:pod_ns_id;type:int;not null" json:"POD_NS_ID"`
+}
