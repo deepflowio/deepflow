@@ -661,23 +661,28 @@ type Metrics struct {
 	SRTSum       uint32 `json:"srt_sum,omitempty"`
 	ARTSum       uint32 `json:"art_sum,omitempty"`
 	RRTSum       uint64 `json:"rrt_sum,omitempty"`
+	CITSum       uint32 `json:"cit_sum,omitempty"`
 
 	RTTClientCount uint32 `json:"rtt_client_count,omitempty"`
 	RTTServerCount uint32 `json:"rtt_server_count,omitempty"`
 	SRTCount       uint32 `json:"srt_count,omitempty"`
 	ARTCount       uint32 `json:"art_count,omitempty"`
 	RRTCount       uint32 `json:"rrt_count,omitempty"`
+	CITCount       uint32 `json:"cit_count,omitempty"`
 
 	RTTClientMax uint32 `json:"rtt_client_max,omitempty"` // us
 	RTTServerMax uint32 `json:"rtt_server_max,omitempty"` // us
 	SRTMax       uint32 `json:"srt_max,omitempty"`        // us
 	ARTMax       uint32 `json:"art_max,omitempty"`        // us
 	RRTMax       uint32 `json:"rrt_max,omitempty"`        // us
+	CITMax       uint32 `json:"cit_max,omitempty"`        // us
 
 	RetransTx       uint32 `json:"retrans_tx,omitempty"`
 	RetransRx       uint32 `json:"retrans_rx,omitempty"`
 	ZeroWinTx       uint32 `json:"zero_win_tx,omitempty"`
 	ZeroWinRx       uint32 `json:"zero_win_rx,omitempty"`
+	SynCount        uint32 `json:"syn_count,omitempty"`
+	SynackCount     uint32 `json:"synack_count,omitempty"`
 	L7ClientError   uint32 `json:"l7_client_error,omitempty"`
 	L7ServerError   uint32 `json:"l7_server_error,omitempty"`
 	L7ServerTimeout uint32 `json:"l7_server_timeout,omitempty"`
@@ -707,23 +712,28 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("srt_sum", ckdb.Float64),
 	ckdb.NewColumn("art_sum", ckdb.Float64),
 	ckdb.NewColumn("rrt_sum", ckdb.Float64),
+	ckdb.NewColumn("cit_sum", ckdb.Float64),
 
 	ckdb.NewColumn("rtt_client_count", ckdb.UInt64),
 	ckdb.NewColumn("rtt_server_count", ckdb.UInt64),
 	ckdb.NewColumn("srt_count", ckdb.UInt64),
 	ckdb.NewColumn("art_count", ckdb.UInt64),
 	ckdb.NewColumn("rrt_count", ckdb.UInt64),
+	ckdb.NewColumn("cit_count", ckdb.UInt64),
 
 	ckdb.NewColumn("rtt_client_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rtt_server_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 	ckdb.NewColumn("srt_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 	ckdb.NewColumn("art_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 	ckdb.NewColumn("rrt_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
+	ckdb.NewColumn("cit_max", ckdb.UInt32).SetIndex(ckdb.IndexNone).SetComment("单位: 微秒"),
 
 	ckdb.NewColumn("retrans_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("retrans_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("zero_win_tx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("zero_win_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("syn_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("synack_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_client_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_server_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32).SetIndex(ckdb.IndexNone),
@@ -792,6 +802,9 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteFloat64(float64(m.RRTSum)); err != nil {
 		return err
 	}
+	if err := block.WriteFloat64(float64(m.CITSum)); err != nil {
+		return err
+	}
 
 	if err := block.WriteUInt64(uint64(m.RTTClientCount)); err != nil {
 		return err
@@ -806,6 +819,9 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt64(uint64(m.RRTCount)); err != nil {
+		return err
+	}
+	if err := block.WriteUInt64(uint64(m.CITCount)); err != nil {
 		return err
 	}
 
@@ -824,6 +840,9 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(m.RRTMax); err != nil {
 		return err
 	}
+	if err := block.WriteUInt32(m.CITMax); err != nil {
+		return err
+	}
 
 	if err := block.WriteUInt32(m.RetransTx); err != nil {
 		return err
@@ -835,6 +854,12 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt32(m.ZeroWinRx); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.SynCount); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.SynackCount); err != nil {
 		return err
 	}
 	if err := block.WriteUInt32(m.L7ClientError); err != nil {
@@ -1156,11 +1181,15 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		m.RRTSum = p.L7.RrtSum
 		m.RRTCount = p.L7.RrtCount
 
+		m.CITSum = p.Tcp.CitSum
+		m.CITCount = p.Tcp.CitCount
+
 		m.RTTClientMax = p.Tcp.RttClientMax
 		m.RTTServerMax = p.Tcp.RttServerMax
 		m.SRTMax = p.Tcp.SrtMax
 		m.ARTMax = p.Tcp.ArtMax
 		m.RRTMax = p.L7.RrtMax
+		m.CITMax = p.Tcp.CitMax
 
 		if p.Tcp.CountsPeerTx != nil {
 			m.RetransTx = p.Tcp.CountsPeerTx.RetransCount
@@ -1170,6 +1199,8 @@ func (m *Metrics) Fill(f *pb.Flow) {
 			m.RetransRx = p.Tcp.CountsPeerRx.RetransCount
 			m.ZeroWinRx = p.Tcp.CountsPeerRx.ZeroWinCount
 		}
+		m.SynCount = p.Tcp.SynCount
+		m.SynackCount = p.Tcp.SynackCount
 	}
 }
 
