@@ -15,6 +15,7 @@
  */
 
 use std::collections::{HashMap, HashSet};
+#[cfg(target_os = "windows")]
 use std::ffi::CString;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
@@ -28,8 +29,10 @@ use std::time::Duration;
 
 use log::{error, info, warn};
 
+#[cfg(target_os = "windows")]
+use super::error::Error;
 use super::{
-    error::{Error, Result},
+    error::Result,
     recv_engine::{self, bpf, RecvEngine},
     BpfOptions, Options, PacketCounter, Pipeline,
 };

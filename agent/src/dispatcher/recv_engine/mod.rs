@@ -17,14 +17,13 @@
 pub(crate) mod af_packet;
 pub(crate) mod bpf;
 
+#[cfg(target_os = "windows")]
 use std::ffi::CStr;
 use std::sync::{atomic::AtomicU64, Arc};
 use std::time::Duration;
 
-use thiserror::Error;
-
 #[cfg(target_os = "linux")]
-use af_packet::{options::Options, tpacket::Tpacket, OptTpacketVersion};
+use af_packet::{options::Options, tpacket::Tpacket};
 pub use public::error::{Error, Result};
 use public::packet;
 

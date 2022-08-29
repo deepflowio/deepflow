@@ -19,13 +19,12 @@ use std::io;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc, Condvar, Mutex, Weak,
+    Arc, Condvar, Mutex,
 };
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use cadence::{
-    ext::{MetricValue, ToCounterValue, ToGaugeValue},
     Counted, Metric, MetricBuilder, MetricError, MetricResult, MetricSink, StatsdClient,
 };
 use log::{debug, info, warn};

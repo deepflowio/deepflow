@@ -38,6 +38,8 @@ use super::{
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 
+#[cfg(target_os = "windows")]
+use crate::utils::net::links_by_name_regex;
 use crate::{
     common::decapsulate::TunnelTypeBitmap,
     dispatcher::recv_engine,
@@ -50,9 +52,9 @@ use crate::{
     },
     trident::Components,
     utils::{
-        environment::{free_memory_check, get_k8s_local_node_ip, is_tt_workload},
+        environment::free_memory_check,
         logger::RemoteLogConfig,
-        net::{get_ctrl_ip_and_mac, get_route_src_ip, links_by_name_regex, MacAddr},
+        net::{get_ctrl_ip_and_mac, MacAddr},
     },
 };
 #[cfg(target_os = "linux")]
@@ -60,7 +62,7 @@ use crate::{
     common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US},
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
-    utils::{cgroups::Cgroups, environment::is_tt_pod},
+    utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
 };
 
 const MB: u64 = 1048576;

@@ -16,19 +16,11 @@
 
 //! Enterprise Edition Feature: windows-dispatcher
 
-use std::{
-    slice::from_raw_parts_mut,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    thread,
-    time::Duration,
-};
+use std::sync::{atomic::AtomicU64, Arc};
 
-use ::pcap::{Active, Capture, Device};
+use ::pcap::{Active, Capture};
 use public::counter;
-use public::error::{Error, Result};
+use public::error::Result;
 use public::packet;
 
 #[derive(Default)]

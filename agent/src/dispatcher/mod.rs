@@ -23,6 +23,7 @@ mod analyzer_mode_dispatcher;
 mod local_mode_dispatcher;
 mod mirror_mode_dispatcher;
 
+#[cfg(target_os = "windows")]
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
@@ -34,6 +35,7 @@ use std::time::Duration;
 #[cfg(target_os = "linux")]
 use libc::c_int;
 use log::{debug, error, info, warn};
+#[cfg(target_os = "linux")]
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
 
 use analyzer_mode_dispatcher::AnalyzerModeDispatcher;
@@ -60,10 +62,10 @@ use crate::{
         LeakyBucket,
     },
 };
-use recv_engine::{af_packet::bpf::*, bpf, RecvEngine};
+use recv_engine::RecvEngine;
 #[cfg(target_os = "linux")]
 use recv_engine::{
-    af_packet::{self, BpfSyntax, OptTpacketVersion, Tpacket},
+    af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, Tpacket},
     DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 #[cfg(target_os = "windows")]

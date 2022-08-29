@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, fmt, fs, io, net::IpAddr, os::unix::io::AsRawFd, time::Duration};
+use std::{collections::HashMap, fs, io, os::unix::io::AsRawFd, time::Duration};
 
 use enum_dispatch::enum_dispatch;
 use nix::sched::{setns, CloneFlags};
-
-use crate::utils::net::MacAddr;
 
 mod active_poller;
 mod api_watcher;

@@ -95,7 +95,10 @@ impl LocalModeDispatcher {
                 base.check_and_update_bpf();
                 continue;
             }
+            #[cfg(target_os = "windows")]
             let (mut packet, mut timestamp) = recved.unwrap();
+            #[cfg(target_os = "linux")]
+            let (packet, mut timestamp) = recved.unwrap();
 
             let pipeline = {
                 let pipelines = base.pipelines.lock().unwrap();
