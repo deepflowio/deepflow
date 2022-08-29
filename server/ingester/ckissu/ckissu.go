@@ -364,6 +364,55 @@ var ColumnMod611 = []*ColumnMod{
 	},
 }
 
+var u64ColumnNameAdd612 = []string{"syn_count", "synack_count", "retrans_syn", "retrans_synack", "cit_count"}
+var u32ColumnNameAdd612 = []string{"cit_max"}
+var f64ColumnNameAdd612 = []string{"cit_sum"}
+var flowMetricsTableAdd612 = []string{
+	"vtap_flow_port.1m", "vtap_flow_port.1m_local",
+	"vtap_flow_port.1s", "vtap_flow_port.1s_local",
+	"vtap_flow_edge_port.1m", "vtap_flow_edge_port.1m_local",
+	"vtap_flow_edge_port.1s", "vtap_flow_edge_port.1s_local",
+}
+
+var ColumnAdd612 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"cit_max", "syn_count", "synack_count"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"cit_count"},
+		ColumnType:  ckdb.UInt64,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"cit_sum"},
+		ColumnType:  ckdb.Float64,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd612,
+		ColumnNames: u64ColumnNameAdd612,
+		ColumnType:  ckdb.UInt64,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd612,
+		ColumnNames: u32ColumnNameAdd612,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd612,
+		ColumnNames: f64ColumnNameAdd612,
+		ColumnType:  ckdb.Float64,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -491,39 +540,28 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 	dones := []*ColumnAdd{}
 
 	columnAdds := []*ColumnAdd{}
-	var columnAddss = []*ColumnAdds{
+	var columnAddss612 = []*ColumnAdds{
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_id", "resource_gl1_id", "resource_gl2_id"},
+			ColumnNames: u32ColumnNameAdd612,
 			ColumnType:  ckdb.UInt32,
 		},
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type"},
-			ColumnType:  ckdb.UInt8,
-		},
-	}
-	var columnAddssEdge = []*ColumnAdds{
-		&ColumnAdds{
-			Dbs:         []string{d.db},
-			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_id_0", "resource_gl1_id_0", "resource_gl2_id_0", "resource_gl0_id_1", "resource_gl1_id_1", "resource_gl2_id_1"},
-			ColumnType:  ckdb.UInt32,
+			ColumnNames: u64ColumnNameAdd612,
+			ColumnType:  ckdb.UInt64,
 		},
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
-			ColumnType:  ckdb.UInt8,
+			ColumnNames: f64ColumnNameAdd612,
+			ColumnType:  ckdb.Float64,
 		},
-	}
-	if strings.Contains(d.db, "_edge") {
-		columnAddss = columnAddssEdge
 	}
 
-	for _, adds := range columnAddss {
+	for _, adds := range columnAddss612 {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 
@@ -601,14 +639,10 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	}
 
 	columnAdds := []*ColumnAdd{}
-	for _, adds := range ColumnAdd611 {
+	for _, adds := range ColumnAdd612 {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 	i.columnAdds = columnAdds
-	i.columnMods = ColumnMod611
-	i.tableRenames = TableRenames611
-	// 610版本无字段名字变更
-	// i.columnRenames = ColumnRename610
 
 	var err error
 	i.primaryConnection, err = common.NewCKConnection(primaryAddr, username, password)
