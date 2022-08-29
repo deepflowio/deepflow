@@ -55,6 +55,7 @@ const (
 
 const (
 	RESOURCE_TYPE_CH_K8S_LABEL   = "ch_k8s_label"
+	RESOURCE_TYPE_CH_K8S_LABELS  = "ch_k8s_labels"
 	RESOURCE_TYPE_CH_REGION      = "ch_region"
 	RESOURCE_TYPE_CH_AZ          = "ch_az"
 	RESOURCE_TYPE_CH_VPC         = "ch_vpc"
@@ -97,6 +98,7 @@ const (
 	CH_DICTIONARY_VTAP          = "vtap_map"
 	CH_DICTIONARY_LB_LISTENER   = "lb_listener_map"
 	CH_DICTIONARY_K8S_LABEL     = "k8s_label_map"
+	CH_DICTIONARY_K8S_LABELS    = "k8s_labels_map"
 
 	CH_DICTIONARY_POD_NODE_PORT  = "pod_node_port_map"
 	CH_DICTIONARY_POD_GROUP_PORT = "pod_group_port_map"
@@ -300,6 +302,17 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_K8S_LABELS_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `pod_id` UInt64,\n" +
+		"    `labels` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `pod_ns_id` UInt64\n" +
+		")\n" +
+		"PRIMARY KEY pod_id\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
 	CREATE_IP_RESOURCE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
 		"(\n" +
 		"    `ip` String,\n" +
@@ -415,6 +428,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_LB_LISTENER:    CREATE_ID_NAME_DICTIONARY_SQL,
 	CH_DICTIONARY_POD_INGRESS:    CREATE_ID_NAME_DICTIONARY_SQL,
 	CH_DICTIONARY_K8S_LABEL:      CREATE_K8S_LABEL_DICTIONARY_SQL,
+	CH_DICTIONARY_K8S_LABELS:     CREATE_K8S_LABELS_DICTIONARY_SQL,
 	CH_DICTIONARY_IP_RESOURCE:    CREATE_IP_RESOURCE_DICTIONARY_SQL,
 }
 
