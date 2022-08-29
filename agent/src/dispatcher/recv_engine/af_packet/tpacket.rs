@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{io, time::Duration};
+use std::io;
 
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, size_t, sockaddr,
