@@ -114,8 +114,8 @@ message Performance {
     uint64 retrans_rx = 2;
     uint64 zero_win_tx = 3;
     uint64 zero_win_rx = 4;
-    uint32 retran_syn = 5;
-    uint32 retran_synack = 6;
+    uint32 retrans_syn = 5;
+    uint32 retrans_synack = 6;
 }
 
 message Anomaly {

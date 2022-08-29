@@ -426,8 +426,8 @@ struct PeriodPerfData {
     synack: u32,
 
     // Retran SYN SYN_ACK count
-    retran_syn: u32,
-    retran_synack: u32,
+    retrans_syn: u32,
+    retrans_synack: u32,
 
     updated: bool,
 }
@@ -517,12 +517,12 @@ impl PerfData {
     }
 
     fn calc_retran_syn(&mut self) {
-        self.period_data.retran_syn += 1;
+        self.period_data.retrans_syn += 1;
         self.period_data.updated = true;
     }
 
-    fn calc_retran_synack(&mut self) {
-        self.period_data.retran_synack += 1;
+    fn calc_retrans_synack(&mut self) {
+        self.period_data.retrans_synack += 1;
         self.period_data.updated = true;
     }
 
@@ -572,8 +572,8 @@ impl PerfData {
 
         stats.syn_count = pd.syn;
         stats.synack_count = pd.synack;
-        stats.retran_syn_count = pd.retran_syn;
-        stats.retran_synack_count = pd.retran_synack;
+        stats.retrans_syn_count = pd.retrans_syn;
+        stats.retrans_synack_count = pd.retrans_synack;
 
         if !flow_reversed {
             if pd.art_1.updated {
@@ -652,7 +652,7 @@ impl TcpPerf {
                 }
             } else {
                 self.perf_data.calc_retrans_syn(fpd);
-                self.perf_data.calc_retran_synack();
+                self.perf_data.calc_retrans_synack();
             }
             return (false, false);
         }
@@ -911,7 +911,7 @@ impl TcpPerf {
         if p.is_syn_ack() {
             // calculate established state retran synack
             if is_retrans {
-                self.perf_data.calc_retran_synack();
+                self.perf_data.calc_retrans_synack();
             }
             self.perf_data.calc_synack();
         }
