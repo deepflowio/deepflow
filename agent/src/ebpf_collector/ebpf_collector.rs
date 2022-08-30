@@ -109,7 +109,6 @@ impl SessionAggr {
             debug!("ebpf_collector out omit: {}", log);
             return;
         }
-        println!("send: {:#?}", log);
         debug!("ebpf_collector out: {}", log);
         if !self.log_rate.acquire(1) {
             self.counter.counter().throttle_drop += 1;

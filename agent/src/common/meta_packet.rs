@@ -43,8 +43,10 @@ use super::{
 
 #[cfg(target_os = "linux")]
 use crate::ebpf::{
-    EbpfType, MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND,
+    EbpfType, GO_HTTP2_UPROBE, MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2,
+    SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
 };
+
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
@@ -838,12 +840,20 @@ impl<'a> MetaPacket<'a> {
         packet.tcp_data.seq = data.tcp_seq as u32;
         packet.ebpf_type = EbpfType::from(data.source);
         packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
-        packet.direction = PacketDirection::from(data.msg_type);
-        if data.msg_type == MSG_REQUEST_END {
-            packet.is_request_end = true;
-        }
-        if data.msg_type == MSG_RESPONSE_END {
-            packet.is_response_end = true;
+
+        // 目前只有 go uprobe http2 的方向判断能确保准确
+        if data.source == GO_HTTP2_UPROBE {
+            if data.l7_protocol_hint == SOCK_DATA_HTTP2
+                || data.l7_protocol_hint == SOCK_DATA_TLS_HTTP2
+            {
+                packet.direction = PacketDirection::from(data.msg_type);
+                if data.msg_type == MSG_REQUEST_END {
+                    packet.is_request_end = true;
+                }
+                if data.msg_type == MSG_RESPONSE_END {
+                    packet.is_response_end = true;
+                }
+            }
         }
         return Ok(packet);
     }
