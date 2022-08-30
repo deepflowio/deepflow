@@ -10,6 +10,7 @@ controller:
   grpc-port: 20035
   # grpc max message lenth default 100M
   grpc-max-message-length: 104857600
+  election: false
 
   # deepflow web service config
   df-web-service:
