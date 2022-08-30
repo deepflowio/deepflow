@@ -1,1 +1,5 @@
-initctl stop deepflow-agent
+#!/bin/sh
+
+if pgrep -x trident >/dev/null 2>&1; then
+    initctl stop deepflow-agent
+fi
