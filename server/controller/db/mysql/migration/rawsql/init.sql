@@ -965,7 +965,7 @@ CREATE TABLE IF NOT EXISTS `resource_group` (
   `business_id`             INTEGER NOT NULL,
   `lcuuid`                  VARCHAR(64) NOT NULL,
   `name`                    VARCHAR(200) NOT NULL DEFAULT '',
-  `type`                    INTEGER NOT NULL COMMENT '3: anonymous vm, 4: anonymous ip, 6: anonymous pod_group, 8: anonymous pod_service, 81: anonymous pod_service as pod_group, 14: anonymous vl2',
+  `type`                    INTEGER NOT NULL COMMENT '3: anonymous vm, 4: anonymous ip, 5: anonymous pod, 6: anonymous pod_group, 8: anonymous pod_service, 81: anonymous pod_service as pod_group, 14: anonymous vl2',
   `ip_type`                 INTEGER COMMENT '1: single ip, 2: ip range, 3: cidr, 4.mix [1, 2, 3]',
   `ips`                     TEXT COMMENT 'ips separated by ,',
   `vm_ids`                  TEXT COMMENT 'vm ids separated by ,',
@@ -983,7 +983,7 @@ CREATE TABLE IF NOT EXISTS `resource_group` (
 
 CREATE TABLE IF NOT EXISTS resource_group_extra_info (
     id                     INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    resource_type          INTEGER NOT NULL COMMENT '1: epc, 2: vm, 3: pod_service, 4: pod_group, 5: vl2, 6: pod_cluster',
+    resource_type          INTEGER NOT NULL COMMENT '1: epc, 2: vm, 3: pod_service, 4: pod_group, 5: vl2, 6: pod_cluster, 7: pod',
     resource_id            INTEGER NOT NULL,
     resource_sub_type      INTEGER,
     pod_namespace_id       INTEGER,
@@ -998,6 +998,7 @@ CREATE TABLE IF NOT EXISTS npb_policy (
     business_id            INTEGER NOT NULL,
     vni                    INTEGER,
     npb_tunnel_id          INTEGER,
+    distribute             TINYINT(1) DEFAULT 1 COMMENT '0-drop, 1-distribute',
     payload_slice          INTEGER DEFAULT NULL,
     acl_id                 INTEGER,
     policy_acl_group_id    INTEGER,
