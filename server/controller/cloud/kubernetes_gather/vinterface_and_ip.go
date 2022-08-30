@@ -272,7 +272,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			pSlisce := []ipaddr.Prefix{*v4ipNet, *v4CIDR}
 			v4AggCIDR := ipaddr.Supernet(pSlisce)
 			intersecFlag4 := false
-			if v4AggCIDR == nil {
+			v4AggCIDRMask, _ := v4AggCIDR.IPNet.Mask.Size()
+			if v4AggCIDR == nil || v4AggCIDRMask < k.PodNetIPv4CIDRMaxMask {
 				continue
 			}
 			for _, cidr := range existCIDR {
@@ -281,20 +282,15 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				}
 				eCIDR := ipaddr.NewPrefix(cidr.IPNet())
 				// 如果聚合出来的cidr与已有的cidr有交集，则按规则重新聚合
-				if len(eCIDR.Exclude(v4AggCIDR)) != 0 || len(v4AggCIDR.Exclude(eCIDR)) != 0 {
+				if v4AggCIDR.Overlaps(eCIDR) {
 					intersecFlag4 = true
 					break
 				}
 			}
 			if !intersecFlag4 {
-				v4AggCIDRMask, _ := v4AggCIDR.IPNet.Mask.Size()
-				if v4AggCIDRMask >= k.PodNetIPv4CIDRMaxMask {
-					noMaskPodV4CIDRs[i] = v4AggCIDR
-					aggFlag4 = true
-					break
-				} else {
-					continue
-				}
+				noMaskPodV4CIDRs[i] = v4AggCIDR
+				aggFlag4 = true
+				break
 			}
 		}
 		if !aggFlag4 {
@@ -311,7 +307,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 			pSlisce := []ipaddr.Prefix{*v6ipNet, *v6CIDR}
 			v6AggCIDR := ipaddr.Supernet(pSlisce)
 			intersecFlag6 := false
-			if v6AggCIDR == nil {
+			v6AggCIDRMask, _ := v6AggCIDR.IPNet.Mask.Size()
+			if v6AggCIDR == nil || v6AggCIDRMask < k.PodNetIPv6CIDRMaxMask {
 				continue
 			}
 			for _, cidr := range existCIDR {
@@ -319,20 +316,15 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 					continue
 				}
 				eCIDR := ipaddr.NewPrefix(cidr.IPNet())
-				if len(eCIDR.Exclude(v6AggCIDR)) != 0 || len(v6AggCIDR.Exclude(eCIDR)) != 0 {
+				if v6CIDR.Overlaps(eCIDR) {
 					intersecFlag6 = true
 					break
 				}
 			}
 			if !intersecFlag6 {
-				v6AggCIDRMask, _ := v6AggCIDR.IPNet.Mask.Size()
-				if v6AggCIDRMask >= k.PodNetIPv6CIDRMaxMask {
-					noMaskPodV6CIDRs[i] = v6AggCIDR
-					aggFlag6 = true
-					break
-				} else {
-					continue
-				}
+				noMaskPodV6CIDRs[i] = v6AggCIDR
+				aggFlag6 = true
+				break
 			}
 		}
 		if !aggFlag6 {
