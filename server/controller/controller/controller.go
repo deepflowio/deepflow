@@ -32,6 +32,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/db/redis"
+	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/manager"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
@@ -126,6 +127,10 @@ func Start(ctx context.Context, configPath string) {
 	// 启动trisolaris
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
+
+	if cfg.Election == true {
+		go election.Start(ctx, cfg)
+	}
 
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
