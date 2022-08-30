@@ -83,7 +83,9 @@ pub const TRACER_RUNNING: u8 = 1;
 #[allow(dead_code)]
 pub const TRACER_STOP: u8 = 2;
 
-//消息类型
+// 消息类型
+// 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
+// go http2 uprobe 目前 只用了MSG_RESPONSE_END, 用于判断流结束.
 #[allow(dead_code)]
 pub const MSG_REQUEST: u8 = 1;
 #[allow(dead_code)]
@@ -146,6 +148,7 @@ pub struct SK_BPF_DATA {
     pub socket_id: u64,
     pub l7_protocol_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
     // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
+    // 目前只有 source=EBPF_TYPE_GO_HTTP2_UPROBE 时,msg_type的判断是准确的.
     pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
     pub need_reconfirm: bool, // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
     // false: 表示eBPF程序对L7协议类型的判断是有把握的不需要上层重新核实。

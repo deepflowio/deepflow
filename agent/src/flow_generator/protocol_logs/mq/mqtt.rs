@@ -314,7 +314,7 @@ impl L7LogParse for MqttLog {
         &mut self,
         payload: &[u8],
         proto: IpProtocol,
-        direction: PacketDirection,
+        _direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
