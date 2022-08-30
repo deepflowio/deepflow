@@ -18,8 +18,8 @@ TcpPerfStats {
     art_count: 1,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -53,8 +53,8 @@ TcpPerfStats {
     art_count: 0,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -88,8 +88,8 @@ TcpPerfStats {
     art_count: 0,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -122,8 +122,8 @@ TcpPerfStats {
     art_count: 1,
     syn_count: 0,
     synack_count: 0,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -157,8 +157,8 @@ TcpPerfStats {
     art_count: 0,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -191,8 +191,8 @@ TcpPerfStats {
     art_count: 1,
     syn_count: 0,
     synack_count: 0,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -226,8 +226,8 @@ TcpPerfStats {
     art_count: 0,
     syn_count: 0,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -260,8 +260,8 @@ TcpPerfStats {
     art_count: 1,
     syn_count: 0,
     synack_count: 0,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -295,8 +295,8 @@ TcpPerfStats {
     art_count: 0,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -329,8 +329,8 @@ TcpPerfStats {
     art_count: 1,
     syn_count: 0,
     synack_count: 0,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -364,8 +364,8 @@ TcpPerfStats {
     art_count: 0,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -398,8 +398,8 @@ TcpPerfStats {
     art_count: 1,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 1,
-    retran_synack_count: 1,
+    retrans_syn_count: 1,
+    retrans_synack_count: 1,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 1,
@@ -433,8 +433,8 @@ TcpPerfStats {
     art_count: 0,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 0,
-    retran_synack_count: 0,
+    retrans_syn_count: 0,
+    retrans_synack_count: 0,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 0,
@@ -467,8 +467,8 @@ TcpPerfStats {
     art_count: 1,
     syn_count: 1,
     synack_count: 1,
-    retran_syn_count: 1,
-    retran_synack_count: 1,
+    retrans_syn_count: 1,
+    retrans_synack_count: 1,
     counts_peers: [
         TcpPerfCountsPeer {
             retrans_count: 1,
