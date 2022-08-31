@@ -460,6 +460,7 @@ impl TcpPerfStats {
             &self.counts_peers[1].zero_win_count.to_string(),
         );
     }
+
     pub fn sequential_merge(&mut self, other: &TcpPerfStats) {
         if self.rtt_client_max < other.rtt_client_max {
             self.rtt_client_max = other.rtt_client_max;
