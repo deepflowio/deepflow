@@ -781,7 +781,9 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	// 'socket_id' used to resolve non-tracing between the same socket
 	__u64 socket_id = 0;
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		socket_id = ++trace_uid->socket_id;
+		// Not use "++trace_uid->socket_id" here,
+		// because it did not pass the verification of linux 4.14.x, 4.15.x
+		socket_id = trace_uid->socket_id + 1;
 	} else {
 		socket_id = socket_info_ptr->uid;
 	}
@@ -798,7 +800,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
-		sk_info.uid = socket_id;
+		sk_info.uid = trace_uid->socket_id + 1;
+		trace_uid->socket_id++; // Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = conn_info->role;
