@@ -372,8 +372,11 @@ impl L7LogParse for MqttLog {
     }
 }
 
-/// 尽力而为解析判断是否为mqtt报文
-/// pest effort parsing to determine whether it is an mqtt packet
+/// 尽力而为解析判断是否为mqtt报文, 因为"不依赖端口判断协议实现"要求首个请求包返回true，其他为false，
+/// 所以只判断是不是合法Connect包
+/// pest effort parsing to determine whether it is an mqtt packet, because "judging protocol implementation
+/// independent of protocol port" requires the first request packet to return true, the others are false,
+/// so only judge whether it is a legitimate "Connect" packet
 pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.proto != IpProtocol::Tcp {
         *bitmap &= !(1 << u8::from(L7Protocol::Mqtt));
@@ -384,94 +387,25 @@ pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
         Some(p) => p,
         None => return false,
     };
-    loop {
-        let (input, header) = match mqtt_fixed_header(payload) {
-            Ok(p) => p,
+
+    let (input, header) = match mqtt_fixed_header(payload) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+
+    if let PacketKind::Connect = header.kind {
+        let data = bytes::complete::take(header.remaining_length as u32);
+        let version = match data.and_then(parse_connect_packet).parse(input) {
+            Ok((_, (version, _))) => version,
             Err(_) => return false,
         };
-
-        match header.kind {
-            PacketKind::Connect => {
-                let data = bytes::complete::take(header.remaining_length as u32);
-                let version = match data.and_then(parse_connect_packet).parse(input) {
-                    Ok((_, (version, _))) => version,
-                    Err(_) => return false,
-                };
-                if version < 3 || version > 5 {
-                    return false;
-                }
-            }
-            PacketKind::Connack => {
-                let input = match parse_connack_packet(input) {
-                    Ok((input, _)) => input,
-                    Err(_) => return false,
-                };
-                // payload = 0
-                if input.len() != 0 {
-                    return false;
-                }
-            }
-            PacketKind::Publish { dup, qos, .. } => {
-                if dup && qos == QualityOfService::AtMostOnce {
-                    debug!("mqtt publish packet has invalid dup flags={}", dup);
-                    return false;
-                }
-            }
-            PacketKind::Subscribe => {
-                if mqtt_packet_identifier
-                    .and(mqtt_subscription_requests)
-                    .parse(input)
-                    .is_err()
-                {
-                    return false;
-                }
-            }
-            PacketKind::Suback => {
-                if mqtt_packet_identifier
-                    .and(mqtt_subscription_acks)
-                    .parse(input)
-                    .is_err()
-                {
-                    return false;
-                }
-            }
-            PacketKind::Unsubscribe => {
-                if mqtt_packet_identifier
-                    .and(mqtt_unsubscription_requests)
-                    .parse(input)
-                    .is_err()
-                {
-                    return false;
-                }
-            }
-            PacketKind::Pingreq | PacketKind::Pingresp | PacketKind::Disconnect => {
-                // payload = 0
-                if header.remaining_length != 0 {
-                    return false;
-                }
-            }
-            PacketKind::Pubcomp
-            | PacketKind::Pubrec
-            | PacketKind::Puback
-            | PacketKind::Unsuback
-            | PacketKind::Pubrel => {
-                // minus variable header, payload = 0
-                // 减掉可变头部, 有效payload = 0
-                if header.remaining_length - 2 != 0 {
-                    return false;
-                }
-            }
-        }
-
-        let remaining_length = header.remaining_length as usize;
-        if input.len() < remaining_length {
+        if version < 3 || version > 5 {
             return false;
         }
-        if input.len() == remaining_length {
-            return true;
-        }
-        payload = &input[remaining_length..];
+        return true;
     }
+
+    false
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
