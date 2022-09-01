@@ -43,6 +43,10 @@ func (a *Aliyun) get{{$typed_name}}Response(region string, request *{{$service}}
 		}
 
 		if response.GetHttpStatus() != 200 {
+			if response.GetHttpStatus() == 403 || response.GetHttpStatus() == 400 {
+				log.Info(response.GetHttpContentString())
+				break
+            }
 			return make([]*simplejson.Json, 0), errors.New(response.GetHttpContentString())
 		}
 

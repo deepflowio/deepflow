@@ -157,8 +157,8 @@ l4_log_tap_types: 0
 l7_log_store_tap_types: 0
 # 数据集成HTTP代理，默认值：0，表示关闭，可选址：0表示关闭/1表示开启
 external_agent_http_proxy_enabled: 0
-# 数据集成HTTP代理端口，默认值：8086，可选值：1-65535
-external_agent_http_proxy_port: 8086
+# 数据集成HTTP代理端口，默认值：38086，可选值：1-65535
+external_agent_http_proxy_port: 38086
 
 # 包分发功能开关
 # 全局去重，默认值：1，表示开启，可选值：0表示关闭/1表示开启
