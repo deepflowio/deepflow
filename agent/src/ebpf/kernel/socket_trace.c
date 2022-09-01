@@ -808,8 +808,9 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	// (jiping) set thread_trace_id = 0 for go process
 	if (conn_info->message_type != MSG_PRESTORE &&
-	    conn_info->message_type != MSG_RECONFIRM &&
-	    extra->source != DATA_SOURCE_GO_HTTP2_UPROBE && !get_go_version())
+	    conn_info->message_type != MSG_RECONFIRM && !get_go_version() &&
+	    // Make the old version validator happy
+	    extra->source != DATA_SOURCE_GO_HTTP2_UPROBE)
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
 			      trace_info_ptr, trace_uid, trace_stats,
 			      &thread_trace_id, time_stamp);
@@ -854,7 +855,11 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
+	}
 
+	if (is_socket_info_valid(socket_info_ptr) &&
+	    // Make the old version validator happy
+	    extra->source != DATA_SOURCE_GO_HTTP2_UPROBE) {
 		/*
 		 * 同方向多个连续请求或回应的场景时，
 		 * 保持捕获数据的序列号保持不变。
