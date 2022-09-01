@@ -1827,6 +1827,15 @@ CREATE TABLE IF NOT EXISTS ch_k8s_label (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_k8s_label;
 
+CREATE TABLE IF NOT EXISTS ch_k8s_labels (
+    `pod_id`        INTEGER NOT NULL PRIMARY KEY,
+    `labels`        TEXT,
+    `l3_epc_id`     INTEGER,
+    `pod_ns_id`     INTEGER,
+    `updated_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_k8s_labels;
+
 CREATE TABLE IF NOT EXISTS ch_pod_node_port (
     id                      INTEGER NOT NULL,
     protocol                INTEGER NOT NULL,
