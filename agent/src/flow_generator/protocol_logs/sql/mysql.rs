@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-use regex::Regex;
-
 use super::super::{
     consts::*, AppProtoHead, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol,
     L7ResponseStatus, LogMessageType,
@@ -143,7 +141,7 @@ impl MysqlLog {
         }
         self.info.command = payload[COMMAND_OFFSET];
         match self.info.command {
-            COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_FETCH_AND_CLOSE => (),
+            COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_CLOSE | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
                 self.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..]);
             }
@@ -358,15 +356,9 @@ pub fn mysql_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
 
     let protocol_version_or_query_type = payload[offset];
     match protocol_version_or_query_type {
-        COM_QUERY => {
+        COM_QUERY | COM_STMT_PREPARE => {
             let context = mysql_string(&payload[offset + 1..]);
             return context.is_ascii();
-        }
-        n if 8 <= n && n <= 20 => {
-            let max_len = payload.len().min(offset + 8);
-            let context = mysql_string(&payload[offset + 1..max_len]);
-            let regex = Regex::new("^[0-9\\.]{3,}").unwrap();
-            return regex.is_match(context.as_str());
         }
         _ => {}
     }
