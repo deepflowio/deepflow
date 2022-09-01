@@ -312,17 +312,12 @@ impl FlowItem {
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         let l4_protocol = packet.lookup_key.proto;
         let l7_protocol = app_table.get_protocol_from_ebpf(packet, local_epc, remote_epc);
-        let mut is_from_app = l7_protocol.is_some();
-        let (mut l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
+        let is_from_app = l7_protocol.is_some();
+        let (l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
         let mut protocol_bitmap = u128::from(l4_protocol);
         if packet.l7_protocol_from_ebpf == L7Protocol::Http1TLS {
             protocol_bitmap |= 1 << u8::from(L7Protocol::Http1TLS);
             protocol_bitmap &= !(1 << u8::from(L7Protocol::Http1));
-        }
-
-        if packet.lookup_key.is_loopback_packet() {
-            is_from_app = true;
-            l7_protocol = packet.l7_protocol_from_ebpf;
         }
 
         FlowItem {
