@@ -1,4 +1,4 @@
-MysqlInfo { protocol_version: 10, server_version: "8.0.26", server_thread_id: 23949439, command: 0, context: "", response_code: 0, error_code: 0, affected_rows: 0, error_message: "" } is_mysql: true
+MysqlInfo { protocol_version: 10, server_version: "8.0.26", server_thread_id: 23949439, command: 0, context: "", response_code: 0, error_code: 0, affected_rows: 0, error_message: "" } is_mysql: false
 MysqlInfo { protocol_version: 0, server_version: "", server_thread_id: 0, command: 0, context: "", response_code: 0, error_code: 0, affected_rows: 0, error_message: "" } is_mysql: false
 MysqlInfo { protocol_version: 0, server_version: "", server_thread_id: 0, command: 0, context: "", response_code: 0, error_code: 0, affected_rows: 0, error_message: "" } is_mysql: false
 MysqlInfo { protocol_version: 0, server_version: "", server_thread_id: 0, command: 3, context: "select @@version_comment limit 1", response_code: 0, error_code: 0, affected_rows: 0, error_message: "" } is_mysql: true
