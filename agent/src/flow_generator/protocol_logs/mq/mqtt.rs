@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, fmt, net::IpAddr};
+use std::{collections::HashMap, fmt};
 
 use log::{debug, warn};
 use nom::{
@@ -36,39 +36,6 @@ use crate::{
     flow_generator::error::{Error, Result},
     proto::flow_log::{self, MqttTopic},
 };
-
-// 因为有些包没有带客户端ID，然而客户端跟服务端是长连接，可以用四元组构造MQTT_ID去索引客户端ID
-// 四元组格式：(src_ip, dst_ip, src_port, dst_port)
-// =================
-// Because some packets do not have a client ID, but the client and the server
-// have a long connection, you can use a quadruple to construct MQTT_ID to index the client ID
-// quadruple：(src_ip, dst_ip, src_port, dst_port)
-pub fn generate_mqtt_id(src_addr: IpAddr, dst_addr: IpAddr, src_port: u16, dst_port: u16) -> u64 {
-    let ip_hash = {
-        let (src, dst) = match (src_addr, dst_addr) {
-            (IpAddr::V4(s), IpAddr::V4(d)) => (
-                u32::from_le_bytes(s.octets()),
-                u32::from_le_bytes(d.octets()),
-            ),
-            (IpAddr::V6(s), IpAddr::V6(d)) => {
-                let (src, dst) = (s.octets(), d.octets());
-                src.chunks(4)
-                    .zip(dst.chunks(4))
-                    .fold((0, 0), |(hash1, hash2), (b1, b2)| {
-                        (
-                            hash1 ^ u32::from_le_bytes(b1.try_into().unwrap()),
-                            hash2 ^ u32::from_le_bytes(b2.try_into().unwrap()),
-                        )
-                    })
-            }
-            _ => unreachable!(),
-        };
-        src ^ dst
-    };
-
-    let port_hash = (dst_port as u64) << 16 | src_port as u64;
-    (ip_hash as u64) << 32 | port_hash
-}
 
 #[derive(Clone, Debug)]
 pub struct MqttInfo {
@@ -153,13 +120,8 @@ impl MqttLog {
         mut special_info: AppProtoLogsInfo,
         base_info: AppProtoLogsBaseInfo,
     ) -> Result<AppProtoLogsData> {
-        let key = generate_mqtt_id(
-            base_info.ip_src,
-            base_info.ip_dst,
-            base_info.port_src,
-            base_info.port_dst,
-        );
         if let AppProtoLogsInfo::Mqtt(ref mut info) = special_info {
+            let key = base_info.flow_id;
             match info.pkt_type {
                 PacketKind::Connect => {
                     let client_id = info.client_id.as_ref().unwrap().clone();
