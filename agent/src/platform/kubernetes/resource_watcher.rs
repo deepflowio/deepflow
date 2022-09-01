@@ -19,7 +19,7 @@ use std::{
     fmt::Debug,
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
+        Arc,
     },
     time::{Duration, SystemTime},
 };
@@ -44,7 +44,7 @@ use log::{debug, info, warn};
 use openshift_openapi::api::route::v1::Route;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
-use tokio::{runtime::Handle, task::JoinHandle, time};
+use tokio::{runtime::Handle, sync::Mutex, task::JoinHandle, time};
 
 const LIST_INTERVAL: Duration = Duration::from_secs(600);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(3600);
@@ -91,7 +91,6 @@ pub struct ResourceWatcher<K> {
     entries: Arc<Mutex<HashMap<String, String>>>,
     err_msg: Arc<Mutex<Option<String>>>,
     kind: &'static str,
-    running: Arc<Mutex<bool>>,
     version: Arc<AtomicU64>,
     runtime: Handle,
 }
@@ -102,14 +101,6 @@ where
     K: Metadata<Ty = ObjectMeta>,
 {
     fn start(&self) -> Option<JoinHandle<()>> {
-        let mut running_guard = self.running.lock().unwrap();
-        if *running_guard {
-            debug!("{} watcher has already running", self.kind);
-            return None;
-        }
-        *running_guard = true;
-        drop(running_guard);
-
         let entries = self.entries.clone();
         let version = self.version.clone();
         let kind = self.kind;
@@ -130,7 +121,7 @@ where
     }
 
     fn error(&self) -> Option<String> {
-        self.err_msg.lock().unwrap().take()
+        self.err_msg.blocking_lock().take()
     }
 
     fn kind(&self) -> String {
@@ -139,8 +130,7 @@ where
 
     fn entries(&self) -> Vec<String> {
         self.entries
-            .lock()
-            .unwrap()
+            .blocking_lock()
             .values()
             .map(Clone::clone)
             .collect::<Vec<_>>()
@@ -159,7 +149,6 @@ where
             version: Arc::new(AtomicU64::new(0)),
             kind,
             err_msg: Arc::new(Mutex::new(None)),
-            running: Arc::new(Mutex::new(false)),
             runtime,
         }
     }
@@ -197,7 +186,7 @@ where
                         kind,
                         &err_msg,
                         &mut event_counter
-                    );
+                    ).await;
                 }
                 _ = ticker.tick() => {
                     if last_update.elapsed().unwrap() < LIST_INTERVAL
@@ -230,23 +219,24 @@ where
                     object_list.items.len()
                 );
                 // 检查内存和List API查询结果是否一致
-                let entries_lock = entries.lock().unwrap();
-                if object_list.items.len() == entries_lock.len() {
-                    let mut identical = true;
-                    for object in object_list.items.iter() {
-                        match object.meta().uid.as_ref() {
-                            Some(uid) if entries_lock.contains_key(uid) => (),
-                            _ => {
-                                identical = false;
-                                break;
+                {
+                    let entries_lock = entries.lock().await;
+                    if object_list.items.len() == entries_lock.len() {
+                        let mut identical = true;
+                        for object in object_list.items.iter() {
+                            match object.meta().uid.as_ref() {
+                                Some(uid) if entries_lock.contains_key(uid) => (),
+                                _ => {
+                                    identical = false;
+                                    break;
+                                }
                             }
                         }
-                    }
-                    if identical {
-                        return;
+                        if identical {
+                            return;
+                        }
                     }
                 }
-                drop(entries_lock);
 
                 debug!("reload {} data", kind);
 
@@ -271,24 +261,24 @@ where
                 }
 
                 if !new_entries.is_empty() {
-                    *entries.lock().unwrap() = new_entries;
+                    *entries.lock().await = new_entries;
                     version.fetch_add(1, Ordering::SeqCst);
                 }
             }
             Err(err) => {
                 let msg = format!("{} watcher list failed: {}", kind, err);
                 warn!("{}", msg);
-                err_msg.lock().unwrap().replace(msg);
+                err_msg.lock().await.replace(msg);
             }
         }
     }
 
-    fn resolve_event(
+    async fn resolve_event(
         maybe_event: Result<Option<Event<K>>, runtime::watcher::Error>,
         last_update: &mut SystemTime,
         entries: &Arc<Mutex<HashMap<String, String>>>,
         version: &Arc<AtomicU64>,
-        kind: &'static str,
+        kind: &str,
         err_msg: &Arc<Mutex<Option<String>>>,
         event_counter: &mut EventCounter,
     ) {
@@ -297,13 +287,13 @@ where
                 match event {
                     Event::Applied(object) => {
                         event_counter.applied += 1;
-                        Self::insert_object(object, entries, version, kind);
+                        Self::insert_object(object, entries, version, kind).await;
                     }
-                    Event::Deleted(object) => {
-                        if let Some(uid) = object.meta().uid.as_ref() {
+                    Event::Deleted(mut object) => {
+                        if let Some(uid) = object.meta_mut().uid.take() {
                             event_counter.deleted += 1;
                             // 只有删除时检查是否需要更新版本号，其余消息直接更新map内容
-                            if entries.lock().unwrap().remove(uid).is_some() {
+                            if entries.lock().await.remove(&uid).is_some() {
                                 version.fetch_add(1, Ordering::SeqCst);
                             }
                         }
@@ -313,7 +303,7 @@ where
                     Event::Restarted(mut objects) => {
                         if let Some(object) = objects.pop() {
                             event_counter.restarted += 1;
-                            Self::insert_object(object, entries, version, kind);
+                            Self::insert_object(object, entries, version, kind).await;
                         }
                     }
                 }
@@ -346,7 +336,7 @@ where
                     runtime::watcher::Error::WatchStartFailed(_) => {
                         let msg = format!("{} watcher watch failed: {}", kind, err);
                         warn!("{}", msg);
-                        err_msg.lock().unwrap().replace(msg);
+                        err_msg.lock().await.replace(msg);
                     }
                     // 正常的超时
                     runtime::watcher::Error::WatchError(err_res)
@@ -360,26 +350,25 @@ where
                     | runtime::watcher::Error::WatchFailed(_) => {
                         let msg = format!("{} watcher watch failed: {}", kind, err);
                         warn!("{}", msg);
-                        err_msg.lock().unwrap().replace(msg);
+                        err_msg.lock().await.replace(msg);
                     }
                 }
             }
         }
     }
 
-    fn insert_object(
+    async fn insert_object(
         object: K,
         entries: &Arc<Mutex<HashMap<String, String>>>,
         version: &Arc<AtomicU64>,
         kind: &str,
     ) {
-        if let Some(uid) = object.meta().uid.as_ref() {
-            match serde_json::to_string(&object) {
-                Ok(serialized_object) => {
-                    entries
-                        .lock()
-                        .unwrap()
-                        .insert(uid.clone(), serialized_object);
+        let uid = object.meta().uid.clone();
+        if let Some(uid) = uid {
+            let serialized_object = serde_json::to_string(&object);
+            match serialized_object {
+                Ok(serobj) => {
+                    entries.lock().await.insert(uid, serobj);
                     version.fetch_add(1, Ordering::SeqCst);
                 }
                 Err(e) => debug!(
