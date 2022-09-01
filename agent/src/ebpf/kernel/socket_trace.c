@@ -728,76 +728,58 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    const struct process_data_extra *extra)
 
 {
-	__u64 pid_tgid;
-	__u32 tgid;
-	__u64 conn_key;
-	__u32 tcp_seq = 0;
-	__u64 thread_trace_id = 0;
-	__u32 k0 = 0;
-	struct socket_info_t sk_info  = { 0 };
-	struct trace_uid_t *trace_uid;
-	struct trace_stats *trace_stats;
-	struct trace_info_t *trace_info_ptr;
-	struct socket_info_t *socket_info_ptr;
-	__u64 socket_id;
-	struct __socket_data_buffer *v_buff;
-	struct __socket_data *v;
-	__u32 len;
-	__u32 buf_size;
-	__u64 peer_conn_key;
-
 	if (conn_info == NULL) {
 		return;
 	}
 
 	// ignore non-http protocols that are go tls
 	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
-		if (conn_info->protocol != PROTO_HTTP1){
+		if (conn_info->protocol != PROTO_HTTP1)
 			return;
-		}
 	}
-
-	pid_tgid = bpf_get_current_pid_tgid();
-	tgid = (__u32) (pid_tgid >> 32);
 
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
 		return;
 	}
 
-	if (time_stamp == 0) {
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 tgid = (__u32) (pid_tgid >> 32);
+	if (time_stamp == 0)
 		time_stamp = bpf_ktime_get_ns();
-	}
-
-	conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
+	__u64 conn_key = gen_conn_key_id((__u64)tgid, (__u64)conn_info->fd);
 
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
 		return;
 	}
 
+	__u32 tcp_seq = 0;
+	__u64 thread_trace_id = 0;
 	if (extra->source != DATA_SOURCE_GO_HTTP2_UPROBE) {
-		if (conn_info->direction == T_INGRESS &&
-		    conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 			tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
-		} else if (conn_info->direction == T_EGRESS &&
-			   conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 			tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
 		}
 	}
 
-	trace_uid = trace_uid_map__lookup(&k0);
+
+	__u32 k0 = 0;
+	struct socket_info_t sk_info = { 0 };
+	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
 	if (trace_uid == NULL)
 		return;
 
-	trace_stats = trace_stats_map__lookup(&k0);
+	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
 		return;
 
-	trace_info_ptr = trace_map__lookup(&pid_tgid);
+	struct trace_info_t *trace_info_ptr =
+				trace_map__lookup(&pid_tgid);
 
-	socket_info_ptr = conn_info->socket_info_ptr;
+	struct socket_info_t *socket_info_ptr = conn_info->socket_info_ptr;
 	// 'socket_id' used to resolve non-tracing between the same socket
-	socket_id = 0;
+	__u64 socket_id = 0;
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		// Not use "++trace_uid->socket_id" here,
 		// because it did not pass the verification of linux 4.14.x, 4.15.x
@@ -811,9 +793,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    conn_info->message_type != MSG_RECONFIRM && !get_go_version() &&
 	    // Make the old version validator happy
 	    extra->source != DATA_SOURCE_GO_HTTP2_UPROBE)
-		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid,
-			      trace_info_ptr, trace_uid, trace_stats,
-			      &thread_trace_id, time_stamp);
+		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid, trace_info_ptr,
+			      trace_uid, trace_stats, &thread_trace_id, time_stamp);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
@@ -873,8 +854,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		socket_info_ptr->msg_type = conn_info->message_type;
 		socket_info_ptr->update_time = time_stamp / NS_PER_SEC;
 		if (socket_info_ptr->peer_fd != 0 && conn_info->direction == T_INGRESS) {
-			peer_conn_key = gen_conn_key_id((__u64)tgid,
-							(__u64)socket_info_ptr->peer_fd);
+			__u64 peer_conn_key = gen_conn_key_id((__u64)tgid,
+							      (__u64)socket_info_ptr->peer_fd);
 			struct socket_info_t *peer_socket_info_ptr =
 							socket_info_map__lookup(&peer_conn_key);
 			if (is_socket_info_valid(peer_socket_info_ptr))
@@ -887,11 +868,11 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		}
 	}
 
-	v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
 		return;
 
-	v = (struct __socket_data *)&v_buff->data[0];
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
 		return;
@@ -941,7 +922,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	 * the bitwise AND operation will set the range of possible values for
 	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
 	 */
-	len = syscall_len & (sizeof(v->data) - 1);
+	__u32 len = syscall_len & (sizeof(v->data) - 1);
 
 	if (vecs) {
 		len = iovecs_copy(v, v_buff, args, syscall_len, len);
@@ -973,7 +954,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (v_buff->events_num == EVENT_BURST_NUM ||
 	    extra->source == DATA_SOURCE_GO_HTTP2_UPROBE) {
-		buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
+		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
 				 & (sizeof(*v_buff) - 1);
 		if (buf_size >= sizeof(*v_buff))
 			bpf_perf_event_output(ctx, &NAME(socket_data),
