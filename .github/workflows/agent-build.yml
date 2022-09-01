@@ -154,7 +154,7 @@ jobs:
           mkdir -p pkg/debian/systemd/etc/systemd/system/
           cp -af pkg/deepflow-agent.service pkg/debian/systemd/etc/systemd/system/
           sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
-          dpkg-deb -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
+          dpkg-deb --no-uniform-compression -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
           mkdir -p pkg/debian/upstart/usr/sbin/
           cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/upstart/usr/sbin/
           mkdir -p pkg/debian/upstart/etc/
@@ -163,7 +163,7 @@ jobs:
           mkdir -p pkg/debian/upstart/etc/init/
           cp -af pkg/deepflow-agent.conf pkg/debian/upstart/etc/init/
           sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/upstart/DEBIAN/control
-          dpkg-deb -b pkg/debian/upstart x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
+          dpkg-deb --no-uniform-compression -b pkg/debian/upstart x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
           zip -r -q artifacts-deb.zip x86_64/*.deb
 
       - name: build binary package  
