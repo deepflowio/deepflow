@@ -383,7 +383,7 @@ pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
         return false;
     }
 
-    let mut payload = match packet.get_l4_payload() {
+    let payload = match packet.get_l4_payload() {
         Some(p) => p,
         None => return false,
     };
