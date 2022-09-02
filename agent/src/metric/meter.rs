@@ -200,6 +200,7 @@ pub struct Latency {
     pub srt_max: u32,
     pub art_max: u32,
     pub rrt_max: u32,
+    pub cit_max: u32, // us, the max time between the client request and the last server response (Payload > 1)
 
     pub rtt_sum: u64,
     pub rtt_client_sum: u64,
@@ -207,6 +208,7 @@ pub struct Latency {
     pub srt_sum: u64,
     pub art_sum: u64,
     pub rrt_sum: u64,
+    pub cit_sum: u64,
 
     pub rtt_count: u32,
     pub rtt_client_count: u32,
@@ -214,9 +216,6 @@ pub struct Latency {
     pub srt_count: u32,
     pub art_count: u32,
     pub rrt_count: u32,
-
-    pub cit_max: u32, // us, the max time between the client request and the last server response (Payload > 1)
-    pub cit_sum: u32,
     pub cit_count: u32,
 }
 
@@ -240,7 +239,6 @@ impl Latency {
         if self.rrt_max < other.rrt_max {
             self.rrt_max = other.rrt_max;
         }
-
         if self.cit_max < other.cit_max {
             self.cit_max = other.cit_max;
         }
