@@ -47,14 +47,6 @@ import (
 
 var log = logging.MustGetLogger("trisolaris/vtap")
 
-var LOCAL_FILE_VTAP = []int{
-	VTAP_TYPE_POD_VM,
-	VTAP_TYPE_POD_HOST,
-	VTAP_TYPE_EXSI,
-	VTAP_TYPE_DEDICATED,
-	VTAP_TYPE_TUNNEL_DECAPSULATION,
-}
-
 type VTapInfo struct {
 	// key: ctrlIP+ctrlMac
 	vTapCaches *VTapCacheMap

@@ -434,3 +434,22 @@ var CloudMonitorExceptionAPI = map[string]string{
 const (
 	STRINGS_JOIN_COMMA = ","
 )
+
+const (
+	TAPMODE_LOCAL    = 0
+	TAPMODE_MIRROR   = 1
+	TAPMODE_ANALYZER = 2
+	TAPMODE_DECAP    = 3
+)
+
+var VTapToChangeTapModes = map[int][]int{
+	VTAP_TYPE_KVM:                  []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_EXSI:                 []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_WORKLOAD_V:           []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_WORKLOAD_P:           []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_DEDICATED:            []int{TAPMODE_ANALYZER},
+	VTAP_TYPE_POD_HOST:             []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_POD_VM:               []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_TUNNEL_DECAPSULATION: []int{TAPMODE_DECAP},
+	VTAP_TYPE_HYPER_V:              []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+}

@@ -298,10 +298,8 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		in.GetOs(),
 		in.GetKernelVersion(),
 		in.GetProcessName())
-	// 专属采集器ctrl_mac可能会变，不更新ctrl_mac
-	if vtapCache.GetVTapType() != VTAP_TYPE_DEDICATED {
-		vtapCache.UpdateCtrlMacFromGrpc(in.GetCtrlMac())
-	}
+
+	vtapCache.UpdateCtrlMacFromGrpc(in.GetCtrlMac())
 	vtapCache.SetControllerSyncFlag()
 	// 记录采集器版本号， push接口用
 	if in.GetVersionPlatformData() != 0 {

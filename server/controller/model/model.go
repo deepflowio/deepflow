@@ -105,6 +105,7 @@ type VtapCreate struct {
 	Name            string `json:"NAME" binding:"required"`
 	Type            int    `json:"TYPE" binding:"required"`
 	CtrlIP          string `json:"CTRL_IP" binding:"required"`
+	CtrlMac         string `json:"CTRL_MAC"`
 	AZ              string `json:"AZ" binding:"required"`
 	Region          string `json:"REGION" binding:"required"`
 	VtapGroupLcuuid string `json:"VTAP_GROUP_LCUUID" binding:"required"`
@@ -161,6 +162,11 @@ type Vtap struct {
 	// TODO: format_state
 	// TODO: format_type
 	// TODO: format_exceptions
+}
+
+type VtapUpdateTapMode struct {
+	VTapLcuuids []string `json:"VTAP_LCUUIDS"`
+	TapMode     int      `json:"TAP_MODE"`
 }
 
 type HostVTapRebalanceResult struct {

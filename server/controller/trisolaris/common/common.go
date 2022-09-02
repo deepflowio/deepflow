@@ -64,11 +64,6 @@ const (
 	CONN_DEFAULT_AZ     = "ALL"
 	CONN_DEFAULT_REGION = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-	TAPMODE_LOCAL    = 0
-	TAPMODE_MIRROR   = 1
-	TAPMODE_ANALYZER = 2
-	TAPMODE_DECAP    = 3
-
 	NPB_BUSINESS_ID  = 1
 	PCAP_BUSINESS_ID = -3
 
