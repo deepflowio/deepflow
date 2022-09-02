@@ -151,6 +151,9 @@ var (
 		input:  "select Sum(`metrics.pending`) from `deepflow_server.queue`",
 		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) FROM deepflow_system.`deepflow_server.queue`",
 		db:     "deepflow_system",
+	}, {
+		input:  "select labels_0 from l7_flow_log",
+		output: "SELECT dictGet(flow_tag.k8s_labels_map, 'labels', toUInt64(pod_id_0)) AS labels_0 FROM flow_log.l7_flow_log",
 	},
 	}
 )

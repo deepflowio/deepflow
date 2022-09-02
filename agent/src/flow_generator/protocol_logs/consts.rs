@@ -142,7 +142,8 @@ pub const COM_QUERY: u8 = 3;
 pub const COM_FIELD_LIST: u8 = 4;
 pub const COM_STMT_PREPARE: u8 = 22;
 pub const COM_STMT_EXECUTE: u8 = 23;
-pub const COM_STMT_FETCH_AND_CLOSE: u8 = 25;
+pub const COM_STMT_CLOSE: u8 = 25;
+pub const COM_STMT_FETCH: u8 = 28;
 pub const COM_MAX: u8 = 26;
 
 // dns constants

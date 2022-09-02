@@ -31,8 +31,8 @@ use arc_swap::access::Access;
 use log::{debug, info, warn};
 
 use super::{
-    mqtt::generate_mqtt_id, AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo,
-    DnsLog, DubboLog, KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
+    KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
 use crate::{
     common::{
@@ -373,13 +373,7 @@ impl SessionQueue {
 
     fn calc_key(item: &AppProtoLogsData) -> u64 {
         if let AppProtoLogsInfo::Mqtt(_) = item.special_info {
-            let base_info = &item.base_info;
-            return generate_mqtt_id(
-                base_info.ip_src,
-                base_info.ip_dst,
-                base_info.port_src,
-                base_info.port_dst,
-            );
+            return item.base_info.flow_id;
         }
         let request_id = match &item.special_info {
             AppProtoLogsInfo::Dns(d) => d.trans_id as u32,
