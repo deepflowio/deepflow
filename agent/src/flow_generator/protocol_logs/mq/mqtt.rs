@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, fmt, net::IpAddr};
+use std::{collections::HashMap, fmt};
 
 use log::{debug, warn};
 use nom::{
@@ -36,39 +36,6 @@ use crate::{
     flow_generator::error::{Error, Result},
     proto::flow_log::{self, MqttTopic},
 };
-
-// 因为有些包没有带客户端ID，然而客户端跟服务端是长连接，可以用四元组构造MQTT_ID去索引客户端ID
-// 四元组格式：(src_ip, dst_ip, src_port, dst_port)
-// =================
-// Because some packets do not have a client ID, but the client and the server
-// have a long connection, you can use a quadruple to construct MQTT_ID to index the client ID
-// quadruple：(src_ip, dst_ip, src_port, dst_port)
-pub fn generate_mqtt_id(src_addr: IpAddr, dst_addr: IpAddr, src_port: u16, dst_port: u16) -> u64 {
-    let ip_hash = {
-        let (src, dst) = match (src_addr, dst_addr) {
-            (IpAddr::V4(s), IpAddr::V4(d)) => (
-                u32::from_le_bytes(s.octets()),
-                u32::from_le_bytes(d.octets()),
-            ),
-            (IpAddr::V6(s), IpAddr::V6(d)) => {
-                let (src, dst) = (s.octets(), d.octets());
-                src.chunks(4)
-                    .zip(dst.chunks(4))
-                    .fold((0, 0), |(hash1, hash2), (b1, b2)| {
-                        (
-                            hash1 ^ u32::from_le_bytes(b1.try_into().unwrap()),
-                            hash2 ^ u32::from_le_bytes(b2.try_into().unwrap()),
-                        )
-                    })
-            }
-            _ => unreachable!(),
-        };
-        src ^ dst
-    };
-
-    let port_hash = (dst_port as u64) << 16 | src_port as u64;
-    (ip_hash as u64) << 32 | port_hash
-}
 
 #[derive(Clone, Debug)]
 pub struct MqttInfo {
@@ -153,13 +120,8 @@ impl MqttLog {
         mut special_info: AppProtoLogsInfo,
         base_info: AppProtoLogsBaseInfo,
     ) -> Result<AppProtoLogsData> {
-        let key = generate_mqtt_id(
-            base_info.ip_src,
-            base_info.ip_dst,
-            base_info.port_src,
-            base_info.port_dst,
-        );
         if let AppProtoLogsInfo::Mqtt(ref mut info) = special_info {
+            let key = base_info.flow_id;
             match info.pkt_type {
                 PacketKind::Connect => {
                     let client_id = info.client_id.as_ref().unwrap().clone();
@@ -372,106 +334,40 @@ impl L7LogParse for MqttLog {
     }
 }
 
-/// 尽力而为解析判断是否为mqtt报文
-/// pest effort parsing to determine whether it is an mqtt packet
+/// 尽力而为解析判断是否为mqtt报文, 因为"不依赖端口判断协议实现"要求首个请求包返回true，其他为false，
+/// 所以只判断是不是合法Connect包
+/// pest effort parsing to determine whether it is an mqtt packet, because "judging protocol implementation
+/// independent of protocol port" requires the first request packet to return true, the others are false,
+/// so only judge whether it is a legitimate "Connect" packet
 pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.proto != IpProtocol::Tcp {
         *bitmap &= !(1 << u8::from(L7Protocol::Mqtt));
         return false;
     }
 
-    let mut payload = match packet.get_l4_payload() {
+    let payload = match packet.get_l4_payload() {
         Some(p) => p,
         None => return false,
     };
-    loop {
-        let (input, header) = match mqtt_fixed_header(payload) {
-            Ok(p) => p,
+
+    let (input, header) = match mqtt_fixed_header(payload) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+
+    if let PacketKind::Connect = header.kind {
+        let data = bytes::complete::take(header.remaining_length as u32);
+        let version = match data.and_then(parse_connect_packet).parse(input) {
+            Ok((_, (version, _))) => version,
             Err(_) => return false,
         };
-
-        match header.kind {
-            PacketKind::Connect => {
-                let data = bytes::complete::take(header.remaining_length as u32);
-                let version = match data.and_then(parse_connect_packet).parse(input) {
-                    Ok((_, (version, _))) => version,
-                    Err(_) => return false,
-                };
-                if version < 3 || version > 5 {
-                    return false;
-                }
-            }
-            PacketKind::Connack => {
-                let input = match parse_connack_packet(input) {
-                    Ok((input, _)) => input,
-                    Err(_) => return false,
-                };
-                // payload = 0
-                if input.len() != 0 {
-                    return false;
-                }
-            }
-            PacketKind::Publish { dup, qos, .. } => {
-                if dup && qos == QualityOfService::AtMostOnce {
-                    debug!("mqtt publish packet has invalid dup flags={}", dup);
-                    return false;
-                }
-            }
-            PacketKind::Subscribe => {
-                if mqtt_packet_identifier
-                    .and(mqtt_subscription_requests)
-                    .parse(input)
-                    .is_err()
-                {
-                    return false;
-                }
-            }
-            PacketKind::Suback => {
-                if mqtt_packet_identifier
-                    .and(mqtt_subscription_acks)
-                    .parse(input)
-                    .is_err()
-                {
-                    return false;
-                }
-            }
-            PacketKind::Unsubscribe => {
-                if mqtt_packet_identifier
-                    .and(mqtt_unsubscription_requests)
-                    .parse(input)
-                    .is_err()
-                {
-                    return false;
-                }
-            }
-            PacketKind::Pingreq | PacketKind::Pingresp | PacketKind::Disconnect => {
-                // payload = 0
-                if header.remaining_length != 0 {
-                    return false;
-                }
-            }
-            PacketKind::Pubcomp
-            | PacketKind::Pubrec
-            | PacketKind::Puback
-            | PacketKind::Unsuback
-            | PacketKind::Pubrel => {
-                // minus variable header, payload = 0
-                // 减掉可变头部, 有效payload = 0
-                if header.remaining_length - 2 != 0 {
-                    return false;
-                }
-            }
-        }
-
-        let remaining_length = header.remaining_length as usize;
-        if input.len() < remaining_length {
+        if version < 3 || version > 5 {
             return false;
         }
-        if input.len() == remaining_length {
-            return true;
-        }
-        payload = &input[remaining_length..];
+        return true;
     }
+
+    false
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
