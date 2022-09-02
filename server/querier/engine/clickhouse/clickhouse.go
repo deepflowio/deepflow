@@ -291,6 +291,13 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		if err != nil {
 			return err
 		}
+		_, ok := e.asTagMap[groupTag]
+		if !ok {
+			err := e.AddTag(groupTag, "")
+			if err != nil {
+				return err
+			}
+		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}
 		notNullExpr, ok := GetNotNullFilter(groupTag, e.asTagMap, e.DB, e.Table)
