@@ -962,15 +962,15 @@ impl QuadrupleGenerator {
                 srt_max: stats.tcp.srt_max,
                 art_max: stats.tcp.art_max,
                 rrt_max: 0,
-                rtt_sum: stats.tcp.rtt as u64,
                 cit_max: stats.tcp.cit_max,
 
+                rtt_sum: stats.tcp.rtt as u64,
                 rtt_client_sum: stats.tcp.rtt_client_sum as u64,
                 rtt_server_sum: stats.tcp.rtt_server_sum as u64,
                 srt_sum: stats.tcp.srt_sum as u64,
                 art_sum: stats.tcp.art_sum as u64,
                 rrt_sum: 0,
-                cit_sum: stats.tcp.cit_sum,
+                cit_sum: stats.tcp.cit_sum as u64,
 
                 rtt_count: (stats.tcp.rtt > 0) as u32,
                 rtt_client_count: stats.tcp.rtt_client_count,
