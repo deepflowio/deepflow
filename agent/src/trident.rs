@@ -1063,6 +1063,7 @@ impl Components {
             policy_getter,
             l7_log_rate.clone(),
             proto_log_sender,
+            &queue_debugger,
         )
         .ok();
         #[cfg(target_os = "linux")]

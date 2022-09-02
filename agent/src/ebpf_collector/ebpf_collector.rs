@@ -29,6 +29,7 @@ use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
+use crate::debug::QueueDebugger;
 use crate::ebpf;
 use crate::flow_generator::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
@@ -40,7 +41,7 @@ use crate::flow_generator::{
 use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
 use crate::utils::{
-    queue::{bounded, DebugSender, Receiver, Sender},
+    queue::{bounded_with_debug, DebugSender, Receiver},
     LeakyBucket,
 };
 use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
@@ -828,7 +829,7 @@ pub struct EbpfCollector {
 }
 
 static mut SWITCH: bool = false;
-static mut SENDER: Option<Sender<Box<MetaPacket>>> = None;
+static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
 static mut CAPTURE_SIZE: usize = ebpf::CAP_LEN_MAX as usize;
 
 impl EbpfCollector {
@@ -837,7 +838,6 @@ impl EbpfCollector {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
-            debug!("ebpf collector in:\n{}", *sd);
 
             let packet = MetaPacket::from_ebpf(sd, CAPTURE_SIZE);
             if packet.is_err() {
@@ -850,7 +850,7 @@ impl EbpfCollector {
         }
     }
 
-    fn ebpf_init(config: &EbpfConfig, sender: Sender<Box<MetaPacket<'static>>>) -> Result<()> {
+    fn ebpf_init(config: &EbpfConfig, sender: DebugSender<Box<MetaPacket<'static>>>) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
             let log_file = config.log_path.clone();
@@ -927,9 +927,11 @@ impl EbpfCollector {
         policy_getter: PolicyGetter,
         l7_log_rate: Arc<LeakyBucket>,
         output: DebugSender<SendItem>,
+        queue_debugger: &QueueDebugger,
     ) -> Result<Box<Self>> {
         info!("ebpf collector init...");
-        let (sender, receiver, _) = bounded(1024);
+        let (sender, receiver, _) =
+            bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);
 
         Self::ebpf_init(config, sender)?;
         info!("ebpf collector initialized.");
