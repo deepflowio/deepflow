@@ -38,15 +38,15 @@ func (a *Aliyun) get{{$typed_name}}Response(region string, request *{{$service}}
 {{- end }}
 
 		response, err := client.{{$func}}(request)
+        if response.GetHttpStatus() == 403 || response.GetHttpStatus() == 400 {
+			log.Info(err)
+			break
+		}
 		if err != nil {
 			return make([]*simplejson.Json, 0), err
 		}
 
 		if response.GetHttpStatus() != 200 {
-			if response.GetHttpStatus() == 403 || response.GetHttpStatus() == 400 {
-				log.Info(response.GetHttpContentString())
-				break
-            }
 			return make([]*simplejson.Json, 0), errors.New(response.GetHttpContentString())
 		}
 
