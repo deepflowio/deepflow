@@ -37,7 +37,10 @@ func (c *Cloud) getSubDomainData() {
 		// 如果当前KubernetesGather数据中没有容器节点，则跳过该集群
 		if len(podNodes) == 0 {
 			log.Info("cloud merge subdomain data: k8s gather resource not found pod node")
-			subDomainResources[lcuuid] = model.SubDomainResource{}
+			subDomainResources[lcuuid] = model.SubDomainResource{
+				ErrorState:   kubernetesGatherResource.ErrorState,
+				ErrorMessage: kubernetesGatherResource.ErrorMessage,
+			}
 			continue
 		}
 		// 取集群中某个容器节点的az信息作为集群的az，当前不支持附属容器集群跨可用区
