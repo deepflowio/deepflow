@@ -17,7 +17,7 @@
 #![allow(dead_code)]
 
 mod collector;
-mod common;
+pub mod common;
 mod config;
 pub mod debug;
 pub mod dispatcher;
