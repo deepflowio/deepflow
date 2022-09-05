@@ -52,7 +52,8 @@ type fileWriter struct {
 }
 
 type syslogWriter struct {
-	directory string
+	directory        string
+	logToFileEnabled bool
 
 	index   int
 	fileMap map[uint32]*fileWriter
@@ -75,6 +76,9 @@ func (w *syslogWriter) write(writer *fileWriter, packet *receiver.RecvBuffer) {
 }
 
 func (w *syslogWriter) writeFile(packet *receiver.RecvBuffer) {
+	if !w.logToFileEnabled {
+		return
+	}
 	if packet == nil {
 		// tick
 		for key, value := range w.fileMap {
@@ -144,20 +148,23 @@ func parseSyslog(bs []byte) (*ESLog, error) {
 	return &esLog, nil
 }
 
-func NewSyslogWriter(in queue.QueueReader, directory string, esEnabled bool, esAddresses []string, esUsername, esPassword string) *syslogWriter {
-	if err := os.MkdirAll(directory, os.ModePerm); err != nil {
-		log.Warningf("cannot output syslog to directory %s: %v", directory, err)
-		return &syslogWriter{}
+func NewSyslogWriter(in queue.QueueReader, logToFileEnabled, esEnabled bool, directory string, esAddresses []string, esUsername, esPassword string) *syslogWriter {
+	if logToFileEnabled {
+		if err := os.MkdirAll(directory, os.ModePerm); err != nil {
+			log.Warningf("cannot output syslog to directory %s: %v", directory, err)
+			return &syslogWriter{}
+		}
 	}
 	var esLogger *ESLogger
 	if esEnabled {
 		esLogger = NewESLogger(esAddresses, esUsername, esPassword)
 	}
 	writer := &syslogWriter{
-		directory: directory,
-		fileMap:   make(map[uint32]*fileWriter, 8),
-		in:        in,
-		esLogger:  esLogger,
+		logToFileEnabled: logToFileEnabled,
+		directory:        directory,
+		fileMap:          make(map[uint32]*fileWriter, 8),
+		in:               in,
+		esLogger:         esLogger,
 	}
 
 	go writer.run()
