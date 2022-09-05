@@ -41,10 +41,18 @@ type FlowLogWriter struct {
 
 func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType, ttl int) *ckdb.Table {
 	var orderKeys = []string{}
-	if id == common.L7_FLOW_ID {
+	flowKeys := []string{"l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port"}
+	switch id {
+	case common.L7_FLOW_ID:
 		orderKeys = []string{"l7_protocol"}
+		orderKeys = append(orderKeys, flowKeys...)
+	case common.L4_FLOW_ID:
+		orderKeys = flowKeys
+	case common.L4_PACKET_ID:
+		orderKeys = []string{"flow_id", "vtap_id"}
+	default:
+		panic("unreachalable")
 	}
-	orderKeys = append(orderKeys, "l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port")
 
 	return &ckdb.Table{
 		ID:              uint8(id),
@@ -61,10 +69,11 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 	}
 }
 
-func GetFlowLogTables(engine ckdb.EngineType, l4LogTtl, l7LogTtl int) []*ckdb.Table {
+func GetFlowLogTables(engine ckdb.EngineType, l4LogTtl, l7LogTtl, l4PacketTtl int) []*ckdb.Table {
 	return []*ckdb.Table{
 		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine, l4LogTtl),
 		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7LoggerColumns(), engine, l7LogTtl),
+		newFlowLogTable(common.L4_PACKET_ID, jsonify.L4PacketColumns(), engine, l4PacketTtl),
 	}
 }
 
@@ -73,9 +82,9 @@ func NewFlowLogWriter(primaryAddr, secondaryAddr, user, password string, replica
 	var err error
 	var tables []*ckdb.Table
 	if replicaEnabled {
-		tables = GetFlowLogTables(ckdb.ReplicatedMergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog)
+		tables = GetFlowLogTables(ckdb.ReplicatedMergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog, flowLogTtl.L4Packet)
 	} else {
-		tables = GetFlowLogTables(ckdb.MergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog)
+		tables = GetFlowLogTables(ckdb.MergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog, flowLogTtl.L4Packet)
 	}
 	for i, table := range tables {
 		counterName := common.FlowLogID(table.ID).String()

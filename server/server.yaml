@@ -241,6 +241,7 @@ ingester:
   #flow-log-ttl:
   #  l4-flow-log: 3
   #  l7-flow-log: 3
+  #  l4-packet: 3
 
   ## split prometheus metrics name lable to table name and metrics name, on the nth position of '_'
   # prometheus-separate-pos: 1
