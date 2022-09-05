@@ -130,98 +130,105 @@ func (m *Manager) GetRecorder(domainLcuuid string) (recorder.Recorder, error) {
 	return *task.Recorder, nil
 }
 
+func (m *Manager) run(ctx context.Context) {
+	// 获取所在控制器的IP
+	var controller mysql.Controller
+	hostName := os.Getenv(common.POD_NAME_KEY)
+	if len(hostName) == 0 {
+		log.Error("hostname is null")
+		return
+	}
+	if ret := mysql.Db.Where("name = ?", hostName).First(&controller); ret.Error != nil {
+		log.Errorf("controller (%s) not in db", hostName)
+		return
+	}
+
+	var domains []mysql.Domain
+	var oldDomains = mapset.NewSet()
+	var newDomains = mapset.NewSet()
+	var delDomains = mapset.NewSet()
+	var addDomains = mapset.NewSet()
+	var intersectDomains = mapset.NewSet()
+
+	for lcuuid := range m.taskMap {
+		oldDomains.Add(lcuuid)
+	}
+	mysql.Db.Where(
+		"enabled = ? AND controller_ip = ?", common.DOMAIN_ENABLED_TRUE, controller.IP,
+	).Find(&domains)
+	lcuuidToDomain := make(map[string]mysql.Domain)
+	for _, domain := range domains {
+		lcuuidToDomain[domain.Lcuuid] = domain
+		newDomains.Add(domain.Lcuuid)
+	}
+
+	// 对于删除的domain，停止Task，并移除管理
+	delDomains = oldDomains.Difference(newDomains)
+	for _, domain := range delDomains.ToSlice() {
+		lcuuid := domain.(string)
+		m.taskMap[lcuuid].Stop()
+		m.mutex.Lock()
+		delete(m.taskMap, lcuuid)
+		m.mutex.Unlock()
+	}
+
+	// 对于新增的domain，启动Task，并纳入Manager管理
+	addDomains = newDomains.Difference(oldDomains)
+	for _, domain := range addDomains.ToSlice() {
+		lcuuid := domain.(string)
+		task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
+		if task == nil {
+			log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
+			continue
+		}
+		m.mutex.Lock()
+		m.taskMap[lcuuid] = task
+		m.taskMap[lcuuid].Start()
+		m.mutex.Unlock()
+	}
+
+	// 检查已有domain是否存在配置/名称修改
+	// 如果存在配置修改，则停止已有Task，并移除管理；同时启动新的Task，并纳入Manager管理
+	// 如果没有配置修改，判断是否存在名称修改更新Task信息
+	intersectDomains = newDomains.Intersect(oldDomains)
+	for _, domain := range intersectDomains.ToSlice() {
+		lcuuid := domain.(string)
+		oldDomainConfig := m.taskMap[lcuuid].DomainConfig
+		newDomainConfig := lcuuidToDomain[lcuuid].Config
+		if oldDomainConfig != newDomainConfig {
+			log.Infof("oldDomainConfig: %s", oldDomainConfig)
+			log.Infof("newDomainConfig: %s", newDomainConfig)
+			m.taskMap[lcuuid].Stop()
+			task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
+			if task == nil {
+				log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
+				continue
+			}
+
+			m.mutex.Lock()
+			delete(m.taskMap, lcuuid)
+			m.taskMap[lcuuid] = task
+			m.taskMap[lcuuid].Start()
+			m.mutex.Unlock()
+		} else {
+			oldDomainName := m.taskMap[lcuuid].DomainName
+			newDomainName := lcuuidToDomain[lcuuid].Name
+			if oldDomainName != newDomainName {
+				m.taskMap[lcuuid].UpdateDomainName(newDomainName)
+			}
+		}
+	}
+}
+
 func (m *Manager) Start() {
-	ctx := context.Context(context.Background())
 	cloudcfg.SetCloudGlobalConfig(m.cfg.TaskCfg.CloudCfg)
+
+	log.Info("manager start")
+	ctx := context.Context(context.Background())
 	go func() {
+		m.run(ctx)
 		for range time.Tick(time.Duration(m.cfg.CloudConfigCheckInterval) * time.Second) {
-			// 获取所在控制器的IP
-			var controller mysql.Controller
-			hostName := os.Getenv(common.POD_NAME_KEY)
-			if len(hostName) == 0 {
-				log.Error("hostname is null")
-				continue
-			}
-			if ret := mysql.Db.Where("name = ?", hostName).First(&controller); ret.Error != nil {
-				log.Errorf("controller (%s) not in db", hostName)
-				continue
-			}
-
-			var domains []mysql.Domain
-			var oldDomains = mapset.NewSet()
-			var newDomains = mapset.NewSet()
-			var delDomains = mapset.NewSet()
-			var addDomains = mapset.NewSet()
-			var intersectDomains = mapset.NewSet()
-
-			for lcuuid := range m.taskMap {
-				oldDomains.Add(lcuuid)
-			}
-			mysql.Db.Where(
-				"enabled = ? AND controller_ip = ?", common.DOMAIN_ENABLED_TRUE, controller.IP,
-			).Find(&domains)
-			lcuuidToDomain := make(map[string]mysql.Domain)
-			for _, domain := range domains {
-				lcuuidToDomain[domain.Lcuuid] = domain
-				newDomains.Add(domain.Lcuuid)
-			}
-
-			// 对于删除的domain，停止Task，并移除管理
-			delDomains = oldDomains.Difference(newDomains)
-			for _, domain := range delDomains.ToSlice() {
-				lcuuid := domain.(string)
-				m.taskMap[lcuuid].Stop()
-				m.mutex.Lock()
-				delete(m.taskMap, lcuuid)
-				m.mutex.Unlock()
-			}
-
-			// 对于新增的domain，启动Task，并纳入Manager管理
-			addDomains = newDomains.Difference(oldDomains)
-			for _, domain := range addDomains.ToSlice() {
-				lcuuid := domain.(string)
-				task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
-				if task == nil {
-					log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
-					continue
-				}
-				m.mutex.Lock()
-				m.taskMap[lcuuid] = task
-				m.taskMap[lcuuid].Start()
-				m.mutex.Unlock()
-			}
-
-			// 检查已有domain是否存在配置/名称修改
-			// 如果存在配置修改，则停止已有Task，并移除管理；同时启动新的Task，并纳入Manager管理
-			// 如果没有配置修改，判断是否存在名称修改更新Task信息
-			intersectDomains = newDomains.Intersect(oldDomains)
-			for _, domain := range intersectDomains.ToSlice() {
-				lcuuid := domain.(string)
-				oldDomainConfig := m.taskMap[lcuuid].DomainConfig
-				newDomainConfig := lcuuidToDomain[lcuuid].Config
-				if oldDomainConfig != newDomainConfig {
-					log.Infof("oldDomainConfig: %s", oldDomainConfig)
-					log.Infof("newDomainConfig: %s", newDomainConfig)
-					m.taskMap[lcuuid].Stop()
-					task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
-					if task == nil {
-						log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
-						continue
-					}
-
-					m.mutex.Lock()
-					delete(m.taskMap, lcuuid)
-					m.taskMap[lcuuid] = task
-					m.taskMap[lcuuid].Start()
-					m.mutex.Unlock()
-				} else {
-					oldDomainName := m.taskMap[lcuuid].DomainName
-					newDomainName := lcuuidToDomain[lcuuid].Name
-					if oldDomainName != newDomainName {
-						m.taskMap[lcuuid].UpdateDomainName(newDomainName)
-					}
-				}
-			}
+			m.run(ctx)
 		}
 	}()
 }
