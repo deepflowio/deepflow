@@ -831,9 +831,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
-	}
 
-	if (is_socket_info_valid(socket_info_ptr)) {
 		/*
 		 * 同方向多个连续请求或回应的场景时，
 		 * 保持捕获数据的序列号保持不变。
