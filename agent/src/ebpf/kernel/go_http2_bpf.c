@@ -165,6 +165,8 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	bpf_debug("coroutine_id=[%u]\n", send_buffer->coroutine_id);
 	bpf_debug("data_type=[%u]\n", send_buffer->data_type);
 	bpf_debug("msg_type=[%u]\n", send_buffer->msg_type);
+	bpf_debug("socket id=[%llu]\n",send_buffer->socket_id);
+	bpf_debug("pid=[%d]\n",send_buffer->pid);
 
 	bpf_debug("fd=[%u]\n", *(__u32 *)(send_buffer->data));
 	bpf_debug("stream id=[%u]\n", *(__u32 *)(send_buffer->data + 4));
@@ -218,7 +220,69 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 
 	send_buffer->data_type = protocol;
 
-	// others ...
+	///////////////////////// 从这里开始复制自 socket_trace.c //////////////////////////////
+	// 参考 socket_trace.c 中 process_data 的逻辑,获取五元组信息
+	__u64 id = bpf_get_current_pid_tgid();
+	__u32 tgid = id >> 32;
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return;
+
+#ifndef BPF_USE_CORE
+	if (unlikely(!offset->ready))
+		return;
+#else
+	offset->ready = 1;
+#endif
+	// 填充协议 TCP/UDP
+	void *sk = get_socket_from_fd(data->fd, offset);
+	struct conn_info_t *conn_info, __conn_info = {};
+	conn_info = &__conn_info;
+	__u8 sock_state;
+	if (!(sk != NULL &&
+		// is_tcp_udp_data 函数更新了 conn_info 的 tuple.l4_protocol
+	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info)) 
+	       != SOCK_CHECK_TYPE_ERROR))) {
+		return;
+	}
+	send_buffer->tuple.l4_protocol = conn_info->tuple.l4_protocol;
+
+	// 填充端口号
+	init_conn_info(tgid,data->fd,conn_info,sk);
+	send_buffer->tuple.dport = conn_info->tuple.dport;
+	send_buffer->tuple.num = conn_info->tuple.num;
+
+	// 根据 conn_info 里标记的 IPv4或者 IPv6, 选择从 sk 的不同偏移,复制地址到 send_buffer
+	// 里面实现了地址填充
+	get_socket_info(send_buffer, sk, conn_info);
+
+	// trace_uid, socket_id 的生成器
+	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
+	if (trace_uid == NULL)
+		return;
+
+	// 更新和获取 socket_id
+	__u64 conn_key;
+	struct socket_info_t *socket_info_ptr;
+	conn_key = gen_conn_key_id((__u64)tgid, (__u64)data->fd);
+	socket_info_ptr = socket_info_map__lookup(&conn_key);
+	if (is_socket_info_valid(socket_info_ptr)) {
+		send_buffer->socket_id = socket_info_ptr->uid;
+	} else {
+		send_buffer->socket_id = trace_uid->socket_id + 1;
+		trace_uid->socket_id++;
+
+		struct socket_info_t sk_info = {
+			.uid = send_buffer->socket_id,
+		};
+		socket_info_map__update(&conn_key, &sk_info);
+	}
+
+	// 进程号线程号
+	send_buffer->tgid = tgid;
+	send_buffer->pid = (__u32) id;
+	////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 // 填充 buffer->send_buffer.data
@@ -297,7 +361,7 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 	struct go_http2_header_field field;
 
 #pragma unroll
-	for (idx = 0; idx < 10; ++idx) {
+	for (idx = 0; idx < 9; ++idx) {
 		if (idx >= headers->fields->len)
 			break;
 
