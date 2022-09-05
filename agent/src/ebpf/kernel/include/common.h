@@ -25,7 +25,9 @@ enum message_type {
 	// L7协议推断数据类型是回应
 	MSG_RESPONSE,
 
+	// HTTP2 request message end marker
 	MSG_REQUEST_END,
+	// HTTP2 response message end marker
 	MSG_RESPONSE_END,
 
 	// 无法推断协议类型，先在map中存储等下一次的数据
