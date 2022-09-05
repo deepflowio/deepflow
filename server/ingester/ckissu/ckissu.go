@@ -413,6 +413,15 @@ var ColumnAdd612 = []*ColumnAdds{
 	},
 }
 
+var ColumnAdd613 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"acl_gids"},
+		ColumnType:  ckdb.ArrayUInt16,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -640,6 +649,9 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 
 	columnAdds := []*ColumnAdd{}
 	for _, adds := range ColumnAdd612 {
+		columnAdds = append(columnAdds, getColumnAdds(adds)...)
+	}
+	for _, adds := range ColumnAdd613 {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 	i.columnAdds = columnAdds

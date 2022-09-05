@@ -51,6 +51,7 @@ type FlowLogDisabled struct {
 type FlowLogTTL struct {
 	L4FlowLog int `yaml:"l4-flow-log"`
 	L7FlowLog int `yaml:"l7-flow-log"`
+	L4Packet  int `yaml:"l4-packet"`
 }
 
 type Config struct {
@@ -82,6 +83,10 @@ func (c *Config) Validate() error {
 		c.FlowLogTTL.L7FlowLog = DefaultFlowLogTTL
 	}
 
+	if c.FlowLogTTL.L4Packet == 0 {
+		c.FlowLogTTL.L4Packet = DefaultFlowLogTTL
+	}
+
 	return nil
 }
 
@@ -93,7 +98,7 @@ func Load(base *config.Config, path string) *Config {
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
-			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL},
+			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL, DefaultFlowLogTTL},
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

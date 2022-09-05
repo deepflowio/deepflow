@@ -25,13 +25,15 @@ type FlowLogID uint8
 const (
 	L4_FLOW_ID FlowLogID = iota
 	L7_FLOW_ID
+	L4_PACKET_ID
 
 	FLOWLOG_ID_MAX
 )
 
 var flowLogNames = []string{
-	L4_FLOW_ID: "l4_flow_log",
-	L7_FLOW_ID: "l7_flow_log",
+	L4_FLOW_ID:   "l4_flow_log",
+	L7_FLOW_ID:   "l7_flow_log",
+	L4_PACKET_ID: "l4_packet",
 }
 
 func (l FlowLogID) String() string {

@@ -230,6 +230,14 @@ func (b *Block) WriteArrayString(v []string) error {
 	return nil
 }
 
+func (b *Block) WriteArrayUint16(v []uint16) error {
+	if err := b.Batch.Column(b.index).Append([][]uint16{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteArrayInt64(v []int64) error {
 	if err := b.Batch.Column(b.index).Append([][]int64{v}); err != nil {
 		return err
@@ -248,6 +256,14 @@ func (b *Block) WriteArrayUInt64(v []uint64) error {
 
 func (b *Block) WriteArrayFloat64(v []float64) error {
 	if err := b.Batch.Column(b.index).Append([][]float64{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
+func (b *Block) WriteArrayByte(v []byte) error {
+	if err := b.Batch.Column(b.index).Append([][]byte{v}); err != nil {
 		return err
 	}
 	b.index++
@@ -287,6 +303,7 @@ const (
 	IPv6
 	IPv4
 	ArrayString
+	ArrayUInt8
 	ArrayUInt16
 	ArrayUInt32
 	ArrayInt64
@@ -322,6 +339,7 @@ var cloumnTypeString = []string{
 	IPv6:                 "IPv6",
 	IPv4:                 "IPv4",
 	ArrayString:          "Array(String)",
+	ArrayUInt8:           "Array(UInt8)",
 	ArrayUInt16:          "Array(UInt16)",
 	ArrayUInt32:          "Array(UInt32)",
 	ArrayInt64:           "Array(Int64)",

@@ -556,6 +556,7 @@ type FlowInfo struct {
 	Duration    uint64 `json:"duration"`   // us
 	IsNewFlow   uint8  `json:"is_new_flow"`
 	Status      uint8  `json:"status"`
+	AclGids     []uint16
 }
 
 var FlowInfoColumns = []*ckdb.Column{
@@ -578,6 +579,7 @@ var FlowInfoColumns = []*ckdb.Column{
 	ckdb.NewColumn("duration", ckdb.UInt64).SetComment("单位: 微秒"),
 	ckdb.NewColumn("is_new_flow", ckdb.UInt8),
 	ckdb.NewColumn("status", ckdb.UInt8).SetComment("状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
+	ckdb.NewColumn("acl_gids", ckdb.ArrayUInt16),
 }
 
 func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
@@ -633,6 +635,9 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt8(f.Status); err != nil {
+		return err
+	}
+	if err := block.WriteArrayUint16(f.AclGids); err != nil {
 		return err
 	}
 
@@ -1149,6 +1154,10 @@ func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.Duration = f.Duration / uint64(time.Microsecond)
 	i.IsNewFlow = uint8(f.IsNewFlow)
 	i.Status = getStatus(datatype.CloseType(i.CloseType))
+	i.AclGids = []uint16{}
+	for _, v := range f.AclGids {
+		i.AclGids = append(i.AclGids, uint16(v))
+	}
 }
 
 func (m *Metrics) Fill(f *pb.Flow) {
