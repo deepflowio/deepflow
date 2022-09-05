@@ -75,6 +75,7 @@ func (k *KubernetesInfo) CacheClusterID(clusterID string) {
 }
 
 func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, err error) {
+	log.Infof("auto create domain (cluster_id: %s)", clusterID)
 	azConMgr := dbmgr.DBMgr[models.AZControllerConnection](k.db)
 	azConn, err := azConMgr.GetFromControllerIP(k.cfg.NodeIP)
 	if err != nil {
