@@ -92,3 +92,13 @@ func (thq *ThrottlingQueue) Send(flow interface{}) bool {
 		return false
 	}
 }
+
+func (thq *ThrottlingQueue) SendWithoutThrottling(flow interface{}) bool {
+	thq.sampleItems[thq.periodEmitCount] = flow
+	thq.periodEmitCount++
+	if thq.periodEmitCount == thq.Throttle || flow == nil {
+		thq.flowLogWriter.Put(thq.index, thq.sampleItems[:thq.periodEmitCount]...)
+		thq.periodEmitCount = 0
+	}
+	return true
+}

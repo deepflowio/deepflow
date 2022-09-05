@@ -350,6 +350,15 @@ func (d *SimpleDecoder) ReadBytes() []byte {
 	return d.buf[d.offset-l : d.offset]
 }
 
+func (d *SimpleDecoder) ReadBytesN(n int) []byte {
+	d.offset += n
+	if d.offset > len(d.buf) {
+		d.err++
+		return nil
+	}
+	return d.buf[d.offset-n : d.offset]
+}
+
 func (d *SimpleDecoder) ReadBytesWithVarintLen() []byte {
 	l := int(d.ReadVarintU32())
 	d.offset += l

@@ -46,26 +46,28 @@ const (
 )
 
 type Counter struct {
-	RawCount         int64 `statsd:"raw-count"`
-	L4Count          int64 `statsd:"l4-count"`
-	L4DropCount      int64 `statsd:"l4-drop-count"`
-	L7Count          int64 `statsd:"l7-count"`
-	L7DropCount      int64 `statsd:"l7-drop-count"`
-	L7HTTPCount      int64 `statsd:"l7-http-count"`
-	L7HTTPDropCount  int64 `statsd:"l7-http-drop-count"`
-	L7DNSCount       int64 `statsd:"l7-dns-count"`
-	L7DNSDropCount   int64 `statsd:"l7-dns-drop-count"`
-	L7SQLCount       int64 `statsd:"l7-sql-count"`
-	L7SQLDropCount   int64 `statsd:"l7-sql-drop-count"`
-	L7NoSQLCount     int64 `statsd:"l7-nosql-count"`
-	L7NoSQLDropCount int64 `statsd:"l7-nosql-drop-count"`
-	L7RPCCount       int64 `statsd:"l7-rpc-count"`
-	L7RPCDropCount   int64 `statsd:"l7-rpc-drop-count"`
-	L7MQCount        int64 `statsd:"l7-mq-count"`
-	L7MQDropCount    int64 `statsd:"l7-mq-drop-count"`
-	OTelCount        int64 `statsd:"otel-count"`
-	OTelDropCount    int64 `statsd:"otel-drop-count"`
-	ErrorCount       int64 `statsd:"err-count"`
+	RawCount          int64 `statsd:"raw-count"`
+	L4Count           int64 `statsd:"l4-count"`
+	L4DropCount       int64 `statsd:"l4-drop-count"`
+	L7Count           int64 `statsd:"l7-count"`
+	L7DropCount       int64 `statsd:"l7-drop-count"`
+	L7HTTPCount       int64 `statsd:"l7-http-count"`
+	L7HTTPDropCount   int64 `statsd:"l7-http-drop-count"`
+	L7DNSCount        int64 `statsd:"l7-dns-count"`
+	L7DNSDropCount    int64 `statsd:"l7-dns-drop-count"`
+	L7SQLCount        int64 `statsd:"l7-sql-count"`
+	L7SQLDropCount    int64 `statsd:"l7-sql-drop-count"`
+	L7NoSQLCount      int64 `statsd:"l7-nosql-count"`
+	L7NoSQLDropCount  int64 `statsd:"l7-nosql-drop-count"`
+	L7RPCCount        int64 `statsd:"l7-rpc-count"`
+	L7RPCDropCount    int64 `statsd:"l7-rpc-drop-count"`
+	L7MQCount         int64 `statsd:"l7-mq-count"`
+	L7MQDropCount     int64 `statsd:"l7-mq-drop-count"`
+	OTelCount         int64 `statsd:"otel-count"`
+	OTelDropCount     int64 `statsd:"otel-drop-count"`
+	L4PacketCount     int64 `statsd:"l4-packet-count"`
+	L4PacketDropCount int64 `statsd:"l4-packet-drop-count"`
+	ErrorCount        int64 `statsd:"err-count"`
 }
 
 type Decoder struct {
@@ -157,6 +159,8 @@ func (d *Decoder) Run() {
 				d.handleTaggedFlow(decoder, pbTaggedFlow)
 			} else if d.msgType == datatype.MESSAGE_TYPE_OPENTELEMETRY {
 				d.handleOpenTelemetry(recvBytes.VtapID, decoder, pbTracesData)
+			} else if d.msgType == datatype.MESSAGE_TYPE_PACKETSEQUENCE {
+				d.handleL4Packet(recvBytes.VtapID, decoder)
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
@@ -229,6 +233,26 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7LoggerToFlowTagInterfaces(l))
 			l.Release()
 		}
+	}
+}
+
+func (d *Decoder) handleL4Packet(vtapID uint16, decoder *codec.SimpleDecoder) {
+	for !decoder.IsEnd() {
+		l4Packet := jsonify.DecodePacketSequence(decoder, vtapID)
+		if decoder.Failed() {
+			if d.counter.ErrorCount == 0 {
+				log.Errorf("packet sequence decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+			}
+			l4Packet.Release()
+			d.counter.ErrorCount++
+			return
+		}
+
+		if d.debugEnabled {
+			log.Debugf("decoder %d vtap %d recv l4 packet: %s", d.index, vtapID, l4Packet)
+		}
+		d.counter.L4PacketCount++
+		d.throttler.SendWithoutThrottling(l4Packet)
 	}
 }
 

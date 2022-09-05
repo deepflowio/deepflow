@@ -46,10 +46,11 @@ const (
 )
 
 type Stream struct {
-	StreamConfig *config.Config
-	FlowLogger   *Logger
-	ProtoLogger  *Logger
-	OtelLogger   *Logger
+	StreamConfig   *config.Config
+	L4FlowLogger   *Logger
+	L7FlowLogger   *Logger
+	OtelLogger     *Logger
+	L4PacketLogger *Logger
 }
 
 type Logger struct {
@@ -75,18 +76,20 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	if err != nil {
 		return nil, err
 	}
-	flowLogger := NewFlowLogger(config, controllers, manager, recv, flowLogWriter)
-	protoLogger := NewProtoLogger(config, controllers, manager, recv, flowLogWriter)
+	l4FlowLogger := NewL4FlowLogger(config, controllers, manager, recv, flowLogWriter)
+	l7FlowLogger := NewL7FlowLogger(config, controllers, manager, recv, flowLogWriter)
 	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
 	if err != nil {
 		return nil, err
 	}
 	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
+	l4PacketLogger := NewLogger(datatype.MESSAGE_TYPE_PACKETSEQUENCE, config, nil, manager, recv, flowLogWriter, common.L4_PACKET_ID, nil)
 	return &Stream{
-		StreamConfig: config,
-		FlowLogger:   flowLogger,
-		ProtoLogger:  protoLogger,
-		OtelLogger:   otelLogger,
+		StreamConfig:   config,
+		L4FlowLogger:   l4FlowLogger,
+		L7FlowLogger:   l7FlowLogger,
+		OtelLogger:     otelLogger,
+		L4PacketLogger: l4PacketLogger,
 	}, nil
 }
 
@@ -111,9 +114,11 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 			flowLogWriter,
 			int(flowLogId),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
-		if i == 0 {
-			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
+		if controllers != nil {
+			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+			if i == 0 {
+				debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
+			}
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
@@ -134,7 +139,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 	}
 }
 
-func NewFlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
+func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
 	msgType := datatype.MESSAGE_TYPE_TAGGEDFLOW
 	queueCount := config.DecoderQueueCount
 	queueSuffix := "-l4"
@@ -186,7 +191,7 @@ func NewFlowLogger(config *config.Config, controllers []net.IP, manager *droplet
 	}
 }
 
-func NewProtoLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
+func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
 	queueSuffix := "-l7"
 	queueCount := config.DecoderQueueCount
 	msgType := datatype.MESSAGE_TYPE_PROTOCOLLOG
@@ -238,7 +243,9 @@ func NewProtoLogger(config *config.Config, controllers []net.IP, manager *drople
 
 func (l *Logger) Start() {
 	for _, platformData := range l.PlatformDatas {
-		platformData.Start()
+		if platformData != nil {
+			platformData.Start()
+		}
 	}
 
 	for _, decoder := range l.Decoders {
@@ -248,19 +255,23 @@ func (l *Logger) Start() {
 
 func (l *Logger) Close() {
 	for _, platformData := range l.PlatformDatas {
-		platformData.Close()
+		if platformData != nil {
+			platformData.Close()
+		}
 	}
 }
 
 func (s *Stream) Start() {
-	s.FlowLogger.Start()
-	s.ProtoLogger.Start()
+	s.L4FlowLogger.Start()
+	s.L7FlowLogger.Start()
+	s.L4PacketLogger.Start()
 	s.OtelLogger.Start()
 }
 
 func (s *Stream) Close() error {
-	s.FlowLogger.Close()
-	s.ProtoLogger.Close()
+	s.L4FlowLogger.Close()
+	s.L7FlowLogger.Close()
+	s.L4PacketLogger.Close()
 	s.OtelLogger.Close()
 	return nil
 }
