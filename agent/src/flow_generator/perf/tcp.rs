@@ -391,22 +391,17 @@ impl TimeStats {
 // 后2个包是server端的应答包，art表示后2个包之间的时间间隔
 #[derive(Default, Debug, PartialEq, Eq)]
 struct PerfData {
-    // flow数据
     rtt_0: TimeStats,
     rtt_1: TimeStats,
-    cit: TimeStats,
-    retrans_sum: u32,
-    rtt_full: Option<Duration>,
-
-    period_data: PeriodPerfData,
-}
-
-#[derive(Default, Debug, PartialEq, Eq)]
-struct PeriodPerfData {
     art_0: TimeStats,
     art_1: TimeStats,
     srt_0: TimeStats,
     srt_1: TimeStats,
+    cit: TimeStats,
+
+    // flow数据
+    retrans_sum: u32,
+    rtt_full: Duration,
 
     // 包括syn重传
     retrans_0: u32,
@@ -439,25 +434,26 @@ impl PerfData {
     // 计算art值
     fn calc_art(&mut self, d: Duration, fpd: bool) {
         if fpd {
-            self.period_data.art_0.update(d);
+            self.art_0.update(d);
         } else {
-            self.period_data.art_1.update(d);
+            self.art_1.update(d);
         }
-        self.period_data.updated = true;
+        self.updated = true;
     }
 
     // 计算srt值
     fn calc_srt(&mut self, d: Duration, fpd: bool) {
         if fpd {
-            self.period_data.srt_0.update(d);
+            self.srt_0.update(d);
         } else {
-            self.period_data.srt_1.update(d);
+            self.srt_1.update(d);
         }
-        self.period_data.updated = true;
+        self.updated = true;
     }
 
     fn calc_rtt_full(&mut self, d: Duration) {
-        self.rtt_full.replace(d);
+        self.rtt_full = d;
+        self.updated = true;
     }
 
     fn calc_rtt(&mut self, d: Duration, fpd: bool) {
@@ -466,138 +462,133 @@ impl PerfData {
         } else {
             self.rtt_1.update(d);
         }
+        self.updated = true;
     }
 
     fn calc_retrans_syn(&mut self, fpd: bool) {
         if fpd {
-            self.period_data.retrans_syn_0 += 1;
+            self.retrans_syn_0 += 1;
         } else {
-            self.period_data.retrans_syn_1 += 1;
+            self.retrans_syn_1 += 1;
         }
         self.calc_retrans(fpd);
-        self.period_data.updated = true;
+        self.updated = true;
     }
 
     fn calc_retrans(&mut self, fpd: bool) {
         if fpd {
-            self.period_data.retrans_0 += 1;
+            self.retrans_0 += 1;
         } else {
-            self.period_data.retrans_1 += 1;
+            self.retrans_1 += 1;
         }
         self.retrans_sum += 1;
-        self.period_data.updated = true;
+        self.updated = true;
     }
 
     fn calc_zero_win(&mut self, fpd: bool) {
         if fpd {
-            self.period_data.zero_win_count_0 += 1;
+            self.zero_win_count_0 += 1;
         } else {
-            self.period_data.zero_win_count_1 += 1;
+            self.zero_win_count_1 += 1;
         }
-        self.period_data.updated = true;
+        self.updated = true;
     }
 
     fn calc_psh_urg(&mut self, fpd: bool) {
         if fpd {
-            self.period_data.psh_urg_count_0 += 1;
+            self.psh_urg_count_0 += 1;
         } else {
-            self.period_data.psh_urg_count_1 += 1;
+            self.psh_urg_count_1 += 1;
         }
-        self.period_data.updated = true;
+        self.updated = true;
     }
 
     fn calc_syn(&mut self) {
-        self.period_data.syn += 1;
-        self.period_data.updated = true;
+        self.syn += 1;
+        self.updated = true;
     }
 
     fn calc_synack(&mut self) {
-        self.period_data.synack += 1;
-        self.period_data.updated = true;
+        self.synack += 1;
+        self.updated = true;
     }
 
     fn calc_retran_syn(&mut self) {
-        self.period_data.retrans_syn += 1;
-        self.period_data.updated = true;
+        self.retrans_syn += 1;
+        self.updated = true;
     }
 
     fn calc_retrans_synack(&mut self) {
-        self.period_data.retrans_synack += 1;
-        self.period_data.updated = true;
+        self.retrans_synack += 1;
+        self.updated = true;
     }
 
     fn calc_cit(&mut self, d: Duration) {
         self.cit.update(d);
+        self.updated = true;
     }
 
     fn update_perf_stats(&mut self, stats: &mut FlowPerfStats, flow_reversed: bool) {
-        let stats = &mut stats.tcp;
+        if !self.updated {
+            return;
+        }
+        self.updated = false;
 
-        if let Some(rtt) = self.rtt_full.take() {
-            stats.rtt = rtt.as_micros() as u32;
+        let stats = &mut stats.tcp;
+        stats.counts_peers[0].retrans_count = self.retrans_0;
+        stats.counts_peers[1].retrans_count = self.retrans_1;
+        stats.total_retrans_count = self.retrans_sum;
+        stats.counts_peers[0].zero_win_count = self.zero_win_count_0;
+        stats.counts_peers[1].zero_win_count = self.zero_win_count_1;
+
+        stats.syn_count = self.syn;
+        stats.synack_count = self.synack;
+        stats.retrans_syn_count = self.retrans_syn;
+        stats.retrans_synack_count = self.retrans_synack;
+
+        stats.rtt = self.rtt_full.as_micros() as u32;
+
+        if !flow_reversed {
+            if self.art_1.updated {
+                stats.art_max = self.art_1.max.as_micros() as u32;
+                stats.art_sum = self.art_1.sum.as_micros() as u32;
+                stats.art_count = self.art_1.count;
+            }
+            if self.srt_1.updated {
+                stats.srt_max = self.srt_1.max.as_micros() as u32;
+                stats.srt_sum = self.srt_1.sum.as_micros() as u32;
+                stats.srt_count = self.srt_1.count;
+            }
+        } else {
+            if self.art_0.updated {
+                stats.art_max = self.art_0.max.as_micros() as u32;
+                stats.art_sum = self.art_0.sum.as_micros() as u32;
+                stats.art_count = self.art_0.count;
+            }
+            if self.srt_0.updated {
+                stats.srt_max = self.srt_0.max.as_micros() as u32;
+                stats.srt_sum = self.srt_0.sum.as_micros() as u32;
+                stats.srt_count = self.srt_0.count;
+            }
+            stats.reverse();
         }
 
         if self.rtt_0.updated {
             stats.rtt_client_max = self.rtt_0.max.as_micros() as u32;
             stats.rtt_client_sum = self.rtt_0.sum.as_micros() as u32;
             stats.rtt_client_count = self.rtt_0.count;
-            self.rtt_0.updated = false;
         }
 
         if self.rtt_1.updated {
             stats.rtt_server_max = self.rtt_1.max.as_micros() as u32;
             stats.rtt_server_sum = self.rtt_1.sum.as_micros() as u32;
             stats.rtt_server_count = self.rtt_1.count;
-            self.rtt_1.updated = false;
         }
 
         if self.cit.updated {
             stats.cit_max = self.cit.max.as_micros() as u32;
             stats.cit_sum = self.cit.sum.as_micros() as u32;
             stats.cit_count = self.cit.count;
-            self.cit.updated = false;
-        }
-
-        if !self.period_data.updated {
-            return;
-        }
-        self.period_data.updated = false;
-
-        let pd = &self.period_data;
-        stats.counts_peers[0].retrans_count = pd.retrans_0;
-        stats.counts_peers[1].retrans_count = pd.retrans_1;
-        stats.total_retrans_count = self.retrans_sum;
-        stats.counts_peers[0].zero_win_count = pd.zero_win_count_0;
-        stats.counts_peers[1].zero_win_count = pd.zero_win_count_1;
-
-        stats.syn_count = pd.syn;
-        stats.synack_count = pd.synack;
-        stats.retrans_syn_count = pd.retrans_syn;
-        stats.retrans_synack_count = pd.retrans_synack;
-
-        if !flow_reversed {
-            if pd.art_1.updated {
-                stats.art_max = pd.art_1.max.as_micros() as u32;
-                stats.art_sum = pd.art_1.sum.as_micros() as u32;
-                stats.art_count = pd.art_1.count;
-            }
-            if pd.srt_1.updated {
-                stats.srt_max = pd.srt_1.max.as_micros() as u32;
-                stats.srt_sum = pd.srt_1.sum.as_micros() as u32;
-                stats.srt_count = pd.srt_1.count;
-            }
-        } else {
-            if pd.art_0.updated {
-                stats.art_max = pd.art_0.max.as_micros() as u32;
-                stats.art_sum = pd.art_0.sum.as_micros() as u32;
-                stats.art_count = pd.art_0.count;
-            }
-            if pd.srt_0.updated {
-                stats.srt_max = pd.srt_0.max.as_micros() as u32;
-                stats.srt_sum = pd.srt_0.sum.as_micros() as u32;
-                stats.srt_count = pd.srt_0.count;
-            }
-            stats.reverse();
         }
     }
 }
@@ -985,18 +976,14 @@ impl L4FlowPerf for TcpPerf {
 
     fn data_updated(&self) -> bool {
         let d = &self.perf_data;
-        d.period_data.updated
-            || d.rtt_0.updated
-            || d.rtt_1.updated
-            || d.rtt_full.is_some()
-            || d.cit.updated
+        d.updated
     }
 
     fn copy_and_reset_data(&mut self, flow_reversed: bool) -> FlowPerfStats {
         let mut stats = FlowPerfStats::default();
         stats.l4_protocol = L4Protocol::Tcp;
         self.perf_data.update_perf_stats(&mut stats, flow_reversed);
-        self.perf_data.period_data = Default::default();
+        self.perf_data = Default::default();
         stats
     }
 }
@@ -1014,20 +1001,20 @@ impl fmt::Debug for TcpPerf {
 #[doc(hidden)]
 pub fn _benchmark_report(perf: &mut TcpPerf) {
     let pd = &mut perf.perf_data;
-    pd.period_data.art_0.max = Duration::from_nanos(100);
-    pd.period_data.art_0.sum = Duration::from_nanos(100);
-    pd.period_data.art_0.count = 1;
-    pd.period_data.art_1.max = Duration::from_nanos(300);
-    pd.period_data.art_1.sum = Duration::from_nanos(300);
-    pd.period_data.art_1.count = 1;
+    pd.art_0.max = Duration::from_nanos(100);
+    pd.art_0.sum = Duration::from_nanos(100);
+    pd.art_0.count = 1;
+    pd.art_1.max = Duration::from_nanos(300);
+    pd.art_1.sum = Duration::from_nanos(300);
+    pd.art_1.count = 1;
     let _ = perf.copy_and_reset_data(false);
     let pd = &mut perf.perf_data;
-    pd.period_data.art_0.max = Duration::from_nanos(200);
-    pd.period_data.art_0.sum = Duration::from_nanos(200);
-    pd.period_data.art_0.count = 1;
-    pd.period_data.srt_0.max = Duration::from_nanos(1000);
-    pd.period_data.srt_0.sum = Duration::from_nanos(1000);
-    pd.period_data.srt_0.count = 1;
+    pd.art_0.max = Duration::from_nanos(200);
+    pd.art_0.sum = Duration::from_nanos(200);
+    pd.art_0.count = 1;
+    pd.srt_0.max = Duration::from_nanos(1000);
+    pd.srt_0.sum = Duration::from_nanos(1000);
+    pd.srt_0.count = 1;
     let _ = perf.copy_and_reset_data(false);
 }
 
@@ -1815,31 +1802,28 @@ mod tests {
                 updated: true,
                 ..Default::default()
             },
-            period_data: PeriodPerfData {
-                art_0: TimeStats {
-                    sum: Duration::from_nanos(70),
-                    max: Duration::from_nanos(70),
-                    count: 1,
-                    updated: true,
-                    ..Default::default()
-                },
-                srt_0: TimeStats {
-                    sum: Duration::from_nanos(16),
-                    max: Duration::from_nanos(16),
-                    count: 2,
-                    updated: true,
-                    ..Default::default()
-                },
-                srt_1: TimeStats {
-                    count: 1,
-                    updated: true,
-                    ..Default::default()
-                },
-                zero_win_count_0: 3,
-                zero_win_count_1: 5,
+            art_0: TimeStats {
+                sum: Duration::from_nanos(70),
+                max: Duration::from_nanos(70),
+                count: 1,
                 updated: true,
                 ..Default::default()
             },
+            srt_0: TimeStats {
+                sum: Duration::from_nanos(16),
+                max: Duration::from_nanos(16),
+                count: 2,
+                updated: true,
+                ..Default::default()
+            },
+            srt_1: TimeStats {
+                count: 1,
+                updated: true,
+                ..Default::default()
+            },
+            zero_win_count_0: 3,
+            zero_win_count_1: 5,
+            updated: true,
             ..Default::default()
         };
 
