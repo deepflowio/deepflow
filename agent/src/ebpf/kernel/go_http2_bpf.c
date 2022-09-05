@@ -168,18 +168,12 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 
 #if 0
 	bpf_debug("tcp_seq=[%u]\n", send_buffer->tcp_seq);
-	bpf_debug("coroutine_id=[%u]\n", send_buffer->coroutine_id);
-	bpf_debug("data_type=[%u]\n", send_buffer->data_type);
 	bpf_debug("msg_type=[%u]\n", send_buffer->msg_type);
 	bpf_debug("socket id=[%llu]\n", send_buffer->socket_id);
-	bpf_debug("pid=[%d]\n", send_buffer->pid);
-
 	bpf_debug("fd=[%u]\n", *(__u32 *)(send_buffer->data));
 	bpf_debug("stream id=[%u]\n", *(__u32 *)(send_buffer->data + 4));
-	bpf_debug("key len=[%u]\n", *(__u32 *)(send_buffer->data + 8));
-	bpf_debug("value len=[%u]\n", *(__u32 *)(send_buffer->data + 12));
 	bpf_debug("header=[%s]\n", send_buffer->data + 16);
-#endif
+#else
 
 	//////////////////////////////////////////////////////
 	int k0 = 0;
@@ -234,6 +228,7 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 
 	v_buff->events_num = 0;
 	v_buff->len = 0;
+#endif
 }
 
 // 填充 buffer->send_buffer 中除了 data 的所有字段
@@ -246,7 +241,6 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 	// source, coroutine_id, msg_type, timestamp
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
 	send_buffer->coroutine_id = get_current_goroutine();
-	send_buffer->msg_type = data->message_type;
 	send_buffer->timestamp = bpf_ktime_get_ns();
 
 	// tcp_seq, direction
@@ -335,6 +329,10 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 			.uid = send_buffer->socket_id,
 		};
 		socket_info_map__update(&conn_key, &sk_info);
+		struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
+		if (trace_stats == NULL)
+			return;
+		trace_stats->socket_map_count++;
 	}
 
 	// 进程号线程号
@@ -356,6 +354,7 @@ static __inline void http2_fill_buffer_and_send(struct http2_header_data *data)
 	if (!buffer || !send_buffer) {
 		return;
 	}
+	send_buffer->msg_type = data->message_type;
 
 	buffer->fd = data->fd;
 	buffer->stream_id = data->stream;
