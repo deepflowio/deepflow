@@ -42,9 +42,9 @@ struct {
 
 // The first 16 bytes are fixed headers, 
 // and the total reported buffer does not exceed 1k
-#define HTTP2_BUFFER_INFO_SIZE (1024 - 16)
+#define HTTP2_BUFFER_INFO_SIZE (CAP_DATA_SIZE  - 16)
 // Make the eBPF validator happy
-#define HTTP2_BUFFER_UESLESS (1024)
+#define HTTP2_BUFFER_UESLESS (CAP_DATA_SIZE)
 
 struct __http2_buffer {
 	__u32 fd;

@@ -329,6 +329,7 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
+	// When go uprobe http2 cannot be used, use kprobe/tracepoint to collect data
 	if (get_go_version()) {
 		return MSG_UNKNOWN;
 	}

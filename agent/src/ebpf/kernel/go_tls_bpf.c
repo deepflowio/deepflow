@@ -33,6 +33,15 @@ struct http2_tcp_seq_key {
 	__u32 tcp_seq_end;
 };
 
+/*
+ * In uprobe_go_tls_read_exit()
+ * Save the TCP sequence number before the syscall(read())
+ * 
+ * In uprobe http2 read() (after syscall read()), lookup TCP sequence number recorded previously on the map.
+ * e.g.: In uprobe_go_http2serverConn_processHeaders(), get TCP sequence before syscall read(). 
+ * 
+ * Note:  Use for after uprobe read() only.
+ */
 struct {
 	__uint(type, BPF_MAP_TYPE_LRU_HASH);
 	__type(key, struct http2_tcp_seq_key);
@@ -40,6 +49,14 @@ struct {
 	__uint(max_entries, 1024);
 } http2_tcp_seq_map SEC(".maps");
 
+/*
+ *  uprobe_go_tls_write_enter  (In tls_conn_map record A(tcp_seq) before syscall)
+ *               |
+ *               | - syscall write()
+ *               |
+ *  uprobe_go_tls_write_exit(return)  lookup A(tcp_seq) from tls_conn_map
+ *     send to user finally tcp sequence is "A(tcp_seq) + bytes_count"
+ */
 SEC("uprobe/go_tls_write_enter")
 int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 {
@@ -114,6 +131,14 @@ out:
 	return 0;
 }
 
+/*
+ *  uprobe_go_tls_read_enter  (In tls_conn_map record A(tcp_seq) before syscall)
+ *               |
+ *               | - syscall read()
+ *               |
+ *  uprobe_go_tls_read_exit(return)  lookup A(tcp_seq) from tls_conn_map
+ *     send to user finally tcp sequence is "A(tcp_seq) + bytes_count"
+ */
 SEC("uprobe/go_tls_read_enter")
 int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 {

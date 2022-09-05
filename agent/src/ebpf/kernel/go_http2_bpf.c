@@ -151,7 +151,7 @@ struct http2_header_data {
 	struct pt_regs *ctx;
 };
 
-// 从 extra 里拿数据并发送,还有一个当作大的栈使用的 __http2_buffer
+// Take data from extra and send it, and a __http2_buffer used as a big stack
 static __inline void report_http2_header(struct pt_regs *ctx)
 {
 	if (!ctx) {
@@ -166,16 +166,6 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 		return;
 	}
 
-#if 0
-	bpf_debug("tcp_seq=[%u]\n", send_buffer->tcp_seq);
-	bpf_debug("msg_type=[%u]\n", send_buffer->msg_type);
-	bpf_debug("socket id=[%llu]\n", send_buffer->socket_id);
-	bpf_debug("fd=[%u]\n", *(__u32 *)(send_buffer->data));
-	bpf_debug("stream id=[%u]\n", *(__u32 *)(send_buffer->data + 4));
-	bpf_debug("header=[%s]\n", send_buffer->data + 16);
-#else
-
-	//////////////////////////////////////////////////////
 	int k0 = 0;
 	struct __socket_data_buffer *v_buff;
 	v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
@@ -189,7 +179,6 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 
-	// 复制字段,如果不行的话还可以一个一个的赋值
 	int fix_header_len = offsetof(typeof(struct __socket_data), data);
 	if (bpf_probe_read(v, fix_header_len, send_buffer))
 		return;
@@ -221,17 +210,15 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 				      BPF_F_CURRENT_CPU, v_buff,
 				      sizeof(*v_buff));
 	} else {
-		/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
 		bpf_perf_event_output(ctx, &NAME(socket_data),
 				      BPF_F_CURRENT_CPU, v_buff, buf_size + 1);
 	}
 
 	v_buff->events_num = 0;
 	v_buff->len = 0;
-#endif
 }
 
-// 填充 buffer->send_buffer 中除了 data 的所有字段
+// Fill all fields except data in buffer->send_buffer
 static __inline void http2_fill_common_socket(struct http2_header_data *data)
 {
 	struct __socket_data *send_buffer = get_http2_send_buffer();
@@ -272,8 +259,8 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 
 	send_buffer->data_type = protocol;
 
-	///////////////////////// 从这里开始复制自 socket_trace.c //////////////////////////////
-	// 参考 socket_trace.c 中 process_data 的逻辑,获取五元组信息
+	// Refer to the logic of process_data in socket_trace.c to 
+	// obtain quintuple information
 	__u64 id = bpf_get_current_pid_tgid();
 	__u32 tgid = id >> 32;
 	__u32 k0 = 0;
@@ -287,34 +274,35 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 #else
 	offset->ready = 1;
 #endif
-	// 填充协议 TCP/UDP
+	// Assignment Protocol TCP/UDP
 	void *sk = get_socket_from_fd(data->fd, offset);
 	struct conn_info_t *conn_info, __conn_info = {};
 	conn_info = &__conn_info;
 	__u8 sock_state;
 	if (!(sk != NULL &&
-	      // is_tcp_udp_data 函数更新了 conn_info 的 tuple.l4_protocol
+	      // is_tcp_udp_data function updates tuple.l4_protocol of conn_info
 	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info)) !=
 	       SOCK_CHECK_TYPE_ERROR))) {
 		return;
 	}
 	send_buffer->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 
-	// 填充端口号
+	// fill in the port number
 	init_conn_info(tgid, data->fd, conn_info, sk);
 	send_buffer->tuple.dport = conn_info->tuple.dport;
 	send_buffer->tuple.num = conn_info->tuple.num;
 
-	// 根据 conn_info 里标记的 IPv4或者 IPv6, 选择从 sk 的不同偏移,复制地址到 send_buffer
-	// 里面实现了地址填充
+	// According to the IPv4 or IPv6 marked in conn_info, 
+	// choose a different offset from sk, copy the address to send_buffer.
+	// It implements address assignment.
 	get_socket_info(send_buffer, sk, conn_info);
 
-	// trace_uid, socket_id 的生成器
+	// trace_uid, generator for socket_id
 	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
 	if (trace_uid == NULL)
 		return;
 
-	// 更新和获取 socket_id
+	// Update and get socket_id
 	__u64 conn_key;
 	struct socket_info_t *socket_info_ptr;
 	conn_key = gen_conn_key_id((__u64)tgid, (__u64)data->fd);
@@ -335,10 +323,8 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 		trace_stats->socket_map_count++;
 	}
 
-	// 进程号线程号
 	send_buffer->tgid = tgid;
 	send_buffer->pid = (__u32)id;
-	////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 // 填充 buffer->send_buffer.data
@@ -402,6 +388,7 @@ struct http2_headers_data {
 	struct pt_regs *ctx;
 };
 
+// Send multiple header messages and add an end marker message at the end
 static __inline int submit_http2_headers(struct http2_headers_data *headers)
 {
 	struct http2_header_data data = {
