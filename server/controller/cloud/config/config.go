@@ -34,5 +34,4 @@ func SetCloudGlobalConfig(c CloudConfig) {
 		DNSEnable:        c.DNSEnable,
 		HTTPTimeout:      c.HTTPTimeout,
 	}
-
 }
