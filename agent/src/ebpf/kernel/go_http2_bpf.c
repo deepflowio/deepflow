@@ -161,35 +161,93 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	if (!send_buffer) {
 		return;
 	}
+
+	if (!send_buffer->pid) {
+		return;
+	}
+
+#if 0
 	bpf_debug("tcp_seq=[%u]\n", send_buffer->tcp_seq);
 	bpf_debug("coroutine_id=[%u]\n", send_buffer->coroutine_id);
 	bpf_debug("data_type=[%u]\n", send_buffer->data_type);
 	bpf_debug("msg_type=[%u]\n", send_buffer->msg_type);
-	bpf_debug("socket id=[%llu]\n",send_buffer->socket_id);
-	bpf_debug("pid=[%d]\n",send_buffer->pid);
+	bpf_debug("socket id=[%llu]\n", send_buffer->socket_id);
+	bpf_debug("pid=[%d]\n", send_buffer->pid);
 
 	bpf_debug("fd=[%u]\n", *(__u32 *)(send_buffer->data));
 	bpf_debug("stream id=[%u]\n", *(__u32 *)(send_buffer->data + 4));
 	bpf_debug("key len=[%u]\n", *(__u32 *)(send_buffer->data + 8));
 	bpf_debug("value len=[%u]\n", *(__u32 *)(send_buffer->data + 12));
 	bpf_debug("header=[%s]\n", send_buffer->data + 16);
+#endif
 
-	// TODO: 代码直接这样写上层看不到数据,原因未知,需要处理
-	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU,
-			      send_buffer, sizeof(*send_buffer));
+	//////////////////////////////////////////////////////
+	int k0 = 0;
+	struct __socket_data_buffer *v_buff;
+	v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		return;
+
+	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
+
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+		return;
+
+	v = (struct __socket_data *)(v_buff->data + v_buff->len);
+
+	// 复制字段,如果不行的话还可以一个一个的赋值
+	int fix_header_len = offsetof(typeof(struct __socket_data), data);
+	if (bpf_probe_read(v, fix_header_len, send_buffer))
+		return;
+
+	__u32 data_len = send_buffer->syscall_len;
+	__u32 len = (data_len) & (sizeof(v->data) - 1);
+
+	if (data_len >= sizeof(v->data)) {
+		if (unlikely(bpf_probe_read(v->data, sizeof(v->data),
+					    send_buffer->data) != 0))
+			return;
+		len = sizeof(v->data);
+	} else {
+		if (unlikely(bpf_probe_read(v->data, len + 1,
+					    send_buffer->data) != 0))
+			return;
+	}
+
+	v->data_len = len;
+	v_buff->len +=
+		offsetof(typeof(struct __socket_data), data) + v->data_len;
+	v_buff->events_num++;
+
+	__u32 buf_size = (v_buff->len +
+			  offsetof(typeof(struct __socket_data_buffer), data)) &
+			 (sizeof(*v_buff) - 1);
+	if (buf_size >= sizeof(*v_buff)) {
+		bpf_perf_event_output(ctx, &NAME(socket_data),
+				      BPF_F_CURRENT_CPU, v_buff,
+				      sizeof(*v_buff));
+	} else {
+		/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+		bpf_perf_event_output(ctx, &NAME(socket_data),
+				      BPF_F_CURRENT_CPU, v_buff, buf_size + 1);
+	}
+
+	v_buff->events_num = 0;
+	v_buff->len = 0;
 }
 
 // 填充 buffer->send_buffer 中除了 data 的所有字段
 static __inline void http2_fill_common_socket(struct http2_header_data *data)
 {
-	// source, coroutine_id, msg_type
 	struct __socket_data *send_buffer = get_http2_send_buffer();
 	if (!send_buffer)
 		return;
 
+	// source, coroutine_id, msg_type, timestamp
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
 	send_buffer->coroutine_id = get_current_goroutine();
 	send_buffer->msg_type = data->message_type;
+	send_buffer->timestamp = bpf_ktime_get_ns();
 
 	// tcp_seq, direction
 	int tcp_seq;
@@ -241,15 +299,15 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 	conn_info = &__conn_info;
 	__u8 sock_state;
 	if (!(sk != NULL &&
-		// is_tcp_udp_data 函数更新了 conn_info 的 tuple.l4_protocol
-	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info)) 
-	       != SOCK_CHECK_TYPE_ERROR))) {
+	      // is_tcp_udp_data 函数更新了 conn_info 的 tuple.l4_protocol
+	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info)) !=
+	       SOCK_CHECK_TYPE_ERROR))) {
 		return;
 	}
 	send_buffer->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 
 	// 填充端口号
-	init_conn_info(tgid,data->fd,conn_info,sk);
+	init_conn_info(tgid, data->fd, conn_info, sk);
 	send_buffer->tuple.dport = conn_info->tuple.dport;
 	send_buffer->tuple.num = conn_info->tuple.num;
 
@@ -281,7 +339,7 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 
 	// 进程号线程号
 	send_buffer->tgid = tgid;
-	send_buffer->pid = (__u32) id;
+	send_buffer->pid = (__u32)id;
 	////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
@@ -307,6 +365,7 @@ static __inline void http2_fill_buffer_and_send(struct http2_header_data *data)
 	__u32 count = 16 + buffer->header_len + buffer->value_len;
 	if (count > HTTP2_BUFFER_INFO_SIZE)
 		return;
+	send_buffer->syscall_len = count;
 	// Useless range  checking. Make the eBPF validator happy
 	if (buffer->header_len >= 0) {
 		if (buffer->header_len < HTTP2_BUFFER_INFO_SIZE) {
