@@ -726,7 +726,6 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
 	    struct member_fields_offset *offset, __u64 time_stamp,
 	    const struct process_data_extra *extra)
-
 {
 	if (conn_info == NULL) {
 		return;
@@ -755,14 +754,12 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	__u32 tcp_seq = 0;
 	__u64 thread_trace_id = 0;
-	if (extra->source != DATA_SOURCE_GO_HTTP2_UPROBE) {
-		if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-			tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
-		} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-			tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
-		}
-	}
 
+	if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
+	} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
+	}
 
 	__u32 k0 = 0;
 	struct socket_info_t sk_info = { 0 };
@@ -790,9 +787,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	// (jiping) set thread_trace_id = 0 for go process
 	if (conn_info->message_type != MSG_PRESTORE &&
-	    conn_info->message_type != MSG_RECONFIRM && !get_go_version() &&
-	    // Make the old version validator happy
-	    extra->source != DATA_SOURCE_GO_HTTP2_UPROBE)
+	    conn_info->message_type != MSG_RECONFIRM && !get_go_version())
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid, trace_info_ptr,
 			      trace_uid, trace_stats, &thread_trace_id, time_stamp);
 
@@ -838,9 +833,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		sk_info.uid = socket_info_ptr->uid;
 	}
 
-	if (is_socket_info_valid(socket_info_ptr) &&
-	    // Make the old version validator happy
-	    extra->source != DATA_SOURCE_GO_HTTP2_UPROBE) {
+	if (is_socket_info_valid(socket_info_ptr)) {
 		/*
 		 * 同方向多个连续请求或回应的场景时，
 		 * 保持捕获数据的序列号保持不变。
@@ -912,8 +905,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	} else
 		v->extra_data_count = 0;
 
-	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
-	    extra->source == DATA_SOURCE_GO_HTTP2_UPROBE)
+	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE)
 		v->tcp_seq = extra->tcp_seq;
 
 	v->coroutine_id = extra->coroutine_id;
@@ -952,8 +944,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v_buff->len += offsetof(typeof(struct __socket_data), data) + v->data_len;
 	v_buff->events_num++;
 
-	if (v_buff->events_num == EVENT_BURST_NUM ||
-	    extra->source == DATA_SOURCE_GO_HTTP2_UPROBE) {
+	if (v_buff->events_num == EVENT_BURST_NUM) {
 		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
 				 & (sizeof(*v_buff) - 1);
 		if (buf_size >= sizeof(*v_buff))
@@ -1018,10 +1009,7 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 	init_conn_info(tgid, args->fd, &__conn_info, sk);
 
 	conn_info->direction = direction;
-	if (extra->source == DATA_SOURCE_GO_HTTP2_UPROBE){
-		conn_info->protocol = extra->protocol;
-		conn_info->message_type = extra->message_type;
-	} else if (!extra->vecs) {
+	if (!extra->vecs) {
 		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state, extra);
 	} else {
 		struct iovec iov_cpy = {};
