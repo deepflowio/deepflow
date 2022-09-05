@@ -19,6 +19,7 @@ package synchronize
 import (
 	api "github.com/deepflowys/deepflow/message/trident"
 	context "golang.org/x/net/context"
+	"google.golang.org/grpc/peer"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
@@ -32,6 +33,11 @@ func NewKubernetesClusterIDEvent() *KubernetesClusterIDEvent {
 }
 
 func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, in *api.KubernetesClusterIDRequest) (*api.KubernetesClusterIDResponse, error) {
+	remote := ""
+	peerIP, _ := peer.FromContext(ctx)
+	remote = peerIP.Addr.String()
+	log.Infof("get kubernetes cluster_id from ip %s", remote)
+
 	clusterID, err := common.GenerateKuberneteClusterIDByMD5(in.GetCaMd5())
 	if err != nil {
 		errorMsg := err.Error()
@@ -42,5 +48,6 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 	kubernetesInfo := trisolaris.GetGKubernetesInfo()
 	kubernetesInfo.CacheClusterID(clusterID)
 
+	log.Infof("response kubernetes cluster_id to ip %s", remote)
 	return &api.KubernetesClusterIDResponse{ClusterId: &clusterID}, nil
 }
