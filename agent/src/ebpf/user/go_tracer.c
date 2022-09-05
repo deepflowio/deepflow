@@ -187,7 +187,9 @@ static struct symbol syms[] = {
 		.probe_func = "uprobe_go_tls_read_exit",
 		.is_probe_ret = true,
 	},
-	// HTTP2
+	// HTTP2，symbols select an interface based on the GO version.
+	// http2 server, fetch response headers
+	// Send multiple header messages and add an end marker message at the end
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2serverConn).writeHeaders",
@@ -200,6 +202,8 @@ static struct symbol syms[] = {
 		.probe_func = "uprobe_go_http2serverConn_writeHeaders",
 		.is_probe_ret = false,
 	},
+	// http2 server, fetch request headers
+	// Send multiple header messages and add an end marker message at the end
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2serverConn).processHeaders",
@@ -212,6 +216,8 @@ static struct symbol syms[] = {
 		.probe_func = "uprobe_go_http2serverConn_processHeaders",
 		.is_probe_ret = false,
 	},
+	// http2 client, fetch response headers
+	// Send multiple header messages and add an end marker message at the end
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2clientConnReadLoop).handleResponse",
@@ -224,6 +230,8 @@ static struct symbol syms[] = {
 		.probe_func = "uprobe_go_http2clientConnReadLoop_handleResponse",
 		.is_probe_ret = false,
 	},
+	// http2 client, fetch request headers
+	// Send multiple header messages
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2ClientConn).writeHeader",
@@ -236,6 +244,8 @@ static struct symbol syms[] = {
 		.probe_func = "uprobe_go_http2ClientConn_writeHeader",
 		.is_probe_ret = false,
 	},
+	// http2 client, fetch request headers
+	// Send end marker message
 	{
 		.type = GO_UPROBE,
 		.symbol = "net/http.(*http2ClientConn).writeHeaders",
@@ -249,18 +259,24 @@ static struct symbol syms[] = {
 		.is_probe_ret = false,
 	},
 	// gRPC
+	// grpc client request or server response, distinguish by side
+	// Send multiple header messages and add an end marker message at the end
 	{
 		.type = GO_UPROBE,
 		.symbol = "google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader",
 		.probe_func = "uprobe_go_loopyWriter_writeHeader",
 		.is_probe_ret = false,
 	},
+	// grpc client fetch response headers
+	// Send multiple header messages and add an end marker message at the end
 	{
 		.type = GO_UPROBE,
 		.symbol = "google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders",
 		.probe_func = "uprobe_go_http2Client_operateHeaders",
 		.is_probe_ret = false,
 	},
+	// grpc server fetch request headers
+	// Send multiple header messages and add an end marker message at the end
 	{
 		.type = GO_UPROBE,
 		.symbol = "google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders",
