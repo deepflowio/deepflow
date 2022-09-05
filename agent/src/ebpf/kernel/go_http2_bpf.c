@@ -151,20 +151,47 @@ struct http2_header_data {
 	struct pt_regs *ctx;
 };
 
-static __inline void report_http2_header(struct pt_regs *ctx, __u64 id,
-					 const enum traffic_direction direction,
-					 const struct data_args_t *args,
-					 ssize_t bytes_count,
-					 const struct process_data_extra *extra)
+// 从 extra 里拿数据并发送,还有一个当作大的栈使用的 __http2_buffer
+static __inline void report_http2_header(struct pt_regs *ctx)
 {
-	process_data(ctx, id, direction, args, bytes_count, extra);
+	if (!ctx) {
+		return;
+	}
+	struct __socket_data *send_buffer = get_http2_send_buffer();
+	if (!send_buffer) {
+		return;
+	}
+	bpf_debug("tcp_seq=[%u]\n", send_buffer->tcp_seq);
+	bpf_debug("coroutine_id=[%u]\n", send_buffer->coroutine_id);
+	bpf_debug("data_type=[%u]\n", send_buffer->data_type);
+	bpf_debug("msg_type=[%u]\n", send_buffer->msg_type);
+
+	bpf_debug("fd=[%u]\n", *(__u32 *)(send_buffer->data));
+	bpf_debug("stream id=[%u]\n", *(__u32 *)(send_buffer->data + 4));
+	bpf_debug("key len=[%u]\n", *(__u32 *)(send_buffer->data + 8));
+	bpf_debug("value len=[%u]\n", *(__u32 *)(send_buffer->data + 12));
+	bpf_debug("header=[%s]\n", send_buffer->data + 16);
+
+	// TODO: 代码直接这样写上层看不到数据,原因未知,需要处理
+	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU,
+			      send_buffer, sizeof(*send_buffer));
 }
 
-static void submit_http2_header(struct http2_header_data *data)
+// 填充 buffer->send_buffer 中除了 data 的所有字段
+static __inline void http2_fill_common_socket(struct http2_header_data *data)
 {
+	// source, coroutine_id, msg_type
+	struct __socket_data *send_buffer = get_http2_send_buffer();
+	if (!send_buffer)
+		return;
+
+	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
+	send_buffer->coroutine_id = get_current_goroutine();
+	send_buffer->msg_type = data->message_type;
+
+	// tcp_seq, direction
 	int tcp_seq;
 	enum traffic_direction direction;
-
 	if (data->read) {
 		tcp_seq = get_tcp_read_seq_from_fd(data->fd);
 		tcp_seq = get_previous_read_tcp_seq(data->fd, tcp_seq);
@@ -178,6 +205,10 @@ static void submit_http2_header(struct http2_header_data *data)
 		return;
 	}
 
+	send_buffer->tcp_seq = tcp_seq;
+	send_buffer->direction = direction;
+
+	// data_type
 	enum traffic_protocol protocol;
 	if (is_http2_tls()) {
 		protocol = PROTO_TLS_HTTP2;
@@ -185,40 +216,37 @@ static void submit_http2_header(struct http2_header_data *data)
 		protocol = PROTO_HTTP2;
 	}
 
-	struct process_data_extra extra = {
-		.vecs = false,
-		.source = DATA_SOURCE_GO_HTTP2_UPROBE,
-		.tcp_seq = tcp_seq,
-		.coroutine_id = get_current_goroutine(),
-		.protocol = protocol,
-		.direction = direction,
-		.message_type = data->message_type,
-	};
+	send_buffer->data_type = protocol;
 
-	struct data_args_t args = {
-		.buf = get_http2_buffer(),
-		.fd = data->fd,
-		.enter_ts = bpf_ktime_get_ns(),
-	};
+	// others ...
+}
+
+// 填充 buffer->send_buffer.data
+static __inline void http2_fill_buffer_and_send(struct http2_header_data *data)
+{
+	if (!data) {
+		return;
+	}
 
 	struct __http2_buffer *buffer = get_http2_buffer();
-	if (!buffer)
-		return;
+	struct __socket_data *send_buffer = get_http2_send_buffer();
 
-	__u32 count = 16;
+	if (!buffer || !send_buffer) {
+		return;
+	}
+
 	buffer->fd = data->fd;
 	buffer->stream_id = data->stream;
 	buffer->header_len = data->name.len & 0x03FF;
 	buffer->value_len = data->value.len & 0x03FF;
 
-	count += (buffer->header_len + buffer->value_len);
-	if (count > 1024)
+	__u32 count = 16 + buffer->header_len + buffer->value_len;
+	if (count > HTTP2_BUFFER_INFO_SIZE)
 		return;
-
 	// Useless range  checking. Make the eBPF validator happy
 	if (buffer->header_len >= 0) {
 		if (buffer->header_len < HTTP2_BUFFER_INFO_SIZE) {
-			bpf_probe_read(buffer->info, buffer->header_len,
+			bpf_probe_read(buffer->info, 1 + buffer->header_len,
 				       data->name.ptr);
 		}
 	}
@@ -229,15 +257,18 @@ static void submit_http2_header(struct http2_header_data *data)
 			if (buffer->value_len < HTTP2_BUFFER_INFO_SIZE) {
 				bpf_probe_read(
 					buffer->info + buffer->header_len,
-					buffer->value_len, data->value.ptr);
+					1 + buffer->value_len, data->value.ptr);
 			}
 		}
 	}
 	if (buffer->header_len + buffer->value_len < HTTP2_BUFFER_INFO_SIZE) {
 		buffer->info[buffer->header_len + buffer->value_len] = 0;
 	}
-	__u64 id = bpf_get_current_pid_tgid();
-	report_http2_header(data->ctx, id, direction, &args, count, &extra);
+
+	if (count < CAP_DATA_SIZE) {
+		bpf_probe_read(send_buffer->data, 1 + count, buffer);
+		report_http2_header(data->ctx);
+	}
 }
 
 struct http2_headers_data {
@@ -259,12 +290,14 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 		.ctx = headers->ctx,
 	};
 
+	http2_fill_common_socket(&data);
+
 	int idx;
 	struct go_http2_header_field *tmp;
 	struct go_http2_header_field field;
 
 #pragma unroll
-	for (idx = 0; idx < 50; ++idx) {
+	for (idx = 0; idx < 10; ++idx) {
 		if (idx >= headers->fields->len)
 			break;
 
@@ -272,7 +305,7 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 		bpf_probe_read(&field, sizeof(field), tmp + idx);
 		data.name = field.name;
 		data.value = field.value;
-		submit_http2_header(&data);
+		http2_fill_buffer_and_send(&data);
 	}
 
 	data.name.len = 0;
@@ -282,7 +315,7 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 	// MSG_RESPONSE -> MSG_RESPONSE_END
 	data.message_type += 2;
 
-	submit_http2_header(&data);
+	http2_fill_buffer_and_send(&data);
 	return 0;
 }
 
@@ -305,15 +338,19 @@ static __inline void *get_fields_from_http2MetaHeadersFrame(void *ptr)
 SEC("uprobe/go_http2ClientConn_writeHeader")
 int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 {
-	struct http2_header_data data = {};
+	struct http2_header_data data = {
+		.read = false,
+		.fd = get_fd_from_http2ClientConn_ctx(ctx),
+		.message_type = MSG_REQUEST,
+		.ctx = ctx,
+	};
+
 	void *ptr = get_the_first_parameter(ctx);
 	ptr += get_uprobe_offset(OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN);
 	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
 	data.stream -= 2;
-	data.read = false;
-	data.fd = get_fd_from_http2ClientConn_ctx(ctx);
-	data.message_type = MSG_REQUEST;
-	data.ctx = ctx;
+
+	http2_fill_common_socket(&data);
 
 	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
 		data.name.ptr = (void *)ctx->rbx;
@@ -330,7 +367,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 		bpf_probe_read(&data.value.len, sizeof(data.value.len),
 			       (void *)(ctx->rsp + 40));
 	}
-	submit_http2_header(&data);
+	http2_fill_buffer_and_send(&data);
 	return 0;
 }
 
@@ -340,7 +377,6 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 {
 	struct http2_header_data data = {};
 	void *ptr = get_the_first_parameter(ctx);
-	;
 	ptr += get_uprobe_offset(OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN);
 	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
 	data.stream -= 2;
@@ -350,7 +386,8 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 	data.ctx = ctx;
 	data.name.len = 0;
 	data.value.len = 0;
-	submit_http2_header(&data);
+	http2_fill_common_socket(&data);
+	http2_fill_buffer_and_send(&data);
 	return 0;
 }
 
@@ -395,6 +432,8 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.message_type = MSG_RESPONSE;
 	data.ctx = ctx;
 
+	http2_fill_common_socket(&data);
+
 	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
 		ptr = (void *)ctx->rcx;
 	} else {
@@ -415,7 +454,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 		data.name.len = 7;
 		data.value.ptr = (char *)&status_value;
 		data.value.len = 3;
-		submit_http2_header(&data);
+		http2_fill_buffer_and_send(&data);
 	}
 
 	char date[] = "date";
@@ -423,7 +462,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.name.len = 4;
 	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x38);
 	if (data.value.len) {
-		submit_http2_header(&data);
+		http2_fill_buffer_and_send(&data);
 	}
 
 	char content_type[] = "content-type";
@@ -431,7 +470,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.name.len = 12;
 	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x48);
 	if (data.value.len) {
-		submit_http2_header(&data);
+		http2_fill_buffer_and_send(&data);
 	}
 
 	char content_length[] = "content-length";
@@ -439,13 +478,13 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.name.len = 14;
 	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x58);
 	if (data.value.len) {
-		submit_http2_header(&data);
+		http2_fill_buffer_and_send(&data);
 	}
 
 	data.name.len = 0;
 	data.value.len = 0;
 	data.message_type += 2;
-	submit_http2_header(&data);
+	http2_fill_buffer_and_send(&data);
 
 	return 0;
 }

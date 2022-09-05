@@ -47,38 +47,51 @@ struct {
 #define HTTP2_BUFFER_UESLESS (1024)
 
 struct __http2_buffer {
-	union {
-		struct {
-			__u32 fd;
-			__u32 stream_id;
-			__u32 header_len;
-			__u32 value_len;
-			char info[HTTP2_BUFFER_INFO_SIZE + HTTP2_BUFFER_UESLESS];
-		};
-		bool tls;
-	};
+	__u32 fd;
+	__u32 stream_id;
+	__u32 header_len;
+	__u32 value_len;
+	char info[HTTP2_BUFFER_INFO_SIZE + HTTP2_BUFFER_UESLESS];
 };
 
-MAP_PERARRAY(http2_buffer, __u32, struct __http2_buffer, 1)
+struct __http2_stack {
+	struct __http2_buffer http2_buffer;
+	struct __socket_data send_buffer;
+	bool tls;
+};
 
-static __inline void *get_http2_buffer()
+MAP_PERARRAY(http2_stack, __u32, struct __http2_stack, 1)
+
+static __inline struct __http2_stack *get_http2_stack()
 {
 	int k0 = 0;
-	return bpf_map_lookup_elem(&NAME(http2_buffer), &k0);
+	return bpf_map_lookup_elem(&NAME(http2_stack), &k0);
+}
+
+static __inline struct __http2_buffer *get_http2_buffer()
+{
+	struct __http2_stack *stack = get_http2_stack();
+	return stack ? (&(stack->http2_buffer)) : NULL;
+}
+
+static __inline struct __socket_data *get_http2_send_buffer()
+{
+	struct __http2_stack *stack = get_http2_stack();
+	return stack ? (&(stack->send_buffer)) : NULL;
 }
 
 static __inline void update_http2_tls(bool tls)
 {
-	struct __http2_buffer *buffer = get_http2_buffer();
-	if (buffer)
-		buffer->tls = tls;
+	struct __http2_stack *stack = get_http2_stack();
+	if (stack)
+		stack->tls = tls;
 }
 
 static __inline bool is_http2_tls()
 {
-	struct __http2_buffer *buffer = get_http2_buffer();
-	if (buffer)
-		return buffer->tls;
+	struct __http2_stack *stack = get_http2_stack();
+	if (stack)
+		return stack->tls;
 	return false;
 }
 

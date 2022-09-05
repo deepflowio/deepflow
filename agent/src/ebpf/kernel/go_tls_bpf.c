@@ -164,7 +164,9 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 		.fd = c->fd,
 		.tcp_seq_end = get_tcp_read_seq_from_fd(c->fd),
 	};
-	bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key, &c->tcp_seq, BPF_NOEXIST);
+	// make linux 4.14 validator happy
+	__u32 tcp_seq = c->tcp_seq;
+	bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key, &tcp_seq, BPF_NOEXIST);
 
 	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
 		bytes_count = ctx->rax;
