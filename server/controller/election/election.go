@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//Reference code: k8s.io/client-go/examples/leader-election/main.go
+// Reference code: https://github.com/kubernetes/client-go/blob/master/examples/leader-election/main.go
 
 package election
 
@@ -35,6 +35,10 @@ import (
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
+)
+
+const (
+	ID_ITEM_NUM = 4
 )
 
 type LeaderData struct {
