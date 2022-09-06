@@ -19,6 +19,7 @@ package router
 import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	"github.com/deepflowys/deepflow/server/controller/service"
@@ -65,7 +66,7 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		var analyzerUpdate model.AnalyzerUpdate
 
 		// 如果不是masterController，将请求转发至是masterController
-		isMasterController, masterControllerName, _ := common.IsMasterControllerAndReturnName()
+		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
 		if !isMasterController {
 			forwardMasterController(c, masterControllerName, cfg.ListenPort)
 			return
@@ -92,7 +93,7 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 func deleteAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		// if not master controller，should forward to master controller
-		isMasterController, masterControllerName, _ := common.IsMasterControllerAndReturnName()
+		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
 		if !isMasterController {
 			forwardMasterController(c, masterControllerName, cfg.ListenPort)
 			return

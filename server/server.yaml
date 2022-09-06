@@ -10,7 +10,11 @@ controller:
   grpc-port: 20035
   # grpc max message lenth default 100M
   grpc-max-message-length: 104857600
-  election: false
+  # kubeconfig
+  kubeconfig:
+  # election
+  election-namespace: deepflow
+  election-name: deepflow-server
 
   # deepflow web service config
   df-web-service:
