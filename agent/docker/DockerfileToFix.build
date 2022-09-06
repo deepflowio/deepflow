@@ -13,13 +13,16 @@ RUN yum install make epel-release -y && yum -y install jq
 
 # 安装基础依赖#
 RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfutils-libelf-devel-static glibc-static zlib-static git  -y && \
-     curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y && \
-     curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
+     curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y
+
+RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-*.rpm && \
      curl http://cloud.deepservice.yunshan.net:1080/kernel/libdwarf-0.4.1-1.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./libdwarf-*.rpm && rm -rf libdwarf-*.rpm && \
      curl http://cloud.deepservice.yunshan.net:1080/kernel/bddisasm-1.34.10-1.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./bddisasm-*.rpm && rm -rf bddisasm-*.rpm && \
+     curl http://cloud.deepservice.yunshan.net:1080/kernel/bcc-bpf-0.25.0-2.el7.x86_64.rpm --silent -O && \
+     yum --disablerepo=* localinstall -y ./bcc-bpf-*.rpm && rm -rf bcc-bpf-*.rpm && \
      yum clean all
 
 
@@ -30,9 +33,11 @@ RUN  yum install curl gcc openssl-devel  libpcap-devel perl-Digest-MD5 gcc elfut
 RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.rpm  && \
     yum -y install musl-libc musl-libc-static musl-clang musl-gcc  && \
     cd /usr/x86_64-linux-musl/lib64  && \
+    curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libbcc_bpf.a --silent -O && \
     curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libpcap.a --silent -O && \
     curl http://cloud.deepservice.yunshan.net:1080/kernel/deepflow-agent-depends/libz.a --silent -O && \
     cd /usr/x86_64-linux-musl/include  && \
+    ln -s /usr/include/bcc bcc && \
     ln -s /usr/include/asm asm  && \
     ln -s /usr/include/asm-generic asm-generic  && \
     ln -s /usr/include/bddisasm bddisasm  && \
@@ -46,7 +51,7 @@ RUN yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.r
 RUN rustup target add x86_64-unknown-linux-musl
 ## 使用依赖缓存
 RUN cargo install sccache && \
-    ln -sf  /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
+    ln -sf /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
     ln -sf /usr/local/llvm-clang/bin/llc /usr/bin/llc && \
     ln -sf /usr/local/llvm-clang/bin/llvm-strip /usr/bin/llvm-strip && \
     ln -sf /usr/local/llvm-clang/bin/llvm-objdump /usr/bin/llvm-objdump
