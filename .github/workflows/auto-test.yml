@@ -209,7 +209,7 @@ jobs:
       - name: Package code build results
         if: ${{ env.AGENT_CHANGE == 'true' }}
         run: |
-          tar cvf agent-artifact.tar agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+          tar cvf agent-artifact.tar agent/output/target/release/deepflow-agent agent/output/target/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
 
       - name: Archive code build results
         if: ${{ env.AGENT_CHANGE == 'true' }}

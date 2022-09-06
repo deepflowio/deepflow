@@ -4,7 +4,6 @@ ARG TZ='Asia/Harbin'
 ENV DEFAULT_TZ ${TZ}
 ENV IN_CONTAINER yes
 RUN --mount=target=/tmp-mount \
-    sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
     apk upgrade --update \
     && apk add -U tzdata \
     && cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime \
@@ -24,4 +23,4 @@ RUN --mount=target=/tmp-mount \
 
 USER root
 
-CMD /bin/deepflow-agent -f /etc/deepflow-agent/deepflow-agent.yaml
+CMD valgrind --tool=massif --time-unit=B  --massif-out-file=/var/log/deepflow-agent/massif.out /bin/deepflow-agent -f /etc/deepflow-agent/deepflow-agent.yaml
