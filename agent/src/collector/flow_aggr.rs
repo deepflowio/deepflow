@@ -30,6 +30,7 @@ use rand::prelude::{Rng, SeedableRng, SmallRng};
 use super::consts::*;
 use super::round_to_minute;
 
+use crate::collector::acc_flow::U16Set;
 use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
 use crate::config::handler::CollectorAccess;
 use crate::sender::SendItem;
@@ -192,6 +193,17 @@ impl FlowAggr {
     }
 
     fn send_flow(&mut self, mut f: TaggedFlow) {
+        // fill acl_gids
+        let mut acl_gids = U16Set::new();
+        for policy_data in f.tag.policy_data.iter() {
+            for action in policy_data.npb_actions.iter() {
+                for gid in action.acl_gids().iter() {
+                    acl_gids.add(*gid);
+                }
+            }
+        }
+        f.flow.acl_gids = Vec::from(acl_gids.list());
+
         if !f.flow.is_new_flow {
             f.flow.start_time = round_to_minute(f.flow.flow_stat_time);
         }
