@@ -18,8 +18,8 @@ bbp_rx                      ,                      , 平均接收包长         
 new_flow                    , new_flow             , 新建连接                , 连接 , counter    , 传输层吞吐   , 111        ,
 closed_flow                 , closed_flow          , 关闭连接                , 连接 , counter    , 传输层吞吐   , 111        ,
 flow_load                   , flow_load            , 活跃连接                , 连接 , gauge      , 传输层吞吐   , 111        ,
-syn_count                   , syn_count            , SYN包数                 , 包   , counter    , 网络层吞吐   , 111        ,
-synack_count                , synack_count         , SYN-ACK包数             , 包   , counter    , 网络层吞吐   , 111        ,
+syn_count                   , syn_count            , SYN包数                 , 包   , counter    , 传输层吞吐   , 111        ,
+synack_count                , synack_count         , SYN-ACK包数             , 包   , counter    , 传输层吞吐   , 111        ,
 
 rtt                         ,                      ,平均TCP建连时延          , 微秒 , delay      , 传输层时延   , 111        ,
 rtt_client                  ,                      ,平均TCP建连客户端时延    , 微秒 , delay      , 传输层时延   , 111        ,
@@ -32,7 +32,7 @@ rtt_client_max              , rtt_client_max       ,最大TCP建连客户端时�
 rtt_server_max              , rtt_server_max       ,最大TCP建连服务端时延    , 微秒 , delay      , 传输层时延   , 111        ,
 srt_max                     , srt_max              ,最大TCP系统时延          , 微秒 , delay      , 传输层时延   , 111        ,
 art_max                     , art_max              ,最大数据时延             , 微秒 , delay      , 传输层时延   , 111        ,
-cit_max                     , cit_max              ,最大客户端等待时延       , 微秒 , delay      , 传输层时延   , 111        ,
+cit_max                     , cit_max              ,最大客户端等待时延        , 微秒 , delay      , 传输层时延   , 111        ,
 
 retrans_syn                 , retrans_syn          , SYN重传                 , 包   , counter    , 传输层性能   , 111        ,
 retrans_synack              , retrans_synack       , SYN-ACK重传             , 包   , counter    , 传输层性能   , 111        ,
