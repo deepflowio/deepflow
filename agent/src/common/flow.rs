@@ -911,6 +911,7 @@ pub struct Flow {
     pub is_new_flow: bool,
     pub reversed: bool,
     pub tap_side: TapSide,
+    pub acl_gids: Vec<u16>,
 }
 
 impl Flow {
@@ -1123,6 +1124,7 @@ impl From<Flow> for flow_log::Flow {
             synack_seq: f.synack_seq,
             last_keepalive_seq: f.last_keepalive_seq,
             last_keepalive_ack: f.last_keepalive_ack,
+            acl_gids: f.acl_gids.into_iter().map(|g| g as u32).collect(),
         }
     }
 }

@@ -303,6 +303,8 @@ type Flow struct {
 	IsNewFlow       bool
 	Reversed        bool
 	TapSide         uint8
+
+	AclGids []uint16
 }
 
 func (t FlowSource) String() string {
@@ -557,6 +559,10 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	p.IsActiveService = Bool2UInt32(f.IsActiveService)
 	p.IsNewFlow = Bool2UInt32(f.IsNewFlow)
 	p.TapSide = uint32(f.TapSide)
+	p.AclGids = make([]uint32, len(f.AclGids))
+	for i := range f.AclGids {
+		p.AclGids[i] = uint32(f.AclGids[i])
+	}
 }
 
 func formatStruct(s interface{}) string {
