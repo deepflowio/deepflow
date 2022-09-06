@@ -82,7 +82,7 @@ var (
 	MaxCollectPps                 = 200000
 	MaxNpbBps                     = int64(1000000000)
 	MaxCPUs                       = 1
-	MaxMemory                     = 2048
+	MaxMemory                     = 4096
 	SyncInterval                  = 60
 	StatsInterval                 = 60
 	RsyslogEnabled                = 1

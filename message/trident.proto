@@ -158,7 +158,7 @@ enum DecapType {
 message Config {
     optional bool    enabled              = 1 [default = true];
     optional uint32  max_cpus             = 2 [default = 1];
-    optional uint32  max_memory           = 3 [default = 2048]; // in MiB
+    optional uint32  max_memory           = 3 [default = 4096]; // in MiB
     optional uint32  sync_interval        = 4 [default = 60];
     optional uint32  stats_interval       = 5 [default = 60];
     optional uint64  global_pps_threshold = 6 [default = 200000];
