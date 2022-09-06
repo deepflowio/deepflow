@@ -27,7 +27,6 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
@@ -79,6 +78,11 @@ func Start(ctx context.Context, configPath string) {
 	}()
 	defer router.SetInitStageForHealthChecker(router.OK)
 
+	// start election
+	if _, enabled := os.LookupEnv("FEATURE_FLAG_ELECTION"); enabled {
+		go election.Start(ctx, cfg)
+	}
+
 	router.SetInitStageForHealthChecker("MySQL migration")
 	migrateDB(cfg)
 
@@ -128,10 +132,6 @@ func Start(ctx context.Context, configPath string) {
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
 
-	if cfg.Election == true {
-		go election.Start(ctx, cfg)
-	}
-
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
 	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
@@ -151,7 +151,7 @@ func Start(ctx context.Context, configPath string) {
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
 		for range time.Tick(time.Minute) {
-			isMasterController, curMasterController, err := common.IsMasterControllerAndReturnName()
+			isMasterController, curMasterController, err := election.IsMasterControllerAndReturnName()
 			if err != nil {
 				continue
 			}
@@ -213,7 +213,7 @@ func migrateDB(cfg *config.ControllerConfig) {
 	// try to check whether it is master controller until successful,
 	// migrate if it is master, exit if not.
 	for range time.Tick(time.Second * 5) {
-		isMasterController, err := common.IsMasterController()
+		isMasterController, err := election.IsMasterController()
 		err = nil
 		isMasterController = true
 		if err == nil && isMasterController {
