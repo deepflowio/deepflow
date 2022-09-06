@@ -1012,8 +1012,18 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 	if (!extra->vecs) {
 		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state, extra);
 	} else {
-		struct iovec iov_cpy;
-		bpf_probe_read(&iov_cpy, sizeof(struct iovec), &args->iov[0]);
+		struct iovec iov_cpy = {};
+		int i;
+#pragma unroll
+		// In some cases length does not appear in iov[0],
+		// and now the loop is limited to 3 times
+		for (i = 0; i < 3; i++) {
+			if (iov_cpy.iov_len != 0 || i >= args->iovlen) {
+				break;
+			}
+			bpf_probe_read(&iov_cpy, sizeof(struct iovec),
+				       &args->iov[i]);
+		}
 		// Ensure we are not reading beyond the available data.
 		const size_t buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
 		infer_l7_class(conn_info, direction, iov_cpy.iov_base, buf_size, sock_state, extra);
