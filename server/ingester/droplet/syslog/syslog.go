@@ -133,7 +133,7 @@ func parseSyslog(bs []byte) (*ESLog, error) {
 		severity = syslog.LOG_INFO
 	case "[WARN]":
 		severity = syslog.LOG_WARNING
-	case "[ERRO]":
+	case "[ERRO]", "[ERROR]":
 		severity = syslog.LOG_ERR
 	default:
 		return nil, errors.New("ignored log level: " + string(columns[3]))
