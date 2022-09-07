@@ -43,7 +43,7 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 		var timeFieldIndex int
 		// 取出time字段对应的下标
 		for i, column := range columns {
-			if column.(string) == m.Time.Alias {
+			if column.(string) == strings.Trim(m.Time.Alias, "`") {
 				timeFieldIndex = i
 				break
 			}
@@ -55,7 +55,7 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 		orderby := "asc"
 		for _, node := range m.Orders.Orders {
 			order := node.(*view.Order)
-			if order.SortBy == m.Time.Alias {
+			if strings.Trim(order.SortBy, "`") == strings.Trim(m.Time.Alias, "`") {
 				orderby = order.OrderBy
 				break
 			}

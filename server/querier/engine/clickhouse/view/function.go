@@ -116,22 +116,22 @@ type Function interface {
 }
 
 func FormatField(field string) string {
-	field = strings.ReplaceAll(field, "'", "")
-	field = strings.ReplaceAll(field, "+", "_plus_")
-	field = strings.ReplaceAll(field, "-", "_minus_")
-	field = strings.ReplaceAll(field, "*", "_multiply_")
-	field = strings.ReplaceAll(field, "/", "_div_")
-	field = strings.ReplaceAll(field, "(", "_")
-	field = strings.ReplaceAll(field, ")", "_")
-	field = strings.ReplaceAll(field, "[", "_")
-	field = strings.ReplaceAll(field, "]", "_")
-	field = strings.ReplaceAll(field, ",", "_")
-	field = strings.ReplaceAll(field, " ", "_")
-	field = strings.ReplaceAll(field, "<", "_")
-	field = strings.ReplaceAll(field, ">", "_")
-	field = strings.ReplaceAll(field, "=", "_")
-	field = strings.ReplaceAll(field, "!", "_")
-	field = strings.ReplaceAll(field, ".", "_")
+	/* 	field = strings.ReplaceAll(field, "'", "")
+	   	field = strings.ReplaceAll(field, "+", "_plus_")
+	   	field = strings.ReplaceAll(field, "-", "_minus_")
+	   	field = strings.ReplaceAll(field, "*", "_multiply_")
+	   	field = strings.ReplaceAll(field, "/", "_div_")
+	   	field = strings.ReplaceAll(field, "(", "_")
+	   	field = strings.ReplaceAll(field, ")", "_")
+	   	field = strings.ReplaceAll(field, "[", "_")
+	   	field = strings.ReplaceAll(field, "]", "_")
+	   	field = strings.ReplaceAll(field, ",", "_")
+	   	field = strings.ReplaceAll(field, " ", "_")
+	   	field = strings.ReplaceAll(field, "<", "_")
+	   	field = strings.ReplaceAll(field, ">", "_")
+	   	field = strings.ReplaceAll(field, "=", "_")
+	   	field = strings.ReplaceAll(field, "!", "_")
+	   	field = strings.ReplaceAll(field, ".", "_") */
 	return field
 }
 
@@ -259,7 +259,9 @@ func (f *DefaultFunction) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -302,7 +304,9 @@ func (f *DefaultFunction) SetAlias(alias string, inner bool) string {
 	if alias == "" {
 		alias = f.GetDefaultAlias(inner)
 	}
+	alias = "`" + strings.Trim(alias, "`") + "`"
 	f.Alias = alias
+
 	return alias
 }
 
@@ -401,7 +405,9 @@ func (f *SpreadFunction) WriteTo(buf *bytes.Buffer) {
 	f.minusFunction.WriteTo(buf)
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -450,7 +456,9 @@ func (f *RspreadFunction) WriteTo(buf *bytes.Buffer) {
 	f.divFunction.WriteTo(buf)
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -480,7 +488,9 @@ func (f *PercentageFunction) WriteTo(buf *bytes.Buffer) {
 	f.divFunction.WriteTo(buf)
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -500,7 +510,9 @@ func (f *HistogramFunction) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(")")
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -557,7 +569,9 @@ func (f *PerSecondFunction) WriteTo(buf *bytes.Buffer) {
 	f.divFunction.WriteTo(buf)
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -675,7 +689,9 @@ func (f *ApdexFunction) WriteTo(buf *bytes.Buffer) {
 	f.divFunction.WriteTo(buf)
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -713,7 +729,9 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(f.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(f.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
@@ -759,7 +777,9 @@ func (f *MinFunction) WriteTo(buf *bytes.Buffer) {
 		buf.WriteString(f.Math)
 		if f.Alias != "" {
 			buf.WriteString(" AS ")
-			buf.WriteString(f.Alias)
+			buf.WriteString("`")
+			buf.WriteString(strings.Trim(f.Alias, "`"))
+			buf.WriteString("`")
 		}
 	}
 }

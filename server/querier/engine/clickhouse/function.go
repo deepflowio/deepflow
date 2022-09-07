@@ -410,9 +410,9 @@ func (t *Time) Format(m *view.Model) {
 		"toStartOfInterval(%s, %s(%d)) + %s(arrayJoin([%s]) * %d)",
 		innerTimeField, toIntervalFunction, m.Time.Interval, toIntervalFunction, windows, m.Time.Interval,
 	)
-	withAlias := "_" + t.Alias
+	withAlias := "_" + strings.Trim(t.Alias, "`")
 	withs := []view.Node{&view.With{Value: withValue, Alias: withAlias}}
-	tagField := fmt.Sprintf("toUnixTimestamp(%s)", withAlias)
+	tagField := fmt.Sprintf("toUnixTimestamp(`%s`)", withAlias)
 	m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
 	if m.Time.Fill != "" && m.Time.Interval > 0 {
@@ -436,7 +436,7 @@ func (f *TagFunction) SetAlias(alias string) {
 
 func (f *TagFunction) getViewNode() view.Node {
 	if f.Value == "" {
-		return &view.Tag{Value: f.Alias, Withs: f.Withs}
+		return &view.Tag{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`")), Withs: f.Withs}
 	} else {
 		return &view.Tag{Value: f.Value, Alias: f.Alias}
 	}
@@ -560,7 +560,8 @@ func (f *TagFunction) Format(m *view.Model) {
 	if strings.HasPrefix(f.Name, TAG_FUNCTION_TOPK) {
 		if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
 			var outAlias string
-			innerAlias := fmt.Sprintf("_%s", f.Alias)
+			alias := strings.Trim(f.Alias, "`")
+			innerAlias := fmt.Sprintf("`_%s`", alias)
 			outAlias, f.Alias = f.Alias, innerAlias
 			node := f.Trans(m)
 			node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_INNER

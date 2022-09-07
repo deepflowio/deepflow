@@ -18,6 +18,7 @@ package view
 
 import (
 	"bytes"
+	"strings"
 )
 
 type Orders struct {
@@ -69,7 +70,9 @@ func (n *Order) ToString() string {
 }
 
 func (n *Order) WriteTo(buf *bytes.Buffer) {
-	buf.WriteString(n.SortBy)
+	buf.WriteString("`")
+	buf.WriteString(strings.Trim(n.SortBy, "`"))
+	buf.WriteString("`")
 	buf.WriteString(" ")
 	if n.OrderBy == "" {
 		buf.WriteString("ASC")
