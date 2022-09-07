@@ -30,6 +30,7 @@ func NewSecurityGroup() *SecurityGroup {
 		OperatorBase[mysql.SecurityGroup]{
 			resourceTypeName: common.RESOURCE_TYPE_SECURITY_GROUP_EN,
 			softDelete:       true,
+			allocateID:       false,
 		},
 	}
 	operater.setter = operater

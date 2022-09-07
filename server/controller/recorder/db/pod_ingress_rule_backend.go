@@ -30,6 +30,7 @@ func NewPodIngressRuleBackend() *PodIngressRuleBackend {
 		OperatorBase[mysql.PodIngressRuleBackend]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

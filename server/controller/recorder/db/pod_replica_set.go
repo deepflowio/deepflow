@@ -30,6 +30,7 @@ func NewPodReplicaSet() *PodReplicaSet {
 		OperatorBase[mysql.PodReplicaSet]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_REPLICA_SET_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

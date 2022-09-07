@@ -30,6 +30,7 @@ func NewRoutingTable() *RoutingTable {
 		OperatorBase[mysql.RoutingTable]{
 			resourceTypeName: common.RESOURCE_TYPE_ROUTING_TABLE_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

@@ -30,6 +30,7 @@ func NewPodIngress() *PodIngress {
 		OperatorBase[mysql.PodIngress]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_INGRESS_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

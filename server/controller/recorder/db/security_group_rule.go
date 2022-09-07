@@ -30,6 +30,7 @@ func NewSecurityGroupRule() *SecurityGroupRule {
 		OperatorBase[mysql.SecurityGroupRule]{
 			resourceTypeName: common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

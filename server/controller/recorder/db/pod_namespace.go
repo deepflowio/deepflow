@@ -30,6 +30,7 @@ func NewPodNamespace() *PodNamespace {
 		OperatorBase[mysql.PodNamespace]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_NAMESPACE_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

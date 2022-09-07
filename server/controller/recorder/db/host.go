@@ -30,6 +30,7 @@ func NewHost() *Host {
 		OperatorBase[mysql.Host]{
 			resourceTypeName: common.RESOURCE_TYPE_HOST_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

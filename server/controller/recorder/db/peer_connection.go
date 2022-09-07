@@ -30,6 +30,7 @@ func NewPeerConnection() *PeerConnection {
 		OperatorBase[mysql.PeerConnection]{
 			resourceTypeName: common.RESOURCE_TYPE_PEER_CONNECTION_EN,
 			softDelete:       true,
+			allocateID:       false,
 		},
 	}
 	operater.setter = operater

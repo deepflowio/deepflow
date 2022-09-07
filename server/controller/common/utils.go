@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +33,8 @@ import (
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 	uuid "github.com/satori/go.uuid"
+
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 var log = logging.MustGetLogger("common")
@@ -188,4 +192,45 @@ func IsValueInSliceString(value string, list []string) bool {
 		}
 	}
 	return false
+}
+
+func GetCurrentController() (*mysql.Controller, error) {
+	controllerIP := os.Getenv(NODE_IP_KEY)
+	var controller *mysql.Controller
+	err := mysql.Db.Where("ip = ?", controllerIP).Find(&controller).Error
+	return controller, err
+}
+
+func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err error) {
+	var host string
+	curController, err := GetCurrentController()
+	if err != nil {
+		return
+	}
+	if curController.NodeType == CONTROLLER_NODE_TYPE_MASTER {
+		host = LOCALHOST
+		httpPort = CONTROLLER_HTTP_PORT
+		grpcPort = CONTROLLER_GRPC_PORT
+	} else {
+		var controller *mysql.Controller
+		err = mysql.Db.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controller).Error
+		if err != nil {
+			return
+		}
+		host = controller.IP
+		httpPort = CONTROLLER_HTTP_NODE_PORT
+		grpcPort = CONTROLLER_GRPC_NODE_PORT
+	}
+	url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, httpPort))
+	log.Info(url)
+	resp, err := CURLPerform("GET", url, nil)
+	if err != nil {
+		return
+	}
+	if curController.NodeType == CONTROLLER_NODE_TYPE_MASTER {
+		masterIP = resp.Get("DATA").Get("POD_IP").MustString()
+	} else {
+		masterIP = resp.Get("DATA").Get("NODE_IP").MustString()
+	}
+	return
 }

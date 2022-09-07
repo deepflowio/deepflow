@@ -20,4 +20,6 @@ type RecorderConfig struct {
 	CacheRefreshInterval         uint16 `default:"60" yaml:"cache_refresh_interval"`
 	DeletedResourceCleanInterval uint16 `default:"24" yaml:"deleted_resource_clean_interval"`
 	DeletedResourceRetentionTime uint16 `default:"168" yaml:"deleted_resource_retention_time"`
+	ResourceMaxID0               int    `default:"64000" yaml:"resource_max_id_0"`
+	ResourceMaxID1               int    `default:"499999" yaml:"resource_max_id_1"`
 }

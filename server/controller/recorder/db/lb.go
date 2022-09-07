@@ -30,6 +30,7 @@ func NewLB() *LB {
 		OperatorBase[mysql.LB]{
 			resourceTypeName: common.RESOURCE_TYPE_LB_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

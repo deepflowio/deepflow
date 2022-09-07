@@ -30,6 +30,7 @@ func NewNATGateway() *NATGateway {
 		OperatorBase[mysql.NATGateway]{
 			resourceTypeName: common.RESOURCE_TYPE_NAT_GATEWAY_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

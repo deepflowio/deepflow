@@ -30,6 +30,7 @@ func NewLBTargetServer() *LBTargetServer {
 		OperatorBase[mysql.LBTargetServer]{
 			resourceTypeName: common.RESOURCE_TYPE_LB_TARGET_SERVER_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

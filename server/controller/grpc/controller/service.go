@@ -21,21 +21,27 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowys/deepflow/server/controller/grpc"
 
+	"github.com/op/go-logging"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
+var log = logging.MustGetLogger("grpc.controller")
+
 type service struct {
 	encryptKeyEvent *EncryptKeyEvent
+	resourceIDEvent *IDEvent
 }
 
 func init() {
+	log.Info("grpc add controller service")
 	grpcserver.Add(newService())
 }
 
 func newService() *service {
 	return &service{
 		encryptKeyEvent: NewEncryptKeyEvent(),
+		resourceIDEvent: NewIDEvent(),
 	}
 }
 
@@ -54,4 +60,12 @@ func (s *service) GenesisSharingK8S(ctx context.Context, in *api.GenesisSharingK
 
 func (s *service) GenesisSharingSync(ctx context.Context, in *api.GenesisSharingSyncRequest) (*api.GenesisSharingSyncResponse, error) {
 	return genesis.Synchronizer.GenesisSharingSync(ctx, in)
+}
+
+func (s *service) GetResourceID(ctx context.Context, in *api.GetResourceIDRequest) (*api.GetResourceIDResponse, error) {
+	return s.resourceIDEvent.Get(ctx, in)
+}
+
+func (s *service) ReleaseResourceID(ctx context.Context, in *api.ReleaseResourceIDRequest) (*api.ReleaseResourceIDResponse, error) {
+	return s.resourceIDEvent.Release(ctx, in)
 }

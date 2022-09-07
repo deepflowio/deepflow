@@ -30,6 +30,7 @@ func NewDHCPPort() *DHCPPort {
 		OperatorBase[mysql.DHCPPort]{
 			resourceTypeName: common.RESOURCE_TYPE_DHCP_PORT_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

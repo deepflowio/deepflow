@@ -30,6 +30,7 @@ func NewAZ() *AZ {
 		OperatorBase[mysql.AZ]{
 			resourceTypeName: common.RESOURCE_TYPE_AZ_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

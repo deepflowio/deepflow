@@ -20,6 +20,11 @@ import (
 	"time"
 )
 
+var CONTROLLER_HTTP_PORT string
+var CONTROLLER_HTTP_NODE_PORT string
+var CONTROLLER_GRPC_PORT string
+var CONTROLLER_GRPC_NODE_PORT string
+
 const GO_BIRTHDAY = "2006-01-02 15:04:05"
 const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
@@ -75,6 +80,8 @@ const (
 const (
 	CONTROLLER_NODE_TYPE_MASTER = 1
 	CONTROLLER_NODE_TYPE_SLAVE  = 2
+
+	CONTROLLER_STATE_NORMAL = 2
 )
 
 const (

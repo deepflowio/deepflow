@@ -30,6 +30,7 @@ func NewLBVMConnection() *LBVMConnection {
 		OperatorBase[mysql.LBVMConnection]{
 			resourceTypeName: common.RESOURCE_TYPE_LB_VM_CONNECTION_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

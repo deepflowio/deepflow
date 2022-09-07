@@ -30,6 +30,7 @@ func NewWANIP() *WANIP {
 		OperatorBase[mysql.WANIP]{
 			resourceTypeName: common.RESOURCE_TYPE_WAN_IP_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }
