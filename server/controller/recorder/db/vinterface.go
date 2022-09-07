@@ -30,6 +30,7 @@ func NewVInterface() *VInterface {
 		OperatorBase[mysql.VInterface]{
 			resourceTypeName: common.RESOURCE_TYPE_VINTERFACE_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

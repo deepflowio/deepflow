@@ -30,6 +30,7 @@ func NewSubnet() *Subnet {
 		OperatorBase[mysql.Subnet]{
 			resourceTypeName: common.RESOURCE_TYPE_SUBNET_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

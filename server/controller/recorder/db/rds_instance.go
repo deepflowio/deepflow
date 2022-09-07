@@ -30,6 +30,7 @@ func NewRDSInstance() *RDSInstance {
 		OperatorBase[mysql.RDSInstance]{
 			resourceTypeName: common.RESOURCE_TYPE_RDS_INSTANCE_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

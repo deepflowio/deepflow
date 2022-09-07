@@ -30,6 +30,7 @@ func NewVRouter() *VRouter {
 		OperatorBase[mysql.VRouter]{
 			resourceTypeName: common.RESOURCE_TYPE_VROUTER_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

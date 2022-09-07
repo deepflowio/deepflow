@@ -30,6 +30,7 @@ func NewPodNode() *PodNode {
 		OperatorBase[mysql.PodNode]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_NODE_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

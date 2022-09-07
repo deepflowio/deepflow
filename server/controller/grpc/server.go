@@ -64,6 +64,7 @@ func Run(ctx context.Context, cfg *config.ControllerConfig) {
 	}
 
 	go server.Serve(lis)
+	log.Infof("listening and serving GRPC on: %s", cfg.GrpcPort)
 
 	wg := utils.GetWaitGroupInCtx(ctx)
 	wg.Add(1)

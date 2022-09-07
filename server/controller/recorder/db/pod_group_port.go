@@ -30,6 +30,7 @@ func NewPodGroupPort() *PodGroupPort {
 		OperatorBase[mysql.PodGroupPort]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_GROUP_PORT_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

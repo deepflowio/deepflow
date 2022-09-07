@@ -30,6 +30,7 @@ func NewFloatingIP() *FloatingIP {
 		OperatorBase[mysql.FloatingIP]{
 			resourceTypeName: common.RESOURCE_TYPE_FLOATING_IP_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }
