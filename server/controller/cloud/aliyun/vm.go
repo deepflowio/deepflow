@@ -17,10 +17,13 @@
 package aliyun
 
 import (
+	"strings"
+	"time"
+
 	ecs "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"time"
 )
 
 func (a *Aliyun) getVMs(region model.Region) (
@@ -181,7 +184,7 @@ func (a *Aliyun) getVMPorts(region model.Region) ([]model.VInterface, []model.IP
 			}
 
 			instanceId := port.Get("InstanceId").MustString()
-			if instanceId == "" {
+			if instanceId == "" || !strings.HasPrefix(instanceId, "i-") {
 				continue
 			}
 
