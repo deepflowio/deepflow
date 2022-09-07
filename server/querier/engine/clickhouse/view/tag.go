@@ -18,6 +18,7 @@ package view
 
 import (
 	"bytes"
+	"strings"
 )
 
 // NodeSet Tag结构体集合
@@ -85,7 +86,9 @@ func (n *Tag) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString(n.Value)
 	if n.Alias != "" {
 		buf.WriteString(" AS ")
-		buf.WriteString(n.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(n.Alias, "`"))
+		buf.WriteString("`")
 	}
 }
 
