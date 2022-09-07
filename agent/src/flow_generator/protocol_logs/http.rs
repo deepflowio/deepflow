@@ -97,7 +97,7 @@ impl HttpInfo {
         }
     }
 
-    pub fn is_nil(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         return self.host.is_empty() && self.method.is_empty() && self.path.is_empty();
     }
 }
