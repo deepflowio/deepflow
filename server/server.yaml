@@ -153,7 +153,7 @@ querier:
   # clickhouse相关配置
   clickhouse:
     database: flow_tag
-    user: default
+    user-name: default
     host: clickhouse
     port: 9000
     timeout: 60
