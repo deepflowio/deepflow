@@ -326,13 +326,13 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 		m.MetricsFloatNames = append(m.MetricsFloatNames, metricName)
 		m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 
-		d.fillExtMetricsBase(m, vtapID, podName, instance)
+		d.fillExtMetricsBase(m, vtapID, podName, instance, false)
 		ms = append(ms, m)
 	}
 	return ms, nil
 }
 
-func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName, instance string) {
+func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podName, instance string, fillWithVtapId bool) {
 	t := &m.Tag
 	t.Code = zerodoc.AZID | zerodoc.HostID | zerodoc.IP | zerodoc.L3Device | zerodoc.L3EpcID | zerodoc.PodClusterID | zerodoc.PodGroupID | zerodoc.PodID | zerodoc.PodNodeID | zerodoc.PodNSID | zerodoc.RegionID | zerodoc.SubnetID | zerodoc.VTAPID | zerodoc.ServiceID | zerodoc.Resource
 	t.VTAPID = vtapID
@@ -350,6 +350,13 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 	} else if instance != "" {
 		t.L3EpcID = int16(d.platformData.QueryVtapEpc0(uint32(vtapID)))
 		ip = parseIPFromInstance(instance)
+	} else if fillWithVtapId {
+		t.L3EpcID = int16(d.platformData.QueryVtapEpc0(uint32(vtapID)))
+		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapID))
+		if vtapInfo != nil {
+			ip = net.ParseIP(vtapInfo.Ip)
+			t.PodClusterID = uint16(vtapInfo.PodClusterId)
+		}
 	}
 
 	if ip != nil {
@@ -435,7 +442,7 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 			podName = tagValue
 		}
 	}
-	d.fillExtMetricsBase(m, vtapID, podName, "")
+	d.fillExtMetricsBase(m, vtapID, podName, "", true)
 
 	iter := point.FieldIterator()
 	for iter.Next() {
