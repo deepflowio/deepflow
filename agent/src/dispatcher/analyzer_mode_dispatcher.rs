@@ -38,7 +38,7 @@ use crate::{
         error::Result,
     },
     flow_generator::FlowMap,
-    handler::PacketHandler,
+    handler::{MiniPacket, PacketHandler},
     proto::trident::IfMacSource,
     rpc::get_timestamp,
     utils::{
@@ -262,8 +262,9 @@ impl AnalyzerModeDispatcher {
                         | ((base.id as u64) << 8)
                         | (u16::from(tap_type) as u64);
                     let handlers = base
-                        .options
-                        .handler_builders
+                        .handler_builder
+                        .lock()
+                        .unwrap()
                         .iter()
                         .map(|b| b.build_with(base.id, 0, MacAddr::try_from(mac).unwrap()))
                         .collect();
@@ -321,14 +322,15 @@ impl AnalyzerModeDispatcher {
             }
 
             Self::prepare_flow(&mut meta_packet, tap_type, base.id as u8);
-            for i in pipeline.handlers.iter_mut() {
-                i.handle(&overlay_packet, &meta_packet);
-            }
             // flowProcesser
-            flow_map.inject_meta_packet(meta_packet);
+            flow_map.inject_meta_packet(&mut meta_packet);
+            let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
+            for i in pipeline.handlers.iter_mut() {
+                i.handle(&mini_packet);
+            }
         }
 
-        base.terminate_queue();
+        base.terminate_handler();
         info!("Stopped dispatcher {}", base.id);
     }
 

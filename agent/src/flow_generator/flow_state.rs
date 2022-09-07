@@ -834,7 +834,7 @@ mod tests {
 
             pkt.lookup_key.timestamp = get_timestamp(0) + (pkt.lookup_key.timestamp - delta);
             last_timestamp = pkt.lookup_key.timestamp;
-            flow_map.inject_meta_packet(pkt);
+            flow_map.inject_meta_packet(&mut pkt);
         }
 
         flow_map.inject_flush_ticker(last_timestamp);

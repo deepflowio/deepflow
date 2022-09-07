@@ -33,10 +33,8 @@ use super::{
     INCL_LEN_OFFSET, RECORD_HEADER_LEN, TS_SEC_OFFSET,
 };
 use crate::config::handler::PcapAccess;
-use crate::utils::{
-    queue,
-    stats::{Collector, Countable, RefCountable, StatsOption},
-};
+use crate::utils::stats::{Collector, Countable, RefCountable, StatsOption};
+use public::queue;
 
 pub struct WorkerManager {
     config: PcapAccess,

@@ -34,7 +34,7 @@ pub use public::counter::*;
 use crate::common::DEFAULT_INGESTER_PORT;
 use crate::proto::stats;
 use crate::sender::SendItem;
-use crate::utils::queue::{bounded, Receiver, Sender};
+use public::queue::{bounded, Receiver, Sender};
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
 const TICK_CYCLE: Duration = Duration::from_secs(60);

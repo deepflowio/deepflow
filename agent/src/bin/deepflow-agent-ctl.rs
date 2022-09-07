@@ -31,9 +31,10 @@ use flate2::write::ZlibDecoder;
 #[cfg(target_os = "linux")]
 use deepflow_agent::debug::PlatformMessage;
 use deepflow_agent::debug::{
-    Beacon, Client, Message, Module, PolicyMessage, QueueMessage, RpcMessage, BEACON_PORT,
+    Beacon, Client, Message, Module, PolicyMessage, RpcMessage, BEACON_PORT,
     DEBUG_QUEUE_IDLE_TIMEOUT, DEEPFLOW_AGENT_BEACON,
 };
+use public::debug::QueueMessage;
 
 const ERR_PORT_MSG: &str = "error: The following required arguments were not provided:
     \t--port <PORT> required arguments were not provided";

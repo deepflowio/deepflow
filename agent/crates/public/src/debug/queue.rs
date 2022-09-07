@@ -16,7 +16,8 @@
 
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv6Addr, SocketAddr, UdpSocket},
+    io::{self, ErrorKind},
+    net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
     str,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -27,15 +28,31 @@ use std::{
     time::{Duration, Instant},
 };
 
-use bincode::{config::Configuration, Decode, Encode};
+use bincode::{config::Configuration, encode_to_vec, Decode, Encode};
 use log::warn;
 
-use super::{debugger::send_to, DEBUG_QUEUE_IDLE_TIMEOUT};
-
-use crate::utils::queue::{Error, Receiver};
+use super::{Error as SendError, Result, DEBUG_QUEUE_IDLE_TIMEOUT, MAX_BUF_SIZE};
+use crate::queue::{Error, Receiver};
 
 const QUEUE_RELEASE_TIMEOUT: Duration = Duration::from_micros(1);
 const QUEUE_RECV_TIMEOUT: Duration = Duration::from_secs(1);
+
+pub fn send_to(
+    sock: &UdpSocket,
+    addr: impl ToSocketAddrs + Clone,
+    msg: impl Encode,
+    conf: Configuration,
+) -> Result<()> {
+    let encoded = encode_to_vec(msg, conf)?;
+    if encoded.len() > MAX_BUF_SIZE {
+        return Err(SendError::IoError(io::Error::new(
+            ErrorKind::Other,
+            "too large packets to send",
+        )));
+    }
+    sock.send_to(encoded.as_slice(), addr)?;
+    Ok(())
+}
 
 #[derive(PartialEq, Debug, Encode, Decode)]
 pub enum QueueMessage {
@@ -67,7 +84,7 @@ pub struct QueueDebugger {
 }
 
 impl QueueDebugger {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             queues: Mutex::new(HashMap::new()),
             threads: Mutex::new(HashMap::new()),
@@ -88,15 +105,15 @@ impl QueueDebugger {
         self.queues.lock().unwrap().insert(name, ctx);
     }
 
-    pub(super) fn turn_on_queue(&self, name: impl AsRef<str>) -> QueueMessage {
+    pub fn turn_on_queue(&self, name: impl AsRef<str>) -> QueueMessage {
         self.change_running(name, true)
     }
 
-    pub(super) fn turn_off_queue(&self, name: impl AsRef<str>) -> QueueMessage {
+    pub fn turn_off_queue(&self, name: impl AsRef<str>) -> QueueMessage {
         self.change_running(name, false)
     }
 
-    pub(super) fn turn_off_all_queue(&self) -> QueueMessage {
+    pub fn turn_off_all_queue(&self) -> QueueMessage {
         let mut threads = self.threads.lock().unwrap();
         self.queues.lock().unwrap().retain(|name, ctx| {
             if !ctx.receiver.terminated() {
@@ -112,7 +129,7 @@ impl QueueDebugger {
         QueueMessage::Fin
     }
 
-    pub(super) fn queue_names(&self) -> Vec<QueueMessage> {
+    pub fn queue_names(&self) -> Vec<QueueMessage> {
         let names = self
             .queues
             .lock()
@@ -123,7 +140,7 @@ impl QueueDebugger {
         vec![QueueMessage::Names(Some(names)), QueueMessage::Fin]
     }
 
-    pub(super) fn send(
+    pub fn send(
         &self,
         name: impl Into<String>,
         conn: SocketAddr,

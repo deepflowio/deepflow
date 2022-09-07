@@ -52,10 +52,12 @@ use crate::{
     sender::SendItem,
     utils::{
         net::MacAddr,
-        queue::{DebugSender, Error, Receiver},
         stats::{Counter, CounterType, CounterValue, RefCountable},
-        LeakyBucket,
     },
+};
+use public::{
+    queue::{DebugSender, Error, Receiver},
+    LeakyBucket,
 };
 
 const QUEUE_BATCH_SIZE: usize = 1024;

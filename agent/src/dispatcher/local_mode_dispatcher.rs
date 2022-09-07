@@ -37,6 +37,7 @@ use crate::{
     },
     config::DispatcherConfig,
     flow_generator::FlowMap,
+    handler::MiniPacket,
     platform::LibvirtXmlExtractor,
     proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
@@ -242,8 +243,10 @@ impl LocalModeDispatcher {
                 u64::from(pipeline.vm_mac) as u32,
             );
             BaseDispatcher::prepare_flow(&mut meta_packet, TapType::Tor, false, base.id as u8);
+            flow_map.inject_meta_packet(&mut meta_packet);
+            let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
             for h in pipeline.handlers.iter_mut() {
-                h.handle(overlay_packet, &meta_packet);
+                h.handle(&mini_packet);
             }
 
             if let Some(policy) = meta_packet.policy_data.as_ref() {
@@ -258,11 +261,10 @@ impl LocalModeDispatcher {
             {
                 base.need_update_bpf.store(true, Ordering::Relaxed);
             }
-            flow_map.inject_meta_packet(meta_packet);
             base.check_and_update_bpf();
         }
 
-        base.terminate_queue();
+        base.terminate_handler();
         info!("Stopped dispatcher {}", base.id);
     }
 

@@ -26,9 +26,11 @@ use std::{
 use bincode::{config::Configuration, Decode, Encode};
 use log::warn;
 
-use super::debugger::send_to;
 use crate::policy::PolicySetter;
-use crate::utils::queue::{bounded, Error, Receiver, Sender};
+use public::{
+    debug::send_to,
+    queue::{bounded, Error, Receiver, Sender},
+};
 
 #[derive(PartialEq, Debug, Encode, Decode)]
 pub enum PolicyMessage {

@@ -34,10 +34,8 @@ use crate::collector::acc_flow::U16Set;
 use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
 use crate::config::handler::CollectorAccess;
 use crate::sender::SendItem;
-use crate::utils::{
-    queue::{DebugSender, Error, Receiver},
-    stats::{Counter, CounterType, CounterValue, RefCountable},
-};
+use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
+use public::queue::{DebugSender, Error, Receiver};
 
 const MINUTE_SLOTS: usize = 2;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(2 * SECONDS_IN_MINUTE);

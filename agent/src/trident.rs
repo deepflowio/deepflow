@@ -39,8 +39,7 @@ use log::{info, warn};
 
 #[cfg(target_os = "linux")]
 use crate::ebpf_collector::EbpfCollector;
-
-use crate::handler::PacketHandlerBuilder;
+use crate::handler::{NpbBuilder, PacketHandlerBuilder};
 use crate::integration_collector::MetricServer;
 use crate::pcap::WorkerManager;
 #[cfg(target_os = "linux")]
@@ -62,7 +61,7 @@ use crate::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
         Config, ConfigError, RuntimeConfig, YamlConfig,
     },
-    debug::{ConstructDebugCtx, Debugger, QueueDebugger},
+    debug::{ConstructDebugCtx, Debugger},
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
@@ -82,11 +81,10 @@ use crate::{
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
         net::{get_ctrl_ip_and_mac, get_route_src_ip, links_by_name_regex, MacAddr},
-        queue,
         stats::{self, Countable, RefCountable, StatsOption},
-        LeakyBucket,
     },
 };
+use public::{debug::QueueDebugger, queue, LeakyBucket};
 
 const MINUTE: Duration = Duration::from_secs(60);
 
@@ -644,6 +642,8 @@ pub struct Components {
     pub packet_sequence_uniform_sender: UniformSenderThread, // Enterprise Edition Feature: packet-sequence
     pub exception_handler: ExceptionHandler,
     pub domain_name_listener: DomainNameListener,
+    pub npb_bps_limit: Arc<LeakyBucket>,
+    pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     max_memory: u64,
     tap_mode: TapMode,
 }
@@ -705,7 +705,11 @@ impl Components {
             self.external_metrics_server.start();
         }
         self.domain_name_listener.start();
-
+        self.handler_builders.iter().for_each(|x| {
+            x.lock().unwrap().iter_mut().for_each(|y| {
+                y.start();
+            })
+        });
         info!("Started components.");
     }
 
@@ -949,6 +953,7 @@ impl Components {
         };
         let bpf_builder = bpf::Builder {
             is_ipv6: ctrl_ip.is_ipv6(),
+            vxlan_flags: yaml_config.vxlan_flags,
             vxlan_port: yaml_config.vxlan_port,
             controller_port: static_config.controller_port,
             controller_tls_port: static_config.controller_tls_port,
@@ -999,6 +1004,11 @@ impl Components {
             #[cfg(target_os = "windows")]
             bpf_syntax_str,
         }));
+
+        let npb_bps_limit = Arc::new(LeakyBucket::new(Some(
+            config_handler.candidate_config.npb.bps_threshold,
+        )));
+        let mut handler_builders = Vec::new();
         for i in 0..dispatcher_num {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1070,8 +1080,21 @@ impl Components {
             );
             packet_sequence_parsers.push(packet_sequence_parser);
 
+            let handler_builder = Arc::new(Mutex::new(vec![
+                PacketHandlerBuilder::Pcap(pcap_sender.clone()),
+                PacketHandlerBuilder::Npb(NpbBuilder::new(
+                    i,
+                    &config_handler.candidate_config.npb,
+                    &queue_debugger,
+                    npb_bps_limit.clone(),
+                    stats_collector.clone(),
+                )),
+            ]));
+            handler_builders.push(handler_builder.clone());
+
             let dispatcher_builder = DispatcherBuilder::new()
                 .id(i)
+                .handler_builders(handler_builder)
                 .ctrl_mac(ctrl_mac)
                 .leaky_bucket(rx_leaky_bucket.clone())
                 .options(Arc::new(dispatcher::Options {
@@ -1085,13 +1108,13 @@ impl Components {
                     tap_mac_script: yaml_config.tap_mac_script.clone(),
                     is_ipv6: ctrl_ip.is_ipv6(),
                     vxlan_port: yaml_config.vxlan_port,
+                    vxlan_flags: yaml_config.vxlan_flags,
                     controller_port: static_config.controller_port,
                     controller_tls_port: static_config.controller_tls_port,
                     snap_len: config_handler
                         .candidate_config
                         .dispatcher
                         .capture_packet_size as usize,
-                    handler_builders: vec![PacketHandlerBuilder::Pcap(pcap_sender.clone())],
                     ..Default::default()
                 }))
                 .bpf_options(bpf_options.clone())
@@ -1308,6 +1331,8 @@ impl Components {
             packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
             packet_sequence_parsers,        // Enterprise Edition Feature: packet-sequence
             domain_name_listener,
+            npb_bps_limit,
+            handler_builders,
         })
     }
 
@@ -1492,6 +1517,11 @@ impl Components {
         self.telegraf_uniform_sender.stop();
         self.packet_sequence_uniform_sender.stop(); // Enterprise Edition Feature: packet-sequence
         self.domain_name_listener.stop();
+        self.handler_builders.iter().for_each(|x| {
+            x.lock().unwrap().iter_mut().for_each(|y| {
+                y.stop();
+            })
+        });
 
         info!("Stopped components.")
     }

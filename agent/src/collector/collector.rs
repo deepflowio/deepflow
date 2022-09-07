@@ -48,10 +48,10 @@ use crate::{
     sender::SendItem,
     utils::{
         net::MacAddr,
-        queue::{DebugSender, Error, Receiver},
         stats::{self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
     },
 };
+use public::queue::{DebugSender, Error, Receiver};
 
 const MINUTE: u64 = 60;
 

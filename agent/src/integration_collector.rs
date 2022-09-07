@@ -48,7 +48,7 @@ use crate::proto::integration::opentelemetry::proto::{
 };
 use crate::proto::trident::Exception;
 use crate::sender::SendItem;
-use crate::utils::queue::{DebugSender, Error};
+use public::queue::{DebugSender, Error};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 

@@ -14,6 +14,17 @@
  * limitations under the License.
  */
 
+mod queue;
+
+use std::time::Duration;
+
+use tonic;
+
+pub use queue::{send_to, QueueDebugger, QueueMessage};
+pub const QUEUE_LEN: usize = 1024;
+pub const DEBUG_QUEUE_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+pub const MAX_BUF_SIZE: usize = 9000;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]

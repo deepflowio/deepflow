@@ -20,12 +20,11 @@ use bincode::{Decode, Encode};
 use parking_lot::RwLock;
 use tokio::runtime::{Builder, Runtime};
 
-use super::error::{Error, Result};
-
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::{self, SyncResponse};
 use crate::rpc::{RunningConfig, Session, StaticConfig, Status, Synchronizer};
+use public::debug::{Error, Result};
 
 pub struct RpcDebugger {
     session: Arc<Session>,

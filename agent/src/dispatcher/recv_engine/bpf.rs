@@ -23,9 +23,9 @@ use crate::common::{
     ETH_TYPE_OFFSET, GRE4_PROTO_OFFSET, GRE6_PROTO_OFFSET, GRE_PROTO_LEN, IPV4_ADDR_LEN,
     IPV4_DST_OFFSET, IPV4_FLAGS_FRAG_OFFSET_LEN, IPV4_FLAGS_OFFSET, IPV4_PROTO_LEN,
     IPV4_PROTO_OFFSET, IPV4_SRC_OFFSET, IPV6_DST_OFFSET, IPV6_PROTO_LEN, IPV6_PROTO_OFFSET,
-    IPV6_SRC_OFFSET, NPB_VXLAN_FLAGS, PORT_LEN, TCP6_DST_OFFSET, TCP6_SRC_OFFSET, TCP_DST_OFFSET,
-    TCP_SRC_OFFSET, UDP6_DST_OFFSET, UDP6_SRC_OFFSET, UDP_DST_OFFSET, UDP_SRC_OFFSET,
-    VLAN_HEADER_SIZE, VXLAN6_FLAGS_OFFSET, VXLAN_FLAGS_OFFSET,
+    IPV6_SRC_OFFSET, PORT_LEN, TCP6_DST_OFFSET, TCP6_SRC_OFFSET, TCP_DST_OFFSET, TCP_SRC_OFFSET,
+    UDP6_DST_OFFSET, UDP6_SRC_OFFSET, UDP_DST_OFFSET, UDP_SRC_OFFSET, VLAN_HEADER_SIZE,
+    VXLAN6_FLAGS_OFFSET, VXLAN_FLAGS_OFFSET,
 };
 
 #[cfg(target_os = "linux")]
@@ -78,6 +78,7 @@ impl BpfBuilder {
 
 pub(crate) struct Builder {
     pub is_ipv6: bool,
+    pub vxlan_flags: u8,
     pub vxlan_port: u16,
     pub controller_port: u16,
     pub analyzer_port: u16,
@@ -179,21 +180,19 @@ impl Builder {
                 off: UDP_DST_OFFSET as u32,
                 size: PORT_LEN as u32,
             }))
-            .branch(
-                JumpIf {
-                    cond: JumpTest::JumpNotEqual,
-                    val: self.vxlan_port as u32,
-                    ..Default::default()
-                },
-                Self::bypass_modifier,
-            )
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpNotEqual,
+                val: self.vxlan_port as u32,
+                skip_true: 6,
+                skip_false: 5,
+            }))
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
                 off: VXLAN_FLAGS_OFFSET as u32,
                 size: 1,
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
-                val: NPB_VXLAN_FLAGS as u32,
+                val: self.vxlan_flags as u32,
                 skip_true: 3,
                 skip_false: 4,
             }))
@@ -240,21 +239,19 @@ impl Builder {
                 off: UDP6_DST_OFFSET as u32,
                 size: PORT_LEN as u32,
             }))
-            .branch(
-                JumpIf {
-                    cond: JumpTest::JumpNotEqual,
-                    val: self.vxlan_port as u32,
-                    ..Default::default()
-                },
-                Self::bypass_modifier,
-            )
+            .append(BpfSyntax::JumpIf(JumpIf {
+                cond: JumpTest::JumpNotEqual,
+                val: self.vxlan_port as u32,
+                skip_false: 6,
+                skip_true: 5,
+            }))
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
                 off: VXLAN6_FLAGS_OFFSET as u32,
                 size: 1,
             }))
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpEqual,
-                val: NPB_VXLAN_FLAGS as u32,
+                val: self.vxlan_flags as u32,
                 skip_true: 3,
                 skip_false: 4,
             }))
@@ -726,6 +723,7 @@ mod tests {
     fn ipv4_bpf_syntax() {
         let builder = Builder {
             is_ipv6: false,
+            vxlan_flags: 0xff,
             vxlan_port: 1122,
             controller_port: 3344,
             controller_tls_port: 5566,
@@ -802,6 +800,7 @@ mod tests {
     fn ipv6_bpf_syntax() {
         let builder = Builder {
             is_ipv6: true,
+            vxlan_flags: 0xff,
             vxlan_port: 1122,
             controller_port: 3344,
             controller_tls_port: 5566,

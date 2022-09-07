@@ -226,6 +226,7 @@ pub struct YamlConfig {
     pub dpdk_ring_port: String,
     pub xflow_collector: XflowGeneratorConfig,
     pub vxlan_port: u16,
+    pub vxlan_flags: u8,
     pub collector_sender_queue_size: usize,
     pub collector_sender_queue_count: usize,
     pub flow_sender_queue_size: usize,
@@ -353,6 +354,11 @@ impl YamlConfig {
             c.packet_sequence_queue_count = 1;
         }
 
+        if c.vxlan_flags == 0x08 || c.vxlan_flags == 0 {
+            c.vxlan_flags = 0xff;
+        }
+        c.vxlan_flags |= 0x08;
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -391,6 +397,7 @@ impl Default for YamlConfig {
             dpdk_ring_port: "dpdkr0".into(),
             xflow_collector: Default::default(),
             vxlan_port: 4789,
+            vxlan_flags: 0xff,
             // default size changes according to tap_mode
             collector_sender_queue_size: 0,
             collector_sender_queue_count: 1,

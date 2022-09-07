@@ -31,7 +31,6 @@ use crate::common::enums::IpProtocol;
 use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
-use crate::debug::QueueDebugger;
 use crate::ebpf;
 use crate::flow_generator::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
@@ -42,11 +41,12 @@ use crate::flow_generator::{
 };
 use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
-use crate::utils::{
+use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
+use public::{
+    debug::QueueDebugger,
     queue::{bounded_with_debug, DebugSender, Receiver},
     LeakyBucket,
 };
-use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
 
 type LoggerItem = (L7Protocol, Box<dyn L7LogParse>);
 

@@ -78,6 +78,8 @@ pub type EnvironmentAccess = Access<EnvironmentConfig>;
 
 pub type SenderAccess = Access<SenderConfig>;
 
+pub type NpbAccess = Access<NpbConfig>;
+
 pub type PlatformAccess = Access<PlatformConfig>;
 
 pub type HandlerAccess = Access<HandlerConfig>;
@@ -166,6 +168,10 @@ pub struct SenderConfig {
     pub dest_ip: IpAddr,
     pub vtap_id: u16,
     pub dest_port: u16,
+    pub vxlan_port: u16,
+    pub vxlan_flags: u8,
+    pub npb_enable_qos_bypass: bool,
+    pub npb_vlan: u16,
     pub npb_vlan_mode: trident::VlanMode,
     pub npb_dedup_enabled: bool,
     pub npb_bps_threshold: u64,
@@ -176,6 +182,34 @@ pub struct SenderConfig {
     pub server_tx_bandwidth_threshold: u64,
     pub bandwidth_probe_interval: Duration,
     pub enabled: bool,
+}
+
+impl Default for SenderConfig {
+    fn default() -> Self {
+        let module_config = ModuleConfig::default();
+        return module_config.sender.clone();
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct NpbConfig {
+    pub underlay_is_ipv6: bool,
+    pub vxlan_flags: u8,
+    pub vxlan_port: u16,
+    pub dedup_enabled: bool,
+    pub enable_qos_bypass: bool,
+    pub output_vlan: u16,
+    pub mtu: u32,
+    pub bps_threshold: u64,
+    pub vlan_mode: trident::VlanMode,
+    pub socket_type: trident::SocketType,
+}
+
+impl Default for NpbConfig {
+    fn default() -> Self {
+        let module_config = ModuleConfig::default();
+        return module_config.npb.clone();
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -583,6 +617,7 @@ pub struct ModuleConfig {
     pub diagnose: DiagnoseConfig,
     pub stats: StatsConfig,
     pub sender: SenderConfig,
+    pub npb: NpbConfig,
     pub handler: HandlerConfig,
     pub log: LogConfig,
     pub synchronizer: SynchronizerConfig,
@@ -680,6 +715,10 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 dest_ip,
                 vtap_id: conf.vtap_id as u16,
                 dest_port: conf.analyzer_port,
+                vxlan_port: conf.yaml_config.vxlan_port,
+                vxlan_flags: conf.yaml_config.vxlan_flags,
+                npb_enable_qos_bypass: conf.yaml_config.enable_qos_bypass,
+                npb_vlan: conf.output_vlan,
                 npb_vlan_mode: conf.npb_vlan_mode,
                 npb_dedup_enabled: conf.npb_dedup_enabled,
                 npb_bps_threshold: conf.npb_bps_threshold,
@@ -695,6 +734,18 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .unwrap()
                     .to_string(),
                 enabled: conf.collector_enabled,
+            },
+            npb: NpbConfig {
+                mtu: conf.mtu,
+                underlay_is_ipv6: dest_ip.is_ipv6(),
+                vxlan_port: conf.yaml_config.vxlan_port,
+                vxlan_flags: conf.yaml_config.vxlan_flags,
+                enable_qos_bypass: conf.yaml_config.enable_qos_bypass,
+                output_vlan: conf.output_vlan,
+                vlan_mode: conf.npb_vlan_mode,
+                dedup_enabled: conf.npb_dedup_enabled,
+                bps_threshold: conf.npb_bps_threshold,
+                socket_type: conf.npb_socket_type,
             },
             collector: CollectorConfig {
                 enabled: conf.collector_enabled,
@@ -869,6 +920,12 @@ impl ConfigHandler {
     pub fn sender(&self) -> SenderAccess {
         Map::new(self.current_config.clone(), |config| -> &SenderConfig {
             &config.sender
+        })
+    }
+
+    pub fn npb(&self) -> NpbAccess {
+        Map::new(self.current_config.clone(), |config| -> &NpbConfig {
+            &config.npb
         })
     }
 
@@ -1587,6 +1644,24 @@ impl ConfigHandler {
                 candidate_config.metric_server, new_config.metric_server
             );
             candidate_config.metric_server = new_config.metric_server;
+        }
+
+        if candidate_config.npb != new_config.npb {
+            if candidate_config.npb.bps_threshold != new_config.npb.bps_threshold {
+                fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
+                    components
+                        .npb_bps_limit
+                        .set_rate(Some(handler.candidate_config.npb.bps_threshold));
+                }
+                callbacks.push(dispatcher_callback);
+            }
+
+            info!(
+                "npb config change from {:#?} to {:#?}",
+                candidate_config.npb, new_config.npb
+            );
+            candidate_config.npb = new_config.npb;
+            restart_dispatcher = true;
         }
 
         if restart_dispatcher && candidate_config.dispatcher.enabled {
