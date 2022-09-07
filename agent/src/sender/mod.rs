@@ -15,6 +15,7 @@
  */
 
 // NpbBandwidthWatcher NewFragmenterBuilder NewCompressorBuilder NewPCapBuilder NewUniformCollectSender
+pub mod npb_sender;
 mod tcp_packet;
 pub(crate) mod uniform_sender;
 

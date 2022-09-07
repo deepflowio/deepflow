@@ -14,14 +14,6 @@
  * limitations under the License.
  */
 
-//! Enterprise Edition Feature: packet-sequence
-use crate::{
-    sender::SendItem,
-    utils::queue::{DebugSender, Error, Receiver},
-};
-
-use crate::flow_generator::packet_sequence::consts;
-use log::{info, warn};
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -29,6 +21,13 @@ use std::{
     },
     thread::{self, JoinHandle},
 };
+
+use log::{info, warn};
+
+// Enterprise Edition Feature: packet-sequence
+use crate::flow_generator::packet_sequence::consts;
+use crate::sender::SendItem;
+use public::queue::{DebugSender, Error, Receiver};
 
 pub struct PacketSequenceParser {
     input_queue: Arc<Receiver<Box<packet_sequence_block::PacketSequenceBlock>>>,

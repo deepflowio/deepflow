@@ -41,7 +41,7 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::common::ebpf::GO_HTTP2_UPROBE;
+use crate::common::{ebpf::GO_HTTP2_UPROBE, IPV4_FRAG_MORE_FRAGMENT};
 #[cfg(target_os = "linux")]
 use crate::ebpf::{
     MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
@@ -49,16 +49,17 @@ use crate::ebpf::{
 };
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
+use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct MetaPacket<'a> {
     // 主机序, 不因L2End1而颠倒, 端口会在查询策略时被修改
     pub lookup_key: LookupKey,
 
     pub raw: Option<&'a [u8]>,
     pub packet_len: usize,
-    vlan_tag_size: usize,
+    pub vlan_tag_size: usize,
     pub ttl: u8,
     pub reset_ttl: bool,
     pub endpoint_data: Option<Arc<EndpointData>>,
@@ -70,17 +71,17 @@ pub struct MetaPacket<'a> {
     offset_mac_1: usize,
     offset_port_0: usize,
     offset_port_1: usize,
-    offset_ipv6_last_option: usize,
-    offset_ipv6_fragment_option: usize,
+    pub offset_ipv6_last_option: usize,
+    pub offset_ipv6_fragment_option: usize,
 
     pub header_type: HeaderType,
     // 读取时不要直接用这个字段，用MetaPacket.GetPktSize()
     // 注意：不含镜像外层VLAN的四个字节
-    l2_l3_opt_size: usize, // 802.1Q + IPv4 optional fields
-    l4_opt_size: usize,    // ICMP payload / TCP optional fields
+    pub l2_l3_opt_size: usize, // 802.1Q + IPv4 optional fields
+    pub l4_opt_size: usize,    // ICMP payload / TCP optional fields
     l3_payload_len: usize,
     l4_payload_len: usize,
-    npb_ignore_l4: bool, // 对于IP分片或IP Options不全的情况，分发时不对l4进行解析
+    pub npb_ignore_l4: bool, // 对于IP分片或IP Options不全的情况，分发时不对l4进行解析
     nd_reply_or_arp_request: bool, // NDP request or ARP request
 
     pub tunnel: Option<&'a TunnelInfo>,
@@ -313,7 +314,6 @@ impl<'a> MetaPacket<'a> {
                         continue;
                     }
                     IpProtocol::Icmpv6 => {
-                        self.offset_ipv6_last_option = option_offset;
                         return (next_header, option_offset - original_offset);
                     }
                     IpProtocol::Esp => {
@@ -504,8 +504,7 @@ impl<'a> MetaPacket<'a> {
                 if dst_endpoint {
                     mem::swap(&mut self.offset_ip_0, &mut self.offset_ip_1);
                 }
-                // 为了不影响L4层的字段偏移，ipv6比ipv4多的20个字节放入m.l2l3OptSize
-                self.l2_l3_opt_size = IPV6_HEADER_ADJUST + vlan_tag_size;
+                self.l2_l3_opt_size = vlan_tag_size;
                 let mut payload = read_u16_be(&packet[FIELD_OFFSET_PAYLOAD_LEN + vlan_tag_size..]);
                 // e1000网卡驱动，在开启TSO功能时，IPv6的payload可能为0
                 // e1000网卡驱动：https://elixir.bootlin.com/linux/v3.0/source/drivers/net/e1000e/netdev.c#L4423
@@ -592,7 +591,8 @@ impl<'a> MetaPacket<'a> {
                     })?;
                 self.lookup_key.proto = ip_protocol;
 
-                if read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]) & 0xFFF != 0 {
+                let frag = read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]);
+                if frag & 0xFFF != 0 || frag & IPV4_FRAG_MORE_FRAGMENT != 0 {
                     // fragment
                     self.header_type = HeaderType::Ipv4;
                     self.npb_ignore_l4 = true;
@@ -872,6 +872,24 @@ impl<'a> MetaPacket<'a> {
             self.lookup_key.dst_mac = mac;
         }
     }
+
+    pub fn npb_mode(&self) -> NpbMode {
+        if self.lookup_key.is_l2() {
+            NpbMode::L2
+        } else if self.lookup_key.is_tcp() && !self.npb_ignore_l4 {
+            if self.lookup_key.is_ipv4() {
+                NpbMode::IPv4TCP
+            } else {
+                NpbMode::IPv6TCP
+            }
+        } else {
+            if self.lookup_key.is_ipv4() {
+                NpbMode::IPv4
+            } else {
+                NpbMode::IPv6
+            }
+        }
+    }
 }
 
 impl<'a> fmt::Display for MetaPacket<'a> {
@@ -900,7 +918,7 @@ impl<'a> fmt::Display for MetaPacket<'a> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct MetaPacketTcpHeader {
     pub seq: u32,
     pub ack: u32,

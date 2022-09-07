@@ -39,6 +39,16 @@ impl TapSide {
     }
 }
 
+bitflags! {
+    #[derive(Default)]
+    pub struct ActionFlags: u8 {
+        const NONE = 0;
+        const PCAP = 0x1;
+        const NPB = 0x2;
+        const NPB_DROP = 0x4;
+    }
+}
+
 #[derive(TryFromPrimitive, IntoPrimitive, Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum DirectionType {
@@ -63,6 +73,8 @@ impl Default for DirectionType {
 #[repr(u8)]
 pub enum NpbTunnelType {
     VxLan,
+    GreErspan,
+    Pcap,
 }
 
 impl NpbTunnelType {
@@ -101,7 +113,7 @@ impl NpbAction {
     }
 
     pub const fn tunnel_id(&self) -> u32 {
-        0
+        100
     }
 
     pub const fn payload_slice(&self) -> u16 {
@@ -121,7 +133,7 @@ impl NpbAction {
     }
 
     pub fn tunnel_ip(&self) -> IpAddr {
-        IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+        IpAddr::from(Ipv4Addr::UNSPECIFIED)
     }
 
     pub fn set_payload_slice(&mut self, _payload_slice: u16) {}
@@ -141,16 +153,26 @@ impl fmt::Display for NpbAction {
 pub struct PolicyData {
     pub npb_actions: Vec<NpbAction>,
     pub acl_id: u32,
-    pub action_flags: u16,
+    pub action_flags: ActionFlags,
 }
 
 impl PolicyData {
-    pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32, action_flags: u16) -> Self {
+    pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32, action_flags: ActionFlags) -> Self {
         Self {
             npb_actions,
             acl_id,
             action_flags,
         }
+    }
+
+    pub fn contain_npb(&self) -> bool {
+        self.acl_id > 0
+            && self.action_flags.contains(ActionFlags::NPB)
+            && !self.action_flags.contains(ActionFlags::NPB_DROP)
+    }
+
+    pub fn contain_pcap(&self) -> bool {
+        self.acl_id > 0 && self.action_flags.contains(ActionFlags::PCAP)
     }
 
     pub fn format_npb_action(&mut self) {}
