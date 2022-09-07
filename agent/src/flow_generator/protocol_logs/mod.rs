@@ -129,7 +129,7 @@ impl Default for L7ProtoRawDataType {
     }
 }
 
-#[derive(Serialize,Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct AppProtoHead {
     #[serde(rename = "l7_protocol")]
     pub proto: L7Protocol,
@@ -530,7 +530,7 @@ impl AppProtoLogsData {
     pub fn omit_send(&self) -> bool {
         match &self.special_info {
             AppProtoLogsInfo::HttpV2(d) => {
-                return d.is_nil();
+                return d.is_empty();
             }
             _ => {
                 return false;
