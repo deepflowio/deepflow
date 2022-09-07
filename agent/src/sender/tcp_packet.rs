@@ -33,9 +33,9 @@ use super::{ERR_INTERVAL, RCV_TIMEOUT, SEQUENCE_OFFSET};
 
 use crate::utils::{
     bytes::write_u64_be,
-    queue::{Error, Receiver},
     stats::{Counter, CounterType, CounterValue, RefCountable},
 };
+use public::queue::{Error, Receiver};
 
 #[derive(Default)]
 pub struct TcpPacketCounter {

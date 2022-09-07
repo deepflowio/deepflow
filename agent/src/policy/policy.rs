@@ -38,8 +38,8 @@ use crate::common::FeatureFlags;
 use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
 use crate::proto::common::TridentType;
-use crate::utils::queue::Sender;
 use npb_pcap_policy::PolicyData;
+use public::queue::Sender;
 
 pub struct PolicyMonitor {
     sender: Arc<Sender<String>>,

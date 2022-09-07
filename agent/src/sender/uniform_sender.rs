@@ -32,10 +32,10 @@ use super::{SendItem, SendMessageType, MAX_FILE_SIZE, PRE_FILE_SUFFIX};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::{Exception, SocketType};
-use crate::utils::{
-    queue::{Error, Receiver},
-    stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
+use crate::utils::stats::{
+    Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
 };
+use public::queue::{Error, Receiver};
 
 #[derive(Debug, Default)]
 pub struct SenderCounter {

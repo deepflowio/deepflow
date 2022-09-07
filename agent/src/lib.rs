@@ -67,6 +67,6 @@ pub use {
     policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,
     proto::common::TridentType as _TridentType,
+    public::{leaky_bucket::LeakyBucket as _LeakyBucket, queue::bounded as _queue_bounded},
     utils::net::MacAddr as _MacAddr,
-    utils::{leaky_bucket::LeakyBucket as _LeakyBucket, queue::bounded as _queue_bounded},
 };

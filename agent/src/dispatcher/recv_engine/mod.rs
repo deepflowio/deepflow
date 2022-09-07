@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-pub(crate) mod af_packet;
+pub mod af_packet;
 pub(crate) mod bpf;
 
 #[cfg(target_os = "windows")]

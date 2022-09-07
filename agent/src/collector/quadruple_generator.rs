@@ -46,9 +46,9 @@ use crate::rpc::get_timestamp;
 use crate::utils::{
     lru::Lru,
     possible_host::PossibleHost,
-    queue::{DebugSender, Error, Receiver},
     stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
 };
+use public::queue::{DebugSender, Error, Receiver};
 
 #[derive(Debug, Default)]
 pub struct QgCounter {

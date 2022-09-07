@@ -199,6 +199,15 @@ pub fn get_route_src_ip(dest_addr: &IpAddr) -> Result<IpAddr> {
     route_get(*dest_addr).map(|r| r.src_ip)
 }
 
+pub fn get_route_src_ip_interface_name(dest_addr: &IpAddr) -> Result<String> {
+    let if_index = route_get(*dest_addr).map(|r| r.oif_index)?;
+    let src_ip = get_route_src_ip(dest_addr)?;
+    Ok(link_list()?
+        .into_iter()
+        .filter(|link| link.if_index == if_index)?
+        .map(|f| Ok(f.name.clone())))
+}
+
 pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
     let dest_safety_sockaddr = match dest_addr {
         IpAddr::V4(v4) => SafetySockAddr::Ipv4(SOCKADDR_IN {

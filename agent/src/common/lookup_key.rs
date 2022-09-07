@@ -28,7 +28,7 @@ use super::{
 use crate::utils::net::MacAddr;
 use npb_pcap_policy::{DedupOperator, TapSide};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LookupKey {
     pub timestamp: Duration,
     pub src_mac: MacAddr,
@@ -187,6 +187,18 @@ impl LookupKey {
             (src_masked_ip as u64) | src_mac_suffix << 32 | src_port << 48,
             (dst_masked_ip as u64) | dst_mac_suffix << 32 | dst_port << 48,
         )
+    }
+
+    pub fn is_l2(&self) -> bool {
+        self.eth_type != EthernetType::Ipv4 && self.eth_type != EthernetType::Ipv6
+    }
+
+    pub fn is_tcp(&self) -> bool {
+        self.proto == IpProtocol::Tcp
+    }
+
+    pub fn is_ipv4(&self) -> bool {
+        self.eth_type == EthernetType::Ipv4
     }
 }
 
