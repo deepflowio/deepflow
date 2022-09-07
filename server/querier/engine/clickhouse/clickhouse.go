@@ -172,6 +172,10 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			if ok {
 				e.asTagMap[as] = strings.Trim(sqlparser.String(function.Name), "`")
 			}
+			binary, ok := item.Expr.(*sqlparser.BinaryExpr)
+			if ok {
+				e.asTagMap[as] = sqlparser.String(binary)
+			}
 		}
 	}
 	return nil
