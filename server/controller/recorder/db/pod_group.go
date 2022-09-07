@@ -30,6 +30,7 @@ func NewPodGroup() *PodGroup {
 		OperatorBase[mysql.PodGroup]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_GROUP_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

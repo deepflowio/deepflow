@@ -60,7 +60,7 @@ type ControllerConfig struct {
 	LogFile              string `default:"/var/log/controller.log" yaml:"log-file"`
 	LogLevel             string `default:"info" yaml:"log-level"`
 	ListenPort           int    `default:"20417" yaml:"listen-port"`
-	ListenNodePort       int    `default:"30417" yaml:"listen-node-port"`
+	ListenNodePort       int    `default:"30417" yaml:"listen-node-port"` // TODO union port data type
 	MasterControllerName string `default:"" yaml:"master-controller-name"`
 	GrpcMaxMessageLength int    `default:"104857600" yaml:"grpc-max-message-length"`
 	GrpcPort             string `default:"20035" yaml:"grpc-port"`

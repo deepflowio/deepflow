@@ -30,6 +30,7 @@ func NewVMSecurityGroup() *VMSecurityGroup {
 		OperatorBase[mysql.VMSecurityGroup]{
 			resourceTypeName: common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

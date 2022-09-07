@@ -30,6 +30,7 @@ func NewPodCluster() *PodCluster {
 		OperatorBase[mysql.PodCluster]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_CLUSTER_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater
