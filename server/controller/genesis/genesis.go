@@ -23,6 +23,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -43,6 +44,7 @@ var GenesisService *Genesis
 var Synchronizer *SynchronizerServer
 
 type Genesis struct {
+	mutex           sync.RWMutex
 	cfg             config.GenesisConfig
 	genesisSyncData atomic.Value
 	kubernetesData  atomic.Value
@@ -55,6 +57,7 @@ func NewGenesis(cfg config.GenesisConfig) *Genesis {
 	var kData atomic.Value
 	kData.Store(map[string]KubernetesInfo{})
 	GenesisService = &Genesis{
+		mutex:           sync.RWMutex{},
 		cfg:             cfg,
 		genesisSyncData: sData,
 		kubernetesData:  kData,
@@ -323,7 +326,6 @@ func (g *Genesis) GetKubernetesData() map[string]KubernetesInfo {
 
 func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, error) {
 	k8sResp := map[string][]string{}
-	g.genesisStatsd.K8SInfoDelay = map[string][]int{}
 
 	localK8sDatas := g.GetKubernetesData()
 	k8sInfo, ok := localK8sDatas[clusterID]
@@ -374,7 +376,11 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		}
 	}
 
+	g.mutex.Lock()
+	g.genesisStatsd.K8SInfoDelay = map[string][]int{}
 	g.genesisStatsd.K8SInfoDelay[clusterID] = []int{int(time.Now().Sub(k8sInfo.Epoch).Seconds())}
+	statsd.MetaStatsd.RegisterStatsdTable(g)
+	g.mutex.Unlock()
 
 	for _, e := range k8sInfo.Entries {
 		eType := e.GetType()
@@ -393,6 +399,5 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			k8sResp[eType] = []string{string(out.Bytes())}
 		}
 	}
-	statsd.MetaStatsd.RegisterStatsdTable(g)
 	return k8sResp, nil
 }
