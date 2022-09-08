@@ -70,13 +70,14 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	}
 	geo.NewGeoTree()
 
-	flowLogWriter, err := dbwriter.NewFlowLogWriter(config.Base.CKDB.Primary, config.Base.CKDB.Secondary, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password, config.ReplicaEnabled, config.CKWriterConfig)
+	flowLogWriter, err := dbwriter.NewFlowLogWriter(config.Base.CKDB.Primary, config.Base.CKDB.Secondary, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password, config.ReplicaEnabled,
+		config.CKWriterConfig, config.FlowLogTTL)
 	if err != nil {
 		return nil, err
 	}
 	flowLogger := NewFlowLogger(config, controllers, manager, recv, flowLogWriter)
 	protoLogger := NewProtoLogger(config, controllers, manager, recv, flowLogWriter)
-	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, dbwriter.DefaultDayForTTL, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
+	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
 	if err != nil {
 		return nil, err
 	}
