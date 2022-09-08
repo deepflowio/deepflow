@@ -120,7 +120,7 @@ func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Contr
 		)
 	}
 
-	mysql.Db.Count(&dataSourceCount)
+	mysql.Db.Model(&model.DataSource{}).Count(&dataSourceCount)
 	if int(dataSourceCount) > cfg.Spec.DataSourceMax {
 		return model.DataSource{}, NewError(
 			common.RESOURCE_NUM_EXCEEDED,

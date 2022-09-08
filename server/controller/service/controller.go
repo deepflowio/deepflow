@@ -301,8 +301,16 @@ func UpdateController(
 			}
 			controllerRegion = controllerUpdate["REGION"].(string)
 		} else {
-			for _, az := range azs {
-				newAzs.Add(az)
+
+			if _, azUpdate := controllerUpdate["IS_ALL_AZ"]; azUpdate {
+				if controllerUpdate["IS_ALL_AZ"].(bool) {
+					newAzs.Add("ALL")
+				}
+			}
+			if !newAzs.Contains("ALL") {
+				for _, az := range azs {
+					newAzs.Add(az)
+				}
 			}
 			delAzs = oldAzs.Difference(newAzs)
 			addAzs = newAzs.Difference(oldAzs)
