@@ -132,6 +132,10 @@ func Start(ctx context.Context, configPath string) {
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
 
+	router.SetInitStageForHealthChecker("TagRecorder init")
+	tr := tagrecorder.NewTagRecorder(*cfg)
+	go tr.StartChDictionaryUpdate()
+
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
 	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
@@ -147,7 +151,6 @@ func Start(ctx context.Context, configPath string) {
 		if cfg.TrisolarisCfg.NodeType != "master" {
 			return
 		}
-		tr := tagrecorder.NewTagRecorder(*cfg)
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
 		for range time.Tick(time.Minute) {
