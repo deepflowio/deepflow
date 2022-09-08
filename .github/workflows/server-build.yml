@@ -60,49 +60,58 @@ jobs:
           cd server
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.amd64
 
-      - name: Package code build results
-        run: |
-          tar cvf server-artifact.tar server/bin/
+  #     - name: Package code build results
+  #       run: |
+  #         tar cvf server-artifact.tar server/bin/
 
-      - name: Archive code build results packager
-        uses: actions/upload-artifact@v3
-        with:
-          name: build results
-          path: |
-            server-artifact.tar
+  #     - name: Archive code build results packager
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: build results
+  #         path: |
+  #           server-artifact.tar
 
-  build_server_image:
-    name: build server image
-    needs: [build_server]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
+  # build_server_image:
+  #   name: build server image
+  #   needs: [build_server]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
+  #       with:
+  #         submodules: recursive
+  #         fetch-depth: 0
+
+  #     - name: Set up Docker Buildx
+  #       uses: docker/setup-buildx-action@v2
+  #       with:
+  #         install: true
+
+  #     - name: Download code build results
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: build results
+  #         path: .
+
+  #     - name: Unpack code build results
+  #       run: |
+  #         tar xvf server-artifact.tar
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
           install: true
-
-      - name: Download code build results
-        uses: actions/download-artifact@v3
-        with:
-          name: build results
-          path: .
-
-      - name: Unpack code build results
-        run: |
-          tar xvf server-artifact.tar
+          driver-opts: |
+            env.http_proxy=${{ secrets.HTTP_PROXY }}
+            env.https_proxy=${{ secrets.HTTP_PROXY }}
+            "env.no_proxy='localhost,127.0.0.1,localaddress,.localdomain.com,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,17.0.0.0/8,.local,169.254.0.0/16,224.0.0.0/4,240.0.0.0/4,.docker.io,docker.io,.github.com,.ghcr.io,ghcr.io,.amazonaws.com,registry-1.docker.io'"
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
         with:
           registry: "ghcr.io" 
           username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GITHUB_TOKEN }}" 
+          password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
 
       - name: Log in to Docker Registry
         uses: docker/login-action@v2
@@ -115,13 +124,6 @@ jobs:
         with:
           registry: "registry.cn-beijing.aliyuncs.com"
           username: "${{ secrets.REGISTRY_ALIYUN_USER }}"
-          password: "${{ secrets.REGISTRY_PASS }}"
-
-      - name: Log in to ALIYUN Docker Registry
-        uses: docker/login-action@v2
-        with:
-          registry: "${{ secrets.REGISTRY_ALIYUN_ADDR }}"
-          username: "${{ secrets.REGISTRY_ALIYUN_USER }}" 
           password: "${{ secrets.REGISTRY_PASS }}"
 
       - name: set env
@@ -142,5 +144,3 @@ jobs:
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
             "deepflowce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
-            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/dev/${{ env.IMAGE }}-ce:${{ env.IMAGE_TAG_PREFIX }}"

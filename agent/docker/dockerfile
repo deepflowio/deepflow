@@ -4,7 +4,6 @@ ARG TZ='Asia/Harbin'
 ENV DEFAULT_TZ ${TZ}
 ENV IN_CONTAINER yes
 RUN --mount=target=/tmp-mount \
-    sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
     apk upgrade --update \
     && apk add -U tzdata \
     && cp /usr/share/zoneinfo/${DEFAULT_TZ} /etc/localtime \
