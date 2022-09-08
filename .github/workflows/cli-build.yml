@@ -69,7 +69,7 @@ jobs:
 
       - uses: manyuanrong/setup-ossutil@v2.0
         with:
-          endpoint: "oss-cn-beijing.aliyuncs.com"
+          endpoint: "oss-accelerate.aliyuncs.com"
           access-key-id: "${{ secrets.ALIYUN_OSS_ACCESS_KEY }}"
           access-key-secret: "${{ secrets.ALIYUN_OSS_SECRETS_KEY }}"
 
