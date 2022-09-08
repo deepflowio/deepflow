@@ -169,8 +169,6 @@ impl L7FlowPerf for KafkaPerfData {
             AppProtoHead {
                 proto: self.l7_proto,
                 msg_type: self.msg_type,
-                status: self.status,
-                code: self.status_code,
                 rrt: rrt,
                 version: 0,
             },
