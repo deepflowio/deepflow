@@ -214,14 +214,18 @@ func migrateDB(cfg *config.ControllerConfig) {
 	// migrate if it is master, exit if not.
 	for range time.Tick(time.Second * 5) {
 		isMasterController, err := election.IsMasterController()
-		if err == nil && isMasterController {
-			ok := migrator.MigrateMySQL(cfg.MySqlCfg)
-			if !ok {
-				log.Error("migrate mysql failed")
-				time.Sleep(time.Second)
-				os.Exit(0)
+		if err == nil {
+			if isMasterController {
+				ok := migrator.MigrateMySQL(cfg.MySqlCfg)
+				if !ok {
+					log.Error("migrate mysql failed")
+					time.Sleep(time.Second)
+					os.Exit(0)
+				}
+				return
+			} else {
+				return
 			}
-			return
 		}
 	}
 }
