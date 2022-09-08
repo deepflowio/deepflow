@@ -181,7 +181,7 @@ ingester:
   #  password:
 
   #ckdb-auth:
-  #  user:
+  #  username:
   #  password:
 
   #ckdb:
@@ -228,6 +228,18 @@ ingester:
 
   ## ext metrics数据的保留的时长(单位: 天)
   #ext-metrics-ttl: 7
+
+  ## flow_metrics database data retention time(unit: day)
+  #flow-metrics-ttl:
+  #  vtap-flow-1m: 7     # vtap_flow[_edge_]_port.1m
+  #  vtap-flow-1s: 1     # vtap_flow[_edge]_port.1s
+  #  vtap-app-1m: 7      # vtap_app[_edge]_port.1m
+  #  vtap-app-1s: 1      # vtap_app[_edge]_port.1s
+
+  ## flow_metrics database data retention time(unit: day)
+  #flow-log-ttl:
+  #  l4-flow-log: 3
+  #  l7-flow-log: 3
 
   ## split prometheus metrics name lable to table name and metrics name, on the nth position of '_'
   # prometheus-separate-pos: 1
