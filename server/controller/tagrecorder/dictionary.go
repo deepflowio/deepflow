@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ import (
 )
 
 func (c *TagRecorder) UpdateChDictionary() {
+	log.Info("tagrecorder update ch dictionary")
 	var analyzers []mysql.Analyzer
 	var controllers []mysql.Controller
 	var azControllerConnections []mysql.AZControllerConnection
@@ -59,9 +61,22 @@ func (c *TagRecorder) UpdateChDictionary() {
 	for _, azAnalyzerConnection := range azAnalyzerConnections {
 		analyzerIPToRegion[azAnalyzerConnection.AnalyzerIP] = azAnalyzerConnection.Region
 	}
-	// 遍历所有数据节点检查并更新字典定义
-	for _, analyzer := range analyzers {
-		analyzerRegion, ok := analyzerIPToRegion[analyzer.IP]
+	connectMaster, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	var clusters []clickhouse.Clusters
+	if err := connectMaster.Select(&clusters, "select host_address,port from system.clusters"); err != nil {
+		log.Error(err)
+		connectMaster.Close()
+		return
+	}
+	connectMaster.Close()
+	// 遍历本区域所有数据节点检查并更新字典定义
+	for _, cluster := range clusters {
+		nodeIP := os.Getenv(common.NODE_IP_KEY)
+		analyzerRegion, ok := analyzerIPToRegion[nodeIP]
 		if !ok {
 			continue
 		}
@@ -71,12 +86,13 @@ func (c *TagRecorder) UpdateChDictionary() {
 		} else {
 			replicaSQL = fmt.Sprintf("REPLICA (HOST '%s%s' PRIORITY %s)", masterRegionPrefix, c.cfg.MySqlCfg.Host, "1")
 		}
-		c.cfg.ClickHouseCfg.Host = analyzer.IP
+		c.cfg.ClickHouseCfg.Host = cluster.HostAddress
+		c.cfg.ClickHouseCfg.Port = uint32(cluster.Port)
 		connect, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
 		if err != nil {
 			continue
 		}
-		log.Infof("refresh clickhouse dictionary in (%s: %d)", analyzer.IP, c.cfg.ClickHouseCfg.Port)
+		log.Infof("refresh clickhouse dictionary in (%s: %d)", cluster.HostAddress, c.cfg.ClickHouseCfg.Port)
 		var databases []string
 
 		// 检查并创建数据库

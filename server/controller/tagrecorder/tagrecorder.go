@@ -39,11 +39,17 @@ func NewTagRecorder(cfg config.ControllerConfig) *TagRecorder {
 func (c *TagRecorder) run() {
 	log.Info("tagrecorder run")
 
-	// 连接数据节点刷新ClickHouse中的字典定义
-	c.UpdateChDictionary()
 	// 调用API获取资源对应的icon_id
 	domainToIconID, resourceToIconID, _ := c.UpdateIconInfo()
 	c.refresh(domainToIconID, resourceToIconID)
+}
+
+func (c *TagRecorder) StartChDictionaryUpdate() {
+	go func() {
+		for range time.Tick(time.Duration(c.cfg.TagRecorderCfg.Interval) * time.Second) {
+			c.UpdateChDictionary()
+		}
+	}()
 }
 
 func (c *TagRecorder) Start() {
