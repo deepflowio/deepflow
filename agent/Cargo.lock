@@ -1590,6 +1590,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 [[package]]
 name = "openshift-openapi"
 version = "0.3.1"
+source = "git+https://github.com/deepflowys/openshift-openapi.git#6498131f5f5ef80411a0aee2e7e9ba632bfdb406"
 dependencies = [
  "base64 0.12.3",
  "bytes 0.5.6",
