@@ -33,6 +33,7 @@ const (
 	DefaultDecoderQueueCount = 2
 	DefaultDecoderQueueSize  = 10000
 	DefaultBrokerQueueSize   = 10000
+	DefaultFlowLogTTL        = 3
 )
 
 type FlowLogDisabled struct {
@@ -47,6 +48,11 @@ type FlowLogDisabled struct {
 	Mqtt  bool `yaml:"mqtt"`
 }
 
+type FlowLogTTL struct {
+	L4FlowLog int `yaml:"l4-flow-log"`
+	L7FlowLog int `yaml:"l7-flow-log"`
+}
+
 type Config struct {
 	Base              *config.Config
 	ReplicaEnabled    bool                  `yaml:"flowlog-replica-enabled"`
@@ -54,6 +60,7 @@ type Config struct {
 	Throttle          int                   `yaml:"throttle"`
 	L4Throttle        int                   `yaml:"l4-throttle"`
 	L7Throttle        int                   `yaml:"l7-throttle"`
+	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl"`
 	FlowLogDisabled   FlowLogDisabled       `yaml:"flow-log-disabled"`
 	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
@@ -67,6 +74,14 @@ func (c *Config) Validate() error {
 		c.DecoderQueueCount = DefaultDecoderQueueCount
 	}
 
+	if c.FlowLogTTL.L4FlowLog == 0 {
+		c.FlowLogTTL.L4FlowLog = DefaultFlowLogTTL
+	}
+
+	if c.FlowLogTTL.L7FlowLog == 0 {
+		c.FlowLogTTL.L7FlowLog = DefaultFlowLogTTL
+	}
+
 	return nil
 }
 
@@ -78,6 +93,7 @@ func Load(base *config.Config, path string) *Config {
 			DecoderQueueCount: DefaultDecoderQueueCount,
 			DecoderQueueSize:  DefaultDecoderQueueSize,
 			CKWriterConfig:    config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			FlowLogTTL:        FlowLogTTL{DefaultFlowLogTTL, DefaultFlowLogTTL},
 		},
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {

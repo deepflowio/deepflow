@@ -34,10 +34,19 @@ const (
 	DefaultUnmarshallQueueSize  = 10240
 	DefaultReceiverWindowSize   = 1024
 	DefaultCKReadTimeout        = 300
+	DefaultFlowMetrics1MTTL     = 7
+	DefaultFlowMetrics1STTL     = 1
 )
 
 type PCapConfig struct {
 	FileDirectory string `yaml:"file-directory"`
+}
+
+type FlowMetricsTTL struct {
+	VtapFlow1M int `yaml:"vtap-flow-1m"`
+	VtapFlow1S int `yaml:"vtap-flow-1s"`
+	VtapApp1M  int `yaml:"vtap-app-1m"`
+	VtapApp1S  int `yaml:"vtap-app-1s"`
 }
 
 type Config struct {
@@ -51,6 +60,7 @@ type Config struct {
 	UnmarshallQueueCount      int                   `yaml:"unmarshall-queue-count"`
 	UnmarshallQueueSize       int                   `yaml:"unmarshall-queue-size"`
 	ReceiverWindowSize        uint64                `yaml:"receiver-window-size"`
+	FlowMetricsTTL            FlowMetricsTTL        `yaml:"flow-metrics-ttl"`
 }
 
 type RozeConfig struct {
@@ -60,6 +70,22 @@ type RozeConfig struct {
 func (c *Config) Validate() error {
 	if c.ReceiverWindowSize < 64 || c.ReceiverWindowSize > 64*1024 {
 		c.ReceiverWindowSize = DefaultReceiverWindowSize
+	}
+
+	if c.FlowMetricsTTL.VtapFlow1M == 0 {
+		c.FlowMetricsTTL.VtapFlow1M = DefaultFlowMetrics1MTTL
+	}
+
+	if c.FlowMetricsTTL.VtapFlow1S == 0 {
+		c.FlowMetricsTTL.VtapFlow1S = DefaultFlowMetrics1STTL
+	}
+
+	if c.FlowMetricsTTL.VtapApp1M == 0 {
+		c.FlowMetricsTTL.VtapApp1M = DefaultFlowMetrics1MTTL
+	}
+
+	if c.FlowMetricsTTL.VtapApp1S == 0 {
+		c.FlowMetricsTTL.VtapApp1S = DefaultFlowMetrics1STTL
 	}
 
 	return nil
@@ -75,6 +101,7 @@ func Load(base *config.Config, path string) *Config {
 			UnmarshallQueueSize:       DefaultUnmarshallQueueSize,
 			ReceiverWindowSize:        DefaultReceiverWindowSize,
 			DisableSecondWriteReplica: true,
+			FlowMetricsTTL:            FlowMetricsTTL{DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL, DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL},
 
 			Pcap: PCapConfig{common.DEFAULT_PCAP_DATA_PATH},
 		},

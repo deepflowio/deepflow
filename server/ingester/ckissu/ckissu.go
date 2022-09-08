@@ -597,7 +597,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
 	dstTableName := d.name[lastUnderlineIndex+1:]
-	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION)[zerodoc.MetricsTableNameToID(d.baseTable)]
+	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, 7, 1, 7, 1)[zerodoc.MetricsTableNameToID(d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
 		rawTable, dstTableName,
