@@ -35,11 +35,11 @@ use super::kubernetes::{
 };
 use super::{InterfaceEntry, InterfaceInfo, LibvirtXmlExtractor};
 
-use crate::utils::command::*;
 use crate::{
     config::{handler::PlatformAccess, KubernetesPollerType},
     handler,
     proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse},
+    utils::command::*,
     utils::environment::is_tt_pod,
 };
 use crate::{exception::ExceptionHandler, rpc::Session};

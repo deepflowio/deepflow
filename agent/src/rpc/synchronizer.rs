@@ -615,7 +615,12 @@ impl Synchronizer {
             exception_handler.set(Exception::InvalidConfiguration);
             return;
         }
-        let runtime_config = runtime_config.unwrap();
+        let mut runtime_config = runtime_config.unwrap();
+        // When the ee version compiles the ce crate, it will be false, only ce version
+        // will be true
+        if static_config.agent_ident == env!("AGENT_NAME") {
+            runtime_config.platform_enabled = false;
+        }
         let yaml_config = &runtime_config.yaml_config;
 
         let _ = escape_tx.send(runtime_config.max_escape);

@@ -25,12 +25,8 @@ pub enum Error {
     #[cfg(target_os = "linux")]
     #[error(transparent)]
     KubeWatcher(#[from] kube::runtime::watcher::Error),
-    #[error(transparent)]
-    ParseUtf8(#[from] std::string::FromUtf8Error),
     #[error("PlatformSynchronizer failed: {0} ")]
     PlatformSynchronizer(String),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
     #[error("data not found: {0}")]
     NotFound(String),
     #[error("Kubernetes ApiWatcher error: {0}")]
