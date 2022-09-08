@@ -21,7 +21,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []model.RoutingTable, error) {
@@ -58,7 +58,7 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 			Lcuuid:       rLcuuid,
 			Name:         rData.Get("RouteTableName").MustString(),
 			VPCLcuuid:    common.GetUUID(vpcID, uuid.Nil),
-			RegionLcuuid: region.lcuuid,
+			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
 
 		routes := rData.Get("RouteSet")
@@ -71,15 +71,29 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 			destination4 := route.Get("DestinationCidrBlock").MustString()
 			destination6 := route.Get("DestinationIpv6CidrBlock").MustString()
 			gwID := route.Get("GatewayId").MustString()
+			if gwID == "" {
+				gwID = common.ROUTING_TABLE_TYPE_LOCAL
+			}
+
+			gwTypeDesc := ""
 			gwType := route.Get("GatewayType").MustString()
-			gwTypeDesc := gwTypeToDesc[gwType]
+			if gwType != "" {
+				gwTypeDesc = gwTypeToDesc[gwType]
+				if gwTypeDesc == "" {
+					gwTypeDesc = gwType
+				}
+			}
+			if gwTypeDesc == "" {
+				gwTypeDesc = common.ROUTING_TABLE_TYPE_LOCAL
+			}
+
 			key := rLcuuid + strconv.Itoa(routeID)
 			routerTables = append(routerTables, model.RoutingTable{
 				Lcuuid:        common.GetUUID(key, uuid.Nil),
 				VRouterLcuuid: rLcuuid,
 				Destination:   destination4 + destination6,
-				NexthopType:   gwTypeDesc,
-				Nexthop:       gwID,
+				Nexthop:       gwTypeDesc,
+				NexthopType:   gwID,
 			})
 		}
 	}

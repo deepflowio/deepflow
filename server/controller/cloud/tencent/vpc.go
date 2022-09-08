@@ -19,7 +19,7 @@ package tencent
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getVPCs(region tencentRegion) ([]model.VPC, error) {
@@ -41,9 +41,10 @@ func (t *Tencent) getVPCs(region tencentRegion) ([]model.VPC, error) {
 			Lcuuid:       common.GetUUID(vpcID, uuid.Nil),
 			Name:         vData.Get("VpcName").MustString(),
 			CIDR:         vData.Get("CidrBlock").MustString(),
-			RegionLcuuid: region.lcuuid,
+			Label:        vpcID,
+			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
-		t.vpcIDToRegionLcuuid[vpcID] = region.lcuuid
+		t.vpcIDToRegionLcuuid[vpcID] = t.getRegionLcuuid(region.lcuuid)
 	}
 	log.Debug("get vpcs complete")
 	return vpcs, nil

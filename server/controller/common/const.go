@@ -422,13 +422,13 @@ var ProtocolMap = map[string]int{
 }
 
 var CloudMonitorExceptionAPI = map[string]string{
-	"aliyun":            "NetworkInterfaceSet,ListenerPortAndProtocol,BackendServer,SnatTableEntry,ForwardTableEntry,KVStoreZone,RouteEntry,Permission",
-	"tencent":           "Listeners,NetworkInterfaceSet",
-	"openstack":         "services,users",
-	"qingcloud":         "DescribeSecurityGroupIPSets,DescribeSecurityGroupRules,DescribeLoadBalancerListeners,DescribeLoadBalancerBackends,DescribeNics,DescribeEips",
-	"apsara_stack":      "NetworkInterfaceSet,ListenerPortAndProtocol,BackendServer,SnatTableEntry,ForwardTableEntry,RouteEntry,Permission",
-	"tencent_tce":       "DescribeNetworkInterfacesEx,DescribeSecurityGroupPolicy",
-	"qingcloud_private": "DescribeSecurityGroupIPSets,DescribeSecurityGroupRules,DescribeLoadBalancerListeners,DescribeLoadBalancerBackends,DescribeNics,DescribeEips",
+	ALIYUN_EN:            "NetworkInterfaceSet,ListenerPortAndProtocol,BackendServer,SnatTableEntry,ForwardTableEntry,KVStoreZone,RouteEntry,Permission",
+	TENCENT_EN:           "Listeners,NetworkInterfaceSet",
+	OPENSTACK_EN:         "services,users",
+	QINGCLOUD_EN:         "DescribeSecurityGroupIPSets,DescribeSecurityGroupRules,DescribeLoadBalancerListeners,DescribeLoadBalancerBackends,DescribeNics,DescribeEips",
+	APSARA_STACK_EN:      "NetworkInterfaceSet,ListenerPortAndProtocol,BackendServer,SnatTableEntry,ForwardTableEntry,RouteEntry,Permission",
+	TENCENT_TCE_EN:       "DescribeNetworkInterfacesEx,DescribeSecurityGroupPolicy",
+	QINGCLOUD_PRIVATE_EN: "DescribeSecurityGroupIPSets,DescribeSecurityGroupRules,DescribeLoadBalancerListeners,DescribeLoadBalancerBackends,DescribeNics,DescribeEips",
 }
 
 const (

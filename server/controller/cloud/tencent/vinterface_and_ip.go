@@ -17,13 +17,11 @@
 package tencent
 
 import (
-	"hash/fnv"
 	"inet.af/netaddr"
-	"strconv"
 
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface, []model.IP, []model.NATRule, error) {
@@ -67,7 +65,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 			DeviceType:    common.VIF_DEVICE_TYPE_VM,
 			VPCLcuuid:     vpcLcuuid,
 			NetworkLcuuid: subnetLcuuid,
-			RegionLcuuid:  region.lcuuid,
+			RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
 		}
 		vinterfaces = append(vinterfaces, vinterface)
 
@@ -88,7 +86,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               privateIP,
 					SubnetLcuuid:     common.GetUUID(subnetLcuuid, uuid.Nil),
-					RegionLcuuid:     region.lcuuid,
+					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 				})
 			} else {
 				log.Infof("ip (%s) not support", privateIP)
@@ -97,27 +95,24 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 			publicIP := privateIPData.Get("PublicIpAddress").MustString()
 			netPublicIP, err := netaddr.ParseIP(publicIP)
 			if err == nil && netPublicIP.Is4() {
-				mHash := fnv.New32a()
-				mHash.Write([]byte(mac))
-				vMac := strconv.Itoa(int(mHash.Sum32()))[1:3] + mac[2:]
 				vLcuuid := common.GetUUID(vinterfaceLcuuid, uuid.Nil)
 				vinterfaces = append(vinterfaces, model.VInterface{
 					Lcuuid:        vLcuuid,
 					Type:          common.VIF_TYPE_WAN,
-					Mac:           vMac,
+					Mac:           "ff" + mac[2:],
 					DeviceLcuuid:  deviceLcuuid,
 					DeviceType:    common.VIF_DEVICE_TYPE_VM,
 					NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 					VPCLcuuid:     vpcLcuuid,
-					RegionLcuuid:  region.lcuuid,
+					RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
 				})
 
 				ips = append(ips, model.IP{
-					Lcuuid:           common.GetUUID(vinterfaceLcuuid+publicIP, uuid.Nil),
+					Lcuuid:           common.GetUUID(deviceLcuuid+publicIP, uuid.Nil),
 					VInterfaceLcuuid: vLcuuid,
 					IP:               publicIP,
 					SubnetLcuuid:     common.GetUUID(common.NETWORK_ISP_LCUUID, uuid.Nil),
-					RegionLcuuid:     region.lcuuid,
+					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 				})
 
 				t.publicIPToVinterface[publicIP] = vinterface
