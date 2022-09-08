@@ -223,7 +223,7 @@ func (m *Manager) run(ctx context.Context) {
 func (m *Manager) Start() {
 	cloudcfg.SetCloudGlobalConfig(m.cfg.TaskCfg.CloudCfg)
 
-	log.Info("manager start")
+	log.Info("manager started")
 	ctx := context.Context(context.Background())
 	go func() {
 		m.run(ctx)
