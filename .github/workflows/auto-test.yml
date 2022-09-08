@@ -51,7 +51,7 @@ jobs:
         if: ${{ env.SERVER_CHANGE == 'true' }}
         uses: actions/setup-go@master
         with:
-          go-version: 1.18.x
+          go-version: 1.19.x
 
       - name: Install Protoc
         if: ${{ env.SERVER_CHANGE == 'true' }}
