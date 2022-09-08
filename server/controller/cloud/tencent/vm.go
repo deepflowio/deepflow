@@ -60,7 +60,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 		}
 
 		vmCteateAt := vData.Get("CreatedTime").MustString()
-		createAt, err := time.ParseInLocation(common.GO_BIRTHDAY, vmCteateAt, time.Local)
+		createAt, err := time.ParseInLocation(time.RFC3339, vmCteateAt, time.Local)
 		if err != nil {
 			log.Warningf("vm (%s) created time format error: %s", vmName, err.Error())
 		}
