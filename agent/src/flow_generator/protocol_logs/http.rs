@@ -21,9 +21,9 @@ use log::info;
 use regex::Regex;
 use serde::Serialize;
 
-use super::{
-    consts::*, value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus,
-};
+use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
+use super::value_is_default;
+use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
 use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
 use crate::common::ebpf::EbpfType;
@@ -33,7 +33,6 @@ use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::L7ProtoRawDataType;
-use crate::proto::flow_log;
 use crate::utils::bytes::{read_u32_be, read_u32_le};
 use crate::utils::net::h2pack;
 
@@ -63,9 +62,10 @@ pub struct HttpInfo {
     pub req_content_length: Option<u64>,
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u64>,
-
     // 流是否结束, 用于 http2 ebpf uprobe 处理
     pub is_end: bool,
+    status_code: u16,
+    status: L7ResponseStatus,
 }
 
 impl HttpInfo {
@@ -80,7 +80,6 @@ impl HttpInfo {
         if self.x_request_id.is_empty() {
             self.x_request_id = other.x_request_id;
         }
-
         // 下面用于请求合并
         if self.path.is_empty() {
             self.path = other.path;
@@ -92,6 +91,13 @@ impl HttpInfo {
             self.method = other.method;
         }
 
+        if other.status != L7ResponseStatus::default() {
+            self.status = other.status;
+        }
+        if other.status_code != 0 {
+            self.status_code = other.status_code;
+        }
+        
         if self.req_content_length.is_none() && other.req_content_length.is_some() {
             self.req_content_length = other.req_content_length;
         }
@@ -102,38 +108,50 @@ impl HttpInfo {
     }
 }
 
-impl From<HttpInfo> for flow_log::HttpInfo {
+impl From<HttpInfo> for L7ProtocolSendLog {
     fn from(f: HttpInfo) -> Self {
-        flow_log::HttpInfo {
-            stream_id: f.stream_id,
-            version: f.version,
-            method: f.method,
-            path: f.path,
-            host: f.host,
-            client_ip: f.client_ip,
-            trace_id: f.trace_id,
-            span_id: f.span_id,
-            req_content_length: match f.req_content_length {
-                Some(length) => length as i64,
-                _ => -1,
+        let mut log = L7ProtocolSendLog {
+            version: Some(f.version),
+            req: L7Request {
+                req_type: f.method,
+                resource: f.path,
+                domain: f.host,
             },
-            resp_content_length: match f.resp_content_length {
-                Some(length) => length as i64,
-                _ => -1,
+            resp: L7Response {
+                status: f.status,
+                code: f.status_code as i32,
+                ..Default::default()
             },
-            x_request_id: f.x_request_id,
+            trace_info: Some(TraceInfo {
+                trace_id: Some(f.trace_id),
+                span_id: Some(f.span_id),
+                ..Default::default()
+            }),
+            ext_info: Some(ExtendedInfo {
+                request_id: Some(f.stream_id),
+                x_request_id: Some(f.x_request_id),
+                client_ip: Some(f.client_ip),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        if let Some(l) = f.req_content_length {
+            log.req_len = l as i32;
         }
+        if let Some(l) = f.resp_content_length {
+            log.resp_len = l as i32;
+        }
+
+        return log;
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct HttpLog {
-    status_code: u16,
     msg_type: LogMessageType,
     // 数据原始类型, 标准的协议格式或者是ebpf上报的自定义格式
     raw_data_type: L7ProtoRawDataType,
     proto: L7Protocol,
-    status: L7ResponseStatus,
 
     info: HttpInfo,
 
@@ -209,7 +227,7 @@ impl HttpLog {
     }
 
     fn reset_logs(&mut self) {
-        self.status_code = 0;
+        self.info.status_code = 0;
         self.info = HttpInfo::default();
     }
 
@@ -218,14 +236,14 @@ impl HttpLog {
             && status_code <= HTTP_STATUS_CLIENT_ERROR_MAX
         {
             // http客户端请求存在错误
-            self.status = L7ResponseStatus::ClientError;
+            self.info.status = L7ResponseStatus::ClientError;
         } else if status_code >= HTTP_STATUS_SERVER_ERROR_MIN
             && status_code <= HTTP_STATUS_SERVER_ERROR_MAX
         {
             // http服务端响应存在错误
-            self.status = L7ResponseStatus::ServerError;
+            self.info.status = L7ResponseStatus::ServerError;
         } else {
-            self.status = L7ResponseStatus::Ok;
+            self.info.status = L7ResponseStatus::Ok;
         }
     }
 
@@ -298,7 +316,7 @@ impl HttpLog {
             let (version, status_code) = get_http_resp_info(str::from_utf8(lines[0])?)?;
 
             self.info.version = version;
-            self.status_code = status_code as u16;
+            self.info.status_code = status_code as u16;
 
             self.msg_type = LogMessageType::Response;
 
@@ -448,6 +466,7 @@ impl HttpLog {
                                 .parse::<u64>()
                                 .unwrap_or_default(),
                         )
+
                     }
                 }
                 header_frame_parsed = true;
@@ -495,8 +514,8 @@ impl HttpLog {
                 }
                 self.info.req_content_length = content_length;
             } else {
-                if self.status_code < HTTP_STATUS_CODE_MIN
-                    || self.status_code > HTTP_STATUS_CODE_MAX
+                if self.info.status_code < HTTP_STATUS_CODE_MIN
+                    || self.info.status_code > HTTP_STATUS_CODE_MAX
                 {
                     return Err(Error::HttpHeaderParseFailed);
                 }
@@ -519,11 +538,11 @@ impl HttpLog {
             b":status" => {
                 self.msg_type = LogMessageType::Response;
 
-                self.status_code = str::from_utf8(val.as_slice())
+                self.info.status_code = str::from_utf8(val.as_slice())
                     .unwrap_or_default()
                     .parse::<u16>()
                     .unwrap_or_default();
-                self.set_status(self.status_code);
+                self.set_status(self.info.status_code);
             }
             b"host" | b":authority" => {
                 self.info.host = String::from_utf8_lossy(val.as_slice()).into_owned()
@@ -686,10 +705,8 @@ impl L7LogParse for HttpLog {
         Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: self.get_l7_protocol(),
             msg_type: self.msg_type,
-            status: self.status,
-            code: self.status_code,
             rrt: 0,
-            version: 0,
+            ..Default::default()
         }))
     }
 
@@ -880,14 +897,11 @@ pub fn http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use regex::bytes::Replacer;
     use std::fs;
     use std::mem::size_of;
     use std::path::Path;
     use std::slice::from_raw_parts;
-
-    use crate::metric::document::Direction;
-    use crate::{common::enums::PacketDirection, utils::test::Capture};
+    use crate::utils::test::Capture;
 
     use super::*;
 
@@ -972,7 +986,7 @@ mod tests {
             stream_id: u32,
             k_len: u32,
             v_len: u32,
-        };
+        }
         impl H2CustomHdr {
             fn to_bytes(self, key: &str, val: &str) -> Vec<u8> {
                 let hdr_p;
