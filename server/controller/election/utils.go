@@ -40,7 +40,7 @@ func IsMasterController() (bool, error) {
 		leaderID := GetLeader()
 		// node_name/node_ip/pod_name/pod_ip
 		leaderInfo := strings.Split(leaderID, "/")
-		if len(leaderInfo) != ID_ITEM_NUM {
+		if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
 			return false, errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
 		}
 		return hostName == leaderInfo[2], nil
@@ -81,7 +81,7 @@ func IsMasterControllerAndReturnName() (bool, string, error) {
 		leaderID := GetLeader()
 		// node_name/node_ip/pod_name/pod_ip
 		leaderInfo := strings.Split(leaderID, "/")
-		if len(leaderInfo) != ID_ITEM_NUM {
+		if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
 			return false, "", errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
 		}
 		if hostName != leaderInfo[2] {
