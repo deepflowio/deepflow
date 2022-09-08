@@ -28,6 +28,7 @@ import (
 
 func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface, []model.IP, []model.NATRule, error) {
 	log.Debug("get vinterfaces,ips starting")
+	t.publicIPToVinterface = map[string]model.VInterface{}
 	var vinterfaces []model.VInterface
 	var ips []model.IP
 	var vNatRules []model.NATRule
@@ -58,7 +59,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 		subnetLcuuid := common.GetUUID(subnetID, uuid.Nil)
 		vinterfaceLcuuid := common.GetUUID(vinterfaceID, uuid.Nil)
 		deviceLcuuid := common.GetUUID(deviceID, uuid.Nil)
-		vinterfaces = append(vinterfaces, model.VInterface{
+		vinterface := model.VInterface{
 			Lcuuid:        vinterfaceLcuuid,
 			Type:          common.VIF_TYPE_LAN,
 			Mac:           mac,
@@ -67,7 +68,8 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 			VPCLcuuid:     vpcLcuuid,
 			NetworkLcuuid: subnetLcuuid,
 			RegionLcuuid:  region.lcuuid,
-		})
+		}
+		vinterfaces = append(vinterfaces, vinterface)
 
 		privateIPs := vData.Get("PrivateIpAddressSet")
 		for private := range privateIPs.MustArray() {
@@ -117,6 +119,8 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 					SubnetLcuuid:     common.GetUUID(common.NETWORK_ISP_LCUUID, uuid.Nil),
 					RegionLcuuid:     region.lcuuid,
 				})
+
+				t.publicIPToVinterface[publicIP] = vinterface
 
 				if privateFlag {
 					vNatRules = append(vNatRules, model.NATRule{
