@@ -66,6 +66,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 		}
 
 		azID := vData.Get("Placement").Get("Zone").MustString()
+		azLcuuid := common.GetUUID(t.uuidGenerate+"_"+azID, uuid.Nil)
 		vms = append(vms, model.VM{
 			Lcuuid:       vmLcuuid,
 			Name:         vmName,
@@ -73,9 +74,10 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 			State:        state,
 			CreatedAt:    createAt,
 			VPCLcuuid:    common.GetUUID(vpcID, uuid.Nil),
-			AZLcuuid:     common.GetUUID(t.uuidGenerate+azID, uuid.Nil),
-			RegionLcuuid: region.lcuuid,
+			AZLcuuid:     azLcuuid,
+			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
+		t.azLcuuidMap[azLcuuid] = 0
 
 		sgIDs := vData.Get("SecurityGroupIds")
 		for s := range sgIDs.MustArray() {

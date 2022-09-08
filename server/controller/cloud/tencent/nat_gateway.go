@@ -21,7 +21,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []model.VInterface, []model.IP, error) {
@@ -30,14 +30,9 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 	var natVinterfaces []model.VInterface
 	var natIPs []model.IP
 
-	attrs := []string{"NatId", "NatName", "VpcId"}
+	attrs := []string{"NatGatewayId", "NatGatewayName", "VpcId"}
 
-	if _, ok := natGatewaySupportRegion[region.name]; !ok {
-		log.Debugf("nat gateway api unsupported region: (%s)", region.name)
-		return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, nil
-	}
-
-	resp, err := t.getResponse("bmvpc", "2018-06-25", "DescribeNatGateways", region.name, "NatGatewayInfoSet", true, map[string]interface{}{})
+	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGateways", region.name, "NatGatewaySet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("nat gateway request tencent api error: (%s)", err.Error())
 		return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, nil
@@ -46,20 +41,20 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 		if !t.checkRequiredAttributes(nData, attrs) {
 			continue
 		}
-		natID := nData.Get("NatId").MustString()
+		natID := nData.Get("NatGatewayId").MustString()
 		natLcuuid := common.GetUUID(natID, uuid.Nil)
 		vpcLcuuid := common.GetUUID(nData.Get("VpcId").MustString(), uuid.Nil)
 		floatingIPs := []string{}
-		for i := range nData.Get("Eips").MustArray() {
-			floatingIPs = append(floatingIPs, nData.Get("Eips").GetIndex(i).MustString())
+		for i := range nData.Get("PublicIpAddressSet").MustArray() {
+			floatingIPs = append(floatingIPs, nData.Get("PublicIpAddressSet").GetIndex(i).Get("PublicIpAddress").MustString())
 		}
 		natGateways = append(natGateways, model.NATGateway{
 			Lcuuid:       natLcuuid,
-			Name:         nData.Get("NatName").MustString(),
+			Name:         nData.Get("NatGatewayName").MustString(),
 			Label:        natID,
 			FloatingIPs:  strings.Join(floatingIPs, ","),
 			VPCLcuuid:    vpcLcuuid,
-			RegionLcuuid: region.lcuuid,
+			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
 		t.natIDs = append(t.natIDs, natID)
 
@@ -73,7 +68,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 				DeviceType:    common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 				NetworkLcuuid: common.NETWORK_ISP_LCUUID,
 				VPCLcuuid:     vpcLcuuid,
-				RegionLcuuid:  region.lcuuid,
+				RegionLcuuid:  t.getRegionLcuuid(region.lcuuid),
 			})
 			for _, ip := range floatingIPs {
 				natIPs = append(natIPs, model.IP{
@@ -81,7 +76,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 					VInterfaceLcuuid: vinterfaceLcuuid,
 					IP:               ip,
 					SubnetLcuuid:     common.NETWORK_ISP_LCUUID,
-					RegionLcuuid:     region.lcuuid,
+					RegionLcuuid:     t.getRegionLcuuid(region.lcuuid),
 				})
 			}
 		}
