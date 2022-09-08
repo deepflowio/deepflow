@@ -94,7 +94,7 @@ func (g *Genesis) GetStatter() statsd.StatsdStatter {
 	globalTags := map[string]string{
 		"domain_name": g.Name,
 		"domain":      g.Lcuuid,
-		"platform":    "genesis",
+		"platform":    common.AGENT_SYNC_EN,
 	}
 
 	return statsd.StatsdStatter{

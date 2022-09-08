@@ -20,10 +20,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/satori/go.uuid"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (t *Tencent) analysisProtocolPort(region tencentRegion, serviceID ...string) mapset.Set {
@@ -101,10 +101,11 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 			continue
 		}
 		sgID := sData.Get("SecurityGroupId").MustString()
+		sgLcuuid := common.GetUUID(sgID, uuid.Nil)
 		sgs = append(sgs, model.SecurityGroup{
-			Lcuuid:       common.GetUUID(sgID, uuid.Nil),
+			Lcuuid:       sgLcuuid,
 			Name:         sData.Get("SecurityGroupName").MustString(),
-			RegionLcuuid: region.lcuuid,
+			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
 
 		ruleSlice := []tencentGressRule{}
@@ -128,7 +129,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 			for r := range egressRules.MustArray() {
 				ruleSlice = append(ruleSlice, tencentGressRule{
 					direction: common.SECURITY_GROUP_RULE_EGRESS,
-					rule:      ingressRules.GetIndex(r),
+					rule:      egressRules.GetIndex(r),
 				})
 			}
 		}
@@ -147,13 +148,13 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 				})
 			}
 			action := common.SECURITY_GROUP_RULE_ACCEPT
-			if cidrBlock, ok := rule.rule.CheckGet("CidrBlock"); ok {
+			if cidrBlock, ok := rule.rule.CheckGet("CidrBlock"); ok && cidrBlock.MustString() != "" {
 				addressSet.Add(cidrBlock.MustString())
 			}
 
-			if sgID, ok := rule.rule.CheckGet("SecurityGroupId"); ok {
+			if rSGID, ok := rule.rule.CheckGet("SecurityGroupId"); ok && rSGID.MustString() != "" {
 				etherType = common.SECURITY_GROUP_IP_TYPE_UNKNOWN
-				addressSet.Add(common.GetUUID(sgID.MustString(), uuid.Nil))
+				addressSet.Add(common.GetUUID(rSGID.MustString(), uuid.Nil))
 			}
 
 			if rule.rule.Get("Action").MustString() != "ACCEPT" {
@@ -234,7 +235,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 					sgGenerateID := sgID + local + strconv.Itoa(policyIndex) + s.(tencentProtocolPort).protocol + "_" + s.(tencentProtocolPort).port + address + strconv.Itoa(action) + "_" + strconv.Itoa(rule.direction)
 					sgRules = append(sgRules, model.SecurityGroupRule{
 						Lcuuid:              common.GetUUID(sgGenerateID, uuid.Nil),
-						SecurityGroupLcuuid: sgID,
+						SecurityGroupLcuuid: sgLcuuid,
 						Direction:           rule.direction,
 						Protocol:            s.(tencentProtocolPort).protocol,
 						EtherType:           etherType,
@@ -255,8 +256,8 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 					remote = common.SECURITY_GROUP_RULE_IPV4_CIDR
 				}
 				sgRules = append(sgRules, model.SecurityGroupRule{
-					Lcuuid:              common.GetUUID(sgID+strconv.Itoa(d)+remote, uuid.Nil),
-					SecurityGroupLcuuid: sgID,
+					Lcuuid:              common.GetUUID(sgLcuuid+strconv.Itoa(d)+remote, uuid.Nil),
+					SecurityGroupLcuuid: sgLcuuid,
 					Direction:           d,
 					EtherType:           e,
 					Protocol:            "ALL",

@@ -178,7 +178,7 @@ func (k *KubernetesGather) GetStatter() statsd.StatsdStatter {
 	globalTags := map[string]string{
 		"domain_name": k.Name,
 		"domain":      k.Lcuuid,
-		"platform":    "kubernetes",
+		"platform":    common.KUBERNETES_EN,
 	}
 
 	return statsd.StatsdStatter{

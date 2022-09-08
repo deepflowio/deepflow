@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/kubernetes"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/cloud/qingcloud"
+	"github.com/deepflowys/deepflow/server/controller/cloud/tencent"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
@@ -54,6 +55,8 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) 
 		platform, err = qingcloud.NewQingCloud(domain)
 	case common.BAIDU_BCE:
 		platform, err = baidubce.NewBaiduBce(domain)
+	case common.TENCENT:
+		platform, err = tencent.NewTencent(domain)
 	case common.KUBERNETES:
 		platform, err = kubernetes.NewKubernetes(domain)
 	case common.HUAWEI:

@@ -20,20 +20,19 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/satori/go.uuid"
 )
 
-func (t *Tencent) getRegions() ([]model.Region, error) {
+func (t *Tencent) getRegions() ([]tencentRegion, error) {
 	log.Debug("get regions starting")
-	var regions []model.Region
+	var regionList []tencentRegion
 
 	attrs := []string{"RegionState", "Region", "RegionName"}
 	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeRegions", "", "RegionSet", false, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("region request tencent api error: (%s)", err.Error())
-		return []model.Region{}, nil
+		return []tencentRegion{}, nil
 	}
 	for _, rData := range resp {
 		if !t.checkRequiredAttributes(rData, attrs) {
@@ -62,16 +61,11 @@ func (t *Tencent) getRegions() ([]model.Region, error) {
 		}
 		rRegion := rData.Get("Region").MustString()
 		regionLcuuid := common.GetUUID(rRegion, uuid.Nil)
-		region := model.Region{
-			Name:   name,
-			Lcuuid: regionLcuuid,
-		}
-		regions = append(regions, region)
 		finance := false
 		if strings.Contains(name, FINANCE_REGION_PROFILE) {
 			finance = true
 		}
-		t.regionList = append(t.regionList, tencentRegion{
+		regionList = append(regionList, tencentRegion{
 			lcuuid:     regionLcuuid,
 			name:       rRegion,
 			regionName: name,
@@ -79,5 +73,5 @@ func (t *Tencent) getRegions() ([]model.Region, error) {
 		})
 	}
 	log.Debug("get regions complete")
-	return regions, nil
+	return regionList, nil
 }
