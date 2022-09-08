@@ -185,6 +185,7 @@ func Start(ctx context.Context, configPath string) {
 	}()
 
 	router.SetInitStageForHealthChecker("Register routers init")
+	router.ElectionRouter(r)
 	router.DebugRouter(r, m, g)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
