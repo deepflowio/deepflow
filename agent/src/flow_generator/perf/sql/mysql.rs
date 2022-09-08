@@ -192,8 +192,6 @@ impl L7FlowPerf for MysqlPerfData {
             AppProtoHead {
                 proto: self.l7_proto,
                 msg_type: self.msg_type,
-                status: self.status,
-                code: 0,
                 rrt: rrt,
                 version: 0,
             },

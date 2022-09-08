@@ -149,6 +149,7 @@ const (
 	L7_PROTOCOL_HTTP_1     L7Protocol = 20
 	L7_PROTOCOL_HTTP_2     L7Protocol = 21
 	L7_PROTOCOL_HTTP_1_TLS L7Protocol = 22
+	L7_PROTOCOL_HTTP_2_TLS L7Protocol = 23
 	L7_PROTOCOL_DUBBO      L7Protocol = 40
 	L7_PROTOCOL_MYSQL      L7Protocol = 60
 	L7_PROTOCOL_REDIS      L7Protocol = 80

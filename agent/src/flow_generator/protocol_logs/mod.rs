@@ -15,17 +15,18 @@
  */
 
 pub mod consts;
+pub mod pb_adapter;
 mod dns;
 mod http;
 mod mq;
 mod parser;
 mod rpc;
 mod sql;
-
 pub use self::http::{
     check_http_method, get_http_request_version, get_http_resp_info, http1_check_protocol,
     http2_check_protocol, is_http_v1_payload, HttpInfo, HttpLog, Httpv2Headers,
 };
+use self::pb_adapter::L7ProtocolSendLog;
 pub use dns::{dns_check_protocol, DnsInfo, DnsLog};
 pub use mq::{
     kafka_check_protocol, mqtt, mqtt_check_protocol, KafkaInfo, KafkaLog, MqttInfo, MqttLog,
@@ -63,7 +64,7 @@ use crate::{
 
 const NANOS_PER_MICRO: u64 = 1000;
 
-#[derive(Serialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
     Ok,
@@ -134,11 +135,6 @@ pub struct AppProtoHead {
     #[serde(rename = "l7_protocol")]
     pub proto: L7Protocol,
     pub msg_type: LogMessageType, // HTTP，DNS: request/response
-    #[serde(rename = "response_status")]
-    pub status: L7ResponseStatus, // 状态描述：0：正常，1：已废弃使用(先前用于表示异常)，2：不存在，3：服务端异常，4：客户端异常
-    #[serde(rename = "response_code")]
-    pub code: u16, // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
-
     #[serde(rename = "response_duration")]
     pub rrt: u64, // HTTP，DNS时延: response-request
     #[serde(skip)]
@@ -150,9 +146,8 @@ impl From<AppProtoHead> for flow_log::AppProtoHead {
         flow_log::AppProtoHead {
             proto: f.proto as u32,
             msg_type: f.msg_type as u32,
-            status: f.status as u32,
-            code: f.code as u32,
             rrt: f.rrt * NANOS_PER_MICRO,
+            ..Default::default()
         }
     }
 }
@@ -431,8 +426,6 @@ impl AppProtoLogsBaseInfo {
         self.resp_tcp_seq = log.resp_tcp_seq;
         self.syscall_trace_id_response = log.syscall_trace_id_response;
         self.head.msg_type = LogMessageType::Session;
-        self.head.code = log.head.code;
-        self.head.status = log.head.status;
         self.head.rrt = log.head.rrt;
     }
 }
@@ -553,18 +546,18 @@ impl AppProtoLogsData {
             base: Some(self.base_info.into()),
             ..Default::default()
         };
-        match self.special_info {
-            AppProtoLogsInfo::Dns(t) => pb_proto_logs_data.dns = Some(t.into()),
-            AppProtoLogsInfo::Mysql(t) => pb_proto_logs_data.mysql = Some(t.into()),
-            AppProtoLogsInfo::Redis(t) => pb_proto_logs_data.redis = Some(t.into()),
-            AppProtoLogsInfo::Kafka(t) => pb_proto_logs_data.kafka = Some(t.into()),
-            AppProtoLogsInfo::Mqtt(t) => pb_proto_logs_data.mqtt = Some(t.into()),
-            AppProtoLogsInfo::Dubbo(t) => pb_proto_logs_data.dubbo = Some(t.into()),
-            AppProtoLogsInfo::HttpV1(t) => pb_proto_logs_data.http = Some(t.into()),
-            AppProtoLogsInfo::HttpV2(t) => pb_proto_logs_data.http = Some(t.into()),
-            AppProtoLogsInfo::HttpV1TLS(t) => pb_proto_logs_data.http = Some(t.into()),
+        let log: L7ProtocolSendLog = match self.special_info {
+            AppProtoLogsInfo::Dns(t) => t.into(),
+            AppProtoLogsInfo::Mysql(t) => t.into(),
+            AppProtoLogsInfo::Redis(t) => t.into(),
+            AppProtoLogsInfo::Kafka(t) => t.into(),
+            AppProtoLogsInfo::Mqtt(t) => t.into(),
+            AppProtoLogsInfo::Dubbo(t) => t.into(),
+            AppProtoLogsInfo::HttpV1(t)
+            | AppProtoLogsInfo::HttpV2(t)
+            | AppProtoLogsInfo::HttpV1TLS(t) => t.into(),
         };
-
+        log.fill_app_proto_log(&mut pb_proto_logs_data);
         pb_proto_logs_data
             .encode(buf)
             .map(|_| pb_proto_logs_data.encoded_len())
@@ -620,7 +613,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             "Timestamp: {:?} Vtap_id: {} Flow_id: {} TapType: {} TapPort: {} TapSide: {:?}\n \
                 \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {} EPC: {} -> {}\n \
                 \tProcess: {}:{} -> {}:{} Trace-id: {} -> {} Thread: {} -> {} cap_seq: {} -> {}\n \
-                \tL7Protocol: {:?} MsgType: {:?} Status: {:?} Code: {} Rrt: {}",
+                \tL7Protocol: {:?} MsgType: {:?} Rrt: {}",
             self.start_time,
             self.vtap_id,
             self.flow_id,
@@ -652,8 +645,6 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.syscall_cap_seq_1,
             self.head.proto,
             self.head.msg_type,
-            self.head.status,
-            self.head.code,
             self.head.rrt
         )
     }
