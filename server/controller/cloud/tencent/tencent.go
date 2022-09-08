@@ -57,16 +57,17 @@ var natGatewaySupportRegion = map[string]int{
 }
 
 type Tencent struct {
-	lcuuid              string
-	uuidGenerate        string
-	regionName          string
-	regionUuid          string
-	includeRegions      []string
-	excludeRegions      []string
-	credential          *tcommon.Credential
-	regionList          []tencentRegion
-	natIDs              []string
-	vpcIDToRegionLcuuid map[string]string
+	lcuuid               string
+	uuidGenerate         string
+	regionName           string
+	regionUuid           string
+	includeRegions       []string
+	excludeRegions       []string
+	credential           *tcommon.Credential
+	regionList           []tencentRegion
+	natIDs               []string
+	vpcIDToRegionLcuuid  map[string]string
+	publicIPToVinterface map[string]model.VInterface
 }
 
 type tencentRegion struct {
@@ -142,9 +143,10 @@ func NewTencentTce(domain mysql.Domain) (*Tencent, error) {
 		credential:     tcommon.NewCredential(secretID, decryptSecretKey),
 
 		// 以下属性为获取资源所用的关联关系
-		regionList:          []tencentRegion{},
-		natIDs:              []string{},
-		vpcIDToRegionLcuuid: map[string]string{},
+		regionList:           []tencentRegion{},
+		natIDs:               []string{},
+		vpcIDToRegionLcuuid:  map[string]string{},
+		publicIPToVinterface: map[string]model.VInterface{},
 	}, nil
 }
 
@@ -256,6 +258,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 	t.regionList = []tencentRegion{}
 	t.natIDs = []string{}
 	t.vpcIDToRegionLcuuid = map[string]string{}
+	t.publicIPToVinterface = map[string]model.VInterface{}
 
 	regions, err := t.getRegions()
 	if err != nil {
@@ -325,6 +328,12 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 		resource.VInterfaces = append(resource.VInterfaces, vinterfaces...)
 		resource.IPs = append(resource.IPs, ips...)
 		resource.NATRules = append(resource.NATRules, vNatRules...)
+
+		fIPs, err := t.getFloatingIPs()
+		if err != nil {
+			return model.Resource{}, nil
+		}
+		resource.FloatingIPs = append(resource.FloatingIPs, fIPs...)
 
 		lbs, lbListeners, lbTargetServers, err := t.getLoadBalances(region)
 		if err != nil {
