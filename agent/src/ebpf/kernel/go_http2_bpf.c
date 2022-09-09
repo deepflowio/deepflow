@@ -1,7 +1,8 @@
-static __inline void *get_the_first_parameter(struct pt_regs *ctx)
+static __inline void *get_the_first_parameter(struct pt_regs *ctx,
+					      struct ebpf_proc_info *info)
 {
 	void *ptr;
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		ptr = (void *)ctx->rax;
 	} else {
 		bpf_probe_read(&ptr, sizeof(ptr), (void *)(ctx->rsp + 8));
@@ -9,95 +10,103 @@ static __inline void *get_the_first_parameter(struct pt_regs *ctx)
 	return ptr;
 }
 
-static __inline bool is_grpc_syscallConn_interface(void *ptr)
+static __inline bool is_grpc_syscallConn_interface(void *ptr,
+						   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
 	bpf_probe_read(&i, sizeof(i), ptr);
-
-	struct ebpf_proc_info *info = get_current_proc_info();
 	return info ? i.type == info->credentials_syscallConn_itab : false;
 }
 
-static __inline int get_fd_from_http2serverConn_ctx(struct pt_regs *ctx)
+static __inline int get_fd_from_http2serverConn_ctx(struct pt_regs *ctx,
+						    struct ebpf_proc_info *info)
 {
 	update_http2_tls(false);
-	void *ptr = get_the_first_parameter(ctx);
-	ptr += get_uprobe_offset(OFFSET_IDX_CONN_HTTP2_SERVER_CONN);
-	return get_fd_from_tcp_or_tls_conn_interface(ptr);
+	void *ptr = get_the_first_parameter(ctx, info);
+	ptr += info->offsets[OFFSET_IDX_CONN_HTTP2_SERVER_CONN];
+	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
 }
 
-static __inline int get_fd_from_http2ClientConn(void *ptr)
+static __inline int get_fd_from_http2ClientConn(void *ptr,
+						struct ebpf_proc_info *info)
 {
 	update_http2_tls(false);
-	ptr += get_uprobe_offset(OFFSET_IDX_TCONN_HTTP2_CLIENT_CONN);
-	return get_fd_from_tcp_or_tls_conn_interface(ptr);
+	ptr += info->offsets[OFFSET_IDX_TCONN_HTTP2_CLIENT_CONN];
+	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
 }
 
-static __inline int get_fd_from_http2ClientConn_ctx(struct pt_regs *ctx)
+static __inline int get_fd_from_http2ClientConn_ctx(struct pt_regs *ctx,
+						    struct ebpf_proc_info *info)
 {
-	void *ptr = get_the_first_parameter(ctx);
-	return get_fd_from_http2ClientConn(ptr);
+	void *ptr = get_the_first_parameter(ctx, info);
+	return get_fd_from_http2ClientConn(ptr, info);
 }
 
-static __inline int get_fd_from_grpc_http2Client_ctx(struct pt_regs *ctx)
+static __inline int
+get_fd_from_grpc_http2Client_ctx(struct pt_regs *ctx,
+				 struct ebpf_proc_info *info)
 {
 	update_http2_tls(false);
-	void *ptr = get_the_first_parameter(ctx);
-	ptr += get_uprobe_offset(OFFSET_IDX_CONN_GRPC_HTTP2_CLIENT);
-	if (is_grpc_syscallConn_interface(ptr)) {
+	void *ptr = get_the_first_parameter(ctx, info);
+	ptr += info->offsets[OFFSET_IDX_CONN_GRPC_HTTP2_CLIENT];
+	if (is_grpc_syscallConn_interface(ptr, info)) {
 		update_http2_tls(true);
 		struct go_interface i;
 		bpf_probe_read(&i, sizeof(i), ptr);
 		bpf_probe_read(&i, sizeof(i), i.ptr);
 		ptr = i.ptr;
 	}
-	return get_fd_from_tcp_or_tls_conn_interface(ptr);
+	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
 }
 
-static __inline int get_fd_from_grpc_http2Server_ctx(struct pt_regs *ctx)
+static __inline int
+get_fd_from_grpc_http2Server_ctx(struct pt_regs *ctx,
+				 struct ebpf_proc_info *info)
 {
 	update_http2_tls(false);
-	void *ptr = get_the_first_parameter(ctx);
-	ptr += get_uprobe_offset(OFFSET_IDX_CONN_GRPC_HTTP2_SERVER);
-	if (is_grpc_syscallConn_interface(ptr)) {
+	void *ptr = get_the_first_parameter(ctx, info);
+	ptr += info->offsets[OFFSET_IDX_CONN_GRPC_HTTP2_SERVER];
+	if (is_grpc_syscallConn_interface(ptr, info)) {
 		update_http2_tls(true);
 		struct go_interface i;
 		bpf_probe_read(&i, sizeof(i), ptr);
 		bpf_probe_read(&i, sizeof(i), i.ptr);
 		ptr = i.ptr;
 	}
-	return get_fd_from_tcp_or_tls_conn_interface(ptr);
+	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
 }
 
-static __inline int get_side_from_grpc_loopyWriter(struct pt_regs *ctx)
+static __inline int get_side_from_grpc_loopyWriter(struct pt_regs *ctx,
+						   struct ebpf_proc_info *info)
 {
-	void *ptr = get_the_first_parameter(ctx);
+	void *ptr = get_the_first_parameter(ctx, info);
 
-	ptr += get_uprobe_offset(OFFSET_IDX_SIDE_GRPC_TRANSPORT_LOOPY_WRITER);
+	ptr += info->offsets[OFFSET_IDX_SIDE_GRPC_TRANSPORT_LOOPY_WRITER];
 	int side = 0;
 	bpf_probe_read(&side, sizeof(side), ptr);
 	return side;
 }
 
-static __inline int get_fd_from_grpc_loopyWriter(struct pt_regs *ctx)
+static __inline int get_fd_from_grpc_loopyWriter(struct pt_regs *ctx,
+						 struct ebpf_proc_info *info)
 {
 	update_http2_tls(false);
-	void *ptr = get_the_first_parameter(ctx);
+	void *ptr = get_the_first_parameter(ctx, info);
 
-	ptr += get_uprobe_offset(OFFSET_IDX_FRAMER_GRPC_TRANSPORT_LOOPY_WRITER);
+	ptr += info->offsets[OFFSET_IDX_FRAMER_GRPC_TRANSPORT_LOOPY_WRITER];
 	bpf_probe_read(&ptr, sizeof(ptr), ptr);
-	ptr += get_uprobe_offset(OFFSET_IDX_WRITER_GRPC_TRANSPORT_FRAMER);
+	ptr += info->offsets[OFFSET_IDX_WRITER_GRPC_TRANSPORT_FRAMER];
 	bpf_probe_read(&ptr, sizeof(ptr), ptr);
-	ptr += get_uprobe_offset(OFFSET_IDX_CONN_GRPC_TRANSPORT_BUFWRITER);
+	ptr += info->offsets[OFFSET_IDX_CONN_GRPC_TRANSPORT_BUFWRITER];
 
-	if (is_grpc_syscallConn_interface(ptr)) {
+	if (is_grpc_syscallConn_interface(ptr, info)) {
 		update_http2_tls(true);
 		struct go_interface i;
 		bpf_probe_read(&i, sizeof(i), ptr);
 		bpf_probe_read(&i, sizeof(i), i.ptr);
 		ptr = i.ptr;
 	}
-	return get_fd_from_tcp_or_tls_conn_interface(ptr);
+	return get_fd_from_tcp_or_tls_conn_interface(ptr, info);
 }
 
 struct go_http2_header_field {
@@ -106,19 +115,22 @@ struct go_http2_header_field {
 	bool sensitive;
 };
 
-static __inline void *
-get_http2ClientConn_from_http2clientConnReadLoop_ctx(struct pt_regs *ctx)
+static __inline void *get_http2ClientConn_from_http2clientConnReadLoop_ctx(
+	struct pt_regs *ctx, struct ebpf_proc_info *info)
 {
-	void *ptr = get_the_first_parameter(ctx);
-	ptr += get_uprobe_offset(OFFSET_IDX_CC_HTTP2_CLIENT_CONN_READ_LOOP);
+	void *ptr = get_the_first_parameter(ctx, info);
+	ptr += info->offsets[OFFSET_IDX_CC_HTTP2_CLIENT_CONN_READ_LOOP];
 	bpf_probe_read(&ptr, sizeof(ptr), ptr);
 	return ptr;
 }
 
-static __inline int get_fd_from_http2clientConnReadLoop_ctx(struct pt_regs *ctx)
+static __inline int
+get_fd_from_http2clientConnReadLoop_ctx(struct pt_regs *ctx,
+					struct ebpf_proc_info *info)
 {
-	void *ptr = get_http2ClientConn_from_http2clientConnReadLoop_ctx(ctx);
-	return get_fd_from_http2ClientConn(ptr);
+	void *ptr =
+		get_http2ClientConn_from_http2clientConnReadLoop_ctx(ctx, info);
+	return get_fd_from_http2ClientConn(ptr, info);
 }
 
 static __inline __u32 get_previous_read_tcp_seq(int fd, __u32 seq_end)
@@ -162,17 +174,10 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	if (!stack) {
 		return;
 	}
-	struct __socket_data *send_buffer = &(stack->send_buffer);
-	if (!send_buffer) {
-		return;
-	}
 
-	if (!send_buffer->pid) {
-		return;
-	}
 	stack->events_num = 1;
 	stack->len = offsetof(typeof(struct __socket_data), data) +
-		     send_buffer->syscall_len;
+		     stack->send_buffer.syscall_len;
 
 	__u32 send_size = (stack->len + 8) & 1023;
 	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU,
@@ -180,12 +185,9 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 }
 
 // Fill all fields except data in buffer->send_buffer
-static __inline void http2_fill_common_socket(struct http2_header_data *data)
+static __inline void http2_fill_common_socket(struct http2_header_data *data,
+					      struct __socket_data *send_buffer)
 {
-	struct __socket_data *send_buffer = get_http2_send_buffer();
-	if (!send_buffer)
-		return;
-
 	// source, coroutine_id, msg_type, timestamp
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
 	send_buffer->coroutine_id = get_current_goroutine();
@@ -220,7 +222,7 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 
 	send_buffer->data_type = protocol;
 
-	// Refer to the logic of process_data in socket_trace.c to 
+	// Refer to the logic of process_data in socket_trace.c to
 	// obtain quintuple information
 	__u64 id = bpf_get_current_pid_tgid();
 	__u32 tgid = id >> 32;
@@ -253,7 +255,7 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 	send_buffer->tuple.dport = conn_info->tuple.dport;
 	send_buffer->tuple.num = conn_info->tuple.num;
 
-	// According to the IPv4 or IPv6 marked in conn_info, 
+	// According to the IPv4 or IPv6 marked in conn_info,
 	// choose a different offset from sk, copy the address to send_buffer.
 	// It implements address assignment.
 	get_socket_info(send_buffer, sk, conn_info);
@@ -289,16 +291,12 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data)
 }
 
 // 填充 buffer->send_buffer.data
-static __inline void http2_fill_buffer_and_send(struct http2_header_data *data)
+static __inline void
+http2_fill_buffer_and_send(struct http2_header_data *data,
+			   struct __http2_buffer *buffer,
+			   struct __socket_data *send_buffer)
 {
-	if (!data) {
-		return;
-	}
-
-	struct __http2_buffer *buffer = get_http2_buffer();
-	struct __socket_data *send_buffer = get_http2_send_buffer();
-
-	if (!buffer || !send_buffer) {
+	if (!data || !buffer || !send_buffer) {
 		return;
 	}
 	send_buffer->msg_type = data->message_type;
@@ -312,6 +310,7 @@ static __inline void http2_fill_buffer_and_send(struct http2_header_data *data)
 	if (count > HTTP2_BUFFER_INFO_SIZE)
 		return;
 	send_buffer->syscall_len = count;
+	send_buffer->data_len = count;
 	// Useless range  checking. Make the eBPF validator happy
 	if (buffer->header_len >= 0) {
 		if (buffer->header_len < HTTP2_BUFFER_INFO_SIZE) {
@@ -359,8 +358,15 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 		.message_type = headers->message_type,
 		.ctx = headers->ctx,
 	};
+	struct __http2_stack *stack = get_http2_stack();
+	if(!stack){
+		return 0;
+	}
 
-	http2_fill_common_socket(&data);
+	struct __http2_buffer *buffer = &(stack->http2_buffer);
+	struct __socket_data *send_buffer = &(stack->send_buffer);
+
+	http2_fill_common_socket(&data, send_buffer);
 
 	int idx;
 	struct go_http2_header_field *tmp;
@@ -375,7 +381,7 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 		bpf_probe_read(&field, sizeof(field), tmp + idx);
 		data.name = field.name;
 		data.value = field.value;
-		http2_fill_buffer_and_send(&data);
+		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
 
 	data.name.len = 0;
@@ -385,22 +391,24 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 	// MSG_RESPONSE -> MSG_RESPONSE_END
 	data.message_type += 2;
 
-	http2_fill_buffer_and_send(&data);
+	http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	return 0;
 }
 
-static __inline __u32 get_stream_from_http2MetaHeadersFrame(void *ptr)
+static __inline __u32
+get_stream_from_http2MetaHeadersFrame(void *ptr, struct ebpf_proc_info *info)
 {
 	bpf_probe_read(&ptr, sizeof(ptr), ptr);
-	ptr += get_uprobe_offset(OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER);
+	ptr += info->offsets[OFFSET_IDX_STREAM_ID_HTTP2_FRAME_HEADER];
 	__u32 stream;
 	bpf_probe_read(&stream, sizeof(stream), ptr);
 	return stream;
 }
 
-static __inline void *get_fields_from_http2MetaHeadersFrame(void *ptr)
+static __inline void *
+get_fields_from_http2MetaHeadersFrame(void *ptr, struct ebpf_proc_info *info)
 {
-	ptr += get_uprobe_offset(OFFSET_IDX_FIELDS_HTTP2_META_HEADERS_FRAME);
+	ptr += info->offsets[OFFSET_IDX_FIELDS_HTTP2_META_HEADERS_FRAME];
 	return ptr;
 }
 
@@ -408,21 +416,37 @@ static __inline void *get_fields_from_http2MetaHeadersFrame(void *ptr)
 SEC("uprobe/go_http2ClientConn_writeHeader")
 int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
 	struct http2_header_data data = {
 		.read = false,
-		.fd = get_fd_from_http2ClientConn_ctx(ctx),
+		.fd = get_fd_from_http2ClientConn_ctx(ctx, info),
 		.message_type = MSG_REQUEST,
 		.ctx = ctx,
 	};
 
-	void *ptr = get_the_first_parameter(ctx);
-	ptr += get_uprobe_offset(OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN);
+	void *ptr = get_the_first_parameter(ctx, info);
+	ptr += info->offsets[OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN];
 	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
 	data.stream -= 2;
 
-	http2_fill_common_socket(&data);
+	struct __http2_stack *stack = get_http2_stack();
+	if(!stack){
+		return 0;
+	}
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	struct __http2_buffer *buffer = &(stack->http2_buffer);
+	struct __socket_data *send_buffer = &(stack->send_buffer);
+
+	http2_fill_common_socket(&data, send_buffer);
+
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		data.name.ptr = (void *)ctx->rbx;
 		data.name.len = ctx->rcx;
 		data.value.ptr = (void *)ctx->rdi;
@@ -437,7 +461,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 		bpf_probe_read(&data.value.len, sizeof(data.value.len),
 			       (void *)(ctx->rsp + 40));
 	}
-	http2_fill_buffer_and_send(&data);
+	http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	return 0;
 }
 
@@ -445,19 +469,36 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 SEC("uprobe/go_http2ClientConn_writeHeaders")
 int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
 	struct http2_header_data data = {};
-	void *ptr = get_the_first_parameter(ctx);
-	ptr += get_uprobe_offset(OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN);
+	void *ptr = get_the_first_parameter(ctx, info);
+	ptr += info->offsets[OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN];
 	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
 	data.stream -= 2;
 	data.read = false;
-	data.fd = get_fd_from_http2ClientConn_ctx(ctx);
+	data.fd = get_fd_from_http2ClientConn_ctx(ctx, info);
 	data.message_type = MSG_REQUEST_END;
 	data.ctx = ctx;
 	data.name.len = 0;
 	data.value.len = 0;
-	http2_fill_common_socket(&data);
-	http2_fill_buffer_and_send(&data);
+
+	struct __http2_stack *stack = get_http2_stack();
+	if(!stack){
+		return 0;
+	}
+
+	struct __http2_buffer *buffer = &(stack->http2_buffer);
+	struct __socket_data *send_buffer = &(stack->send_buffer);
+
+	http2_fill_common_socket(&data, send_buffer);
+	http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	return 0;
 }
 
@@ -467,21 +508,27 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 {
 	struct go_slice fields;
 	void *frame;
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		frame = (void *)ctx->rbx;
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
 	}
 
-	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame);
+	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
 	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
 		.read = true,
-		.fd = get_fd_from_http2serverConn_ctx(ctx),
-		.stream = get_stream_from_http2MetaHeadersFrame(frame),
+		.fd = get_fd_from_http2serverConn_ctx(ctx, info),
+		.stream = get_stream_from_http2MetaHeadersFrame(frame, info),
 		.message_type = MSG_REQUEST,
 		.ctx = ctx,
 	};
@@ -493,18 +540,34 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 SEC("uprobe/go_http2serverConn_writeHeaders")
 int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
 	// headerData *http2writeResHeaders
 	void *ptr;
 
 	struct http2_header_data data = {};
 	data.read = false;
-	data.fd = get_fd_from_http2serverConn_ctx(ctx);
+	data.fd = get_fd_from_http2serverConn_ctx(ctx, info);
 	data.message_type = MSG_RESPONSE;
 	data.ctx = ctx;
 
-	http2_fill_common_socket(&data);
+	struct __http2_stack *stack = get_http2_stack();
+	if(!stack){
+		return 0;
+	}
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	struct __http2_buffer *buffer = &(stack->http2_buffer);
+	struct __socket_data *send_buffer = &(stack->send_buffer);
+
+	http2_fill_common_socket(&data, send_buffer);
+
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		ptr = (void *)ctx->rcx;
 	} else {
 		bpf_probe_read(&ptr, sizeof(ptr), (void *)(ctx->rsp + 24));
@@ -524,7 +587,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 		data.name.len = 7;
 		data.value.ptr = (char *)&status_value;
 		data.value.len = 3;
-		http2_fill_buffer_and_send(&data);
+		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
 
 	char date[] = "date";
@@ -532,7 +595,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.name.len = 4;
 	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x38);
 	if (data.value.len) {
-		http2_fill_buffer_and_send(&data);
+		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
 
 	char content_type[] = "content-type";
@@ -540,7 +603,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.name.len = 12;
 	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x48);
 	if (data.value.len) {
-		http2_fill_buffer_and_send(&data);
+		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
 
 	char content_length[] = "content-length";
@@ -548,13 +611,13 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.name.len = 14;
 	bpf_probe_read(&(data.value), sizeof(data.value), ptr + 0x58);
 	if (data.value.len) {
-		http2_fill_buffer_and_send(&data);
+		http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	}
 
 	data.name.len = 0;
 	data.value.len = 0;
 	data.message_type += 2;
-	http2_fill_buffer_and_send(&data);
+	http2_fill_buffer_and_send(&data, buffer, send_buffer);
 
 	return 0;
 }
@@ -566,20 +629,28 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 	struct go_slice fields;
 	void *frame;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		frame = (void *)ctx->rcx;
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 24));
 	}
 
-	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame);
+	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
 	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
 		.read = true,
-		.fd = get_fd_from_http2clientConnReadLoop_ctx(ctx),
-		.stream = get_stream_from_http2MetaHeadersFrame(frame),
+		.fd = get_fd_from_http2clientConnReadLoop_ctx(ctx, info),
+		.stream = get_stream_from_http2MetaHeadersFrame(frame, info),
 		.message_type = MSG_RESPONSE,
 		.ctx = ctx,
 	};
@@ -590,8 +661,16 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 SEC("uprobe/go_loopyWriter_writeHeader")
 int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
 	struct go_slice fields = { 0 };
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		fields.ptr = (void *)ctx->rdi;
 		fields.len = ctx->rsi;
 		fields.cap = ctx->r8;
@@ -604,17 +683,17 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 	struct http2_headers_data headers = { 0 };
 	headers.fields = &fields;
 	headers.read = false;
-	headers.fd = get_fd_from_grpc_loopyWriter(ctx);
+	headers.fd = get_fd_from_grpc_loopyWriter(ctx, info);
 	headers.ctx = ctx;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		headers.stream = (__u32)ctx->rbx;
 	} else {
 		bpf_probe_read(&headers.stream, sizeof(headers.stream),
 			       (void *)(ctx->rsp + 16));
 	}
 
-	int is_server_side = get_side_from_grpc_loopyWriter(ctx);
+	int is_server_side = get_side_from_grpc_loopyWriter(ctx, info);
 	headers.message_type = is_server_side ? MSG_RESPONSE : MSG_REQUEST;
 	return submit_http2_headers(&headers);
 }
@@ -626,20 +705,28 @@ int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 	struct go_slice fields;
 	void *frame;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		frame = (void *)ctx->rbx;
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
 	}
 
-	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame);
+	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
 	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
 		.read = true,
-		.fd = get_fd_from_grpc_http2Server_ctx(ctx),
-		.stream = get_stream_from_http2MetaHeadersFrame(frame),
+		.fd = get_fd_from_grpc_http2Server_ctx(ctx, info),
+		.stream = get_stream_from_http2MetaHeadersFrame(frame, info),
 		.message_type = MSG_REQUEST,
 		.ctx = ctx,
 	};
@@ -654,20 +741,28 @@ int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 	struct go_slice fields;
 	void *frame;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		frame = (void *)ctx->rbx;
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
 	}
 
-	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame);
+	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
 	bpf_probe_read(&fields, sizeof(fields), fields_ptr);
 
 	struct http2_headers_data headers = {
 		.fields = &fields,
 		.read = true,
-		.fd = get_fd_from_grpc_http2Client_ctx(ctx),
-		.stream = get_stream_from_http2MetaHeadersFrame(frame),
+		.fd = get_fd_from_grpc_http2Client_ctx(ctx, info),
+		.stream = get_stream_from_http2MetaHeadersFrame(frame, info),
 		.message_type = MSG_RESPONSE,
 		.ctx = ctx,
 	};

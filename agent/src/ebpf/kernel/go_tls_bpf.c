@@ -63,15 +63,23 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 	struct tls_conn c = {};
 	struct tls_conn_key key = {};
 
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
 	c.sp = (void *)ctx->rsp;
 
 	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
-		c.fd = get_fd_from_tls_conn_struct((void *)ctx->rax);
+		c.fd = get_fd_from_tls_conn_struct((void *)ctx->rax, info);
 		c.buffer = (char *)ctx->rbx;
 	} else {
 		void *conn;
 		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
-		c.fd = get_fd_from_tls_conn_struct(conn);
+		c.fd = get_fd_from_tls_conn_struct(conn, info);
 		bpf_probe_read(&c.buffer, sizeof(c.buffer),
 			       (void *)(c.sp + 16));
 	}
@@ -80,7 +88,7 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 		return 0;
 	c.tcp_seq = get_tcp_write_seq_from_fd(c.fd);
 
-	key.tgid = bpf_get_current_pid_tgid() >> 32;
+	key.tgid = pid;
 	key.goid = get_current_goroutine();
 
 	bpf_map_update_elem(&tls_conn_map, &key, &c, BPF_ANY);
@@ -95,14 +103,22 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 	struct tls_conn_key key = {};
 	ssize_t bytes_count;
 
-	key.tgid = bpf_get_current_pid_tgid() >> 32;
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
+	key.tgid = id >> 32;
 	key.goid = get_current_goroutine();
 
 	c = bpf_map_lookup_elem(&tls_conn_map, &key);
 	if (!c)
 		return 0;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		bytes_count = ctx->rax;
 	} else {
 		bpf_probe_read(&bytes_count, sizeof(bytes_count),
@@ -117,7 +133,6 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 		.enter_ts = bpf_ktime_get_ns(),
 	};
 
-	__u64 id = bpf_get_current_pid_tgid();
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_GO_TLS_UPROBE,
@@ -142,18 +157,26 @@ out:
 SEC("uprobe/go_tls_read_enter")
 int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
 	struct tls_conn c = {};
 	struct tls_conn_key key = {};
 
 	c.sp = (void *)ctx->rsp;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
-		c.fd = get_fd_from_tls_conn_struct((void *)ctx->rax);
+	if (info->version >= GO_VERSION(1, 17, 0)) {
+		c.fd = get_fd_from_tls_conn_struct((void *)ctx->rax, info);
 		c.buffer = (char *)ctx->rbx;
 	} else {
 		void *conn;
 		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
-		c.fd = get_fd_from_tls_conn_struct(conn);
+		c.fd = get_fd_from_tls_conn_struct(conn, info);
 		bpf_probe_read(&c.buffer, sizeof(c.buffer),
 			       (void *)(c.sp + 16));
 	}
@@ -173,6 +196,14 @@ int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 SEC("uprobe/go_tls_read_exit")
 int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 {
+	__u64 id = bpf_get_current_pid_tgid();
+	pid_t pid = id >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+
 	struct tls_conn *c;
 	struct tls_conn_key key = {};
 	ssize_t bytes_count;
@@ -191,9 +222,10 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 	};
 	// make linux 4.14 validator happy
 	__u32 tcp_seq = c->tcp_seq;
-	bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key, &tcp_seq, BPF_NOEXIST);
+	bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key, &tcp_seq,
+			    BPF_NOEXIST);
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		bytes_count = ctx->rax;
 	} else {
 		bpf_probe_read(&bytes_count, sizeof(bytes_count),
@@ -209,7 +241,6 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 		.enter_ts = bpf_ktime_get_ns(),
 	};
 
-	__u64 id = bpf_get_current_pid_tgid();
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_GO_TLS_UPROBE,
