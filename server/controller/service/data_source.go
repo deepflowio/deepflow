@@ -217,7 +217,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	if dataSourceUpdate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
 			common.INVALID_POST_DATA,
-			fmt.Sprintf("data_source retention_time should lt %d", cfg.Spec.DataSourceRetentionTimeMax),
+			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
 	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
