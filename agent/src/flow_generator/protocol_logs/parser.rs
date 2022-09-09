@@ -34,8 +34,8 @@ use super::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
     KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
-use crate::ebpf::EbpfType;
-use crate::flow_generator::protocol_logs::L7ProtoRawDataType;
+
+use crate::{common::ebpf::EbpfType, flow_generator::protocol_logs::L7ProtoRawDataType};
 use crate::{
     common::{
         enums::{EthernetType, PacketDirection},
