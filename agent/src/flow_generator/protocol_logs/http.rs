@@ -26,11 +26,11 @@ use super::{
 };
 use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
+use crate::common::ebpf::EbpfType;
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
-use crate::ebpf::EbpfType;
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::L7ProtoRawDataType;
 use crate::proto::flow_log;
