@@ -15,12 +15,12 @@
  */
 use serde::Serialize;
 
+use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
 use super::{
     consts::*, value_is_default, AppProtoHead, AppProtoHeadEnum, AppProtoLogsInfo,
     AppProtoLogsInfoEnum, L7LogParse, L7ResponseStatus, LogMessageType,
 };
 
-use crate::proto::flow_log;
 use crate::{
     common::{
         enums::{IpProtocol, PacketDirection},
@@ -52,32 +52,70 @@ pub struct DnsInfo {
     // SOA: primary name server
     #[serde(rename = "response_result", skip_serializing_if = "value_is_default")]
     pub answers: String,
+
+    pub status: L7ResponseStatus,
+    pub status_code: u8,
 }
 
 impl DnsInfo {
     pub fn merge(&mut self, other: Self) {
         self.answers = other.answers;
+        if other.status != L7ResponseStatus::default() {
+            self.status = other.status;
+        }
+        if other.status_code != 0 {
+            self.status_code = other.status_code;
+        }
+    }
+
+    pub fn get_domain_str(&self) -> &'static str {
+        let typ = [
+            "", "A", "NS", "MD", "MF", "CNAME", "SOA", "MB", "MG", "MR", "NULL", "WKS", "PTR",
+            "HINFO", "MINFO", "MX", "TXT",
+        ];
+
+        match self.domain_type {
+            1..=16 => typ[self.domain_type as usize],
+            28 => "AAAA",
+            252 => "AXFR",
+            253 => "MAILB",
+            254 => "MAILA",
+            255 => "ANY",
+            _ => "",
+        }
     }
 }
 
-impl From<DnsInfo> for flow_log::DnsInfo {
+impl From<DnsInfo> for L7ProtocolSendLog {
     fn from(f: DnsInfo) -> Self {
-        flow_log::DnsInfo {
-            trans_id: f.trans_id as u32,
-            query_type: f.domain_type as u32,
-            query_name: f.query_name,
-            answers: f.answers,
-        }
+        let req_type = String::from(f.get_domain_str());
+        let log = L7ProtocolSendLog {
+            req: L7Request {
+                req_type,
+                resource: f.query_name,
+                ..Default::default()
+            },
+            resp: L7Response {
+                result: f.answers,
+                code: f.status_code as i32,
+                status: f.status,
+                ..Default::default()
+            },
+            ext_info: Some(ExtendedInfo {
+                request_id: Some(f.trans_id as u32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        return log;
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct DnsLog {
     info: DnsInfo,
-
     msg_type: LogMessageType,
-    status: L7ResponseStatus,
-    status_code: u8,
 }
 
 impl DnsLog {
@@ -277,11 +315,11 @@ impl DnsLog {
 
     fn set_status(&mut self, status_code: u8) {
         if status_code == 0 {
-            self.status = L7ResponseStatus::Ok;
+            self.info.status = L7ResponseStatus::Ok;
         } else if status_code == 1 || status_code == 3 {
-            self.status = L7ResponseStatus::ClientError;
+            self.info.status = L7ResponseStatus::ClientError;
         } else {
-            self.status = L7ResponseStatus::ServerError;
+            self.info.status = L7ResponseStatus::ServerError;
         }
     }
 
@@ -292,8 +330,8 @@ impl DnsLog {
         }
         self.info.trans_id = read_u16_be(&payload[..DNS_HEADER_FLAGS_OFFSET]);
         self.info.query_type = payload[DNS_HEADER_FLAGS_OFFSET] & 0x80;
-        self.status_code = payload[DNS_HEADER_FLAGS_OFFSET + 1] & 0xf;
-        self.set_status(self.status_code);
+        self.info.status_code = payload[DNS_HEADER_FLAGS_OFFSET + 1] & 0xf;
+        self.set_status(self.info.status_code);
         let qd_count = read_u16_be(&payload[DNS_HEADER_QDCOUNT_OFFSET..]);
         let an_count = read_u16_be(&payload[DNS_HEADER_ANCOUNT_OFFSET..]);
         let ns_count = read_u16_be(&payload[DNS_HEADER_NSCOUNT_OFFSET..]);
@@ -317,13 +355,12 @@ impl DnsLog {
 
             self.msg_type = LogMessageType::Response;
         }
+
         Ok(AppProtoHead {
             proto: L7Protocol::Dns,
             msg_type: self.msg_type,
-            status: self.status,
-            code: self.status_code as u16,
             rrt: 0,
-            version: 0,
+            ..Default::default()
         })
     }
 }
