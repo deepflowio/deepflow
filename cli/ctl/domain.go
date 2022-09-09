@@ -163,7 +163,11 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v1/domains/", server.IP, server.Port)
 
-	body := formatBody(filename)
+	body, err := formatBody(filename)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
 	if !validateBody(body) {
 		return
 	}
@@ -208,7 +212,11 @@ func updateDomain(cmd *cobra.Command, args []string, filename string) {
 		domainTypeInt := response.Get("DATA").GetIndex(9).Get("TYPE").MustInt()
 		url := fmt.Sprintf("http://%s:%d/v1/domains/%s/", server.IP, server.Port, lcuuid)
 
-		body := formatBody(filename)
+		body, err := formatBody(filename)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
 		if !validateBody(body) {
 			return
 		}
@@ -274,39 +282,37 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 	}
 }
 
-func upperBodyKey(body map[string]interface{}) map[string]interface{} {
+func formatBody(filename string) (map[string]interface{}, error) {
 	upperBody := make(map[string]interface{})
-	for k, v := range body {
-		upperK := strings.ToUpper(k)
-		upperBody[upperK] = v
-	}
-	return upperBody
-}
-
-func loadBody(filename string) map[string]interface{} {
 	var body map[string]interface{}
+	var err error
+
 	if filename == "-" {
 		scanner := bufio.NewScanner(os.Stdin)
 		var strContent string
 		for scanner.Scan() {
 			strContent += scanner.Text() + "\n"
 		}
-		yaml.Unmarshal([]byte(strContent), &body)
+		err = yaml.Unmarshal([]byte(strContent), &body)
+		if err != nil {
+			return upperBody, err
+		}
 	} else {
 		yamlFile, err := ioutil.ReadFile(filename)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return nil
+			return upperBody, err
 		}
-		yaml.Unmarshal(yamlFile, &body)
+		err = yaml.Unmarshal(yamlFile, &body)
+		if err != nil {
+			return upperBody, err
+		}
 	}
-	return body
-}
 
-func formatBody(filename string) map[string]interface{} {
-	body := loadBody(filename)
-	body = upperBodyKey(body)
-	return body
+	for k, v := range body {
+		upperK := strings.ToUpper(k)
+		upperBody[upperK] = v
+	}
+	return upperBody, nil
 }
 
 func validateBody(body map[string]interface{}) bool {
