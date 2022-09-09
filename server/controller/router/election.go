@@ -13,30 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package main
+package router
 
 import (
-	"flag"
-	"fmt"
+	"github.com/gin-gonic/gin"
 
-	"github.com/deepflowys/deepflow/cli/ctl"
+	"github.com/deepflowys/deepflow/server/controller/service"
 )
 
-var version = flag.Bool("v", false, "Display the version")
-var RevCount, Revision, CommitDate, goVersion string
+func ElectionRouter(e *gin.Engine) {
+	e.GET("/v1/election-leader/", getLeaderInfo)
+}
 
-func main() {
-	flag.Parse()
-	if *version {
-		fmt.Printf(
-			"%s %s %s\n%s\n%s\n",
-			RevCount, Revision, CommitDate,
-			"deepflow-ctl community edition",
-			goVersion,
-		)
-		return
-	}
-
-	ctl.Execute()
+func getLeaderInfo(c *gin.Context) {
+	data, err := service.GetLeaderInfo()
+	JsonResponse(c, data, err)
 }
