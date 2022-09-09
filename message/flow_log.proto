@@ -69,9 +69,9 @@ message FlowKey {
 
 message FlowMetricsPeer {
     uint64 byte_count = 1;
-    uint64 l3_byte_count = 2;
-    uint64 l4_byte_count = 3;
-    uint64 packet_count = 4;
+    uint64 l3_byte_count= 2;
+    uint64 l4_byte_count= 3;
+    uint64 packet_count= 4;
     uint64 total_byte_count = 5;
     uint64 total_packet_count = 6;
 
@@ -117,6 +117,7 @@ message TCPPerfStats {
     uint32 srt_max = 3;
     uint32 art_max = 4;
 
+
     uint32 rtt = 5;
     uint32 rtt_client_sum = 6;
     uint32 rtt_server_sum = 7;
@@ -156,38 +157,8 @@ message L7PerfStats {
     uint32 rrt_max = 8;
 }
 
-message L7Request {
-    string req_type = 1;
-    string domain = 2;
-    string resource = 3;
-}
-
-message L7Response {
-    uint32 status = 1;
-    int32 code = 2;
-    string exception = 3;
-    string result = 4;
-}
-
-message TraceInfo {
-    string trace_id = 1;
-    string span_id = 2;
-    string parent_span_id = 3;
-}
-
-message ExtendedInfo {
-    string service_name = 1;
-    string client_ip = 2;
-    uint32 request_id = 3;
-    string x_request_id = 4;
-    uint32 row_effect = 5;
-}
-
 message AppProtoLogsData {
     AppProtoLogsBaseInfo base = 1;
-
-    // 后面使用统一适配结构,
-    // 不再为每个协议单独定义结构,下面这些结构不应该再使用,后面会去掉
     HttpInfo http = 2;
     DnsInfo dns = 3;
     DubboInfo dubbo = 4;
@@ -195,14 +166,6 @@ message AppProtoLogsData {
     MysqlInfo mysql = 6;
     RedisInfo redis = 7;
     MqttInfo mqtt = 8;
-
-    uint32 req_len = 9;
-    uint32 resp_len = 10;
-    L7Request req = 11;
-    L7Response resp = 12;
-    string version = 13;
-    TraceInfo trace_info = 14;
-    ExtendedInfo ext_info = 15;
 }
 
 message AppProtoLogsBaseInfo {
@@ -253,11 +216,8 @@ message AppProtoLogsBaseInfo {
 message AppProtoHead {
     uint32 proto = 1;
     uint32 msg_type = 2;
-
-    //这两个字段不再使用,响应码和响应状态放到L7Response
     uint32 status = 3;
-    uint32 code = 4;
-
+    uint32 code = 4 ;
     uint64 rrt = 5;
 }
 
@@ -299,7 +259,7 @@ message DubboInfo {
     string trace_id = 11;
 }
 
-message KafkaInfo {
+message KafkaInfo{
     uint32 correlation_id = 1;
 
     int32 req_msg_size = 2;
@@ -344,5 +304,5 @@ message MqttInfo {
 
 message MqttTopic {
     string name = 1;
-    int32 qos = 2; // -1 mean not exist qos
+    int32 qos = 2;  // -1 mean not exist qos
 }

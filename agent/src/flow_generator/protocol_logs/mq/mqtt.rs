@@ -35,11 +35,8 @@ use super::super::{
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
     common::meta_packet::MetaPacket,
-    flow_generator::{
-        error::{Error, Result},
-        protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-    },
-    proto::flow_log::MqttTopic,
+    flow_generator::error::{Error, Result},
+    proto::flow_log::{self, MqttTopic},
 };
 
 #[derive(Serialize, Clone, Debug)]
@@ -64,7 +61,6 @@ pub struct MqttInfo {
     pub publish_topic: Option<String>,
     #[serde(skip)]
     pub code: u8, // connect_ack packet return code
-    pub status: L7ResponseStatus,
 }
 
 pub fn topics_format<S>(t: &Option<Vec<MqttTopic>>, serializer: S) -> Result<S::Ok, S::Error>
@@ -87,7 +83,6 @@ impl Default for MqttInfo {
             subscribe_topics: None,
             publish_topic: None,
             code: 0,
-            status: L7ResponseStatus::Ok,
         }
     }
 }
@@ -95,7 +90,6 @@ impl Default for MqttInfo {
 impl MqttInfo {
     pub fn merge(&mut self, other: Self) {
         self.res_msg_size = other.res_msg_size;
-        self.status = other.status;
         match other.pkt_type {
             PacketKind::Publish { .. } => {
                 self.publish_topic = other.publish_topic;
@@ -106,57 +100,31 @@ impl MqttInfo {
             _ => (),
         }
     }
-
-    pub fn get_version_str(&self) -> &'static str {
-        match self.version {
-            3 => "3.1",
-            4 => "3.1.1",
-            5 => "5.0",
-            _ => "",
-        }
-    }
 }
 
-impl From<MqttInfo> for L7ProtocolSendLog {
+impl From<MqttInfo> for flow_log::MqttInfo {
     fn from(f: MqttInfo) -> Self {
-        let version = Some(String::from(f.get_version_str()));
-        let mut topic_str = String::new();
-        match f.pkt_type {
+        let topics = match f.pkt_type {
             PacketKind::Publish { .. } => {
-                if let Some(t) = f.publish_topic {
-                    topic_str.push_str(format!("| topic: {}, qos: -1 |", t).as_str());
-                }
+                vec![MqttTopic {
+                    name: f.publish_topic.unwrap_or_default(),
+                    qos: -1,
+                }]
             }
             PacketKind::Unsubscribe | PacketKind::Subscribe => {
-                if let Some(s) = f.subscribe_topics {
-                    for i in s {
-                        topic_str
-                            .push_str(format!("| topic: {}, qos: {} ", i.name, i.qos).as_str());
-                    }
-                    if !topic_str.is_empty() {
-                        topic_str.push_str("|");
-                    }
-                }
+                f.subscribe_topics.unwrap_or_default()
             }
-            _ => {}
+            _ => vec![],
         };
-        let log = L7ProtocolSendLog {
-            version: version,
-            req_len: f.req_msg_size as u32,
-            resp_len: f.res_msg_size as u32,
-            req: L7Request {
-                req_type: f.pkt_type.to_string(),
-                domain: f.client_id.unwrap_or_default(),
-                resource: topic_str,
-            },
-            resp: L7Response {
-                status: f.status,
-                code: f.code as i32,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        return log;
+
+        flow_log::MqttInfo {
+            mqtt_type: f.pkt_type.to_string(),
+            req_msg_size: f.req_msg_size,
+            proto_version: f.version as u32,
+            client_id: f.client_id.unwrap_or_default(),
+            resp_msg_size: f.res_msg_size,
+            topics,
+        }
     }
 }
 
@@ -330,10 +298,11 @@ impl MqttLog {
             app_proto_heads.push(AppProtoHead {
                 proto: L7Protocol::Mqtt,
                 msg_type: self.msg_type,
+                status: self.status,
+                code: info.code as u16,
                 rrt: 0,
-                ..Default::default()
+                version: info.version,
             });
-            info.status = self.status;
             self.info.push(info);
 
             if input.len() <= header.remaining_length as usize {
