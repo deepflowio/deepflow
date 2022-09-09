@@ -237,28 +237,73 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 #else
 	offset->ready = 1;
 #endif
-	// Assignment Protocol TCP/UDP
+
+	send_buffer->tuple.l4_protocol = IPPROTO_TCP;
 	void *sk = get_socket_from_fd(data->fd, offset);
-	struct conn_info_t *conn_info, __conn_info = {};
-	conn_info = &__conn_info;
-	__u8 sock_state;
-	if (!(sk != NULL &&
-	      // is_tcp_udp_data function updates tuple.l4_protocol of conn_info
-	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info)) !=
-	       SOCK_CHECK_TYPE_ERROR))) {
-		return;
-	}
-	send_buffer->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 
 	// fill in the port number
-	init_conn_info(tgid, data->fd, conn_info, sk);
-	send_buffer->tuple.dport = conn_info->tuple.dport;
-	send_buffer->tuple.num = conn_info->tuple.num;
+	__be16 inet_dport;
+	__u16 inet_sport;
+	__u16 skc_family;
+#ifdef BPF_USE_CORE
+	struct sock *__sk = sk;
+	bpf_core_read(&inet_dport, sizeof(inet_dport),
+		      &__sk->__sk_common.skc_dport);
+	bpf_core_read(&inet_sport, sizeof(inet_sport),
+		      &__sk->__sk_common.skc_num);
+	bpf_core_read(&skc_family, sizeof(skc_family),
+		      &__sk->__sk_common.skc_family);
+#else
+	struct skc_flags_t {
+		unsigned char skc_reuse : 4;
+		unsigned char skc_reuseport : 1;
+		unsigned char skc_ipv6only : 1;
+		unsigned char skc_net_refcnt : 1;
+	};
+	struct skc_flags_t skc_flags;
+	bpf_probe_read(&skc_flags, sizeof(skc_flags),
+		       sk + STRUCT_SOCK_COMMON_IPV6ONLY_OFFSET);
+	bpf_probe_read(&skc_family, sizeof(skc_family),
+		       sk + STRUCT_SOCK_FAMILY_OFFSET);
+	bpf_probe_read(&inet_dport, sizeof(inet_dport),
+		       sk + STRUCT_SOCK_DPORT_OFFSET);
+	bpf_probe_read(&inet_sport, sizeof(inet_sport),
+		       sk + STRUCT_SOCK_SPORT_OFFSET);
+#endif
+	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
+	send_buffer->tuple.num = inet_sport;
 
-	// According to the IPv4 or IPv6 marked in conn_info,
-	// choose a different offset from sk, copy the address to send_buffer.
-	// It implements address assignment.
-	get_socket_info(send_buffer, sk, conn_info);
+	switch (skc_family) {
+	case PF_INET:
+#ifdef BPF_USE_CORE
+		bpf_core_read(send_buffer->tuple.rcv_saddr, 4,
+			      &__sk->__sk_common.skc_rcv_saddr);
+		bpf_core_read(send_buffer->tuple.daddr, 4,
+			      &__sk->__sk_common.skc_daddr);
+#else
+		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
+			       sk + STRUCT_SOCK_SADDR_OFFSET);
+		bpf_probe_read(send_buffer->tuple.daddr, 4,
+			       sk + STRUCT_SOCK_DADDR_OFFSET);
+#endif
+		send_buffer->tuple.addr_len = 4;
+		break;
+	case PF_INET6:
+#ifdef BPF_USE_CORE
+		bpf_core_read(send_buffer->tuple.rcv_saddr, 16,
+			      &__sk->__sk_common.skc_v6_rcv_saddr);
+		bpf_core_read(send_buffer->tuple.daddr, 16,
+			      &__sk->__sk_common.skc_v6_daddr);
+#else
+		bpf_probe_read(send_buffer->tuple.rcv_saddr, 16,
+			       sk + STRUCT_SOCK_IP6SADDR_OFFSET);
+		bpf_probe_read(send_buffer->tuple.daddr, 16,
+			       sk + STRUCT_SOCK_IP6SADDR_OFFSET);
+#endif
+		send_buffer->tuple.addr_len = 16;
+		break;
+	}
+
 
 	// trace_uid, generator for socket_id
 	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
