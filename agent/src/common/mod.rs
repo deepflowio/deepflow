@@ -16,6 +16,7 @@
 
 mod consts;
 pub mod decapsulate;
+pub mod ebpf;
 pub mod endpoint;
 pub mod enums;
 mod error;

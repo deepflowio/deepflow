@@ -25,13 +25,14 @@ use log::{debug, error, info, warn};
 use lru::LruCache;
 
 use super::{Error, Result};
+
+use crate::common::ebpf::{get_all_protocols_by_ebpf_type, EbpfType};
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::debug::QueueDebugger;
-use crate::ebpf::EbpfType;
-use crate::ebpf::{self, get_all_protocols_by_ebpf_type};
+use crate::ebpf;
 use crate::flow_generator::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
     kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,

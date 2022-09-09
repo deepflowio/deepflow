@@ -47,9 +47,9 @@ use std::{
 use prost::Message;
 use serde::{Serialize, Serializer};
 
-use crate::ebpf::EbpfType;
 use crate::{
     common::{
+        ebpf::EbpfType,
         enums::{IpProtocol, PacketDirection, TapType},
         flow::L7Protocol,
         meta_packet::MetaPacket,

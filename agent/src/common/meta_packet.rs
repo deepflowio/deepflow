@@ -28,6 +28,7 @@ use pnet::packet::{
     tcp::{TcpOptionNumber, TcpOptionNumbers},
 };
 
+use super::ebpf::EbpfType;
 #[cfg(target_os = "linux")]
 use super::enums::TapType;
 use super::{
@@ -41,12 +42,12 @@ use super::{
     tap_port::TapPort,
 };
 
+use crate::common::ebpf::GO_HTTP2_UPROBE;
 #[cfg(target_os = "linux")]
 use crate::ebpf::{
-    EbpfType, GO_HTTP2_UPROBE, MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2,
-    SOCK_DATA_TLS_HTTP2, SOCK_DIR_RCV, SOCK_DIR_SND,
+    MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
+    SOCK_DIR_RCV, SOCK_DIR_SND,
 };
-
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
