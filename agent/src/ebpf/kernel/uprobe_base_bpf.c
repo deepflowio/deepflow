@@ -56,9 +56,16 @@ struct __http2_buffer {
 
 struct __http2_stack {
 	struct __http2_buffer http2_buffer;
-	struct __socket_data send_buffer;
+	union {
+		char __raw[sizeof(struct __socket_data) + 8];
+		struct {
+			__u32 events_num;
+			__u32 len;
+			struct __socket_data send_buffer;
+		}__attribute__((packed));
+	};
 	bool tls;
-};
+} __attribute__((packed));
 
 MAP_PERARRAY(http2_stack, __u32, struct __http2_stack, 1)
 
