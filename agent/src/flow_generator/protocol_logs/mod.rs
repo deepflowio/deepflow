@@ -144,9 +144,15 @@ pub struct AppProtoLogsBaseInfo {
     pub head: AppProtoHead,
 
     /* L2 */
-    #[serde(serialize_with = "to_string_format")]
+    #[serde(
+        skip_serializing_if = "value_is_default",
+        serialize_with = "to_string_format"
+    )]
     pub mac_src: MacAddr,
-    #[serde(serialize_with = "to_string_format")]
+    #[serde(
+        skip_serializing_if = "value_is_default",
+        serialize_with = "to_string_format"
+    )]
     pub mac_dst: MacAddr,
     /* L3 ipv4 or ipv6 */
     pub ip_src: IpAddr,
