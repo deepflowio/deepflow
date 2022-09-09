@@ -54,10 +54,19 @@ struct __http2_buffer {
 	char info[HTTP2_BUFFER_INFO_SIZE + HTTP2_BUFFER_UESLESS];
 };
 
+#define SOCKET_DATA_HEADER offsetof(typeof(struct __socket_data), data)
+
 struct __http2_stack {
-	struct __http2_buffer http2_buffer;
 	union {
-		char __raw[sizeof(struct __socket_data) + 8];
+		union {
+			char __raw[sizeof(struct __socket_data) + 8];
+			struct {
+				__u32 __unused_events_num;
+				__u32 __unused_len;
+				char __unused_header[SOCKET_DATA_HEADER];
+				struct __http2_buffer http2_buffer;
+			} __attribute__((packed));
+		};
 		struct {
 			__u32 events_num;
 			__u32 len;

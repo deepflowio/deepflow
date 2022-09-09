@@ -296,7 +296,7 @@ http2_fill_buffer_and_send(struct http2_header_data *data,
 			   struct __http2_buffer *buffer,
 			   struct __socket_data *send_buffer)
 {
-	if (!data || !buffer || !send_buffer) {
+	if (!data || !buffer || !send_buffer || !send_buffer->tcp_seq) {
 		return;
 	}
 	send_buffer->msg_type = data->message_type;
@@ -333,10 +333,7 @@ http2_fill_buffer_and_send(struct http2_header_data *data,
 		buffer->info[buffer->header_len + buffer->value_len] = 0;
 	}
 
-	if (count < CAP_DATA_SIZE) {
-		bpf_probe_read(send_buffer->data, 1 + count, buffer);
-		report_http2_header(data->ctx);
-	}
+	report_http2_header(data->ctx);
 }
 
 struct http2_headers_data {
