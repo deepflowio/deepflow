@@ -40,9 +40,9 @@ struct {
 	__uint(max_entries, MAX_SYSTEM_THREADS);
 } goroutines_map SEC(".maps");
 
-// The first 16 bytes are fixed headers, 
+// The first 16 bytes are fixed headers,
 // and the total reported buffer does not exceed 1k
-#define HTTP2_BUFFER_INFO_SIZE (CAP_DATA_SIZE  - 16)
+#define HTTP2_BUFFER_INFO_SIZE (CAP_DATA_SIZE - 16)
 // Make the eBPF validator happy
 #define HTTP2_BUFFER_UESLESS (CAP_DATA_SIZE)
 
@@ -62,7 +62,7 @@ struct __http2_stack {
 			__u32 events_num;
 			__u32 len;
 			struct __socket_data send_buffer;
-		}__attribute__((packed));
+		} __attribute__((packed));
 	};
 	bool tls;
 } __attribute__((packed));
@@ -102,27 +102,6 @@ static __inline bool is_http2_tls()
 	return false;
 }
 
-static __inline struct ebpf_proc_info *get_current_proc_info()
-{
-	__u64 id;
-	pid_t pid;
-
-	id = bpf_get_current_pid_tgid();
-	pid = id >> 32;
-	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	return info;
-}
-
-static __inline int get_uprobe_offset(int offset_idx)
-{
-	struct ebpf_proc_info *info = get_current_proc_info();
-	if (info) {
-		return info->offsets[offset_idx];
-	}
-
-	return -1;
-}
-
 static __inline __u32 get_go_version(void)
 {
 	__u64 id;
@@ -139,21 +118,6 @@ static __inline __u32 get_go_version(void)
 	return 0;
 }
 
-static __inline int get_runtime_g_goid_offset(void)
-{
-	return get_uprobe_offset(OFFSET_IDX_GOID_RUNTIME_G);
-}
-
-static __inline int get_crypto_tls_conn_conn_offset(void)
-{
-	return get_uprobe_offset(OFFSET_IDX_CONN_TLS_CONN);
-}
-
-static __inline int get_net_poll_fd_sysfd(void)
-{
-	return get_uprobe_offset(OFFSET_IDX_SYSFD_POLL_FD);
-}
-
 static __inline __s64 get_current_goroutine(void)
 {
 	__u64 current_thread = bpf_get_current_pid_tgid();
@@ -165,22 +129,22 @@ static __inline __s64 get_current_goroutine(void)
 	return 0;
 }
 
-static __inline bool is_tcp_conn_interface(void *conn)
+static __inline bool is_tcp_conn_interface(void *conn,
+					   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
 	bpf_probe_read(&i, sizeof(i), conn);
-
-	struct ebpf_proc_info *info = get_current_proc_info();
 	return info ? i.type == info->net_TCPConn_itab : false;
 }
 
-static __inline int get_fd_from_tcp_conn_interface(void *conn)
+static __inline int get_fd_from_tcp_conn_interface(void *conn,
+						   struct ebpf_proc_info *info)
 {
-	if (!is_tcp_conn_interface(conn)) {
+	if (!is_tcp_conn_interface(conn, info)) {
 		return -1;
 	}
 
-	int offset_fd_sysfd = get_net_poll_fd_sysfd();
+	int offset_fd_sysfd = info->offsets[OFFSET_IDX_SYSFD_POLL_FD];
 	if (offset_fd_sysfd < 0)
 		return -1;
 
@@ -194,44 +158,47 @@ static __inline int get_fd_from_tcp_conn_interface(void *conn)
 	return fd;
 }
 
-static __inline int get_fd_from_tls_conn_struct(void *conn)
+static __inline int get_fd_from_tls_conn_struct(void *conn,
+						struct ebpf_proc_info *info)
 {
-	int offset_conn_conn = get_crypto_tls_conn_conn_offset();
+	int offset_conn_conn = info->offsets[OFFSET_IDX_CONN_TLS_CONN];
+	;
 	if (offset_conn_conn < 0)
 		return -1;
 
-	return get_fd_from_tcp_conn_interface(conn + offset_conn_conn);
+	return get_fd_from_tcp_conn_interface(conn + offset_conn_conn, info);
 }
 
-static __inline bool is_tls_conn_interface(void *conn)
+static __inline bool is_tls_conn_interface(void *conn,
+					   struct ebpf_proc_info *info)
 {
 	struct go_interface i;
 	bpf_probe_read(&i, sizeof(i), conn);
-
-	struct ebpf_proc_info *info = get_current_proc_info();
 	return info ? i.type == info->crypto_tls_Conn_itab : false;
 }
 
-static __inline int get_fd_from_tls_conn_interface(void *conn)
+static __inline int get_fd_from_tls_conn_interface(void *conn,
+						   struct ebpf_proc_info *info)
 {
-	if (!is_tls_conn_interface(conn)) {
+	if (!is_tls_conn_interface(conn, info)) {
 		return -1;
 	}
 	struct go_interface i = {};
 
 	bpf_probe_read(&i, sizeof(i), conn);
-	return get_fd_from_tls_conn_struct(i.ptr);
+	return get_fd_from_tls_conn_struct(i.ptr, info);
 }
 
-static __inline int get_fd_from_tcp_or_tls_conn_interface(void *conn)
+static __inline int
+get_fd_from_tcp_or_tls_conn_interface(void *conn, struct ebpf_proc_info *info)
 {
 	int fd;
-	fd = get_fd_from_tls_conn_interface(conn);
+	fd = get_fd_from_tls_conn_interface(conn, info);
 	if (fd > 0) {
 		update_http2_tls(true);
 		return fd;
 	}
-	fd = get_fd_from_tcp_conn_interface(conn);
+	fd = get_fd_from_tcp_conn_interface(conn, info);
 	if (fd > 0) {
 		return fd;
 	}
@@ -241,7 +208,14 @@ static __inline int get_fd_from_tcp_or_tls_conn_interface(void *conn)
 SEC("uprobe/runtime.casgstatus")
 int runtime_casgstatus(struct pt_regs *ctx)
 {
-	int offset_g_goid = get_runtime_g_goid_offset();
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 pid = pid_tgid >> 32;
+
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return 0;
+	}
+	int offset_g_goid = info->offsets[OFFSET_IDX_GOID_RUNTIME_G];
 	if (offset_g_goid < 0) {
 		return 0;
 	}
@@ -249,7 +223,7 @@ int runtime_casgstatus(struct pt_regs *ctx)
 	__s32 newval;
 	void *g_ptr;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		g_ptr = (void *)(ctx->rax);
 		newval = (__s32)(ctx->rcx);
 	} else {
@@ -264,8 +238,7 @@ int runtime_casgstatus(struct pt_regs *ctx)
 
 	__s64 goid = 0;
 	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
-	__u64 current_thread = bpf_get_current_pid_tgid();
-	bpf_map_update_elem(&goroutines_map, &current_thread, &goid, BPF_ANY);
+	bpf_map_update_elem(&goroutines_map, &pid_tgid, &goid, BPF_ANY);
 
 	return 0;
 }
