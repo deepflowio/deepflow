@@ -16,16 +16,14 @@
 
 extern crate libc;
 
+use serde::Serialize;
 pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; //u8
 pub use libc::c_uint;
-use serde::Serialize;
 pub use std::ffi::{CStr, CString}; //u32
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-
-use crate::common::flow::L7Protocol;
 
 // 最大长度
 pub const CAP_LEN_MAX: usize = 1024;
@@ -365,7 +363,7 @@ const EBPF_TYPE_GO_HTTP2_UPROBE: u8 = 2;
 const EBPF_TYPE_NONE: u8 = 255;
 
 // ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
-#[derive(Serialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize,Debug, PartialEq, Copy, Clone)]
 #[repr(u8)]
 pub enum EbpfType {
     // 常规 tp, 通过 hook 系统调用 read/write 获取到原始报文, l7_protocol_from_ebpf 不可信,目前通过遍历所有支持的协议判断协议类型
@@ -403,38 +401,4 @@ impl Default for EbpfType {
     fn default() -> Self {
         return Self::TracePoint;
     }
-}
-
-pub fn get_all_protocols_by_ebpf_type(ebpf_type: EbpfType, is_tls: bool) -> Vec<L7Protocol> {
-    let mut protocols;
-    match ebpf_type {
-        // ebpf 类型 GoHttp2Uprobe 是自定义数据格式,目前只有http2
-        EbpfType::GoHttp2Uprobe => {
-            if is_tls {
-                protocols = vec![L7Protocol::Http2TLS];
-            } else {
-                protocols = vec![L7Protocol::Http2];
-            }
-        }
-        // ebpf 类型 TracePoint 和 TlsUprobe 通过遍历所有支持的协议判断应用层协议.
-        EbpfType::TracePoint | EbpfType::TlsUprobe => {
-            protocols = vec![
-                L7Protocol::Dubbo,
-                L7Protocol::Mysql,
-                L7Protocol::Redis,
-                L7Protocol::Kafka,
-                L7Protocol::Mqtt,
-                L7Protocol::Dns,
-            ];
-            if is_tls {
-                protocols.push(L7Protocol::Http1TLS);
-                protocols.push(L7Protocol::Http2TLS);
-            } else {
-                protocols.push(L7Protocol::Http1);
-                protocols.push(L7Protocol::Http2);
-            }
-        }
-        _ => unreachable!(),
-    }
-    return protocols;
 }

@@ -30,8 +30,8 @@ use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::debug::QueueDebugger;
+use crate::ebpf;
 use crate::ebpf::EbpfType;
-use crate::ebpf::{self, get_all_protocols_by_ebpf_type};
 use crate::flow_generator::{
     dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
     kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
@@ -503,7 +503,36 @@ impl FlowItem {
         if self.is_skip {
             return Err(LogError::L7ProtocolCheckLimit);
         }
-        let protocols = get_all_protocols_by_ebpf_type(packet.ebpf_type, packet.is_tls());
+        let mut protocols;
+        match packet.ebpf_type {
+            // ebpf 类型 GoHttp2Uprobe 是自定义数据格式,目前只有http2
+            EbpfType::GoHttp2Uprobe => {
+                if packet.is_tls() {
+                    protocols = vec![L7Protocol::Http2TLS];
+                } else {
+                    protocols = vec![L7Protocol::Http2];
+                }
+            }
+            // ebpf 类型 TracePoint 和 TlsUprobe 通过遍历所有支持的协议判断应用层协议.
+            EbpfType::TracePoint | EbpfType::TlsUprobe => {
+                protocols = vec![
+                    L7Protocol::Dubbo,
+                    L7Protocol::Mysql,
+                    L7Protocol::Redis,
+                    L7Protocol::Kafka,
+                    L7Protocol::Mqtt,
+                    L7Protocol::Dns,
+                ];
+                if packet.is_tls() {
+                    protocols.push(L7Protocol::Http1TLS);
+                    protocols.push(L7Protocol::Http2TLS);
+                } else {
+                    protocols.push(L7Protocol::Http1);
+                    protocols.push(L7Protocol::Http2);
+                }
+            }
+            _ => unreachable!(),
+        }
 
         for i in protocols {
             if self.protocol_bitmap & 1 << u8::from(i) == 0 {
