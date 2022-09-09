@@ -156,6 +156,8 @@ impl L7FlowPerf for DnsPerfData {
             AppProtoHead {
                 proto: self.session_data.l7_proto,
                 msg_type: self.session_data.msg_type,
+                status: self.session_data.status,
+                code: self.session_data.status_code as u16,
                 rrt,
                 version: 0,
             },

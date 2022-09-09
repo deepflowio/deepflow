@@ -21,9 +21,9 @@ use log::info;
 use regex::Regex;
 use serde::Serialize;
 
-use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
-use super::value_is_default;
-use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
+use super::{
+    consts::*, value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus,
+};
 use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
 use crate::common::enums::{IpProtocol, PacketDirection};
@@ -31,6 +31,7 @@ use crate::common::flow::L7Protocol;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
+use crate::proto::flow_log;
 use crate::utils::bytes::read_u32_be;
 use crate::utils::net::h2pack;
 
@@ -60,9 +61,6 @@ pub struct HttpInfo {
     pub req_content_length: Option<u64>,
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u64>,
-
-    status_code: u16,
-    status: L7ResponseStatus,
 }
 
 impl HttpInfo {
@@ -77,57 +75,39 @@ impl HttpInfo {
         if self.x_request_id.is_empty() {
             self.x_request_id = other.x_request_id;
         }
-        if other.status != L7ResponseStatus::default() {
-            self.status = other.status;
-        }
-        if other.status_code != 0 {
-            self.status_code = other.status_code;
-        }
     }
 }
 
-impl From<HttpInfo> for L7ProtocolSendLog {
+impl From<HttpInfo> for flow_log::HttpInfo {
     fn from(f: HttpInfo) -> Self {
-        let mut log = L7ProtocolSendLog {
-            version: Some(f.version),
-            req: L7Request {
-                req_type: f.method,
-                resource: f.path,
-                domain: f.host,
+        flow_log::HttpInfo {
+            stream_id: f.stream_id,
+            version: f.version,
+            method: f.method,
+            path: f.path,
+            host: f.host,
+            client_ip: f.client_ip,
+            trace_id: f.trace_id,
+            span_id: f.span_id,
+            req_content_length: match f.req_content_length {
+                Some(length) => length as i64,
+                _ => -1,
             },
-            resp: L7Response {
-                status: f.status,
-                code: f.status_code as i32,
-                ..Default::default()
+            resp_content_length: match f.resp_content_length {
+                Some(length) => length as i64,
+                _ => -1,
             },
-            trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
-                span_id: Some(f.span_id),
-                ..Default::default()
-            }),
-            ext_info: Some(ExtendedInfo {
-                request_id: Some(f.stream_id),
-                x_request_id: Some(f.x_request_id),
-                client_ip: Some(f.client_ip),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        if let Some(l) = f.req_content_length {
-            log.req_len = l as u32;
+            x_request_id: f.x_request_id,
         }
-        if let Some(l) = f.resp_content_length {
-            log.resp_len = l as u32;
-        }
-
-        return log;
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct HttpLog {
+    status_code: u16,
     msg_type: LogMessageType,
     proto: L7Protocol,
+    status: L7ResponseStatus,
 
     info: HttpInfo,
 
@@ -198,7 +178,7 @@ impl HttpLog {
     }
 
     fn reset_logs(&mut self) {
-        self.info.status_code = 0;
+        self.status_code = 0;
         self.info = HttpInfo::default();
     }
 
@@ -207,14 +187,14 @@ impl HttpLog {
             && status_code <= HTTP_STATUS_CLIENT_ERROR_MAX
         {
             // http客户端请求存在错误
-            self.info.status = L7ResponseStatus::ClientError;
+            self.status = L7ResponseStatus::ClientError;
         } else if status_code >= HTTP_STATUS_SERVER_ERROR_MIN
             && status_code <= HTTP_STATUS_SERVER_ERROR_MAX
         {
             // http服务端响应存在错误
-            self.info.status = L7ResponseStatus::ServerError;
+            self.status = L7ResponseStatus::ServerError;
         } else {
-            self.info.status = L7ResponseStatus::Ok;
+            self.status = L7ResponseStatus::Ok;
         }
     }
 
@@ -232,7 +212,7 @@ impl HttpLog {
             let (version, status_code) = get_http_resp_info(str::from_utf8(lines[0])?)?;
 
             self.info.version = version;
-            self.info.status_code = status_code as u16;
+            self.status_code = status_code as u16;
 
             self.msg_type = LogMessageType::Response;
 
@@ -383,11 +363,11 @@ impl HttpLog {
                         b":status" => {
                             self.msg_type = LogMessageType::Response;
 
-                            self.info.status_code = str::from_utf8(header.1.as_slice())
+                            self.status_code = str::from_utf8(header.1.as_slice())
                                 .unwrap_or_default()
                                 .parse::<u16>()
                                 .unwrap_or_default();
-                            self.set_status(self.info.status_code);
+                            self.set_status(self.status_code);
                         }
                         b"host" | b":authority" => {
                             self.info.host =
@@ -499,8 +479,8 @@ impl HttpLog {
                 }
                 self.info.req_content_length = content_length;
             } else {
-                if self.info.status_code < HTTP_STATUS_CODE_MIN
-                    || self.info.status_code > HTTP_STATUS_CODE_MAX
+                if self.status_code < HTTP_STATUS_CODE_MIN
+                    || self.status_code > HTTP_STATUS_CODE_MAX
                 {
                     return Err(Error::HttpHeaderParseFailed);
                 }
@@ -614,8 +594,10 @@ impl L7LogParse for HttpLog {
         Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: self.get_l7_protocol(),
             msg_type: self.msg_type,
+            status: self.status,
+            code: self.status_code,
             rrt: 0,
-            ..Default::default()
+            version: 0,
         }))
     }
 

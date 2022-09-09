@@ -1,2 +1,2 @@
-KafkaInfo { correlation_id: 2, req_msg_size: 49, api_version: 3, api_key: 18, client_id: "adminclient-1", resp_msg_size: -1, status: Ok, status_code: 0 } is_kafka: true
-KafkaInfo { correlation_id: 2, req_msg_size: -1, api_version: 0, api_key: 0, client_id: "", resp_msg_size: 435, status: Ok, status_code: 0 } is_kafka: false
+KafkaInfo { correlation_id: 2, req_msg_size: 49, api_version: 3, api_key: 18, client_id: "adminclient-1", resp_msg_size: -1 } is_kafka: true
+KafkaInfo { correlation_id: 2, req_msg_size: -1, api_version: 0, api_key: 0, client_id: "", resp_msg_size: 435 } is_kafka: false
