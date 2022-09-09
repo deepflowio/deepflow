@@ -157,7 +157,12 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	if (!ctx) {
 		return;
 	}
-	struct __socket_data *send_buffer = get_http2_send_buffer();
+	struct __http2_stack *stack = get_http2_stack();
+
+	if (!stack) {
+		return;
+	}
+	struct __socket_data *send_buffer = &(stack->send_buffer);
 	if (!send_buffer) {
 		return;
 	}
@@ -165,57 +170,13 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	if (!send_buffer->pid) {
 		return;
 	}
+	stack->events_num = 1;
+	stack->len = offsetof(typeof(struct __socket_data), data) +
+		     send_buffer->syscall_len;
 
-	int k0 = 0;
-	struct __socket_data_buffer *v_buff;
-	v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
-	if (!v_buff)
-		return;
-
-	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
-
-	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
-		return;
-
-	v = (struct __socket_data *)(v_buff->data + v_buff->len);
-
-	int fix_header_len = offsetof(typeof(struct __socket_data), data);
-	if (bpf_probe_read(v, fix_header_len, send_buffer))
-		return;
-
-	__u32 data_len = send_buffer->syscall_len;
-	__u32 len = (data_len) & (sizeof(v->data) - 1);
-
-	if (data_len >= sizeof(v->data)) {
-		if (unlikely(bpf_probe_read(v->data, sizeof(v->data),
-					    send_buffer->data) != 0))
-			return;
-		len = sizeof(v->data);
-	} else {
-		if (unlikely(bpf_probe_read(v->data, len + 1,
-					    send_buffer->data) != 0))
-			return;
-	}
-
-	v->data_len = len;
-	v_buff->len +=
-		offsetof(typeof(struct __socket_data), data) + v->data_len;
-	v_buff->events_num++;
-
-	__u32 buf_size = (v_buff->len +
-			  offsetof(typeof(struct __socket_data_buffer), data)) &
-			 (sizeof(*v_buff) - 1);
-	if (buf_size >= sizeof(*v_buff)) {
-		bpf_perf_event_output(ctx, &NAME(socket_data),
-				      BPF_F_CURRENT_CPU, v_buff,
-				      sizeof(*v_buff));
-	} else {
-		bpf_perf_event_output(ctx, &NAME(socket_data),
-				      BPF_F_CURRENT_CPU, v_buff, buf_size + 1);
-	}
-
-	v_buff->events_num = 0;
-	v_buff->len = 0;
+	__u32 send_size = (stack->len + 8) & 1023;
+	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU,
+			      &(stack->__raw), 1 + send_size);
 }
 
 // Fill all fields except data in buffer->send_buffer
