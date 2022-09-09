@@ -26,8 +26,8 @@ use super::super::{
 use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
 use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
+use crate::proto::flow_log;
 
 const SEPARATOR_SIZE: usize = 2;
 
@@ -58,7 +58,6 @@ pub struct RedisInfo {
         serialize_with = "vec_u8_to_string"
     )]
     pub error: Vec<u8>, // '-'
-    pub resp_status: L7ResponseStatus,
 }
 
 pub fn vec_u8_to_string<S>(v: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -73,7 +72,6 @@ impl RedisInfo {
         self.response = other.response;
         self.status = other.status;
         self.error = other.error;
-        self.resp_status = other.resp_status;
     }
 }
 
@@ -107,23 +105,15 @@ impl fmt::Display for RedisInfo {
     }
 }
 
-impl From<RedisInfo> for L7ProtocolSendLog {
+impl From<RedisInfo> for flow_log::RedisInfo {
     fn from(f: RedisInfo) -> Self {
-        let log = L7ProtocolSendLog {
-            req: L7Request {
-                req_type: String::from_utf8_lossy(f.request_type.as_slice()).to_string(),
-                resource: String::from_utf8_lossy(f.request.as_slice()).to_string(),
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: f.resp_status,
-                exception: String::from_utf8_lossy(f.error.as_slice()).to_string(),
-                result: String::from_utf8_lossy(f.response.as_slice()).to_string(),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        return log;
+        flow_log::RedisInfo {
+            request: f.request,
+            request_type: f.request_type,
+            response: f.response,
+            status: f.status,
+            error: f.error,
+        }
     }
 }
 
@@ -132,6 +122,7 @@ pub struct RedisLog {
     info: RedisInfo,
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
+    status: L7ResponseStatus,
 }
 
 impl RedisLog {
@@ -154,12 +145,12 @@ impl RedisLog {
             return;
         }
 
-        self.info.resp_status = L7ResponseStatus::Ok;
+        self.status = L7ResponseStatus::Ok;
         match context[0] {
             b'+' => self.info.status = context,
             b'-' if error_response => {
                 self.info.error = context;
-                self.info.resp_status = L7ResponseStatus::ServerError;
+                self.status = L7ResponseStatus::ServerError;
             }
             b'-' if !error_response => self.info.response = context,
             _ => self.info.response = context,
@@ -189,8 +180,10 @@ impl L7LogParse for RedisLog {
         Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: L7Protocol::Redis,
             msg_type: self.msg_type,
+            status: self.status,
+            code: 0,
             rrt: 0,
-            ..Default::default()
+            version: 0,
         }))
     }
 

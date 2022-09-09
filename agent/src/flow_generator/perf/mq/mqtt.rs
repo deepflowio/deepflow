@@ -144,6 +144,8 @@ impl L7FlowPerf for MqttPerfData {
             AppProtoHead {
                 proto: self.l7_proto,
                 msg_type: self.msg_type,
+                status: self.status,
+                code: self.status_code as u16,
                 rrt: rrt,
                 version: self.proto_version,
             },

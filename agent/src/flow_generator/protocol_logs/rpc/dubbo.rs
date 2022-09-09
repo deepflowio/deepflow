@@ -27,8 +27,8 @@ use crate::common::enums::{IpProtocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
 use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
+use crate::proto::flow_log;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
 
 const TRACE_ID_MAX_LEN: usize = 51;
@@ -60,66 +60,37 @@ pub struct DubboInfo {
     // resp
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
     pub resp_msg_size: i32,
-    pub resp_status: L7ResponseStatus,
-    pub status_code: u8,
 }
 
 impl DubboInfo {
     pub fn merge(&mut self, other: Self) {
         self.resp_msg_size = other.resp_msg_size;
-        if other.resp_status != L7ResponseStatus::default() {
-            self.resp_status = other.resp_status;
-        }
-        if other.status_code != 0 {
-            self.status_code = other.status_code;
-        }
-    }
-
-    pub fn get_dubbo_exception_str(&self) -> &'static str {
-        match self.status_code {
-            20 => "OK",
-            30 => "CLIENT_TIMEOUT",
-            31 => "SERVER_TIMEOUT",
-            40 => "BAD_REQUEST",
-            50 => "BAD_RESPONSE",
-            60 => "SERVICE_NOT_FOUND",
-            70 => "SERVICE_ERROR",
-            80 => "SERVER_ERROR",
-            90 => "CLIENT_ERROR",
-            100 => "SERVER_THREADPOOL_EXHAUSTED_ERROR",
-            _ => "",
-        }
     }
 }
 
-impl From<DubboInfo> for L7ProtocolSendLog {
+impl From<DubboInfo> for flow_log::DubboInfo {
     fn from(f: DubboInfo) -> Self {
-        let exception = String::from(f.get_dubbo_exception_str());
-        let log = L7ProtocolSendLog {
-            req_len: f.req_msg_size as u32,
-            resp_len: f.resp_msg_size as u32,
-            version: Some(f.dubbo_version),
-            req: L7Request {
-                domain: f.service_name,
-                resource: f.method_name,
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: f.resp_status,
-                code: f.status_code as i32,
-                exception: exception,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        return log;
+        flow_log::DubboInfo {
+            serial_id: f.serial_id as u32,
+            r#type: f.data_type as u32,
+            id: f.request_id as u32,
+            req_body_len: f.req_msg_size,
+            version: f.dubbo_version,
+            service_name: f.service_name,
+            service_version: f.service_version,
+            method_name: f.method_name,
+            trace_id: f.trace_id,
+            resp_body_len: f.resp_msg_size,
+        }
     }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct DubboLog {
     info: DubboInfo,
+
+    status: L7ResponseStatus,
+    status_code: u8,
     msg_type: LogMessageType,
 
     l7_log_dynamic_config: L7LogDynamicConfig,
@@ -151,8 +122,8 @@ impl DubboLog {
         self.info.service_version = String::new();
         self.info.method_name = String::new();
         self.info.resp_msg_size = -1;
-        self.info.resp_status = L7ResponseStatus::Ok;
-        self.info.status_code = 0;
+        self.status = L7ResponseStatus::Ok;
+        self.status_code = 0;
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
@@ -249,7 +220,7 @@ impl DubboLog {
     }
 
     fn set_status(&mut self, status_code: u8) {
-        self.info.resp_status = match status_code {
+        self.status = match status_code {
             20 => L7ResponseStatus::Ok,
             30 => L7ResponseStatus::ClientError,
             31 => L7ResponseStatus::ServerError,
@@ -271,8 +242,8 @@ impl DubboLog {
         self.info.resp_msg_size = dubbo_header.data_length;
         self.info.serial_id = dubbo_header.serial_id;
         self.info.request_id = dubbo_header.request_id;
-        self.info.status_code = dubbo_header.status_code;
-        self.set_status(self.info.status_code);
+        self.status_code = dubbo_header.status_code;
+        self.set_status(self.status_code);
     }
 }
 
@@ -302,8 +273,10 @@ impl L7LogParse for DubboLog {
         Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: L7Protocol::Dubbo,
             msg_type: self.msg_type,
+            status: self.status,
+            code: self.status_code as u16,
             rrt: 0,
-            ..Default::default()
+            version: 0,
         }))
     }
 
