@@ -90,15 +90,6 @@ impl Default for MqttInfo {
 impl MqttInfo {
     pub fn merge(&mut self, other: Self) {
         self.res_msg_size = other.res_msg_size;
-        match other.pkt_type {
-            PacketKind::Publish { .. } => {
-                self.publish_topic = other.publish_topic;
-            }
-            PacketKind::Unsubscribe | PacketKind::Subscribe => {
-                self.subscribe_topics = other.subscribe_topics;
-            }
-            _ => (),
-        }
     }
 }
 
