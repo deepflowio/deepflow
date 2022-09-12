@@ -47,6 +47,8 @@ func isActive(urlPrefix string, ip string, port int) bool {
 	} else if response.StatusCode != http.StatusOK {
 		log.Warning("curl (%s) failed, (%d)", url, response.StatusCode)
 	}
-	defer response.Body.Close()
+	if response != nil && response.Body != nil {
+		response.Body.Close()
+	}
 	return err == nil && response.StatusCode == http.StatusOK
 }
