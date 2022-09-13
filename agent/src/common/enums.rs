@@ -20,8 +20,10 @@ use std::fmt;
 
 use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
+use serde::Serialize;
 
-use super::super::ebpf::{MSG_REQUEST, MSG_RESPONSE};
+#[cfg(target_os = "linux")]
+use super::super::ebpf::{MSG_REQUEST, MSG_REQUEST_END, MSG_RESPONSE, MSG_RESPONSE_END};
 use super::flow::FlowMetricsPeer;
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
@@ -73,7 +75,9 @@ impl PartialEq<EthernetType> for u16 {
 
 // IPProtocol is an enumeration of IP protocol values, and acts as a decoder
 // for any type it supports.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
+#[derive(
+    Serialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, TryFromPrimitive, IntoPrimitive,
+)]
 #[repr(u8)]
 pub enum IpProtocol {
     Ipv6HopByHop = 0,
@@ -175,7 +179,7 @@ impl PartialEq<LinkType> for u8 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, Ord)]
 #[repr(u16)]
 pub enum TapType {
     Any,
@@ -244,22 +248,6 @@ pub enum IfType {
     Ieee80211 = 71,
     Tunnel = 131,
     Ieee1394 = 144,
-}
-
-impl fmt::Display for IfType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IfType::Other => write!(f, "other"),
-            IfType::Ethernet => write!(f, "ethernet"),
-            IfType::TokenRing => write!(f, "tokenping"),
-            IfType::Ppp => write!(f, "ppp"),
-            IfType::Loopback => write!(f, "loopback"),
-            IfType::Atm => write!(f, "atm"),
-            IfType::Ieee80211 => write!(f, "ieee80211"),
-            IfType::Tunnel => write!(f, "tunnel"),
-            IfType::Ieee1394 => write!(f, "ieee1394"),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -409,11 +397,12 @@ impl Default for PacketDirection {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl From<u8> for PacketDirection {
     fn from(msg_type: u8) -> Self {
         match msg_type {
-            MSG_REQUEST => Self::ClientToServer,
-            MSG_RESPONSE => Self::ServerToClient,
+            MSG_REQUEST | MSG_REQUEST_END => Self::ClientToServer,
+            MSG_RESPONSE | MSG_RESPONSE_END => Self::ServerToClient,
             _ => panic!("ebpf direction({}) unknown.", msg_type),
         }
     }

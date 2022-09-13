@@ -458,7 +458,6 @@ func (p *PlatformDataOP) generatePodIPS() {
 			break
 		}
 	}
-	log.Debug(podIPs)
 	p.updatePodIPs(podIPs)
 }
 

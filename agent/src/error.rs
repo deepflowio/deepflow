@@ -22,14 +22,11 @@ pub enum Error {
     ParseMacFailed(String),
     #[error("call try_from() failed from {0}")]
     TryFromFailed(String),
+    #[cfg(target_os = "linux")]
     #[error(transparent)]
     KubeWatcher(#[from] kube::runtime::watcher::Error),
-    #[error(transparent)]
-    ParseUtf8(#[from] std::string::FromUtf8Error),
     #[error("PlatformSynchronizer failed: {0} ")]
     PlatformSynchronizer(String),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
     #[error("data not found: {0}")]
     NotFound(String),
     #[error("Kubernetes ApiWatcher error: {0}")]
@@ -38,14 +35,12 @@ pub enum Error {
     SysMonitor(String),
     #[error("environment error: {0}")]
     Environment(String),
-    #[error(transparent)]
-    Errno(#[from] nix::errno::Errno),
-    #[error("ethtool: {0}")]
-    Ethtool(String),
     #[error("parse packet failed from: {0}")]
     ParsePacketFailed(String),
     #[error("invalid tpacket version: {0}")]
     InvalidTpVersion(isize),
+    #[error("windows error: {0}")]
+    Windows(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

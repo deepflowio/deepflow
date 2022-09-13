@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef _USER_SOCKET_H_
 #define _USER_SOCKET_H_
 
@@ -18,6 +34,7 @@ struct socket_bpf_data {
 	uint32_t process_id;	   // tgid in kernel struct task_struct
 	uint32_t thread_id;	   // pid in kernel struct task_struct, main thread iff pid==tgid
 	uint64_t coroutine_id;	   // CoroutineID, i.e., golang goroutine id
+	uint8_t source;		   // syscall,go_tls_uprobe,go_http2_uprobe
 	uint8_t  process_name[16]; // 进程名字
 
 	struct __tuple_t tuple;	   // Socket五元组信息

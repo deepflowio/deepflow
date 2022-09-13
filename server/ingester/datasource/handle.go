@@ -212,13 +212,14 @@ const (
 
 func getMetricsTableName(id uint8, table string, t TableType) string {
 	tableId := zerodoc.MetricsTableID(id)
+	tablePrefix := strings.Split(tableId.TableName(), ".")[0]
 	if len(table) == 0 {
 		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), t.String())
 	}
 	if len(t.String()) == 0 {
-		return fmt.Sprintf("%s.`%s_%s`", ckdb.METRICS_DB, tableId.TableName(), table)
+		return fmt.Sprintf("%s.`%s.%s`", ckdb.METRICS_DB, tablePrefix, table)
 	}
-	return fmt.Sprintf("%s.`%s_%s_%s`", ckdb.METRICS_DB, tableId.TableName(), table, t.String())
+	return fmt.Sprintf("%s.`%s.%s_%s`", ckdb.METRICS_DB, tablePrefix, table, t.String())
 }
 
 func stringSliceHas(items []string, item string) bool {
@@ -367,7 +368,8 @@ GROUP BY (%s)`,
 func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 	tableGlobal := getMetricsTableName(t.ID, dstTable, GLOBAL)
 	tableLocal := getMetricsTableName(t.ID, dstTable, LOCAL)
-	engine := fmt.Sprintf(ckdb.Distributed.String(), t.Cluster, t.Database, dstTable+"_"+LOCAL.String())
+	tablePrefix := strings.Split(t.GlobalName, ".")[0]
+	engine := fmt.Sprintf(ckdb.Distributed.String(), t.Cluster, t.Database, tablePrefix+"."+dstTable+"_"+LOCAL.String())
 
 	createTable := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS %s ENGINE = %s",
 		tableGlobal, tableLocal, engine)
@@ -410,7 +412,7 @@ func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.Metri
 	table := getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
-		tableMod = getMetricsTableName(uint8(tableId), dstTable, LOCAL)
+		tableMod = getMetricsTableName(uint8(tableId), "", LOCAL)
 	} else {
 		tableMod = getMetricsTableName(uint8(tableId), dstTable, AGG)
 	}

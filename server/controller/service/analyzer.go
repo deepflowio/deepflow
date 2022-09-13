@@ -43,6 +43,8 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 		db = db.Where("lcuuid = ?", lcuuid)
 	} else if ip, ok := filter["ip"]; ok {
 		db = db.Where("ip = ?", ip)
+	} else if name, ok := filter["name"]; ok && name != "" {
+		db = db.Where("name = ? OR ip = ?", name, name)
 	} else if region, ok := filter["region"]; ok {
 		azConns := []mysql.AZAnalyzerConnection{}
 		ips := []string{}
@@ -267,8 +269,16 @@ func UpdateAnalyzer(
 			}
 			analyzerRegion = analyzerUpdate["REGION"].(string)
 		} else {
-			for _, az := range azs {
-				newAzs.Add(az)
+
+			if _, azUpdate := analyzerUpdate["IS_ALL_AZ"]; azUpdate {
+				if analyzerUpdate["IS_ALL_AZ"].(bool) {
+					newAzs.Add("ALL")
+				}
+			}
+			if !newAzs.Contains("ALL") {
+				for _, az := range azs {
+					newAzs.Add(az)
+				}
 			}
 			delAzs = oldAzs.Difference(newAzs)
 			addAzs = newAzs.Difference(oldAzs)

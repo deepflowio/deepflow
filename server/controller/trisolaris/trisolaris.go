@@ -24,8 +24,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/kubernetes"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/node"
-	grpcserver "github.com/deepflowys/deepflow/server/controller/trisolaris/server/grpc"
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/vtap"
 )
 
@@ -85,11 +83,9 @@ func PutVTapCache() {
 
 func (t *Trisolaris) Start() {
 	t.metaData.InitData() // 需要先初始化
-	ctx, _ := utils.NewWaitGroupCtx()
 	go t.metaData.TimedRefreshMetaData()
 	go t.vTapInfo.TimedRefreshVTapCache()
 	go t.nodeInfo.TimedRefreshNodeCache()
-	go grpcserver.Run(ctx, t.config)
 }
 
 func NewTrisolaris(cfg *config.Config, db *gorm.DB) *Trisolaris {

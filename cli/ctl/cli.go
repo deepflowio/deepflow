@@ -17,6 +17,7 @@
 package ctl
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -27,17 +28,25 @@ import (
 
 type Ctl struct{}
 
-func Execute() {
+func Execute(version string) {
 	root := &cobra.Command{
 		Use:              "deepflow-ctl",
 		Short:            "deepflow server tool",
 		TraverseChildren: true,
 	}
 
+	var outputVersion bool
+	root.PersistentFlags().BoolVarP(&outputVersion, "version", "v", false, "deepflow-ctl version")
 	root.PersistentFlags().StringP("ip", "i", common.GetDefaultRouteIP(), "deepflow-server service ip")
 	root.PersistentFlags().Uint32P("api-port", "", 30417, "deepflow-server service http port")
 	root.PersistentFlags().Uint32P("rpc-port", "", 30035, "deepflow-server service grpc port")
 	root.ParseFlags(os.Args[1:])
+
+	// support output version
+	if outputVersion {
+		fmt.Printf(version)
+		return
+	}
 
 	root.AddCommand(RegisterAgentCommand())
 	root.AddCommand(RegisterAgentUpgradeCommand())

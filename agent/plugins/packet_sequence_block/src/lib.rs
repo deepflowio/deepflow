@@ -25,19 +25,23 @@ pub struct PacketSequenceBlock {}
 
 impl PacketSequenceBlock {
     pub fn check(&self, _: usize) -> bool {
-        false
+        unimplemented!();
     }
 
     pub fn convert_duration_to_timestamp(_: usize, _: Duration) -> u64 {
-        0
+        unimplemented!();
     }
 
-    pub fn append_packet(&self, _: MiniMetaPacket, _: u8) {}
+    pub fn append_packet(&self, _: MiniMetaPacket, _: u8) {
+        unimplemented!();
+    }
 
-    pub fn reverse_needed_for_new_packet(&mut self) {}
+    pub fn reverse_needed_for_new_packet(&mut self) {
+        unimplemented!();
+    }
 
     pub fn encode(self, _: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        Ok(0)
+        unimplemented!();
     }
 }
 

@@ -541,12 +541,24 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
+	for _, suffix := range []string{"", "_0", "_1"} {
+		k8sLabelSuffix := "labels" + suffix
+		podIDSuffix := "pod_id" + suffix
+		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.k8s_labels_map, 'labels', toUInt64("+podIDSuffix+"))",
+				podIDSuffix+"!=0",
+				"",
+				"",
+			),
+		}
+	}
 
 	// 单个外部字段-ext_metrics
 	tagResourceMap["tag"] = map[string]*Tag{
 		"default": NewTag(
 			"tag_values[indexOf(tag_names,'%s')]",
-			"",
+			"`%s` != ''",
 			"tag_values[indexOf(tag_names,'%s')] %s %v",
 			"%s(tag_values[indexOf(tag_names,'%s')],%v)",
 		),
@@ -555,7 +567,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	tagResourceMap["attribute"] = map[string]*Tag{
 		"default": NewTag(
 			"attribute_values[indexOf(attribute_names,'%s')]",
-			"",
+			"`%s` != ''",
 			"attribute_values[indexOf(attribute_names,'%s')] %s %v",
 			"%s(attribute_values[indexOf(attribute_names,'%s')],%v)",
 		),
@@ -577,6 +589,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+
 	// 外部指标量
 	tagResourceMap["metrics"] = map[string]*Tag{
 		"default": NewTag(

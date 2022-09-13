@@ -17,6 +17,8 @@
 package router
 
 import (
+	"io"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 
@@ -38,6 +40,8 @@ func VTapGroupConfigRouter(e *gin.Engine) {
 
 	e.GET("/v1/vtap-group-configuration/filter/", getVTapGroupConfigByFilter)
 	e.DELETE("/v1/vtap-group-configuration/filter/", deleteVTapGroupConfigByFilter)
+
+	e.GET("/v1/vtap/configuration/", getVTapGroupconfiguration)
 }
 
 func createVTapGroupConfig(c *gin.Context) {
@@ -94,7 +98,7 @@ func updateVTapGroupAdvancedConfig(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
 	vTapGroupConfig := &model.VTapGroupConfiguration{}
 	err := c.ShouldBindBodyWith(&vTapGroupConfig, binding.YAML)
-	if err == nil {
+	if err == nil || err == io.EOF {
 		data, err := service.UpdateVTapGroupAdvancedConfig(lcuuid, vTapGroupConfig)
 		JsonResponse(c, data, err)
 	} else {
@@ -138,5 +142,11 @@ func getVTapGroupExampleConfig(c *gin.Context) {
 
 func getVTapGroupAdvancedConfigs(c *gin.Context) {
 	data, err := service.GetVTapGroupAdvancedConfigs()
+	JsonResponse(c, data, err)
+}
+
+func getVTapGroupconfiguration(c *gin.Context) {
+	lcuuid, _ := c.GetQuery("lcuuid")
+	data, err := service.GetVTapGroupConfiguration(lcuuid)
 	JsonResponse(c, data, err)
 }

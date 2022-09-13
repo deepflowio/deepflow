@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include "libbpf/include/linux/err.h"
@@ -507,6 +523,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->process_id = sd->tgid;
 		submit_data->thread_id = sd->pid;
 		submit_data->coroutine_id = sd->coroutine_id;
+		submit_data->source = sd->source;
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;
@@ -815,8 +832,8 @@ int running_socket_tracer(l7_handle_fn handle,
 	if (tracer_probes_init(tracer))
 		return -EINVAL;
 
-	// Update go offsets to eBPF "uprobe_offsets_map" 
-	update_go_offsets_to_map(tracer);
+	// Update go offsets to eBPF "proc_info_map" 
+	update_proc_info_to_map(tracer);
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;

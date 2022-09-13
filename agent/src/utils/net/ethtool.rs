@@ -21,7 +21,7 @@ use nix::errno::Errno;
 use nix::libc::ioctl;
 use nix::sys::socket::{socket, AddressFamily, SockFlag, SockType};
 
-use crate::error::{Error, Result};
+use super::error::{Error, Result};
 
 // ioctl ethtool request
 #[cfg(target_env = "gnu")]

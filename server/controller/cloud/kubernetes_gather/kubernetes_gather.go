@@ -273,9 +273,9 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	if err != nil {
 		return model.KubernetesGatherResource{}, err
 	}
-	for _, s := range podServices {
+	for index, s := range podServices {
 		if ingressLcuuid, ok := k.serviceLcuuidToIngressLcuuid[s.Lcuuid]; ok {
-			s.PodIngressLcuuid = ingressLcuuid
+			podServices[index].PodIngressLcuuid = ingressLcuuid
 		}
 	}
 

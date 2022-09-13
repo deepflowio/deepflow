@@ -1,10 +1,20 @@
+# logfile path
+log-file: /var/log/deepflow/server.log
+# loglevel: "debug/info/warn/error"
+log-level: info
+
 controller:
-  # logfile path
-  log-file: /var/log/deepflow/server.log
-  # loglevel: "debug/info/warn/error"
-  log-level: info
   # controller http listenport
   listen-port: 20417
+  # grpc server port
+  grpc-port: 20035
+  # grpc max message lenth default 100M
+  grpc-max-message-length: 104857600
+  # kubeconfig
+  kubeconfig:
+  # election
+  election-namespace: deepflow
+  election-name: deepflow-server
 
   # deepflow web service config
   df-web-service:
@@ -61,6 +71,8 @@ controller:
     health_check_handle_channel_len: 1000
     # License检查的时间间隔，单位: 秒
     license_check_interval: 60
+    # vtap检查的时间间隔，单位: 秒
+    vtap_check_interval: 60
     # warrant
     warrant:
       host: warrant
@@ -81,7 +93,7 @@ controller:
         aliyun_region_name: cn-beijing
       recorder:
         # recorder模块缓存自愈刷新时间间隔，单位：分钟
-        cache_refresh_interval: 3600
+        cache_refresh_interval: 60
         # 软删除资源数据清理时间间隔，单位：小时
         # 此值应小于 soft_deleted_resource_expire_interval
         deleted_resource_clean_interval: 24
@@ -95,7 +107,6 @@ controller:
       port: 123
       timeout: 1
 
-    trident-port: 20035
     trident-type-for-unkonw-vtap: 0
 
     platform-vips:
@@ -103,9 +114,6 @@ controller:
 
     # master/slave 区域标识, 默认为主区域，部署时会自动修改
     node-type: master
-
-    # grpc max message lenth default 100M
-    grpc-max-message-length: 104857600
 
     # 区域服务域名前缀
     region-domain-prefix: ""
@@ -139,17 +147,13 @@ controller:
     exclude_ip_ranges:
 
 querier:
-  # logfile path
-  log-file: /var/log/deepflow/server.log
-  # loglevel: "debug/info/warn/error"
-  log-level: info
   # querier http listenport
   listen-port: 20416
 
   # clickhouse相关配置
   clickhouse:
     database: flow_tag
-    user: default
+    user-name: default
     host: clickhouse
     port: 9000
     timeout: 60
@@ -240,17 +244,14 @@ ingester:
   ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #stream-roze-enabled: true
 
+  # whether to enable deepflow-aget syslog to write to files in syslog-directory
+  #agent-log-to-file: false
+
   ## syslog存储位置
   #syslog-directory: /var/log/deepflow-agent
 
   ## syslog是否写入elasticsearch，默认启用
   #es-syslog: true
-
-  ## logfile path
-  #log-file: /var/log/ingester/ingester.log
-
-  ## loglevel: "debug/info/warn/error"
-  #log-level: info
 
   ## profiler
   #profiler: false

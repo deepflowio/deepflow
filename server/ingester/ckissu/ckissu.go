@@ -34,6 +34,7 @@ import (
 var log = logging.MustGetLogger("issu")
 
 type Issu struct {
+	tableRenames                           []*TableRename
 	columnRenames                          []*ColumnRename
 	columnMods                             []*ColumnMod
 	columnAdds                             []*ColumnAdd
@@ -41,6 +42,13 @@ type Issu struct {
 	primaryAddr, secondaryAddr             string
 	username, password                     string
 	exit                                   bool
+}
+
+type TableRename struct {
+	OldDb     string
+	OldTables []string
+	NewDb     string
+	NewTables []string
 }
 
 type ColumnRename struct {
@@ -72,6 +80,39 @@ type ColumnAdds struct {
 	ColumnNames  []string
 	ColumnType   ckdb.ColumnType
 	DefaultValue string
+}
+
+var TableRenames611 = []*TableRename{
+	&TableRename{
+		OldDb:     "vtap_acl",
+		OldTables: []string{"1m_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_acl.1m_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_flow_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_flow_port.1m_local", "vtap_flow_port.1s_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_flow_edge_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_flow_edge_port.1m_local", "vtap_flow_edgeport.1s_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_app_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_app_port.1m_local", "vtap_app_port.1s_local"},
+	},
+	&TableRename{
+		OldDb:     "vtap_app_edge_port",
+		OldTables: []string{"1m_local", "1s_local"},
+		NewDb:     "flow_metrics",
+		NewTables: []string{"vtap_app_edge_port.1m_local", "vtap_app_edge_port.1s_local"},
+	},
 }
 
 var ColumnRename572 = []*ColumnRename{
@@ -323,8 +364,57 @@ var ColumnMod611 = []*ColumnMod{
 	},
 }
 
-func getTables(connect *sql.DB, tableName string) ([]string, error) {
-	sql := fmt.Sprintf("SHOW TABLES IN %s", ckdb.METRICS_DB)
+var u64ColumnNameAdd612 = []string{"syn_count", "synack_count", "retrans_syn", "retrans_synack", "cit_count"}
+var u32ColumnNameAdd612 = []string{"cit_max"}
+var f64ColumnNameAdd612 = []string{"cit_sum"}
+var flowMetricsTableAdd612 = []string{
+	"vtap_flow_port.1m", "vtap_flow_port.1m_local",
+	"vtap_flow_port.1s", "vtap_flow_port.1s_local",
+	"vtap_flow_edge_port.1m", "vtap_flow_edge_port.1m_local",
+	"vtap_flow_edge_port.1s", "vtap_flow_edge_port.1s_local",
+}
+
+var ColumnAdd612 = []*ColumnAdds{
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"cit_max", "syn_count", "synack_count"},
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"cit_count"},
+		ColumnType:  ckdb.UInt64,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
+		ColumnNames: []string{"cit_sum"},
+		ColumnType:  ckdb.Float64,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd612,
+		ColumnNames: u64ColumnNameAdd612,
+		ColumnType:  ckdb.UInt64,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd612,
+		ColumnNames: u32ColumnNameAdd612,
+		ColumnType:  ckdb.UInt32,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_metrics"},
+		Tables:      flowMetricsTableAdd612,
+		ColumnNames: f64ColumnNameAdd612,
+		ColumnType:  ckdb.Float64,
+	},
+}
+
+func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
+	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -336,12 +426,12 @@ func getTables(connect *sql.DB, tableName string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if strings.HasPrefix(table, tableName) {
+		if strings.HasPrefix(table, tableName) ||
+			len(tableName) == 0 {
 			tables = append(tables, table)
 		}
 	}
 	return tables, nil
-
 }
 
 type DatasourceInfo struct {
@@ -353,8 +443,8 @@ type DatasourceInfo struct {
 	interval   ckdb.TimeFuncType
 }
 
-func getDatasourceInfo(connect *sql.DB, name string) (*DatasourceInfo, error) {
-	sql := fmt.Sprintf("SHOW CREATE TABLE %s.`%s_mv`", ckdb.METRICS_DB, name)
+func getDatasourceInfo(connect *sql.DB, db, name string) (*DatasourceInfo, error) {
+	sql := fmt.Sprintf("SHOW CREATE TABLE %s.`%s_mv`", db, name)
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -408,7 +498,7 @@ func getDatasourceInfo(connect *sql.DB, name string) (*DatasourceInfo, error) {
 	}
 
 	return &DatasourceInfo{
-		db:         ckdb.METRICS_DB,
+		db:         db,
 		baseTable:  baseTable,
 		name:       name,
 		summable:   summable,
@@ -418,10 +508,11 @@ func getDatasourceInfo(connect *sql.DB, name string) (*DatasourceInfo, error) {
 }
 
 // 找出自定义数据源和参数
-func getUserDefinedDatasourceInfos(connect *sql.DB, tableName string) ([]*DatasourceInfo, error) {
-	tables, err := getTables(connect, tableName)
+func getUserDefinedDatasourceInfos(connect *sql.DB, db, tableName string) ([]*DatasourceInfo, error) {
+	tables, err := getTables(connect, db, tableName)
 	if err != nil {
-		return nil, err
+		log.Info(err)
+		return nil, nil
 	}
 
 	aggTables := []string{}
@@ -434,7 +525,7 @@ func getUserDefinedDatasourceInfos(connect *sql.DB, tableName string) ([]*Dataso
 
 	dSInfos := []*DatasourceInfo{}
 	for _, name := range aggTables {
-		ds, err := getDatasourceInfo(connect, name)
+		ds, err := getDatasourceInfo(connect, db, name)
 		if err != nil {
 			return nil, err
 		}
@@ -449,39 +540,28 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 	dones := []*ColumnAdd{}
 
 	columnAdds := []*ColumnAdd{}
-	var columnAddss = []*ColumnAdds{
+	var columnAddss612 = []*ColumnAdds{
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_id", "resource_gl1_id", "resource_gl2_id"},
+			ColumnNames: u32ColumnNameAdd612,
 			ColumnType:  ckdb.UInt32,
 		},
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_type", "resource_gl1_type", "resource_gl2_type"},
-			ColumnType:  ckdb.UInt8,
-		},
-	}
-	var columnAddssEdge = []*ColumnAdds{
-		&ColumnAdds{
-			Dbs:         []string{d.db},
-			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_id_0", "resource_gl1_id_0", "resource_gl2_id_0", "resource_gl0_id_1", "resource_gl1_id_1", "resource_gl2_id_1"},
-			ColumnType:  ckdb.UInt32,
+			ColumnNames: u64ColumnNameAdd612,
+			ColumnType:  ckdb.UInt64,
 		},
 		&ColumnAdds{
 			Dbs:         []string{d.db},
 			Tables:      []string{d.name, d.name + "_agg"},
-			ColumnNames: []string{"resource_gl0_type_0", "resource_gl1_type_0", "resource_gl2_type_0", "resource_gl0_type_1", "resource_gl1_type_1", "resource_gl2_type_1"},
-			ColumnType:  ckdb.UInt8,
+			ColumnNames: f64ColumnNameAdd612,
+			ColumnType:  ckdb.Float64,
 		},
-	}
-	if strings.Contains(d.db, "_edge") {
-		columnAddss = columnAddssEdge
 	}
 
-	for _, adds := range columnAddss {
+	for _, adds := range columnAddss612 {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 
@@ -512,12 +592,12 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		return nil, err
 	}
 
-	lastUnderlineIndex := strings.LastIndex(d.name, "_")
+	lastUnderlineIndex := strings.LastIndex(d.name, ".")
 	if lastUnderlineIndex < 0 {
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
-	baseTableName, dstTableName := d.name[:lastUnderlineIndex], d.name[lastUnderlineIndex+1:]
-	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION)[zerodoc.MetricsTableNameToID(baseTableName)]
+	dstTableName := d.name[lastUnderlineIndex+1:]
+	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION)[zerodoc.MetricsTableNameToID(d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
 		rawTable, dstTableName,
@@ -559,13 +639,10 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	}
 
 	columnAdds := []*ColumnAdd{}
-	for _, adds := range ColumnAdd611 {
+	for _, adds := range ColumnAdd612 {
 		columnAdds = append(columnAdds, getColumnAdds(adds)...)
 	}
 	i.columnAdds = columnAdds
-	i.columnMods = ColumnMod611
-	// 610版本无字段名字变更
-	// i.columnRenames = ColumnRename610
 
 	var err error
 	i.primaryConnection, err = common.NewCKConnection(primaryAddr, username, password)
@@ -581,6 +658,49 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	}
 
 	return i, nil
+}
+
+func (i *Issu) RunRenameTable(ds *datasource.DatasourceManager) error {
+	for _, tableRename := range i.tableRenames {
+		if err := i.renameTable(i.primaryConnection, tableRename); err != nil {
+			return err
+		}
+	}
+
+	if err := i.renameUserDefineDatasource(i.primaryConnection, ds); err != nil {
+		log.Warning(err)
+	}
+
+	return nil
+}
+
+func (i *Issu) renameTable(connect *sql.DB, c *TableRename) error {
+	for i := range c.OldTables {
+		createDb := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", c.NewDb)
+		_, err := connect.Exec(createDb)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+
+		// RENAME TABLE vtap_acl.1m TO flow_metrics."vtap_acl.1m";
+		sql := fmt.Sprintf("RENAME TABLE %s.%s to %s.\"%s\"",
+			c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i])
+		log.Info("rename table: ", sql)
+		_, err = connect.Exec(sql)
+		if err != nil {
+			if strings.Contains(err.Error(), "doesn't exist") {
+				log.Infof("table: %s.%s rename to table: %s.\"%s\" error: %s", c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i], err)
+				continue
+			} else if strings.Contains(err.Error(), "already exists") {
+				log.Infof("table: %s.%s rename to table: %s.\"%s\" error: %s", c.OldDb, c.OldTables[i], c.NewDb, c.NewTables[i], err)
+				continue
+			}
+			log.Error(err)
+			return err
+		}
+	}
+	return nil
 }
 
 func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
@@ -757,9 +877,10 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 	for _, tableName := range []string{
 		zerodoc.VTAP_FLOW_PORT_1M.TableName(), zerodoc.VTAP_FLOW_EDGE_PORT_1M.TableName(),
 		zerodoc.VTAP_APP_PORT_1M.TableName(), zerodoc.VTAP_APP_EDGE_PORT_1M.TableName()} {
-		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, tableName)
+		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, ckdb.METRICS_DB, tableName)
 		if err != nil {
-			return nil, err
+			log.Warning(err)
+			continue
 		}
 		for _, dsInfo := range datasourceInfos {
 			adds, err := i.addColumnDatasource(connect, dsInfo)
@@ -818,5 +939,34 @@ func (i *Issu) Close() error {
 		}
 		connect.Close()
 	}
+	return nil
+}
+
+func (i *Issu) renameUserDefineDatasource(connect *sql.DB, ds *datasource.DatasourceManager) error {
+	for _, dbGroup := range []string{"vtap_flow", "vtap_app"} {
+		dbName := dbGroup + "_port"
+		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, dbName, "")
+		if err != nil {
+			return err
+		}
+		for _, dsInfo := range datasourceInfos {
+			if err := i.renameTable(connect, &TableRename{
+				OldDb:     dsInfo.db,
+				OldTables: []string{dsInfo.name + "_agg"},
+				NewDb:     ckdb.METRICS_DB,
+				NewTables: []string{fmt.Sprintf("%s.%s", dsInfo.db, dsInfo.name+"_agg")},
+			}); err != nil {
+				return err
+			}
+			interval := 60
+			if dsInfo.interval == ckdb.TimeFuncDay {
+				interval = 1440
+			}
+			if err := ds.Handle(dbGroup, "add", dsInfo.baseTable, dsInfo.name, dsInfo.summable, dsInfo.unsummable, interval, 7*24); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }

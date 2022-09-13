@@ -17,8 +17,7 @@
 use std::{mem::size_of, path::PathBuf, process};
 use sysinfo::{System, SystemExt};
 
-use log::debug;
-use windows::Win32::{
+use ::windows::Win32::{
     Foundation::{GetLastError, BOOL, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
     System::{
         Diagnostics::ToolHelp::{
@@ -29,6 +28,8 @@ use windows::Win32::{
         Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
     },
 };
+
+use log::debug;
 
 use crate::{
     error::{Error, Result},
@@ -202,10 +203,11 @@ pub fn get_exec_path() -> Result<PathBuf> {
 
 /// 返回当前系统的空闲内存数目，单位：%
 pub fn get_current_sys_free_memory_percentage() -> u32 {
-    let s = System::new_all();
+    let mut s = System::new();
+    s.refresh_memory();
     let total_memory = s.total_memory();
-    if total_memory > 0 {
-        return ((s.available_memory() / total_memory) * 100) as u32;
+    if total_memory > 100 {
+        return (s.available_memory() / (total_memory / 100)) as u32;
     }
     0
 }

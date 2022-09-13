@@ -1235,6 +1235,13 @@ func (t *PlatformInfoTable) QueryVtapEpc0(vtapId uint32) int32 {
 	return datatype.EPC_FROM_INTERNET
 }
 
+func (t *PlatformInfoTable) QueryVtapInfo(vtapId uint32) *VtapInfo {
+	if vtapInfo, ok := t.vtapIdInfos[vtapId]; ok {
+		return vtapInfo
+	}
+	return nil
+}
+
 func (t *PlatformInfoTable) inPlatformData(epcID int32, isIPv4 bool, ip4 uint32, ip6 net.IP) bool {
 	if isIPv4 {
 		if t.queryIPV4Infos(int16(epcID), ip4) != nil {

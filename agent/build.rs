@@ -22,13 +22,13 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
         .out_dir("src/proto")
         .compile(
             &[
-                "src/proto/message/common.proto",
-                "src/proto/message/trident.proto",
-                "src/proto/message/metric.proto",
-                "src/proto/message/flow_log.proto",
-                "src/proto/message/stats.proto",
+                "../message/common.proto",
+                "../message/trident.proto",
+                "../message/metric.proto",
+                "../message/flow_log.proto",
+                "../message/stats.proto",
             ],
-            &["src/proto/message"],
+            &["../message"],
         )?;
     Ok(())
 }
@@ -53,7 +53,7 @@ fn set_build_info() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn set_build_libebpf() -> Result<(), Box<dyn Error>> {
+fn set_build_libtrace() -> Result<(), Box<dyn Error>> {
     let output = match env::var("CARGO_CFG_TARGET_ENV")?.as_str() {
         "gnu" => Command::new("sh").arg("-c")
             .arg("cd src/ebpf && make clean && make --no-print-directory && make tools --no-print-directory")
@@ -65,9 +65,9 @@ fn set_build_libebpf() -> Result<(), Box<dyn Error>> {
     };
     if !output.status.success() {
         eprintln!("{}", str::from_utf8(&output.stderr)?);
-        panic!("compile libebpf.a error!");
+        panic!("compile libtrace.a error!");
     }
-    let library_name = "ebpf";
+    let library_name = "trace";
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let library_dir = dunce::canonicalize(root.join("src/ebpf/"))?;
     println!("cargo:rustc-link-lib=static={}", library_name);
@@ -113,7 +113,10 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 fn main() -> Result<(), Box<dyn Error>> {
     generate_protobuf()?;
     set_build_info()?;
-    set_build_libebpf()?;
-    set_linkage()?;
+    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    if target_os.as_str() == "linux" {
+        set_build_libtrace()?;
+        set_linkage()?;
+    }
     Ok(())
 }

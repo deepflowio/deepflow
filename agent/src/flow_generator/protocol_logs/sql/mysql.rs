@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
-use regex::Regex;
+use serde::Serialize;
 
 use super::super::{
-    consts::*, AppProtoHead, AppProtoLogsData, AppProtoLogsInfo, L7LogParse, L7Protocol,
+    consts::*, value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol,
     L7ResponseStatus, LogMessageType,
 };
 
-use crate::proto::flow_log;
+use crate::flow_generator::protocol_logs::pb_adapter::{
+    ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
+};
+use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::{
     common::enums::{IpProtocol, PacketDirection},
     common::meta_packet::MetaPacket,
@@ -29,20 +32,33 @@ use crate::{
     utils::bytes,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
     // Server Greeting
+    #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub protocol_version: u8,
+    #[serde(skip)]
     pub server_version: String,
+    #[serde(skip)]
     pub server_thread_id: u32,
     // request
+    #[serde(rename = "request_type")]
     pub command: u8,
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub context: String,
     // response
+    #[serde(skip)]
     pub response_code: u8,
+    #[serde(skip)]
     pub error_code: u16,
+    #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
     pub affected_rows: u64,
+    #[serde(
+        rename = "response_execption",
+        skip_serializing_if = "value_is_default"
+    )]
     pub error_message: String,
+    pub status: L7ResponseStatus,
 }
 
 impl MysqlInfo {
@@ -51,22 +67,73 @@ impl MysqlInfo {
         self.affected_rows = other.affected_rows;
         self.error_code = other.error_code;
         self.error_message = other.error_message;
+        self.status = other.status;
+    }
+
+    pub fn get_command_str(&self) -> &'static str {
+        let command = [
+            "COM_SLEEP",
+            "COM_QUIT",
+            "COM_INIT_DB",
+            "COM_QUERY",
+            "COM_FIELD_LIST",
+            "COM_CREATE_DB",
+            "COM_DROP_DB",
+            "COM_REFRESH",
+            "COM_SHUTDOWN",
+            "COM_STATISTICS",
+            "COM_PROCESS_INFO",
+            "COM_CONNECT",
+            "COM_PROCESS_KILL",
+            "COM_DEBUG",
+            "COM_PING",
+            "COM_TIME",
+            "COM_DELAYED_INSERT",
+            "COM_CHANGE_USER",
+            "COM_BINLOG_DUMP",
+            "COM_TABLE_DUMP",
+            "COM_CONNECT_OUT",
+            "COM_REGISTER_SLAVE",
+            "COM_STMT_PREPARE",
+            "COM_STMT_EXECUTE",
+            "COM_STMT_SEND_LONG_DATA",
+            "COM_STMT_CLOSE",
+            "COM_STMT_RESET",
+            "COM_SET_OPTION",
+            "COM_STMT_FETCH",
+            "COM_DAEMON",
+            "COM_BINLOG_DUMP_GTID",
+            "COM_RESET_CONNECTION",
+        ];
+        match self.command {
+            0x00..=0x1f => command[self.command as usize],
+            _ => "",
+        }
     }
 }
 
-impl From<MysqlInfo> for flow_log::MysqlInfo {
+impl From<MysqlInfo> for L7ProtocolSendLog {
     fn from(f: MysqlInfo) -> Self {
-        flow_log::MysqlInfo {
-            protocol_version: f.protocol_version as u32,
-            server_version: f.server_version,
-            server_thread_id: f.server_thread_id,
-            command: f.command as u32,
-            context: f.context,
-            response_code: f.response_code as u32,
-            affected_rows: f.affected_rows,
-            error_code: f.error_code as u32,
-            error_message: f.error_message,
-        }
+        let log = L7ProtocolSendLog {
+            version: Some(f.protocol_version.to_string()),
+            req: L7Request {
+                req_type: String::from(f.get_command_str()),
+                resource: f.context,
+                ..Default::default()
+            },
+            resp: L7Response {
+                status: f.status,
+                code: f.error_code as i32,
+                exception: f.error_message,
+                ..Default::default()
+            },
+            ext_info: Some(ExtendedInfo {
+                row_effect: Some(f.affected_rows as u32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        return log;
     }
 }
 
@@ -76,7 +143,6 @@ pub struct MysqlLog {
 
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
-    status: L7ResponseStatus,
 }
 
 fn mysql_string(payload: &[u8]) -> String {
@@ -96,16 +162,7 @@ impl MysqlLog {
 
     fn reset_logs(&mut self) {
         self.info = MysqlInfo::default();
-        self.status = L7ResponseStatus::Ok;
-    }
-
-    fn get_log_data_special_info(self, log_data: &mut AppProtoLogsData) {
-        if (&self).msg_type == LogMessageType::Response
-            && (&self).info.response_code == MYSQL_RESPONSE_CODE_ERR
-        {
-            log_data.base_info.head.code = (&self).info.error_code;
-        }
-        log_data.special_info = AppProtoLogsInfo::Mysql(self.info);
+        self.info.status = L7ResponseStatus::Ok;
     }
 
     fn greeting(&mut self, payload: &[u8]) -> Result<()> {
@@ -142,7 +199,7 @@ impl MysqlLog {
         }
         self.info.command = payload[COMMAND_OFFSET];
         match self.info.command {
-            COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_FETCH_AND_CLOSE => (),
+            COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_CLOSE | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
                 self.request_string(&payload[COMMAND_OFFSET + COMMAND_LEN..]);
             }
@@ -176,12 +233,12 @@ impl MysqlLog {
     fn set_status(&mut self, status_code: u16) {
         if status_code != 0 {
             if status_code >= 2000 && status_code <= 2999 {
-                self.status = L7ResponseStatus::ClientError;
+                self.info.status = L7ResponseStatus::ClientError;
             } else {
-                self.status = L7ResponseStatus::ServerError;
+                self.info.status = L7ResponseStatus::ServerError;
             }
         } else {
-            self.status = L7ResponseStatus::Ok;
+            self.info.status = L7ResponseStatus::Ok;
         }
     }
 
@@ -209,7 +266,7 @@ impl MysqlLog {
                     String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
             }
             MYSQL_RESPONSE_CODE_OK => {
-                self.status = L7ResponseStatus::Ok;
+                self.info.status = L7ResponseStatus::Ok;
                 self.info.affected_rows =
                     MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
             }
@@ -225,7 +282,9 @@ impl L7LogParse for MysqlLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-    ) -> Result<AppProtoHead> {
+        _is_req_end: Option<bool>,
+        _is_resp_end: Option<bool>,
+    ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -249,18 +308,16 @@ impl L7LogParse for MysqlLog {
         };
         self.msg_type = msg_type;
 
-        Ok(AppProtoHead {
+        Ok(AppProtoHeadEnum::Single(AppProtoHead {
             proto: L7Protocol::Mysql,
             msg_type,
-            status: self.status,
-            code: self.info.error_code,
             rrt: 0,
-            version: 0,
-        })
+            ..Default::default()
+        }))
     }
 
-    fn info(&self) -> AppProtoLogsInfo {
-        AppProtoLogsInfo::Mysql(self.info.clone())
+    fn info(&self) -> AppProtoLogsInfoEnum {
+        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Mysql(self.info.clone()))
     }
 }
 
@@ -357,15 +414,9 @@ pub fn mysql_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
 
     let protocol_version_or_query_type = payload[offset];
     match protocol_version_or_query_type {
-        COM_QUERY => {
+        COM_QUERY | COM_STMT_PREPARE => {
             let context = mysql_string(&payload[offset + 1..]);
             return context.is_ascii();
-        }
-        n if 8 <= n && n <= 20 => {
-            let max_len = payload.len().min(offset + 8);
-            let context = mysql_string(&payload[offset + 1..max_len]);
-            let regex = Regex::new("^[0-9\\.]{3,}").unwrap();
-            return regex.is_match(context.as_str());
         }
         _ => {}
     }
@@ -405,7 +456,13 @@ mod tests {
                 Some(p) => p,
                 None => continue,
             };
-            let _ = mysql.parse(payload, packet.lookup_key.proto, packet.direction);
+            let _ = mysql.parse(
+                payload,
+                packet.lookup_key.proto,
+                packet.direction,
+                None,
+                None,
+            );
             let is_mysql = mysql_check_protocol(&mut bitmap, packet);
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
         }

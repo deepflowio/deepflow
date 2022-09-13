@@ -30,19 +30,16 @@ use log::{debug, error, info, warn};
 use ring::digest;
 use tokio::runtime::Runtime;
 
-use super::{
-    kubernetes::{
-        check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, InterfaceInfo,
-        PassivePoller, Poller,
-    },
-    InterfaceEntry, LibvirtXmlExtractor,
+use super::kubernetes::{
+    check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, PassivePoller, Poller,
 };
+use super::{InterfaceEntry, InterfaceInfo, LibvirtXmlExtractor};
 
-use crate::utils::command::*;
 use crate::{
     config::{handler::PlatformAccess, KubernetesPollerType},
     handler,
     proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse},
+    utils::command::*,
     utils::environment::is_tt_pod,
 };
 use crate::{exception::ExceptionHandler, rpc::Session};

@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-use std::error::Error;
-use std::ffi::CStr;
 use std::fmt;
 use std::mem;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 use std::time::Duration;
+#[cfg(target_os = "linux")]
+use std::{error::Error, ffi::CStr, net::Ipv6Addr};
 
 use pnet::packet::{
     icmp::{IcmpType, IcmpTypes},
@@ -28,18 +28,26 @@ use pnet::packet::{
     tcp::{TcpOptionNumber, TcpOptionNumbers},
 };
 
+use super::ebpf::EbpfType;
+#[cfg(target_os = "linux")]
+use super::enums::TapType;
 use super::{
     consts::*,
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
-    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TapType, TcpFlags},
+    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TcpFlags},
     flow::L7Protocol,
     lookup_key::LookupKey,
     policy::PolicyData,
     tap_port::TapPort,
 };
 
-use crate::ebpf::{MSG_REQUEST, SK_BPF_DATA, SOCK_DIR_RCV, SOCK_DIR_SND};
+use crate::common::ebpf::GO_HTTP2_UPROBE;
+#[cfg(target_os = "linux")]
+use crate::ebpf::{
+    MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
+    SOCK_DIR_RCV, SOCK_DIR_SND,
+};
 use crate::error;
 use crate::utils::net::{is_unicast_link_local, MacAddr};
 
@@ -101,11 +109,15 @@ pub struct MetaPacket<'a> {
     pub source_ip: u32,
 
     // for ebpf
+    pub ebpf_type: EbpfType,
     pub raw_from_ebpf: Vec<u8>,
 
     pub socket_id: u64,
     pub cap_seq: u64,
     pub l7_protocol_from_ebpf: L7Protocol,
+    //  流结束标识, 目前只有 go http2 uprobe 用到
+    pub is_request_end: bool,
+    pub is_response_end: bool,
 
     pub process_id: u32,
     pub thread_id: u32,
@@ -121,7 +133,12 @@ impl<'a> MetaPacket<'a> {
             self.lookup_key.timestamp -= Duration::from_nanos(-time_diff as u64);
         }
     }
-
+    pub fn is_tls(&self) -> bool {
+        match self.l7_protocol_from_ebpf {
+            L7Protocol::Http1TLS | L7Protocol::Http2TLS => true,
+            _ => false,
+        }
+    }
     pub fn empty() -> MetaPacket<'a> {
         MetaPacket {
             offset_mac_0: FIELD_OFFSET_SA,
@@ -754,6 +771,7 @@ impl<'a> MetaPacket<'a> {
         self.l4_payload_len
     }
 
+    #[cfg(target_os = "linux")]
     pub unsafe fn from_ebpf(
         data: *mut SK_BPF_DATA,
         capture_size: usize,
@@ -821,19 +839,30 @@ impl<'a> MetaPacket<'a> {
             .to_string();
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
-        packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocal_hint as u8);
-        packet.direction = if data.msg_type == MSG_REQUEST {
-            PacketDirection::ClientToServer
-        } else {
-            PacketDirection::ServerToClient
-        };
+        packet.ebpf_type = EbpfType::from(data.source);
+        packet.l7_protocol_from_ebpf = L7Protocol::from(data.l7_protocol_hint as u8);
+
+        // 目前只有 go uprobe http2 的方向判断能确保准确
+        if data.source == GO_HTTP2_UPROBE {
+            if data.l7_protocol_hint == SOCK_DATA_HTTP2
+                || data.l7_protocol_hint == SOCK_DATA_TLS_HTTP2
+            {
+                packet.direction = PacketDirection::from(data.msg_type);
+                if data.msg_type == MSG_REQUEST_END {
+                    packet.is_request_end = true;
+                }
+                if data.msg_type == MSG_RESPONSE_END {
+                    packet.is_response_end = true;
+                }
+            }
+        }
         return Ok(packet);
     }
 
-    pub fn ebpf_flow_id(&self) -> u64 {
-        let protocol = u8::from(self.l7_protocol_from_ebpf) as u64;
+    pub fn ebpf_flow_id(&self) -> u128 {
+        let protocol = u8::from(self.l7_protocol_from_ebpf) as u128;
 
-        self.socket_id | protocol << 56
+        (self.socket_id as u128) | protocol << u64::BITS
     }
 
     pub fn set_loopback_mac(&mut self, mac: MacAddr) {

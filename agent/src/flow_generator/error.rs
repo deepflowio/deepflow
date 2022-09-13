@@ -39,9 +39,9 @@ pub enum Error {
     KafkaLogParseFailed,
     #[error("kafka perf parse failed")]
     KafkaPerfParseFailed,
-    #[error("kafka log parse failed")]
+    #[error("mqtt log parse failed")]
     MqttLogParseFailed,
-    #[error("kafka perf parse failed")]
+    #[error("mqtt perf parse failed")]
     MqttPerfParseFailed,
     #[error("redis log parse failed")]
     RedisLogParseFailed,

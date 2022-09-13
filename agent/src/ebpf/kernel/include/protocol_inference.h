@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef __BPF_PROTO_INFER_H__
 #define __BPF_PROTO_INFER_H__
 
@@ -313,6 +329,11 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
+	// When go uprobe http2 cannot be used, use kprobe/tracepoint to collect data
+	if (get_go_version()) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP2)
 			return MSG_UNKNOWN;
@@ -602,8 +623,11 @@ static __inline enum message_type infer_redis_message(const char *buf,
 	    first_byte != '$' && first_byte != '*')
 		return MSG_UNKNOWN;
 
-	// redis 中必须包含 crlf
-	if (!is_include_crlf(buf))
+	// The redis message must contain /r/n.
+	// Due to the limitation of eBPF, only the first 20 bytes are checked.
+	// The position where the error type /r/n appears may exceed 20 bytes. 
+	// Therefore, the error type is not checked
+	if (first_byte != '-' && !is_include_crlf(buf))
 		return MSG_UNKNOWN;
 
 	//-ERR unknown command 'foobar'
@@ -1078,7 +1102,8 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	 * If extra->tls is true, the datas is obtained by the uprobe.
 	 * The obtained datas is unencrypted, not filtered.
 	 */
-	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) && !extra->tls) {
+	if ((conn_info->tuple.dport == 443 || conn_info->tuple.num == 443) &&
+	    extra->source == DATA_SOURCE_SYSCALL) {
 		return inferred_message;
 	}
 

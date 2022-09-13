@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 )
 
 var DOMAIN_PASSWORD_KEYS = []string{
@@ -175,6 +176,7 @@ func CreateDomain(domainCreate model.DomainCreate, grpcServerPort string) (*mode
 	domain.DisplayName = displayName
 	domain.Type = domainCreate.Type
 	domain.IconID = domainCreate.IconID
+	domain.State = common.DOMAIN_STATE_NORMAL
 
 	// set region and controller ip if not specified
 	if domainCreate.Config == nil {
@@ -324,7 +326,7 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServer
 		if region, ok := configUpdate["region_uuid"]; ok {
 			if region != config["region_uuid"] {
 				log.Infof("delete domain (%s) soft deleted resource", domain.Name)
-				deleteSoftDeletedResource(lcuuid)
+				cleanSoftDeletedResource(lcuuid)
 			}
 		}
 
@@ -357,31 +359,33 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServer
 	return &response[0], nil
 }
 
-func deleteSoftDeletedResource(lcuuid string) {
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.CEN{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PeerConnection{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.RedisInstance{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.RDSInstance{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.LBTargetServer{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.LBListener{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.LB{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.NATGateway{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.SecurityGroup{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.DHCPPort{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.VRouter{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.Pod{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodReplicaSet{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodGroup{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodService{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodIngress{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodNamespace{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodNode{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.PodCluster{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.VM{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.Host{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.Network{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.VPC{})
-	mysql.Db.Unscoped().Where("domain = ? & deleted_at != NULL", lcuuid).Delete(&mysql.AZ{})
+func cleanSoftDeletedResource(lcuuid string) {
+	condition := "domain = ? AND deleted_at IS NOT NULL"
+	log.Infof("clean soft deleted resources (domain = %s AND deleted_at IS NOT NULL) started", lcuuid)
+	forceDelete[mysql.CEN](condition, lcuuid)
+	forceDelete[mysql.PeerConnection](condition, lcuuid)
+	forceDelete[mysql.RedisInstance](condition, lcuuid)
+	forceDelete[mysql.RDSInstance](condition, lcuuid)
+	forceDelete[mysql.LBListener](condition, lcuuid)
+	forceDelete[mysql.LB](condition, lcuuid)
+	forceDelete[mysql.NATGateway](condition, lcuuid)
+	forceDelete[mysql.SecurityGroup](condition, lcuuid)
+	forceDelete[mysql.DHCPPort](condition, lcuuid)
+	forceDelete[mysql.VRouter](condition, lcuuid)
+	forceDelete[mysql.Pod](condition, lcuuid)
+	forceDelete[mysql.PodReplicaSet](condition, lcuuid)
+	forceDelete[mysql.PodGroup](condition, lcuuid)
+	forceDelete[mysql.PodService](condition, lcuuid)
+	forceDelete[mysql.PodIngress](condition, lcuuid)
+	forceDelete[mysql.PodNamespace](condition, lcuuid)
+	forceDelete[mysql.PodNode](condition, lcuuid)
+	forceDelete[mysql.PodCluster](condition, lcuuid)
+	forceDelete[mysql.VM](condition, lcuuid)
+	forceDelete[mysql.Host](condition, lcuuid)
+	forceDelete[mysql.Network](condition, lcuuid)
+	forceDelete[mysql.VPC](condition, lcuuid)
+	forceDelete[mysql.AZ](condition, lcuuid)
+	log.Info("clean soft deleted resources completed")
 }
 
 func DeleteDomain(lcuuid string) (map[string]string, error) {
@@ -393,9 +397,9 @@ func DeleteDomain(lcuuid string) (map[string]string, error) {
 		)
 	}
 
-	log.Infof("delete domain (%s)", domain.Name)
+	log.Infof("delete domain (%s) resources started", domain.Name)
 
-	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.WANIP{})
+	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.WANIP{}) // TODO use forceDelete func
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.LANIP{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.FloatingIP{})
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.VInterface{})
@@ -473,6 +477,7 @@ func DeleteDomain(lcuuid string) (map[string]string, error) {
 	mysql.Db.Unscoped().Where("domain = ?", lcuuid).Delete(&mysql.AZ{})
 
 	mysql.Db.Delete(&domain)
+	log.Infof("delete domain (%s) resources completed", domain.Name)
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
@@ -522,6 +527,17 @@ func GetSubDomains(filter map[string]interface{}) ([]model.SubDomain, error) {
 			vpcLcuuid := subDomainResp.Config["vpc_uuid"].(string)
 			if _, ok := lcuuidToVPCName[vpcLcuuid]; ok {
 				subDomainResp.VPCName = lcuuidToVPCName[vpcLcuuid]
+			}
+		}
+
+		var k8sCluster mysql.KubernetesCluster
+		if err := mysql.Db.Where("cluster_id = ?", subDomain.ClusterID).First(&k8sCluster).Error; err == nil {
+			v := strings.Split(k8sCluster.Value, "-")
+			if len(v) == 2 {
+				var vtap mysql.VTap
+				if err = mysql.Db.Where("ctrl_ip = ? AND ctrl_mac = ?", v[0], v[1]).First(&vtap).Error; err == nil {
+					subDomainResp.Config["vtap_id"] = vtap.Name
+				}
 			}
 		}
 		response = append(response, subDomainResp)
@@ -590,7 +606,7 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 		)
 	}
 
-	log.Infof("delete sub_domain (%s)", subDomain.Name)
+	log.Infof("delete sub_domain (%s) resources started", subDomain.Name)
 
 	var podCluster mysql.PodCluster
 	mysql.Db.Unscoped().Where("lcuuid = ?", lcuuid).Find(&podCluster)
@@ -598,7 +614,8 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 	// mysql.Db.Unscoped().Clauses(clause.Returning{Columns: []clause.Column{{Name: "id"}}}).Where("lcuuid = ?", lcuuid).Delete(&podCluster)
 	log.Info(podCluster)
 	if podCluster.ID != 0 {
-		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.WANIP{})
+		log.Infof("delete pod_cluster (%+v) resources", podCluster)
+		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.WANIP{}) // TODO use forceDelete func
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.LANIP{})
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.VInterface{})
 		mysql.Db.Unscoped().Where("sub_domain = ?", lcuuid).Delete(&mysql.Subnet{})
@@ -619,5 +636,13 @@ func DeleteSubDomain(lcuuid string) (map[string]string, error) {
 	}
 
 	mysql.Db.Delete(&subDomain)
+	log.Infof("delete sub_domain (%s) resources completed", subDomain.Name)
 	return map[string]string{"LCUUID": lcuuid}, nil
+}
+
+func forceDelete[MT constraint.MySQLSoftDeleteModel](query interface{}, args ...interface{}) { // TODO common func
+	err := mysql.Db.Unscoped().Where(query, args...).Delete(new(MT)).Error
+	if err != nil {
+		log.Errorf("mysql delete resource: %v %v failed: %s", query, args, err)
+	}
 }

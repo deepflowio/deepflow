@@ -49,8 +49,15 @@ thread_threshold: 500
 process_threshold: 10
 
 # 基础配置参数
-# 采集网口，默认值：^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo)$，长度范围[0, 65535]
-tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo)$
+# 采集网口，默认值：^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$，长度范围[0, 65535]
+# qemu: tap.*
+# localhost: lo
+# common nic: eth|en[ospx].*
+# flannel: veth.*
+# calico: cali.*
+# cilium: lxc.*
+# kube-ovn: [0-9a-f]+_h$#
+tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$
 # 流量过滤，默认值：空，表示全采集，长度范围[1, 512]
 # 请参考BPF语法：https://biot.com/capstats/bpf.html
 capture_bpf:
@@ -150,8 +157,8 @@ l4_log_tap_types: 0
 l7_log_store_tap_types: 0
 # 数据集成HTTP代理，默认值：0，表示关闭，可选址：0表示关闭/1表示开启
 external_agent_http_proxy_enabled: 0
-# 数据集成HTTP代理端口，默认值：8086，可选值：1-65535
-external_agent_http_proxy_port: 8086
+# 数据集成HTTP代理端口，默认值：38086，可选值：1-65535
+external_agent_http_proxy_port: 38086
 
 # 包分发功能开关
 # 全局去重，默认值：1，表示开启，可选值：0表示关闭/1表示开启

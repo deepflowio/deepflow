@@ -37,6 +37,8 @@ pub const HTTP_RESP_MIN_LEN: usize = 13; // 响应行："HTTP/1.1 200 "
 pub const HTTP_HOST_OFFSET: usize = 6;
 pub const HTTP_CONTENT_LENGTH_OFFSET: usize = 16;
 
+pub const HTTPV2_CUSTOM_DATA_MIN_LENGTH: usize = 16;
+
 pub const HTTPV2_FRAME_HEADER_LENGTH: usize = 9;
 pub const HTTPV2_MAGIC_LENGTH: usize = 24;
 pub const HTTPV2_MAGIC_PREFIX: &str = "PRI * HTTP";
@@ -55,27 +57,6 @@ pub const SPAN_ID_TYPE: usize = 1;
 // Kafka constants
 pub const KAFKA_REQ_HEADER_LEN: usize = 14;
 pub const KAFKA_RESP_HEADER_LEN: usize = 8;
-
-// Mqtt constants
-pub const MQTT_FIXED_HEADER_LEN: usize = 2;
-pub const MQTT_VAR_BYTES_MAX_LEN: usize = 4;
-pub const MQTT_STATUS_FAILED_MIN: u8 = 128;
-pub const MQTT_STATUS_FAILED_MAX: u8 = 162;
-pub const MQTT_CONNECT: u8 = 1;
-pub const MQTT_CONNACK: u8 = 2;
-pub const MQTT_PUBLISH: u8 = 3;
-pub const MQTT_PUBACK: u8 = 4;
-pub const MQTT_PUBREC: u8 = 5;
-pub const MQTT_PUBREL: u8 = 6;
-pub const MQTT_PUBCOMP: u8 = 7;
-pub const MQTT_SUBSCRIBE: u8 = 8;
-pub const MQTT_SUBACK: u8 = 9;
-pub const MQTT_UNSUBSCRIBE: u8 = 10;
-pub const MQTT_UNSUBACK: u8 = 11;
-pub const MQTT_PINGREQ: u8 = 12;
-pub const MQTT_PINGRESP: u8 = 13;
-pub const MQTT_DISCONNECT: u8 = 14;
-pub const MQTT_AUTH: u8 = 15;
 
 // dubbo constants
 pub const DUBBO_MAGIC_HIGH: u8 = 0xda;
@@ -163,7 +144,8 @@ pub const COM_QUERY: u8 = 3;
 pub const COM_FIELD_LIST: u8 = 4;
 pub const COM_STMT_PREPARE: u8 = 22;
 pub const COM_STMT_EXECUTE: u8 = 23;
-pub const COM_STMT_FETCH_AND_CLOSE: u8 = 25;
+pub const COM_STMT_CLOSE: u8 = 25;
+pub const COM_STMT_FETCH: u8 = 28;
 pub const COM_MAX: u8 = 26;
 
 // dns constants
