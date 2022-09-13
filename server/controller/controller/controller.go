@@ -27,11 +27,11 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/db/redis"
+	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/manager"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
@@ -77,6 +77,11 @@ func Start(ctx context.Context, configPath string) {
 		}
 	}()
 	defer router.SetInitStageForHealthChecker(router.OK)
+
+	// start election
+	if _, enabled := os.LookupEnv("FEATURE_FLAG_ELECTION"); enabled {
+		go election.Start(ctx, cfg)
+	}
 
 	router.SetInitStageForHealthChecker("MySQL migration")
 	migrateDB(cfg)
@@ -146,7 +151,7 @@ func Start(ctx context.Context, configPath string) {
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
 		for range time.Tick(time.Minute) {
-			isMasterController, curMasterController, err := common.IsMasterControllerAndReturnName()
+			isMasterController, curMasterController, err := election.IsMasterControllerAndReturnName()
 			if err != nil {
 				continue
 			}
@@ -180,6 +185,7 @@ func Start(ctx context.Context, configPath string) {
 	}()
 
 	router.SetInitStageForHealthChecker("Register routers init")
+	router.ElectionRouter(r)
 	router.DebugRouter(r, m, g)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
@@ -208,17 +214,19 @@ func migrateDB(cfg *config.ControllerConfig) {
 	// try to check whether it is master controller until successful,
 	// migrate if it is master, exit if not.
 	for range time.Tick(time.Second * 5) {
-		isMasterController, err := common.IsMasterController()
-		err = nil
-		isMasterController = true
-		if err == nil && isMasterController {
-			ok := migrator.MigrateMySQL(cfg.MySqlCfg)
-			if !ok {
-				log.Error("migrate mysql failed")
-				time.Sleep(time.Second)
-				os.Exit(0)
+		isMasterController, err := election.IsMasterController()
+		if err == nil {
+			if isMasterController {
+				ok := migrator.MigrateMySQL(cfg.MySqlCfg)
+				if !ok {
+					log.Error("migrate mysql failed")
+					time.Sleep(time.Second)
+					os.Exit(0)
+				}
+				return
+			} else {
+				return
 			}
-			return
 		}
 	}
 }

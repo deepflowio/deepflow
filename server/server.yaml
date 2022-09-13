@@ -10,6 +10,11 @@ controller:
   grpc-port: 20035
   # grpc max message lenth default 100M
   grpc-max-message-length: 104857600
+  # kubeconfig
+  kubeconfig:
+  # election
+  election-namespace: deepflow
+  election-name: deepflow-server
 
   # deepflow web service config
   df-web-service:
@@ -148,7 +153,7 @@ querier:
   # clickhouse相关配置
   clickhouse:
     database: flow_tag
-    user: default
+    user-name: default
     host: clickhouse
     port: 9000
     timeout: 60
@@ -238,6 +243,9 @@ ingester:
 
   ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #stream-roze-enabled: true
+
+  # whether to enable deepflow-aget syslog to write to files in syslog-directory
+  #agent-log-to-file: false
 
   ## syslog存储位置
   #syslog-directory: /var/log/deepflow-agent

@@ -592,12 +592,12 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		return nil, err
 	}
 
-	lastUnderlineIndex := strings.LastIndex(d.name, "_")
+	lastUnderlineIndex := strings.LastIndex(d.name, ".")
 	if lastUnderlineIndex < 0 {
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
-	baseTableName, dstTableName := d.name[:lastUnderlineIndex], d.name[lastUnderlineIndex+1:]
-	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION)[zerodoc.MetricsTableNameToID(baseTableName)]
+	dstTableName := d.name[lastUnderlineIndex+1:]
+	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION)[zerodoc.MetricsTableNameToID(d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
 		rawTable, dstTableName,
@@ -879,7 +879,8 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 		zerodoc.VTAP_APP_PORT_1M.TableName(), zerodoc.VTAP_APP_EDGE_PORT_1M.TableName()} {
 		datasourceInfos, err := getUserDefinedDatasourceInfos(connect, ckdb.METRICS_DB, tableName)
 		if err != nil {
-			return nil, err
+			log.Warning(err)
+			continue
 		}
 		for _, dsInfo := range datasourceInfos {
 			adds, err := i.addColumnDatasource(connect, dsInfo)

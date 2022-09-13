@@ -50,6 +50,8 @@ type StatsdElement struct {
 	PrivateTagKey string
 	// private tag value to count
 	// when the type is Timing，unit is: ms
+	// since this is a map, concurrent writing is not supported and locks can be used if required.
+	// future: it might be useful sync.Map
 	PrivateTagValueToCount map[string][]int
 }
 

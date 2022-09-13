@@ -4,6 +4,7 @@
 20      , HTTP
 21      , HTTP2
 22      , HTTP1_TLS
+23      , HTTP2_TLS
 40      , Dubbo
 60      , MySQL
 80      , Redis

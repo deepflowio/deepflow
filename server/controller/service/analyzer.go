@@ -269,8 +269,16 @@ func UpdateAnalyzer(
 			}
 			analyzerRegion = analyzerUpdate["REGION"].(string)
 		} else {
-			for _, az := range azs {
-				newAzs.Add(az)
+
+			if _, azUpdate := analyzerUpdate["IS_ALL_AZ"]; azUpdate {
+				if analyzerUpdate["IS_ALL_AZ"].(bool) {
+					newAzs.Add("ALL")
+				}
+			}
+			if !newAzs.Contains("ALL") {
+				for _, az := range azs {
+					newAzs.Add(az)
+				}
 			}
 			delAzs = oldAzs.Difference(newAzs)
 			addAzs = newAzs.Difference(oldAzs)

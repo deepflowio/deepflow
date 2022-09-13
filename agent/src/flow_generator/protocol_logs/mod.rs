@@ -15,17 +15,18 @@
  */
 
 pub mod consts;
+pub mod pb_adapter;
 mod dns;
 mod http;
 mod mq;
 mod parser;
 mod rpc;
 mod sql;
-
 pub use self::http::{
     check_http_method, get_http_request_version, get_http_resp_info, http1_check_protocol,
     http2_check_protocol, is_http_v1_payload, HttpInfo, HttpLog, Httpv2Headers,
 };
+use self::pb_adapter::L7ProtocolSendLog;
 pub use dns::{dns_check_protocol, DnsInfo, DnsLog};
 pub use mq::{
     kafka_check_protocol, mqtt, mqtt_check_protocol, KafkaInfo, KafkaLog, MqttInfo, MqttLog,
@@ -49,6 +50,7 @@ use serde::{Serialize, Serializer};
 
 use crate::{
     common::{
+        ebpf::EbpfType,
         enums::{IpProtocol, PacketDirection, TapType},
         flow::L7Protocol,
         meta_packet::MetaPacket,
@@ -62,7 +64,7 @@ use crate::{
 
 const NANOS_PER_MICRO: u64 = 1000;
 
-#[derive(Serialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize, Debug, PartialEq, Copy, Clone, Eq)]
 #[repr(u8)]
 pub enum L7ResponseStatus {
     Ok,
@@ -103,16 +105,36 @@ impl From<PacketDirection> for LogMessageType {
     }
 }
 
+// 应用层协议原始数据类型
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[repr(u8)]
+pub enum L7ProtoRawDataType {
+    // 标准协议类型, 从af_packet, ebpf 的 tracepoint 或者 部分 uprobe(read/write等获取原始数据的hook点) 上报的数据都属于这个类型
+    RawProtocol,
+    // ebpf hook 在 go readHeader/writeHeader 获取http2原始未压缩的 header
+    GoHttp2Uprobe,
+}
+
+impl L7ProtoRawDataType {
+    pub fn from_ebpf_type(t: EbpfType) -> Self {
+        match t {
+            EbpfType::TracePoint | EbpfType::TlsUprobe | EbpfType::None => Self::RawProtocol,
+            EbpfType::GoHttp2Uprobe => Self::GoHttp2Uprobe,
+        }
+    }
+}
+
+impl Default for L7ProtoRawDataType {
+    fn default() -> Self {
+        return Self::RawProtocol;
+    }
+}
+
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct AppProtoHead {
     #[serde(rename = "l7_protocol")]
     pub proto: L7Protocol,
     pub msg_type: LogMessageType, // HTTP，DNS: request/response
-    #[serde(rename = "response_status")]
-    pub status: L7ResponseStatus, // 状态描述：0：正常，1：已废弃使用(先前用于表示异常)，2：不存在，3：服务端异常，4：客户端异常
-    #[serde(rename = "response_code")]
-    pub code: u16, // HTTP状态码: 1xx-5xx, DNS状态码: 0-7
-
     #[serde(rename = "response_duration")]
     pub rrt: u64, // HTTP，DNS时延: response-request
     #[serde(skip)]
@@ -124,9 +146,8 @@ impl From<AppProtoHead> for flow_log::AppProtoHead {
         flow_log::AppProtoHead {
             proto: f.proto as u32,
             msg_type: f.msg_type as u32,
-            status: f.status as u32,
-            code: f.code as u32,
             rrt: f.rrt * NANOS_PER_MICRO,
+            ..Default::default()
         }
     }
 }
@@ -149,9 +170,15 @@ pub struct AppProtoLogsBaseInfo {
     pub head: AppProtoHead,
 
     /* L2 */
-    #[serde(serialize_with = "to_string_format")]
+    #[serde(
+        skip_serializing_if = "value_is_default",
+        serialize_with = "to_string_format"
+    )]
     pub mac_src: MacAddr,
-    #[serde(serialize_with = "to_string_format")]
+    #[serde(
+        skip_serializing_if = "value_is_default",
+        serialize_with = "to_string_format"
+    )]
     pub mac_dst: MacAddr,
     /* L3 ipv4 or ipv6 */
     pub ip_src: IpAddr,
@@ -167,6 +194,7 @@ pub struct AppProtoLogsBaseInfo {
     pub resp_tcp_seq: u32,
 
     /* EBPF Info */
+    pub ebpf_type: EbpfType,
     #[serde(skip_serializing_if = "value_is_default")]
     pub process_id_0: u32,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -305,6 +333,7 @@ impl AppProtoLogsBaseInfo {
             port_dst: packet.lookup_key.dst_port,
             protocol: packet.lookup_key.proto,
 
+            ebpf_type: packet.ebpf_type,
             process_id_0: if is_src { packet.process_id } else { 0 },
             process_id_1: if !is_src { packet.process_id } else { 0 },
             process_kname_0: if is_src {
@@ -397,8 +426,6 @@ impl AppProtoLogsBaseInfo {
         self.resp_tcp_seq = log.resp_tcp_seq;
         self.syscall_trace_id_response = log.syscall_trace_id_response;
         self.head.msg_type = LogMessageType::Session;
-        self.head.code = log.head.code;
-        self.head.status = log.head.status;
         self.head.rrt = log.head.rrt;
     }
 }
@@ -483,23 +510,54 @@ impl AppProtoLogsData {
         }
     }
 
+    pub fn is_request(&self) -> bool {
+        return self.base_info.head.msg_type == LogMessageType::Request;
+    }
+
+    pub fn is_end(&self) -> bool {
+        match &self.special_info {
+            AppProtoLogsInfo::HttpV2(d) => {
+                return d.is_end;
+            }
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    //是否忽略不发送, 目前仅用于过滤http2 uprobe 收到多余结束标识,导致空数据.
+    pub fn omit_send(&self) -> bool {
+        match &self.special_info {
+            AppProtoLogsInfo::HttpV2(d) => {
+                return d.is_empty();
+            }
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    pub fn is_response(&self) -> bool {
+        return self.base_info.head.msg_type == LogMessageType::Response;
+    }
+
     pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let mut pb_proto_logs_data = flow_log::AppProtoLogsData {
             base: Some(self.base_info.into()),
             ..Default::default()
         };
-        match self.special_info {
-            AppProtoLogsInfo::Dns(t) => pb_proto_logs_data.dns = Some(t.into()),
-            AppProtoLogsInfo::Mysql(t) => pb_proto_logs_data.mysql = Some(t.into()),
-            AppProtoLogsInfo::Redis(t) => pb_proto_logs_data.redis = Some(t.into()),
-            AppProtoLogsInfo::Kafka(t) => pb_proto_logs_data.kafka = Some(t.into()),
-            AppProtoLogsInfo::Mqtt(t) => pb_proto_logs_data.mqtt = Some(t.into()),
-            AppProtoLogsInfo::Dubbo(t) => pb_proto_logs_data.dubbo = Some(t.into()),
-            AppProtoLogsInfo::HttpV1(t) => pb_proto_logs_data.http = Some(t.into()),
-            AppProtoLogsInfo::HttpV2(t) => pb_proto_logs_data.http = Some(t.into()),
-            AppProtoLogsInfo::HttpV1TLS(t) => pb_proto_logs_data.http = Some(t.into()),
+        let log: L7ProtocolSendLog = match self.special_info {
+            AppProtoLogsInfo::Dns(t) => t.into(),
+            AppProtoLogsInfo::Mysql(t) => t.into(),
+            AppProtoLogsInfo::Redis(t) => t.into(),
+            AppProtoLogsInfo::Kafka(t) => t.into(),
+            AppProtoLogsInfo::Mqtt(t) => t.into(),
+            AppProtoLogsInfo::Dubbo(t) => t.into(),
+            AppProtoLogsInfo::HttpV1(t)
+            | AppProtoLogsInfo::HttpV2(t)
+            | AppProtoLogsInfo::HttpV1TLS(t) => t.into(),
         };
-
+        log.fill_app_proto_log(&mut pb_proto_logs_data);
         pb_proto_logs_data
             .encode(buf)
             .map(|_| pb_proto_logs_data.encoded_len())
@@ -507,6 +565,7 @@ impl AppProtoLogsData {
 
     pub fn ebpf_flow_session_id(&self) -> u64 {
         // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
+        // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
         let flow_id_part =
             (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
         if let Some(session_id) = self.special_info.session_id() {
@@ -525,9 +584,19 @@ impl AppProtoLogsData {
         }
     }
 
-    pub fn session_merge(&mut self, log: AppProtoLogsData) {
+    pub fn session_merge(&mut self, log: Self) {
         self.base_info.merge(log.base_info);
-        self.special_info.merge(log.special_info);
+        self.protocol_merge(log.special_info);
+    }
+
+    pub fn protocol_merge(&mut self, log_info: AppProtoLogsInfo) {
+        self.special_info.merge(log_info);
+    }
+
+    // 是否需要进一步聚合
+    // 目前仅http2 uprobe 需要聚合多个请求
+    pub fn need_protocol_merge(&self) -> bool {
+        return self.base_info.ebpf_type == EbpfType::GoHttp2Uprobe;
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {
@@ -544,7 +613,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             "Timestamp: {:?} Vtap_id: {} Flow_id: {} TapType: {} TapPort: {} TapSide: {:?}\n \
                 \t{}_{}_{} -> {}_{}_{} Proto: {:?} Seq: {} -> {} VIP: {} -> {} EPC: {} -> {}\n \
                 \tProcess: {}:{} -> {}:{} Trace-id: {} -> {} Thread: {} -> {} cap_seq: {} -> {}\n \
-                \tL7Protocol: {:?} MsgType: {:?} Status: {:?} Code: {} Rrt: {}",
+                \tL7Protocol: {:?} MsgType: {:?} Rrt: {}",
             self.start_time,
             self.vtap_id,
             self.flow_id,
@@ -576,8 +645,6 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.syscall_cap_seq_1,
             self.head.proto,
             self.head.msg_type,
-            self.head.status,
-            self.head.code,
             self.head.rrt
         )
     }
@@ -589,6 +656,8 @@ pub trait L7LogParse: Send + Sync {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
+        is_req_end: Option<bool>,
+        is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum>;
     fn info(&self) -> AppProtoLogsInfoEnum;
 }

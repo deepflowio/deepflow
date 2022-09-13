@@ -116,12 +116,12 @@ func CreateDataSource(dataSourceCreate model.DataSourceCreate, cfg *config.Contr
 	if dataSourceCreate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
 			common.PARAMETER_ILLEGAL,
-			fmt.Sprintf("data_source retention_time should lt %d", cfg.Spec.DataSourceRetentionTimeMax),
+			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
 
-	mysql.Db.Count(&dataSourceCount)
-	if int(dataSourceCount) > cfg.Spec.DataSourceMax {
+	mysql.Db.Model(&model.DataSource{}).Count(&dataSourceCount)
+	if int(dataSourceCount) >= cfg.Spec.DataSourceMax {
 		return model.DataSource{}, NewError(
 			common.RESOURCE_NUM_EXCEEDED,
 			fmt.Sprintf("data_source count exceeds (limit %d)", cfg.Spec.DataSourceMax),
@@ -217,7 +217,7 @@ func UpdateDataSource(lcuuid string, dataSourceUpdate model.DataSourceUpdate, cf
 	if dataSourceUpdate.RetentionTime > cfg.Spec.DataSourceRetentionTimeMax {
 		return model.DataSource{}, NewError(
 			common.INVALID_POST_DATA,
-			fmt.Sprintf("data_source retention_time should lt %d", cfg.Spec.DataSourceRetentionTimeMax),
+			fmt.Sprintf("data_source retention_time should le %d", cfg.Spec.DataSourceRetentionTimeMax),
 		)
 	}
 	dataSource.RetentionTime = dataSourceUpdate.RetentionTime
