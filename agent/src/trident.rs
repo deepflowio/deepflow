@@ -281,6 +281,11 @@ impl Trident {
             policy_setter,
             exception_handler.clone(),
         ));
+        stats_collector.register_countable(
+            "ntp",
+            stats::Countable::Owned(Box::new(synchronizer.ntp_counter())),
+            Default::default(),
+        );
         synchronizer.start();
 
         let log_dir = Path::new(config_handler.static_config.log_file.as_str());

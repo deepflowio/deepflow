@@ -15,11 +15,11 @@
  */
 
 pub mod consts;
-pub mod pb_adapter;
 mod dns;
 mod http;
 mod mq;
 mod parser;
+pub mod pb_adapter;
 mod rpc;
 mod sql;
 pub use self::http::{

@@ -21,8 +21,11 @@ use std::mem;
 use std::net::IpAddr;
 use std::process::{self, Command};
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
-use std::sync::{self, Arc};
+use std::sync::{
+    self,
+    atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
+    Arc, Weak,
+};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
 use std::{fs::Permissions, os::unix::fs::PermissionsExt};
@@ -54,6 +57,7 @@ use crate::utils::{
     self,
     environment::{get_executable_path, is_tt_pod, running_in_container},
     net::{is_unicast_link_local, MacAddr},
+    stats,
 };
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
@@ -799,6 +803,10 @@ impl Synchronizer {
         self.ntp_diff.clone()
     }
 
+    pub fn ntp_counter(&self) -> NtpCounter {
+        NtpCounter(Arc::downgrade(&self.ntp_diff()))
+    }
+
     fn run_ntp_sync(&self) {
         let running_config = self.running_config.clone();
         let session = self.session.clone();
@@ -1268,5 +1276,24 @@ impl RuntimeEnvironment {
                 .unwrap_or_default()
                 .into(),
         }
+    }
+}
+
+pub struct NtpCounter(Weak<AtomicI64>);
+
+impl stats::OwnedCountable for NtpCounter {
+    fn get_counters(&self) -> Vec<stats::Counter> {
+        match self.0.upgrade() {
+            Some(counter) => vec![(
+                "time_diff",
+                stats::CounterType::Counted,
+                stats::CounterValue::Signed(counter.load(Ordering::Relaxed)),
+            )],
+            None => vec![],
+        }
+    }
+
+    fn closed(&self) -> bool {
+        self.0.strong_count() == 0
     }
 }
