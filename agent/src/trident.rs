@@ -261,6 +261,7 @@ impl Trident {
 
         let mut stats_sender = UniformSenderThread::new(
             stats::DFSTATS_SENDER_ID,
+            "stats",
             stats_collector.get_receiver(),
             config_handler.sender(),
             stats_collector.clone(),
@@ -777,21 +778,23 @@ impl Components {
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let sender_id = 0usize;
+        let l4_flow_aggr_queue_name = "3-flow-to-collector-sender";
         let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size as usize,
-            "3-flow-to-collector-sender",
+            l4_flow_aggr_queue_name,
             &queue_debugger,
         );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "3-flow-to-collector-sender".to_string()),
+                StatsOption::Tag("module", l4_flow_aggr_queue_name.to_string()),
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
         let l4_flow_uniform_sender = UniformSenderThread::new(
             sender_id,
+            l4_flow_aggr_queue_name,
             Arc::new(l4_flow_aggr_receiver),
             config_handler.sender(),
             stats_collector.clone(),
@@ -799,21 +802,23 @@ impl Components {
         );
 
         let sender_id = 1usize;
+        let metrics_queue_name = "2-doc-to-collector-sender";
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
             yaml_config.collector_sender_queue_size,
-            "2-doc-to-collector-sender",
+            metrics_queue_name,
             &queue_debugger,
         );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "2-doc-to-collector-sender".to_string()),
+                StatsOption::Tag("module", metrics_queue_name.to_string()),
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
         let metrics_uniform_sender = UniformSenderThread::new(
             sender_id,
+            metrics_queue_name,
             Arc::new(metrics_receiver),
             config_handler.sender(),
             stats_collector.clone(),
@@ -821,21 +826,23 @@ impl Components {
         );
 
         let sender_id = 2usize;
+        let proto_log_queue_name = "3-protolog-to-collector-sender";
         let (proto_log_sender, proto_log_receiver, counter) = queue::bounded_with_debug(
             yaml_config.flow_sender_queue_size,
-            "3-protolog-to-collector-sender",
+            proto_log_queue_name,
             &queue_debugger,
         );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "3-protolog-to-collector-sender".to_string()),
+                StatsOption::Tag("module", proto_log_queue_name.to_string()),
                 StatsOption::Tag("index", "0".to_string()),
             ],
         );
         let l7_flow_uniform_sender = UniformSenderThread::new(
             sender_id,
+            proto_log_queue_name,
             Arc::new(proto_log_receiver),
             config_handler.sender(),
             stats_collector.clone(),
@@ -873,10 +880,11 @@ impl Components {
 
         // Enterprise Edition Feature: packet-sequence
         let sender_id = 6; // TODO sender_id should be generated automatically
+        let packet_sequence_queue_name = "packet_sequence_block-to-sender";
         let (packet_sequence_uniform_output, packet_sequence_uniform_input, counter) =
             queue::bounded_with_debug(
                 yaml_config.packet_sequence_queue_size,
-                "packet_sequence_block-to-sender",
+                packet_sequence_queue_name,
                 &queue_debugger,
             );
 
@@ -884,12 +892,13 @@ impl Components {
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "packet_sequence_block-to-sender".to_string()),
+                StatsOption::Tag("module", packet_sequence_queue_name.to_string()),
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
         let packet_sequence_uniform_sender = UniformSenderThread::new(
             sender_id,
+            packet_sequence_queue_name,
             Arc::new(packet_sequence_uniform_input),
             config_handler.sender(),
             stats_collector.clone(),
@@ -1083,21 +1092,23 @@ impl Components {
         let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
         let sender_id = 3;
+        let otel_queue_name = "otel-to-sender";
         let (otel_sender, otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
-            "otel-to-sender",
+            otel_queue_name,
             &queue_debugger,
         );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "otel-to-sender".to_string()),
+                StatsOption::Tag("module", otel_queue_name.to_string()),
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
         let otel_uniform_sender = UniformSenderThread::new(
             sender_id,
+            otel_queue_name,
             Arc::new(otel_receiver),
             config_handler.sender(),
             stats_collector.clone(),
@@ -1105,21 +1116,23 @@ impl Components {
         );
 
         let sender_id = 4;
+        let prometheus_queue_name = "prometheus-to-sender";
         let (prometheus_sender, prometheus_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
-            "prometheus-to-sender",
+            prometheus_queue_name,
             &queue_debugger,
         );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "prometheus-to-sender".to_string()),
+                StatsOption::Tag("module", prometheus_queue_name.to_string()),
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
         let prometheus_uniform_sender = UniformSenderThread::new(
             sender_id,
+            prometheus_queue_name,
             Arc::new(prometheus_receiver),
             config_handler.sender(),
             stats_collector.clone(),
@@ -1127,21 +1140,23 @@ impl Components {
         );
 
         let sender_id = 5;
+        let telegraf_queue_name = "telegraf-to-sender";
         let (telegraf_sender, telegraf_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
-            "telegraf-to-sender",
+            telegraf_queue_name,
             &queue_debugger,
         );
         stats_collector.register_countable(
             "queue",
             Countable::Owned(Box::new(counter)),
             vec![
-                StatsOption::Tag("module", "telegraf-to-sender".to_string()),
+                StatsOption::Tag("module", telegraf_queue_name.to_string()),
                 StatsOption::Tag("index", sender_id.to_string()),
             ],
         );
         let telegraf_uniform_sender = UniformSenderThread::new(
             sender_id,
+            telegraf_queue_name,
             Arc::new(telegraf_receiver),
             config_handler.sender(),
             stats_collector.clone(),
