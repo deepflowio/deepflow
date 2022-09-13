@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-pub(crate) mod bytes;
 #[cfg(target_os = "linux")]
 pub(crate) mod cgroups;
 pub(crate) mod command;
@@ -31,6 +30,7 @@ pub(crate) mod queue;
 pub(crate) mod stats;
 
 pub use leaky_bucket::LeakyBucket;
+pub use public::bytes;
 
 #[cfg(test)]
 pub mod test;

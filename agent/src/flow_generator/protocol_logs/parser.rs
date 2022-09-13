@@ -38,8 +38,8 @@ use super::{
 use crate::{common::ebpf::EbpfType, flow_generator::protocol_logs::L7ProtoRawDataType};
 use crate::{
     common::{
-        enums::{EthernetType, PacketDirection},
-        flow::{get_uniq_flow_id_in_one_minute, L7Protocol},
+        enums::EthernetType,
+        flow::{get_uniq_flow_id_in_one_minute, L7Protocol, PacketDirection},
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,

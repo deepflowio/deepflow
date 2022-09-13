@@ -18,8 +18,7 @@ use std::cmp::max;
 use std::time::Duration;
 
 use crate::common::{
-    enums::PacketDirection,
-    flow::{FlowPerfStats, L4Protocol},
+    flow::{FlowPerfStats, L4Protocol, PacketDirection},
     meta_packet::MetaPacket,
 };
 use crate::flow_generator::error::{Error, Result};

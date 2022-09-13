@@ -14,8 +14,17 @@
  * limitations under the License.
  */
 
-pub mod bytes;
-pub mod counter;
-pub mod enums;
-pub mod error;
-pub mod packet;
+//! Enterprise Edition Feature: analyzer_mode
+use std::time::Duration;
+
+pub struct PacketDedupMap;
+
+impl PacketDedupMap {
+    pub fn new() -> Self {
+        PacketDedupMap
+    }
+
+    pub fn duplicate(&mut self, _: &mut [u8], _: Duration) -> bool {
+        unimplemented!();
+    }
+}

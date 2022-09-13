@@ -21,8 +21,8 @@ use crate::{
     common::{
         decapsulate::TunnelType,
         endpoint::EndpointData,
-        enums::{EthernetType, PacketDirection, TapType, TcpFlags},
-        flow::FlowMetricsPeer,
+        enums::{EthernetType, TapType, TcpFlags},
+        flow::{FlowMetricsPeer, PacketDirection},
         lookup_key::LookupKey,
         meta_packet::MetaPacket,
         tagged_flow::TaggedFlow,

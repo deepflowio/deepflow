@@ -35,8 +35,8 @@ use super::{
     consts::*,
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
-    enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TcpFlags},
-    flow::L7Protocol,
+    enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
+    flow::{L7Protocol, PacketDirection},
     lookup_key::LookupKey,
     tap_port::TapPort,
 };

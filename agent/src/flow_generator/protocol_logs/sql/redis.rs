@@ -23,7 +23,8 @@ use super::super::{
     LogMessageType,
 };
 
-use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::common::enums::IpProtocol;
+use crate::common::flow::PacketDirection;
 use crate::common::meta_packet::MetaPacket;
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
@@ -377,7 +378,7 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::enums::PacketDirection, utils::test::Capture};
+    use crate::{common::flow::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/redis";
 

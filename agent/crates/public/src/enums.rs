@@ -22,10 +22,6 @@ use bitflags::bitflags;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::Serialize;
 
-#[cfg(target_os = "linux")]
-use super::super::ebpf::{MSG_REQUEST, MSG_REQUEST_END, MSG_RESPONSE, MSG_RESPONSE_END};
-use super::flow::FlowMetricsPeer;
-
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
 #[derive(
@@ -126,6 +122,124 @@ impl PartialEq<IpProtocol> for u8 {
     }
 }
 
+impl From<IpProtocol> for u128 {
+    fn from(protocol: IpProtocol) -> Self {
+        let bitmap = if protocol == IpProtocol::Tcp {
+            1 << u8::from(L7Protocol::Http1)
+                | 1 << u8::from(L7Protocol::Http2)
+                | 1 << u8::from(L7Protocol::Dns)
+                | 1 << u8::from(L7Protocol::Mysql)
+                | 1 << u8::from(L7Protocol::Redis)
+                | 1 << u8::from(L7Protocol::Dubbo)
+                | 1 << u8::from(L7Protocol::Kafka)
+                | 1 << u8::from(L7Protocol::Mqtt)
+        } else {
+            1 << u8::from(L7Protocol::Dns)
+        };
+        return bitmap;
+    }
+}
+
+#[derive(Serialize, Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum L4Protocol {
+    Unknown = 0,
+    Tcp = 1,
+    Udp = 2,
+}
+
+impl From<IpProtocol> for L4Protocol {
+    fn from(proto: IpProtocol) -> Self {
+        match proto {
+            IpProtocol::Tcp => Self::Tcp,
+            IpProtocol::Udp => Self::Udp,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl Default for L4Protocol {
+    fn default() -> Self {
+        L4Protocol::Unknown
+    }
+}
+
+const L7_PROTOCOL_UNKNOWN: u8 = 0;
+const L7_PROTOCOL_OTHER: u8 = 1;
+const L7_PROTOCOL_HTTP1: u8 = 20;
+const L7_PROTOCOL_HTTP2: u8 = 21;
+const L7_PROTOCOL_HTTP1_TLS: u8 = 22;
+const L7_PROTOCOL_HTTP2_TLS: u8 = 23;
+const L7_PROTOCOL_DUBBO: u8 = 40;
+const L7_PROTOCOL_MYSQL: u8 = 60;
+const L7_PROTOCOL_REDIS: u8 = 80;
+const L7_PROTOCOL_KAFKA: u8 = 100;
+const L7_PROTOCOL_MQTT: u8 = 101;
+const L7_PROTOCOL_DNS: u8 = 120;
+const L7_PROTOCOL_MAX: u8 = 255;
+
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
+#[repr(u8)]
+pub enum L7Protocol {
+    Unknown = L7_PROTOCOL_UNKNOWN,
+    Other = L7_PROTOCOL_OTHER,
+    Http1 = L7_PROTOCOL_HTTP1,
+    Http2 = L7_PROTOCOL_HTTP2,
+    Http1TLS = L7_PROTOCOL_HTTP1_TLS,
+    Http2TLS = L7_PROTOCOL_HTTP2_TLS,
+    Dubbo = L7_PROTOCOL_DUBBO,
+    Mysql = L7_PROTOCOL_MYSQL,
+    Redis = L7_PROTOCOL_REDIS,
+    Kafka = L7_PROTOCOL_KAFKA,
+    Mqtt = L7_PROTOCOL_MQTT,
+    Dns = L7_PROTOCOL_DNS,
+    Max = L7_PROTOCOL_MAX,
+}
+
+impl Default for L7Protocol {
+    fn default() -> Self {
+        L7Protocol::Unknown
+    }
+}
+
+impl From<u8> for L7Protocol {
+    fn from(v: u8) -> Self {
+        match v {
+            L7_PROTOCOL_OTHER => L7Protocol::Other,
+            L7_PROTOCOL_HTTP1 => L7Protocol::Http1,
+            L7_PROTOCOL_HTTP2 => L7Protocol::Http2,
+            L7_PROTOCOL_HTTP1_TLS => L7Protocol::Http1TLS,
+            L7_PROTOCOL_HTTP2_TLS => L7Protocol::Http2TLS,
+            L7_PROTOCOL_DUBBO => L7Protocol::Dubbo,
+            L7_PROTOCOL_MYSQL => L7Protocol::Mysql,
+            L7_PROTOCOL_REDIS => L7Protocol::Redis,
+            L7_PROTOCOL_KAFKA => L7Protocol::Kafka,
+            L7_PROTOCOL_MQTT => L7Protocol::Mqtt,
+            L7_PROTOCOL_DNS => L7Protocol::Dns,
+            _ => L7Protocol::Unknown,
+        }
+    }
+}
+
+impl From<L7Protocol> for u8 {
+    fn from(v: L7Protocol) -> u8 {
+        match v {
+            L7Protocol::Other => L7_PROTOCOL_OTHER,
+            L7Protocol::Http1 => L7_PROTOCOL_HTTP1,
+            L7Protocol::Http2 => L7_PROTOCOL_HTTP2,
+            L7Protocol::Http1TLS => L7_PROTOCOL_HTTP1_TLS,
+            L7Protocol::Http2TLS => L7_PROTOCOL_HTTP2_TLS,
+            L7Protocol::Dubbo => L7_PROTOCOL_DUBBO,
+            L7Protocol::Mysql => L7_PROTOCOL_MYSQL,
+            L7Protocol::Redis => L7_PROTOCOL_REDIS,
+            L7Protocol::Kafka => L7_PROTOCOL_KAFKA,
+            L7Protocol::Mqtt => L7_PROTOCOL_MQTT,
+            L7Protocol::Dns => L7_PROTOCOL_DNS,
+            _ => L7_PROTOCOL_UNKNOWN,
+        }
+    }
+}
+
 // LinkType is an enumeration of link types, and acts as a decoder for any
 // link type it supports.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, TryFromPrimitive, IntoPrimitive)]
@@ -181,7 +295,7 @@ impl PartialEq<LinkType> for u8 {
     }
 }
 
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq, Ord)]
+#[derive(Serialize, Debug, Clone, Copy, Hash, PartialEq, Eq, Ord)]
 #[repr(u16)]
 pub enum TapType {
     Any,
@@ -377,37 +491,16 @@ impl TcpFlags {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum PacketDirection {
-    ClientToServer = FlowMetricsPeer::SRC,
-    ServerToClient = FlowMetricsPeer::DST,
-}
-
-impl PacketDirection {
-    pub fn reversed(&self) -> Self {
-        match self {
-            PacketDirection::ClientToServer => PacketDirection::ServerToClient,
-            PacketDirection::ServerToClient => PacketDirection::ClientToServer,
-        }
-    }
-}
-
-impl Default for PacketDirection {
-    fn default() -> PacketDirection {
-        PacketDirection::ClientToServer
-    }
-}
-
-#[cfg(target_os = "linux")]
-impl From<u8> for PacketDirection {
-    fn from(msg_type: u8) -> Self {
-        match msg_type {
-            MSG_REQUEST | MSG_REQUEST_END => Self::ClientToServer,
-            MSG_RESPONSE | MSG_RESPONSE_END => Self::ServerToClient,
-            _ => panic!("ebpf direction({}) unknown.", msg_type),
-        }
-    }
+// according to https://man7.org/linux/man-pages/man7/packet.7.html sll_pkttype
+pub enum LinuxSllPacketType {
+    Host = 0,      // To us
+    Broadcast = 1, // To all
+    Multicast = 2, // To group
+    OtherHost = 3, // To someone else
+    Outgoing = 4,  // Outgoing of any type
+    // These ones are invisible user level,
+    Loopback = 5,  // MC/BRD frame looped back
+    FastRoute = 6, // FastRoute frame
 }
 
 #[cfg(test)]

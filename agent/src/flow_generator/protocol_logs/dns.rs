@@ -23,8 +23,8 @@ use super::{
 
 use crate::{
     common::{
-        enums::{IpProtocol, PacketDirection},
-        flow::L7Protocol,
+        enums::IpProtocol,
+        flow::{L7Protocol, PacketDirection},
         meta_packet::MetaPacket,
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
@@ -442,7 +442,7 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::enums::PacketDirection, utils::test::Capture};
+    use crate::{common::flow::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/dns";
 

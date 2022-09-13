@@ -51,8 +51,8 @@ use serde::{Serialize, Serializer};
 use crate::{
     common::{
         ebpf::EbpfType,
-        enums::{IpProtocol, PacketDirection, TapType},
-        flow::L7Protocol,
+        enums::{IpProtocol, TapType},
+        flow::{L7Protocol, PacketDirection},
         meta_packet::MetaPacket,
         tap_port::TapPort,
     },

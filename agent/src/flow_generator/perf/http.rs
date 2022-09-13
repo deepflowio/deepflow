@@ -23,8 +23,8 @@ use crate::utils::net::h2pack;
 
 use crate::{
     common::{
-        enums::{IpProtocol, PacketDirection},
-        flow::{FlowPerfStats, L7PerfStats, L7Protocol},
+        enums::IpProtocol,
+        flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection},
         meta_packet::MetaPacket,
     },
     flow_generator::{

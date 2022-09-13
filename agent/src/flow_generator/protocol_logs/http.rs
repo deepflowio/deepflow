@@ -27,8 +27,8 @@ use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseSta
 use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
 use crate::common::ebpf::EbpfType;
-use crate::common::enums::{IpProtocol, PacketDirection};
-use crate::common::flow::L7Protocol;
+use crate::common::enums::IpProtocol;
+use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};

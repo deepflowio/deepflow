@@ -542,6 +542,7 @@ dependencies = [
  "npb_pcap_policy",
  "num_enum",
  "openshift-openapi",
+ "packet_dedup",
  "packet_sequence_block",
  "page_size",
  "parking_lot 0.11.2",
@@ -1636,6 +1637,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ff7415e9ae3fff1225851df9e0d9e4e5479f947619774677a63572e55e80eff"
 
 [[package]]
+name = "packet_dedup"
+version = "0.1.0"
+
+[[package]]
 name = "packet_sequence_block"
 version = "0.1.0"
 dependencies = [
@@ -2023,7 +2028,12 @@ dependencies = [
 name = "public"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "cadence",
+ "num_enum",
+ "serde",
+ "serde_json",
+ "serde_yaml",
  "thiserror",
 ]
 
