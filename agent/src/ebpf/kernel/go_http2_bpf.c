@@ -188,10 +188,11 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 static __inline void http2_fill_common_socket(struct http2_header_data *data,
 					      struct __socket_data *send_buffer)
 {
-	// source, coroutine_id, msg_type, timestamp
+	// source, coroutine_id, timestamp, comm
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
 	send_buffer->coroutine_id = get_current_goroutine();
 	send_buffer->timestamp = bpf_ktime_get_ns();
+	bpf_get_current_comm(send_buffer->comm, sizeof(send_buffer->comm));
 
 	// tcp_seq, direction
 	int tcp_seq;
