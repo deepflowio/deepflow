@@ -18,8 +18,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use lru::LruCache;
 
-use crate::common::enums::PacketDirection;
-use crate::common::flow::L7Protocol;
+use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::common::{L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL};
 

@@ -702,7 +702,7 @@ impl Synchronizer {
             *trident_state.lock().unwrap() = trident::State::Disabled;
         } else {
             *trident_state.lock().unwrap() =
-                trident::State::ConfigChanged((runtime_config, blacklist));
+                trident::State::ConfigChanged((runtime_config, blacklist, macs));
         }
         cvar.notify_one();
     }

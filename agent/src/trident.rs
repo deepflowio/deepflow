@@ -77,11 +77,11 @@ use crate::{
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, kernel_check,
-            running_in_container, trident_process_check,
+            running_in_container, tap_interface_check, trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
-        net::{get_ctrl_ip_and_mac, get_route_src_ip, links_by_name_regex},
+        net::{get_ctrl_ip_and_mac, get_route_src_ip, links_by_name_regex, MacAddr},
         queue,
         stats::{self, Countable, RefCountable, StatsOption},
         LeakyBucket,
@@ -92,13 +92,13 @@ const MINUTE: Duration = Duration::from_secs(60);
 
 pub enum State {
     Running,
-    ConfigChanged((RuntimeConfig, Vec<u64>)),
+    ConfigChanged((RuntimeConfig, Vec<u64>, Vec<MacAddr>)), // (runtime_config, blacklist, vm_mac_addrs)
     Terminated,
     Disabled, // 禁用状态
 }
 
 impl State {
-    fn unwrap_config(self) -> (RuntimeConfig, Vec<u64>) {
+    fn unwrap_config(self) -> (RuntimeConfig, Vec<u64>, Vec<MacAddr>) {
         match self {
             Self::ConfigChanged(c) => c,
             _ => panic!("not config type"),
@@ -370,7 +370,7 @@ impl Trident {
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
-            let (new_conf, blacklist) = new_state.unwrap_config();
+            let (new_conf, blacklist, vm_mac_addrs) = new_state.unwrap_config();
             if let Some(old_yaml) = yaml_conf {
                 if old_yaml != new_conf.yaml_config {
                     if let Some(mut c) = components.take() {
@@ -397,16 +397,12 @@ impl Trident {
                         policy_getter,
                         exception_handler.clone(),
                         remote_log_config.clone(),
+                        vm_mac_addrs,
                     )?;
                     comp.start();
                     for callback in callbacks {
                         callback(&config_handler, &mut comp);
                     }
-                    dispatcher_listener_callback(
-                        &config_handler.candidate_config.dispatcher,
-                        &comp,
-                        blacklist,
-                    );
                     components.replace(comp);
                 }
                 Some(components) => {
@@ -416,6 +412,7 @@ impl Trident {
                         &config_handler.candidate_config.dispatcher,
                         &components,
                         blacklist,
+                        vm_mac_addrs,
                     );
                     for callback in callbacks {
                         callback(&config_handler, components);
@@ -446,29 +443,27 @@ fn dispatcher_listener_callback(
     conf: &DispatcherConfig,
     components: &Components,
     blacklist: Vec<u64>,
+    vm_mac_addrs: Vec<MacAddr>,
 ) {
-    if conf.tap_mode == TapMode::Local {
-        let if_mac_source = conf.if_mac_source;
-        let links = match links_by_name_regex(&conf.tap_interface_regex) {
-            Err(e) => {
-                warn!("get interfaces by name regex failed: {}", e);
-                vec![]
-            }
-            Ok(links) => {
-                if links.is_empty() {
-                    warn!(
-                        "tap-interface-regex({}) do not match any interface, in local mode",
-                        conf.tap_interface_regex
-                    );
-                }
-                links
-            }
-        };
-        for listener in components.dispatcher_listeners.iter() {
-            listener.on_tap_interface_change(&links, if_mac_source, conf.trident_type, &blacklist);
+    let if_mac_source = conf.if_mac_source;
+    let links = match links_by_name_regex(&conf.tap_interface_regex) {
+        Err(e) => {
+            warn!("get interfaces by name regex failed: {}", e);
+            vec![]
         }
-    } else {
-        todo!()
+        Ok(links) => {
+            if links.is_empty() {
+                warn!(
+                    "tap-interface-regex({}) do not match any interface, in local mode",
+                    conf.tap_interface_regex
+                );
+            }
+            links
+        }
+    };
+    for listener in components.dispatcher_listeners.iter() {
+        listener.on_tap_interface_change(&links, if_mac_source, conf.trident_type, &blacklist);
+        listener.on_vm_change(&vm_mac_addrs);
     }
 }
 
@@ -700,6 +695,7 @@ impl Components {
         policy_getter: PolicyGetter,
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
+        vm_mac_addrs: Vec<MacAddr>,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -717,7 +713,10 @@ impl Components {
         ));
 
         match candidate_config.tap_mode {
-            TapMode::Analyzer => todo!(),
+            TapMode::Analyzer => {
+                kernel_check();
+                tap_interface_check(&yaml_config.src_interfaces);
+            }
             _ => {
                 // NPF服务检查
                 // TODO: npf (only on windows)
@@ -1095,6 +1094,7 @@ impl Components {
                 candidate_config.dispatcher.trident_type,
                 &vec![],
             );
+            dispatcher_listener.on_vm_change(&vm_mac_addrs);
 
             dispatchers.push(dispatcher);
             dispatcher_listeners.push(dispatcher_listener);
@@ -1403,7 +1403,6 @@ impl Components {
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
-        info!("Stopping components.");
 
         for d in self.dispatchers.iter_mut() {
             d.stop();

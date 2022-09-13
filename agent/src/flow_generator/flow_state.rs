@@ -694,8 +694,7 @@ mod tests {
     use crate::common::endpoint::{
         EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET,
     };
-    use crate::common::enums::PacketDirection;
-    use crate::common::flow::CloseType;
+    use crate::common::flow::{CloseType, PacketDirection};
     use crate::common::tagged_flow::TaggedFlow;
     use crate::flow_generator::flow_map::_new_flow_map_and_receiver;
     use crate::flow_generator::flow_node::FlowNode;

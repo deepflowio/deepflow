@@ -33,7 +33,8 @@ use super::super::{
 };
 
 use crate::{
-    common::enums::{IpProtocol, PacketDirection},
+    common::enums::IpProtocol,
+    common::flow::PacketDirection,
     common::meta_packet::MetaPacket,
     flow_generator::{
         error::{Error, Result},
@@ -759,7 +760,7 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::enums::PacketDirection, utils::test::Capture};
+    use crate::{common::flow::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/mqtt";
 

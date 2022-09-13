@@ -27,8 +27,8 @@ use lru::LruCache;
 use super::{Error, Result};
 
 use crate::common::ebpf::{get_all_protocols_by_ebpf_type, EbpfType};
-use crate::common::enums::{IpProtocol, PacketDirection};
-use crate::common::flow::L7Protocol;
+use crate::common::enums::IpProtocol;
+use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::debug::QueueDebugger;
@@ -370,24 +370,6 @@ struct FlowItem {
     is_skip: bool,
 
     parser: Option<Box<dyn L7LogParse>>,
-}
-
-impl From<IpProtocol> for u128 {
-    fn from(protocol: IpProtocol) -> Self {
-        let bitmap = if protocol == IpProtocol::Tcp {
-            1 << u8::from(L7Protocol::Http1)
-                | 1 << u8::from(L7Protocol::Http2)
-                | 1 << u8::from(L7Protocol::Dns)
-                | 1 << u8::from(L7Protocol::Mysql)
-                | 1 << u8::from(L7Protocol::Redis)
-                | 1 << u8::from(L7Protocol::Dubbo)
-                | 1 << u8::from(L7Protocol::Kafka)
-                | 1 << u8::from(L7Protocol::Mqtt)
-        } else {
-            1 << u8::from(L7Protocol::Dns)
-        };
-        return bitmap;
-    }
 }
 
 impl FlowItem {
