@@ -19,7 +19,7 @@ use std::{collections::HashMap, fmt};
 use log::{debug, warn};
 use nom::{
     bits, bytes,
-    combinator::{map, map_res, recognize},
+    combinator::map_res,
     error,
     multi::{many1, many1_count},
     number, sequence, IResult, Parser,
@@ -122,9 +122,9 @@ impl From<MqttInfo> for L7ProtocolSendLog {
         let version = Some(String::from(f.get_version_str()));
         let mut topic_str = String::new();
         match f.pkt_type {
-            PacketKind::Publish { .. } => {
+            PacketKind::Publish { qos, .. } => {
                 if let Some(t) = f.publish_topic {
-                    topic_str.push_str(format!("| topic: {}, qos: -1 |", t).as_str());
+                    topic_str.push_str(format!("| topic: {}, qos: {} |", t, qos as u32).as_str());
                 }
             }
             PacketKind::Unsubscribe | PacketKind::Subscribe => {
@@ -279,12 +279,6 @@ impl MqttLog {
                             .collect(),
                     );
                 }
-                PacketKind::Suback => {
-                    self.msg_type = LogMessageType::Response;
-                    info.res_msg_size = header.remaining_length;
-                    info.pkt_type = header.kind;
-                    info.version = self.version;
-                }
                 PacketKind::Unsubscribe => {
                     let (_, (_, reqs)) = mqtt_packet_identifier
                         .and(mqtt_unsubscription_requests)
@@ -309,7 +303,8 @@ impl MqttLog {
                     info.req_msg_size = header.remaining_length;
                     self.msg_type = LogMessageType::Request;
                 }
-                PacketKind::Pingresp
+                PacketKind::Suback
+                | PacketKind::Pingresp
                 | PacketKind::Pubcomp
                 | PacketKind::Pubrec
                 | PacketKind::Puback
@@ -483,9 +478,9 @@ impl Default for PacketKind {
 
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QualityOfService {
-    AtMostOnce,
-    AtLeastOnce,
-    ExactlyOnce,
+    AtMostOnce = 0,
+    AtLeastOnce = 1,
+    ExactlyOnce = 2,
 }
 
 impl Default for QualityOfService {
@@ -550,26 +545,54 @@ fn mqtt_packet_kind(input: &[u8]) -> IResult<&[u8], PacketKind> {
     Ok((input, kind))
 }
 
-fn decode_variable_length(bytes: &[u8]) -> u32 {
-    let mut output: u32 = 0;
-    for (exp, val) in bytes.iter().enumerate() {
-        output += (*val as u32 & 0b0111_1111) * 128u32.pow(exp as u32);
+fn decode_variable_length(input: &[u8]) -> IResult<&[u8], u32> {
+    let mut len: usize = 0;
+    let mut done = false;
+    let mut len_len = 0;
+    let mut shift = 0;
+
+    // Use continuation bit at position 7 to continue reading next
+    // byte to frame 'length'.
+    // Stream 0b1xxx_xxxx 0b1yyy_yyyy 0b1zzz_zzzz 0b0www_wwww will
+    // be framed as number 0bwww_wwww_zzz_zzzz_yyy_yyyy_xxx_xxxx
+    for &byte in input.iter() {
+        len_len += 1;
+        let byte = byte as usize;
+        len += (byte & 0x7F) << shift;
+
+        // stop when continue bit is 0
+        done = (byte & 0x80) == 0;
+        if done {
+            break;
+        }
+
+        shift += 7;
+
+        // Only a max of 4 bytes allowed for remaining length
+        // more than 4 shifts (0, 7, 14, 21) implies bad length
+        if shift > 21 {
+            return Err(nom::Err::Error(error::Error::new(
+                input,
+                error::ErrorKind::TooLarge,
+            )));
+        }
     }
 
-    output
+    // Not enough bytes to frame remaining length. wait for
+    // one more byte
+    if !done {
+        return Err(nom::Err::Error(error::Error::new(
+            input,
+            error::ErrorKind::Fail,
+        )));
+    }
+
+    Ok((&input[len_len..], len as u32))
 }
 
 pub fn mqtt_fixed_header(input: &[u8]) -> IResult<&[u8], PacketHeader> {
     let (input, kind) = mqtt_packet_kind(input)?;
-    let (input, remaining_length) = map(
-        recognize(
-            number::complete::u8.and(bytes::complete::take_while_m_n(0, 3, |b| {
-                b & 0b1000_0000 != 0
-            })),
-        ),
-        decode_variable_length,
-    )
-    .parse(input)?;
+    let (input, remaining_length) = decode_variable_length(input)?;
 
     Ok((
         input,
@@ -785,6 +808,7 @@ mod tests {
                 "mqtt_one_packet_multi_publish.pcap",
                 "mqtt_one_packet_multi_publish.result",
             ),
+            ("mqtt_pub.pcap", "mqtt_pub.result"),
         ];
 
         for item in files.iter() {
@@ -808,13 +832,15 @@ mod tests {
     fn check_variable_length_decoding() {
         let input = &[64];
 
-        let output = decode_variable_length(input);
+        let (input, output) = decode_variable_length(input).unwrap();
         assert_eq!(output, 64);
+        assert_eq!(input.len(), 0);
 
         let input = &[193, 2];
 
-        let output = decode_variable_length(input);
+        let (input, output) = decode_variable_length(input).unwrap();
         assert_eq!(output, 321);
+        assert_eq!(input.len(), 0);
     }
 
     #[test]
