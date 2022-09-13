@@ -23,7 +23,8 @@ use super::super::{
     L7Protocol, L7ResponseStatus, LogMessageType,
 };
 
-use crate::common::enums::{IpProtocol, PacketDirection};
+use crate::common::enums::IpProtocol;
+use crate::common::flow::PacketDirection;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
@@ -392,7 +393,7 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::enums::PacketDirection, utils::test::Capture};
+    use crate::{common::flow::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
 

@@ -35,14 +35,25 @@ use std::time::Duration;
 #[cfg(target_os = "linux")]
 use libc::c_int;
 use log::{debug, error, info, warn};
+use packet_dedup::*;
 #[cfg(target_os = "linux")]
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
+#[cfg(target_os = "linux")]
+use public::enums::LinuxSllPacketType::Outgoing;
+#[cfg(target_os = "windows")]
+use windows_recv_engine::WinPacket;
 
-use analyzer_mode_dispatcher::AnalyzerModeDispatcher;
+use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherListener}; // Enterprise Edition Feature: analyzer_mode
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
 use error::{Error, Result};
-use local_mode_dispatcher::LocalModeDispatcher;
+use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use mirror_mode_dispatcher::MirrorModeDispatcher;
+use recv_engine::RecvEngine;
+#[cfg(target_os = "linux")]
+use recv_engine::{
+    af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
+    DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
+};
 
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;
@@ -62,21 +73,9 @@ use crate::{
         LeakyBucket,
     },
 };
-use recv_engine::RecvEngine;
-#[cfg(target_os = "linux")]
-use recv_engine::{
-    af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, Tpacket},
-    DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
-};
-#[cfg(target_os = "windows")]
-use windows_recv_engine::WinPacket;
-
-use self::local_mode_dispatcher::LocalModeDispatcherListener;
-#[cfg(target_os = "linux")]
-use self::recv_engine::af_packet::RawInstruction;
 
 enum DispatcherFlavor {
-    Analyzer(AnalyzerModeDispatcher),
+    Analyzer(AnalyzerModeDispatcher), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcher),
     Mirror(MirrorModeDispatcher),
 }
@@ -84,7 +83,7 @@ enum DispatcherFlavor {
 impl DispatcherFlavor {
     fn init(&mut self) {
         match self {
-            DispatcherFlavor::Analyzer(d) => d.init(),
+            DispatcherFlavor::Analyzer(d) => d.base.init(), // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Local(d) => d.base.init(),
             DispatcherFlavor::Mirror(d) => d.init(),
         }
@@ -92,7 +91,7 @@ impl DispatcherFlavor {
 
     fn run(&mut self) {
         match self {
-            DispatcherFlavor::Analyzer(d) => d.run(),
+            DispatcherFlavor::Analyzer(d) => d.run(), // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Local(d) => d.run(),
             DispatcherFlavor::Mirror(d) => d.run(),
         }
@@ -100,6 +99,8 @@ impl DispatcherFlavor {
 
     fn listener(&self) -> DispatcherListener {
         match self {
+            // Enterprise Edition Feature: analyzer_mode
+            DispatcherFlavor::Analyzer(d) => DispatcherListener::Analyzer(d.listener()),
             DispatcherFlavor::Local(d) => DispatcherListener::Local(d.listener()),
             _ => todo!(),
         }
@@ -178,6 +179,7 @@ impl Dispatcher {
 
 #[derive(Clone)]
 pub enum DispatcherListener {
+    Analyzer(AnalyzerModeDispatcherListener), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcherListener),
 }
 
@@ -185,11 +187,18 @@ impl DispatcherListener {
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         match self {
             Self::Local(l) => l.on_config_change(config),
+            Self::Analyzer(l) => l.on_config_change(config), // Enterprise Edition Feature: analyzer_mode
         }
     }
 
-    pub fn on_vm_change(&self, _: &[MacAddr]) {
-        todo!()
+    pub fn on_vm_change(&self, vm_mac_addrs: &[MacAddr]) {
+        match self {
+            // Enterprise Edition Feature: analyzer_mode
+            Self::Analyzer(l) => {
+                l.on_vm_change(vm_mac_addrs);
+            }
+            _ => {}
+        }
     }
 
     pub fn on_tap_interface_change(
@@ -202,6 +211,10 @@ impl DispatcherListener {
         match self {
             Self::Local(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source, trident_type, blacklist)
+            }
+            // Enterprise Edition Feature: analyzer_mode
+            Self::Analyzer(l) => {
+                l.on_tap_interface_change(interfaces, if_mac_source);
             }
         }
     }
@@ -570,6 +583,7 @@ impl DispatcherBuilder {
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
         let tap_mode = options.tap_mode;
+        let snap_len = options.snap_len;
         let engine = if tap_mode == TapMode::Mirror && options.dpdk_conf.enabled {
             #[cfg(all(target_os = "linux", not(target_arch = "s390x")))]
             {
@@ -733,7 +747,45 @@ impl DispatcherBuilder {
                 DispatcherFlavor::Local(LocalModeDispatcher { base, extractor })
             }
             TapMode::Mirror => DispatcherFlavor::Mirror(MirrorModeDispatcher { base }),
-            TapMode::Analyzer => DispatcherFlavor::Analyzer(AnalyzerModeDispatcher { base }),
+            TapMode::Analyzer => {
+                #[cfg(target_os = "linux")]
+                {
+                    base.bpf_options
+                        .lock()
+                        .unwrap()
+                        .bpf_syntax
+                        .push(BpfSyntax::LoadExtension(LoadExtension {
+                            num: Extension::ExtType,
+                        }));
+                    base.bpf_options
+                        .lock()
+                        .unwrap()
+                        .bpf_syntax
+                        .push(BpfSyntax::JumpIf(JumpIf {
+                            cond: JumpTest::JumpNotEqual,
+                            val: Outgoing as u32,
+                            skip_true: 1,
+                            ..Default::default()
+                        }));
+                    base.bpf_options
+                        .lock()
+                        .unwrap()
+                        .bpf_syntax
+                        .push(BpfSyntax::RetConstant(RetConstant { val: 0 })); // Do not capture tx direction traffic
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    // TODO fill bpf_syntax_str
+                }
+
+                DispatcherFlavor::Analyzer(AnalyzerModeDispatcher {
+                    base,
+                    vm_mac_addrs: Arc::new(Mutex::new(Default::default())),
+                    dedup: PacketDedupMap::new(),
+                    tap_pipelines: Default::default(),
+                    pool_raw_size: snap_len,
+                })
+            }
             _ => {
                 return Err(Error::ConfigInvalid(format!(
                     "invalid tap mode {:?}",

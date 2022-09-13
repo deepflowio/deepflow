@@ -50,8 +50,11 @@ use super::{
 use crate::{
     common::{
         endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET},
-        enums::{EthernetType, HeaderType, IpProtocol, PacketDirection, TapType, TcpFlags},
-        flow::{CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, TunnelField},
+        enums::{EthernetType, HeaderType, IpProtocol, TapType, TcpFlags},
+        flow::{
+            CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, PacketDirection,
+            TunnelField,
+        },
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,

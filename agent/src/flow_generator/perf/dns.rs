@@ -264,7 +264,7 @@ mod tests {
 
     use super::*;
 
-    use crate::common::enums::PacketDirection;
+    use crate::common::flow::PacketDirection;
     use crate::utils::test::Capture;
 
     const FILE_DIR: &str = "resources/test/flow_generator/dns";

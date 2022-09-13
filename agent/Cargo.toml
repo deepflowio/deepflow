@@ -41,6 +41,7 @@ md-5 = "0.10.1"
 nom = "7.1.1"
 npb_pcap_policy = { path = "plugins/npb_pcap_policy" }
 num_enum = "0.5.6"
+packet_dedup = { path = "plugins/packet_dedup" }
 packet_sequence_block = { path = "plugins/packet_sequence_block" }
 page_size = "0.4.2"
 parking_lot = "0.11"
