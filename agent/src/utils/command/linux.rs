@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
-use std::{fs, io, path::Path, process::Command};
-
-use crate::error::{Error, Result};
+use std::{
+    fs,
+    io::{Error, ErrorKind, Result},
+    path::Path,
+    process::Command,
+};
 
 const OVS_INTERFACE_COLUMNS_OPTION: &str = "--columns=_uuid,external_ids,ifindex,mac,mac_in_use,name,ofport,options,other_config,status,type";
 const NEUTRON_OPENVSWITCH_AGENT: &str = "/usr/lib/systemd/system/neutron-openvswitch-agent.service";
@@ -107,9 +110,9 @@ pub fn get_bridge_mapping() -> Result<String> {
             "/etc/neutron/plugin.ini",
         ];
     }
+
     // 从配置文件找bridge_mappings
     // 一般来说只应该有一处配置；如果有多个，全部返回
-
     let mut bridge_mappings = "".to_string();
     for config_path in config_paths {
         let content = fs::read_to_string(config_path);
@@ -127,7 +130,10 @@ pub fn get_bridge_mapping() -> Result<String> {
         }
     }
     if bridge_mappings.is_empty() {
-        return Err(Error::NotFound("bridge_mappings not found".to_string()));
+        return Err(Error::new(
+            ErrorKind::Other,
+            "bridge_mappings not found".to_string(),
+        ));
     }
 
     Ok(bridge_mappings)
@@ -136,18 +142,20 @@ pub fn get_bridge_mapping() -> Result<String> {
 fn exec_command(program: &str, args: &[&str]) -> Result<String> {
     let output = Command::new(program).args(args).output()?;
     if output.status.success() {
-        Ok(String::from_utf8(output.stdout)?)
+        Ok(String::from_utf8(output.stdout)
+            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?)
     } else {
-        Ok(String::from_utf8(output.stderr)?)
+        Ok(String::from_utf8(output.stderr)
+            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?)
     }
 }
 
 pub fn get_all_vm_xml<P: AsRef<Path>>(xml_path: P) -> Result<String> {
     if !xml_path.as_ref().is_dir() {
-        return Err(Error::IoError(io::Error::new(
-            io::ErrorKind::Other,
+        return Err(Error::new(
+            ErrorKind::Other,
             format!("xml_path is not directory: {}", xml_path.as_ref().display()),
-        )));
+        ));
     }
     let mut files = vec![];
     for entry in fs::read_dir(xml_path)? {

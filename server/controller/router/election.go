@@ -13,10 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package router
 
-package common
+import (
+	"github.com/gin-gonic/gin"
 
-const (
-	CK_VERSION             = "v6.1.2.0" // 用于表示clickhouse的表版本号
-	DEFAULT_PCAP_DATA_PATH = "/var/lib/pcap"
+	"github.com/deepflowys/deepflow/server/controller/service"
 )
+
+func ElectionRouter(e *gin.Engine) {
+	e.GET("/v1/election-leader/", getLeaderInfo)
+}
+
+func getLeaderInfo(c *gin.Context) {
+	data, err := service.GetLeaderInfo()
+	JsonResponse(c, data, err)
+}

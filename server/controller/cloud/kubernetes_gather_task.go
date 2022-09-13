@@ -77,30 +77,35 @@ func (k *KubernetesGatherTask) GetResource() kubernetes_gather_model.KubernetesG
 
 func (k *KubernetesGatherTask) Start() {
 	go func() {
+		k.run()
 		// TODO 配置时间间隔
 		ticker := time.NewTicker(time.Minute)
 	LOOP:
 		for {
 			select {
 			case <-ticker.C:
-				log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name)
-				var err error
-				k.resource, err = k.kubernetesGather.GetKubernetesGatherData()
-				// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
-				if err != nil {
-					k.resource.ErrorMessage = err.Error()
-					if k.resource.ErrorState == 0 {
-						k.resource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
-					}
-				} else {
-					k.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
-				}
-				log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name)
+				k.run()
 			case <-k.kCtx.Done():
 				break LOOP
 			}
 		}
 	}()
+}
+
+func (k *KubernetesGatherTask) run() {
+	log.Infof("kubernetes gather (%s) assemble data starting", k.kubernetesGather.Name)
+	var err error
+	k.resource, err = k.kubernetesGather.GetKubernetesGatherData()
+	// 这里因为任务内部没有对成功的状态赋值状态码，在这里统一处理了
+	if err != nil {
+		k.resource.ErrorMessage = err.Error()
+		if k.resource.ErrorState == 0 {
+			k.resource.ErrorState = common.RESOURCE_STATE_CODE_EXCEPTION
+		}
+	} else {
+		k.resource.ErrorState = common.RESOURCE_STATE_CODE_SUCCESS
+	}
+	log.Infof("kubernetes gather (%s) assemble data complete", k.kubernetesGather.Name)
 }
 
 func (k *KubernetesGatherTask) Stop() {

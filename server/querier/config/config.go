@@ -39,7 +39,7 @@ type QuerierConfig struct {
 }
 
 type Clickhouse struct {
-	User           string `default:"default" yaml:"user"`
+	User           string `default:"default" yaml:"user-name"`
 	Password       string `default:"" yaml:"password"`
 	Host           string `default:"clickhouse" yaml:"host"`
 	Port           int    `default:"9000" yaml:"port"`

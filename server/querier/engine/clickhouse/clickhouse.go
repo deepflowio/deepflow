@@ -172,6 +172,10 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			if ok {
 				e.asTagMap[as] = strings.Trim(sqlparser.String(function.Name), "`")
 			}
+			binary, ok := item.Expr.(*sqlparser.BinaryExpr)
+			if ok {
+				e.asTagMap[as] = sqlparser.String(binary)
+			}
 		}
 	}
 	return nil
@@ -290,6 +294,13 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 		err := e.AddGroup(groupTag)
 		if err != nil {
 			return err
+		}
+		_, ok := e.asTagMap[groupTag]
+		if !ok {
+			err := e.AddTag(groupTag, "")
+			if err != nil {
+				return err
+			}
 		}
 		// TODO: 特殊处理塞进group的fromat中
 		whereStmt := Where{}

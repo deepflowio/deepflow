@@ -55,6 +55,8 @@ func (v *VPC) generateDBItemToAdd(cloudItem *cloudmodel.VPC) (*mysql.VPC, bool) 
 		CreateMethod: common.CREATE_METHOD_LEARN,
 		Domain:       v.cache.DomainLcuuid,
 		Region:       cloudItem.RegionLcuuid,
+		CIDR:         cloudItem.CIDR,
+		TunnelID:     cloudItem.TunnelID,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

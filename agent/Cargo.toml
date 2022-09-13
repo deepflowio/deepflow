@@ -58,8 +58,8 @@ tonic = "0.5.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 cgroups-rs = "0.2.9"
-k8s-openapi = { version = "^0.13", features = ["v1_19"] }
-kube = { version = "0.64", default-features = false, features = ["client", "derive", "runtime", "rustls-tls"] }
+k8s-openapi = { version = "^0.15", features = ["v1_19"] }
+kube = { version = "0.74", default-features = false, features = ["client", "derive", "runtime", "rustls-tls"] }
 libc = "0.2.103"
 neli = "0.5.3"
 nix = "0.23"
