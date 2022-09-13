@@ -143,6 +143,9 @@ func (c *Cloud) run() {
 	if err := c.platform.CheckAuth(); err != nil {
 		log.Error("cloud (%s) check auth failed", c.basicInfo)
 	}
+	log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name)
+	c.getCloudData()
+	log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
 
 	ticker := time.NewTicker(time.Second * c.basicInfo.Interval)
 LOOP:
