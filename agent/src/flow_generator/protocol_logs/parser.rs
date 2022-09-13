@@ -315,9 +315,6 @@ impl SessionQueue {
         let key = Self::calc_key(&item);
         match item.base_info.head.msg_type {
             LogMessageType::Request => {
-                if let AppProtoLogsInfo::Mqtt(ref m) = item.special_info {
-                    info!("zhicong request {:?} {:?}", item.base_info.head, m);
-                }
                 // request，放入map
                 if let Some(p) = map.remove(&key) {
                     // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
@@ -339,22 +336,13 @@ impl SessionQueue {
                     if request.base_info.head.proto == item.base_info.head.proto {
                         self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                         self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        if let AppProtoLogsInfo::Mqtt(ref m) = item.special_info {
-                            info!("zhicong response merge {:?} {:?}", item.base_info.head, m);
-                        }
                         request.session_merge(item);
                         self.send(request);
                     } else {
-                        if let AppProtoLogsInfo::Mqtt(ref m) = item.special_info {
-                            info!("zhicong key1 response {:?} {:?}", item.base_info.head, m);
-                        }
                         map.insert(key, request);
                         self.send(item);
                     }
                 } else {
-                    if let AppProtoLogsInfo::Mqtt(ref m) = item.special_info {
-                        info!("zhicong key2 response {:?} {:?}", item.base_info.head, m);
-                    }
                     self.send(item);
                 }
             }
@@ -642,7 +630,7 @@ impl AppProtoLogsParser {
                 vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             L7Protocol::Mqtt => {
-                app_logs.mqtt.parse(
+                let heads = app_logs.mqtt.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
@@ -655,10 +643,13 @@ impl AppProtoLogsParser {
 
                 let result = special_info
                     .into_iter()
-                    .map(|v| {
+                    .zip(heads.into_iter())
+                    .map(|(v, head)| {
+                        let mut mqtt_base_info = base_info.clone();
+                        mqtt_base_info.head.msg_type = head.msg_type;
                         app_logs
                             .mqtt
-                            .amend_mqtt_proto_log_and_generate_log_data(v, base_info.clone())
+                            .amend_mqtt_proto_log_and_generate_log_data(v, mqtt_base_info)
                     })
                     .collect::<Result<Vec<_>>>()?;
 
