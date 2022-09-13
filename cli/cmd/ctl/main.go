@@ -17,26 +17,19 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 
 	"github.com/deepflowys/deepflow/cli/ctl"
 )
 
-var version = flag.Bool("v", false, "Display the version")
 var RevCount, Revision, CommitDate, goVersion string
 
 func main() {
-	flag.Parse()
-	if *version {
-		fmt.Printf(
-			"%s %s %s\n%s\n%s\n",
-			RevCount, Revision, CommitDate,
-			"deepflow-ctl community edition",
-			goVersion,
-		)
-		return
-	}
-
-	ctl.Execute()
+	version := fmt.Sprintf(
+		"%s %s %s\n%s\n%s\n",
+		RevCount, Revision, CommitDate,
+		"deepflow-ctl community edition",
+		goVersion,
+	)
+	ctl.Execute(version)
 }
