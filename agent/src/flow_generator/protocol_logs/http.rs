@@ -97,7 +97,7 @@ impl HttpInfo {
         if other.status_code != 0 {
             self.status_code = other.status_code;
         }
-        
+
         if self.req_content_length.is_none() && other.req_content_length.is_some() {
             self.req_content_length = other.req_content_length;
         }
@@ -466,7 +466,6 @@ impl HttpLog {
                                 .parse::<u64>()
                                 .unwrap_or_default(),
                         )
-
                     }
                 }
                 header_frame_parsed = true;
@@ -901,9 +900,10 @@ mod tests {
     use std::mem::size_of;
     use std::path::Path;
     use std::slice::from_raw_parts;
-    use crate::utils::test::Capture;
 
     use super::*;
+
+    use crate::utils::test::Capture;
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 
