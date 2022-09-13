@@ -15,6 +15,7 @@
  */
 
 extern crate libc;
+
 pub use libc::c_char;
 pub use libc::c_int;
 pub use libc::c_uchar; //u8
@@ -40,7 +41,9 @@ pub const SOCK_DATA_HTTP1: u16 = 20;
 #[allow(dead_code)]
 pub const SOCK_DATA_HTTP2: u16 = 21;
 #[allow(dead_code)]
-pub const SOCK_DATA_GO_TLS_HTTP1: u16 = 22;
+pub const SOCK_DATA_TLS_HTTP1: u16 = 22;
+#[allow(dead_code)]
+pub const SOCK_DATA_TLS_HTTP2: u16 = 23;
 #[allow(dead_code)]
 pub const SOCK_DATA_DUBBO: u16 = 40;
 #[allow(dead_code)]
@@ -68,11 +71,17 @@ pub const TRACER_RUNNING: u8 = 1;
 #[allow(dead_code)]
 pub const TRACER_STOP: u8 = 2;
 
-//消息类型
+// 消息类型
+// 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
+// go http2 uprobe 目前 只用了MSG_RESPONSE_END, 用于判断流结束.
 #[allow(dead_code)]
 pub const MSG_REQUEST: u8 = 1;
 #[allow(dead_code)]
 pub const MSG_RESPONSE: u8 = 2;
+#[allow(dead_code)]
+pub const MSG_REQUEST_END: u8 = 3;
+#[allow(dead_code)]
+pub const MSG_RESPONSE_END: u8 = 4;
 
 //Register event types
 #[allow(dead_code)]
@@ -107,6 +116,7 @@ pub struct SK_BPF_DATA {
     pub process_id: u32,   // tgid in kernel struct task_struct
     pub thread_id: u32,    // pid in kernel struct task_struct, main thread iff pid==tgid
     pub coroutine_id: u64, // CoroutineID, i.e., golang goroutine id
+    pub source: u8,        // SYSCALL,GO_TLS_UPROBE,GO_HTTP2_UPROBE
 
     pub process_name: [u8; 16usize], //进程或线程名字，占用16bytes
 
@@ -124,8 +134,9 @@ pub struct SK_BPF_DATA {
      * 上面保证任何时刻启动程序在当前机器下获取的socket_id都是唯一的。
      */
     pub socket_id: u64,
-    pub l7_protocal_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
+    pub l7_protocol_hint: u16, // 应用数据（cap_data）的协议，取值：SOCK_DATA_*（在上面定义）
     // 存在一定误判性（例如标识为A协议但实际上是未知协议，或标识为多种协议），上层应用应继续深入判断
+    // 目前只有 source=EBPF_TYPE_GO_HTTP2_UPROBE 时,msg_type的判断是准确的.
     pub msg_type: u8, // 信息类型，值为MSG_REQUEST(1), MSG_RESPONSE(2), 需要应用层分析进一步确认。
     pub need_reconfirm: bool, // true: 表示eBPF程序对L7协议类型的判断并不确定需要上层重新核实。
     // false: 表示eBPF程序对L7协议类型的判断是有把握的不需要上层重新核实。
@@ -223,7 +234,7 @@ impl fmt::Display for SK_BPF_DATA {
                 port_dst,
                 self.tcp_seq,
                 self.syscall_trace_id_call,
-                self.l7_protocal_hint,
+                self.l7_protocol_hint,
                 data_bytes
             )
         }

@@ -244,6 +244,9 @@ ingester:
   ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #stream-roze-enabled: true
 
+  # whether to enable deepflow-aget syslog to write to files in syslog-directory
+  #agent-log-to-file: false
+
   ## syslog存储位置
   #syslog-directory: /var/log/deepflow-agent
 

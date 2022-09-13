@@ -49,6 +49,7 @@ type Config struct {
 	Queue           QueueConfig   `yaml:"queue"`
 	RpcTimeout      time.Duration `yaml:"rpc-timeout"`
 	PCap            PCapConfig    `yaml:"pcap"`
+	AgentLogToFile  bool          `yaml:"agent-log-to-file"`
 	SyslogDirectory string        `yaml:"syslog-directory"`
 	ESSyslog        bool          `yaml:"es-syslog"`
 }

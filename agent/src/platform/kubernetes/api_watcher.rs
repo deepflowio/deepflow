@@ -220,9 +220,10 @@ impl ApiWatcher {
         err_msgs: &Arc<Mutex<Vec<String>>>,
         namespace: Option<&str>,
     ) -> Result<(HashMap<String, GenericResourceWatcher>, Vec<JoinHandle<()>>)> {
-        let config = Config::infer().await.map_err(|e| {
+        let mut config = Config::infer().await.map_err(|e| {
             Error::KubernetesApiWatcher(format!("failed to infer kubernetes config: {}", e))
         })?;
+        config.accept_invalid_certs = true;
         info!("api server url is: {}", config.cluster_url);
         let client = match Client::try_from(config) {
             Ok(c) => c,

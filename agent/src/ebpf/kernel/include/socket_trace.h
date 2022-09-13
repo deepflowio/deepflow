@@ -145,13 +145,20 @@ struct conn_info_t {
 	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
 };
 
+enum process_data_extra_source {
+	DATA_SOURCE_SYSCALL,
+	DATA_SOURCE_GO_TLS_UPROBE,
+	DATA_SOURCE_GO_HTTP2_UPROBE,
+};
+
 struct process_data_extra {
 	bool vecs : 1;
-	bool go : 1;
-	bool tls : 1;
-	bool use_tcp_seq : 1;
+	enum process_data_extra_source source;
+	enum traffic_protocol protocol;
 	__u32 tcp_seq;
 	__u64 coroutine_id;
+	enum traffic_direction direction;
+	enum message_type message_type;
 };
 
 enum syscall_src_func {
@@ -252,18 +259,27 @@ static __inline __u64 gen_conn_key_id(__u64 param_1, __u64 param_2)
 
 #define MAX_SYSTEM_THREADS 40960
 
-struct go_interface
-{
-	long long type;
+struct go_interface {
+	unsigned long long type;
 	void *ptr;
 };
 
-struct tls_conn
-{
+struct go_slice {
+	void *ptr;
+	unsigned long long len;
+	unsigned long long cap;
+};
+
+struct go_string {
+	const char *ptr;
+	unsigned long long len;
+};
+
+struct tls_conn {
 	int fd;
 	char *buffer;
 	__u32 tcp_seq;
-	void* sp; // stack pointer
+	void *sp; // stack pointer
 };
 
 struct tls_conn_key
@@ -273,9 +289,13 @@ struct tls_conn_key
 };
 
 #ifdef BPF_USE_CORE
+// 函数参数寄存器
 #define rax ax
 #define rbx bx
 #define rcx cx
+#define rdi di
+#define rsi si
+// 栈指针寄存器
 #define rsp sp
 #endif
 
