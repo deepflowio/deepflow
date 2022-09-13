@@ -22,6 +22,7 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/config"
 	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
+	rozeconfig "github.com/deepflowys/deepflow/server/ingester/roze/config"
 	"github.com/deepflowys/deepflow/server/libs/app"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
@@ -37,13 +38,13 @@ type DbWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabled bool, ckWriterCfg config.CKWriterConfig) (*DbWriter, error) {
+func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabled bool, ckWriterCfg config.CKWriterConfig, flowMetricsTtl rozeconfig.FlowMetricsTTL) (*DbWriter, error) {
 	ckwriters := []*ckwriter.CKWriter{}
 	engine := ckdb.MergeTree
 	if replicaEnabled {
 		engine = ckdb.ReplicatedMergeTree
 	}
-	tables := zerodoc.GetMetricsTables(engine, common.CK_VERSION)
+	tables := zerodoc.GetMetricsTables(engine, common.CK_VERSION, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S)
 	for _, table := range tables {
 		counterName := "metrics_1m"
 		if table.ID >= uint8(zerodoc.VTAP_FLOW_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_FLOW_EDGE_PORT_1S) {
