@@ -17,6 +17,7 @@
 #ifndef _BPF_SYMBOL_H_
 #define _BPF_SYMBOL_H_
 #include <stdint.h>
+#include "list.h"
 
 #define FUNC_RET_MAX 32
 

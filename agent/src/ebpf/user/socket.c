@@ -16,7 +16,6 @@
 
 #define _GNU_SOURCE
 #include <arpa/inet.h>
-#include "libbpf/include/linux/err.h"
 #include <sched.h>
 #include <sys/prctl.h>
 #include "symbol.h"
@@ -27,10 +26,11 @@
 #include "socket.h"
 #include "log.h"
 #include "go_tracer.h"
+#include "load.h"
+#include "btf_vmlinux.h"
 
 #include "socket_trace_bpf_common.c"
 #include "socket_trace_bpf_5_2.c"
-#include "socket_trace_bpf_core.c"
 
 // eBPF Map Name
 #define MAP_MEMBERS_OFFSET_NAME		"__members_offset"
@@ -47,7 +47,7 @@
 static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
 static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
 
-static struct list_head events_list;		// Use for extra register events
+static struct list_head events_list;	// Use for extra register events
 
 static pthread_t proc_events_pthread;	// Process exec/exit thread
 
@@ -71,6 +71,8 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 static bool is_adapt_success(struct bpf_tracer *t);
 static int socket_tracer_stop(void);
 static int socket_tracer_start(void);
+static int update_offsets_table(struct bpf_tracer *t,
+				struct bpf_offset_param *offset);
 
 static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 {
@@ -264,7 +266,7 @@ static int socktrace_sockopt_set(sockoptid_t opt, const void *conf, size_t size)
 static bool bpf_offset_map_collect(struct bpf_tracer *tracer,
 				   struct bpf_offset_param_array *array)
 {
-	int nr_cpus = libbpf_num_possible_cpus();
+	int nr_cpus = get_num_possible_cpus();
 	struct bpf_offset_param values[nr_cpus];
 	if (!bpf_table_get_value(tracer, MAP_MEMBERS_OFFSET_NAME, 0, values))
 		return false;
@@ -352,8 +354,7 @@ static inline int dispatch_queue_index(uint64_t val, int count)
 // Some event types of data are handled by the user using a separate callback interface,
 // which completes the dispatch logic after reading the data from the Perf-Reader.
 static int register_events_handle(struct event_meta *meta,
-				  int size,
-				  struct bpf_tracer *tracer)
+				  int size, struct bpf_tracer *tracer)
 {
 	// Internal logic processing for process exec/exit.
 	if (meta->event_type == EVENT_TYPE_PROC_EXEC ||
@@ -379,12 +380,12 @@ static int register_events_handle(struct event_meta *meta,
 	int nr;
 	struct mem_block_head *block_head;
 
-	q_idx = dispatch_queue_index((uint64_t)meta->event_type,
+	q_idx = dispatch_queue_index((uint64_t) meta->event_type,
 				     tracer->dispatch_workers_nr);
 	q = &tracer->queues[q_idx];
 	block_head = malloc(sizeof(struct mem_block_head) + size);
 	if (block_head == NULL) {
-		ebpf_warning("block_head alloc memory faild\n");
+		ebpf_warning("block_head alloc memory failed\n");
 		return ETR_NOMEM;
 	}
 
@@ -394,7 +395,7 @@ static int register_events_handle(struct event_meta *meta,
 	if (nr < 1) {
 		atomic64_add(&q->enqueue_lost, 1);
 		free(block_head);
-		ebpf_warning("Add ring(q:%d) faild\n", q_idx);
+		ebpf_warning("Add ring(q:%d) failed\n", q_idx);
 		return ETR_NOROOM;
 	}
 
@@ -440,7 +441,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	int q_idx;
 	struct queue *q;
 	int nr;
-	struct mem_block_head *block_head;      // 申请内存块的指针
+	struct mem_block_head *block_head;	// 申请内存块的指针
 
 	struct __socket_data_buffer *buf = (struct __socket_data_buffer *)raw;
 	int i, start = 0;
@@ -448,7 +449,8 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 
 	// 确定分发到哪个队列上，通过第一个socket_data来确定
 	sd = (struct __socket_data *)&buf->data[start];
-	q_idx = dispatch_queue_index(sd->socket_id, tracer->dispatch_workers_nr);
+	q_idx =
+	    dispatch_queue_index(sd->socket_id, tracer->dispatch_workers_nr);
 	q = &tracer->queues[q_idx];
 
 	if (buf->events_num > MAX_PKT_BURST) {
@@ -492,7 +494,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 	void *socket_data_buff = malloc(alloc_len);
 	if (socket_data_buff == NULL) {
 		ebpf_warning("malloc() error.\n");
-		atomic64_inc(&q->heap_get_faild);
+		atomic64_inc(&q->heap_get_failed);
 		return;
 	}
 
@@ -599,19 +601,24 @@ static void reader_lost_cb(void *t, uint64_t lost)
 
 static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 {
-	struct bpf_map *map =
-	    bpf_object__find_map_by_name(tracer->pobj, MAP_TRACE_NAME);
-	int map_fd = bpf_map__fd(map);
+	struct ebpf_map *map =
+	    ebpf_obj__get_map_by_name(tracer->obj, MAP_TRACE_NAME);
+	if (map == NULL) {
+		ebpf_warning("[%s] map(name:%s) is NULL.\n", __func__,
+			     MAP_TRACE_NAME);
+		return;
+	}
+	int map_fd = map->fd;
 
 	uint64_t trace_key = 0, next_trace_key;
 	uint32_t reclaim_count = 0;
 	struct trace_info_t value;
 	uint32_t uptime = get_sys_uptime();
 
-	while (bpf_map_get_next_key(map_fd, &trace_key, &next_trace_key) == 0) {
-		if (bpf_map_lookup_elem(map_fd, &next_trace_key, &value) == 0) {
+	while (bpf_get_next_key(map_fd, &trace_key, &next_trace_key) == 0) {
+		if (bpf_lookup_elem(map_fd, &next_trace_key, &value) == 0) {
 			if (uptime - value.update_time > timeout) {
-				bpf_map_delete_elem(map_fd, &next_trace_key);
+				bpf_delete_elem(map_fd, &next_trace_key);
 				reclaim_count++;
 			}
 		}
@@ -626,9 +633,13 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 
 static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 {
-	struct bpf_map *map =
-	    bpf_object__find_map_by_name(tracer->pobj, MAP_SOCKET_INFO_NAME);
-	int map_fd = bpf_map__fd(map);
+	struct ebpf_map *map =
+	    ebpf_obj__get_map_by_name(tracer->obj, MAP_SOCKET_INFO_NAME);
+	if (map == NULL) {
+		ebpf_warning("[%s] map(name:%s) is NULL.\n", __func__,
+			     MAP_SOCKET_INFO_NAME);
+	}
+	int map_fd = map->fd;
 
 	uint64_t conn_key, next_conn_key;
 	uint32_t sockets_reclaim_count = 0;
@@ -636,10 +647,10 @@ static void reclaim_socket_map(struct bpf_tracer *tracer, uint32_t timeout)
 	conn_key = 0;
 	uint32_t uptime = get_sys_uptime();
 
-	while (bpf_map_get_next_key(map_fd, &conn_key, &next_conn_key) == 0) {
-		if (bpf_map_lookup_elem(map_fd, &next_conn_key, &value) == 0) {
+	while (bpf_get_next_key(map_fd, &conn_key, &next_conn_key) == 0) {
+		if (bpf_lookup_elem(map_fd, &next_conn_key, &value) == 0) {
 			if (uptime - value.update_time > timeout) {
-				bpf_map_delete_elem(map_fd, &next_conn_key);
+				bpf_delete_elem(map_fd, &next_conn_key);
 				sockets_reclaim_count++;
 			}
 		}
@@ -711,8 +722,56 @@ static int check_kern_adapt_and_state_update(void)
 // Manage process start or exit events.
 static void process_events_handle_main(__unused void *arg)
 {
-	prctl(PR_SET_NAME,"proc-events");
+	prctl(PR_SET_NAME, "proc-events");
 	go_process_events_handle();
+}
+
+static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
+{
+	struct ebpf_object *obj = t->obj;
+	if (DF_IS_ERR_OR_NULL(obj->btf_vmlinux)) {
+		ebpf_info("btf_vmlinux is null.\n");
+		return ETR_NOTSUPP;
+	}
+
+	int copied_seq_offs, write_seq_offs, files_offs, sk_flags_offs;
+	copied_seq_offs =
+	    kernel_struct_field_offset(obj, "tcp_sock", "copied_seq");
+	write_seq_offs =
+	    kernel_struct_field_offset(obj, "tcp_sock", "write_seq");
+	files_offs = kernel_struct_field_offset(obj, "task_struct", "files");
+	sk_flags_offs =
+	    kernel_struct_field_offset(obj, "sock", "__sk_flags_offset");
+	if (sk_flags_offs == ETR_NOTEXIST) {
+		sk_flags_offs =
+		    kernel_struct_field_offset(obj, "sock", "sk_pacing_shift");
+	}
+
+	if (copied_seq_offs < 0 || write_seq_offs < 0 ||
+	    files_offs < 0 || sk_flags_offs < 0) {
+		return ETR_NOTSUPP;
+	}
+
+	ebpf_info("Offsets from BTF vmlinux:\n");
+	ebpf_info("    copied_seq_offs: 0x%x\n", copied_seq_offs);
+	ebpf_info("    write_seq_offs: 0x%x\n", write_seq_offs);
+	ebpf_info("    files_offs: 0x%x\n", files_offs);
+	ebpf_info("    sk_flags_offs: 0x%x\n", sk_flags_offs);
+
+	struct bpf_offset_param offset;
+	offset.ready = 1;
+	offset.task__files_offset = files_offs;
+	offset.sock__flags_offset = sk_flags_offs;
+	offset.socket__has_wq_ptr = 0;
+	offset.tcp_sock__copied_seq_offset = copied_seq_offs;
+	offset.tcp_sock__write_seq_offset = write_seq_offs;
+
+	if (update_offsets_table(t, &offset) != ETR_OK) {
+		ebpf_warning("Update offsets map failed.\n");
+		return ETR_UPDATE_MAP_FAILD;
+	}
+
+	return ETR_OK;
 }
 
 /**
@@ -741,7 +800,7 @@ static void process_events_handle_main(__unused void *arg)
  *     Indicates the maximum threshold for clearing socket MAP entries.
  *     If the number of current map entries exceeds this threshold, the MAP will be cleared.
  *
- * @return value: 0 on success, if not 0 is faild
+ * @return value: 0 on success, if not 0 is failed
  */
 int running_socket_tracer(l7_handle_fn handle,
 			  int thread_nr,
@@ -765,12 +824,7 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 	}
 
-	if (is_core_kernel()) {
-		snprintf(bpf_load_buffer_name, NAME_LEN,
-			 "socket-trace-bpf-linux-core");
-		bpf_bin_buffer = (void *)socket_trace_core_ebpf_data;
-		buffer_sz = sizeof(socket_trace_core_ebpf_data);
-	} else if (major == 5 && minor == 2) {
+	if (major == 5 && minor == 2) {
 		snprintf(bpf_load_buffer_name, NAME_LEN,
 			 "socket-trace-bpf-linux-5.2");
 		bpf_bin_buffer = (void *)socket_trace_5_2_ebpf_data;
@@ -783,7 +837,10 @@ int running_socket_tracer(l7_handle_fn handle,
 	}
 
 	// Initialize events_list
-	INIT_LIST_HEAD(&events_list);
+	if (events_list.next == events_list.prev &&
+		events_list.next == NULL) {
+		init_list_head(&events_list);
+	}
 
 	struct tracer_probes_conf *tps =
 	    malloc(sizeof(struct tracer_probes_conf));
@@ -792,7 +849,7 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -ENOMEM;
 	}
 	memset(tps, 0, sizeof(*tps));
-	INIT_LIST_HEAD(&tps->uprobe_syms_head);
+	init_list_head(&tps->uprobe_syms_head);
 	socket_tracer_set_probes(tps);
 	struct bpf_tracer *tracer =
 	    create_bpf_tracer(SK_TRACER_NAME, bpf_load_buffer_name,
@@ -831,6 +888,13 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	if (tracer_probes_init(tracer))
 		return -EINVAL;
+
+	// Update kernel offsets map from btf vmlinux file.
+	if (update_offset_map_from_btf_vmlinux(tracer) != ETR_OK) {
+		ebpf_info("Set offsets map from btf_vmlinux, not support.\n");
+	} else {
+		ebpf_info("Set offsets map from btf_vmlinux, success.\n");
+	}
 
 	// Update go offsets to eBPF "proc_info_map" 
 	update_proc_info_to_map(tracer);
@@ -892,8 +956,8 @@ int running_socket_tracer(l7_handle_fn handle,
 			   (void *)&process_events_handle_main, NULL);
 	if (ret) {
 		ebpf_info
-			("<%s> proc_events_pthread, pthread_create is error:%s\n",
-			 __func__, strerror(errno));
+		    ("<%s> proc_events_pthread, pthread_create is error:%s\n",
+		     __func__, strerror(errno));
 		return ret;
 	}
 
@@ -955,7 +1019,6 @@ static int socket_tracer_start(void)
 		    ("socket_tracer state is already TRACER_RUNNING, without operating.\n");
 		return 0;
 	}
-
 	// Protect the probes operation in multiple threads, similar to socket_tracer_stop()
 	pthread_mutex_lock(&t->mutex_probes_lock);
 	if ((ret = tracer_hooks_attach(t)) == 0) {
@@ -971,7 +1034,7 @@ static int socket_tracer_start(void)
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total)
 {
-	int nr_cpus = libbpf_num_possible_cpus();
+	int nr_cpus = get_num_possible_cpus();
 	struct trace_stats values[nr_cpus];
 	memset(values, 0, sizeof(values));
 
@@ -990,7 +1053,8 @@ static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 }
 
 // Update offsets tables for all cpus
-static int update_offsets_table(struct bpf_tracer *t, struct bpf_offset_param *offset)
+static int update_offsets_table(struct bpf_tracer *t,
+				struct bpf_offset_param *offset)
 {
 	struct bpf_offset_param offs[MAX_CPU_NR];
 	int i;
@@ -1031,10 +1095,14 @@ static bool is_adapt_success(struct bpf_tracer *t)
 			if (!cpu_online[i])
 				continue;
 			if (offset[i].ready == 1) {
-				if (update_offsets_table(t, &offset[i]) == ETR_OK)
+				// Update all cpus offset map.
+				if (update_offsets_table(t, &offset[i]) ==
+				    ETR_OK) {
 					is_success = true;
-				else
+				} else {
 					is_success = false;
+				}
+
 				break;
 			}
 		}
@@ -1081,7 +1149,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 		stats.queue_burst_count +=
 		    atomic64_read(&t->queues[i].burst_count);
 		stats.mem_alloc_fail_count +=
-		    atomic64_read(&t->queues[i].heap_get_faild);
+		    atomic64_read(&t->queues[i].heap_get_failed);
 	}
 
 	stats.is_adapt_success = t->adapt_success;
@@ -1100,7 +1168,7 @@ struct socket_trace_stats socket_tracer_stats(void)
  * @type Event type
  * @fn Callback function
  *
- * @return 0 is success, if not 0 is faild
+ * @return 0 is success, if not 0 is failed
  */
 int register_event_handle(uint32_t type, void (*fn)(void *))
 {
@@ -1114,12 +1182,12 @@ int register_event_handle(uint32_t type, void (*fn)(void *))
 	// Initialize events_list
 	if (events_head->next == events_head->prev &&
 	    events_head->next == NULL) {
-		INIT_LIST_HEAD(events_head);
+		init_list_head(events_head);
 	}
 
 	struct extra_event *event = calloc(1, sizeof(struct extra_event));
 	if (event == NULL) {
-		ebpf_warning("calloc() is faild.\n");
+		ebpf_warning("calloc() is failed.\n");
 		return -1;
 	}
 
@@ -1319,8 +1387,8 @@ void print_dns_info(const char *data, int len)
 					answers[i].rdata[j] = reader[j];
 
 				answers[i].rdata[ntohs
-						 (answers[i].
-						  resource->data_len)]
+						 (answers[i].resource->
+						  data_len)]
 				    = '\0';
 
 				reader =

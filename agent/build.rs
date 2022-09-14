@@ -88,6 +88,7 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rustc-link-lib=static=bddisasm");
     println!("cargo:rustc-link-lib=static=dwarf");
+    println!("cargo:rustc-link-lib=static=bcc_bpf");
 
     match target_env.as_str() {
         "gnu" => {

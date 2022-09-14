@@ -31,9 +31,9 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <limits.h>		//PATH_MAX(4096)
-#include "bcc/bcc_proc.h"
-#include "bcc/bcc_elf.h"
-#include "bcc/bcc_syms.h"
+#include <bcc/bcc_proc.h>
+#include <bcc/bcc_elf.h>
+#include <bcc/bcc_syms.h>
 #include "log.h"
 #include "common.h"
 #include "symbol.h"
@@ -172,9 +172,9 @@ static struct bcc_symbol_option default_option = {
 	.check_debug_file_crc = 1,
 	.lazy_symbolize = 1,
 #if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-	.use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
+	.use_symbol_type = 65535 | (1 << STT_PPC64_ELFV2_SYM_LEP),
 #else
-	.use_symbol_type = BCC_SYM_ALL_TYPES,
+	.use_symbol_type = 65535,
 #endif
 };
 

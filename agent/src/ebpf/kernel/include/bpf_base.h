@@ -14,28 +14,96 @@
  * limitations under the License.
  */
 
-#ifndef __BPF_BASE_H__
-#define __BPF_BASE_H__
+#ifndef DF_BPF_BASE_H
+#define DF_BPF_BASE_H
 
 #include <linux/version.h>
-
-#ifndef BPF_USE_CORE
 #include <asm/ptrace.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <stddef.h>
-#include "../../libbpf/include/uapi/linux/bpf.h"
-#endif
-
-#include "../../libbpf/src/bpf_tracing.h"
-#include "../../libbpf/src/bpf_helpers.h"
-#include "../../libbpf/src/bpf_core_read.h"
+#include <bcc/compat/linux/bpf.h>
 #include "utils.h"
 
-#define MAX_CPU         256
+struct task_struct;
 
+/*
+ * bpf helpers
+ */
+static void *(*bpf_map_lookup_elem)(void *map, const void *key) = (void *) 1;
+static long (*bpf_map_update_elem)(void *map, const void *key, const void *value, __u64 flags) = (void *) 2;
+static long (*bpf_map_delete_elem)(void *map, const void *key) = (void *) 3;
+static long (*bpf_probe_read)(void *dst, __u32 size, const void *unsafe_ptr) = (void *) 4;
+static __u64 (*bpf_ktime_get_ns)(void) = (void *) 5;
+static long (*bpf_trace_printk)(const char *fmt, __u32 fmt_size, ...) = (void *) 6;
+static __u32 (*bpf_get_prandom_u32)(void) = (void *) 7;
+static __u32 (*bpf_get_smp_processor_id)(void) = (void *) 8;
+static long (*bpf_tail_call)(void *ctx, void *prog_array_map, __u32 index) = (void *) 12;
+static __u64 (*bpf_get_current_pid_tgid)(void) = (void *) 14;
+static __u64 (*bpf_get_current_uid_gid)(void) = (void *) 15;
+static long (*bpf_get_current_comm)(void *buf, __u32 size_of_buf) = (void *) 16;
+static __u64 (*bpf_get_current_task)(void) = (void *) 35;
+static long (*bpf_perf_event_output)(void *ctx, void *map, __u64 flags, void *data, __u64 size) = (void *) 25;
+static long (*bpf_probe_read_str)(void *dst, __u32 size, const void *unsafe_ptr) = (void *) 45;
+// bpf_probe_read_user added in Linux 5.5, Instead of bpf_probe_read_user(), use bpf_probe_read() here.
+static long (*bpf_probe_read_user)(void *dst, __u32 size, const void *unsafe_ptr) = (void *)4; // real value is 112
+
+#if __GNUC__ && !__clang__
+#define SEC(name) __attribute__((section(name), used))
+#else
+#define SEC(name) \
+	_Pragma("GCC diagnostic push")                                      \
+	_Pragma("GCC diagnostic ignored \"-Wignored-attributes\"")          \
+	__attribute__((section(name), used))                                \
+	_Pragma("GCC diagnostic pop")                                       \
+
+#endif
+
+#if defined(__x86_64__)
+#ifdef __KERNEL__
+#define PT_REGS_PARM1(x) ((x)->di)
+#define PT_REGS_PARM2(x) ((x)->si)
+#define PT_REGS_PARM3(x) ((x)->dx)
+#define PT_REGS_PARM4(x) ((x)->cx)
+#define PT_REGS_PARM5(x) ((x)->r8)
+#define PT_REGS_RET(x) ((x)->sp)
+#define PT_REGS_FP(x) ((x)->bp)
+#define PT_REGS_RC(x) ((x)->ax)
+#define PT_REGS_SP(x) ((x)->sp)
+#define PT_REGS_IP(x) ((x)->ip)
+#else
+#ifdef __i386__
+/* i386 kernel is built with -mregparm=3 */
+#define PT_REGS_PARM1(x) ((x)->eax)
+#define PT_REGS_PARM2(x) ((x)->edx)
+#define PT_REGS_PARM3(x) ((x)->ecx)
+#define PT_REGS_PARM4(x) 0
+#define PT_REGS_PARM5(x) 0
+#define PT_REGS_RET(x) ((x)->esp)
+#define PT_REGS_FP(x) ((x)->ebp)
+#define PT_REGS_RC(x) ((x)->eax)
+#define PT_REGS_SP(x) ((x)->esp)
+#define PT_REGS_IP(x) ((x)->eip)
+#else
+#define PT_REGS_PARM1(x) ((x)->rdi)
+#define PT_REGS_PARM2(x) ((x)->rsi)
+#define PT_REGS_PARM3(x) ((x)->rdx)
+#define PT_REGS_PARM4(x) ((x)->rcx)
+#define PT_REGS_PARM5(x) ((x)->r8)
+#define PT_REGS_RET(x) ((x)->rsp)
+#define PT_REGS_FP(x) ((x)->rbp)
+#define PT_REGS_RC(x) ((x)->rax)
+#define PT_REGS_SP(x) ((x)->rsp)
+#define PT_REGS_IP(x) ((x)->rip)
+#endif
+#endif
+#else
+_Pragma("GCC error \"Must specify a BPF target arch\"");
+#endif
+
+#define MAX_CPU         256
 #define SP_OFFSET(offset) (void *)(__u64)PT_REGS_SP(ctx) + offset * 8
 
 #define bpf_debug(fmt, ...)				\
@@ -101,21 +169,24 @@
 #endif
 #endif
 
-/*
- * Legacy fixed-layout (through struct bpf_map_def) BPF map declaration in BPF code,
- * residing in SEC("maps") will be dropped. Only BTF-defined maps will be supported starting from v1.0.
- * ref:https://github.com/libbpf/libbpf/wiki/Libbpf:-the-road-to-v1.0#drop-support-for-legacy-bpf-map-declaration-syntax
- */
+struct bpf_map_def {
+	unsigned int type;
+	unsigned int key_size;
+	unsigned int value_size;
+	unsigned int max_entries;
+};
+
 #define __BPF_MAP_DEF(_kt, _vt, _ents) \
-	__type(key, _kt); \
-	__type(value, _vt); \
-	__uint(max_entries, (_ents))
+	.key_size = sizeof(_kt),       \
+	.value_size = sizeof(_vt),     \
+	.max_entries = (_ents)
 
 #define MAP_ARRAY(name, key_type, value_type, max_entries) \
-struct { \
-    __uint(type, BPF_MAP_TYPE_ARRAY); \
-    __BPF_MAP_DEF(key_type, value_type, max_entries); \
-} __##name SEC(".maps"); \
+struct bpf_map_def SEC("maps") __##name = \
+{   \
+    .type = BPF_MAP_TYPE_ARRAY, \
+    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+}; \
 static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
@@ -131,10 +202,11 @@ static __always_inline __attribute__((unused)) int name ## __delete(key_type *ke
 
 // BPF_MAP_TYPE_ARRAY define
 #define MAP_PERARRAY(name, key_type, value_type, max_entries) \
-struct { \
-    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY); \
-    __BPF_MAP_DEF(key_type, value_type, max_entries); \
-}  __##name SEC(".maps"); \
+struct bpf_map_def SEC("maps") __##name = \
+{   \
+    .type = BPF_MAP_TYPE_PERCPU_ARRAY, \
+    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+}; \
 static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
@@ -148,18 +220,19 @@ static __always_inline __attribute__((unused)) int name ## __delete(key_type *ke
     return bpf_map_delete_elem(& __##name, (const void *)key); \
 }
 
-
 #define MAP_PERF_EVENT(name, key_type, value_type, max_entries) \
-struct {  \
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY); \
-    __BPF_MAP_DEF(key_type, value_type, max_entries); \
-} __##name SEC(".maps");
+struct bpf_map_def SEC("maps") __ ## name = \
+{   \
+    .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY, \
+    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+};
 
 #define MAP_HASH(name, key_type, value_type, max_entries) \
-struct { \
-    __uint(type, BPF_MAP_TYPE_HASH); \
-    __BPF_MAP_DEF(key_type, value_type, max_entries); \
-} __##name SEC(".maps"); \
+struct bpf_map_def SEC("maps") __##name = \
+{   \
+    .type = BPF_MAP_TYPE_HASH, \
+    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+}; \
 static __always_inline __attribute__((unused)) value_type * name ## __lookup(key_type *key) \
 { \
     return (value_type *) bpf_map_lookup_elem(& __##name, (const void *)key); \
@@ -187,4 +260,4 @@ static __always_inline __attribute__((unused)) int name ## __delete(key_type *ke
 
 #define BPF_LEN_CAP(x, cap) (x < cap ? (x & (cap - 1)) : cap)
 
-#endif /* __BPF_BASE_H__ */
+#endif /* DF_BPF_BASE_H */

@@ -14,14 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef __TASK_STRUCT_UTILS_H__
-#define __TASK_STRUCT_UTILS_H__
+#ifndef DF_TASK_STRUCT_UTILS_H
+#define DF_TASK_STRUCT_UTILS_H
 
-#ifndef BPF_USE_CORE
 #include <linux/sched.h>
 #include <math.h>
-#endif
-
 #include "utils.h"
 
 #define NSEC_PER_SEC	1000000000L
@@ -46,8 +43,6 @@ static __inline void *retry_get_socket_file_addr(struct task_struct *task,
 	return file;
 }
 
-#define ARRAY_SIZE(a)    (sizeof(a) / sizeof(a[0]))
-
 static __inline void *infer_and_get_socket_from_fd(int fd_num,
 						   struct member_fields_offset
 						   *offset, bool debug)
@@ -56,10 +51,6 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 	void *file = NULL;
 	void *private_data = NULL;
 	struct socket *socket;
-#ifdef BPF_USE_CORE
-	struct file **fd = BPF_CORE_READ(task, files, fdt, fd);
-	bpf_probe_read(&file, sizeof(file), fd + fd_num);
-#else
 	struct socket __socket;
 	int i;
 	// 成员 files 在 struct task_struct 中的偏移量
@@ -97,25 +88,22 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 				}
 			}
 		}
-	} else
+	} else {
 		file =
 		    retry_get_socket_file_addr(task, fd_num,
 					       offset->task__files_offset);
-#endif
+	}
+
 	if (file == NULL) {
-		//bpf_printk("file == NULL\n");
+		//bpf_debug("file == NULL\n");
 		return NULL;
 	}
-#ifdef BPF_USE_CORE
-	struct file *__file = file;
-	private_data = BPF_CORE_READ(__file, private_data);
-#else
+
 	bpf_probe_read(&private_data, sizeof(private_data),
 		       file + STRUCT_FILES_PRIVATE_DATA_OFFSET);
-#endif
 	if (private_data == NULL) {
 		if (debug)
-			bpf_printk("private_data == NULL\n");
+			bpf_debug("private_data == NULL\n");
 		return NULL;
 	}
 
@@ -123,11 +111,6 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 	short socket_type;
 	void *check_file;
 	void *sk;
-#ifdef BPF_USE_CORE
-	socket_type = BPF_CORE_READ(socket, type);
-	check_file = BPF_CORE_READ(socket, file);
-	sk = BPF_CORE_READ(socket, sk);
-#else
 	bpf_probe_read(&__socket, sizeof(__socket), (void *)socket);
 	socket_type = __socket.type;
 	if (__socket.file != file) {
@@ -137,14 +120,14 @@ static __inline void *infer_and_get_socket_from_fd(int fd_num,
 		check_file = __socket.file;
 		sk = __socket.sk;
 	}
-#endif
+
 	if ((socket_type == SOCK_STREAM || socket_type == SOCK_DGRAM) &&
 	    check_file == file /*&& __socket.state == SS_CONNECTED */ ) {
 		return sk;
 	}
 
 	if (debug)
-		bpf_printk
+		bpf_debug
 		    (" NULL __socket.type:%d __socket.file == file (%d)\n",
 		     socket_type, check_file == file);
 
@@ -156,24 +139,14 @@ static __inline void *get_socket_from_fd(int fd_num,
 {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	void *file = NULL;
-#ifdef BPF_USE_CORE
-	struct file **fd = BPF_CORE_READ(task, files, fdt, fd);
-	bpf_probe_read(&file, sizeof(file), fd + fd_num);
-#else
 	file =
 	    retry_get_socket_file_addr(task, fd_num,
 				       offset->task__files_offset);
-#endif
 	if (file == NULL)
 		return NULL;
 	void *private_data = NULL;
-#ifdef BPF_USE_CORE
-	struct file *__file = file;
-	private_data = BPF_CORE_READ(__file, private_data);
-#else
 	bpf_probe_read(&private_data, sizeof(private_data),
 		       file + STRUCT_FILES_PRIVATE_DATA_OFFSET);
-#endif
 	if (private_data == NULL) {
 		return NULL;
 	}
@@ -182,11 +155,6 @@ static __inline void *get_socket_from_fd(int fd_num,
 	short socket_type;
 	void *check_file;
 	void *sk;
-#ifdef BPF_USE_CORE
-	socket_type = BPF_CORE_READ(socket, type);
-	check_file = BPF_CORE_READ(socket, file);
-	sk = BPF_CORE_READ(socket, sk);
-#else
 	struct socket __socket;
 	bpf_probe_read(&__socket, sizeof(__socket), (void *)socket);
 
@@ -198,7 +166,6 @@ static __inline void *get_socket_from_fd(int fd_num,
 		check_file = __socket.file;
 		sk = __socket.sk;
 	}
-#endif
 	if ((socket_type == SOCK_STREAM || socket_type == SOCK_DGRAM) &&
 	    check_file == file /*&& __socket.state == SS_CONNECTED */ ) {
 		return sk;
@@ -207,4 +174,4 @@ static __inline void *get_socket_from_fd(int fd_num,
 	return NULL;
 }
 
-#endif /* __TASK_STRUCT_UTILS_H__ */
+#endif /* DF_TASK_STRUCT_UTILS_H */

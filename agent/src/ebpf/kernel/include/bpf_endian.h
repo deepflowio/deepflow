@@ -14,30 +14,56 @@
  * limitations under the License.
  */
 
-#ifndef __BPF_ENDIAN__
-#define __BPF_ENDIAN__
-#define ___bpf_mvb(x, b, n, m) ((__u##b)(x) << (b-(n+1)*8) >> (b-8) << (m*8))
-#define ___bpf_swab16(x) ((__u16)(			\
-			  ___bpf_mvb(x, 16, 0, 1) |	\
-			  ___bpf_mvb(x, 16, 1, 0)))
+#ifndef DF_BPF_ENDIAN
+#define DF_BPF_ENDIAN
 
-#define ___bpf_swab32(x) ((__u32)(			\
-			  ___bpf_mvb(x, 32, 0, 3) |	\
-			  ___bpf_mvb(x, 32, 1, 2) |	\
-			  ___bpf_mvb(x, 32, 2, 1) |	\
-			  ___bpf_mvb(x, 32, 3, 0)))
+#include "utils.h"
 
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-# define __bpf_ntohs(x)			__builtin_bswap16(x)
-# define __bpf_htons(x)			__builtin_bswap16(x)
-# define __bpf_ntohl(x)			__builtin_bswap32(x)
-# define __bpf_htonl(x)			__builtin_bswap32(x)
-#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-# define __bpf_ntohs(x)			(x)
-# define __bpf_htons(x)			(x)
-# define __bpf_ntohl(x)			(x)
-# define __bpf_htonl(x)			(x)
+#if (__BYTE_ORDER__) == ( __ORDER_LITTLE_ENDIAN__)
+#define ARCH_IS_BIG_ENDIAN	0
+#define ARCH_IS_LITTLE_ENDIAN	1
 #else
-# error "Fix your compiler's __BYTE_ORDER__?!"
+#define ARCH_IS_BIG_ENDIAN	1
+#define ARCH_IS_LITTLE_ENDIAN 	0
 #endif
-#endif /* __BPF_ENDIAN__ */
+
+#define ___bpf_mvb(x, b, n, m) ((__u##b)(x) << (b-(n+1)*8) >> (b-8) << (m*8))
+
+// TODO: Consider the differences between architectures. 
+
+static __inline __u16 __byte_swap_u16(__u16 x)
+{
+	if (__builtin_constant_p(x)) {
+		return ((__u16) (___bpf_mvb(x, 16, 0, 1) |
+				 ___bpf_mvb(x, 16, 1, 0)));
+	} else {
+		if (ARCH_IS_LITTLE_ENDIAN) {
+			return __builtin_bswap16(x);
+		} else {
+			return x;
+		}
+	}
+}
+
+static __inline __u32 __byte_swap_u32(__u32 x)
+{
+	if (__builtin_constant_p(x)) {
+		return ((__u32) (___bpf_mvb(x, 32, 0, 3) |
+				 ___bpf_mvb(x, 32, 1, 2) |
+				 ___bpf_mvb(x, 32, 2, 1) |
+				 ___bpf_mvb(x, 32, 3, 0)));
+	} else {
+		if (ARCH_IS_LITTLE_ENDIAN) {
+			return __builtin_bswap32(x);
+		} else {
+			return x;
+		}
+	}
+}
+
+#define __bpf_ntohs(x)  __byte_swap_u16(x)
+#define __bpf_htons(x)  __byte_swap_u16(x)
+#define __bpf_ntohl(x)  __byte_swap_u32(x)
+#define __bpf_htonl(x)  __byte_swap_u32(x)
+
+#endif /* DF_BPF_ENDIAN */

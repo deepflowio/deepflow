@@ -308,7 +308,7 @@ extern "C" {
     // Register extra event handle for socket tracer
     // @event_type : register event type, e.g.: EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT ...
     // @callback : Callback function for event
-    // @return 0 is success, if not 0 is faild
+    // @return 0 is success, if not 0 is failed
     pub fn register_event_handle(
         event_type: c_uint,
         callback: extern "C" fn(data: *mut PROCESS_EVENT),

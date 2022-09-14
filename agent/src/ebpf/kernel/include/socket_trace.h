@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __BPF_SOCKET_TRACE_H__
-#define __BPF_SOCKET_TRACE_H__
+#ifndef DF_BPF_SOCKET_TRACE_H
+#define DF_BPF_SOCKET_TRACE_H
 
 #include "bpf_base.h"
 #include "common.h"
@@ -30,7 +30,6 @@
 #define likely(x)               __builtin_expect(!!(x), 1)
 #endif
 
-#ifndef BPF_USE_CORE
 #include <sys/socket.h>
 #include <stddef.h>
 #include <netinet/in.h>
@@ -65,17 +64,6 @@ struct mmsghdr {
 	struct user_msghdr msg_hdr;
 	unsigned int msg_len;
 };
-#else
-
-#ifndef NULL
-#define NULL ((void*)0)
-#endif
-
-#define AF_INET         2	/* Internet IP Protocol         */
-#define PF_INET         AF_INET
-#define AF_INET6        10	/* IP version 6                 */
-#define PF_INET6        AF_INET6
-#endif
 
 #define CONN_ADD		    0
 #define CONN_DEL		    1
@@ -177,14 +165,6 @@ enum syscall_src_func {
 	SYSCALL_FUNC_READV,
 	SYSCALL_FUNC_SENDFILE
 };
-
-#ifdef BPF_USE_CORE
-typedef long __kernel_time_t;
-struct timespec {
-	__kernel_time_t tv_sec;
-	long tv_nsec;
-};
-#endif
 
 struct data_args_t {
 	// Represents the function from which this argument group originates.
@@ -288,15 +268,4 @@ struct tls_conn_key
 	long long int goid;
 };
 
-#ifdef BPF_USE_CORE
-// 函数参数寄存器
-#define rax ax
-#define rbx bx
-#define rcx cx
-#define rdi di
-#define rsi si
-// 栈指针寄存器
-#define rsp sp
-#endif
-
-#endif /* __BPF_SOCKET_TRACE_H__ */
+#endif /* DF_BPF_SOCKET_TRACE_H */
