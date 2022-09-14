@@ -35,9 +35,9 @@
 #include <arpa/inet.h>
 #include <memory.h>
 #include "common.h"
-#include "bcc/bcc_proc.h"
-#include "bcc/bcc_elf.h"
-#include "bcc/bcc_syms.h"
+#include <bcc/bcc_proc.h>
+#include <bcc/bcc_elf.h>
+#include <bcc/bcc_syms.h>
 #include "log.h"
 #include "symbol.h"
 #include "tracer.h"
@@ -46,6 +46,7 @@
 #include "table.h"
 #include "symbol.h"
 #include "socket.h"
+#include "elf.h"
 
 #define MAP_PROC_INFO_MAP_NAME	"proc_info_map"
 #define PROCFS_CHECK_PERIOD  60	// 60 seconds
@@ -343,7 +344,7 @@ bool fetch_go_elf_version(const char *path, struct version_info * go_ver)
 		goto exit;
 	}
 	Elf_Data *data = NULL;
-	data = get_section_elf_data(e, ".go.buildinfo");
+	data = get_sec_elf_data(e, ".go.buildinfo");
 	if (!data)
 		goto exit;
 
@@ -522,7 +523,7 @@ static int resolve_bin_file(const char *path, int pid,
 		if (p_info == NULL) {
 			p_info = alloc_proc_info_by_pid();
 			if (p_info == NULL)
-				goto offset_faild;
+				goto offset_failed;
 			is_new_info = true;
 		}
 
@@ -534,9 +535,10 @@ static int resolve_bin_file(const char *path, int pid,
 			free(p_info->path);
 			p_info->path = NULL;
 		}
+
 		p_info->path = strdup(binary_path);
 		if (p_info->path == NULL) {
-			goto offset_faild;
+			goto offset_failed;
 		}
 		// resolve all offsets.
 		for (int k = 0; k < NELEMS(offsets); k++) {
@@ -583,7 +585,7 @@ failed:
 	}
 	return ret;
 
-offset_faild:
+offset_failed:
 	*resolve_num = syms_count;
 	if (p_info != NULL) {
 		free(p_info);
@@ -677,8 +679,8 @@ int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
 
-	INIT_LIST_HEAD(&proc_events_head);
-	INIT_LIST_HEAD(&proc_info_head);
+	init_list_head(&proc_events_head);
+	init_list_head(&proc_info_head);
 	pthread_mutex_init(&mutex_proc_events_lock, NULL);
 
 	fddir = opendir("/proc/");

@@ -232,12 +232,8 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	if (!offset)
 		return;
 
-#ifndef BPF_USE_CORE
 	if (unlikely(!offset->ready))
 		return;
-#else
-	offset->ready = 1;
-#endif
 
 	send_buffer->tuple.l4_protocol = IPPROTO_TCP;
 	void *sk = get_socket_from_fd(data->fd, offset);
@@ -246,15 +242,6 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	__be16 inet_dport;
 	__u16 inet_sport;
 	__u16 skc_family;
-#ifdef BPF_USE_CORE
-	struct sock *__sk = sk;
-	bpf_core_read(&inet_dport, sizeof(inet_dport),
-		      &__sk->__sk_common.skc_dport);
-	bpf_core_read(&inet_sport, sizeof(inet_sport),
-		      &__sk->__sk_common.skc_num);
-	bpf_core_read(&skc_family, sizeof(skc_family),
-		      &__sk->__sk_common.skc_family);
-#else
 	struct skc_flags_t {
 		unsigned char skc_reuse : 4;
 		unsigned char skc_reuseport : 1;
@@ -270,37 +257,22 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 		       sk + STRUCT_SOCK_DPORT_OFFSET);
 	bpf_probe_read(&inet_sport, sizeof(inet_sport),
 		       sk + STRUCT_SOCK_SPORT_OFFSET);
-#endif
 	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
 	send_buffer->tuple.num = inet_sport;
 
 	switch (skc_family) {
 	case PF_INET:
-#ifdef BPF_USE_CORE
-		bpf_core_read(send_buffer->tuple.rcv_saddr, 4,
-			      &__sk->__sk_common.skc_rcv_saddr);
-		bpf_core_read(send_buffer->tuple.daddr, 4,
-			      &__sk->__sk_common.skc_daddr);
-#else
 		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
 			       sk + STRUCT_SOCK_SADDR_OFFSET);
 		bpf_probe_read(send_buffer->tuple.daddr, 4,
 			       sk + STRUCT_SOCK_DADDR_OFFSET);
-#endif
 		send_buffer->tuple.addr_len = 4;
 		break;
 	case PF_INET6:
-#ifdef BPF_USE_CORE
-		bpf_core_read(send_buffer->tuple.rcv_saddr, 16,
-			      &__sk->__sk_common.skc_v6_rcv_saddr);
-		bpf_core_read(send_buffer->tuple.daddr, 16,
-			      &__sk->__sk_common.skc_v6_daddr);
-#else
 		bpf_probe_read(send_buffer->tuple.rcv_saddr, 16,
 			       sk + STRUCT_SOCK_IP6SADDR_OFFSET);
 		bpf_probe_read(send_buffer->tuple.daddr, 16,
 			       sk + STRUCT_SOCK_IP6SADDR_OFFSET);
-#endif
 		send_buffer->tuple.addr_len = 16;
 		break;
 	}

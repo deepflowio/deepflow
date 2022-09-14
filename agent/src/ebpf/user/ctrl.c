@@ -135,7 +135,7 @@ static inline int sockopt_init(void)
 
 int ctrl_init(void)
 {
-	INIT_LIST_HEAD(&sockopt_list);
+	init_list_head(&sockopt_list);
 	int ret = sockopt_init();
 	if (unlikely(ret < 0)) {
 		ebpf_info("[%s] sockopt module initialization failed!\n",
@@ -213,7 +213,7 @@ static inline int sockopt_msg_recv(int clt_fd, struct tracer_sock_msg **pmsg)
 
 	*pmsg = malloc(sizeof(struct tracer_sock_msg) + msg_hdr.len);
 	if (unlikely(NULL == *pmsg)) {
-		ebpf_warning("malloc() faild, no memory\n");
+		ebpf_warning("malloc() failed, no memory\n");
 		return ETR_NOMEM;
 	}
 

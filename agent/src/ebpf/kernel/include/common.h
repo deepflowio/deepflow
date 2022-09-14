@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __BPF_COMMON_H__
-#define __BPF_COMMON_H__
+#ifndef DF_BPF_COMMON_H
+#define DF_BPF_COMMON_H
 
 // 消息类型
 enum message_type {
@@ -69,4 +69,4 @@ struct protocol_message_t {
 	enum message_type type;
 };
 
-#endif /* __BPF_COMMON_H__ */
+#endif /* DF_BPF_COMMON_H */

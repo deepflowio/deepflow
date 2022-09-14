@@ -13,10 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-#ifdef BPF_USE_CORE
-#include "../libbpf/.github/actions/build-selftests/vmlinux.h"
-#endif
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
 
@@ -45,7 +41,7 @@ MAP_PERARRAY(data_buf, __u32, struct __socket_data_buffer, 1)
 MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1)
 
 /*
- * 记录追踪各种ID值(确保唯一性, pre cpu 没有使用锁）
+ * 记录追踪各种ID值(确保唯一性, per CPU 没有使用锁）
  * 生成方法：
  *    1、先初始化一个基值（基值 = [CPU IDX: 8bit] + [ sys_boot_time ]）
  *    2、在基值的基础上递增
@@ -97,7 +93,6 @@ static __inline void delete_socket_info(__u64 conn_key,
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
 
-#ifndef BPF_USE_CORE
 static __inline unsigned int __retry_get_sock_flags(void *sk,
 						    int offset)
 {
@@ -165,32 +160,24 @@ static __inline void get_sock_flags(void *sk,
 
 	conn_info->sk_type = sk_flags->sk_type;
 }
-#endif
 
 static __inline int is_tcp_udp_data(void *sk,
 				    struct member_fields_offset *offset,
 				    struct conn_info_t *conn_info)
 {
-#ifdef BPF_USE_CORE
-	struct sock *__sk = sk;
-	struct sock_common *sk_common = sk;
-	conn_info->skc_ipv6only = BPF_CORE_READ_BITFIELD_PROBED(sk_common, skc_ipv6only);
-	bpf_core_read(&conn_info->skc_family, sizeof(conn_info->skc_family),
-		      &__sk->__sk_common.skc_family);
-#else
-struct skc_flags_t {
-	unsigned char skc_reuse : 4;
-	unsigned char skc_reuseport : 1;
-	unsigned char skc_ipv6only : 1;
-	unsigned char skc_net_refcnt : 1;
-};
+	struct skc_flags_t {
+		unsigned char skc_reuse : 4;
+		unsigned char skc_reuseport : 1;
+		unsigned char skc_ipv6only : 1;
+		unsigned char skc_net_refcnt : 1;
+	};
+
 	struct skc_flags_t skc_flags;
 	bpf_probe_read(&skc_flags, sizeof(skc_flags),
 		       sk + STRUCT_SOCK_COMMON_IPV6ONLY_OFFSET);
 	conn_info->skc_ipv6only = skc_flags.skc_ipv6only;
 	bpf_probe_read(&conn_info->skc_family, sizeof(conn_info->skc_family),
 		       sk + STRUCT_SOCK_FAMILY_OFFSET);
-#endif
 	/*
 	 * Without thinking about PF_UNIX.
 	 */
@@ -205,16 +192,7 @@ struct skc_flags_t {
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
-#ifdef BPF_USE_CORE
-	extern __u32 LINUX_KERNEL_VERSION __kconfig;
-	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 6, 0))
-		bpf_core_read(&conn_info->sk_type, sizeof(conn_info->sk_type), &__sk->sk_type);
-	else
-		conn_info->sk_type = BPF_CORE_READ_BITFIELD_PROBED(__sk, sk_type);
-	
-#else
 	get_sock_flags(sk, offset, conn_info);
-#endif
 
 	if (conn_info->sk_type == SOCK_DGRAM) {
 		conn_info->tuple.l4_protocol = IPPROTO_UDP;
@@ -226,12 +204,7 @@ struct skc_flags_t {
 	}
 
 	unsigned char skc_state;
-#ifdef BPF_USE_CORE
-	bpf_core_read(&skc_state, sizeof(unsigned short),
-		      &__sk->__sk_common.skc_state);
-#else
 	bpf_probe_read(&skc_state, sizeof(skc_state), (void *)sk + STRUCT_SOCK_SKC_STATE_OFFSET);
-#endif
 
 	/* 如果连接尚未建立好，不处于ESTABLISHED或者CLOSE_WAIT状态，退出 */
 	if ((1 << skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
@@ -248,16 +221,8 @@ static __inline void init_conn_info(__u32 tgid, __u32 fd,
 {
 	__be16 inet_dport;
 	__u16 inet_sport;
-#ifdef BPF_USE_CORE
-	struct sock *__sk = sk;
-	bpf_core_read(&inet_dport, sizeof(inet_dport),
-		      &__sk->__sk_common.skc_dport);
-	bpf_core_read(&inet_sport, sizeof(inet_sport),
-		      &__sk->__sk_common.skc_num);
-#else
 	bpf_probe_read(&inet_dport, sizeof(inet_dport), sk + STRUCT_SOCK_DPORT_OFFSET);
 	bpf_probe_read(&inet_sport, sizeof(inet_sport), sk + STRUCT_SOCK_SPORT_OFFSET);
-#endif
 	conn_info->tuple.dport = __bpf_ntohs(inet_dport);
 	conn_info->tuple.num = inet_sport;
 	conn_info->prev_count = 0;
@@ -289,35 +254,18 @@ static __inline bool get_socket_info(struct __socket_data *v,
 		return false;
 #endif
 
-#ifdef BPF_USE_CORE
-	struct sock *__sk = sk;
-#endif
 	/*
 	 * Without thinking about PF_UNIX.
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
-#ifdef BPF_USE_CORE
-		bpf_core_read(v->tuple.rcv_saddr, 4,
-			      &__sk->__sk_common.skc_rcv_saddr);
-		bpf_core_read(v->tuple.daddr, 4,
-			      &__sk->__sk_common.skc_daddr);	
-#else
 		bpf_probe_read(v->tuple.rcv_saddr, 4, sk + STRUCT_SOCK_SADDR_OFFSET);
 		bpf_probe_read(v->tuple.daddr, 4, sk + STRUCT_SOCK_DADDR_OFFSET);
-#endif
 		v->tuple.addr_len = 4;
 		break;
 	case PF_INET6:
-#ifdef BPF_USE_CORE
-		bpf_core_read(v->tuple.rcv_saddr, 16,
-			      &__sk->__sk_common.skc_v6_rcv_saddr);
-		bpf_core_read(v->tuple.daddr, 16,
-			      &__sk->__sk_common.skc_v6_daddr);	
-#else
 		bpf_probe_read(v->tuple.rcv_saddr, 16, sk + STRUCT_SOCK_IP6SADDR_OFFSET);
 		bpf_probe_read(v->tuple.daddr, 16, sk + STRUCT_SOCK_IP6SADDR_OFFSET);
-#endif
 		v->tuple.addr_len = 16;
 		break;
 	default:
@@ -370,7 +318,6 @@ static __inline void infer_l7_class(struct conn_info_t* conn_info,
 	conn_info->message_type = inferred_protocol.type;
 }
 
-#ifndef BPF_USE_CORE
 static __inline __u32 retry_get_write_seq(void *sk,
 					  int offset,
 					  int snd_nxt_offset)
@@ -482,11 +429,9 @@ static __inline void infer_tcp_seq_offset(void *sk,
 		}
 	}
 }
-#endif
 
 static __inline int infer_offset_retry(int fd)
 {
-#ifndef BPF_USE_CORE
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
@@ -514,7 +459,6 @@ static __inline int infer_offset_retry(int fd)
 
 	if (!offset->ready)
 		return OFFSET_NO_READY;
-#endif
 	return OFFSET_READY;
 }
 
@@ -673,25 +617,6 @@ static __inline int iovecs_copy(struct __socket_data *v,
 	return bytes_sent;
 }
 
-#ifdef BPF_USE_CORE
-static __u32 __inline get_tcp_write_seq_from_fd(int fd)
-{
-	void *sock = get_socket_from_fd(fd, NULL);
-	__u32 tcp_seq = 0;
-	struct tcp_sock *tcp_sock = (struct tcp_sock *)sock;
-	bpf_core_read(&tcp_seq, sizeof(tcp_seq), &tcp_sock->write_seq);
-	return tcp_seq;
-}
-
-static __u32 __inline get_tcp_read_seq_from_fd(int fd)
-{
-	void *sock = get_socket_from_fd(fd, NULL);
-	__u32 tcp_seq = 0;
-	struct tcp_sock *tcp_sock = (struct tcp_sock *)sock;
-	bpf_core_read(&tcp_seq, sizeof(tcp_seq), &tcp_sock->copied_seq);
-	return tcp_seq;
-}
-#else
 static __u32 __inline get_tcp_write_seq_from_fd(int fd)
 {
 	__u32 k0 = 0;
@@ -719,7 +644,6 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 		       sock + offset->tcp_sock__copied_seq_offset);
 	return tcp_seq;
 }
-#endif
 
 static __inline void
 data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
@@ -987,12 +911,8 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 	if (!offset)
 		return;
 
-#ifndef BPF_USE_CORE
 	if (unlikely(!offset->ready))
 		return;
-#else
-	offset->ready = 1;
-#endif
 	
 	void *sk = get_socket_from_fd(args->fd, offset);
 	struct conn_info_t *conn_info, __conn_info = {};

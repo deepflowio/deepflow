@@ -19,13 +19,12 @@
  * key: struct tls_conn_key {process ID, coroutine ID}
  * value: struct tls_conn
  */
-struct {
-	// FIXME: function entry without exit will cause memory leaks
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, struct tls_conn_key);
-	__type(value, struct tls_conn);
-	__uint(max_entries, MAX_SYSTEM_THREADS);
-} tls_conn_map SEC(".maps");
+struct bpf_map_def SEC("maps") tls_conn_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(struct tls_conn_key),
+	.value_size = sizeof(struct tls_conn),
+	.max_entries = MAX_SYSTEM_THREADS,
+};
 
 struct http2_tcp_seq_key {
 	int tgid;
@@ -42,12 +41,12 @@ struct http2_tcp_seq_key {
  * 
  * Note:  Use for after uprobe read() only.
  */
-struct {
-	__uint(type, BPF_MAP_TYPE_LRU_HASH);
-	__type(key, struct http2_tcp_seq_key);
-	__type(value, __u32);
-	__uint(max_entries, 1024);
-} http2_tcp_seq_map SEC(".maps");
+struct bpf_map_def SEC("maps") http2_tcp_seq_map = {
+	.type = BPF_MAP_TYPE_LRU_HASH,
+	.key_size = sizeof(struct http2_tcp_seq_key),
+	.value_size = sizeof(__u32),
+	.max_entries = 10240,
+};
 
 /*
  *  uprobe_go_tls_write_enter  (In tls_conn_map record A(tcp_seq) before syscall)

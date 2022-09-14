@@ -26,36 +26,122 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <linux/version.h>
 #include <linux/perf_event.h>
 #include <linux/unistd.h>
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
 #include <inttypes.h>
-#include "list_head.h"
+#include <sys/utsname.h>
+#include "list.h"
 #include "common.h"
 #include "log.h"
-#include "../libbpf/src/libbpf_internal.h"
 
 bool is_core_kernel(void)
 {
 	return (access("/sys/kernel/btf/vmlinux", F_OK) == 0);
 }
 
+static int parse_online_cpus(const char *cpu_file, bool ** mask, int *cpu_count)
+{
+	int fd, i, n, len, start, end = -1;
+	bool *tmp;
+	char buf[1024];
+	if ((fd = open(cpu_file, O_RDONLY | O_CLOEXEC)) < 0) {
+		ebpf_warning("Failed to open file (%s: %d)\n", cpu_file, errno);
+		return -1;
+	}
+
+	len = read(fd, buf, sizeof(buf));
+	close(fd);
+	if (len <= 0) {
+		ebpf_warning("Failed to read file (%s: %d)\n", cpu_file, errno);
+		return -1;
+	}
+
+	if (len >= sizeof(buf)) {
+		ebpf_warning("File is too big %s\n", cpu_file);
+		return -1;
+	}
+
+	for (i = 0; i < len; i++) {
+		if (buf[i] == ',' || buf[i] == '\n') {
+			continue;
+		}
+		n = sscanf(&buf[i], "%d%n-%d%n", &start, &len, &end, &len);
+		if (n <= 0 || n > 2) {
+			goto failed;
+		} else if (n == 1) {
+			end = start;
+		}
+		if (start < 0 || start > end) {
+			goto failed;
+		}
+
+		tmp = realloc(*mask, end + 1);
+		if (!tmp) {
+			goto failed;
+		}
+		*mask = tmp;
+		memset(tmp + *cpu_count, 0, start - *cpu_count);
+		memset(tmp + start, 1, end - start + 1);
+		*cpu_count = end + 1;
+		i += (len - 1);
+	}
+
+	if (*cpu_count == 0) {
+		goto failed;
+	}
+
+	return 0;
+failed:
+	ebpf_warning("CPU range error\n");
+	if (*mask != NULL) {
+		free(*mask);
+		*mask = NULL;
+	}
+
+	*cpu_count = 0;
+	return -1;
+}
+
 int get_cpus_count(bool ** mask)
 {
 	bool *online = NULL;
-	int err, n;
+	int err, n = 0;
 	const char *online_cpus_file = "/sys/devices/system/cpu/online";
 
-	err = parse_cpu_mask_file(online_cpus_file, &online, &n);
+	err = parse_online_cpus(online_cpus_file, &online, &n);
 	if (err) {
-		ebpf_info("failed to get online CPU mask: %d\n", err);
+		ebpf_warning("failed to get online CPU mask: %d\n", err);
 		return -1;
 	}
 
 	*mask = online;
 	return n;
+}
+
+int get_num_possible_cpus(void)
+{
+	bool *mask = NULL;
+	int err, n = 0, i, cpus = 0;
+	static const char *fcpu = "/sys/devices/system/cpu/possible";
+
+	err = parse_online_cpus(fcpu, &mask, &n);
+	if (err) {
+		ebpf_warning("failed to get online CPU mask: %d\n", err);
+		return -1;
+	}
+
+	for (i = 0; i < n; i++) {
+		if (mask[i]) {
+			cpus++;
+		}
+	}
+
+	free(mask);
+	return cpus;
 }
 
 // 系统启动到现在的时间（以秒为单位）
@@ -83,10 +169,10 @@ static void exec_clear_residual_probes(const char *events_file,
 	struct list_head probe_head;
 	struct probe_elem *pe;
 
-	INIT_LIST_HEAD(&probe_head);
+	init_list_head(&probe_head);
 
 	if ((fp = fopen(events_file, "r")) == NULL) {
-		ebpf_info("Open config file(\"%s\") faild.\n", events_file);
+		ebpf_info("Open config file(\"%s\") failed.\n", events_file);
 		return;
 	}
 
@@ -216,12 +302,13 @@ static int fs_write(char *file_name, char *v, int mode, int len)
 
 	fd = open(file_name, mode);
 	if (fd < 0) {
-		ebpf_info("Open debug file(\"%s\") write faild.\n", file_name);
+		ebpf_warning("Open debug file(\"%s\") write failed.\n",
+			     file_name);
 		return -1;
 	}
 
 	if ((err = write(fd, v, len)) < 0)
-		ebpf_info("Write %s to file \"%s\" faild.\n", v, file_name);
+		ebpf_warning("Write %s to file \"%s\" failed.\n", v, file_name);
 
 	close(fd);
 	return err;
@@ -276,4 +363,44 @@ unsigned long long get_process_starttime(int pid)
 	}
 
 	return starttime;
+}
+
+int fetch_kernel_version(int *major, int *minor, int *patch)
+{
+	struct utsname sys_info;
+
+	// Get the real version of Ubuntu
+
+	if (access("/proc/version_signature", R_OK) == 0) {
+		FILE *f = fopen("/proc/version_signature", O_RDONLY);
+		if (f) {
+			if (fscanf(f, "%*s %*s %d.%d.%d\n", major, minor, patch)
+			    != 3) {
+				fclose(f);
+				*major = *minor = *patch = 0;
+				return ETR_INVAL;
+			}
+			fclose(f);
+			return ETR_OK;
+		}
+	}
+
+	uname(&sys_info);
+	if (sscanf(sys_info.release, "%u.%u.%u", major, minor, patch) != 3)
+		return ETR_INVAL;
+
+	return ETR_OK;
+}
+
+unsigned int fetch_kernel_version_code(void)
+{
+	int ret;
+	int major, minor, patch;
+	ret = fetch_kernel_version(&major, &minor, &patch);
+	if (ret != ETR_OK) {
+		printf("fetch_kernel_version error\n");
+		return 0;
+	}
+
+	return KERNEL_VERSION(major, minor, patch);
 }

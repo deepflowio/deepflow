@@ -45,6 +45,12 @@ enum
 /* Current function name.  Need (char *) cast to silence gcc4 pointer signedness warning. */
 #define ebpf_error_function ((char *) __FUNCTION__)
 
+#ifdef BPF_DEBUG
+#define ebpf_debug(fmt, ...)  printf(fmt, ##__VA_ARGS__);
+#else
+#define ebpf_debug(fmt, ...)
+#endif
+
 #define ebpf_info(format,args...) \
 	_ebpf_info (format, ## args)
 

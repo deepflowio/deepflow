@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __BPF_SOCKET_TRACE_COMMON_H__
-#define __BPF_SOCKET_TRACE_COMMON_H__
+#ifndef DF_BPF_SOCKET_TRACE_COMMON_H
+#define DF_BPF_SOCKET_TRACE_COMMON_H
 #define CAP_DATA_SIZE 1024
 
 enum endpoint_role {
