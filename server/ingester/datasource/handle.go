@@ -289,7 +289,7 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrS
 		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
 		partitionTime.String(t.TimeKey),
 		makeTTLString(t.TimeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes),
-		ckdb.DF_STORAGE_POLICY)
+		t.StoragePolicy)
 }
 
 func MakeMVTableCreateSQL(t *ckdb.Table, dstTable, aggrSummable, aggrUnsummable string, aggrTimeFunc ckdb.TimeFuncType) string {
@@ -376,12 +376,12 @@ func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 	return createTable
 }
 
-func getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Table {
-	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, 7, 1, 7, 1)[id]
+func (m *DatasourceManager) getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Table {
+	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1)[id]
 }
 
 func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
-	table := getMetricsTable(tableId)
+	table := m.getMetricsTable(tableId)
 	if baseTable != ORIGIN_TABLE_1M && baseTable != ORIGIN_TABLE_1S {
 		return fmt.Errorf("Only support base datasource 1s,1m")
 	}
@@ -409,7 +409,7 @@ func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.Me
 }
 
 func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, dstTable string, duration int) error {
-	table := getMetricsTable(tableId)
+	table := m.getMetricsTable(tableId)
 	tableMod := ""
 	if dstTable == ORIGIN_TABLE_1M || dstTable == ORIGIN_TABLE_1S {
 		tableMod = getMetricsTableName(uint8(tableId), "", LOCAL)
@@ -447,27 +447,20 @@ func delTableMV(ck clickhouse.Conn, dbId zerodoc.MetricsTableID, table string) e
 }
 
 func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSummable, aggrUnsummable string, interval, duration int) error {
-	var cks []clickhouse.Conn
-	for _, addr := range m.ckAddrs {
-		if len(addr) == 0 {
-			continue
-		}
-		ck, err := clickhouse.Open(&clickhouse.Options{
-			Addr: []string{addr},
-			Auth: clickhouse.Auth{
-				Database: "default",
-				Username: m.user,
-				Password: m.password,
-			},
-		})
-
-		if err != nil {
-			return err
-		}
-		cks = append(cks, ck)
+	if len(m.ckAddr) == 0 {
+		return fmt.Errorf("ck addr is empty")
 	}
-	if len(cks) == 0 {
-		return fmt.Errorf("invalid clickhouse addrs: Addrs=%v ", m.ckAddrs)
+	ck, err := clickhouse.Open(&clickhouse.Options{
+		Addr: []string{m.ckAddr},
+		Auth: clickhouse.Auth{
+			Database: "default",
+			Username: m.user,
+			Password: m.password,
+		},
+	})
+
+	if err != nil {
+		return err
 	}
 
 	duration = duration / 24 // 切换为天
@@ -478,10 +471,8 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		if dbGroup == FLOW_LOG_L7 {
 			flowLogID = common.L7_FLOW_ID
 		}
-		for _, ck := range cks {
-			if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
-				return err
-			}
+		if err := m.modFlowLogLocalTable(ck, flowLogID, duration); err != nil {
+			return err
 		}
 		return nil
 	}
@@ -521,28 +512,26 @@ func (m *DatasourceManager) Handle(dbGroup, action, baseTable, dstTable, aggrSum
 		return fmt.Errorf("dst table name is empty")
 	}
 
-	for _, ck := range cks {
-		for _, tableId := range subTableIDs {
-			switch actionEnum {
-			case ADD:
-				aggInterval := IntervalHour
-				if interval == 1440 {
-					aggInterval = IntervalDay
-				}
-				if err := m.createTableMV(ck, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
-					return err
-				}
-			case MOD:
-				if err := m.modTableMV(ck, tableId, dstTable, duration); err != nil {
-					return err
-				}
-			case DEL:
-				if err := delTableMV(ck, tableId, dstTable); err != nil {
-					return err
-				}
-			default:
-				return fmt.Errorf("unsupport action %s", action)
+	for _, tableId := range subTableIDs {
+		switch actionEnum {
+		case ADD:
+			aggInterval := IntervalHour
+			if interval == 1440 {
+				aggInterval = IntervalDay
 			}
+			if err := m.createTableMV(ck, tableId, baseTable, dstTable, aggrSummable, aggrUnsummable, aggInterval, duration); err != nil {
+				return err
+			}
+		case MOD:
+			if err := m.modTableMV(ck, tableId, dstTable, duration); err != nil {
+				return err
+			}
+		case DEL:
+			if err := delTableMV(ck, tableId, dstTable); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("unsupport action %s", action)
 		}
 	}
 	return nil

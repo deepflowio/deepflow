@@ -78,9 +78,8 @@ func (m *ExtMetrics) Release() {
 	ReleaseExtMetrics(m)
 }
 
-func (m *ExtMetrics) GenCKTable(ttl int) *ckdb.Table {
+func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int) *ckdb.Table {
 	timeKey := "time"
-	cluster := ckdb.DF_CLUSTER
 	engine := ckdb.MergeTree
 
 	orderKeys := []string{}
@@ -103,6 +102,7 @@ func (m *ExtMetrics) GenCKTable(ttl int) *ckdb.Table {
 		PartitionFunc:   DefaultPartition,
 		Engine:          engine,
 		Cluster:         cluster,
+		StoragePolicy:   storagePolicy,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 	}

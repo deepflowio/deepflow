@@ -1319,17 +1319,17 @@ func ReleaseFlowLogger(l *FlowLogger) {
 
 var L4FlowCounter uint32
 
-func genID(time uint32, counter *uint32, shardID int) uint64 {
+func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 	count := atomic.AddUint32(counter, 1)
-	// 高32位时间，24-32位 表示 shardid, 低24位是counter
-	return uint64(time)<<32 | (uint64(shardID) << 24) | (uint64(count) & 0xffffff)
+	// 高32位时间，18-32位 表示 vtapid, 低18位是counter
+	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
 }
 
-func TaggedFlowToLogger(f *pb.TaggedFlow, shardID int, platformData *grpc.PlatformInfoTable) *FlowLogger {
+func TaggedFlowToLogger(f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *FlowLogger {
 	isIPV6 := f.Flow.EthType == uint32(layers.EthernetTypeIPv6)
 
 	s := AcquireFlowLogger()
-	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, shardID)
+	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, uint16(f.Flow.FlowKey.VtapId))
 	s.DataLinkLayer.Fill(f.Flow)
 	s.NetworkLayer.Fill(f.Flow, isIPV6)
 	s.TransportLayer.Fill(f.Flow)

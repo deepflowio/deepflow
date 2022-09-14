@@ -290,12 +290,8 @@ type Field struct {
 	TagValue uint16
 }
 
-func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version string, ttl int) *ckdb.Table {
+func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy string, ttl int) *ckdb.Table {
 	timeKey := "time"
-	cluster := ckdb.DF_CLUSTER
-	if engine == ckdb.ReplicatedMergeTree {
-		cluster = ckdb.DF_REPLICATED_CLUSTER
-	}
 
 	var orderKeys []string
 	code := metricsTableCodes[id]
@@ -333,6 +329,7 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version st
 		PartitionFunc:   ckdb.TimeFuncTwelveHour,
 		Engine:          engine,
 		Cluster:         cluster,
+		StoragePolicy:   storagePolicy,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 	}
@@ -347,22 +344,21 @@ func newMetricsSecondTable(minuteTable *ckdb.Table, ttl int) *ckdb.Table {
 	t.TTL = ttl
 	t.PartitionFunc = ckdb.TimeFuncFourHour
 	t.Engine = ckdb.MergeTree // 秒级数据不用支持使用replica
-	t.Cluster = ckdb.DF_CLUSTER
 
 	return &t
 }
 
-func GetMetricsTables(engine ckdb.EngineType, version string, flowMinuteTtl, flowSecondTtl, appMinuteTtl, appSecondTtl int) []*ckdb.Table {
+func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy string, flowMinuteTtl, flowSecondTtl, appMinuteTtl, appSecondTtl int) []*ckdb.Table {
 	var metricsTables []*ckdb.Table
 
 	minuteTables := []*ckdb.Table{}
 	for i := VTAP_FLOW_PORT_1M; i <= VTAP_FLOW_EDGE_PORT_1M; i++ {
-		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, flowMinuteTtl))
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, flowMinuteTtl))
 	}
 	for i := VTAP_APP_PORT_1M; i <= VTAP_APP_EDGE_PORT_1M; i++ {
-		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, appMinuteTtl))
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, appMinuteTtl))
 	}
-	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, 7)) // vtap_acl ttl is always 7 day
+	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 7)) // vtap_acl ttl is always 7 day
 
 	secondTables := []*ckdb.Table{}
 	for i := VTAP_FLOW_PORT_1S; i <= VTAP_FLOW_EDGE_PORT_1S; i++ {

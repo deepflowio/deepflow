@@ -846,9 +846,9 @@ func ReleaseL7Logger(l *L7Logger) {
 
 var L7LogCounter uint32
 
-func ProtoLogToL7Logger(l *pb.AppProtoLogsData, shardID int, platformData *grpc.PlatformInfoTable) *L7Logger {
+func ProtoLogToL7Logger(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) *L7Logger {
 	h := AcquireL7Logger()
-	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7LogCounter, shardID)
+	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7LogCounter, uint16(l.Base.VtapId))
 	h.Fill(l, platformData)
 	return h
 }

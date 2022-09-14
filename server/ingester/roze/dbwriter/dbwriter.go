@@ -38,13 +38,9 @@ type DbWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabled bool, ckWriterCfg config.CKWriterConfig, flowMetricsTtl rozeconfig.FlowMetricsTTL) (*DbWriter, error) {
+func NewDbWriter(primaryAddr, user, password, clusterName, storagePolicy string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl rozeconfig.FlowMetricsTTL) (*DbWriter, error) {
 	ckwriters := []*ckwriter.CKWriter{}
-	engine := ckdb.MergeTree
-	if replicaEnabled {
-		engine = ckdb.ReplicatedMergeTree
-	}
-	tables := zerodoc.GetMetricsTables(engine, common.CK_VERSION, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S)
+	tables := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S)
 	for _, table := range tables {
 		counterName := "metrics_1m"
 		if table.ID >= uint8(zerodoc.VTAP_FLOW_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_FLOW_EDGE_PORT_1S) {
@@ -54,7 +50,7 @@ func NewDbWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabl
 		} else if table.ID >= uint8(zerodoc.VTAP_APP_PORT_1M) && table.ID <= uint8(zerodoc.VTAP_APP_EDGE_PORT_1M) {
 			counterName = "app_1m"
 		}
-		ckwriter, err := ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName, table, replicaEnabled,
+		ckwriter, err := ckwriter.NewCKWriter(primaryAddr, "", user, password, counterName, table, false,
 			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
 		if err != nil {
 			log.Error(err)

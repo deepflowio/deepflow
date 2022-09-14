@@ -71,7 +71,9 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	}
 	geo.NewGeoTree()
 
-	flowLogWriter, err := dbwriter.NewFlowLogWriter(config.Base.CKDB.Primary, config.Base.CKDB.Secondary, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password, config.ReplicaEnabled,
+	flowLogWriter, err := dbwriter.NewFlowLogWriter(
+		config.Base.CKDB.ActualAddr, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password,
+		config.Base.CKDB.ClusterName, config.Base.CKDB.StoragePolicy,
 		config.CKWriterConfig, config.FlowLogTTL)
 	if err != nil {
 		return nil, err
@@ -122,7 +124,6 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.Base.ShardID,
 			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
@@ -174,7 +175,6 @@ func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 		}
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.Base.ShardID,
 			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
@@ -224,7 +224,6 @@ func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-l7-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		decoders[i] = decoder.NewDecoder(
 			i,
-			config.Base.ShardID,
 			msgType,
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),

@@ -172,8 +172,20 @@ querier:
     # user-password:
 
 ingester:
-  #ckdb-service-prefix: clickhouse
-  #ckdb-service-port: 9000
+  #ckdb:
+  #  # use internal or external ckdb
+  #  external: false
+  #  host: deepflow-clickhouse
+  #  port: 9000
+  #  # if `external` is 'true', default value is 'default', else 'df_cluster'
+  #  cluster-name:
+  #  # if `external` is 'true', default value 'default', else 'df_storage'
+  #  storage-policy:
+
+  #ckdb-auth:
+  #  username: default
+  #  # '#','@' special characters are not supported in passwords
+  #  password:
 
   # local node ip, if not set will get from environment variable 'NODE_IP', dafault: ""
   #node-ip:
@@ -193,15 +205,6 @@ ingester:
   #  user:
   #  password:
 
-  #ckdb-auth:
-  #  username:
-  #  # '#','@' special characters are not supported in passwords
-  #  password:
-
-  #ckdb:
-  #  primary: 127.0.0.1:9000
-  #  secondary:          // 如果配置2个地址，xxx-replica-enabled 为false，则作为primary写入, xxx-replica-enabled 为true 作为replica写入
-
   ## ckdb若使用对象存储,需要设置将数据转移至对象存储
   #ckdb-s3:
   #  enabled: false  #是否使用了对象存储
@@ -218,9 +221,6 @@ ingester:
 
   ## The listening port used by Ingester to receive data
   #listen-port: 20033
-
-  #metrics-replica-enabled: false
-  #flowlog-replica-enabled: false
 
   ## 遥测数据写入配置
   #metrics-ck-writer:
@@ -248,7 +248,7 @@ ingester:
 
   ## flow_metrics database data retention time(unit: day)
   #flow-metrics-ttl:
-  #  vtap-flow-1m: 7     # vtap_flow[_edge_]_port.1m
+  #  vtap-flow-1m: 7     # vtap_flow[_edge]_port.1m
   #  vtap-flow-1s: 1     # vtap_flow[_edge]_port.1s
   #  vtap-app-1m: 7      # vtap_app[_edge]_port.1m
   #  vtap-app-1s: 1      # vtap_app[_edge]_port.1s
@@ -364,18 +364,11 @@ ingester:
   ## 是否不写入秒级数据: 默认: false(写入)
   #disable-second-write: false
 
-  ## 是否不写秒级数据的replica: 默认: true(不写)
-  #disable-second-write-replica: true
-
   ## parallelism of unmarshall, defaults to 4
   #unmarshall-queue-count: 4
 
   ## size of unmarshall queue, defaults to 10240
   #unmarshall-queue-size: 10240
-
-  ## ########################## stream config ############################################
-  ## 用来保证全集群流日志_id的唯一性
-  #shard-id: 0
 
   ## writer all queue limit max size
   #throttle: 50000

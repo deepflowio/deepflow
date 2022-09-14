@@ -35,7 +35,7 @@ const (
 )
 
 type DatasourceManager struct {
-	ckAddrs        []string // 需要修改数据源的clickhouse地址, 支持多个
+	ckAddr         string // 需要修改数据源的clickhouse地址, 支持多个
 	user           string
 	password       string
 	readTimeout    int
@@ -44,19 +44,23 @@ type DatasourceManager struct {
 	ckdbS3Volume   string
 	ckdbS3TTLTimes int
 
+	ckdbCluster       string
+	ckdbStoragePolicy string
+
 	server *http.Server
 }
 
-func NewDatasourceManager(ckAddrs []string, user, password string, readTimeout int, replicaEnabled, ckdbS3Enabled bool, ckdbS3Volume string, ckdbS3TTLTimes int) *DatasourceManager {
+func NewDatasourceManager(ckAddr string, user, password, ckdbCluster, ckdbStoragePolicy string, readTimeout int, ckdbS3Enabled bool, ckdbS3Volume string, ckdbS3TTLTimes int) *DatasourceManager {
 	return &DatasourceManager{
-		ckAddrs:        ckAddrs,
-		user:           user,
-		password:       password,
-		readTimeout:    readTimeout,
-		replicaEnabled: replicaEnabled,
-		ckdbS3Enabled:  ckdbS3Enabled,
-		ckdbS3Volume:   ckdbS3Volume,
-		ckdbS3TTLTimes: ckdbS3TTLTimes,
+		ckAddr:            ckAddr,
+		user:              user,
+		password:          password,
+		readTimeout:       readTimeout,
+		ckdbS3Enabled:     ckdbS3Enabled,
+		ckdbS3Volume:      ckdbS3Volume,
+		ckdbS3TTLTimes:    ckdbS3TTLTimes,
+		ckdbCluster:       ckdbCluster,
+		ckdbStoragePolicy: ckdbStoragePolicy,
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),
