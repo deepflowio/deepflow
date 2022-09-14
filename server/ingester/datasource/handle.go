@@ -377,7 +377,7 @@ func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 }
 
 func getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Table {
-	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION)[id] // GetMetricsTables取的全局变量的值，以roze在启动时对tables初始化的参数为准
+	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, 7, 1, 7, 1)[id]
 }
 
 func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
