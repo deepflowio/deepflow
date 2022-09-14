@@ -359,7 +359,7 @@ func GetMetricsTables(engine ckdb.EngineType, version string, flowMinuteTtl, flo
 	for i := VTAP_FLOW_PORT_1M; i <= VTAP_FLOW_EDGE_PORT_1M; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, flowMinuteTtl))
 	}
-	for i := VTAP_APP_PORT_1M; i <= VTAP_APP_PORT_1M; i++ {
+	for i := VTAP_APP_PORT_1M; i <= VTAP_APP_EDGE_PORT_1M; i++ {
 		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, appMinuteTtl))
 	}
 	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, 7)) // vtap_acl ttl is always 7 day
