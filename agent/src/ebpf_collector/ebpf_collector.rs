@@ -26,18 +26,17 @@ use lru::LruCache;
 
 use super::{Error, Result};
 
-use crate::common::ebpf::{get_all_protocols_by_ebpf_type, EbpfType};
 use crate::common::enums::IpProtocol;
-use crate::common::flow::{L7Protocol, PacketDirection};
+use crate::common::flow::{ipprotocol_to_bitmap, L7Protocol, PacketDirection};
+use crate::common::l7_protocol_log::{
+    get_all_protocol, L7ProtocolLog, L7ProtocolLogInterface, ParseParam,
+};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::ebpf;
 use crate::flow_generator::{
-    dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
-    kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
-    AppProtoHeadEnum, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfoEnum, AppTable,
-    DnsLog, DubboLog, Error as LogError, HttpLog, KafkaLog, L7LogParse, L7ProtoRawDataType,
-    MqttLog, MysqlLog, RedisLog, Result as LogResult,
+    AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, AppTable, Error as LogError,
+    L7LogParse, Result as LogResult,
 };
 use crate::policy::PolicyGetter;
 use crate::sender::SendItem;
@@ -106,7 +105,7 @@ impl SessionAggr {
     }
 
     fn send(&self, log: AppProtoLogsData) {
-        if log.omit_send() {
+        if log.ebpf_special_info.as_ref().unwrap().skip_send() {
             debug!("ebpf_collector out omit: {}", log);
             return;
         }
@@ -251,7 +250,7 @@ impl SessionAggr {
     fn on_merge_request_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
         let (value, _) = self.remove(slot_index, key, 1);
         if value.is_none() {
-            let (req_end, resp_end) = log.is_req_resp_end();
+            let (req_end, resp_end) = log.ebpf_special_info.as_ref().unwrap().is_req_resp_end();
             // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
             // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
             if req_end || resp_end {
@@ -270,7 +269,7 @@ impl SessionAggr {
         let mut item = value.unwrap();
         item.session_merge(log);
 
-        if item.is_session_end() {
+        if item.ebpf_special_info.as_ref().unwrap().is_session_end() {
             self.cache_count -= 1;
             self.send(item);
         } else {
@@ -306,7 +305,7 @@ impl SessionAggr {
     fn on_merge_response_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
         let (value, _) = self.remove(slot_index, key, 1);
         if value.is_none() {
-            let (req_end, resp_end) = log.is_req_resp_end();
+            let (req_end, resp_end) = log.ebpf_special_info.as_ref().unwrap().is_req_resp_end();
             // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
             // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
             if req_end || resp_end {
@@ -324,7 +323,7 @@ impl SessionAggr {
         let mut item = value.unwrap();
         item.session_merge(log);
 
-        if item.is_session_end() {
+        if item.ebpf_special_info.as_ref().unwrap().is_session_end() {
             self.cache_count -= 1;
             self.send(item);
         } else {
@@ -369,7 +368,7 @@ struct FlowItem {
     is_success: bool,
     is_skip: bool,
 
-    parser: Option<Box<dyn L7LogParse>>,
+    parser: Option<L7ProtocolLog>,
 }
 
 impl FlowItem {
@@ -379,40 +378,16 @@ impl FlowItem {
 
     fn get_parser(
         protocol: L7Protocol,
-        ebpf_type: EbpfType,
         log_parser_config: &LogParserAccess,
-    ) -> Option<Box<dyn L7LogParse>> {
-        let raw_data_type = L7ProtoRawDataType::from_ebpf_type(ebpf_type);
-
-        match protocol {
-            L7Protocol::Dns => Some(Box::from(DnsLog::default())),
-            L7Protocol::Http1 => Some(Box::from(HttpLog::new(
-                log_parser_config,
-                false,
-                raw_data_type,
-            ))),
-            L7Protocol::Http2 => Some(Box::from(HttpLog::new(
-                log_parser_config,
-                false,
-                raw_data_type,
-            ))),
-            L7Protocol::Http1TLS => Some(Box::from(HttpLog::new(
-                log_parser_config,
-                true,
-                raw_data_type,
-            ))),
-            L7Protocol::Http2TLS => Some(Box::from(HttpLog::new(
-                log_parser_config,
-                true,
-                raw_data_type,
-            ))),
-            L7Protocol::Mysql => Some(Box::from(MysqlLog::default())),
-            L7Protocol::Redis => Some(Box::from(RedisLog::default())),
-            L7Protocol::Kafka => Some(Box::from(KafkaLog::default())),
-            L7Protocol::Dubbo => Some(Box::from(DubboLog::new(log_parser_config))),
-            L7Protocol::Mqtt => Some(Box::from(MqttLog::default())),
-            _ => None,
+    ) -> Option<L7ProtocolLog> {
+        for mut i in get_all_protocol().into_iter() {
+            if i.protocol().0 == protocol {
+                i.set_parse_config(log_parser_config);
+                return Some(i);
+            }
         }
+
+        return None;
     }
 
     fn new(
@@ -427,15 +402,15 @@ impl FlowItem {
         let l7_protocol = app_table.get_protocol_from_ebpf(packet, local_epc, remote_epc);
         let is_from_app = l7_protocol.is_some();
         let (l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
-        let mut protocol_bitmap = u128::from(l4_protocol);
+        let mut protocol_bitmap = ipprotocol_to_bitmap(l4_protocol);
         match packet.l7_protocol_from_ebpf {
             L7Protocol::Http1TLS => {
-                protocol_bitmap |= 1 << u8::from(L7Protocol::Http1TLS);
-                protocol_bitmap &= !(1 << u8::from(L7Protocol::Http1));
+                protocol_bitmap |= 1 << (L7Protocol::Http1TLS as u8);
+                protocol_bitmap &= !(1 << (L7Protocol::Http1 as u8));
             }
             L7Protocol::Http2TLS => {
-                protocol_bitmap |= 1 << u8::from(L7Protocol::Http2TLS);
-                protocol_bitmap &= !(1 << u8::from(L7Protocol::Http2));
+                protocol_bitmap |= 1 << (L7Protocol::Http2TLS as u8);
+                protocol_bitmap &= !(1 << (L7Protocol::Http2 as u8));
             }
             _ => {}
         }
@@ -452,25 +427,7 @@ impl FlowItem {
             server_port,
             protocol_bitmap,
             protocol_bitmap_image: protocol_bitmap,
-            parser: Self::get_parser(l7_protocol, packet.ebpf_type, log_parser_config),
-        }
-    }
-
-    fn _check(&mut self, protocol: L7Protocol, packet: &MetaPacket) -> bool {
-        match protocol {
-            L7Protocol::Dns => dns_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Dubbo => dubbo_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Kafka => kafka_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Mqtt => mqtt_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http1 | L7Protocol::Http1TLS => {
-                http1_check_protocol(&mut self.protocol_bitmap, packet)
-            }
-            L7Protocol::Http2 | L7Protocol::Http2TLS => {
-                http2_check_protocol(&mut self.protocol_bitmap, packet)
-            }
-            _ => false,
+            parser: Self::get_parser(l7_protocol, log_parser_config),
         }
     }
 
@@ -480,21 +437,28 @@ impl FlowItem {
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
-    ) -> LogResult<AppProtoHeadEnum> {
+    ) -> LogResult<Vec<L7ProtocolLog>> {
         if self.is_skip {
             return Err(LogError::L7ProtocolCheckLimit);
         }
-        let protocols = get_all_protocols_by_ebpf_type(packet.ebpf_type, packet.is_tls());
 
-        for i in protocols {
-            if self.protocol_bitmap & 1 << u8::from(i) == 0 {
+        for mut protocol_log in get_all_protocol().into_iter() {
+            if protocol_log.is_skip_parse(self.protocol_bitmap) {
                 continue;
             }
-            if self._check(i, packet) {
-                self.l7_protocol = i;
+            protocol_log.set_parse_config(log_parser_config);
+            if protocol_log.check_payload(
+                &packet.raw_from_ebpf.as_ref(),
+                &packet.lookup_key,
+                ParseParam::from(packet),
+            ) {
+                self.l7_protocol = protocol_log.protocol().0;
                 self.server_port = packet.lookup_key.dst_port;
-                self.parser = Self::get_parser(i, packet.ebpf_type, log_parser_config);
+                self.parser = Some(protocol_log);
                 return self._parse(packet, local_epc, app_table);
+            } else {
+                // 解析不通过，flowitem之后会忽略该协议的解析
+                protocol_log.set_bitmap_skip_parse(&mut self.protocol_bitmap);
             }
         }
         self.is_skip = app_table.set_protocol_from_ebpf(
@@ -512,7 +476,7 @@ impl FlowItem {
         packet: &mut MetaPacket,
         local_epc: i32,
         app_table: &mut AppTable,
-    ) -> LogResult<AppProtoHeadEnum> {
+    ) -> LogResult<Vec<L7ProtocolLog>> {
         if !self.is_success && self.is_skip {
             return Err(LogError::L7ProtocolParseLimit);
         }
@@ -523,13 +487,17 @@ impl FlowItem {
             PacketDirection::ServerToClient
         };
 
-        let ret = self.parser.as_mut().unwrap().parse(
+        let l7log = self.parser.take().unwrap();
+        let default_log = l7log.get_default();
+
+        let ret = l7log.parse_payload(
             packet.raw_from_ebpf.as_ref(),
-            packet.lookup_key.proto,
-            packet.direction,
-            Some(packet.is_request_end),
-            Some(packet.is_response_end),
+            &packet.lookup_key,
+            ParseParam::from(&packet),
         );
+        if ret.is_ok() {
+            self.parser.replace(default_log);
+        }
 
         if !self.is_success {
             if ret.is_ok() {
@@ -562,7 +530,7 @@ impl FlowItem {
         self.protocol_bitmap = if self.l4_protocol == l4_protocol {
             self.protocol_bitmap_image
         } else {
-            u128::from(l4_protocol)
+            ipprotocol_to_bitmap(l4_protocol)
         };
         self.l4_protocol = l4_protocol;
         self.parser = None;
@@ -574,7 +542,7 @@ impl FlowItem {
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
-    ) -> LogResult<AppProtoHeadEnum> {
+    ) -> LogResult<Vec<L7ProtocolLog>> {
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         if self.last_packet + Self::FLOW_ITEM_TIMEOUT < time_in_sec {
             self.reset(packet.lookup_key.proto);
@@ -594,10 +562,6 @@ impl FlowItem {
         }
 
         return self.check(packet, local_epc, app_table, log_parser_config);
-    }
-
-    fn get_info(&mut self) -> AppProtoLogsInfoEnum {
-        self.parser.as_ref().unwrap().info()
     }
 
     fn lookup_epc(&mut self, packet: &MetaPacket, mut policy_getter: PolicyGetter, local_epc: i32) {
@@ -623,27 +587,29 @@ impl FlowItem {
     ) -> Option<Vec<AppProtoLogsData>> {
         // 策略EPC
         self.lookup_epc(packet, policy_getter, local_epc);
-        // 应用解析, 获取日志信息
-        let result = self
-            .parse(packet, local_epc, app_table, log_parser_config)
-            .ok()?
-            .into_iter()
-            .zip(self.get_info().into_iter())
-            .map(|(h, i)| {
-                let base = AppProtoLogsBaseInfo::from_ebpf(
-                    &packet,
-                    h,
-                    vtap_id,
-                    local_epc,
-                    self.remote_epc,
-                );
-                AppProtoLogsData {
-                    base_info: base,
-                    special_info: i,
+        if let Ok(logs) = self.parse(packet, local_epc, app_table, log_parser_config) {
+            let mut result = vec![];
+            for log in logs.into_iter() {
+                if let Some(header) = log.app_proto_head() {
+                    let base = AppProtoLogsBaseInfo::from_ebpf(
+                        &packet,
+                        header,
+                        vtap_id,
+                        local_epc,
+                        self.remote_epc,
+                    );
+                    result.push(AppProtoLogsData {
+                        // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑，暂时添加一个Option字段。
+                        // 后面吧cbpf也抽出来后，只会留下一个 special_info: L7protocolLog， AppProtoLogsInfo会去掉
+                        base_info: base,
+                        special_info: AppProtoLogsInfo::None(()),
+                        ebpf_special_info: Some(log),
+                    });
                 }
-            })
-            .collect();
-        Some(result)
+            }
+            return Some(result);
+        }
+        return None;
     }
 }
 

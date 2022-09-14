@@ -17,7 +17,7 @@
 use std::str;
 
 use arc_swap::access::Access;
-use log::info;
+use log::debug;
 use regex::Regex;
 use serde::Serialize;
 
@@ -26,9 +26,13 @@ use super::value_is_default;
 use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
 use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
+use crate::__log_info_merge;
 use crate::common::ebpf::EbpfType;
 use crate::common::enums::IpProtocol;
-use crate::common::flow::{L7Protocol, PacketDirection};
+use crate::common::flow::L7Protocol;
+use crate::common::flow::PacketDirection;
+use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
+use crate::common::lookup_key::LookupKey;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
@@ -159,18 +163,176 @@ impl From<HttpInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct HttpLog {
     msg_type: LogMessageType,
     // 数据原始类型, 标准的协议格式或者是ebpf上报的自定义格式
+    #[serde(skip)]
     raw_data_type: L7ProtoRawDataType,
     proto: L7Protocol,
 
     info: HttpInfo,
 
     is_https: bool,
-
+    // check 是否已经解析过,已经解析过parse会跳过
+    parsed: bool,
+    #[serde(skip)]
     l7_log_dynamic_config: L7LogDynamicConfig,
+    start_time: u64,
+    end_time: u64,
+}
+
+impl L7ProtocolLogInterface for HttpLog {
+    fn session_id(&self) -> Option<u32> {
+        return Some(self.info.stream_id);
+    }
+
+    fn set_parse_config(&mut self, log_parser_config: &LogParserAccess) {
+        self.update_config(log_parser_config)
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
+        __log_info_merge!(self, HttpLog, other);
+    }
+
+    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool {
+        self.start_time = param.time;
+        self.end_time = param.time;
+        if let Some(p) = &param.ebpf_param {
+            self.is_https = p.is_tls;
+        }
+        match param.ebpf_type {
+            EbpfType::GoHttp2Uprobe => {
+                self.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
+                if let Some(p) = &param.ebpf_param {
+                    self.parsed = self
+                        .parse_http2_go_uprobe(
+                            payload,
+                            param.direction,
+                            false,
+                            Some(p.is_req_end),
+                            Some(p.is_resp_end),
+                        )
+                        .is_ok();
+                    return self.parsed;
+                } else {
+                    return false;
+                }
+            }
+            _ => {
+                // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
+                match self.proto {
+                    L7Protocol::Http1 => return self.http1_check_protocol(payload, lookup_key),
+                    L7Protocol::Http2 => return self.http2_check_protocol(payload, lookup_key),
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+
+    fn parse_payload(
+        mut self,
+        payload: &[u8],
+        _lookup_key: &LookupKey,
+        param: ParseParam,
+    ) -> Result<Vec<L7ProtocolLog>> {
+        if self.parsed {
+            return Ok(vec![L7ProtocolLog::HttpLog(self)]);
+        }
+        self.start_time = param.time;
+        self.end_time = param.time;
+        if let Some(p) = &param.ebpf_param {
+            self.is_https = p.is_tls;
+        }
+        match param.ebpf_type {
+            EbpfType::GoHttp2Uprobe => {
+                self.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
+                if let Some(p) = &param.ebpf_param {
+                    self.parse_http2_go_uprobe(
+                        payload,
+                        param.direction,
+                        false,
+                        Some(p.is_req_end),
+                        Some(p.is_resp_end),
+                    )?;
+                    return Ok(vec![L7ProtocolLog::HttpLog(self)]);
+                } else {
+                    return Err(Error::InvalidIpProtocol);
+                };
+            }
+            _ => {
+                match self.proto {
+                    L7Protocol::Http1 => self.parse_http_v1(payload, param.direction)?,
+                    L7Protocol::Http2 => self.parse_http_v2(payload, param.direction)?,
+                    _ => unreachable!(),
+                }
+                return Ok(vec![L7ProtocolLog::HttpLog(self)]);
+            }
+        }
+    }
+
+    fn protocol(&self) -> (L7Protocol, &str) {
+        match self.proto {
+            L7Protocol::Http1 => {
+                return (
+                    L7Protocol::Http1,
+                    if self.is_tls() { "HTTP1TLS" } else { "HTTP1" },
+                );
+            }
+            L7Protocol::Http2 => {
+                return (
+                    L7Protocol::Http2,
+                    if self.is_tls() { "HTTP2TLS" } else { "HTTP2" },
+                );
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: self.get_l7_protocol_with_tls(),
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return self.is_https;
+    }
+
+    fn skip_send(&self) -> bool {
+        return self.info.is_empty();
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.info.into();
+    }
+
+    fn need_merge(&self) -> bool {
+        match self.raw_data_type {
+            L7ProtoRawDataType::GoHttp2Uprobe => {
+                return true;
+            }
+            _ => {
+                return false;
+            }
+        }
+    }
+
+    fn is_req_resp_end(&self) -> (bool, bool) {
+        return (self.info.is_req_end, self.info.is_resp_end);
+    }
+    fn parse_on_udp(&self) -> bool {
+        return false;
+    }
+
+    fn get_default(&self) -> L7ProtocolLog {
+        let mut log = Self::default();
+        log.l7_log_dynamic_config = self.l7_log_dynamic_config.clone();
+        log.proto = self.proto;
+        return L7ProtocolLog::HttpLog(log);
+    }
 }
 
 fn parse_lines(payload: &[u8], limit: usize) -> Vec<&[u8]> {
@@ -198,20 +360,70 @@ impl HttpLog {
     const TRACE_ID: u8 = 0;
     const SPAN_ID: u8 = 1;
 
-    pub fn new(
-        config: &LogParserAccess,
-        is_https: bool,
-        raw_data_type: L7ProtoRawDataType,
-    ) -> Self {
+    pub fn new(config: &LogParserAccess, is_https: bool) -> Self {
         Self {
             l7_log_dynamic_config: config.load().l7_log_dynamic.clone(),
             is_https,
-            raw_data_type,
             ..Default::default()
         }
     }
 
-    fn get_l7_protocol(&self) -> L7Protocol {
+    pub fn new_v1() -> Self {
+        return Self {
+            proto: L7Protocol::Http1,
+            ..Default::default()
+        };
+    }
+
+    pub fn new_v2() -> Self {
+        return Self {
+            proto: L7Protocol::Http2,
+            ..Default::default()
+        };
+    }
+
+    pub fn set_config(&mut self, config: &LogParserAccess) {
+        self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
+    }
+
+    // 这个逻辑直接复制 http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
+    // 等perf抽象出来后，只会保留这一个
+    pub fn http1_check_protocol(&mut self, payload: &[u8], lookup_key: &LookupKey) -> bool {
+        if lookup_key.proto != IpProtocol::Tcp {
+            return false;
+        }
+
+        let lines = parse_lines(payload, 1);
+        if lines.len() == 0 {
+            // 没有/r/n认为一定不是HTTPv1
+            return false;
+        }
+
+        let regex = Regex::new("^(GET|POST|HEAD|PUT|DELETE|CONNECT|TRACE|OPTIONS|LINK|UNLINK|COPY|MOVE|PATCH|WRAPPED|EXTENSION\\-METHOD).+HTTP/1.[01]$").unwrap();
+        let line = String::from_utf8_lossy(lines[0]).into_owned();
+        if regex.is_match(line.as_str()) {
+            self.proto = L7Protocol::Http1;
+            return true;
+        }
+        return false;
+    }
+
+    // 这个逻辑直接复制 http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
+    // 等perf抽象出来后，只会保留这一个
+    pub fn http2_check_protocol(&mut self, payload: &[u8], lookup_key: &LookupKey) -> bool {
+        if lookup_key.proto != IpProtocol::Tcp {
+            return false;
+        }
+        self.parsed = self
+            .parse_http_v2(payload, PacketDirection::ClientToServer)
+            .is_ok();
+        if self.parsed {
+            self.proto = L7Protocol::Http2;
+        }
+        return self.parsed;
+    }
+
+    fn get_l7_protocol_with_tls(&self) -> L7Protocol {
         match self.proto {
             L7Protocol::Http1 => {
                 if self.is_https {
@@ -227,13 +439,13 @@ impl HttpLog {
                     L7Protocol::Http2
                 }
             }
-            _ => L7Protocol::Unknown,
+            _ => unreachable!(),
         }
     }
 
     pub fn update_config(&mut self, config: &LogParserAccess) {
         self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
-        info!(
+        debug!(
             "http log update l7 log dynamic config to {:#?}",
             self.l7_log_dynamic_config
         );
@@ -697,6 +909,7 @@ impl HttpLog {
     }
 }
 
+// TODO 这个接口后面去掉,逻辑保留.
 impl L7LogParse for HttpLog {
     fn parse(
         &mut self,
@@ -721,7 +934,7 @@ impl L7LogParse for HttpLog {
             }
         }
         Ok(AppProtoHeadEnum::Single(AppProtoHead {
-            proto: self.get_l7_protocol(),
+            proto: self.get_l7_protocol_with_tls(),
             msg_type: self.msg_type,
             rrt: 0,
             ..Default::default()
@@ -864,7 +1077,7 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
 // 通过请求识别HTTPv1
 pub fn http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Http1));
+        *bitmap &= !(1 << L7Protocol::Http1 as u8);
         return false;
     }
 
@@ -876,7 +1089,7 @@ pub fn http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     let lines = parse_lines(payload, 1);
     if lines.len() == 0 {
         // 没有/r/n认为一定不是HTTPv1
-        *bitmap &= !(1 << u8::from(L7Protocol::Http1));
+        *bitmap &= !(1 << L7Protocol::Http1 as u8);
         return false;
     }
 
@@ -886,9 +1099,10 @@ pub fn http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
 }
 
 // 通过请求识别HTTPv2
+// TODO 这个以后要去掉
 pub fn http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Http2));
+        *bitmap &= !(1 << (L7Protocol::Http2 as u8));
         return false;
     }
 
@@ -915,14 +1129,13 @@ pub fn http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::test::Capture;
     use std::fs;
     use std::mem::size_of;
     use std::path::Path;
     use std::slice::from_raw_parts;
 
     use super::*;
-
-    use crate::utils::test::Capture;
 
     const FILE_DIR: &str = "resources/test/flow_generator/http";
 

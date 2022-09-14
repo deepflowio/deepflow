@@ -20,7 +20,6 @@ use std::time::Duration;
 use std::{fmt, str};
 
 use crate::utils::net::h2pack;
-
 use crate::{
     common::{
         enums::IpProtocol,
@@ -162,7 +161,6 @@ impl L7FlowPerf for HttpPerfData {
                 proto: self.session_data.l7_proto,
                 msg_type: self.session_data.msg_type,
                 rrt,
-                version: 0,
             },
             0,
         ))
