@@ -18,10 +18,10 @@ use std::io;
 
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, size_t, sockaddr,
-    sockaddr_ll, socklen_t, AF_PACKET, ETH_P_ALL, MAP_LOCKED, MAP_NORESERVE, MAP_SHARED, POLLERR,
-    POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
+    sockaddr_ll, socklen_t, AF_PACKET, ETH_P_ALL, MAP_SHARED, MAP_LOCKED, MAP_NORESERVE, POLLERR, POLLIN, PROT_READ,
+    PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
 };
-use log::warn;
+use log::{info, warn};
 use public::error::*;
 use public::packet::Packet;
 use socket::{self, Socket};
@@ -186,7 +186,7 @@ impl Tpacket {
     fn mmap_ring(&mut self) -> af_packet::Result<()> {
         // 接收队列
         unsafe {
-            let ret = mmap(
+            let mut ret = mmap(
                 std::ptr::null_mut(),
                 (self.opts.block_size * self.opts.num_blocks) as size_t,
                 (PROT_READ | PROT_WRITE) as c_int,
@@ -195,7 +195,18 @@ impl Tpacket {
                 0 as off_t,
             ) as isize;
             if ret == -1 {
-                return Err(io::Error::last_os_error().into());
+                info!("Afpacket mmap error: {:?}, maybe env lack permission, retry without MAP_LOCKED and MAP_NORESERVE.", io::Error::last_os_error());
+                ret = mmap(
+                    std::ptr::null_mut(),
+                    (self.opts.block_size * self.opts.num_blocks) as size_t,
+                    (PROT_READ | PROT_WRITE) as c_int,
+                    MAP_SHARED as c_int,
+                    self.raw_socket.fileno() as c_int,
+                    0 as off_t,
+                ) as isize;
+                if ret == -1 {
+                    return Err(io::Error::last_os_error().into());
+                }
             }
             self.ring = ret as *mut u8;
         }
