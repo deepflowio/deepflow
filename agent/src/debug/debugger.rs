@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "windows")]
+use std::net::Ipv4Addr;
 use std::{
     io::{self, ErrorKind},
     net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
@@ -90,6 +92,7 @@ impl Debugger {
         let debuggers = self.debuggers.clone();
         let conf = self.config.clone();
 
+        #[cfg(target_os = "linux")]
         let thread = thread::spawn(move || {
             let addr: SocketAddr =
                 (IpAddr::from(Ipv6Addr::UNSPECIFIED), conf.load().listen_port).into();
@@ -171,6 +174,183 @@ impl Debugger {
                             e
                         );
                         continue;
+                    }
+                }
+            }
+        });
+
+        #[cfg(target_os = "windows")]
+        let thread = thread::spawn(move || {
+            let (mut has_ipv4, mut has_ipv6) = (false, false);
+            for &ip in conf.load().controller_ips.iter() {
+                if ip.is_ipv4() {
+                    has_ipv4 = true;
+                } else if ip.is_ipv6() {
+                    has_ipv6 = true;
+                }
+            }
+
+            // [Issue #34202]: https://github.com/rust-lang/rust/issues/34202
+            // This will return an error when the IP version of the local socket does not match that returned from [`ToSocketAddrs`]
+            // So it needs to bind to ipv4 addr's socket and ipv6 addr's socket on Windows
+            let addr_v4: SocketAddr =
+                (IpAddr::from(Ipv4Addr::UNSPECIFIED), conf.load().listen_port).into();
+            let addr_v6: SocketAddr =
+                (IpAddr::from(Ipv6Addr::UNSPECIFIED), conf.load().listen_port).into();
+            let sock_v4 = match UdpSocket::bind(addr_v4) {
+                Ok(s) => Arc::new(s),
+                Err(e) => {
+                    error!(
+                        "failed to create debugger socket with addr_v4={:?} error: {}",
+                        addr_v4, e
+                    );
+                    return;
+                }
+            };
+
+            let sock_v6 = match UdpSocket::bind(addr_v6) {
+                Ok(s) => Arc::new(s),
+                Err(e) => {
+                    error!(
+                        "failed to create debugger socket with addr_v6={:?} error: {}",
+                        addr_v6, e
+                    );
+                    return;
+                }
+            };
+            info!(
+                "debugger listening on: {:?} and {:?}",
+                sock_v4.local_addr().unwrap(),
+                sock_v6.local_addr().unwrap()
+            );
+
+            let sock_v4_clone = sock_v4.clone();
+            let sock_v6_clone = sock_v6.clone();
+            let running_clone = running.clone();
+            let serialize_conf = config::standard();
+            thread::spawn(move || {
+                while running_clone.load(Ordering::Relaxed) {
+                    thread::sleep(BEACON_INTERVAL);
+                    let hostname = match hostname::get() {
+                        Ok(hostname) => match hostname.into_string() {
+                            Ok(s) => s,
+                            Err(e) => {
+                                warn!("get hostname failed: {:?}", e);
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            warn!("get hostname failed: {}", e);
+                            continue;
+                        }
+                    };
+
+                    let beacon = Beacon {
+                        vtap_id: conf.load().vtap_id,
+                        hostname,
+                    };
+
+                    let serialized_beacon = match encode_to_vec(beacon, serialize_conf) {
+                        Ok(v) => v,
+                        Err(_) => continue,
+                    };
+                    for &ip in conf.load().controller_ips.iter() {
+                        if has_ipv4 {
+                            if let Err(e) = sock_v4_clone.send_to(
+                                [
+                                    DEEPFLOW_AGENT_BEACON.as_bytes(),
+                                    serialized_beacon.as_slice(),
+                                ]
+                                .concat()
+                                .as_slice(),
+                                (ip, BEACON_PORT),
+                            ) {
+                                warn!("write beacon to client error: {}", e);
+                            }
+                        } else if has_ipv6 {
+                            if let Err(e) = sock_v6_clone.send_to(
+                                [
+                                    DEEPFLOW_AGENT_BEACON.as_bytes(),
+                                    serialized_beacon.as_slice(),
+                                ]
+                                .concat()
+                                .as_slice(),
+                                (ip, BEACON_PORT),
+                            ) {
+                                warn!("write beacon to client error: {}", e);
+                            }
+                        }
+                    }
+                }
+            });
+
+            while running.load(Ordering::Relaxed) {
+                if has_ipv4 {
+                    let mut buf_v4 = [0u8; MAX_BUF_SIZE];
+                    let mut addr_v4 = None;
+                    match sock_v4.recv_from(&mut buf_v4) {
+                        Ok((n, a)) => {
+                            if n == 0 {
+                                continue;
+                            }
+                            if addr_v4.is_none() {
+                                addr_v4.replace(a);
+                            }
+                            Self::dispatch(
+                                (&sock_v4, addr_v4.unwrap()),
+                                &buf_v4,
+                                &debuggers,
+                                serialize_conf,
+                            )
+                            .unwrap_or_else(|e| warn!("handle client request error: {}", e));
+                        }
+                        Err(e) => {
+                            match e.kind() {
+                                ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
+                                _ => {
+                                    warn!(
+                                        "receive udp packet error: kind=({:?}) detail={}",
+                                        e.kind(),
+                                        e
+                                    );
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                }
+                if has_ipv6 {
+                    let mut buf_v6 = [0u8; MAX_BUF_SIZE];
+                    let mut addr_v6 = None;
+                    match sock_v6.recv_from(&mut buf_v6) {
+                        Ok((n, a)) => {
+                            if n == 0 {
+                                continue;
+                            }
+                            if addr_v6.is_none() {
+                                addr_v6.replace(a);
+                            }
+                            Self::dispatch(
+                                (&sock_v6, addr_v6.unwrap()),
+                                &buf_v6,
+                                &debuggers,
+                                serialize_conf,
+                            )
+                            .unwrap_or_else(|e| warn!("handle client request error: {}", e));
+                        }
+                        Err(e) => {
+                            match e.kind() {
+                                ErrorKind::ConnectionReset => {} // It's a bug of Windows, https://stackoverflow.com/questions/34242622/windows-udp-sockets-recvfrom-fails-with-error-10054
+                                _ => {
+                                    warn!(
+                                        "receive udp packet error: kind=({:?}) detail={}",
+                                        e.kind(),
+                                        e
+                                    );
+                                }
+                            }
+                            continue;
+                        }
                     }
                 }
             }
