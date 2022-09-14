@@ -18,6 +18,7 @@ package view
 
 import (
 	"bytes"
+	"strings"
 )
 
 // NodeSet Group结构体集合
@@ -82,10 +83,16 @@ func (n *Group) ToString() string {
 }
 
 func (n *Group) WriteTo(buf *bytes.Buffer) {
-	buf.WriteString(n.Value)
 	if n.Alias != "" {
+		buf.WriteString(n.Value)
 		buf.WriteString(" AS ")
-		buf.WriteString(n.Alias)
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(n.Alias, "`"))
+		buf.WriteString("`")
+	} else {
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(n.Value, "`"))
+		buf.WriteString("`")
 	}
 }
 

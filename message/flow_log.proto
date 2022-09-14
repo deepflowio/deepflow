@@ -47,6 +47,8 @@ message Flow {
     uint32 synack_seq = 21;
     uint32 last_keepalive_seq = 22;
     uint32 last_keepalive_ack = 23;
+
+    repeated uint32 acl_gids = 24;
 }
 
 message FlowKey {
