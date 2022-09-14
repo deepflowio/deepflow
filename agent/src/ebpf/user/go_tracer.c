@@ -523,7 +523,7 @@ static int resolve_bin_file(const char *path, int pid,
 		if (p_info == NULL) {
 			p_info = alloc_proc_info_by_pid();
 			if (p_info == NULL)
-				goto offset_faild;
+				goto offset_failed;
 			is_new_info = true;
 		}
 
@@ -535,8 +535,9 @@ static int resolve_bin_file(const char *path, int pid,
 			free(p_info->path);
 			p_info->path = NULL;
 		}
-		p_offs->path = strdup(binary_path);
-		if (p_offs->path == NULL) {
+
+		p_info->path = strdup(binary_path);
+		if (p_info->path == NULL) {
 			goto offset_failed;
 		}
 		// resolve all offsets.
@@ -679,7 +680,7 @@ int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	DIR *fddir = NULL;
 
 	init_list_head(&proc_events_head);
-	init_list_head(&proc_offsets_head);
+	init_list_head(&proc_info_head);
 	pthread_mutex_init(&mutex_proc_events_lock, NULL);
 
 	fddir = opendir("/proc/");

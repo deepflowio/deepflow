@@ -41,12 +41,12 @@ struct http2_tcp_seq_key {
  * 
  * Note:  Use for after uprobe read() only.
  */
-struct {
-	__uint(type, BPF_MAP_TYPE_LRU_HASH);
-	__type(key, struct http2_tcp_seq_key);
-	__type(value, __u32);
-	__uint(max_entries, 1024);
-} http2_tcp_seq_map SEC(".maps");
+struct bpf_map_def SEC("maps") http2_tcp_seq_map = {
+	.type = BPF_MAP_TYPE_LRU_HASH,
+	.key_size = sizeof(struct http2_tcp_seq_key),
+	.value_size = sizeof(__u32),
+	.max_entries = 10240,
+};
 
 /*
  *  uprobe_go_tls_write_enter  (In tls_conn_map record A(tcp_seq) before syscall)

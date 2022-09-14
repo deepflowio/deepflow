@@ -172,9 +172,9 @@ static struct bcc_symbol_option default_option = {
 	.check_debug_file_crc = 1,
 	.lazy_symbolize = 1,
 #if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-	.use_symbol_type = BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
+	.use_symbol_type = 65535 | (1 << STT_PPC64_ELFV2_SYM_LEP),
 #else
-	.use_symbol_type = BCC_SYM_ALL_TYPES,
+	.use_symbol_type = 65535,
 #endif
 };
 
@@ -194,18 +194,6 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 						    const uint64_t addr,
 						    int pid)
 {
-	static struct bcc_symbol_option default_option = {
-		.use_debug_file = 1,
-		.check_debug_file_crc = 1,
-		.lazy_symbolize = 1,
-#if defined(__powerpc64__) && defined(_CALL_ELF) && _CALL_ELF == 2
-		.use_symbol_type =
-		    BCC_SYM_ALL_TYPES | (1 << STT_PPC64_ELFV2_SYM_LEP),
-#else
-		.use_symbol_type = 65535,
-#endif
-	};
-
 	if (bin_file == NULL) {
 		ebpf_warning("bin_file == NULL, failed.\n");
 		return NULL;

@@ -21,10 +21,10 @@
  * key: pid
  * value: struct ebpf_proc_info
  */
-struct bpf_map_def SEC("maps") uprobe_offsets_map = {
+struct bpf_map_def SEC("maps") proc_info_map = {
 	.type = BPF_MAP_TYPE_HASH,
 	.key_size = sizeof(int),
-	.value_size = sizeof(struct member_offsets),
+	.value_size = sizeof(struct ebpf_proc_info),
 	.max_entries = HASH_ENTRIES_MAX,
 };
 

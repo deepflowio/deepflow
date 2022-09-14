@@ -44,8 +44,13 @@ extern struct btf *btf__parse_raw(const char *path);
 
 int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj)
 {
+	/*
+	 * If a raw btf file is provided, it can be loaded in the specified
+	 * directory("/usr/lib/btf/vmlinux-%1$s.btf").
+	 */
 	const char *path_fmt_array[] = {
 		"/sys/kernel/btf/vmlinux",
+		"/usr/lib/btf/vmlinux-%1$s.btf",
 		"/boot/vmlinux-%1$s",
 		"/lib/modules/%1$s/vmlinux-%1$s",
 		"/lib/modules/%1$s/build/vmlinux",
@@ -66,8 +71,9 @@ int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj)
 		snprintf(path, PATH_MAX, path_fmt_array[i], sysinfo.release);
 		if (access(path, R_OK))
 			continue;
-		if (i == 0) {
+		if (i == 0 || i == 1) {
 			// /sys/kernel/btf/vmlinux
+			// /usr/lib/btf/vmlinux-%1$s.btf
 			btf = btf__parse_raw(path);
 		} else {
 			btf = btf__parse_elf(path, NULL);
