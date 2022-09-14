@@ -14,9 +14,27 @@
  * limitations under the License.
  */
 
-package migration
+package huawei
 
-const (
-	DB_VERSION_TABLE  = "db_version"
-	DB_VERSION_EXPECT = "6.1.3.1" // TODO add array to implement step-by-step migration
+import (
+	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
+
+	"github.com/deepflowys/deepflow/server/controller/cloud/config"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
+
+func TestHuaWei(t *testing.T) {
+	Convey("TestHuaWei", t, func() {
+		domain := mysql.Domain{
+			DisplayName: "test_huawei",
+		}
+
+		huawei, _ := NewHuaWei(domain, &config.CloudConfig{})
+		data, _ := huawei.GetCloudData()
+		Convey("huaweiResource number should be equal", func() {
+			So(len(data.VPCs), ShouldEqual, 3)
+		})
+	})
+}

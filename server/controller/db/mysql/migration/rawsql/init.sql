@@ -1645,6 +1645,7 @@ CREATE TABLE IF NOT EXISTS controller (
     node_type           INTEGER DEFAULT 2 COMMENT 'region node type 1.master 2.slave',
     region_domain_prefix VARCHAR(256) DEFAULT '',
     node_name           CHAR(64),
+    pod_ip              CHAR(64),
     lcuuid              CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE controller;
@@ -1670,6 +1671,7 @@ CREATE TABLE IF NOT EXISTS analyzer (
     vtap_max                INTEGER DEFAULT 200,
     synced_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     nat_ip_enabled          TINYINT(1) DEFAULT 0 COMMENT '0: disabled 1:enabled',
+    pod_ip                  CHAR(64),
     lcuuid                  CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE analyzer;

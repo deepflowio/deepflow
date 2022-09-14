@@ -74,7 +74,7 @@ $(ELFFILES):
 
 $(STATIC_OBJDIR) $(SHARED_OBJDIR):
 	$(call msg,MKDIR,$@)
-	$(Q)mkdir -p $@/user/bcc
+	$(Q)mkdir -p $@/user
 
 $(STATIC_OBJDIR)/%.o: %.c | $(STATIC_OBJDIR)
 	$(call msg,CC,$@)

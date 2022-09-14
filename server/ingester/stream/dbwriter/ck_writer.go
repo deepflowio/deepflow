@@ -22,6 +22,7 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/config"
 	"github.com/deepflowys/deepflow/server/ingester/pkg/ckwriter"
 	"github.com/deepflowys/deepflow/server/ingester/stream/common"
+	streamconfig "github.com/deepflowys/deepflow/server/ingester/stream/config"
 	"github.com/deepflowys/deepflow/server/ingester/stream/jsonify"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 )
@@ -38,7 +39,7 @@ type FlowLogWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType) *ckdb.Table {
+func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType, ttl int) *ckdb.Table {
 	var orderKeys = []string{}
 	if id == common.L7_FLOW_ID {
 		orderKeys = []string{"l7_protocol"}
@@ -54,27 +55,27 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 		TimeKey:         id.TimeKey(),
 		Engine:          engine,
 		PartitionFunc:   DefaultPartition,
-		TTL:             DefaultDayForTTL,
+		TTL:             ttl,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 	}
 }
 
-func GetFlowLogTables(engine ckdb.EngineType) []*ckdb.Table {
+func GetFlowLogTables(engine ckdb.EngineType, l4LogTtl, l7LogTtl int) []*ckdb.Table {
 	return []*ckdb.Table{
-		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine),
-		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7LoggerColumns(), engine),
+		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine, l4LogTtl),
+		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7LoggerColumns(), engine, l7LogTtl),
 	}
 }
 
-func NewFlowLogWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabled bool, ckWriterCfg config.CKWriterConfig) (*FlowLogWriter, error) {
+func NewFlowLogWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabled bool, ckWriterCfg config.CKWriterConfig, flowLogTtl streamconfig.FlowLogTTL) (*FlowLogWriter, error) {
 	ckwriters := make([]*ckwriter.CKWriter, common.FLOWLOG_ID_MAX)
 	var err error
 	var tables []*ckdb.Table
 	if replicaEnabled {
-		tables = GetFlowLogTables(ckdb.ReplicatedMergeTree)
+		tables = GetFlowLogTables(ckdb.ReplicatedMergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog)
 	} else {
-		tables = GetFlowLogTables(ckdb.MergeTree)
+		tables = GetFlowLogTables(ckdb.MergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog)
 	}
 	for i, table := range tables {
 		counterName := common.FlowLogID(table.ID).String()

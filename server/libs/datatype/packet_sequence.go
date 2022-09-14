@@ -17,9 +17,7 @@
 package datatype
 
 import (
-	"encoding/binary"
 	"errors"
-	"time"
 
 	"github.com/deepflowys/deepflow/server/libs/codec"
 )
@@ -36,48 +34,17 @@ const (
 )
 
 const (
-	PRECISION_SECOND = uint8(iota)
-	PRECISION_100_MILL_SECOND
-	PRECISION_10_MILL_SECOND
-	PRECISION_MILL_SECOND
-	PRECISION_100_MICRO_SECOND
-	PRECISION_10_MICRO_SECOND
-	PRECISION_MICRO_SECOND
-	PRECISION_100_NANO_SECOND // 7B can only save timestamps with an accuracy of 100 nanoseconds
-	PRECISION_10_NANO_SECOND
-	PRECISION_NANO_SECOND
+	DIRECTION_OFFSET     = 15
+	FIRST_TIMESTAMP_MASK = uint64((1 << 56) - 1)
 )
-
-// ConvertDuration2Timestamp accounting the precision to convert the duration to the timestamp
-func ConvertDuration2Timestamp(precision uint8, duration time.Duration) uint64 {
-	var timestamp = uint64(0)
-	switch precision {
-	case PRECISION_SECOND:
-		timestamp = uint64(duration.Seconds())
-	case PRECISION_100_MILL_SECOND:
-		timestamp = uint64(duration.Round(100*time.Millisecond).Milliseconds() / 100)
-	case PRECISION_10_MILL_SECOND:
-		timestamp = uint64(duration.Round(10*time.Millisecond).Milliseconds() / 10)
-	case PRECISION_MILL_SECOND:
-		timestamp = uint64(duration.Milliseconds())
-	case PRECISION_100_MICRO_SECOND:
-		timestamp = uint64(duration.Round(100*time.Microsecond).Microseconds() / 100)
-	case PRECISION_10_MICRO_SECOND:
-		timestamp = uint64(duration.Round(10*time.Microsecond).Microseconds() / 10)
-	case PRECISION_MICRO_SECOND:
-		timestamp = uint64(duration.Microseconds())
-	case PRECISION_100_NANO_SECOND:
-		timestamp = uint64(duration.Round(100*time.Nanosecond).Nanoseconds() / 100)
-	default:
-		timestamp = uint64(duration.Milliseconds())
-	}
-	return timestamp
-}
 
 type UncompressedPacketSequenceBlock struct {
 	FlowId          uint64
-	FullPacketsData []FullPacketData
+	StartTime       uint32
+	EndTimeDelta    uint16
+	PacketCount     uint16
 	TimePrecision   uint8
+	FullPacketsData []FullPacketData
 }
 
 type FullPacketData struct {
@@ -91,30 +58,47 @@ type FullPacketData struct {
 	Flags            uint8
 	Direction        PacketDirection
 	OptSackPermitted bool
-	OptSack          []byte
+	OptSack          []uint32
 }
 
-func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder) ([]*UncompressedPacketSequenceBlock, error) {
-	var uncompressedPacketSequenceBlocks []*UncompressedPacketSequenceBlock
-	for !decoder.IsEnd() {
-		l := decoder.ReadU32()
-		u := &UncompressedPacketSequenceBlock{}
-		flowId := decoder.ReadU64()
-		u.FlowId = flowId
-		l -= 8
+func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder, blocks []*UncompressedPacketSequenceBlock) ([]*UncompressedPacketSequenceBlock, int, error) {
+	blocksCount := 0
+	blockIndex := 0
+	oldBlockSize := len(blocks)
+	for !decoder.IsEnd() { // if decoder is not end, it still has blocks
+		length := decoder.ReadU32() // the block's length
+		var block *UncompressedPacketSequenceBlock
+		if blockIndex < oldBlockSize && blocks[blockIndex] != nil {
+			block = blocks[blockIndex] // reuse []*UncompressedPacketSequenceBlock
+		} else if blockIndex < oldBlockSize {
+			block = &UncompressedPacketSequenceBlock{}
+			blocks[blockIndex] = block
+		} else {
+			block = &UncompressedPacketSequenceBlock{}
+		}
+		block.FlowId = decoder.ReadU64()
+		block.StartTime = decoder.ReadU32()
+		block.EndTimeDelta = decoder.ReadU16()
+		block.PacketCount = decoder.ReadU16()
+		length -= 16 // 16 = flowId(8B) + startTime(4B) + endTimeDelta(2B) + packetCount(2B)
 		lastPacketsData := [2]FullPacketData{}
 		var (
 			hasLastPacket [2]bool // 0: hasLastC2SPacket, 1: hasLastS2CPacket
 			lastTimestamp uint64
 			offset        int
 		)
-		for l > 0 {
+		oldFullPacketsDataSize := len(block.FullPacketsData)
+		fullPacketsDataIndex := 0
+		for length > 0 { //
 			offset = decoder.Offset()
 			var d FullPacketData
+			if fullPacketsDataIndex < oldFullPacketsDataSize {
+				d = block.FullPacketsData[fullPacketsDataIndex] // reuse block.FullPacketsData
+			}
 			if lastTimestamp == 0 { // it means that this packet is the first packet
 				timestamp := decoder.ReadU64()
-				u.TimePrecision = uint8(timestamp >> 56)
-				lastTimestamp = timestamp & uint64((1<<56)-1)
+				block.TimePrecision = uint8(timestamp >> 56)     // get higher 1 byte, 0: second ~ 9: nanosecond
+				lastTimestamp = timestamp & FIRST_TIMESTAMP_MASK // get lower 7 bytes
 			} else {
 				delta := decoder.ReadVarintU64()
 				lastTimestamp += delta
@@ -122,7 +106,7 @@ func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder) ([]*UncompressedPac
 			d.Timestamp = lastTimestamp
 
 			fieldFlag := decoder.ReadU16()
-			d.Direction = PacketDirection(fieldFlag >> 15)
+			d.Direction = PacketDirection(fieldFlag >> DIRECTION_OFFSET)
 
 			lowFieldFlag := uint8(fieldFlag)
 			if lowFieldFlag&HAS_FLAG > 0 {
@@ -132,8 +116,7 @@ func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder) ([]*UncompressedPac
 			}
 			if lowFieldFlag&HAS_SEQ > 0 {
 				if hasLastPacket[d.Direction] {
-					delta := decoder.ReadZigzagU32()
-					d.Seq = lastPacketsData[d.Direction].Seq + delta
+					d.Seq = lastPacketsData[d.Direction].Seq + decoder.ReadZigzagU32()
 				} else {
 					d.Seq = decoder.ReadU32()
 				}
@@ -173,31 +156,30 @@ func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder) ([]*UncompressedPac
 				sackNum := sackFlag & 0x7
 				if sackNum > 0 {
 					lastSack := decoder.ReadU32()
-					sack := make([]byte, 4)
-					binary.BigEndian.PutUint32(sack, lastSack)
-					d.OptSack = append(d.OptSack, sack...)
-					lastSack += decoder.ReadVarintU32()
-					binary.BigEndian.PutUint32(sack, lastSack)
-					d.OptSack = append(d.OptSack, sack...)
-					for i := uint8(0); i < sackNum-1; i++ {
+					d.OptSack = append(d.OptSack, lastSack)
+					for i := uint8(0); i < sackNum*2-1; i++ {
 						lastSack += decoder.ReadVarintU32()
-						binary.BigEndian.PutUint32(sack, lastSack)
-						d.OptSack = append(d.OptSack, sack...)
-						lastSack += decoder.ReadVarintU32()
-						binary.BigEndian.PutUint32(sack, lastSack)
-						d.OptSack = append(d.OptSack, sack...)
+						d.OptSack = append(d.OptSack, lastSack)
 					}
 				}
 			}
 			hasLastPacket[d.Direction] = true
 			lastPacketsData[d.Direction] = d
-			u.FullPacketsData = append(u.FullPacketsData, d)
-			l -= uint32(decoder.Offset() - offset)
+			if fullPacketsDataIndex >= oldFullPacketsDataSize {
+				block.FullPacketsData = append(block.FullPacketsData, d)
+			}
+			fullPacketsDataIndex++
+
+			length -= uint32(decoder.Offset() - offset)
 			if decoder.Failed() {
-				return nil, errors.New("decode packet sequence block failed")
+				return nil, 0, errors.New("decode packet sequence block failed")
 			}
 		}
-		uncompressedPacketSequenceBlocks = append(uncompressedPacketSequenceBlocks, u)
+		if blockIndex >= oldBlockSize {
+			blocks = append(blocks, block)
+		}
+		blockIndex++
+		blocksCount++
 	}
-	return uncompressedPacketSequenceBlocks, nil
+	return blocks, blocksCount, nil
 }
