@@ -127,6 +127,43 @@ static __inline __u32 get_go_version(void)
 	return 0;
 }
 
+// The function address is used to set the hook point. itab is used for http2
+// to obtain fd. After directly parsing the Go ELF file, the address of the
+// function must be obtained, but the itab may not be obtained. Continuing to
+// use the previous get_go_version judgment will cause kprobe to skip the 
+// judgment, and the uprobe cannot take the correct value, resulting in packet
+// loss. Therefore, the more stringent limit judgment conditions
+// 函数地址用于设置 hook 点. itab 用于 http2 获取 fd. 在直接解析 Go ELF 文件后,
+// 一定能获取到函数的地址,但是不一定能获取 itab. 如果继续使用先前 get_go_version
+// 判断将导致 kprobe 跳过判断, 而 uprobe 又无法正确取值的情况导致报文丢失.因此更
+// 严格的限制判断条件
+static __inline bool skip_http2_kprobe(void)
+{
+	__u64 id;
+	pid_t pid;
+
+	id = bpf_get_current_pid_tgid();
+	pid = id >> 32;
+	struct ebpf_proc_info *info;
+	info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	if (!info) {
+		return false;
+	}
+	// must have net_TCPConn_itab
+	if (!info->net_TCPConn_itab) {
+		return false;
+	}
+	// HTTP2
+	if (info->crypto_tls_Conn_itab) {
+		return true;
+	}
+	// gRPC
+	if (info->credentials_syscallConn_itab) {
+		return true;
+	}
+	return false;
+}
+
 static __inline __s64 get_current_goroutine(void)
 {
 	__u64 current_thread = bpf_get_current_pid_tgid();
@@ -171,7 +208,6 @@ static __inline int get_fd_from_tls_conn_struct(void *conn,
 						struct ebpf_proc_info *info)
 {
 	int offset_conn_conn = info->offsets[OFFSET_IDX_CONN_TLS_CONN];
-	;
 	if (offset_conn_conn < 0)
 		return -1;
 
