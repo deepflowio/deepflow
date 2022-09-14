@@ -19,6 +19,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
@@ -27,6 +28,7 @@ import (
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	k8s "github.com/deepflowys/deepflow/server/controller/cloud/kubernetes_gather"
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
@@ -34,6 +36,41 @@ import (
 
 var DOMAIN_PASSWORD_KEYS = []string{
 	"admin_password", "secret_key", "password", "boss_secret_key", "manage_one_password",
+}
+
+func getGrpcServerAndPort(controllerIP string, cfg *config.ControllerConfig) (string, string) {
+	// get local controller ip
+	localControllerIP := os.Getenv(common.NODE_IP_KEY)
+	if localControllerIP == "" {
+		log.Errorf("get env(%s) data failed", common.NODE_IP_KEY)
+		return controllerIP, cfg.GrpcNodePort
+	}
+
+	// get controller region
+	var localAZConn mysql.AZControllerConnection
+	var localRegion string
+	if ret := mysql.Db.Where("controller_ip = ?", localControllerIP).First(&localAZConn); ret.Error == nil {
+		localRegion = localAZConn.Region
+	}
+
+	var azConn mysql.AZControllerConnection
+	var region string
+	if ret := mysql.Db.Where("controller_ip = ?", controllerIP).First(&azConn); ret.Error == nil {
+		region = azConn.Region
+	}
+
+	// return ip and grpc_node_port if local_region != regionToAZLcuuids
+	// return pod_ip and grpc_port if local_region == region
+	if region != localRegion {
+		return controllerIP, cfg.GrpcNodePort
+	} else {
+		localPodIP := os.Getenv(common.POD_IP_KEY)
+		if localPodIP == "" {
+			log.Errorf("get env(%s) data failed", common.POD_IP_KEY)
+			return controllerIP, cfg.GrpcNodePort
+		}
+		return localPodIP, cfg.GrpcPort
+	}
 }
 
 func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) {
@@ -153,7 +190,7 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 	return response, nil
 }
 
-func CreateDomain(domainCreate model.DomainCreate, grpcServerPort string) (*model.Domain, error) {
+func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
 	mysql.Db.Model(&mysql.Domain{}).Where("name = ?", domainCreate.Name).Count(&count)
@@ -217,9 +254,10 @@ func CreateDomain(domainCreate model.DomainCreate, grpcServerPort string) (*mode
 
 	// encrypt password/access_key
 	for _, key := range DOMAIN_PASSWORD_KEYS {
-		if _, ok := domainCreate.Config[key]; ok {
+		if _, ok := domainCreate.Config[key]; ok && cfg != nil {
+			serverIP, grpcServerPort := getGrpcServerAndPort(domain.ControllerIP, cfg)
 			encryptKey, err := common.GetEncryptKey(
-				domain.ControllerIP, grpcServerPort, domainCreate.Config[key].(string),
+				serverIP, grpcServerPort, domainCreate.Config[key].(string),
 			)
 			if err != nil {
 				log.Error("get encrypt key failed (%s)", err.Error())
@@ -274,7 +312,9 @@ func createKubernetesRelatedResources(domain mysql.Domain, regionLcuuid string) 
 	return
 }
 
-func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServerPort string) (*model.Domain, error) {
+func UpdateDomain(
+	lcuuid string, domainUpdate map[string]interface{}, cfg *config.ControllerConfig,
+) (*model.Domain, error) {
 	var domain mysql.Domain
 	var dbUpdateMap = make(map[string]interface{})
 
@@ -332,13 +372,14 @@ func UpdateDomain(lcuuid string, domainUpdate map[string]interface{}, grpcServer
 
 		// transfer password/access_key
 		for _, key := range DOMAIN_PASSWORD_KEYS {
-			if _, ok := configUpdate[key]; ok {
+			if _, ok := configUpdate[key]; ok && cfg != nil {
 				if configUpdate[key] == common.DEFAULT_ENCRYPTION_PASSWORD {
 					configUpdate[key] = config[key]
 				} else {
+					serverIP, grpcServerPort := getGrpcServerAndPort(domain.ControllerIP, cfg)
 					// encrypt password/access_key
 					encryptKey, err := common.GetEncryptKey(
-						domain.ControllerIP, grpcServerPort, configUpdate[key].(string),
+						serverIP, grpcServerPort, configUpdate[key].(string),
 					)
 					if err != nil {
 						log.Error(err)

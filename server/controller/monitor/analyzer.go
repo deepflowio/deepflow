@@ -23,21 +23,26 @@ import (
 	"github.com/deckarep/golang-set"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/monitor/config"
+	mconfig "github.com/deepflowys/deepflow/server/controller/monitor/config"
 )
 
 type AnalyzerCheck struct {
-	cfg                   config.MonitorConfig
+	cfg                   mconfig.MonitorConfig
+	healthCheckPort       int
+	healthCheckNodePort   int
 	ch                    chan string
 	normalAnalyzerDict    map[string]*dfHostCheck
 	exceptionAnalyzerDict map[string]*dfHostCheck
 }
 
-func NewAnalyzerCheck(cfg config.MonitorConfig) *AnalyzerCheck {
+func NewAnalyzerCheck(cfg *config.ControllerConfig) *AnalyzerCheck {
 	return &AnalyzerCheck{
-		cfg:                   cfg,
-		ch:                    make(chan string, cfg.HealthCheckHandleChannelLen),
+		cfg:                   cfg.MonitorCfg,
+		healthCheckPort:       cfg.ListenPort,
+		healthCheckNodePort:   cfg.ListenNodePort,
+		ch:                    make(chan string, cfg.MonitorCfg.HealthCheckHandleChannelLen),
 		normalAnalyzerDict:    make(map[string]*dfHostCheck),
 		exceptionAnalyzerDict: make(map[string]*dfHostCheck),
 	}
@@ -65,15 +70,32 @@ func (c *AnalyzerCheck) Start() {
 }
 
 func (c *AnalyzerCheck) healthCheck() {
+	var controllers []mysql.Controller
 	var analyzers []mysql.Analyzer
 	var exceptionIPs []string
 
 	log.Info("analyzer health check start")
 
+	mysql.Db.Find(&controllers)
+	ipToController := make(map[string]*mysql.Controller)
+	for i, controller := range controllers {
+		ipToController[controller.IP] = &controllers[i]
+	}
+
 	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Find(&analyzers)
 	for _, analyzer := range analyzers {
+		// use pod ip in master region if pod_ip != null
+		analyzerIP := analyzer.IP
+		healthCheckPort := c.healthCheckNodePort
+		if controller, ok := ipToController[analyzer.IP]; ok {
+			if controller.NodeType == common.CONTROLLER_NODE_TYPE_MASTER && len(controller.PodIP) != 0 {
+				analyzerIP = controller.PodIP
+				healthCheckPort = c.healthCheckPort
+			}
+		}
+
 		// 检查逻辑同控制器
-		active := isActive(common.HEALTH_CHECK_URL, analyzer.IP, c.cfg.HealthCheckPort)
+		active := isActive(common.HEALTH_CHECK_URL, analyzerIP, healthCheckPort)
 		if analyzer.State == common.HOST_STATE_COMPLETE {
 			if active {
 				if _, ok := c.normalAnalyzerDict[analyzer.IP]; ok {

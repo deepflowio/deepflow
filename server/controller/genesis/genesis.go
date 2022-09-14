@@ -32,8 +32,9 @@ import (
 
 	api "github.com/deepflowys/deepflow/message/controller"
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/genesis/config"
+	gconfig "github.com/deepflowys/deepflow/server/controller/genesis/config"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"github.com/deepflowys/deepflow/server/libs/queue"
@@ -45,20 +46,22 @@ var Synchronizer *SynchronizerServer
 
 type Genesis struct {
 	mutex           sync.RWMutex
-	cfg             config.GenesisConfig
+	grpcPort        string
+	cfg             gconfig.GenesisConfig
 	genesisSyncData atomic.Value
 	kubernetesData  atomic.Value
 	genesisStatsd   statsd.GenesisStatsd
 }
 
-func NewGenesis(cfg config.GenesisConfig) *Genesis {
+func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 	var sData atomic.Value
 	sData.Store(GenesisSyncData{})
 	var kData atomic.Value
 	kData.Store(map[string]KubernetesInfo{})
 	GenesisService = &Genesis{
 		mutex:           sync.RWMutex{},
-		cfg:             cfg,
+		grpcPort:        cfg.GrpcPort,
+		cfg:             cfg.GenesisCfg,
 		genesisSyncData: sData,
 		kubernetesData:  kData,
 		genesisStatsd: statsd.GenesisStatsd{
@@ -145,7 +148,12 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			vtapIDMap[storage.VtapID] = 0
 		}
 
-		grpcServer := net.JoinHostPort(controller.IP, g.cfg.GRPCServerPort)
+		// use pod ip communication in internal region
+		serverIP := controller.PodIP
+		if serverIP == "" {
+			serverIP = controller.IP
+		}
+		grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
 		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 		if err != nil {
 			log.Error("create grpc connection faild:" + err.Error())
@@ -334,7 +342,13 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 		mysql.Db.Where("ip <> ?", os.Getenv(common.NODE_IP_KEY)).Find(&controllers)
 		retFlag := false
 		for _, controller := range controllers {
-			grpcServer := net.JoinHostPort(controller.IP, g.cfg.GRPCServerPort)
+
+			// use pod ip communication in internal region
+			serverIP := controller.PodIP
+			if serverIP == "" {
+				serverIP = controller.IP
+			}
+			grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
 			conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 			if err != nil {
 				log.Error("create grpc connection faild:" + err.Error())

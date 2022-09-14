@@ -4,10 +4,12 @@ log-file: /var/log/deepflow/server.log
 log-level: info
 
 controller:
-  # controller http listenport
-  listen-port: 20417
-  # grpc server port
-  grpc-port: 20035
+  ## controller http listenport
+  #listen-port: 20417
+  #listen-node-port: 30417
+  ## grpc server port
+  #grpc-port: 20035
+  #grpc-node-port: 30035
   # grpc max message lenth default 100M
   grpc-max-message-length: 104857600
   # kubeconfig

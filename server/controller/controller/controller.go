@@ -118,7 +118,7 @@ func Start(ctx context.Context, configPath string) {
 
 	router.SetInitStageForHealthChecker("Genesis init")
 	// 启动genesis
-	g := genesis.NewGenesis(cfg.GenesisCfg)
+	g := genesis.NewGenesis(cfg)
 	g.Start()
 
 	router.SetInitStageForHealthChecker("Manager init")
@@ -136,8 +136,8 @@ func Start(ctx context.Context, configPath string) {
 	tr := tagrecorder.NewTagRecorder(*cfg)
 	go tr.StartChDictionaryUpdate()
 
-	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
-	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
+	controllerCheck := monitor.NewControllerCheck(cfg)
+	analyzerCheck := monitor.NewAnalyzerCheck(cfg)
 	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
@@ -195,7 +195,7 @@ func Start(ctx context.Context, configPath string) {
 	router.VtapRouter(r)
 	router.VtapGroupRouter(r, cfg)
 	router.DataSourceRouter(r, cfg)
-	router.DomainRouter(r, cfg.GenesisCfg.GRPCServerPort)
+	router.DomainRouter(r, cfg)
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
 	trouter.RegistRouter(r)
