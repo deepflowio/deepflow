@@ -39,7 +39,7 @@ type FlowLogWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType, ttl int) *ckdb.Table {
+func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.EngineType, cluster, storagePolicy string, ttl int) *ckdb.Table {
 	var orderKeys = []string{}
 	flowKeys := []string{"l3_epc_id_1", "ip4_1", "ip6_1", "l3_epc_id_0", "ip4_0", "ip6_0", "server_port"}
 	switch id {
@@ -62,6 +62,8 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 		Columns:         columns,
 		TimeKey:         id.TimeKey(),
 		Engine:          engine,
+		Cluster:         cluster,
+		StoragePolicy:   storagePolicy,
 		PartitionFunc:   DefaultPartition,
 		TTL:             ttl,
 		OrderKeys:       orderKeys,
@@ -69,26 +71,21 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 	}
 }
 
-func GetFlowLogTables(engine ckdb.EngineType, l4LogTtl, l7LogTtl, l4PacketTtl int) []*ckdb.Table {
+func GetFlowLogTables(engine ckdb.EngineType, cluster, storagePolicy string, l4LogTtl, l7LogTtl, l4PacketTtl int) []*ckdb.Table {
 	return []*ckdb.Table{
-		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine, l4LogTtl),
-		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7LoggerColumns(), engine, l7LogTtl),
-		newFlowLogTable(common.L4_PACKET_ID, jsonify.L4PacketColumns(), engine, l4PacketTtl),
+		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine, cluster, storagePolicy, l4LogTtl),
+		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7LoggerColumns(), engine, cluster, storagePolicy, l7LogTtl),
+		newFlowLogTable(common.L4_PACKET_ID, jsonify.L4PacketColumns(), engine, cluster, storagePolicy, l4PacketTtl),
 	}
 }
 
-func NewFlowLogWriter(primaryAddr, secondaryAddr, user, password string, replicaEnabled bool, ckWriterCfg config.CKWriterConfig, flowLogTtl streamconfig.FlowLogTTL) (*FlowLogWriter, error) {
+func NewFlowLogWriter(addr, user, password, cluster, storagePolicy string, ckWriterCfg config.CKWriterConfig, flowLogTtl streamconfig.FlowLogTTL) (*FlowLogWriter, error) {
 	ckwriters := make([]*ckwriter.CKWriter, common.FLOWLOG_ID_MAX)
 	var err error
-	var tables []*ckdb.Table
-	if replicaEnabled {
-		tables = GetFlowLogTables(ckdb.ReplicatedMergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog, flowLogTtl.L4Packet)
-	} else {
-		tables = GetFlowLogTables(ckdb.MergeTree, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog, flowLogTtl.L4Packet)
-	}
+	tables := GetFlowLogTables(ckdb.MergeTree, cluster, storagePolicy, flowLogTtl.L4FlowLog, flowLogTtl.L7FlowLog, flowLogTtl.L4Packet)
 	for i, table := range tables {
 		counterName := common.FlowLogID(table.ID).String()
-		ckwriters[i], err = ckwriter.NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName, table, replicaEnabled,
+		ckwriters[i], err = ckwriter.NewCKWriter(addr, "", user, password, counterName, table, false,
 			ckWriterCfg.QueueCount, ckWriterCfg.QueueSize, ckWriterCfg.BatchSize, ckWriterCfg.FlushTimeout)
 		if err != nil {
 			log.Error(err)

@@ -17,6 +17,7 @@
 /server/controller/cloud/aliyun/api_response.gen.go
 /server/controller/recorder/cache/cache_test.db
 /server/libs/geo/ip_info.go
+/server/libs/kubernetes/watcher.gen.go
 /cli/vendor/
 /cli/bin/
 /server/libs/zerodoc/pb/metric.proto

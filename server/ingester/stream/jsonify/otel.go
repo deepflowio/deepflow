@@ -33,7 +33,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, platformData *grpc.PlatformInfoTable) []*L7Logger {
+func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable) []*L7Logger {
 	ret := []*L7Logger{}
 	for _, resourceSpan := range l.GetResourceSpans() {
 		var resAttributes []*v11.KeyValue
@@ -43,16 +43,16 @@ func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, shardID int, pla
 		}
 		for _, scopeSpan := range resourceSpan.GetScopeSpans() {
 			for _, span := range scopeSpan.GetSpans() {
-				ret = append(ret, spanToL7Logger(vtapID, span, resAttributes, shardID, platformData))
+				ret = append(ret, spanToL7Logger(vtapID, span, resAttributes, platformData))
 			}
 		}
 	}
 	return ret
 }
 
-func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, shardID int, platformData *grpc.PlatformInfoTable) *L7Logger {
+func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) *L7Logger {
 	h := AcquireL7Logger()
-	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7LogCounter, shardID)
+	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7LogCounter, vtapID)
 	h.VtapID = vtapID
 	h.FillOTel(span, resAttributes, platformData)
 	return h

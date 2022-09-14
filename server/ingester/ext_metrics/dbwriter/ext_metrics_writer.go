@@ -59,12 +59,15 @@ type tableInfo struct {
 }
 
 type ExtMetricsWriter struct {
-	msgType      datatype.MessageType
-	ckdbAddr     string
-	ckdbUsername string
-	ckdbPassword string
-	ttl          int
-	writerConfig baseconfig.CKWriterConfig
+	msgType           datatype.MessageType
+	ckdbAddr          string
+	ckdbUsername      string
+	ckdbPassword      string
+	ckdbCluster       string
+	ckdbStoragePolicy string
+	ttl               int
+	writerConfig      baseconfig.CKWriterConfig
+	ckdbWatcher       *baseconfig.Watcher
 
 	ckdbConn *sql.DB
 
@@ -116,7 +119,7 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	}
 
 	// 将要创建的表信息
-	table := s.GenCKTable(w.ttl)
+	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl)
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddr, "", w.ckdbUsername, w.ckdbPassword,
 		s.TableName, table, false, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
@@ -124,7 +127,9 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 		return nil, err
 	}
 	// 需要在cluseter其他节点也创建
-	w.createTableOnCluster(table)
+	if err := w.createTableOnCluster(table); err != nil {
+		log.Warningf("crate table on cluster other node failed. %s", err)
+	}
 
 	ckwriter.Run()
 	if w.ttl != config.DefaultExtMetricsTTL {
@@ -142,16 +147,16 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 }
 
 func (w *ExtMetricsWriter) createTableOnCluster(table *ckdb.Table) error {
-	nodes, err := w.getClusterNodesWithoutLocal(table.Cluster.String())
+	endpoints, err := w.ckdbWatcher.GetClickhouseEndpointsWithoutMyself()
 	if err != nil {
 		return err
 	}
-	for _, node := range nodes {
-		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", node.Addr, node.Port), w.ckdbUsername, w.ckdbPassword, table)
+	for _, endpoint := range endpoints {
+		err := ckwriter.InitTable(fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port), w.ckdbUsername, w.ckdbPassword, table)
 		if err != nil {
-			log.Warningf("node %s:%d init table failed. err: %s", node.Addr, node.Port, err)
+			log.Warningf("node %s:%d init table failed. err: %s", endpoint.Host, endpoint.Port, err)
 		} else {
-			log.Infof("node %s:%d init table %s success", node.Addr, node.Port, table.LocalName)
+			log.Infof("node %s:%d init table %s success", endpoint.Host, endpoint.Port, table.LocalName)
 		}
 	}
 	return nil
@@ -225,14 +230,17 @@ func NewExtMetricsWriter(
 		return nil, err
 	}
 	writer := &ExtMetricsWriter{
-		msgType:       msgType,
-		ckdbAddr:      config.Base.CKDB.Primary,
-		ckdbUsername:  config.Base.CKDBAuth.Username,
-		ckdbPassword:  config.Base.CKDBAuth.Password,
-		tables:        make(map[string]*tableInfo),
-		ttl:           config.TTL,
-		writerConfig:  config.CKWriterConfig,
-		flowTagWriter: flowTagWriter,
+		msgType:           msgType,
+		ckdbAddr:          config.Base.CKDB.ActualAddr,
+		ckdbUsername:      config.Base.CKDBAuth.Username,
+		ckdbPassword:      config.Base.CKDBAuth.Password,
+		ckdbCluster:       config.Base.CKDB.ClusterName,
+		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
+		tables:            make(map[string]*tableInfo),
+		ttl:               config.TTL,
+		ckdbWatcher:       config.Base.CKDB.Watcher,
+		writerConfig:      config.CKWriterConfig,
+		flowTagWriter:     flowTagWriter,
 
 		counter: &Counter{},
 	}
