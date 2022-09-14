@@ -6,6 +6,36 @@ Provides the Rust language interface.
 
 Kernel version support: `Linux 4.14+`
 
+# Protocol Tracing
+
+Deepflow-agent deploys eBPF probes (kprobe/traceponit) on Linux syscalls. When application makes network-related syscalls, deepflow-agent's eBPF probes snoop the data.
+
+The following protocols are currently probed:
+
+- HTTP1
+- HTTP2
+- DUBBO
+- MYSQL
+- REDIS
+- KAFKA
+- MQTT
+- DNS
+
+## TLS/SSL Tracing
+
+Currently only for Golang programs.
+
+Use eBPF user-space probes (uprobes), set up on the Golang application's TLS API.
+
+HTTP1 and HTTP2 protocals data are currently probed on TLS/SSL.
+
+Trace to the Golang program is implemented by the following method:
+- All the currently running Golang binary executables are found by traversing Procfs, and then the files are parsed to obtain the Golang version, trace symbol offset address, structure member offsets and other informations.
+- Create probes and attach based on the parsed datas.
+- Capture process execute/exit events by tracking two tracepoints(`tracepoint/sched/sched_process_exec` and `tracepoint/sched/sched_process_exit`). Update probes based on captured events.
+
+Note: In order to avoid attaching/detaching the golang program repeatedly, it is necessary to confirm that the golang application has been running stably before DeepFlow-agent starts the attach operation. After DeepFlow-agent detects that the golang application is loaded, it delays the attach operation for 120 seconds. 
+
 # Tested kernel version
 
 - 4.14.x
