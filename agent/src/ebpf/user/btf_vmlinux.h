@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-// This file is only needed to support build for CentOS 6
-// Remove it when no longer needed.
-// File is trivial and therefore is in public domain.
+#ifndef DF_BTF_VMLINUX_H_
+#define DF_BTF_VMLINUX_H_
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
+#define BTF_MEMBER_BIT_OFFSET(val)      ((val) & 0xffffff)
+#define BTF_INFO_KFLAG(info)    ((info) >> 31)
+#define BTF_MEM_OFFSET(T, O)    (BTF_INFO_KFLAG((T)) ? BTF_MEMBER_BIT_OFFSET((O)) : (O))
 
-#include <unistd.h>
-#include <sys/syscall.h>
+int ebpf_obj__load_vmlinux_btf(struct ebpf_object *obj);
+int kernel_struct_field_offset(struct ebpf_object *obj, const char *struct_name,
+			       const char *field_name);
 
-#define setns(FD, NSTYPE) syscall(__NR_setns, (int)(FD), (int)(NSTYPE))
+#endif /* DF_BTF_VMLINUX_H_ */

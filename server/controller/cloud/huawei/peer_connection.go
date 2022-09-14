@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package huawei
+
+import (
+	"fmt"
+
+	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+)
+
+func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
+	var pns []model.PeerConnection
+	for project, token := range h.projectTokenMap {
+		jpns, err := h.getRawData(
+			fmt.Sprintf("https://vpc.%s.%s/v2.0/vpc/peerings", project.name, h.config.URLDomain), token.token, "peerings",
+		)
+		if err != nil {
+			log.Errorf("request failed: %v", err)
+			return nil, err
+		}
+
+		for i := range jpns {
+			jpn := jpns[i]
+			if !CheckAttributes(jpn, []string{"id", "name", "request_vpc_info", "accept_vpc_info"}) {
+				continue
+			}
+			id := jpn.Get("id").MustString()
+			localTenant := jpn.Get("request_vpc_info").Get("tenant_id").MustString()
+			if localTenant == "" {
+				log.Debugf("peer_connection: %s has no local region", id)
+				continue
+			}
+			remoteTenant := jpn.Get("accept_vpc_info").Get("tenant_id").MustString()
+			if localTenant == "" {
+				log.Debugf("peer_connection: %s has no remote region", id)
+				continue
+			}
+			pns = append(
+				pns,
+				model.PeerConnection{
+					Lcuuid:             id,
+					Name:               jpn.Get("name").MustString(),
+					Label:              id,
+					LocalVPCLcuuid:     jpn.Get("request_vpc_info").Get("vpc_id").MustString(),
+					RemoteVPCLcuuid:    jpn.Get("accept_vpc_info").Get("vpc_id").MustString(),
+					LocalRegionLcuuid:  h.projectNameToRegionLcuuid(localTenant),
+					RemoteRegionLcuuid: h.projectNameToRegionLcuuid(remoteTenant),
+				},
+			)
+		}
+	}
+	return pns, nil
+}

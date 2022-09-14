@@ -40,6 +40,12 @@ ln -s /usr/bin/llvm-strip-11 /usr/bin/llvm-strip
 
 编译依赖的静态库：
 ```bash
+# bcc
+# reference：https://github.com/iovisor/bcc/blob/master/INSTALL.md
+wget https://github.com/iovisor/bcc/releases/download/v0.25.0/bcc-src-with-submodule.tar.gz
+tar -xzf bcc-src-with-submodule.tar.gz
+cd bcc && cmake3 . && make && make install
+
 # bddisasm
 git clone https://github.com/bitdefender/bddisasm
 cd bddisasm

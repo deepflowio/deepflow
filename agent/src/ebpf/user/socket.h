@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _USER_SOCKET_H_
-#define _USER_SOCKET_H_
+#ifndef DF_USER_SOCKET_H
+#define DF_USER_SOCKET_H
 
 #ifndef CACHE_LINE_SIZE
 #define CACHE_LINE_SIZE 64
@@ -167,4 +167,4 @@ int running_socket_tracer(l7_handle_fn handle,
 			  uint32_t max_trace_entries,
 			  uint32_t socket_map_max_reclaim);
 int register_event_handle(uint32_t type, void (*fn)(void *));
-#endif /*_USER_SOCKET_H_*/
+#endif /* DF_USER_SOCKET_H */

@@ -19,7 +19,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
 
-use log::warn;
+use log::{debug, warn};
 use nom::{bytes::complete::take, Parser};
 
 use crate::{
@@ -36,7 +36,7 @@ use crate::{
         protocol_logs::{
             mqtt::{
                 mqtt_fixed_header, parse_connack_packet, parse_connect_packet, parse_status_code,
-                PacketKind,
+                PacketKind, QualityOfService,
             },
             AppProtoHead, L7ResponseStatus, LogMessageType,
         },
@@ -144,7 +144,7 @@ impl L7FlowPerf for MqttPerfData {
             AppProtoHead {
                 proto: self.l7_proto,
                 msg_type: self.msg_type,
-                rrt: rrt,
+                rrt,
                 version: self.proto_version,
             },
             0,
@@ -199,8 +199,25 @@ impl MqttPerfData {
                     self.status = parse_status_code(return_code);
                     self.calc_response(timestamp, flow_id);
                 }
-                PacketKind::Publish { .. }
-                | PacketKind::Suback
+                PacketKind::Publish { dup, qos, .. } => {
+                    if dup && qos == QualityOfService::AtMostOnce {
+                        debug!("mqtt publish packet has invalid dup flags={}", dup);
+                        return Err(Error::MqttPerfParseFailed);
+                    }
+                    // QOS=1,2会有报文标识符
+                    // QOS=1,2 there will be a message identifier
+                    match qos {
+                        QualityOfService::AtLeastOnce | QualityOfService::ExactlyOnce => {
+                            self.msg_type = LogMessageType::Request;
+                            self.calc_request(timestamp, flow_id);
+                        }
+                        QualityOfService::AtMostOnce => {
+                            self.msg_type = LogMessageType::Response;
+                            self.calc_response(timestamp, flow_id);
+                        }
+                    }
+                }
+                PacketKind::Suback
                 | PacketKind::Pingresp
                 | PacketKind::Pubcomp
                 | PacketKind::Pubrec

@@ -141,7 +141,7 @@ func (c *Cloud) run() {
 	log.Infof("cloud (%s) started", c.basicInfo.Name)
 
 	if err := c.platform.CheckAuth(); err != nil {
-		log.Error("cloud (%s) check auth failed", c.basicInfo)
+		log.Errorf("cloud (%+v) check auth failed", c.basicInfo)
 	}
 	log.Infof("cloud (%s) assemble data starting", c.basicInfo.Name)
 	c.getCloudData()

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __BPF_PROTO_INFER_H__
-#define __BPF_PROTO_INFER_H__
+#ifndef DF_BPF_PROTO_INFER_H
+#define DF_BPF_PROTO_INFER_H
 
 #include "common.h"
 #include "socket_trace.h"
@@ -1205,4 +1205,4 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 	return inferred_message;
 }
 
-#endif /* __BPF_PROTO_INFER_H__ */
+#endif /* DF_BPF_PROTO_INFER_H */

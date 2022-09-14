@@ -164,6 +164,7 @@ impl Encoder {
 
 pub struct UniformSenderThread {
     id: usize,
+    name: &'static str,
     input: Arc<Receiver<SendItem>>,
     config: SenderAccess,
 
@@ -177,6 +178,7 @@ pub struct UniformSenderThread {
 impl UniformSenderThread {
     pub fn new(
         id: usize,
+        name: &'static str,
         input: Arc<Receiver<SendItem>>,
         config: SenderAccess,
         stats: Arc<Collector>,
@@ -185,6 +187,7 @@ impl UniformSenderThread {
         let running = Arc::new(AtomicBool::new(false));
         Self {
             id,
+            name,
             input,
             config,
             thread_handle: None,
@@ -205,6 +208,7 @@ impl UniformSenderThread {
 
         let mut uniform_sender = UniformSender::new(
             self.id,
+            self.name,
             self.input.clone(),
             self.config.clone(),
             self.running.clone(),
@@ -231,6 +235,7 @@ impl UniformSenderThread {
 
 pub struct UniformSender {
     id: usize,
+    name: &'static str,
 
     input: Arc<Receiver<SendItem>>,
     counter: Arc<SenderCounter>,
@@ -260,6 +265,7 @@ impl UniformSender {
 
     pub fn new(
         id: usize,
+        name: &'static str,
         input: Arc<Receiver<SendItem>>,
         config: SenderAccess,
         running: Arc<AtomicBool>,
@@ -268,6 +274,7 @@ impl UniformSender {
     ) -> Self {
         Self {
             id,
+            name,
             input,
             counter: Arc::new(SenderCounter::default()),
             encoder: Encoder::new(0, SendMessageType::TaggedFlow, config.load().vtap_id),
@@ -291,7 +298,8 @@ impl UniformSender {
     fn update_dst_ip_and_port(&mut self) {
         if self.dst_ip != self.config.load().dest_ip {
             info!(
-                "update dst ip from {} to {}",
+                "{} sender update dst ip from {} to {}",
+                self.name,
                 self.dst_ip,
                 self.config.load().dest_ip
             );
@@ -301,7 +309,8 @@ impl UniformSender {
 
         if self.dst_port != self.config.load().dest_port {
             info!(
-                "update dst port from {} to {}",
+                "{} sender update dst port from {} to {}",
+                self.name,
                 self.dst_port,
                 self.config.load().dest_port
             );
@@ -322,7 +331,7 @@ impl UniformSender {
         if self.reconnect || self.tcp_stream.is_none() {
             if let Some(t) = self.tcp_stream.take() {
                 if let Err(e) = t.shutdown(Shutdown::Both) {
-                    debug!("tcp stream shutdown failed {}", e);
+                    debug!("{} sender tcp stream shutdown failed {}", self.name, e);
                 }
             }
             self.tcp_stream = TcpStream::connect((self.dst_ip, self.dst_port)).ok();
@@ -330,7 +339,10 @@ impl UniformSender {
                 if let Err(e) =
                     tcp_stream.set_write_timeout(Some(Duration::from_secs(Self::TCP_WRITE_TIMEOUT)))
                 {
-                    debug!("tcp stream set write timeout failed {}", e);
+                    debug!(
+                        "{} sender tcp stream set write timeout failed {}",
+                        self.name, e
+                    );
                     self.tcp_stream.take();
                     return;
                 }
@@ -338,7 +350,10 @@ impl UniformSender {
             } else {
                 if self.counter.dropped.load(Ordering::Relaxed) == 0 {
                     self.exception_handler.set(Exception::AnalyzerSocketError);
-                    error!("tcp connection to {}:{} failed", self.dst_ip, self.dst_port,);
+                    error!(
+                        "{} sender tcp connection to {}:{} failed",
+                        self.name, self.dst_ip, self.dst_port,
+                    );
                 }
                 self.counter.dropped.fetch_add(1, Ordering::Relaxed);
                 return;
@@ -362,15 +377,15 @@ impl UniformSender {
                     }
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                    debug!("tcp stream write data block {}", e);
+                    debug!("{} sender tcp stream write data block {}", self.name, e);
                     continue;
                 }
                 Err(e) => {
                     if self.counter.dropped.load(Ordering::Relaxed) == 0 {
                         self.exception_handler.set(Exception::AnalyzerSocketError);
                         error!(
-                            "tcp stream write data to {}:{} failed: {}",
-                            self.dst_ip, self.dst_port, e
+                            "{} sender tcp stream write data to {}:{} failed: {}",
+                            self.name, self.dst_ip, self.dst_port, e
                         );
                     }
                     self.counter.dropped.fetch_add(1, Ordering::Relaxed);
@@ -404,14 +419,20 @@ impl UniformSender {
                 Ok(send_item) => {
                     let message_type = send_item.message_type();
                     self.counter.rx.fetch_add(1, Ordering::Relaxed);
-                    debug!("send item {}: {}", message_type, send_item);
+                    debug!(
+                        "{} sender send item {}: {}",
+                        self.name, message_type, send_item
+                    );
                     let result = match socket_type {
                         SocketType::File => self.handle_target_file(send_item, &mut kv_string),
                         _ => self.handle_target_server(send_item),
                     };
                     if let Err(e) = result {
                         if self.counter.dropped.load(Ordering::Relaxed) == 0 {
-                            warn!("send item {} failed {}", message_type, e);
+                            warn!(
+                                "{} sender send item {} failed {}",
+                                self.name, message_type, e
+                            );
                             // reopen write file and overwritten
                             let _ = self.buf_writer.take();
                         }

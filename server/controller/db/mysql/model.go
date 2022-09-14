@@ -825,6 +825,7 @@ type Controller struct {
 	NodeType           int       `gorm:"column:node_type;type:int;default:2" json:"NODE_TYPE"`  // region node type 1.master 2.slave
 	RegionDomainPrefix string    `gorm:"column:region_domain_prefix;type:varchar(256);default:''" json:"REGION_DOMAIN_PREFIX"`
 	NodeName           string    `gorm:"column:node_name;type:char(64);default:null" json:"NODE_NAME"`
+	PodIP              string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 
@@ -858,6 +859,7 @@ type Analyzer struct {
 	VTapMax           int       `gorm:"column:vtap_max;type:int;default:200" json:"VTAP_MAX"`
 	SyncedAt          time.Time `gorm:"column:synced_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_AT"`
 	NATIPEnabled      int       `gorm:"column:nat_ip_enabled;default:0" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
+	PodIP             string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
 	Lcuuid            string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 

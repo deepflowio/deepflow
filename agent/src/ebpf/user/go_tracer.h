@@ -17,7 +17,7 @@
 #ifndef _BPF_GO_TRACER_H_
 #define _BPF_GO_TRACER_H_
 #include "symbol.h"
-#include "list_head.h"
+#include "list.h"
 
 #include "../kernel/include/socket_trace_common.h"
 

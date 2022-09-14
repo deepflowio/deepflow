@@ -20,7 +20,6 @@
 #include <getopt.h>
 #include "tracer.h"
 #include "socket.h"
-#include "../libbpf/src/libbpf_internal.h"
 
 #define MFBPF_NAME           "deepflow-ebpfctl"
 #define MFBPF_VERSION        "v1.0.0"
@@ -118,19 +117,19 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("%-18s %d\n", "Adapt", btp->adapt_success);
 	printf("\n-------------------- Queue ---------------------------\n");
 	int j;
-	uint64_t enqueue_nr, enqueue_lost, burst_count, heap_get_faild,
+	uint64_t enqueue_nr, enqueue_lost, burst_count, heap_get_failed,
 	    dequeue_nr;
-	enqueue_nr = enqueue_lost = burst_count = heap_get_faild = dequeue_nr =
+	enqueue_nr = enqueue_lost = burst_count = heap_get_failed = dequeue_nr =
 	    0;
 	for (j = 0; j < btp->dispatch_workers_nr; j++) {
 		rx_q = &btp->rx_queues[j];
 		printf
 		    ("worker %d for queue, de %" PRIu64 " en %" PRIu64 " lost %"
-		     PRIu64 " alloc faild %" PRIu64 " burst %" PRIu64
+		     PRIu64 " alloc failed %" PRIu64 " burst %" PRIu64
 		     " queue size %u cap %u\n", j, rx_q->dequeue_nr,
-		     rx_q->enqueue_nr, rx_q->enqueue_lost, rx_q->heap_get_faild,
+		     rx_q->enqueue_nr, rx_q->enqueue_lost, rx_q->heap_get_failed,
 		     rx_q->burst_count, rx_q->queue_size, rx_q->ring_capacity);
-		heap_get_faild += rx_q->heap_get_faild;
+		heap_get_failed += rx_q->heap_get_failed;
 		dequeue_nr += rx_q->dequeue_nr;
 		enqueue_nr += rx_q->enqueue_nr;
 		enqueue_lost += rx_q->enqueue_lost;
@@ -139,8 +138,8 @@ static void tracer_dump(struct bpf_tracer_param *param)
 
 	printf
 	    ("\nSUM dequeue %" PRIu64 " enqueue %" PRIu64 " lost %" PRIu64
-	     " alloc faild %" PRIu64 " burst count %" PRIu64 "\n", dequeue_nr,
-	     enqueue_nr, enqueue_lost, heap_get_faild, burst_count);
+	     " alloc failed %" PRIu64 " burst count %" PRIu64 "\n", dequeue_nr,
+	     enqueue_nr, enqueue_lost, heap_get_failed, burst_count);
 
 	fflush(stdout);
 
@@ -353,13 +352,10 @@ static inline void mfbpf_sockopt_msg_free(void *msg)
 	msg = NULL;
 }
 
-static inline void fetch_kernel_version(char *buf)
+static inline void get_kernel_version(char *buf)
 {
-	uint32_t ver = get_kernel_version();
 	int major, minor, patch;
-	major = ver >> 16;
-	minor = (ver & 0xffff) >> 8;
-	patch = ver & 0xff;
+	fetch_kernel_version(&major, &minor, &patch);
 	snprintf(buf, LINUX_VER_LEN, "Linux %d.%d.%d\n", major, minor, patch);
 }
 
@@ -372,7 +368,7 @@ static int socktrace_do_cmd(struct mfbpf_obj *obj, mfbpf_cmd_t cmd,
 	int err;
 	char linux_ver_str[LINUX_VER_LEN];
 	memset((void *)linux_ver_str, 0, sizeof(linux_ver_str));
-	fetch_kernel_version(linux_ver_str);
+	get_kernel_version(linux_ver_str);
 	printf("\n\033[0;33;mLinux Version: %s\033[0m\n", linux_ver_str);
 
 	switch (conf->cmd) {

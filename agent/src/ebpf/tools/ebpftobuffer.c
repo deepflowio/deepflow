@@ -74,10 +74,10 @@ int main(int argc, char *argv[])
 	remove(target_file);
 	int target_fd = open(target_file, O_RDWR | O_CREAT | O_APPEND, 0777);
 	if (target_fd == -1) {
-		fprintf(stderr, "open(%s) faild.\n", target_file);
+		fprintf(stderr, "open(%s) failed.\n", target_file);
 		return -1;
 	}
-	snprintf(data_buf, sizeof(data_buf), "static const unsigned char %s[] = \"",
+	snprintf(data_buf, sizeof(data_buf), "static unsigned char %s[] = \"",
 		 variable_name);
 	int data_len = strlen(data_buf);
 	if (write(target_fd, data_buf, data_len) != data_len) {

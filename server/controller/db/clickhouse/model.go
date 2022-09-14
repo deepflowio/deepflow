@@ -14,14 +14,9 @@
  * limitations under the License.
  */
 
-#pragma once
+package clickhouse
 
-#ifdef HAVE_EXTERNAL_LIBBPF
-#include <bpf/bpf.h>
-#include <bpf/btf.h>
-#include <bpf/libbpf.h>
-#else
-#include "libbpf/src/bpf.h"
-#include "libbpf/src/btf.h"
-#include "libbpf/src/libbpf.h"
-#endif
+type Clusters struct {
+	HostAddress string `db:"host_address"`
+	Port        uint16 `db:"port"`
+}
