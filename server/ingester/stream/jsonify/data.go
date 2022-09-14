@@ -683,6 +683,8 @@ type Metrics struct {
 	ZeroWinRx       uint32 `json:"zero_win_rx,omitempty"`
 	SynCount        uint32 `json:"syn_count,omitempty"`
 	SynackCount     uint32 `json:"synack_count,omitempty"`
+	RetransSyn      uint32 `json:"retrans_syn,omitempty"`
+	RetransSynack   uint32 `json:"retrans_synack,omitempty"`
 	L7ClientError   uint32 `json:"l7_client_error,omitempty"`
 	L7ServerError   uint32 `json:"l7_server_error,omitempty"`
 	L7ServerTimeout uint32 `json:"l7_server_timeout,omitempty"`
@@ -734,6 +736,8 @@ var MetricsColumns = []*ckdb.Column{
 	ckdb.NewColumn("zero_win_rx", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("syn_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("synack_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("retrans_syn", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+	ckdb.NewColumn("retrans_synack", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_client_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_server_error", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 	ckdb.NewColumn("l7_server_timeout", ckdb.UInt32).SetIndex(ckdb.IndexNone),
@@ -1201,6 +1205,12 @@ func (m *Metrics) Fill(f *pb.Flow) {
 		}
 		m.SynCount = p.Tcp.SynCount
 		m.SynackCount = p.Tcp.SynackCount
+		if m.SynCount > 0 {
+			m.RetransSyn = m.SynCount - 1
+		}
+		if m.SynackCount > 0 {
+			m.RetransSynack = m.SynackCount - 1
+		}
 	}
 }
 
