@@ -89,6 +89,13 @@ enum probe_type {
 	UPROBE
 };
 
+enum feature_flag {
+	FEATURE_GO_NO_SYMBOL,
+	FEATURE_MAX,
+};
+
+extern bool feature_flags[FEATURE_MAX];
+
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_PORT 54583
 
@@ -418,6 +425,8 @@ prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 	}
 }
 
+int set_feature_flag(int flag);
+int clear_feature_flag(int flag);
 int bpf_tracer_init(const char *log_file, bool is_stdout);
 int tracer_bpf_load(struct bpf_tracer *tracer);
 int tracer_probes_init(struct bpf_tracer *tracer);

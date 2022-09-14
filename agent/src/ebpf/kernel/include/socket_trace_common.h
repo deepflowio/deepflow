@@ -148,9 +148,16 @@ enum offsets_index {
 struct ebpf_proc_info {
 	__u32 version;
 	__u16 offsets[OFFSET_IDX_MAX];
+	
+	// In golang, itab represents type, and in interface, struct is represented
+	// by the address of itab. We use itab to judge the structure type, and 
+	// find the fd representing the connection after multiple jumps. These
+	// types are not available in Go ELF files without a symbol table.
+	// Go 用 itab 表示类型, 在 interface 中通过 itab 确定具体的 struct, 并根据
+	// struct 找到表示连接的 fd.
 	__u64 net_TCPConn_itab;
-	__u64 crypto_tls_Conn_itab;
-	__u64 credentials_syscallConn_itab;
+	__u64 crypto_tls_Conn_itab; // TLS_HTTP1,TLS_HTTP2
+	__u64 credentials_syscallConn_itab; // gRPC
 };
 
 enum {
