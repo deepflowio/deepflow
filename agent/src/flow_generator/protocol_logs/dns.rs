@@ -21,12 +21,14 @@ use super::{
     AppProtoLogsInfoEnum, L7LogParse, L7ResponseStatus, LogMessageType,
 };
 
+use crate::common::flow::L7Protocol;
+use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
+use crate::common::lookup_key::LookupKey;
+use crate::{__log_info_merge, ignore_non_raw_protocol};
 use crate::{
     common::{
-        enums::IpProtocol,
-        flow::{L7Protocol, PacketDirection},
-        meta_packet::MetaPacket,
-        IPV4_ADDR_LEN, IPV6_ADDR_LEN,
+        enums::IpProtocol, flow::PacketDirection, meta_packet::MetaPacket, IPV4_ADDR_LEN,
+        IPV6_ADDR_LEN,
     },
     flow_generator::{
         error::{Error, Result},
@@ -112,10 +114,75 @@ impl From<DnsInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct DnsLog {
     info: DnsInfo,
     msg_type: LogMessageType,
+    // 是否已经解析过,避免check后重复解析
+    parsed: bool,
+    start_time: u64,
+    end_time: u64,
+}
+
+// 抽象接口实现
+impl L7ProtocolLogInterface for DnsLog {
+    fn session_id(&self) -> Option<u32> {
+        return Some(self.info.trans_id as u32);
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<(), Error> {
+        __log_info_merge!(self, DnsLog, other);
+    }
+
+    fn check_payload(&mut self, payload: &[u8], lk: &LookupKey, param: ParseParam) -> bool {
+        ignore_non_raw_protocol!(param);
+        self.start_time = param.time;
+        self.end_time = param.time;
+        return self.dns_check_protocol(payload, lk, param.direction);
+    }
+
+    fn parse_payload(
+        mut self,
+        payload: &[u8],
+        lk: &LookupKey,
+        param: ParseParam,
+    ) -> Result<Vec<L7ProtocolLog>> {
+        if self.parsed {
+            return Ok(vec![L7ProtocolLog::DnsLog(self)]);
+        }
+        self.start_time = param.time;
+        self.end_time = param.time;
+        self.parse(payload, lk.proto, param.direction, None, None)?;
+        return Ok(vec![L7ProtocolLog::DnsLog(self)]);
+    }
+
+    fn protocol(&self) -> (L7Protocol, &str) {
+        return (L7Protocol::Dns, "DNS");
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: self.protocol().0,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.info.into();
+    }
+
+    fn is_tls(&self) -> bool {
+        return false;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn get_default(&self) -> L7ProtocolLog {
+        return L7ProtocolLog::DnsLog(Self::default());
+    }
 }
 
 impl DnsLog {
@@ -125,6 +192,20 @@ impl DnsLog {
         self.info.query_name = String::new();
         self.info.answers = String::new();
         self.info.status_code = None;
+    }
+
+    pub fn dns_check_protocol(
+        &mut self,
+        payload: &[u8],
+        lookup_key: &LookupKey,
+        direction: PacketDirection,
+    ) -> bool {
+        if lookup_key.dst_port != DNS_PORT && lookup_key.src_port != DNS_PORT {
+            return false;
+        }
+        let ret = self.parse(payload, lookup_key.proto, direction, None, None);
+        self.parsed = ret.is_ok() && self.msg_type == LogMessageType::Request;
+        return self.parsed;
     }
 
     fn decode_name(&self, payload: &[u8], g_offset: usize) -> Result<(String, usize)> {
@@ -362,11 +443,11 @@ impl DnsLog {
             proto: L7Protocol::Dns,
             msg_type: self.msg_type,
             rrt: 0,
-            ..Default::default()
         })
     }
 }
 
+// TODO 这个接口以后不再使用,parse逻辑要保留
 impl L7LogParse for DnsLog {
     fn parse(
         &mut self,
@@ -406,10 +487,11 @@ impl L7LogParse for DnsLog {
 }
 
 // 通过请求来识别DNS
+// TODO 这个以后会去掉
 pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.dst_port != DNS_PORT {
         if packet.lookup_key.src_port != DNS_PORT {
-            *bitmap &= !(1 << u8::from(L7Protocol::Dns));
+            *bitmap &= !(1 << (L7Protocol::Dns as u8));
         }
         return false;
     }
@@ -429,7 +511,7 @@ pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
         None,
     );
     if ret.is_err() && packet.lookup_key.proto == IpProtocol::Udp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Dns));
+        *bitmap &= !(1 << L7Protocol::Dns as u8);
         return false;
     }
     return ret.is_ok() && dns.msg_type == LogMessageType::Request;

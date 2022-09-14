@@ -30,6 +30,8 @@ use super::super::ebpf::{MSG_REQUEST, MSG_REQUEST_END, MSG_RESPONSE, MSG_RESPONS
 use super::{
     decapsulate::TunnelType,
     enums::{EthernetType, IpProtocol, TapType, TcpFlags},
+    l7_protocol_log::get_all_protocol,
+    l7_protocol_log::L7ProtocolLogInterface,
     tap_port::TapPort,
 };
 
@@ -44,7 +46,8 @@ use crate::{
     metric::document::TapSide,
 };
 
-pub use public::enums::{L4Protocol, L7Protocol};
+pub use public::enums::L4Protocol;
+pub use public::l7_protocol::*;
 
 const COUNTER_FLOW_ID_MASK: u64 = 0x00FFFFFF;
 
@@ -1388,4 +1391,20 @@ pub fn get_direction(
 pub fn get_uniq_flow_id_in_one_minute(flow_id: u64) -> u64 {
     // flowID中时间低8位可保证1分钟内时间的唯一，counter可保证一秒内流的唯一性（假设fps < 2^24）
     (flow_id >> 32 & 0xff << 24) | (flow_id & COUNTER_FLOW_ID_MASK)
+}
+
+pub fn ipprotocol_to_bitmap(proto: IpProtocol) -> u128 {
+    let mut bitmap: u128 = 0;
+    for i in get_all_protocol().iter() {
+        match proto {
+            IpProtocol::Tcp if i.parse_on_tcp() => {
+                bitmap |= 1 << (i.protocol().0 as u8);
+            }
+            IpProtocol::Udp if i.parse_on_udp() => {
+                bitmap |= 1 << (i.protocol().0 as u8);
+            }
+            _ => {}
+        }
+    }
+    return bitmap;
 }

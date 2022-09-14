@@ -28,10 +28,11 @@ use serde::{Serialize, Serializer};
 
 use super::super::{
     value_is_default, value_is_negative, AppProtoHead, AppProtoHeadEnum, AppProtoLogsBaseInfo,
-    AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsInfoEnum, L7LogParse, L7Protocol,
-    L7ResponseStatus, LogMessageType,
+    AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsInfoEnum, L7LogParse, L7ResponseStatus,
+    LogMessageType,
 };
 
+use crate::common::flow::L7Protocol;
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
@@ -41,6 +42,13 @@ use crate::{
         protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
     },
     proto::flow_log::MqttTopic,
+};
+use crate::{
+    common::{
+        l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam},
+        lookup_key::LookupKey,
+    },
+    ignore_non_raw_protocol,
 };
 
 #[derive(Serialize, Clone, Debug)]
@@ -162,13 +170,103 @@ impl From<MqttInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct MqttLog {
     info: Vec<MqttInfo>,
     msg_type: LogMessageType,
     status: L7ResponseStatus,
     version: u8,
     client_map: HashMap<u64, String>,
+
+    start_time: u64,
+    end_time: u64,
+}
+
+impl L7ProtocolLogInterface for MqttLog {
+    fn session_id(&self) -> Option<u32> {
+        return None;
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
+        if let L7ProtocolLog::MqttLog(mut mqtt) = other {
+            if mqtt.start_time < self.start_time {
+                self.start_time = mqtt.start_time;
+            }
+            if mqtt.end_time > self.end_time {
+                self.end_time = mqtt.end_time;
+            }
+
+            // 这里的info是parse_payload()拉平的info，长度必定为1.
+            let info = self.info.get_mut(0).unwrap();
+            let __other = mqtt.info.pop().unwrap();
+            info.merge(__other);
+        }
+        return Ok(());
+    }
+
+    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool {
+        ignore_non_raw_protocol!(param);
+        return Self::mqtt_check_protocol(payload, lookup_key);
+    }
+
+    fn parse_payload(
+        mut self,
+        payload: &[u8],
+        lookup_key: &LookupKey,
+        param: ParseParam,
+    ) -> Result<Vec<L7ProtocolLog>> {
+        let header = self.parse(payload, lookup_key.proto, param.direction, None, None)?;
+        let mut v = vec![];
+        for (h, i) in header.into_iter().zip(self.info.into_iter()).into_iter() {
+            let version = i.version;
+            let status = i.status;
+            v.push(L7ProtocolLog::MqttLog(Self {
+                // 目前暂时是将info 单独拉到每个log上，后面再优化
+                info: vec![i],
+                msg_type: h.msg_type,
+                status: status,
+                version: version,
+                // 这里的client_map 后面并不会用到，暂时用new应付编译器
+                client_map: HashMap::new(),
+                start_time: param.time,
+                end_time: param.time,
+            }));
+        }
+        return Ok(v);
+    }
+
+    fn protocol(&self) -> (L7Protocol, &str) {
+        return (L7Protocol::Mqtt, "MQTT");
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: self.protocol().0,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return false;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(mut self) -> L7ProtocolSendLog {
+        // 这里的info是parse_payload()拉平的info，长度必定为1.
+        return self.info.pop().unwrap().into();
+    }
+
+    fn parse_on_udp(&self) -> bool {
+        return false;
+    }
+
+    fn get_default(&self) -> L7ProtocolLog {
+        return L7ProtocolLog::MqttLog(Self::default());
+    }
 }
 
 impl MqttLog {
@@ -344,6 +442,33 @@ impl MqttLog {
         }
         Ok(app_proto_heads)
     }
+
+    // 这个逻辑是直接复制 mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
+    // 后面把perf抽象后只会保留在这个
+    pub fn mqtt_check_protocol(payload: &[u8], lookup_key: &LookupKey) -> bool {
+        if lookup_key.proto != IpProtocol::Tcp {
+            return false;
+        }
+
+        let (input, header) = match mqtt_fixed_header(payload) {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        if let PacketKind::Connect = header.kind {
+            let data = bytes::complete::take(header.remaining_length as u32);
+            let version = match data.and_then(parse_connect_packet).parse(input) {
+                Ok((_, (version, _))) => version,
+                Err(_) => return false,
+            };
+            if version < 3 || version > 5 {
+                return false;
+            }
+            return true;
+        }
+
+        false
+    }
 }
 
 impl L7LogParse for MqttLog {
@@ -394,7 +519,7 @@ impl L7LogParse for MqttLog {
 /// so only judge whether it is a legitimate "Connect" packet
 pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Mqtt));
+        *bitmap &= !(1 << L7Protocol::Mqtt as u8);
         return false;
     }
 

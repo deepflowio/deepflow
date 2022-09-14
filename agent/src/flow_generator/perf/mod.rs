@@ -188,7 +188,7 @@ impl FlowPerf {
         };
 
         for i in protocols {
-            if self.protocol_bitmap & 1 << u8::from(i) == 0 {
+            if self.protocol_bitmap & 1 << (i as u8) == 0 {
                 continue;
             }
             if self._l7_check(i, packet) {
@@ -243,16 +243,16 @@ impl FlowPerf {
             l4,
             l7: Self::l7_new(l7_protocol, rrt_cache.clone()),
             protocol_bitmap: if l4_proto == L4Protocol::Tcp {
-                1 << u8::from(L7Protocol::Http1)
-                    | 1 << u8::from(L7Protocol::Http2)
-                    | 1 << u8::from(L7Protocol::Dns)
-                    | 1 << u8::from(L7Protocol::Mysql)
-                    | 1 << u8::from(L7Protocol::Redis)
-                    | 1 << u8::from(L7Protocol::Dubbo)
-                    | 1 << u8::from(L7Protocol::Kafka)
-                    | 1 << u8::from(L7Protocol::Mqtt)
+                1 << (L7Protocol::Http1 as u8)
+                    | 1 << (L7Protocol::Http2 as u8)
+                    | 1 << (L7Protocol::Dns as u8)
+                    | 1 << (L7Protocol::Mysql as u8)
+                    | 1 << (L7Protocol::Redis as u8)
+                    | 1 << (L7Protocol::Dubbo as u8)
+                    | 1 << (L7Protocol::Kafka as u8)
+                    | 1 << (L7Protocol::Mqtt as u8)
             } else {
-                1 << u8::from(L7Protocol::Dns)
+                1 << (L7Protocol::Dns as u8)
             },
             rrt_cache,
             l7_protocol,

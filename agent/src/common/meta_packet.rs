@@ -859,7 +859,7 @@ impl<'a> MetaPacket<'a> {
     }
 
     pub fn ebpf_flow_id(&self) -> u128 {
-        let protocol = u8::from(self.l7_protocol_from_ebpf) as u128;
+        let protocol = self.l7_protocol_from_ebpf as u128;
 
         (self.socket_id as u128) | protocol << u64::BITS
     }
