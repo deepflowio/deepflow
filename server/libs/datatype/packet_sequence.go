@@ -38,148 +38,118 @@ const (
 	FIRST_TIMESTAMP_MASK = uint64((1 << 56) - 1)
 )
 
-type UncompressedPacketSequenceBlock struct {
-	FlowId          uint64
-	StartTime       uint32
-	EndTimeDelta    uint16
-	PacketCount     uint16
-	TimePrecision   uint8
-	FullPacketsData []FullPacketData
-}
-
 type FullPacketData struct {
-	Timestamp        uint64
-	Seq              uint32
-	Ack              uint32
-	PayloadLen       uint16
-	WinSize          uint16
-	OptMss           uint16
-	OptWs            uint8
-	Flags            uint8
-	Direction        PacketDirection
-	OptSackPermitted bool
-	OptSack          []uint32
+	Timestamp        uint64          `json:"timestamp"`
+	Seq              uint32          `json:"seq"`
+	Ack              uint32          `json:"ack"`
+	PayloadLen       uint16          `json:"payload_len"`
+	WinSize          uint16          `json:"win_size"`
+	OptMss           uint16          `json:"opt_mss"`
+	OptWs            uint8           `json:"opt_ws"`
+	Flags            uint8           `json:"flags"`
+	Direction        PacketDirection `json:"direction"`
+	OptSackPermitted bool            `json:"opt_sack_permitted"`
+	OptSack          []uint32        `json:"opt_sack"`
 }
 
-func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder, blocks []*UncompressedPacketSequenceBlock) ([]*UncompressedPacketSequenceBlock, int, error) {
-	blocksCount := 0
-	blockIndex := 0
-	oldBlockSize := len(blocks)
-	for !decoder.IsEnd() { // if decoder is not end, it still has blocks
-		length := decoder.ReadU32() // the block's length
-		var block *UncompressedPacketSequenceBlock
-		if blockIndex < oldBlockSize && blocks[blockIndex] != nil {
-			block = blocks[blockIndex] // reuse []*UncompressedPacketSequenceBlock
-		} else if blockIndex < oldBlockSize {
-			block = &UncompressedPacketSequenceBlock{}
-			blocks[blockIndex] = block
+func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder, packets []*FullPacketData) ([]*FullPacketData, int, error) {
+	var (
+		packetIndex     int
+		hasLastPacket   [2]bool // 0: hasLastC2SPacket, 1: hasLastS2CPacket
+		lastPacketsData [2]*FullPacketData
+		lastTimestamp   uint64
+	)
+	oldPacketNum := len(packets)
+
+	for !decoder.IsEnd() {
+		var packet *FullPacketData
+		if packetIndex < oldPacketNum && packets[packetIndex] != nil {
+			packet = packets[packetIndex] // reuse []*FullPacketData
+		} else if packetIndex < oldPacketNum {
+			packet = &FullPacketData{}
+			packets[packetIndex] = packet
 		} else {
-			block = &UncompressedPacketSequenceBlock{}
+			packet = &FullPacketData{}
 		}
-		block.FlowId = decoder.ReadU64()
-		block.StartTime = decoder.ReadU32()
-		block.EndTimeDelta = decoder.ReadU16()
-		block.PacketCount = decoder.ReadU16()
-		length -= 16 // 16 = flowId(8B) + startTime(4B) + endTimeDelta(2B) + packetCount(2B)
-		lastPacketsData := [2]FullPacketData{}
-		var (
-			hasLastPacket [2]bool // 0: hasLastC2SPacket, 1: hasLastS2CPacket
-			lastTimestamp uint64
-			offset        int
-		)
-		oldFullPacketsDataSize := len(block.FullPacketsData)
-		fullPacketsDataIndex := 0
-		for length > 0 { //
-			offset = decoder.Offset()
-			var d FullPacketData
-			if fullPacketsDataIndex < oldFullPacketsDataSize {
-				d = block.FullPacketsData[fullPacketsDataIndex] // reuse block.FullPacketsData
-			}
-			if lastTimestamp == 0 { // it means that this packet is the first packet
-				timestamp := decoder.ReadU64()
-				block.TimePrecision = uint8(timestamp >> 56)     // get higher 1 byte, 0: second ~ 9: nanosecond
-				lastTimestamp = timestamp & FIRST_TIMESTAMP_MASK // get lower 7 bytes
-			} else {
-				delta := decoder.ReadVarintU64()
-				lastTimestamp += delta
-			}
-			d.Timestamp = lastTimestamp
 
-			fieldFlag := decoder.ReadU16()
-			d.Direction = PacketDirection(fieldFlag >> DIRECTION_OFFSET)
+		if lastTimestamp == 0 { // it means that this packet is the first packet
+			timestamp := decoder.ReadU64()
+			// TODO: the higher 1 byte is time precision, reserved, 0: nanosecond ~ 9: second
+			lastTimestamp = timestamp & FIRST_TIMESTAMP_MASK // get lower 7 bytes, timestamp unit: microseconds
+		} else {
+			delta := decoder.ReadVarintU64()
+			lastTimestamp += delta
+		}
+		packet.Timestamp = lastTimestamp
 
-			lowFieldFlag := uint8(fieldFlag)
-			if lowFieldFlag&HAS_FLAG > 0 {
-				d.Flags = decoder.ReadU8()
-			} else {
-				d.Flags = lastPacketsData[d.Direction].Flags
-			}
-			if lowFieldFlag&HAS_SEQ > 0 {
-				if hasLastPacket[d.Direction] {
-					d.Seq = lastPacketsData[d.Direction].Seq + decoder.ReadZigzagU32()
-				} else {
-					d.Seq = decoder.ReadU32()
-				}
-			} else {
-				d.Seq = lastPacketsData[d.Direction].Seq
-			}
-			if lowFieldFlag&HAS_ACK > 0 {
-				if hasLastPacket[d.Direction] {
-					d.Ack = lastPacketsData[d.Direction].Ack + decoder.ReadZigzagU32()
-				} else {
-					d.Ack = decoder.ReadU32()
-				}
-			} else {
-				d.Ack = lastPacketsData[d.Direction].Ack
-			}
-			if lowFieldFlag&HAS_PAYLOAD_SIZE > 0 {
-				d.PayloadLen = decoder.ReadU16()
-			} else {
-				d.PayloadLen = lastPacketsData[d.Direction].PayloadLen
-			}
-			if lowFieldFlag&HAS_WINDOW_SIZE > 0 {
-				d.WinSize = decoder.ReadU16()
-			} else {
-				d.WinSize = lastPacketsData[d.Direction].WinSize
-			}
-			if lowFieldFlag&HAS_OPT_MSS > 0 {
-				d.OptMss = decoder.ReadU16()
-			}
-			if lowFieldFlag&HAS_OPT_WS > 0 {
-				d.OptWs = decoder.ReadU8()
-			}
-			if lowFieldFlag&HAS_OPT_SACK > 0 {
-				sackFlag := decoder.ReadU8()
-				if sackFlag>>3 > 0 {
-					d.OptSackPermitted = true
-				}
-				sackNum := sackFlag & 0x7
-				if sackNum > 0 {
-					lastSack := decoder.ReadU32()
-					d.OptSack = append(d.OptSack, lastSack)
-					for i := uint8(0); i < sackNum*2-1; i++ {
-						lastSack += decoder.ReadVarintU32()
-						d.OptSack = append(d.OptSack, lastSack)
-					}
-				}
-			}
-			hasLastPacket[d.Direction] = true
-			lastPacketsData[d.Direction] = d
-			if fullPacketsDataIndex >= oldFullPacketsDataSize {
-				block.FullPacketsData = append(block.FullPacketsData, d)
-			}
-			fullPacketsDataIndex++
+		fieldFlag := decoder.ReadU16()
+		packet.Direction = PacketDirection(fieldFlag >> DIRECTION_OFFSET)
 
-			length -= uint32(decoder.Offset() - offset)
-			if decoder.Failed() {
-				return nil, 0, errors.New("decode packet sequence block failed")
+		lowFieldFlag := uint8(fieldFlag)
+		if lowFieldFlag&HAS_FLAG > 0 {
+			packet.Flags = decoder.ReadU8()
+		} else {
+			packet.Flags = lastPacketsData[packet.Direction].Flags
+		}
+		if lowFieldFlag&HAS_SEQ > 0 {
+			if hasLastPacket[packet.Direction] {
+				packet.Seq = lastPacketsData[packet.Direction].Seq + decoder.ReadZigzagU32()
+			} else {
+				packet.Seq = decoder.ReadU32()
+			}
+		} else {
+			packet.Seq = lastPacketsData[packet.Direction].Seq
+		}
+		if lowFieldFlag&HAS_ACK > 0 {
+			if hasLastPacket[packet.Direction] {
+				packet.Ack = lastPacketsData[packet.Direction].Ack + decoder.ReadZigzagU32()
+			} else {
+				packet.Ack = decoder.ReadU32()
+			}
+		} else {
+			packet.Ack = lastPacketsData[packet.Direction].Ack
+		}
+		if lowFieldFlag&HAS_PAYLOAD_SIZE > 0 {
+			packet.PayloadLen = decoder.ReadU16()
+		} else {
+			packet.PayloadLen = lastPacketsData[packet.Direction].PayloadLen
+		}
+		if lowFieldFlag&HAS_WINDOW_SIZE > 0 {
+			packet.WinSize = decoder.ReadU16()
+		} else {
+			packet.WinSize = lastPacketsData[packet.Direction].WinSize
+		}
+		if lowFieldFlag&HAS_OPT_MSS > 0 {
+			packet.OptMss = decoder.ReadU16()
+		}
+		if lowFieldFlag&HAS_OPT_WS > 0 {
+			packet.OptWs = decoder.ReadU8()
+		}
+		if lowFieldFlag&HAS_OPT_SACK > 0 {
+			sackFlag := decoder.ReadU8()
+			if sackFlag>>3 > 0 {
+				packet.OptSackPermitted = true
+			}
+			sackNum := sackFlag & 0x7
+			if sackNum > 0 {
+				lastSack := decoder.ReadU32()
+				packet.OptSack = append(packet.OptSack, lastSack)
+				for i := uint8(0); i < sackNum*2-1; i++ {
+					lastSack += decoder.ReadVarintU32()
+					packet.OptSack = append(packet.OptSack, lastSack)
+				}
 			}
 		}
-		if blockIndex >= oldBlockSize {
-			blocks = append(blocks, block)
+		hasLastPacket[packet.Direction] = true
+		lastPacketsData[packet.Direction] = packet
+		if packetIndex >= oldPacketNum {
+			packets = append(packets, packet)
 		}
-		blockIndex++
-		blocksCount++
+		packetIndex++
+		if decoder.Failed() {
+			return nil, 0, errors.New("decode packet sequence block failed")
+		}
 	}
-	return blocks, blocksCount, nil
+
+	return packets, packetIndex, nil
 }
