@@ -29,11 +29,23 @@ use std::time::Duration;
 use anyhow::Result;
 use arc_swap::access::Access;
 use dns_lookup::lookup_host;
+#[cfg(target_os = "linux")]
+use flexi_logger::Duplicate;
 use flexi_logger::{
-    colored_opt_format, Age, Cleanup, Criterion, Duplicate, FileSpec, Logger, LoggerHandle, Naming,
+    colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
 };
 use log::{info, warn};
 
+#[cfg(target_os = "linux")]
+use crate::ebpf_collector::EbpfCollector;
+
+use crate::handler::PacketHandlerBuilder;
+use crate::integration_collector::MetricServer;
+use crate::pcap::WorkerManager;
+#[cfg(target_os = "linux")]
+use crate::platform::{ApiWatcher, PlatformSynchronizer};
+#[cfg(target_os = "linux")]
+use crate::utils::cgroups::Cgroups;
 use crate::{
     collector::Collector,
     collector::{
@@ -52,20 +64,15 @@ use crate::{
     dispatcher::{
         self, recv_engine::bpf, BpfOptions, Dispatcher, DispatcherBuilder, DispatcherListener,
     },
-    ebpf_collector::EbpfCollector,
     exception::ExceptionHandler,
     flow_generator::{AppProtoLogsParser, PacketSequenceParser},
-    handler::PacketHandlerBuilder,
-    integration_collector::MetricServer,
     monitor::Monitor,
-    pcap::WorkerManager,
-    platform::{ApiWatcher, LibvirtXmlExtractor, PlatformSynchronizer},
+    platform::LibvirtXmlExtractor,
     policy::{Policy, PolicyGetter},
     proto::trident::TapMode,
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
-        cgroups::Cgroups,
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, kernel_check,
             running_in_container, trident_process_check,
@@ -148,7 +155,7 @@ impl Trident {
         );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
-        let mut logger = Logger::try_with_str("info")
+        let logger = Logger::try_with_str("info")
             .unwrap()
             .format(colored_opt_format)
             .log_to_file_and_writer(
@@ -165,9 +172,13 @@ impl Trident {
             )
             .create_symlink(&config.log_file)
             .append();
-        if nix::unistd::getppid().as_raw() != 1 {
-            logger = logger.duplicate_to_stderr(Duplicate::All);
-        }
+
+        #[cfg(target_os = "linux")]
+        let logger = if nix::unistd::getppid().as_raw() != 1 {
+            logger.duplicate_to_stderr(Duplicate::All)
+        } else {
+            logger
+        };
         let logger_handle = logger.start()?;
 
         let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
@@ -209,10 +220,12 @@ impl Trident {
         info!("========== DeepFlow Agent start! ==========");
 
         let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
-        info!(
-            "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
-            ctrl_ip
-        );
+        if running_in_container() {
+            info!(
+                "use K8S_NODE_IP_FOR_DEEPFLOW env ip as destination_ip({})",
+                ctrl_ip
+            );
+        }
         info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
 
         let exception_handler = ExceptionHandler::default();
@@ -540,16 +553,20 @@ pub struct Components {
     pub dispatcher_listeners: Vec<DispatcherListener>,
     pub log_parsers: Vec<AppProtoLogsParser>,
     pub collectors: Vec<CollectorThread>,
-    pub l4_flow_uniform_sender: Option<UniformSenderThread>,
+    pub l4_flow_uniform_sender: UniformSenderThread,
     pub metrics_uniform_sender: UniformSenderThread,
     pub l7_flow_uniform_sender: UniformSenderThread,
+    #[cfg(target_os = "linux")]
     pub platform_synchronizer: PlatformSynchronizer,
+    #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
     pub debugger: Debugger,
     pub pcap_manager: WorkerManager,
+    #[cfg(target_os = "linux")]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
     pub stats_collector: Arc<stats::Collector>,
+    #[cfg(target_os = "linux")]
     pub cgroups_controller: Arc<Cgroups>,
     pub external_metrics_server: MetricServer,
     pub otel_uniform_sender: UniformSenderThread,
@@ -571,15 +588,14 @@ impl Components {
         }
         self.libvirt_xml_extractor.start();
         self.pcap_manager.start();
+        #[cfg(target_os = "linux")]
         self.platform_synchronizer.start();
+        #[cfg(target_os = "linux")]
         self.api_watcher.start();
         self.debugger.start();
         self.metrics_uniform_sender.start();
         self.l7_flow_uniform_sender.start();
-
-        if let Some(l4_sender) = self.l4_flow_uniform_sender.as_mut() {
-            l4_sender.start();
-        }
+        self.l4_flow_uniform_sender.start();
 
         // Enterprise Edition Feature: packet-sequence
         self.packet_sequence_uniform_sender.start();
@@ -608,6 +624,8 @@ impl Components {
         for collector in self.collectors.iter_mut() {
             collector.start();
         }
+
+        #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.start();
         }
@@ -663,6 +681,7 @@ impl Components {
         // TODO: packet handler builders
 
         let libvirt_xml_extractor = Arc::new(LibvirtXmlExtractor::new());
+        #[cfg(target_os = "linux")]
         let platform_synchronizer = PlatformSynchronizer::new(
             config_handler.platform(),
             session.clone(),
@@ -670,6 +689,7 @@ impl Components {
             exception_handler.clone(),
         );
 
+        #[cfg(target_os = "linux")]
         let api_watcher = Arc::new(ApiWatcher::new(
             config_handler.platform(),
             session.clone(),
@@ -677,7 +697,9 @@ impl Components {
         ));
 
         let context = ConstructDebugCtx {
+            #[cfg(target_os = "linux")]
             api_watcher: api_watcher.clone(),
+            #[cfg(target_os = "linux")]
             poller: platform_synchronizer.clone_poller(),
             session: session.clone(),
             static_config: synchronizer.static_config.clone(),
@@ -750,37 +772,26 @@ impl Components {
             yaml_config.analyzer_ip, candidate_config.sender.dest_ip
         );
         let sender_id = 0usize;
-        let mut l4_flow_aggr_sender = None;
-        let mut l4_flow_uniform_sender = None;
-        if config_handler
-            .candidate_config
-            .collector
-            .l4_log_store_tap_types
-            .iter()
-            .any(|&t| t)
-        {
-            let (sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow_sender_queue_size as usize,
-                "3-flow-to-collector-sender",
-                &queue_debugger,
-            );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "3-flow-to-collector-sender".to_string()),
-                    StatsOption::Tag("index", sender_id.to_string()),
-                ],
-            );
-            l4_flow_aggr_sender = Some(sender);
-            l4_flow_uniform_sender = Some(UniformSenderThread::new(
-                sender_id,
-                Arc::new(l4_flow_aggr_receiver),
-                config_handler.sender(),
-                stats_collector.clone(),
-                exception_handler.clone(),
-            ));
-        }
+        let (l4_flow_aggr_sender, l4_flow_aggr_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.flow_sender_queue_size as usize,
+            "3-flow-to-collector-sender",
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "3-flow-to-collector-sender".to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let l4_flow_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            Arc::new(l4_flow_aggr_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
 
         let sender_id = 1usize;
         let (metrics_sender, metrics_receiver, counter) = queue::bounded_with_debug(
@@ -837,7 +848,7 @@ impl Components {
                 Ipv4Addr::UNSPECIFIED.into()
             }
         };
-        let bpf_syntax = bpf::Builder {
+        let bpf_builder = bpf::Builder {
             is_ipv6: ctrl_ip.is_ipv6(),
             vxlan_port: yaml_config.vxlan_port,
             controller_port: static_config.controller_port,
@@ -845,8 +856,11 @@ impl Components {
             proxy_controller_port: candidate_config.dispatcher.proxy_controller_port,
             analyzer_source_ip: source_ip,
             analyzer_port: candidate_config.dispatcher.analyzer_port,
-        }
-        .build_pcap_syntax();
+        };
+        #[cfg(target_os = "linux")]
+        let bpf_syntax = bpf_builder.build_pcap_syntax();
+        #[cfg(target_os = "windows")]
+        let bpf_syntax_str = bpf_builder.build_pcap_syntax_to_str();
 
         let l7_log_rate = Arc::new(LeakyBucket::new(Some(
             candidate_config.log_parser.l7_log_collect_nps_threshold,
@@ -879,7 +893,10 @@ impl Components {
 
         let bpf_options = Arc::new(Mutex::new(BpfOptions {
             capture_bpf: candidate_config.dispatcher.capture_bpf.clone(),
+            #[cfg(target_os = "linux")]
             bpf_syntax,
+            #[cfg(target_os = "windows")]
+            bpf_syntax_str,
         }));
         for i in 0..dispatcher_num {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
@@ -952,19 +969,27 @@ impl Components {
             );
             packet_sequence_parsers.push(packet_sequence_parser);
 
-            let dispatcher = DispatcherBuilder::new()
+            let dispatcher_builder = DispatcherBuilder::new()
                 .id(i)
                 .ctrl_mac(ctrl_mac)
                 .leaky_bucket(rx_leaky_bucket.clone())
                 .options(Arc::new(dispatcher::Options {
+                    #[cfg(target_os = "linux")]
                     af_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
+                    #[cfg(target_os = "linux")]
                     af_packet_version: config_handler.candidate_config.dispatcher.af_packet_version,
+                    #[cfg(target_os = "windows")]
+                    win_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
                     tap_mode: yaml_config.tap_mode,
                     tap_mac_script: yaml_config.tap_mac_script.clone(),
                     is_ipv6: ctrl_ip.is_ipv6(),
                     vxlan_port: yaml_config.vxlan_port,
                     controller_port: static_config.controller_port,
                     controller_tls_port: static_config.controller_tls_port,
+                    snap_len: config_handler
+                        .candidate_config
+                        .dispatcher
+                        .capture_packet_size as usize,
                     handler_builders: vec![PacketHandlerBuilder::Pcap(pcap_sender.clone())],
                     ..Default::default()
                 }))
@@ -984,11 +1009,23 @@ impl Components {
                 .stats_collector(stats_collector.clone())
                 .flow_map_config(config_handler.flow())
                 .policy_getter(policy_getter)
-                .platform_poller(platform_synchronizer.clone_poller())
                 .exception_handler(exception_handler.clone())
-                .ntp_diff(synchronizer.ntp_diff())
+                .ntp_diff(synchronizer.ntp_diff());
+
+            #[cfg(target_os = "linux")]
+            let dispatcher = dispatcher_builder
+                .platform_poller(platform_synchronizer.clone_poller())
                 .build()
                 .unwrap();
+            #[cfg(target_os = "windows")]
+            let dispatcher = if yaml_config.tap_mode == TapMode::Local {
+                dispatcher_builder
+                    .pcap_interfaces(tap_interfaces.clone())
+                    .build()
+                    .unwrap()
+            } else {
+                todo!()
+            };
 
             // TODO: 创建dispatcher的时候处理这些
             let mut dispatcher_listener = dispatcher.listener();
@@ -1018,6 +1055,7 @@ impl Components {
             collectors.push(collector);
         }
 
+        #[cfg(target_os = "linux")]
         let ebpf_collector = EbpfCollector::new(
             synchronizer.ntp_diff(),
             &config_handler.candidate_config.ebpf,
@@ -1025,8 +1063,10 @@ impl Components {
             policy_getter,
             l7_log_rate.clone(),
             proto_log_sender,
+            &queue_debugger,
         )
         .ok();
+        #[cfg(target_os = "linux")]
         if let Some(collector) = &ebpf_collector {
             stats_collector.register_countable(
                 "ebpf-collector",
@@ -1034,6 +1074,7 @@ impl Components {
                 vec![],
             );
         }
+        #[cfg(target_os = "linux")]
         let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
         let sender_id = 3;
@@ -1135,14 +1176,18 @@ impl Components {
             l4_flow_uniform_sender,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
+            #[cfg(target_os = "linux")]
             platform_synchronizer,
+            #[cfg(target_os = "linux")]
             api_watcher,
             debugger,
             pcap_manager,
             log_parsers,
+            #[cfg(target_os = "linux")]
             ebpf_collector,
             stats_collector,
             running: AtomicBool::new(false),
+            #[cfg(target_os = "linux")]
             cgroups_controller,
             external_metrics_server,
             exception_handler,
@@ -1161,7 +1206,7 @@ impl Components {
         id: usize,
         stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Box<TaggedFlow>>,
-        l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
+        l4_flow_aggr_sender: queue::DebugSender<SendItem>,
         metrics_sender: queue::DebugSender<SendItem>,
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
@@ -1202,24 +1247,19 @@ impl Components {
             ],
         );
 
-        let (mut l4_log_sender, mut l4_log_receiver) = (None, None);
-        if l4_flow_aggr_sender.is_some() {
-            let (l4_flow_sender, l4_flow_receiver, counter) = queue::bounded_with_debug(
-                yaml_config.flow.aggr_queue_size as usize,
-                "2-second-flow-to-minute-aggrer",
-                queue_debugger,
-            );
-            stats_collector.register_countable(
-                "queue",
-                Countable::Owned(Box::new(counter)),
-                vec![
-                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
-                    StatsOption::Tag("index", id.to_string()),
-                ],
-            );
-            l4_log_sender = Some(l4_flow_sender);
-            l4_log_receiver = Some(l4_flow_receiver);
-        }
+        let (l4_log_sender, l4_log_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.flow.aggr_queue_size as usize,
+            "2-second-flow-to-minute-aggrer",
+            queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
+                StatsOption::Tag("index", id.to_string()),
+            ],
+        );
 
         // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
         // QuadrupleGenerator的Delay组成部分：
@@ -1253,15 +1293,12 @@ impl Components {
             stats_collector.clone(),
         );
 
-        let mut l4_flow_aggr = None;
-        if let Some(l4_log_receiver) = l4_log_receiver {
-            l4_flow_aggr = Some(FlowAggrThread::new(
-                id,                                   // id
-                l4_log_receiver,                      // input
-                l4_flow_aggr_sender.unwrap().clone(), // output
-                config_handler.collector(),
-            ));
-        }
+        let l4_flow_aggr = FlowAggrThread::new(
+            id,                          // id
+            l4_log_receiver,             // input
+            l4_flow_aggr_sender.clone(), // output
+            config_handler.collector(),
+        );
 
         let (mut second_collector, mut minute_collector) = (None, None);
         if metrics_type.contains(MetricsType::SECOND) {
@@ -1291,7 +1328,7 @@ impl Components {
 
         CollectorThread::new(
             quadruple_generator,
-            l4_flow_aggr,
+            Some(l4_flow_aggr),
             second_collector,
             minute_collector,
         )
@@ -1307,7 +1344,9 @@ impl Components {
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
+        #[cfg(target_os = "linux")]
         self.platform_synchronizer.stop();
+        #[cfg(target_os = "linux")]
         self.api_watcher.stop();
 
         // TODO: collector
@@ -1319,18 +1358,18 @@ impl Components {
             p.stop();
         }
 
-        if let Some(l4_flow_uniform_sender) = self.l4_flow_uniform_sender.as_mut() {
-            l4_flow_uniform_sender.stop();
-        }
+        self.l4_flow_uniform_sender.stop();
         self.metrics_uniform_sender.stop();
         self.l7_flow_uniform_sender.stop();
 
         self.libvirt_xml_extractor.stop();
         self.pcap_manager.stop();
         self.debugger.stop();
+        #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.stop();
         }
+        #[cfg(target_os = "linux")]
         match self.cgroups_controller.stop() {
             Ok(_) => {
                 info!("stopped cgroups_controller");

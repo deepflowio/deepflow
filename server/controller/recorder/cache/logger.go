@@ -56,6 +56,18 @@ func deleteDiffBase(resource, lcuuid string) string {
 	return fmt.Sprintf("cache diff base delete %s (lcuuid: %s) success", resource, lcuuid)
 }
 
+func addToToolMap(resource, lcuuid string) string {
+	return fmt.Sprintf("cache tool map add %s (lcuuid: %s) success", resource, lcuuid)
+}
+
+func updateToolMap(resource, lcuuid string) string {
+	return fmt.Sprintf("cache tool map update %s (lcuuid: %s) success", resource, lcuuid)
+}
+
+func deleteFromToolMap(resource, lcuuid string) string {
+	return fmt.Sprintf("cache tool map delete %s (lcuuid: %s) success", resource, lcuuid)
+}
+
 func refreshResource(resource string) string {
 	return fmt.Sprintf("refresh %s", resource)
 }

@@ -23,6 +23,7 @@ use std::{
 };
 
 use log::{error, warn};
+use serde::Serialize;
 
 use super::{
     decapsulate::TunnelType,
@@ -379,17 +380,26 @@ pub struct TcpPerfStats {
     pub rtt_server_max: u32, // us
     pub srt_max: u32,        // us
     pub art_max: u32,        // us, UDP复用
+    pub cit_max: u32, // us, the max time between the client request and the last server response (Payload > 1)
 
     pub rtt: u32,            // us, TCP建连过程, 只会计算出一个RTT
     pub rtt_client_sum: u32, // us, 假定一条流在一分钟内的时延加和不会超过u32
     pub rtt_server_sum: u32, // us
     pub srt_sum: u32,        // us
     pub art_sum: u32,        // us
+    pub cit_sum: u32,        // us
 
     pub rtt_client_count: u32,
     pub rtt_server_count: u32,
     pub srt_count: u32,
     pub art_count: u32, // UDP复用
+    pub cit_count: u32,
+
+    pub syn_count: u32,
+    pub synack_count: u32,
+
+    pub retrans_syn_count: u32,
+    pub retrans_synack_count: u32,
 
     pub counts_peers: [TcpPerfCountsPeer; 2],
     pub total_retrans_count: u32,
@@ -403,16 +413,31 @@ impl TcpPerfStats {
         append_key_value(dst, "rtt_server_max", &self.rtt_server_max.to_string());
         append_key_value(dst, "srt_max", &self.srt_max.to_string());
         append_key_value(dst, "art_max", &self.art_max.to_string());
+        append_key_value(dst, "cit_max", &self.cit_max.to_string());
 
         append_key_value(dst, "rtt_client_sum", &self.rtt_client_sum.to_string());
         append_key_value(dst, "rtt_server_sum", &self.rtt_server_sum.to_string());
         append_key_value(dst, "srt_sum", &self.srt_sum.to_string());
         append_key_value(dst, "art_sum", &self.art_sum.to_string());
+        append_key_value(dst, "cit_sum", &self.cit_sum.to_string());
 
         append_key_value(dst, "rtt_client_count", &self.rtt_client_count.to_string());
         append_key_value(dst, "rtt_server_count", &self.rtt_server_count.to_string());
         append_key_value(dst, "srt_count", &self.srt_count.to_string());
         append_key_value(dst, "art_count", &self.art_count.to_string());
+        append_key_value(dst, "cit_count", &self.cit_sum.to_string());
+        append_key_value(dst, "syn_count", &self.syn_count.to_string());
+        append_key_value(dst, "synack_count", &self.synack_count.to_string());
+        append_key_value(
+            dst,
+            "retrans_syn_count",
+            &self.retrans_syn_count.to_string(),
+        );
+        append_key_value(
+            dst,
+            "retrans_synack_count",
+            &self.retrans_synack_count.to_string(),
+        );
 
         append_key_value(
             dst,
@@ -435,6 +460,7 @@ impl TcpPerfStats {
             &self.counts_peers[1].zero_win_count.to_string(),
         );
     }
+
     pub fn sequential_merge(&mut self, other: &TcpPerfStats) {
         if self.rtt_client_max < other.rtt_client_max {
             self.rtt_client_max = other.rtt_client_max;
@@ -451,15 +477,25 @@ impl TcpPerfStats {
         if self.rtt < other.rtt {
             self.rtt = other.rtt;
         }
+        if self.cit_max < other.cit_max {
+            self.cit_max = other.cit_max;
+        }
+
         self.rtt_client_sum += other.rtt_client_sum;
         self.rtt_server_sum += other.rtt_server_sum;
         self.srt_sum += other.srt_sum;
         self.art_sum += other.art_sum;
+        self.cit_sum += other.cit_sum;
 
         self.rtt_client_count += other.rtt_client_count;
         self.rtt_server_count += other.rtt_server_count;
         self.srt_count += other.srt_count;
         self.art_count += other.art_count;
+        self.syn_count += other.syn_count;
+        self.cit_count += other.cit_count;
+        self.synack_count += other.synack_count;
+        self.retrans_syn_count += other.retrans_syn_count;
+        self.retrans_synack_count += other.retrans_synack_count;
         self.counts_peers[0].sequential_merge(&other.counts_peers[0]);
         self.counts_peers[1].sequential_merge(&other.counts_peers[1]);
         self.total_retrans_count += other.total_retrans_count;
@@ -491,6 +527,11 @@ impl From<TcpPerfStats> for flow_log::TcpPerfStats {
             counts_peer_tx: Some(p.counts_peers[0].into()),
             counts_peer_rx: Some(p.counts_peers[1].into()),
             total_retrans_count: p.total_retrans_count,
+            cit_count: p.cit_count,
+            cit_sum: p.cit_sum,
+            cit_max: p.cit_max,
+            syn_count: p.syn_count,
+            synack_count: p.synack_count,
         }
     }
 }
@@ -642,7 +683,7 @@ const L7_PROTOCOL_MQTT: u8 = 101;
 const L7_PROTOCOL_DNS: u8 = 120;
 const L7_PROTOCOL_MAX: u8 = 255;
 
-#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
 #[repr(u8)]
 pub enum L7Protocol {
     Unknown = L7_PROTOCOL_UNKNOWN,

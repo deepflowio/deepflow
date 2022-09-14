@@ -525,6 +525,7 @@ static void reader_raw_cb(void *t, void *raw, int raw_size)
 		submit_data->process_id = sd->tgid;
 		submit_data->thread_id = sd->pid;
 		submit_data->coroutine_id = sd->coroutine_id;
+		submit_data->source = sd->source;
 		submit_data->cap_data =
 		    (char *)((void **)&submit_data->cap_data + 1);
 		submit_data->syscall_len = sd->syscall_len;
@@ -895,8 +896,8 @@ int running_socket_tracer(l7_handle_fn handle,
 		ebpf_info("Set offsets map from btf_vmlinux, success.\n");
 	}
 
-	// Update go offsets to eBPF "uprobe_offsets_map"
-	update_go_offsets_to_map(tracer);
+	// Update go offsets to eBPF "proc_info_map" 
+	update_proc_info_to_map(tracer);
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;

@@ -1127,6 +1127,7 @@ type VInterface struct {
 
 func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.Name = cloudItem.Name
+	v.Type = cloudItem.Type
 	v.TapMac = cloudItem.TapMac
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid

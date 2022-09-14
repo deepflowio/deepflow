@@ -22,6 +22,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	"github.com/deepflowys/deepflow/server/controller/service"
@@ -31,7 +32,7 @@ func ControllerRouter(e *gin.Engine, m *monitor.ControllerCheck, cfg *config.Con
 	e.GET("/v1/controllers/:lcuuid/", getController)
 	e.GET("/v1/controllers/", getControllers)
 	e.PATCH("/v1/controllers/:lcuuid/", updateController(m, cfg))
-	e.DELETE("/v1/controllers/:lcuuid/", deleteController(m))
+	e.DELETE("/v1/controllers/:lcuuid/", deleteController(m, cfg))
 }
 
 func getController(c *gin.Context) {
@@ -47,6 +48,9 @@ func getControllers(c *gin.Context) {
 		args["ip"] = value
 	}
 	if value, ok := c.GetQuery("controller"); ok {
+		args["name"] = value
+	}
+	if value, ok := c.GetQuery("name"); ok {
 		args["name"] = value
 	}
 	if value, ok := c.GetQuery("analyzer"); ok {
@@ -71,7 +75,7 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		var controllerUpdate model.ControllerUpdate
 
 		// 如果不是masterController，将请求转发至是masterController
-		isMasterController, masterControllerName, _ := common.IsMasterController()
+		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
 		if !isMasterController {
 			forwardMasterController(c, masterControllerName, cfg.ListenPort)
 			return
@@ -95,8 +99,15 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 	})
 }
 
-func deleteController(m *monitor.ControllerCheck) gin.HandlerFunc {
+func deleteController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		// if not master controller，should forward to master controller
+		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
+		if !isMasterController {
+			forwardMasterController(c, masterControllerName, cfg.ListenPort)
+			return
+		}
+
 		lcuuid := c.Param("lcuuid")
 		data, err := service.DeleteController(lcuuid, m)
 		JsonResponse(c, data, err)

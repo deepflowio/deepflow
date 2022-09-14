@@ -17,22 +17,21 @@
 package controller
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/deepflowys/deepflow/server/libs/logger"
-
 	"github.com/gin-gonic/gin"
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/db/redis"
+	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	"github.com/deepflowys/deepflow/server/controller/manager"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
@@ -43,6 +42,8 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	trouter "github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
+
+	"github.com/deepflowys/deepflow/server/controller/grpc"
 
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/controller"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
@@ -55,16 +56,12 @@ var log = logging.MustGetLogger("controller")
 
 type Controller struct{}
 
-func Start(configPath string) {
+func Start(ctx context.Context, configPath string) {
 	flag.Parse()
-	logger.EnableStdoutLog()
 
 	serverCfg := config.DefaultConfig()
 	serverCfg.Load(configPath)
 	cfg := &serverCfg.ControllerConfig
-	logger.EnableFileLog(cfg.LogFile)
-	logLevel, _ := logging.LogLevel(cfg.LogLevel)
-	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN DeepFlow Controller ==============================")
 	log.Infof("controller config:\n%s", string(bytes))
@@ -80,6 +77,11 @@ func Start(configPath string) {
 		}
 	}()
 	defer router.SetInitStageForHealthChecker(router.OK)
+
+	// start election
+	if _, enabled := os.LookupEnv("FEATURE_FLAG_ELECTION"); enabled {
+		go election.Start(ctx, cfg)
+	}
 
 	router.SetInitStageForHealthChecker("MySQL migration")
 	migrateDB(cfg)
@@ -105,7 +107,7 @@ func Start(configPath string) {
 		}
 	}
 
-	router.SetInitStageForHealthChecker("Monitor init")
+	router.SetInitStageForHealthChecker("Statsd init")
 	// start statsd
 	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
@@ -130,9 +132,9 @@ func Start(configPath string) {
 	t := trisolaris.NewTrisolaris(&cfg.TrisolarisCfg, mysql.Db)
 	go t.Start()
 
-	router.SetInitStageForHealthChecker("Register routers init")
 	controllerCheck := monitor.NewControllerCheck(cfg.MonitorCfg)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg.MonitorCfg)
+	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
@@ -149,7 +151,7 @@ func Start(configPath string) {
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
 		for range time.Tick(time.Minute) {
-			isMasterController, curMasterController, err := common.IsMasterController()
+			isMasterController, curMasterController, err := election.IsMasterControllerAndReturnName()
 			if err != nil {
 				continue
 			}
@@ -166,6 +168,9 @@ func Start(configPath string) {
 					// 数据节点检查
 					analyzerCheck.Start()
 
+					// vtap check
+					vtapCheck.Start()
+
 					// license分配和检查
 					vtapLicenseAllocation.Start()
 
@@ -179,6 +184,8 @@ func Start(configPath string) {
 		}
 	}()
 
+	router.SetInitStageForHealthChecker("Register routers init")
+	router.ElectionRouter(r)
 	router.DebugRouter(r, m, g)
 	router.ControllerRouter(r, controllerCheck, cfg)
 	router.AnalyzerRouter(r, analyzerCheck, cfg)
@@ -189,6 +196,12 @@ func Start(configPath string) {
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
 	trouter.RegistRouter(r)
+
+	grpcStart(ctx, cfg)
+}
+
+func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {
+	go grpc.Run(ctx, cfg)
 }
 
 // migrate db by master region master controller
@@ -201,17 +214,19 @@ func migrateDB(cfg *config.ControllerConfig) {
 	// try to check whether it is master controller until successful,
 	// migrate if it is master, exit if not.
 	for range time.Tick(time.Second * 5) {
-		isMasterController, _, err := common.IsMasterController()
-		err = nil
-		isMasterController = true
-		if err == nil && isMasterController {
-			ok := migrator.MigrateMySQL(cfg.MySqlCfg)
-			if !ok {
-				log.Error("migrate mysql failed")
-				time.Sleep(time.Second)
-				os.Exit(0)
+		isMasterController, err := election.IsMasterController()
+		if err == nil {
+			if isMasterController {
+				ok := migrator.MigrateMySQL(cfg.MySqlCfg)
+				if !ok {
+					log.Error("migrate mysql failed")
+					time.Sleep(time.Second)
+					os.Exit(0)
+				}
+				return
+			} else {
+				return
 			}
-			return
 		}
 	}
 }

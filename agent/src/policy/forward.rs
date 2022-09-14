@@ -25,6 +25,7 @@ use log::debug;
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
 
+use super::UnsafeWrapper;
 use crate::common::decapsulate::TunnelType;
 use crate::common::enums::TapType;
 use crate::common::lookup_key::LookupKey;
@@ -111,9 +112,12 @@ type TableLruCache = LruCache<L3Key, L3Item>;
 
 const MAX_QUEUE_COUNT: usize = 16;
 
+type MacIpTables = UnsafeWrapper<Vec<Option<Box<TableLruCache>>>>;
+type VipDeviceTables = UnsafeWrapper<HashMap<u64, bool>>;
+
 pub struct Forward {
-    mac_ip_tables: Vec<Option<Box<TableLruCache>>>,
-    vip_device_tables: Option<Box<HashMap<u64, bool>>>,
+    mac_ip_tables: MacIpTables,
+    vip_device_tables: VipDeviceTables,
 
     queue_count: usize,
 }
@@ -122,11 +126,11 @@ impl Forward {
     pub fn new(queue_count: usize) -> Self {
         assert!(queue_count < MAX_QUEUE_COUNT && queue_count > 0);
         Self {
-            mac_ip_tables: vec![
+            mac_ip_tables: MacIpTables::from(vec![
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None, None,
-            ],
-            vip_device_tables: Some(Box::new(HashMap::new())),
+            ]),
+            vip_device_tables: VipDeviceTables::from(HashMap::new()),
             queue_count,
         }
     }
@@ -260,36 +264,35 @@ impl Forward {
         platforms: &Vec<Arc<PlatformData>>,
         interfaces: &Vec<NetworkInterface>,
     ) {
-        for i in 0..self.queue_count {
+        let mut mac_ip_tables = Vec::with_capacity(self.queue_count);
+        for _ in 0..self.queue_count {
             let mut mac_ip_table = TableLruCache::new(1 << 14);
             self.update_l3_from_platforms(&mut mac_ip_table, platforms);
             self.update_l3_from_interfaces(trident_type, &mut mac_ip_table, interfaces);
 
-            self.mac_ip_tables[i].replace(Box::new(mac_ip_table));
+            mac_ip_tables.push(Some(Box::new(mac_ip_table)));
         }
+        self.mac_ip_tables.set(mac_ip_tables);
 
         let mut vip_device_table = HashMap::new();
 
         self.update_vip_from_platforms(&mut vip_device_table, platforms);
-        self.vip_device_tables.replace(Box::new(vip_device_table));
+
+        self.vip_device_tables.set(vip_device_table);
     }
 
     fn query_vip(&self, mac: MacAddr) -> bool {
-        if self.vip_device_tables.is_none() {
-            false
-        } else {
-            let mac = u64::from(mac);
-            self.vip_device_tables.as_ref().unwrap().get(&mac).is_some()
-        }
+        let mac = u64::from(mac);
+        return self.vip_device_tables.get().get(&mac).is_some();
     }
 
-    pub fn query(&self, index: usize, mac: MacAddr, ip: IpAddr, l2_end: bool) -> bool {
+    pub fn query(&mut self, index: usize, mac: MacAddr, ip: IpAddr, l2_end: bool) -> bool {
         let key = L3Key { mac, ip };
-        if self.mac_ip_tables[index].is_none() {
+        if self.mac_ip_tables.get()[index].is_none() {
             return l2_end && self.query_vip(mac);
         }
 
-        return self.mac_ip_tables[index]
+        return self.mac_ip_tables.get()[index]
             .as_ref()
             .unwrap()
             .peek(&key)
@@ -298,15 +301,19 @@ impl Forward {
     }
 
     pub fn add(&mut self, index: usize, packet: &LookupKey, tap_port: TapPort, from: u16) {
-        if self.mac_ip_tables[index].is_none() {
-            self.mac_ip_tables[index] = Some(Box::new(TableLruCache::new(1 << 14)));
+        if self.mac_ip_tables.get()[index].is_none() {
+            self.mac_ip_tables.get_mut()[index] = Some(Box::new(TableLruCache::new(1 << 14)));
         }
 
         let key = L3Key {
             mac: packet.src_mac,
             ip: packet.src_ip,
         };
-        if let Some(value) = self.mac_ip_tables[index].as_mut().unwrap().get_mut(&key) {
+        if let Some(value) = self.mac_ip_tables.get_mut()[index]
+            .as_mut()
+            .unwrap()
+            .get_mut(&key)
+        {
             value.from |= from;
             value.last = packet.timestamp;
             value.tap_type = packet.tap_type;
@@ -321,7 +328,10 @@ impl Forward {
                 ip: key.ip,
                 mac: key.mac,
             };
-            self.mac_ip_tables[index].as_mut().unwrap().push(key, value);
+            self.mac_ip_tables.get_mut()[index]
+                .as_mut()
+                .unwrap()
+                .push(key, value);
         }
     }
 }

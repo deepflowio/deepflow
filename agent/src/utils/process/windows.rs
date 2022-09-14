@@ -17,8 +17,7 @@
 use std::{mem::size_of, path::PathBuf, process};
 use sysinfo::{System, SystemExt};
 
-use log::debug;
-use windows::Win32::{
+use ::windows::Win32::{
     Foundation::{GetLastError, BOOL, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
     System::{
         Diagnostics::ToolHelp::{
@@ -29,6 +28,8 @@ use windows::Win32::{
         Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
     },
 };
+
+use log::debug;
 
 use crate::{
     error::{Error, Result},

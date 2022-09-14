@@ -117,7 +117,7 @@ var (
 		output: "WITH if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, 4294967295)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('ffffffff800000000000000000000000'), 16)))) AS mask_ip_0 SELECT 'region' AS node_type_0, mask_ip_0 FROM flow_log.l7_flow_log GROUP BY mask_ip_0, node_type_0",
 	}, {
 		input:  "select region_id_0 from l7_flow_log group by region_id_0,chost_id_1",
-		output: "SELECT region_id_0 FROM flow_log.l7_flow_log PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY region_id_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS chost_id_1",
+		output: "SELECT region_id_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS chost_id_1 FROM flow_log.l7_flow_log PREWHERE (region_id_0!=0) AND (l3_device_id_1!=0 AND l3_device_type_1=1) GROUP BY region_id_0, if(l3_device_type_1=1,l3_device_id_1, 0) AS chost_id_1",
 	}, {
 		input:  "SELECT ip_0 FROM l4_flow_log WHERE  ((is_internet_1=1) OR (is_internet_0=1)) GROUP BY ip_0 limit 1",
 		output: "SELECT if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0 FROM flow_log.l4_flow_log PREWHERE (((l3_epc_id_1 = -2)) OR ((l3_epc_id_0 = -2))) GROUP BY if(is_ipv4=1, IPv4NumToString(ip4_0), IPv6NumToString(ip6_0)) AS ip_0 LIMIT 1",
@@ -138,10 +138,10 @@ var (
 		output: "SELECT dictGet(flow_tag.k8s_label_map, 'value', (toUInt64(pod_id_0),'statefulset.kubernetes.io/pod-name')) AS `label.abc` FROM flow_log.l4_flow_log PREWHERE toUInt64(pod_id_0) IN (SELECT pod_id FROM flow_tag.k8s_label_map WHERE value = 'opensource-loki-0' and key='statefulset.kubernetes.io/pod-name') AND (pod_id_0!=0) GROUP BY `label.abc`",
 	}, {
 		input:  "select `attribute.cc` as `attribute.abc` from l7_flow_log where `attribute.abc`='opensource-loki-0' group by `attribute.abc`",
-		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.l7_flow_log PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' GROUP BY `attribute.abc`",
+		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.l7_flow_log PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' AND (`attribute.cc` != '') GROUP BY `attribute.abc`",
 	}, {
 		input:  "select `tag.cc` as `tag.abc` from cpu where `tag.abc`='opensource-loki-0' group by `tag.abc`",
-		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.cpu PREWHERE tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' GROUP BY `tag.abc`",
+		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.cpu PREWHERE tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' AND (`tag.cc` != '') GROUP BY `tag.abc`",
 		db:     "ext_metrics",
 	}, {
 		input:  "select `metrics.storageclass_annotations` AS `job_info` from prometheus_kube",
@@ -151,6 +151,9 @@ var (
 		input:  "select Sum(`metrics.pending`) from `deepflow_server.queue`",
 		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) FROM deepflow_system.`deepflow_server.queue`",
 		db:     "deepflow_system",
+	}, {
+		input:  "select labels_0 from l7_flow_log",
+		output: "SELECT dictGet(flow_tag.k8s_labels_map, 'labels', toUInt64(pod_id_0)) AS labels_0 FROM flow_log.l7_flow_log",
 	},
 	}
 )

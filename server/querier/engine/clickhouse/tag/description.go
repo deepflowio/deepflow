@@ -172,7 +172,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 
 			for _, enumValue := range enumData.([][]interface{}) {
 				// 如果是int/int_enum，则将value转为interface
-				if tagType == "int" || tagType == "int_enum" {
+				if tagType == "int" || tagType == "int_enum" || tagType == "bit_enum" {
 					value, _ := strconv.Atoi(enumValue[0].(string))
 					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1]))
 				} else {
@@ -328,6 +328,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		"values":  []interface{}{},
 	}
 	for _, value := range tagValues {
+
 		response["values"] = append(
 			response["values"], []interface{}{value.Value, value.DisplayName},
 		)
@@ -434,7 +435,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				labelTag := strings.TrimPrefix(tag, "label.")
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map WHERE key='%s' AND %s GROUP BY value, display_name ORDER BY value ASC", labelTag, whereSql)
 			} else {
-				return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
+				return map[string][]interface{}{}, nil
 			}
 		}
 		log.Debug(sql)
@@ -485,7 +486,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			sql = "SELECT deviceid AS value,name AS display_name,uid FROM device_map WHERE devicetype=11"
 		}
 		if sql == "" {
-			return nil, errors.New(fmt.Sprintf("tag (%s) not found", tag))
+			return map[string][]interface{}{}, nil
 		}
 		log.Debug(sql)
 		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})

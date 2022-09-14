@@ -17,6 +17,7 @@
 package cache
 
 import (
+	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	rcommon "github.com/deepflowys/deepflow/server/controller/recorder/common"
@@ -65,13 +66,15 @@ func (m *CacheManager) UpdateSequence() {
 	}
 }
 
-func (m *CacheManager) GetSubDomainCache(subDomainLcuuid string) *Cache {
+func (m *CacheManager) CreateSubDomainCacheIfNotExists(subDomainLcuuid string) *Cache {
 	cache, exists := m.SubDomainCacheMap[subDomainLcuuid]
 	if exists {
 		return cache
 	}
+	log.Infof("subdomain cache (lcuuid: %s) not exists", subDomainLcuuid)
 	cache = NewCache(m.DomainCache.DomainLcuuid)
 	cache.SubDomainLcuuid = subDomainLcuuid
+	m.SubDomainCacheMap[subDomainLcuuid] = cache
 	return cache
 }
 
@@ -466,14 +469,12 @@ func (c *Cache) refreshNetworks() []int {
 func (c *Cache) AddSubnets(items []*mysql.Subnet) {
 	for _, item := range items {
 		c.DiffBaseDataSet.addSubnet(item, c.Sequence)
-		c.ToolDataSet.addSubnet(item)
 	}
 }
 
 func (c *Cache) DeleteSubnets(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteSubnet(lcuuid)
-		c.ToolDataSet.deleteSubnet(lcuuid)
 	}
 }
 
@@ -583,6 +584,10 @@ func (c *Cache) AddVInterfaces(items []*mysql.VInterface) {
 		c.DiffBaseDataSet.addVInterface(item, c.Sequence, &c.ToolDataSet)
 		c.ToolDataSet.addVInterface(item)
 	}
+}
+
+func (c *Cache) UpdateVInterface(cloudItem *cloudmodel.VInterface) {
+	c.ToolDataSet.updateVInterface(cloudItem)
 }
 
 func (c *Cache) DeleteVInterfaces(lcuuids []string) {

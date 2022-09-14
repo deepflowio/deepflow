@@ -61,6 +61,11 @@ type ControllerConfig struct {
 	LogLevel             string `default:"info" yaml:"log-level"`
 	ListenPort           int    `default:"20417" yaml:"listen-port"`
 	MasterControllerName string `default:"" yaml:"master-controller-name"`
+	GrpcMaxMessageLength int    `default:"104857600" yaml:"grpc-max-message-length"`
+	GrpcPort             string `default:"20035" yaml:"grpc-port"`
+	Kubeconfig           string `yaml:"kubeconfig"`
+	ElectionName         string `default:"deepflow-server" yaml:"election-name"`
+	ElectionNamespace    string `default:"deepflow" yaml:"election-namespace"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`
 

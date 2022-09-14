@@ -34,6 +34,8 @@ use super::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
     KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
+
+use crate::{common::ebpf::EbpfType, flow_generator::protocol_logs::L7ProtoRawDataType};
 use crate::{
     common::{
         enums::{EthernetType, PacketDirection},
@@ -127,6 +129,7 @@ impl MetaAppProto {
             syscall_trace_id_thread_1: 0,
             syscall_cap_seq_0: 0,
             syscall_cap_seq_1: 0,
+            ebpf_type: EbpfType::None,
         };
         if flow.flow.tap_side == TapSide::Local {
             base_info.mac_src = flow.flow.flow_key.mac_src;
@@ -343,8 +346,10 @@ impl SessionQueue {
                     self.send(item);
                 }
             }
+            LogMessageType::Session => self.send(item),
             _ => (),
         }
+
         self.time_window.replace(time_window);
     }
 
@@ -370,6 +375,9 @@ impl SessionQueue {
     }
 
     fn calc_key(item: &AppProtoLogsData) -> u64 {
+        if let AppProtoLogsInfo::Mqtt(_) = item.special_info {
+            return item.base_info.flow_id;
+        }
         let request_id = match &item.special_info {
             AppProtoLogsInfo::Dns(d) => d.trans_id as u32,
             AppProtoLogsInfo::Dubbo(d) => d.serial_id as u32,
@@ -433,7 +441,7 @@ struct AppLogs {
 impl AppLogs {
     pub fn new(config: &LogParserAccess) -> Self {
         Self {
-            http: HttpLog::new(config, false),
+            http: HttpLog::new(config, false, L7ProtoRawDataType::RawProtocol),
             dubbo: DubboLog::new(config),
             ..Default::default()
         }
@@ -522,14 +530,17 @@ impl AppProtoLogsParser {
                             &mut app_logs,
                         );
                         for app_proto in app_protos {
-                            let proto_log = match Self::parse_log(*app_proto, &mut app_logs) {
+                            let proto_logs = match Self::parse_log(*app_proto, &mut app_logs) {
                                 Ok(a) => a,
                                 Err(e) => {
                                     debug!("{}", e);
                                     continue;
                                 }
                             };
-                            session_queue.aggregate_session_and_send(proto_log);
+
+                            for proto_log in proto_logs {
+                                session_queue.aggregate_session_and_send(proto_log);
+                            }
                         }
                     }
                     Err(Error::Timeout) => {
@@ -555,7 +566,10 @@ impl AppProtoLogsParser {
         info!("app protocol logs parser (id={}) stopped", self.id);
     }
 
-    fn parse_log(mut app_proto: MetaAppProto, app_logs: &mut AppLogs) -> Result<AppProtoLogsData> {
+    fn parse_log(
+        mut app_proto: MetaAppProto,
+        app_logs: &mut AppLogs,
+    ) -> Result<Vec<AppProtoLogsData>> {
         // 应用流日志只存C2S方向,所以非C2S方向需要转换方向
         if app_proto.base_info.head.msg_type != LogMessageType::Request {
             let base_info = &mut app_proto.base_info;
@@ -569,77 +583,100 @@ impl AppProtoLogsParser {
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.dns.info();
                 let base_info = app_proto.base_info;
-                AppProtoLogsData::new(base_info, special_info)
+                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             L7Protocol::Http1 | L7Protocol::Http2 => {
                 app_logs.http.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.http.info();
                 let base_info = app_proto.base_info;
 
-                AppProtoLogsData::new(base_info, special_info)
+                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             L7Protocol::Dubbo => {
                 app_logs.dubbo.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.dubbo.info();
                 let base_info = app_proto.base_info;
 
-                AppProtoLogsData::new(base_info, special_info)
+                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             L7Protocol::Kafka => {
                 app_logs.kafka.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.kafka.info();
                 let base_info = app_proto.base_info;
 
-                AppProtoLogsData::new(base_info, special_info)
+                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             L7Protocol::Mqtt => {
-                app_logs.mqtt.set_version(app_proto.base_info.head.version);
                 app_logs.mqtt.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
+
                 let special_info = app_logs.mqtt.info();
                 let base_info = app_proto.base_info;
 
-                AppProtoLogsData::new(base_info, special_info)
+                let result = special_info
+                    .into_iter()
+                    .map(|v| {
+                        app_logs
+                            .mqtt
+                            .amend_mqtt_proto_log_and_generate_log_data(v, base_info.clone())
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+
+                result
             }
             L7Protocol::Redis => {
                 app_logs.redis.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.redis.info();
                 let base_info = app_proto.base_info;
 
-                AppProtoLogsData::new(base_info, special_info)
+                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             L7Protocol::Mysql => {
                 app_logs.mysql.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
+                    None,
+                    None,
                 )?;
                 let special_info = app_logs.mysql.info();
                 let base_info = app_proto.base_info;
 
-                AppProtoLogsData::new(base_info, special_info)
+                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             _ => unreachable!(),
         };

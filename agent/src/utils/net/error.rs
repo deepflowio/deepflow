@@ -28,6 +28,7 @@ pub enum Error {
     LinkNotFoundIndex(u32),
     #[error("link regex invalid")]
     LinkRegexInvalid(#[from] regex::Error),
+    #[cfg(target_os = "linux")]
     #[error("netlink error")]
     NetLinkError(#[from] neli::err::NlError),
     #[error("IO error")]
@@ -38,6 +39,11 @@ pub enum Error {
     Windows(String),
     #[error("{0}")]
     LinkIdxNotFoundByIP(String),
+    #[cfg(target_os = "linux")]
+    #[error(transparent)]
+    Errno(#[from] nix::errno::Errno),
+    #[error("ethtool: {0}")]
+    Ethtool(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

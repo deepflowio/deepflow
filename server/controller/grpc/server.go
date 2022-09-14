@@ -24,11 +24,11 @@ import (
 	"github.com/op/go-logging"
 	"google.golang.org/grpc"
 
-	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
-var log = logging.MustGetLogger("server")
+var log = logging.MustGetLogger("grpc/server")
 
 var register = struct {
 	sync.RWMutex
@@ -46,7 +46,7 @@ func Add(r interface{}) {
 	register.r = append(register.r, (r).(Registration))
 }
 
-func Run(ctx context.Context, cfg *config.Config) {
+func Run(ctx context.Context, cfg *config.ControllerConfig) {
 	maxMsgSize := cfg.GrpcMaxMessageLength
 	server := grpc.NewServer(
 		grpc.MaxMsgSize(maxMsgSize),
@@ -57,7 +57,7 @@ func Run(ctx context.Context, cfg *config.Config) {
 		registration.Register(server)
 	}
 
-	addr := net.JoinHostPort("", cfg.TridentPort)
+	addr := net.JoinHostPort("", cfg.GrpcPort)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("net.Listen err: %v", err)

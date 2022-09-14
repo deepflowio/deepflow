@@ -16,12 +16,14 @@
 
 mod debugger;
 mod error;
+#[cfg(target_os = "linux")]
 mod platform;
 mod queue;
 mod rpc;
 
 use bincode::{Decode, Encode};
 pub use debugger::{Client, ConstructDebugCtx, Debugger};
+#[cfg(target_os = "linux")]
 pub use platform::PlatformMessage;
 pub use queue::{QueueDebugger, QueueMessage};
 pub use rpc::{ConfigResp, RpcMessage};
@@ -43,6 +45,7 @@ pub const MAX_BUF_SIZE: usize = 9000;
 pub enum Module {
     Unknown,
     Rpc,
+    #[cfg(target_os = "linux")]
     Platform,
     List,
     Queue,

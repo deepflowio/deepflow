@@ -19,6 +19,8 @@ use std::{
     ptr,
 };
 
+use log::warn;
+use regex::Regex;
 use windows::Win32::{
     Foundation::{CHAR, ERROR_BUFFER_OVERFLOW, NO_ERROR},
     NetworkManagement::IpHelper::{
@@ -33,9 +35,9 @@ use windows::Win32::{
     },
 };
 
-use super::{Addr, Link, MacAddr, NeighborEntry, Route, MAC_ADDR_ZERO};
+use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
 use super::{Error, Result};
-use crate::{common::IfType, utils::WIN_ERROR_CODE_STR};
+use crate::{common::enums::IfType, utils::WIN_ERROR_CODE_STR};
 
 /*
 * TODO
@@ -121,19 +123,8 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
     })
 }
 
-pub fn get_interface_by_name(friendly_name: &str) -> Result<Link> {
-    let (adapters, _) = get_adapters_addresses()?;
-    adapters
-        .into_iter()
-        .find(|link| link.name.as_str() == friendly_name)
-        .ok_or(Error::Windows(format!(
-            "cannot find correspond interface by name={}",
-            friendly_name
-        )))
-}
-
 pub fn get_interface_by_index(if_index: u32) -> Result<Link> {
-    let (adapters, _) = get_adapters_addresses()?;
+    let adapters = get_pcap_interfaces()?;
     adapters
         .into_iter()
         .find(|link| link.if_index == if_index)
@@ -155,21 +146,57 @@ pub fn addr_list() -> Result<Vec<Addr>> {
     get_adapters_addresses().map(|(_, addresses)| addresses)
 }
 
-pub fn link_by_name(name: String) -> Result<Link> {
-    todo!()
+pub fn link_by_name<S: AsRef<str>>(name: S) -> Result<Link> {
+    let adapters = get_pcap_interfaces()?;
+    adapters
+        .into_iter()
+        .find(|link| link.name.as_str() == name.as_ref())
+        .ok_or(Error::Windows(format!(
+            "cannot find correspond interface by name={}",
+            name.as_ref()
+        )))
 }
 
 pub fn link_list() -> Result<Vec<Link>> {
-    get_adapters_addresses().map(|(adapters, _)| adapters)
+    get_pcap_interfaces()
 }
 
-pub fn get_src_ip_and_mac(dest_addr: IpAddr) -> Result<(IpAddr, MacAddr)> {
-    route_get(dest_addr)
+pub fn links_by_name_regex<S: AsRef<str>>(regex: S) -> Result<Vec<Link>> {
+    let regex = regex.as_ref();
+    if regex == "" {
+        return Ok(vec![]);
+    }
+    let regex = if regex.ends_with('$') {
+        Regex::new(regex)
+    } else {
+        Regex::new(&format!("{}$", regex))
+    }?;
+    Ok(link_list()?
+        .into_iter()
+        .filter(|link| {
+            if !link.flags.contains(LinkFlags::LOOPBACK) {
+                // filter zero mac
+                if link.mac_addr == MacAddr::ZERO {
+                    warn!(
+                        "link {} has invalid mac address {}",
+                        link.name, link.mac_addr
+                    );
+                    return false;
+                }
+            }
+
+            regex.is_match(&link.name)
+        })
+        .collect())
+}
+
+pub fn get_route_src_ip_and_mac(dest_addr: &IpAddr) -> Result<(IpAddr, MacAddr)> {
+    route_get(*dest_addr)
         .and_then(|r| get_interface_by_index(r.oif_index).map(|link| (r.src_ip, link.mac_addr)))
 }
 
-pub fn get_route_src_ip(dest_addr: IpAddr) -> Result<IpAddr> {
-    route_get(dest_addr).map(|r| r.src_ip)
+pub fn get_route_src_ip(dest_addr: &IpAddr) -> Result<IpAddr> {
+    route_get(*dest_addr).map(|r| r.src_ip)
 }
 
 pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
@@ -280,6 +307,27 @@ pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
     }
 }
 
+fn get_pcap_interfaces() -> Result<Vec<Link>> {
+    let devices = pcap::Device::list()
+        .map_err(|e| Error::Windows(format!("list pcap interfaces failed: {}", e)))?;
+    let adapters = get_adapters_addresses().map(|(adapters, _)| adapters)?;
+    let mut pcap_interfaces = vec![];
+    for device in devices {
+        if let Some(link) = adapters
+            .iter()
+            .find(|&l| !&l.adapter_id.is_empty() && device.name.contains(&l.adapter_id))
+        {
+            let mut _link = link.clone();
+            _link.device_name = device.name;
+            pcap_interfaces.push(_link);
+        }
+    }
+
+    Ok(pcap_interfaces)
+}
+
+// Link { if_index: 6, mac_addr: 00:15:5d:70:01:03, adapter_uid: "{1AF9CCBA-3FEE-4CD1-810F-3761F8A4DE25}", name: "vEthernet (NAT-VM)", if_type: Some("ethernet"), parent_index: None }
+// Link { if_index: 19, mac_addr: b0:60:88:51:d7:54, adapter_uid: "{95BC9BD0-4C29-44FC-B0C7-896326EF378F}", name: "WLAN", if_type: Some("ieee80211"), parent_index: None }
 fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
     // recommended initial size
     const RECOMMENDED_BUF_SIZE: u32 = 15000;
@@ -303,24 +351,24 @@ fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
             if ret_code == NO_ERROR {
                 if size == 0 {
                     return Err(Error::Windows(String::from(
-                    "failed to run GetAdaptersAddresses function because cannot get data from kernel size=0",
-                )));
+                        "failed to run GetAdaptersAddresses function because cannot get data from kernel size=0",
+                    )));
                 }
                 break;
             }
 
             if ret_code != ERROR_BUFFER_OVERFLOW {
                 let err_msg = format!(
-                "failed to run get_adapters_addresses function because of win32 error code({}),\n{}",
-                ret_code, WIN_ERROR_CODE_STR
-            );
+                    "failed to run get_adapters_addresses function because of win32 error code({}),\n{}",
+                    ret_code, WIN_ERROR_CODE_STR
+                );
                 return Err(Error::Windows(err_msg));
             }
 
             if size <= adapter_address.len() as u32 {
                 return Err(Error::Windows(String::from(
-                "failed to run get adapters_addresses function because buffer's size less than buffer's length",
-            )));
+                    "failed to run get adapters_addresses function because buffer's size less than buffer's length",
+                )));
             }
 
             // buffer小了, 增大buffer
@@ -355,12 +403,23 @@ fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 }
             };
 
+            let adapter_id = match count_len(adapter.AdapterName.0, 0)
+                .map(|len| std::slice::from_raw_parts(adapter.AdapterName.0, len))
+                .and_then(|s| String::from_utf8(s.into()).ok())
+            {
+                Some(name) => name,
+                None => {
+                    adapter_ptr = adapter.Next;
+                    continue;
+                }
+            };
+
             let mac_addr = match adapter
                 .PhysicalAddress
                 .get(..adapter.PhysicalAddressLength as usize)
                 .and_then(|s| <&[u8; 6]>::try_from(s).ok())
                 .map(|mac| MacAddr(*mac))
-                .filter(|&addr| addr != MAC_ADDR_ZERO)
+                .filter(|&addr| addr != MacAddr::ZERO)
             {
                 Some(mac) => mac,
                 None => {
@@ -383,12 +442,38 @@ fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 _ => adapter.Ipv6IfIndex,
             };
 
+            let mut flags = Default::default();
+            if adapter.OperStatus == IfOperStatusUp {
+                flags |= LinkFlags::UP;
+            }
+
+            match IfType::try_from(adapter.IfType).map_err(|e| {
+                Error::Windows(format!(
+                    "adapter name={}, id={} info has invalid if_type, error: {}",
+                    friendly_name, adapter_id, e
+                ))
+            })? {
+                IfType::Ethernet | IfType::TokenRing | IfType::Ieee80211 | IfType::Ieee1394 => {
+                    flags |= LinkFlags::BROADCAST | LinkFlags::MULTICAST
+                }
+                IfType::Ppp | IfType::Tunnel => {
+                    flags |= LinkFlags::POINT_TO_POINT | LinkFlags::MULTICAST
+                }
+                IfType::Loopback => flags |= LinkFlags::LOOPBACK | LinkFlags::MULTICAST,
+                IfType::Atm => {
+                    flags |= LinkFlags::BROADCAST | LinkFlags::POINT_TO_POINT | LinkFlags::MULTICAST
+                }
+                _ => (),
+            }
+
             links.push(Link {
                 name: friendly_name,
+                adapter_id,
                 mac_addr,
                 if_index,
-                if_type: IfType::try_from(adapter.IfType).ok().map(|t| t.to_string()),
+                flags,
                 parent_index: None,
+                device_name: "".to_string(),
             });
 
             // 现在支持单播地址获取,组播/多播地址未支持

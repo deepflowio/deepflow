@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -180,29 +179,6 @@ func GetUUID(str string, namespace uuid.UUID) string {
 		return v4.String()
 	}
 	return uuid.NewV5(uuid.NamespaceOID, str).String()
-}
-
-// 功能：判断当前控制器是否为masterController
-func IsMasterController() (bool, string, error) {
-	// 获取本机hostname
-	hostName, err := os.Hostname()
-	if err != nil {
-		log.Error(err)
-		return false, "", err
-	}
-	// 通过sideCar API获取MasterControllerName
-	url := fmt.Sprintf("http://%s:%d", LOCALHOST, MASTER_CONTROLLER_CHECK_PORT)
-	response, err := CURLPerform("GET", url, nil)
-	if err != nil {
-		return false, "", err
-	}
-	masterControllerName := response.Get("name").MustString()
-
-	// 比较是否相同返回结果
-	if hostName != masterControllerName {
-		return false, masterControllerName, nil
-	}
-	return true, masterControllerName, nil
 }
 
 func IsValueInSliceString(value string, list []string) bool {

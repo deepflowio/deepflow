@@ -18,6 +18,7 @@ package ctl
 
 import (
 	"fmt"
+	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"os"
 
@@ -60,9 +61,9 @@ func RegisterAgentGroupConfigCommand() *cobra.Command {
 
 	var updateFilename string
 	update := &cobra.Command{
-		Use:     "update <agent-group ID> -f <filename>",
+		Use:     "update -f <filename>",
 		Short:   "update agent-group config",
-		Example: "deepflow-ctl agent-group-config update g-xxxxxx -f deepflow-config.yaml",
+		Example: "deepflow-ctl agent-group-config update -f deepflow-config.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			updateAgentGroupConfig(cmd, args, updateFilename)
 		},
@@ -170,13 +171,27 @@ func createAgentGroupConfig(cmd *cobra.Command, args []string, createFilename st
 }
 
 func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename string) {
-	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify name.\nExample: %s", cmd.Example)
+	yamlFile, err := ioutil.ReadFile(updateFilename)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	updateMap := make(map[string]interface{})
+	err = yaml.Unmarshal(yamlFile, &updateMap)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	vtapGroupID, ok := updateMap["vtap_group_id"]
+	if !ok {
+		fmt.Fprintln(os.Stderr, "must specify vtap_group_id")
 		return
 	}
 
 	server := common.GetServerInfo(cmd)
-	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, args[0])
+	url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, vtapGroupID)
 	// call vtap-group api, get lcuuid
 	response, err := common.CURLPerform("GET", url, nil, "")
 	if err != nil {
@@ -192,10 +207,6 @@ func updateAgentGroupConfig(cmd *cobra.Command, args []string, updateFilename st
 
 	// call vtap-group config update api
 	url = fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/advanced/%s/", server.IP, server.Port, lcuuid)
-	yamlFile, err := ioutil.ReadFile(updateFilename)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
 	_, err = common.CURLPerform("PATCH", url, nil, string(yamlFile))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -130,6 +130,7 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"rtt_server": NewReplaceMetrics("rtt_server_sum/rtt_server_count", "").SetIsAgg(false),
 	"srt":        NewReplaceMetrics("srt_sum/srt_count", "").SetIsAgg(false),
 	"art":        NewReplaceMetrics("art_sum/art_count", "").SetIsAgg(false),
+	"cit":        NewReplaceMetrics("cit_sum/cit_count", "").SetIsAgg(false),
 	"rrt":        NewReplaceMetrics("rrt_sum/rrt_count", "").SetIsAgg(false),
 
 	"l7_error":              NewReplaceMetrics("l7_client_error+l7_server_error", ""),

@@ -68,6 +68,7 @@ func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeT
 		NewChPodGroupPort(),
 		NewChIPPort(),
 		NewChK8sLabel(),
+		NewChK8sLabels(),
 		NewChVTapPort(),
 		NewChNetwork(resourceTypeToIconID),
 		NewChTapType(resourceTypeToIconID),

@@ -108,6 +108,9 @@ func (i *VInterface) generateUpdateInfo(diffBase *cache.VInterface, cloudItem *c
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}
+	if diffBase.Type != cloudItem.Type {
+		updateInfo["iftype"] = cloudItem.Type
+	}
 	return updateInfo, len(updateInfo) > 0
 }
 
@@ -117,6 +120,7 @@ func (i *VInterface) addCache(dbItems []*mysql.VInterface) {
 
 func (i *VInterface) updateCache(cloudItem *cloudmodel.VInterface, diffBase *cache.VInterface) {
 	diffBase.Update(cloudItem)
+	i.cache.UpdateVInterface(cloudItem)
 }
 
 func (i *VInterface) deleteCache(lcuuids []string) {

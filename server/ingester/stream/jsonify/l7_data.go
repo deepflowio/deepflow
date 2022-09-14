@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
@@ -598,7 +599,18 @@ func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
 	}
 	info := l.Mqtt
 	h.RequestType = info.MqttType
-	h.RequestResource = info.ClientId
+	h.RequestDomain = info.ClientId
+	if len(info.Topics) == 1 {
+		h.RequestResource = info.Topics[0].Name
+	} else if len(info.Topics) > 1 {
+		var topics_string strings.Builder
+		topics_string.WriteString(info.Topics[0].Name)
+		for i := 1; i < len(info.Topics); i++ {
+			topics_string.WriteByte(',')
+			topics_string.WriteString(info.Topics[i].Name)
+		}
+		h.RequestResource = topics_string.String()
+	}
 
 	switch info.ProtoVersion {
 	case 3:
@@ -643,31 +655,93 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	}
 
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
-	switch datatype.L7Protocol(l.Base.Head.Proto) {
-	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
-		h.fillHttp(l)
-	case datatype.L7_PROTOCOL_DNS:
-		h.fillDns(l)
-	case datatype.L7_PROTOCOL_MYSQL:
-		// mysql 异常时有响应码
-		if h.ResponseStatus != datatype.STATUS_CLIENT_ERROR &&
-			h.ResponseStatus != datatype.STATUS_SERVER_ERROR {
-			h.ResponseCode = nil
+	// 协议结构统一, 不再为每个协议定义单独结构
+	h.fillL7Log(l)
+}
+
+func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
+	h.Version = l.Version
+	h.requestLength = int64(l.ReqLen)
+	h.responseLength = int64(l.RespLen)
+
+	if l.Req != nil {
+		h.RequestDomain = l.Req.Domain
+		h.RequestResource = l.Req.Resource
+		h.RequestType = l.Req.ReqType
+		if h.requestLength != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
+			h.RequestLength = &h.requestLength
 		}
-		h.fillMysql(l)
-	case datatype.L7_PROTOCOL_REDIS:
-		// redis 没有响应码
-		if h.responseCode == 0 {
-			h.ResponseCode = nil
+	}
+	if l.Resp != nil {
+		h.ResponseStatus = uint8(l.Resp.Status)
+		h.responseCode = int16(l.Resp.Code)
+		h.ResponseResult = l.Resp.Result
+		h.fillExceptionDesc(l)
+		if h.Type != uint8(datatype.MSG_T_REQUEST) {
+			if h.responseCode != 0 {
+				h.ResponseCode = &h.responseCode
+			}
+			if h.responseLength != -1 {
+				h.ResponseLength = &h.responseLength
+			}
 		}
-		h.fillRedis(l)
-	case datatype.L7_PROTOCOL_DUBBO:
-		h.fillDubbo(l)
+	}
+
+	if l.ExtInfo != nil {
+		h.requestId = uint64(l.ExtInfo.RequestId)
+		if h.requestId != 0 {
+			h.RequestId = &h.requestId
+		}
+		h.ServiceName = l.ExtInfo.ServiceName
+		h.XRequestId = l.ExtInfo.XRequestId
+		h.sqlAffectedRows = uint64(l.ExtInfo.RowEffect)
+		if h.sqlAffectedRows != 0 {
+			h.SqlAffectedRows = &h.sqlAffectedRows
+		}
+		h.HttpProxyClient = l.ExtInfo.ClientIp
+	}
+	if l.TraceInfo != nil {
+		h.SpanId = l.TraceInfo.SpanId
+		h.TraceId = l.TraceInfo.TraceId
+	}
+
+	// 处理内置协议特殊情况
+	switch datatype.L7Protocol(h.L7Protocol) {
 	case datatype.L7_PROTOCOL_KAFKA:
-		// 非fetch命令没有响应码
-		h.fillKafka(l)
+		if l.Req != nil {
+			if h.responseCode == 0 && l.Req.ReqType != KafkaCommandString[Fetch] {
+				h.ResponseStatus = datatype.STATUS_NOT_EXIST
+				h.ResponseCode = nil
+			}
+		}
+	}
+}
+
+func (h *L7Logger) fillExceptionDesc(l *pb.AppProtoLogsData) {
+	if h.ResponseStatus != datatype.STATUS_SERVER_ERROR && h.ResponseStatus != datatype.STATUS_CLIENT_ERROR {
+		return
+	}
+	code := l.Resp.Code
+	switch datatype.L7Protocol(h.L7Protocol) {
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2,
+		datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
+		h.ResponseException = GetHTTPExceptionDesc(uint16(code))
+	case datatype.L7_PROTOCOL_DNS:
+		h.ResponseException = GetDNSExceptionDesc(uint16(code))
+	case datatype.L7_PROTOCOL_DUBBO:
+		h.ResponseException = GetDubboExceptionDesc(uint16(code))
+	case datatype.L7_PROTOCOL_KAFKA:
+		h.ResponseException = GetKafkaExceptionDesc(int16(code))
 	case datatype.L7_PROTOCOL_MQTT:
-		h.fillMqtt(l)
+		if l.Version != "5" {
+			h.ResponseException = GetMQTTV3ExceptionDesc(uint16(code))
+		} else {
+			h.ResponseException = GetMQTTV5ExceptionDesc(uint16(code))
+		}
+	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_REDIS:
+		fallthrough
+	default:
+		h.ResponseException = l.Resp.Exception
 	}
 }
 

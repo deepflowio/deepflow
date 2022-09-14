@@ -26,7 +26,6 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
-	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/stats"
 	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/config"
@@ -41,9 +40,6 @@ func Start(configPath string) {
 	ServerCfg.Load(configPath)
 	config.Cfg = &ServerCfg.QuerierConfig
 	cfg := ServerCfg.QuerierConfig
-	logger.EnableFileLog(cfg.LogFile)
-	logLevel, _ := logging.LogLevel(cfg.LogLevel)
-	logging.SetLevel(logLevel, "")
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN DeepFlow Querier ==============================")
 	log.Infof("querier config:\n%s", string(bytes))

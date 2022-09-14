@@ -88,7 +88,7 @@ static __inline void delete_socket_info(__u64 conn_key,
 	socket_info_map__delete(&conn_key);
 	trace_stats->socket_map_count--;
 }
-
+#include "uprobe_base_bpf.c" // get_go_version
 #include "include/protocol_inference.h"
 #define EVENT_BURST_NUM            16
 #define CONN_PERSIST_TIME_MAX_NS   100000000000ULL
@@ -645,21 +645,18 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 	return tcp_seq;
 }
 
-#include "uprobe_base_bpf.c" // get_go_version
-
 static __inline void
 data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
 	    struct member_fields_offset *offset, __u64 time_stamp,
 	    const struct process_data_extra *extra)
-
 {
 	if (conn_info == NULL) {
 		return;
 	}
 
 	// ignore non-http protocols that are go tls
-	if (extra->go && extra->tls) {
+	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
 		if (conn_info->protocol != PROTO_HTTP1)
 			return;
 	}
@@ -705,7 +702,9 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	// 'socket_id' used to resolve non-tracing between the same socket
 	__u64 socket_id = 0;
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		socket_id = ++trace_uid->socket_id;
+		// Not use "++trace_uid->socket_id" here,
+		// because it did not pass the verification of linux 4.14.x, 4.15.x
+		socket_id = trace_uid->socket_id + 1;
 	} else {
 		socket_id = socket_info_ptr->uid;
 	}
@@ -722,7 +721,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
-		sk_info.uid = socket_id;
+		sk_info.uid = trace_uid->socket_id + 1;
+		trace_uid->socket_id++; // Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = conn_info->role;
@@ -801,8 +801,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
 
-	if (conn_info->protocol == PROTO_HTTP1 && extra->go && extra->tls)
-		v->data_type = PROTO_GO_TLS_HTTP1;
+	if (conn_info->protocol == PROTO_HTTP1 && extra->source == DATA_SOURCE_GO_TLS_UPROBE)
+		v->data_type = PROTO_TLS_HTTP1;
 
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
@@ -827,10 +827,11 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	} else
 		v->extra_data_count = 0;
 
-	if (extra->use_tcp_seq)
+	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE)
 		v->tcp_seq = extra->tcp_seq;
 
 	v->coroutine_id = extra->coroutine_id;
+	v->source = extra->source;
 	/*
 	 * the bitwise AND operation will set the range of possible values for
 	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
@@ -924,16 +925,32 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 	}
 
 	init_conn_info(tgid, args->fd, &__conn_info, sk);
-	conn_info->direction = direction;
 
+	conn_info->direction = direction;
 	if (!extra->vecs) {
 		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state, extra);
 	} else {
-		struct iovec iov_cpy;
-		bpf_probe_read(&iov_cpy, sizeof(struct iovec), &args->iov[0]);
+		struct iovec iov_cpy = {};
+		int i;
+		ssize_t length = 0;
+		void *buf = NULL;
+#pragma unroll
+		// length = sum(iov[i].iov_len),
+		// and now the loop is limited to 5 times
+		for (i = 0; i < 5; i++) {
+			if (i >= args->iovlen) {
+				break;
+			}
+			bpf_probe_read(&iov_cpy, sizeof(struct iovec),
+				       &args->iov[i]);
+			if (buf == NULL) {
+				buf = iov_cpy.iov_base;
+			}
+			length += iov_cpy.iov_len;
+		}
 		// Ensure we are not reading beyond the available data.
-		const size_t buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
-		infer_l7_class(conn_info, direction, iov_cpy.iov_base, buf_size, sock_state, extra);
+		const size_t buf_size = length < bytes_count ? length : bytes_count;
+		infer_l7_class(conn_info, direction, buf, buf_size, sock_state, extra);
 	}
 
 	// When at least one of protocol or message_type is valid, 
@@ -948,7 +965,10 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 					  const enum traffic_direction direction,
 					  const struct data_args_t* args, ssize_t bytes_count) {
-	struct process_data_extra extra = {};
+	struct process_data_extra extra = {
+		.vecs = false,
+		.source = DATA_SOURCE_SYSCALL,
+	};
 	process_data(ctx, id, direction, args, bytes_count, &extra);
 
 }
@@ -959,17 +979,9 @@ static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 					       ssize_t bytes_count) {
 	struct process_data_extra extra = {
 		.vecs = true,
+		.source = DATA_SOURCE_SYSCALL,
 	};
 	process_data(ctx, id, direction, args, bytes_count, &extra);
-}
-
-static __inline void
-process_uprobe_data_tls(struct pt_regs *ctx, __u64 id,
-			const enum traffic_direction direction,
-			const struct data_args_t *args, ssize_t bytes_count,
-			struct process_data_extra *extra)
-{
-	process_data(ctx, id, direction, args, bytes_count, extra);
 }
 
 /***********************************************************
@@ -1028,7 +1040,10 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* read_args = active_read_args_map__lookup(&id);
 	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
 	if (read_args != NULL && read_args->fd > 2) {
-		struct process_data_extra extra = {};
+		struct process_data_extra extra = {
+			.vecs = false,
+			.source = DATA_SOURCE_SYSCALL,
+		};
 		process_data((struct pt_regs *)ctx, id, T_INGRESS, read_args,
 			     bytes_count, &extra);
 	}
@@ -1420,5 +1435,6 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 
 //Refer to the eBPF programs here
 #include "go_tls_bpf.c"
+#include "go_http2_bpf.c"
 
 char _license[] SEC("license") = "GPL";

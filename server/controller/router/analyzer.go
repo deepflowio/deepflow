@@ -19,6 +19,7 @@ package router
 import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	"github.com/deepflowys/deepflow/server/controller/service"
@@ -31,7 +32,7 @@ func AnalyzerRouter(e *gin.Engine, m *monitor.AnalyzerCheck, cfg *config.Control
 	e.GET("/v1/analyzers/:lcuuid/", getAnalyzer)
 	e.GET("/v1/analyzers/", getAnalyzers)
 	e.PATCH("/v1/analyzers/:lcuuid/", updateAnalyzer(m, cfg))
-	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(m))
+	e.DELETE("/v1/analyzers/:lcuuid/", deleteAnalyzer(m, cfg))
 }
 
 func getAnalyzer(c *gin.Context) {
@@ -49,6 +50,9 @@ func getAnalyzers(c *gin.Context) {
 	if value, ok := c.GetQuery("ip"); ok {
 		args["ip"] = value
 	}
+	if value, ok := c.GetQuery("name"); ok {
+		args["name"] = value
+	}
 	if value, ok := c.GetQuery("region"); ok {
 		args["region"] = value
 	}
@@ -62,7 +66,7 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 		var analyzerUpdate model.AnalyzerUpdate
 
 		// 如果不是masterController，将请求转发至是masterController
-		isMasterController, masterControllerName, _ := common.IsMasterController()
+		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
 		if !isMasterController {
 			forwardMasterController(c, masterControllerName, cfg.ListenPort)
 			return
@@ -86,8 +90,15 @@ func updateAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.
 	})
 }
 
-func deleteAnalyzer(m *monitor.AnalyzerCheck) gin.HandlerFunc {
+func deleteAnalyzer(m *monitor.AnalyzerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		// if not master controller，should forward to master controller
+		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
+		if !isMasterController {
+			forwardMasterController(c, masterControllerName, cfg.ListenPort)
+			return
+		}
+
 		lcuuid := c.Param("lcuuid")
 		data, err := service.DeleteAnalyzer(lcuuid, m)
 		JsonResponse(c, data, err)

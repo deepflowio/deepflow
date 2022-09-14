@@ -78,8 +78,11 @@ message Traffic {
     uint64 closed_flow = 10;
     uint32 l7_request = 11;
     uint32 l7_response = 12;
+    uint32 syn = 13;
+    uint32 synack = 14;
 }
 
+// current max id = 21
 message Latency {
     uint32 rtt_max = 1;
     uint32 rtt_client_max = 2;
@@ -87,6 +90,7 @@ message Latency {
     uint32 srt_max = 4;
     uint32 art_max = 5;
     uint32 rrt_max = 6;
+    uint32 cit_max = 19;
 
     uint64 rtt_sum = 7;
     uint64 rtt_client_sum = 8;
@@ -94,6 +98,7 @@ message Latency {
     uint64 srt_sum = 10;
     uint64 art_sum = 11;
     uint64 rrt_sum = 12;
+    uint64 cit_sum = 20;
 
     uint32 rtt_count = 13;
     uint32 rtt_client_count = 14;
@@ -101,6 +106,7 @@ message Latency {
     uint32 srt_count = 16;
     uint32 art_count = 17;
     uint32 rrt_count = 18;
+    uint32 cit_count = 21;
 }
 
 message Performance {
@@ -108,6 +114,8 @@ message Performance {
     uint64 retrans_rx = 2;
     uint64 zero_win_tx = 3;
     uint64 zero_win_rx = 4;
+    uint32 retrans_syn = 5;
+    uint32 retrans_synack = 6;
 }
 
 message Anomaly {

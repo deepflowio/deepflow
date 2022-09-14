@@ -35,8 +35,10 @@ type Traffic struct {
 	NewFlow    uint64 `db:"new_flow"`
 	ClosedFlow uint64 `db:"closed_flow"`
 
-	L7Request  uint32 `db:"l7_request"`
-	L7Response uint32 `db:"l7_response"`
+	L7Request   uint32 `db:"l7_request"`
+	L7Response  uint32 `db:"l7_response"`
+	SynCount    uint32 `db:"syn_count"`
+	SynackCount uint32 `db:"synack_count"`
 }
 
 func (t *Traffic) Reverse() {
@@ -62,6 +64,8 @@ func (t *Traffic) WriteToPB(p *pb.Traffic) {
 
 	p.L7Request = t.L7Request
 	p.L7Response = t.L7Response
+	p.Syn = t.SynCount
+	p.Synack = t.SynackCount
 }
 
 func (t *Traffic) ReadFromPB(p *pb.Traffic) {
@@ -78,6 +82,8 @@ func (t *Traffic) ReadFromPB(p *pb.Traffic) {
 
 	t.L7Request = p.L7Request
 	t.L7Response = p.L7Response
+	t.SynCount = p.Syn
+	t.SynackCount = p.Synack
 }
 
 func (t *Traffic) ConcurrentMerge(other *Traffic) {
@@ -94,6 +100,8 @@ func (t *Traffic) ConcurrentMerge(other *Traffic) {
 
 	t.L7Request += other.L7Request
 	t.L7Response += other.L7Response
+	t.SynCount += other.SynCount
+	t.SynackCount += other.SynackCount
 }
 
 func (t *Traffic) SequentialMerge(other *Traffic) {
@@ -109,11 +117,11 @@ func (t *Traffic) MarshalTo(b []byte) int {
 
 	fields := []string{
 		"packet_tx=", "packet_rx=", "byte_tx=", "byte_rx=", "byte=", "l3_byte_tx=", "l3_byte_rx=", "l4_byte_tx=", "l4_byte_rx=", "new_flow=", "closed_flow=",
-		"l7_request=", "l7_response=",
+		"l7_request=", "l7_response=", "syn_count=", "synack_count=",
 	}
 	values := []uint64{
 		t.PacketTx, t.PacketRx, t.ByteTx, t.ByteRx, t.ByteTx + t.ByteRx, t.L3ByteTx, t.L3ByteRx, t.L4ByteTx, t.L4ByteRx, t.NewFlow, t.ClosedFlow,
-		uint64(t.L7Request), uint64(t.L7Response),
+		uint64(t.L7Request), uint64(t.L7Response), uint64(t.SynCount), uint64(t.SynackCount),
 	}
 	n := marshalKeyValues(b[offset:], fields, values)
 	if n == 0 {
@@ -141,6 +149,9 @@ const (
 
 	TRAFFIC_L7_REQUEST
 	TRAFFIC_L7_RESPONSE
+
+	TRAFFIC_SYN_COUNT
+	TRAFFIC_SYNACK_COUNT
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -165,6 +176,9 @@ func TrafficColumns() []*ckdb.Column {
 
 			TRAFFIC_L7_REQUEST:  {"l7_request", "累计应用请求数"},
 			TRAFFIC_L7_RESPONSE: {"l7_response", "累计应用响应数"},
+
+			TRAFFIC_SYN_COUNT:    {"syn_count", "Total SYN packet count"},
+			TRAFFIC_SYNACK_COUNT: {"synack_count", "Total SYNACK packet count"},
 		},
 		ckdb.UInt64)
 }
@@ -190,6 +204,9 @@ func (t *Traffic) WriteBlock(block *ckdb.Block) error {
 
 		TRAFFIC_L7_REQUEST:  uint64(t.L7Request),
 		TRAFFIC_L7_RESPONSE: uint64(t.L7Response),
+
+		TRAFFIC_SYN_COUNT:    uint64(t.SynCount),
+		TRAFFIC_SYNACK_COUNT: uint64(t.SynackCount),
 	}
 	for _, v := range values {
 		if err := block.WriteUInt64(v); err != nil {
@@ -206,6 +223,7 @@ type Latency struct {
 	SRTMax       uint32 `db:"srt_max"`        // us
 	ARTMax       uint32 `db:"art_max"`        // us
 	RRTMax       uint32 `db:"rrt_max"`        // us
+	CITMax       uint32 `db:"cit_max"`        // client idle time max
 
 	RTTSum       uint64 `db:"rtt_sum"`        // us
 	RTTClientSum uint64 `db:"rtt_client_sum"` // us
@@ -213,6 +231,7 @@ type Latency struct {
 	SRTSum       uint64 `db:"srt_sum"`        // us
 	ARTSum       uint64 `db:"art_sum"`        // us
 	RRTSum       uint64 `db:"rrt_sum"`        // us
+	CITSum       uint64 `db:"cit_sum"`
 
 	RTTCount       uint32 `db:"rtt_count"`
 	RTTClientCount uint32 `db:"rtt_client_count"`
@@ -220,6 +239,7 @@ type Latency struct {
 	SRTCount       uint32 `db:"srt_count"`
 	ARTCount       uint32 `db:"art_count"`
 	RRTCount       uint32 `db:"rrt_count"`
+	CITCount       uint32 `db:"cit_count"`
 }
 
 func (_ *Latency) Reverse() {
@@ -233,6 +253,7 @@ func (l *Latency) WriteToPB(p *pb.Latency) {
 	p.SrtMax = l.SRTMax
 	p.ArtMax = l.ARTMax
 	p.RrtMax = l.RRTMax
+	p.CitMax = l.CITMax
 
 	p.RttSum = l.RTTSum
 	p.RttClientSum = l.RTTClientSum
@@ -240,6 +261,7 @@ func (l *Latency) WriteToPB(p *pb.Latency) {
 	p.SrtSum = l.SRTSum
 	p.ArtSum = l.ARTSum
 	p.RrtSum = l.RRTSum
+	p.CitSum = l.CITSum
 
 	p.RttCount = l.RTTCount
 	p.RttClientCount = l.RTTClientCount
@@ -247,6 +269,7 @@ func (l *Latency) WriteToPB(p *pb.Latency) {
 	p.SrtCount = l.SRTCount
 	p.ArtCount = l.ARTCount
 	p.RrtCount = l.RRTCount
+	p.CitCount = l.CITCount
 }
 
 func (l *Latency) ReadFromPB(p *pb.Latency) {
@@ -256,6 +279,7 @@ func (l *Latency) ReadFromPB(p *pb.Latency) {
 	l.SRTMax = p.SrtMax
 	l.ARTMax = p.ArtMax
 	l.RRTMax = p.RrtMax
+	l.CITMax = p.CitMax
 
 	l.RTTSum = p.RttSum
 	l.RTTClientSum = p.RttClientSum
@@ -263,6 +287,7 @@ func (l *Latency) ReadFromPB(p *pb.Latency) {
 	l.SRTSum = p.SrtSum
 	l.ARTSum = p.ArtSum
 	l.RRTSum = p.RrtSum
+	l.CITSum = p.CitSum
 
 	l.RTTCount = p.RttCount
 	l.RTTClientCount = p.RttClientCount
@@ -270,6 +295,7 @@ func (l *Latency) ReadFromPB(p *pb.Latency) {
 	l.SRTCount = p.SrtCount
 	l.ARTCount = p.ArtCount
 	l.RRTCount = p.RrtCount
+	l.CITCount = p.CitCount
 }
 
 func (l *Latency) ConcurrentMerge(other *Latency) {
@@ -291,6 +317,9 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	if l.RRTMax < other.RRTMax {
 		l.RRTMax = other.RRTMax
 	}
+	if l.CITMax < other.CITMax {
+		l.CITMax = other.CITMax
+	}
 
 	l.RTTSum += other.RTTSum
 	l.RTTClientSum += other.RTTClientSum
@@ -298,6 +327,7 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	l.SRTSum += other.SRTSum
 	l.ARTSum += other.ARTSum
 	l.RRTSum += other.RRTSum
+	l.CITSum += other.CITSum
 
 	l.RTTCount += other.RTTCount
 	l.RTTClientCount += other.RTTClientCount
@@ -305,6 +335,7 @@ func (l *Latency) ConcurrentMerge(other *Latency) {
 	l.SRTCount += other.SRTCount
 	l.ARTCount += other.ARTCount
 	l.RRTCount += other.RRTCount
+	l.CITCount += other.CITCount
 }
 
 func (l *Latency) SequentialMerge(other *Latency) {
@@ -312,13 +343,13 @@ func (l *Latency) SequentialMerge(other *Latency) {
 }
 
 func (l *Latency) MarshalTo(b []byte) int {
-	fields := []string{"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=", "rrt_sum=",
-		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=", "rrt_count=",
-		"rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=", "rrt_max="}
+	fields := []string{"rtt_sum=", "rtt_client_sum=", "rtt_server_sum=", "srt_sum=", "art_sum=", "rrt_sum=", "cit_sum=",
+		"rtt_count=", "rtt_client_count=", "rtt_server_count=", "srt_count=", "art_count=", "rrt_count=", "cit_count",
+		"rtt_max=", "rtt_client_max=", "rtt_server_max=", "srt_max=", "art_max=", "rrt_max=", "cit_max="}
 	values := []uint64{
-		l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.RRTSum,
-		uint64(l.RTTCount), uint64(l.RTTClientCount), uint64(l.RTTServerCount), uint64(l.SRTCount), uint64(l.ARTCount), uint64(l.RRTCount),
-		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax), uint64(l.RRTMax),
+		l.RTTSum, l.RTTClientSum, l.RTTServerSum, l.SRTSum, l.ARTSum, l.RRTSum, l.CITSum,
+		uint64(l.RTTCount), uint64(l.RTTClientCount), uint64(l.RTTServerCount), uint64(l.SRTCount), uint64(l.ARTCount), uint64(l.RRTCount), uint64(l.CITCount),
+		uint64(l.RTTMax), uint64(l.RTTClientMax), uint64(l.RTTServerMax), uint64(l.SRTMax), uint64(l.ARTMax), uint64(l.RRTMax), uint64(l.CITMax),
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -330,6 +361,7 @@ const (
 	LATENCY_SRT
 	LATENCY_ART
 	LATENCY_RRT
+	LATENCY_CIT
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -342,6 +374,7 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_SRT:        {"srt_sum", "累计所有系统响应时延(us)"},
 			LATENCY_ART:        {"art_sum", "累计所有应用响应时延(us)"},
 			LATENCY_RRT:        {"rrt_sum", "累计所有应用请求响应时延(us)"},
+			LATENCY_CIT:        {"cit_sum", "Total client idle time(us)"},
 		},
 		ckdb.Float64)
 	counterColumns := ckdb.NewColumnsWithComment(
@@ -352,6 +385,7 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_SRT:        {"srt_count", "系统响应时延计算次数"},
 			LATENCY_ART:        {"art_count", "应用响应时延计算次数"},
 			LATENCY_RRT:        {"rrt_count", "应用请求响应时延计算次数"},
+			LATENCY_CIT:        {"cit_count", "Client idle time calculation times"},
 		},
 		ckdb.UInt64)
 	maxColumns := ckdb.NewColumnsWithComment(
@@ -362,6 +396,7 @@ func LatencyColumns() []*ckdb.Column {
 			LATENCY_SRT:        {"srt_max", "所有系统响应时延最大值(us)"},
 			LATENCY_ART:        {"art_max", "所有应用响应时延最大值(us)"},
 			LATENCY_RRT:        {"rrt_max", "所有应用请求响应时延最大值(us)"},
+			LATENCY_CIT:        {"cit_max", "Max client idle time(us)"},
 		}, ckdb.UInt32)
 	for _, c := range maxColumns {
 		c.SetIndex(ckdb.IndexNone)
@@ -381,14 +416,16 @@ func (l *Latency) WriteBlock(block *ckdb.Block) error {
 		LATENCY_RTT_SERVER: float64(l.RTTServerSum),
 		LATENCY_SRT:        float64(l.SRTSum),
 		LATENCY_ART:        float64(l.ARTSum),
-		LATENCY_RRT:        float64(l.RRTSum)}
+		LATENCY_RRT:        float64(l.RRTSum),
+		LATENCY_CIT:        float64(l.CITSum)}
 	counterValues := []uint64{
 		LATENCY_RTT:        uint64(l.RTTCount),
 		LATENCY_RTT_CLIENT: uint64(l.RTTClientCount),
 		LATENCY_RTT_SERVER: uint64(l.RTTServerCount),
 		LATENCY_SRT:        uint64(l.SRTCount),
 		LATENCY_ART:        uint64(l.ARTCount),
-		LATENCY_RRT:        uint64(l.RRTCount)}
+		LATENCY_RRT:        uint64(l.RRTCount),
+		LATENCY_CIT:        uint64(l.CITCount)}
 
 	maxValues := []uint32{
 		LATENCY_RTT:        l.RTTMax,
@@ -396,7 +433,8 @@ func (l *Latency) WriteBlock(block *ckdb.Block) error {
 		LATENCY_RTT_SERVER: l.RTTServerMax,
 		LATENCY_SRT:        l.SRTMax,
 		LATENCY_ART:        l.ARTMax,
-		LATENCY_RRT:        l.RRTMax}
+		LATENCY_RRT:        l.RRTMax,
+		LATENCY_CIT:        l.CITMax}
 	for _, v := range sumValues {
 		if err := block.WriteFloat64(v); err != nil {
 			return err
@@ -418,10 +456,12 @@ func (l *Latency) WriteBlock(block *ckdb.Block) error {
 }
 
 type Performance struct {
-	RetransTx uint64 `db:"retrans_tx"`
-	RetransRx uint64 `db:"retrans_rx"`
-	ZeroWinTx uint64 `db:"zero_win_tx"`
-	ZeroWinRx uint64 `db:"zero_win_rx"`
+	RetransTx     uint64 `db:"retrans_tx"`
+	RetransRx     uint64 `db:"retrans_rx"`
+	ZeroWinTx     uint64 `db:"zero_win_tx"`
+	ZeroWinRx     uint64 `db:"zero_win_rx"`
+	RetransSyn    uint32 `db:"retrans_syn"`
+	RetransSynack uint32 `db:"retrans_synack"`
 }
 
 func (a *Performance) Reverse() {
@@ -433,6 +473,8 @@ func (a *Performance) WriteToPB(p *pb.Performance) {
 	p.RetransRx = a.RetransRx
 	p.ZeroWinTx = a.ZeroWinTx
 	p.ZeroWinRx = a.ZeroWinRx
+	p.RetransSyn = a.RetransSyn
+	p.RetransSynack = a.RetransSynack
 }
 
 func (a *Performance) ReadFromPB(p *pb.Performance) {
@@ -440,6 +482,8 @@ func (a *Performance) ReadFromPB(p *pb.Performance) {
 	a.RetransRx = p.RetransRx
 	a.ZeroWinTx = p.ZeroWinTx
 	a.ZeroWinRx = p.ZeroWinRx
+	a.RetransSyn = p.RetransSyn
+	a.RetransSynack = p.RetransSynack
 }
 
 func (a *Performance) ConcurrentMerge(other *Performance) {
@@ -447,6 +491,8 @@ func (a *Performance) ConcurrentMerge(other *Performance) {
 	a.RetransRx += other.RetransRx
 	a.ZeroWinTx += other.ZeroWinTx
 	a.ZeroWinRx += other.ZeroWinRx
+	a.RetransSyn += other.RetransSyn
+	a.RetransSynack += other.RetransSynack
 }
 
 func (a *Performance) SequentialMerge(other *Performance) {
@@ -455,10 +501,10 @@ func (a *Performance) SequentialMerge(other *Performance) {
 
 func (a *Performance) MarshalTo(b []byte) int {
 	fields := []string{
-		"retrans_tx=", "retrans_rx=", "retrans=", "zero_win_tx=", "zero_win_rx=", "zero_win=",
+		"retrans_tx=", "retrans_rx=", "retrans=", "zero_win_tx=", "zero_win_rx=", "zero_win=", "retrans_syn=", "retrans_synack",
 	}
 	values := []uint64{
-		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx, a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx,
+		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx, a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx, uint64(a.RetransSyn), uint64(a.RetransSynack),
 	}
 	return marshalKeyValues(b, fields, values)
 }
@@ -471,6 +517,9 @@ const (
 	PERF_ZERO_WIN_TX
 	PERF_ZERO_WIN_RX
 	PERF_ZERO_WIN
+
+	PERF_RETRANS_SYN
+	PERF_RETRANS_SYNACK
 )
 
 // Columns列和WriteBlock的列需要按顺序一一对应
@@ -484,6 +533,9 @@ func PerformanceColumns() []*ckdb.Column {
 			PERF_ZERO_WIN_TX: {"zero_win_tx", "客户端累计零窗次数"},
 			PERF_ZERO_WIN_RX: {"zero_win_rx", "服务端累计零窗次数"},
 			PERF_ZERO_WIN:    {"zero_win", "累计零窗次数"},
+
+			PERF_RETRANS_SYN:    {"retrans_syn", "Total client retransmit SYN times"},
+			PERF_RETRANS_SYNACK: {"retrans_synack", "Total server retransmit SYNACK times"},
 		},
 		ckdb.UInt64)
 }
@@ -493,6 +545,7 @@ func (a *Performance) WriteBlock(block *ckdb.Block) error {
 	values := []uint64{
 		a.RetransTx, a.RetransRx, a.RetransTx + a.RetransRx,
 		a.ZeroWinTx, a.ZeroWinRx, a.ZeroWinTx + a.ZeroWinRx,
+		uint64(a.RetransSyn), uint64(a.RetransSynack),
 	}
 	for _, v := range values {
 		if err := block.WriteUInt64(v); err != nil {
