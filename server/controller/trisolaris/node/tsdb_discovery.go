@@ -17,6 +17,7 @@
 package node
 
 import (
+	"os"
 	"sync"
 
 	"github.com/google/uuid"
@@ -43,6 +44,11 @@ func (a *TSDBDiscovery) register(request *trident.SyncRequest) {
 	if request.GetTsdbReportInfo() != nil {
 		pcapDataMountPath = request.GetTsdbReportInfo().GetPcapDataMountPath()
 	}
+	podIP := os.Getenv(POD_IP_KEY)
+	if podIP == "" {
+		log.Errorf("get env(%s) data failed", POD_IP_KEY)
+		return
+	}
 	tsdb := &models.Analyzer{
 		IP:                request.GetCtrlIp(),
 		NATIPEnabled:      0,
@@ -57,6 +63,7 @@ func (a *TSDBDiscovery) register(request *trident.SyncRequest) {
 		State:             HOST_STATE_COMPLETE,
 		Lcuuid:            uuid.NewString(),
 		PcapDataMountPath: pcapDataMountPath,
+		PodIP:             podIP,
 	}
 	a.Lock()
 	defer a.Unlock()
