@@ -151,6 +151,10 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 			dbTSDB.Name = cacheTSDB.GetName()
 			filter = true
 		}
+		if dbTSDB.PodIP != cacheTSDB.GetPodIP() {
+			dbTSDB.PodIP = cacheTSDB.GetPodIP()
+			filter = true
+		}
 		if filter == true {
 			updateTSDB = append(updateTSDB, dbTSDB)
 		}
@@ -357,7 +361,7 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 }
 
 func (n *NodeInfo) RegisterTSDB(request *trident.SyncRequest) {
-	log.Infof("resiter tsdb(%v)", request)
+	log.Infof("register tsdb(%v)", request)
 	n.tsdbRegister.register(request)
 	select {
 	case n.chRegister <- struct{}{}:
@@ -413,6 +417,10 @@ func (n *NodeInfo) isRegisterController() {
 		}
 		if dbController.NodeName != data.NodeName {
 			dbController.NodeName = data.NodeName
+			changed = true
+		}
+		if dbController.PodIP != data.PodIP {
+			dbController.PodIP = data.PodIP
 			changed = true
 		}
 		if changed {

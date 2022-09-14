@@ -58,6 +58,11 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
 		return nil
 	}
+	podIP := os.Getenv(POD_IP_KEY)
+	if name == "" {
+		log.Errorf("get env(%s) data failed", POD_IP_KEY)
+		return nil
+	}
 
 	log.Infof("controller name (%s), node_name (%s)", name, nodeName)
 	return &models.Controller{
@@ -74,5 +79,6 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		Lcuuid:             uuid.NewString(),
 		RegionDomainPrefix: c.regionDomainPrefix,
 		NodeName:           nodeName,
+		PodIP:              podIP,
 	}
 }

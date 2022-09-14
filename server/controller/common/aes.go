@@ -17,8 +17,6 @@ import (
 	"github.com/deepflowys/deepflow/message/controller"
 )
 
-const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-
 func GenerateAesKey(input []byte) string {
 	return fmt.Sprintf("%x", md5.Sum(input))
 }

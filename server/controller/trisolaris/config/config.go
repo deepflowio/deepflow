@@ -17,6 +17,9 @@
 package config
 
 import (
+	"crypto/md5"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 
@@ -46,6 +49,7 @@ type Config struct {
 	RegionDomainPrefix       string   `yaml:"region-domain-prefix"`
 	ClearKubernetesTime      int      `default:"600" yaml:"clear-kubernetes-time"`
 	NodeIP                   string
+	LocalClusterID           string
 	VTapCacheRefreshInterval int    `default:"300" yaml:"vtapcache-refresh-interval"`
 	MetaDataRefreshInterval  int    `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval      int    `default:"60" yaml:"node-refresh-interval"`
@@ -66,4 +70,13 @@ func (c *Config) Convert() {
 	} else {
 		c.NodeIP = nodeIP
 	}
+
+	caFile, err := ioutil.ReadFile(common.K8S_CA_CRT_PATH)
+	if err != nil {
+		log.Errorf("get k8s ca file (%s) failed", common.K8S_CA_CRT_PATH)
+		return
+	}
+	c.LocalClusterID, _ = common.GenerateKuberneteClusterIDByMD5(
+		fmt.Sprintf("%x", md5.Sum(caFile)),
+	)
 }
