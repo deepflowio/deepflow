@@ -57,13 +57,12 @@ type Partition struct {
 	rows, bytesOnDisk          uint64
 }
 
-func NewCKMonitor(cfg *config.CKDiskMonitor, primaryAddr, secondaryAddr, username, password string) (*Monitor, error) {
+func NewCKMonitor(cfg *config.CKDiskMonitor, primaryAddr, username, password string) (*Monitor, error) {
 	m := &Monitor{
 		checkInterval:        cfg.CheckInterval,
 		usedPercentThreshold: cfg.UsedPercent,
 		freeSpaceThreshold:   cfg.FreeSpace << 30, // GB
 		primaryAddr:          primaryAddr,
-		secondaryAddr:        secondaryAddr,
 		username:             username,
 		password:             password,
 	}
@@ -71,13 +70,6 @@ func NewCKMonitor(cfg *config.CKDiskMonitor, primaryAddr, secondaryAddr, usernam
 	m.primaryConn, err = common.NewCKConnection(primaryAddr, username, password)
 	if err != nil {
 		return nil, err
-	}
-
-	if secondaryAddr != "" {
-		m.secondaryConn, err = common.NewCKConnection(secondaryAddr, username, password)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return m, nil

@@ -50,17 +50,15 @@ type FlowMetricsTTL struct {
 }
 
 type Config struct {
-	Base                      *config.Config
-	CKReadTimeout             int                   `yaml:"ck-read-timeout"`
-	ReplicaEnabled            bool                  `yaml:"metrics-replica-enabled"`
-	CKWriterConfig            config.CKWriterConfig `yaml:"metrics-ck-writer"`
-	Pcap                      PCapConfig            `yaml:"pcap"`
-	DisableSecondWrite        bool                  `yaml:"disable-second-write"`
-	DisableSecondWriteReplica bool                  `yaml:"disable-second-write-replica"`
-	UnmarshallQueueCount      int                   `yaml:"unmarshall-queue-count"`
-	UnmarshallQueueSize       int                   `yaml:"unmarshall-queue-size"`
-	ReceiverWindowSize        uint64                `yaml:"receiver-window-size"`
-	FlowMetricsTTL            FlowMetricsTTL        `yaml:"flow-metrics-ttl"`
+	Base                 *config.Config
+	CKReadTimeout        int                   `yaml:"ck-read-timeout"`
+	CKWriterConfig       config.CKWriterConfig `yaml:"metrics-ck-writer"`
+	Pcap                 PCapConfig            `yaml:"pcap"`
+	DisableSecondWrite   bool                  `yaml:"disable-second-write"`
+	UnmarshallQueueCount int                   `yaml:"unmarshall-queue-count"`
+	UnmarshallQueueSize  int                   `yaml:"unmarshall-queue-size"`
+	ReceiverWindowSize   uint64                `yaml:"receiver-window-size"`
+	FlowMetricsTTL       FlowMetricsTTL        `yaml:"flow-metrics-ttl"`
 }
 
 type RozeConfig struct {
@@ -94,14 +92,13 @@ func (c *Config) Validate() error {
 func Load(base *config.Config, path string) *Config {
 	config := &RozeConfig{
 		Roze: Config{
-			Base:                      base,
-			CKWriterConfig:            config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
-			CKReadTimeout:             DefaultCKReadTimeout,
-			UnmarshallQueueCount:      DefaultUnmarshallQueueCount,
-			UnmarshallQueueSize:       DefaultUnmarshallQueueSize,
-			ReceiverWindowSize:        DefaultReceiverWindowSize,
-			DisableSecondWriteReplica: true,
-			FlowMetricsTTL:            FlowMetricsTTL{DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL, DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL},
+			Base:                 base,
+			CKWriterConfig:       config.CKWriterConfig{QueueCount: 1, QueueSize: 1000000, BatchSize: 512000, FlushTimeout: 10},
+			CKReadTimeout:        DefaultCKReadTimeout,
+			UnmarshallQueueCount: DefaultUnmarshallQueueCount,
+			UnmarshallQueueSize:  DefaultUnmarshallQueueSize,
+			ReceiverWindowSize:   DefaultReceiverWindowSize,
+			FlowMetricsTTL:       FlowMetricsTTL{DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL, DefaultFlowMetrics1MTTL, DefaultFlowMetrics1STTL},
 
 			Pcap: PCapConfig{common.DEFAULT_PCAP_DATA_PATH},
 		},

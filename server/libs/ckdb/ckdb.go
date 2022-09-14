@@ -466,26 +466,11 @@ func (t EngineType) String() string {
 	return engineTypeString[t]
 }
 
-type ClusterType uint8
-
 const (
-	DF_CLUSTER ClusterType = iota
-	DF_REPLICATED_CLUSTER
+	DF_STORAGE_POLICY     = "df_storage"
+	DF_CLUSTER            = "df_cluster"
+	DF_REPLICATED_CLUSTER = "df_replicated_cluster"
 )
-
-const (
-	DF_STORAGE_POLICY = "df_storage"
-)
-
-// cluster名称在clickhouse的配置文件中定义，若修改则需修改部署
-var clusterTypeString = []string{
-	DF_CLUSTER:            "df_cluster",
-	DF_REPLICATED_CLUSTER: "df_replicated_cluster",
-}
-
-func (t ClusterType) String() string {
-	return clusterTypeString[t]
-}
 
 type Column struct {
 	Name    string     // 列名

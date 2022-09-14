@@ -34,14 +34,14 @@ import (
 var log = logging.MustGetLogger("issu")
 
 type Issu struct {
-	tableRenames                           []*TableRename
-	columnRenames                          []*ColumnRename
-	columnMods                             []*ColumnMod
-	columnAdds                             []*ColumnAdd
-	primaryConnection, SecondaryConnection *sql.DB
-	primaryAddr, secondaryAddr             string
-	username, password                     string
-	exit                                   bool
+	tableRenames       []*TableRename
+	columnRenames      []*ColumnRename
+	columnMods         []*ColumnMod
+	columnAdds         []*ColumnAdd
+	primaryConnection  *sql.DB
+	primaryAddr        string
+	username, password string
+	exit               bool
 }
 
 type TableRename struct {
@@ -618,7 +618,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
 	dstTableName := d.name[lastUnderlineIndex+1:]
-	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, 7, 1, 7, 1)[zerodoc.MetricsTableNameToID(d.baseTable)]
+	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, 7, 1, 7, 1)[zerodoc.MetricsTableNameToID(d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
 		rawTable, dstTableName,
@@ -650,12 +650,11 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 	return dones, nil
 }
 
-func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, error) {
+func NewCKIssu(primaryAddr, username, password string) (*Issu, error) {
 	i := &Issu{
-		primaryAddr:   primaryAddr,
-		secondaryAddr: secondaryAddr,
-		username:      username,
-		password:      password,
+		primaryAddr: primaryAddr,
+		username:    username,
+		password:    password,
 		// columnRenames: ColumnRename572,
 	}
 
@@ -672,13 +671,6 @@ func NewCKIssu(primaryAddr, secondaryAddr, username, password string) (*Issu, er
 	i.primaryConnection, err = common.NewCKConnection(primaryAddr, username, password)
 	if err != nil {
 		return nil, err
-	}
-
-	if secondaryAddr != "" {
-		i.SecondaryConnection, err = common.NewCKConnection(secondaryAddr, username, password)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return i, nil
@@ -919,51 +911,47 @@ func (i *Issu) addColumns(connect *sql.DB) ([]*ColumnAdd, error) {
 }
 
 func (i *Issu) Start() error {
-	for _, connect := range []*sql.DB{i.primaryConnection, i.SecondaryConnection} {
-		if connect == nil {
-			continue
-		}
-		renames, errRenames := i.renameColumns(connect)
-		if errRenames != nil {
-			return errRenames
-		}
-		mods, errMods := i.modColumns(connect)
-		if errMods != nil {
-			return errMods
-		}
+	connect := i.primaryConnection
+	if connect == nil {
+		return fmt.Errorf("primary connection is nil")
+	}
+	renames, errRenames := i.renameColumns(connect)
+	if errRenames != nil {
+		return errRenames
+	}
+	mods, errMods := i.modColumns(connect)
+	if errMods != nil {
+		return errMods
+	}
 
-		adds, errAdds := i.addColumns(connect)
-		if errAdds != nil {
-			return errAdds
-		}
+	adds, errAdds := i.addColumns(connect)
+	if errAdds != nil {
+		return errAdds
+	}
 
-		for _, cr := range renames {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
-			}
+	for _, cr := range renames {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
 		}
-		for _, cr := range mods {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
-			}
+	}
+	for _, cr := range mods {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
 		}
-		for _, cr := range adds {
-			if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
-				return err
-			}
+	}
+	for _, cr := range adds {
+		if err := i.setTableVersion(connect, cr.Db, cr.Table); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
 func (i *Issu) Close() error {
-	for _, connect := range []*sql.DB{i.primaryConnection, i.SecondaryConnection} {
-		if connect == nil {
-			continue
-		}
-		connect.Close()
+	if i.primaryConnection == nil {
+		return nil
 	}
-	return nil
+	return i.primaryConnection.Close()
 }
 
 func (i *Issu) renameUserDefineDatasource(connect *sql.DB, ds *datasource.DatasourceManager) error {

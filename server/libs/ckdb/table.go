@@ -37,7 +37,8 @@ type Table struct {
 	SummingKey      string       // When using SummingMergeEngine, this field is used for Summing aggregation
 	TTL             int          // 数据默认保留时长。 单位:天
 	PartitionFunc   TimeFuncType // partition函数作用于Time,
-	Cluster         ClusterType  // 高可用和非高可用表，对应的cluster不同
+	Cluster         string       // 对应的cluster
+	StoragePolicy   string       // 存储策略
 	Engine          EngineType   // 表引擎
 	OrderKeys       []string     // 排序的key
 	PrimaryKeyCount int          // 一级索引的key的个数, 从orderKeys中数前n个,
@@ -99,12 +100,12 @@ SETTINGS storage_policy = '%s'`,
 		strings.Join(t.OrderKeys, ","),
 		partition,
 		ttl,
-		DF_STORAGE_POLICY)
+		t.StoragePolicy)
 	return createTable
 }
 
 func (t *Table) MakeGlobalTableCreateSQL() string {
-	engine := fmt.Sprintf(Distributed.String(), t.Cluster.String(), t.Database, t.LocalName)
+	engine := fmt.Sprintf(Distributed.String(), t.Cluster, t.Database, t.LocalName)
 	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`%s` AS %s.`%s` ENGINE=%s",
 		t.Database, t.GlobalName, t.Database, t.LocalName, engine)
 }

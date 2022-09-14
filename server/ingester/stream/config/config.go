@@ -56,7 +56,6 @@ type FlowLogTTL struct {
 
 type Config struct {
 	Base              *config.Config
-	ReplicaEnabled    bool                  `yaml:"flowlog-replica-enabled"`
 	CKWriterConfig    config.CKWriterConfig `yaml:"flowlog-ck-writer"`
 	Throttle          int                   `yaml:"throttle"`
 	L4Throttle        int                   `yaml:"l4-throttle"`

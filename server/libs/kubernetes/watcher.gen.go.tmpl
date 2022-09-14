@@ -1,0 +1,224 @@
+package kubernetes
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	corev1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
+	routev1 "github.com/openshift/api/route/v1"
+	"github.com/openshift/client-go/route/clientset/versioned"
+)
+
+{{ range . }}
+
+{{ $api_parameter := print .parameter }}
+
+{{ $plural_name := print .plural_name }}
+
+{{ $typed_name := print .type .name }}
+
+{{ $is_openshift := eq .name "Route" }}
+
+/*
+ * K8s同步watcher
+ *     每一个watcher是一个单独的goroutine，由两个channel
+ *     发过来的消息触发进行工作。其一是k8s api的watch消息，
+ *     当监控的对象发生改变时，channel会收到事件，watcher
+ *     只关注add和delete；另一个channel是每隔10分钟的tick，
+ *     当watcher 10分钟内没有收到监控对象的添加删除事件时，
+ *     会直接调用k8s list api拿到所有监控资源，和内存数据
+ *     进行比对。此外，当API watcher退出时，ctx会自动关闭，
+ *     watcher也会退出。
+ */
+type {{$typed_name}}Watcher struct {
+	ctx    context.Context
+{{- if $is_openshift }}
+	client *versioned.Clientset
+{{- else }}
+	client *kubernetes.Clientset
+{{- end }}
+	namespace string
+
+	m       sync.RWMutex
+	entries map[string]*{{.type_lower}}.{{.name}}
+	version uint64
+
+	hasError uint32
+	errorMsg atomic.Value
+}
+
+func (w *{{$typed_name}}Watcher) Type() string {
+	return "{{.name}}Watcher"
+}
+
+func (w *{{$typed_name}}Watcher) Version() uint64 {
+	return atomic.LoadUint64(&w.version)
+}
+
+func (w *{{$typed_name}}Watcher) Error() string {
+	if atomic.LoadUint32(&w.hasError) == 0 {
+		return ""
+	}
+	atomic.StoreUint32(&w.hasError, 0)
+	return w.errorMsg.Load().(string)
+}
+
+func (w *{{$typed_name}}Watcher) Entries() []runtime.Object {
+	w.m.RLock()
+	entries := make([]runtime.Object, 0, len(w.entries))
+	for _, e := range w.entries {
+		entries = append(entries, e)
+	}
+	w.m.RUnlock()
+	return entries
+}
+
+func (w *{{$typed_name}}Watcher) run() {
+	var watcher watch.Interface
+	var err error
+
+	log.Info("{{ $plural_name }} watcher starting")
+PREPARE:
+	for {
+		select {
+		case <-w.ctx.Done():
+			log.Info("{{ $plural_name }} watcher stopped")
+			return
+		default:
+			watcher, err = w.client.{{.type}}().{{ $plural_name }}({{ $api_parameter }}).Watch(w.ctx, metav1.ListOptions{})
+			if err == nil {
+				break PREPARE
+			}
+			errMsg := fmt.Sprintf("{{ $plural_name }} watcher Watch failed: %v", err)
+			log.Warning(errMsg)
+			w.errorMsg.Store(errMsg)
+			atomic.StoreUint32(&w.hasError, 1)
+			time.Sleep(time.Minute)
+		}
+	}
+
+	log.Info("{{ $plural_name }} watcher started")
+	ticker := time.NewTicker(LIST_INTERVAL)
+	lastUpdate := time.Now()
+	lastRefresh := time.Now()
+LOOP:
+	for {
+		select {
+		case <-w.ctx.Done():
+			log.Info("{{ $plural_name }} watcher stopped")
+			break LOOP
+		case ev, ok := <-watcher.ResultChan():
+			if !ok {
+				log.Debugf("{{ $plural_name }} watcher try rewatch")
+				newWatcher, err := w.client.{{.type}}().{{ $plural_name }}({{ $api_parameter }}).Watch(w.ctx, metav1.ListOptions{})
+				if err != nil {
+					errMsg := fmt.Sprintf("{{ $plural_name }} watcher Watch failed: %v", err)
+					log.Warning(errMsg)
+					w.errorMsg.Store(errMsg)
+					atomic.StoreUint32(&w.hasError, 1)
+					time.Sleep(time.Minute)
+				} else {
+					watcher = newWatcher
+				}
+				continue LOOP
+			}
+			if ev.Type == watch.Error {
+				if to, ok := ev.Object.(*metav1.Status); ok {
+					if strings.Contains(to.Message, "RST_STREAM") {
+						// 正常的超时
+						log.Debugf("{{ $plural_name }} watcher timeout rewatch")
+						continue
+					}
+				}
+				log.Warningf("{{ $plural_name }} watcher has error: %v", ev.Object)
+				continue
+			}
+			if ev.Type != watch.Added && ev.Type != watch.Deleted && ev.Type != watch.Modified {
+				continue
+			}
+			el, ok := ev.Object.(*{{.type_lower}}.{{.name}})
+			if !ok {
+				continue
+			}
+			id := string(el.ObjectMeta.UID)
+			// 只有删除时检查是否需要更新版本号，其余消息直接更新map内容
+			if ev.Type == watch.Deleted {
+				if _, in := w.entries[id]; !in {
+					continue
+				}
+				w.m.Lock()
+				delete(w.entries, id)
+				w.m.Unlock()
+			} else {
+				w.m.Lock()
+				w.entries[id] = el
+				w.m.Unlock()
+			}
+			atomic.AddUint64(&w.version, 1)
+			lastUpdate = time.Now()
+		case t := <-ticker.C:
+			if t.Sub(lastUpdate) < LIST_INTERVAL && t.Sub(lastRefresh) < REFRESH_INTERVAL {
+				continue
+			}
+			lastUpdate = t
+			lastRefresh = t
+			list, err := w.client.{{.type}}().{{ $plural_name }}({{ $api_parameter }}).List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				log.Warningf("call {{ $plural_name }} list failed: %v", err)
+				continue
+			}
+			// 检查内存和List API查询结果是否一致
+			if len(w.entries) == len(list.Items) {
+				identical := true
+				for _, item := range list.Items {
+					if _, in := w.entries[string(item.ObjectMeta.UID)]; !in {
+						identical = false
+						break
+					}
+				}
+				if identical {
+					continue
+				}
+			}
+			log.Debugf("reload %s data", "{{ $plural_name }}")
+			w.m.Lock()
+			w.entries = make(map[string]*{{.type_lower}}.{{.name}})
+			for i, item := range list.Items {
+				w.entries[string(item.ObjectMeta.UID)] = &list.Items[i]
+			}
+			w.m.Unlock()
+			atomic.AddUint64(&w.version, 1)
+		}
+	}
+	ticker.Stop()
+	log.Info("{{ $plural_name }} watcher stopped")
+}
+
+func Start{{$typed_name}}Watcher(ctx context.Context, client *WatcherClient, namespace string) (Watcher, error) {
+	w := &{{$typed_name}}Watcher{
+		ctx: ctx,
+{{ if $is_openshift }}
+		client: client.openshift,
+{{ else }}
+		client: client.kubernetes,
+{{ end }}
+		entries: make(map[string]*{{.type_lower}}.{{.name}}),
+		namespace: namespace,
+	}
+	go w.run()
+	return w, nil
+}
+
+{{ end }}

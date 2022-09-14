@@ -164,9 +164,8 @@ func (t *FlowTag) Columns() []*ckdb.Column {
 	return columns
 }
 
-func (t *FlowTag) GenCKTable(ttl int, partition ckdb.TimeFuncType) *ckdb.Table {
+func (t *FlowTag) GenCKTable(cluster, storagePolicy string, ttl int, partition ckdb.TimeFuncType) *ckdb.Table {
 	timeKey := "time"
-	cluster := ckdb.DF_CLUSTER
 	engine := ckdb.ReplacingMergeTree
 
 	orderKeys := []string{
@@ -188,6 +187,7 @@ func (t *FlowTag) GenCKTable(ttl int, partition ckdb.TimeFuncType) *ckdb.Table {
 		PartitionFunc:   partition,
 		Engine:          engine,
 		Cluster:         cluster,
+		StoragePolicy:   storagePolicy,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 	}

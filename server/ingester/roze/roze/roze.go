@@ -70,7 +70,8 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 	recv.RegistHandler(datatype.MESSAGE_TYPE_METRICS, unmarshallQueues, unmarshallQueueCount)
 
 	var err error
-	roze.dbwriter, err = dbwriter.NewDbWriter(cfg.Base.CKDB.Primary, cfg.Base.CKDB.Secondary, cfg.Base.CKDBAuth.Username, cfg.Base.CKDBAuth.Password, cfg.ReplicaEnabled, cfg.CKWriterConfig, cfg.FlowMetricsTTL)
+	roze.dbwriter, err = dbwriter.NewDbWriter(cfg.Base.CKDB.ActualAddr, cfg.Base.CKDBAuth.Username, cfg.Base.CKDBAuth.Password, cfg.Base.CKDB.ClusterName, cfg.Base.CKDB.StoragePolicy,
+		cfg.CKWriterConfig, cfg.FlowMetricsTTL)
 	if err != nil {
 		log.Error(err)
 		return nil, err

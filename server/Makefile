@@ -14,7 +14,7 @@ all: server
 generate_sources = $(shell find -not -path './vendor/*' -name '*.go.tmpl' -or -name '*.tmpldata')
 generated_libs = libs/hmap/idmap/ubig_id_map.go libs/hmap/idmap/ubig_id_map_test.go \
 		 libs/hmap/lru/ubig_lru.go libs/hmap/lru/ubig_lru_test.go \
-		 libs/zerodoc/pooled_meters.go
+		 libs/zerodoc/pooled_meters.go libs/kubernetes/watcher.gen.go
 
 proto = vendor/${MESSAGE}/common/common.pb.go vendor/${MESSAGE}/trident/trident.pb.go vendor/${MESSAGE}/controller/controller.pb.go libs/datatype/pb/flow_log.pb.go libs/zerodoc/pb/metric.pb.go libs/stats/pb/stats.pb.go
 
@@ -100,3 +100,4 @@ clean:
 	rm -f libs/datatype/pb/flow_log.proto
 	rm -f libs/zerodoc/pb/metric.proto
 	rm -f libs/stats/pb/stats.proto
+	rm -f libs/kubernetes/watcher.gen.go

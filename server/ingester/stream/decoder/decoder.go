@@ -73,7 +73,6 @@ type Counter struct {
 type Decoder struct {
 	index         int
 	msgType       datatype.MessageType
-	shardID       int
 	platformData  *grpc.PlatformInfoTable
 	inQueue       queue.QueueReader
 	throttler     *throttler.ThrottlingQueue
@@ -89,7 +88,7 @@ type Decoder struct {
 }
 
 func NewDecoder(
-	index, shardID int, msgType datatype.MessageType,
+	index int, msgType datatype.MessageType,
 	platformData *grpc.PlatformInfoTable,
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
@@ -99,7 +98,6 @@ func NewDecoder(
 	return &Decoder{
 		index:         index,
 		msgType:       msgType,
-		shardID:       shardID,
 		platformData:  platformData,
 		inQueue:       inQueue,
 		throttler:     throttler,
@@ -224,7 +222,7 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 		log.Debugf("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
 	}
 	d.counter.OTelCount++
-	ls := jsonify.OTelTracesDataToL7Loggers(vtapID, tracesData, d.shardID, d.platformData)
+	ls := jsonify.OTelTracesDataToL7Loggers(vtapID, tracesData, d.platformData)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.Send(l) {
@@ -261,7 +259,7 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
 	d.counter.L4Count++
-	l := jsonify.TaggedFlowToLogger(flow, d.shardID, d.platformData)
+	l := jsonify.TaggedFlowToLogger(flow, d.platformData)
 	if !d.throttler.Send(l) {
 		d.counter.L4DropCount++
 	}
@@ -278,7 +276,7 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		d.l7Disableds[proto.Base.Head.Proto] {
 		drop = 1
 	} else {
-		l := jsonify.ProtoLogToL7Logger(proto, d.shardID, d.platformData)
+		l := jsonify.ProtoLogToL7Logger(proto, d.platformData)
 		if !d.throttler.Send(l) {
 			d.counter.L7DropCount++
 			drop = 1

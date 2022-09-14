@@ -1,0 +1,16 @@
+[
+	{"type": "CoreV1", "type_lower":"corev1", "name": "Node",       "parameter": "",            "plural_name":"Nodes"},
+	{"type": "CoreV1", "type_lower":"corev1", "name": "Namespace",  "parameter": "",            "plural_name":"Namespaces"},
+	{"type": "CoreV1", "type_lower":"corev1", "name": "Service",    "parameter": "w.namespace", "plural_name":"Services" },
+	{"type": "CoreV1", "type_lower":"corev1", "name": "Pod",        "parameter": "w.namespace", "plural_name":"Pods"},
+	{"type": "CoreV1", "type_lower":"corev1", "name": "ReplicationController", "parameter": "w.namespace","plural_name":"ReplicationControllers"},
+	{"type": "CoreV1", "type_lower":"corev1", "name": "Endpoints",  "parameter": "w.namespace", "plural_name":"Endpoints"},
+	{"type": "AppsV1", "type_lower":"appsv1", "name": "Deployment", "parameter": "w.namespace", "plural_name":"Deployments"},
+	{"type": "AppsV1", "type_lower":"appsv1", "name": "StatefulSet","parameter": "w.namespace", "plural_name":"StatefulSets"},
+	{"type": "AppsV1", "type_lower":"appsv1", "name": "DaemonSet",  "parameter": "w.namespace", "plural_name":"DaemonSets"},
+	{"type": "AppsV1", "type_lower":"appsv1", "name": "ReplicaSet", "parameter": "w.namespace", "plural_name":"ReplicaSets"},
+	{"type": "NetworkingV1",      "type_lower":"networkingv1",      "name": "Ingress", "parameter": "w.namespace","plural_name":"Ingresses"},
+	{"type": "NetworkingV1beta1", "type_lower":"networkingv1beta1", "name": "Ingress", "parameter": "w.namespace","plural_name":"Ingresses"},
+	{"type": "ExtensionsV1beta1", "type_lower":"extensionsv1beta1", "name": "Ingress", "parameter": "w.namespace","plural_name":"Ingresses"},
+	{"type": "RouteV1",           "type_lower":"routev1",           "name": "Route",   "parameter": "w.namespace","plural_name":"Routes"}
+]

@@ -17,35 +17,39 @@
 package config
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
+
+	"github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/libs/ckdb"
 )
 
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultContrallerIP      = "127.0.0.1"
-	DefaultControllerPort    = 20035
-	DefaultCheckInterval     = 600 // clickhouse是异步删除
-	DefaultDiskUsedPercent   = 90
-	DefaultDiskFreeSpace     = 50
-	DefaultCKDBS3Volume      = "vol_s3"
-	DefaultCKDBS3TTLTimes    = 3 // 对象存储的保留时长是本地存储的3倍
-	DefaultInfluxdbHost      = "influxdb"
-	DefaultInfluxdbPort      = "20044"
-	EnvK8sNodeIP             = "K8S_NODE_IP_FOR_DEEPFLOW"
-	EnvK8sPodName            = "K8S_POD_NAME_FOR_DEEPFLOW"
-	DefaultCKDBServicePrefix = "clickhouse"
-	DefaultCKDBServicePort   = 9000
-	DefaultListenPort        = 20033
+	DefaultContrallerIP    = "127.0.0.1"
+	DefaultControllerPort  = 20035
+	DefaultCheckInterval   = 600 // clickhouse是异步删除
+	DefaultDiskUsedPercent = 90
+	DefaultDiskFreeSpace   = 50
+	DefaultCKDBS3Volume    = "vol_s3"
+	DefaultCKDBS3TTLTimes  = 3 // 对象存储的保留时长是本地存储的3倍
+	DefaultInfluxdbHost    = "influxdb"
+	DefaultInfluxdbPort    = "20044"
+	EnvK8sNodeIP           = "K8S_NODE_IP_FOR_DEEPFLOW"
+	EnvK8sPodName          = "K8S_POD_NAME_FOR_DEEPFLOW"
+	DefaultCKDBService     = "deepflow-clickhouse"
+	DefaultCKDBServicePort = 9000
+	DefaultListenPort      = 20033
+	ServerPodNameKey       = "deepflow-server"
 )
 
 type CKDiskMonitor struct {
@@ -65,11 +69,6 @@ type HostPort struct {
 	Port string `yaml:"port"`
 }
 
-type CKAddrs struct {
-	Primary   string `yaml:"primary"`
-	Secondary string `yaml:"secondary"` // 既可以是primary也可以是replica
-}
-
 type Auth struct {
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
@@ -82,13 +81,21 @@ type CKWriterConfig struct {
 	FlushTimeout int `yaml:"flush-timeout"`
 }
 
+type CKDB struct {
+	External      bool   `yaml:"external"`
+	Host          string `yaml:"host"`
+	ActualAddr    string
+	Watcher       *Watcher
+	Port          int    `yaml:"port"`
+	ClusterName   string `yaml:"cluster-name"`
+	StoragePolicy string `yaml:"storage-policy"`
+}
+
 type Config struct {
 	ListenPort            uint16        `yaml:"listen-port"`
+	CKDB                  CKDB          `yaml:"ckdb"`
 	ControllerIPs         []string      `yaml:"controller-ips,flow"`
 	ControllerPort        uint16        `yaml:"controller-port"`
-	CKDBServicePrefix     string        `yaml:"ckdb-service-prefix"`
-	CKDBServicePort       int           `yaml:"ckdb-service-port"`
-	CKDB                  CKAddrs       `yaml:"ckdb"`
 	CKDBAuth              Auth          `yaml:"ckdb-auth"`
 	StreamRozeEnabled     bool          `yaml:"stream-roze-enabled"`
 	UDPReadBuffer         int           `yaml:"udp-read-buffer"`
@@ -100,7 +107,6 @@ type Config struct {
 	InfluxdbWriterEnabled bool          `yaml:"influxdb-writer-enabled"`
 	Influxdb              HostPort      `yaml:"influxdb"`
 	NodeIP                string        `yaml:"node-ip"`
-	ShardID               int           `yaml:"shard-id"`
 	LogFile               string
 	LogLevel              string
 }
@@ -122,7 +128,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// if the controller IP is localhost, can't get node ip through ip routing,
 	// should get node ip from ENV
 	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
 		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
@@ -132,28 +137,58 @@ func (c *Config) Validate() error {
 		c.NodeIP = nodeIP
 	}
 
-	if c.CKDB.Primary == "" {
-		podName, exist := os.LookupEnv(EnvK8sPodName)
-		if !exist {
-			panic(fmt.Sprintf("Can't get pod name env %s", EnvK8sPodName))
-		}
-		index := strings.LastIndex(podName, "-")
-		if index == -1 || index >= len(podName)-1 {
-			panic(fmt.Sprintf("pod name is %s,  should cantains '-'", podName))
-		}
-		indexInt, err := strconv.Atoi(podName[index+1:])
-		if err != nil {
-			panic(fmt.Sprintf("pod name is %s,  should have digit subfix", podName))
-		}
-		if c.ShardID == 0 {
-			c.ShardID = indexInt
-		}
-		c.CKDB.Primary = fmt.Sprintf("%s-%d:%d", c.CKDBServicePrefix, indexInt, c.CKDBServicePort)
-		log.Infof("get clickhouse address: %s", c.CKDB.Primary)
+	podName, exist := os.LookupEnv(EnvK8sPodName)
+	if !exist {
+		panic(fmt.Sprintf("Can't get pod name env %s", EnvK8sPodName))
 	}
 
-	if c.CKDB.Primary == c.CKDB.Secondary {
-		return errors.New("in 'ckdb' config, 'primary' is equal to 'secondary', it is not allowed")
+	if c.CKDB.Host == "" {
+		c.CKDB.Host = DefaultCKDBService
+	}
+	if c.CKDB.Port == 0 {
+		c.CKDB.Port = DefaultCKDBServicePort
+	}
+	if c.CKDB.ClusterName == "" {
+		if c.CKDB.External {
+			c.CKDB.ClusterName = "default"
+		} else {
+			c.CKDB.ClusterName = ckdb.DF_CLUSTER
+		}
+	}
+
+	if c.CKDB.StoragePolicy == "" {
+		if c.CKDB.External {
+			c.CKDB.StoragePolicy = "default"
+		} else {
+			c.CKDB.StoragePolicy = ckdb.DF_STORAGE_POLICY
+
+		}
+	}
+
+	watcher, err := NewWatcher(podName, ServerPodNameKey, c.CKDB.Host)
+	if err != nil {
+		panic(fmt.Sprintf("get kubernetes watcher failed %s", err))
+	}
+
+	endpoint, err := watcher.GetMyClickhouseEndpoint()
+	if err != nil {
+		panic(fmt.Sprintf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err))
+	}
+	c.CKDB.ActualAddr = fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
+	c.CKDB.Watcher = watcher
+	log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddr)
+
+	conn, err := common.NewCKConnection(c.CKDB.ActualAddr, c.CKDBAuth.Username, c.CKDBAuth.Password)
+	if err != nil {
+		panic(fmt.Sprintf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddr, err))
+	}
+
+	if err := CheckCluster(conn, c.CKDB.ClusterName); err != nil {
+		panic(fmt.Sprintf("get clickhouse cluster (%s) info from table 'system.clusters' failed, err: %s", c.CKDB.ClusterName, err))
+	}
+
+	if err := CheckStoragePolicy(conn, c.CKDB.StoragePolicy); err != nil {
+		panic(fmt.Sprintf("get clickhouse storage policy(%s) info from table 'system.storage_polices' failed, err: %s", c.CKDB.StoragePolicy, err))
 	}
 
 	level := strings.ToLower(c.LogLevel)
@@ -175,8 +210,7 @@ func Load(path string) *Config {
 		Base: Config{
 			ControllerIPs:     []string{DefaultContrallerIP},
 			ControllerPort:    DefaultControllerPort,
-			CKDBServicePrefix: DefaultCKDBServicePrefix,
-			CKDBServicePort:   DefaultCKDBServicePort,
+			CKDBAuth:          Auth{"default", ""},
 			StreamRozeEnabled: true,
 			UDPReadBuffer:     64 << 20,
 			TCPReadBuffer:     4 << 20,
@@ -202,4 +236,32 @@ func Load(path string) *Config {
 	config.Base.LogFile = config.LogFile
 	config.Base.LogLevel = config.LogLevel
 	return &config.Base
+}
+
+func CheckCluster(conn *sql.DB, clusterName string) error {
+	sql := fmt.Sprintf("SELECT host_address,port FROM system.clusters WHERE cluster='%s'", clusterName)
+	rows, err := conn.Query(sql)
+	if err != nil {
+		return err
+	}
+	var addr string
+	var port uint16
+	for rows.Next() {
+		return rows.Scan(&addr, &port)
+	}
+
+	return fmt.Errorf("cluster '%s' not find", clusterName)
+}
+
+func CheckStoragePolicy(conn *sql.DB, storagePolicy string) error {
+	sql := fmt.Sprintf("SELECT policy_name FROM system.storage_policies WHERE policy_name='%s'", storagePolicy)
+	rows, err := conn.Query(sql)
+	if err != nil {
+		return err
+	}
+	var policyName string
+	for rows.Next() {
+		return rows.Scan(&policyName)
+	}
+	return fmt.Errorf("storage policy '%s' not find", storagePolicy)
 }
