@@ -23,21 +23,26 @@ import (
 	"github.com/deckarep/golang-set"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/monitor/config"
+	mconfig "github.com/deepflowys/deepflow/server/controller/monitor/config"
 )
 
 type ControllerCheck struct {
-	cfg                     config.MonitorConfig
+	cfg                     mconfig.MonitorConfig
+	healthCheckPort         int
+	healthCheckNodePort     int
 	ch                      chan string
 	normalControllerDict    map[string]*dfHostCheck
 	exceptionControllerDict map[string]*dfHostCheck
 }
 
-func NewControllerCheck(cfg config.MonitorConfig) *ControllerCheck {
+func NewControllerCheck(cfg *config.ControllerConfig) *ControllerCheck {
 	return &ControllerCheck{
-		cfg:                     cfg,
-		ch:                      make(chan string, cfg.HealthCheckHandleChannelLen),
+		cfg:                     cfg.MonitorCfg,
+		healthCheckPort:         cfg.ListenPort,
+		healthCheckNodePort:     cfg.ListenNodePort,
+		ch:                      make(chan string, cfg.MonitorCfg.HealthCheckHandleChannelLen),
 		normalControllerDict:    make(map[string]*dfHostCheck),
 		exceptionControllerDict: make(map[string]*dfHostCheck),
 	}
@@ -94,7 +99,15 @@ func (c *ControllerCheck) healthCheck() {
 		// - 检查是否在正常/异常Dict中
 		//   - 如果在，则从正常/异常Dict中移除
 		//   - 如果不在，do nothing
-		active := isActive(common.HEALTH_CHECK_URL, controller.IP, c.cfg.HealthCheckPort)
+
+		// use pod ip in master region if pod_ip != null
+		controllerIP := controller.IP
+		healthCheckPort := c.healthCheckNodePort
+		if controller.NodeType == common.CONTROLLER_NODE_TYPE_MASTER && len(controller.PodIP) != 0 {
+			controllerIP = controller.PodIP
+			healthCheckPort = c.healthCheckPort
+		}
+		active := isActive(common.HEALTH_CHECK_URL, controllerIP, healthCheckPort)
 		if controller.State == common.HOST_STATE_COMPLETE {
 			if active {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {
