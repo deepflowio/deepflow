@@ -35,7 +35,7 @@ use super::{
     KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
 
-use crate::{common::ebpf::EbpfType, flow_generator::protocol_logs::L7ProtoRawDataType};
+use crate::common::ebpf::EbpfType;
 use crate::{
     common::{
         enums::EthernetType,
@@ -442,9 +442,12 @@ struct AppLogs {
 
 impl AppLogs {
     pub fn new(config: &LogParserAccess) -> Self {
+        let mut dubbo = DubboLog::new();
+        dubbo.update_config(config);
+
         Self {
-            http: HttpLog::new(config, false, L7ProtoRawDataType::RawProtocol),
-            dubbo: DubboLog::new(config),
+            http: HttpLog::new(config, false),
+            dubbo: dubbo,
             ..Default::default()
         }
     }

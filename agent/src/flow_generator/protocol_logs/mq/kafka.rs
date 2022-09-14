@@ -17,13 +17,17 @@ use serde::Serialize;
 
 use super::super::{
     consts::KAFKA_REQ_HEADER_LEN, value_is_default, value_is_negative, AppProtoHead,
-    AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
+    AppProtoLogsInfo, L7LogParse, L7ResponseStatus, LogMessageType,
 };
 
+use crate::common::flow::L7Protocol;
+use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
+use crate::common::lookup_key::LookupKey;
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
 use crate::flow_generator::protocol_logs::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
+use crate::{__log_info_merge, ignore_non_raw_protocol};
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
@@ -174,12 +178,79 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct KafkaLog {
     info: KafkaInfo,
     msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
 }
 
+impl L7ProtocolLogInterface for KafkaLog {
+    fn session_id(&self) -> Option<u32> {
+        return Some(self.info.correlation_id);
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
+        __log_info_merge!(self, KafkaLog, other);
+    }
+
+    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool {
+        ignore_non_raw_protocol!(param);
+        return Self::kafka_check_protocol(payload, lookup_key);
+    }
+
+    fn parse_payload(
+        mut self,
+        payload: &[u8],
+        lookup_key: &crate::_LookupKey,
+        param: crate::common::l7_protocol_log::ParseParam,
+    ) -> Result<Vec<crate::common::l7_protocol_log::L7ProtocolLog>> {
+        self.start_time = param.time;
+        self.end_time = param.time;
+        Self::parse(
+            &mut self,
+            payload,
+            lookup_key.proto,
+            param.direction,
+            None,
+            None,
+        )?;
+        return Ok(vec![L7ProtocolLog::KafkaLog(self)]);
+    }
+
+    fn protocol(&self) -> (L7Protocol, &str) {
+        return (L7Protocol::Kafka, "KAFKA");
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: L7Protocol::Kafka,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return false;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.info.into();
+    }
+
+    fn parse_on_udp(&self) -> bool {
+        return false;
+    }
+
+    fn get_default(&self) -> L7ProtocolLog {
+        return L7ProtocolLog::KafkaLog(Self::default());
+    }
+}
 impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
     fn reset_logs(&mut self) {
@@ -240,8 +311,27 @@ impl KafkaLog {
             proto: L7Protocol::Kafka,
             msg_type: self.msg_type,
             rrt: 0,
-            version: 0,
         })
+    }
+
+    // 这个逻辑是直接复制 kafka_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
+    // 后面把perf抽象后只会保留在这个
+    pub fn kafka_check_protocol(payload: &[u8], lookup_key: &LookupKey) -> bool {
+        if lookup_key.proto != IpProtocol::Tcp {
+            // *bitmap &= !(1 << u8::from(L7Protocol::Kafka));
+            return false;
+        }
+
+        if payload.len() < KAFKA_REQ_HEADER_LEN {
+            return false;
+        }
+        let mut kafka = KafkaLog::default();
+
+        let ret = kafka.request(payload, true);
+        if ret.is_err() {
+            return false;
+        }
+        return kafka.info.check();
     }
 }
 
@@ -275,7 +365,7 @@ impl L7LogParse for KafkaLog {
 
 pub fn kafka_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Kafka));
+        *bitmap &= !(1 << L7Protocol::Kafka as u8);
         return false;
     }
 

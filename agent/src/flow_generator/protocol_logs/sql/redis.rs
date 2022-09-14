@@ -19,16 +19,19 @@ use serde::{Serialize, Serializer};
 use std::{fmt, str};
 
 use super::super::{
-    value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus,
-    LogMessageType,
+    value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus, LogMessageType,
 };
 
 use crate::common::enums::IpProtocol;
+use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
+use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
+use crate::common::lookup_key::LookupKey;
 use crate::common::meta_packet::MetaPacket;
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
 use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
+use crate::{__log_info_merge, ignore_non_raw_protocol};
 
 const SEPARATOR_SIZE: usize = 2;
 
@@ -128,11 +131,79 @@ impl From<RedisInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct RedisLog {
     info: RedisInfo,
     l7_proto: L7Protocol,
     msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+}
+
+impl L7ProtocolLogInterface for RedisLog {
+    fn session_id(&self) -> Option<u32> {
+        return None;
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
+        __log_info_merge!(self, RedisLog, other);
+    }
+
+    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool {
+        ignore_non_raw_protocol!(param);
+        return Self::redis_check_protocol(payload, lookup_key);
+    }
+
+    fn parse_payload(
+        mut self,
+        payload: &[u8],
+        lookup_key: &LookupKey,
+        param: crate::common::l7_protocol_log::ParseParam,
+    ) -> Result<Vec<crate::common::l7_protocol_log::L7ProtocolLog>> {
+        self.start_time = param.time;
+        self.end_time = param.time;
+        Self::parse(
+            &mut self,
+            payload,
+            lookup_key.proto,
+            param.direction,
+            None,
+            None,
+        )?;
+        return Ok(vec![L7ProtocolLog::RedisLog(self)]);
+    }
+
+    fn protocol(&self) -> (L7Protocol, &str) {
+        return (L7Protocol::Redis, "REDIS");
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: self.protocol().0,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return false;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.info.into();
+    }
+
+    fn parse_on_udp(&self) -> bool {
+        return false;
+    }
+
+    fn get_default(&self) -> L7ProtocolLog {
+        return L7ProtocolLog::RedisLog(Self::default());
+    }
 }
 
 impl RedisLog {
@@ -165,6 +236,19 @@ impl RedisLog {
             b'-' if !error_response => self.info.response = context,
             _ => self.info.response = context,
         }
+    }
+
+    // 这个逻辑是直接复制 redis_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
+    // 后面把perf抽象后只会保留在这个
+    pub fn redis_check_protocol(payload: &[u8], lookup_key: &LookupKey) -> bool {
+        if lookup_key.proto != IpProtocol::Tcp {
+            return false;
+        }
+
+        if payload[0] != b'*' {
+            return false;
+        }
+        return decode_asterisk(payload, true).is_some();
     }
 }
 
@@ -355,7 +439,7 @@ pub fn decode_error_code(context: &[u8]) -> Option<&[u8]> {
 // 通过请求识别REDIS
 pub fn redis_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Redis));
+        *bitmap &= !(1 << L7Protocol::Redis as u8);
         return false;
     }
 

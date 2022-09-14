@@ -48,11 +48,13 @@ use std::{
 use prost::Message;
 use serde::{Serialize, Serializer};
 
+use crate::common::l7_protocol_log::L7ProtocolLogInterface;
 use crate::{
     common::{
         ebpf::EbpfType,
         enums::{IpProtocol, TapType},
         flow::{L7Protocol, PacketDirection},
+        l7_protocol_log::L7ProtocolLog,
         meta_packet::MetaPacket,
         tap_port::TapPort,
     },
@@ -132,13 +134,13 @@ impl Default for L7ProtoRawDataType {
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct AppProtoHead {
-    #[serde(rename = "l7_protocol")]
+    // #[serde(rename = "l7_protocol")]
     pub proto: L7Protocol,
     pub msg_type: LogMessageType, // HTTP，DNS: request/response
     #[serde(rename = "response_duration")]
     pub rrt: u64, // HTTP，DNS时延: response-request
-    #[serde(skip)]
-    pub version: u8,
+                                  // #[serde(skip)]
+                                  // pub version: u8,
 }
 
 impl From<AppProtoHead> for flow_log::AppProtoHead {
@@ -446,6 +448,7 @@ impl AppProtoLogsBaseInfo {
     }
 }
 
+// TODO 这个结构后面去掉
 #[derive(Serialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum AppProtoLogsInfo {
@@ -458,6 +461,8 @@ pub enum AppProtoLogsInfo {
     HttpV1(HttpInfo),
     HttpV2(HttpInfo),
     HttpV1TLS(HttpInfo),
+    // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑,暂时添加一个None
+    None(()),
 }
 
 impl AppProtoLogsInfo {
@@ -499,6 +504,9 @@ impl fmt::Display for AppProtoLogsInfo {
             Self::HttpV1(l) => write!(f, "{:?}", l),
             Self::HttpV2(l) => write!(f, "{:?}", l),
             Self::HttpV1TLS(l) => write!(f, "{:?}", l),
+            _ => {
+                write!(f, "None")
+            }
         }
     }
 }
@@ -508,13 +516,18 @@ pub struct AppProtoLogsData {
     #[serde(flatten)]
     pub base_info: AppProtoLogsBaseInfo,
     #[serde(flatten)]
+    // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑，暂时添加一个Option字段。
+    // 后面吧cbpf也抽出来后，只会留下一个 special_info: L7protocolLog， AppProtoLogsInfo会去掉
+    // 暂时来说 cbpf 使用special_info， ebpf 使用ebpf_special_info
     pub special_info: AppProtoLogsInfo,
+    #[serde(flatten)]
+    pub ebpf_special_info: Option<L7ProtocolLog>,
 }
 
 impl fmt::Display for AppProtoLogsData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\n", self.base_info)?;
-        write!(f, "\t{}", self.special_info)
+        write!(f, "\t{:?}", self.special_info)
     }
 }
 
@@ -523,40 +536,12 @@ impl AppProtoLogsData {
         Self {
             base_info,
             special_info,
+            ebpf_special_info: None,
         }
     }
 
     pub fn is_request(&self) -> bool {
         return self.base_info.head.msg_type == LogMessageType::Request;
-    }
-
-    // return (is_req_end, is_resp_end)
-    pub fn is_req_resp_end(&self) -> (bool, bool) {
-        match &self.special_info {
-            AppProtoLogsInfo::HttpV2(d) => {
-                return d.is_req_resp_end();
-            }
-            _ => {
-                return (false, false);
-            }
-        }
-    }
-
-    pub fn is_session_end(&self) -> bool {
-        let (e1, e2) = self.is_req_resp_end();
-        return e1 && e2;
-    }
-
-    //是否忽略不发送, 目前仅用于过滤http2 uprobe 收到多余结束标识,导致空数据.
-    pub fn omit_send(&self) -> bool {
-        match &self.special_info {
-            AppProtoLogsInfo::HttpV2(d) => {
-                return d.is_empty();
-            }
-            _ => {
-                return false;
-            }
-        }
     }
 
     pub fn is_response(&self) -> bool {
@@ -568,18 +553,30 @@ impl AppProtoLogsData {
             base: Some(self.base_info.into()),
             ..Default::default()
         };
-        let log: L7ProtocolSendLog = match self.special_info {
-            AppProtoLogsInfo::Dns(t) => t.into(),
-            AppProtoLogsInfo::Mysql(t) => t.into(),
-            AppProtoLogsInfo::Redis(t) => t.into(),
-            AppProtoLogsInfo::Kafka(t) => t.into(),
-            AppProtoLogsInfo::Mqtt(t) => t.into(),
-            AppProtoLogsInfo::Dubbo(t) => t.into(),
-            AppProtoLogsInfo::HttpV1(t)
-            | AppProtoLogsInfo::HttpV2(t)
-            | AppProtoLogsInfo::HttpV1TLS(t) => t.into(),
-        };
-        log.fill_app_proto_log(&mut pb_proto_logs_data);
+
+        // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑， 暂时根据ebpf_special_info是否为空判断用那个结构编码
+        if let Some(l7_log) = self.ebpf_special_info {
+            let log: L7ProtocolSendLog = l7_log.into();
+            log.fill_app_proto_log(&mut pb_proto_logs_data);
+        } else {
+            let log: L7ProtocolSendLog = match self.special_info {
+                AppProtoLogsInfo::Dns(t) => t.into(),
+                AppProtoLogsInfo::Mysql(t) => t.into(),
+                AppProtoLogsInfo::Redis(t) => t.into(),
+                AppProtoLogsInfo::Kafka(t) => t.into(),
+                AppProtoLogsInfo::Mqtt(t) => t.into(),
+                AppProtoLogsInfo::Dubbo(t) => t.into(),
+                AppProtoLogsInfo::HttpV1(t)
+                | AppProtoLogsInfo::HttpV2(t)
+                | AppProtoLogsInfo::HttpV1TLS(t) => t.into(),
+
+                AppProtoLogsInfo::None(()) => {
+                    unreachable!()
+                }
+            };
+            log.fill_app_proto_log(&mut pb_proto_logs_data);
+        }
+
         pb_proto_logs_data
             .encode(buf)
             .map(|_| pb_proto_logs_data.encoded_len())
@@ -590,7 +587,7 @@ impl AppProtoLogsData {
         // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
         let flow_id_part =
             (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
-        if let Some(session_id) = self.special_info.session_id() {
+        if let Some(session_id) = self.ebpf_special_info.as_ref().unwrap().session_id() {
             flow_id_part
                 | (self.base_info.head.proto as u64) << 24
                 | ((session_id as u64) & 0xffffff)
@@ -606,19 +603,32 @@ impl AppProtoLogsData {
         }
     }
 
+    // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑, 暂时添加ebpf_special_info是否空来决定怎怎么merge
+    // 后面只会保留L7ProtocolLog.merge_log
     pub fn session_merge(&mut self, log: Self) {
         self.base_info.merge(log.base_info);
-        self.protocol_merge(log.special_info);
+        if let Some(ebpf_log) = log.ebpf_special_info {
+            self.ebpf_protocol_merge(ebpf_log);
+        } else {
+            self.protocol_merge(log.special_info);
+        }
     }
 
-    fn protocol_merge(&mut self, log_info: AppProtoLogsInfo) {
-        self.special_info.merge(log_info);
+    pub fn protocol_merge(&mut self, log: AppProtoLogsInfo) {
+        self.special_info.merge(log);
+    }
+
+    pub fn ebpf_protocol_merge(&mut self, log: L7ProtocolLog) {
+        if let Result::Err(_err) = self.ebpf_special_info.as_mut().unwrap().merge_log(log) {
+            // TODO 暂时先应付编译器警告
+        }
     }
 
     // 是否需要进一步聚合
     // 目前仅http2 uprobe 需要聚合多个请求
     pub fn need_protocol_merge(&self) -> bool {
-        return self.base_info.ebpf_type == EbpfType::GoHttp2Uprobe;
+        // return self.base_info.ebpf_type == EbpfType::GoHttp2Uprobe;
+        return self.ebpf_special_info.as_ref().unwrap().need_merge();
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {
@@ -672,6 +682,7 @@ impl fmt::Display for AppProtoLogsBaseInfo {
     }
 }
 
+// TODO 这个接口后面要去掉
 pub trait L7LogParse: Send + Sync {
     fn parse(
         &mut self,
@@ -690,7 +701,7 @@ pub enum AppProtoHeadEnum {
     Multi(Vec<AppProtoHead>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum AppProtoLogsInfoEnum {
     Single(AppProtoLogsInfo),
     Multi(Vec<AppProtoLogsInfo>),
