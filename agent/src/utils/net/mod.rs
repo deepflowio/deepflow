@@ -18,7 +18,10 @@ use std::{
     array::TryFromSliceError,
     fmt,
     net::{IpAddr, Ipv6Addr},
+    process,
     str::FromStr,
+    thread,
+    time::Duration,
 };
 
 use bitflags::bitflags;
@@ -296,6 +299,8 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
             let ctrl_mac = get_mac_by_ip(ip);
             if ctrl_mac.is_err() {
                 error!("failed getting ctrl_mac from {}: {:?}", ip, ctrl_mac);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
             }
             (ip, ctrl_mac.unwrap())
         }
@@ -303,6 +308,8 @@ pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
             let tuple = get_route_src_ip_and_mac(&dest);
             if tuple.is_err() {
                 error!("failed getting control ip and mac");
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
             }
             tuple.unwrap()
         }
