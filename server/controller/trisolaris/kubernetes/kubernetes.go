@@ -96,7 +96,7 @@ func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, er
 		ControllerIP:        k.cfg.NodeIP,
 		Config:              domainConf,
 	}
-	domain, err := service.CreateDomain(domainCreate, "")
+	domain, err := service.CreateDomain(domainCreate, nil)
 	if err != nil {
 		return
 	}

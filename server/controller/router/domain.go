@@ -21,16 +21,17 @@ import (
 	"github.com/gin-gonic/gin/binding"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/service"
 )
 
-func DomainRouter(e *gin.Engine, grpcServerPort string) {
+func DomainRouter(e *gin.Engine, cfg *config.ControllerConfig) {
 	// TODO: 后续统一为v2
 	e.GET("/v2/domains/:lcuuid/", getDomain)
 	e.GET("/v2/domains/", getDomains)
-	e.POST("/v1/domains/", createDomain(grpcServerPort))
-	e.PATCH("/v1/domains/:lcuuid/", updateDomain(grpcServerPort))
+	e.POST("/v1/domains/", createDomain(cfg))
+	e.PATCH("/v1/domains/:lcuuid/", updateDomain(cfg))
 	e.DELETE("/v1/domains/:lcuuid/", deleteDomain)
 
 	e.GET("/v2/sub-domains/:lcuuid/", getSubDomain)
@@ -56,7 +57,7 @@ func getDomains(c *gin.Context) {
 	JsonResponse(c, data, err)
 }
 
-func createDomain(grpcServerPort string) gin.HandlerFunc {
+func createDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var domainCreate model.DomainCreate
@@ -68,12 +69,12 @@ func createDomain(grpcServerPort string) gin.HandlerFunc {
 			return
 		}
 
-		data, err := service.CreateDomain(domainCreate, grpcServerPort)
+		data, err := service.CreateDomain(domainCreate, cfg)
 		JsonResponse(c, data, err)
 	})
 }
 
-func updateDomain(grpcServerPort string) gin.HandlerFunc {
+func updateDomain(cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		var err error
 		var domainUpdate model.DomainUpdate
@@ -90,7 +91,7 @@ func updateDomain(grpcServerPort string) gin.HandlerFunc {
 		c.ShouldBindBodyWith(&patchMap, binding.JSON)
 
 		lcuuid := c.Param("lcuuid")
-		data, err := service.UpdateDomain(lcuuid, patchMap, grpcServerPort)
+		data, err := service.UpdateDomain(lcuuid, patchMap, cfg)
 		JsonResponse(c, data, err)
 	})
 }
