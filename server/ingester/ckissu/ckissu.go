@@ -378,7 +378,7 @@ var ColumnAdd612 = []*ColumnAdds{
 	&ColumnAdds{
 		Dbs:         []string{"flow_log"},
 		Tables:      []string{"l4_flow_log", "l4_flow_log_local"},
-		ColumnNames: []string{"cit_max", "syn_count", "synack_count"},
+		ColumnNames: []string{"cit_max", "syn_count", "synack_count", "retrans_syn", "retrans_synack"},
 		ColumnType:  ckdb.UInt32,
 	},
 	&ColumnAdds{
