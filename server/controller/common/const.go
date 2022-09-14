@@ -21,6 +21,7 @@ import (
 )
 
 const GO_BIRTHDAY = "2006-01-02 15:04:05"
+const K8S_CA_CRT_PATH = "/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
 const (
 	REMOTE_API_TIMEOUT = 30
