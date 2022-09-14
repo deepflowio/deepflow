@@ -229,6 +229,7 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
     }
 }
 
+#[allow(dead_code)]
 extern "C" fn process_event_handle(p: *mut PROCESS_EVENT) {
     unsafe {
         println!(
@@ -244,12 +245,17 @@ fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
-        // 第一个参数空指针传递可以填写std::ptr::null()
+        // feature flag example
+        //let FEATURE_GO_NO_SYMBOL = 0;
+        //set_feature_flag(FEATURE_GO_NO_SYMBOL);
+
+        // The first parameter passed by a null pointer can be 
+	// filled with std::ptr::null()
         if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
             println!("bpf_tracer_init() file:{:?} error", log_file);
             ::std::process::exit(1);
         }
-
+/*
         if register_event_handle(
             EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
             process_event_handle,
@@ -258,7 +264,7 @@ fn main() {
             println!("register_event_handle() faild");
             ::std::process::exit(1);
         }
-
+*/
         if running_socket_tracer(
             socket_trace_callback, /* 回调接口 rust -> C */
             1,                     /* 工作线程数，是指用户态有多少线程参与数据处理 */

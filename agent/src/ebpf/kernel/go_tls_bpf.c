@@ -72,7 +72,7 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 
 	c.sp = (void *)ctx->rsp;
 
-	if (get_go_version() >= GO_VERSION(1, 17, 0)) {
+	if (info->version >= GO_VERSION(1, 17, 0)) {
 		c.fd = get_fd_from_tls_conn_struct((void *)ctx->rax, info);
 		c.buffer = (char *)ctx->rbx;
 	} else {

@@ -55,7 +55,7 @@ STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 # -DBPF_DEBUG
 CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
-LDFLAGS ?= -lbddisasm -ldwarf -lelf -lz -lpthread
+LDFLAGS ?= -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread
 
 all: build
 

@@ -291,6 +291,9 @@ pub struct SK_TRACE_STATS {
 }
 
 extern "C" {
+    pub fn set_feature_flag(flag: c_int) -> c_int;
+    pub fn clear_feature_flag(flag: c_int) -> c_int;
+
     // 初始化tracer用于设置eBPF环境初始化。
     // 参数：
     //   log_file  日志文件路径，如果是传递一个空指针将不会有日志写到文件。

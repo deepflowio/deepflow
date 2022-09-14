@@ -39,6 +39,9 @@ volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳�
 volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
 uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
 
+// eBPF feature flags
+bool feature_flags[FEATURE_MAX] = { 0 };
+
 /*
  * tracers
  */
@@ -1140,6 +1143,24 @@ static struct tracer_sockopts trace_sockopts = {
 	.get_opt_max = SOCKOPT_GET_TRACER_SHOW,
 	.get = tracer_sockopt_get,
 };
+
+int set_feature_flag(int flag)
+{
+	if (flag < FEATURE_MAX) {
+		feature_flags[flag] = true;
+		return 0;
+	}
+	return ETR_INVAL;
+}
+
+int clear_feature_flag(int flag)
+{
+	if (flag < FEATURE_MAX) {
+		feature_flags[flag] = false;
+		return 0;
+	}
+	return ETR_INVAL;
+}
 
 int bpf_tracer_init(const char *log_file, bool is_stdout)
 {
