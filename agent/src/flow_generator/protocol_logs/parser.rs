@@ -630,7 +630,7 @@ impl AppProtoLogsParser {
                 vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
             }
             L7Protocol::Mqtt => {
-                app_logs.mqtt.parse(
+                let heads = app_logs.mqtt.parse(
                     app_proto.raw_proto_payload.as_slice(),
                     app_proto.base_info.protocol,
                     app_proto.direction,
@@ -643,10 +643,13 @@ impl AppProtoLogsParser {
 
                 let result = special_info
                     .into_iter()
-                    .map(|v| {
+                    .zip(heads.into_iter())
+                    .map(|(v, head)| {
+                        let mut mqtt_base_info = base_info.clone();
+                        mqtt_base_info.head.msg_type = head.msg_type;
                         app_logs
                             .mqtt
-                            .amend_mqtt_proto_log_and_generate_log_data(v, base_info.clone())
+                            .amend_mqtt_proto_log_and_generate_log_data(v, mqtt_base_info)
                     })
                     .collect::<Result<Vec<_>>>()?;
 
