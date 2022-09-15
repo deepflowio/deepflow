@@ -87,7 +87,7 @@ var (
 		output: "SELECT divide(plus(MAX(byte_tx), AVGIf(rtt, rtt != 0)), minus(1, AVGIf(rtt, rtt != 0))) AS `avg_rtt` FROM flow_log.l4_flow_log",
 	}, {
 		input:  "select Apdex(rtt, 100) as apdex_rtt_100 from l4_flow_log",
-		output: "WITH if(COUNT()>0, divide(plus(SUM(if(rtt<=100,1,0)), SUM(if(100<rtt AND rtt<=100*4,0.5,0))), COUNT()), null) AS `divide_0diveider_as_null_plus_apdex_satisfy_rtt_100_apdex_toler_rtt_100_count_` SELECT divide_0diveider_as_null_plus_apdex_satisfy_rtt_100_apdex_toler_rtt_100_count_*100 AS `apdex_rtt_100` FROM flow_log.l4_flow_log",
+		output: "WITH if(COUNT()>0, divide(plus(SUM(if(rtt<=100,1,0)), SUM(if(100<rtt AND rtt<=100*4,0.5,0))), COUNT()), null) AS `divide_0diveider_as_null_plus_apdex_satisfy_rtt_100_apdex_toler_rtt_100_count_` SELECT `divide_0diveider_as_null_plus_apdex_satisfy_rtt_100_apdex_toler_rtt_100_count_`*100 AS `apdex_rtt_100` FROM flow_log.l4_flow_log",
 	}, {
 		input:  "select Max(byte) as max_byte, time(time,120) as time_120 from l4_flow_log group by time_120 having Min(byte)>=0",
 		output: "WITH toStartOfInterval(time, toIntervalSecond(120)) + toIntervalSecond(arrayJoin([0]) * 120) AS `_time_120` SELECT toUnixTimestamp(`_time_120`) AS `time_120`, MAX(byte_tx+byte_rx) AS `max_byte` FROM flow_log.l4_flow_log GROUP BY `time_120` HAVING MIN(byte_tx+byte_rx) >= 0",
