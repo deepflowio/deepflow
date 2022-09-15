@@ -17,12 +17,14 @@
 package node
 
 import (
+	"os"
 	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/golang/protobuf/proto"
 
+	"github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
@@ -133,16 +135,23 @@ func (c *TSDBCache) UpdateSyncedAt(syncedAt time.Time) {
 	c.setSyncFlag()
 }
 
-func (c *TSDBCache) UpdateSystemInfo(cpuNum int, memorySize int64, arch string, os string,
+func (c *TSDBCache) UpdateSystemInfo(cpuNum int, memorySize int64, arch string, tsdbOS string,
 	kernelVersion string, pcapDataMountPath string, name string) {
 
 	c.cpuNum = cpuNum
 	c.memorySize = memorySize
 	c.arch = &arch
-	c.os = &os
+	c.os = &tsdbOS
 	c.kernelVersion = &kernelVersion
 	c.pcapDataMountPath = &pcapDataMountPath
 	c.name = &name
+
+	podIP := os.Getenv(common.POD_IP_KEY)
+	if podIP == "" {
+		log.Errorf("get env(%s) data failed", common.POD_IP_KEY)
+	} else if podIP != *c.podIP {
+		c.podIP = &podIP
+	}
 }
 
 type TSDBCacheMap struct {
