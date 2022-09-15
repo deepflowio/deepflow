@@ -22,14 +22,10 @@ use std::{
     path::PathBuf,
     process,
 };
-use sysinfo::{System, SystemExt};
 
 use log::debug;
 use nix::sys::utsname::uname;
-
-// compatible minimal kernel version 2.6
-const MIN_MAJOR_RELEASE: u8 = 2;
-const MIN_MINOR_RELEASE: u8 = 6;
+use sysinfo::{System, SystemExt};
 
 //返回当前进程占用内存RSS单位（字节）
 pub fn get_memory_rss() -> Result<u64> {
@@ -60,36 +56,14 @@ pub fn get_memory_rss() -> Result<u64> {
 
 // 仅计算当前进程及其子进程，没有计算子进程的子进程等
 // /proc/<pid>/status目录中ppid为当前进程的pid
+// =================
+// Only the current process and its child processes are counted, the child processes of the child process are not counted, etc.
+// The ppid in the /proc/<pid>/status directory is the pid of the current process
 pub fn get_process_num() -> Result<u32> {
     let pid = process::id();
-
-    let sys_uname = uname();
-    let mut kernel_release = sys_uname.release().trim().split('.');
-    let major = kernel_release
-        .next()
-        .and_then(|m| m.parse::<u8>().ok())
-        .unwrap_or(MIN_MAJOR_RELEASE);
-    let minor = kernel_release
-        .next()
-        .and_then(|m| m.parse::<u8>().ok())
-        .unwrap_or(MIN_MINOR_RELEASE);
-
-    // /proc/<pid>/task/<tid>/children ,stable since 3.5
-    if major > 3 || (major == 3 && minor >= 5) {
-        let mut file = File::open(format!("/proc/{0}/task/{0}/children", pid))?;
-        let mut buf = String::new();
-        file.read_to_string(&mut buf)?;
-        let num = buf
-            .trim()
-            .split(' ')
-            .filter_map(|n| n.parse::<u32>().ok())
-            .count() as u32
-            + 1; // 加上当前进程
-        Ok(num)
-    } else {
-        // 加上当前进程
-        get_num_from_status_file("PPid:", pid.to_string().as_str()).map(|num| num + 1)
-    }
+    // plus current process
+    // 加上当前进程
+    get_num_from_status_file("PPid:", pid.to_string().as_str()).map(|num| num + 1)
 }
 
 // 仅计算当前pid下的线程数, linux下应该都是1
@@ -226,7 +200,14 @@ fn get_num_from_status_file(pattern: &str, value: &str) -> Result<u32> {
             }
         };
 
-        let mut status = File::open(format!("/proc/{}/status", search_pid))?;
+        let status_file = format!("/proc/{}/status", search_pid);
+        let mut status = match File::open(status_file.as_str()) {
+            Ok(s) => s,
+            Err(e) => {
+                debug!("open status file {} failed", status_file);
+                continue;
+            }
+        };
         let mut buf = String::new();
         status.read_to_string(&mut buf)?;
 
