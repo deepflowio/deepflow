@@ -372,7 +372,7 @@ int fetch_kernel_version(int *major, int *minor, int *patch)
 	// Get the real version of Ubuntu
 
 	if (access("/proc/version_signature", R_OK) == 0) {
-		FILE *f = fopen("/proc/version_signature", O_RDONLY);
+		FILE *f = fopen("/proc/version_signature", "r");
 		if (f) {
 			if (fscanf(f, "%*s %*s %d.%d.%d\n", major, minor, patch)
 			    != 3) {
