@@ -132,6 +132,7 @@ func FormatField(field string) string {
 	   	field = strings.ReplaceAll(field, "=", "_")
 	   	field = strings.ReplaceAll(field, "!", "_")
 	   	field = strings.ReplaceAll(field, ".", "_") */
+	field = strings.ReplaceAll(field, "`", "")
 	return field
 }
 
@@ -504,9 +505,9 @@ type HistogramFunction struct {
 
 func (f *HistogramFunction) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString("histogram(")
-	f.Fields[1].WriteTo(buf)
+	buf.WriteString(FormatField(f.Fields[1].ToString()))
 	buf.WriteString(")(")
-	f.Fields[0].WriteTo(buf)
+	buf.WriteString(FormatField(f.Fields[0].ToString()))
 	buf.WriteString(")")
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
@@ -718,13 +719,15 @@ func (f *DivFunction) WriteTo(buf *bytes.Buffer) {
 		f.Fields[1].WriteTo(buf)
 		buf.WriteString("+1e-15)")
 	} else if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_NULL {
-		buf.WriteString("divide_0diveider_as_null")
-		buf.WriteString(f.Fields[0].(Function).GetDefaultAlias(true))
-		buf.WriteString(f.Fields[1].(Function).GetDefaultAlias(true))
+		buf.WriteString("`divide_0diveider_as_null")
+		buf.WriteString(FormatField(f.Fields[0].(Function).GetDefaultAlias(true)))
+		buf.WriteString(FormatField(f.Fields[1].(Function).GetDefaultAlias(true)))
+		buf.WriteString("`")
 	} else if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_0 {
-		buf.WriteString("divide_0diveider_as_0")
-		buf.WriteString(f.Fields[0].(Function).GetDefaultAlias(true))
-		buf.WriteString(f.Fields[1].(Function).GetDefaultAlias(true))
+		buf.WriteString("`divide_0diveider_as_0")
+		buf.WriteString(FormatField(f.Fields[0].(Function).GetDefaultAlias(true)))
+		buf.WriteString(FormatField(f.Fields[1].(Function).GetDefaultAlias(true)))
+		buf.WriteString("`")
 	}
 	buf.WriteString(f.Math)
 	if !f.Nest && f.Alias != "" {
@@ -743,22 +746,22 @@ func (f *DivFunction) GetWiths() []Node {
 			"if(%s>0, divide(%s, %s), null)",
 			f.Fields[1].ToString(), f.Fields[0].ToString(), f.Fields[1].ToString(),
 		)
-		alias := fmt.Sprintf(
+		alias := FormatField(fmt.Sprintf(
 			"divide_0diveider_as_null%s%s",
-			f.Fields[0].(Function).GetDefaultAlias(true),
-			f.Fields[1].(Function).GetDefaultAlias(true),
-		)
+			FormatField(f.Fields[0].(Function).GetDefaultAlias(true)),
+			FormatField(f.Fields[1].(Function).GetDefaultAlias(true)),
+		))
 		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
 	} else if f.DivType == FUNCTION_DIV_TYPE_0DIVIDER_AS_0 {
 		with := fmt.Sprintf(
 			"if(%s>0, divide(%s, %s), 0)",
 			f.Fields[1].ToString(), f.Fields[0].ToString(), f.Fields[1].ToString(),
 		)
-		alias := fmt.Sprintf(
+		alias := FormatField(fmt.Sprintf(
 			"divide_0diveider_as_0%s%s",
-			f.Fields[0].(Function).GetDefaultAlias(true),
-			f.Fields[1].(Function).GetDefaultAlias(true),
-		)
+			FormatField(f.Fields[0].(Function).GetDefaultAlias(true)),
+			FormatField(f.Fields[1].(Function).GetDefaultAlias(true)),
+		))
 		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
 	}
 	return f.Withs
@@ -773,7 +776,7 @@ func (f *MinFunction) WriteTo(buf *bytes.Buffer) {
 		f.DefaultFunction.WriteTo(buf)
 	} else {
 		buf.WriteString("min_fillnullaszero_")
-		f.Fields[0].WriteTo(buf)
+		buf.WriteString(FormatField(f.Fields[0].ToString()))
 		buf.WriteString(f.Math)
 		if f.Alias != "" {
 			buf.WriteString(" AS ")
@@ -798,9 +801,9 @@ func (f *MinFunction) GetWiths() []Node {
 			"if(count(%s)=%d, min(%s), 0)",
 			f.Fields[0].ToString(), count, f.Fields[0].ToString(),
 		)
-		alias := fmt.Sprintf(
+		alias := FormatField(fmt.Sprintf(
 			"min_fillnullaszero_%s", f.Fields[0].ToString(),
-		)
+		))
 		f.Withs = append(f.Withs, &With{Value: with, Alias: alias})
 		return f.Withs
 	}
