@@ -18,8 +18,8 @@ use std::io;
 
 use libc::{
     c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, size_t, sockaddr,
-    sockaddr_ll, socklen_t, AF_PACKET, ETH_P_ALL, MAP_SHARED, MAP_LOCKED, MAP_NORESERVE, POLLERR, POLLIN, PROT_READ,
-    PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
+    sockaddr_ll, socklen_t, AF_PACKET, ETH_P_ALL, MAP_LOCKED, MAP_NORESERVE, MAP_SHARED, POLLERR,
+    POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
 };
 use log::warn;
 use public::error::*;
