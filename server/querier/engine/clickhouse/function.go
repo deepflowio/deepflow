@@ -256,7 +256,7 @@ func (f *AggFunction) Trans(m *view.Model) view.Node {
 		outFunc.SetArgs(f.Args[1:])
 	}
 	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED {
-		innerAlias := f.FormatInnerTag(m)
+		innerAlias := strings.Trim(f.FormatInnerTag(m), "`")
 		switch f.Metrics.Type {
 		case metrics.METRICS_TYPE_COUNTER, metrics.METRICS_TYPE_GAUGE:
 			// 计数类和油标类，null需要补成0
