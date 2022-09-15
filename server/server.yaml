@@ -47,6 +47,7 @@ controller:
   clickhouse:
     database: flow_tag
     user-name: default
+    host: clickhouse
     port: 9000
     # user-password:
 
@@ -67,8 +68,6 @@ controller:
   monitor:
     # controller/analyzer health_check interval, unit: s
     health_check_interval: 60
-    # controller/analyzer health_check port, default: 30417
-    health_check_port: 30417
     # 健康检查异常/控制器切换处理channel的长度
     health_check_handle_channel_len: 1000
     # License检查的时间间隔，单位: 秒
@@ -140,9 +139,6 @@ controller:
 
     # 数据持久化检测间隔，单位：秒
     data_persistence_interval: 60
-
-    # genesis的grpc通信端口
-    grpc_server_port: 30035
 
     # 内网IP网段范围配置，配置的IP所在网络会被作为内网进行学习
     local_ip_ranges:
