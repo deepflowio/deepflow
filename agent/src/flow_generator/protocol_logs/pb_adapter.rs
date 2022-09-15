@@ -27,7 +27,7 @@ pub struct L7Request {
 #[derive(Default, Debug)]
 pub struct L7Response {
     pub status: L7ResponseStatus,
-    pub code: i32,
+    pub code: Option<i32>,
     pub exception: String,
     pub result: String,
 }
@@ -52,11 +52,13 @@ pub struct ExtendedInfo {
 server的协议适配结构,用于把所有协议转换成统一的结构发送到server.
 目前暂时所有协议都需要实现 From<xxx> for L7ProtocolSendLog, 将协议转为L7ProtocolSendLog这个通用结构,后面考虑将协议抽象成trait.
 这个结构最终用于填充 AppProtoLogsData 这个pb结构提,然后pb编码后发送到server.
+
+在server中, req_len,resp_len = -1 时会认为没有值. resp.code = -32768 会认为没有值.
 */
 #[derive(Default, Debug)]
 pub struct L7ProtocolSendLog {
-    pub req_len: i32,
-    pub resp_len: i32,
+    pub req_len: Option<u32>,
+    pub resp_len: Option<u32>,
     pub req: L7Request,
     pub resp: L7Response,
     pub version: Option<String>,
@@ -66,15 +68,27 @@ pub struct L7ProtocolSendLog {
 
 impl L7ProtocolSendLog {
     pub fn fill_app_proto_log(self, log: &mut flow_log::AppProtoLogsData) {
-        log.req_len = self.req_len;
-        log.resp_len = self.resp_len;
+        let req_len = if let Some(len) = self.req_len {
+            len as i32
+        } else {
+            -1
+        };
+
+        let resp_len = if let Some(len) = self.resp_len {
+            len as i32
+        } else {
+            -1
+        };
+
+        log.req_len = req_len;
+        log.resp_len = resp_len;
         log.req = Some(flow_log::L7Request {
             req_type: self.req.req_type.into(),
             domain: self.req.domain.into(),
             resource: self.req.resource.into(),
         });
         log.resp = Some(flow_log::L7Response {
-            code: self.resp.code,
+            code: self.resp.code.unwrap_or(i16::MIN as i32),
             status: self.resp.status as u32,
             exception: self.resp.exception.into(),
             result: self.resp.result.into(),

@@ -458,9 +458,16 @@ impl FlowItem {
         let is_from_app = l7_protocol.is_some();
         let (l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
         let mut protocol_bitmap = u128::from(l4_protocol);
-        if packet.l7_protocol_from_ebpf == L7Protocol::Http1TLS {
-            protocol_bitmap |= 1 << u8::from(L7Protocol::Http1TLS);
-            protocol_bitmap &= !(1 << u8::from(L7Protocol::Http1));
+        match packet.l7_protocol_from_ebpf {
+            L7Protocol::Http1TLS => {
+                protocol_bitmap |= 1 << u8::from(L7Protocol::Http1TLS);
+                protocol_bitmap &= !(1 << u8::from(L7Protocol::Http1));
+            }
+            L7Protocol::Http2TLS => {
+                protocol_bitmap |= 1 << u8::from(L7Protocol::Http2TLS);
+                protocol_bitmap &= !(1 << u8::from(L7Protocol::Http2));
+            }
+            _ => {}
         }
 
         FlowItem {
@@ -487,9 +494,12 @@ impl FlowItem {
             L7Protocol::Mqtt => mqtt_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
             L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http2 => http2_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http1TLS => http1_check_protocol(&mut self.protocol_bitmap, packet),
+            L7Protocol::Http1 | L7Protocol::Http1TLS => {
+                http1_check_protocol(&mut self.protocol_bitmap, packet)
+            }
+            L7Protocol::Http2 | L7Protocol::Http2TLS => {
+                http2_check_protocol(&mut self.protocol_bitmap, packet)
+            }
             _ => false,
         }
     }

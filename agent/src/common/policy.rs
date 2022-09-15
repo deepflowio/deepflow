@@ -683,7 +683,9 @@ impl TryFrom<trident::FlowAcl> for Acl {
                 NpbAction::new(
                     n.npb_acl_group_id(),
                     n.tunnel_id(),
-                    n.tunnel_ip().parse::<IpAddr>().unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
+                    n.tunnel_ip()
+                        .parse::<IpAddr>()
+                        .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
                     NpbTunnelType::new(n.tunnel_type.unwrap() as u8),
                     TapSide::new(n.tap_side.unwrap() as u8),
                     n.payload_slice() as u16,

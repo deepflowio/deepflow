@@ -647,7 +647,7 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	h.L7Protocol = uint8(l.Base.Head.Proto)
 	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
 
-	h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
+	h.ResponseStatus = datatype.STATUS_NOT_EXIST
 	if h.Type != uint8(datatype.MSG_T_REQUEST) {
 		h.ResponseStatus = uint8(l.Base.Head.Status)
 		h.responseCode = int16(l.Base.Head.Code)
@@ -659,6 +659,7 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	h.fillL7Log(l)
 }
 
+// requestLength,responseLength 等于 -1 会认为是没有值. responseCode=-32768 会认为没有值
 func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 	h.Version = l.Version
 	h.requestLength = int64(l.ReqLen)
@@ -673,12 +674,12 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 		}
 	}
 	if l.Resp != nil {
-		h.ResponseStatus = uint8(l.Resp.Status)
 		h.responseCode = int16(l.Resp.Code)
 		h.ResponseResult = l.Resp.Result
 		h.fillExceptionDesc(l)
 		if h.Type != uint8(datatype.MSG_T_REQUEST) {
-			if h.responseCode != 0 {
+			h.ResponseStatus = uint8(l.Resp.Status)
+			if h.responseCode != -32768 {
 				h.ResponseCode = &h.responseCode
 			}
 			if h.responseLength != -1 {

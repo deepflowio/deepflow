@@ -59,18 +59,17 @@ pub struct HttpInfo {
     pub x_request_id: String,
 
     #[serde(rename = "request_length", skip_serializing_if = "Option::is_none")]
-    pub req_content_length: Option<u64>,
+    pub req_content_length: Option<u32>,
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
-    pub resp_content_length: Option<u64>,
+    pub resp_content_length: Option<u32>,
     // 流是否结束, 用于 http2 ebpf uprobe 处理
     pub is_end: bool,
-    status_code: u16,
+    status_code: Option<i32>,
     status: L7ResponseStatus,
 }
 
 impl HttpInfo {
     pub fn merge(&mut self, other: Self) {
-        self.resp_content_length = other.resp_content_length;
         if self.trace_id.is_empty() {
             self.trace_id = other.trace_id;
         }
@@ -94,12 +93,15 @@ impl HttpInfo {
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }
-        if other.status_code != 0 {
+        if self.status_code.is_none() {
             self.status_code = other.status_code;
         }
 
-        if self.req_content_length.is_none() && other.req_content_length.is_some() {
+        if self.req_content_length.is_none() {
             self.req_content_length = other.req_content_length;
+        }
+        if self.resp_content_length.is_none() {
+            self.resp_content_length = other.resp_content_length;
         }
     }
 
@@ -110,7 +112,10 @@ impl HttpInfo {
 
 impl From<HttpInfo> for L7ProtocolSendLog {
     fn from(f: HttpInfo) -> Self {
-        let mut log = L7ProtocolSendLog {
+        let log = L7ProtocolSendLog {
+            // http2 可能没有:content-length头. 默认长度设置-1 防止server判断为0
+            req_len: f.req_content_length,
+            resp_len: f.resp_content_length,
             version: Some(f.version),
             req: L7Request {
                 req_type: f.method,
@@ -119,7 +124,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 status: f.status,
-                code: f.status_code as i32,
+                code: f.status_code,
                 ..Default::default()
             },
             trace_info: Some(TraceInfo {
@@ -135,13 +140,6 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             }),
             ..Default::default()
         };
-        if let Some(l) = f.req_content_length {
-            log.req_len = l as i32;
-        }
-        if let Some(l) = f.resp_content_length {
-            log.resp_len = l as i32;
-        }
-
         return log;
     }
 }
@@ -227,7 +225,7 @@ impl HttpLog {
     }
 
     fn reset_logs(&mut self) {
-        self.info.status_code = 0;
+        self.info.status_code = None;
         self.info = HttpInfo::default();
     }
 
@@ -252,8 +250,6 @@ impl HttpLog {
     // |                          fd (32)                              |
     // +---------------------------------------------------------------+
     // |                          streadID (32)                        |
-    // +---------------------------------------------------------------+
-    // |                          keyLength (32)                       |
     // +---------------------------------------------------------------+
     // |                          valueLength (32)                     |
     // +---------------------------------------------------------------+
@@ -290,7 +286,7 @@ impl HttpLog {
             self.info.req_content_length = Some(
                 str::from_utf8(val.as_slice())
                     .unwrap_or_default()
-                    .parse::<u64>()
+                    .parse::<u32>()
                     .unwrap_or_default(),
             );
         }
@@ -316,7 +312,7 @@ impl HttpLog {
             let (version, status_code) = get_http_resp_info(str::from_utf8(lines[0])?)?;
 
             self.info.version = version;
-            self.info.status_code = status_code as u16;
+            self.info.status_code = Some(status_code as i32);
 
             self.msg_type = LogMessageType::Response;
 
@@ -335,7 +331,7 @@ impl HttpLog {
             self.msg_type = LogMessageType::Request;
         }
 
-        let mut content_length: Option<u64> = None;
+        let mut content_length: Option<u32> = None;
         for body_line in &lines[1..] {
             let col_index = body_line.iter().position(|x| *x == b':');
             if col_index.is_none() {
@@ -348,7 +344,7 @@ impl HttpLog {
             let key = str::from_utf8(&body_line[..col_index])?.to_lowercase();
             let value = str::from_utf8(&body_line[col_index + 1..])?.trim();
             if &key == "content-length" {
-                content_length = Some(value.parse::<u64>().unwrap_or_default());
+                content_length = Some(value.parse::<u32>().unwrap_or_default());
             } else if self.l7_log_dynamic_config.is_trace_id(key.as_str()) {
                 if let Some(id) = Self::decode_id(value, key.as_str(), Self::TRACE_ID) {
                     self.info.trace_id = id;
@@ -400,7 +396,7 @@ impl HttpLog {
     }
 
     fn parse_http_v2(&mut self, payload: &[u8], direction: PacketDirection) -> Result<()> {
-        let mut content_length: Option<u64> = None;
+        let mut content_length: Option<u32> = None;
         let mut header_frame_parsed = false;
         let mut is_httpv2 = false;
         let mut frame_payload = payload;
@@ -463,7 +459,7 @@ impl HttpLog {
                         content_length = Some(
                             str::from_utf8(val.as_slice())
                                 .unwrap_or_default()
-                                .parse::<u64>()
+                                .parse::<u32>()
                                 .unwrap_or_default(),
                         )
                     }
@@ -483,11 +479,11 @@ impl HttpLog {
                 // 若未在Headers帧中携带，则去解析Headers帧后的Data帧的数据长度以进行“Content-Length”解析
                 // 如grpc-go源码中，在封装FrameHeader头时，不封装“Content-Length”，需要解析其关联的Data帧进行“Content-Length”解析
                 // 参考：https://github.com/grpc/grpc-go/blob/master/internal/transport/handler_server.go#L246
-                content_length = Some(httpv2_header.frame_length as u64);
+                content_length = Some(httpv2_header.frame_length);
                 if httpv2_header.flags & FLAG_HEADERS_PADDED != 0 {
-                    if content_length.unwrap_or_default() > frame_payload[0] as u64 {
+                    if content_length.unwrap_or_default() > frame_payload[0] as u32 {
                         content_length =
-                            Some(content_length.unwrap_or_default() - frame_payload[0] as u64);
+                            Some(content_length.unwrap_or_default() - frame_payload[0] as u32);
                     }
                 }
                 break;
@@ -513,11 +509,15 @@ impl HttpLog {
                 }
                 self.info.req_content_length = content_length;
             } else {
-                if self.info.status_code < HTTP_STATUS_CODE_MIN
-                    || self.info.status_code > HTTP_STATUS_CODE_MAX
-                {
+                if let Some(code) = self.info.status_code {
+                    let code = code as u16;
+                    if code < HTTP_STATUS_CODE_MIN || code > HTTP_STATUS_CODE_MAX {
+                        return Err(Error::HttpHeaderParseFailed);
+                    }
+                } else {
                     return Err(Error::HttpHeaderParseFailed);
                 }
+
                 self.info.resp_content_length = content_length;
             }
             self.info.version = String::from("2");
@@ -536,12 +536,12 @@ impl HttpLog {
             }
             b":status" => {
                 self.msg_type = LogMessageType::Response;
-
-                self.info.status_code = str::from_utf8(val.as_slice())
+                let code = str::from_utf8(val.as_slice())
                     .unwrap_or_default()
                     .parse::<u16>()
                     .unwrap_or_default();
-                self.set_status(self.info.status_code);
+                self.info.status_code = Some(code as i32);
+                self.set_status(code);
             }
             b"host" | b":authority" => {
                 self.info.host = String::from_utf8_lossy(val.as_slice()).into_owned()

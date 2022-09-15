@@ -51,9 +51,9 @@ pub struct MqttInfo {
     #[serde(rename = "request_type")]
     pub pkt_type: PacketKind,
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
-    pub req_msg_size: i32,
+    pub req_msg_size: Option<u32>,
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
-    pub res_msg_size: i32,
+    pub res_msg_size: Option<u32>,
     #[serde(
         rename = "request_resource",
         skip_serializing_if = "Option::is_none",
@@ -63,7 +63,7 @@ pub struct MqttInfo {
     #[serde(skip)]
     pub publish_topic: Option<String>,
     #[serde(skip)]
-    pub code: u8, // connect_ack packet return code
+    pub code: Option<i32>, // connect_ack packet return code
     pub status: L7ResponseStatus,
 }
 
@@ -82,11 +82,11 @@ impl Default for MqttInfo {
             client_id: None,
             version: 0,
             pkt_type: Default::default(),
-            req_msg_size: -1,
-            res_msg_size: -1,
+            req_msg_size: None,
+            res_msg_size: None,
             subscribe_topics: None,
             publish_topic: None,
-            code: 0,
+            code: None,
             status: L7ResponseStatus::Ok,
         }
     }
@@ -94,7 +94,9 @@ impl Default for MqttInfo {
 
 impl MqttInfo {
     pub fn merge(&mut self, other: Self) {
-        self.res_msg_size = other.res_msg_size;
+        if self.res_msg_size.is_none() {
+            self.res_msg_size = other.res_msg_size;
+        }
         self.status = other.status;
         match other.pkt_type {
             PacketKind::Publish { .. } => {
@@ -122,19 +124,18 @@ impl From<MqttInfo> for L7ProtocolSendLog {
         let version = Some(String::from(f.get_version_str()));
         let mut topic_str = String::new();
         match f.pkt_type {
-            PacketKind::Publish { qos, .. } => {
+            PacketKind::Publish { .. } => {
                 if let Some(t) = f.publish_topic {
-                    topic_str.push_str(format!("| topic: {}, qos: {} |", t, qos as u32).as_str());
+                    topic_str.push_str(t.as_str());
                 }
             }
             PacketKind::Unsubscribe | PacketKind::Subscribe => {
                 if let Some(s) = f.subscribe_topics {
                     for i in s {
-                        topic_str
-                            .push_str(format!("| topic: {}, qos: {} ", i.name, i.qos).as_str());
+                        topic_str.push_str(format!("{},", i.name).as_str());
                     }
                     if !topic_str.is_empty() {
-                        topic_str.push_str("|");
+                        topic_str.pop();
                     }
                 }
             }
@@ -151,7 +152,7 @@ impl From<MqttInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 status: f.status,
-                code: f.code as i32,
+                code: f.code,
                 ..Default::default()
             },
             ..Default::default()
@@ -223,17 +224,17 @@ impl MqttLog {
                     info.version = version;
                     info.client_id = Some(client_id.to_string());
                     self.msg_type = LogMessageType::Request;
-                    info.req_msg_size = header.remaining_length;
+                    info.req_msg_size = Some(header.remaining_length as u32);
                     info.pkt_type = header.kind;
                     self.version = version;
                 }
                 PacketKind::Connack => {
                     let (_, return_code) =
                         parse_connack_packet(input).map_err(|_| Error::MqttLogParseFailed)?;
-                    info.code = return_code;
+                    info.code = Some(return_code as i32);
                     info.version = self.version;
                     self.msg_type = LogMessageType::Response;
-                    info.res_msg_size = header.remaining_length;
+                    info.res_msg_size = Some(header.remaining_length as u32);
                     info.pkt_type = header.kind;
                     self.status = parse_status_code(return_code);
                 }
@@ -249,10 +250,10 @@ impl MqttLog {
                     if qos == QualityOfService::AtLeastOnce || qos == QualityOfService::ExactlyOnce
                     {
                         self.msg_type = LogMessageType::Request;
-                        info.req_msg_size = header.remaining_length;
+                        info.req_msg_size = Some(header.remaining_length as u32);
                     } else {
                         self.msg_type = LogMessageType::Response;
-                        info.res_msg_size = header.remaining_length;
+                        info.res_msg_size = Some(header.remaining_length as u32);
                     };
                     info.publish_topic.replace(topic_name.to_string());
                     info.pkt_type = header.kind;
@@ -266,7 +267,7 @@ impl MqttLog {
                         .parse(input)
                         .map_err(|_| Error::MqttLogParseFailed)?;
                     self.msg_type = LogMessageType::Request;
-                    info.req_msg_size = header.remaining_length;
+                    info.req_msg_size = Some(header.remaining_length as u32);
                     info.pkt_type = header.kind;
                     info.version = self.version;
                     info.subscribe_topics.replace(
@@ -285,7 +286,7 @@ impl MqttLog {
                         .parse(input)
                         .map_err(|_| Error::MqttLogParseFailed)?;
                     self.msg_type = LogMessageType::Request;
-                    info.req_msg_size = header.remaining_length;
+                    info.req_msg_size = Some(header.remaining_length as u32);
                     info.pkt_type = header.kind;
                     info.version = self.version;
                     info.subscribe_topics.replace(
@@ -300,7 +301,7 @@ impl MqttLog {
                 PacketKind::Pingreq | PacketKind::Pubrel => {
                     info.pkt_type = header.kind;
                     info.version = self.version;
-                    info.req_msg_size = header.remaining_length;
+                    info.req_msg_size = Some(header.remaining_length as u32);
                     self.msg_type = LogMessageType::Request;
                 }
                 PacketKind::Suback
@@ -312,12 +313,12 @@ impl MqttLog {
                     info.pkt_type = header.kind;
                     info.version = self.version;
                     self.msg_type = LogMessageType::Response;
-                    info.res_msg_size = header.remaining_length;
+                    info.res_msg_size = Some(header.remaining_length as u32);
                 }
                 PacketKind::Disconnect => {
                     info.pkt_type = header.kind;
                     self.msg_type = LogMessageType::Session;
-                    info.res_msg_size = header.remaining_length;
+                    info.res_msg_size = Some(header.remaining_length as u32);
                     info.version = self.version;
                 }
             }
