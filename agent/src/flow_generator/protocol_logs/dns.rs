@@ -54,7 +54,7 @@ pub struct DnsInfo {
     pub answers: String,
 
     pub status: L7ResponseStatus,
-    pub status_code: u8,
+    pub status_code: Option<i32>,
 }
 
 impl DnsInfo {
@@ -63,7 +63,7 @@ impl DnsInfo {
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }
-        if other.status_code != 0 {
+        if self.status_code.is_none() {
             self.status_code = other.status_code;
         }
     }
@@ -97,7 +97,7 @@ impl From<DnsInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 result: f.answers,
-                code: f.status_code as i32,
+                code: f.status_code,
                 status: f.status,
                 ..Default::default()
             },
@@ -124,6 +124,7 @@ impl DnsLog {
         self.info.query_type = 0;
         self.info.query_name = String::new();
         self.info.answers = String::new();
+        self.info.status_code = None;
     }
 
     fn decode_name(&self, payload: &[u8], g_offset: usize) -> Result<(String, usize)> {
@@ -330,8 +331,9 @@ impl DnsLog {
         }
         self.info.trans_id = read_u16_be(&payload[..DNS_HEADER_FLAGS_OFFSET]);
         self.info.query_type = payload[DNS_HEADER_FLAGS_OFFSET] & 0x80;
-        self.info.status_code = payload[DNS_HEADER_FLAGS_OFFSET + 1] & 0xf;
-        self.set_status(self.info.status_code);
+        let code = payload[DNS_HEADER_FLAGS_OFFSET + 1] & 0xf;
+        self.info.status_code = Some(code as i32);
+        self.set_status(code);
         let qd_count = read_u16_be(&payload[DNS_HEADER_QDCOUNT_OFFSET..]);
         let an_count = read_u16_be(&payload[DNS_HEADER_ANCOUNT_OFFSET..]);
         let ns_count = read_u16_be(&payload[DNS_HEADER_NSCOUNT_OFFSET..]);

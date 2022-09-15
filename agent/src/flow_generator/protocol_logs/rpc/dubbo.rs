@@ -45,7 +45,7 @@ pub struct DubboInfo {
 
     // req
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
-    pub req_msg_size: i32,
+    pub req_msg_size: Option<u32>,
     #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub dubbo_version: String,
     #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
@@ -59,18 +59,20 @@ pub struct DubboInfo {
 
     // resp
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
-    pub resp_msg_size: i32,
+    pub resp_msg_size: Option<u32>,
     pub resp_status: L7ResponseStatus,
-    pub status_code: u8,
+    pub status_code: Option<i32>,
 }
 
 impl DubboInfo {
     pub fn merge(&mut self, other: Self) {
-        self.resp_msg_size = other.resp_msg_size;
+        if self.resp_msg_size.is_none() {
+            self.resp_msg_size = other.resp_msg_size;
+        }
         if other.resp_status != L7ResponseStatus::default() {
             self.resp_status = other.resp_status;
         }
-        if other.status_code != 0 {
+        if self.status_code.is_none() {
             self.status_code = other.status_code;
         }
     }
@@ -89,7 +91,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 status: f.resp_status,
-                code: f.status_code as i32,
+                code: f.status_code,
                 ..Default::default()
             },
             ..Default::default()
@@ -126,14 +128,14 @@ impl DubboLog {
         self.info.serial_id = 0;
         self.info.data_type = 0;
         self.info.request_id = 0;
-        self.info.req_msg_size = -1;
+        self.info.req_msg_size = None;
         self.info.dubbo_version = String::new();
         self.info.service_name = String::new();
         self.info.service_version = String::new();
         self.info.method_name = String::new();
-        self.info.resp_msg_size = -1;
+        self.info.resp_msg_size = None;
         self.info.resp_status = L7ResponseStatus::Ok;
-        self.info.status_code = 0;
+        self.info.status_code = None;
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
@@ -222,7 +224,7 @@ impl DubboLog {
         self.msg_type = LogMessageType::Request;
 
         self.info.data_type = dubbo_header.data_type;
-        self.info.req_msg_size = dubbo_header.data_length;
+        self.info.req_msg_size = Some(dubbo_header.data_length as u32);
         self.info.serial_id = dubbo_header.serial_id;
         self.info.request_id = dubbo_header.request_id;
 
@@ -249,11 +251,11 @@ impl DubboLog {
         self.msg_type = LogMessageType::Response;
 
         self.info.data_type = dubbo_header.data_type;
-        self.info.resp_msg_size = dubbo_header.data_length;
+        self.info.resp_msg_size = Some(dubbo_header.data_length as u32);
         self.info.serial_id = dubbo_header.serial_id;
         self.info.request_id = dubbo_header.request_id;
-        self.info.status_code = dubbo_header.status_code;
-        self.set_status(self.info.status_code);
+        self.info.status_code = Some(dubbo_header.status_code as i32);
+        self.set_status(dubbo_header.status_code);
     }
 }
 

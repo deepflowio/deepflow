@@ -38,7 +38,7 @@ pub struct KafkaInfo {
 
     // request
     #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
-    pub req_msg_size: i32,
+    pub req_msg_size: Option<u32>,
     #[serde(skip)]
     pub api_version: u16,
     #[serde(rename = "request_type")]
@@ -48,20 +48,22 @@ pub struct KafkaInfo {
 
     // reponse
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
-    pub resp_msg_size: i32,
+    pub resp_msg_size: Option<u32>,
     pub status: L7ResponseStatus,
-    pub status_code: u16,
+    pub status_code: Option<i32>,
 }
 
 impl KafkaInfo {
     // https://kafka.apache.org/protocol.html
     const API_KEY_MAX: u16 = 67;
     pub fn merge(&mut self, other: Self) {
-        self.resp_msg_size = other.resp_msg_size;
+        if self.resp_msg_size.is_none() {
+            self.resp_msg_size = other.resp_msg_size;
+        }
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }
-        if other.status_code != 0 {
+        if self.status_code.is_none() {
             self.status_code = other.status_code;
         }
     }
@@ -158,7 +160,7 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 status: f.status,
-                code: f.status_code as i32,
+                code: f.status_code,
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
@@ -181,13 +183,13 @@ impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
     fn reset_logs(&mut self) {
         self.info.correlation_id = 0;
-        self.info.req_msg_size = -1;
+        self.info.req_msg_size = None;
         self.info.api_version = 0;
         self.info.api_key = 0;
         self.info.client_id = String::new();
-        self.info.resp_msg_size = -1;
+        self.info.resp_msg_size = None;
         self.info.status = L7ResponseStatus::Ok;
-        self.info.status_code = 0;
+        self.info.status_code = None;
     }
 
     // 协议识别的时候严格检查避免误识别，日志解析的时候不用严格检查因为可能有长度截断
@@ -195,14 +197,15 @@ impl KafkaLog {
     // The protocol identification is strictly checked to avoid misidentification.
     // The log analysis is not strictly checked because there may be length truncation
     fn request(&mut self, payload: &[u8], strict: bool) -> Result<AppProtoHead> {
-        self.info.req_msg_size = read_u32_be(payload) as i32;
+        let req_len = read_u32_be(payload);
+        self.info.req_msg_size = Some(req_len);
         let client_id_len = read_u16_be(&payload[12..]) as usize;
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
             self.reset_logs();
             return Err(Error::KafkaLogParseFailed);
         }
 
-        if strict && self.info.req_msg_size as usize != payload.len() - Self::MSG_LEN_SIZE {
+        if strict && req_len as usize != payload.len() - Self::MSG_LEN_SIZE {
             self.reset_logs();
             return Err(Error::KafkaLogParseFailed);
         }
@@ -228,7 +231,7 @@ impl KafkaLog {
     }
 
     fn response(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
-        self.info.resp_msg_size = read_u32_be(payload) as i32;
+        self.info.resp_msg_size = Some(read_u32_be(payload));
         self.info.correlation_id = read_u32_be(&payload[4..]);
         self.msg_type = LogMessageType::Response;
 

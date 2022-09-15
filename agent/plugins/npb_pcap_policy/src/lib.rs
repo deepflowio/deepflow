@@ -78,9 +78,7 @@ pub struct NpbAction {
 
 impl Default for NpbAction {
     fn default() -> Self {
-        Self {
-            acl_gids: vec![],
-        }
+        Self { acl_gids: vec![] }
     }
 }
 
@@ -126,14 +124,11 @@ impl NpbAction {
         IpAddr::V4(Ipv4Addr::UNSPECIFIED)
     }
 
-    pub fn set_payload_slice(&mut self, _payload_slice: u16) {
-    }
+    pub fn set_payload_slice(&mut self, _payload_slice: u16) {}
 
-    pub fn add_tap_side(&mut self, _tap_side: TapSide) {
-    }
+    pub fn add_tap_side(&mut self, _tap_side: TapSide) {}
 
-    pub fn set_tap_side(&mut self, _tap_side: TapSide) {
-    }
+    pub fn set_tap_side(&mut self, _tap_side: TapSide) {}
 }
 
 impl fmt::Display for NpbAction {
@@ -158,8 +153,7 @@ impl PolicyData {
         }
     }
 
-    pub fn format_npb_action(&mut self) {
-    }
+    pub fn format_npb_action(&mut self) {}
 
     pub fn merge_npb_action(
         &mut self,
@@ -168,9 +162,9 @@ impl PolicyData {
         _directions: Vec<DirectionType>,
     ) {
         self.acl_id = acl_id;
-        actions.into_iter().for_each(|x| {
-            self.npb_actions.push(x.clone())
-        })
+        actions
+            .into_iter()
+            .for_each(|x| self.npb_actions.push(x.clone()))
     }
 
     fn dedup_npb_actions(&self, _packet: &dyn DedupOperator) -> Vec<NpbAction> {
@@ -183,6 +177,6 @@ impl PolicyData {
 }
 
 pub trait DedupOperator: Send + Sync {
-    fn is_tor(&self) ->bool;
-    fn is_valid(&self, tap_side: TapSide) ->bool;
+    fn is_tor(&self) -> bool;
+    fn is_valid(&self, tap_side: TapSide) -> bool;
 }

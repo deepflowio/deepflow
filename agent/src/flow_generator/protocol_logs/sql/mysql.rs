@@ -50,7 +50,7 @@ pub struct MysqlInfo {
     #[serde(skip)]
     pub response_code: u8,
     #[serde(skip)]
-    pub error_code: u16,
+    pub error_code: Option<i32>,
     #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
     pub affected_rows: u64,
     #[serde(
@@ -65,9 +65,11 @@ impl MysqlInfo {
     pub fn merge(&mut self, other: Self) {
         self.response_code = other.response_code;
         self.affected_rows = other.affected_rows;
-        self.error_code = other.error_code;
         self.error_message = other.error_message;
         self.status = other.status;
+        if self.error_code.is_none() {
+            self.error_code = other.error_code;
+        }
     }
 
     pub fn get_command_str(&self) -> &'static str {
@@ -123,7 +125,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 status: f.status,
-                code: f.error_code as i32,
+                code: f.error_code,
                 exception: f.error_message,
                 ..Default::default()
             },
@@ -163,6 +165,7 @@ impl MysqlLog {
     fn reset_logs(&mut self) {
         self.info = MysqlInfo::default();
         self.info.status = L7ResponseStatus::Ok;
+        self.info.error_code = None;
     }
 
     fn greeting(&mut self, payload: &[u8]) -> Result<()> {
@@ -252,10 +255,11 @@ impl MysqlLog {
         match self.info.response_code {
             MYSQL_RESPONSE_CODE_ERR => {
                 if remain > ERROR_CODE_LEN {
-                    self.info.error_code = bytes::read_u16_le(&payload[ERROR_CODE_OFFSET..]);
+                    let code = bytes::read_u16_le(&payload[ERROR_CODE_OFFSET..]);
+                    self.info.error_code = Some(code as i32);
+                    self.set_status(code);
                     remain -= ERROR_CODE_LEN;
                 }
-                self.set_status(self.info.error_code);
                 let error_message_offset =
                     if remain > SQL_STATE_LEN && payload[SQL_STATE_OFFSET] == SQL_STATE_MARKER {
                         SQL_STATE_OFFSET + SQL_STATE_LEN
