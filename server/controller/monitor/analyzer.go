@@ -159,7 +159,7 @@ func (c *AnalyzerCheck) vtapAnalyzerCheck() {
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 			// 检查是否存在已分配数据节点，但异常未清除的采集器
 			exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-			mysql.Db.Model(vtap).Update("exceptions", exceptions)
+			mysql.Db.Model(&vtap).Update("exceptions", exceptions)
 		}
 	}
 	// 如果存在没有数据节点的采集器，触发数据节点重新分配
@@ -246,7 +246,7 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 			if len(analyzerAvailableVTapNum) == 0 {
 				log.Warningf("no available analyzer for vtap (%s)", vtap.Name)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-				mysql.Db.Model(vtap).Update("exceptions", exceptions)
+				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
 				continue
 			}
 			sort.Slice(analyzerAvailableVTapNum, func(i, j int) bool {
@@ -257,10 +257,10 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 
 			// 分配数据节点成功，更新数据节点IP + 清空数据节点分配失败的错误码
 			log.Infof("alloc analyzer (%s) for vtap (%s)", analyzerAvailableVTapNum[0].Key, vtap.Name)
-			mysql.Db.Model(vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
+			mysql.Db.Model(&vtap).Update("analyzer_ip", analyzerAvailableVTapNum[0].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED
-				mysql.Db.Model(vtap).Update("exceptions", exceptions)
+				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
 			}
 		}
 	}

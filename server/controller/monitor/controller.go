@@ -171,7 +171,7 @@ func (c *ControllerCheck) vtapControllerCheck() {
 		} else if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 			// 检查是否存在已分配控制器，但异常未清除的采集器
 			exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-			mysql.Db.Model(vtap).Update("exceptions", exceptions)
+			mysql.Db.Model(&vtap).Update("exceptions", exceptions)
 		}
 	}
 	// 如果存在没有控制器的采集器，触发控制器重新分配
@@ -258,7 +258,7 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 			if len(controllerAvailableVTapNum) == 0 {
 				log.Warningf("no available controller for vtap (%s)", vtap.Name)
 				exceptions := vtap.Exceptions | common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				mysql.Db.Model(vtap).Update("exceptions", exceptions)
+				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
 				continue
 			}
 			sort.Slice(controllerAvailableVTapNum, func(i, j int) bool {
@@ -269,10 +269,10 @@ func (c *ControllerCheck) vtapControllerAlloc(excludeIP string) {
 
 			// 分配控制器成功，更新控制器IP + 清空控制器分配失败的错误码
 			log.Infof("alloc controller (%s) for vtap (%s)", controllerAvailableVTapNum[0].Key, vtap.Name)
-			mysql.Db.Model(vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
+			mysql.Db.Model(&vtap).Update("controller_ip", controllerAvailableVTapNum[0].Key)
 			if vtap.Exceptions&common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED != 0 {
 				exceptions := vtap.Exceptions ^ common.VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED
-				mysql.Db.Model(vtap).Update("exceptions", exceptions)
+				mysql.Db.Model(&vtap).Update("exceptions", exceptions)
 			}
 		}
 	}
