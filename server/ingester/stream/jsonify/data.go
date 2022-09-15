@@ -866,6 +866,12 @@ func (m *Metrics) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(m.SynackCount); err != nil {
 		return err
 	}
+	if err := block.WriteUInt32(m.RetransSyn); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(m.RetransSynack); err != nil {
+		return err
+	}
 	if err := block.WriteUInt32(m.L7ClientError); err != nil {
 		return err
 	}
