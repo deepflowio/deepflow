@@ -106,6 +106,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			LicenseType:      vtap.LicenseType,
 			ExpectedRevision: vtap.ExpectedRevision,
 			UpgradePackage:   vtap.UpgradePackage,
+			TapMode:          vtap.TapMode,
 		}
 		// state
 		if vtap.Enable == common.VTAP_ENABLE_FALSE {

@@ -158,6 +158,7 @@ type Vtap struct {
 	LicenseFunctions   []int   `json:"LICENSE_FUNCTIONS"`
 	ExpectedRevision   string  `json:"EXPECTED_REVISION"`
 	UpgradePackage     string  `json:"UPGRADE_PACKAGE"`
+	TapMode            int     `json:"TAP_MODE"`
 	Lcuuid             string  `json:"LCUUID"`
 	// TODO: format_state
 	// TODO: format_type
