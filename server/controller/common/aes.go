@@ -133,3 +133,12 @@ func GetLocalClusterID() (string, error) {
 	}
 	return GenerateKuberneteClusterIDByMD5(GenerateAesKey(caData))
 }
+
+func GetCAMD5() string {
+	caData, err := ioutil.ReadFile(K8S_CA_CRT_PATH)
+	if err != nil {
+		log.Error(err)
+		return ""
+	}
+	return GenerateAesKey(caData)
+}
