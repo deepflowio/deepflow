@@ -63,10 +63,10 @@ type StaticConfig struct {
 	BpfDisabled                     *bool                 `yaml:"bpf-disabled,omitempty"`
 	L7ProtocolInferenceMaxFailCount *uint64               `yaml:"l7-protocol-inference-max-fail-count,omitempty"`
 	L7ProtocolInferenceTtl          *uint64               `yaml:"l7-protocol-inference-ttl,omitempty"`
-	PacketSequenceBlockSize         *int                  `yaml:"packet-sequence-block-size"`
-	PacketSequenceQueueSize         *int                  `yaml:"packet-sequence-queue-size"`
-	PacketSequenceQueueCount        *int                  `yaml:"packet-sequence-queue-count"`
-	PacketSequenceFlag              *uint8                `yaml:"packet-sequence-flag"`
+	PacketSequenceBlockSize         *int                  `yaml:"packet-sequence-block-size,omitempty"`
+	PacketSequenceQueueSize         *int                  `yaml:"packet-sequence-queue-size,omitempty"`
+	PacketSequenceQueueCount        *int                  `yaml:"packet-sequence-queue-count,omitempty"`
+	PacketSequenceFlag              *uint8                `yaml:"packet-sequence-flag,omitempty"`
 }
 
 type XflowCollectorConfig struct {
