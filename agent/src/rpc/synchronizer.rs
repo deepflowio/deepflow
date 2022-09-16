@@ -36,7 +36,7 @@ use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use prost::Message;
 use rand::RngCore;
 use sysinfo::{System, SystemExt};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio::time;
@@ -429,7 +429,11 @@ impl Synchronizer {
             status: Default::default(),
             session,
             running: Arc::new(AtomicBool::new(false)),
-            rt: Runtime::new().unwrap(),
+            rt: Builder::new_multi_thread()
+                .worker_threads(1)
+                .enable_all()
+                .build()
+                .unwrap(),
             threads: Default::default(),
             flow_acl_listener: Arc::new(sync::Mutex::new(vec![Box::new(policy_setter)])),
             exception_handler,

@@ -32,7 +32,11 @@ use flate2::Compression;
 use k8s_openapi::apimachinery::pkg::version::Info;
 use kube::{Client, Config};
 use log::{debug, error, info, warn};
-use tokio::{runtime::Runtime, task::JoinHandle};
+use sysinfo::{System, SystemExt};
+use tokio::{
+    runtime::{Builder, Runtime},
+    task::JoinHandle,
+};
 
 use super::resource_watcher::{GenericResourceWatcher, Watcher};
 use crate::{
@@ -113,6 +117,14 @@ impl ApiWatcher {
         session: Arc<Session>,
         exception_handler: ExceptionHandler,
     ) -> Self {
+        // worker_threads = min(min(3 * CPU_CORE + 0, THREAD_THRESHOLD), RESOURCES.len())
+        let worker_threads = System::new()
+            .physical_core_count()
+            .map(|c| c * 3)
+            .unwrap_or(RESOURCES.len())
+            .min(config.load().thread_threshold as usize)
+            .min(RESOURCES.len());
+
         Self {
             context: Arc::new(Context {
                 config,
@@ -122,7 +134,11 @@ impl ApiWatcher {
                         .unwrap()
                         .as_secs(),
                 ),
-                runtime: Runtime::new().unwrap(),
+                runtime: Builder::new_multi_thread()
+                    .worker_threads(worker_threads)
+                    .enable_all()
+                    .build()
+                    .unwrap(),
             }),
             thread: Mutex::new(None),
             session,
