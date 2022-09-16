@@ -277,6 +277,7 @@ impl FirstPath {
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
+        #[cfg(feature = "policy")]
         self.generate_group_ip_map(groups);
 
         self.fast.generate_mask_table_from_group(groups);
@@ -550,6 +551,7 @@ impl FirstPath {
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
         let mut policy = PolicyData::default();
 
+        #[cfg(feature = "policy")]
         self.get_policy_from_table(key, &endpoints, &mut policy);
 
         self.fast.add_policy(key, &policy, &policy, endpoints);

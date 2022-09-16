@@ -385,6 +385,7 @@ impl PolicySetter {
     }
 
     pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
+        #[cfg(feature = "policy")]
         self.policy().update_acl(acls, check)?;
 
         Ok(())

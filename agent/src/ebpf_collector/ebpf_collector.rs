@@ -1006,6 +1006,11 @@ impl EbpfCollector {
                 std::ptr::null()
             };
 
+            #[cfg(feature = "ebpf-go-no-symbol")]
+            let FEATURE_GO_NO_SYMBOL = 0;
+            #[cfg(feature = "ebpf-go-no-symbol")]
+            ebpf::set_feature_flag(0);
+
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
                 info!("ebpf bpf_tracer_init error: {}", config.log_path);
                 return Err(Error::EbpfInitError);
