@@ -88,6 +88,35 @@ static __inline void delete_socket_info(__u64 conn_key,
 	socket_info_map__delete(&conn_key);
 	trace_stats->socket_map_count--;
 }
+
+static __u32 __inline get_tcp_write_seq_from_fd(int fd)
+{
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return 0;
+
+	void *sock = get_socket_from_fd(fd, offset);
+	__u32 tcp_seq = 0;
+	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
+		       sock + offset->tcp_sock__write_seq_offset);
+	return tcp_seq;
+}
+
+static __u32 __inline get_tcp_read_seq_from_fd(int fd)
+{
+	__u32 k0 = 0;
+	struct member_fields_offset *offset = members_offset__lookup(&k0);
+	if (!offset)
+		return 0;
+
+	void *sock = get_socket_from_fd(fd, offset);
+	__u32 tcp_seq = 0;
+	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
+		       sock + offset->tcp_sock__copied_seq_offset);
+	return tcp_seq;
+}
+
 #include "uprobe_base_bpf.c" // get_go_version
 #include "include/protocol_inference.h"
 #define EVENT_BURST_NUM            16
@@ -615,34 +644,6 @@ static __inline int iovecs_copy(struct __socket_data *v,
 	}
 
 	return bytes_sent;
-}
-
-static __u32 __inline get_tcp_write_seq_from_fd(int fd)
-{
-	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
-	if (!offset)
-		return 0;
-
-	void *sock = get_socket_from_fd(fd, offset);
-	__u32 tcp_seq = 0;
-	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-		       sock + offset->tcp_sock__write_seq_offset);
-	return tcp_seq;
-}
-
-static __u32 __inline get_tcp_read_seq_from_fd(int fd)
-{
-	__u32 k0 = 0;
-	struct member_fields_offset *offset = members_offset__lookup(&k0);
-	if (!offset)
-		return 0;
-
-	void *sock = get_socket_from_fd(fd, offset);
-	__u32 tcp_seq = 0;
-	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
-		       sock + offset->tcp_sock__copied_seq_offset);
-	return tcp_seq;
 }
 
 static __inline void

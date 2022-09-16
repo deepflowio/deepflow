@@ -16,6 +16,28 @@
 
 #define HASH_ENTRIES_MAX 40960
 
+struct http2_tcp_seq_key {
+	int tgid;
+	int fd;
+	__u32 tcp_seq_end;
+};
+
+/*
+ * In uprobe_go_tls_read_exit()
+ * Save the TCP sequence number before the syscall(read())
+ * 
+ * In uprobe http2 read() (after syscall read()), lookup TCP sequence number recorded previously on the map.
+ * e.g.: In uprobe_go_http2serverConn_processHeaders(), get TCP sequence before syscall read(). 
+ * 
+ * Note:  Use for after uprobe read() only.
+ */
+struct bpf_map_def SEC("maps") http2_tcp_seq_map = {
+	.type = BPF_MAP_TYPE_LRU_HASH,
+	.key_size = sizeof(struct http2_tcp_seq_key),
+	.value_size = sizeof(__u32),
+	.max_entries = 10240,
+};
+
 /*
  * The binary executable file offset of the GO process
  * key: pid
