@@ -260,6 +260,11 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
 	send_buffer->tuple.num = inet_sport;
 
+	// Display ipv4 when both ipv4 and ipv6 are supported
+	if (skc_family == PF_INET6 && skc_flags.skc_ipv6only == 0) {
+		skc_family = PF_INET;
+	}
+
 	switch (skc_family) {
 	case PF_INET:
 		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
@@ -275,8 +280,9 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 			       sk + STRUCT_SOCK_IP6SADDR_OFFSET);
 		send_buffer->tuple.addr_len = 16;
 		break;
+	default:
+		return;
 	}
-
 
 	// trace_uid, generator for socket_id
 	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
