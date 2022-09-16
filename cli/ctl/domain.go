@@ -54,7 +54,7 @@ func RegisterDomainCommand() *cobra.Command {
 		Use:   "domain",
 		Short: "domain operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("please run with 'list | create | delete'.\n")
+			fmt.Printf("please run with 'list | create | update | delete | example'.\n")
 		},
 	}
 
@@ -105,7 +105,7 @@ func RegisterDomainCommand() *cobra.Command {
 	exampleCmd := &cobra.Command{
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
-		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.ALIYUN_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.AGENT_SYNC_EN}, ",")),
+		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.ALIYUN_EN, common.TENCENT_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.AGENT_SYNC_EN}, ",")),
 		Example: "deepflow-ctl domain example agent_sync",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
@@ -270,6 +270,8 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		fmt.Printf(string(example.YamlDomainKubernetes))
 	case common.ALIYUN_EN:
 		fmt.Printf(string(example.YamlDomainAliYun))
+	case common.TENCENT_EN:
+		fmt.Printf(string(example.YamlDomainTencent))
 	case common.QINGCLOUD_EN:
 		fmt.Printf(string(example.YamlDomainQingCloud))
 	case common.BAIDU_BCE_EN:
