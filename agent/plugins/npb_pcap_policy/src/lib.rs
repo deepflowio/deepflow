@@ -22,8 +22,6 @@ use bitflags::bitflags;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-type ActionFlag = u16;
-
 bitflags! {
     #[derive(Default)]
     pub struct TapSide: u8 {
@@ -148,11 +146,11 @@ impl fmt::Display for NpbAction {
 pub struct PolicyData {
     pub npb_actions: Vec<NpbAction>,
     pub acl_id: u32,
-    pub action_flags: ActionFlag,
+    pub action_flags: u16,
 }
 
 impl PolicyData {
-    pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32, action_flags: ActionFlag) -> Self {
+    pub fn new(npb_actions: Vec<NpbAction>, acl_id: u32, action_flags: u16) -> Self {
         Self {
             npb_actions,
             acl_id,
