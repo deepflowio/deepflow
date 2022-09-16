@@ -192,6 +192,7 @@ pub struct PlatformConfig {
     pub epc_id: u32,
     pub kubernetes_api_enabled: bool,
     pub namespace: Option<String>,
+    pub thread_threshold: u32,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -714,6 +715,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 } else {
                     Some(conf.yaml_config.kubernetes_namespace.clone())
                 },
+                thread_threshold: conf.thread_threshold,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {

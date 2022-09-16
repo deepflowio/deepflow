@@ -228,6 +228,7 @@ impl MetricServer {
         Self {
             running: Arc::new(AtomicBool::new(false)),
             rt: Builder::new_multi_thread()
+                .worker_threads(2)
                 .enable_all()
                 .thread_name("integration collector thread")
                 .build()

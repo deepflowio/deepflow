@@ -28,7 +28,7 @@ use std::{
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use ring::digest;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 
 use super::kubernetes::{
     check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, PassivePoller, Poller,
@@ -552,7 +552,7 @@ impl PlatformSynchronizer {
     }
 
     fn process(args: ProcessArgs) {
-        let rt = Runtime::new().unwrap();
+        let rt = Builder::new_current_thread().enable_all().build().unwrap();
 
         let mut last_version = 0;
         let mut kubernetes_version = 0;

@@ -533,6 +533,10 @@ func (v *VTapInfo) GetVTapPolicyVersion(vtapID int, functions mapset.Set) uint64
 	return v.vTapPolicyData.getVTapPolicyVersion(vtapID, functions)
 }
 
+func (v *VTapInfo) IsTheSameRegion(region string) bool {
+	return v.getRegion() == region
+}
+
 func GetKey(vtap *models.VTap) string {
 	if vtap.CtrlMac == "" {
 		return vtap.CtrlIP

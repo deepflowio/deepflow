@@ -42,7 +42,9 @@ type NodeInfo struct {
 	tsdbCaches              *TSDBCacheMap // 数据节点缓存
 	tsdbRegion              map[string]uint32
 	tsdbToNATIP             map[string]string
+	tsdbToPodIP             map[string]string
 	controllerToNATIP       map[string]string
+	controllerToPodIP       map[string]string
 	sysConfigurationToValue map[string]string
 	pcapDataRetention       uint32
 	metaData                *metadata.MetaData
@@ -61,7 +63,9 @@ func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		tsdbCaches:              newTSDBCacheMap(),
 		tsdbRegion:              make(map[string]uint32),
 		tsdbToNATIP:             make(map[string]string),
+		tsdbToPodIP:             make(map[string]string),
 		controllerToNATIP:       make(map[string]string),
+		controllerToPodIP:       make(map[string]string),
 		sysConfigurationToValue: make(map[string]string),
 		metaData:                metaData,
 		tsdbRegister:            newTSDBDiscovery(),
@@ -193,10 +197,13 @@ func (n *NodeInfo) generateControllerInfo() {
 	}
 
 	controllerToNATIP := make(map[string]string)
+	controllerToPodIP := make(map[string]string)
 	for _, controller := range dbControllers {
 		controllerToNATIP[controller.IP] = controller.NATIP
+		controllerToPodIP[controller.IP] = controller.PodIP
 	}
 	n.controllerToNATIP = controllerToNATIP
+	n.controllerToPodIP = controllerToPodIP
 }
 
 func (n *NodeInfo) initTSDBInfo() {
@@ -210,11 +217,14 @@ func (n *NodeInfo) initTSDBInfo() {
 	}
 
 	tsdbToNATIP := make(map[string]string)
+	tsdbToPodIP := make(map[string]string)
 	for _, dbTSDB := range dbTSDBs {
 		n.AddTSDBCache(dbTSDB)
 		tsdbToNATIP[dbTSDB.IP] = dbTSDB.NATIP
+		tsdbToPodIP[dbTSDB.IP] = dbTSDB.PodIP
 	}
 	n.tsdbToNATIP = tsdbToNATIP
+	n.tsdbToPodIP = tsdbToPodIP
 	n.generateTSDBRegion()
 	n.generatesysConfiguration()
 }
@@ -279,8 +289,20 @@ func (n *NodeInfo) GetTSDBNatIP(ip string) string {
 	return n.tsdbToNATIP[ip]
 }
 
+func (n *NodeInfo) updateTSDBPodIP(data map[string]string) {
+	n.tsdbToPodIP = data
+}
+
+func (n *NodeInfo) GetTSDBPodIP(ip string) string {
+	return n.tsdbToPodIP[ip]
+}
+
 func (n *NodeInfo) GetControllerNatIP(ip string) string {
 	return n.controllerToNATIP[ip]
+}
+
+func (n *NodeInfo) GetControllerPodIP(ip string) string {
+	return n.controllerToPodIP[ip]
 }
 
 func (n *NodeInfo) updateTSDBInfo() {
@@ -290,12 +312,14 @@ func (n *NodeInfo) updateTSDBInfo() {
 	dbKeys := mapset.NewSet()
 	ipToTSDB := make(map[string]*models.Analyzer)
 	tsdbToNATIP := make(map[string]string)
+	tsdbToPodIP := make(map[string]string)
 	for _, dbTSDB := range dbTSDBs {
 		ipToTSDB[dbTSDB.IP] = dbTSDB
-		tsdbToNATIP[dbTSDB.IP] = dbTSDB.NATIP
+		tsdbToPodIP[dbTSDB.IP] = dbTSDB.NATIP
 		dbKeys.Add(dbTSDB.IP)
 	}
 	n.updateTSDBNATIP(tsdbToNATIP)
+	n.updateTSDBPodIP(tsdbToPodIP)
 
 	cacheKeys := n.tsdbCaches.GetKeySet()
 	addTSDB := dbKeys.Difference(cacheKeys)
