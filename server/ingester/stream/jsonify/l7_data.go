@@ -286,6 +286,9 @@ type L7Logger struct {
 
 	AttributeNames  []string
 	AttributeValues []string
+
+	MetricsNames  []string
+	MetricsValues []float64
 }
 
 func L7LoggerColumns() []*ckdb.Column {
@@ -323,6 +326,8 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("sql_affected_rows", ckdb.UInt64Nullable).SetComment("sql影响行数"),
 		ckdb.NewColumn("attribute_names", ckdb.ArrayString).SetComment("额外的属性"),
 		ckdb.NewColumn("attribute_values", ckdb.ArrayString).SetComment("额外的属性对应的值"),
+		ckdb.NewColumn("metrics_names", ckdb.ArrayString).SetComment("额外的指标"),
+		ckdb.NewColumn("metrics_values", ckdb.ArrayFloat64).SetComment("额外的指标对应的值"),
 	)
 	return l7Columns
 }
@@ -420,6 +425,12 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteArrayString(h.AttributeValues); err != nil {
+		return err
+	}
+	if err := block.WriteArrayString(h.MetricsNames); err != nil {
+		return err
+	}
+	if err := block.WriteArrayFloat64(h.MetricsValues); err != nil {
 		return err
 	}
 
