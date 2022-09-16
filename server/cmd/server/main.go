@@ -29,6 +29,7 @@ import (
 	"io/ioutil"
 
 	"github.com/deepflowys/deepflow/server/controller/controller"
+	"github.com/deepflowys/deepflow/server/controller/report"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 	"github.com/deepflowys/deepflow/server/ingester/ingester"
 	"github.com/deepflowys/deepflow/server/libs/logger"
@@ -49,7 +50,7 @@ var log = logging.MustGetLogger(execName())
 var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")
 var version = flag.Bool("v", false, "Display the version")
 
-var RevCount, Revision, CommitDate, goVersion string
+var Branch, RevCount, Revision, CommitDate, goVersion string
 
 type Config struct {
 	LogFile  string `default:"/var/log/deepflow/server.log" yaml:"log-file"`
@@ -92,6 +93,8 @@ func main() {
 		cancel()
 		utils.GetWaitGroupInCtx(ctx).Wait() // wait for goroutine cancel
 	}()
+
+	report.SetServerInfo(Branch, RevCount, Revision)
 	go controller.Start(ctx, *configPath)
 
 	go querier.Start(*configPath)
