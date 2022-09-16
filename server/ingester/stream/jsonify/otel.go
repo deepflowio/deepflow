@@ -145,16 +145,14 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 	h.IsIPv4 = true
 	sw8SegmentId := ""
 	attributeNames, attributeValues := []string{}, []string{}
+	metricsNames, metricsValues := []string{}, []float64{}
 	for i, attr := range append(spanAttributes, resAttributes...) {
 		key := attr.GetKey()
 		value := attr.GetValue()
 		if value == nil {
 			continue
 		}
-
-		// FIXME 不同类型都按string存储，后续不同类型存储应分开, 参考: https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto#L31
-		attributeNames = append(attributeNames, key)
-		attributeValues = append(attributeValues, getValueString(value))
+		is_metrics := false
 
 		if i >= len(spanAttributes) {
 			switch key {
@@ -235,22 +233,41 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 				h.RequestType = value.GetStringValue()
 			case "http.target", "db.statement", "messaging.url", "rpc.service":
 				h.RequestResource = value.GetStringValue()
-			case "http.request_content_length":
-				h.requestLength = value.GetIntValue()
-				h.RequestLength = &h.requestLength
-			case "http.response_content_length":
-				h.responseLength = value.GetIntValue()
-				h.ResponseLength = &h.responseLength
 			case "sw8.span_id":
 				h.SpanId = getValueString(value)
 			case "sw8.parent_span_id":
 				h.ParentSpanId = getValueString(value)
 			case "sw8.segment_id":
 				sw8SegmentId = getValueString(value)
+			case "http.request_content_length":
+				h.requestLength = value.GetIntValue()
+				h.RequestLength = &h.requestLength
+				is_metrics = true
+			case "http.response_content_length":
+				h.responseLength = value.GetIntValue()
+				h.ResponseLength = &h.responseLength
+				is_metrics = true
+			case "db.cassandra.page_size":
+				h.sqlAffectedRows = uint64(value.GetIntValue())
+				h.SqlAffectedRows = &h.sqlAffectedRows
+				is_metrics = true
+			case "message.uncompressed_size", "messaging.message_payload_size_bytes", "messaging.message_payload_compressed_size_bytes":
+				is_metrics = true
 			default:
 				// nothing
 			}
 		}
+
+		if is_metrics {
+			metricsNames = append(attributeNames, key)
+			v, _ := strconv.ParseFloat(getValueString(value), 64)
+			metricsValues = append(metricsValues, v)
+		} else {
+			// FIXME 不同类型都按string存储，后续不同类型存储应分开, 参考: https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto#L31
+			attributeNames = append(attributeNames, key)
+			attributeValues = append(attributeValues, getValueString(value))
+		}
+
 	}
 	if sw8SegmentId != "" {
 		h.SpanId = sw8SegmentId + "-" + h.SpanId
@@ -280,6 +297,8 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 
 	h.AttributeNames = attributeNames
 	h.AttributeValues = attributeValues
+	h.MetricsNames = metricsNames
+	h.MetricsValues = metricsValues
 }
 
 func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) {
