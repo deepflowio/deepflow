@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use bincode::{Decode, Encode};
 use parking_lot::RwLock;
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 
 use super::error::{Error, Result};
 
@@ -72,7 +72,7 @@ impl RpcDebugger {
             status,
             config,
             running_config,
-            rt: Runtime::new().unwrap(),
+            rt: Builder::new_current_thread().enable_all().build().unwrap(),
         }
     }
 
