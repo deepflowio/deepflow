@@ -25,7 +25,7 @@ use log::{error, info, warn};
 use md5::{Digest, Md5};
 use serde::Deserialize;
 use thiserror::Error;
-use tokio::runtime::Runtime;
+use tokio::runtime::Builder;
 
 use crate::common::decapsulate::TunnelType;
 use crate::common::{
@@ -126,7 +126,7 @@ impl Config {
                 }
             }
         };
-        let runtime = Runtime::new().unwrap();
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
         runtime.block_on(async {
             loop {
                 session.update_current_server().await;
