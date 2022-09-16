@@ -70,6 +70,7 @@ type ControllerConfig struct {
 	Kubeconfig           string `yaml:"kubeconfig"`
 	ElectionName         string `default:"deepflow-server" yaml:"election-name"`
 	ElectionNamespace    string `default:"deepflow" yaml:"election-namespace"`
+	ReportingDisabled    bool   `default:"false" yaml:"reporting-disabled"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`
 

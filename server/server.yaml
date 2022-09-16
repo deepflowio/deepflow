@@ -18,6 +18,8 @@ controller:
   # election
   election-namespace: deepflow
   election-name: deepflow-server
+  # reporting
+  reporting-disabled: false
 
   # deepflow web service config
   df-web-service:

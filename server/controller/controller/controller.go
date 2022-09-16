@@ -40,6 +40,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/monitor/license"
 	"github.com/deepflowys/deepflow/server/controller/recorder"
 	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/report"
 	"github.com/deepflowys/deepflow/server/controller/router"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
@@ -209,6 +210,10 @@ func Start(ctx context.Context, configPath string) {
 	trouter.RegistRouter(r)
 
 	grpcStart(ctx, cfg)
+
+	if !cfg.ReportingDisabled {
+		go report.NewReportServer(mysql.Db).StartReporting()
+	}
 }
 
 func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {
