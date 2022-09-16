@@ -742,9 +742,27 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	files_offs = kernel_struct_field_offset(obj, "task_struct", "files");
 	sk_flags_offs =
 	    kernel_struct_field_offset(obj, "sock", "__sk_flags_offset");
+
+	/*
+	 * From linux 5.6+, struct sock has changed(without '__sk_flags_offset[0]').
+	 * ...
+	 * 	u8 sk_padding : 1,
+	 *	   sk_kern_sock : 1,
+	 *	   sk_no_check_tx : 1,
+	 *	   sk_no_check_rx : 1,
+	 *	   sk_userlocks : 4;
+	 *	u8  sk_pacing_shift;
+	 *      u16 sk_type;
+	 * ...
+	 * Ajust:
+	 * sk_flags_offs = [sk_pacing_shift offset] - 1;
+	 */
 	if (sk_flags_offs == ETR_NOTEXIST) {
 		sk_flags_offs =
 		    kernel_struct_field_offset(obj, "sock", "sk_pacing_shift");
+		if (sk_flags_offs > 0) {
+			sk_flags_offs -= 1;
+		}
 	}
 
 	if (copied_seq_offs < 0 || write_seq_offs < 0 ||
