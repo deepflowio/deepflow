@@ -22,7 +22,7 @@ require (
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
-	github.com/deepflowys/deepflow/message v0.0.0-20220913095419-6581590ceacd
+	github.com/deepflowys/deepflow/message v0.0.0-20220915023244-98d8d6c05bcf
 	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
@@ -51,6 +51,7 @@ require (
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.2
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.479
 	github.com/textnode/fencer v0.0.0-20121219195347-6baed0e5ef9a
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2

@@ -334,4 +334,13 @@ static_config:
   l7-protocol-inference-max-fail-count: 5
   # 一个服务的应用层协议类型推断结果的有效期，单位为秒，超过有效期后会触发下一次推断
   l7-protocol-inference-ttl: 60
+  ## 流日志时序数据单个流flush最大数据长度，超过这个长度就发送到sender，单位为B，默认64B
+  #packet-sequence-block-size: 64
+  ## the size of queue linking packet-sequence-block and uniform-collect-sender, minimum 65536
+  ## - 1-packet-sequence-block-to-uniform-collect-sender
+  #packet-sequence-queue-size: 65536
+  ## the number of encoders for uniform collect sender
+  #packet-sequence-queue-count: 1
+  ##packet-sequence-flag decides which tcp flags need to be reported
+  #packet-sequence-flag: 255
 `)

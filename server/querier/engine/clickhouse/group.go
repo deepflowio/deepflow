@@ -63,10 +63,10 @@ func GetNotNullFilter(name string, asTagMap map[string]string, db, table string)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if strings.HasPrefix(preAsTag, "tag.") || strings.HasPrefix(preAsTag, "attribute.") {
 					tagItem, ok = tag.GetTag("tag", db, table, "default")
-					filter := fmt.Sprintf(tagItem.NotNullFilter, preAsTag)
+					filter := fmt.Sprintf(tagItem.NotNullFilter, name)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				} else if common.IsValueInSliceString(preAsTag, []string{"request_id", "response_code", "span_kind", "request_length", "response_length", "sql_affected_rows"}) {
-					filter := fmt.Sprintf("%s is not null", preAsTag)
+					filter := fmt.Sprintf("%s is not null", name)
 					return &view.Expr{Value: "(" + filter + ")"}, true
 				}
 				return &view.Expr{}, false

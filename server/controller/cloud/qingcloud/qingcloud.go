@@ -223,7 +223,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 	}
 
 	// qingcloud has a unified call API，so this could be very convenient
-	if !strings.Contains(common.CloudMonitorExceptionAPI["qingcloud"], action) {
+	if !strings.Contains(common.CloudMonitorExceptionAPI[common.QINGCLOUD_EN], action) {
 		cost := time.Now().Sub(startTime).Milliseconds()
 		if _, ok := q.cloudStatsd.APICost[action]; !ok {
 			q.cloudStatsd.APICost[action] = []int{int(cost)}
@@ -266,7 +266,7 @@ func (q *QingCloud) GetStatter() statsd.StatsdStatter {
 	globalTags := map[string]string{
 		"domain_name": q.Name,
 		"domain":      q.Uuid,
-		"platform":    "qingcloud",
+		"platform":    common.QINGCLOUD_EN,
 	}
 
 	return statsd.StatsdStatter{
