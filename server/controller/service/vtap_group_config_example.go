@@ -343,4 +343,13 @@ static_config:
   #packet-sequence-queue-count: 1
   ##packet-sequence-flag decides which tcp flags need to be reported
   #packet-sequence-flag: 255
+  ## 是否开启ebpf
+  ebpf-disabled: false
+  ## eBPF uprobe 开启 Golang 符号表解析，默认为 false# 作用于裁剪了标准符号表的 Golang 进程（例如 K8s 自身进程一般属于此类）。
+  ## 当关闭此开关时，无法采集此类进程的 uprobe 数据。
+  ## 当开启此开关时，对于 Golang >= 1.13 且 < 1.18 的 Golang 进程，
+  ## 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
+  ebpf-uprobe-golang-symbol-enabled: false
+  ## 开发过程中的功能控制开关，支持多个
+  feature-flags:
 `)

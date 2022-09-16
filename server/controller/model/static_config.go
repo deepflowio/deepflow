@@ -67,6 +67,9 @@ type StaticConfig struct {
 	PacketSequenceQueueSize         *int                  `yaml:"packet-sequence-queue-size,omitempty"`
 	PacketSequenceQueueCount        *int                  `yaml:"packet-sequence-queue-count,omitempty"`
 	PacketSequenceFlag              *uint8                `yaml:"packet-sequence-flag,omitempty"`
+	EbpfDisabled                    *bool                 `yaml:"ebpf-disabled,omitempty"`
+	EbpfUprobeGolangSymbolEnabled   *bool                 `yaml:"ebpf-uprobe-golang-symbol-enabled,omitempty"`
+	FeatureFlags                    []string              `yaml:"feature-flags,omitempty"`
 }
 
 type XflowCollectorConfig struct {
