@@ -420,6 +420,18 @@ var ColumnAdd613 = []*ColumnAdds{
 		ColumnNames: []string{"acl_gids"},
 		ColumnType:  ckdb.ArrayUInt16,
 	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"metrics_names"},
+		ColumnType:  ckdb.ArrayString,
+	},
+	&ColumnAdds{
+		Dbs:         []string{"flow_log"},
+		Tables:      []string{"l7_flow_log", "l7_flow_log_local"},
+		ColumnNames: []string{"metrics_values"},
+		ColumnType:  ckdb.ArrayFloat64,
+	},
 }
 
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
