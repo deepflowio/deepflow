@@ -69,6 +69,8 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 	}
 	if vtapConfig.NatIPEnabled == 1 {
 		proxyControllerIP = trisolaris.GetGNodeInfo().GetControllerNatIP(proxyControllerIP)
+	} else if gVTapInfo.IsTheSameRegion(c.GetRegion()) {
+		proxyControllerIP = trisolaris.GetGNodeInfo().GetControllerPodIP(proxyControllerIP)
 	}
 	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
 	if ok == false {
@@ -164,7 +166,12 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 		configure.AnalyzerIp = &configTSDBIP
 	} else if cacheTSBIP != "" {
 		if vtapConfig.NatIPEnabled == 0 {
-			configure.AnalyzerIp = &cacheTSBIP
+			if gVTapInfo.IsTheSameRegion(c.GetRegion()) {
+				podIP := trisolaris.GetGNodeInfo().GetTSDBPodIP(cacheTSBIP)
+				configure.AnalyzerIp = &podIP
+			} else {
+				configure.AnalyzerIp = &cacheTSBIP
+			}
 		} else {
 			natIP := trisolaris.GetGNodeInfo().GetTSDBNatIP(cacheTSBIP)
 			configure.AnalyzerIp = &natIP
