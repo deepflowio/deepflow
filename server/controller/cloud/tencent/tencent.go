@@ -227,7 +227,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 			return []*simplejson.Json{}, errors.New(errMsg)
 		}
 
-		if len(resultSet.MustArray()) == 0 {
+		if len(resultSet.MustArray()) == 0 && len(resultSet.MustMap()) > 0 {
 			responses = append(responses, resultSet)
 		} else {
 			for r := range resultSet.MustArray() {
