@@ -7,6 +7,7 @@ replace (
 	github.com/deepflowys/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
 	github.com/deepflowys/deepflow/server/controller/monitor/license => ./controller/monitor/license
+	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch => ./querier/engine/clickhouse/packet_batch
 	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
 )
 
@@ -26,6 +27,7 @@ require (
 	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
+	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/go-redis/redis v6.15.9+incompatible

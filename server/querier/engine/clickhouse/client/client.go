@@ -22,6 +22,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowys/deepflow/server/querier/statsd"
+	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
 	"time"
 	"unsafe"
@@ -47,6 +48,9 @@ type Client struct {
 }
 
 func (c *Client) init(query_uuid string) error {
+	if query_uuid == "" {
+		query_uuid = uuid.NewString()
+	}
 	if c.Debug == nil {
 		c.Debug = &Debug{
 			QueryUUID: query_uuid,
