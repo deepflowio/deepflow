@@ -331,6 +331,19 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 {
 	// When go uprobe http2 cannot be used, use kprobe/tracepoint to collect data
 	if (skip_http2_kprobe()) {
+		if (conn_info->direction == T_INGRESS &&
+		    conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+			struct http2_tcp_seq_key tcp_seq_key = {
+				.tgid = bpf_get_current_pid_tgid() >> 32,
+				.fd = conn_info->fd,
+				.tcp_seq_end =
+					get_tcp_read_seq_from_fd(conn_info->fd),
+			};
+			// make linux 4.14 validator happy
+			__u32 tcp_seq = tcp_seq_key.tcp_seq_end - count;
+			bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key,
+					    &tcp_seq, BPF_NOEXIST);
+		}
 		return MSG_UNKNOWN;
 	}
 

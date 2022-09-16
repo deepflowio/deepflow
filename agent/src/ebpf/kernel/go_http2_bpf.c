@@ -188,6 +188,10 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 static __inline void http2_fill_common_socket(struct http2_header_data *data,
 					      struct __socket_data *send_buffer)
 {
+	// Assigned at the end of the function,
+	// 0 means that the function returns during execution
+	send_buffer->pid = 0;
+
 	// source, coroutine_id, timestamp, comm
 	send_buffer->source = DATA_SOURCE_GO_HTTP2_UPROBE;
 	send_buffer->coroutine_id = get_current_goroutine();
@@ -204,10 +208,6 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	} else {
 		tcp_seq = get_tcp_write_seq_from_fd(data->fd);
 		direction = T_EGRESS;
-	}
-
-	if (tcp_seq == 0) {
-		return;
 	}
 
 	send_buffer->tcp_seq = tcp_seq;
@@ -320,7 +320,8 @@ http2_fill_buffer_and_send(struct http2_header_data *data,
 			   struct __http2_buffer *buffer,
 			   struct __socket_data *send_buffer)
 {
-	if (!data || !buffer || !send_buffer || !send_buffer->tcp_seq) {
+	// Check if pid is a valid value
+	if (!data || !buffer || !send_buffer || !send_buffer->pid) {
 		return;
 	}
 	send_buffer->msg_type = data->message_type;
@@ -380,7 +381,7 @@ static __inline int submit_http2_headers(struct http2_headers_data *headers)
 		.ctx = headers->ctx,
 	};
 	struct __http2_stack *stack = get_http2_stack();
-	if(!stack){
+	if (!stack) {
 		return 0;
 	}
 
@@ -458,7 +459,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 	data.stream -= 2;
 
 	struct __http2_stack *stack = get_http2_stack();
-	if(!stack){
+	if (!stack) {
 		return 0;
 	}
 
@@ -511,7 +512,7 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 	data.value.len = 0;
 
 	struct __http2_stack *stack = get_http2_stack();
-	if(!stack){
+	if (!stack) {
 		return 0;
 	}
 
@@ -579,7 +580,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	data.ctx = ctx;
 
 	struct __http2_stack *stack = get_http2_stack();
-	if(!stack){
+	if (!stack) {
 		return 0;
 	}
 
