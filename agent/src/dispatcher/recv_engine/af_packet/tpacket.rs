@@ -21,7 +21,7 @@ use libc::{
     sockaddr_ll, socklen_t, AF_PACKET, ETH_P_ALL, MAP_SHARED, MAP_LOCKED, MAP_NORESERVE, POLLERR, POLLIN, PROT_READ,
     PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
 };
-use log::{info, warn};
+use log::warn;
 use public::error::*;
 use public::packet::Packet;
 use socket::{self, Socket};
@@ -195,7 +195,7 @@ impl Tpacket {
                 0 as off_t,
             ) as isize;
             if ret == -1 {
-                info!("Afpacket mmap error: {:?}, maybe env lack permission, retry without MAP_LOCKED and MAP_NORESERVE.", io::Error::last_os_error());
+                warn!("Afpacket mmap error: {:?}, maybe env lack permission, retry without MAP_LOCKED and MAP_NORESERVE.", io::Error::last_os_error());
                 ret = mmap(
                     std::ptr::null_mut(),
                     (self.opts.block_size * self.opts.num_blocks) as size_t,
