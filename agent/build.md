@@ -71,6 +71,12 @@ cd elfutils-0.187
 ./configure
 make && make install && make clean
 ln -s /usr/local/lib/libelf.a /usr/lib/libelf.a
+
+# libGoReSym
+wget https://github.com/deepflowys/libGoReSym/archive/refs/tags/v0.0.1-2.tar.gz
+tar -xzf v0.0.1-2.tar.gz
+cd libGoReSym-0.0.1-2
+make && make install && make clean
 ```
 
 Compile agent：
