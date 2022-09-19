@@ -41,6 +41,12 @@ var METRICS_TYPE_NAME_MAP = map[string]int{
 	"tag":        METRICS_TYPE_TAG,
 }
 
+var METRICS_ARRAY_NAME_MAP = map[string][]string{
+	"flow_log":        []string{"metrics_names", "metrics_values"},
+	"ext_metrics":     []string{"metrics_float_names", "metrics_float_values"},
+	"deepflow_system": []string{"metrics_float_names", "metrics_float_values"},
+}
+
 const (
 	FUNCTION_TYPE_UNKNOWN int = iota // 未被定义的算子
 	FUNCTION_TYPE_AGG                // 聚合类算子 例：sum、max、min
