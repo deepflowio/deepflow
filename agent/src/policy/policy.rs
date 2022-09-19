@@ -34,6 +34,7 @@ use crate::common::enums::TapType;
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
+use crate::common::FeatureFlags;
 use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
 use crate::proto::common::TridentType;
@@ -84,10 +85,11 @@ impl Policy {
         level: usize,
         map_size: usize,
         fast_disable: bool,
+        features: FeatureFlags,
     ) -> (PolicySetter, PolicyGetter) {
         let policy = Box::into_raw(Box::new(Policy {
             labeler: Labeler::default(),
-            table: FirstPath::new(queue_count, level, map_size, fast_disable),
+            table: FirstPath::new(queue_count, level, map_size, fast_disable, features),
             forward: Forward::new(queue_count),
             queue_count,
             first_hit: 0,
@@ -420,13 +422,15 @@ mod test {
 
     use super::*;
     use crate::common::endpoint::FeatureFlags;
+    use crate::common::feature;
     use crate::common::platform_data::IpSubnet;
     use crate::common::policy::{Cidr, CidrType};
     use crate::utils::net::MacAddr;
 
     #[test]
     fn test_policy_normal() {
-        let (mut setter, mut getter) = Policy::new(10, 0, 1024, false);
+        let (mut setter, mut getter) =
+            Policy::new(10, 0, 1024, false, feature::FeatureFlags::POLICY);
         let interface: PlatformData = PlatformData {
             mac: 0x002233445566,
             ips: vec![IpSubnet {

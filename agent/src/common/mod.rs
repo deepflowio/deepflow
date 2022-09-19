@@ -20,6 +20,7 @@ pub mod ebpf;
 pub mod endpoint;
 pub mod enums;
 mod error;
+pub mod feature;
 pub mod flow;
 pub mod lookup_key;
 pub mod matched_field;
@@ -33,6 +34,7 @@ pub mod tap_port;
 pub mod tap_types;
 
 pub use consts::*;
+pub use feature::FeatureFlags;
 pub use meta_packet::MetaPacket;
 pub use platform_data::PlatformData;
 pub use tagged_flow::TaggedFlow;

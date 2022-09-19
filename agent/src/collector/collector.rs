@@ -518,9 +518,25 @@ impl Stash {
                 Ipv4Addr::UNSPECIFIED.into()
             }
         } else if ep == FLOW_METRICS_PEER_SRC {
-            flow_key.ip_src
+            if flow.flow_metrics_peers[0].l3_epc_id > 0 {
+                flow_key.ip_src
+            } else {
+                if is_ipv6 {
+                    Ipv6Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
+            }
         } else {
-            flow_key.ip_dst
+            if flow.flow_metrics_peers[1].l3_epc_id > 0 {
+                flow_key.ip_dst
+            } else {
+                if is_ipv6 {
+                    Ipv6Addr::UNSPECIFIED.into()
+                } else {
+                    Ipv4Addr::UNSPECIFIED.into()
+                }
+            }
         };
         let mut tagger = Tagger {
             global_thread_id: self.global_thread_id,
@@ -606,7 +622,7 @@ impl Stash {
                     dst_ip = acc_flow.nat_dst_ip;
                 }
             }
-            // 本端IP为云外Internet地址或不活跃时置为0
+
             if !inactive_ip_enabeld {
                 if !acc_flow.is_active_host0 {
                     src_ip = if is_ipv6 {
@@ -616,6 +632,25 @@ impl Stash {
                     };
                 }
                 if !acc_flow.is_active_host1 {
+                    dst_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
+            } else {
+                // After enabling the storage of inactive IP addresses,
+                // the Internet IP address also needs to be saved as 0
+                // =======================================
+                // 开启存储非活跃IP后，Internet IP也需要存0
+                if flow.flow_metrics_peers[0].l3_epc_id <= 0 {
+                    src_ip = if is_ipv6 {
+                        Ipv6Addr::UNSPECIFIED.into()
+                    } else {
+                        Ipv4Addr::UNSPECIFIED.into()
+                    };
+                }
+                if flow.flow_metrics_peers[1].l3_epc_id <= 0 {
                     dst_ip = if is_ipv6 {
                         Ipv6Addr::UNSPECIFIED.into()
                     } else {
