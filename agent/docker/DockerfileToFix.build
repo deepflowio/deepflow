@@ -23,7 +23,7 @@ RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.e
      yum --disablerepo=* localinstall -y ./bddisasm-*.rpm && rm -rf bddisasm-*.rpm && \
      curl http://cloud.deepservice.yunshan.net:1080/kernel/bcc-bpf-0.25.0-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./bcc-bpf-*.rpm && rm -rf bcc-bpf-*.rpm && \
-     curl http://cloud.deepservice.yunshan.net:1080/kernel/libGoReSym-0.0.1-1.el7.x86_64.rpm --silent -O && \
+     curl http://cloud.deepservice.yunshan.net:1080/kernel/libGoReSym-0.0.1-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./libGoReSym-*.rpm && rm -rf libGoReSym-*.rpm && \
      yum clean all
 
