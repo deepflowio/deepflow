@@ -101,6 +101,8 @@ type VTapInfo struct {
 	defaultVTapGroup *string
 
 	vTapIPs *atomic.Value // []*trident.VtapIp
+
+	localClusterID *string
 }
 
 func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *VTapInfo {
@@ -533,8 +535,8 @@ func (v *VTapInfo) GetVTapPolicyVersion(vtapID int, functions mapset.Set) uint64
 	return v.vTapPolicyData.getVTapPolicyVersion(vtapID, functions)
 }
 
-func (v *VTapInfo) IsTheSameRegion(region string) bool {
-	return v.getRegion() == region
+func (v *VTapInfo) IsTheSameCluster(clusterID string) bool {
+	return v.getLocalClusterID() == clusterID
 }
 
 func GetKey(vtap *models.VTap) string {
@@ -629,6 +631,7 @@ func (v *VTapInfo) GenerateVTapCache() {
 	v.updateVTapInfo()
 	v.updateCacheToDB()
 	v.generateVTapIP()
+	v.generateLocalClusterID()
 }
 
 func (v *VTapInfo) UpdateTSDBVTapInfo(cVTaps []*trident.CommunicationVtap, tsdbIP string) {
@@ -674,6 +677,26 @@ func (v *VTapInfo) generateAllVTapPlatformData() {
 	log.Debug(v.vTapPlatformData)
 }
 
+func (v *VTapInfo) getLocalClusterID() string {
+	if v.localClusterID != nil {
+		return *v.localClusterID
+	}
+
+	return ""
+}
+
+func (v *VTapInfo) generateLocalClusterID() {
+	if v.getLocalClusterID() == "" {
+		clusterID, err := GetLocalClusterID()
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		v.localClusterID = proto.String(clusterID)
+		log.Infof("local cluster id: %s", v.getLocalClusterID())
+	}
+}
+
 func (v *VTapInfo) InitData() {
 	v.loadBaseData()
 	if v.vtaps != nil {
@@ -687,6 +710,7 @@ func (v *VTapInfo) InitData() {
 	// 最后生成romote segment
 	v.generateAllVTapRemoteSegements()
 	v.generateVTapIP()
+	v.generateLocalClusterID()
 	v.isReady.Set()
 }
 
