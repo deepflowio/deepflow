@@ -37,7 +37,7 @@ use crate::sender::SendItem;
 use crate::utils::queue::{bounded, Receiver, Sender};
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
-const TICK_CYCLE: Duration = Duration::from_secs(5);
+const TICK_CYCLE: Duration = Duration::from_secs(60);
 pub const DFSTATS_SENDER_ID: usize = 100;
 
 pub enum StatsOption {
