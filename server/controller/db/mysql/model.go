@@ -1157,6 +1157,7 @@ type NpbPolicy struct {
 	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
 	Vni              int       `gorm:"column:vni;type:int;default:null" json:"VNI"`
 	NpbTunnelID      int       `gorm:"column:npb_tunnel_id;type:int;default:null" json:"NPB_TUNNEL_ID"`
+	Distribute       int       `gorm:"column:distribute;type:int;default:null" json:"distribute"` // 0-drop, 1-distribute
 	PayloadSlice     int       `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
 	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
 	PolicyACLGroupID int       `gorm:"column:policy_acl_group_id;type:int;default:null" json:"POLICY_ACL_GROUP_ID"`

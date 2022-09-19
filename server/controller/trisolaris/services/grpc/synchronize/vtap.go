@@ -34,17 +34,17 @@ import (
 )
 
 var (
-	RAW_UDP = api.SocketType_RAW_UDP
-	TCP     = api.SocketType_TCP
-	UDP     = api.SocketType_UDP
-	FILE    = api.SocketType_FILE
+	RAW_UDP_SOCKET = api.SocketType_RAW_UDP
+	TCP_SOCKET     = api.SocketType_TCP
+	UDP_SOCKET     = api.SocketType_UDP
+	FILE_SOCKET    = api.SocketType_FILE
 )
 
 var SOCKET_TYPE_TO_MESSAGE = map[string]api.SocketType{
-	"RAW_UDP": RAW_UDP,
-	"TCP":     TCP,
-	"UDP":     UDP,
-	"FILE":    FILE,
+	"RAW_UDP": RAW_UDP_SOCKET,
+	"TCP":     TCP_SOCKET,
+	"UDP":     UDP_SOCKET,
+	"FILE":    FILE_SOCKET,
 }
 
 type VTapEvent struct{}
@@ -70,15 +70,15 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 
 	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
 	if ok == false {
-		collectorSocketType = UDP
+		collectorSocketType = UDP_SOCKET
 	}
 	compressorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CompressorSocketType]
 	if ok == false {
-		compressorSocketType = RAW_UDP
+		compressorSocketType = RAW_UDP_SOCKET
 	}
 	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
 	if ok == false {
-		npbSocketType = RAW_UDP
+		npbSocketType = RAW_UDP_SOCKET
 	}
 	decapTypes := make([]api.DecapType, 0, len(vtapConfig.ConvertedDecapType))
 	for _, decap := range vtapConfig.ConvertedDecapType {
@@ -418,15 +418,15 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	}
 	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
 	if ok == false {
-		collectorSocketType = UDP
+		collectorSocketType = UDP_SOCKET
 	}
 	compressorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CompressorSocketType]
 	if ok == false {
-		compressorSocketType = RAW_UDP
+		compressorSocketType = RAW_UDP_SOCKET
 	}
 	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
 	if ok == false {
-		npbSocketType = RAW_UDP
+		npbSocketType = RAW_UDP_SOCKET
 	}
 	decapTypes := make([]api.DecapType, 0, len(vtapConfig.ConvertedDecapType))
 	for _, decap := range vtapConfig.ConvertedDecapType {

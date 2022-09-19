@@ -400,16 +400,6 @@ func (op *PolicyDataOP) generateRawData() {
 	op.updateRawData(rawData)
 }
 
-var (
-	TCP = 6
-	UDP = 17
-)
-
-var protocolMap = map[string]int{
-	"TCP": TCP,
-	"UDP": UDP,
-}
-
 type GroupIDs struct {
 	srcGroupIDs []int32
 	dstGroupIDs []int32
@@ -453,10 +443,16 @@ func (op *PolicyDataOP) generateProtoPorts(acl *models.ACL, flowACL *trident.Flo
 	dstGroupIDs := groupIDs.dstGroupIDs
 	dstPorts := acl.DstPorts
 	srcPorts := acl.SrcPorts
+	srcProtocol := PROTOCOL_ALL
+	dstProtocol := PROTOCOL_ALL
 	protocol := PROTOCOL_ALL
 	if acl.Protocol != 0 {
+		srcProtocol = acl.Protocol
+		dstProtocol = acl.Protocol
 		protocol = acl.Protocol
 	}
+	dstGroupType := -1
+	srcGroupType := -1
 	groupDataOP := op.metaData.GetGroupDataOP()
 	idToGroup := groupDataOP.GetIDToGroup()
 	groupIDToPodServiceIDs := groupDataOP.GetGroupIDToPodServiceIDs()
@@ -467,6 +463,7 @@ func (op *PolicyDataOP) generateProtoPorts(acl *models.ACL, flowACL *trident.Flo
 		dstGroup, ok := idToGroup[int(dstGroupIDs[0])]
 		if ok && dstGroup.Type == RESOURCE_GROUP_TYPE_ANONYMOUS_POD_SERVICE &&
 			len(dstGroup.ExtraInfoIDs) > 0 {
+			dstGroupType = RESOURCE_GROUP_TYPE_ANONYMOUS_POD_SERVICE
 			for _, podServiceID := range groupIDToPodServiceIDs[dstGroup.ID] {
 				podService, ok := pRawData.idToPodService[podServiceID]
 				if ok == false {
@@ -490,13 +487,13 @@ func (op *PolicyDataOP) generateProtoPorts(acl *models.ACL, flowACL *trident.Flo
 				}
 				if len(protocols) == 1 {
 					for key, _ := range protocols {
-						protocol = protocolMap[key]
+						dstProtocol = ProtocolMap[key]
 					}
-					if protocol == 0 {
-						protocol = PROTOCOL_ALL
+					if dstProtocol == 0 {
+						dstProtocol = PROTOCOL_ALL
 					}
 				} else {
-					protocol = PROTOCOL_ALL
+					dstProtocol = PROTOCOL_ALL
 				}
 			}
 		}
@@ -506,6 +503,7 @@ func (op *PolicyDataOP) generateProtoPorts(acl *models.ACL, flowACL *trident.Flo
 		srcGroup, ok := idToGroup[int(srcGroupIDs[0])]
 		if ok && srcGroup.Type == RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP_AS_POD_SERVICE &&
 			len(srcGroup.ExtraInfoIDs) > 0 {
+			srcGroupType = RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP_AS_POD_SERVICE
 			for _, podServiceID := range groupIDToPodServiceIDs[srcGroup.ID] {
 				protocols := make(map[string]struct{})
 				for _, podGroupPort := range pRawData.podServiceIDToPodGroupPorts[podServiceID] {
@@ -514,33 +512,52 @@ func (op *PolicyDataOP) generateProtoPorts(acl *models.ACL, flowACL *trident.Flo
 				}
 				if len(protocols) == 1 {
 					for key, _ := range protocols {
-						protocol = protocolMap[key]
+						srcProtocol = ProtocolMap[key]
 					}
-					if protocol == 0 {
-						protocol = PROTOCOL_ALL
+					if srcProtocol == 0 {
+						srcProtocol = PROTOCOL_ALL
 					}
 				} else {
-					protocol = PROTOCOL_ALL
+					srcProtocol = PROTOCOL_ALL
 				}
 			}
 		}
 	}
 
-	dstPortsStrList := make([]string, 0, len(dstPortsStr))
-	for key, _ := range dstPortsStr {
-		dstPortsStrList = append(dstPortsStrList, key)
-	}
-	srcPortsStrList := make([]string, 0, len(srcPortsStr))
-	for key, _ := range srcPortsStr {
-		srcPortsStrList = append(srcPortsStrList, key)
-	}
-	if len(dstPortsStrList) > 0 {
-		sort.Strings(dstPortsStrList)
-		dstPorts = strings.Join(dstPortsStrList, ",")
-	}
-	if len(srcPortsStrList) > 0 {
-		sort.Strings(srcPortsStrList)
-		srcPorts = strings.Join(srcPortsStrList, ",")
+	// The collection point acts as a client, ignoring the port/protocol information;
+	// the peer acts as a server and needs to carry the port/protocol
+	if srcGroupType == RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP_AS_POD_SERVICE &&
+		dstGroupType == RESOURCE_GROUP_TYPE_ANONYMOUS_POD_SERVICE {
+		protocol = dstProtocol
+		dstPortsStrList := make([]string, 0, len(dstPortsStr))
+		for key, _ := range dstPortsStr {
+			dstPortsStrList = append(dstPortsStrList, key)
+		}
+		if len(dstPortsStrList) > 0 {
+			sort.Strings(dstPortsStrList)
+			dstPorts = strings.Join(dstPortsStrList, ",")
+		}
+		srcPorts = ""
+	} else if dstGroupType == RESOURCE_GROUP_TYPE_ANONYMOUS_POD_SERVICE {
+		protocol = dstProtocol
+		dstPortsStrList := make([]string, 0, len(dstPortsStr))
+		for key, _ := range dstPortsStr {
+			dstPortsStrList = append(dstPortsStrList, key)
+		}
+		if len(dstPortsStrList) > 0 {
+			sort.Strings(dstPortsStrList)
+			dstPorts = strings.Join(dstPortsStrList, ",")
+		}
+	} else if srcGroupType == RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP_AS_POD_SERVICE {
+		protocol = srcProtocol
+		srcPortsStrList := make([]string, 0, len(srcPortsStr))
+		for key, _ := range srcPortsStr {
+			srcPortsStrList = append(srcPortsStrList, key)
+		}
+		if len(srcPortsStrList) > 0 {
+			sort.Strings(srcPortsStrList)
+			srcPorts = strings.Join(srcPortsStrList, ",")
+		}
 	}
 
 	flowACL.SrcPorts = proto.String(srcPorts)
@@ -573,7 +590,11 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 				log.Errorf("npb tunnel id (%d) not found", npbPolicy.NpbTunnelID)
 				continue
 			}
+
 			tunnelType := trident.TunnelType(npbTunnel.Type)
+			if npbPolicy.Distribute == NPB_POLICY_FLOW_DROP {
+				tunnelType = trident.TunnelType_NPB_DROP
+			}
 			npbAction := &trident.NpbAction{
 				TunnelId:      proto.Uint32(uint32(npbPolicy.Vni)),
 				TunnelIp:      proto.String(npbTunnel.IP),

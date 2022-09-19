@@ -183,6 +183,11 @@ const (
 )
 
 const (
+	NPB_POLICY_FLOW_DROP       = 0
+	NPB_POLICY_FLOW_DISTRIBUTE = 1
+)
+
+const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
 	DEFAULT_PORT_NAME_REGEX     = "(cni|flannel|vxlan.calico|tunl|en[ospx])"
 
@@ -432,9 +437,14 @@ const (
 	GENESIS_METRIC_NAME_K8SINFO_DELAY = "genesis.k8sinfo.delay"
 )
 
+var (
+	TCP = 6
+	UDP = 17
+)
+
 var ProtocolMap = map[string]int{
-	"TCP": 6,
-	"UDP": 17,
+	"TCP": TCP,
+	"UDP": UDP,
 }
 
 var CloudMonitorExceptionAPI = map[string]string{
