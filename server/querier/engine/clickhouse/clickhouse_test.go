@@ -154,6 +154,9 @@ var (
 	}, {
 		input:  "select labels_0 from l7_flow_log",
 		output: "SELECT dictGet(flow_tag.k8s_labels_map, 'labels', toUInt64(pod_id_0)) AS `labels_0` FROM flow_log.l7_flow_log",
+	}, {
+		input:  "select `metrics.xxx` as xxx from l7_flow_log",
+		output: "SELECT if(indexOf(metrics_names, 'xxx')=0,null,metrics_values[indexOf(metrics_names, 'xxx')]) AS `xxx` FROM flow_log.l7_flow_log PREWHERE (xxx is not null)",
 	},
 	}
 )
