@@ -20,6 +20,7 @@ else
 	msg = @printf '  %-8s %s%s\n' "$(1)" "$(notdir $(2))" "$(if $(3), $(3))";
 endif
 
+CLANG ?= /usr/bin/clang
 CC ?= gcc
 OBJDIR ?= .
 STATIC_OBJDIR := $(OBJDIR)/staticobjs
@@ -32,8 +33,8 @@ define compile_socket_trace_elf
 endef
 
 CURRDIR := $(PWD)
-CLANG_VER := $(shell /usr/bin/clang --version | grep "version" | awk '{if ($$3!="version"){print $$3}else{exit -1}}' || /usr/bin/clang --version | grep "version" | awk '{if ($$4!="version"){print $$4}else{exit -1}}')
-CLANG_VER_MAIN := $(shell /usr/bin/clang --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || /usr/bin/clang --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
+CLANG_VER := $(shell ${CLANG} --version | grep "version" | awk '{if ($$3!="version"){print $$3}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{if ($$4!="version"){print $$4}else{exit -1}}')
+CLANG_VER_MAIN := $(shell ${CLANG} --version | grep "version" | awk '{print $$3}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}' || ${CLANG} --version | grep "version" | awk '{print $$4}' | awk -F. '{print $$1}' | awk '{if (int($$0)!=0){print $$0}else{exit -1}}')
 LIBTRACE := libtrace.a
 OBJS := user/elf.o \
 	user/common.o \
@@ -55,7 +56,7 @@ STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 # -DBPF_DEBUG
 CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
-LDFLAGS ?= -lbddisasm -ldwarf -lelf -lz -lpthread
+LDFLAGS ?= -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread
 
 all: build
 
