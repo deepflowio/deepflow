@@ -253,6 +253,8 @@ pub struct YamlConfig {
     pub packet_sequence_queue_size: usize, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_queue_count: usize, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_flag: u8,          // Enterprise Edition Feature: packet-sequence
+    pub ebpf_uprobe_golang_symbol_enabled: bool,
+    pub feature_flags: Vec<String>,
 }
 
 impl YamlConfig {
@@ -415,6 +417,8 @@ impl Default for YamlConfig {
             packet_sequence_queue_size: 0,  // Enterprise Edition Feature: packet-sequence
             packet_sequence_queue_count: 1, // Enterprise Edition Feature: packet-sequence
             packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
+            ebpf_uprobe_golang_symbol_enabled: false,
+            feature_flags: vec![],
         }
     }
 }
