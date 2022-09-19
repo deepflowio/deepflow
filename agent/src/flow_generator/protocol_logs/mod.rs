@@ -426,7 +426,7 @@ impl AppProtoLogsBaseInfo {
         self.resp_tcp_seq = log.resp_tcp_seq;
         self.syscall_trace_id_response = log.syscall_trace_id_response;
         self.head.msg_type = LogMessageType::Session;
-        self.head.rrt = log.head.rrt;
+        self.head.rrt = (self.end_time - self.start_time).as_micros() as u64;
     }
 }
 
@@ -517,7 +517,7 @@ impl AppProtoLogsData {
     pub fn is_end(&self) -> bool {
         match &self.special_info {
             AppProtoLogsInfo::HttpV2(d) => {
-                return d.is_end;
+                return d.is_end();
             }
             _ => {
                 return false;

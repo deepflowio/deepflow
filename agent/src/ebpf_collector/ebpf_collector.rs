@@ -139,7 +139,6 @@ impl SessionAggr {
             }
         }
         self.start_time += count * Self::SLOT_WIDTH;
-
         self.slot_count - 1
     }
 
@@ -197,7 +196,7 @@ impl SessionAggr {
         2.1.1: 找到,聚合发送.
         2.1.2: 找不到, 先存下来,等待响应.
 
-     对于go http2 uprobe 来说,不管收到请求还是响应,都会和现有的数据数据聚合,知道收到结束标志位再发送
+     对于go http2 uprobe 来说,不管收到请求还是响应,都会和现有的数据数据聚合,直到收到请求结束标志和响应结束标志再发送
 
      slot有flush机制,目前只有当收到新的AppProtoLogsData,  slot index >= slot的长度, 才会触发.
      flush会强制发送前面的slot,然后将后面slot的map搬上来,空出slot.
@@ -254,10 +253,6 @@ impl SessionAggr {
     fn on_merge_request_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
         let (value, _) = self.remove(slot_index, key, 1);
         if value.is_none() {
-            // 收到结束标记,但是没有需要发送的数据,可能是乱序(低概率)或者是间隔时间太长, 忽略这段数据.
-            if log.is_end() {
-                return;
-            }
             // 防止缓存过多的log
             if self.log_exceed() {
                 self.send(log);
@@ -268,10 +263,9 @@ impl SessionAggr {
             return;
         }
         let mut item = value.unwrap();
-        let is_end = log.is_end();
         item.protocol_merge(log.special_info);
 
-        if is_end {
+        if item.is_end() {
             self.cache_count -= 1;
             self.send(item);
         } else {
@@ -327,16 +321,9 @@ impl SessionAggr {
             return;
         }
         let mut item = value.unwrap();
-        let is_end = log.is_end();
-        let log_start_time = log.base_info.start_time;
         item.session_merge(log);
 
-        if is_end {
-            item.base_info.head.rrt = if log_start_time > item.base_info.start_time {
-                (log_start_time - item.base_info.start_time).as_micros() as u64
-            } else {
-                0
-            };
+        if item.is_end() {
             self.cache_count -= 1;
             self.send(item);
         } else {

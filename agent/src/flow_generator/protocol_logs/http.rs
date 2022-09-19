@@ -62,8 +62,11 @@ pub struct HttpInfo {
     pub req_content_length: Option<u32>,
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u32>,
-    // 流是否结束, 用于 http2 ebpf uprobe 处理
-    pub is_end: bool,
+    // 流是否结束, 用于 http2 ebpf uprobe 处理.
+    // 由于ebpf有可能响应会比请求先到,所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
+    is_req_end: bool,
+    is_resp_end: bool,
+
     status_code: Option<i32>,
     status: L7ResponseStatus,
 }
@@ -103,10 +106,21 @@ impl HttpInfo {
         if self.resp_content_length.is_none() {
             self.resp_content_length = other.resp_content_length;
         }
+        // 下面用于判断是否结束
+        if other.is_req_end {
+            self.is_req_end = true;
+        }
+        if other.is_resp_end {
+            self.is_resp_end = true;
+        }
     }
 
     pub fn is_empty(&self) -> bool {
         return self.host.is_empty() && self.method.is_empty() && self.path.is_empty();
+    }
+
+    pub fn is_end(&self) -> bool {
+        return self.is_req_end && self.is_resp_end;
     }
 }
 
@@ -251,18 +265,21 @@ impl HttpLog {
     // +---------------------------------------------------------------+
     // |                          streadID (32)                        |
     // +---------------------------------------------------------------+
+    // |                          keyLength (32)                       |
+    // +---------------------------------------------------------------+
     // |                          valueLength (32)                     |
     // +---------------------------------------------------------------+
     // |                          key (keyLength,变长)               ...|
     // +---------------------------------------------------------------+
     // |                          value (valueLength,变长)           ...|
     // +---------------------------------------------------------------+
-    fn parse_http2_go_uprobe(
+    pub fn parse_http2_go_uprobe(
         &mut self,
         payload: &[u8],
         direction: PacketDirection,
         check_only: bool,
-        is_end: Option<bool>,
+        is_req_end: Option<bool>,
+        is_resp_end: Option<bool>,
     ) -> Result<()> {
         if payload.len() < HTTPV2_CUSTOM_DATA_MIN_LENGTH {
             return Err(Error::HttpHeaderParseFailed);
@@ -291,7 +308,8 @@ impl HttpLog {
             );
         }
 
-        self.info.is_end = if let Some(end) = is_end { end } else { false };
+        self.info.is_req_end = is_req_end.unwrap_or_default();
+        self.info.is_resp_end = is_resp_end.unwrap_or_default();
         self.info.version = String::from("2");
         self.info.stream_id = stream_id;
         self.proto = L7Protocol::Http2;
@@ -684,7 +702,7 @@ impl L7LogParse for HttpLog {
         payload: &[u8],
         proto: IpProtocol,
         direction: PacketDirection,
-        _is_req_end: Option<bool>,
+        is_req_end: Option<bool>,
         is_resp_end: Option<bool>,
     ) -> Result<AppProtoHeadEnum> {
         if proto != IpProtocol::Tcp {
@@ -694,7 +712,7 @@ impl L7LogParse for HttpLog {
 
         match self.raw_data_type {
             L7ProtoRawDataType::GoHttp2Uprobe => {
-                self.parse_http2_go_uprobe(payload, direction, false, is_resp_end)?;
+                self.parse_http2_go_uprobe(payload, direction, false, is_req_end, is_resp_end)?;
             }
             _ => {
                 self.parse_http_v1(payload, direction)
@@ -883,7 +901,7 @@ pub fn http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
     match packet.ebpf_type {
         EbpfType::GoHttp2Uprobe => {
             return http2
-                .parse_http2_go_uprobe(payload, PacketDirection::ClientToServer, true, None)
+                .parse_http2_go_uprobe(payload, PacketDirection::ClientToServer, true, None, None)
                 .is_ok();
         }
         _ => {
@@ -1013,8 +1031,13 @@ mod tests {
                 let payload = hdr.to_bytes(key, val);
                 let mut h = HttpLog::default();
                 h.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
-                let res =
-                    h.parse_http2_go_uprobe(&payload, PacketDirection::ClientToServer, true, None);
+                let res = h.parse_http2_go_uprobe(
+                    &payload,
+                    PacketDirection::ClientToServer,
+                    true,
+                    None,
+                    None,
+                );
                 assert_eq!(res.is_ok(), false);
                 println!("{:#?}", res.err().unwrap());
             }
@@ -1043,8 +1066,13 @@ mod tests {
             let payload = hdr.to_bytes(key, val);
             let mut h = HttpLog::default();
             h.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
-            let res =
-                h.parse_http2_go_uprobe(&payload, PacketDirection::ClientToServer, false, None);
+            let res = h.parse_http2_go_uprobe(
+                &payload,
+                PacketDirection::ClientToServer,
+                false,
+                None,
+                None,
+            );
             assert_eq!(res.is_ok(), true);
             println!("{:#?}", h);
         }
