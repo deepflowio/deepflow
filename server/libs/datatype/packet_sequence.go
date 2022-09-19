@@ -52,14 +52,16 @@ type FullPacketData struct {
 	OptSack          []uint32        `json:"opt_sack"`
 }
 
+var emptyFullPacketData = FullPacketData{}
+
 func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder, packets []*FullPacketData) ([]*FullPacketData, int, error) {
 	var (
-		packetIndex     int
-		hasLastPacket   [2]bool // 0: hasLastC2SPacket, 1: hasLastS2CPacket
-		lastPacketsData [2]*FullPacketData
-		lastTimestamp   uint64
+		packetIndex   int
+		hasLastPacket [2]bool // 0: hasLastC2SPacket, 1: hasLastS2CPacket
+		lastTimestamp uint64
 	)
 	oldPacketNum := len(packets)
+	lastPacketsData := [2]*FullPacketData{&emptyFullPacketData, &emptyFullPacketData}
 
 	for !decoder.IsEnd() {
 		var packet *FullPacketData
@@ -70,6 +72,7 @@ func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder, packets []*FullPack
 			packets[packetIndex] = packet
 		} else {
 			packet = &FullPacketData{}
+			packets = append(packets, packet)
 		}
 
 		if lastTimestamp == 0 { // it means that this packet is the first packet
@@ -142,9 +145,6 @@ func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder, packets []*FullPack
 		}
 		hasLastPacket[packet.Direction] = true
 		lastPacketsData[packet.Direction] = packet
-		if packetIndex >= oldPacketNum {
-			packets = append(packets, packet)
-		}
 		packetIndex++
 		if decoder.Failed() {
 			return nil, 0, errors.New("decode packet sequence block failed")
