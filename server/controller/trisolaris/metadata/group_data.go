@@ -164,8 +164,8 @@ func (g *GroupDataOP) getDropletGroupsVersion() uint64 {
 	return g.dropletGroupProto.getVersion()
 }
 
-//The data traversal must be kept in order to ensure
-//that the calculation hash is consistent when the data is unchanged
+// The data traversal must be kept in order to ensure
+// that the calculation hash is consistent when the data is unchanged
 func (g *GroupDataOP) generateGroupRawData() {
 	dbDatCache := g.metaData.GetDBDataCache()
 
@@ -208,7 +208,9 @@ func (g *GroupDataOP) generateGroupRawData() {
 	}
 
 	podGroupIDs := mapset.NewSet()
+	podIDs := mapset.NewSet()
 	groupIDToPodGroupIDs := make(map[int][]int)
+	groupIDToPodIDs := make(map[int][]int)
 	groupIDToPodServiceIDs := make(map[int][]int)
 	resourceGroups := dbDatCache.GetResourceGroups()
 	tridentGroups := make([]*models.ResourceGroup, 0, len(resourceGroups))
@@ -230,10 +232,11 @@ func (g *GroupDataOP) generateGroupRawData() {
 				}
 				extraInfo, ok := idToExtraInfo[idInt]
 				if ok == false {
-					log.Errorf("extra info not found (id:%d)", idInt)
+					log.Errorf("resourceGroup(id=%d) did not find extra_info(id:%d)", resourceGroup.ID, idInt)
 					continue
 				}
-				if resourceGroup.Type == RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP {
+				switch resourceGroup.Type {
+				case RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP:
 					podGroupIDs.Add(extraInfo.ResourceID)
 					if _, ok := groupIDToPodGroupIDs[resourceGroup.ID]; ok {
 						groupIDToPodGroupIDs[resourceGroup.ID] = append(
@@ -241,7 +244,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 					} else {
 						groupIDToPodGroupIDs[resourceGroup.ID] = []int{extraInfo.ResourceID}
 					}
-				} else {
+				case RESOURCE_GROUP_TYPE_ANONYMOUS_POD_SERVICE, RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP_AS_POD_SERVICE:
 					if ids, ok := podServiceIDToPodGroupIDs[extraInfo.ResourceID]; ok {
 						newPodGroupIDs := mapset.NewSet()
 						for _, id := range ids {
@@ -255,8 +258,15 @@ func (g *GroupDataOP) generateGroupRawData() {
 					} else {
 						groupIDToPodServiceIDs[resourceGroup.ID] = []int{extraInfo.ResourceID}
 					}
+				case RESOURCE_GROUP_TYPE_ANONYMOUS_POD:
+					podIDs.Add(extraInfo.ResourceID)
+					if _, ok := groupIDToPodIDs[resourceGroup.ID]; ok {
+						groupIDToPodIDs[resourceGroup.ID] = append(
+							groupIDToPodIDs[resourceGroup.ID], extraInfo.ResourceID)
+					} else {
+						groupIDToPodIDs[resourceGroup.ID] = []int{extraInfo.ResourceID}
+					}
 				}
-
 			}
 		}
 	}
@@ -264,15 +274,14 @@ func (g *GroupDataOP) generateGroupRawData() {
 	pgidToPids := make(map[int][]int)
 	groupPodIDs := mapset.NewSet()
 	for _, pod := range dbDatCache.GetPods() {
-		if !podGroupIDs.Contains(pod.PodGroupID) {
-			continue
-		}
-		groupPodIDs.Add(pod.ID)
-		if _, ok := pgidToPids[pod.PodGroupID]; ok {
-			pgidToPids[pod.PodGroupID] = append(
-				pgidToPids[pod.PodGroupID], pod.ID)
-		} else {
-			pgidToPids[pod.PodGroupID] = []int{pod.ID}
+		if podGroupIDs.Contains(pod.PodGroupID) {
+			groupPodIDs.Add(pod.ID)
+			if _, ok := pgidToPids[pod.PodGroupID]; ok {
+				pgidToPids[pod.PodGroupID] = append(
+					pgidToPids[pod.PodGroupID], pod.ID)
+			} else {
+				pgidToPids[pod.PodGroupID] = []int{pod.ID}
+			}
 		}
 	}
 
@@ -280,7 +289,8 @@ func (g *GroupDataOP) generateGroupRawData() {
 	podVifs := mapset.NewSet()
 	pidToVifIDs := make(map[int][]int)
 	for _, vif := range dbDatCache.GetVInterfaces() {
-		if vif.DeviceType == VIF_DEVICE_TYPE_POD && groupPodIDs.Contains(vif.DeviceID) {
+		if vif.DeviceType == VIF_DEVICE_TYPE_POD &&
+			(groupPodIDs.Contains(vif.DeviceID) || podIDs.Contains(vif.DeviceID)) {
 			podVifs.Add(vif.ID)
 			if _, ok := pidToVifIDs[vif.DeviceID]; ok {
 				pidToVifIDs[vif.DeviceID] = append(
@@ -379,6 +389,16 @@ func (g *GroupDataOP) generateGroupRawData() {
 			} else {
 				ips = append(ips, "0.0.0.0/0")
 				ips = append(ips, "::/0")
+			}
+		case RESOURCE_GROUP_TYPE_ANONYMOUS_POD:
+			for _, podID := range groupIDToPodIDs[resourceGroup.ID] {
+				if vifIDs, ok := pidToVifIDs[podID]; ok {
+					for _, vifID := range vifIDs {
+						if tips, ok := vifidToIPs[vifID]; ok {
+							ips = append(ips, tips...)
+						}
+					}
+				}
 			}
 		case RESOURCE_GROUP_TYPE_ANONYMOUS_POD_GROUP:
 			for _, podGroupID := range groupIDToPodGroupIDs[resourceGroup.ID] {
