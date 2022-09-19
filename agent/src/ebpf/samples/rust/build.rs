@@ -27,6 +27,7 @@ fn set_build_libtrace() -> Result<(), Box<dyn Error>> {
         "cargo:rustc-link-search=native={}",
         env::join_paths(&[library_dir]).unwrap().to_str().unwrap()
     );
+    println!("cargo:rustc-link-lib=static=GoReSym");
     println!("cargo:rustc-link-lib=static=bddisasm");
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");

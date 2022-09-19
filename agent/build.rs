@@ -86,6 +86,7 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search=native=/usr/lib");
     println!("cargo:rustc-link-search=native=/usr/lib64");
 
+    println!("cargo:rustc-link-lib=static=GoReSym");
     println!("cargo:rustc-link-lib=static=bddisasm");
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");

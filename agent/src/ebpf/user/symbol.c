@@ -40,7 +40,7 @@
 #include "tracer.h"
 #include "bddisasm/bddisasm.h"
 #include "bddisasm/disasmtypes.h"
-//#include "libGoReSym.h"
+#include "libGoReSym.h"
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
 			struct tracer_probes_conf *conf)
@@ -238,7 +238,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 			goto invalid;
 		}
 	}
-#if 0
+
 	// If bcc_elf_foreach_sym is successful, uprobe_sym->entry will 
 	// not be 0. try GoReSym
 	if (feature_flags[FEATURE_GO_NO_SYMBOL] && uprobe_sym->name && uprobe_sym->entry == 0x0) {
@@ -248,7 +248,7 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		uprobe_sym->entry = func.r0;
 		uprobe_sym->size = func.r1;
 	}
-#endif
+
 	if (uprobe_sym->entry == 0x0)
 		goto invalid;
 
@@ -345,14 +345,14 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 	};
 
 	bcc_elf_foreach_sym(bin, find_sym, &default_option, &tmp);
-#if 0
+
 	if (feature_flags[FEATURE_GO_NO_SYMBOL] && !tmp.entry) {
 		// The function address is used to set the hook point.
 		// itab is used for http2 to obtain fd. Currently only
 		// net_TCPConn_itab can be obtained for HTTPS.
 		tmp.entry = itab_address((char *)bin, (char *)symname);
 	}
-#endif
+
 	ebpf_info("Uprobe [%s] %s: %p\n", bin, symname, tmp.entry);
 	return tmp.entry;
 }
