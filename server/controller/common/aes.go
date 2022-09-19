@@ -124,3 +124,12 @@ func DecryptSecretKey(secretKey string) (string, error) {
 	}
 	return decryptSecretKey, nil
 }
+
+func GetLocalClusterID() (string, error) {
+	caData, err := ioutil.ReadFile(K8S_CA_CRT_PATH)
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+	return GenerateKuberneteClusterIDByMD5(GenerateAesKey(caData))
+}
