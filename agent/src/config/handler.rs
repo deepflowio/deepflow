@@ -381,6 +381,7 @@ pub struct EbpfConfig {
     pub log_path: String,
     pub l7_log_tap_types: [bool; 256],
     pub ctrl_mac: MacAddr,
+    pub ebpf_uprobe_golang_symbol_enabled: bool,
 }
 
 #[cfg(target_os = "linux")]
@@ -778,6 +779,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 } else {
                     MacAddr::ZERO
                 },
+                ebpf_uprobe_golang_symbol_enabled: conf
+                    .yaml_config
+                    .ebpf_uprobe_golang_symbol_enabled,
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
