@@ -54,7 +54,7 @@ use crate::{
     },
     common::{
         enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
-        DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
+        FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -249,6 +249,7 @@ impl Trident {
             default_runtime_config.yaml_config.first_path_level as usize,
             default_runtime_config.yaml_config.fast_path_map_size,
             false,
+            FeatureFlags::from(&default_runtime_config.yaml_config.feature_flags),
         );
 
         let mut config_handler = ConfigHandler::new(

@@ -57,6 +57,10 @@ pub const SOCK_DATA_MQTT: u16 = 101;
 #[allow(dead_code)]
 pub const SOCK_DATA_DNS: u16 = 120;
 
+// Feature
+#[allow(dead_code)]
+pub const FEATURE_UPROBE_GOLANG_SYMBOL: c_int = 0;
+
 //L7层协议是否需要重新核实
 #[allow(dead_code)]
 pub const L7_PROTO_NOT_RECONFIRM: u8 = 0;
