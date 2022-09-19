@@ -154,6 +154,10 @@ func (c *Config) Validate() error {
 		return errors.New("in 'ckdb' config, 'primary' is equal to 'secondary', it is not allowed")
 	}
 
+	if c.CKDBAuth.Password != "" {
+		c.CKDBAuth.Password = convertToHttpChar(c.CKDBAuth.Password)
+	}
+
 	level := strings.ToLower(c.LogLevel)
 	c.LogLevel = "info"
 	for _, l := range []string{"error", "warn", "info", "debug"} {
@@ -163,6 +167,33 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func convertToHttpChar(s string) string {
+	sb := strings.Builder{}
+	for _, c := range s {
+		switch c {
+		case '+':
+			sb.WriteString("%2B")
+		case ' ':
+			sb.WriteString("%20")
+		case '/':
+			sb.WriteString("%2F")
+		case '?':
+			sb.WriteString("%3F")
+		case '%':
+			sb.WriteString("%25")
+		case '#':
+			sb.WriteString("%23")
+		case '&':
+			sb.WriteString("%26")
+		case '=':
+			sb.WriteString("%3D")
+		default:
+			sb.WriteByte(byte(c))
+		}
+	}
+	return sb.String()
 }
 
 func Load(path string) *Config {
