@@ -872,5 +872,9 @@ func L7LoggerToFlowTagInterfaces(l *L7Logger) ([]interface{}, []interface{}) {
 		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name))
 		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name, l.AttributeValues[i]))
 	}
+	for _, name := range l.MetricsNames {
+		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldMetrics, name))
+		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldMetrics, name))
+	}
 	return fields, fieldValues
 }
