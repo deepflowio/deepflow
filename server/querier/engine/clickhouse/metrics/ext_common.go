@@ -28,7 +28,11 @@ var EXT_METRICS = map[string]*Metrics{}
 func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
 	var err error
-	if db == "ext_metrics" || db == "deepflow_system" {
+	if db == "ext_metrics" || db == "deepflow_system" || (db == "flow_log" && table == "l7_flow_log") {
+		// 避免ut报错
+		if config.Cfg == nil {
+			return nil, nil
+		}
 		externalChClient := client.Client{
 			Host:     config.Cfg.Clickhouse.Host,
 			Port:     config.Cfg.Clickhouse.Port,
@@ -51,7 +55,8 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 		for i, _tagName := range externalMetricFloatRst["values"] {
 			tagName := _tagName.([]interface{})[0]
 			externalTag := tagName.(string)
-			dbField := fmt.Sprintf("metrics_float_values[indexOf(metrics_float_names, '%s')]", externalTag)
+			metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
+			dbField := fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, externalTag, metrics_values_field, metrics_names_field, externalTag)
 			lm := NewMetrics(
 				i, dbField, externalTag, "", METRICS_TYPE_COUNTER,
 				"指标", []bool{true, true, true}, "", table,
