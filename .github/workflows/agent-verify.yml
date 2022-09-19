@@ -26,7 +26,7 @@ jobs:
 
       - name: verify agent
         run: |  
-          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.9 "-c" "\
+          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.10 "-c" "\
           cd  agent && \
           cd src/ebpf && \
           make clean && \
