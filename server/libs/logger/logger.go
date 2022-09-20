@@ -176,7 +176,7 @@ func getRemoteAddress(remote string, port int) string {
 }
 
 // msgType在datatype/droplet-message.go中定义
-// trident调用时前2个参数传入datatype.MESSAGE_TYPE_SYSLOG 和 datatype.DROPLET_PORT
+// trident调用时前2个参数传入datatype.MESSAGE_TYPE_SYSLOG 和 30033
 func EnableRsyslog(msgType byte, remotePort int, remotes ...string) error {
 	rsyslogBackends = rsyslogBackends[:0]
 	rsyslogWriters = rsyslogWriters[:0]
