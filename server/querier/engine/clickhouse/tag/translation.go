@@ -591,10 +591,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// 外部指标量
-	tagResourceMap["metrics"] = map[string]*Tag{
+	tagResourceMap["metrics."] = map[string]*Tag{
 		"default": NewTag(
 			"",
 			"%s is not null",
+			"",
+			"",
+		),
+	}
+	tagResourceMap["metrics"] = map[string]*Tag{
+		"default": NewTag(
+			"arrayZip(%s, %s)",
+			"",
 			"",
 			"",
 		),
