@@ -341,7 +341,10 @@ static_config:
   #packet-sequence-queue-size: 65536
   ## the number of encoders for uniform collect sender
   #packet-sequence-queue-count: 1
-  ##packet-sequence-flag decides which tcp flags need to be reported
+  ##packet-sequence-flag determines which fields need to be reported, the default value is 0, which means the feature is disabled, and 255, which means all fields need to be reported
+  ## all fields corresponding to each bit: 
+  ## | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
+  ## 8      7     6     5              4             3         2        1          0 
   #packet-sequence-flag: 255
   ## 是否开启ebpf
   ebpf-disabled: false

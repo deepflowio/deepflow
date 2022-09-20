@@ -980,7 +980,11 @@ impl EbpfCollector {
         }
     }
 
-    fn ebpf_init(config: &EbpfConfig, sender: DebugSender<Box<MetaPacket<'static>>>) -> Result<()> {
+    fn ebpf_init(
+        config: &EbpfConfig,
+        sender: DebugSender<Box<MetaPacket<'static>>>,
+        ebpf_uprobe_golang_symbol_enabled: bool,
+    ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
             let log_file = config.log_path.clone();
@@ -992,6 +996,10 @@ impl EbpfCollector {
             } else {
                 std::ptr::null()
             };
+
+            if ebpf_uprobe_golang_symbol_enabled {
+                ebpf::set_feature_flag(ebpf::FEATURE_UPROBE_GOLANG_SYMBOL);
+            }
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
                 info!("ebpf bpf_tracer_init error: {}", config.log_path);
@@ -1063,7 +1071,7 @@ impl EbpfCollector {
         let (sender, receiver, _) =
             bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);
 
-        Self::ebpf_init(config, sender)?;
+        Self::ebpf_init(config, sender, config.ebpf_uprobe_golang_symbol_enabled)?;
         info!("ebpf collector initialized.");
         return Ok(Box::new(EbpfCollector {
             thread_runner: EbpfRunner {

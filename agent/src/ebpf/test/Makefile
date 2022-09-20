@@ -25,7 +25,7 @@ CC ?= gcc
 CFLAGS ?= -std=gnu99 --static -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 
 EXECS := test_symbol test_offset
-LDLIBS += ../libtrace.a -lbcc_bpf -lbddisasm -ldwarf -lelf -lz -lpthread
+LDLIBS += ../libtrace.a -lbcc_bpf -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread
 
 all: $(EXECS) 
 

@@ -315,7 +315,8 @@ func (n *NodeInfo) updateTSDBInfo() {
 	tsdbToPodIP := make(map[string]string)
 	for _, dbTSDB := range dbTSDBs {
 		ipToTSDB[dbTSDB.IP] = dbTSDB
-		tsdbToPodIP[dbTSDB.IP] = dbTSDB.NATIP
+		tsdbToNATIP[dbTSDB.IP] = dbTSDB.NATIP
+		tsdbToPodIP[dbTSDB.IP] = dbTSDB.PodIP
 		dbKeys.Add(dbTSDB.IP)
 	}
 	n.updateTSDBNATIP(tsdbToNATIP)

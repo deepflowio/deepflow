@@ -548,7 +548,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_LOCAL,
-		Lcuuid:          vtapLKResult.AZ,
+		Lcuuid:          vtapLKResult.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
 	return dbVTap, result

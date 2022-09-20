@@ -23,6 +23,7 @@ use super::fast_path::FastPath;
 use super::Result as PResult;
 use super::UnsafeWrapper;
 use crate::common::endpoint::{EndpointData, FeatureFlags};
+use crate::common::feature;
 use crate::common::lookup_key::LookupKey;
 use crate::common::matched_field::{MatchedField, MatchedFieldN, MatchedFieldv4, MatchedFieldv6};
 use crate::common::platform_data::PlatformData;
@@ -213,6 +214,8 @@ pub struct FirstPath {
 
     fast_disable: bool,
     queue_count: usize,
+
+    features: feature::FeatureFlags,
 }
 
 impl FirstPath {
@@ -222,7 +225,13 @@ impl FirstPath {
     const LEVEL_MAX: usize = 16;
     const TABLE_SIZE: usize = 1 << Self::VECTOR_MASK_SIZE_MAX;
 
-    pub fn new(queue_count: usize, level: usize, map_size: usize, fast_disable: bool) -> FirstPath {
+    pub fn new(
+        queue_count: usize,
+        level: usize,
+        map_size: usize,
+        fast_disable: bool,
+        features: feature::FeatureFlags,
+    ) -> FirstPath {
         FirstPath {
             group_ip_map: Some(HashMap::new()),
             vector_4: Vector4::default(),
@@ -242,6 +251,7 @@ impl FirstPath {
             fast: FastPath::new(queue_count, map_size),
             queue_count,
             fast_disable,
+            features,
         }
     }
 
@@ -277,7 +287,9 @@ impl FirstPath {
     }
 
     pub fn update_ip_group(&mut self, groups: &Vec<Arc<IpGroupData>>) {
-        self.generate_group_ip_map(groups);
+        if self.features.contains(feature::FeatureFlags::POLICY) {
+            self.generate_group_ip_map(groups);
+        }
 
         self.fast.generate_mask_table_from_group(groups);
         self.fast.generate_mask_table();
@@ -449,18 +461,20 @@ impl FirstPath {
     }
 
     pub fn update_acl(&mut self, acls: &Vec<Arc<Acl>>, check: bool) -> PResult<()> {
-        let mut valid_acls = Vec::new();
+        if self.features.contains(feature::FeatureFlags::POLICY) {
+            let mut valid_acls = Vec::new();
 
-        for acl in acls {
-            if self.is_invalid_acl(acl, check) {
-                continue;
+            for acl in acls {
+                if self.is_invalid_acl(acl, check) {
+                    continue;
+                }
+                let mut valid_acl = (**acl).clone();
+
+                valid_acl.reset();
+                valid_acls.push(valid_acl);
             }
-            let mut valid_acl = (**acl).clone();
-
-            valid_acl.reset();
-            valid_acls.push(valid_acl);
+            self.generate_first_table(&mut valid_acls)?;
         }
-        self.generate_first_table(&mut valid_acls)?;
 
         // fast
         self.fast.generate_interest_table(acls);
@@ -550,7 +564,9 @@ impl FirstPath {
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
         let mut policy = PolicyData::default();
 
-        self.get_policy_from_table(key, &endpoints, &mut policy);
+        if self.features.contains(feature::FeatureFlags::POLICY) {
+            self.get_policy_from_table(key, &endpoints, &mut policy);
+        }
 
         self.fast.add_policy(key, &policy, &policy, endpoints);
 
@@ -597,7 +613,7 @@ mod tests {
     use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
 
     fn generate_table() -> PResult<FirstPath> {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false);
+        let mut first = FirstPath::new(1, 8, 1 << 16, false, feature::FeatureFlags::POLICY);
         let acl = Acl::new(
             1,
             vec![10],

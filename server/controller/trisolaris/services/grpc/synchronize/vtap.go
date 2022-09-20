@@ -60,7 +60,7 @@ func Int2Bool(i int) bool {
 	return true
 }
 
-func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
+func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api.Config {
 	gVTapInfo := trisolaris.GetGVTapInfo()
 	proxyControllerIP := c.GetControllerIP()
 	vtapConfig := c.GetVTapConfig()
@@ -69,7 +69,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 	}
 	if vtapConfig.NatIPEnabled == 1 {
 		proxyControllerIP = trisolaris.GetGNodeInfo().GetControllerNatIP(proxyControllerIP)
-	} else if gVTapInfo.IsTheSameRegion(c.GetRegion()) {
+	} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
 		proxyControllerIP = trisolaris.GetGNodeInfo().GetControllerPodIP(proxyControllerIP)
 	}
 	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
@@ -166,7 +166,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 		configure.AnalyzerIp = &configTSDBIP
 	} else if cacheTSBIP != "" {
 		if vtapConfig.NatIPEnabled == 0 {
-			if gVTapInfo.IsTheSameRegion(c.GetRegion()) {
+			if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
 				podIP := trisolaris.GetGNodeInfo().GetTSDBPodIP(cacheTSBIP)
 				configure.AnalyzerIp = &podIP
 			} else {
@@ -216,6 +216,15 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache) *api.Config {
 func isOpenK8sSyn(vtapType int) bool {
 	switch vtapType {
 	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST, VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_WORKLOAD_P:
+		return true
+	default:
+		return false
+	}
+}
+
+func isPodVTap(vtapType int) bool {
+	switch vtapType {
+	case VTAP_TYPE_POD_VM, VTAP_TYPE_POD_HOST:
 		return true
 	default:
 		return false
@@ -343,7 +352,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		tapTypes = gVTapInfo.GetTapTypes()
 	}
 
-	configInfo := e.generateConfigInfo(vtapCache)
+	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId())
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
@@ -517,7 +526,7 @@ func (e *VTapEvent) pushResponse(in *api.SyncRequest) (*api.SyncResponse, error)
 		tapTypes = gVTapInfo.GetTapTypes()
 	}
 
-	configInfo := e.generateConfigInfo(vtapCache)
+	configInfo := e.generateConfigInfo(vtapCache, in.GetKubernetesClusterId())
 	// 携带信息有cluster_id时选择一个采集器开启云平台同步开关
 	if in.GetKubernetesClusterId() != "" && isOpenK8sSyn(vtapCache.GetVTapType()) == true {
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
