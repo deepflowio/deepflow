@@ -64,6 +64,14 @@ func GetBillingMethod() string {
 	return trisolaris.config.BillingMethod
 }
 
+func GetGrpcPort() int {
+	return trisolaris.config.GetGrpcPort()
+}
+
+func GetIngesterPort() int {
+	return trisolaris.config.GetIngesterPort()
+}
+
 func PutPlatformData() {
 	trisolaris.metaData.PutChPlatformData()
 }
