@@ -72,6 +72,9 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	if err != nil {
 		return errResponse, errors.New(fmt.Sprintf("read (%s) body failed, (%v)", url, err))
 	}
+	if resp.StatusCode != http.StatusOK {
+		return errResponse, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, string(respBytes)))
+	}
 
 	response, err := simplejson.NewJson(respBytes)
 	if err != nil {
@@ -79,7 +82,7 @@ func CURLPerform(method string, url string, body map[string]interface{}, strBody
 	}
 
 	optStatus := response.Get("OPT_STATUS").MustString()
-	if resp.StatusCode != http.StatusOK || (optStatus != "" && optStatus != SUCCESS) {
+	if optStatus != "" && optStatus != SUCCESS {
 		description := response.Get("DESCRIPTION").MustString()
 		return response, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, description))
 	}
