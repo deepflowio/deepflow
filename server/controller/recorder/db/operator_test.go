@@ -35,7 +35,7 @@ func (t *SuiteTest) TestformatDBItemsToAdd() {
 	vif1.ID += 1
 	mysql.Db.Create(&vif1)
 
-	vifsToAdd, lcuuidsToAdd, ok := operator.formatDBItemsToAdd(vifs)
+	vifsToAdd, lcuuidsToAdd, _, ok := operator.formatItemsToAdd(vifs)
 	assert.True(t.T(), ok)
 	assert.Equal(t.T(), 1, len(vifsToAdd))
 	assert.Equal(t.T(), vif2.Lcuuid, lcuuidsToAdd[0])

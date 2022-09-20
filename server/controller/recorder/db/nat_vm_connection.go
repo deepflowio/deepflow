@@ -30,6 +30,7 @@ func NewNATVMConnection() *NATVMConnection {
 		OperatorBase[mysql.NATVMConnection]{
 			resourceTypeName: common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

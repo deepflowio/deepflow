@@ -30,6 +30,7 @@ func NewNetwork() *Network {
 		OperatorBase[mysql.Network]{
 			resourceTypeName: common.RESOURCE_TYPE_NETWORK_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

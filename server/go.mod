@@ -22,6 +22,7 @@ require (
 	github.com/bxcodec/faker/v3 v3.8.0
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
+	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/deepflowys/deepflow/message v0.0.0-20220915023244-98d8d6c05bcf
 	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000

@@ -27,7 +27,6 @@ import (
 
 	"github.com/deepflowys/deepflow/server/ingester/ckmonitor"
 	"github.com/deepflowys/deepflow/server/ingester/datasource"
-	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/debug"
 	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/pool"
@@ -101,13 +100,13 @@ func Start(configPath string) []io.Closer {
 		stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD | stats.REMOTE_TYPE_INFLUXDB)
 		stats.SetRemotes(net.JoinHostPort(cfg.Influxdb.Host, cfg.Influxdb.Port))
 	}
-	stats.SetDFRemote(net.JoinHostPort("127.0.0.1", strconv.Itoa(datatype.DROPLET_PORT)))
+	stats.SetDFRemote(net.JoinHostPort("127.0.0.1", strconv.Itoa(int(cfg.ListenPort))))
 
 	dropletConfig := dropletcfg.Load(cfg, configPath)
 	bytes, _ = yaml.Marshal(dropletConfig)
 	log.Infof("droplet config:\n%s", string(bytes))
 
-	receiver := receiver.NewReceiver(datatype.DROPLET_PORT, cfg.UDPReadBuffer, cfg.TCPReadBuffer)
+	receiver := receiver.NewReceiver(int(cfg.ListenPort), cfg.UDPReadBuffer, cfg.TCPReadBuffer)
 
 	closers := droplet.Start(dropletConfig, receiver)
 

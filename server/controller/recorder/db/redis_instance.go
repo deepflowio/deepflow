@@ -30,6 +30,7 @@ func NewRedisInstance() *RedisInstance {
 		OperatorBase[mysql.RedisInstance]{
 			resourceTypeName: common.RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

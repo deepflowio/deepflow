@@ -9,6 +9,7 @@ controller:
   #listen-node-port: 30417
   ## grpc server port
   #grpc-port: 20035
+  #ingester-port: 20033
   #grpc-node-port: 30035
   # grpc max message lenth default 100M
   grpc-max-message-length: 104857600
@@ -101,6 +102,10 @@ controller:
         deleted_resource_clean_interval: 24
         # 软删除资源数据保留时间，单位：小时，默认：7 * 24
         deleted_resource_retention_time: 168
+        # 资源ID限制：区域、可用区、宿主机、VPC、网络、容器集群、命名空间
+        resource_max_id_0: 64000
+        # 资源ID限制：所有设备ID（除宿主机外）、容器节点、Ingress、工作负载、ReplicaSet、POD
+        resource_max_id_1: 499999
 
   trisolaris:
     tsdb_ip:
@@ -181,6 +186,7 @@ ingester:
 
   #ckdb-auth:
   #  username:
+  #  # '#','@' special characters are not supported in passwords
   #  password:
 
   #ckdb:
@@ -200,6 +206,9 @@ ingester:
   #influxdb:
   #  host: influxdb
   #  port: 20044
+
+  ## The listening port used by Ingester to receive data
+  #listen-port: 20033
 
   #metrics-replica-enabled: false
   #flowlog-replica-enabled: false

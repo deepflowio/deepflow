@@ -30,6 +30,7 @@ func NewVPC() *VPC {
 		OperatorBase[mysql.VPC]{
 			resourceTypeName: common.RESOURCE_TYPE_VPC_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

@@ -30,6 +30,7 @@ func NewLANIP() *LANIP {
 		OperatorBase[mysql.LANIP]{
 			resourceTypeName: common.RESOURCE_TYPE_LAN_IP_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

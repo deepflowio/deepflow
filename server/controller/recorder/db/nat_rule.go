@@ -30,6 +30,7 @@ func NewNATRule() *NATRule {
 		OperatorBase[mysql.NATRule]{
 			resourceTypeName: common.RESOURCE_TYPE_NAT_RULE_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

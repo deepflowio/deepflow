@@ -19,6 +19,7 @@ package config
 import (
 	"io/ioutil"
 	"os"
+	"strconv"
 
 	logging "github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
@@ -60,10 +61,11 @@ type ControllerConfig struct {
 	LogFile              string `default:"/var/log/controller.log" yaml:"log-file"`
 	LogLevel             string `default:"info" yaml:"log-level"`
 	ListenPort           int    `default:"20417" yaml:"listen-port"`
-	ListenNodePort       int    `default:"30417" yaml:"listen-node-port"`
+	ListenNodePort       int    `default:"30417" yaml:"listen-node-port"` // TODO union port data type
 	MasterControllerName string `default:"" yaml:"master-controller-name"`
 	GrpcMaxMessageLength int    `default:"104857600" yaml:"grpc-max-message-length"`
 	GrpcPort             string `default:"20035" yaml:"grpc-port"`
+	IngesterPort         string `default:"20033" yaml:"ingester-port"`
 	GrpcNodePort         string `default:"30035" yaml:"grpc-node-port"`
 	Kubeconfig           string `yaml:"kubeconfig"`
 	ElectionName         string `default:"deepflow-server" yaml:"election-name"`
@@ -110,7 +112,15 @@ func (c *Config) Load(path string) {
 		log.Error(err)
 		os.Exit(1)
 	}
-	c.ControllerConfig.TrisolarisCfg.LogLevel = c.ControllerConfig.LogLevel
+	c.ControllerConfig.TrisolarisCfg.SetLogLevel(c.ControllerConfig.LogLevel)
+	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
+	if err == nil {
+		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)
+	}
+	ingesterPort, err := strconv.Atoi(c.ControllerConfig.IngesterPort)
+	if err == nil {
+		c.ControllerConfig.TrisolarisCfg.SetIngesterPort(ingesterPort)
+	}
 }
 
 func DefaultConfig() *Config {

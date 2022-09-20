@@ -429,7 +429,7 @@ func cleanSoftDeletedResource(lcuuid string) {
 	log.Info("clean soft deleted resources completed")
 }
 
-func DeleteDomain(lcuuid string) (map[string]string, error) {
+func DeleteDomain(lcuuid string) (map[string]string, error) { // TODO whether release resource ids
 	var domain mysql.Domain
 
 	if ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(&domain); ret.Error != nil {

@@ -27,25 +27,26 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/db/redis"
 	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
+	"github.com/deepflowys/deepflow/server/controller/grpc"
 	"github.com/deepflowys/deepflow/server/controller/manager"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	"github.com/deepflowys/deepflow/server/controller/monitor/license"
 	"github.com/deepflowys/deepflow/server/controller/recorder"
+	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
 	"github.com/deepflowys/deepflow/server/controller/router"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	trouter "github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
 
-	"github.com/deepflowys/deepflow/server/controller/grpc"
-
-	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/controller"
+	_ "github.com/deepflowys/deepflow/server/controller/grpc/controller"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/healthcheck"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/synchronize"
 	_ "github.com/deepflowys/deepflow/server/controller/trisolaris/services/http/cache"
@@ -65,6 +66,7 @@ func Start(ctx context.Context, configPath string) {
 	bytes, _ := yaml.Marshal(cfg)
 	log.Info("============================== Launching YUNSHAN DeepFlow Controller ==============================")
 	log.Infof("controller config:\n%s", string(bytes))
+	setGlobalConfig(cfg)
 
 	// register router
 	r := gin.Default()
@@ -93,6 +95,12 @@ func Start(ctx context.Context, configPath string) {
 		log.Error("connect mysql failed")
 		time.Sleep(time.Second)
 		os.Exit(0)
+	}
+
+	// 启动资源ID管理器
+	if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
+		router.SetInitStageForHealthChecker("Resource ID manager init")
+		startResourceIDManager(cfg)
 	}
 
 	// 初始化Redis
@@ -232,4 +240,38 @@ func migrateDB(cfg *config.ControllerConfig) {
 			}
 		}
 	}
+}
+
+// start ID manager in master region master controller
+func startResourceIDManager(cfg *config.ControllerConfig) {
+	// exit if not in master region
+	if cfg.TrisolarisCfg.NodeType != "master" {
+		return
+	}
+
+	// try to check whether it is master controller until successful,
+	// migrate if it is master, exit if not.
+	for range time.Tick(time.Second * 5) {
+		isMasterController, err := election.IsMasterController()
+		if err == nil {
+			if isMasterController {
+				err := recorderdb.InitIDManager(&cfg.ManagerCfg.TaskCfg.RecorderCfg)
+				if err != nil {
+					log.Error("start resource id mananger failed")
+					time.Sleep(time.Second)
+					os.Exit(0)
+				}
+				return
+			} else {
+				return
+			}
+		}
+	}
+}
+
+func setGlobalConfig(cfg *config.ControllerConfig) {
+	common.CONTROLLER_HTTP_PORT = fmt.Sprintf("%d", cfg.ListenPort)
+	common.CONTROLLER_HTTP_NODE_PORT = fmt.Sprintf("%d", cfg.ListenNodePort)
+	common.CONTROLLER_GRPC_PORT = cfg.GrpcPort
+	common.CONTROLLER_GRPC_NODE_PORT = cfg.GrpcNodePort
 }

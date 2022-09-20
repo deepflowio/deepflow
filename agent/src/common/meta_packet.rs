@@ -848,11 +848,10 @@ impl<'a> MetaPacket<'a> {
                 || data.l7_protocol_hint == SOCK_DATA_TLS_HTTP2
             {
                 packet.direction = PacketDirection::from(data.msg_type);
-                if data.msg_type == MSG_REQUEST_END {
-                    packet.is_request_end = true;
-                }
-                if data.msg_type == MSG_RESPONSE_END {
-                    packet.is_response_end = true;
+                match data.msg_type {
+                    MSG_REQUEST_END => packet.is_request_end = true,
+                    MSG_RESPONSE_END => packet.is_response_end = true,
+                    _ => {}
                 }
             }
         }

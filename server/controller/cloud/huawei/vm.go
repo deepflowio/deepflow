@@ -67,6 +67,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 				Lcuuid:       id,
 				Name:         name,
 				Label:        name,
+				HType:        common.VM_HTYPE_VM_C,
 				State:        STATE_CONVERTION[jVM.Get("status").MustString()],
 				AZLcuuid:     azLcuuid,
 				RegionLcuuid: regionLcuuid,
@@ -88,6 +89,10 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 			vms = append(vms, vm)
 			h.toolDataSet.azLcuuidToResourceNum[azLcuuid]++
 			h.toolDataSet.regionLcuuidToResourceNum[regionLcuuid]++
+
+			vs, is := h.formatVInterfacesAndIPs(jVM.Get("addresses"), regionLcuuid, id)
+			vifs = append(vifs, vs...)
+			ips = append(ips, is...)
 
 			jSGs, ok := jVM.CheckGet("security_groups")
 			if ok {
@@ -128,8 +133,13 @@ func (h *HuaWei) formatVMSecurityGroups(jSGs *simplejson.Json, vpcLcuuid, vmLcuu
 func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, vmLcuuid string) (vifs []model.VInterface, ips []model.IP) {
 	requiredAttrs := []string{"addr", "OS-EXT-IPS-MAC:mac_addr", "OS-EXT-IPS:type"}
 	for vpcLcuuid, jVIFs := range addrs.MustMap() {
-		for _, jV := range jVIFs.([]map[string]interface{}) {
+		for _, jVIF := range jVIFs.([]interface{}) {
+			jV := jVIF.(map[string]interface{})
 			if !CheckMapAttributes(jV, requiredAttrs) {
+				continue
+			}
+			if jV["OS-EXT-IPS:type"].(string) != "floating" {
+				log.Infof("exclude vinterface, not floating: %s", jV["OS-EXT-IPS:type"].(string))
 				continue
 			}
 			mac := jV["OS-EXT-IPS-MAC:mac_addr"].(string)
