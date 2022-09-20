@@ -81,6 +81,7 @@ func (c *Cloud) Start() {
 }
 
 func (c *Cloud) Stop() {
+	c.platform.ClearDebugLog()
 	if c.cCancel != nil {
 		c.cCancel()
 	}

@@ -17,6 +17,15 @@
 package baidubce
 
 import (
+	"encoding/json"
+
+	"github.com/baidubce/bce-sdk-go/services/appblb"
+	"github.com/baidubce/bce-sdk-go/services/bcc/api"
+	"github.com/baidubce/bce-sdk-go/services/blb"
+	"github.com/baidubce/bce-sdk-go/services/cce"
+	"github.com/baidubce/bce-sdk-go/services/eni"
+	"github.com/baidubce/bce-sdk-go/services/rds"
+	"github.com/baidubce/bce-sdk-go/services/vpc"
 	simplejson "github.com/bitly/go-simplejson"
 	logging "github.com/op/go-logging"
 
@@ -39,6 +48,8 @@ type BaiduBce struct {
 	// 以下两个字段的作用：消除公有云的无资源的区域和可用区
 	regionLcuuidToResourceNum map[string]int
 	azLcuuidToResourceNum     map[string]int
+
+	debugger *cloudcommon.Debugger
 }
 
 func NewBaiduBce(domain mysql.Domain) (*BaiduBce, error) {
@@ -82,7 +93,13 @@ func NewBaiduBce(domain mysql.Domain) (*BaiduBce, error) {
 
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),
+
+		debugger: cloudcommon.NewDebugger(domain.Name),
 	}, nil
+}
+
+func (b *BaiduBce) ClearDebugLog() {
+	b.debugger.Clear()
 }
 
 func (b *BaiduBce) CheckAuth() error {
@@ -205,5 +222,26 @@ func (b *BaiduBce) GetCloudData() (model.Resource, error) {
 	resource.PeerConnections = peerConnections
 	resource.RDSInstances = rdsInstances
 	resource.SubDomains = subDomains
+	b.debugger.Refresh()
 	return resource, nil
+}
+
+type BCEResultStruct interface {
+	api.ZoneModel | *blb.DescribeLoadBalancersResult | *vpc.ListNatGatewayResult | *vpc.ListSubnetResult |
+		*vpc.ListPeerConnsResult | *rds.ListRdsResult | *vpc.GetRouteTableResult | *api.ListSecurityGroupResult |
+		*cce.ListClusterResult | *api.ListInstanceResult | *eni.ListEniResult | *vpc.ListVPCResult |
+		*appblb.DescribeLoadBalancersResult
+}
+
+func structToJson[T BCEResultStruct](structs []T) (jsonList []*simplejson.Json) {
+	for _, s := range structs {
+		byteData, _ := json.Marshal(s)
+		jsonData, err := simplejson.NewJson(byteData)
+		if err != nil {
+			log.Errorf("convert to json data failed: %s", err.Error())
+			continue
+		}
+		jsonList = append(jsonList, jsonData)
+	}
+	return
 }

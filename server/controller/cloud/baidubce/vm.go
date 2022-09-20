@@ -54,6 +54,7 @@ func (b *BaiduBce) getVMs(
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListInstances", " ", structToJson(results))
 	vmIdToLcuuid = make(map[string]string)
 	for _, r := range results {
 		for _, vm := range r.Instances {
@@ -197,6 +198,8 @@ func (b *BaiduBce) getVMEnis(
 			}
 			marker = result.NextMarker
 		}
+
+		b.debugger.WriteJson("ListEni", " ", structToJson(results))
 		for _, r := range results {
 			for _, eni := range r.Eni {
 				// 未挂载虚拟机的弹性网卡不学习

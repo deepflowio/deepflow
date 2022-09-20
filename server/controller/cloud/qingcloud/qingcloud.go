@@ -69,6 +69,8 @@ type QingCloud struct {
 
 	// statsd monitor
 	cloudStatsd statsd.CloudStatsd
+
+	debugger *cloudcommon.Debugger
 }
 
 func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
@@ -119,7 +121,13 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 			APICost:  make(map[string][]int),
 			ResCount: make(map[string][]int),
 		},
+
+		debugger: cloudcommon.NewDebugger(domain.Name),
 	}, nil
+}
+
+func (q *QingCloud) ClearDebugLog() {
+	q.debugger.Clear()
 }
 
 func (q *QingCloud) GenSignature(signURL, secret string) string {
@@ -236,6 +244,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 			q.cloudStatsd.APICount[action] = append(q.cloudStatsd.APICount[action], count)
 		}
 	}
+	q.debugger.WriteJson(resultKey, " ", response)
 	return response, nil
 }
 
@@ -395,5 +404,6 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	q.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	// register statsd
 	statsd.MetaStatsd.RegisterStatsdTable(q)
+	q.debugger.Refresh()
 	return resource, nil
 }

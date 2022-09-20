@@ -28,6 +28,7 @@ type CloudConfig struct {
 	HostnameToIPFile         string `default:"/etc/hostname_to_ip.csv" yaml:"hostname_to_ip_file"`
 	DNSEnable                bool   `default:"false" yaml:"dns_enable"`
 	HTTPTimeout              int    `default:"30" yaml:"http_timeout"`
+	DebugEnabled             bool   `default:"false" yaml:"debug_enabled"`
 }
 
 func SetCloudGlobalConfig(c CloudConfig) {
@@ -35,5 +36,6 @@ func SetCloudGlobalConfig(c CloudConfig) {
 		HostnameToIPFile: c.HostnameToIPFile,
 		DNSEnable:        c.DNSEnable,
 		HTTPTimeout:      c.HTTPTimeout,
+		DebugEnabled:     c.DebugEnabled,
 	}
 }
