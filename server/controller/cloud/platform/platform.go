@@ -40,6 +40,7 @@ var log = logging.MustGetLogger("cloud.platform")
 type Platform interface {
 	CheckAuth() error
 	GetCloudData() (model.Resource, error)
+	ClearDebugLog()
 }
 
 func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) {

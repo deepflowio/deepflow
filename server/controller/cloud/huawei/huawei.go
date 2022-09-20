@@ -42,6 +42,7 @@ type HuaWei struct {
 	projectTokenMap map[Project]*Token // 缓存各项目的token
 	toolDataSet     *ToolDataSet       // 处理资源数据时，构建的需要提供给其他资源使用的工具数据
 	cloudStatsd     statsd.CloudStatsd // 性能监控
+	debugger        *cloudcommon.Debugger
 }
 
 func NewHuaWei(domain mysql.Domain, globalCloudCfg *config.CloudConfig) (*HuaWei, error) {
@@ -58,7 +59,12 @@ func NewHuaWei(domain mysql.Domain, globalCloudCfg *config.CloudConfig) (*HuaWei
 		name:            domain.Name,
 		config:          conf,
 		projectTokenMap: make(map[Project]*Token),
+		debugger:        cloudcommon.NewDebugger(domain.Name),
 	}, nil
+}
+
+func (h *HuaWei) ClearDebugLog() {
+	h.debugger.Clear()
 }
 
 func (h *HuaWei) CheckAuth() error {
@@ -157,6 +163,8 @@ func (h *HuaWei) GetCloudData() (model.Resource, error) {
 
 	h.cloudStatsd.RefreshResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(h)
+
+	h.debugger.Refresh()
 	return resource, nil
 }
 
@@ -218,5 +226,7 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 
 	h.cloudStatsd.RefreshAPICost(resultKey, statsdAPIStartTime)
 	h.cloudStatsd.RefreshAPICount(resultKey, statsdAPIDataCount)
+
+	h.debugger.WriteJson(resultKey, url, jsonList)
 	return
 }

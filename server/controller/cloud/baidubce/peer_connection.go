@@ -46,6 +46,7 @@ func (b *BaiduBce) getPeerConnections(region model.Region, vpcIdToLcuuid map[str
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListPeerConn", " ", structToJson(results))
 	for _, r := range results {
 		for _, conn := range r.PeerConns {
 			if conn.Role != "acceptor" {

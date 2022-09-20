@@ -50,6 +50,7 @@ func (b *BaiduBce) getNetworks(
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListSubnets", " ", structToJson(results))
 	networkIdToLcuuid = make(map[string]string)
 	for _, r := range results {
 		for _, subnet := range r.Subnets {

@@ -40,6 +40,7 @@ func (b *BaiduBce) getRouterAndTables(
 			return nil, nil, err
 		}
 
+		b.debugger.WriteJson("GetRouteTableDetail", " ", structToJson([]*vpc.GetRouteTableResult{result}))
 		vrouterLcuuid := common.GenerateUUID(result.RouteTableId)
 		vrouterName, _ := vpcIdToName[vpcId]
 		retVRouter := model.VRouter{

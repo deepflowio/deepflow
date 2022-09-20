@@ -86,6 +86,8 @@ func NewGenesis(domain mysql.Domain, cfg config.CloudConfig) (*Genesis, error) {
 	}, nil
 }
 
+func (g *Genesis) ClearDebugLog() {}
+
 func (g *Genesis) CheckAuth() error {
 	return nil
 }

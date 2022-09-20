@@ -52,6 +52,7 @@ func (b *BaiduBce) getNatGateways(region model.Region, vpcIdToLcuuid map[string]
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListNatGateway", " ", structToJson(results))
 	for _, r := range results {
 		for _, nat := range r.Nats {
 			vpcLcuuid, ok := vpcIdToLcuuid[nat.VpcId]

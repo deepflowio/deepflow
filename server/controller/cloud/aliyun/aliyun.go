@@ -19,9 +19,7 @@ package aliyun
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
@@ -49,6 +47,8 @@ type Aliyun struct {
 	// 以下两个字段的作用：消除公有云的无资源的区域和可用区
 	regionLcuuidToResourceNum map[string]int
 	azLcuuidToResourceNum     map[string]int
+
+	debugger *cloudcommon.Debugger
 }
 
 func NewAliyun(domain mysql.Domain) (*Aliyun, error) {
@@ -102,65 +102,18 @@ func NewAliyun(domain mysql.Domain) (*Aliyun, error) {
 
 		regionLcuuidToResourceNum: make(map[string]int),
 		azLcuuidToResourceNum:     make(map[string]int),
+
+		debugger: cloudcommon.NewDebugger(domain.Name),
 	}, nil
+}
+
+func (a *Aliyun) ClearDebugLog() {
+	a.debugger.Clear()
 }
 
 func (a *Aliyun) CheckAuth() error {
 	_, err := sdk.NewClientWithAccessKey(a.regionName, a.secretID, a.secretKey)
 	return err
-}
-
-func (a *Aliyun) getResponse(
-	client interface{}, request interface{}, funcName string, resultKey string, once bool,
-) ([]*simplejson.Json, error) {
-	var resp []*simplejson.Json
-
-	pageNum := 1
-	pageSize := 50
-	totalCount := 0
-	for {
-		rRequest := reflect.ValueOf(request)
-		if !once {
-			reflect.ValueOf(request).Elem().FieldByName("PageSize").SetString(strconv.Itoa(pageSize))
-			reflect.ValueOf(request).Elem().FieldByName("PageNumber").SetString(strconv.Itoa(pageNum))
-		}
-		ret := reflect.ValueOf(client).MethodByName(funcName).Call([]reflect.Value{rRequest})
-
-		if ret[1].Interface() != nil {
-			return make([]*simplejson.Json, 0), ret[1].Interface().(error)
-		}
-
-		rStatus := ret[0].MethodByName("GetHttpStatus").Call([]reflect.Value{})[0]
-		if rStatus.Interface().(int) != 200 {
-			rContent := ret[0].MethodByName("GetHttpContentString").Call([]reflect.Value{})[0]
-			err := errors.New(rContent.Interface().(string))
-			return make([]*simplejson.Json, 0), err
-		}
-
-		rResult := ret[0].MethodByName("GetHttpContentBytes").Call([]reflect.Value{})
-
-		result, err := simplejson.NewJson(rResult[0].Interface().([]byte))
-		if err != nil {
-			return make([]*simplejson.Json, 0), err
-		}
-
-		if curResp, ok := result.CheckGet(resultKey); ok {
-			resp = append(resp, curResp)
-		} else {
-			break
-		}
-
-		if !once {
-			pageNum += 1
-			totalCount += pageSize
-			if totalCount >= result.Get("TotalCount").MustInt() {
-				break
-			}
-		} else {
-			break
-		}
-	}
-	return resp, nil
 }
 
 func (a *Aliyun) getRegionLcuuid(lcuuid string) string {
@@ -354,5 +307,6 @@ func (a *Aliyun) GetCloudData() (model.Resource, error) {
 	resource.RedisInstances = redisInstances
 	resource.RDSInstances = rdsInstances
 	resource.CENs = cens
+	a.debugger.Refresh()
 	return resource, err
 }

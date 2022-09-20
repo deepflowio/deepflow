@@ -80,6 +80,8 @@ func NewKubernetes(domain mysql.Domain) (*Kubernetes, error) {
 	}, nil
 }
 
+func (k *Kubernetes) ClearDebugLog() {}
+
 func (k *Kubernetes) GetCloudData() (model.Resource, error) {
 	return model.Resource{}, nil
 }

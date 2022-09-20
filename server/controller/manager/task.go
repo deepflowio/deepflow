@@ -78,6 +78,7 @@ func (t *Task) Start() {
 }
 
 func (t *Task) Stop() {
+	t.Cloud.Stop()
 	if t.tCancel != nil {
 		t.tCancel()
 	}
