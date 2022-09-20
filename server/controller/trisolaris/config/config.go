@@ -52,6 +52,8 @@ type Config struct {
 	VTapAutoRegister         bool   `default:"true" yaml:"vtap-auto-register"`
 	DefaultTapMode           int    `yaml:"default-tap-mode"`
 	BillingMethod            string `default:"license" yaml:"billing-method"`
+	GrpcPort                 int
+	IngesterPort             int
 }
 
 func (c *Config) Convert() {
@@ -72,4 +74,24 @@ func (c *Config) Convert() {
 	} else {
 		c.NodeIP = nodeIP
 	}
+}
+
+func (c *Config) SetGrpcPort(port int) {
+	c.GrpcPort = port
+}
+
+func (c *Config) SetIngesterPort(port int) {
+	c.IngesterPort = port
+}
+
+func (c *Config) GetGrpcPort() int {
+	return c.GrpcPort
+}
+
+func (c *Config) GetIngesterPort() int {
+	return c.IngesterPort
+}
+
+func (c *Config) SetLogLevel(logLevel string) {
+	c.LogLevel = logLevel
 }
