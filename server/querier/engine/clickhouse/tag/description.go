@@ -44,6 +44,8 @@ var TAG_DESCRIPTIONS = map[TagDescriptionKey]*TagDescription{}
 
 // key=tagEnumFile
 var TAG_ENUMS = map[string][]*TagEnum{}
+var TAG_INT_ENUMS = map[string][]*TagEnum{}
+var TAG_STRING_ENUMS = map[string][]*TagEnum{}
 
 var tagTypeToOperators = map[string][]string{
 	"resource":    []string{"=", "!=", "IN", "NOT IN", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP"},
@@ -167,6 +169,8 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	if ok {
 		for tagEnumFile, enumData := range tagEnumData.(map[string]interface{}) {
 			tagEnums := []*TagEnum{}
+			tagIntEnums := []*TagEnum{}
+			tagStringEnums := []*TagEnum{}
 			// 根据tagEnumFile获取tagTypeToOperators
 			tagType, _ := enumFileToTagType[tagEnumFile]
 
@@ -174,10 +178,18 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 如果是int/int_enum，则将value转为interface
 				if tagType == "int" || tagType == "int_enum" || tagType == "bit_enum" {
 					value, _ := strconv.Atoi(enumValue[0].(string))
+					tagIntEnums = append(tagIntEnums, NewTagEnum(enumValue[0], enumValue[1]))
 					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1]))
 				} else {
+					tagStringEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 				}
+			}
+			if len(tagIntEnums) != 0 {
+				TAG_INT_ENUMS[tagEnumFile] = tagIntEnums
+			}
+			if len(tagStringEnums) != 0 {
+				TAG_STRING_ENUMS[tagEnumFile] = tagStringEnums
 			}
 			TAG_ENUMS[tagEnumFile] = tagEnums
 		}
@@ -299,6 +311,27 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	sqlSplit := strings.Split(sql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
+	response := map[string][]interface{}{}
+	if tag == "all_int_enum" {
+		for key, tagValue := range TAG_INT_ENUMS {
+			tagValues := []interface{}{}
+			for _, value := range tagValue {
+				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName})
+			}
+			response[key] = tagValues
+		}
+		return response, nil
+	}
+	if tag == "all_string_enum" {
+		for key, tagValue := range TAG_STRING_ENUMS {
+			tagValues := []interface{}{}
+			for _, value := range tagValue {
+				tagValues = append(tagValues, []interface{}{value.Value, value.DisplayName})
+			}
+			response[key] = tagValues
+		}
+		return response, nil
+	}
 	// 标签是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
 		return GetTagResourceValues(sql)
@@ -323,7 +356,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	if !ok {
 		return GetTagResourceValues(sql)
 	}
-	response := map[string][]interface{}{
+	response = map[string][]interface{}{
 		"columns": []interface{}{"value", "display_name"},
 		"values":  []interface{}{},
 	}

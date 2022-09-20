@@ -72,3 +72,13 @@ type K8sLabelsKey struct {
 type TapTypeKey struct {
 	Value int
 }
+
+type StringEnumTagKey struct {
+	TagName  string
+	TagValue string
+}
+
+type IntEnumTagKey struct {
+	TagName  string
+	TagValue int
+}
