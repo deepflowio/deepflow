@@ -1067,6 +1067,9 @@ impl EbpfCollector {
         output: DebugSender<SendItem>,
         queue_debugger: &QueueDebugger,
     ) -> Result<Box<Self>> {
+        if config.ebpf_disabled {
+            return Err(Error::EbpfDisabled);
+        }
         info!("ebpf collector init...");
         let (sender, receiver, _) =
             bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);

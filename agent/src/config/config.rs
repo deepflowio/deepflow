@@ -255,6 +255,7 @@ pub struct YamlConfig {
     pub packet_sequence_flag: u8,          // Enterprise Edition Feature: packet-sequence
     pub ebpf_uprobe_golang_symbol_enabled: bool,
     pub feature_flags: Vec<String>,
+    pub ebpf_disabled: bool,
 }
 
 impl YamlConfig {
@@ -419,6 +420,7 @@ impl Default for YamlConfig {
             packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
             ebpf_uprobe_golang_symbol_enabled: false,
             feature_flags: vec![],
+            ebpf_disabled: false,
         }
     }
 }

@@ -204,7 +204,7 @@ fn get_num_from_status_file(pattern: &str, value: &str) -> Result<u32> {
         let mut status = match File::open(status_file.as_str()) {
             Ok(s) => s,
             Err(e) => {
-                debug!("open status file {} failed", status_file);
+                debug!("open status file {} error: {:?}", status_file, e);
                 continue;
             }
         };
