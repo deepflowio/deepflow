@@ -59,6 +59,12 @@ type Config struct {
 }
 
 func (c *Config) Convert() {
+	if c.Chrony.Host != "" {
+		if value, ok := os.LookupEnv(c.Chrony.Host); ok {
+			c.Chrony.Host = value
+		}
+		log.Infof("%+v", c.Chrony)
+	}
 	nodeIP := os.Getenv(common.NODE_IP_KEY)
 	if nodeIP == "" {
 		log.Errorf("get env(%s) data failed", common.NODE_IP_KEY)
