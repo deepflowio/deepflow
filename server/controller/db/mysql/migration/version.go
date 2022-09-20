@@ -18,5 +18,5 @@ package migration
 
 const (
 	DB_VERSION_TABLE  = "db_version"
-	DB_VERSION_EXPECT = "6.1.3.1" // TODO add array to implement step-by-step migration
+	DB_VERSION_EXPECT = "6.1.3.3" // TODO add array to implement step-by-step migration
 )
