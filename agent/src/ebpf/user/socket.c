@@ -1325,6 +1325,29 @@ static unsigned char *read_name(unsigned char *reader, unsigned char *buffer,
 	return name;
 }
 
+struct http2_buffer_header {
+	__u32 fd;
+	__u32 stream_id;
+	__u32 header_len;
+	__u32 value_len;
+};
+
+void print_uprobe_http2_info(const char *data, int len)
+{
+	struct http2_buffer_header header;
+	char key[256] = { 0 };
+	char value[256] = { 0 };
+	memcpy(&header, data, sizeof(header));
+	printf("fd=[%d]\n", header.fd);
+	printf("stream_id=[%d]\n", header.stream_id);
+	memcpy(&key, data + sizeof(header), header.header_len);
+	memcpy(&value, data + sizeof(header) + header.header_len,
+	       header.value_len);
+	printf("header=[%s:%s]\n", key, value);
+	fflush(stdout);
+	return;
+}
+
 void print_dns_info(const char *data, int len)
 {
 	//refer: https://www.binarytides.com/dns-query-code-in-c-with-winsock/
