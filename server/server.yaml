@@ -206,6 +206,9 @@ ingester:
   #  host: influxdb
   #  port: 20044
 
+  ## The listening port used by Ingester to receive data
+  #listen-port: 20033
+
   #metrics-replica-enabled: false
   #flowlog-replica-enabled: false
 
