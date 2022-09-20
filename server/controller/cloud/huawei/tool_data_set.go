@@ -40,6 +40,7 @@ type ToolDataSet struct {
 	keyToVMLcuuid                 map[SubnetIPKey]string
 	keyToNATGatewayLcuuid         map[VPCIPKey]string
 	vinterfaceLcuuidToPublicIP    map[string]string
+	vinterfaceLcuuidToIP          map[string]string
 	lbLcuuidToVPCLcuuid           map[string]string
 	lbLcuuidToIP                  map[string]string
 
@@ -66,6 +67,7 @@ func NewToolDataSet() *ToolDataSet {
 		keyToVMLcuuid:                 make(map[SubnetIPKey]string),
 		keyToNATGatewayLcuuid:         make(map[VPCIPKey]string),
 		vinterfaceLcuuidToPublicIP:    make(map[string]string),
+		vinterfaceLcuuidToIP:          make(map[string]string),
 		lbLcuuidToVPCLcuuid:           make(map[string]string),
 		lbLcuuidToIP:                  make(map[string]string),
 		regionLcuuidToResourceNum:     make(map[string]int),
