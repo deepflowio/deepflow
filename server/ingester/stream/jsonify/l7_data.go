@@ -659,12 +659,6 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
 
 	h.ResponseStatus = datatype.STATUS_NOT_EXIST
-	if h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.ResponseStatus = uint8(l.Base.Head.Status)
-		h.responseCode = int16(l.Base.Head.Code)
-		h.ResponseCode = &h.responseCode
-	}
-
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	// 协议结构统一, 不再为每个协议定义单独结构
 	h.fillL7Log(l)
@@ -684,18 +678,17 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 			h.RequestLength = &h.requestLength
 		}
 	}
-	if l.Resp != nil {
-		h.responseCode = int16(l.Resp.Code)
+	if l.Resp != nil && h.Type != uint8(datatype.MSG_T_REQUEST) {
 		h.ResponseResult = l.Resp.Result
+		h.responseCode = int16(l.Resp.Code)
+		h.ResponseStatus = uint8(l.Resp.Status)
 		h.fillExceptionDesc(l)
-		if h.Type != uint8(datatype.MSG_T_REQUEST) {
-			h.ResponseStatus = uint8(l.Resp.Status)
-			if h.responseCode != -32768 {
-				h.ResponseCode = &h.responseCode
-			}
-			if h.responseLength != -1 {
-				h.ResponseLength = &h.responseLength
-			}
+
+		if h.responseCode != datatype.L7PROTOCOL_LOG_RESP_CODE_NONE {
+			h.ResponseCode = &h.responseCode
+		}
+		if h.responseLength != -1 {
+			h.ResponseLength = &h.responseLength
 		}
 	}
 

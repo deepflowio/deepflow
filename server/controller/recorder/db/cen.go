@@ -30,6 +30,7 @@ func NewCEN() *CEN {
 		OperatorBase[mysql.CEN]{
 			resourceTypeName: common.RESOURCE_TYPE_CEN_EN,
 			softDelete:       true,
+			allocateID:       false,
 		},
 	}
 	operater.setter = operater

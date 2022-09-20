@@ -87,13 +87,14 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 }
 
 func GetMetrics(field string, db string, table string) (*Metrics, bool) {
-	if db == "ext_metrics" || db == "deepflow_system" {
+	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
 		field = strings.Trim(field, "`")
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
+				metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
 				return NewMetrics(
-					0, fmt.Sprintf("if(indexOf(metrics_float_names, '%s')=0,null,metrics_float_values[indexOf(metrics_float_names, '%s')])", fieldSplit[1], fieldSplit[1]),
+					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldSplit[1], metrics_values_field, metrics_names_field, fieldSplit[1]),
 					field, "", METRICS_TYPE_COUNTER,
 					"指标", []bool{true, true, true}, "", table,
 				), true
@@ -116,7 +117,22 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 		case "l4_flow_log":
 			return GetL4FlowLogMetrics(), err
 		case "l7_flow_log":
-			return GetL7FlowLogMetrics(), err
+			metrics := make(map[string]*Metrics)
+			loads := GetL7FlowLogMetrics()
+			exts, err := GetExtMetrics(db, table, where)
+			for k, v := range loads {
+				if _, ok := metrics[k]; !ok {
+					metrics[k] = v
+				}
+			}
+			loadsLen := len(loads)
+			for k, v := range exts {
+				if _, ok := metrics[k]; !ok {
+					v.Index += loadsLen
+					metrics[k] = v
+				}
+			}
+			return metrics, err
 		}
 	case "flow_metrics":
 		switch table {

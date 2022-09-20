@@ -28,6 +28,8 @@ pub enum Error {
     EbpfL7ParseError,
     #[error("l7 get log info error.")]
     EbpfL7GetLogInfoError,
+    #[error("ebpf disabled.")]
+    EbpfDisabled,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

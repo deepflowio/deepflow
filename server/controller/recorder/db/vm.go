@@ -30,6 +30,7 @@ func NewVM() *VM {
 		OperatorBase[mysql.VM]{
 			resourceTypeName: common.RESOURCE_TYPE_VM_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

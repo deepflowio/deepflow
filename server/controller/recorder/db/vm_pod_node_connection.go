@@ -30,6 +30,7 @@ func NewVMPodNodeConnection() *VMPodNodeConnection {
 		OperatorBase[mysql.VMPodNodeConnection]{
 			resourceTypeName: common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

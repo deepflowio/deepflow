@@ -17,9 +17,6 @@
 package config
 
 import (
-	"crypto/md5"
-	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 
@@ -49,16 +46,23 @@ type Config struct {
 	RegionDomainPrefix       string   `yaml:"region-domain-prefix"`
 	ClearKubernetesTime      int      `default:"600" yaml:"clear-kubernetes-time"`
 	NodeIP                   string
-	LocalClusterID           string
 	VTapCacheRefreshInterval int    `default:"300" yaml:"vtapcache-refresh-interval"`
 	MetaDataRefreshInterval  int    `default:"60" yaml:"metadata-refresh-interval"`
 	NodeRefreshInterval      int    `default:"60" yaml:"node-refresh-interval"`
 	VTapAutoRegister         bool   `default:"true" yaml:"vtap-auto-register"`
 	DefaultTapMode           int    `yaml:"default-tap-mode"`
 	BillingMethod            string `default:"license" yaml:"billing-method"`
+	GrpcPort                 int
+	IngesterPort             int
 }
 
 func (c *Config) Convert() {
+	if c.Chrony.Host != "" {
+		if value, ok := os.LookupEnv(c.Chrony.Host); ok {
+			c.Chrony.Host = value
+		}
+		log.Infof("%+v", c.Chrony)
+	}
 	nodeIP := os.Getenv(common.NODE_IP_KEY)
 	if nodeIP == "" {
 		log.Errorf("get env(%s) data failed", common.NODE_IP_KEY)
@@ -70,13 +74,24 @@ func (c *Config) Convert() {
 	} else {
 		c.NodeIP = nodeIP
 	}
+}
 
-	caFile, err := ioutil.ReadFile(common.K8S_CA_CRT_PATH)
-	if err != nil {
-		log.Errorf("get k8s ca file (%s) failed", common.K8S_CA_CRT_PATH)
-		return
-	}
-	c.LocalClusterID, _ = common.GenerateKuberneteClusterIDByMD5(
-		fmt.Sprintf("%x", md5.Sum(caFile)),
-	)
+func (c *Config) SetGrpcPort(port int) {
+	c.GrpcPort = port
+}
+
+func (c *Config) SetIngesterPort(port int) {
+	c.IngesterPort = port
+}
+
+func (c *Config) GetGrpcPort() int {
+	return c.GrpcPort
+}
+
+func (c *Config) GetIngesterPort() int {
+	return c.IngesterPort
+}
+
+func (c *Config) SetLogLevel(logLevel string) {
+	c.LogLevel = logLevel
 }

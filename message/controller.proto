@@ -9,6 +9,8 @@ service Controller {
     rpc GenesisSharingK8S (GenesisSharingK8SRequest) returns (GenesisSharingK8SResponse) {}
     rpc GenesisSharingSync (GenesisSharingSyncRequest) returns (GenesisSharingSyncResponse) {}
     rpc GetEncryptKey (EncryptKeyRequest) returns (EncryptKeyResponse) {}
+    rpc GetResourceID (GetResourceIDRequest) returns (GetResourceIDResponse) {}
+    rpc ReleaseResourceID (ReleaseResourceIDRequest) returns (ReleaseResourceIDResponse) {}
 }
 
 message GenesisSharingK8SRequest {
@@ -136,4 +138,21 @@ message EncryptKeyRequest {
 message EncryptKeyResponse {
     optional string error_msg = 1;
     optional string encrypt_key = 2;
+}
+
+message GetResourceIDRequest {
+    required string type = 1;
+    required uint32 count = 2;
+}
+
+message GetResourceIDResponse {
+    repeated uint32 ids = 1; 
+}
+
+message ReleaseResourceIDRequest {
+    required string type = 1;
+    repeated uint32 ids = 2;
+}
+
+message ReleaseResourceIDResponse {
 }

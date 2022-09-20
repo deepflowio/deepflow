@@ -33,6 +33,7 @@ const (
 	DEVICE_OWNER_ROUTER_IFACE = "network:router_interface"
 	DEVICE_OWNER_FLOATING_IP  = "network:floatingip"
 	DEVICE_OWNER_DHCP         = "network:dhcp"
+	DEVICE_OWNER_NAT_GATEWAY  = "network:nat_gateway"
 )
 
 func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model.IP, []model.FloatingIP, []model.NATRule, error) {
@@ -63,14 +64,17 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 			if network.Lcuuid == "" {
 				log.Infof("exclude vinterface: %s", mac)
 			}
+			var deviceID string
+			deviceID = jPort.Get("device_id").MustString()
 			deviceOwner := jPort.Get("device_owner").MustString()
+
+			h.formatVInterfaceRelatedToolDataSet(jPort, deviceID, deviceOwner, network.VPCLcuuid)
+
 			if !common.Contains([]string{DEVICE_OWNER_DHCP, DEVICE_OWNER_ROUTER_GW, DEVICE_OWNER_VM, DEVICE_OWNER_ROUTER_IFACE}, deviceOwner) && !strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
 				log.Infof("exclude vinterface: %s, %s", mac, deviceOwner)
 				continue
 			}
-			var deviceID string
 			var deviceType int
-			deviceID = jPort.Get("device_id").MustString()
 			if deviceOwner == DEVICE_OWNER_ROUTER_GW {
 				deviceType = common.VIF_DEVICE_TYPE_VROUTER
 			} else if deviceOwner == DEVICE_OWNER_DHCP {
@@ -88,7 +92,7 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 					RegionLcuuid: regionLcuuid,
 				}
 				dhcpPorts = append(dhcpPorts, dhcpPort)
-			} else if deviceOwner == DEVICE_OWNER_VM || strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
+			} else if strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
 				deviceType = common.VIF_DEVICE_TYPE_VM
 			} else if deviceOwner == DEVICE_OWNER_ROUTER_IFACE {
 				deviceType = common.VIF_DEVICE_TYPE_VROUTER
@@ -118,6 +122,27 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 		h.formatPublicIPs(project, token.token)
 	}
 	return dhcpPorts, vifs, ips, fIPs, natRules, nil
+}
+
+func (h *HuaWei) formatVInterfaceRelatedToolDataSet(jPort *simplejson.Json, deviceID, deviceOwner, vpcLcuuid string) {
+	jIPs, ok := jPort.CheckGet("fixed_ips")
+	if !ok {
+		return
+	}
+	ipRequiredAttrs := []string{"ip_address"}
+	for i := range jIPs.MustArray() {
+		jIP := jIPs.GetIndex(i)
+		if !CheckAttributes(jIP, ipRequiredAttrs) {
+			continue
+		}
+		ipAddr := jIP.Get("ip_address").MustString()
+		if deviceOwner == DEVICE_OWNER_NAT_GATEWAY {
+			h.toolDataSet.keyToNATGatewayLcuuid[VPCIPKey{vpcLcuuid, ipAddr}] = deviceID
+		}
+		if strings.HasPrefix(deviceOwner, DEVICE_OWNER_VM_PRE) {
+			h.toolDataSet.keyToVMLcuuid[SubnetIPKey{jIP.Get("subnet_id").MustString(), ipAddr}] = deviceID
+		}
+	}
 }
 
 func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterface) (ips []model.IP, fIP model.FloatingIP, natRule model.NATRule) {
@@ -153,6 +178,8 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 				RegionLcuuid:     vif.RegionLcuuid,
 			},
 		)
+		// 仅取1个IP
+		h.toolDataSet.vinterfaceLcuuidToIP[vif.Lcuuid] = ipAddr
 		if i == 0 && floatingIP != "" {
 			natRule = model.NATRule{
 				Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
@@ -162,11 +189,6 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 				FixedIP:          ipAddr,
 				VInterfaceLcuuid: vif.Lcuuid,
 			}
-		}
-		if vif.DeviceType == common.VIF_DEVICE_TYPE_VM {
-			h.toolDataSet.keyToVMLcuuid[SubnetIPKey{jIP.Get("subnet_id").MustString(), ipAddr}] = vif.DeviceLcuuid
-		} else if vif.DeviceType == common.VIF_DEVICE_TYPE_NAT_GATEWAY {
-			h.toolDataSet.keyToNATGatewayLcuuid[VPCIPKey{vif.VPCLcuuid, ipAddr}] = vif.DeviceLcuuid
 		}
 	}
 	return

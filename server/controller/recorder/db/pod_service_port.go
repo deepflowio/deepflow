@@ -30,6 +30,7 @@ func NewPodServicePort() *PodServicePort {
 		OperatorBase[mysql.PodServicePort]{
 			resourceTypeName: common.RESOURCE_TYPE_POD_SERVICE_PORT_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }

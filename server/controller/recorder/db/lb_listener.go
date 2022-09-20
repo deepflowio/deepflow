@@ -30,6 +30,7 @@ func NewLBListener() *LBListener {
 		OperatorBase[mysql.LBListener]{
 			resourceTypeName: common.RESOURCE_TYPE_LB_LISTENER_EN,
 			softDelete:       true,
+			allocateID:       false,
 		},
 	}
 	operater.setter = operater

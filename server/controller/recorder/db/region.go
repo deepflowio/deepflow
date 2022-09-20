@@ -30,6 +30,7 @@ func NewRegion() *Region {
 		OperatorBase[mysql.Region]{
 			resourceTypeName: common.RESOURCE_TYPE_REGION_EN,
 			softDelete:       true,
+			allocateID:       true,
 		},
 	}
 	operater.setter = operater

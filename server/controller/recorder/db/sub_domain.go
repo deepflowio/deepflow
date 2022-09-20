@@ -30,6 +30,7 @@ func NewSubDomain() *SubDomain {
 		OperatorBase[mysql.SubDomain]{
 			resourceTypeName: common.RESOURCE_TYPE_SUB_DOMAIN_EN,
 			softDelete:       false,
+			allocateID:       false,
 		},
 	}
 }
