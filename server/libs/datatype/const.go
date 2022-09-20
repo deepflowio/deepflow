@@ -152,6 +152,10 @@ const (
 	IPV4_FRAG_OFFSET_MASK   = 0x1fff
 )
 
+const (
+	L7PROTOCOL_LOG_RESP_CODE_NONE = -32768
+)
+
 func (t HeaderType) IsL3() bool {
 	return t < HEADER_TYPE_L4
 }

@@ -592,6 +592,8 @@ func (p L7Protocol) String() string {
 		formatted = "httpv2"
 	case L7_PROTOCOL_HTTP_1_TLS:
 		formatted = "httpv1_tls"
+	case L7_PROTOCOL_HTTP_2_TLS:
+		formatted = "httpv2_tls"
 	case L7_PROTOCOL_DNS:
 		formatted = "dns"
 	case L7_PROTOCOL_MYSQL:
@@ -616,6 +618,7 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	L7_PROTOCOL_HTTP_1.String():     L7_PROTOCOL_HTTP_1,
 	L7_PROTOCOL_HTTP_2.String():     L7_PROTOCOL_HTTP_2,
 	L7_PROTOCOL_HTTP_1_TLS.String(): L7_PROTOCOL_HTTP_1_TLS,
+	L7_PROTOCOL_HTTP_2_TLS.String(): L7_PROTOCOL_HTTP_2_TLS,
 	L7_PROTOCOL_DNS.String():        L7_PROTOCOL_DNS,
 	L7_PROTOCOL_MYSQL.String():      L7_PROTOCOL_MYSQL,
 	L7_PROTOCOL_REDIS.String():      L7_PROTOCOL_REDIS,
