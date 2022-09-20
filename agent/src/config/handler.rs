@@ -382,6 +382,7 @@ pub struct EbpfConfig {
     pub l7_log_tap_types: [bool; 256],
     pub ctrl_mac: MacAddr,
     pub ebpf_uprobe_golang_symbol_enabled: bool,
+    pub ebpf_disabled: bool,
 }
 
 #[cfg(target_os = "linux")]
@@ -410,6 +411,11 @@ impl fmt::Debug for EbpfConfig {
                     .collect::<Vec<_>>(),
             )
             .field("ctrl_mac", &self.ctrl_mac)
+            .field(
+                "ebpf-uprobe-golang-symbol-enabled",
+                &self.ebpf_uprobe_golang_symbol_enabled,
+            )
+            .field("ebpf-disabled", &self.ebpf_disabled)
             .finish()
     }
 }
@@ -782,6 +788,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 ebpf_uprobe_golang_symbol_enabled: conf
                     .yaml_config
                     .ebpf_uprobe_golang_symbol_enabled,
+                ebpf_disabled: conf.yaml_config.ebpf_disabled,
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
