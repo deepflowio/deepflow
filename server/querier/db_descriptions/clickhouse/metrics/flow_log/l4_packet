@@ -1,0 +1,2 @@
+# Field              , DBField              , DisplayName             , Unit , Type       , Category   , Permission , Description
+packet_count         ,                      , 时序包数量              , 个   , counter    , 时序包数量 , 111        ,

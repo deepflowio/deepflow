@@ -1,0 +1,7 @@
+# Name                    , ClientName                , ServerName                , DisplayName            , Type          , EnumFile           , Category    , Permission , Discription
+time                      ,                           ,                           ,                        , time          ,                    ,             , 111        ,
+
+flow_id                   , flow_id                   , flow_id                   , 流日志ID               , int           ,                    , 流信息      , 111        ,
+vtap                      , vtap                      , vtap                      , 采集器                 , resource      ,                    , 流信息      , 111        ,
+start_time                , start_time                , start_time                , 开始时间               , int           ,                    , 流信息      , 111        ,
+end_time                  , end_time                  , end_time                  , 结束时间               , int           ,                    , 流信息      , 111        ,
