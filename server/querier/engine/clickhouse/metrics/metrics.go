@@ -125,8 +125,10 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 					metrics[k] = v
 				}
 			}
+			loadsLen := len(loads)
 			for k, v := range exts {
 				if _, ok := metrics[k]; !ok {
+					v.Index += loadsLen
 					metrics[k] = v
 				}
 			}
