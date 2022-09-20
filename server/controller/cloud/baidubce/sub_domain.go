@@ -48,6 +48,7 @@ func (b *BaiduBce) getSubDomains(region model.Region, vpcIdToLcuuid map[string]s
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListClusters", " ", structToJson(results))
 	for _, r := range results {
 		for _, cluster := range r.Clusters {
 			vpcLcuuid, ok := vpcIdToLcuuid[cluster.VpcId]

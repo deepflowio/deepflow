@@ -63,6 +63,7 @@ func (b *BaiduBce) getRDSInstances(
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListRds", " ", structToJson(results))
 	for _, r := range results {
 		for _, instance := range r.Instances {
 			rds, err := rdsClient.GetDetail(instance.InstanceId)

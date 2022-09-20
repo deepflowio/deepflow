@@ -71,6 +71,7 @@ func (a *Aliyun) get{{$typed_name}}Response(region string, request *{{$service}}
 		break
 {{- end }}
 	}
+	a.debugger.WriteJson("{{$result_key}}", " ", resp)
 	return resp, nil
 }
 

@@ -48,6 +48,7 @@ func (b *BaiduBce) getVPCs(region model.Region) ([]model.VPC, map[string]string,
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListVPC", " ", structToJson(results))
 	vpcIdToName = make(map[string]string)
 	vpcIdToLcuuid = make(map[string]string)
 	for _, r := range results {

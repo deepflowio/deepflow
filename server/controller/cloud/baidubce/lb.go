@@ -54,6 +54,7 @@ func (b *BaiduBce) getLoadBalances(region model.Region, vpcIdToLcuuid map[string
 	log.Debug("get lbs complete")
 	return retLBs, retVInterfaces, retIPs, nil
 }
+
 func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[string]string, networkIdToLcuuid map[string]string) (
 	[]model.LB, []model.VInterface, []model.IP, error,
 ) {
@@ -81,6 +82,7 @@ func (b *BaiduBce) getBLoadBalances(region model.Region, vpcIdToLcuuid map[strin
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("blbDescribeLoadBalancers", " ", structToJson(results))
 	for _, r := range results {
 		for _, lb := range r.BlbList {
 			vpcLcuuid, ok := vpcIdToLcuuid[lb.VpcId]
@@ -143,6 +145,7 @@ func (b *BaiduBce) getAppBLoadBalances(region model.Region, vpcIdToLcuuid map[st
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("appblbDescribeLoadBalancers", " ", structToJson(results))
 	for _, r := range results {
 		for _, lb := range r.BlbList {
 			vpcLcuuid, ok := vpcIdToLcuuid[lb.VpcId]

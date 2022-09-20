@@ -53,6 +53,7 @@ func (b *BaiduBce) getSecurityGroups(region model.Region, vpcIdToLcuuid map[stri
 		marker = result.NextMarker
 	}
 
+	b.debugger.WriteJson("ListSecurityGroup", " ", structToJson(results))
 	for _, r := range results {
 		for _, securityGroup := range r.SecurityGroups {
 			vpcLcuuid, ok := vpcIdToLcuuid[securityGroup.VpcId]

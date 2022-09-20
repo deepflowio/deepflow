@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -64,6 +65,8 @@ type Tencent struct {
 	vpcIDToRegionLcuuid  map[string]string
 	publicIPToVinterface map[string]model.VInterface
 	cloudStatsd          statsd.CloudStatsd
+
+	debugger *cloudcommon.Debugger
 }
 
 type tencentRegion struct {
@@ -147,7 +150,12 @@ func NewTencent(domain mysql.Domain) (*Tencent, error) {
 			APICost:  make(map[string][]int),
 			ResCount: make(map[string][]int),
 		},
+		debugger: cloudcommon.NewDebugger(domain.Name),
 	}, nil
+}
+
+func (t *Tencent) ClearDebugLog() {
+	t.debugger.Clear()
 }
 
 func (t *Tencent) CheckAuth() error {
@@ -265,7 +273,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 			t.cloudStatsd.APICount[action] = append(t.cloudStatsd.APICount[action], sumCount)
 		}
 	}
-
+	t.debugger.WriteJson(resultKey, regionName, responses)
 	return responses, nil
 }
 
@@ -454,5 +462,6 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 	t.cloudStatsd.ResCount = statsd.GetResCount(resource)
 	statsd.MetaStatsd.RegisterStatsdTable(t)
+	t.debugger.Refresh()
 	return resource, nil
 }

@@ -38,6 +38,7 @@ func (b *BaiduBce) getRegionAndAZs() ([]model.Region, []model.AZ, map[string]str
 		log.Error(err)
 		return nil, nil, nil, err
 	}
+	b.debugger.WriteJson("ListZone", " ", structToJson(result.Zones))
 	zones := result.Zones
 
 	regionName := ""
