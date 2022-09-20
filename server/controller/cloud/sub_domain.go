@@ -119,9 +119,7 @@ func (c *Cloud) getSubDomainData() {
 
 // - 根据IP查询对应的虚拟机，生成与虚拟机的关联关系
 // - 根据虚拟机的az属性，确定容器节点的az信息
-func (c *Cloud) getSubDomainPodNodes(
-	subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource,
-) ([]model.PodNode, []model.VMPodNodeConnection) {
+func (c *Cloud) getSubDomainPodNodes(subDomainLcuuid string, resource *kubernetes_model.KubernetesGatherResource) ([]model.PodNode, []model.VMPodNodeConnection) {
 	var retPodNodes []model.PodNode
 	var retVMPodNodeConnections []model.VMPodNodeConnection
 
@@ -148,9 +146,6 @@ func (c *Cloud) getSubDomainPodNodes(
 
 	ipToVM := make(map[string]*model.VM)
 	for _, ip := range c.resource.IPs {
-		if _, ok := vinterfaceLcuuidToVMLcuuid[ip.VInterfaceLcuuid]; !ok {
-			continue
-		}
 		vmLcuuid, ok := vinterfaceLcuuidToVMLcuuid[ip.VInterfaceLcuuid]
 		if !ok {
 			continue
