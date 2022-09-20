@@ -26,6 +26,7 @@ use std::time::{Duration, UNIX_EPOCH};
 
 extern "C" {
     fn print_dns_info(data: *mut c_char, len: c_uint);
+    fn print_uprobe_http2_info(data: *mut c_char, len: c_uint);
 }
 
 fn flow_info(sd: *mut SK_BPF_DATA) -> String {
@@ -212,6 +213,8 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
                      (*sd).timestamp);
             if sk_proto_safe(sd) == SOCK_DATA_DNS {
                 print_dns_info((*sd).cap_data, (*sd).cap_len);
+            } else if (*sd).source == 2 {
+                print_uprobe_http2_info((*sd).cap_data, (*sd).cap_len);
             } else {
                 for x in data.into_iter() {
                     if x < 32 || x > 126 {
