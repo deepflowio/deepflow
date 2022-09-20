@@ -18,6 +18,8 @@ package cloud
 
 import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/satori/go.uuid"
 )
 
 // Kubernetes平台直接使用对应kubernetesgather的resource作为cloud的resource
@@ -73,6 +75,31 @@ func (c *Cloud) getKubernetesData() {
 		regions = append(regions, kubernetesGatherResource.Region)
 	}
 
+	// 将所有容器节点默认同步为云服务器
+	vms := []model.VM{}
+	vmPodNodeConnections := []model.VMPodNodeConnection{}
+	for _, node := range kubernetesGatherResource.PodNodes {
+		state := common.VM_STATE_RUNNING
+		if node.State == common.POD_NODE_STATE_EXCEPTION {
+			state = common.VM_STATE_EXCEPTION
+		}
+		vmLcuuid := "ff" + common.GetUUID(node.Name, uuid.Nil)[2:]
+		vms = append(vms, model.VM{
+			Lcuuid:       vmLcuuid,
+			Name:         node.Name,
+			Label:        node.Lcuuid,
+			State:        state,
+			VPCLcuuid:    node.VPCLcuuid,
+			AZLcuuid:     node.AZLcuuid,
+			RegionLcuuid: node.RegionLcuuid,
+		})
+		vmPodNodeConnections = append(vmPodNodeConnections, model.VMPodNodeConnection{
+			Lcuuid:        common.GetUUID(vmLcuuid+node.Lcuuid, uuid.Nil),
+			VMLcuuid:      vmLcuuid,
+			PodNodeLcuuid: node.Lcuuid,
+		})
+	}
+
 	// 更新resource资源
 	c.resource = model.Resource{
 		AZs:                    []model.AZ{kubernetesGatherResource.AZ},
@@ -92,9 +119,11 @@ func (c *Cloud) getKubernetesData() {
 		PodIngressRules:        kubernetesGatherResource.PodIngressRules,
 		PodIngressRuleBackends: kubernetesGatherResource.PodIngressRuleBackends,
 		IPs:                    ips,
+		VMs:                    vms,
 		Regions:                regions,
 		Subnets:                subnets,
 		Networks:               networks,
 		VInterfaces:            vinterfaces,
+		VMPodNodeConnections:   vmPodNodeConnections,
 	}
 }
