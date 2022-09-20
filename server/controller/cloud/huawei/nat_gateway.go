@@ -159,11 +159,13 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 				VInterfaceLcuuid: jRule.Get("port_id").MustString(),
 				FloatingIP:       floatingIP,
 				FloatingIPPort:   floatingIPPort,
-				FixedIP:          jRule.Get("port_id").MustString(),
+				FixedIP:          h.toolDataSet.vinterfaceLcuuidToIP[jRule.Get("port_id").MustString()],
 				FixedIPPort:      fixedIPPort,
 			},
 		)
-		h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID] = append(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP)
+		if !common.Contains(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP) {
+			h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID] = append(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP)
+		}
 	}
 	return
 }
@@ -206,7 +208,9 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 				FixedIP:          fixedIP,
 			},
 		)
-		h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID] = append(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP)
+		if !common.Contains(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP) {
+			h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID] = append(h.toolDataSet.natGatewayLcuuidToFloatingIPs[natGatewayID], floatingIP)
+		}
 	}
 	return
 }
