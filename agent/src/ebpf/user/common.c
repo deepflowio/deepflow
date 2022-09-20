@@ -295,14 +295,13 @@ int max_rlim_open_files_set(int num)
 	return ret;
 }
 
-//OPEN_FILES_MAX
-static int fs_write(char *file_name, char *v, int mode, int len)
+static int fs_write(const char *file_name, char *v, int mode, int len)
 {
 	int fd, err = 0;
 
 	fd = open(file_name, mode);
 	if (fd < 0) {
-		ebpf_warning("Open debug file(\"%s\") write failed.\n",
+		ebpf_warning("Open debug file(\"%s\") open failed.\n",
 			     file_name);
 		return -1;
 	}
@@ -314,9 +313,40 @@ static int fs_write(char *file_name, char *v, int mode, int len)
 	return err;
 }
 
-int sysfs_write(char *file_name, char *v)
+int sysfs_write(const char *file_name, char *v)
 {
 	return fs_write(file_name, v, O_WRONLY, 1);
+}
+
+static int fs_read(const char *file_name, char *v, int mode, int len)
+{
+	int fd, err = 0;
+
+	fd = open(file_name, mode);
+	if (fd < 0) {
+		ebpf_warning("Open debug file(\"%s\") open failed.\n",
+			     file_name);
+		return -1;
+	}
+
+	if ((err = read(fd, v, len)) < 0)
+		ebpf_warning("Read %s to file \"%s\" failed.\n", v, file_name);
+
+	close(fd);
+	return err;
+}
+
+int sysfs_read_num(const char *file_name)
+{
+	int ret;
+	char buf[64];
+	memset(buf, 0, sizeof(buf));
+	ret = fs_read(file_name, (char *)buf, O_RDONLY, 1);
+	if (ret > 0) {
+		return atoi(buf);
+	}
+
+	return ETR_INVAL;
 }
 
 uint64_t gettime(clockid_t clk_id, int flag)
