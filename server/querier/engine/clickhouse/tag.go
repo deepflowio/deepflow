@@ -60,7 +60,16 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 			stmt = &SelectTag{Value: TagTranslatorStr, Alias: selectTag}
 		}
 	} else {
-		if tagItem.TagTranslator != "" {
+		if name == "metrics" {
+			tagTranslator := ""
+			if db == "flow_log" {
+				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_names", "metrics_values")
+			} else {
+				tagTranslator = fmt.Sprintf(tagItem.TagTranslator, "metrics_float_names", "metrics_float_values")
+
+			}
+			stmt = &SelectTag{Value: tagTranslator, Alias: selectTag}
+		} else if tagItem.TagTranslator != "" {
 			stmt = &SelectTag{Value: tagItem.TagTranslator, Alias: selectTag}
 		} else if alias != "" {
 			stmt = &SelectTag{Value: name, Alias: selectTag}
@@ -75,7 +84,7 @@ func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
 		if strings.HasPrefix(name, "`metrics.") && db == "ext_metrics" {
-			tagItem, ok = tag.GetTag("metrics", db, table, "default")
+			tagItem, ok = tag.GetTag("metrics.", db, table, "default")
 			filter := ""
 			if as == "" {
 				filter = fmt.Sprintf(tagItem.NotNullFilter, name)
@@ -119,7 +128,7 @@ func (t *SelectTag) Format(m *view.Model) {
 		}
 		m.AddCallback(MacTranslate([]interface{}{t.Value, alias}))
 	}
-	if t.Alias == "tags" || t.Alias == "attributes" {
+	if t.Alias == "tags" || t.Alias == "attributes" || t.Alias == "metrics" {
 		m.AddCallback(ExternalTagsFormat([]interface{}{}))
 	}
 }
