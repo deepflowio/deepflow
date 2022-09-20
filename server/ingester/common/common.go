@@ -38,7 +38,7 @@ const (
 )
 
 func NewCKConnection(addr, username, password string) (*sql.DB, error) {
-	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s?username=%s&password=%s", addr, username, password))
+	connect, err := sql.Open("clickhouse", fmt.Sprintf("//%s:%s@%s", username, password, addr))
 	if err != nil {
 		return nil, err
 	}
