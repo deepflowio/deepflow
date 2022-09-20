@@ -546,7 +546,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		podIDSuffix := "pod_id" + suffix
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(flow_tag.k8s_labels_map, 'labels', toUInt64("+podIDSuffix+"))",
+				"dictGetOrDefault(flow_tag.k8s_labels_map, 'labels', toUInt64("+podIDSuffix+"),'{}')",
 				podIDSuffix+"!=0",
 				"",
 				"",
