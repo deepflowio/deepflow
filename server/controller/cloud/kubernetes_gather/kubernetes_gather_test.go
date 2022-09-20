@@ -27,9 +27,9 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
-	"github.com/deepflowys/deepflow/server/controller/genesis/config"
 )
 
 func TestKubernetes(t *testing.T) {
@@ -81,7 +81,7 @@ func TestKubernetes(t *testing.T) {
 		})
 		defer k8sInfoPatch.Reset()
 
-		g := genesis.NewGenesis(config.GenesisConfig{})
+		g := genesis.NewGenesis(&config.ControllerConfig{})
 		vJsonData, _ := ioutil.ReadFile("./testfiles/vinterfaces.json")
 		var vData genesis.GenesisSyncData
 		json.Unmarshal(vJsonData, &vData)
