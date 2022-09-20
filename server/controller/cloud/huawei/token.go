@@ -50,14 +50,12 @@ func (t *Token) isExpired() bool {
 }
 
 func (h *HuaWei) getToken(projectName, projectID string) (*Token, error) {
-	p := Project{projectName, projectID}
-	t, ok := h.projectTokenMap[p]
+	t, ok := h.projectTokenMap[Project{projectName, projectID}]
 	if !ok || t.isExpired() {
 		t, err := h.createToken(projectName, projectID)
 		if err != nil {
 			return t, err
 		}
-		h.projectTokenMap[p] = t
 		return t, err
 	}
 	return t, nil
@@ -113,14 +111,24 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 		if !CheckAttributes(jp, []string{"id", "name"}) {
 			continue
 		}
-		id := jp.Get("id").MustString()
 		name := jp.Get("name").MustString()
+		if len(h.config.IncludeRegions) > 0 && !common.Contains(h.config.IncludeRegions, name) {
+			log.Infof("exclude project: %s, not included", name)
+			continue
+		}
+		if common.Contains(h.config.ExcludeRegions, name) {
+			log.Infof("exclude project: %s", name)
+			continue
+		}
+
+		id := jp.Get("id").MustString()
 		token, err = h.getToken(name, id)
 		if err != nil {
 			log.Errorf("get token failed, pass this project (%s, %s)", name, id)
 			continue
 		}
 		projectIDs = append(projectIDs, id)
+		h.projectTokenMap[Project{name, id}] = token
 	}
 
 	for p, t := range h.projectTokenMap {
@@ -141,7 +149,8 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 			delete(h.projectTokenMap, p)
 			continue
 		}
-		log.Debugf("project info (%+v), token info (%+v)", p, t)
+		log.Infof("project info (%+v)", p)
+		log.Debugf("token info (%+v)", t)
 	}
 	return
 }

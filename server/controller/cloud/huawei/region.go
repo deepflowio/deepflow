@@ -30,6 +30,11 @@ func (h *HuaWei) getRegions() ([]model.Region, error) {
 		log.Errorf("request failed: %v", err)
 		return nil, err
 	}
+	includedRegionIDs := []string{}
+	for p := range h.projectTokenMap {
+		includedRegionIDs = append(includedRegionIDs, p.name)
+	}
+
 	var regions []model.Region
 	for i := range jRegions {
 		jr := jRegions[i]
@@ -37,11 +42,8 @@ func (h *HuaWei) getRegions() ([]model.Region, error) {
 			continue
 		}
 		id := jr.Get("id").MustString()
-		if len(h.config.IncludeRegions) > 0 && !common.Contains(h.config.IncludeRegions, id) {
+		if len(includedRegionIDs) > 0 && !common.Contains(includedRegionIDs, id) {
 			log.Infof("exclude region: %s, not included", id)
-		}
-		if common.Contains(h.config.ExcludeRegions, id) {
-			log.Infof("exclude region: %s", id)
 			continue
 		}
 
