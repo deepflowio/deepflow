@@ -185,6 +185,7 @@ ingester:
 
   #ckdb-auth:
   #  username:
+  #  # '#','@' special characters are not supported in passwords
   #  password:
 
   #ckdb:

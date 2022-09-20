@@ -259,7 +259,7 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 		}
 
 		if is_metrics {
-			metricsNames = append(attributeNames, key)
+			metricsNames = append(metricsNames, key)
 			v, _ := strconv.ParseFloat(getValueString(value), 64)
 			metricsValues = append(metricsValues, v)
 		} else {
