@@ -659,12 +659,6 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	h.L7ProtocolStr = datatype.L7Protocol(h.L7Protocol).String()
 
 	h.ResponseStatus = datatype.STATUS_NOT_EXIST
-	if h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.ResponseStatus = uint8(l.Base.Head.Status)
-		h.responseCode = int16(l.Base.Head.Code)
-		h.ResponseCode = &h.responseCode
-	}
-
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	// 协议结构统一, 不再为每个协议定义单独结构
 	h.fillL7Log(l)
