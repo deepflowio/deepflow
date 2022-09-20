@@ -62,16 +62,11 @@ func Int2Bool(i int) bool {
 
 func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api.Config {
 	gVTapInfo := trisolaris.GetGVTapInfo()
-	proxyControllerIP := c.GetControllerIP()
 	vtapConfig := c.GetVTapConfig()
 	if vtapConfig == nil {
 		return &api.Config{}
 	}
-	if vtapConfig.NatIPEnabled == 1 {
-		proxyControllerIP = trisolaris.GetGNodeInfo().GetControllerNatIP(proxyControllerIP)
-	} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-		proxyControllerIP = trisolaris.GetGNodeInfo().GetControllerPodIP(proxyControllerIP)
-	}
+
 	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
 	if ok == false {
 		collectorSocketType = UDP
@@ -152,7 +147,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		// 采集器其他配置
 		Enabled:           proto.Bool(Int2Bool(c.GetVTapEnabled())),
 		Host:              proto.String(c.GetVTapHost()),
-		ProxyControllerIp: &proxyControllerIP,
+		ProxyControllerIp: proto.String(c.GetControllerIP()),
 		VtapId:            &vtapID,
 		TridentType:       &tridentType,
 		EpcId:             &vpcID,
@@ -169,6 +164,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 			if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
 				podIP := trisolaris.GetGNodeInfo().GetTSDBPodIP(cacheTSBIP)
 				configure.AnalyzerIp = &podIP
+				configure.AnalyzerPort = proto.Uint32(uint32(trisolaris.GetIngesterPort()))
 			} else {
 				configure.AnalyzerIp = &cacheTSBIP
 			}
@@ -176,6 +172,13 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 			natIP := trisolaris.GetGNodeInfo().GetTSDBNatIP(cacheTSBIP)
 			configure.AnalyzerIp = &natIP
 		}
+	}
+
+	if vtapConfig.NatIPEnabled == 1 {
+		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
+	} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
+		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
+		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
 	}
 
 	if configure.GetProxyControllerIp() == "" {

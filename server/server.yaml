@@ -9,6 +9,7 @@ controller:
   #listen-node-port: 30417
   ## grpc server port
   #grpc-port: 20035
+  #ingester-port: 20033
   #grpc-node-port: 30035
   # grpc max message lenth default 100M
   grpc-max-message-length: 104857600
