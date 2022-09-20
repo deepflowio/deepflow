@@ -74,7 +74,7 @@ func GetTagTranslator(name, alias, db, table string) (Statement, error) {
 func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
 	tagItem, ok := tag.GetTag(name, db, table, "default")
 	if !ok {
-		if strings.HasPrefix(name, "`metrics.") {
+		if strings.HasPrefix(name, "`metrics.") && db == "ext_metrics" {
 			tagItem, ok = tag.GetTag("metrics", db, table, "default")
 			filter := ""
 			if as == "" {
