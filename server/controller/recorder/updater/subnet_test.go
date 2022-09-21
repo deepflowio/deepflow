@@ -19,7 +19,7 @@ package updater
 import (
 	"reflect"
 
-	"bou.ke/monkey"
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -56,15 +56,14 @@ func (t *SuiteTest) getSubnetMock(mockDB bool) (*cache.Cache, cloudmodel.Subnet)
 func (t *SuiteTest) TestHandleAddSubnetSucess() {
 	cache_, cloudItem := t.getSubnetMock(false)
 	networkID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetNetworkIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetNetworkIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return networkID, true
 	})
+	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.Subnets), 0)
 
 	updater := NewSubnet(cache_, []cloudmodel.Subnet{cloudItem})
 	updater.HandleAddAndUpdate()
-
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetNetworkIDByLcuuid")
 
 	var addedItem *mysql.Subnet
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
