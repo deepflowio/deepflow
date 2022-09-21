@@ -457,8 +457,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 	ptr += info->offsets[OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN];
 	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
 
-	// FIXME: Need a more precise version number
-	if (info->version >= GO_VERSION(1, 15, 0)) {
+	if (info->version >= GO_VERSION(1, 16, 0)) {
 		data.stream -= 2;
 	}
 
