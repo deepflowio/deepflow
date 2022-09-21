@@ -24,8 +24,9 @@ use super::enums::{EthernetType, IpProtocol};
 
 use crate::proto::trident::DecapType;
 use crate::utils::bytes;
+use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
 #[repr(u8)]
 pub enum TunnelType {
     None = DecapType::None as u8,
