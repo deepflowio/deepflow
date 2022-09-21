@@ -598,3 +598,12 @@ func GetAZLcuuidFromUUIDGenerate(uuidGenerate string) string {
 	lcuuid := common.GetUUID(uuidGenerate, uuid.Nil)
 	return lcuuid[:len(lcuuid)-2] + "ff"
 }
+
+// TODO add reason
+func GenerateWANVInterfaceMac(mac string) string {
+	if len(mac) < 2 {
+		log.Errorf("generate mac: %s failed", mac)
+		return mac
+	}
+	return "ff" + mac[2:]
+}
