@@ -13,7 +13,7 @@ RUN yum install make epel-release centos-release-scl -y && yum -y install jq
 
 # 安装基础依赖#
 RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git  -y && \
-     echo "source /opt/rh/devtoolset-8/enable" >> /etc/profile && \
+     source /opt/rh/devtoolset-8/enable && \
      curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y
 
 RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
@@ -58,7 +58,9 @@ RUN cargo install sccache && \
     ln -sf /usr/local/llvm-clang/bin/clang /usr/bin/clang && \
     ln -sf /usr/local/llvm-clang/bin/llc /usr/bin/llc && \
     ln -sf /usr/local/llvm-clang/bin/llvm-strip /usr/bin/llvm-strip && \
-    ln -sf /usr/local/llvm-clang/bin/llvm-objdump /usr/bin/llvm-objdump
+    ln -sf /usr/local/llvm-clang/bin/llvm-objdump /usr/bin/llvm-objdump && \
+    gcc --version
+
 CMD bash
 
 # 编译说明
