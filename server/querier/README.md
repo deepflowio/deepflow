@@ -331,7 +331,7 @@ clickhouse指标量及算子特殊处理：
 - pod_ingress和lb_listener只支持where，不支持select和group
 - resource类型tag（不包括tap, vtap）+ip支持node_type和icon_id
 - tap_port需和tap_port_type一起select和group
-- is_internet不支持AS
+- is_internet, metrics不支持AS
 - 自动分组相关限制
   - 不支持AS
   - select和group时，不能同时select和group ip和subnet_id
