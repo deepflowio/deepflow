@@ -38,13 +38,11 @@ struct EnvCommand(&'static str, Vec<&'static str>);
 fn set_build_info() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=AGENT_NAME=deepflow-agent-ce");
     let entries = vec![
+        EnvCommand("BRANCH", vec!["git", "branch", "--show-current"]),
+        EnvCommand("COMMIT_ID", vec!["git", "rev-parse", "HEAD"]),
         EnvCommand("REV_COUNT", vec!["git", "rev-list", "--count", "HEAD"]),
-        EnvCommand(
-            "COMMIT_DATE",
-            vec!["git", "show", "-s", "--format=%cd", "--date=short", "HEAD"],
-        ),
-        EnvCommand("REVISION", vec!["git", "rev-parse", "HEAD"]),
         EnvCommand("RUSTC_VERSION", vec!["rustc", "--version"]),
+        EnvCommand("COMPILE_TIME", vec!["date", "+%Y-%m-%d %H:%M:%S"]),
     ];
     for e in entries {
         let output = Command::new(e.1[0]).args(&e.1[1..]).output()?.stdout;
@@ -96,6 +94,7 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
             println!("cargo:rustc-link-lib=dylib=pthread");
             println!("cargo:rustc-link-lib=dylib=elf");
             println!("cargo:rustc-link-lib=dylib=z");
+            println!("cargo:rustc-link-lib=dylib=stdc++");
         }
         "musl" => {
             println!("cargo:rustc-link-lib=static=c");
