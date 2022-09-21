@@ -11,7 +11,6 @@ replace (
 )
 
 require (
-	bou.ke/monkey v1.0.2
 	github.com/ClickHouse/clickhouse-go/v2 v2.1.0
 	github.com/OneOfOne/xxhash v1.2.8
 	github.com/Workiva/go-datastructures v1.0.53

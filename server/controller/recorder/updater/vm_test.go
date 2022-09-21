@@ -19,7 +19,7 @@ package updater
 import (
 	"reflect"
 
-	"bou.ke/monkey"
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -63,15 +63,14 @@ func (t *SuiteTest) getVMMock(mockDB bool) (*cache.Cache, cloudmodel.VM) {
 func (t *SuiteTest) TestHandleAddVMSucess() {
 	cache_, cloudItem := t.getVMMock(false)
 	vpcID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return vpcID, true
 	})
+	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.VMs), 0)
 
 	updater := NewVM(cache_, []cloudmodel.VM{cloudItem})
 	updater.HandleAddAndUpdate()
-
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid")
 
 	var addedItem *mysql.VM
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)

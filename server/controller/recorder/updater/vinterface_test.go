@@ -19,7 +19,7 @@ package updater
 import (
 	"reflect"
 
-	"bou.ke/monkey"
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/bxcodec/faker/v3"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -69,11 +69,11 @@ func (t *SuiteTest) TestHandleUpdateVInterfaceSucess() {
 	updater := NewVInterface(cache_, []cloudmodel.VInterface{cloudItem})
 	ipUpdater := NewIP(cache_, []cloudmodel.IP{cloudIP})
 	updater.HandleAddAndUpdate()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVInterfaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVInterfaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return 100, true
 	})
+	defer monkey.Reset()
 	ipUpdater.HandleAddAndUpdate()
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVInterfaceIDByLcuuid")
 	updater.HandleDelete()
 	ipUpdater.HandleDelete()
 

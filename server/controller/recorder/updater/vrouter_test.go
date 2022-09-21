@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"bou.ke/monkey"
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -56,15 +56,14 @@ func (t *SuiteTest) getVRouterMock(mockDB bool) (*cache.Cache, cloudmodel.VRoute
 func (t *SuiteTest) TestHandleAddVRouterSucess() {
 	cache_, cloudItem := t.getVRouterMock(false)
 	vpcID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return vpcID, true
 	})
+	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.VRouters), 0)
 
 	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem})
 	updater.HandleAddAndUpdate()
-
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(cache_), "GetVPCIDByLcuuid")
 
 	var addedItem *mysql.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
@@ -79,14 +78,13 @@ func (t *SuiteTest) TestHandleUpdateVRouterSucess() {
 	cloudItem.Name = cloudItem.Name + "new"
 	cloudItem.VPCLcuuid = uuid.NewString()
 	newVPCID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return newVPCID, true
 	})
+	defer monkey.Reset()
 
 	updater := NewVRouter(cache_, []cloudmodel.VRouter{cloudItem})
 	updater.HandleAddAndUpdate()
-
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid")
 
 	var addedItem *mysql.VRouter
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
