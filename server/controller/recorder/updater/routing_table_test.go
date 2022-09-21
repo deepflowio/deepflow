@@ -19,7 +19,7 @@ package updater
 import (
 	"reflect"
 
-	"bou.ke/monkey"
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -55,15 +55,14 @@ func (t *SuiteTest) getRoutingTableMock(mockDB bool) (*cache.Cache, cloudmodel.R
 func (t *SuiteTest) TestHandleAddRoutingTableSucess() {
 	cache_, cloudItem := t.getRoutingTableMock(false)
 	vrouterID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVRouterIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVRouterIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return vrouterID, true
 	})
+	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.RoutingTables), 0)
 
 	updater := NewRoutingTable(cache_, []cloudmodel.RoutingTable{cloudItem})
 	updater.HandleAddAndUpdate()
-
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVRouterIDByLcuuid")
 
 	var addedItem *mysql.RoutingTable
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
