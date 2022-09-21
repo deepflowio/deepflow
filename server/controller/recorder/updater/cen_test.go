@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"bou.ke/monkey"
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
@@ -57,15 +57,14 @@ func (t *SuiteTest) getCENMock(mockDB bool) (*cache.Cache, cloudmodel.CEN) {
 func (t *SuiteTest) TestHandleAddCENSucess() {
 	cache_, cloudItem := t.getCENMock(false)
 	vpcID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return vpcID, true
 	})
+	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.CENs), 0)
 
 	updater := NewCEN(cache_, []cloudmodel.CEN{cloudItem})
 	updater.HandleAddAndUpdate()
-
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&cache_.ToolDataSet), "GetVPCIDByLcuuid")
 
 	var addedItem *mysql.CEN
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)
