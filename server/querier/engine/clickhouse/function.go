@@ -80,6 +80,9 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	if !ok {
 		return nil, 0, "", nil
 	}
+	if metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
+		return nil, 0, "", nil
+	}
 	var unit string
 	if function, ok := metrics.METRICS_FUNCTIONS_MAP[name]; !ok {
 		return nil, 0, "", nil

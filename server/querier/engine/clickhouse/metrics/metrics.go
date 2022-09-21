@@ -132,6 +132,11 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 					metrics[k] = v
 				}
 			}
+			metrics["metrics"] = NewMetrics(
+				len(metrics), "metrics",
+				"metrics", "", METRICS_TYPE_ARRAY,
+				"指标", []bool{true, true, true}, "", table,
+			)
 			return metrics, err
 		}
 	case "flow_metrics":
