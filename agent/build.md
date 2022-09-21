@@ -8,7 +8,7 @@ The easiest way is to use our docker image:
 ```bash
 docker run --privileged --rm -it -v \
     $(pwd):/deepflow hub.deepflow.yunshan.net/public/rust-build bash -c \
-    "git clone https://github.com/deepflowys/deepflow.git /deepflow && cd /deepflow/agent && cargo build"
+    "source /opt/rh/devtoolset-8/enable && git clone https://github.com/deepflowys/deepflow.git /deepflow && cd /deepflow/agent && cargo build"
 
 # binary file directory: ./deepflow/agent/target/debug/deepflow-agent
 ```
@@ -40,6 +40,12 @@ ln -s /usr/bin/llvm-strip-11 /usr/bin/llvm-strip
 
 Compile static libraries:
 ```bash
+# bcc
+# reference：https://github.com/iovisor/bcc/blob/master/INSTALL.md
+wget https://github.com/iovisor/bcc/releases/download/v0.25.0/bcc-src-with-submodule.tar.gz
+tar -xzf bcc-src-with-submodule.tar.gz
+cd bcc && cmake3 . && make && make install
+
 # bddisasm
 git clone https://github.com/bitdefender/bddisasm
 cd bddisasm

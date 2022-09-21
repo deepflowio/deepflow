@@ -96,6 +96,7 @@ fn set_linkage() -> Result<(), Box<dyn Error>> {
             println!("cargo:rustc-link-lib=dylib=pthread");
             println!("cargo:rustc-link-lib=dylib=elf");
             println!("cargo:rustc-link-lib=dylib=z");
+            println!("cargo:rustc-link-lib=dylib=stdc++");
         }
         "musl" => {
             println!("cargo:rustc-link-lib=static=c");
