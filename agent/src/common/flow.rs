@@ -23,7 +23,7 @@ use std::{
 };
 
 use log::{error, warn};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use super::{
     decapsulate::TunnelType,
@@ -36,11 +36,15 @@ use crate::utils::net::MacAddr;
 use crate::{
     common::endpoint::EPC_FROM_INTERNET, metric::document::Direction, proto::common::TridentType,
 };
-use crate::{flow_generator::FlowState, metric::document::TapSide};
+use crate::{
+    flow_generator::protocol_logs::{duration_to_micros, to_string_format},
+    flow_generator::FlowState,
+    metric::document::TapSide,
+};
 
 const COUNTER_FLOW_ID_MASK: u64 = 0x00FFFFFF;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Serialize, Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
 pub enum CloseType {
     Unknown = 0,
@@ -87,13 +91,16 @@ impl Default for CloseType {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+#[derive(Serialize, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub struct FlowKey {
     pub vtap_id: u16,
     pub tap_type: TapType,
+    #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
     /* L2 */
+    #[serde(serialize_with = "to_string_format")]
     pub mac_src: MacAddr,
+    #[serde(serialize_with = "to_string_format")]
     pub mac_dst: MacAddr,
     /* L3 ipv4 or ipv6 */
     pub ip_src: IpAddr,
@@ -101,55 +108,8 @@ pub struct FlowKey {
     /* L4 */
     pub port_src: u16,
     pub port_dst: u16,
+    #[serde(rename = "protocol")]
     pub proto: IpProtocol,
-}
-
-fn append_key(dst: &mut String, key: &str) {
-    dst.push_str(",\"");
-    dst.push_str(key);
-    dst.push_str("\":");
-}
-
-fn append_keys(dst: &mut String, key1: &str, key2: &str) {
-    dst.push_str(",\"");
-    dst.push_str(key1);
-    dst.push_str(key2);
-    dst.push_str("\":");
-}
-
-fn append_key_value(dst: &mut String, key: &str, value: &str) {
-    append_key(dst, key);
-    dst.push_str(value);
-}
-
-fn append_keys_value(dst: &mut String, key1: &str, key2: &str, value: &str) {
-    append_keys(dst, key1, key2);
-    dst.push_str(value);
-}
-
-fn append_key_string(dst: &mut String, key: &str, value: &str) {
-    append_key(dst, key);
-    dst.push('\"');
-    dst.push_str(value);
-    dst.push('\"');
-}
-
-fn append_key_bool(dst: &mut String, key: &str, value: bool) {
-    append_key(dst, key);
-    if value {
-        dst.push_str("true");
-    } else {
-        dst.push_str("false");
-    }
-}
-
-fn append_keys_bool(dst: &mut String, key1: &str, key2: &str, value: bool) {
-    append_keys(dst, key1, key2);
-    if value {
-        dst.push_str("true");
-    } else {
-        dst.push_str("false");
-    }
 }
 
 impl FlowKey {
@@ -157,18 +117,6 @@ impl FlowKey {
         swap(&mut self.mac_src, &mut self.mac_dst);
         swap(&mut self.ip_src, &mut self.ip_dst);
         swap(&mut self.port_src, &mut self.port_dst);
-    }
-    pub fn to_kv_string(&self, dst: &mut String) {
-        append_key_value(dst, "vtap_id", &self.vtap_id.to_string());
-        append_key_string(dst, "tap_type", &self.tap_type.to_string());
-        append_key_string(dst, "tap_port", &self.tap_port.to_string());
-        append_key_string(dst, "mac_src", &self.mac_src.to_string());
-        append_key_string(dst, "mac_dst", &self.mac_dst.to_string());
-        append_key_string(dst, "ip_src", &self.ip_src.to_string());
-        append_key_string(dst, "ip_dst", &self.ip_dst.to_string());
-        append_key_value(dst, "port_src", &self.port_src.to_string());
-        append_key_value(dst, "port_dst", &self.port_dst.to_string());
-        append_key_string(dst, "protocol", &format!("{:?}", self.proto));
     }
 }
 
@@ -236,7 +184,7 @@ impl From<FlowKey> for flow_log::FlowKey {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum FlowSource {
     Normal = 0,
@@ -250,21 +198,40 @@ impl Default for FlowSource {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct TunnelField {
+    #[serde(rename = "tunnel_tx_ip_0")]
     pub tx_ip0: Ipv4Addr, // 对应发送方向的源隧道IP
+    #[serde(rename = "tunnel_tx_ip_1")]
     pub tx_ip1: Ipv4Addr, // 对应发送方向的目的隧道IP
+    #[serde(rename = "tunnel_rx_ip_0")]
     pub rx_ip0: Ipv4Addr, // 对应接收方向的源隧道IP
+    #[serde(rename = "tunnel_rx_ip_1")]
     pub rx_ip1: Ipv4Addr, // 对应接收方向的目的隧道IP
-    pub tx_mac0: u32,     // 对应发送方向的源隧道MAC，低4字节
-    pub tx_mac1: u32,     // 对应发送方向的目的隧道MAC，低4字节
-    pub rx_mac0: u32,     // 对应接收方向的源隧道MAC，低4字节
-    pub rx_mac1: u32,     // 对应接收方向的目的隧道MAC，低4字节
+    #[serde(rename = "tunnel_tx_mac_0", serialize_with = "mac_low32_to_string")]
+    pub tx_mac0: u32, // 对应发送方向的源隧道MAC，低4字节
+    #[serde(rename = "tunnel_tx_mac_1", serialize_with = "mac_low32_to_string")]
+    pub tx_mac1: u32, // 对应发送方向的目的隧道MAC，低4字节
+    #[serde(rename = "tunnel_rx_mac_0", serialize_with = "mac_low32_to_string")]
+    pub rx_mac0: u32, // 对应接收方向的源隧道MAC，低4字节
+    #[serde(rename = "tunnel_rx_mac_1", serialize_with = "mac_low32_to_string")]
+    pub rx_mac1: u32, // 对应接收方向的目的隧道MAC，低4字节
+    #[serde(rename = "tunnel_tx_id")]
     pub tx_id: u32,
+    #[serde(rename = "tunnel_rx_id")]
     pub rx_id: u32,
     pub tunnel_type: TunnelType,
+    #[serde(rename = "tunnel_tier")]
     pub tier: u8,
+    #[serde(skip)]
     pub is_ipv6: bool,
+}
+
+pub fn mac_low32_to_string<S>(d: &u32, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&format!("{:08x}", d))
 }
 
 impl Default for TunnelField {
@@ -294,21 +261,6 @@ impl TunnelField {
         swap(&mut self.tx_mac0, &mut self.rx_mac0);
         swap(&mut self.tx_mac1, &mut self.rx_mac1);
         swap(&mut self.tx_id, &mut self.rx_id);
-    }
-
-    pub fn to_kv_string(&self, dst: &mut String) {
-        append_key_string(dst, "tunnel_type", &self.tunnel_type.to_string());
-        append_key_string(dst, "tunnel_tx_ip_0", &self.tx_ip0.to_string());
-        append_key_string(dst, "tunnel_tx_ip_1", &self.tx_ip1.to_string());
-        append_key_string(dst, "tunnel_rx_ip_0", &self.rx_ip0.to_string());
-        append_key_string(dst, "tunnel_rx_ip_1", &self.rx_ip1.to_string());
-        append_key_string(dst, "tunnel_tx_mac_0", &format!("{:08x}", self.tx_mac0));
-        append_key_string(dst, "tunnel_tx_mac_1", &format!("{:08x}", self.tx_mac1));
-        append_key_string(dst, "tunnel_rx_mac_0", &format!("{:08x}", self.tx_mac0));
-        append_key_string(dst, "tunnel_rx_mac_1", &format!("{:08x}", self.tx_mac1));
-        append_key_value(dst, "tunnel_tx_id", &self.tx_id.to_string());
-        append_key_value(dst, "tunnel_rx_id", &self.rx_id.to_string());
-        append_key_value(dst, "tunnel_tier", &self.tier.to_string());
     }
 }
 
@@ -372,7 +324,7 @@ impl From<TcpPerfCountsPeer> for flow_log::TcpPerfCountsPeer {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 // UDPPerfStats仅有2个字段，复用art_max, art_sum, art_count
 pub struct TcpPerfStats {
     // 除特殊说明外，均为每个流统计周期（目前是自然分）清零
@@ -398,69 +350,41 @@ pub struct TcpPerfStats {
     pub syn_count: u32,
     pub synack_count: u32,
 
+    #[serde(rename = "retrans_syn")]
     pub retrans_syn_count: u32,
+    #[serde(rename = "retrans_synack")]
     pub retrans_synack_count: u32,
 
+    #[serde(flatten, serialize_with = "serialize_tcp_perf_counts")]
     pub counts_peers: [TcpPerfCountsPeer; 2],
+    #[serde(skip)]
     pub total_retrans_count: u32,
 }
 
-impl TcpPerfStats {
-    pub fn to_kv_string(&self, dst: &mut String) {
-        append_key_value(dst, "rtt", &self.rtt.to_string());
-
-        append_key_value(dst, "rtt_client_max", &self.rtt_client_max.to_string());
-        append_key_value(dst, "rtt_server_max", &self.rtt_server_max.to_string());
-        append_key_value(dst, "srt_max", &self.srt_max.to_string());
-        append_key_value(dst, "art_max", &self.art_max.to_string());
-        append_key_value(dst, "cit_max", &self.cit_max.to_string());
-
-        append_key_value(dst, "rtt_client_sum", &self.rtt_client_sum.to_string());
-        append_key_value(dst, "rtt_server_sum", &self.rtt_server_sum.to_string());
-        append_key_value(dst, "srt_sum", &self.srt_sum.to_string());
-        append_key_value(dst, "art_sum", &self.art_sum.to_string());
-        append_key_value(dst, "cit_sum", &self.cit_sum.to_string());
-
-        append_key_value(dst, "rtt_client_count", &self.rtt_client_count.to_string());
-        append_key_value(dst, "rtt_server_count", &self.rtt_server_count.to_string());
-        append_key_value(dst, "srt_count", &self.srt_count.to_string());
-        append_key_value(dst, "art_count", &self.art_count.to_string());
-        append_key_value(dst, "cit_count", &self.cit_sum.to_string());
-        append_key_value(dst, "syn_count", &self.syn_count.to_string());
-        append_key_value(dst, "synack_count", &self.synack_count.to_string());
-        append_key_value(
-            dst,
-            "retrans_syn_count",
-            &self.retrans_syn_count.to_string(),
-        );
-        append_key_value(
-            dst,
-            "retrans_synack_count",
-            &self.retrans_synack_count.to_string(),
-        );
-
-        append_key_value(
-            dst,
-            "retrans_tx",
-            &self.counts_peers[0].retrans_count.to_string(),
-        );
-        append_key_value(
-            dst,
-            "retrans_rx",
-            &self.counts_peers[1].retrans_count.to_string(),
-        );
-        append_key_value(
-            dst,
-            "zero_win_tx",
-            &self.counts_peers[0].zero_win_count.to_string(),
-        );
-        append_key_value(
-            dst,
-            "zero_win_rx",
-            &self.counts_peers[1].zero_win_count.to_string(),
-        );
+pub fn serialize_tcp_perf_counts<S>(
+    v: &[TcpPerfCountsPeer; 2],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    #[derive(Serialize)]
+    struct Ser {
+        pub retrans_tx: u32,
+        pub retrans_rx: u32,
+        pub zero_win_tx: u32,
+        pub zero_win_rx: u32,
     }
+    let s = Ser {
+        retrans_tx: v[0].retrans_count,
+        retrans_rx: v[1].retrans_count,
+        zero_win_tx: v[0].zero_win_count,
+        zero_win_rx: v[1].zero_win_count,
+    };
+    serializer.serialize_newtype_struct("tcp_perf_counts", &s)
+}
 
+impl TcpPerfStats {
     pub fn sequential_merge(&mut self, other: &TcpPerfStats) {
         if self.rtt_client_max < other.rtt_client_max {
             self.rtt_client_max = other.rtt_client_max;
@@ -536,22 +460,17 @@ impl From<TcpPerfStats> for flow_log::TcpPerfStats {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct FlowPerfStats {
+    #[serde(flatten)]
     pub tcp: TcpPerfStats,
+    #[serde(flatten)]
     pub l7: L7PerfStats,
     pub l4_protocol: L4Protocol,
     pub l7_protocol: L7Protocol,
 }
 
 impl FlowPerfStats {
-    pub fn to_kv_string(&self, dst: &mut String) {
-        self.tcp.to_kv_string(dst);
-        self.l7.to_kv_string(dst);
-        append_key_string(dst, "l4_protocol", &format!("{:?}", self.l4_protocol));
-        append_key_string(dst, "l7_protocol", &format!("{:?}", self.l7_protocol));
-    }
-
     pub fn sequential_merge(&mut self, other: &FlowPerfStats) {
         if self.l4_protocol == L4Protocol::Unknown {
             self.l4_protocol = other.l4_protocol;
@@ -592,30 +511,24 @@ impl From<FlowPerfStats> for flow_log::FlowPerfStats {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct L7PerfStats {
+    #[serde(rename = "l7_request")]
     pub request_count: u32,
+    #[serde(rename = "l7_response")]
     pub response_count: u32,
+    #[serde(rename = "l7_client_error")]
     pub err_client_count: u32, // client端原因导致的响应异常数量
+    #[serde(rename = "l7_server_error")]
     pub err_server_count: u32, // server端原因导致的响应异常数量
-    pub err_timeout: u32,      // request请求timeout数量
-    pub rrt_count: u32,        // u32可记录40000M时延, 一条流在一分钟内的请求数远无法达到此数值
-    pub rrt_sum: u64,          // us RRT(Request Response Time)
-    pub rrt_max: u32,          // us agent保证在3600s以内
+    #[serde(rename = "l7_server_timeout")]
+    pub err_timeout: u32, // request请求timeout数量
+    pub rrt_count: u32, // u32可记录40000M时延, 一条流在一分钟内的请求数远无法达到此数值
+    pub rrt_sum: u64,   // us RRT(Request Response Time)
+    pub rrt_max: u32,   // us agent保证在3600s以内
 }
 
 impl L7PerfStats {
-    pub fn to_kv_string(&self, dst: &mut String) {
-        append_key_value(dst, "l7_request", &self.request_count.to_string());
-        append_key_value(dst, "l7_response", &self.response_count.to_string());
-        append_key_value(dst, "l7_client_err", &self.err_client_count.to_string());
-        append_key_value(dst, "l7_server_err", &self.err_server_count.to_string());
-        append_key_value(dst, "l7_server_timeout", &self.err_timeout.to_string());
-        append_key_value(dst, "rrt_count", &self.rrt_count.to_string());
-        append_key_value(dst, "rrt_sum", &self.rrt_sum.to_string());
-        append_key_value(dst, "rrt_max", &self.rrt_max.to_string());
-    }
-
     pub fn sequential_merge(&mut self, other: &L7PerfStats) {
         self.request_count += other.request_count;
         self.response_count += other.response_count;
@@ -645,7 +558,7 @@ impl From<L7PerfStats> for flow_log::L7PerfStats {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 pub enum L4Protocol {
     Unknown = 0,
@@ -770,6 +683,61 @@ pub struct FlowMetricsPeer {
     pub is_local_ip: bool,      // 同EndpointInfo中的IsLocalIp, 流日志中不需要存储
 }
 
+pub fn serialize_flow_metrics<S>(v: &[FlowMetricsPeer; 2], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    #[derive(Serialize)]
+    struct Ser {
+        byte_tx: u64,
+        byte_rx: u64,
+        l3_byte_tx: u64,
+        l3_byte_rx: u64,
+        l4_byte_tx: u64,
+        l4_byte_rx: u64,
+        packet_tx: u64,
+        packet_rx: u64,
+        total_byte_tx: u64,
+        total_byte_rx: u64,
+        total_packet_tx: u64,
+        total_packet_rx: u64,
+        l3_epc_id_0: i32,
+        l3_epc_id_1: i32,
+        l2_end_0: bool,
+        l2_end_1: bool,
+        l3_end_0: bool,
+        l3_end_1: bool,
+
+        #[serde(serialize_with = "to_string_format")]
+        tcp_flags_bit_0: TcpFlags,
+        #[serde(serialize_with = "to_string_format")]
+        tcp_flags_bit_1: TcpFlags,
+    }
+    let s = Ser {
+        byte_tx: v[0].byte_count,
+        byte_rx: v[1].byte_count,
+        l3_byte_tx: v[0].l3_byte_count,
+        l3_byte_rx: v[1].l3_byte_count,
+        l4_byte_tx: v[0].l4_byte_count,
+        l4_byte_rx: v[1].l4_byte_count,
+        packet_tx: v[0].packet_count,
+        packet_rx: v[1].packet_count,
+        total_byte_tx: v[0].total_byte_count,
+        total_byte_rx: v[1].total_byte_count,
+        total_packet_tx: v[0].total_packet_count,
+        total_packet_rx: v[1].total_packet_count,
+        l3_epc_id_0: v[0].l3_epc_id,
+        l3_epc_id_1: v[1].l3_epc_id,
+        l2_end_0: v[0].is_l2_end,
+        l2_end_1: v[1].is_l2_end,
+        l3_end_0: v[0].is_l3_end,
+        l3_end_1: v[1].is_l3_end,
+        tcp_flags_bit_0: v[0].tcp_flags,
+        tcp_flags_bit_1: v[1].tcp_flags,
+    };
+    serializer.serialize_newtype_struct("flow_metrics", &s)
+}
+
 impl Default for FlowMetricsPeer {
     fn default() -> Self {
         FlowMetricsPeer {
@@ -800,35 +768,6 @@ impl Default for FlowMetricsPeer {
 impl FlowMetricsPeer {
     pub const SRC: u8 = 0;
     pub const DST: u8 = 1;
-
-    pub fn to_kv_string(&self, dst: &mut String, direction: u8) {
-        let mut subfix = ["_tx", "_0"];
-        if direction == Self::DST {
-            subfix = ["_rx", "_1"];
-        }
-
-        append_keys_value(dst, "byte", subfix[0], &self.byte_count.to_string());
-        append_keys_value(dst, "l3_byte", subfix[0], &self.l3_byte_count.to_string());
-        append_keys_value(dst, "l4_byte", subfix[0], &self.l4_byte_count.to_string());
-        append_keys_value(dst, "packet", subfix[0], &self.packet_count.to_string());
-        append_keys_value(
-            dst,
-            "total_byte",
-            subfix[0],
-            &self.total_byte_count.to_string(),
-        );
-        append_keys_value(
-            dst,
-            "total_packet",
-            subfix[1],
-            &self.total_packet_count.to_string(),
-        );
-
-        append_keys_value(dst, "l3_epc_id", subfix[1], &self.l3_epc_id.to_string());
-        append_keys_bool(dst, "l2_end", subfix[1], self.is_l2_end);
-        append_keys_bool(dst, "l3_end", subfix[1], self.is_l3_end);
-        append_key_string(dst, "tcp_flags", &self.tcp_flags.to_string());
-    }
 
     pub fn sequential_merge(&mut self, other: &FlowMetricsPeer) {
         self.byte_count += other.byte_count;
@@ -877,24 +816,33 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Serialize, Default, Clone, Debug)]
 pub struct Flow {
+    #[serde(flatten)]
     pub flow_key: FlowKey,
+    #[serde(flatten, serialize_with = "serialize_flow_metrics")]
     pub flow_metrics_peers: [FlowMetricsPeer; 2],
 
+    #[serde(flatten, skip_serializing_if = "tunnel_is_none")]
     pub tunnel: TunnelField,
 
     pub flow_id: u64,
 
     /* TCP Seq */
     pub syn_seq: u32,
+    #[serde(rename = "syn_ack_seq")]
     pub synack_seq: u32,
     pub last_keepalive_seq: u32,
     pub last_keepalive_ack: u32,
 
+    #[serde(serialize_with = "duration_to_micros")]
     pub start_time: Duration,
+    #[serde(serialize_with = "duration_to_micros")]
     pub end_time: Duration,
+    #[serde(serialize_with = "duration_to_micros")]
     pub duration: Duration,
+
+    #[serde(skip)]
     pub flow_stat_time: Duration,
 
     /* L2 */
@@ -902,55 +850,28 @@ pub struct Flow {
     pub eth_type: EthernetType,
 
     /* TCP Perf Data*/
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub flow_perf_stats: Option<FlowPerfStats>,
 
     pub close_type: CloseType,
     pub flow_source: FlowSource,
+    #[serde(skip)]
     pub is_active_service: bool,
+    #[serde(skip)]
     pub queue_hash: u8,
     pub is_new_flow: bool,
+    #[serde(skip)]
     pub reversed: bool,
     pub tap_side: TapSide,
+    #[serde(skip)]
     pub acl_gids: Vec<u16>,
 }
 
+fn tunnel_is_none(t: &TunnelField) -> bool {
+    t.tunnel_type == TunnelType::None
+}
+
 impl Flow {
-    pub fn to_kv_string(&self, dst: &mut String) {
-        self.flow_key.to_kv_string(dst);
-        self.flow_metrics_peers[0].to_kv_string(dst, 0);
-        self.flow_metrics_peers[1].to_kv_string(dst, 1);
-
-        if self.tunnel.tunnel_type != TunnelType::None {
-            self.tunnel.to_kv_string(dst);
-        }
-
-        append_key_value(dst, "flow_id", &self.flow_id.to_string());
-        append_key_value(dst, "syn_seq", &self.syn_seq.to_string());
-        append_key_value(dst, "syn_ack_seq", &self.synack_seq.to_string());
-        append_key_value(
-            dst,
-            "last_keepalive_seq",
-            &self.last_keepalive_seq.to_string(),
-        );
-        append_key_value(
-            dst,
-            "last_keepalive_ack",
-            &self.last_keepalive_ack.to_string(),
-        );
-        append_key_value(dst, "start_time", &self.start_time.as_micros().to_string());
-        append_key_value(dst, "end_time", &self.end_time.as_micros().to_string());
-        append_key_value(dst, "duration", &self.duration.as_micros().to_string());
-        append_key_value(dst, "vlan", &self.vlan.to_string());
-        append_key_string(dst, "eth_type", &format!("{:?}", self.eth_type));
-        if let Some(flow_perf_stats) = &self.flow_perf_stats {
-            flow_perf_stats.to_kv_string(dst);
-        }
-        append_key_string(dst, "close_type", &format!("{:?}", self.close_type));
-        append_key_string(dst, "flow_source", &format!("{:?}", self.flow_source));
-        append_key_bool(dst, "is_new_flow", self.is_new_flow);
-        append_key_string(dst, "tap_side", &format!("{:?}", self.tap_side));
-    }
-
     pub fn sequential_merge(&mut self, other: &Flow) {
         self.flow_metrics_peers[0].sequential_merge(&other.flow_metrics_peers[0]);
         self.flow_metrics_peers[1].sequential_merge(&other.flow_metrics_peers[1]);

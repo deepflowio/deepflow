@@ -17,15 +17,18 @@
 use std::fmt;
 
 use prost::Message;
+use serde::Serialize;
 
 use super::flow::Flow;
 use super::tag::Tag;
 
 use crate::proto::flow_log;
 
-#[derive(Default, Clone, Debug)]
+#[derive(Serialize, Default, Clone, Debug)]
 pub struct TaggedFlow {
+    #[serde(flatten)]
     pub flow: Flow,
+    #[serde(skip)]
     pub tag: Tag,
 }
 
@@ -48,10 +51,9 @@ impl TaggedFlow {
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {
-        self.flow.to_kv_string(dst);
-        // replace first ',' to '{'
-        dst.replace_range(..1, "{");
-        dst.push_str("}\n");
+        let json = serde_json::to_string(&self).unwrap();
+        dst.push_str(&json);
+        dst.push('\n');
     }
 }
 

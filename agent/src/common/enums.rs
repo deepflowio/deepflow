@@ -28,7 +28,9 @@ use super::flow::FlowMetricsPeer;
 
 /// EthernetType is an enumeration of ethernet type values, and acts as a decoder
 /// for any type it supports.
-#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, TryFromPrimitive, IntoPrimitive)]
+#[derive(
+    Serialize, Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord, TryFromPrimitive, IntoPrimitive,
+)]
 #[repr(u16)]
 pub enum EthernetType {
     // EthernetTypeLLC is not an actual ethernet type.  It is instead a
