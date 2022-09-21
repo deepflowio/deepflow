@@ -121,6 +121,9 @@ func (a *Aliyun) getRouterTables(region model.Region, routerId string) ([]model.
 			if nType != "" {
 				nexthopType = nType
 			}
+			if nexthopType == "NatGateway" {
+				nexthopType = common.ROUTING_TABLE_TYPE_NAT_GATEWAY
+			}
 
 			retRule := model.RoutingTable{
 				Lcuuid:        common.GenerateUUID(routerLcuuid + destination + nexthop),

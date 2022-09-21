@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
@@ -103,7 +104,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 	return vms, vmSGs, vifs, ips, nil
 }
 
-func (h *HuaWei) formatVMSecurityGroups(jSGs *simplejson.Json, vpcLcuuid, vmLcuuid string) (vmSGs []model.VMSecurityGroup) {
+func (h *HuaWei) formatVMSecurityGroups(jSGs *simplejson.Json, projectID, vmLcuuid string) (vmSGs []model.VMSecurityGroup) {
 	set := make(map[string]bool)
 	for i := range jSGs.MustArray() {
 		jSG := jSGs.GetIndex(i)
@@ -115,7 +116,7 @@ func (h *HuaWei) formatVMSecurityGroups(jSGs *simplejson.Json, vpcLcuuid, vmLcuu
 			set[name] = true
 		}
 
-		sgLcuuid, ok := h.toolDataSet.keyToSecurityGroupLcuuid[VPCSecurityGroupKey{vpcLcuuid, name}]
+		sgLcuuid, ok := h.toolDataSet.keyToSecurityGroupLcuuid[ProjectSecurityGroupKey{projectID, name}]
 		if !ok {
 			continue
 		}
@@ -150,7 +151,7 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 			vif := model.VInterface{
 				Lcuuid:        common.GenerateUUID(vmLcuuid + mac),
 				Type:          common.VIF_TYPE_WAN,
-				Mac:           "ff" + mac[:2],
+				Mac:           cloudcommon.GenerateWANVInterfaceMac(mac),
 				DeviceLcuuid:  vmLcuuid,
 				DeviceType:    common.VIF_DEVICE_TYPE_VM,
 				NetworkLcuuid: common.NETWORK_ISP_LCUUID,

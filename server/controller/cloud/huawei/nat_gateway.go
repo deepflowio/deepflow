@@ -81,10 +81,10 @@ func (h *HuaWei) getNATGateways() (
 		natRules = append(natRules, snatRules...)
 	}
 
-	for _, ng := range natGateways {
+	for i, ng := range natGateways {
 		floatingIPs := h.toolDataSet.natGatewayLcuuidToFloatingIPs[ng.Lcuuid]
 		if len(floatingIPs) != 0 {
-			ng.FloatingIPs = strings.Join(floatingIPs, common.STRINGS_JOIN_COMMA)
+			natGateways[i].FloatingIPs = strings.Join(floatingIPs, common.STRINGS_JOIN_COMMA)
 			vifLcuuid := common.GenerateUUID(ng.Lcuuid)
 			vifs = append(
 				vifs,
@@ -149,6 +149,18 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 			fixedIPPort = 0
 		}
 		floatingIP := jRule.Get("floating_ip_address").MustString()
+		ipFlag := "."
+		if !strings.Contains(floatingIP, ipFlag) {
+			ipFlag = ":"
+		}
+		var fixedIP string
+		for _, ip := range h.toolDataSet.vinterfaceLcuuidToIPs[jRule.Get("port_id").MustString()] {
+			if strings.Contains(ip, ipFlag) {
+				fixedIP = ip
+				break
+			}
+		}
+
 		natRules = append(
 			natRules,
 			model.NATRule{
@@ -159,7 +171,7 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 				VInterfaceLcuuid: jRule.Get("port_id").MustString(),
 				FloatingIP:       floatingIP,
 				FloatingIPPort:   floatingIPPort,
-				FixedIP:          h.toolDataSet.vinterfaceLcuuidToIP[jRule.Get("port_id").MustString()],
+				FixedIP:          fixedIP,
 				FixedIPPort:      fixedIPPort,
 			},
 		)

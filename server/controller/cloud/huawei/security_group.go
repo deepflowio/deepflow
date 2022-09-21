@@ -70,7 +70,7 @@ func (h *HuaWei) getSecurityGroups() ([]model.SecurityGroup, []model.SecurityGro
 				},
 			)
 			h.toolDataSet.regionLcuuidToResourceNum[regionLcuuid]++
-			h.toolDataSet.keyToSecurityGroupLcuuid[VPCSecurityGroupKey{project.id, name}] = id
+			h.toolDataSet.keyToSecurityGroupLcuuid[ProjectSecurityGroupKey{project.id, name}] = id
 
 			jRules, ok := jSG.CheckGet("security_group_rules")
 			if ok {

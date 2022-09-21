@@ -178,8 +178,7 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 				RegionLcuuid:     vif.RegionLcuuid,
 			},
 		)
-		// 仅取1个IP
-		h.toolDataSet.vinterfaceLcuuidToIP[vif.Lcuuid] = ipAddr
+		h.toolDataSet.vinterfaceLcuuidToIPs[vif.Lcuuid] = append(h.toolDataSet.vinterfaceLcuuidToIPs[vif.Lcuuid], ipAddr)
 		if i == 0 && floatingIP != "" {
 			natRule = model.NATRule{
 				Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
