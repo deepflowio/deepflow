@@ -52,7 +52,7 @@ use crate::policy::PolicySetter;
 use crate::proto::common::TridentType;
 use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
-use crate::trident::{self, TridentState};
+use crate::trident::{self, TridentState, VersionInfo};
 use crate::utils::{
     self,
     environment::{get_executable_path, is_tt_pod, running_in_container},
@@ -67,8 +67,7 @@ const SECOND: Duration = Duration::from_secs(1);
 const NORMAL_EXIT_WITH_RESTART: i32 = 3;
 
 pub struct StaticConfig {
-    pub agent_ident: &'static str,
-    pub revision: &'static str,
+    pub version_info: &'static VersionInfo,
     pub boot_time: SystemTime,
 
     pub tap_mode: tp::TapMode,
@@ -80,11 +79,20 @@ pub struct StaticConfig {
     pub env: RuntimeEnvironment,
 }
 
+const EMPTY_VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
+    name: "",
+    branch: "",
+    commit_id: "",
+    rev_count: "",
+    compiler: "",
+    compile_time: "",
+    revision: "",
+};
+
 impl Default for StaticConfig {
     fn default() -> Self {
         Self {
-            agent_ident: "",
-            revision: "",
+            version_info: EMPTY_VERSION_INFO,
             boot_time: SystemTime::now(),
             tap_mode: Default::default(),
             vtap_group_id_request: Default::default(),
@@ -403,8 +411,7 @@ impl Synchronizer {
     pub fn new(
         session: Arc<Session>,
         trident_state: TridentState,
-        agent_ident: &'static str,
-        revision: &'static str,
+        version_info: &'static VersionInfo,
         ctrl_ip: String,
         ctrl_mac: String,
         controller_ip: String,
@@ -415,8 +422,7 @@ impl Synchronizer {
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
-                agent_ident,
-                revision,
+                version_info,
                 boot_time: SystemTime::now(),
                 tap_mode: tp::TapMode::Local,
                 vtap_group_id_request,
@@ -504,9 +510,9 @@ impl Synchronizer {
             version_acls: Some(status.version_acls),
             version_groups: Some(status.version_groups),
             state: Some(tp::State::Running.into()),
-            revision: Some(static_config.revision.to_owned()),
+            revision: Some(static_config.version_info.revision.to_owned()),
             exception: Some(exception_handler.take()),
-            process_name: Some(static_config.agent_ident.to_owned()),
+            process_name: Some(static_config.version_info.name.to_owned()),
             ctrl_mac: Some(running_config.ctrl_mac.clone()),
             ctrl_ip: Some(running_config.ctrl_ip.clone()),
             tap_mode: Some(static_config.tap_mode.into()),
@@ -544,7 +550,9 @@ impl Synchronizer {
         status: &Arc<RwLock<Status>>,
     ) {
         match &resp.revision {
-            Some(revision) if revision != "" && revision != &static_config.revision => {
+            Some(revision)
+                if revision != "" && revision != &static_config.version_info.revision =>
+            {
                 if let Some(url) = &resp.self_update_url {
                     if url.trim().to_lowercase() != "grpc" {
                         warn!("error upgrade method, only support grpc: {}", url);
@@ -552,7 +560,7 @@ impl Synchronizer {
                     }
                     info!(
                         "trigger upgrade as revision update from {} to {}",
-                        &static_config.revision, revision
+                        &static_config.version_info.revision, revision
                     );
                     status.write().new_revision = Some(revision.clone());
                 }
@@ -632,7 +640,7 @@ impl Synchronizer {
         let mut runtime_config = runtime_config.unwrap();
         // When the ee version compiles the ce crate, it will be false, only ce version
         // will be true
-        if static_config.agent_ident == env!("AGENT_NAME") {
+        if static_config.version_info.name == env!("AGENT_NAME") {
             runtime_config.platform_enabled = false;
         }
         let yaml_config = &runtime_config.yaml_config;

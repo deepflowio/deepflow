@@ -65,17 +65,30 @@ fn wait_on_signals() {
 #[cfg(windows)]
 fn wait_on_signals() {}
 
+const VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
+    name: env!("AGENT_NAME"),
+    branch: env!("BRANCH"),
+    commit_id: env!("COMMIT_ID"),
+    rev_count: env!("REV_COUNT"),
+    compiler: env!("RUSTC_VERSION"),
+    compile_time: env!("COMPILE_TIME"),
+
+    revision: concat!(
+        env!("BRANCH"),
+        " ",
+        env!("REV_COUNT"),
+        "-",
+        env!("COMMIT_ID")
+    ),
+};
+
 fn main() -> Result<()> {
     let opts = Opts::parse();
-    let version = concat!(env!("REV_COUNT"), "-", env!("REVISION"));
     if opts.version {
-        println!("{} {}", version, env!("COMMIT_DATE"));
-        println!("deepflow-agent community edition");
-        println!(env!("RUSTC_VERSION"));
+        println!("{}", VERSION_INFO);
         return Ok(());
     }
-    let mut t =
-        trident::Trident::start(&Path::new(&opts.config_file), env!("AGENT_NAME"), version)?;
+    let mut t = trident::Trident::start(&Path::new(&opts.config_file), VERSION_INFO)?;
     wait_on_signals();
     t.stop();
 
