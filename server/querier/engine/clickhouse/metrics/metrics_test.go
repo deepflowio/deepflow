@@ -51,6 +51,9 @@ func TestCheckDBField(t *testing.T) {
 					case "l4_flow_log":
 						metrics = L4_FLOW_LOG_METRICS
 						replaceMetrics = L4_FLOW_LOG_METRICS_REPLACE
+					case "l4_packet":
+						metrics = L4_PACKET_METRICS
+						replaceMetrics = L4_PACKET_METRICS_REPLACE
 					case "l7_flow_log":
 						metrics = L7_FLOW_LOG_METRICS
 						replaceMetrics = L7_FLOW_LOG_METRICS_REPLACE
