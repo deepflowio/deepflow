@@ -193,6 +193,7 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
+    pub tap_mode: TapMode,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -382,6 +383,7 @@ pub struct EbpfConfig {
     pub l7_log_tap_types: [bool; 256],
     pub ctrl_mac: MacAddr,
     pub ebpf_uprobe_golang_symbol_enabled: bool,
+    pub ebpf_disabled: bool,
 }
 
 #[cfg(target_os = "linux")]
@@ -410,6 +412,11 @@ impl fmt::Debug for EbpfConfig {
                     .collect::<Vec<_>>(),
             )
             .field("ctrl_mac", &self.ctrl_mac)
+            .field(
+                "ebpf-uprobe-golang-symbol-enabled",
+                &self.ebpf_uprobe_golang_symbol_enabled,
+            )
+            .field("ebpf-disabled", &self.ebpf_disabled)
             .finish()
     }
 }
@@ -717,6 +724,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     Some(conf.yaml_config.kubernetes_namespace.clone())
                 },
                 thread_threshold: conf.thread_threshold,
+                tap_mode: conf.yaml_config.tap_mode,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -782,6 +790,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 ebpf_uprobe_golang_symbol_enabled: conf
                     .yaml_config
                     .ebpf_uprobe_golang_symbol_enabled,
+                ebpf_disabled: conf.yaml_config.ebpf_disabled,
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
@@ -1367,12 +1376,21 @@ impl ConfigHandler {
 
             #[cfg(target_os = "linux")]
             fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
-                if is_tt_pod(handler.candidate_config.platform.trident_type) {
-                    components.platform_synchronizer.start_kubernetes_poller();
+                let conf = &handler.candidate_config.platform;
+                if handler.candidate_config.enabled
+                    && (conf.tap_mode == TapMode::Local || is_tt_pod(conf.trident_type))
+                {
+                    components.platform_synchronizer.start();
+                    if is_tt_pod(conf.trident_type) {
+                        components.platform_synchronizer.start_kubernetes_poller();
+                    } else {
+                        components.platform_synchronizer.stop_kubernetes_poller();
+                    }
                 } else {
-                    components.platform_synchronizer.stop_kubernetes_poller();
+                    components.platform_synchronizer.stop();
+                    info!("PlatformSynchronizer is not enabled");
                 }
-                if handler.candidate_config.platform.kubernetes_api_enabled {
+                if conf.kubernetes_api_enabled {
                     components.api_watcher.start();
                 } else {
                     components.api_watcher.stop();

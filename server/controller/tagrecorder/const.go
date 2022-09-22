@@ -79,6 +79,8 @@ const (
 	RESOURCE_TYPE_CH_VTAP          = "ch_vtap"
 	RESOURCE_TYPE_CH_VTAP_PORT     = "ch_vtap_port"
 	RESOURCE_TYPE_CH_LB_LISTENER   = "ch_lb_listener"
+	RESOURCE_TYPE_CH_STRING_ENUM   = "ch_string_enum"
+	RESOURCE_TYPE_CH_INT_ENUM      = "ch_int_enum"
 )
 
 const (
@@ -109,6 +111,9 @@ const (
 
 	CH_DICTIONARY_IP_RELATION = "ip_relation_map"
 	CH_DICTIONARY_IP_RESOURCE = "ip_resource_map"
+
+	CH_STRING_DICTIONARY_ENUM = "string_enum_map"
+	CH_INT_DICTIONARY_ENUM    = "int_enum_map"
 )
 
 const (
@@ -361,6 +366,26 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_STRING_ENUM_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `tag_name` String,\n" +
+		"    `value` String,\n" +
+		"    `name` String\n" +
+		")\n" +
+		"PRIMARY KEY tag_name, value\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_INT_ENUM_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `tag_name` String,\n" +
+		"    `value` UInt64,\n" +
+		"    `name` String\n" +
+		")\n" +
+		"PRIMARY KEY tag_name, value\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(COMPLEX_KEY_HASHED())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
@@ -430,6 +455,8 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_K8S_LABEL:      CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_K8S_LABELS:     CREATE_K8S_LABELS_DICTIONARY_SQL,
 	CH_DICTIONARY_IP_RESOURCE:    CREATE_IP_RESOURCE_DICTIONARY_SQL,
+	CH_STRING_DICTIONARY_ENUM:    CREATE_STRING_ENUM_SQL,
+	CH_INT_DICTIONARY_ENUM:       CREATE_INT_ENUM_SQL,
 }
 
 var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{

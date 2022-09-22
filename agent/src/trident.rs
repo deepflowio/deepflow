@@ -15,6 +15,7 @@
  */
 
 use std::env;
+use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
@@ -104,6 +105,44 @@ impl State {
     }
 }
 
+pub struct VersionInfo {
+    pub name: &'static str,
+    pub branch: &'static str,
+    pub commit_id: &'static str,
+    pub rev_count: &'static str,
+    pub compiler: &'static str,
+    pub compile_time: &'static str,
+
+    pub revision: &'static str,
+}
+
+impl fmt::Display for VersionInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}-{}
+Name: {}
+Branch: {}
+CommitId: {}
+RevCount: {}
+Compiler: {}
+CompileTime: {}",
+            self.rev_count,
+            self.commit_id,
+            match self.name {
+                "deepflow-agent-ce" => "deepflow-agent community edition",
+                "deepflow-agent-ee" => "deepflow-agent enterprise edition",
+                _ => panic!("unknown deepflow-agent edition"),
+            },
+            self.branch,
+            self.commit_id,
+            self.rev_count,
+            self.compiler,
+            self.compile_time
+        )
+    }
+}
+
 pub type TridentState = Arc<(Mutex<State>, Condvar)>;
 
 pub struct Trident {
@@ -119,8 +158,7 @@ pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "C:\\DeepFlow\\trident\\trid
 impl Trident {
     pub fn start<P: AsRef<Path>>(
         config_path: P,
-        agent_ident: &'static str,
-        revision: &'static str,
+        version_info: &'static VersionInfo,
     ) -> Result<Trident> {
         let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
         let state_thread = state.clone();
@@ -194,8 +232,7 @@ impl Trident {
             if let Err(e) = Self::run(
                 state_thread,
                 config,
-                agent_ident,
-                revision,
+                version_info,
                 logger_handle,
                 remote_log_config,
                 stats_collector,
@@ -211,8 +248,7 @@ impl Trident {
     fn run(
         state: TridentState,
         mut config: Config,
-        agent_ident: &'static str,
-        revision: &'static str,
+        version_info: &'static VersionInfo,
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
         stats_collector: Arc<stats::Collector>,
@@ -273,8 +309,7 @@ impl Trident {
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             state.clone(),
-            agent_ident,
-            revision,
+            version_info,
             ctrl_ip.to_string(),
             ctrl_mac.to_string(),
             config_handler.static_config.controller_ips[0].clone(),

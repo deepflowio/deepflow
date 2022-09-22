@@ -106,8 +106,6 @@ func (m MessageType) HeaderType() MessageHeaderType {
 }
 
 const (
-	DROPLET_PORT = 20033
-
 	// pcap压缩包头发送时最大长度为：MESSAGE_HEADER_LEN + compressor header + 14 + 4 * n + 65535
 	// otel的数据长度可达300k
 	MESSAGE_FRAME_SIZE_MAX = 512000

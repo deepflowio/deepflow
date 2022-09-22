@@ -22,7 +22,7 @@ mod flow_node;
 mod flow_state;
 mod packet_sequence; // Enterprise Edition Feature: packet-sequence
 pub mod perf;
-mod protocol_logs;
+pub mod protocol_logs;
 mod service_table;
 
 pub use app_table::AppTable;

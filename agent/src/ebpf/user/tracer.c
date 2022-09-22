@@ -1180,8 +1180,28 @@ int bpf_tracer_init(const char *log_file, bool is_stdout)
 	if (max_locked_memory_set_unlimited() != 0)
 		return ETR_INVAL;
 
-	if (sysfs_write("/proc/sys/net/core/bpf_jit_enable", "1") < 0)
-		return ETR_INVAL;
+	const char *jit_enable_path = "/proc/sys/net/core/bpf_jit_enable";
+	int jit_enable_val = sysfs_read_num(jit_enable_path);
+	if (jit_enable_val == 0) {
+		if (sysfs_write(jit_enable_path, "1") < 0) {
+			ebpf_warning
+			    ("Set 'bpf_jit_enable' is failed, Permission denied\n"
+			     " (may be docker container is unprivileged).\n"
+			     " There will be 10%%-30%% performance\n"
+			     " degradation, ensure that the host enable jit.\n"
+			     "cmdline:\n"
+			     " \"echo 1 > /proc/sys/net/core/bpf_jit_enable\"\n");
+		} else {
+			ebpf_info("Set bpf_jit_enable success\n");
+		}
+	} else if (jit_enable_val == 1) {
+		ebpf_info
+		    ("Currently \"/proc/sys/net/core/bpf_jit_enable\" value is 1,"
+		     " not need set.\n");
+	} else {
+		ebpf_warning
+		    ("\"/proc/sys/net/core/bpf_jit_enable value is invalid\n");
+	}
 
 	max_rlim_open_files_set(OPEN_FILES_MAX);
 	sys_cpus_count = get_cpus_count(&cpu_online);
@@ -1249,6 +1269,8 @@ int tracer_stop(void)
 {
 	struct bpf_tracer *t = NULL;
 	int i, ret = 0;
+
+	memset(feature_flags, 0, sizeof(feature_flags));
 
 	for (i = 0; i < tracers_count; i++) {
 		t = tracers[i];

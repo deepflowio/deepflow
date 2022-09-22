@@ -191,6 +191,7 @@ impl PlatformSynchronizer {
         }
 
         self.stop_kubernetes_poller();
+        info!("PlatformSynchronizer stopped");
     }
 
     pub fn start(&self) {
@@ -225,6 +226,7 @@ impl PlatformSynchronizer {
         if is_tt_pod(self.config.load().trident_type) {
             self.kubernetes_poller.start();
         }
+        info!("PlatformSynchronizer started");
     }
 
     fn query_platform(

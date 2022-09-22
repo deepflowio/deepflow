@@ -45,6 +45,7 @@ const (
 	EnvK8sPodName            = "K8S_POD_NAME_FOR_DEEPFLOW"
 	DefaultCKDBServicePrefix = "clickhouse"
 	DefaultCKDBServicePort   = 9000
+	DefaultListenPort        = 20033
 )
 
 type CKDiskMonitor struct {
@@ -82,6 +83,7 @@ type CKWriterConfig struct {
 }
 
 type Config struct {
+	ListenPort            uint16        `yaml:"listen-port"`
 	ControllerIPs         []string      `yaml:"controller-ips,flow"`
 	ControllerPort        uint16        `yaml:"controller-port"`
 	CKDBServicePrefix     string        `yaml:"ckdb-service-prefix"`
@@ -181,6 +183,7 @@ func Load(path string) *Config {
 			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
 			CKS3Storage:       CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
 			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
+			ListenPort:        DefaultListenPort,
 		},
 	}
 	if err != nil {

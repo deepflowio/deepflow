@@ -456,7 +456,10 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 	void *ptr = get_the_first_parameter(ctx, info);
 	ptr += info->offsets[OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN];
 	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
-	data.stream -= 2;
+
+	if (info->version >= GO_VERSION(1, 16, 0)) {
+		data.stream -= 2;
+	}
 
 	struct __http2_stack *stack = get_http2_stack();
 	if (!stack) {
@@ -500,10 +503,14 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 	}
 
 	struct http2_header_data data = {};
-	void *ptr = get_the_first_parameter(ctx, info);
-	ptr += info->offsets[OFFSET_IDX_STREAM_HTTP2_CLIENT_CONN];
-	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr);
-	data.stream -= 2;
+
+	if (info->version >= GO_VERSION(1, 17, 0)) {
+		data.stream = (__u32)ctx->rbx;
+	} else {
+		bpf_probe_read(&(data.stream), sizeof(data.stream),
+			       (void *)(ctx->rsp + 16));
+	}
+
 	data.read = false;
 	data.fd = get_fd_from_http2ClientConn_ctx(ctx, info);
 	data.message_type = MSG_REQUEST_END;
