@@ -90,6 +90,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	tridentType := common.TridentType(c.GetVTapType())
 	podClusterId := uint32(c.GetPodClusterID())
 	vpcID := uint32(c.GetVPCID())
+	tapMode := api.TapMode(c.GetTapMode())
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -151,6 +152,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		VtapId:            &vtapID,
 		TridentType:       &tridentType,
 		EpcId:             &vpcID,
+		TapMode:           &tapMode,
 		// 容器采集器所在容器集群ID
 		PodClusterId: &podClusterId,
 	}
