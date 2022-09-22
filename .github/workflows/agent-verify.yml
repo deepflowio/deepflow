@@ -25,16 +25,14 @@ jobs:
           password: "${{ secrets.GITHUB_TOKEN }}" 
 
       - name: verify agent
-        run: |  
-          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.10 "-c" "\
-          cd  agent && \
-          cd src/ebpf && \
+        run: |
+          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.11 "-c" "\
+          source /opt/rh/devtoolset-8/enable && \
+          cd  agent/src/ebpf && \
           make clean && \
           make rust-sample && \
           make test && \
           make tools && \
           cd ../../ && \
-          RUSTFLAGS="-D warnings" && \
-          cargo check && \
-          cargo fmt --all -- --check && \
-          cargo test"
+          RUSTFLAGS='-D warnings' cargo check && \
+          cargo fmt --all -- --check"
