@@ -117,6 +117,8 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 		switch table {
 		case "l4_flow_log":
 			return GetL4FlowLogMetrics(), err
+		case "l4_packet":
+			return GetL4PacketMetrics(), err
 		case "l7_flow_log":
 			metrics := make(map[string]*Metrics)
 			loads := GetL7FlowLogMetrics()
@@ -261,6 +263,9 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "l4_flow_log":
 			metrics = L4_FLOW_LOG_METRICS
 			replaceMetrics = L4_FLOW_LOG_METRICS_REPLACE
+		case "l4_packet":
+			metrics = L4_PACKET_METRICS
+			replaceMetrics = L4_PACKET_METRICS_REPLACE
 		case "l7_flow_log":
 			metrics = L7_FLOW_LOG_METRICS
 			replaceMetrics = L7_FLOW_LOG_METRICS_REPLACE

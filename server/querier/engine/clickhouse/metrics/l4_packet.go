@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package common
+package metrics
 
-const PERMISSION_TYPE_NUM = 3
+var L4_PACKET_METRICS = map[string]*Metrics{}
 
-var DB_TABLE_MAP = map[string][]string{
-	"flow_log":        []string{"l4_flow_log", "l7_flow_log", "l4_packet"},
-	"flow_metrics":    []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port", "vtap_acl"},
-	"ext_metrics":     []string{"ext_common"},
-	"deepflow_system": []string{"deepflow_system_common"},
+var L4_PACKET_METRICS_REPLACE = map[string]*Metrics{}
+
+func GetL4PacketMetrics() map[string]*Metrics {
+	// TODO: 特殊指标量修改
+	return L4_PACKET_METRICS
 }

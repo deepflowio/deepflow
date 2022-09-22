@@ -161,6 +161,9 @@ var (
 		input:  "select `metrics.xxx` as xxx from cpu",
 		output: "SELECT if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')]) AS `xxx` FROM ext_metrics.cpu PREWHERE (xxx is not null)",
 		db:     "ext_metrics",
+	}, {
+		input:  "select Sum(packet_count) as count from l4_packet",
+		output: "SELECT SUM(packet_count) AS `count` FROM flow_log.l4_packet",
 	},
 	}
 )
