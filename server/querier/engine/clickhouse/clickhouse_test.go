@@ -157,6 +157,9 @@ var (
 	}, {
 		input:  "select `metrics.xxx` as xxx from l7_flow_log",
 		output: "SELECT if(indexOf(metrics_names, 'xxx')=0,null,metrics_values[indexOf(metrics_names, 'xxx')]) AS `xxx` FROM flow_log.l7_flow_log PREWHERE (xxx is not null)",
+	}, {
+		input:  "select Sum(packet_count) as count from l4_packet",
+		output: "SELECT SUM(packet_count) AS `count` FROM flow_log.l4_packet",
 	},
 	}
 )
