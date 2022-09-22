@@ -18,49 +18,17 @@ package tagrecorder
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
 
-	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/clickhouse"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 func (c *TagRecorder) UpdateChDictionary() {
 	log.Info("tagrecorder update ch dictionary")
-	var analyzers []mysql.Analyzer
-	var controllers []mysql.Controller
-	var azControllerConnections []mysql.AZControllerConnection
-	var azAnalyzerConnections []mysql.AZAnalyzerConnection
-	mysql.Db.Find(&analyzers)
-	mysql.Db.Where("node_type = ?", common.CONTROLLER_NODE_TYPE_MASTER).Find(&controllers)
-	mysql.Db.Find(&azControllerConnections)
-	mysql.Db.Find(&azAnalyzerConnections)
-	var masterRegion string
-	var masterRegionPrefix string
-	controllerIPToRegion := make(map[string]string)
-	for _, azControllerConnection := range azControllerConnections {
-		controllerIPToRegion[azControllerConnection.ControllerIP] = azControllerConnection.Region
-	}
-	for _, controller := range controllers {
-		if region, ok := controllerIPToRegion[controller.IP]; ok {
-			masterRegion = region
-			masterRegionPrefix = controller.RegionDomainPrefix
-			break
-		}
-	}
-	if masterRegion == "" {
-		log.Error("master region not found")
-		return
-	}
-	analyzerIPToRegion := make(map[string]string)
-	for _, azAnalyzerConnection := range azAnalyzerConnections {
-		analyzerIPToRegion[azAnalyzerConnection.AnalyzerIP] = azAnalyzerConnection.Region
-	}
 	connectMaster, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
 	if err != nil {
 		log.Error(err)
@@ -75,17 +43,7 @@ func (c *TagRecorder) UpdateChDictionary() {
 	connectMaster.Close()
 	// 遍历本区域所有数据节点检查并更新字典定义
 	for _, cluster := range clusters {
-		nodeIP := os.Getenv(common.NODE_IP_KEY)
-		analyzerRegion, ok := analyzerIPToRegion[nodeIP]
-		if !ok {
-			continue
-		}
-		replicaSQL := ""
-		if analyzerRegion == masterRegion {
-			replicaSQL = fmt.Sprintf("REPLICA (HOST '%s' PRIORITY %s)", c.cfg.MySqlCfg.Host, "1")
-		} else {
-			replicaSQL = fmt.Sprintf("REPLICA (HOST '%s%s' PRIORITY %s)", masterRegionPrefix, c.cfg.MySqlCfg.Host, "1")
-		}
+		replicaSQL := fmt.Sprintf("REPLICA (HOST '%s' PRIORITY %s)", c.cfg.MySqlCfg.Host, "1")
 		c.cfg.ClickHouseCfg.Host = cluster.HostAddress
 		c.cfg.ClickHouseCfg.Port = uint32(cluster.Port)
 		connect, err := clickhouse.Connect(c.cfg.ClickHouseCfg)
