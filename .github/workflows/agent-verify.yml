@@ -9,7 +9,7 @@ name: verify agent
 jobs:
   verify_agent:
     name: verify agent
-    runs-on: [self-hosted, 16c16g]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
