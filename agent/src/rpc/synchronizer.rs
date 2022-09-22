@@ -1191,7 +1191,7 @@ impl Synchronizer {
                             let (ts, cvar) = &*trident_state;
                             *ts.lock().unwrap() = trident::State::Terminated;
                             cvar.notify_one();
-                            warn!("trident upgrade is successful and restarts normally, trident restart...");
+                            warn!("agent upgrade is successful and restarts normally, agent restart...");
                             time::sleep(Duration::from_secs(1)).await;
                             process::exit(NORMAL_EXIT_WITH_RESTART);
                         },

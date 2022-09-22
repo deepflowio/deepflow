@@ -56,6 +56,7 @@ use crate::{
     common::{
         enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
         FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
+        NORMAL_EXIT_WITH_RESTART,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -375,6 +376,11 @@ impl Trident {
                     if let Some(mut c) = components.take() {
                         c.stop();
                     }
+                    // EbpfCollector does not support recreation because it calls bpf_tracer_init, which can only be called once in a process
+                    // Work around this problem by exiting and restart trident
+                    warn!("yaml_config updated, agent restart...");
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(NORMAL_EXIT_WITH_RESTART);
                 }
             }
             yaml_conf = Some(new_conf.yaml_config.clone());
@@ -626,10 +632,10 @@ pub struct Components {
 
 impl Components {
     fn start(&mut self) {
-        info!("Staring components.");
         if self.running.swap(true, Ordering::Relaxed) {
             return;
         }
+        info!("Staring components.");
         self.libvirt_xml_extractor.start();
         self.pcap_manager.start();
         #[cfg(target_os = "linux")]
@@ -1394,11 +1400,10 @@ impl Components {
     }
 
     fn stop(&mut self) {
-        info!("Stopping components.");
-
         if !self.running.swap(false, Ordering::Relaxed) {
             return;
         }
+        info!("Stopping components.");
 
         for d in self.dispatchers.iter_mut() {
             d.stop();
