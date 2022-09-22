@@ -136,6 +136,7 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 			Name:               controller.Name,
 			NodeType:           controller.NodeType,
 			State:              controller.State,
+			PodIP:              controller.PodIP,
 			NatIP:              controller.NATIP,
 			NatIPEnabled:       controller.NATIPEnabled,
 			CPUNum:             controller.CPUNum,

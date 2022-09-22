@@ -40,6 +40,7 @@ type Controller struct {
 	Name               string         `json:"NAME"`
 	NodeType           int            `json:"NODE_TYPE"`
 	State              int            `json:"STATE"`
+	PodIP              string         `json:"POD_IP"`
 	NatIP              string         `json:"NAT_IP"`
 	NatIPEnabled       int            `json:"NAT_IP_ENABLED"`
 	CPUNum             int            `json:"CPU_NUM"`
@@ -80,6 +81,7 @@ type Analyzer struct {
 	IP                string       `json:"IP"`
 	Name              string       `json:"NAME"`
 	State             int          `json:"STATE"`
+	PodIP             string       `json:"POD_IP"`
 	NatIP             string       `json:"NAT_IP"`
 	NatIPEnabled      int          `json:"NAT_IP_ENABLED"`
 	Agg               int          `json:"AGG"`

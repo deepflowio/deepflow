@@ -95,6 +95,7 @@ func GetAnalyzers(filter map[string]interface{}) (resp []model.Analyzer, err err
 			IP:                analyzer.IP,
 			Name:              analyzer.Name,
 			State:             analyzer.State,
+			PodIP:             analyzer.PodIP,
 			NatIP:             analyzer.NATIP,
 			NatIPEnabled:      analyzer.NATIPEnabled,
 			Agg:               analyzer.Agg,
