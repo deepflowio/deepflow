@@ -118,7 +118,7 @@ const (
 
 const (
 	VTAP_TYPE_KVM = 1 + iota
-	VTAP_TYPE_EXSI
+	VTAP_TYPE_ESXI
 	VTAP_TYPE_WORKLOAD_V
 	_ // 4
 	VTAP_TYPE_WORKLOAD_P
@@ -131,7 +131,7 @@ const (
 
 var VTapTypeName = map[int]string{
 	VTAP_TYPE_KVM:                  "VTAP_TYPE_KVM",
-	VTAP_TYPE_EXSI:                 "VTAP_TYPE_EXSI",
+	VTAP_TYPE_ESXI:                 "VTAP_TYPE_ESXI",
 	VTAP_TYPE_WORKLOAD_V:           "VTAP_TYPE_WORKLOAD_V",
 	VTAP_TYPE_WORKLOAD_P:           "VTAP_TYPE_WORKLOAD_P",
 	VTAP_TYPE_DEDICATED:            "VTAP_TYPE_DEDICATED",
@@ -463,7 +463,7 @@ const (
 
 var VTapToChangeTapModes = map[int][]int{
 	VTAP_TYPE_KVM:                  []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
-	VTAP_TYPE_EXSI:                 []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
+	VTAP_TYPE_ESXI:                 []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 	VTAP_TYPE_WORKLOAD_V:           []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 	VTAP_TYPE_WORKLOAD_P:           []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 	VTAP_TYPE_DEDICATED:            []int{TAPMODE_ANALYZER},

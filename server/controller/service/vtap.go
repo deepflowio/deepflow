@@ -161,7 +161,7 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 		}
 
 		switch vtap.Type {
-		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_EXSI, common.VTAP_TYPE_WORKLOAD_V,
+		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_WORKLOAD_V,
 			common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM, common.VTAP_TYPE_HYPER_V,
 			common.VTAP_TYPE_WORKLOAD_P:
 			vtapResp.LaunchServer = vtap.LaunchServer
@@ -804,7 +804,7 @@ func updateVTapTapMode(lcuuid string, tapMode int) error {
 				formatLKResult(vtapLKResult, updateMap)
 			}
 		}
-	case common.VTAP_TYPE_EXSI:
+	case common.VTAP_TYPE_ESXI:
 		if tapMode == common.TAPMODE_LOCAL {
 			vtapLKData := vtapop.NewVTapLkData(vtap.CtrlIP, vtap.CtrlMac, []string{vtap.CtrlIP}, "", az.Region)
 			vtapLKResult := vtapLKData.LookUpLocalVTapByIP(mysql.Db)

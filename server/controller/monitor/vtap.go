@@ -79,7 +79,7 @@ func (v *VTapCheck) launchServerCheck() {
 				}
 			}
 
-		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_EXSI, common.VTAP_TYPE_HYPER_V:
+		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_HYPER_V:
 			var host mysql.Host
 			if ret := mysql.Db.Where("ip = ?", vtap.LaunchServer).First(&host); ret.Error != nil {
 				log.Infof("delete vtap: %s %s", vtap.Name, vtap.Lcuuid)
