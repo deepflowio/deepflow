@@ -1270,6 +1270,8 @@ int tracer_stop(void)
 	struct bpf_tracer *t = NULL;
 	int i, ret = 0;
 
+	memset(feature_flags, 0, sizeof(feature_flags));
+
 	for (i = 0; i < tracers_count; i++) {
 		t = tracers[i];
 		ret = t->stop_handle();

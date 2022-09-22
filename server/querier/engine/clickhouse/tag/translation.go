@@ -546,7 +546,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		podIDSuffix := "pod_id" + suffix
 		tagResourceMap[k8sLabelSuffix] = map[string]*Tag{
 			"default": NewTag(
-				"dictGet(flow_tag.k8s_labels_map, 'labels', toUInt64("+podIDSuffix+"))",
+				"dictGetOrDefault(flow_tag.k8s_labels_map, 'labels', toUInt64("+podIDSuffix+"),'{}')",
 				podIDSuffix+"!=0",
 				"",
 				"",
@@ -591,10 +591,18 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	}
 
 	// 外部指标量
-	tagResourceMap["metrics"] = map[string]*Tag{
+	tagResourceMap["metrics."] = map[string]*Tag{
 		"default": NewTag(
 			"",
 			"%s is not null",
+			"",
+			"",
+		),
+	}
+	tagResourceMap["metrics"] = map[string]*Tag{
+		"default": NewTag(
+			"arrayZip(%s, %s)",
+			"",
 			"",
 			"",
 		),
