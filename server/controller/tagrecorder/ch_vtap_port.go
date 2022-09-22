@@ -371,7 +371,7 @@ func (v *ChVTapPort) generateVtapDeviceInfo() (map[int]DeviceInfo, bool) {
 		if vTap.LaunchServerID == 0 {
 			continue
 		}
-		if vTap.Type == common.VTAP_TYPE_KVM || vTap.Type == common.VTAP_TYPE_EXSI || vTap.Type == common.VTAP_TYPE_HYPER_V {
+		if vTap.Type == common.VTAP_TYPE_KVM || vTap.Type == common.VTAP_TYPE_ESXI || vTap.Type == common.VTAP_TYPE_HYPER_V {
 			vTapIDToDeviceInfo[vTap.ID] = DeviceInfo{
 				DeviceType: common.VIF_DEVICE_TYPE_HOST,
 				DeviceID:   vTap.LaunchServerID,

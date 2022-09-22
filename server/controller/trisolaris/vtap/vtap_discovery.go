@@ -446,7 +446,7 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 	}
 	vTapName := fmt.Sprintf("%s-H%d", host.Name, host.ID)
 	return &VTapLKResult{
-		VTapType:       VTAP_TYPE_EXSI,
+		VTapType:       VTAP_TYPE_ESXI,
 		LaunchServer:   host.IP,
 		LaunchServerID: host.ID,
 		VTapName:       vTapName,

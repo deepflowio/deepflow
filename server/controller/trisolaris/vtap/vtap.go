@@ -766,7 +766,7 @@ func (v *VTapInfo) monitorDataChanged() {
 func (v *VTapInfo) getVTapPodDomains(c *VTapCache) []string {
 	result := []string{}
 	noPodDomains := []int{VTAP_TYPE_WORKLOAD_V, VTAP_TYPE_WORKLOAD_P}
-	serverPodDomains := []int{VTAP_TYPE_EXSI, VTAP_TYPE_KVM, VTAP_TYPE_HYPER_V, VTAP_TYPE_HYPER_V_NETWORK}
+	serverPodDomains := []int{VTAP_TYPE_ESXI, VTAP_TYPE_KVM, VTAP_TYPE_HYPER_V, VTAP_TYPE_HYPER_V_NETWORK}
 	nodePodDomains := []int{VTAP_TYPE_POD_HOST, VTAP_TYPE_POD_VM}
 	podDomains := mapset.NewSet()
 	if Find[int](noPodDomains, c.GetVTapType()) {
