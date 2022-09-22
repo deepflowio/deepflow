@@ -58,7 +58,7 @@ func (v *VTapInfo) GenerateVTapLocalSegments(c *VTapCache) []*trident.Segment {
 	segment := v.metaData.GetPlatformDataOP().GetSegment()
 	podNodeIDToVmID := rawData.GetPodNodeIDToVmID()
 
-	if vtapType == VTAP_TYPE_EXSI {
+	if vtapType == VTAP_TYPE_ESXI {
 		localSegments = segment.GetTypeVMSegments(launchServer, launchServerID)
 	} else if Find[int](serverVTap, vtapType) {
 		launchServerSegments := segment.GetLaunchServerSegments(launchServer)
