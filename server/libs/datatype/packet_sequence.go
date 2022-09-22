@@ -48,7 +48,7 @@ type FullPacketData struct {
 	OptWs            uint8           `json:"opt_ws"`
 	Flags            uint8           `json:"flags"`
 	Direction        PacketDirection `json:"direction"`
-	OptSackPermitted bool            `json:"opt_sack_permitted"`
+	OptSackPermitted uint8           `json:"opt_sack_permitted"`
 	OptSack          []uint32        `json:"opt_sack"`
 }
 
@@ -131,7 +131,7 @@ func DecodePacketSequenceBlock(decoder *codec.SimpleDecoder, packets []*FullPack
 		if lowFieldFlag&HAS_OPT_SACK > 0 {
 			sackFlag := decoder.ReadU8()
 			if sackFlag>>3 > 0 {
-				packet.OptSackPermitted = true
+				packet.OptSackPermitted = 1
 			}
 			sackNum := sackFlag & 0x7
 			if sackNum > 0 {
