@@ -1077,7 +1077,7 @@ impl Components {
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
-            let dispatcher = if yaml_config.tap_mode == TapMode::Local {
+            let dispatcher = if candidate_config.tap_mode == TapMode::Local {
                 dispatcher_builder
                     .pcap_interfaces(tap_interfaces.clone())
                     .build()

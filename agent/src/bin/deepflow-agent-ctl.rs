@@ -111,14 +111,12 @@ struct PlatformCmd {
     mac_mappings: bool,
 }
 
-#[cfg(target_os = "linux")]
 #[derive(Debug, Parser)]
 struct PolicyCmd {
     #[clap(subcommand)]
     subcmd: PolicySubCmd,
 }
 
-#[cfg(target_os = "linux")]
 #[derive(Subcommand, Debug)]
 enum PolicySubCmd {
     Monitor,
@@ -126,7 +124,6 @@ enum PolicySubCmd {
     Analyzing(AnalyzingArgs),
 }
 
-#[cfg(target_os = "linux")]
 #[derive(Debug, Parser)]
 struct AnalyzingArgs {
     /// Set policy id
