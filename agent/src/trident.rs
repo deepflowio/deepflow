@@ -700,7 +700,6 @@ impl Components {
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
         let max_memory = config_handler.candidate_config.environment.max_memory;
-        let tap_mode = config_handler.candidate_config.yaml_config.tap_mode;
 
         trident_process_check();
         controller_ip_check(&static_config.controller_ips);
@@ -710,12 +709,12 @@ impl Components {
             exception_handler.clone(),
         ));
 
-        match yaml_config.tap_mode {
+        match candidate_config.tap_mode {
             TapMode::Analyzer => todo!(),
             _ => {
                 // NPF服务检查
                 // TODO: npf (only on windows)
-                if yaml_config.tap_mode == TapMode::Mirror {
+                if candidate_config.tap_mode == TapMode::Mirror {
                     kernel_check();
                 }
             }
@@ -768,7 +767,7 @@ impl Components {
             synchronizer.ntp_diff(),
         );
 
-        let rx_leaky_bucket = Arc::new(LeakyBucket::new(match yaml_config.tap_mode {
+        let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.tap_mode {
             TapMode::Analyzer => None,
             _ => Some(
                 config_handler
@@ -1033,7 +1032,7 @@ impl Components {
                     af_packet_version: config_handler.candidate_config.dispatcher.af_packet_version,
                     #[cfg(target_os = "windows")]
                     win_packet_blocks: config_handler.candidate_config.dispatcher.af_packet_blocks,
-                    tap_mode: yaml_config.tap_mode,
+                    tap_mode: candidate_config.tap_mode,
                     tap_mac_script: yaml_config.tap_mac_script.clone(),
                     is_ipv6: ctrl_ip.is_ipv6(),
                     vxlan_port: yaml_config.vxlan_port,
@@ -1071,7 +1070,7 @@ impl Components {
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
-            let dispatcher = if yaml_config.tap_mode == TapMode::Local {
+            let dispatcher = if candidate_config.tap_mode == TapMode::Local {
                 dispatcher_builder
                     .pcap_interfaces(tap_interfaces.clone())
                     .build()
@@ -1254,7 +1253,7 @@ impl Components {
             otel_uniform_sender,
             prometheus_uniform_sender,
             telegraf_uniform_sender,
-            tap_mode,
+            tap_mode: candidate_config.tap_mode,
             packet_sequence_uniform_sender, // Enterprise Edition Feature: packet-sequence
             packet_sequence_parsers,        // Enterprise Edition Feature: packet-sequence
             domain_name_listener,

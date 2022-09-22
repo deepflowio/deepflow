@@ -193,7 +193,6 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
-    pub tap_mode: TapMode,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -566,6 +565,7 @@ pub struct MetricServerConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModuleConfig {
     pub enabled: bool,
+    pub tap_mode: TapMode,
     pub yaml_config: YamlConfig,
     pub collector: CollectorConfig,
     pub environment: EnvironmentConfig,
@@ -620,6 +620,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
         let config = ModuleConfig {
             enabled: conf.enabled,
             yaml_config: conf.yaml_config.clone(),
+            tap_mode: conf.tap_mode,
             diagnose: DiagnoseConfig {
                 enabled: conf.enabled,
                 libvirt_xml_path: conf.libvirt_xml_path.parse().unwrap_or_default(),
@@ -659,10 +660,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 proxy_controller_port: conf.proxy_controller_port,
                 capture_bpf: conf.capture_bpf.to_string(),
                 max_memory: conf.max_memory,
-                af_packet_blocks: conf.yaml_config.get_af_packet_blocks(conf.max_memory),
+                af_packet_blocks: conf
+                    .yaml_config
+                    .get_af_packet_blocks(conf.tap_mode, conf.max_memory),
                 #[cfg(target_os = "linux")]
                 af_packet_version: conf.capture_socket_type.into(),
-                tap_mode: conf.yaml_config.tap_mode,
+                tap_mode: conf.tap_mode,
                 region_id: conf.region_id,
                 pod_cluster_id: conf.pod_cluster_id,
                 enabled: conf.enabled,
@@ -724,7 +727,6 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     Some(conf.yaml_config.kubernetes_namespace.clone())
                 },
                 thread_threshold: conf.thread_threshold,
-                tap_mode: conf.yaml_config.tap_mode,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -960,7 +962,7 @@ impl ConfigHandler {
 
         if candidate_config.dispatcher != new_config.dispatcher {
             if candidate_config.dispatcher.if_mac_source != new_config.dispatcher.if_mac_source {
-                if yaml_config.tap_mode != TapMode::Local {
+                if candidate_config.tap_mode != TapMode::Local {
                     info!(
                         "if_mac_source set to {:?}",
                         new_config.dispatcher.if_mac_source
@@ -969,7 +971,7 @@ impl ConfigHandler {
             }
 
             #[cfg(target_os = "windows")]
-            if yaml_config.tap_mode == TapMode::Local
+            if candidate_config.tap_mode == TapMode::Local
                 && candidate_config.dispatcher.tap_interface_regex
                     != new_config.dispatcher.tap_interface_regex
             {
@@ -993,7 +995,7 @@ impl ConfigHandler {
             if candidate_config.dispatcher.capture_packet_size
                 != new_config.dispatcher.capture_packet_size
             {
-                if yaml_config.tap_mode == TapMode::Analyzer || cfg!(target_os = "windows") {
+                if candidate_config.tap_mode == TapMode::Analyzer || cfg!(target_os = "windows") {
                     todo!()
                 }
             }
@@ -1034,15 +1036,20 @@ impl ConfigHandler {
             }
 
             if candidate_config.dispatcher.max_memory != new_config.dispatcher.max_memory {
-                if yaml_config.get_af_packet_blocks(new_config.dispatcher.max_memory)
-                    != yaml_config.get_af_packet_blocks(candidate_config.dispatcher.max_memory)
+                if yaml_config
+                    .get_af_packet_blocks(new_config.tap_mode, new_config.dispatcher.max_memory)
+                    != yaml_config.get_af_packet_blocks(
+                        candidate_config.tap_mode,
+                        candidate_config.dispatcher.max_memory,
+                    )
                     || yaml_config.get_fast_path_map_size(new_config.dispatcher.max_memory)
                         != yaml_config
                             .get_fast_path_map_size(candidate_config.dispatcher.max_memory)
-                    || yaml_config.get_channel_size(new_config.dispatcher.max_memory)
-                        != yaml_config.get_channel_size(candidate_config.dispatcher.max_memory)
-                    || yaml_config.get_flow_capacity(new_config.dispatcher.max_memory)
-                        != yaml_config.get_flow_capacity(candidate_config.dispatcher.max_memory)
+                    || candidate_config.get_channel_size(new_config.dispatcher.max_memory)
+                        != candidate_config.get_channel_size(candidate_config.dispatcher.max_memory)
+                    || candidate_config.get_flow_capacity(new_config.dispatcher.max_memory)
+                        != candidate_config
+                            .get_flow_capacity(candidate_config.dispatcher.max_memory)
                 {
                     restart_dispatcher = true;
                     info!("max_memory change, restart dispatcher");
@@ -1056,7 +1063,7 @@ impl ConfigHandler {
                     new_config.dispatcher.global_pps_threshold;
 
                 fn leaky_bucket_callback(handler: &ConfigHandler, components: &mut Components) {
-                    match handler.candidate_config.yaml_config.tap_mode {
+                    match handler.candidate_config.tap_mode {
                         TapMode::Analyzer => {
                             components.rx_leaky_bucket.set_rate(None);
                             info!("dispatcher.global pps set ulimit when tap_mode=analyzer");
@@ -1180,7 +1187,7 @@ impl ConfigHandler {
 
         if candidate_config.environment != new_config.environment {
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                if yaml_config.tap_mode != TapMode::Analyzer {
+                if candidate_config.tap_mode != TapMode::Analyzer {
                     // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                     info!(
                         "memory limit set to {}",
@@ -1274,7 +1281,7 @@ impl ConfigHandler {
             }
 
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                if yaml_config.tap_mode != TapMode::Analyzer {
+                if candidate_config.tap_mode != TapMode::Analyzer {
                     // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                     info!(
                         "memory limit set to {}",
@@ -1378,7 +1385,8 @@ impl ConfigHandler {
             fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                 let conf = &handler.candidate_config.platform;
                 if handler.candidate_config.enabled
-                    && (conf.tap_mode == TapMode::Local || is_tt_pod(conf.trident_type))
+                    && (handler.candidate_config.tap_mode == TapMode::Local
+                        || is_tt_pod(conf.trident_type))
                 {
                     components.platform_synchronizer.start();
                     if is_tt_pod(conf.trident_type) {
@@ -1417,13 +1425,13 @@ impl ConfigHandler {
             }
 
             if candidate_config.sender.npb_socket_type != new_config.sender.npb_socket_type {
-                if yaml_config.tap_mode != TapMode::Analyzer {
+                if candidate_config.tap_mode != TapMode::Analyzer {
                     restart_dispatcher = true;
                 }
             }
 
             if candidate_config.sender.npb_dedup_enabled != new_config.sender.npb_dedup_enabled {
-                if yaml_config.tap_mode != TapMode::Analyzer {
+                if candidate_config.tap_mode != TapMode::Analyzer {
                     restart_dispatcher = true;
                 }
             }
@@ -1436,7 +1444,7 @@ impl ConfigHandler {
 
         if candidate_config.handler != new_config.handler {
             if candidate_config.handler.npb_dedup_enabled != new_config.handler.npb_dedup_enabled {
-                if yaml_config.tap_mode != TapMode::Analyzer {
+                if candidate_config.tap_mode != TapMode::Analyzer {
                     restart_dispatcher = true;
                 }
             }
@@ -1593,15 +1601,7 @@ impl ConfigHandler {
     }
 }
 
-impl YamlConfig {
-    fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
-        if self.fast_path_map_size > 0 {
-            return self.fast_path_map_size;
-        }
-
-        min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
-    }
-
+impl ModuleConfig {
     fn get_channel_size(&self, mem_size: u64) -> usize {
         if self.tap_mode == TapMode::Analyzer {
             return 1 << 14;
@@ -1612,14 +1612,24 @@ impl YamlConfig {
 
     fn get_flow_capacity(&self, mem_size: u64) -> usize {
         if self.tap_mode == TapMode::Analyzer {
-            return self.flow.capacity as usize;
+            return self.yaml_config.flow.capacity as usize;
         }
 
         min((mem_size / MB / 128 * 65536) as usize, 1 << 30)
     }
+}
 
-    fn get_af_packet_blocks(&self, mem_size: u64) -> usize {
-        if self.tap_mode == TapMode::Analyzer || self.af_packet_blocks_enabled {
+impl YamlConfig {
+    fn get_fast_path_map_size(&self, mem_size: u64) -> usize {
+        if self.fast_path_map_size > 0 {
+            return self.fast_path_map_size;
+        }
+
+        min(max((mem_size / MB / 128 * 32000) as usize, 32000), 1 << 20)
+    }
+
+    fn get_af_packet_blocks(&self, tap_mode: TapMode, mem_size: u64) -> usize {
+        if tap_mode == TapMode::Analyzer || self.af_packet_blocks_enabled {
             self.af_packet_blocks.max(8)
         } else {
             (mem_size as usize / recv_engine::DEFAULT_BLOCK_SIZE / 16).min(128)
