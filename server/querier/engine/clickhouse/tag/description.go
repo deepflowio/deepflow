@@ -352,54 +352,66 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		return nil, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
 	}
 	// 根据tagEnumFile获取values
-	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
+	tagValues, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 	if !isEnumOK {
 		return GetTagResourceValues(sql)
 	}
-	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
-	if isStringEnumOK {
-		table = "string_enum_map"
-	}
-	_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
-	if isIntEnumOK {
-		table = "int_enum_map"
-	}
-
-	var limitSql string
-	var likeSql string
-	var whereSql string
-	chClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       "flow_tag",
-	}
-	limitList := strings.Split(sql, "LIMIT")
-	if len(limitList) <= 1 {
-		limitList = strings.Split(sql, "limit")
-	}
-	likeSql = limitList[0]
-	if len(limitList) > 1 {
-		limitSql = " LIMIT " + limitList[1]
-	}
-	likeList := strings.Split(likeSql, "WHERE")
-	if len(likeList) == 1 {
-		likeList = strings.Split(likeSql, "where")
-	}
-	if len(likeList) > 1 {
-		if strings.Trim(likeList[1], " ") != "" {
-			whereSql = " AND " + strings.ReplaceAll(likeList[1], "*", "%")
+	if strings.Contains(sql, "WHERE") || strings.Contains(sql, "where") {
+		_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
+		if isStringEnumOK {
+			table = "string_enum_map"
 		}
-	}
-	sql = fmt.Sprintf("SELECT value,name AS display_name FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name ORDER BY value ASC %s", table, tag, whereSql, limitSql)
-	log.Debug(sql)
-	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-	if err != nil {
-		return nil, err
-	}
+		_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
+		if isIntEnumOK {
+			table = "int_enum_map"
+		}
 
-	return rst, err
+		var limitSql string
+		var likeSql string
+		var whereSql string
+		chClient := client.Client{
+			Host:     config.Cfg.Clickhouse.Host,
+			Port:     config.Cfg.Clickhouse.Port,
+			UserName: config.Cfg.Clickhouse.User,
+			Password: config.Cfg.Clickhouse.Password,
+			DB:       "flow_tag",
+		}
+		limitList := strings.Split(sql, "LIMIT")
+		if len(limitList) <= 1 {
+			limitList = strings.Split(sql, "limit")
+		}
+		likeSql = limitList[0]
+		if len(limitList) > 1 {
+			limitSql = " LIMIT " + limitList[1]
+		}
+		likeList := strings.Split(likeSql, "WHERE")
+		if len(likeList) == 1 {
+			likeList = strings.Split(likeSql, "where")
+		}
+		if len(likeList) > 1 {
+			if strings.Trim(likeList[1], " ") != "" {
+				whereSql = " AND " + strings.ReplaceAll(likeList[1], "*", "%")
+			}
+		}
+		sql = fmt.Sprintf("SELECT value,name AS display_name FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name ORDER BY value ASC %s", table, tag, whereSql, limitSql)
+		log.Debug(sql)
+		response, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+		if err != nil {
+			return nil, err
+		}
+		return response, err
+	} else {
+		response = map[string][]interface{}{
+			"columns": []interface{}{"value", "display_name"},
+			"values":  []interface{}{},
+		}
+		for _, value := range tagValues {
+			response["values"] = append(
+				response["values"], []interface{}{value.Value, value.DisplayName},
+			)
+		}
+		return response, nil
+	}
 
 }
 
