@@ -34,7 +34,7 @@ use crate::common::{
 };
 use crate::proto::{
     common,
-    trident::{self, KubernetesClusterIdRequest},
+    trident::{self, KubernetesClusterIdRequest, TapMode},
 };
 use crate::rpc::Session;
 
@@ -211,8 +211,6 @@ pub struct YamlConfig {
     pub fast_path_map_size: usize,
     pub first_path_level: u32,
     pub src_interfaces: Vec<String>,
-    #[serde(with = "TapModeDef")]
-    pub tap_mode: trident::TapMode,
     pub mirror_traffic_pcp: u16,
     pub vtap_group_id_request: String,
     pub pcap: PcapConfig,
@@ -259,12 +257,12 @@ pub struct YamlConfig {
 }
 
 impl YamlConfig {
-    pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {
+    pub fn load_from_file<T: AsRef<Path>>(path: T, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = fs::read_to_string(path)?;
-        Self::load(&contents)
+        Self::load(&contents, tap_mode)
     }
 
-    pub fn load<C: AsRef<str>>(contents: C) -> Result<Self, io::Error> {
+    pub fn load<C: AsRef<str>>(contents: C, tap_mode: TapMode) -> Result<Self, io::Error> {
         let contents = contents.as_ref();
         let mut c = if contents.len() == 0 {
             // parsing empty string leads to EOF error
@@ -297,14 +295,14 @@ impl YamlConfig {
             c.analyzer_queue_size = 1 << 17;
         }
         if c.collector_sender_queue_size == 0 {
-            c.collector_sender_queue_size = if c.tap_mode == trident::TapMode::Analyzer {
+            c.collector_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
                 8 << 20
             } else {
                 1 << 16
             }
         }
         if c.flow_sender_queue_size == 0 {
-            c.flow_sender_queue_size = if c.tap_mode == trident::TapMode::Analyzer {
+            c.flow_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
                 8 << 20
             } else {
                 1 << 16
@@ -341,7 +339,7 @@ impl YamlConfig {
 
         // Enterprise Edition Feature: packet-sequence
         if c.packet_sequence_queue_size == 0 {
-            if c.tap_mode == trident::TapMode::Analyzer {
+            if tap_mode == trident::TapMode::Analyzer {
                 c.packet_sequence_queue_size = 8 << 20;
             } else {
                 c.packet_sequence_queue_size = 1 << 16;
@@ -379,7 +377,6 @@ impl Default for YamlConfig {
             fast_path_map_size: 1 << 14,
             first_path_level: 0,
             src_interfaces: vec![],
-            tap_mode: trident::TapMode::Local,
             mirror_traffic_pcp: 0,
             vtap_group_id_request: "".into(),
             pcap: Default::default(),
@@ -663,6 +660,7 @@ pub struct RuntimeConfig {
     pub log_file_size: u32,
     pub external_agent_http_proxy_enabled: bool,
     pub external_agent_http_proxy_port: u16,
+    pub tap_mode: TapMode,
     // TODO: expand and remove
     pub yaml_config: YamlConfig,
 }
@@ -887,7 +885,8 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             log_file_size: conf.log_file_size(),
             external_agent_http_proxy_enabled: conf.external_agent_http_proxy_enabled(),
             external_agent_http_proxy_port: conf.external_agent_http_proxy_port() as u16,
-            yaml_config: YamlConfig::load(conf.local_config())?,
+            tap_mode: conf.tap_mode(),
+            yaml_config: YamlConfig::load(conf.local_config(), conf.tap_mode())?,
         };
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
