@@ -410,6 +410,7 @@ impl Trident {
                     components.replace(comp);
                 }
                 Some(components) => {
+                    components.start();
                     components.config = config_handler.candidate_config.clone();
                     dispatcher_listener_callback(
                         &config_handler.candidate_config.dispatcher,
