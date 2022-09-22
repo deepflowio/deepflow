@@ -88,6 +88,7 @@ func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, er
 		"pod_net_ipv6_cidr_max_mask": 64,
 		"port_name_regex":            DEFAULT_PORT_NAME_REGEX,
 		"region_uuid":                azConn.Region,
+		"vtap_id":                    "",
 	}
 	domainCreate := model.DomainCreate{
 		Name:                "k8s-" + clusterID,
