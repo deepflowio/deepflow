@@ -161,7 +161,7 @@ func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values [
 	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
 		var tagsIndex int
 		for i, column := range columns {
-			if column.(string) == "tags" || column.(string) == "attributes" || column.(string) == "metrics" {
+			if column.(string) == args[0].(string) {
 				tagsIndex = i
 				break
 			}
