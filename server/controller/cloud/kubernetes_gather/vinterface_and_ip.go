@@ -408,6 +408,7 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		podIPs = append(podIPs, modelIP)
 	}
 	// 处理nodeIP，生成port，ip，cidrs信息
+	invalidNodeIPs := mapset.NewSet()
 	nodeVinterfaceLcuuids := mapset.NewSet()
 	for _, vItem := range vData {
 		if vItem.KubernetesClusterID != k.ClusterID {
@@ -454,6 +455,8 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				// if is subdomain, don't record node ip and vinterface
 				if k.isSubDomain {
 					k8sNodeIPs.Remove(ipPrefix.IP().String())
+					invalidNodeIPs.Add(ipPrefix.IP().String())
+					log.Debugf("vinterface,ip the subdomain node ip (%s) already exists on the vm ip", ipPrefix.IP().String())
 					continue
 				}
 				rangePrefix, ok := ipPrefix.Range().Prefix()
@@ -517,6 +520,10 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 				k8sNodeIPs.Remove(ipPrefix.IP().String())
 			// 处理genesis额外上报的IP
 			case k.PortNameRegex != "" && portNameRegex.MatchString(nName):
+				if invalidNodeIPs.Contains(ipPrefix.IP().String()) {
+					log.Debugf("vinterface,ip invalid node ip (%s)", ipPrefix.IP().String())
+					continue
+				}
 				// 判断是否在节点默认cidr中，如果在则使用该cidr
 				// 判断网段是否节点已有其他cidr中，如果在则使用该cidr
 				// 判断网段是否在POD默认cidr中，如果在则使用该cidr
