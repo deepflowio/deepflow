@@ -266,7 +266,7 @@ impl Status {
     }
 
     fn modify_platform(&mut self, macs: &Vec<MacAddr>, config: &RuntimeConfig) {
-        if config.yaml_config.tap_mode == TapMode::Analyzer {
+        if config.tap_mode == TapMode::Analyzer {
             return;
         }
         let mut local_mac_map = HashMap::new();
@@ -643,13 +643,11 @@ impl Synchronizer {
         if static_config.version_info.name == env!("AGENT_NAME") {
             runtime_config.platform_enabled = false;
         }
-        let yaml_config = &runtime_config.yaml_config;
-
         let _ = escape_tx.send(runtime_config.max_escape);
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
-        let (_, macs) = Self::parse_segment(yaml_config.tap_mode, &resp);
+        let (_, macs) = Self::parse_segment(runtime_config.tap_mode, &resp);
 
         let mut status = status.write();
         status.proxy_ip = if runtime_config.proxy_controller_ip.len() > 0 {
