@@ -17,8 +17,10 @@
 package pool
 
 import (
+	"math"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	logging "github.com/op/go-logging"
 )
@@ -83,8 +85,8 @@ type LockFreePool struct {
 }
 
 func (p *LockFreePool) Get() interface{} {
-	p.counter.InUseObjects += 1
-	p.counter.InUseBytes += p.counter.ObjectSize
+	atomic.AddUint64(&p.counter.InUseObjects, 1)
+	atomic.AddUint64(&p.counter.InUseBytes, p.counter.ObjectSize)
 
 	elemPool := p.fullPool.Get().(*[]interface{}) // avoid convT2Eslice
 	pool := *elemPool
@@ -99,8 +101,8 @@ func (p *LockFreePool) Get() interface{} {
 }
 
 func (p *LockFreePool) Put(x interface{}) {
-	p.counter.InUseObjects -= 1
-	p.counter.InUseBytes -= p.counter.ObjectSize
+	atomic.AddUint64(&p.counter.InUseObjects, math.MaxUint64)
+	atomic.AddUint64(&p.counter.InUseBytes, math.MaxUint64-p.counter.ObjectSize+1)
 
 	pool := p.emptyPool.Get().(*[]interface{}) // avoid convT2Eslice
 	*pool = append(*pool, x)

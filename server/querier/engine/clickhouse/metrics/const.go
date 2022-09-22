@@ -30,6 +30,7 @@ const (
 	METRICS_TYPE_PERCENTAGE            // 百分比，例如异常比例、重传比例
 	METRICS_TYPE_QUOTIENT              // 商值，例如平均包长
 	METRICS_TYPE_TAG                   // tag，例如ip
+	METRICS_TYPE_ARRAY                 // 数组类型，不支持算子，select时需展开
 )
 
 var METRICS_TYPE_NAME_MAP = map[string]int{

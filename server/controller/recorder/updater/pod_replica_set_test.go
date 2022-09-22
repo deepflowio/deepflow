@@ -19,7 +19,7 @@ package updater
 import (
 	"reflect"
 
-	"bou.ke/monkey"
+	"github.com/agiledragon/gomonkey/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
@@ -57,24 +57,23 @@ func (t *SuiteTest) TestHandleAddPodReplicaSetSucess() {
 	c, cloudItem := t.getPodReplicaSetMock(false)
 	assert.Equal(t.T(), len(c.PodReplicaSets), 0)
 	podNamespaceID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodNamespaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodNamespaceIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return podNamespaceID, true
 	})
+	defer monkey.Reset()
 	podClusterID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodClusterIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey1 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodClusterIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return podClusterID, true
 	})
+	defer monkey1.Reset()
 	podGroupID := randID()
-	monkey.PatchInstanceMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodGroupIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
+	monkey2 := gomonkey.ApplyPrivateMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodGroupIDByLcuuid", func(_ *cache.ToolDataSet, _ string) (int, bool) {
 		return podGroupID, true
 	})
+	defer monkey2.Reset()
 
 	updater := NewPodReplicaSet(c, []cloudmodel.PodReplicaSet{cloudItem})
 	updater.HandleAddAndUpdate()
-
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodNamespaceIDByLcuuid")
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodClusterIDByLcuuid")
-	monkey.UnpatchInstanceMethod(reflect.TypeOf(&c.ToolDataSet), "GetPodGroupIDByLcuuid")
 
 	var addedItem *mysql.PodReplicaSet
 	result := t.db.Where("lcuuid = ?", cloudItem.Lcuuid).Find(&addedItem)

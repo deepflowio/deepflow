@@ -159,19 +159,14 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 
 func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
 	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-		newValues = make([]interface{}, len(values))
 		var tagsIndex int
 		for i, column := range columns {
-			if column.(string) == "tags" || column.(string) == "attributes" {
+			if column.(string) == "tags" || column.(string) == "attributes" || column.(string) == "metrics" {
 				tagsIndex = i
 				break
 			}
 		}
-		for i, value := range values {
-			newValues[i] = value
-		}
-
-		for i, newValue := range newValues {
+		for _, newValue := range values {
 			newValueSlice := newValue.([]interface{})
 			tagsMap := make(map[string]interface{})
 			for _, tagValue := range newValueSlice[tagsIndex].([][]interface{}) {
@@ -185,7 +180,7 @@ func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values [
 				return newValues
 			}
 			newValueSlice[tagsIndex] = string(tagsStr)
-			newValues[i] = newValueSlice
+			newValues = append(newValues, newValueSlice)
 		}
 		return newValues
 	}

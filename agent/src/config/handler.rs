@@ -193,6 +193,7 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
+    pub tap_mode: TapMode,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -723,6 +724,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     Some(conf.yaml_config.kubernetes_namespace.clone())
                 },
                 thread_threshold: conf.thread_threshold,
+                tap_mode: conf.yaml_config.tap_mode,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1374,12 +1376,21 @@ impl ConfigHandler {
 
             #[cfg(target_os = "linux")]
             fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
-                if is_tt_pod(handler.candidate_config.platform.trident_type) {
-                    components.platform_synchronizer.start_kubernetes_poller();
+                let conf = &handler.candidate_config.platform;
+                if handler.candidate_config.enabled
+                    && (conf.tap_mode == TapMode::Local || is_tt_pod(conf.trident_type))
+                {
+                    components.platform_synchronizer.start();
+                    if is_tt_pod(conf.trident_type) {
+                        components.platform_synchronizer.start_kubernetes_poller();
+                    } else {
+                        components.platform_synchronizer.stop_kubernetes_poller();
+                    }
                 } else {
-                    components.platform_synchronizer.stop_kubernetes_poller();
+                    components.platform_synchronizer.stop();
+                    info!("PlatformSynchronizer is not enabled");
                 }
-                if handler.candidate_config.platform.kubernetes_api_enabled {
+                if conf.kubernetes_api_enabled {
                     components.api_watcher.start();
                 } else {
                     components.api_watcher.stop();
