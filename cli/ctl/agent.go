@@ -68,7 +68,7 @@ func RegisterAgentUpgradeCommand() *cobra.Command {
 		Use:   "agent-upgrade",
 		Short: "agent upgrade operation commands",
 		Example: "deepflow-ctl agent-upgrade list\n" +
-			"deepflow-ctl agent-upgrade vtap-name --package=/usr/sbin/trident\n",
+			"deepflow-ctl agent-upgrade vtap-name --package=/usr/sbin/deepflow-agent\n",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) == 1 {
 				if args[0] == "list" {
