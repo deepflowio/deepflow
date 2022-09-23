@@ -57,11 +57,11 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 			externalTag := tagName.(string)
 			metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
 			dbField := fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, externalTag, metrics_values_field, metrics_names_field, externalTag)
+			metricName := fmt.Sprintf("%s.%s", "metrics", externalTag)
 			lm := NewMetrics(
-				i, dbField, externalTag, "", METRICS_TYPE_COUNTER,
+				i, dbField, metricName, "", METRICS_TYPE_COUNTER,
 				"指标", []bool{true, true, true}, "", table,
 			)
-			metricName := fmt.Sprintf("%s.%s", "metrics", externalTag)
 			loadMetrics[metricName] = lm
 		}
 	}
