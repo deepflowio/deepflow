@@ -155,8 +155,8 @@ var (
 		input:  "select labels_0 from l7_flow_log",
 		output: "SELECT dictGetOrDefault(flow_tag.k8s_labels_map, 'labels', toUInt64(pod_id_0),'{}') AS `labels_0` FROM flow_log.l7_flow_log",
 	}, {
-		input:  "select `metrics.xxx` as xxx from l7_flow_log",
-		output: "SELECT if(indexOf(metrics_names, 'xxx')=0,null,metrics_values[indexOf(metrics_names, 'xxx')]) AS `xxx` FROM flow_log.l7_flow_log",
+		input:  "select `metrics.xxx.yyy` as xxx from l7_flow_log",
+		output: "SELECT if(indexOf(metrics_names, 'xxx.yyy')=0,null,metrics_values[indexOf(metrics_names, 'xxx.yyy')]) AS `xxx` FROM flow_log.l7_flow_log",
 	}, {
 		input:  "select `metrics.xxx` as xxx from cpu",
 		output: "SELECT if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')]) AS `xxx` FROM ext_metrics.cpu PREWHERE (xxx is not null)",

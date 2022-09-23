@@ -92,9 +92,10 @@ func GetMetrics(field string, db string, table string) (*Metrics, bool) {
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
+				fieldName := strings.Replace(field, "metrics.", "", 1)
 				metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
 				return NewMetrics(
-					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldSplit[1], metrics_values_field, metrics_names_field, fieldSplit[1]),
+					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, "", METRICS_TYPE_COUNTER,
 					"指标", []bool{true, true, true}, "", table,
 				), true
