@@ -1,4 +1,4 @@
-FROM ghcr.io/deepflowys/rust-build:1.10 as builder
+FROM ghcr.io/deepflowys/rust-build:1.14 as builder
 COPY .  /deepflow/
 WORKDIR /deepflow/agent
 RUN RUSTFLAGS="-D warnings" && cargo build --release --target=x86_64-unknown-linux-musl && \
@@ -6,5 +6,3 @@ RUN RUSTFLAGS="-D warnings" && cargo build --release --target=x86_64-unknown-lin
     ls -alh target/x86_64-unknown-linux-musl/release
 FROM scratch
 COPY --from=builder /deepflow/agent/ /
-
-

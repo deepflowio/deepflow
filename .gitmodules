@@ -1,0 +1,3 @@
+[submodule "message/opentelemetry"]
+	path = message/opentelemetry
+	url = https://github.com/open-telemetry/opentelemetry-proto.git

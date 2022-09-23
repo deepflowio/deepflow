@@ -12,9 +12,10 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 RUN yum install make epel-release centos-release-scl -y && yum -y install jq
 
 # 安装基础依赖#
-RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git  -y && \
+RUN  yum install curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git -y && \
      echo "source /opt/rh/devtoolset-8/enable" >> /etc/profile && \
      curl  https://sh.rustup.rs -so restup.sh; bash restup.sh -y
+RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/protoc --silent -O && chmod a+x protoc && mv protoc /usr/bin/ && whereis protoc && protoc --version
 
 RUN  curl http://cloud.deepservice.yunshan.net:1080/kernel/llvm-clang-11.0.0-2.el7.x86_64.rpm --silent -O && \
      yum --disablerepo=* localinstall -y ./llvm-clang-*.rpm && rm -rf llvm-clang-*.rpm && \
