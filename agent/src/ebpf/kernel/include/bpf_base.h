@@ -126,6 +126,7 @@ _Pragma("GCC error \"Must specify a BPF target arch\"");
  *                  |--------------EAX-----------------|
  * |----------------------RAX--------------------------|
  */
+#if defined(__x86_64__)
 #define PT_GO_REGS_PARM1(x) ((x)->rax)
 #define PT_GO_REGS_PARM2(x) ((x)->rbx)
 #define PT_GO_REGS_PARM3(x) ((x)->rcx)
@@ -135,6 +136,17 @@ _Pragma("GCC error \"Must specify a BPF target arch\"");
 #define PT_GO_REGS_PARM7(x) ((x)->r9)
 #define PT_GO_REGS_PARM8(x) ((x)->r10)
 #define PT_GO_REGS_PARM9(x) ((x)->rdx)
+#elif defined(__aarch64__)
+#define PT_GO_REGS_PARM1(x) ((x)->r0)
+#define PT_GO_REGS_PARM2(x) ((x)->r1)
+#define PT_GO_REGS_PARM3(x) ((x)->r2)
+#define PT_GO_REGS_PARM4(x) ((x)->r3)
+#define PT_GO_REGS_PARM5(x) ((x)->r4)
+#define PT_GO_REGS_PARM6(x) ((x)->r5)
+#define PT_GO_REGS_PARM7(x) ((x)->r6)
+#define PT_GO_REGS_PARM8(x) ((x)->r7)
+#define PT_GO_REGS_PARM9(x) ((x)->r8)
+#endif
 
 #define __stringify_1(x) #x
 #define __stringify(x)  __stringify_1(x)
