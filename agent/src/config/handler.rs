@@ -1363,6 +1363,11 @@ impl ConfigHandler {
             candidate_config.collector = new_config.collector;
         }
 
+        if candidate_config.tap_mode != new_config.tap_mode {
+            info!("tap_mode set to {:?}", new_config.tap_mode);
+            candidate_config.tap_mode = new_config.tap_mode;
+        }
+
         if candidate_config.platform != new_config.platform {
             if candidate_config.platform.enabled != new_config.platform.enabled {
                 info!("Platform enabled set to {}", new_config.platform.enabled);
