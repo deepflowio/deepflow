@@ -315,16 +315,6 @@ func UpdateAnalyzer(
 		m.TriggerReallocAnalyzer("")
 	}
 
-	// 修改状态
-	if _, ok := analyzerUpdate["STATE"]; ok {
-		dbUpdateMap["state"] = analyzerUpdate["STATE"]
-		// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配数据节点
-		state := int(analyzerUpdate["STATE"].(float64))
-		if state == common.HOST_STATE_MAINTENANCE || state == common.HOST_STATE_EXCEPTION {
-			m.TriggerReallocAnalyzer(analyzer.IP)
-		}
-	}
-
 	// 修改nat_ip
 	if _, ok := analyzerUpdate["NAT_IP"]; ok {
 		// TODO: 触发给数据节点下发信息的推送
@@ -336,8 +326,21 @@ func UpdateAnalyzer(
 		dbUpdateMap["agg"] = analyzerUpdate["AGG"]
 	}
 
+	// 修改状态
+	var state int
+	if _, ok := analyzerUpdate["STATE"]; ok {
+		dbUpdateMap["state"] = analyzerUpdate["STATE"]
+		state = int(analyzerUpdate["STATE"].(float64))
+	}
+
 	// 更新analyzer DB
 	mysql.Db.Model(&analyzer).Updates(dbUpdateMap)
+
+	// if state equal to maintaince/exception, trigger realloc analyzer
+	// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配数据节点
+	if state == common.HOST_STATE_MAINTENANCE || state == common.HOST_STATE_EXCEPTION {
+		m.TriggerReallocAnalyzer(analyzer.IP)
+	}
 
 	response, _ := GetAnalyzers(map[string]interface{}{"lcuuid": lcuuid})
 	return response[0], nil
