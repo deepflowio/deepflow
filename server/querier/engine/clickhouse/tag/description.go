@@ -356,7 +356,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	if !isEnumOK {
 		return GetTagResourceValues(sql)
 	}
-	if strings.Contains(sql, "WHERE") || strings.Contains(sql, "where") {
+	if strings.Contains(sql, "LIKE") || strings.Contains(sql, "like") {
 		_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
 		if isStringEnumOK {
 			table = "string_enum_map"
