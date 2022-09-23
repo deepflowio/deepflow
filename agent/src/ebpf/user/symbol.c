@@ -38,8 +38,10 @@
 #include "common.h"
 #include "symbol.h"
 #include "tracer.h"
+#if defined __x86_64__
 #include "bddisasm/bddisasm.h"
 #include "bddisasm/disasmtypes.h"
+#endif
 #include "libGoReSym.h"
 
 void free_uprobe_symbol(struct symbol_uprobe *u_sym,
@@ -118,6 +120,7 @@ int find_load(uint64_t v_addr, uint64_t mem_sz, uint64_t file_offset,
 	return 0;
 }
 
+#if defined __x86_64__
 static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
 {
 	NDSTATUS status;
@@ -167,6 +170,56 @@ close_file:
 out:
 	uprobe_sym->rets_count = cnt;
 }
+#endif
+
+#if defined __aarch64__
+// https://developer.arm.com/documentation/ddi0596/2020-12/Base-Instructions/RET--Return-from-subroutine-
+static int is_a64_ret_ins(unsigned int code)
+{
+        return (code & 0xfffffc1f) == 0xd65f0000;
+}
+
+static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
+{
+	static const int ARM64_INS_LEN = 4;
+	int fd = 0;
+	int cnt = 0;
+	size_t offset = 0;
+	char *buffer = NULL;
+	uint32_t code = 0;
+
+	fd = open(uprobe_sym->binary_path, O_RDONLY);
+	if (fd == -1)
+		goto out;
+
+	if (lseek(fd, uprobe_sym->entry, SEEK_SET) == -1)
+		goto close_file;
+
+	buffer = malloc(uprobe_sym->size);
+	if (!buffer)
+		goto close_file;
+
+	if (read(fd, buffer, uprobe_sym->size) == -1)
+		goto free_buffer;
+
+	memset(uprobe_sym->rets, 0, sizeof(uprobe_sym->rets));
+	while (cnt < FUNC_RET_MAX &&
+	       offset <= uprobe_sym->size - ARM64_INS_LEN) {
+		code = *(*uint32_t)(buffer + offset);
+		if (is_a64_ret_ins(code)) {
+			uprobe_sym->rets[cnt++] = uprobe_sym->entry + offset;
+		}
+		offset += ARM64_INS_LEN;
+	}
+
+free_buffer:
+	free(buffer);
+close_file:
+	close(fd);
+out:
+	uprobe_sym->rets_count = cnt;
+}
+#endif
 
 static struct bcc_symbol_option default_option = {
 	.use_debug_file = 1,
