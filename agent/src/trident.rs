@@ -1464,6 +1464,7 @@ impl Components {
             l4_log_receiver,             // input
             l4_flow_aggr_sender.clone(), // output
             config_handler.collector(),
+            synchronizer.ntp_diff(),
         );
 
         let (mut second_collector, mut minute_collector) = (None, None);

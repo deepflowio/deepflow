@@ -16,7 +16,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     Arc,
 };
 use std::thread;
@@ -33,6 +33,7 @@ use super::round_to_minute;
 use crate::collector::acc_flow::U16Set;
 use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
 use crate::config::handler::CollectorAccess;
+use crate::rpc::get_timestamp;
 use crate::sender::SendItem;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use public::queue::{DebugSender, Error, Receiver};
@@ -58,6 +59,7 @@ pub struct FlowAggrThread {
     thread_handle: Option<JoinHandle<()>>,
 
     running: Arc<AtomicBool>,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl FlowAggrThread {
@@ -66,6 +68,7 @@ impl FlowAggrThread {
         input: Receiver<Arc<TaggedFlow>>,
         output: DebugSender<SendItem>,
         config: CollectorAccess,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         let running = Arc::new(AtomicBool::new(false));
         Self {
@@ -75,6 +78,7 @@ impl FlowAggrThread {
             thread_handle: None,
             config,
             running,
+            ntp_diff,
         }
     }
 
@@ -89,6 +93,7 @@ impl FlowAggrThread {
             self.output.clone(),
             self.running.clone(),
             self.config.clone(),
+            self.ntp_diff.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || flow_aggr.run()));
         info!("l4 flow aggr id: {} started", self.id);
@@ -117,6 +122,7 @@ pub struct FlowAggr {
     running: Arc<AtomicBool>,
 
     counter: FlowAggrCounter,
+    ntp_diff: Arc<AtomicI64>,
 }
 
 impl FlowAggr {
@@ -125,6 +131,7 @@ impl FlowAggr {
         output: DebugSender<SendItem>,
         running: Arc<AtomicBool>,
         config: CollectorAccess,
+        ntp_diff: Arc<AtomicI64>,
     ) -> Self {
         let mut stashs = VecDeque::new();
         for _ in 0..MINUTE_SLOTS {
@@ -134,18 +141,16 @@ impl FlowAggr {
             input,
             output: ThrottlingQueue::new(output, config.clone()),
             stashs,
-            slot_start_time: round_to_minute(
-                SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                    - Duration::from_secs(SECONDS_IN_MINUTE),
-            ),
+            slot_start_time: Duration::ZERO,
             last_flush_time: Duration::ZERO,
             config,
             running,
             counter: FlowAggrCounter::default(),
+            ntp_diff,
         }
     }
 
-    fn merge(&mut self, f: Arc<TaggedFlow>) {
+    fn minute_merge(&mut self, f: Arc<TaggedFlow>) {
         let flow_time = f.flow.flow_stat_time;
         if flow_time < self.slot_start_time {
             debug!("flow drop before slot start time. flow stat time: {:?}, slot start time is {:?}, delay is {:?}", flow_time, self.slot_start_time, self.slot_start_time - flow_time);
@@ -224,7 +229,7 @@ impl FlowAggr {
             self.send_flow(v);
         }
         self.stashs.push_back(slot_map);
-        self.last_flush_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        self.last_flush_time = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         self.slot_start_time += Duration::from_secs(SECONDS_IN_MINUTE);
     }
 
@@ -252,11 +257,11 @@ impl FlowAggr {
                         || self.config.load().l4_log_store_tap_types
                             [u16::from(tagged_flow.flow.flow_key.tap_type) as usize]
                     {
-                        self.merge(tagged_flow);
+                        self.minute_merge(tagged_flow);
                     }
                 }
                 Err(Error::Timeout) => {
-                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                    let now = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
                     if now > self.last_flush_time + FLUSH_TIMEOUT {
                         self.flush_front_slot_and_rotate();
                     }
@@ -385,5 +390,6 @@ impl ThrottlingQueue {
             new
         );
         self.throttle = new * Self::THROTTLE_BUCKET;
+        self.stashs.truncate(self.throttle as usize);
     }
 }

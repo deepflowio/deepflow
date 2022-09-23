@@ -68,8 +68,6 @@ use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
 const MINUTE: Duration = Duration::from_secs(60);
-const SECOND: Duration = Duration::from_secs(1);
-const INFLUX_DB_PORT: u16 = 8086;
 
 type Access<C> = Map<Arc<ArcSwap<ModuleConfig>>, ModuleConfig, fn(&ModuleConfig) -> &C>;
 
