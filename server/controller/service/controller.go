@@ -351,24 +351,27 @@ func UpdateController(
 		// TODO: 触发给采集器下发信息的推送
 	}
 
-	// 修改状态
-	if _, ok := controllerUpdate["STATE"]; ok {
-		dbUpdateMap["state"] = controllerUpdate["STATE"]
-		// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配控制器
-		state := int(controllerUpdate["STATE"].(float64))
-		if state == common.HOST_STATE_MAINTENANCE || state == common.HOST_STATE_EXCEPTION {
-			m.TriggerReallocController(controller.IP)
-		}
-	}
-
 	// 修改nat_ip
 	if _, ok := controllerUpdate["NAT_IP"]; ok {
 		// TODO: 触发给采集器下发信息的推送
 		dbUpdateMap["nat_ip"] = controllerUpdate["NAT_IP"]
 	}
 
+	// 修改状态
+	var state int
+	if _, ok := controllerUpdate["STATE"]; ok {
+		dbUpdateMap["state"] = controllerUpdate["STATE"]
+		state = int(controllerUpdate["STATE"].(float64))
+	}
+
 	// 更新controller DB
 	mysql.Db.Model(&controller).Updates(dbUpdateMap)
+
+	// if state equal to maintaince/exception, trigger realloc controller
+	// 如果是将状态修改为运维/异常，则触发对应的采集器重新分配控制器
+	if state == common.HOST_STATE_MAINTENANCE || state == common.HOST_STATE_EXCEPTION {
+		m.TriggerReallocController(controller.IP)
+	}
 
 	response, _ := GetControllers(map[string]string{"lcuuid": lcuuid})
 	return response[0], nil
