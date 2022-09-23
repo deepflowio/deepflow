@@ -119,8 +119,9 @@ impl HttpInfo {
         return self.host.is_empty() && self.method.is_empty() && self.path.is_empty();
     }
 
-    pub fn is_end(&self) -> bool {
-        return self.is_req_end && self.is_resp_end;
+    // return (is_req_end, is_resp_end)
+    pub fn is_req_resp_end(&self) -> (bool, bool) {
+        return (self.is_req_end, self.is_resp_end);
     }
 }
 
