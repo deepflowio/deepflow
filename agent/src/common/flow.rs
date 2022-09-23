@@ -26,7 +26,7 @@ use log::{error, warn};
 use serde::{Serialize, Serializer};
 
 #[cfg(target_os = "linux")]
-use super::super::ebpf::{MSG_REQUEST, MSG_RESPONSE};
+use super::super::ebpf::{MSG_REQUEST, MSG_REQUEST_END, MSG_RESPONSE, MSG_RESPONSE_END};
 use super::{
     decapsulate::TunnelType,
     enums::{EthernetType, IpProtocol, TapType, TcpFlags},
@@ -720,7 +720,7 @@ impl From<FlowMetricsPeer> for flow_log::FlowMetricsPeer {
     }
 }
 
-#[derive(Serialize, Clone, Debug, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum PacketDirection {
     ClientToServer = FlowMetricsPeer::SRC,
@@ -746,8 +746,8 @@ impl Default for PacketDirection {
 impl From<u8> for PacketDirection {
     fn from(msg_type: u8) -> Self {
         match msg_type {
-            MSG_REQUEST => Self::ClientToServer,
-            MSG_RESPONSE => Self::ServerToClient,
+            MSG_REQUEST | MSG_REQUEST_END => Self::ClientToServer,
+            MSG_RESPONSE | MSG_RESPONSE_END => Self::ServerToClient,
             _ => panic!("ebpf direction({}) unknown.", msg_type),
         }
     }
