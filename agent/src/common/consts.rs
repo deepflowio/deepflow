@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+#[cfg(target_os = "linux")]
+pub const PROCESS_NAME: &str = "deepflow-agent";
+#[cfg(target_os = "windows")]
+pub const PROCESS_NAME: &str = "deepflow-agent.exe";
+
 pub const DEFAULT_INGESTER_PORT: u16 = 30033;
 pub const DEFAULT_CONTROLLER_PORT: u16 = 30035;
 pub const DEFAULT_CONTROLLER_TLS_PORT: u16 = 30135;

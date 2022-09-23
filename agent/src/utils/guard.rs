@@ -29,14 +29,13 @@ use chrono::prelude::*;
 use log::{debug, error, info, warn};
 
 use super::process::{
-    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_memory_rss, get_process_num,
-    get_thread_num,
+    get_current_sys_free_memory_percentage, get_file_and_size_sum, get_memory_rss,
+    get_process_num_by_name, get_thread_num, FileAndSizeSum,
 };
-use crate::common::NORMAL_EXIT_WITH_RESTART;
+use crate::common::{NORMAL_EXIT_WITH_RESTART, PROCESS_NAME};
 use crate::config::handler::EnvironmentAccess;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::Exception;
-use crate::utils::process::FileAndSizeSum;
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -175,7 +174,7 @@ impl Guard {
                     }
                 }
 
-                match get_process_num() {
+                match get_process_num_by_name(PROCESS_NAME) {
                     Ok(process_num) => {
                         let process_limit = limit.load().process_threshold;
                         if process_num > process_limit {

@@ -54,18 +54,6 @@ pub fn get_memory_rss() -> Result<u64> {
     ))
 }
 
-// 仅计算当前进程及其子进程，没有计算子进程的子进程等
-// /proc/<pid>/status目录中ppid为当前进程的pid
-// =================
-// Only the current process and its child processes are counted, the child processes of the child process are not counted, etc.
-// The ppid in the /proc/<pid>/status directory is the pid of the current process
-pub fn get_process_num() -> Result<u32> {
-    let pid = process::id();
-    // plus current process
-    // 加上当前进程
-    get_num_from_status_file("PPid:", pid.to_string().as_str()).map(|num| num + 1)
-}
-
 // 仅计算当前pid下的线程数, linux下应该都是1
 pub fn get_thread_num() -> Result<u32> {
     let pid = process::id();

@@ -27,7 +27,7 @@ use bytesize::ByteSize;
 use log::{error, warn};
 use sysinfo::{DiskExt, System, SystemExt};
 
-use crate::common::TRIDENT_PROCESS_LIMIT;
+use crate::common::{PROCESS_NAME, TRIDENT_PROCESS_LIMIT};
 use crate::error::{Error, Result};
 use crate::exception::ExceptionHandler;
 use crate::proto::{common::TridentType, trident::Exception};
@@ -214,17 +214,7 @@ pub fn controller_ip_check(ips: &[String]) {
 }
 
 pub fn trident_process_check() {
-    let process_num = if cfg!(target_os = "windows") {
-        get_process_num_by_name("deepflow-agent.exe")
-    } else {
-        let base_name = Path::new(&env::args().next().unwrap())
-            .file_name()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned();
-        get_process_num_by_name(&base_name)
-    };
+    let process_num = get_process_num_by_name(PROCESS_NAME);
 
     match process_num {
         Ok(num) => {
