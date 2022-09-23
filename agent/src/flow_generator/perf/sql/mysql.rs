@@ -298,7 +298,7 @@ mod test {
 
     use super::*;
 
-    use crate::{common::enums::PacketDirection, utils::test::Capture};
+    use crate::{common::flow::PacketDirection, utils::test::Capture};
 
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";
 

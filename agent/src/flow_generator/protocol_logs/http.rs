@@ -27,8 +27,8 @@ use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseSta
 use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
 
 use crate::common::ebpf::EbpfType;
-use crate::common::enums::{IpProtocol, PacketDirection};
-use crate::common::flow::L7Protocol;
+use crate::common::enums::IpProtocol;
+use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
@@ -119,8 +119,9 @@ impl HttpInfo {
         return self.host.is_empty() && self.method.is_empty() && self.path.is_empty();
     }
 
-    pub fn is_end(&self) -> bool {
-        return self.is_req_end && self.is_resp_end;
+    // return (is_req_end, is_resp_end)
+    pub fn is_req_resp_end(&self) -> (bool, bool) {
+        return (self.is_req_end, self.is_resp_end);
     }
 }
 

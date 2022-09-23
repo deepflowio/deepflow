@@ -164,6 +164,10 @@ impl MacAddr {
         self.0
     }
 
+    pub fn to_lower_32b(&self) -> u32 {
+        u32::from_be_bytes(self.0[2..6].try_into().unwrap()) as u32
+    }
+
     #[cfg(target_os = "linux")]
     pub fn is_multicast(octets: &[u8]) -> bool {
         assert!(octets.len() > MAC_ADDR_LEN);

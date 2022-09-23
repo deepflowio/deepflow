@@ -201,7 +201,7 @@ func (m *Monitor) dropMinPartitions(connect *sql.DB) error {
 	}
 
 	for _, p := range partitions {
-		sql := fmt.Sprintf("ALTER TABLE %s.%s DROP PARTITION '%s'", p.database, p.table, p.partition)
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP PARTITION '%s'", p.database, p.table, p.partition)
 		log.Warningf("drop partition: %s, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", p.partition, p.database, p.table, p.minTime, p.maxTime, p.rows, p.bytesOnDisk)
 		_, err := connect.Exec(sql)
 		if err != nil {
@@ -218,7 +218,7 @@ func (m *Monitor) moveMinPartitions(connect *sql.DB) error {
 	}
 
 	for _, p := range partitions {
-		sql := fmt.Sprintf("ALTER TABLE %s.%s MOVE PARTITION '%s' TO VOLUME '%s'", p.database, p.table, p.partition, config.DefaultCKDBS3Volume)
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` MOVE PARTITION '%s' TO VOLUME '%s'", p.database, p.table, p.partition, config.DefaultCKDBS3Volume)
 		log.Warningf("move partition: %s, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", p.partition, p.database, p.table, p.minTime, p.maxTime, p.rows, p.bytesOnDisk)
 		_, err := connect.Exec(sql)
 		if err != nil {

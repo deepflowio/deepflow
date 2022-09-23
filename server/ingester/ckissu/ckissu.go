@@ -750,7 +750,7 @@ func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
 
 func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 	// ALTER TABLE flow_log.l4_flow_log  RENAME COLUMN retan_tx TO retran_tx
-	sql := fmt.Sprintf("ALTER TABLE %s.%s RENAME COLUMN %s to %s",
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` RENAME COLUMN %s to %s",
 		cr.Db, cr.Table, cr.OldColumnName, cr.NewColumnName)
 	log.Info("rename column: ", sql)
 	_, err := connect.Exec(sql)
@@ -770,7 +770,7 @@ func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
 
 func (i *Issu) modColumn(connect *sql.DB, cm *ColumnMod) error {
 	if cm.DropIndex {
-		sql := fmt.Sprintf("ALTER TABLE %s.%s DROP INDEX %s_idx",
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
 			cm.Db, cm.Table, cm.ColumnName)
 		log.Info("drop index: ", sql)
 		_, err := connect.Exec(sql)
@@ -784,7 +784,7 @@ func (i *Issu) modColumn(connect *sql.DB, cm *ColumnMod) error {
 		}
 	}
 	// ALTER TABLE flow_log.l7_flow_log  MODIFY COLUMN span_kind Nullable(UInt8);
-	sql := fmt.Sprintf("ALTER TABLE %s.%s MODIFY COLUMN %s %s",
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` MODIFY COLUMN %s %s",
 		cm.Db, cm.Table, cm.ColumnName, cm.NewColumnType)
 	log.Info("modify column: ", sql)
 	_, err := connect.Exec(sql)

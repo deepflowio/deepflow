@@ -27,8 +27,8 @@ use lru::LruCache;
 use super::{Error, Result};
 
 use crate::common::ebpf::{get_all_protocols_by_ebpf_type, EbpfType};
-use crate::common::enums::{IpProtocol, PacketDirection};
-use crate::common::flow::L7Protocol;
+use crate::common::enums::IpProtocol;
+use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::debug::QueueDebugger;
@@ -143,6 +143,7 @@ impl SessionAggr {
     }
 
     // slot_range 最多往前多少个slot找. 返回data和对应的slot_index
+    // slot_range:How many slots to look for at most, Return data and corresponding slot_index
     fn remove(
         &mut self,
         slot_idx: usize,
@@ -222,6 +223,7 @@ impl SessionAggr {
         let (value, _) = self.remove(slot_index, key, 0);
         if value.is_none() {
             // 防止缓存过多的log
+            // Prevent too many logs from being cached
             if self.log_exceed() {
                 self.send(log);
             } else {
@@ -232,14 +234,9 @@ impl SessionAggr {
         }
         let item = value.unwrap();
         // 若乱序，已存在响应，则可以匹配为会话，则聚合响应发送
+        // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
         if item.is_response() {
-            let rrt = if item.base_info.start_time > log.base_info.start_time {
-                item.base_info.start_time - log.base_info.start_time
-            } else {
-                Duration::ZERO
-            };
             log.session_merge(item);
-            log.base_info.head.rrt = rrt.as_micros() as u64;
             self.cache_count -= 1;
             self.send(log);
         } else {
@@ -250,68 +247,18 @@ impl SessionAggr {
     }
 
     // 处理聚合日志, 目前只有 http2 go uprobe 需要聚合
+    // Process aggregated logs, currently only http2 go uprobe needs to aggregate
     fn on_merge_request_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
         let (value, _) = self.remove(slot_index, key, 1);
         if value.is_none() {
+            let (req_end, resp_end) = log.is_req_resp_end();
+            // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
+            // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
+            if req_end || resp_end {
+                return;
+            }
             // 防止缓存过多的log
-            if self.log_exceed() {
-                self.send(log);
-            } else {
-                self.insert(slot_index, key, log);
-                self.cache_count += 1;
-            }
-            return;
-        }
-        let mut item = value.unwrap();
-        item.protocol_merge(log.special_info);
-
-        if item.is_end() {
-            self.cache_count -= 1;
-            self.send(item);
-        } else {
-            if !log.base_info.start_time.is_zero()
-                && log.base_info.start_time < item.base_info.start_time
-            {
-                item.base_info.start_time = log.base_info.start_time;
-            }
-            self.insert(slot_index, key, item);
-        }
-    }
-
-    fn on_non_merge_response_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
-        let (item, _) = self.remove(slot_index, key, 1);
-        if item.is_none() {
-            // ebpf的数据存在乱序，回应比请求先到的情况
-            if self.log_exceed() {
-                self.send(log);
-            } else {
-                self.insert(slot_index, key, log);
-                self.cache_count += 1;
-            }
-            return;
-        }
-        let mut item = item.unwrap();
-
-        let rrt = if log.base_info.start_time > item.base_info.start_time {
-            log.base_info.start_time - item.base_info.start_time
-        } else {
-            Duration::ZERO
-        };
-        // 若乱序导致map中的也是响应, 则发送响应,继续缓存新的响应
-        if item.is_response() {
-            self.insert(slot_index, key, log);
-            self.send(item);
-        } else {
-            item.session_merge(log);
-            item.base_info.head.rrt = rrt.as_micros() as u64;
-            self.cache_count -= 1;
-            self.send(item);
-        }
-    }
-
-    fn on_merge_response_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
-        let (value, _) = self.remove(slot_index, key, 1);
-        if value.is_none() {
+            // Prevent too many logs from being cached
             if self.log_exceed() {
                 self.send(log);
             } else {
@@ -323,7 +270,61 @@ impl SessionAggr {
         let mut item = value.unwrap();
         item.session_merge(log);
 
-        if item.is_end() {
+        if item.is_session_end() {
+            self.cache_count -= 1;
+            self.send(item);
+        } else {
+            self.insert(slot_index, key, item);
+        }
+    }
+
+    fn on_non_merge_response_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
+        let (item, _) = self.remove(slot_index, key, 1);
+        if item.is_none() {
+            if self.log_exceed() {
+                self.send(log);
+            } else {
+                self.insert(slot_index, key, log);
+                self.cache_count += 1;
+            }
+            return;
+        }
+        let mut item = item.unwrap();
+
+        // 若乱序导致map中的也是响应, 则发送响应,继续缓存新的响应
+        // If the out-of-order causes the response in the map, the response is sent and the new response continues to be cached
+        if item.is_response() {
+            self.insert(slot_index, key, log);
+            self.send(item);
+        } else {
+            item.session_merge(log);
+            self.cache_count -= 1;
+            self.send(item);
+        }
+    }
+
+    fn on_merge_response_log(&mut self, log: AppProtoLogsData, slot_index: usize, key: u64) {
+        let (value, _) = self.remove(slot_index, key, 1);
+        if value.is_none() {
+            let (req_end, resp_end) = log.is_req_resp_end();
+            // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
+            // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
+            if req_end || resp_end {
+                return;
+            }
+
+            if self.log_exceed() {
+                self.send(log);
+            } else {
+                self.insert(slot_index, key, log);
+                self.cache_count += 1;
+            }
+            return;
+        }
+        let mut item = value.unwrap();
+        item.session_merge(log);
+
+        if item.is_session_end() {
             self.cache_count -= 1;
             self.send(item);
         } else {
@@ -369,24 +370,6 @@ struct FlowItem {
     is_skip: bool,
 
     parser: Option<Box<dyn L7LogParse>>,
-}
-
-impl From<IpProtocol> for u128 {
-    fn from(protocol: IpProtocol) -> Self {
-        let bitmap = if protocol == IpProtocol::Tcp {
-            1 << u8::from(L7Protocol::Http1)
-                | 1 << u8::from(L7Protocol::Http2)
-                | 1 << u8::from(L7Protocol::Dns)
-                | 1 << u8::from(L7Protocol::Mysql)
-                | 1 << u8::from(L7Protocol::Redis)
-                | 1 << u8::from(L7Protocol::Dubbo)
-                | 1 << u8::from(L7Protocol::Kafka)
-                | 1 << u8::from(L7Protocol::Mqtt)
-        } else {
-            1 << u8::from(L7Protocol::Dns)
-        };
-        return bitmap;
-    }
 }
 
 impl FlowItem {
