@@ -188,7 +188,7 @@ func (w *ExtMetricsWriter) GetCounter() interface{} {
 }
 
 func (w *ExtMetricsWriter) setTTL(database, tableName string) error {
-	sql := fmt.Sprintf("ALTER TABLE %s.%s MODIFY TTL time +  toIntervalDay(%d)",
+	sql := fmt.Sprintf("ALTER TABLE %s.`%s` MODIFY TTL time +  toIntervalDay(%d)",
 		database, tableName+ckdb.LOCAL_SUBFFIX, w.ttl)
 	log.Info(sql)
 	_, err := w.ckdbConn.Exec(sql)
