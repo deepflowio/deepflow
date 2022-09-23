@@ -50,9 +50,9 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 
 	c.sp = (void *)ctx->rsp;
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		c.fd = get_fd_from_tls_conn_struct((void *)ctx->rax, info);
-		c.buffer = (char *)ctx->rbx;
+	if (is_register_based_call(info)) {
+		c.fd = get_fd_from_tls_conn_struct((void *)PT_GO_REGS_PARM1(ctx), info);
+		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
 		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
@@ -95,8 +95,8 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 	if (!c)
 		return 0;
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		bytes_count = ctx->rax;
+	if (is_register_based_call(info)) {
+		bytes_count = PT_GO_REGS_PARM1(ctx);
 	} else {
 		bpf_probe_read(&bytes_count, sizeof(bytes_count),
 			       (void *)(c->sp + 40));
@@ -147,9 +147,9 @@ int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 
 	c.sp = (void *)ctx->rsp;
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		c.fd = get_fd_from_tls_conn_struct((void *)ctx->rax, info);
-		c.buffer = (char *)ctx->rbx;
+	if (is_register_based_call(info)) {
+		c.fd = get_fd_from_tls_conn_struct((void *)PT_GO_REGS_PARM1(ctx), info);
+		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
 		bpf_probe_read(&conn, sizeof(conn), (void *)(c.sp + 8));
@@ -202,8 +202,8 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 	bpf_map_update_elem(&http2_tcp_seq_map, &tcp_seq_key, &tcp_seq,
 			    BPF_NOEXIST);
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		bytes_count = ctx->rax;
+	if (is_register_based_call(info)) {
+		bytes_count = PT_GO_REGS_PARM1(ctx);
 	} else {
 		bpf_probe_read(&bytes_count, sizeof(bytes_count),
 			       (void *)(c->sp + 40));

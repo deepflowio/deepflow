@@ -272,6 +272,22 @@ get_fd_from_tcp_or_tls_conn_interface(void *conn, struct ebpf_proc_info *info)
 	return -1;
 }
 
+// Go implements a new way of passing function arguments and results using 
+// registers instead of the stack. We need the go version and the computer
+// architecture to determine the parameter locations
+static __inline bool is_register_based_call(struct ebpf_proc_info *info)
+{
+#if defined(__x86_64__)
+	// https://go.dev/doc/go1.17
+	return info->version >= GO_VERSION(1, 17, 0);
+#elif defined(__aarch64__)
+	// https://groups.google.com/g/golang-checkins/c/SO9OmZYkOXU
+	return info->version >= GO_VERSION(1, 18, 0);
+#else
+_Pragma("error \"Must specify a BPF target arch\"");
+#endif
+}
+
 SEC("uprobe/runtime.casgstatus")
 int runtime_casgstatus(struct pt_regs *ctx)
 {
@@ -290,9 +306,9 @@ int runtime_casgstatus(struct pt_regs *ctx)
 	__s32 newval;
 	void *g_ptr;
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		g_ptr = (void *)(ctx->rax);
-		newval = (__s32)(ctx->rcx);
+	if (is_register_based_call(info)) {
+		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
+		newval = (__s32)PT_GO_REGS_PARM3(ctx);
 	} else {
 		bpf_probe_read(&g_ptr, sizeof(g_ptr), (void *)(ctx->rsp + 8));
 		bpf_probe_read(&newval, sizeof(newval),
