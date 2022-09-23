@@ -2,8 +2,8 @@ static __inline void *get_the_first_parameter(struct pt_regs *ctx,
 					      struct ebpf_proc_info *info)
 {
 	void *ptr;
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		ptr = (void *)ctx->rax;
+	if (is_register_based_call(info)) {
+		ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
 		bpf_probe_read(&ptr, sizeof(ptr), (void *)(ctx->rsp + 8));
 	}
@@ -483,11 +483,11 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 
 	http2_fill_common_socket(&data, send_buffer);
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		data.name.ptr = (void *)ctx->rbx;
-		data.name.len = ctx->rcx;
-		data.value.ptr = (void *)ctx->rdi;
-		data.value.len = ctx->rsi;
+	if (is_register_based_call(info)) {
+		data.name.ptr = (void *)PT_GO_REGS_PARM2(ctx);
+		data.name.len = PT_GO_REGS_PARM3(ctx);
+		data.value.ptr = (void *)PT_GO_REGS_PARM4(ctx);
+		data.value.len = PT_GO_REGS_PARM5(ctx);
 	} else {
 		bpf_probe_read(&data.name.ptr, sizeof(data.name.ptr),
 			       (void *)(ctx->rsp + 16));
@@ -516,8 +516,8 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 
 	struct http2_header_data data = {};
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		data.stream = (__u32)ctx->rbx;
+	if (is_register_based_call(info)) {
+		data.stream = (__u32)PT_GO_REGS_PARM2(ctx);
 	} else {
 		bpf_probe_read(&(data.stream), sizeof(data.stream),
 			       (void *)(ctx->rsp + 16));
@@ -556,8 +556,8 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 	if (!info) {
 		return 0;
 	}
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		frame = (void *)ctx->rbx;
+	if (is_register_based_call(info)) {
+		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
 	}
@@ -608,8 +608,8 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 
 	http2_fill_common_socket(&data, send_buffer);
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		ptr = (void *)ctx->rcx;
+	if (is_register_based_call(info)) {
+		ptr = (void *)PT_GO_REGS_PARM3(ctx);
 	} else {
 		bpf_probe_read(&ptr, sizeof(ptr), (void *)(ctx->rsp + 24));
 	}
@@ -678,8 +678,8 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 		return 0;
 	}
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		frame = (void *)ctx->rcx;
+	if (is_register_based_call(info)) {
+		frame = (void *)PT_GO_REGS_PARM3(ctx);
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 24));
 	}
@@ -711,10 +711,10 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 	}
 
 	struct go_slice fields = { 0 };
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		fields.ptr = (void *)ctx->rdi;
-		fields.len = ctx->rsi;
-		fields.cap = ctx->r8;
+	if (is_register_based_call(info)) {
+		fields.ptr = (void *)PT_GO_REGS_PARM4(ctx);
+		fields.len = PT_GO_REGS_PARM5(ctx);
+		fields.cap = PT_GO_REGS_PARM6(ctx);
 	} else {
 		// 8 + 8 + 4 + 4
 		bpf_probe_read(&fields, sizeof(fields),
@@ -727,8 +727,8 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 	headers.fd = get_fd_from_grpc_loopyWriter(ctx, info);
 	headers.ctx = ctx;
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		headers.stream = (__u32)ctx->rbx;
+	if (is_register_based_call(info)) {
+		headers.stream = (__u32)PT_GO_REGS_PARM2(ctx);
 	} else {
 		bpf_probe_read(&headers.stream, sizeof(headers.stream),
 			       (void *)(ctx->rsp + 16));
@@ -754,8 +754,8 @@ int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 		return 0;
 	}
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		frame = (void *)ctx->rbx;
+	if (is_register_based_call(info)) {
+		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
 	}
@@ -790,8 +790,8 @@ int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 		return 0;
 	}
 
-	if (info->version >= GO_VERSION(1, 17, 0)) {
-		frame = (void *)ctx->rbx;
+	if (is_register_based_call(info)) {
+		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
 	}
