@@ -30,6 +30,20 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
             ],
             &["../message"],
         )?;
+    tonic_build::configure()
+        .build_server(false)
+        .out_dir("src/proto/integration")
+        .include_file("mod.rs")
+        .compile(
+            &["../message/opentelemetry/opentelemetry/proto/trace/v1/trace.proto"],
+            &["../message/opentelemetry"],
+        )?;
+
+    // FIXME: Wait for the rustfmt ignore attribute to be removed in stable rust support
+    Command::new("cargo")
+        .args(["fmt", "--", "src/proto/*.rs", "src/proto/integration/*.rs"])
+        .spawn()?;
+
     Ok(())
 }
 

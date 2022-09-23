@@ -15,7 +15,7 @@
  */
 
 use std::io::Read;
-use std::net::{IpAddr, Ipv6Addr, TcpStream};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -24,12 +24,14 @@ use std::time::Duration;
 use flate2::read::GzDecoder;
 use http::header::CONTENT_ENCODING;
 use http::HeaderMap;
-use hyper::service::{make_service_fn, service_fn};
 use hyper::{
     body::{aggregate, Buf},
+    server::conn::AddrStream,
+    service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, log_enabled, warn, Level};
+use prost::Message;
 use tokio::{
     runtime::{Builder, Runtime},
     select,
@@ -39,6 +41,11 @@ use tokio::{
 };
 
 use crate::exception::ExceptionHandler;
+use crate::proto::integration::opentelemetry::proto::{
+    common::v1::any_value::Value,
+    common::v1::{AnyValue, KeyValue},
+    trace::v1::TracesData,
+};
 use crate::proto::trident::Exception;
 use crate::sender::SendItem;
 use crate::utils::queue::{DebugSender, Error};
@@ -126,8 +133,50 @@ async fn aggregate_with_catch_exception(
     })
 }
 
+fn decode_otel_trace_data(peer_addr: SocketAddr, data: Vec<u8>) -> Result<Vec<u8>, GenericError> {
+    let mut d = TracesData::decode(data.as_slice())?;
+    // 因为collector传过来traceData的全部span都有"app.host.ip"的属性，所以只检查第一个span有没有“app.host.ip”即可，
+    // sdk传过来的traceData因没有该属性则要补上(key: “app.host.ip”, value: 对端IP)属性值
+    // =======================================================================
+    // Because all the spans of the traceData passed by the collector have the attribute "app.host.ip",
+    // only check whether the first span has "app.host.ip". The traceData passed by the sdk does not have this attribute.
+    //  Fill in the (key: "app.host.ip", value: peer IP) attribute value
+    let mut skip_verify_ip = false;
+    let host_ip = KeyValue {
+        key: "app.host.ip".into(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue(peer_addr.ip().to_string())),
+        }),
+    };
+    for resource_span in d.resource_spans.iter_mut() {
+        for scope_span in resource_span.scope_spans.iter_mut() {
+            for span in scope_span.spans.iter_mut() {
+                if skip_verify_ip {
+                    span.attributes.push(host_ip.clone());
+                } else if span
+                    .attributes
+                    .iter()
+                    .find(|attr| attr.key.as_str() == "app.host.ip")
+                    .is_some()
+                {
+                    debug!("send otel collector traces_data to sender: {:?}", d);
+                    return Ok(data);
+                } else {
+                    skip_verify_ip = true;
+                    span.attributes.push(host_ip.clone());
+                }
+            }
+        }
+    }
+
+    let sdk_data = d.encode_to_vec();
+    debug!("send otel sdk traces_data to sender: {:?}", d);
+    return Ok(sdk_data);
+}
+
 /// 接收metric server发送的请求，根据路由处理分发
 async fn handler(
+    peer_addr: SocketAddr,
     req: Request<Body>,
     otel_sender: DebugSender<SendItem>,
     prometheus_sender: DebugSender<SendItem>,
@@ -151,10 +200,13 @@ async fn handler(
                     return Ok(e);
                 }
             };
-
             let tracing_data = decode_metric(whole_body, &part.headers)?;
+            let data = decode_otel_trace_data(peer_addr, tracing_data).map_err(|e| {
+                debug!("decode otel trace data error: {}", e);
+                e
+            })?;
             if let Err(Error::Terminated(..)) =
-                otel_sender.send(SendItem::ExternalOtel(OpenTelemetry(tracing_data)))
+                otel_sender.send(SendItem::ExternalOtel(OpenTelemetry(data)))
             {
                 warn!("sender queue has terminated");
             }
@@ -189,6 +241,11 @@ async fn handler(
                 }
             };
             let metric = decode_metric(whole_body, &part.headers)?;
+            if log_enabled!(Level::Debug) {
+                if let Ok(r) = String::from_utf8(metric.clone()) {
+                    debug!("telegraf metric: {}", r)
+                }
+            }
             if let Err(Error::Terminated(..)) =
                 telegraf_sender.send(SendItem::ExternalTelegraf(TelegrafMetric(metric)))
             {
@@ -276,7 +333,6 @@ impl MetricServer {
             .unwrap()
             .replace(self.rt.spawn(async move {
                 info!("integration collector starting");
-
                 while running.load(Ordering::Relaxed) {
                     let mut max_tries = 0;
                     let (server_builder, addr) = loop {
@@ -315,14 +371,16 @@ impl MetricServer {
                     let prometheus_sender = prometheus_sender.clone();
                     let telegraf_sender = telegraf_sender.clone();
                     let exception_handler_inner = exception_handler.clone();
-                    let service = make_service_fn(move |_| {
+                    let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
                         let prometheus_sender = prometheus_sender.clone();
                         let telegraf_sender = telegraf_sender.clone();
                         let exception_handler = exception_handler_inner.clone();
-                        async {
+                        let peer_addr = conn.remote_addr();
+                        async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
                                 handler(
+                                    peer_addr,
                                     req,
                                     otel_sender.clone(),
                                     prometheus_sender.clone(),
