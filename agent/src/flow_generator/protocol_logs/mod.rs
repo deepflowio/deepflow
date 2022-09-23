@@ -422,11 +422,27 @@ impl AppProtoLogsBaseInfo {
         }
         self.syscall_trace_id_thread_1 = log.syscall_trace_id_thread_1;
         self.syscall_cap_seq_1 = log.syscall_cap_seq_1;
+
+        self.start_time = log.start_time.min(self.start_time);
         self.end_time = log.end_time.max(self.start_time);
-        self.resp_tcp_seq = log.resp_tcp_seq;
+        match log.head.msg_type {
+            LogMessageType::Request if self.req_tcp_seq == 0 && log.req_tcp_seq != 0 => {
+                self.req_tcp_seq = log.req_tcp_seq;
+            }
+            LogMessageType::Response if self.resp_tcp_seq == 0 && log.resp_tcp_seq != 0 => {
+                self.resp_tcp_seq = log.resp_tcp_seq;
+            }
+            _ => {}
+        }
+
         self.syscall_trace_id_response = log.syscall_trace_id_response;
         self.head.msg_type = LogMessageType::Session;
-        self.head.rrt = (self.end_time - self.start_time).as_micros() as u64;
+
+        self.head.rrt = if self.end_time > self.start_time {
+            (self.end_time - self.start_time).as_micros() as u64
+        } else {
+            0
+        }
     }
 }
 
@@ -514,15 +530,21 @@ impl AppProtoLogsData {
         return self.base_info.head.msg_type == LogMessageType::Request;
     }
 
-    pub fn is_end(&self) -> bool {
+    // return (is_req_end, is_resp_end)
+    pub fn is_req_resp_end(&self) -> (bool, bool) {
         match &self.special_info {
             AppProtoLogsInfo::HttpV2(d) => {
-                return d.is_end();
+                return d.is_req_resp_end();
             }
             _ => {
-                return false;
+                return (false, false);
             }
         }
+    }
+
+    pub fn is_session_end(&self) -> bool {
+        let (e1, e2) = self.is_req_resp_end();
+        return e1 && e2;
     }
 
     //是否忽略不发送, 目前仅用于过滤http2 uprobe 收到多余结束标识,导致空数据.
@@ -589,7 +611,7 @@ impl AppProtoLogsData {
         self.protocol_merge(log.special_info);
     }
 
-    pub fn protocol_merge(&mut self, log_info: AppProtoLogsInfo) {
+    fn protocol_merge(&mut self, log_info: AppProtoLogsInfo) {
         self.special_info.merge(log_info);
     }
 
