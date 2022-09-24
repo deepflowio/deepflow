@@ -29,6 +29,7 @@ import (
 type KubernetesGatherTask struct {
 	kCtx             context.Context
 	kCancel          context.CancelFunc
+	interval         uint32
 	kubernetesGather *kubernetes_gather.KubernetesGather
 	resource         kubernetes_gather_model.KubernetesGatherResource
 	basicInfo        kubernetes_gather_model.KubernetesGatherBasicInfo
@@ -36,7 +37,7 @@ type KubernetesGatherTask struct {
 }
 
 func NewKubernetesGatherTask(
-	domain *mysql.Domain, subDomain *mysql.SubDomain, ctx context.Context, isSubDomain bool) *KubernetesGatherTask {
+	domain *mysql.Domain, subDomain *mysql.SubDomain, ctx context.Context, isSubDomain bool, interval uint32) *KubernetesGatherTask {
 	kubernetesGather := kubernetes_gather.NewKubernetesGather(domain, subDomain, isSubDomain)
 	if kubernetesGather == nil {
 		log.Errorf("kubernetes_gather (%s) task init faild", subDomain.Name)
@@ -62,6 +63,7 @@ func NewKubernetesGatherTask(
 		},
 		kCtx:             kCtx,
 		kCancel:          kCancel,
+		interval:         interval,
 		kubernetesGather: kubernetesGather,
 		SubDomainConfig:  subDomainConfig,
 	}
@@ -78,8 +80,7 @@ func (k *KubernetesGatherTask) GetResource() kubernetes_gather_model.KubernetesG
 func (k *KubernetesGatherTask) Start() {
 	go func() {
 		k.run()
-		// TODO 配置时间间隔
-		ticker := time.NewTicker(time.Minute)
+		ticker := time.NewTicker(time.Second * time.Duration(k.interval))
 	LOOP:
 		for {
 			select {
