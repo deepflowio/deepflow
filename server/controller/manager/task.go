@@ -39,7 +39,7 @@ type Task struct {
 func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context) *Task {
 
 	tCtx, tCancel := context.WithCancel(ctx)
-	cloud := cloud.NewCloud(domain, 60, cfg.CloudCfg, tCtx)
+	cloud := cloud.NewCloud(domain, cfg.CloudCfg, tCtx)
 	if cloud == nil {
 		return nil
 	}
