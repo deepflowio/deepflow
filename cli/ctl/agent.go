@@ -143,8 +143,17 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		dataYaml, _ := yaml.JSONToYAML(dataJson)
 		fmt.Printf(string(dataYaml))
 	} else {
-		cmdFormat := "%-48s%-32s%-24s%-16s%-16s%s\n"
-		fmt.Printf(cmdFormat, "NAME", "CTRL_IP", "CTRL_MAC", "STATE", "EXCEPTIONS", "AGENT_GROUP_NAME")
+		nameMaxSize := 0
+		for i := range response.Get("DATA").MustArray() {
+			vtap := response.Get("DATA").GetIndex(i)
+			l := len(vtap.Get("NAME").MustString())
+			if l > nameMaxSize {
+				nameMaxSize = l
+			}
+		}
+
+		cmdFormat := "%-*s %-10s %-16s %-18s %-8s %-10s %s\n"
+		fmt.Printf(cmdFormat, nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", "EXCEPTIONS", "GROUP")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
 			stateString := ""
@@ -159,6 +168,8 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 				stateString = common.VTAP_STATE_PENDING_STR
 			}
 
+			vtapTypeString, _ := common.VTapTypeName[vtap.Get("TYPE").MustInt()]
+
 			exceptionStrings := []string{}
 			for i := range vtap.Get("EXCEPTIONS").MustArray() {
 				exceptionInt := vtap.Get("EXCEPTIONS").GetIndex(i).MustInt()
@@ -166,7 +177,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 			}
 
 			fmt.Printf(
-				cmdFormat, vtap.Get("NAME").MustString(), vtap.Get("CTRL_IP").MustString(),
+				cmdFormat, nameMaxSize, vtap.Get("NAME").MustString(), vtapTypeString, vtap.Get("CTRL_IP").MustString(),
 				vtap.Get("CTRL_MAC").MustString(), stateString, strings.Join(exceptionStrings, ","),
 				vtap.Get("VTAP_GROUP_NAME").MustString(),
 			)

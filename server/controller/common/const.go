@@ -130,15 +130,15 @@ const (
 )
 
 var VTapTypeName = map[int]string{
-	VTAP_TYPE_KVM:                  "VTAP_TYPE_KVM",
-	VTAP_TYPE_ESXI:                 "VTAP_TYPE_ESXI",
-	VTAP_TYPE_WORKLOAD_V:           "VTAP_TYPE_WORKLOAD_V",
-	VTAP_TYPE_WORKLOAD_P:           "VTAP_TYPE_WORKLOAD_P",
-	VTAP_TYPE_DEDICATED:            "VTAP_TYPE_DEDICATED",
-	VTAP_TYPE_POD_HOST:             "VTAP_TYPE_POD_HOST",
-	VTAP_TYPE_POD_VM:               "VTAP_TYPE_POD_VM",
-	VTAP_TYPE_TUNNEL_DECAPSULATION: "VTAP_TYPE_TUNNEL_DECAPSULATION",
-	VTAP_TYPE_HYPER_V:              "VTAP_TYPE_HYPER_V",
+	VTAP_TYPE_KVM:                  "KVM",
+	VTAP_TYPE_ESXI:                 "ESXI",
+	VTAP_TYPE_WORKLOAD_V:           "CHOST_VM",
+	VTAP_TYPE_WORKLOAD_P:           "CHOST_BM",
+	VTAP_TYPE_DEDICATED:            "DEDICATED",
+	VTAP_TYPE_POD_HOST:             "K8S_BM",
+	VTAP_TYPE_POD_VM:               "K8S_VM",
+	VTAP_TYPE_TUNNEL_DECAPSULATION: "TUN_DECAP",
+	VTAP_TYPE_HYPER_V:              "HYPER_V",
 }
 
 const (
