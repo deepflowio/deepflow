@@ -19,7 +19,8 @@ package config
 var CONF *CloudConfig
 
 type CloudConfig struct {
-	KubernetesGatherInterval uint32 `default:"60" yaml:"kubernetes_gather_interval"`
+	CloudGatherInterval      uint32 `default:"30" yaml:"cloud_gather_interval"`
+	KubernetesGatherInterval uint32 `default:"30" yaml:"kubernetes_gather_interval"`
 	AliyunRegionName         string `default:"cn-beijing" yaml:"aliyun_region_name"`
 	HuaweiDomainName         string `default:"myhuaweicloud.com" yaml:"huawei_domain_name"`
 	GenesisDefaultRegionName string `default:"系统默认" yaml:"genesis_default_region"`

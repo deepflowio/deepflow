@@ -47,7 +47,7 @@ type Cloud struct {
 }
 
 // TODO 添加参数
-func NewCloud(domain mysql.Domain, interval int, cfg config.CloudConfig, ctx context.Context) *Cloud {
+func NewCloud(domain mysql.Domain, cfg config.CloudConfig, ctx context.Context) *Cloud {
 	platform, err := platform.NewPlatform(domain, cfg)
 	if err != nil {
 		log.Error(err)
@@ -57,10 +57,9 @@ func NewCloud(domain mysql.Domain, interval int, cfg config.CloudConfig, ctx con
 	cCtx, cCancel := context.WithCancel(ctx)
 	return &Cloud{
 		basicInfo: model.BasicInfo{
-			Lcuuid:   domain.Lcuuid,
-			Name:     domain.Name,
-			Type:     domain.Type,
-			Interval: time.Duration(interval),
+			Lcuuid: domain.Lcuuid,
+			Name:   domain.Name,
+			Type:   domain.Type,
 		},
 		platform:                platform,
 		kubernetesGatherTaskMap: make(map[string]*KubernetesGatherTask),
@@ -147,7 +146,7 @@ func (c *Cloud) run() {
 	c.getCloudData()
 	log.Infof("cloud (%s) assemble data complete", c.basicInfo.Name)
 
-	ticker := time.NewTicker(time.Second * c.basicInfo.Interval)
+	ticker := time.NewTicker(time.Second * time.Duration(c.cfg.CloudGatherInterval))
 LOOP:
 	for {
 		select {
@@ -193,7 +192,9 @@ func (c *Cloud) runKubernetesGatherTask() {
 			return
 		}
 		domain := domains[0]
-		kubernetesGatherTask := NewKubernetesGatherTask(&domain, nil, c.cCtx, false)
+		kubernetesGatherTask := NewKubernetesGatherTask(
+			&domain, nil, c.cCtx, false, c.cfg.KubernetesGatherInterval,
+		)
 		if kubernetesGatherTask == nil {
 			return
 		}
@@ -237,7 +238,8 @@ func (c *Cloud) runKubernetesGatherTask() {
 		for _, subDomain := range addSubDomains.ToSlice() {
 			lcuuid := subDomain.(string)
 			kubernetesGatherTask := NewKubernetesGatherTask(
-				nil, lcuuidToSubDomain[lcuuid], c.cCtx, true)
+				nil, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
+			)
 			if kubernetesGatherTask == nil {
 				continue
 			}
@@ -259,7 +261,8 @@ func (c *Cloud) runKubernetesGatherTask() {
 				log.Infof("newSubDomainConfig: %s", newSubDomainConfig)
 				c.kubernetesGatherTaskMap[lcuuid].Stop()
 				kubernetesGatherTask := NewKubernetesGatherTask(
-					nil, lcuuidToSubDomain[lcuuid], c.cCtx, true)
+					nil, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
+				)
 				if kubernetesGatherTask == nil {
 					continue
 				}
