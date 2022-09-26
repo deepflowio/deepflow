@@ -32,6 +32,7 @@ func DebugRouter(e *gin.Engine, m *manager.Manager, g *genesis.Genesis) {
 	e.GET("/v1/info/:lcuuid/", getCloudResource(m))
 	e.GET("/v1/genesis/:type/", getGenesisSyncData(g, true))
 	e.GET("/v1/sync/:type/", getGenesisSyncData(g, false))
+	e.GET("/v1/agent-stats/:ip/", getAgentStats(g))
 	e.GET("/v1/kubernetes-info/:clusterID/", getGenesisKubernetesData(g))
 	e.GET("/v1/sub-tasks/:lcuuid/", getKubernetesGatherBasicInfos(m))
 	e.GET("/v1/kubernetes-gather-infos/:lcuuid/", getKubernetesGatherResources(m))
@@ -135,6 +136,13 @@ func getRecorderCacheToolMap(m *manager.Manager) gin.HandlerFunc {
 		subDomainLcuuid := c.Param("subDomainLcuuid")
 		field := c.Param("field")
 		data, err := service.GetRecorderToolMapByField(domainLcuuid, subDomainLcuuid, field, m)
+		JsonResponse(c, data, err)
+	})
+}
+
+func getAgentStats(g *genesis.Genesis) gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		data, err := service.GetAgentStats(g, c.Param("ip"))
 		JsonResponse(c, data, err)
 	})
 }
