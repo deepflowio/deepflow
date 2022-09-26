@@ -236,12 +236,17 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		fmt.Println(err)
 		return
 	}
-	splitStr := strings.Split(output, " ")
-	if len(splitStr) < 2 {
-		fmt.Printf("get expectedVersion faild, exec: %s, output: %s", command, output)
-		return
+
+	var expectedVersion string
+	splitStr := strings.Split(output, "\n")
+	if len(splitStr) < 5 {
+		splitStr = strings.Split(splitStr[0], " ")
+		if len(splitStr) == 2 {
+			expectedVersion = splitStr[0]
+		}
+	} else {
+		expectedVersion = splitStr[0]
 	}
-	expectedVersion := splitStr[0]
 	if expectedVersion == "" {
 		fmt.Printf("get expectedVersion faild, exec: %s, output: %s", command, output)
 		return
