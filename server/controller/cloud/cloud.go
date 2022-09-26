@@ -254,11 +254,11 @@ func (c *Cloud) runKubernetesGatherTask() {
 		intersectSubDomains = newSubDomains.Intersect(oldSubDomains)
 		for _, subDomain := range intersectSubDomains.ToSlice() {
 			lcuuid := subDomain.(string)
-			oldSubDomainConfig := c.kubernetesGatherTaskMap[lcuuid].SubDomainConfig
-			newSubDomainConfig := lcuuidToSubDomain[lcuuid].Config
-			if oldSubDomainConfig != newSubDomainConfig {
-				log.Infof("oldSubDomainConfig: %s", oldSubDomainConfig)
-				log.Infof("newSubDomainConfig: %s", newSubDomainConfig)
+			oldSubDomain := c.kubernetesGatherTaskMap[lcuuid]
+			newSubDomain := lcuuidToSubDomain[lcuuid]
+			if oldSubDomain.SubDomainConfig != newSubDomain.Config || oldSubDomain.kubernetesGather.Name != newSubDomain.Name {
+				log.Infof("oldSubDomainConfig: %s", oldSubDomain.SubDomainConfig)
+				log.Infof("newSubDomainConfig: %s", newSubDomain.Config)
 				c.kubernetesGatherTaskMap[lcuuid].Stop()
 				kubernetesGatherTask := NewKubernetesGatherTask(
 					nil, lcuuidToSubDomain[lcuuid], c.cCtx, true, c.cfg.KubernetesGatherInterval,
