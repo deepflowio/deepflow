@@ -132,3 +132,7 @@ func GetGenesisKubernetesData(g *genesis.Genesis, clusterID string) (map[string]
 	data, err := g.GetKubernetesResponse(clusterID)
 	return data, err
 }
+
+func GetAgentStats(g *genesis.Genesis, ip string) ([]genesis.TridentStats, error) {
+	return genesis.Synchronizer.GetAgentStats(ip), nil
+}
