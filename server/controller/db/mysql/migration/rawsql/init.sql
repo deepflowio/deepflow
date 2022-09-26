@@ -1287,52 +1287,6 @@ CREATE TABLE IF NOT EXISTS policy_acl_group (
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
 TRUNCATE TABLE policy_acl_group;
 
-CREATE TABLE IF NOT EXISTS vtap_system_configuration(
-    id                        INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    max_collect_pps           INTEGER DEFAULT NULL,
-    max_npb_bps               BIGINT DEFAULT NULL COMMENT 'unit: bps',
-    max_cpus                  INTEGER DEFAULT NULL,
-    max_memory                INTEGER DEFAULT NULL COMMENT 'unit: M',
-    sync_interval             INTEGER DEFAULT NULL,
-    stats_interval            INTEGER NOT NULL DEFAULT 60,
-    rsyslog_enabled           TINYINT(1) DEFAULT 1 COMMENT '0: disabled 1:enabled',
-    max_tx_bandwidth          BIGINT DEFAULT 0 COMMENT 'unit: bps',
-    bandwidth_probe_interval  INTEGER DEFAULT 10,
-    tap_interface_regex       TEXT,
-    max_escape_seconds        INTEGER DEFAULT 3600,
-    mtu                       INTEGER DEFAULT 1500,
-    output_vlan               INTEGER DEFAULT NULL,
-    collector_socket_type     CHAR(64) DEFAULT 'UDP',
-    compressor_socket_type    CHAR(64) DEFAULT 'UDP',
-    npb_socket_type           CHAR(64) DEFAULT 'RAW_UDP',
-    npb_vlan_mode             INTEGER DEFAULT 0,
-    collector_enabled         TINYINT(1) DEFAULT 1 COMMENT '0: disabled 1:enabled',
-    vtap_flow_1s_enabled      TINYINT(1) DEFAULT 1 COMMENT '0: disabled 1:enabled',
-    l4_log_tap_types          TEXT COMMENT 'tap type info, separate by ","',
-    npb_dedup_enabled         TINYINT(1) DEFAULT 1 COMMENT '0: disabled 1:enabled',
-    platform_enabled          TINYINT(1) DEFAULT 0 COMMENT '0: disabled 1:enabled',
-    if_mac_source             INTEGER DEFAULT 0 COMMENT '0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析',
-    vm_xml_path               TEXT,
-    nat_ip_enabled            TINYINT(1) DEFAULT 0 COMMENT '0: disabled 1:enabled',
-    capture_packet_size       INTEGER DEFAULT 65535,
-    inactive_server_port_enabled   TINYINT(1) DEFAULT 1 COMMENT '0: disabled 1:enabled',
-    vtap_lcuuid               CHAR(64) DEFAULT NULL,
-    vtap_group_lcuuid         CHAR(64) DEFAULT NULL,
-    log_threshold             INTEGER DEFAULT 300,
-    log_level                 CHAR(64) DEFAULT 'INFO',
-    log_retention             INTEGER DEFAULT 30,
-    http_log_proxy_client     CHAR(64) DEFAULT 'X-Forwarded-For',
-    http_log_trace_id         CHAR(64) DEFAULT 'X-B3-TraceId',
-    l7_log_packet_size        INTEGER DEFAULT 256,
-    l4_log_collect_nps_threshold   INTEGER DEFAULT 10000,
-    l7_log_collect_nps_threshold   INTEGER DEFAULT 10000,
-    l7_metrics_enabled        TINYINT(1) DEFAULT 1 COMMENT '0: disabled 1:enabled',
-    l7_log_store_tap_types    TEXT COMMENT 'l7 log store tap types, separate by ","',
-    decap_type                TEXT COMMENT 'separate by ","',
-    lcuuid                    CHAR(64)
-) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
-TRUNCATE TABLE vtap_system_configuration;
-
 CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     id                        INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     max_collect_pps           INTEGER DEFAULT NULL,
@@ -2006,35 +1960,6 @@ INSERT INTO vl2(state, name, net_type, isp, lcuuid, domain) values(0, 'PublicNet
 set @lcuuid = (select uuid());
 set @short_uuid = (select substr(replace(uuid(),'-',''), 1, 10));
 INSERT INTO vtap_group(lcuuid, id, name, short_uuid) values(@lcuuid, 1, "default", @short_uuid);
-INSERT INTO vtap_system_configuration(lcuuid, vtap_group_lcuuid, max_collect_pps, max_npb_bps, max_cpus, max_memory, sync_interval, bandwidth_probe_interval, tap_interface_regex) values(@lcuuid, @lcuuid, 200000, 1000000000, 1, 768, 60, 10, 'tap.*');
-INSERT INTO vtap_group_configuration(lcuuid) values(@lcuuid);
-set @lcuuid = (select uuid());
-INSERT INTO vtap_group_configuration(lcuuid, vtap_group_lcuuid,
-id, max_memory, max_cpus, max_npb_bps, max_collect_pps, bandwidth_probe_interval, max_tx_bandwidth, log_threshold, log_level,
-tap_interface_regex, capture_packet_size, decap_type, if_mac_source, vm_xml_path, sync_interval, max_escape_seconds,
-mtu, output_vlan, nat_ip_enabled, log_retention,
-collector_socket_type, compressor_socket_type, http_log_proxy_client, http_log_trace_id, http_log_span_id, l7_log_packet_size, l4_log_collect_nps_threshold, l7_log_collect_nps_threshold,
-npb_socket_type, npb_vlan_mode,
-platform_enabled, rsyslog_enabled,
-collector_enabled, inactive_server_port_enabled, l7_metrics_enabled, vtap_flow_1s_enabled,
-l4_log_tap_types, l7_log_store_tap_types,
-npb_dedup_enabled, capture_socket_type,
-capture_bpf, thread_threshold, process_threshold,
-pod_cluster_internal_ip, domains, ntp_enabled, l4_performance_enabled,
-sys_free_memory_limit, log_file_size, http_log_x_request_id, stats_interval,
-external_agent_http_proxy_enabled, external_agent_http_proxy_port
-) values(@lcuuid, "",
--1, 768, 1, 1000000000, 200000, 10, 0, 300, 'INFO',
-'^tap.*', 65535, '0', 0, '/etc/libvirt/qemu/', 60, 3600, 1500, 0, 0, 30,
-'TCP', 'TCP', 'X-Forwarded-For', '关闭', '关闭', 256, 10000, 10000,
-'RAW_UDP', 0,
-0, 1,
-1, 1, 1, 1, 0, 0, 1, 0,
-"", 100, 10,
-0, "0", 1, 1,
-0, 1000, '关闭', 60,
-0, 8086
-);
 
 CREATE TABLE IF NOT EXISTS data_source (
     id                          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
