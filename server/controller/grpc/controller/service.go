@@ -45,6 +45,7 @@ func newService() *service {
 }
 
 func (s *service) Register(gs *grpc.Server) error {
+	log.Info("grpc register controller service")
 	api.RegisterControllerServer(gs, s)
 	return nil
 }
