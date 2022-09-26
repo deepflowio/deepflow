@@ -94,6 +94,7 @@ func (t *Trisolaris) Start() {
 	go t.metaData.TimedRefreshMetaData()
 	go t.vTapInfo.TimedRefreshVTapCache()
 	go t.nodeInfo.TimedRefreshNodeCache()
+	go t.kubernetesInfo.TimedRefreshClusterID()
 }
 
 func NewTrisolaris(cfg *config.Config, db *gorm.DB) *Trisolaris {

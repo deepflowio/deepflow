@@ -41,14 +41,32 @@ type KubernetesInfo struct {
 }
 
 func NewKubernetesInfo(db *gorm.DB, cfg *config.Config) *KubernetesInfo {
-	DomainMgr := dbmgr.DBMgr[models.Domain](db)
-	dbDomains, _ := DomainMgr.GetBatchFromTypes([]int{KUBERNETES})
-	clusterIDToDomain := make(map[string]string)
-	for _, dbDomain := range dbDomains {
-		clusterIDToDomain[dbDomain.ClusterID] = dbDomain.Lcuuid
-	}
+	return &KubernetesInfo{cfg: cfg, db: db}
+}
 
-	return &KubernetesInfo{clusterIDToDomain: clusterIDToDomain, cfg: cfg, db: db}
+func (k *KubernetesInfo) TimedRefreshClusterID() {
+	ticker := time.NewTicker(time.Duration(60) * time.Second).C
+	for {
+		k.refresh()
+		select {
+		case <-ticker:
+			k.refresh()
+		}
+	}
+}
+
+func (k *KubernetesInfo) refresh() {
+	log.Infof("refresh cache cluster_id started")
+	k.mutex.Lock()
+	DomainMgr := dbmgr.DBMgr[models.Domain](k.db)
+	dbDomains, _ := DomainMgr.GetBatchFromTypes([]int{KUBERNETES})
+	k.clusterIDToDomain = make(map[string]string)
+	for _, dbDomain := range dbDomains {
+		k.clusterIDToDomain[dbDomain.ClusterID] = dbDomain.Lcuuid
+	}
+	k.mutex.Unlock()
+	log.Infof("refresh cache cluster_id completed")
+	return
 }
 
 func (k *KubernetesInfo) CacheClusterID(clusterID string) {
