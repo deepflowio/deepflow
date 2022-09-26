@@ -384,7 +384,7 @@ enum TunnelType {
     VXLAN = 0;
     GRE_ERSPAN = 1;
     PCAP = 2;
-    NpbDrop = 3;
+    NPB_DROP = 3;
 }
 
 message NpbAction {
