@@ -22,14 +22,17 @@ import (
 	"github.com/deepflowys/deepflow/cli/ctl"
 )
 
-var RevCount, Revision, CommitDate, goVersion string
+var RevCount, Revision, CommitDate, goVersion, Branch, CompileTime string
 
 func main() {
 	version := fmt.Sprintf(
-		"%s %s %s\n%s\n%s\n",
-		RevCount, Revision, CommitDate,
-		"deepflow-ctl community edition",
-		goVersion,
+		"%s\n%s\n%s\n%s\n%s\n%s\n",
+		"Name: deepflow-ctl community edition",
+		"Branch: "+Branch,
+		"CommitID: "+Revision,
+		"RevCount: "+RevCount,
+		"Compiler: "+goVersion,
+		"CompileTime: "+CompileTime,
 	)
 	ctl.Execute(version)
 }
