@@ -50,7 +50,7 @@ var log = logging.MustGetLogger(execName())
 var configPath = flag.String("f", "/etc/server.yaml", "Specify config file location")
 var version = flag.Bool("v", false, "Display the version")
 
-var Branch, RevCount, Revision, CommitDate, goVersion string
+var Branch, RevCount, Revision, CommitDate, goVersion, CompileTime string
 
 type Config struct {
 	LogFile  string `default:"/var/log/deepflow/server.log" yaml:"log-file"`
@@ -74,10 +74,13 @@ func main() {
 	flag.Parse()
 	if *version {
 		fmt.Printf(
-			"%s %s %s\n%s\n%s\n",
-			RevCount, Revision, CommitDate,
-			"deepflow-server community edition",
-			goVersion,
+			"%s\n%s\n%s\n%s\n%s\n%s\n",
+			"Name: deepflow-server community edition",
+			"Branch: "+Branch,
+			"CommitID: "+Revision,
+			"RevCount: "+RevCount,
+			"Compiler: "+goVersion,
+			"CompileTime: "+CompileTime,
 		)
 		os.Exit(0)
 	}
