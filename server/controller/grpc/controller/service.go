@@ -34,7 +34,6 @@ type service struct {
 }
 
 func init() {
-	log.Info("grpc add controller service")
 	grpcserver.Add(newService())
 }
 
