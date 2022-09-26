@@ -78,6 +78,16 @@ func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8
 	}
 }
 
+func (g *SynchronizerServer) GetAgentStats(ip string) []TridentStats {
+	result := []TridentStats{}
+	for _, value := range g.tridentStatsMap {
+		if ip == "" || value.IP == ip {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
 func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.GenesisSyncRequest) (*trident.GenesisSyncResponse, error) {
 	stats := TridentStats{}
 	remote := ""

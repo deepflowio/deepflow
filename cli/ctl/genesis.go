@@ -17,6 +17,8 @@
 package ctl
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -32,7 +34,7 @@ func RegisterGenesisCommand() *cobra.Command {
 		Use:   "genesis",
 		Short: "genesis operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("please run with 'sync | k8s'.")
+			fmt.Println("please run with 'sync | k8s | agent'.")
 		},
 	}
 
@@ -58,8 +60,21 @@ func RegisterGenesisCommand() *cobra.Command {
 	}
 	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type")
 
+	var serverIP string
+	agentInfo := &cobra.Command{
+		Use:     "agent",
+		Short:   "genesis agent info",
+		Example: "deepflow-ctl genesis agent -s server_ip [host_ip]",
+		Run: func(cmd *cobra.Command, args []string) {
+			agentInfo(cmd, args, serverIP)
+		},
+	}
+	agentInfo.Flags().StringVarP(&serverIP, "server ip", "s", "", "deepflow-server ip")
+	agentInfo.MarkFlagRequired("server ip")
+
 	genesis.AddCommand(syncInfo)
 	genesis.AddCommand(k8sInfo)
+	genesis.AddCommand(agentInfo)
 	return genesis
 }
 
@@ -291,4 +306,32 @@ func tableVinterface(response *simplejson.Json, table *tablewriter.Table) {
 
 	table.AppendBulk(tableItems)
 	table.Render()
+}
+
+func agentInfo(cmd *cobra.Command, args []string, serverIP string) {
+	if len(args) == 0 {
+		args = []string{""}
+	}
+
+	url := fmt.Sprintf("http://%s:%d/v1/agent-stats/%s/", serverIP, 20417, args[0])
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	responseByte, err := response.MarshalJSON()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	var str bytes.Buffer
+	err = json.Indent(&str, responseByte, "", "    ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	fmt.Println(str.String())
 }
