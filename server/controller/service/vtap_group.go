@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
 )
 
 func GetVtapGroups(filter map[string]interface{}) (resp []model.VtapGroup, err error) {
@@ -136,6 +137,7 @@ func CreateVtapGroup(vtapGroupCreate model.VtapGroupCreate, cfg *config.Controll
 	}
 
 	response, _ := GetVtapGroups(map[string]interface{}{"lcuuid": lcuuid})
+	refresh.RefreshCache([]string{common.VTAP_CHANGED})
 	return response[0], nil
 }
 
@@ -218,6 +220,7 @@ func UpdateVtapGroup(lcuuid string, vtapGroupUpdate map[string]interface{}, cfg 
 	mysql.Db.Model(&vtapGroup).Updates(dbUpdateMap)
 
 	response, _ := GetVtapGroups(map[string]interface{}{"lcuuid": lcuuid})
+	refresh.RefreshCache([]string{common.VTAP_CHANGED})
 	return response[0], nil
 }
 
@@ -237,5 +240,6 @@ func DeleteVtapGroup(lcuuid string) (resp map[string]string, err error) {
 
 	mysql.Db.Model(&mysql.VTap{}).Where("vtap_group_lcuuid = ?", lcuuid).Update("vtap_group_lcuuid", defaultVtapGroup.Lcuuid)
 	mysql.Db.Delete(&vtapGroup)
+	refresh.RefreshCache([]string{common.VTAP_CHANGED})
 	return map[string]string{"LCUUID": lcuuid}, nil
 }

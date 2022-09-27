@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/kubernetes"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/metadata"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/node"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/vtap"
 )
 
@@ -36,6 +37,7 @@ type Trisolaris struct {
 	vTapInfo       *vtap.VTapInfo
 	nodeInfo       *node.NodeInfo
 	kubernetesInfo *kubernetes.KubernetesInfo
+	refreshOP      *refresh.RefreshOP
 }
 
 var trisolaris *Trisolaris
@@ -77,7 +79,6 @@ func PutPlatformData() {
 }
 
 func PutTapType() {
-	log.Info("PutTapType")
 	trisolaris.metaData.PutChTapType()
 }
 
@@ -89,25 +90,36 @@ func PutVTapCache() {
 	trisolaris.vTapInfo.PutVTapCacheRefresh()
 }
 
+func PutFlowACL() {
+	trisolaris.metaData.PutChPolicy()
+}
+
+func PutGroup() {
+	trisolaris.metaData.PutChGroup()
+}
+
 func (t *Trisolaris) Start() {
 	t.metaData.InitData() // 需要先初始化
 	go t.metaData.TimedRefreshMetaData()
 	go t.vTapInfo.TimedRefreshVTapCache()
 	go t.nodeInfo.TimedRefreshNodeCache()
 	go t.kubernetesInfo.TimedRefreshClusterID()
+	go t.refreshOP.TimedRefreshIPs()
 }
 
 func NewTrisolaris(cfg *config.Config, db *gorm.DB) *Trisolaris {
 	if trisolaris == nil {
 		cfg.Convert()
 		metaData := metadata.NewMetaData(db, cfg)
+		nodeInfo := node.NewNodeInfo(db, metaData, cfg)
 		trisolaris = &Trisolaris{
 			config:         cfg,
 			dbConn:         db,
 			metaData:       metaData,
 			vTapInfo:       vtap.NewVTapInfo(db, metaData, cfg),
-			nodeInfo:       node.NewNodeInfo(db, metaData, cfg),
+			nodeInfo:       nodeInfo,
 			kubernetesInfo: kubernetes.NewKubernetesInfo(db, cfg),
+			refreshOP:      refresh.NewRefreshOP(db, cfg.NodeIP),
 		}
 	} else {
 		return trisolaris

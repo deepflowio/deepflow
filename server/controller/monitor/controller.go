@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	mconfig "github.com/deepflowys/deepflow/server/controller/monitor/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/refresh"
 )
 
 type ControllerCheck struct {
@@ -66,6 +67,7 @@ func (c *ControllerCheck) Start() {
 		for {
 			excludeIP := <-c.ch
 			c.vtapControllerAlloc(excludeIP)
+			refresh.RefreshCache([]string{common.VTAP_CHANGED})
 		}
 	}()
 }

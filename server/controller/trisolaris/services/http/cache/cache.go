@@ -20,22 +20,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/op/go-logging"
 
+	. "github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/server/http/common"
 )
 
 var log = logging.MustGetLogger("trisolaris/cache")
-
-const (
-	VTAP_CHANGED          = "vtap"
-	ANALYZER_CHANGED      = "analyzer"
-	PLATFORM_DATA_CHANGED = "platform_data"
-	FLOW_ACL_CHANGED      = "flow_acl "
-	GROUP_CHANGED         = "group"
-	TAP_TYPE_CHANGED      = "tap_type"
-	SERVICE_CHANGED       = "service"
-)
 
 func init() {
 	http.Register(NewCacheService())
@@ -60,6 +51,10 @@ func PutCache(c *gin.Context) {
 				trisolaris.PutVTapCache()
 			case TAP_TYPE_CHANGED:
 				trisolaris.PutTapType()
+			case FLOW_ACL_CHANGED:
+				trisolaris.PutFlowACL()
+			case GROUP_CHANGED, SERVICE_CHANGED:
+				trisolaris.PutGroup()
 			}
 		}
 	}

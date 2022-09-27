@@ -472,3 +472,13 @@ var VTapToChangeTapModes = map[int][]int{
 	VTAP_TYPE_TUNNEL_DECAPSULATION: []int{TAPMODE_DECAP},
 	VTAP_TYPE_HYPER_V:              []int{TAPMODE_LOCAL, TAPMODE_MIRROR},
 }
+
+const (
+	VTAP_CHANGED          = "vtap"
+	ANALYZER_CHANGED      = "analyzer"
+	PLATFORM_DATA_CHANGED = "platform_data"
+	FLOW_ACL_CHANGED      = "flow_acl"
+	GROUP_CHANGED         = "group"
+	TAP_TYPE_CHANGED      = "tap_type"
+	SERVICE_CHANGED       = "service"
+)
