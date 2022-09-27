@@ -38,6 +38,8 @@ type MetaData struct {
 	policyDataOP   *PolicyDataOP
 	chPlatformData chan struct{}
 	chTapType      chan struct{}
+	chPolicy       chan struct{}
+	chGroup        chan struct{}
 	config         *config.Config
 	db             *gorm.DB
 }
@@ -50,6 +52,8 @@ func NewMetaData(db *gorm.DB, cfg *config.Config) *MetaData {
 		tapType:        newTapType(db),
 		chPlatformData: make(chan struct{}, 1),
 		chTapType:      make(chan struct{}, 1),
+		chPolicy:       make(chan struct{}, 1),
+		chGroup:        make(chan struct{}, 1),
 		config:         cfg,
 		db:             db,
 	}
@@ -76,6 +80,20 @@ func (m *MetaData) updateDBDataCache(d *DBDataCache) {
 func (m *MetaData) PutChPlatformData() {
 	select {
 	case m.chPlatformData <- struct{}{}:
+	default:
+	}
+}
+
+func (m *MetaData) PutChPolicy() {
+	select {
+	case m.chPolicy <- struct{}{}:
+	default:
+	}
+}
+
+func (m *MetaData) PutChGroup() {
+	select {
+	case m.chGroup <- struct{}{}:
 	default:
 	}
 }
@@ -156,6 +174,17 @@ func (m *MetaData) timedRefreshMetaData() {
 			m.generateDbDataCache()
 			m.platformDataOP.GeneratePlatformData()
 			log.Info("end generate platform data from rpc")
+		case <-m.chPolicy:
+			log.Info("start generate policy from rpc")
+			m.generateDbDataCache()
+			m.groupDataOP.generateGroupData()
+			m.policyDataOP.generatePolicyData()
+			log.Info("end generate policy from rpc")
+		case <-m.chGroup:
+			log.Info("start generate group from rpc")
+			m.generateDbDataCache()
+			m.groupDataOP.generateGroupData()
+			log.Info("end generate group from rpc")
 		}
 	}
 }
