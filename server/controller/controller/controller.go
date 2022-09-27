@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +31,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/db/redis"
 	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
@@ -39,9 +39,9 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	"github.com/deepflowys/deepflow/server/controller/monitor/license"
 	"github.com/deepflowys/deepflow/server/controller/recorder"
-	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
 	"github.com/deepflowys/deepflow/server/controller/report"
 	"github.com/deepflowys/deepflow/server/controller/router"
+	"github.com/deepflowys/deepflow/server/controller/service"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
@@ -85,9 +85,12 @@ func Start(ctx context.Context, configPath string) {
 	if _, enabled := os.LookupEnv("FEATURE_FLAG_ELECTION"); enabled {
 		go election.Start(ctx, cfg)
 	}
+	isMasterController := IsMasterController(cfg)
 
-	router.SetInitStageForHealthChecker("MySQL migration")
-	migrateDB(cfg)
+	if isMasterController {
+		router.SetInitStageForHealthChecker("MySQL migration")
+		migrateDB(cfg)
+	}
 
 	router.SetInitStageForHealthChecker("MySQL init")
 	// 初始化MySQL
@@ -98,10 +101,13 @@ func Start(ctx context.Context, configPath string) {
 		os.Exit(0)
 	}
 
+	// TODO move to goroutine
 	// 启动资源ID管理器
 	if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-		router.SetInitStageForHealthChecker("Resource ID manager init")
-		startResourceIDManager(cfg)
+		if isMasterController {
+			router.SetInitStageForHealthChecker("Resource ID manager init")
+			startResourceIDManager(cfg)
+		}
 	}
 
 	// 初始化Redis
@@ -162,6 +168,7 @@ func Start(ctx context.Context, configPath string) {
 		}
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
 		masterController := ""
+		// TODO start as soon as possible
 		for range time.Tick(time.Minute) {
 			isMasterController, curMasterController, err := election.IsMasterControllerAndReturnName()
 			if err != nil {
@@ -171,6 +178,9 @@ func Start(ctx context.Context, configPath string) {
 				log.Infof("current master controller is %s", curMasterController)
 				masterController = curMasterController
 				if isMasterController {
+					// 启动资源ID管理器
+					startResourceIDManager(cfg)
+
 					// 启动tagrecorder
 					tr.Start()
 
@@ -187,10 +197,15 @@ func Start(ctx context.Context, configPath string) {
 					vtapLicenseAllocation.Start()
 
 					// 启动软删除数据清理
-					recorder.CleanDeletedResources(
+					recorder.TimedCleanDeletedResources(
 						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceCleanInterval),
 						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceRetentionTime),
 					)
+
+					if _, enabled := os.LookupEnv("FEATURE_FLAG_CHECK_DOMAIN_CONTROLLER"); enabled {
+						// 自动切换domain控制器
+						service.TimedCheckDomain()
+					}
 				}
 			}
 		}
@@ -221,63 +236,23 @@ func grpcStart(ctx context.Context, cfg *config.ControllerConfig) {
 	go grpc.Run(ctx, cfg)
 }
 
-// migrate db by master region master controller
-func migrateDB(cfg *config.ControllerConfig) {
-	// exit if not in master region
-	if cfg.TrisolarisCfg.NodeType != "master" {
-		return
-	}
-
-	// try to check whether it is master controller until successful,
-	// migrate if it is master, exit if not.
-	for range time.Tick(time.Second * 5) {
-		isMasterController, err := election.IsMasterController()
-		if err == nil {
-			if isMasterController {
-				ok := migrator.MigrateMySQL(cfg.MySqlCfg)
-				if !ok {
-					log.Error("migrate mysql failed")
-					time.Sleep(time.Second)
-					os.Exit(0)
-				}
-				return
-			} else {
-				return
-			}
-		}
-	}
-}
-
-// start ID manager in master region master controller
-func startResourceIDManager(cfg *config.ControllerConfig) {
-	// exit if not in master region
-	if cfg.TrisolarisCfg.NodeType != "master" {
-		return
-	}
-
-	// try to check whether it is master controller until successful,
-	// migrate if it is master, exit if not.
-	for range time.Tick(time.Second * 5) {
-		isMasterController, err := election.IsMasterController()
-		if err == nil {
-			if isMasterController {
-				err := recorderdb.InitIDManager(&cfg.ManagerCfg.TaskCfg.RecorderCfg)
-				if err != nil {
-					log.Error("start resource id mananger failed")
-					time.Sleep(time.Second)
-					os.Exit(0)
-				}
-				return
-			} else {
-				return
-			}
-		}
-	}
-}
-
 func setGlobalConfig(cfg *config.ControllerConfig) {
-	common.CONTROLLER_HTTP_PORT = fmt.Sprintf("%d", cfg.ListenPort)
-	common.CONTROLLER_HTTP_NODE_PORT = fmt.Sprintf("%d", cfg.ListenNodePort)
-	common.CONTROLLER_GRPC_PORT = cfg.GrpcPort
-	common.CONTROLLER_GRPC_NODE_PORT = cfg.GrpcNodePort
+	grpcPort, err := strconv.Atoi(cfg.GrpcPort)
+	if err != nil {
+		log.Error("config grpc-port is not a port")
+		time.Sleep(time.Second)
+		os.Exit(0)
+	}
+	grpcNodePort, err := strconv.Atoi(cfg.GrpcNodePort)
+	if err != nil {
+		log.Error("config grpc-node-port is not a port")
+		time.Sleep(time.Second)
+		os.Exit(0)
+	}
+	common.GConfig = &common.GlobalConfig{
+		HTTPPort:     cfg.ListenPort,
+		HTTPNodePort: cfg.ListenNodePort,
+		GRPCPort:     grpcPort,
+		GRPCNodePort: grpcNodePort,
+	}
 }
