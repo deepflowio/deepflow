@@ -1,5 +1,15 @@
-![DeepFlow](./docs/deepflow-logo.png)
-=====================================
+<p align="center">
+  <img src="./docs/deepflow-logo.png" alt="DeepFlow" width="300" />
+
+  <p align="center">DeepFlow is an automated observability platform for cloud-native developers..</p>
+</p>
+<p align="center">
+    <img alt="GitHub Release" src="https://img.shields.io/github/v/release/deepflowys/deepflow"> </a>
+    <img alt="docker pulls" src="https://img.shields.io/docker/pulls/deepflowce/deepflow-agent?color=green?label=docker pulls"> </a>
+    <img alt="License" src="https://img.shields.io/github/license/deepflowys/deepflow?color=yellow"> </a>
+</p>
+
+-------------
 
 English | [简体中文](./README-CN.md)
 
