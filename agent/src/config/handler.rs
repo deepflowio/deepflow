@@ -326,6 +326,11 @@ impl fmt::Debug for FlowConfig {
                 &self.l7_protocol_inference_max_fail_count,
             )
             .field("l7_protocol_inference_ttl", &self.l7_protocol_inference_ttl)
+            .field("packet_sequence_flag", &self.packet_sequence_flag)
+            .field(
+                "packet_sequence_block_size",
+                &self.packet_sequence_block_size,
+            )
             .finish()
     }
 }

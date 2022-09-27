@@ -54,6 +54,18 @@ pub fn get_memory_rss() -> Result<u64> {
     ))
 }
 
+// 仅计算当前进程及其子进程，没有计算子进程的子进程等
+// /proc/<pid>/status目录中ppid为当前进程的pid
+// =================
+// Only the current process and its child processes are counted, the child processes of the child process are not counted, etc.
+// The ppid in the /proc/<pid>/status directory is the pid of the current process
+pub fn get_process_num() -> Result<u32> {
+    let pid = process::id();
+    // plus current process
+    // 加上当前进程
+    get_num_from_status_file("PPid:", pid.to_string().as_str()).map(|num| num + 1)
+}
+
 // 仅计算当前pid下的线程数, linux下应该都是1
 pub fn get_thread_num() -> Result<u32> {
     let pid = process::id();
@@ -170,10 +182,24 @@ fn get_num_from_status_file(pattern: &str, value: &str) -> Result<u32> {
 
     let mut num = 0;
     for entry in dirs {
-        let entry = entry?;
+        let entry = match entry {
+            Ok(item) => item,
+            Err(e) => {
+                debug!("{:?}", e);
+                continue;
+            }
+        };
 
-        if !entry.file_type()?.is_dir() {
-            continue;
+        match entry.file_type() {
+            Ok(t) => {
+                if !t.is_dir() {
+                    continue;
+                }
+            }
+            Err(e) => {
+                debug!("filename: {:?}, {:?}", entry.file_name(), e);
+                continue;
+            }
         }
 
         let search_pid = match entry
@@ -197,7 +223,10 @@ fn get_num_from_status_file(pattern: &str, value: &str) -> Result<u32> {
             }
         };
         let mut buf = String::new();
-        status.read_to_string(&mut buf)?;
+        if let Err(e) = status.read_to_string(&mut buf) {
+            debug!("status_file: {}, read_to_string: {}", status_file, e);
+            continue;
+        }
 
         for line in buf.lines() {
             if !line.starts_with(pattern) {
