@@ -20,3 +20,10 @@ type KVPair struct {
 	Key   string
 	Value int
 }
+
+type GlobalConfig struct {
+	HTTPPort     int
+	HTTPNodePort int
+	GRPCPort     int
+	GRPCNodePort int
+}

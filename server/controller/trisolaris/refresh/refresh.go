@@ -18,7 +18,6 @@ package refresh
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"time"
 
@@ -49,22 +48,7 @@ func NewRefreshOP(db *gorm.DB, nodeIP string) *RefreshOP {
 	return refreshOP
 }
 
-func isTCPActive(ip string, port string) error {
-	conn, err := net.DialTimeout("tcp", ip+":"+port, 2*time.Second)
-	if err != nil {
-		return err
-	} else {
-		if conn != nil {
-			conn.Close()
-		} else {
-			return fmt.Errorf("check tcp alive failed (ip:%s, port:%s)", ip, port)
-		}
-	}
-
-	return nil
-}
-
-var urlFormat = "http://%s:%s/v1/caches/?"
+var urlFormat = "http://%s:%d/v1/caches/?"
 
 func RefreshCache(dataTypes []string) {
 	if refreshOP != nil {
@@ -83,12 +67,12 @@ func (r *RefreshOP) refreshCache(dataTypes []string) {
 		params.Add("type", dataType)
 	}
 	for _, controllerIP := range controllerIPs {
-		err := isTCPActive(controllerIP, common.CONTROLLER_HTTP_PORT)
+		err := common.IsTCPActive(controllerIP, common.GConfig.HTTPPort)
 		if err != nil {
-			log.Errorf("%s:%s unreachable, err(%s)", controllerIP, common.CONTROLLER_HTTP_PORT, err)
+			log.Errorf("%s:%d unreachable, err(%s)", controllerIP, common.GConfig.HTTPPort, err)
 			continue
 		}
-		trisolaris_url := fmt.Sprintf(urlFormat, controllerIP, common.CONTROLLER_HTTP_PORT) + params.Encode()
+		trisolaris_url := fmt.Sprintf(urlFormat, controllerIP, common.GConfig.HTTPPort) + params.Encode()
 		resp, err := common.CURLPerform("PUT", trisolaris_url, nil)
 		if err != nil {
 			log.Errorf("request trisolaris failed: %s, URL: %s", resp, trisolaris_url)
