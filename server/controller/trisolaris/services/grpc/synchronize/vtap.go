@@ -390,22 +390,108 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	}, nil
 }
 
+func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
+	vtapConfig := trisolaris.GetGVTapInfo().GetVTapConfigFromShortID(groupID)
+	if vtapConfig == nil {
+		return nil
+	}
+	collectorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CollectorSocketType]
+	if ok == false {
+		collectorSocketType = UDP
+	}
+	compressorSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.CompressorSocketType]
+	if ok == false {
+		compressorSocketType = RAW_UDP
+	}
+	npbSocketType, ok := SOCKET_TYPE_TO_MESSAGE[vtapConfig.NpbSocketType]
+	if ok == false {
+		npbSocketType = RAW_UDP
+	}
+	decapTypes := make([]api.DecapType, 0, len(vtapConfig.ConvertedDecapType))
+	for _, decap := range vtapConfig.ConvertedDecapType {
+		decapTypes = append(decapTypes, api.DecapType(decap))
+	}
+	npbVlanMode := api.VlanMode(vtapConfig.NpbVlanMode)
+	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
+	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
+	configure := &api.Config{
+		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
+		CollectorSocketType:           &collectorSocketType,
+		CompressorSocketType:          &compressorSocketType,
+		PlatformEnabled:               proto.Bool(Int2Bool(vtapConfig.PlatformEnabled)),
+		MaxCpus:                       proto.Uint32(uint32(vtapConfig.MaxCPUs)),
+		MaxMemory:                     proto.Uint32(uint32(vtapConfig.MaxMemory)),
+		StatsInterval:                 proto.Uint32(uint32(vtapConfig.StatsInterval)),
+		SyncInterval:                  proto.Uint32(uint32(vtapConfig.SyncInterval)),
+		NpbBpsThreshold:               proto.Uint64(uint64(vtapConfig.MaxNpbBps)),
+		GlobalPpsThreshold:            proto.Uint64(uint64(vtapConfig.MaxCollectPps)),
+		Mtu:                           proto.Uint32(uint32(vtapConfig.Mtu)),
+		OutputVlan:                    proto.Uint32(uint32(vtapConfig.OutputVlan)),
+		RsyslogEnabled:                proto.Bool(Int2Bool(vtapConfig.RsyslogEnabled)),
+		ServerTxBandwidthThreshold:    proto.Uint64(uint64(vtapConfig.MaxTxBandwidth)),
+		BandwidthProbeInterval:        proto.Uint64(uint64(vtapConfig.BandwidthProbeInterval)),
+		MaxEscapeSeconds:              proto.Uint32(uint32(vtapConfig.MaxEscapeSeconds)),
+		NpbVlanMode:                   &npbVlanMode,
+		NpbDedupEnabled:               proto.Bool(Int2Bool(vtapConfig.NpbDedupEnabled)),
+		IfMacSource:                   &ifMacSource,
+		NpbSocketType:                 &npbSocketType,
+		VtapFlow_1SEnabled:            proto.Bool(Int2Bool(vtapConfig.VTapFlow1sEnabled)),
+		CapturePacketSize:             proto.Uint32(uint32(vtapConfig.CapturePacketSize)),
+		InactiveServerPortEnabled:     proto.Bool(Int2Bool(vtapConfig.InactiveServerPortEnabled)),
+		InactiveIpEnabled:             proto.Bool(Int2Bool(vtapConfig.InactiveIPEnabled)),
+		LibvirtXmlPath:                proto.String(vtapConfig.VMXMLPath),
+		LogThreshold:                  proto.Uint32(uint32(vtapConfig.LogThreshold)),
+		LogLevel:                      proto.String(vtapConfig.LogLevel),
+		LogRetention:                  proto.Uint32(uint32(vtapConfig.LogRetention)),
+		L4LogCollectNpsThreshold:      proto.Uint64(uint64(vtapConfig.L4LogCollectNpsThreshold)),
+		L7LogCollectNpsThreshold:      proto.Uint64(uint64(vtapConfig.L7LogCollectNpsThreshold)),
+		L7MetricsEnabled:              proto.Bool(Int2Bool(vtapConfig.L7MetricsEnabled)),
+		L7LogPacketSize:               proto.Uint32(uint32(vtapConfig.L7LogPacketSize)),
+		DecapType:                     decapTypes,
+		CaptureSocketType:             &captureSocketType,
+		CaptureBpf:                    proto.String(vtapConfig.CaptureBpf),
+		ThreadThreshold:               proto.Uint32(uint32(vtapConfig.ThreadThreshold)),
+		ProcessThreshold:              proto.Uint32(uint32(vtapConfig.ProcessThreshold)),
+		HttpLogProxyClient:            proto.String(vtapConfig.HTTPLogProxyClient),
+		HttpLogTraceId:                proto.String(vtapConfig.HTTPLogTraceID),
+		HttpLogSpanId:                 proto.String(vtapConfig.HTTPLogSpanID),
+		HttpLogXRequestId:             proto.String(vtapConfig.HTTPLogXRequestID),
+		NtpEnabled:                    proto.Bool(Int2Bool(vtapConfig.NtpEnabled)),
+		L4PerformanceEnabled:          proto.Bool(Int2Bool(vtapConfig.L4PerformanceEnabled)),
+		KubernetesApiEnabled:          proto.Bool(false),
+		SysFreeMemoryLimit:            proto.Uint32(uint32(vtapConfig.SysFreeMemoryLimit)),
+		LogFileSize:                   proto.Uint32(uint32(vtapConfig.LogFileSize)),
+		ExternalAgentHttpProxyEnabled: proto.Bool(Int2Bool(vtapConfig.ExternalAgentHTTPProxyEnabled)),
+		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
+		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
+		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
+		// 调整后采集器配置信息
+		L7LogStoreTapTypes: vtapConfig.ConvertedL7LogStoreTapTypes,
+		L4LogTapTypes:      vtapConfig.ConvertedL4LogTapTypes,
+	}
+
+	return configure
+}
+
 func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 	ctrlIP := in.GetCtrlIp()
 	ctrlMac := in.GetCtrlMac()
 	vtapCacheKey := ctrlIP + "-" + ctrlMac
 
+	configInfo := e.generateNoVTapCacheConfig(in.GetVtapGroupIdRequest())
 	gVTapInfo := trisolaris.GetGVTapInfo()
 	if in.GetKubernetesClusterId() != "" {
 		tridentType := common.TridentType(VTAP_TYPE_POD_VM)
-		configInfo := &api.Config{
-			KubernetesApiEnabled: proto.Bool(false),
-			AnalyzerIp:           proto.String("127.0.0.1"),
-			MaxEscapeSeconds:     proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),
-			MaxMemory:            proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
-			Enabled:              proto.Bool(true),
-			TridentType:          &tridentType,
+		if configInfo == nil {
+			configInfo = &api.Config{
+				KubernetesApiEnabled: proto.Bool(false),
+				MaxEscapeSeconds:     proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),
+				MaxMemory:            proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
+			}
 		}
+		configInfo.TridentType = &tridentType
+		configInfo.AnalyzerIp = proto.String("127.0.0.1")
+		configInfo.Enabled = proto.Bool(true)
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
 		if value == vtapCacheKey {
 			configInfo.KubernetesApiEnabled = proto.Bool(true)
@@ -422,13 +508,15 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 	tridentTypeForUnkonwVTap := gVTapInfo.GetTridentTypeForUnkonwVTap()
 	if tridentTypeForUnkonwVTap != 0 {
 		tridentType := common.TridentType(tridentTypeForUnkonwVTap)
-		configInfo := &api.Config{
-			TridentType:      &tridentType,
-			AnalyzerIp:       proto.String("127.0.0.1"),
-			MaxEscapeSeconds: proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),
-			MaxMemory:        proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
-			PlatformEnabled:  proto.Bool(true),
+		if configInfo == nil {
+			configInfo = &api.Config{
+				MaxEscapeSeconds: proto.Uint32(uint32(gVTapInfo.GetDefaultMaxEscapeSeconds())),
+				MaxMemory:        proto.Uint32(uint32(gVTapInfo.GetDefaultMaxMemory())),
+			}
 		}
+		configInfo.TridentType = &tridentType
+		configInfo.AnalyzerIp = proto.String("127.0.0.1")
+		configInfo.PlatformEnabled = proto.Bool(true)
 
 		return &api.SyncResponse{
 			Status: &STATUS_SUCCESS,
@@ -437,6 +525,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 	}
 	return &api.SyncResponse{
 		Status: &STATUS_FAILED,
+		Config: configInfo,
 	}
 }
 
