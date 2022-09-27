@@ -176,12 +176,24 @@ static __inline void report_http2_header(struct pt_regs *ctx)
 	}
 
 	stack->events_num = 1;
-	stack->len = offsetof(typeof(struct __socket_data), data) +
-		     stack->send_buffer.syscall_len;
+	stack->len = SOCKET_DATA_HEADER + stack->send_buffer.syscall_len;
 
-	__u32 send_size = (stack->len + 8) & 1023;
-	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU,
-			      &(stack->__raw), 1 + send_size);
+	__u32 send_size = (stack->len + 8) & 2047;
+	static const int SEND_SIZE_MAX =
+		sizeof(struct __socket_data) +
+		offsetof(typeof(struct __socket_data_buffer), data);
+	if (send_size < SEND_SIZE_MAX) {
+		bpf_perf_event_output(ctx, &NAME(socket_data),
+				      BPF_F_CURRENT_CPU, stack, 1 + send_size);
+		return;
+	}
+	const __u32 diff = send_size - SEND_SIZE_MAX;
+	send_size = SEND_SIZE_MAX;
+	stack->len -= diff;
+	stack->send_buffer.data_len -= diff;
+	bpf_perf_event_output(ctx, &NAME(socket_data), BPF_F_CURRENT_CPU, stack,
+			      SEND_SIZE_MAX);
+	return;
 }
 
 // Fill all fields except data in buffer->send_buffer
