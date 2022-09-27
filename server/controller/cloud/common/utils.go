@@ -333,7 +333,7 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	// 查询数据库获取采集器，生成采集器ctrl_ip到launch_server的对应关系
+	// TODO delete? not used 查询数据库获取采集器，生成采集器ctrl_ip到launch_server的对应关系
 	vtaps := []mysql.VTap{}
 	mysql.Db.Find(&vtaps)
 

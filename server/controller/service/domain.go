@@ -19,8 +19,10 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/gorm/clause"
@@ -685,5 +687,52 @@ func forceDelete[MT constraint.MySQLSoftDeleteModel](query interface{}, args ...
 	err := mysql.Db.Unscoped().Where(query, args...).Delete(new(MT)).Error
 	if err != nil {
 		log.Errorf("mysql delete resource: %v %v failed: %s", query, args, err)
+	}
+}
+
+func TimedCheckDomain() {
+	CheckAndAllocateDomainController()
+	go func() {
+		for range time.Tick(time.Duration(5) * time.Minute) {
+			CheckAndAllocateDomainController()
+		}
+	}()
+}
+
+func CheckAndAllocateDomainController() {
+	log.Infof("check domain controller health started")
+	controllerIPToRegionLcuuid := make(map[string]string)
+	var azCConns []*mysql.AZControllerConnection
+	mysql.Db.Find(&azCConns)
+	for _, c := range azCConns {
+		controllerIPToRegionLcuuid[c.ControllerIP] = c.Region
+	}
+	var controllers []*mysql.Controller
+	mysql.Db.Find(&controllers)
+	regionLcuuidToHealthyControllerIPs := make(map[string][]string)
+	for _, c := range controllers {
+		if c.State == common.CONTROLLER_STATE_NORMAL {
+			regionLcuuidToHealthyControllerIPs[controllerIPToRegionLcuuid[c.IP]] = append(
+				regionLcuuidToHealthyControllerIPs[controllerIPToRegionLcuuid[c.IP]], c.IP,
+			)
+		}
+	}
+	log.Debug(regionLcuuidToHealthyControllerIPs)
+
+	var domains []*mysql.Domain
+	mysql.Db.Find(&domains)
+	for _, domain := range domains {
+		config := make(map[string]interface{})
+		json.Unmarshal([]byte(domain.Config), &config)
+		regionLcuuid := config["region_uuid"].(string)
+		healthyControllerIPs := regionLcuuidToHealthyControllerIPs[regionLcuuid]
+		if !common.Contains(healthyControllerIPs, domain.ControllerIP) {
+			length := len(healthyControllerIPs)
+			if length > 0 {
+				domain.ControllerIP = healthyControllerIPs[rand.Intn(length)]
+				mysql.Db.Save(&domain)
+				log.Infof("change domain (name: %s) controller ip to %s", domain.Name, domain.ControllerIP)
+			}
+		}
 	}
 }

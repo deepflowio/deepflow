@@ -194,8 +194,12 @@ func IsValueInSliceString(value string, list []string) bool {
 	return false
 }
 
+func GetCurrentControllerIP() string {
+	return os.Getenv(NODE_IP_KEY)
+}
+
 func GetCurrentController() (*mysql.Controller, error) {
-	controllerIP := os.Getenv(NODE_IP_KEY)
+	controllerIP := GetCurrentControllerIP()
 	var controller *mysql.Controller
 	err := mysql.Db.Where("ip = ?", controllerIP).Find(&controller).Error
 	return controller, err
@@ -209,8 +213,8 @@ func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err err
 	}
 	if curController.NodeType == CONTROLLER_NODE_TYPE_MASTER {
 		host = LOCALHOST
-		httpPort = CONTROLLER_HTTP_PORT
-		grpcPort = CONTROLLER_GRPC_PORT
+		httpPort = fmt.Sprintf("%d", GConfig.HTTPPort)
+		grpcPort = fmt.Sprintf("%d", GConfig.GRPCPort)
 	} else {
 		var controller *mysql.Controller
 		err = mysql.Db.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controller).Error
@@ -218,8 +222,8 @@ func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err err
 			return
 		}
 		host = controller.IP
-		httpPort = CONTROLLER_HTTP_NODE_PORT
-		grpcPort = CONTROLLER_GRPC_NODE_PORT
+		httpPort = fmt.Sprintf("%d", GConfig.HTTPNodePort)
+		grpcPort = fmt.Sprintf("%d", GConfig.GRPCNodePort)
 	}
 	url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, httpPort))
 	log.Info(url)
@@ -233,4 +237,18 @@ func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err err
 		masterIP = resp.Get("DATA").Get("NODE_IP").MustString()
 	}
 	return
+}
+
+func IsTCPActive(ip string, port int) error {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), 2*time.Second)
+	if err != nil {
+		return err
+	} else {
+		if conn != nil {
+			conn.Close()
+		} else {
+			return fmt.Errorf("check tcp alive failed (ip:%s, port:%d)", ip, port)
+		}
+	}
+	return nil
 }

@@ -62,7 +62,7 @@ func clean(expireInterval int) {
 	log.Info("clean soft deleted resources completed")
 }
 
-func CleanDeletedResources(cleanInterval, expireInterval int) {
+func TimedCleanDeletedResources(cleanInterval, expireInterval int) {
 	// 在启动cleaner前先清理一次数据
 	clean(expireInterval)
 	go func() {
