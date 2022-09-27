@@ -67,6 +67,7 @@ type VTapInfo struct {
 	lcuuidToVPCID                  map[string]int
 	hostIDToVPCID                  map[int]int
 	hypervNetworkHostIds           mapset.Set
+	vtapGroupShortIDToLcuuid       map[string]string
 	vtapGroupLcuuidToConfiguration map[string]*VTapConfig
 	vtapGroupLcuuidToLocalConfig   map[string]string
 	noVTapTapPortsMac              mapset.Set
@@ -121,6 +122,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		lcuuidToVPCID:                  make(map[string]int),
 		hostIDToVPCID:                  make(map[int]int),
 		hypervNetworkHostIds:           mapset.NewSet(),
+		vtapGroupShortIDToLcuuid:       make(map[string]string),
 		vtapGroupLcuuidToConfiguration: make(map[string]*VTapConfig),
 		vtapGroupLcuuidToLocalConfig:   make(map[string]string),
 		noVTapTapPortsMac:              mapset.NewSet(),
@@ -206,6 +208,21 @@ func (v *VTapInfo) loadDefaultVTapGroup() string {
 
 	v.defaultVTapGroup = proto.String(defaultVTapGroup.Lcuuid)
 	return defaultVTapGroup.Lcuuid
+}
+
+func (v *VTapInfo) loadVTapGroup() {
+	vtapGroups, err := dbmgr.DBMgr[models.VTapGroup](v.db).Gets()
+	if err != nil {
+		log.Errorf("get vtap group failed, err(%s)", err)
+		return
+	}
+
+	vtapGroupShortIDToLcuuid := make(map[string]string)
+	for _, vtapGroup := range vtapGroups {
+		vtapGroupShortIDToLcuuid[vtapGroup.ShortUUID] = vtapGroup.Lcuuid
+	}
+
+	v.vtapGroupShortIDToLcuuid = vtapGroupShortIDToLcuuid
 }
 
 func vtapPortToStr(port int64) string {
@@ -367,6 +384,7 @@ func (v *VTapInfo) loadBaseData() {
 	v.loadKubernetesCluster()
 	v.loadRegion()
 	v.loadDefaultVTapGroup()
+	v.loadVTapGroup()
 }
 
 func isBlank(value reflect.Value) bool {
@@ -473,6 +491,15 @@ func (v *VTapInfo) convertConfig(configs []*models.VTapGroupConfiguration) {
 	}
 	v.vtapGroupLcuuidToConfiguration = vtapGroupLcuuidToConfiguration
 	v.vtapGroupLcuuidToLocalConfig = vtapGroupLcuuidToLocalConfig
+}
+
+func (v *VTapInfo) GetVTapConfigFromShortID(shortID string) *VTapConfig {
+	lcuuid, ok := v.vtapGroupShortIDToLcuuid[shortID]
+	if ok == false {
+		return nil
+	}
+
+	return v.vtapGroupLcuuidToConfiguration[lcuuid]
 }
 
 func (v *VTapInfo) GetVTapLocalConfig(vtapGroupLcuuid string) string {
