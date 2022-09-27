@@ -75,6 +75,7 @@ socket = "0.0.7"
 
 [patch.crates-io]
 openshift-openapi = { git = "https://github.com/deepflowys/openshift-openapi.git" }
+kube = { git = "https://github.com/deepflowys/kube", tag = "0.74.1" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 pcap = "0.10.1"
