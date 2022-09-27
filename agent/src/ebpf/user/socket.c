@@ -1335,14 +1335,20 @@ struct http2_buffer_header {
 void print_uprobe_http2_info(const char *data, int len)
 {
 	struct http2_buffer_header header;
-	char key[256] = { 0 };
-	char value[256] = { 0 };
+	char key[1024] = { 0 };
+	char value[1024] = { 0 };
 	memcpy(&header, data, sizeof(header));
 	printf("fd=[%d]\n", header.fd);
 	printf("stream_id=[%d]\n", header.stream_id);
+
+	const int value_start = sizeof(header) + header.header_len;
+
+	header.header_len = header.header_len < 1024 ? header.header_len : 1023;
+	header.value_len = header.value_len < 1024 ? header.value_len : 1023;
+
 	memcpy(&key, data + sizeof(header), header.header_len);
-	memcpy(&value, data + sizeof(header) + header.header_len,
-	       header.value_len);
+	memcpy(&value, data + value_start, header.value_len);
+
 	printf("header=[%s:%s]\n", key, value);
 	fflush(stdout);
 	return;
