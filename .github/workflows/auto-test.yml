@@ -360,7 +360,7 @@ jobs:
 
       - name: add deepflow helm repo
         run: |
-          helm repo add deepflow https://deepflowys.github.io/deepflow
+          helm repo add deepflow https://deepflowys.github.io/deepflow-charts
           helm repo update deepflow 
 
       - name: install and upgrade deepflow server 
@@ -509,7 +509,7 @@ jobs:
 
       - name: install deepflow
         run: |
-          helm repo add deepflow https://deepflowys.github.io/deepflow
+          helm repo add deepflow https://deepflowys.github.io/deepflow-charts
           helm repo update deepflow 
           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
               --set global.allInOneLocalStorage=true \
