@@ -77,3 +77,8 @@ DeepFlow 官方社群对外开放，欢迎加入讨论：
 
 - 感谢 [eBPF](https://ebpf.io/)，革命性的 Linux 内核技术
 - 感谢 [OpenTelemetry](https://opentelemetry.io/)，提供了采集应用可观测性数据的标准 API
+
+# Landscapes
+
+- DeepFlow 已加入 <a href="https://landscape.cncf.io/?selected=deep-flow">CNCF CLOUD NATIVE Landscape</a>
+- DeepFlow 已加入 <a href="https://ebpf.io/applications#deepflow">eBPF Project Landscape</a>
