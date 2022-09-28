@@ -17,16 +17,14 @@ use serde::Serialize;
 
 use super::super::{
     consts::KAFKA_REQ_HEADER_LEN, value_is_default, value_is_negative, AppProtoHead,
-    AppProtoLogsInfo, L7LogParse, L7ResponseStatus, LogMessageType,
+    L7ResponseStatus, LogMessageType,
 };
 
 use crate::common::flow::L7Protocol;
 use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
-use crate::common::lookup_key::LookupKey;
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
-use crate::flow_generator::protocol_logs::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::{__log_info_merge, ignore_non_raw_protocol};
 use crate::{
     common::enums::IpProtocol,
@@ -195,23 +193,18 @@ impl L7ProtocolLogInterface for KafkaLog {
         __log_info_merge!(self, KafkaLog, other);
     }
 
-    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
-        return Self::kafka_check_protocol(payload, lookup_key);
+        return Self::kafka_check_protocol(payload, param);
     }
 
-    fn parse_payload(
-        mut self,
-        payload: &[u8],
-        lookup_key: &crate::_LookupKey,
-        param: crate::common::l7_protocol_log::ParseParam,
-    ) -> Result<Vec<crate::common::l7_protocol_log::L7ProtocolLog>> {
+    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
         self.start_time = param.time;
         self.end_time = param.time;
         Self::parse(
             &mut self,
             payload,
-            lookup_key.proto,
+            param.l4_protocol,
             param.direction,
             None,
             None,
@@ -247,7 +240,7 @@ impl L7ProtocolLogInterface for KafkaLog {
         return false;
     }
 
-    fn get_default(&self) -> L7ProtocolLog {
+    fn reset_and_copy(&self) -> L7ProtocolLog {
         return L7ProtocolLog::KafkaLog(Self::default());
     }
 }
@@ -316,9 +309,8 @@ impl KafkaLog {
 
     // 这个逻辑是直接复制 kafka_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
     // 后面把perf抽象后只会保留在这个
-    pub fn kafka_check_protocol(payload: &[u8], lookup_key: &LookupKey) -> bool {
-        if lookup_key.proto != IpProtocol::Tcp {
-            // *bitmap &= !(1 << u8::from(L7Protocol::Kafka));
+    pub fn kafka_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
 
@@ -333,9 +325,7 @@ impl KafkaLog {
         }
         return kafka.info.check();
     }
-}
 
-impl L7LogParse for KafkaLog {
     fn parse(
         &mut self,
         payload: &[u8],
@@ -343,7 +333,7 @@ impl L7LogParse for KafkaLog {
         direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -351,15 +341,11 @@ impl L7LogParse for KafkaLog {
         if payload.len() < KAFKA_REQ_HEADER_LEN {
             return Err(Error::KafkaLogParseFailed);
         }
-        let head = match direction {
+        match direction {
             PacketDirection::ClientToServer => self.request(payload, false),
             PacketDirection::ServerToClient => self.response(payload),
         }?;
-        Ok(AppProtoHeadEnum::Single(head))
-    }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Kafka(self.info.clone()))
+        return Ok(());
     }
 }
 

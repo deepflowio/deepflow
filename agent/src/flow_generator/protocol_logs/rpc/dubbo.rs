@@ -19,20 +19,18 @@ use log::debug;
 use serde::Serialize;
 
 use super::super::{
-    consts::*, value_is_default, value_is_negative, AppProtoHead, AppProtoLogsInfo, L7LogParse,
-    L7ResponseStatus, LogMessageType,
+    consts::*, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
 };
 
 use crate::common::enums::IpProtocol;
 use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
+use crate::common::l7_protocol_log::ParseParam;
 use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface};
-use crate::common::lookup_key::LookupKey;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
-use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::utils::bytes::{read_u32_be, read_u64_be};
 use crate::{__log_info_merge, ignore_non_raw_protocol};
 
@@ -128,28 +126,22 @@ impl L7ProtocolLogInterface for DubboLog {
         __log_info_merge!(self, DubboLog, other);
     }
 
-    fn check_payload(
-        &mut self,
-        payload: &[u8],
-        lookup_key: &LookupKey,
-        param: crate::common::l7_protocol_log::ParseParam,
-    ) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
-        return Self::dubbo_check_protocol(payload, lookup_key);
+        return Self::dubbo_check_protocol(payload, param);
     }
 
     fn parse_payload(
         mut self,
         payload: &[u8],
-        lookup_key: &crate::_LookupKey,
-        param: crate::common::l7_protocol_log::ParseParam,
+        param: &ParseParam,
     ) -> Result<Vec<crate::common::l7_protocol_log::L7ProtocolLog>> {
         self.start_time = param.time;
         self.end_time = param.time;
         Self::parse(
             &mut self,
             payload,
-            lookup_key.proto,
+            param.l4_protocol,
             param.direction,
             None,
             None,
@@ -185,7 +177,7 @@ impl L7ProtocolLogInterface for DubboLog {
         return false;
     }
 
-    fn get_default(&self) -> L7ProtocolLog {
+    fn reset_and_copy(&self) -> L7ProtocolLog {
         let mut log = Self::default();
         log.l7_log_dynamic_config = self.l7_log_dynamic_config.clone();
         return L7ProtocolLog::DubboLog(log);
@@ -345,8 +337,8 @@ impl DubboLog {
 
     // 这个逻辑是直接复制 dubbo_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
     // 后面把perf抽象后只会保留在这个
-    pub fn dubbo_check_protocol(payload: &[u8], lookup_key: &LookupKey) -> bool {
-        if lookup_key.proto != IpProtocol::Tcp {
+    pub fn dubbo_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
 
@@ -359,9 +351,7 @@ impl DubboLog {
 
         return header.check();
     }
-}
 
-impl L7LogParse for DubboLog {
     fn parse(
         &mut self,
         payload: &[u8],
@@ -369,7 +359,7 @@ impl L7LogParse for DubboLog {
         direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -386,16 +376,7 @@ impl L7LogParse for DubboLog {
                 self.response(&dubbo_header);
             }
         }
-        Ok(AppProtoHeadEnum::Single(AppProtoHead {
-            proto: self.protocol().0,
-            msg_type: self.msg_type,
-            rrt: 0,
-            ..Default::default()
-        }))
-    }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Dubbo(self.info.clone()))
+        return Ok(());
     }
 }
 

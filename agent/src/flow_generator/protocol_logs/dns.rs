@@ -16,14 +16,10 @@
 use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
-use super::{
-    consts::*, value_is_default, AppProtoHead, AppProtoHeadEnum, AppProtoLogsInfo,
-    AppProtoLogsInfoEnum, L7LogParse, L7ResponseStatus, LogMessageType,
-};
+use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
 use crate::common::flow::L7Protocol;
 use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
-use crate::common::lookup_key::LookupKey;
 use crate::{__log_info_merge, ignore_non_raw_protocol};
 use crate::{
     common::{
@@ -134,25 +130,20 @@ impl L7ProtocolLogInterface for DnsLog {
         __log_info_merge!(self, DnsLog, other);
     }
 
-    fn check_payload(&mut self, payload: &[u8], lk: &LookupKey, param: ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
         self.start_time = param.time;
         self.end_time = param.time;
-        return self.dns_check_protocol(payload, lk, param.direction);
+        return self.dns_check_protocol(payload, param);
     }
 
-    fn parse_payload(
-        mut self,
-        payload: &[u8],
-        lk: &LookupKey,
-        param: ParseParam,
-    ) -> Result<Vec<L7ProtocolLog>> {
+    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
         if self.parsed {
             return Ok(vec![L7ProtocolLog::DnsLog(self)]);
         }
         self.start_time = param.time;
         self.end_time = param.time;
-        self.parse(payload, lk.proto, param.direction, None, None)?;
+        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         return Ok(vec![L7ProtocolLog::DnsLog(self)]);
     }
 
@@ -180,7 +171,7 @@ impl L7ProtocolLogInterface for DnsLog {
         return false;
     }
 
-    fn get_default(&self) -> L7ProtocolLog {
+    fn reset_and_copy(&self) -> L7ProtocolLog {
         return L7ProtocolLog::DnsLog(Self::default());
     }
 }
@@ -194,16 +185,11 @@ impl DnsLog {
         self.info.status_code = None;
     }
 
-    pub fn dns_check_protocol(
-        &mut self,
-        payload: &[u8],
-        lookup_key: &LookupKey,
-        direction: PacketDirection,
-    ) -> bool {
-        if lookup_key.dst_port != DNS_PORT && lookup_key.src_port != DNS_PORT {
+    pub fn dns_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if param.port_dst != DNS_PORT && param.port_src != DNS_PORT {
             return false;
         }
-        let ret = self.parse(payload, lookup_key.proto, direction, None, None);
+        let ret = self.parse(payload, param.l4_protocol, param.direction, None, None);
         self.parsed = ret.is_ok() && self.msg_type == LogMessageType::Request;
         return self.parsed;
     }
@@ -405,7 +391,7 @@ impl DnsLog {
         }
     }
 
-    fn decode_payload(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
+    fn decode_payload(&mut self, payload: &[u8]) -> Result<()> {
         if payload.len() <= DNS_HEADER_SIZE {
             let err_msg = format!("dns payload length too short:{}", payload.len());
             return Err(Error::DNSLogParseFailed(err_msg));
@@ -439,16 +425,9 @@ impl DnsLog {
             self.msg_type = LogMessageType::Response;
         }
 
-        Ok(AppProtoHead {
-            proto: L7Protocol::Dns,
-            msg_type: self.msg_type,
-            rrt: 0,
-        })
+        return Ok(());
     }
-}
 
-// TODO 这个接口以后不再使用,parse逻辑要保留
-impl L7LogParse for DnsLog {
     fn parse(
         &mut self,
         payload: &[u8],
@@ -456,10 +435,10 @@ impl L7LogParse for DnsLog {
         _direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         self.reset_logs();
         match proto {
-            IpProtocol::Udp => Ok(AppProtoHeadEnum::Single(self.decode_payload(payload)?)),
+            IpProtocol::Udp => self.decode_payload(payload),
             IpProtocol::Tcp => {
                 if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
                     let err_msg = format!("dns payload length error:{}", payload.len());
@@ -470,19 +449,13 @@ impl L7LogParse for DnsLog {
                     let err_msg = format!("dns payload length error:{}", size);
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
-                Ok(AppProtoHeadEnum::Single(
-                    self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])?,
-                ))
+                return self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..]);
             }
             _ => {
                 let err_msg = format!("dns payload length error:{}", payload.len());
                 return Err(Error::DNSLogParseFailed(err_msg));
             }
         }
-    }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Dns(self.info.clone()))
     }
 }
 
