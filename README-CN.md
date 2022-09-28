@@ -6,7 +6,7 @@
 <p align="center">
     <img alt="GitHub Release" src="https://img.shields.io/github/v/release/deepflowys/deepflow"> </a>
     <img alt="docker pulls" src="https://img.shields.io/docker/pulls/deepflowce/deepflow-agent?color=green?label=docker pulls"> </a>
-    <img alt="License" src="https://img.shields.io/github/license/deepflowys/deepflow?color=yellow"> </a>
+    <img alt="License" src="https://img.shields.io/github/license/deepflowys/deepflow?color=purple"> </a>
 </p>
 
 -------------
