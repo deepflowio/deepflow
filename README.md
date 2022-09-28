@@ -77,3 +77,8 @@ Join the WeChat group，you can communicate with other users (in Chinese):
 
 - Thanks [eBPF](https://ebpf.io/), a revolutionary Linux kernel technology.
 - Thanks [OpenTelemetry](https://opentelemetry.io/), provides vendor-neutral APIs to collect application telemetry data.
+
+# Landscapes
+
+- DeepFlow enriches the <a href="https://landscape.cncf.io/?selected=deep-flow">CNCF CLOUD NATIVE Landscape</a>.
+- DeepFlow enriches the <a href="https://ebpf.io/applications#deepflow">eBPF Project Landscape</a>.
