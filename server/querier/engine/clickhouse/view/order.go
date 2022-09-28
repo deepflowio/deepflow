@@ -61,6 +61,7 @@ type Order struct {
 	NodeBase
 	SortBy  string
 	OrderBy string
+	IsField bool
 }
 
 func (n *Order) ToString() string {
@@ -70,9 +71,13 @@ func (n *Order) ToString() string {
 }
 
 func (n *Order) WriteTo(buf *bytes.Buffer) {
-	buf.WriteString("`")
-	buf.WriteString(strings.Trim(n.SortBy, "`"))
-	buf.WriteString("`")
+	if n.IsField {
+		buf.WriteString("`")
+		buf.WriteString(strings.Trim(n.SortBy, "`"))
+		buf.WriteString("`")
+	} else {
+		buf.WriteString(n.SortBy)
+	}
 	buf.WriteString(" ")
 	if n.OrderBy == "" {
 		buf.WriteString("ASC")
