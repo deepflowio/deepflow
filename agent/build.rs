@@ -38,7 +38,7 @@ struct EnvCommand(&'static str, Vec<&'static str>);
 fn set_build_info() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=AGENT_NAME=deepflow-agent-ce");
     let entries = vec![
-        EnvCommand("BRANCH", vec!["git", "branch", "--show-current"]),
+        EnvCommand("BRANCH", vec!["git", "rev-parse", "--abbrev-ref", "HEAD"]),
         EnvCommand("COMMIT_ID", vec!["git", "rev-parse", "HEAD"]),
         EnvCommand("REV_COUNT", vec!["git", "rev-list", "--count", "HEAD"]),
         EnvCommand("RUSTC_VERSION", vec!["rustc", "--version"]),
