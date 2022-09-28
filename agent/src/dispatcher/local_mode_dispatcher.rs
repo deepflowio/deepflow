@@ -421,7 +421,7 @@ impl LocalModeDispatcherListener {
     fn get_if_index_to_inner_mac_map(poller: &GenericPoller) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
-        if let Some(entries) = poller.get_interface_info() {
+        if let Some(entries) = poller.get_interface_info_in(&None) {
             debug!("Poller Mac:");
             for entry in entries {
                 debug!("\tif_index: {}, mac: {}", entry.tap_idx, entry.mac);

@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+use std::fmt::Debug;
+
+use neli::err::{NlError, SerError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -29,8 +32,8 @@ pub enum Error {
     #[error("link regex invalid")]
     LinkRegexInvalid(#[from] regex::Error),
     #[cfg(target_os = "linux")]
-    #[error("netlink error")]
-    NetLinkError(#[from] neli::err::NlError),
+    #[error("netlink error: {0}")]
+    NetlinkError(String),
     #[error("IO error")]
     IoError(#[from] std::io::Error),
     #[error("no route to host: {0}")]
@@ -44,6 +47,18 @@ pub enum Error {
     Errno(#[from] nix::errno::Errno),
     #[error("ethtool: {0}")]
     Ethtool(String),
+}
+
+impl<T: Debug, P: Debug> From<NlError<T, P>> for Error {
+    fn from(e: NlError<T, P>) -> Self {
+        Self::NetlinkError(format!("{}", e))
+    }
+}
+
+impl From<SerError> for Error {
+    fn from(e: SerError) -> Self {
+        Self::NetlinkError(format!("{}", e))
+    }
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

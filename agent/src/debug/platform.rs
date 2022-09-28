@@ -61,20 +61,16 @@ impl PlatformDebugger {
     }
 
     pub(super) fn mac_mapping(&self) -> Vec<PlatformMessage> {
-        let mapping = self.poller.get_interface_info().map(|infos| {
-            let mut entries = infos
-                .into_iter()
-                .map(|i| (i.tap_idx, i.mac.to_string()))
-                .collect::<Vec<_>>();
-            entries.sort();
-            entries
-        });
-        match mapping {
-            Some(m) => {
-                let res = vec![PlatformMessage::MacMappings(Some(m)), PlatformMessage::Fin];
-                res
-            }
-            None => vec![PlatformMessage::NotFound],
-        }
+        let mut mappings = self
+            .poller
+            .get_interface_info()
+            .into_iter()
+            .map(|i| (i.tap_idx, i.mac.to_string()))
+            .collect::<Vec<_>>();
+        mappings.sort();
+        vec![
+            PlatformMessage::MacMappings(Some(mappings)),
+            PlatformMessage::Fin,
+        ]
     }
 }

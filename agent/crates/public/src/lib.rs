@@ -22,6 +22,8 @@ pub mod enums;
 pub mod error;
 pub mod l7_protocol;
 pub mod leaky_bucket;
+#[cfg(target_os = "linux")]
+pub mod netns;
 pub mod packet;
 pub mod queue;
 pub mod utils;

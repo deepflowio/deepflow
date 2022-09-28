@@ -338,8 +338,8 @@ fn get_pcap_interfaces() -> Result<Vec<Link>> {
     Ok(pcap_interfaces)
 }
 
-// Link { if_index: 6, mac_addr: 00:15:5d:70:01:03, adapter_uid: "{1AF9CCBA-3FEE-4CD1-810F-3761F8A4DE25}", name: "vEthernet (NAT-VM)", if_type: Some("ethernet"), parent_index: None }
-// Link { if_index: 19, mac_addr: b0:60:88:51:d7:54, adapter_uid: "{95BC9BD0-4C29-44FC-B0C7-896326EF378F}", name: "WLAN", if_type: Some("ieee80211"), parent_index: None }
+// Link { if_index: 6, mac_addr: 00:15:5d:70:01:03, adapter_uid: "{1AF9CCBA-3FEE-4CD1-810F-3761F8A4DE25}", name: "vEthernet (NAT-VM)", if_type: Some("ethernet"), peer_index: None }
+// Link { if_index: 19, mac_addr: b0:60:88:51:d7:54, adapter_uid: "{95BC9BD0-4C29-44FC-B0C7-896326EF378F}", name: "WLAN", if_type: Some("ieee80211"), peer_index: None }
 fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
     // recommended initial size
     const RECOMMENDED_BUF_SIZE: u32 = 15000;
@@ -484,7 +484,7 @@ fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 mac_addr,
                 if_index,
                 flags,
-                parent_index: None,
+                peer_index: None,
                 device_name: "".to_string(),
             });
 

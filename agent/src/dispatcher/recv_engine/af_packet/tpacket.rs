@@ -104,7 +104,7 @@ impl Tpacket {
             // 根据网卡名称获取网卡if_index
             let link = link_by_name(self.opts.iface.clone()).map_err(|e| match e {
                 net::Error::LinkNotFound(s) => af_packet::Error::LinkError(s),
-                net::Error::NetLinkError(ne) => af_packet::Error::LinkError(ne.to_string()),
+                net::Error::NetlinkError(ne) => af_packet::Error::LinkError(ne.to_string()),
                 _ => unreachable!(),
             })?;
             if_index = link.if_index as i32;
