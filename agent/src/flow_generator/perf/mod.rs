@@ -35,6 +35,9 @@ use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::AppProtoHead;
 
+use crate::common::l7_protocol_log::{
+    get_bitmap, get_ext_protocol, L7ProtocolLog, L7ProtocolLogInterface, ParseParam,
+};
 use crate::common::{
     enums::IpProtocol,
     flow::{FlowPerfStats, L4Protocol, L7Protocol},
@@ -97,6 +100,9 @@ pub enum L7FlowPerfTable {
 pub struct FlowPerf {
     l4: L4FlowPerfTable,
     l7: Option<L7FlowPerfTable>,
+
+    // perf 目前还没有抽象出来,自定义协议需要添加字段区分,以后抽出来后 l7可以去掉.
+    l7_protocol_log: Option<L7ProtocolLog>,
 
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
@@ -197,6 +203,24 @@ impl FlowPerf {
                 return self._l7_parse(packet, flow_id, app_table);
             }
         }
+
+        // perf 还没有抽象出来,自定义协议需要单独处理,perf暂时是只check.
+        // 这里只记录下check出来的l7protocol并记录, 用于后面的l7解析
+        if let Some(payload) = packet.get_l4_payload() {
+            let param = ParseParam::from(packet);
+            for mut i in get_ext_protocol() {
+                if i.check_payload(payload, &param) {
+                    self.l7_protocol = i.protocol().0;
+                    self.l7_protocol_log = Some(i);
+                    if !self.is_success {
+                        app_table.set_protocol(packet, self.l7_protocol);
+                        self.is_success = true;
+                    }
+                    return Ok(());
+                }
+            }
+        }
+
         self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
 
         Err(Error::L7ProtocolUnknown)
@@ -210,6 +234,22 @@ impl FlowPerf {
     ) -> Result<()> {
         if self.l7.is_some() {
             return self._l7_parse(packet, flow_id, app_table);
+        }
+
+        // 目前perf 没有抽象, 自定义协议暂时只是check, 如果check成功那么会记录l7_protocol和log,避免重复check并用于下次解析.
+        // 后面perf抽出来后会去掉
+        if let Some(l7log) = &self.l7_protocol_log {
+            if let Some(payload) = packet.get_l4_payload() {
+                let param = ParseParam::from(packet);
+                let mut default_log = l7log.reset_and_copy();
+                if default_log.check_payload(payload, &param) {
+                    self.l7_protocol_log.replace(default_log);
+                    return Ok(());
+                }
+            }
+            self.l7_protocol_log = None;
+            self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+            return Err(Error::L7ProtocolUnknown);
         }
 
         if self.is_from_app {
@@ -242,18 +282,13 @@ impl FlowPerf {
         Some(Self {
             l4,
             l7: Self::l7_new(l7_protocol, rrt_cache.clone()),
-            protocol_bitmap: if l4_proto == L4Protocol::Tcp {
-                1 << (L7Protocol::Http1 as u8)
-                    | 1 << (L7Protocol::Http2 as u8)
-                    | 1 << (L7Protocol::Dns as u8)
-                    | 1 << (L7Protocol::Mysql as u8)
-                    | 1 << (L7Protocol::Redis as u8)
-                    | 1 << (L7Protocol::Dubbo as u8)
-                    | 1 << (L7Protocol::Kafka as u8)
-                    | 1 << (L7Protocol::Mqtt as u8)
-            } else {
-                1 << (L7Protocol::Dns as u8)
+            protocol_bitmap: {
+                match l4_proto {
+                    L4Protocol::Tcp => get_bitmap(IpProtocol::Tcp),
+                    _ => get_bitmap(IpProtocol::Udp),
+                }
             },
+            l7_protocol_log: None,
             rrt_cache,
             l7_protocol,
             is_from_app: l7_proto.is_some(),
@@ -325,6 +360,12 @@ impl FlowPerf {
         }
         if let Some(l7) = self.l7.as_mut() {
             l7.app_proto_head()
+        } else if let Some(l7log) = &self.l7_protocol_log {
+            if let Some(h) = l7log.app_proto_head() {
+                return Some((h, 0));
+            } else {
+                return None;
+            }
         } else {
             None
         }

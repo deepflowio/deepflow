@@ -27,9 +27,7 @@ use nom::{
 use serde::{Serialize, Serializer};
 
 use super::super::{
-    value_is_default, value_is_negative, AppProtoHead, AppProtoHeadEnum, AppProtoLogsBaseInfo,
-    AppProtoLogsData, AppProtoLogsInfo, AppProtoLogsInfoEnum, L7LogParse, L7ResponseStatus,
-    LogMessageType,
+    value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
 };
 
 use crate::common::flow::L7Protocol;
@@ -44,10 +42,7 @@ use crate::{
     proto::flow_log::MqttTopic,
 };
 use crate::{
-    common::{
-        l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam},
-        lookup_key::LookupKey,
-    },
+    common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam},
     ignore_non_raw_protocol,
 };
 
@@ -204,26 +199,21 @@ impl L7ProtocolLogInterface for MqttLog {
         return Ok(());
     }
 
-    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
-        return Self::mqtt_check_protocol(payload, lookup_key);
+        return Self::mqtt_check_protocol(payload, param);
     }
 
-    fn parse_payload(
-        mut self,
-        payload: &[u8],
-        lookup_key: &LookupKey,
-        param: ParseParam,
-    ) -> Result<Vec<L7ProtocolLog>> {
-        let header = self.parse(payload, lookup_key.proto, param.direction, None, None)?;
+    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
+        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         let mut v = vec![];
-        for (h, i) in header.into_iter().zip(self.info.into_iter()).into_iter() {
+        for i in self.info.into_iter() {
             let version = i.version;
             let status = i.status;
             v.push(L7ProtocolLog::MqttLog(Self {
                 // 目前暂时是将info 单独拉到每个log上，后面再优化
                 info: vec![i],
-                msg_type: h.msg_type,
+                msg_type: self.msg_type,
                 status: status,
                 version: version,
                 // 这里的client_map 后面并不会用到，暂时用new应付编译器
@@ -264,43 +254,13 @@ impl L7ProtocolLogInterface for MqttLog {
         return false;
     }
 
-    fn get_default(&self) -> L7ProtocolLog {
+    fn reset_and_copy(&self) -> L7ProtocolLog {
         return L7ProtocolLog::MqttLog(Self::default());
     }
 }
 
 impl MqttLog {
-    pub fn amend_mqtt_proto_log_and_generate_log_data(
-        &mut self,
-        mut special_info: AppProtoLogsInfo,
-        base_info: AppProtoLogsBaseInfo,
-    ) -> Result<AppProtoLogsData> {
-        if let AppProtoLogsInfo::Mqtt(ref mut info) = special_info {
-            let key = base_info.flow_id;
-            match info.pkt_type {
-                PacketKind::Connect => {
-                    let client_id = info.client_id.as_ref().unwrap().clone();
-                    self.client_map.insert(key, client_id);
-                }
-                PacketKind::Disconnect => info.client_id = self.client_map.remove(&key),
-                _ => {
-                    info.client_id = {
-                        match self.client_map.get(&key) {
-                            Some(v) => Some(v.clone()),
-                            None => {
-                                debug!("client id not found, maybe four tuple(src_ip, dst_ip, src_port, dst_port) already changed, 
-                                or CONNECT packet not found, or treat other packets as MQTT packets.");
-                                return Err(Error::MqttLogParseFailed);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok(AppProtoLogsData::new(base_info, special_info))
-    }
-
-    fn parse_mqtt_info(&mut self, mut payload: &[u8]) -> Result<Vec<AppProtoHead>> {
+    fn parse_mqtt_info(&mut self, mut payload: &[u8]) -> Result<()> {
         // 现在只支持MQTT 3.1.1解析，不支持v5.0
         // Now only supports MQTT 3.1.1 parsing, not support v5.0
         if self.version != 0 && self.version != 4 {
@@ -308,7 +268,6 @@ impl MqttLog {
             return Err(Error::MqttLogParseFailed);
         }
 
-        let mut app_proto_heads = vec![];
         loop {
             let (input, header) =
                 mqtt_fixed_header(payload).map_err(|_| Error::MqttLogParseFailed)?;
@@ -422,12 +381,6 @@ impl MqttLog {
                 }
             }
 
-            app_proto_heads.push(AppProtoHead {
-                proto: L7Protocol::Mqtt,
-                msg_type: self.msg_type,
-                rrt: 0,
-                ..Default::default()
-            });
             info.status = self.status;
             self.info.push(info);
 
@@ -437,16 +390,16 @@ impl MqttLog {
             payload = &input[header.remaining_length as usize..];
         }
 
-        if app_proto_heads.is_empty() {
+        if self.info.is_empty() {
             return Err(Error::MqttLogParseFailed);
         }
-        Ok(app_proto_heads)
+        Ok(())
     }
 
     // 这个逻辑是直接复制 mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
     // 后面把perf抽象后只会保留在这个
-    pub fn mqtt_check_protocol(payload: &[u8], lookup_key: &LookupKey) -> bool {
-        if lookup_key.proto != IpProtocol::Tcp {
+    pub fn mqtt_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
 
@@ -469,9 +422,7 @@ impl MqttLog {
 
         false
     }
-}
 
-impl L7LogParse for MqttLog {
     fn parse(
         &mut self,
         payload: &[u8],
@@ -479,36 +430,16 @@ impl L7LogParse for MqttLog {
         _direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
         self.status = L7ResponseStatus::Ok;
         self.info.clear();
-        let mut proto_head = self.parse_mqtt_info(payload).map_err(|e| {
+        return self.parse_mqtt_info(payload).map_err(|e| {
             self.status = L7ResponseStatus::Error;
             e
-        })?;
-        if proto_head.len() == 1 {
-            Ok(AppProtoHeadEnum::Single(proto_head.pop().unwrap()))
-        } else {
-            Ok(AppProtoHeadEnum::Multi(proto_head))
-        }
-    }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        if self.info.len() == 0 {
-            AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Mqtt(Default::default()))
-        } else if self.info.len() == 1 {
-            AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Mqtt(self.info.last().unwrap().clone()))
-        } else {
-            AppProtoLogsInfoEnum::Multi(
-                self.info
-                    .iter()
-                    .map(|i| AppProtoLogsInfo::Mqtt(i.clone()))
-                    .collect(),
-            )
-        }
+        });
     }
 }
 
