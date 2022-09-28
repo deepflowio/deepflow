@@ -52,6 +52,7 @@ type VTapLKResult struct {
 	LaunchServerID int
 	VTapName       string
 	AZ             string
+	Region         string
 	Lcuuid         string
 }
 
@@ -182,6 +183,7 @@ func (l *VTapLKData) LookUpVTapByHost(db *gorm.DB) *VTapLKResult {
 		launchServerID int
 		vTapName       string
 		az             string
+		region         string
 	)
 	if dbHost.HType == HOST_HTYPE_HYPER_V {
 		vTapType = VTAP_TYPE_HYPER_V
@@ -192,6 +194,7 @@ func (l *VTapLKData) LookUpVTapByHost(db *gorm.DB) *VTapLKResult {
 	launchServerID = dbHost.ID
 	vTapName = fmt.Sprintf("%s-H%d", dbHost.Name, dbHost.ID)
 	az = dbHost.AZ
+	region = dbHost.Region
 
 	return &VTapLKResult{
 		VTapType:       vTapType,
@@ -199,6 +202,7 @@ func (l *VTapLKData) LookUpVTapByHost(db *gorm.DB) *VTapLKResult {
 		LaunchServerID: launchServerID,
 		VTapName:       vTapName,
 		AZ:             az,
+		Region:         region,
 		Lcuuid:         uuid.NewString(),
 	}
 }
@@ -216,6 +220,7 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 		LaunchServerID:  vtapLKData.LaunchServerID,
 		Name:            vtapLKData.VTapName,
 		AZ:              vtapLKData.AZ,
+		Region:          vtapLKData.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_LOCAL,
@@ -328,6 +333,7 @@ func (l *VTapLKData) LookUpVTapByPodNode(db *gorm.DB) *VTapLKResult {
 		LaunchServerID: matchPodNode.ID,
 		VTapName:       vTapName,
 		AZ:             matchPodNode.AZ,
+		Region:         matchPodNode.Region,
 		Lcuuid:         matchPodNode.Lcuuid,
 	}
 }
@@ -345,6 +351,7 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 		LaunchServerID:  vtapLKResult.LaunchServerID,
 		Name:            vtapLKResult.VTapName,
 		AZ:              vtapLKResult.AZ,
+		Region:          vtapLKResult.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_LOCAL,
@@ -451,6 +458,7 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 		LaunchServerID: host.ID,
 		VTapName:       vTapName,
 		AZ:             host.AZ,
+		Region:         host.Region,
 		Lcuuid:         uuid.NewString(),
 	}
 }
@@ -468,6 +476,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 		LaunchServerID:  vtapLKResult.LaunchServerID,
 		Name:            vtapLKResult.VTapName,
 		AZ:              vtapLKResult.AZ,
+		Region:          vtapLKResult.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_MIRROR,
@@ -528,6 +537,7 @@ func (l *VTapLKData) LookUpLocalVTapByIP(db *gorm.DB) *VTapLKResult {
 		LaunchServerID: vm.ID,
 		VTapName:       vTapName,
 		AZ:             vm.AZ,
+		Region:         vm.Region,
 		Lcuuid:         vm.Lcuuid,
 	}
 }
@@ -545,6 +555,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		LaunchServerID:  vtapLKResult.LaunchServerID,
 		Name:            vtapLKResult.VTapName,
 		AZ:              vtapLKResult.AZ,
+		Region:          vtapLKResult.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_LOCAL,
@@ -568,6 +579,7 @@ func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
 		Name:            r.host,
 		LaunchServer:    r.ctrlIP,
 		AZ:              az.Lcuuid,
+		Region:          r.region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
 		TapMode:         TAPMODE_ANALYZER,

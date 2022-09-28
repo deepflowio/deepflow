@@ -153,11 +153,14 @@ func GetVtaps(filter map[string]interface{}) (resp []model.Vtap, err error) {
 			vtapResp.VtapGroupName = groupName
 		}
 		// regions
-		if region, ok := azToRegion[vtap.AZ]; ok {
-			if regionName, ok := lcuuidToRegion[region]; ok {
-				vtapResp.RegionName = regionName
+		vtapResp.Region = vtap.Region
+		if len(vtapResp.Region) == 0 {
+			if region, ok := azToRegion[vtap.AZ]; ok {
+				vtapResp.Region = region
 			}
-			vtapResp.Region = region
+		}
+		if regionName, ok := lcuuidToRegion[vtapResp.Region]; ok {
+			vtapResp.RegionName = regionName
 		}
 
 		switch vtap.Type {
@@ -215,6 +218,7 @@ func CreateVtap(vtapCreate model.VtapCreate) (model.Vtap, error) {
 	vtap.CtrlMac = vtapCreate.CtrlMac
 	vtap.LaunchServer = vtapCreate.CtrlIP
 	vtap.AZ = vtapCreate.AZ
+	vtap.Region = vtapCreate.Region
 	vtap.VtapGroupLcuuid = vtapCreate.VtapGroupLcuuid
 	switch vtapCreate.Type {
 	case common.VTAP_TYPE_DEDICATED:

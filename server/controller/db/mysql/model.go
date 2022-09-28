@@ -891,6 +891,7 @@ type VTap struct {
 	LaunchServer       string    `gorm:"column:launch_server;type:char(64);not null" json:"LAUNCH_SERVER"`
 	LaunchServerID     int       `gorm:"column:launch_server_id;type:int;default:null" json:"LAUNCH_SERVER_ID"`
 	AZ                 string    `gorm:"column:az;type:char(64);default:''" json:"AZ"`
+	Region             string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Revision           string    `gorm:"column:revision;type:char(64);default:null" json:"REVISION"`
 	SyncedControllerAt time.Time `gorm:"column:synced_controller_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_CONTROLLER_AT"`
 	SyncedAnalyzerAt   time.Time `gorm:"column:synced_analyzer_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_ANALYZER_AT"`
