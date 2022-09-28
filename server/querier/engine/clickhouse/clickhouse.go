@@ -275,12 +275,24 @@ func (e *CHEngine) ToSQLString() string {
 }
 
 func (e *CHEngine) parseOrderBy(order *sqlparser.Order) error {
-	e.Model.Orders.Append(
-		&view.Order{
-			SortBy:  chCommon.ParseAlias(order.Expr),
-			OrderBy: order.Direction,
-		},
-	)
+	switch expr := order.Expr.(type) {
+	case *sqlparser.FuncExpr:
+		e.Model.Orders.Append(
+			&view.Order{
+				SortBy:  sqlparser.String(expr),
+				OrderBy: order.Direction,
+				IsField: false,
+			},
+		)
+	case *sqlparser.ColName:
+		e.Model.Orders.Append(
+			&view.Order{
+				SortBy:  chCommon.ParseAlias(expr),
+				OrderBy: order.Direction,
+				IsField: true,
+			},
+		)
+	}
 	return nil
 }
 
