@@ -24,7 +24,7 @@ thiserror = "1.0"
 tonic = "0.8.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-neli = "0.5.3"
+neli = "0.6.2"
 nix = "0.23"
 
 [target.'cfg(target_os = "windows")'.dependencies]
