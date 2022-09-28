@@ -898,6 +898,7 @@ CREATE TABLE IF NOT EXISTS vtap (
     launch_server           CHAR(64) NOT NULL,
     launch_server_id        INTEGER,
     az                      CHAR(64) DEFAULT '',
+    region                  CHAR(64) DEFAULT '',
     revision                CHAR(64),
     synced_controller_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     synced_analyzer_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
