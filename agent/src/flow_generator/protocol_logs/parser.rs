@@ -31,22 +31,23 @@ use arc_swap::access::Access;
 use log::{debug, info, warn};
 
 use super::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsInfo, DnsLog, DubboLog,
-    KafkaLog, LogMessageType, MqttLog, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, KafkaLog,
+    LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
 
-use crate::common::ebpf::EbpfType;
+use crate::common::{
+    ebpf::EbpfType,
+    l7_protocol_log::{get_all_protocol, L7ProtocolLog, L7ProtocolLogInterface, ParseParam},
+};
 use crate::{
     common::{
         enums::EthernetType,
-        flow::{get_uniq_flow_id_in_one_minute, L7Protocol, PacketDirection},
+        flow::{get_uniq_flow_id_in_one_minute, PacketDirection},
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
     flow_generator::{
-        error::Result,
-        protocol_logs::{HttpLog, L7LogParse},
-        FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
+        error::Result, protocol_logs::HttpLog, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
     },
     metric::document::TapSide,
     sender::SendItem,
@@ -377,16 +378,13 @@ impl SessionQueue {
     }
 
     fn calc_key(item: &AppProtoLogsData) -> u64 {
-        if let AppProtoLogsInfo::Mqtt(_) = item.special_info {
+        if let L7ProtocolLog::MqttLog(_) = item.special_info {
             return item.base_info.flow_id;
         }
-        let request_id = match &item.special_info {
-            AppProtoLogsInfo::Dns(d) => d.trans_id as u32,
-            AppProtoLogsInfo::Dubbo(d) => d.serial_id as u32,
-            AppProtoLogsInfo::HttpV1(h) => h.stream_id,
-            AppProtoLogsInfo::HttpV2(h) => h.stream_id,
-            AppProtoLogsInfo::Kafka(k) => k.correlation_id,
-            _ => 0,
+        let request_id = if let Some(id) = item.special_info.session_id() {
+            id
+        } else {
+            0
         };
         // key需保证流日志1分钟内唯一，由1分钟内唯一的flow_id和request_id组成
         get_uniq_flow_id_in_one_minute(item.base_info.flow_id) << 32 | (request_id as u64)
@@ -535,7 +533,7 @@ impl AppProtoLogsParser {
                             &mut app_logs,
                         );
                         for app_proto in app_protos {
-                            let proto_logs = match Self::parse_log(*app_proto, &mut app_logs) {
+                            let proto_logs = match Self::parse_log(*app_proto, &config) {
                                 Ok(a) => a,
                                 Err(e) => {
                                     debug!("{}", e);
@@ -573,7 +571,7 @@ impl AppProtoLogsParser {
 
     fn parse_log(
         mut app_proto: MetaAppProto,
-        app_logs: &mut AppLogs,
+        config: &LogParserAccess,
     ) -> Result<Vec<AppProtoLogsData>> {
         // 应用流日志只存C2S方向,所以非C2S方向需要转换方向
         if app_proto.base_info.head.msg_type != LogMessageType::Request {
@@ -582,113 +580,33 @@ impl AppProtoLogsParser {
             swap(&mut base_info.ip_src, &mut base_info.ip_dst);
             swap(&mut base_info.l3_epc_id_src, &mut base_info.l3_epc_id_dst);
         }
-        let proto_log = match app_proto.base_info.head.proto {
-            L7Protocol::Dns => {
-                app_logs.dns.parse(
-                    app_proto.raw_proto_payload.as_slice(),
-                    app_proto.base_info.protocol,
-                    app_proto.direction,
-                    None,
-                    None,
-                )?;
-                let special_info = app_logs.dns.info();
-                let base_info = app_proto.base_info;
-                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
-            }
-            L7Protocol::Http1 | L7Protocol::Http2 => {
-                app_logs.http.parse(
-                    app_proto.raw_proto_payload.as_slice(),
-                    app_proto.base_info.protocol,
-                    app_proto.direction,
-                    None,
-                    None,
-                )?;
-                let special_info = app_logs.http.info();
-                let base_info = app_proto.base_info;
 
-                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
-            }
-            L7Protocol::Dubbo => {
-                app_logs.dubbo.parse(
-                    app_proto.raw_proto_payload.as_slice(),
-                    app_proto.base_info.protocol,
-                    app_proto.direction,
-                    None,
-                    None,
-                )?;
-                let special_info = app_logs.dubbo.info();
-                let base_info = app_proto.base_info;
-
-                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
-            }
-            L7Protocol::Kafka => {
-                app_logs.kafka.parse(
-                    app_proto.raw_proto_payload.as_slice(),
-                    app_proto.base_info.protocol,
-                    app_proto.direction,
-                    None,
-                    None,
-                )?;
-                let special_info = app_logs.kafka.info();
-                let base_info = app_proto.base_info;
-
-                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
-            }
-            L7Protocol::Mqtt => {
-                let heads = app_logs.mqtt.parse(
-                    app_proto.raw_proto_payload.as_slice(),
-                    app_proto.base_info.protocol,
-                    app_proto.direction,
-                    None,
-                    None,
-                )?;
-
-                let special_info = app_logs.mqtt.info();
-                let base_info = app_proto.base_info;
-
-                let result = special_info
-                    .into_iter()
-                    .zip(heads.into_iter())
-                    .map(|(v, head)| {
-                        let mut mqtt_base_info = base_info.clone();
-                        mqtt_base_info.head.msg_type = head.msg_type;
-                        app_logs
-                            .mqtt
-                            .amend_mqtt_proto_log_and_generate_log_data(v, mqtt_base_info)
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-
-                result
-            }
-            L7Protocol::Redis => {
-                app_logs.redis.parse(
-                    app_proto.raw_proto_payload.as_slice(),
-                    app_proto.base_info.protocol,
-                    app_proto.direction,
-                    None,
-                    None,
-                )?;
-                let special_info = app_logs.redis.info();
-                let base_info = app_proto.base_info;
-
-                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
-            }
-            L7Protocol::Mysql => {
-                app_logs.mysql.parse(
-                    app_proto.raw_proto_payload.as_slice(),
-                    app_proto.base_info.protocol,
-                    app_proto.direction,
-                    None,
-                    None,
-                )?;
-                let special_info = app_logs.mysql.info();
-                let base_info = app_proto.base_info;
-
-                vec![AppProtoLogsData::new(base_info, special_info.into_inner())]
-            }
-            _ => unreachable!(),
+        let mut logs = vec![];
+        let param = ParseParam {
+            l4_protocol: app_proto.base_info.protocol,
+            ip_src: app_proto.base_info.ip_src,
+            ip_dst: app_proto.base_info.ip_dst,
+            port_src: app_proto.base_info.port_src,
+            port_dst: app_proto.base_info.port_dst,
+            direction: app_proto.direction,
+            ebpf_type: EbpfType::None,
+            ebpf_param: None,
+            time: app_proto.base_info.start_time.as_micros() as u64,
         };
+        for mut i in get_all_protocol() {
+            if i.protocol().0 == app_proto.base_info.head.proto {
+                i.set_parse_config(config);
+                if let Ok(log) = i.parse_payload(app_proto.raw_proto_payload.as_slice(), &param) {
+                    for i in log.into_iter() {
+                        logs.push(AppProtoLogsData {
+                            base_info: app_proto.base_info.clone(),
+                            special_info: i,
+                        });
+                    }
+                }
+            }
+        }
 
-        Ok(proto_log)
+        return Ok(logs);
     }
 }

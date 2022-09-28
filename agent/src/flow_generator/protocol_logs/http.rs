@@ -23,8 +23,8 @@ use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
 use super::value_is_default;
-use super::{consts::*, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7ResponseStatus};
-use super::{AppProtoHeadEnum, AppProtoLogsInfoEnum, LogMessageType};
+use super::LogMessageType;
+use super::{consts::*, AppProtoHead, L7ResponseStatus};
 
 use crate::__log_info_merge;
 use crate::common::ebpf::EbpfType;
@@ -32,7 +32,6 @@ use crate::common::enums::IpProtocol;
 use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
-use crate::common::lookup_key::LookupKey;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
@@ -195,7 +194,7 @@ impl L7ProtocolLogInterface for HttpLog {
         __log_info_merge!(self, HttpLog, other);
     }
 
-    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         self.start_time = param.time;
         self.end_time = param.time;
         if let Some(p) = &param.ebpf_param {
@@ -222,20 +221,15 @@ impl L7ProtocolLogInterface for HttpLog {
             _ => {
                 // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
                 match self.proto {
-                    L7Protocol::Http1 => return self.http1_check_protocol(payload, lookup_key),
-                    L7Protocol::Http2 => return self.http2_check_protocol(payload, lookup_key),
+                    L7Protocol::Http1 => return self.http1_check_protocol(payload, param),
+                    L7Protocol::Http2 => return self.http2_check_protocol(payload, param),
                     _ => unreachable!(),
                 }
             }
         }
     }
 
-    fn parse_payload(
-        mut self,
-        payload: &[u8],
-        _lookup_key: &LookupKey,
-        param: ParseParam,
-    ) -> Result<Vec<L7ProtocolLog>> {
+    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
         if self.parsed {
             return Ok(vec![L7ProtocolLog::HttpLog(self)]);
         }
@@ -327,7 +321,7 @@ impl L7ProtocolLogInterface for HttpLog {
         return false;
     }
 
-    fn get_default(&self) -> L7ProtocolLog {
+    fn reset_and_copy(&self) -> L7ProtocolLog {
         let mut log = Self::default();
         log.l7_log_dynamic_config = self.l7_log_dynamic_config.clone();
         log.proto = self.proto;
@@ -388,8 +382,8 @@ impl HttpLog {
 
     // 这个逻辑直接复制 http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
     // 等perf抽象出来后，只会保留这一个
-    pub fn http1_check_protocol(&mut self, payload: &[u8], lookup_key: &LookupKey) -> bool {
-        if lookup_key.proto != IpProtocol::Tcp {
+    pub fn http1_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
 
@@ -410,8 +404,8 @@ impl HttpLog {
 
     // 这个逻辑直接复制 http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
     // 等perf抽象出来后，只会保留这一个
-    pub fn http2_check_protocol(&mut self, payload: &[u8], lookup_key: &LookupKey) -> bool {
-        if lookup_key.proto != IpProtocol::Tcp {
+    pub fn http2_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
             return false;
         }
         self.parsed = self
@@ -907,10 +901,7 @@ impl HttpLog {
             TraceType::TraceParent => Self::decode_traceparent(payload, id_type),
         }
     }
-}
 
-// TODO 这个接口后面去掉,逻辑保留.
-impl L7LogParse for HttpLog {
     fn parse(
         &mut self,
         payload: &[u8],
@@ -918,7 +909,7 @@ impl L7LogParse for HttpLog {
         direction: PacketDirection,
         is_req_end: Option<bool>,
         is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -933,22 +924,7 @@ impl L7LogParse for HttpLog {
                     .or(self.parse_http_v2(payload, direction))?;
             }
         }
-        Ok(AppProtoHeadEnum::Single(AppProtoHead {
-            proto: self.get_l7_protocol_with_tls(),
-            msg_type: self.msg_type,
-            rrt: 0,
-            ..Default::default()
-        }))
-    }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        if self.info.version == "2" {
-            return AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::HttpV2(self.info.clone()));
-        }
-        if self.is_https {
-            return AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::HttpV1TLS(self.info.clone()));
-        }
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::HttpV1(self.info.clone()))
+        Ok(())
     }
 }
 

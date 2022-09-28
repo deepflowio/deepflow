@@ -35,7 +35,7 @@ pub use parser::{AppProtoLogsParser, MetaAppProto};
 pub use rpc::{dubbo_check_protocol, DubboHeader, DubboInfo, DubboLog};
 pub use sql::{
     decode, mysql_check_protocol, redis_check_protocol, MysqlHeader, MysqlInfo, MysqlLog,
-    RedisInfo, RedisLog,
+    PostgresqlLog, RedisInfo, RedisLog,
 };
 
 use std::{
@@ -134,13 +134,11 @@ impl Default for L7ProtoRawDataType {
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct AppProtoHead {
-    // #[serde(rename = "l7_protocol")]
+    #[serde(rename = "l7_protocol")]
     pub proto: L7Protocol,
     pub msg_type: LogMessageType, // HTTP，DNS: request/response
     #[serde(rename = "response_duration")]
     pub rrt: u64, // HTTP，DNS时延: response-request
-                                  // #[serde(skip)]
-                                  // pub version: u8,
 }
 
 impl From<AppProtoHead> for flow_log::AppProtoHead {
@@ -448,80 +446,12 @@ impl AppProtoLogsBaseInfo {
     }
 }
 
-// TODO 这个结构后面去掉
-#[derive(Serialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum AppProtoLogsInfo {
-    Dns(DnsInfo),
-    Mysql(MysqlInfo),
-    Redis(RedisInfo),
-    Kafka(KafkaInfo),
-    Mqtt(MqttInfo),
-    Dubbo(DubboInfo),
-    HttpV1(HttpInfo),
-    HttpV2(HttpInfo),
-    HttpV1TLS(HttpInfo),
-    // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑,暂时添加一个None
-    None(()),
-}
-
-impl AppProtoLogsInfo {
-    fn session_id(&self) -> Option<u32> {
-        match self {
-            AppProtoLogsInfo::Dns(t) if t.trans_id > 0 => Some(t.trans_id as u32),
-            AppProtoLogsInfo::Kafka(t) if t.correlation_id > 0 => Some(t.correlation_id),
-            AppProtoLogsInfo::Dubbo(t) if t.serial_id > 0 => Some(t.serial_id as u32),
-            AppProtoLogsInfo::HttpV2(t) if t.stream_id > 0 => Some(t.stream_id),
-            _ => None,
-        }
-    }
-
-    fn merge(&mut self, other: Self) {
-        match (self, other) {
-            (Self::Dns(m), Self::Dns(o)) => m.merge(o),
-            (Self::Mysql(m), Self::Mysql(o)) => m.merge(o),
-            (Self::Redis(m), Self::Redis(o)) => m.merge(o),
-            (Self::Kafka(m), Self::Kafka(o)) => m.merge(o),
-            (Self::Mqtt(m), Self::Mqtt(o)) => m.merge(o),
-            (Self::Dubbo(m), Self::Dubbo(o)) => m.merge(o),
-            (Self::HttpV1(m), Self::HttpV1(o)) => m.merge(o),
-            (Self::HttpV2(m), Self::HttpV2(o)) => m.merge(o),
-            (Self::HttpV1TLS(m), Self::HttpV1TLS(o)) => m.merge(o),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl fmt::Display for AppProtoLogsInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Dns(l) => write!(f, "{:?}", l),
-            Self::Mysql(l) => write!(f, "{:?}", l),
-            Self::Redis(l) => write!(f, "{}", l),
-            Self::Dubbo(l) => write!(f, "{:?}", l),
-            Self::Kafka(l) => write!(f, "{:?}", l),
-            Self::Mqtt(l) => write!(f, "{:?}", l),
-            Self::HttpV1(l) => write!(f, "{:?}", l),
-            Self::HttpV2(l) => write!(f, "{:?}", l),
-            Self::HttpV1TLS(l) => write!(f, "{:?}", l),
-            _ => {
-                write!(f, "None")
-            }
-        }
-    }
-}
-
 #[derive(Serialize, Debug, Clone)]
 pub struct AppProtoLogsData {
     #[serde(flatten)]
     pub base_info: AppProtoLogsBaseInfo,
     #[serde(flatten)]
-    // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑，暂时添加一个Option字段。
-    // 后面吧cbpf也抽出来后，只会留下一个 special_info: L7protocolLog， AppProtoLogsInfo会去掉
-    // 暂时来说 cbpf 使用special_info， ebpf 使用ebpf_special_info
-    pub special_info: AppProtoLogsInfo,
-    #[serde(flatten)]
-    pub ebpf_special_info: Option<L7ProtocolLog>,
+    pub special_info: L7ProtocolLog,
 }
 
 impl fmt::Display for AppProtoLogsData {
@@ -532,11 +462,10 @@ impl fmt::Display for AppProtoLogsData {
 }
 
 impl AppProtoLogsData {
-    pub fn new(base_info: AppProtoLogsBaseInfo, special_info: AppProtoLogsInfo) -> Self {
+    pub fn new(base_info: AppProtoLogsBaseInfo, special_info: L7ProtocolLog) -> Self {
         Self {
             base_info,
             special_info,
-            ebpf_special_info: None,
         }
     }
 
@@ -554,28 +483,8 @@ impl AppProtoLogsData {
             ..Default::default()
         };
 
-        // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑， 暂时根据ebpf_special_info是否为空判断用那个结构编码
-        if let Some(l7_log) = self.ebpf_special_info {
-            let log: L7ProtocolSendLog = l7_log.into();
-            log.fill_app_proto_log(&mut pb_proto_logs_data);
-        } else {
-            let log: L7ProtocolSendLog = match self.special_info {
-                AppProtoLogsInfo::Dns(t) => t.into(),
-                AppProtoLogsInfo::Mysql(t) => t.into(),
-                AppProtoLogsInfo::Redis(t) => t.into(),
-                AppProtoLogsInfo::Kafka(t) => t.into(),
-                AppProtoLogsInfo::Mqtt(t) => t.into(),
-                AppProtoLogsInfo::Dubbo(t) => t.into(),
-                AppProtoLogsInfo::HttpV1(t)
-                | AppProtoLogsInfo::HttpV2(t)
-                | AppProtoLogsInfo::HttpV1TLS(t) => t.into(),
-
-                AppProtoLogsInfo::None(()) => {
-                    unreachable!()
-                }
-            };
-            log.fill_app_proto_log(&mut pb_proto_logs_data);
-        }
+        let log: L7ProtocolSendLog = self.special_info.into();
+        log.fill_app_proto_log(&mut pb_proto_logs_data);
 
         pb_proto_logs_data
             .encode(buf)
@@ -587,7 +496,7 @@ impl AppProtoLogsData {
         // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
         let flow_id_part =
             (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
-        if let Some(session_id) = self.ebpf_special_info.as_ref().unwrap().session_id() {
+        if let Some(session_id) = self.special_info.session_id() {
             flow_id_part
                 | (self.base_info.head.proto as u64) << 24
                 | ((session_id as u64) & 0xffffff)
@@ -603,32 +512,20 @@ impl AppProtoLogsData {
         }
     }
 
-    // 目前协议抽象只是先了ebpf，为了兼容cbpf的逻辑, 暂时添加ebpf_special_info是否空来决定怎怎么merge
-    // 后面只会保留L7ProtocolLog.merge_log
     pub fn session_merge(&mut self, log: Self) {
         self.base_info.merge(log.base_info);
-        if let Some(ebpf_log) = log.ebpf_special_info {
-            self.ebpf_protocol_merge(ebpf_log);
-        } else {
-            self.protocol_merge(log.special_info);
-        }
+        self.protocol_merge(log.special_info);
     }
 
-    pub fn protocol_merge(&mut self, log: AppProtoLogsInfo) {
-        self.special_info.merge(log);
-    }
-
-    pub fn ebpf_protocol_merge(&mut self, log: L7ProtocolLog) {
-        if let Result::Err(_err) = self.ebpf_special_info.as_mut().unwrap().merge_log(log) {
-            // TODO 暂时先应付编译器警告
-        }
+    fn protocol_merge(&mut self, log: L7ProtocolLog) {
+        if let Ok(_) = self.special_info.merge_log(log) {}
     }
 
     // 是否需要进一步聚合
     // 目前仅http2 uprobe 需要聚合多个请求
     pub fn need_protocol_merge(&self) -> bool {
         // return self.base_info.ebpf_type == EbpfType::GoHttp2Uprobe;
-        return self.ebpf_special_info.as_ref().unwrap().need_merge();
+        return self.special_info.need_merge();
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {
@@ -679,65 +576,5 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.head.msg_type,
             self.head.rrt
         )
-    }
-}
-
-// TODO 这个接口后面要去掉
-pub trait L7LogParse: Send + Sync {
-    fn parse(
-        &mut self,
-        payload: &[u8],
-        proto: IpProtocol,
-        direction: PacketDirection,
-        is_req_end: Option<bool>,
-        is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum>;
-    fn info(&self) -> AppProtoLogsInfoEnum;
-}
-
-#[derive(Debug, Clone)]
-pub enum AppProtoHeadEnum {
-    Single(AppProtoHead),
-    Multi(Vec<AppProtoHead>),
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub enum AppProtoLogsInfoEnum {
-    Single(AppProtoLogsInfo),
-    Multi(Vec<AppProtoLogsInfo>),
-}
-
-impl AppProtoLogsInfoEnum {
-    /// 假设所有应用日志都只携带一个info，如果有多个则不要用该方法
-    /// Assuming that all application logs carry only one info, do not use this method if there are multiple
-    pub fn into_inner(self) -> AppProtoLogsInfo {
-        match self {
-            Self::Single(v) => v,
-            Self::Multi(_) => unreachable!(),
-        }
-    }
-}
-
-impl IntoIterator for AppProtoHeadEnum {
-    type Item = AppProtoHead;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::Single(v) => vec![v].into_iter(),
-            Self::Multi(v) => v.into_iter(),
-        }
-    }
-}
-
-impl IntoIterator for AppProtoLogsInfoEnum {
-    type Item = AppProtoLogsInfo;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::Single(v) => vec![v].into_iter(),
-            Self::Multi(v) => v.into_iter(),
-        }
     }
 }

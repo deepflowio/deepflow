@@ -24,6 +24,7 @@ const L7_PROTOCOL_HTTP1_TLS: u8 = 22;
 const L7_PROTOCOL_HTTP2_TLS: u8 = 23;
 const L7_PROTOCOL_DUBBO: u8 = 40;
 const L7_PROTOCOL_MYSQL: u8 = 60;
+const L7_PROTOCOL_POSTGRESQL: u8 = 61;
 const L7_PROTOCOL_REDIS: u8 = 80;
 const L7_PROTOCOL_KAFKA: u8 = 100;
 const L7_PROTOCOL_MQTT: u8 = 101;
@@ -45,7 +46,10 @@ pub enum L7Protocol {
     Kafka = L7_PROTOCOL_KAFKA,
     Mqtt = L7_PROTOCOL_MQTT,
     Dns = L7_PROTOCOL_DNS,
+
     // add new protocol here
+    Postgresql = L7_PROTOCOL_POSTGRESQL,
+
     Max = L7_PROTOCOL_MAX,
 }
 
@@ -55,6 +59,8 @@ impl Default for L7Protocol {
     }
 }
 
+// 这个仅用与ebpf, 从l7_protocol_hint获取对应L7Protocol.
+// only use for ebpf get l7 protocol from l7_protocol_hint
 impl From<u8> for L7Protocol {
     fn from(v: u8) -> Self {
         match v {
@@ -69,7 +75,10 @@ impl From<u8> for L7Protocol {
             L7_PROTOCOL_KAFKA => L7Protocol::Kafka,
             L7_PROTOCOL_MQTT => L7Protocol::Mqtt,
             L7_PROTOCOL_DNS => L7Protocol::Dns,
+
             // add new protocol here
+            L7_PROTOCOL_POSTGRESQL => L7Protocol::Postgresql,
+
             _ => L7Protocol::Unknown,
         }
     }

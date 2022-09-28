@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+use std::net::IpAddr;
+
 use enum_dispatch::enum_dispatch;
+use public::enums::IpProtocol;
 use public::l7_protocol::L7Protocol;
 use serde::Serialize;
 
@@ -22,49 +25,31 @@ use super::ebpf::EbpfType;
 use super::flow::PacketDirection;
 use super::MetaPacket;
 
-use crate::common::lookup_key::LookupKey;
 use crate::config::handler::LogParserAccess;
 use crate::flow_generator::protocol_logs::pb_adapter::L7ProtocolSendLog;
 use crate::flow_generator::protocol_logs::{
-    DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, RedisLog,
+    DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog, RedisLog,
 };
 use crate::flow_generator::AppProtoHead;
 use crate::flow_generator::Error;
 use crate::flow_generator::Result;
 
-#[macro_export]
-macro_rules! __log_info_merge {
-    ($self:ident,$log_type:ident,$other:ident) => {
-        if let L7ProtocolLog::$log_type(__other) = $other {
-            if __other.start_time < $self.start_time {
-                $self.start_time = __other.start_time;
-            }
-            if __other.end_time > $self.end_time {
-                $self.end_time = __other.end_time;
-            }
-            $self.info.merge(__other.info);
-        }
-        return Ok(());
-    };
-}
-
-// 忽略非原始数据类型
-#[macro_export]
-macro_rules! ignore_non_raw_protocol {
-    ($parse_param:ident) => {
-        if !$parse_param.ebpf_type.is_raw_protocol() {
-            return false;
-        }
-    };
-}
-
 /*
- 所有协议都需要实现这个接口.
- 其中,check 用于MetaPacket判断应用层协议, parse用于解析具体协议.
+ 所有协议都需要实现L7ProtocolLogInterface这个接口.
+ 其中,check_payload 用于MetaPacket判断应用层协议, parse_payload 用于解析具体协议.
  更具体就是遍历ALL_PROTOCOL的协议,用check判断协议,再用parse解析整个payload, 实现的结构应该在parse的时候记录关键字段.
  最后发送到server之前, 调用into() 转成通用结构L7ProtocolLogData.
 
+ all protocol need implement L7ProtocolLogInterface trait.
+ check_payload use to determine what protocol the payload is.
+ parse_payload use to parse whole payload.
+ more specifically, traversal all protocol from get_all_protocol,check the payload and then parse it,
+ convert to L7ProtocolLogData struct and send to server.
+
+
  ebpf处理过程为:
+
+ ebpf protocol parse process:
 
 
                                    payload:&[u8]
@@ -137,7 +122,7 @@ about SessionAggr:
 
 about check():
     check() will travsal all protocol from get_all_protocol() to determine what protocol belong to the payload.
-    first, check the bitmap(config by server,describe follow) is ignore the protocol ? then call L7ProtocolLog::check_payload() to check.
+    first, check the bitmap(describe follow) is ignore the protocol ? then call L7ProtocolLog::check_payload() to check.
 
 about parse_payload()
     it use same struct in L7ProtocolLog::check_payload().
@@ -161,9 +146,52 @@ about bitmap:
 
  TODO: cbpf 处理过程
  hint: check 和 parse 是同一个结构, check可以把解析结果保存下来,避免重复解析.
+       check and parse use same struct. so it can save information and prevent duplicate parse.
 
 */
 
+#[macro_export]
+macro_rules! __log_info_merge {
+    ($self:ident,$log_type:ident,$other:ident) => {
+        if let L7ProtocolLog::$log_type(__other) = $other {
+            if __other.start_time < $self.start_time {
+                $self.start_time = __other.start_time;
+            }
+            if __other.end_time > $self.end_time {
+                $self.end_time = __other.end_time;
+            }
+            $self.info.merge(__other.info);
+        }
+        return Ok(());
+    };
+}
+
+// 忽略非原始数据类型
+// ignore non raw protocol.
+#[macro_export]
+macro_rules! ignore_non_raw_protocol {
+    ($parse_param:ident) => {
+        if !$parse_param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
+    };
+}
+
+// 忽略ebpf数据类型
+// 由于ebpf需要在ebpf上报, 所以拓展协议可能需要忽略.
+
+// ignore check the payload from ebpf.
+// data from ebpf need submit from kernel, the extend protocol should ignore.
+#[macro_export]
+macro_rules! ignore_ebpf {
+    ($parse_param:ident) => {
+        if !($parse_param.ebpf_type == EbpfType::None) {
+            return false;
+        }
+    };
+}
+
+#[derive(Clone, Copy)]
 pub struct EbpfParam {
     pub is_tls: bool,
     // 目前仅 http2 uprobe 有意义
@@ -171,10 +199,19 @@ pub struct EbpfParam {
     pub is_resp_end: bool,
 }
 
+#[derive(Clone, Copy)]
 pub struct ParseParam {
+    // l3/l4 info
+    pub l4_protocol: IpProtocol,
+    pub ip_src: IpAddr,
+    pub ip_dst: IpAddr,
+    pub port_src: u16,
+    pub port_dst: u16,
+
     pub direction: PacketDirection,
     pub ebpf_type: EbpfType,
     // ebpf_type 不为 EBPF_TYPE_NONE 会有值
+    // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam>,
     pub time: u64,
 }
@@ -182,6 +219,12 @@ pub struct ParseParam {
 impl ParseParam {
     pub fn from(packet: &MetaPacket) -> Self {
         let mut param = Self {
+            l4_protocol: packet.lookup_key.proto,
+            ip_src: packet.lookup_key.src_ip,
+            ip_dst: packet.lookup_key.dst_ip,
+            port_src: packet.lookup_key.src_port,
+            port_dst: packet.lookup_key.dst_port,
+
             direction: packet.direction,
             ebpf_type: packet.ebpf_type,
             ebpf_param: None,
@@ -208,22 +251,24 @@ impl ParseParam {
 #[enum_dispatch(L7ProtocolLog)]
 pub trait L7ProtocolLogInterface {
     // 个别协议一个连接可能有子流, 这里需要返回流标识, 例如http2的stream id
+    // distinguish stream from some protocl. such as http2 streamid, dns transaction id
     fn session_id(&self) -> Option<u32>;
     // 协议字段合并
     // enum_dispatch 不能使用&Self 参数, 这里只能使用&L7Protocol.
+    // 返回的错误暂时无视
+    // merge request and response. now return err will have no effect.
     fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()>;
     // 协议判断
     // direction 并非所有协议都准确.
-    fn check_payload(&mut self, payload: &[u8], lookup_key: &LookupKey, param: ParseParam) -> bool;
+    // protocol determine, direction will not always correct.
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
     // 协议解析
-    fn parse_payload(
-        self,
-        payload: &[u8],
-        lookup_key: &LookupKey,
-        param: ParseParam,
-    ) -> Result<Vec<L7ProtocolLog>>;
+    // parse payload
+    fn parse_payload(self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>>;
     // 返回协议号和协议名称, 由于的bitmap使用u128,所以协议号不能超过128.
-    // 其中 src/common/flow.rs 里面的 pub const L7_PROTOCOL_xxx 是内部保留的协议号.
+    // 其中 crates/public/src/l7_protocol.rs 里面的 pub const L7_PROTOCOL_xxx 是已实现的协议号.
+    // return protocol number and protocol string. because of bitmap use u128, so the max protocol number can not exceed 128
+    // crates/public/src/l7_protocol.rs, pub const L7_PROTOCOL_xxx is the implemented protocol.
     fn protocol(&self) -> (L7Protocol, &str);
     fn app_proto_head(&self) -> Option<AppProtoHead>;
     fn is_tls(&self) -> bool;
@@ -231,27 +276,34 @@ pub trait L7ProtocolLogInterface {
 
     // 是否需要进一步合并, 目前只有在ebpf有意义, 内置协议也只有 EBPF_TYPE_GO_HTTP2_UPROBE 会用到.
     // 除非确实需要多次log合并,否则应该一律返回false
+    // should need merge more than once? only ebpf will need merge many times.
+    // should always return false when non ebpf.
     fn need_merge(&self) -> bool {
         return false;
     }
     // 对于需要多次merge的情况下,判断流是否已经结束,只有在need_merge->true的情况下有用
     // 返回 req_end,resp_end
+    // when need merge more than once, use to determine if the stream has ended.
     fn is_req_resp_end(&self) -> (bool, bool) {
         return (false, false);
     }
     // 仅http和dubbo协议会有log_parser_config，其他协议可以忽略。
+    // only http and dubbo use config. other protocol should do nothing.
     fn set_parse_config(&mut self, _log_parser_config: &LogParserAccess) {}
     // l4是tcp是是否解析，用于快速过滤协议
+    // just parse on tcp.
     fn parse_on_tcp(&self) -> bool {
         return true;
     }
     // l4是udp是是否解析，用于快速过滤协议
+    // just parse on udp.
     fn parse_on_udp(&self) -> bool {
         return true;
     }
     fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog;
 
-    fn get_default(&self) -> L7ProtocolLog;
+    // reset log and copy it. use for same flow parse.
+    fn reset_and_copy(&self) -> L7ProtocolLog;
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -265,7 +317,9 @@ pub enum L7ProtocolLog {
     DubboLog(DubboLog),
     KafkaLog(KafkaLog),
     MqttLog(MqttLog),
+
     // add new protocol here
+    PostgresLog(PostgresqlLog),
 }
 
 impl Into<L7ProtocolSendLog> for L7ProtocolLog {
@@ -299,16 +353,11 @@ impl L7ProtocolLogInterface for L7ProtocolLogUnknown {
         return Ok(());
     }
 
-    fn check_payload(&mut self, _payload: &[u8], _lk: &LookupKey, _param: ParseParam) -> bool {
+    fn check_payload(&mut self, _payload: &[u8], _param: &ParseParam) -> bool {
         return true;
     }
 
-    fn parse_payload(
-        self,
-        _payload: &[u8],
-        _lk: &LookupKey,
-        _param: ParseParam,
-    ) -> Result<Vec<L7ProtocolLog>> {
+    fn parse_payload(self, _payload: &[u8], _param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
         return Err(Error::L7ProtocolCheckLimit);
     }
 
@@ -332,13 +381,30 @@ impl L7ProtocolLogInterface for L7ProtocolLogUnknown {
         return true;
     }
 
-    fn get_default(&self) -> L7ProtocolLog {
+    fn reset_and_copy(&self) -> L7ProtocolLog {
         return L7ProtocolLog::L7ProtocolUnknown(*self);
     }
 }
 
+pub fn get_bitmap(protocol: IpProtocol) -> u128 {
+    let mut bitmap: u128 = 0;
+    for i in get_all_protocol().iter() {
+        match protocol {
+            IpProtocol::Tcp if i.parse_on_tcp() => {
+                bitmap |= 1 << (i.protocol().0 as u8);
+            }
+            IpProtocol::Udp if i.parse_on_udp() => {
+                bitmap |= 1 << (i.protocol().0 as u8);
+            }
+            _ => {}
+        }
+    }
+    return bitmap;
+}
+
 // 内部实现的协议
 // log的具体结构和实现在 src/flow_generator/protocol_logs/** 下
+// the inner implement protocol source code in src/flow_generator/protocol_logs/**
 pub fn get_all_protocol() -> Vec<L7ProtocolLog> {
     let mut all_proto = vec![
         L7ProtocolLog::DnsLog(DnsLog::default()),
@@ -357,9 +423,11 @@ pub fn get_all_protocol() -> Vec<L7ProtocolLog> {
 
 // 所有拓展协议，实际上是perf没有实现的协议。 由于perf没有抽象出来，需要区分出来
 // 后面perf抽象出来后会去掉，只留下get_all_protocol
+// extend protocol.
 pub fn get_ext_protocol() -> Vec<L7ProtocolLog> {
     let all_proto = vec![
         // add protocol log implement here
+        L7ProtocolLog::PostgresLog(PostgresqlLog::default()),
     ];
     return all_proto;
 }
