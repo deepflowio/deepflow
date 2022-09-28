@@ -360,10 +360,12 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
 	if isStringEnumOK {
 		table = "string_enum_map"
+		tag = tagDescription.EnumFile
 	}
 	_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
 	if isIntEnumOK {
 		table = "int_enum_map"
+		tag = tagDescription.EnumFile
 	}
 
 	var limitSql string
