@@ -550,8 +550,10 @@ impl Synchronizer {
         status: &Arc<RwLock<Status>>,
     ) {
         match &resp.revision {
+            // static_config.version_info.revision is: ${branch} ${rev_count}-${commit_id}
+            // resp.revision is: ${rev_count}-${commit_id}
             Some(revision)
-                if revision != "" && revision != &static_config.version_info.revision =>
+                if revision != "" && !static_config.version_info.revision.contains(revision) =>
             {
                 if let Some(url) = &resp.self_update_url {
                     if url.trim().to_lowercase() != "grpc" {
