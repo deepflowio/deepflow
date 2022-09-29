@@ -169,6 +169,7 @@ querier:
     host: clickhouse
     port: 9000
     timeout: 60
+    # user-password:
 
 ingester:
   #ckdb-service-prefix: clickhouse
