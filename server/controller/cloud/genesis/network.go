@@ -54,6 +54,7 @@ func (g *Genesis) getNetworks() ([]model.Network, error) {
 			Shared:         false,
 			External:       n.External,
 			NetType:        int(n.NetType),
+			AZLcuuid:       g.azLcuuid,
 			RegionLcuuid:   g.regionUuid,
 		}
 		networks = append(networks, network)
