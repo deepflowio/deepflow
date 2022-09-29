@@ -18,6 +18,7 @@ package synchronize
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -236,6 +237,18 @@ func isPodVTap(vtapType int) bool {
 	}
 }
 
+func getRealRevision(revision string) string {
+	var realRevision string
+	splitStr := strings.Split(revision, " ")
+	if len(splitStr) == 2 {
+		realRevision = splitStr[1]
+	} else {
+		realRevision = revision
+	}
+
+	return realRevision
+}
+
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	gVTapInfo := trisolaris.GetGVTapInfo()
 	ctrlIP := in.GetCtrlIp()
@@ -298,7 +311,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	}
 
 	// trident上报的revision与升级trident_revision一致后，则取消预期的`expected_revision`
-	if vtapCache.GetExpectedRevision() == in.GetRevision() {
+	if vtapCache.GetExpectedRevision() == getRealRevision(in.GetRevision()) {
 		vtapCache.UpdateUpgradeInfo("", "")
 	}
 	if uint32(vtapCache.GetBootTime()) != in.GetBootTime() {
