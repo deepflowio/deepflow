@@ -334,6 +334,27 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 						}
 						return &view.Expr{Value: filter}, nil
 					}
+				} else if strings.HasPrefix(t.Tag, "Enum(") {
+					t.Tag = strings.TrimLeft(t.Tag, "Enum(")
+					t.Tag = strings.TrimRight(t.Tag, ")")
+					tagItem, ok = tag.GetTag(t.Tag, db, table, "enum")
+					if ok {
+						switch strings.ToLower(op) {
+						case "regexp":
+							filter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value)
+						case "not regexp":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value) + ")"
+						case "not ilike":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "ilike", t.Value) + ")"
+						case "not in":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", t.Value) + ")"
+						case "!=":
+							filter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", t.Value) + ")"
+						default:
+							filter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
+						}
+						return &view.Expr{Value: filter}, nil
+					}
 				}
 				switch strings.ToLower(op) {
 				case "regexp":
