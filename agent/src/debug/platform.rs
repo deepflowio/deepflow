@@ -23,7 +23,7 @@ use crate::platform::{ApiWatcher, GenericPoller, Poller};
 #[derive(PartialEq, Eq, Debug, Encode, Decode)]
 pub enum PlatformMessage {
     Version(Option<String>),
-    Watcher(String),
+    Watcher(Vec<u8>),
     MacMappings(Option<Vec<(u32, String)>>),
     Fin,
     NotFound,
