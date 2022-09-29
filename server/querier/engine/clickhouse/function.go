@@ -42,13 +42,14 @@ const (
 	TAG_FUNCTION_ANY                        = "any"
 	TAG_FUNCTION_TOPK                       = "topK"
 	TAG_FUNCTION_NEW_TAG                    = "newTag"
+	TAG_FUNCTION_ENUM                       = "enum"
 )
 
 var TAG_FUNCTIONS = []string{
 	TAG_FUNCTION_NODE_TYPE, TAG_FUNCTION_ICON_ID, TAG_FUNCTION_MASK, TAG_FUNCTION_TIME,
 	TAG_FUNCTION_TO_UNIX_TIMESTAMP_64_MICRO, TAG_FUNCTION_TO_STRING, TAG_FUNCTION_IF,
 	TAG_FUNCTION_UNIQ, TAG_FUNCTION_ANY, TAG_FUNCTION_TOPK, TAG_FUNCTION_TO_UNIX_TIMESTAMP,
-	TAG_FUNCTION_NEW_TAG,
+	TAG_FUNCTION_NEW_TAG, TAG_FUNCTION_ENUM,
 }
 
 type Function interface {
@@ -473,6 +474,11 @@ func (f *TagFunction) Check() error {
 		if !ok {
 			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
 		}
+	case TAG_FUNCTION_ENUM:
+		_, ok := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+		if !ok {
+			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
+		}
 	}
 	return nil
 }
@@ -522,6 +528,10 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		node := f.getViewNode()
 		node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_TOP
 		return node
+	case TAG_FUNCTION_ENUM:
+		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+		f.Value = tagDes.TagTranslator
+		return f.getViewNode()
 	}
 	values := make([]string, len(fields))
 	for i, field := range fields {
