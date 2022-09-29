@@ -275,7 +275,8 @@ func configData(response *trident.SyncResponse) {
 	fmt.Println("config:")
 	config := response.GetConfig()
 	fmt.Println(proto.MarshalTextString(config))
-	fmt.Println("revision: ", response.GetRevision())
+	fmt.Println("revision:", response.GetRevision())
+	fmt.Println("self_update_url:", response.GetSelfUpdateUrl())
 }
 
 func skipInterface(response *trident.SyncResponse) {
