@@ -18,6 +18,7 @@
 use std::fmt;
 use std::{
     collections::HashSet,
+    io::Write,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket},
     time::Duration,
 };
@@ -25,6 +26,7 @@ use std::{
 use anyhow::{anyhow, Result};
 use bincode::{config, decode_from_std_read};
 use clap::{ArgEnum, Parser, Subcommand};
+use flate2::write::ZlibDecoder;
 
 #[cfg(target_os = "linux")]
 use deepflow_agent::debug::PlatformMessage;
@@ -477,6 +479,13 @@ impl Controller {
         Ok(())
     }
 
+    fn decode_entry(decoder: &mut ZlibDecoder<Vec<u8>>, entry: &[u8]) -> Result<String> {
+        decoder.write_all(entry)?;
+        let b = decoder.reset(vec![])?;
+        let result = String::from_utf8(b)?;
+        Ok(result)
+    }
+
     #[cfg(target_os = "linux")]
     fn platform(&self, c: PlatformCmd) -> Result<()> {
         if self.port.is_none() {
@@ -545,9 +554,10 @@ impl Controller {
 
             let msg = Message {
                 module: Module::Platform,
-                msg: PlatformMessage::Watcher(r.to_string()),
+                msg: PlatformMessage::Watcher(r.to_string().into_bytes()),
             };
             client.send_to(msg)?;
+            let mut decoder = ZlibDecoder::new(vec![]);
             loop {
                 let res = client.recv::<PlatformMessage>()?;
                 match res {
@@ -556,7 +566,10 @@ impl Controller {
                         $ deepflow-agent-ctl -p 54911 platform --k8s-get node
                         nodes entries...
                         */
-                        println!("{}", v);
+                        match Self::decode_entry(&mut decoder, v.as_slice()) {
+                            Ok(v) => println!("{}", v),
+                            Err(e) => eprintln!("{}", e),
+                        }
                     }
                     PlatformMessage::NotFound => return Err(anyhow!("no data")),
                     PlatformMessage::Fin => return Ok(()),

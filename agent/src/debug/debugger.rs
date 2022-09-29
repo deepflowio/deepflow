@@ -376,7 +376,8 @@ impl Debugger {
                 let debugger = &debuggers.platform;
                 let resp = match req.into_inner() {
                     PlatformMessage::Version(_) => debugger.api_version(),
-                    PlatformMessage::Watcher(w) => debugger.watcher(w),
+                    PlatformMessage::Watcher(w) => debugger
+                        .watcher(String::from_utf8(w).map_err(|e| Error::FromUtf8(e.to_string()))?),
                     PlatformMessage::MacMappings(_) => debugger.mac_mapping(),
                     _ => unreachable!(),
                 };
