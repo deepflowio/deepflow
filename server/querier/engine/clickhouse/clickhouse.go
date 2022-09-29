@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	//"github.com/k0kubun/pp"
+	"regexp"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -58,6 +59,22 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 			return nil, nil, err
 		}
 		return result, nil, nil
+	}
+	sqlList := strings.SplitAfterN(sql, "WHERE", 2)
+	if len(sqlList) == 1 {
+		sqlList = strings.SplitAfterN(sql, "where", 2)
+	}
+	if len(sqlList) > 1 {
+		var rgx = regexp.MustCompile(`(Enum\(.*?\))`)
+		rs := rgx.FindAllStringSubmatch(sqlList[1], -1)
+		rMap := map[string]string{}
+		for _, r := range rs {
+			rMap[r[1]] = r[1]
+		}
+		for _, value := range rMap {
+			sqlList[1] = strings.ReplaceAll(sqlList[1], value, "`"+value+"`")
+		}
+		sql = sqlList[0] + sqlList[1]
 	}
 	debug := &client.Debug{
 		IP:        config.Cfg.Clickhouse.Host,
