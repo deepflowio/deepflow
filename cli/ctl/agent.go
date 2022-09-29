@@ -299,19 +299,23 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 		fmt.Printf("get agent(%s) info failed, url: %s\n", vtapName, vtapURL)
 		return
 	}
+	hosts[vtapController] = struct{}{}
 	url_format := "http://%s:%d/v1/upgrade/vtap/%s/"
 	body := map[string]interface{}{
 		"expected_revision": expectedVersion,
 		"upgrade_package":   upgradePackage,
 	}
+	sendHosts := make([]string, 0, len(hosts))
 	for host, _ := range hosts {
+		sendHosts = append(sendHosts, host)
 		url := fmt.Sprintf(url_format, host, server.Port, vtapLcuuid)
 		_, err := common.CURLPerform("PATCH", url, body, "")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			fmt.Printf("upgrade agent %s failed\n", vtapName)
-			return
+			fmt.Printf("upgrade agent %s server %s failed\n", vtapName, host)
+			continue
 		}
 	}
+	fmt.Printf("send upgrade data to server:%v\n", sendHosts)
 	fmt.Printf("set agent %s revision(%s) success\n", vtapName, expectedVersion)
 }
