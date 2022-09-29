@@ -103,7 +103,7 @@ func (e *UpgradeEvent) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_Upgrad
 		}
 		err = in.Send(response)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("vtap(%s), err:%s", vtapCacheKey, err)
 			break
 		}
 	}
