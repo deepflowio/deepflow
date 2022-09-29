@@ -278,7 +278,7 @@ func (v *ChVTapPort) generateNewData() (map[VtapPortKey]mysql.ChVTapPort, bool) 
 					continue
 				}
 				for _, vTap := range vTaps {
-					if vTap.AZ == host.AZ && (vTap.ID != 0 || tapPort != 0) {
+					if vTap.Region == host.Region && (vTap.ID != 0 || tapPort != 0) {
 						key := VtapPortKey{VtapID: vTap.ID, TapPort: tapPort}
 						keyToItem[key] = mysql.ChVTapPort{
 							VTapID:   vTap.ID,
