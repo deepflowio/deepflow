@@ -28,6 +28,8 @@ pub enum Error {
     IoError(#[from] std::io::Error),
     #[error("{0}")]
     NotFound(String),
+    #[error("{0}")]
+    FromUtf8(String),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
