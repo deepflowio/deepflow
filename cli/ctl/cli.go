@@ -53,6 +53,7 @@ func Execute(version string) {
 	root.AddCommand(RegisterAgentGroupCommand())
 	root.AddCommand(RegisterAgentGroupConfigCommand())
 	root.AddCommand(RegisterDomainCommand())
+	root.AddCommand(RegisterSubDomainCommand())
 	root.AddCommand(RegisterGenesisCommand())
 	root.AddCommand(RegisterCloudCommand())
 	root.AddCommand(RegisterRecorderCommand())

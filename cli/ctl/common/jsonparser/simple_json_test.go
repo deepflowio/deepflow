@@ -28,10 +28,9 @@ func TestGetTheMaxSizeOfAttr(t *testing.T) {
 		attr string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    int
-		wantErr bool
+		name string
+		args args
+		want int
 	}{
 		{
 			name: "success",
@@ -39,8 +38,7 @@ func TestGetTheMaxSizeOfAttr(t *testing.T) {
 				data: case1Json,
 				attr: "NAME",
 			},
-			want:    11,
-			wantErr: false,
+			want: 11,
 		},
 		{
 			name: "data has no NAME attribute",
@@ -48,8 +46,7 @@ func TestGetTheMaxSizeOfAttr(t *testing.T) {
 				data: case2Json,
 				attr: "NAME",
 			},
-			want:    0,
-			wantErr: false,
+			want: 0,
 		},
 		{
 			name: "DATA is not an array",
@@ -57,18 +54,13 @@ func TestGetTheMaxSizeOfAttr(t *testing.T) {
 				data: case3Json,
 				attr: "NAME",
 			},
-			want:    0,
-			wantErr: true,
+			want: 0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := GetTheMaxSizeOfAttr(tt.args.data.Get("DATA"), tt.args.attr)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetTheMaxSizeOfName() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := GetTheMaxSizeOfAttr(tt.args.data.Get("DATA"), tt.args.attr)
 			if got != tt.want {
 				t.Errorf("GetTheMaxSizeOfName() got = %v, want %v", got, tt.want)
 			}
