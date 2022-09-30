@@ -21,6 +21,7 @@ pub mod endpoint;
 mod error;
 pub mod feature;
 pub mod flow;
+pub mod l7_protocol_info;
 pub mod l7_protocol_log;
 pub mod lookup_key;
 pub mod matched_field;

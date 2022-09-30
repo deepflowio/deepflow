@@ -35,8 +35,9 @@ use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::AppProtoHead;
 
+use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
-    get_bitmap, get_ext_protocol, L7ProtocolLog, L7ProtocolLogInterface, ParseParam,
+    get_all_protocol, get_bitmap, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
 };
 use crate::common::{
     enums::IpProtocol,
@@ -102,7 +103,7 @@ pub struct FlowPerf {
     l7: Option<L7FlowPerfTable>,
 
     // perf 目前还没有抽象出来,自定义协议需要添加字段区分,以后抽出来后 l7可以去掉.
-    l7_protocol_log: Option<L7ProtocolLog>,
+    l7_protocol_log_parser: Option<L7ProtocolParser>,
 
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
@@ -146,7 +147,7 @@ impl FlowPerf {
         }
     }
 
-    fn _l7_parse(
+    fn _l7_parse_perf(
         &mut self,
         packet: &MetaPacket,
         flow_id: u64,
@@ -168,62 +169,67 @@ impl FlowPerf {
         return ret;
     }
 
+    fn _l7_parse_log(
+        &mut self,
+        packet: &MetaPacket,
+        app_table: &mut AppTable,
+        parse_param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
+        if self.is_skip {
+            return Err(Error::L7ProtocolParseLimit);
+        }
+
+        if let Some(payload) = packet.get_l4_payload() {
+            let mut parser = self.l7_protocol_log_parser.take().unwrap();
+            let ret = parser.parse_payload(payload, parse_param);
+            if ret.is_ok() {
+                parser.reset();
+                self.l7_protocol_log_parser.replace(parser);
+            }
+
+            if !self.is_success {
+                if ret.is_ok() {
+                    app_table.set_protocol(packet, self.l7_protocol);
+                    self.is_success = true;
+                } else {
+                    self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+                }
+            }
+            return ret;
+        }
+
+        return Err(Error::L7ProtocolUnknown);
+    }
+
     fn l7_check(
         &mut self,
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
-    ) -> Result<()> {
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
         }
 
-        let protocols = if packet.lookup_key.proto == IpProtocol::Tcp {
-            vec![
-                L7Protocol::Http1,
-                L7Protocol::Http2,
-                L7Protocol::Dubbo,
-                L7Protocol::Mysql,
-                L7Protocol::Redis,
-                L7Protocol::Kafka,
-                L7Protocol::Mqtt,
-                L7Protocol::Dns,
-            ]
-        } else {
-            vec![L7Protocol::Dns]
-        };
-
-        for i in protocols {
-            if self.protocol_bitmap & 1 << (i as u8) == 0 {
-                continue;
-            }
-            if self._l7_check(i, packet) {
-                self.l7_protocol = i;
-                self.l7 = Self::l7_new(i, self.rrt_cache.clone());
-                return self._l7_parse(packet, flow_id, app_table);
-            }
-        }
-
-        // perf 还没有抽象出来,自定义协议需要单独处理,perf暂时是只check.
-        // 这里只记录下check出来的l7protocol并记录, 用于后面的l7解析
         if let Some(payload) = packet.get_l4_payload() {
             let param = ParseParam::from(packet);
-            for mut i in get_ext_protocol() {
+            for mut i in get_all_protocol() {
                 if i.check_payload(payload, &param) {
                     self.l7_protocol = i.protocol().0;
-                    self.l7_protocol_log = Some(i);
-                    if !self.is_success {
-                        app_table.set_protocol(packet, self.l7_protocol);
-                        self.is_success = true;
+                    // perf 没有抽象出来,这里可能返回None,对于返回None即不解析perf,只解析log
+                    self.l7 = Self::l7_new(i.protocol().0, self.rrt_cache.clone());
+                    if self.l7.is_some() {
+                        self._l7_parse_perf(packet, flow_id, app_table)?;
                     }
-                    return Ok(());
+
+                    self.l7_protocol_log_parser = Some(i);
+                    return self._l7_parse_log(packet, app_table, &param);
                 }
             }
         }
 
         self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
-
-        Err(Error::L7ProtocolUnknown)
+        return Err(Error::L7ProtocolUnknown);
     }
 
     fn l7_parse(
@@ -231,25 +237,13 @@ impl FlowPerf {
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
-    ) -> Result<()> {
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if self.l7.is_some() {
-            return self._l7_parse(packet, flow_id, app_table);
+            self._l7_parse_perf(packet, flow_id, app_table)?;
         }
 
-        // 目前perf 没有抽象, 自定义协议暂时只是check, 如果check成功那么会记录l7_protocol和log,避免重复check并用于下次解析.
-        // 后面perf抽出来后会去掉
-        if let Some(l7log) = &self.l7_protocol_log {
-            if let Some(payload) = packet.get_l4_payload() {
-                let param = ParseParam::from(packet);
-                let mut default_log = l7log.reset_and_copy();
-                if default_log.check_payload(payload, &param) {
-                    self.l7_protocol_log.replace(default_log);
-                    return Ok(());
-                }
-            }
-            self.l7_protocol_log = None;
-            self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
-            return Err(Error::L7ProtocolUnknown);
+        if self.l7_protocol_log_parser.is_some() {
+            return self._l7_parse_log(packet, app_table, &ParseParam::from(packet));
         }
 
         if self.is_from_app {
@@ -267,6 +261,7 @@ impl FlowPerf {
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         l4_proto: L4Protocol,
         l7_proto: Option<L7Protocol>,
+        l7_parser: Option<L7ProtocolParser>,
         counter: Arc<FlowPerfCounter>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
@@ -288,7 +283,7 @@ impl FlowPerf {
                     _ => get_bitmap(IpProtocol::Udp),
                 }
             },
-            l7_protocol_log: None,
+            l7_protocol_log_parser: l7_parser,
             rrt_cache,
             l7_protocol,
             is_from_app: l7_proto.is_some(),
@@ -313,15 +308,15 @@ impl FlowPerf {
         l4_performance_enabled: bool,
         l7_performance_enabled: bool,
         app_table: &mut AppTable,
-    ) -> Result<()> {
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if l4_performance_enabled {
             self.l4.parse(packet, is_first_packet_direction)?;
         }
         if l7_performance_enabled {
             // 抛出错误由flowMap.FlowPerfCounter处理
-            self.l7_parse(packet, flow_id, app_table)?;
+            return self.l7_parse(packet, flow_id, app_table);
         }
-        Ok(())
+        return Ok(vec![]);
     }
 
     pub fn copy_and_reset_perf_data(
@@ -352,22 +347,5 @@ impl FlowPerf {
         }
 
         stats
-    }
-
-    pub fn app_proto_head(&mut self, l7_performance_enabled: bool) -> Option<(AppProtoHead, u16)> {
-        if !l7_performance_enabled {
-            return None;
-        }
-        if let Some(l7) = self.l7.as_mut() {
-            l7.app_proto_head()
-        } else if let Some(l7log) = &self.l7_protocol_log {
-            if let Some(h) = l7log.app_proto_head() {
-                return Some((h, 0));
-            } else {
-                return None;
-            }
-        } else {
-            None
-        }
     }
 }

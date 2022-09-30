@@ -21,11 +21,12 @@ use super::super::{
 };
 
 use crate::common::flow::L7Protocol;
-use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
+use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
+use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
-use crate::{__log_info_merge, ignore_non_raw_protocol};
+use crate::{__log_info_merge, __parse_common, ignore_non_raw_protocol};
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
@@ -36,6 +37,11 @@ use crate::{
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct KafkaInfo {
+    msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+    is_tls: bool,
+
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub correlation_id: u32,
 
@@ -54,6 +60,36 @@ pub struct KafkaInfo {
     pub resp_msg_size: Option<u32>,
     pub status: L7ResponseStatus,
     pub status_code: Option<i32>,
+}
+
+impl L7ProtocolInfoInterface for KafkaInfo {
+    fn session_id(&self) -> Option<u32> {
+        return Some(self.correlation_id);
+    }
+
+    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+        __log_info_merge!(self, KafkaInfo, other);
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: L7Protocol::Kafka,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return self.is_tls;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.into();
+    }
 }
 
 impl KafkaInfo {
@@ -179,69 +215,37 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct KafkaLog {
     info: KafkaInfo,
-    msg_type: LogMessageType,
-    start_time: u64,
-    end_time: u64,
 }
 
-impl L7ProtocolLogInterface for KafkaLog {
-    fn session_id(&self) -> Option<u32> {
-        return Some(self.info.correlation_id);
-    }
-
-    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
-        __log_info_merge!(self, KafkaLog, other);
-    }
-
+impl L7ProtocolParserInterface for KafkaLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
         return Self::kafka_check_protocol(payload, param);
     }
 
-    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
-        self.start_time = param.time;
-        self.end_time = param.time;
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        __parse_common!(self, param);
         Self::parse(
-            &mut self,
+            self,
             payload,
             param.l4_protocol,
             param.direction,
             None,
             None,
         )?;
-        return Ok(vec![L7ProtocolLog::KafkaLog(self)]);
+        return Ok(vec![L7ProtocolInfo::KafkaInfo(self.info.clone())]);
     }
 
     fn protocol(&self) -> (L7Protocol, &str) {
         return (L7Protocol::Kafka, "KAFKA");
     }
 
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
-            proto: L7Protocol::Kafka,
-            msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
-        });
-    }
-
-    fn is_tls(&self) -> bool {
-        return false;
-    }
-
-    fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.info.into();
-    }
-
     fn parse_on_udp(&self) -> bool {
         return false;
     }
 
-    fn reset_and_copy(&self) -> L7ProtocolLog {
-        return L7ProtocolLog::KafkaLog(Self::default());
+    fn reset(&mut self) {
+        *self = Self::default();
     }
 }
 impl KafkaLog {
@@ -275,7 +279,7 @@ impl KafkaLog {
             return Err(Error::KafkaLogParseFailed);
         }
 
-        self.msg_type = LogMessageType::Request;
+        self.info.msg_type = LogMessageType::Request;
         self.info.api_key = read_u16_be(&payload[4..]);
         self.info.api_version = read_u16_be(&payload[6..]);
         self.info.correlation_id = read_u32_be(&payload[8..]);
@@ -289,7 +293,7 @@ impl KafkaLog {
 
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
-            msg_type: self.msg_type,
+            msg_type: self.info.msg_type,
             rrt: 0,
             ..Default::default()
         })
@@ -298,11 +302,11 @@ impl KafkaLog {
     fn response(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
         self.info.resp_msg_size = Some(read_u32_be(payload));
         self.info.correlation_id = read_u32_be(&payload[4..]);
-        self.msg_type = LogMessageType::Response;
+        self.info.msg_type = LogMessageType::Response;
 
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
-            msg_type: self.msg_type,
+            msg_type: self.info.msg_type,
             rrt: 0,
         })
     }

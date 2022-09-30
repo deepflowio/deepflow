@@ -20,10 +20,14 @@ use std::{fmt, str};
 
 use super::super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
+use crate::__parse_common;
 use crate::common::enums::IpProtocol;
 use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
-use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
+use crate::common::l7_protocol_info::L7ProtocolInfo;
+use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
+use crate::common::l7_protocol_log::L7ProtocolParserInterface;
+use crate::common::l7_protocol_log::ParseParam;
 use crate::common::meta_packet::MetaPacket;
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
@@ -33,6 +37,11 @@ const SEPARATOR_SIZE: usize = 2;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct RedisInfo {
+    msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+    is_tls: bool,
+
     #[serde(
         rename = "request_resource",
         skip_serializing_if = "value_is_default",
@@ -59,6 +68,36 @@ pub struct RedisInfo {
     )]
     pub error: Vec<u8>, // '-'
     pub resp_status: L7ResponseStatus,
+}
+
+impl L7ProtocolInfoInterface for RedisInfo {
+    fn session_id(&self) -> Option<u32> {
+        return None;
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        __log_info_merge!(self, RedisInfo, other);
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: L7Protocol::Redis,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return self.is_tls;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.into();
+    }
 }
 
 pub fn vec_u8_to_string<S>(v: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -130,70 +169,30 @@ impl From<RedisInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct RedisLog {
     info: RedisInfo,
-    l7_proto: L7Protocol,
-    msg_type: LogMessageType,
-    start_time: u64,
-    end_time: u64,
 }
 
-impl L7ProtocolLogInterface for RedisLog {
-    fn session_id(&self) -> Option<u32> {
-        return None;
-    }
-
-    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
-        __log_info_merge!(self, RedisLog, other);
-    }
-
+impl L7ProtocolParserInterface for RedisLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
         return Self::redis_check_protocol(payload, param);
     }
 
-    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
-        self.start_time = param.time;
-        self.end_time = param.time;
-        Self::parse(
-            &mut self,
-            payload,
-            param.l4_protocol,
-            param.direction,
-            None,
-            None,
-        )?;
-        return Ok(vec![L7ProtocolLog::RedisLog(self)]);
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        __parse_common!(self, param);
+        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        return Ok(vec![L7ProtocolInfo::RedisInfo(self.info.clone())]);
     }
 
     fn protocol(&self) -> (L7Protocol, &str) {
         return (L7Protocol::Redis, "REDIS");
     }
 
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
-            proto: self.protocol().0,
-            msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
-        });
-    }
-
-    fn is_tls(&self) -> bool {
-        return false;
-    }
-
-    fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.info.into();
-    }
-
     fn parse_on_udp(&self) -> bool {
         return false;
     }
 
-    fn reset_and_copy(&self) -> L7ProtocolLog {
-        return L7ProtocolLog::RedisLog(Self::default());
+    fn reset(&mut self) {
+        *self = Self::default();
     }
 }
 
@@ -207,12 +206,12 @@ impl RedisLog {
             Some(i) if i > 0 => Vec::from(&context[..i]),
             _ => context.clone(),
         };
-        self.msg_type = LogMessageType::Request;
+        self.info.msg_type = LogMessageType::Request;
         self.info.request = context;
     }
 
     fn fill_response(&mut self, context: Vec<u8>, error_response: bool) {
-        self.msg_type = LogMessageType::Response;
+        self.info.msg_type = LogMessageType::Response;
         if context.is_empty() {
             return;
         }

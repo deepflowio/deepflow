@@ -35,7 +35,7 @@ pub use parser::{AppProtoLogsParser, MetaAppProto};
 pub use rpc::{dubbo_check_protocol, DubboHeader, DubboInfo, DubboLog};
 pub use sql::{
     decode, mysql_check_protocol, redis_check_protocol, MysqlHeader, MysqlInfo, MysqlLog,
-    PostgresqlLog, RedisInfo, RedisLog,
+    PostgresInfo, PostgresqlLog, RedisInfo, RedisLog,
 };
 
 use std::{
@@ -48,13 +48,12 @@ use std::{
 use prost::Message;
 use serde::{Serialize, Serializer};
 
-use crate::common::l7_protocol_log::L7ProtocolLogInterface;
+use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::{
     common::{
         ebpf::EbpfType,
         enums::{IpProtocol, TapType},
         flow::{L7Protocol, PacketDirection},
-        l7_protocol_log::L7ProtocolLog,
         meta_packet::MetaPacket,
         tap_port::TapPort,
     },
@@ -108,7 +107,7 @@ impl From<PacketDirection> for LogMessageType {
 }
 
 // 应用层协议原始数据类型
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize)]
 #[repr(u8)]
 pub enum L7ProtoRawDataType {
     // 标准协议类型, 从af_packet, ebpf 的 tracepoint 或者 部分 uprobe(read/write等获取原始数据的hook点) 上报的数据都属于这个类型
@@ -451,7 +450,7 @@ pub struct AppProtoLogsData {
     #[serde(flatten)]
     pub base_info: AppProtoLogsBaseInfo,
     #[serde(flatten)]
-    pub special_info: L7ProtocolLog,
+    pub special_info: L7ProtocolInfo,
 }
 
 impl fmt::Display for AppProtoLogsData {
@@ -462,7 +461,7 @@ impl fmt::Display for AppProtoLogsData {
 }
 
 impl AppProtoLogsData {
-    pub fn new(base_info: AppProtoLogsBaseInfo, special_info: L7ProtocolLog) -> Self {
+    pub fn new(base_info: AppProtoLogsBaseInfo, special_info: L7ProtocolInfo) -> Self {
         Self {
             base_info,
             special_info,
@@ -517,7 +516,7 @@ impl AppProtoLogsData {
         self.protocol_merge(log.special_info);
     }
 
-    fn protocol_merge(&mut self, log: L7ProtocolLog) {
+    fn protocol_merge(&mut self, log: L7ProtocolInfo) {
         if let Ok(_) = self.special_info.merge_log(log) {}
     }
 

@@ -30,7 +30,11 @@ use super::super::{
     value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
 };
 
-use crate::common::flow::L7Protocol;
+use crate::common::{
+    flow::L7Protocol,
+    l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+    l7_protocol_log::L7ProtocolParserInterface,
+};
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
@@ -41,13 +45,14 @@ use crate::{
     },
     proto::flow_log::MqttTopic,
 };
-use crate::{
-    common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam},
-    ignore_non_raw_protocol,
-};
+use crate::{common::l7_protocol_log::ParseParam, ignore_non_raw_protocol};
 
 #[derive(Serialize, Clone, Debug)]
 pub struct MqttInfo {
+    start_time: u64,
+    end_time: u64,
+    msg_type: LogMessageType,
+
     #[serde(rename = "request_domain", skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -71,6 +76,45 @@ pub struct MqttInfo {
     pub status: L7ResponseStatus,
 }
 
+impl L7ProtocolInfoInterface for MqttInfo {
+    fn session_id(&self) -> Option<u32> {
+        return None;
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        if let L7ProtocolInfo::MqttInfo(mqtt) = other {
+            if mqtt.start_time < self.start_time {
+                self.start_time = mqtt.start_time;
+            }
+            if mqtt.end_time > self.end_time {
+                self.end_time = mqtt.end_time;
+            }
+            self.merge(mqtt);
+        }
+        return Ok(());
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: L7Protocol::Mqtt,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return false;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.into();
+    }
+}
+
 pub fn topics_format<S>(t: &Option<Vec<MqttTopic>>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -92,6 +136,9 @@ impl Default for MqttInfo {
             publish_topic: None,
             code: None,
             status: L7ResponseStatus::Ok,
+            start_time: 0,
+            end_time: 0,
+            msg_type: LogMessageType::Other,
         }
     }
 }
@@ -177,50 +224,21 @@ pub struct MqttLog {
     end_time: u64,
 }
 
-impl L7ProtocolLogInterface for MqttLog {
-    fn session_id(&self) -> Option<u32> {
-        return None;
-    }
-
-    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
-        if let L7ProtocolLog::MqttLog(mut mqtt) = other {
-            if mqtt.start_time < self.start_time {
-                self.start_time = mqtt.start_time;
-            }
-            if mqtt.end_time > self.end_time {
-                self.end_time = mqtt.end_time;
-            }
-
-            // 这里的info是parse_payload()拉平的info，长度必定为1.
-            let info = self.info.get_mut(0).unwrap();
-            let __other = mqtt.info.pop().unwrap();
-            info.merge(__other);
-        }
-        return Ok(());
-    }
-
+impl L7ProtocolParserInterface for MqttLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
         return Self::mqtt_check_protocol(payload, param);
     }
 
-    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         let mut v = vec![];
-        for i in self.info.into_iter() {
-            let version = i.version;
-            let status = i.status;
-            v.push(L7ProtocolLog::MqttLog(Self {
-                // 目前暂时是将info 单独拉到每个log上，后面再优化
-                info: vec![i],
-                msg_type: self.msg_type,
-                status: status,
-                version: version,
-                // 这里的client_map 后面并不会用到，暂时用new应付编译器
-                client_map: HashMap::new(),
-                start_time: param.time,
-                end_time: param.time,
-            }));
+        for i in self.info.iter() {
+            let mut info = i.clone();
+            info.msg_type = self.msg_type;
+            info.start_time = self.start_time;
+            info.end_time = self.end_time;
+            v.push(L7ProtocolInfo::MqttInfo(info));
         }
         return Ok(v);
     }
@@ -229,33 +247,12 @@ impl L7ProtocolLogInterface for MqttLog {
         return (L7Protocol::Mqtt, "MQTT");
     }
 
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
-            proto: self.protocol().0,
-            msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
-        });
-    }
-
-    fn is_tls(&self) -> bool {
-        return false;
-    }
-
-    fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(mut self) -> L7ProtocolSendLog {
-        // 这里的info是parse_payload()拉平的info，长度必定为1.
-        return self.info.pop().unwrap().into();
-    }
-
     fn parse_on_udp(&self) -> bool {
         return false;
     }
 
-    fn reset_and_copy(&self) -> L7ProtocolLog {
-        return L7ProtocolLog::MqttLog(Self::default());
+    fn reset(&mut self) {
+        *self = Self::default();
     }
 }
 
