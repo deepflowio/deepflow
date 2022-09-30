@@ -524,8 +524,8 @@ func DeleteDomain(lcuuid string) (map[string]string, error) { // TODO whether re
 	return map[string]string{"LCUUID": lcuuid}, nil
 }
 
-func GetSubDomains(filter map[string]interface{}) ([]model.SubDomain, error) {
-	var response []model.SubDomain
+func GetSubDomains(filter map[string]interface{}) ([]*model.SubDomain, error) {
+	var response []*model.SubDomain
 	var subDomains []mysql.SubDomain
 	var vpcs []mysql.VPC
 
@@ -583,7 +583,15 @@ func GetSubDomains(filter map[string]interface{}) ([]model.SubDomain, error) {
 				}
 			}
 		}
-		response = append(response, subDomainResp)
+
+		// get domain name
+		var domain mysql.Domain
+		if err := mysql.Db.Where("lcuuid = ?", subDomain.Domain).First(&domain).Error; err != nil {
+			log.Error(err)
+		}
+		subDomainResp.DomainName = domain.Name
+
+		response = append(response, &subDomainResp)
 	}
 	return response, nil
 }
@@ -612,7 +620,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 	mysql.Db.Create(&subDomain)
 
 	response, _ := GetSubDomains(map[string]interface{}{"lcuuid": lcuuid})
-	return &response[0], nil
+	return response[0], nil
 }
 
 func UpdateSubDomain(lcuuid string, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
@@ -637,7 +645,7 @@ func UpdateSubDomain(lcuuid string, subDomainUpdate map[string]interface{}) (*mo
 	mysql.Db.Model(&subDomain).Updates(dbUpdateMap)
 
 	response, _ := GetSubDomains(map[string]interface{}{"lcuuid": lcuuid})
-	return &response[0], nil
+	return response[0], nil
 }
 
 func DeleteSubDomain(lcuuid string) (map[string]string, error) {

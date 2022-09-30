@@ -58,10 +58,7 @@ func listVPC(cmd *cobra.Command, args []string, output string) error {
 		fmt.Printf(string(dataYaml))
 		return nil
 	}
-	nameMaxSize, err := jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "NAME")
-	if err != nil {
-		return fmt.Errorf("error in GetTheMaxSizeOfName func: %w", err)
-	}
+	nameMaxSize := jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "NAME")
 	cmdFormat := "%-*s %-20s\n"
 	fmt.Printf(cmdFormat, nameMaxSize, "NAME", "LCUUID")
 	for i := range response.Get("DATA").MustArray() {
