@@ -322,6 +322,7 @@ type SubDomain struct {
 	CreatedAt    string                 `json:"CREATED_AT"`
 	SyncedAt     string                 `json:"SYNCED_AT"`
 	Lcuuid       string                 `json:"LCUUID"`
+	DomainName   string                 `json:"DOMAIN_NAME"`
 }
 
 type SubDomainCreate struct {
