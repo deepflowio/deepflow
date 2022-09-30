@@ -2052,6 +2052,7 @@ CREATE TABLE IF NOT EXISTS ch_string_enum (
     tag_name                VARCHAR(256) NOT NULL ,
     value                   VARCHAR(256) NOT NULL,
     name                    VARCHAR(256) ,
+    updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY  (tag_name,value)
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_string_enum;
@@ -2060,6 +2061,7 @@ CREATE TABLE IF NOT EXISTS ch_int_enum (
     tag_name                VARCHAR(256) NOT NULL,
     value                   INTEGER DEFAULT 0,
     name                    VARCHAR(256) ,
+    updated_at              DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY  (tag_name,value)
 )ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_int_enum;
