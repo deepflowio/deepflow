@@ -22,9 +22,10 @@ import (
 )
 
 // 本消息格式仅用于同droplet通信:
-//     1. FrameSize用于粘包，为了简化包头压缩算法逻辑，UDP发送时也需要预留FrameSize但是内容可以为0
-//     2. MessageType标注消息类型
-//     3. MessageValue为具体的消息内容
+//  1. FrameSize用于粘包，为了简化包头压缩算法逻辑，UDP发送时也需要预留FrameSize但是内容可以为0
+//  2. MessageType标注消息类型
+//  3. MessageValue为具体的消息内容
+//
 // --------------------------------------------------------
 // | FrameSize(4B) | MessageType(1B) |  MessageValue(...) |
 // --------------------------------------------------------

@@ -295,6 +295,9 @@ ingester:
   ## tcp socket receiver buffer: 4M
   #tcp-read-buffer: 4194304
 
+  ## Rpc synchronization recv/send msg buffer(unit: Byte)
+  #grpc-buffer-size: 41943040
+
   ## ########################## droplet config ##########################################
   ## Rpc synchronization timeout default 8s
   #rpc-timeout: 8

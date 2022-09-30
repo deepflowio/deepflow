@@ -168,7 +168,7 @@ func (s *RpcConfigSynchronizer) Stop() {
 	s.triggeredSession.Close()
 }
 
-func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration) ConfigSynchronizer {
+func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration, maxMsgSize int) ConfigSynchronizer {
 	s := &RpcConfigSynchronizer{
 		PollingSession:   grpc.GrpcSession{},
 		triggeredSession: grpc.GrpcSession{},
@@ -181,7 +181,7 @@ func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration) 
 			return
 		}
 	}
-	s.PollingSession.Init(ips, port, DEFAULT_SYNC_INTERVAL, runOnce)
+	s.PollingSession.Init(ips, port, DEFAULT_SYNC_INTERVAL, maxMsgSize, runOnce)
 	s.PollingSession.SetTimeout(timeout)
 	run := func() {
 		if err := s.pull(); err != nil {
@@ -189,6 +189,6 @@ func NewRpcConfigSynchronizer(ips []net.IP, port uint16, timeout time.Duration) 
 			return
 		}
 	}
-	s.triggeredSession.Init(ips, port, DEFAULT_PUSH_INTERVAL, run)
+	s.triggeredSession.Init(ips, port, DEFAULT_PUSH_INTERVAL, maxMsgSize, run)
 	return s
 }
