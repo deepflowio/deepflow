@@ -106,7 +106,7 @@ func Start(cfg *config.Config, recv *receiver.Receiver) (closers []io.Closer) {
 	labelerManager.Start()
 
 	if len(controllers) > 0 {
-		synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.Base.ControllerPort, cfg.RpcTimeout)
+		synchronizer := config.NewRpcConfigSynchronizer(controllers, cfg.Base.ControllerPort, cfg.RpcTimeout, cfg.Base.GrpcBufferSize)
 		synchronizer.Register(func(response *trident.SyncResponse, version *config.RpcInfoVersions) {
 			log.Debug(response, version)
 			cleaner.UpdatePcapDataRetention(time.Duration(response.Config.GetPcapDataRetention()) * time.Hour * 24)
