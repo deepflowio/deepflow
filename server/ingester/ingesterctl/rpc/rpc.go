@@ -99,7 +99,7 @@ func initCmd(cmd CmdExecute) {
 		controllers = append(controllers, ip)
 	}
 
-	synchronizer := dropletcfg.NewRpcConfigSynchronizer(controllers, cfg.Base.ControllerPort, cfg.RpcTimeout)
+	synchronizer := dropletcfg.NewRpcConfigSynchronizer(controllers, cfg.Base.ControllerPort, cfg.RpcTimeout, cfg.Base.GrpcBufferSize)
 	synchronizer.Register(func(response *trident.SyncResponse, version *dropletcfg.RpcInfoVersions) {
 		cmd(response)
 		fmt.Println("press Ctrl^c to end it !!")

@@ -73,7 +73,7 @@ var unsummableMaxFieldsMap = map[string]struct{}{
 	"rrt_max":        {},
 }
 
-//  对于unsumable的sum列使用max,min聚合时, count列取相应的max,min列的值
+// 对于unsumable的sum列使用max,min聚合时, count列取相应的max,min列的值
 var unsummableFieldsMap = map[string]struct{}{
 	"rtt_sum":        {},
 	"rtt_client_sum": {},

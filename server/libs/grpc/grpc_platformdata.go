@@ -255,7 +255,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int16, ipv60 net.IP, epcID
 	return
 }
 
-func NewPlatformInfoTable(ips []net.IP, port int, moduleName, pcapDataPath, nodeIP string, receiver *receiver.Receiver) *PlatformInfoTable {
+func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize int, moduleName, pcapDataPath, nodeIP string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		receiver:             receiver,
 		bootTime:             uint32(time.Now().Unix()),
@@ -285,7 +285,7 @@ func NewPlatformInfoTable(ips []net.IP, port int, moduleName, pcapDataPath, node
 			log.Warning(err)
 		}
 	}
-	table.Init(ips, uint16(port), DEFAULT_SYNC_INTERVAL, runOnce)
+	table.Init(ips, uint16(port), DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, runOnce)
 	return table
 }
 
@@ -761,11 +761,14 @@ func lookup(host net.IP) (net.IP, error) {
 }
 
 // is_key_service查询
-//   使用 epcid+ip+port 查询is_key_service
+//
+//	使用 epcid+ip+port 查询is_key_service
+//
 // service_id 查询, 只支持查询pod_service类型的服务
-//   1，使用 epcid+clusterIP(device_type为POD_SERVICE) + port(可选) 查询
-//   2，使用 epcid+后端podIP(pod_id 非0) + port(可选) 查询
-//   3，使用 epcid+nodeIP(pod_node_id 非0)+port(必选) 查询
+//
+//	1，使用 epcid+clusterIP(device_type为POD_SERVICE) + port(可选) 查询
+//	2，使用 epcid+后端podIP(pod_id 非0) + port(可选) 查询
+//	3，使用 epcid+nodeIP(pod_node_id 非0)+port(必选) 查询
 func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int16, ipv4 uint32, protocol layers.IPProtocol, serverPort uint16) (bool, uint32) {
 	if t.serviceLabeler == nil {
 		return false, 0
@@ -1408,7 +1411,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, "debug", "", "", nil)
+			table := NewPlatformInfoTable(ips, port, 41943040, "debug", "", "", nil)
 			table.Reload()
 			fmt.Println(table)
 		},

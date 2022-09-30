@@ -117,7 +117,7 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 			int(flowLogId),
 		)
 		if controllers != nil {
-			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, "stream-"+datatype.MessageTypeString[msgType]+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 			if i == 0 {
 				debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
 			}
@@ -169,7 +169,7 @@ func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 			flowLogWriter,
 			int(common.L4_FLOW_ID),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-l4-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, "stream-l4-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		if i == 0 {
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA, platformDatas[i])
 		}
@@ -221,7 +221,7 @@ func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 			flowLogWriter,
 			int(common.L7_FLOW_ID),
 		)
-		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), "stream-l7-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+		platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, "stream-l7-log-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 		decoders[i] = decoder.NewDecoder(
 			i,
 			msgType,

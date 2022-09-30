@@ -207,7 +207,7 @@ func (q *XDPDescQueue) enqueue(descs []unix.XDPDesc, n uint32) error {
 }
 
 // 从UMEM队列中取一个条目
-//func (u *XDPUmemQueue) dequeueOne(index *uint64) uint32 {
+// func (u *XDPUmemQueue) dequeueOne(index *uint64) uint32 {
 func (u *XDPUmemQueue) dequeueOne(index *uint64) {
 	u.entries = u.getAvailEntries(1)
 

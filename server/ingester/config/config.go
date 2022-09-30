@@ -50,6 +50,7 @@ const (
 	DefaultCKDBServicePort = 9000
 	DefaultListenPort      = 20033
 	ServerPodNameKey       = "deepflow-server"
+	DefaultGrpcBufferSize  = 41943040
 )
 
 type CKDiskMonitor struct {
@@ -107,6 +108,7 @@ type Config struct {
 	InfluxdbWriterEnabled bool          `yaml:"influxdb-writer-enabled"`
 	Influxdb              HostPort      `yaml:"influxdb"`
 	NodeIP                string        `yaml:"node-ip"`
+	GrpcBufferSize        int           `yaml:"grpc-buffer-size"`
 	LogFile               string
 	LogLevel              string
 }
@@ -199,6 +201,10 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.GrpcBufferSize <= 0 {
+		c.GrpcBufferSize = DefaultGrpcBufferSize
+	}
+
 	return nil
 }
 
@@ -218,6 +224,7 @@ func Load(path string) *Config {
 			CKS3Storage:       CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
 			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
 			ListenPort:        DefaultListenPort,
+			GrpcBufferSize:    DefaultGrpcBufferSize,
 		},
 	}
 	if err != nil {

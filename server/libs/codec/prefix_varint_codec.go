@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//reference: https://github.com/stoklund/varint/blob/master/prefix_varint.cpp
+// reference: https://github.com/stoklund/varint/blob/master/prefix_varint.cpp
 package codec
 
 import (
