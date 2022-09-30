@@ -28,8 +28,11 @@ use super::{Error, Result};
 
 use crate::common::enums::IpProtocol;
 use crate::common::flow::{L7Protocol, PacketDirection};
+use crate::common::l7_protocol_info::L7ProtocolInfo;
+use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
 use crate::common::l7_protocol_log::{
-    get_all_protocol, get_bitmap, L7ProtocolLog, L7ProtocolLogInterface, ParseParam,
+    get_all_protocol, get_bitmap, get_parser, L7ProtocolParser, L7ProtocolParserInterface,
+    ParseParam,
 };
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
@@ -366,7 +369,7 @@ struct FlowItem {
     is_success: bool,
     is_skip: bool,
 
-    parser: Option<L7ProtocolLog>,
+    parser: Option<L7ProtocolParser>,
 }
 
 impl FlowItem {
@@ -377,15 +380,12 @@ impl FlowItem {
     fn get_parser(
         protocol: L7Protocol,
         log_parser_config: &LogParserAccess,
-    ) -> Option<L7ProtocolLog> {
-        for mut i in get_all_protocol().into_iter() {
-            if i.protocol().0 == protocol {
-                i.set_parse_config(log_parser_config);
-                return Some(i);
-            }
+    ) -> Option<L7ProtocolParser> {
+        let mut parser = get_parser(protocol);
+        if let Some(p) = &mut parser {
+            p.set_parse_config(log_parser_config);
         }
-
-        return None;
+        return parser;
     }
 
     fn new(
@@ -435,7 +435,7 @@ impl FlowItem {
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
-    ) -> LogResult<Vec<L7ProtocolLog>> {
+    ) -> LogResult<Vec<L7ProtocolInfo>> {
         if self.is_skip {
             return Err(LogError::L7ProtocolCheckLimit);
         }
@@ -471,7 +471,7 @@ impl FlowItem {
         packet: &mut MetaPacket,
         local_epc: i32,
         app_table: &mut AppTable,
-    ) -> LogResult<Vec<L7ProtocolLog>> {
+    ) -> LogResult<Vec<L7ProtocolInfo>> {
         if !self.is_success && self.is_skip {
             return Err(LogError::L7ProtocolParseLimit);
         }
@@ -482,12 +482,13 @@ impl FlowItem {
             PacketDirection::ServerToClient
         };
 
-        let l7log = self.parser.take().unwrap();
-        let default_log = l7log.reset_and_copy();
+        let mut l7_parser = self.parser.take().unwrap();
 
-        let ret = l7log.parse_payload(packet.raw_from_ebpf.as_ref(), &ParseParam::from(&packet));
+        let ret =
+            l7_parser.parse_payload(packet.raw_from_ebpf.as_ref(), &ParseParam::from(&packet));
         if ret.is_ok() {
-            self.parser.replace(default_log);
+            l7_parser.reset();
+            self.parser.replace(l7_parser);
         }
 
         if !self.is_success {
@@ -533,7 +534,7 @@ impl FlowItem {
         local_epc: i32,
         app_table: &mut AppTable,
         log_parser_config: &LogParserAccess,
-    ) -> LogResult<Vec<L7ProtocolLog>> {
+    ) -> LogResult<Vec<L7ProtocolInfo>> {
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         if self.last_packet + Self::FLOW_ITEM_TIMEOUT < time_in_sec {
             self.reset(packet.lookup_key.proto);

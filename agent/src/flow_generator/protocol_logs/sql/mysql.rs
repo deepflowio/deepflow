@@ -18,11 +18,12 @@ use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
-use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
+use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
+use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
-use crate::{__log_info_merge, ignore_non_raw_protocol};
+use crate::{__log_info_merge, __parse_common, ignore_non_raw_protocol};
 use crate::{
     common::enums::IpProtocol,
     common::flow::L7Protocol,
@@ -34,6 +35,11 @@ use crate::{
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
+    msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+    is_tls: bool,
+
     // Server Greeting
     #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub protocol_version: u8,
@@ -59,6 +65,36 @@ pub struct MysqlInfo {
     )]
     pub error_message: String,
     pub status: L7ResponseStatus,
+}
+
+impl L7ProtocolInfoInterface for MysqlInfo {
+    fn session_id(&self) -> Option<u32> {
+        return None;
+    }
+
+    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+        __log_info_merge!(self, MysqlInfo, other);
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        Some(AppProtoHead {
+            proto: L7Protocol::Mysql,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        })
+    }
+
+    fn is_tls(&self) -> bool {
+        return self.is_tls;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.into();
+    }
 }
 
 impl MysqlInfo {
@@ -142,71 +178,34 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct MysqlLog {
     info: MysqlInfo,
-
     l7_proto: L7Protocol,
-    msg_type: LogMessageType,
-    start_time: u64,
-    end_time: u64,
-    is_tls: bool,
 }
 
-impl L7ProtocolLogInterface for MysqlLog {
-    fn session_id(&self) -> Option<u32> {
-        return None;
-    }
-
-    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
-        __log_info_merge!(self, MysqlLog, other);
-    }
-
+impl L7ProtocolParserInterface for MysqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
         return Self::mysql_check_protocol(payload, param);
     }
 
-    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
-        if let Some(p) = param.ebpf_param {
-            self.is_tls = p.is_tls;
-        }
-        self.start_time = param.time;
-        self.end_time = param.time;
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        __parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
-        return Ok(vec![L7ProtocolLog::MysqlLog(self)]);
-    }
-
-    fn protocol(&self) -> (L7Protocol, &str) {
-        return (L7Protocol::Mysql, "MYSQL");
-    }
-
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        Some(AppProtoHead {
-            proto: self.protocol().0,
-            msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
-        })
-    }
-
-    fn is_tls(&self) -> bool {
-        return false;
-    }
-
-    fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.info.into();
+        return Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())]);
     }
 
     fn parse_on_udp(&self) -> bool {
         return false;
     }
 
-    fn reset_and_copy(&self) -> L7ProtocolLog {
-        return L7ProtocolLog::MysqlLog(Self {
-            l7_proto: L7Protocol::Mysql,
+    fn protocol(&self) -> (L7Protocol, &str) {
+        return (L7Protocol::Mysql, "MYSQL");
+    }
+
+    fn reset(&mut self) {
+        *self = Self {
+            l7_proto: self.l7_proto,
             ..Default::default()
-        });
+        };
     }
 }
 
@@ -400,7 +399,7 @@ impl MysqlLog {
             LogMessageType::Other => self.greeting(&payload[offset..])?,
             _ => return Err(Error::MysqlLogParseFailed),
         };
-        self.msg_type = msg_type;
+        self.info.msg_type = msg_type;
 
         return Ok(());
     }

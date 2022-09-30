@@ -55,6 +55,8 @@ use crate::{
             CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, PacketDirection,
             TunnelField,
         },
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::get_parser,
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,
@@ -663,11 +665,23 @@ impl FlowMap {
         (self.policy_getter).lookup(meta_packet, self.id as usize);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
+        let mut l7proto = self.app_table.get_protocol(meta_packet);
+        let l7_parser = if let Some(p) = l7proto {
+            // 如果是Other 说明是协议没能正确判断.
+            if p == L7Protocol::Other {
+                l7proto = None;
+            }
+            get_parser(p)
+        } else {
+            None
+        };
+
         if self.config.load().collector_enabled {
             node.meta_flow_perf = FlowPerf::new(
                 self.rrt_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
-                self.app_table.get_protocol(meta_packet),
+                l7proto,
+                l7_parser,
                 self.counter.clone(),
             )
         }
@@ -811,6 +825,7 @@ impl FlowMap {
         meta_packet: &MetaPacket,
         is_first_packet_direction: bool,
     ) {
+        let mut infos = None;
         if let Some(perf) = node.meta_flow_perf.as_mut() {
             let flow_id = node.tagged_flow.flow.flow_id;
             match perf.parse(
@@ -821,21 +836,28 @@ impl FlowMap {
                 self.l7_metrics_enabled(),
                 &mut self.app_table,
             ) {
+                Ok(info) => {
+                    infos = Some(info);
+                }
                 Err(Error::L7ReqNotFound(c)) => {
                     self.counter
                         .mismatched_response
                         .fetch_add(c, Ordering::Relaxed);
                 }
                 Err(e) => debug!("{}", e),
-                _ => (),
             }
         }
         if self.config.load().app_proto_log_enabled && meta_packet.packet_len > 0 {
-            self.write_to_app_proto_log(
-                node,
-                &meta_packet,
-                self.config.load().l7_log_packet_size as u16,
-            );
+            if let Some(info) = infos {
+                for i in info.into_iter() {
+                    self.write_to_app_proto_log(
+                        node,
+                        &meta_packet,
+                        i,
+                        self.config.load().l7_log_packet_size as u16,
+                    );
+                }
+            }
         }
     }
 
@@ -1019,7 +1041,8 @@ impl FlowMap {
         &mut self,
         node: &mut FlowNode,
         meta_packet: &MetaPacket,
-        pkt_size: u16,
+        l7_info: L7ProtocolInfo,
+        _pkt_size: u16,
     ) {
         let lookup_key = &meta_packet.lookup_key; //  trisolaris接口定义: 0(TAP_ANY)表示所有都需要
         if !self.config.load().l7_log_tap_types[u16::from(TapType::Any) as usize]
@@ -1033,25 +1056,20 @@ impl FlowMap {
             return;
         }
         // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
-        let (head, offset) = match node
-            .meta_flow_perf
-            .as_mut()
-            .and_then(|perf| perf.app_proto_head(self.l7_metrics_enabled()))
-        {
-            Some(v) => v,
-            None => return,
-        };
+        if let Some(head) = l7_info.app_proto_head() {
+            node.tagged_flow.flow.set_tap_side(
+                self.config.load().trident_type,
+                self.config.load().cloud_gateway_traffic,
+            );
 
-        node.tagged_flow.flow.set_tap_side(
-            self.config.load().trident_type,
-            self.config.load().cloud_gateway_traffic,
-        );
-
-        if let Some(app_proto) =
-            MetaAppProto::new(&node.tagged_flow, meta_packet, head, offset, pkt_size)
-        {
-            if let Err(_) = self.out_log_queue.send(Box::new(app_proto)) {
-                warn!("flow-map push MetaAppProto to queue failed because queue have terminated");
+            if let Some(app_proto) =
+                MetaAppProto::new(&node.tagged_flow, meta_packet, l7_info, head)
+            {
+                if let Err(_) = self.out_log_queue.send(Box::new(app_proto)) {
+                    warn!(
+                        "flow-map push MetaAppProto to queue failed because queue have terminated"
+                    );
+                }
             }
         }
     }

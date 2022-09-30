@@ -219,7 +219,14 @@ impl AppTable {
                 key,
                 AppTableValue {
                     unknown_count: 0,
-                    l7_protocol: protocol,
+                    // 第一次失败不写unknown,因为协判断不一定是支持完整解析,这里允许一定的容错
+                    l7_protocol: {
+                        if protocol == L7Protocol::Unknown {
+                            L7Protocol::Other
+                        } else {
+                            protocol
+                        }
+                    },
                     last: time_in_sec,
                 },
             );
@@ -254,7 +261,14 @@ impl AppTable {
                 key,
                 AppTableValue {
                     unknown_count: 0,
-                    l7_protocol: protocol,
+                    // 第一次失败不写unknown,因为协判断不一定是支持完整解析,这里允许一定的容错
+                    l7_protocol: {
+                        if protocol == L7Protocol::Unknown {
+                            L7Protocol::Other
+                        } else {
+                            protocol
+                        }
+                    },
                     last: time_in_sec,
                 },
             );
