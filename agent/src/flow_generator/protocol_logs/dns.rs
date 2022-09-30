@@ -17,10 +17,9 @@ use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
 use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
-
-use crate::common::flow::L7Protocol;
-use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam};
-use crate::{__log_info_merge, ignore_non_raw_protocol};
+use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
+use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
+use crate::{__log_info_merge, __parse_common, ignore_non_raw_protocol};
 use crate::{
     common::{
         enums::IpProtocol, flow::PacketDirection, meta_packet::MetaPacket, IPV4_ADDR_LEN,
@@ -32,6 +31,7 @@ use crate::{
     },
     utils::{bytes::read_u16_be, net::parse_ip_slice},
 };
+use public::l7_protocol::L7Protocol;
 
 #[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct DnsInfo {
@@ -53,6 +53,41 @@ pub struct DnsInfo {
 
     pub status: L7ResponseStatus,
     pub status_code: Option<i32>,
+
+    start_time: u64,
+    end_time: u64,
+    msg_type: LogMessageType,
+    is_tls: bool,
+}
+
+impl L7ProtocolInfoInterface for DnsInfo {
+    fn session_id(&self) -> Option<u32> {
+        return Some(self.trans_id as u32);
+    }
+
+    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+        __log_info_merge!(self, DnsInfo, other);
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: L7Protocol::Dns,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return self.is_tls;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.into();
+    }
 }
 
 impl DnsInfo {
@@ -113,66 +148,33 @@ impl From<DnsInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct DnsLog {
     info: DnsInfo,
-    msg_type: LogMessageType,
     // 是否已经解析过,避免check后重复解析
     parsed: bool,
-    start_time: u64,
-    end_time: u64,
 }
 
-// 抽象接口实现
-impl L7ProtocolLogInterface for DnsLog {
-    fn session_id(&self) -> Option<u32> {
-        return Some(self.info.trans_id as u32);
-    }
-
-    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<(), Error> {
-        __log_info_merge!(self, DnsLog, other);
-    }
-
+//解析器接口实现
+impl L7ProtocolParserInterface for DnsLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         ignore_non_raw_protocol!(param);
-        self.start_time = param.time;
-        self.end_time = param.time;
+        __parse_common!(self, param);
         return self.dns_check_protocol(payload, param);
     }
 
-    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
-            return Ok(vec![L7ProtocolLog::DnsLog(self)]);
+            return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
         }
-        self.start_time = param.time;
-        self.end_time = param.time;
+        __parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
-        return Ok(vec![L7ProtocolLog::DnsLog(self)]);
+        return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
     }
 
     fn protocol(&self) -> (L7Protocol, &str) {
         return (L7Protocol::Dns, "DNS");
     }
 
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
-            proto: self.protocol().0,
-            msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
-        });
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.info.into();
-    }
-
-    fn is_tls(&self) -> bool {
-        return false;
-    }
-
-    fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn reset_and_copy(&self) -> L7ProtocolLog {
-        return L7ProtocolLog::DnsLog(Self::default());
+    fn reset(&mut self) {
+        *self = Self::default();
     }
 }
 
@@ -190,7 +192,7 @@ impl DnsLog {
             return false;
         }
         let ret = self.parse(payload, param.l4_protocol, param.direction, None, None);
-        self.parsed = ret.is_ok() && self.msg_type == LogMessageType::Request;
+        self.parsed = ret.is_ok() && self.info.msg_type == LogMessageType::Request;
         return self.parsed;
     }
 
@@ -284,7 +286,7 @@ impl DnsLog {
         self.info.query_name.push_str(&name);
         if self.info.query_type == DNS_REQUEST {
             self.info.domain_type = read_u16_be(&payload[offset..]);
-            self.msg_type = LogMessageType::Request;
+            self.info.msg_type = LogMessageType::Request;
         }
 
         Ok(offset + QUESTION_CLASS_TYPE_SIZE)
@@ -422,7 +424,7 @@ impl DnsLog {
                 g_offset = self.decode_resource_record(payload, g_offset)?;
             }
 
-            self.msg_type = LogMessageType::Response;
+            self.info.msg_type = LogMessageType::Response;
         }
 
         return Ok(());
@@ -487,7 +489,7 @@ pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
         *bitmap &= !(1 << L7Protocol::Dns as u8);
         return false;
     }
-    return ret.is_ok() && dns.msg_type == LogMessageType::Request;
+    return ret.is_ok() && dns.info.msg_type == LogMessageType::Request;
 }
 
 #[cfg(test)]

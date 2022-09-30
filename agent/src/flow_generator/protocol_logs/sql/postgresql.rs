@@ -21,7 +21,8 @@ use crate::{
     common::{
         ebpf::EbpfType,
         flow::PacketDirection,
-        l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface, ParseParam},
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
     flow_generator::{
         protocol_logs::{
@@ -35,6 +36,11 @@ use crate::{
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct PostgresInfo {
+    msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+    is_tls: bool,
+
     // request
     pub context: String,
     pub req_type: u8,
@@ -48,64 +54,36 @@ pub struct PostgresInfo {
     pub status: L7ResponseStatus,
 }
 
-#[derive(Default, Debug, Clone, Serialize)]
-pub struct PostgresqlLog {
-    info: PostgresInfo,
-    msg_type: LogMessageType,
-    start_time: u64,
-    end_time: u64,
-    is_tls: bool,
-}
-
-impl L7ProtocolLogInterface for PostgresqlLog {
+impl L7ProtocolInfoInterface for PostgresInfo {
     fn session_id(&self) -> Option<u32> {
         return None;
     }
 
-    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
-        if let L7ProtocolLog::PostgresLog(pg) = other {
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        if let L7ProtocolInfo::PostgresInfo(pg) = other {
             if pg.start_time < self.start_time {
                 self.start_time = pg.start_time;
             }
             if pg.end_time > self.end_time {
                 self.end_time = pg.end_time;
             }
-
             match pg.msg_type {
                 LogMessageType::Request => {
-                    self.info.req_type = pg.info.req_type;
-                    self.info.context = pg.info.context.clone();
+                    self.req_type = pg.req_type;
+                    self.context = pg.context.clone();
                 }
                 LogMessageType::Response => {
-                    self.info.resp_type = pg.info.resp_type;
-                    self.info.response_code = pg.info.response_code;
-                    self.info.error_code = pg.info.error_code;
-                    self.info.error_message = pg.info.error_message;
-                    self.info.status = pg.info.status;
-                    self.info.affected_rows = pg.info.affected_rows;
+                    self.resp_type = pg.resp_type;
+                    self.response_code = pg.response_code;
+                    self.error_code = pg.error_code;
+                    self.error_message = pg.error_message;
+                    self.status = pg.status;
+                    self.affected_rows = pg.affected_rows;
                 }
                 _ => {}
             }
         }
         return Ok(());
-    }
-
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        ignore_ebpf!(param);
-        self.set_msg_type(param.direction);
-        return self.parse(payload, true).is_ok();
-    }
-
-    fn parse_payload(mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolLog>> {
-        self.start_time = param.time;
-        self.end_time = param.time;
-        self.set_msg_type(param.direction);
-        self.parse(payload, false)?;
-        return Ok(vec![L7ProtocolLog::PostgresLog(self)]);
-    }
-
-    fn protocol(&self) -> (L7Protocol, &str) {
-        return (L7Protocol::Postgresql, "POSTGRESQL");
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -129,26 +107,62 @@ impl L7ProtocolLogInterface for PostgresqlLog {
             req_len: None,
             resp_len: None,
             req: L7Request {
-                req_type: String::from(char::from(self.info.req_type)),
+                req_type: String::from(char::from(self.req_type)),
                 domain: String::new(),
-                resource: self.info.context,
+                resource: self.context,
             },
             resp: L7Response {
-                status: self.info.status,
-                code: Some(self.info.resp_type as i32),
-                result: self.info.error_message,
+                status: self.status,
+                code: Some(self.resp_type as i32),
+                result: self.error_message,
                 ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
-                row_effect: Some(self.info.affected_rows as u32),
+                row_effect: Some(self.affected_rows as u32),
                 ..Default::default()
             }),
             ..Default::default()
         };
     }
+}
 
-    fn reset_and_copy(&self) -> L7ProtocolLog {
-        return L7ProtocolLog::PostgresLog(Self::default());
+#[derive(Default, Debug, Clone, Serialize)]
+pub struct PostgresqlLog {
+    info: PostgresInfo,
+    parsed: bool,
+}
+
+impl L7ProtocolParserInterface for PostgresqlLog {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        ignore_ebpf!(param);
+        self.info.start_time = param.time;
+        self.info.end_time = param.time;
+        self.set_msg_type(param.direction);
+        if self.parse(payload).is_ok() {
+            self.parsed = true;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        if self.parsed {
+            return Ok(vec![L7ProtocolInfo::PostgresInfo(self.info.clone())]);
+        }
+        self.info.start_time = param.time;
+        self.info.end_time = param.time;
+        self.set_msg_type(param.direction);
+        self.parse(payload)?;
+        return Ok(vec![L7ProtocolInfo::PostgresInfo(self.info.clone())]);
+    }
+
+    fn protocol(&self) -> (L7Protocol, &str) {
+        return (L7Protocol::Postgresql, "POSTGRESQL");
+    }
+
+    fn reset(&mut self) {
+        *self = Self::default();
     }
 
     fn parse_on_udp(&self) -> bool {
@@ -159,8 +173,8 @@ impl L7ProtocolLogInterface for PostgresqlLog {
 impl PostgresqlLog {
     fn set_msg_type(&mut self, direction: PacketDirection) {
         match direction {
-            PacketDirection::ClientToServer => self.msg_type = LogMessageType::Request,
-            PacketDirection::ServerToClient => self.msg_type = LogMessageType::Response,
+            PacketDirection::ClientToServer => self.info.msg_type = LogMessageType::Request,
+            PacketDirection::ServerToClient => self.info.msg_type = LogMessageType::Response,
         }
     }
 
@@ -170,12 +184,12 @@ impl PostgresqlLog {
     payload: len - 4 byte
     */
 
-    fn parse(&mut self, payload: &[u8], check_only: bool) -> Result<()> {
+    fn parse(&mut self, payload: &[u8]) -> Result<()> {
         if payload.len() < 5 {
             return Err(Error::L7ProtocolUnknown);
         }
         let typ = payload[0];
-        if !check_type(self.msg_type, typ) {
+        if !check_type(self.info.msg_type, typ) {
             return Err(Error::L7ProtocolUnknown);
         };
 
@@ -183,10 +197,8 @@ impl PostgresqlLog {
         if payload.len() - 1 < data_len as usize {
             return Err(Error::L7ProtocolUnknown);
         }
-        if check_only {
-            return Ok(());
-        }
-        match self.msg_type {
+
+        match self.info.msg_type {
             LogMessageType::Request => {
                 self.info.req_type = typ;
                 self.info.context = String::from_utf8_lossy(&payload[5..]).to_string();

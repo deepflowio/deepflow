@@ -17,7 +17,6 @@
 use std::{
     cmp::min,
     collections::HashMap,
-    mem::swap,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
@@ -28,7 +27,7 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use log::{debug, info, warn};
+use log::{info, warn};
 
 use super::{
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, KafkaLog,
@@ -37,8 +36,9 @@ use super::{
 
 use crate::common::{
     ebpf::EbpfType,
-    l7_protocol_log::{get_all_protocol, L7ProtocolLog, L7ProtocolLogInterface, ParseParam},
+    l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
 };
+
 use crate::{
     common::{
         enums::EthernetType,
@@ -46,9 +46,7 @@ use crate::{
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
-    flow_generator::{
-        error::Result, protocol_logs::HttpLog, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC,
-    },
+    flow_generator::{protocol_logs::HttpLog, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     metric::document::TapSide,
     sender::SendItem,
     utils::{
@@ -74,29 +72,16 @@ const THROTTLE_BUCKET: usize = 1 << THROTTLE_BUCKET_BITS; // 2^N。由于发送�
 pub struct MetaAppProto {
     base_info: AppProtoLogsBaseInfo,
     direction: PacketDirection,
-    raw_proto_payload: Vec<u8>,
+    l7_info: L7ProtocolInfo,
 }
 
 impl MetaAppProto {
     pub fn new(
         flow: &TaggedFlow,
         meta_packet: &MetaPacket,
+        l7_info: L7ProtocolInfo,
         head: AppProtoHead,
-        offset: u16,
-        packet_size: u16,
     ) -> Option<Self> {
-        // 因metaPacket在logs处理时可能已经释放，需要copy metaPacket
-        // 此处，只拷贝待解析的协议payload部分, offset表示相对于协议payload的偏移
-        let raw_proto_payload = {
-            let payload = meta_packet.get_l4_payload()?;
-            let (offset, packet_size) = (offset as usize, packet_size as usize);
-            let max_payload_len = payload.len() - offset;
-            if max_payload_len > packet_size {
-                (&payload[offset..offset + packet_size]).to_vec()
-            } else {
-                (&payload[offset..offset + max_payload_len]).to_vec()
-            }
-        };
         let mut base_info = AppProtoLogsBaseInfo {
             start_time: meta_packet.lookup_key.timestamp,
             end_time: meta_packet.lookup_key.timestamp,
@@ -159,7 +144,7 @@ impl MetaAppProto {
         Some(Self {
             base_info,
             direction: meta_packet.direction,
-            raw_proto_payload,
+            l7_info,
         })
     }
 }
@@ -378,7 +363,7 @@ impl SessionQueue {
     }
 
     fn calc_key(item: &AppProtoLogsData) -> u64 {
-        if let L7ProtocolLog::MqttLog(_) = item.special_info {
+        if let L7ProtocolInfo::MqttInfo(_) = item.special_info {
             return item.base_info.flow_id;
         }
         let request_id = if let Some(id) = item.special_info.session_id() {
@@ -408,6 +393,9 @@ impl SessionQueue {
     }
 
     fn send(&mut self, item: AppProtoLogsData) {
+        if item.special_info.skip_send() {
+            return;
+        }
         if !self.log_rate.acquire(1) {
             self.counter.throttle_drop.fetch_add(1, Ordering::Relaxed);
             return;
@@ -444,7 +432,7 @@ impl AppLogs {
         dubbo.update_config(config);
 
         Self {
-            http: HttpLog::new(config, false),
+            http: HttpLog::new(config),
             dubbo: dubbo,
             ..Default::default()
         }
@@ -533,17 +521,10 @@ impl AppProtoLogsParser {
                             &mut app_logs,
                         );
                         for app_proto in app_protos {
-                            let proto_logs = match Self::parse_log(*app_proto, &config) {
-                                Ok(a) => a,
-                                Err(e) => {
-                                    debug!("{}", e);
-                                    continue;
-                                }
-                            };
-
-                            for proto_log in proto_logs {
-                                session_queue.aggregate_session_and_send(proto_log);
-                            }
+                            session_queue.aggregate_session_and_send(AppProtoLogsData {
+                                base_info: (*app_proto).base_info.clone(),
+                                special_info: (*app_proto).l7_info,
+                            });
                         }
                     }
                     Err(Error::Timeout) => {
@@ -567,46 +548,5 @@ impl AppProtoLogsParser {
             let _ = thread.join();
         }
         info!("app protocol logs parser (id={}) stopped", self.id);
-    }
-
-    fn parse_log(
-        mut app_proto: MetaAppProto,
-        config: &LogParserAccess,
-    ) -> Result<Vec<AppProtoLogsData>> {
-        // 应用流日志只存C2S方向,所以非C2S方向需要转换方向
-        if app_proto.base_info.head.msg_type != LogMessageType::Request {
-            let base_info = &mut app_proto.base_info;
-            swap(&mut base_info.port_dst, &mut base_info.port_src);
-            swap(&mut base_info.ip_src, &mut base_info.ip_dst);
-            swap(&mut base_info.l3_epc_id_src, &mut base_info.l3_epc_id_dst);
-        }
-
-        let mut logs = vec![];
-        let param = ParseParam {
-            l4_protocol: app_proto.base_info.protocol,
-            ip_src: app_proto.base_info.ip_src,
-            ip_dst: app_proto.base_info.ip_dst,
-            port_src: app_proto.base_info.port_src,
-            port_dst: app_proto.base_info.port_dst,
-            direction: app_proto.direction,
-            ebpf_type: EbpfType::None,
-            ebpf_param: None,
-            time: app_proto.base_info.start_time.as_micros() as u64,
-        };
-        for mut i in get_all_protocol() {
-            if i.protocol().0 == app_proto.base_info.head.proto {
-                i.set_parse_config(config);
-                if let Ok(log) = i.parse_payload(app_proto.raw_proto_payload.as_slice(), &param) {
-                    for i in log.into_iter() {
-                        logs.push(AppProtoLogsData {
-                            base_info: app_proto.base_info.clone(),
-                            special_info: i,
-                        });
-                    }
-                }
-            }
-        }
-
-        return Ok(logs);
     }
 }

@@ -22,11 +22,14 @@ use super::super::{
     consts::*, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
 };
 
+use crate::__parse_common;
 use crate::common::enums::IpProtocol;
 use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
+use crate::common::l7_protocol_info::L7ProtocolInfo;
+use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
+use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
-use crate::common::l7_protocol_log::{L7ProtocolLog, L7ProtocolLogInterface};
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
@@ -38,6 +41,11 @@ const TRACE_ID_MAX_LEN: usize = 51;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
+    start_time: u64,
+    end_time: u64,
+    msg_type: LogMessageType,
+    is_tls: bool,
+
     // header
     #[serde(skip)]
     pub serial_id: u8,
@@ -81,6 +89,36 @@ impl DubboInfo {
     }
 }
 
+impl L7ProtocolInfoInterface for DubboInfo {
+    fn session_id(&self) -> Option<u32> {
+        return Some(self.request_id as u32);
+    }
+
+    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+        __log_info_merge!(self, DubboInfo, other);
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        return Some(AppProtoHead {
+            proto: L7Protocol::Dubbo,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        });
+    }
+
+    fn is_tls(&self) -> bool {
+        return self.is_tls;
+    }
+
+    fn skip_send(&self) -> bool {
+        return false;
+    }
+
+    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
+        return self.into();
+    }
+}
+
 impl From<DubboInfo> for L7ProtocolSendLog {
     fn from(f: DubboInfo) -> Self {
         let log = L7ProtocolSendLog {
@@ -106,24 +144,13 @@ impl From<DubboInfo> for L7ProtocolSendLog {
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct DubboLog {
     info: DubboInfo,
-    msg_type: LogMessageType,
     #[serde(skip)]
     l7_log_dynamic_config: L7LogDynamicConfig,
-    start_time: u64,
-    end_time: u64,
 }
 
-impl L7ProtocolLogInterface for DubboLog {
-    fn session_id(&self) -> Option<u32> {
-        return Some(self.info.request_id as u32);
-    }
-
+impl L7ProtocolParserInterface for DubboLog {
     fn set_parse_config(&mut self, log_parser_config: &LogParserAccess) {
         self.update_config(log_parser_config);
-    }
-
-    fn merge_log(&mut self, other: L7ProtocolLog) -> Result<()> {
-        __log_info_merge!(self, DubboLog, other);
     }
 
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
@@ -131,56 +158,24 @@ impl L7ProtocolLogInterface for DubboLog {
         return Self::dubbo_check_protocol(payload, param);
     }
 
-    fn parse_payload(
-        mut self,
-        payload: &[u8],
-        param: &ParseParam,
-    ) -> Result<Vec<crate::common::l7_protocol_log::L7ProtocolLog>> {
-        self.start_time = param.time;
-        self.end_time = param.time;
-        Self::parse(
-            &mut self,
-            payload,
-            param.l4_protocol,
-            param.direction,
-            None,
-            None,
-        )?;
-        return Ok(vec![L7ProtocolLog::DubboLog(self)]);
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        __parse_common!(self, param);
+        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        return Ok(vec![L7ProtocolInfo::DubboInfo((&self.info).clone())]);
     }
 
     fn protocol(&self) -> (L7Protocol, &str) {
         return (L7Protocol::Dubbo, "DUBBO");
     }
 
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
-            proto: L7Protocol::Dubbo,
-            msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
-        });
-    }
-
-    fn is_tls(&self) -> bool {
-        return false;
-    }
-
-    fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.info.into();
-    }
-
     fn parse_on_udp(&self) -> bool {
         return false;
     }
 
-    fn reset_and_copy(&self) -> L7ProtocolLog {
+    fn reset(&mut self) {
         let mut log = Self::default();
         log.l7_log_dynamic_config = self.l7_log_dynamic_config.clone();
-        return L7ProtocolLog::DubboLog(log);
+        *self = log;
     }
 }
 
@@ -298,7 +293,7 @@ impl DubboLog {
     }
 
     fn request(&mut self, payload: &[u8], dubbo_header: &DubboHeader) {
-        self.msg_type = LogMessageType::Request;
+        self.info.msg_type = LogMessageType::Request;
 
         self.info.data_type = dubbo_header.data_type;
         self.info.req_msg_size = Some(dubbo_header.data_length as u32);
@@ -325,7 +320,7 @@ impl DubboLog {
     }
 
     fn response(&mut self, dubbo_header: &DubboHeader) {
-        self.msg_type = LogMessageType::Response;
+        self.info.msg_type = LogMessageType::Response;
 
         self.info.data_type = dubbo_header.data_type;
         self.info.resp_msg_size = Some(dubbo_header.data_length as u32);
