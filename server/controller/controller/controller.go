@@ -207,6 +207,7 @@ func Start(ctx context.Context, configPath string) {
 	router.DomainRouter(r, cfg)
 	router.VTapGroupConfigRouter(r)
 	router.VTapInterface(r, cfg)
+	router.VPCRouter(r)
 	trouter.RegistRouter(r)
 
 	grpcStart(ctx, cfg)
