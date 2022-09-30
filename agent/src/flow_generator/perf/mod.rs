@@ -45,10 +45,6 @@ use crate::common::{
     meta_packet::MetaPacket,
 };
 
-use super::protocol_logs::{
-    dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
-    kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
-};
 use {
     self::http::HttpPerfData,
     dns::DnsPerfData,
@@ -130,20 +126,6 @@ impl FlowPerf {
                 Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
             }
             _ => None,
-        }
-    }
-
-    fn _l7_check(&mut self, protocol: L7Protocol, packet: &MetaPacket) -> bool {
-        match protocol {
-            L7Protocol::Dns => dns_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Dubbo => dubbo_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Kafka => kafka_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Mqtt => mqtt_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http2 => http2_check_protocol(&mut self.protocol_bitmap, packet),
-            _ => false,
         }
     }
 

@@ -28,7 +28,6 @@ use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
 use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
-use crate::common::meta_packet::MetaPacket;
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
 use crate::{__log_info_merge, ignore_non_raw_protocol};
@@ -228,8 +227,6 @@ impl RedisLog {
         }
     }
 
-    // 这个逻辑是直接复制 redis_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
-    // 后面把perf抽象后只会保留在这个
     pub fn redis_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
@@ -415,25 +412,6 @@ pub fn decode_error_code(context: &[u8]) -> Option<&[u8]> {
     None
 }
 
-// 通过请求识别REDIS
-pub fn redis_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << L7Protocol::Redis as u8);
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-    let payload = payload.unwrap();
-
-    if payload[0] != b'*' {
-        return false;
-    }
-    return decode_asterisk(payload, true).is_some();
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -455,7 +433,6 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -475,7 +452,7 @@ mod tests {
                 None,
                 None,
             );
-            let is_redis = redis_check_protocol(&mut bitmap, packet);
+            let is_redis = RedisLog::redis_check_protocol(payload, &ParseParam::from(packet));
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output

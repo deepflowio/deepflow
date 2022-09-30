@@ -23,19 +23,16 @@ pub mod pb_adapter;
 mod rpc;
 mod sql;
 pub use self::http::{
-    check_http_method, get_http_request_version, get_http_resp_info, http1_check_protocol,
-    http2_check_protocol, is_http_v1_payload, HttpInfo, HttpLog, Httpv2Headers,
+    check_http_method, get_http_request_version, get_http_resp_info, is_http_v1_payload, HttpInfo,
+    HttpLog, Httpv2Headers,
 };
 use self::pb_adapter::L7ProtocolSendLog;
-pub use dns::{dns_check_protocol, DnsInfo, DnsLog};
-pub use mq::{
-    kafka_check_protocol, mqtt, mqtt_check_protocol, KafkaInfo, KafkaLog, MqttInfo, MqttLog,
-};
+pub use dns::{DnsInfo, DnsLog};
+pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 pub use parser::{AppProtoLogsParser, MetaAppProto};
-pub use rpc::{dubbo_check_protocol, DubboHeader, DubboInfo, DubboLog};
+pub use rpc::{DubboHeader, DubboInfo, DubboLog};
 pub use sql::{
-    decode, mysql_check_protocol, redis_check_protocol, MysqlHeader, MysqlInfo, MysqlLog,
-    PostgresInfo, PostgresqlLog, RedisInfo, RedisLog,
+    decode, MysqlHeader, MysqlInfo, MysqlLog, PostgresInfo, PostgresqlLog, RedisInfo, RedisLog,
 };
 
 use std::{

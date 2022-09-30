@@ -65,7 +65,7 @@ use crate::flow_generator::Result;
                                          |
                                          |
                                          |
-                            L7ProtocolLog::check_payload()
+                        L7ProtocolParser::check_payload()
                                   |           |
                                   |           |
                                   v           v
@@ -73,14 +73,14 @@ use crate::flow_generator::Result;
                     |
                     |
                     v
-       L7protocolLog::parse_payload()
+       L7ProtocolParser::parse_payload()
                     |
                     |
-         |<---------v----------->Vec<L7ProtocolLog>-------->
+         |<---------v---------->Vec<L7ProtocolInfo>-------->
          |                                                 |
          v                                                 |
  raise err, ignore the packet                              v
-                                                      for each log
+                                                      for each info
                                                            |
                                                            |
                                                            v
@@ -91,11 +91,11 @@ use crate::flow_generator::Result;
                            |
                            |
                            v
-             L7protocolLog::merge_log(req/resp)   (merge req and resp to session)
+             L7ProtocolInfo::merge_log(req/resp)   (merge req and resp to session)
                            |
                            |
                            v
-               ! L7protocolLog::skip_send()
+               ! L7ProtocolInfo::skip_send()
                            |
                            v
                     send to server
@@ -121,10 +121,10 @@ about SessionAggr:
 
 about check():
     check() will travsal all protocol from get_all_protocol() to determine what protocol belong to the payload.
-    first, check the bitmap(describe follow) is ignore the protocol ? then call L7ProtocolLog::check_payload() to check.
+    first, check the bitmap(describe follow) is ignore the protocol ? then call L7ProtocolParser::check_payload() to check.
 
 about parse_payload()
-    it use same struct in L7ProtocolLog::check_payload().
+    it use same struct in L7ProtocolParser::check_payload().
 
 about bitmap:
     u128, every bit repersent the protocol shoud check or not(1 indicate check, 0 for ignore), the number of protocol as follow:
@@ -314,18 +314,6 @@ impl L7ProtocolParserInterface for L7ProtocolLogUnknown {
     fn reset(&mut self) {}
 }
 
-pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
-    if p == L7Protocol::Unknown || p == L7Protocol::Other {
-        return None;
-    }
-    for i in get_all_protocol().into_iter() {
-        if i.protocol().0 == p {
-            return Some(i);
-        }
-    }
-    return None;
-}
-
 pub fn get_bitmap(protocol: IpProtocol) -> u128 {
     let mut bitmap: u128 = 0;
     for i in get_all_protocol().iter() {
@@ -342,11 +330,31 @@ pub fn get_bitmap(protocol: IpProtocol) -> u128 {
     return bitmap;
 }
 
+pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
+    let parser = match p {
+        L7Protocol::Http1 => Some(L7ProtocolParser::DnsParser(DnsLog::default())),
+        L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
+        L7Protocol::Dubbo => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2())),
+        L7Protocol::Mysql => Some(L7ProtocolParser::KafkaParser(KafkaLog::default())),
+        L7Protocol::Redis => Some(L7ProtocolParser::MysqlParser(MysqlLog::default())),
+        L7Protocol::Kafka => Some(L7ProtocolParser::RedisParser(RedisLog::default())),
+        L7Protocol::Mqtt => Some(L7ProtocolParser::DubboParser(DubboLog::default())),
+        L7Protocol::Dns => Some(L7ProtocolParser::MqttParser(MqttLog::default())),
+
+        // add new protocol here
+        L7Protocol::Postgresql => Some(L7ProtocolParser::PostgresLog(PostgresqlLog::default())),
+
+        _ => None,
+    };
+
+    return parser;
+}
+
 // 内部实现的协议
 // log的具体结构和实现在 src/flow_generator/protocol_logs/** 下
 // the inner implement protocol source code in src/flow_generator/protocol_logs/**
 pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
-    let mut all_proto = vec![
+    let all_proto = vec![
         L7ProtocolParser::DnsParser(DnsLog::default()),
         L7ProtocolParser::HttpParser(HttpLog::new_v1()),
         L7ProtocolParser::HttpParser(HttpLog::new_v2()),
@@ -355,19 +363,10 @@ pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
         L7ProtocolParser::RedisParser(RedisLog::default()),
         L7ProtocolParser::DubboParser(DubboLog::default()),
         L7ProtocolParser::MqttParser(MqttLog::default()),
-    ];
-    all_proto.extend(get_ext_protocol());
-
-    return all_proto;
-}
-
-// 所有拓展协议，实际上是perf没有实现的协议。 由于perf没有抽象出来，需要区分出来
-// 后面perf抽象出来后会去掉，只留下get_all_protocol
-// extend protocol.
-pub fn get_ext_protocol() -> Vec<L7ProtocolParser> {
-    let all_proto = vec![
-        // add protocol log implement here
+        
+        // add new protocol here
         L7ProtocolParser::PostgresLog(PostgresqlLog::default()),
     ];
+
     return all_proto;
 }
