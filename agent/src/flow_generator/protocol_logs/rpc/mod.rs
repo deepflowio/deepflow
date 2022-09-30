@@ -16,4 +16,4 @@
 
 mod dubbo;
 
-pub use dubbo::{dubbo_check_protocol, DubboHeader, DubboInfo, DubboLog};
+pub use dubbo::{DubboHeader, DubboInfo, DubboLog};

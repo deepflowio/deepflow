@@ -38,7 +38,6 @@ use crate::common::{
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
-    common::meta_packet::MetaPacket,
     flow_generator::{
         error::{Error, Result},
         protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
@@ -393,8 +392,11 @@ impl MqttLog {
         Ok(())
     }
 
-    // 这个逻辑是直接复制 mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
-    // 后面把perf抽象后只会保留在这个
+    /// 尽力而为解析判断是否为mqtt报文, 因为"不依赖端口判断协议实现"要求首个请求包返回true，其他为false，
+    /// 所以只判断是不是合法Connect包
+    /// pest effort parsing to determine whether it is an mqtt packet, because "judging protocol implementation
+    /// independent of protocol port" requires the first request packet to return true, the others are false,
+    /// so only judge whether it is a legitimate "Connect" packet
     pub fn mqtt_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
@@ -438,42 +440,6 @@ impl MqttLog {
             e
         });
     }
-}
-
-/// 尽力而为解析判断是否为mqtt报文, 因为"不依赖端口判断协议实现"要求首个请求包返回true，其他为false，
-/// 所以只判断是不是合法Connect包
-/// pest effort parsing to determine whether it is an mqtt packet, because "judging protocol implementation
-/// independent of protocol port" requires the first request packet to return true, the others are false,
-/// so only judge whether it is a legitimate "Connect" packet
-pub fn mqtt_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << L7Protocol::Mqtt as u8);
-        return false;
-    }
-
-    let payload = match packet.get_l4_payload() {
-        Some(p) => p,
-        None => return false,
-    };
-
-    let (input, header) = match mqtt_fixed_header(payload) {
-        Ok(p) => p,
-        Err(_) => return false,
-    };
-
-    if let PacketKind::Connect = header.kind {
-        let data = bytes::complete::take(header.remaining_length as u32);
-        let version = match data.and_then(parse_connect_packet).parse(input) {
-            Ok((_, (version, _))) => version,
-            Err(_) => return false,
-        };
-        if version < 3 || version > 5 {
-            return false;
-        }
-        return true;
-    }
-
-    false
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -826,7 +792,6 @@ mod tests {
 
         let mut mqtt = MqttLog::default();
         let mut output: String = String::new();
-        let mut bitmap = 0;
         let first_dst_port = packets[0].lookup_key.dst_port;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
@@ -845,7 +810,7 @@ mod tests {
                 None,
                 None,
             );
-            let is_mqtt = mqtt_check_protocol(&mut bitmap, packet);
+            let is_mqtt = MqttLog::mqtt_check_protocol(payload, &ParseParam::from(packet));
             for i in mqtt.info.iter() {
                 output.push_str(&format!("{:?} is_mqtt: {}\r\n", i, is_mqtt));
             }

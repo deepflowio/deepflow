@@ -21,10 +21,7 @@ use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::{__log_info_merge, __parse_common, ignore_non_raw_protocol};
 use crate::{
-    common::{
-        enums::IpProtocol, flow::PacketDirection, meta_packet::MetaPacket, IPV4_ADDR_LEN,
-        IPV6_ADDR_LEN,
-    },
+    common::{enums::IpProtocol, flow::PacketDirection, IPV4_ADDR_LEN, IPV6_ADDR_LEN},
     flow_generator::{
         error::{Error, Result},
         perf::DNS_PORT,
@@ -461,37 +458,6 @@ impl DnsLog {
     }
 }
 
-// 通过请求来识别DNS
-// TODO 这个以后会去掉
-pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.dst_port != DNS_PORT {
-        if packet.lookup_key.src_port != DNS_PORT {
-            *bitmap &= !(1 << (L7Protocol::Dns as u8));
-        }
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-
-    let payload = payload.unwrap();
-    let mut dns = DnsLog::default();
-    let ret = dns.parse(
-        payload,
-        packet.lookup_key.proto,
-        packet.direction,
-        None,
-        None,
-    );
-    if ret.is_err() && packet.lookup_key.proto == IpProtocol::Udp {
-        *bitmap &= !(1 << L7Protocol::Dns as u8);
-        return false;
-    }
-    return ret.is_ok() && dns.info.msg_type == LogMessageType::Request;
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -512,7 +478,6 @@ mod tests {
 
         let mut output = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -532,7 +497,7 @@ mod tests {
                 None,
                 None,
             );
-            let is_dns = dns_check_protocol(&mut bitmap, packet);
+            let is_dns = dns.dns_check_protocol(payload, &ParseParam::from(packet));
             output.push_str(&format!("{:?} is_dns: {}\r\n", dns.info, is_dns));
         }
         output
