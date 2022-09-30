@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	TIMEOUT = 5
+	TIMEOUT = 60
 )
 
 type Endpoint struct {
