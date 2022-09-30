@@ -32,7 +32,6 @@ use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
-use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::L7ProtoRawDataType;
@@ -413,8 +412,6 @@ impl HttpLog {
         self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
     }
 
-    // 这个逻辑直接复制 http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
-    // 等perf抽象出来后，只会保留这一个
     pub fn http1_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
@@ -435,8 +432,6 @@ impl HttpLog {
         return false;
     }
 
-    // 这个逻辑直接复制 http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket)
-    // 等perf抽象出来后，只会保留这一个
     pub fn http2_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         if param.l4_protocol != IpProtocol::Tcp {
             return false;
@@ -1063,59 +1058,6 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
     Ok((version, status_code))
 }
 
-// 通过请求识别HTTPv1
-pub fn http1_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << L7Protocol::Http1 as u8);
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-    let payload = payload.unwrap();
-    let lines = parse_lines(payload, 1);
-    if lines.len() == 0 {
-        // 没有/r/n认为一定不是HTTPv1
-        *bitmap &= !(1 << L7Protocol::Http1 as u8);
-        return false;
-    }
-
-    let regex = Regex::new("^(GET|POST|HEAD|PUT|DELETE|CONNECT|TRACE|OPTIONS|LINK|UNLINK|COPY|MOVE|PATCH|WRAPPED|EXTENSION\\-METHOD).+HTTP/1.[01]$").unwrap();
-    let line = String::from_utf8_lossy(lines[0]).into_owned();
-    return regex.is_match(line.as_str());
-}
-
-// 通过请求识别HTTPv2
-// TODO 这个以后要去掉
-pub fn http2_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << (L7Protocol::Http2 as u8));
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-    let payload = payload.unwrap();
-    let mut http2 = HttpLog::default();
-
-    match packet.ebpf_type {
-        EbpfType::GoHttp2Uprobe => {
-            return http2
-                .parse_http2_go_uprobe(payload, PacketDirection::ClientToServer, true, None, None)
-                .is_ok();
-        }
-        _ => {
-            return http2
-                .parse_http_v2(payload, PacketDirection::ClientToServer)
-                .is_ok();
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::utils::test::Capture;
@@ -1137,7 +1079,6 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -1167,8 +1108,10 @@ mod tests {
                 None,
                 None,
             );
-            let mut is_http = http1_check_protocol(&mut bitmap, packet);
-            is_http |= http2_check_protocol(&mut bitmap, packet);
+            // let mut is_http = http1_check_protocol(&mut bitmap, packet);
+            let param = &ParseParam::from(packet);
+            let mut is_http = http.http1_check_protocol(payload, param);
+            is_http |= http.http2_check_protocol(payload, param);
 
             output.push_str(&format!("{:?} is_http: {}\r\n", http.info, is_http));
         }
