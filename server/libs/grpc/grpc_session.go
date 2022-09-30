@@ -39,6 +39,7 @@ type GrpcSession struct {
 	ips          []net.IP
 	port         uint16
 	syncInterval time.Duration
+	maxMsgSize   int
 	runOnce      func()
 
 	stop         bool
@@ -66,10 +67,9 @@ func (s *GrpcSession) nextServer() error {
 	if s.ips[s.ipIndex].To4() == nil {
 		server = fmt.Sprintf("[%s]:%d", s.ips[s.ipIndex], s.port)
 	}
-	size := 1024 * 1024 * 40
 	options := make([]grpc.DialOption, 0, 4)
 	options = append(options, grpc.WithInsecure(), grpc.WithTimeout(s.syncInterval),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(size)), grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(size)))
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(s.maxMsgSize)), grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(s.maxMsgSize)))
 	clientConn, err := grpc.Dial(server, options...)
 	if err != nil {
 		return err
@@ -135,10 +135,11 @@ func (s *GrpcSession) SetTimeout(timeout time.Duration) {
 	s.timeout = timeout
 }
 
-func (s *GrpcSession) Init(ips []net.IP, port uint16, syncInterval time.Duration, runOnce func()) {
+func (s *GrpcSession) Init(ips []net.IP, port uint16, syncInterval time.Duration, maxMsgSize int, runOnce func()) {
 	s.ips = ips
 	s.port = port
 	s.syncInterval = syncInterval
+	s.maxMsgSize = maxMsgSize
 	s.runOnce = runOnce
 	s.ipIndex = -1
 	s.synchronized = true // 避免启动后连接服务器失败时不打印
