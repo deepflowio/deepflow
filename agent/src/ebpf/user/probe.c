@@ -126,8 +126,8 @@ static int program__attach_probe(const struct ebpf_prog *prog, bool retprobe,
 	} else {
 		// ref_ctr_offset Appear in linux 4.20, set 0
 		// https://lore.kernel.org/lkml/20180606083344.31320-3-ravi.bangoria@linux.ibm.com/
-		pfd = bpf_attach_uprobe(progfd, attach_type, ev_name,
-					config1, offset, pid, 0);
+		pfd = bpf_attach_uprobe(progfd, attach_type, ev_name, config1,
+					offset, pid, 0);
 	}
 
 	if (pfd < 0)

@@ -250,9 +250,7 @@ fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
-        // feature flag example
-        //let FEATURE_GO_NO_SYMBOL = 0;
-        //set_feature_flag(FEATURE_GO_NO_SYMBOL);
+        set_feature_flag(FEATURE_UPROBE_OPENSSL);
 
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()

@@ -434,3 +434,35 @@ unsigned int fetch_kernel_version_code(void)
 
 	return KERNEL_VERSION(major, minor, patch);
 }
+
+bool is_process(int pid)
+{
+	char file[PATH_MAX], buff[4096];
+	int fd;
+	int read_tgid = -1, read_pid = -1;
+
+	snprintf(file, sizeof(file), "/proc/%d/status", pid);
+	if (access(file, F_OK))
+		return false;
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0)
+		return false;
+
+	read(fd, buff, sizeof(buff));
+	close(fd);
+
+	char *p = strstr(buff, "Tgid:");
+	sscanf(p, "Tgid:\t%d", &read_tgid);
+
+	p = strstr(buff, "Pid:");
+	sscanf(p, "Pid:\t%d", &read_pid);
+
+	if (read_tgid == -1 || read_pid == -1)
+		return false;
+
+	if (read_tgid != -1 && read_pid != -1 && read_tgid == read_pid)
+		return true;
+
+	return false;
+}

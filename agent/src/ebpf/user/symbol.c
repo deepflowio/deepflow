@@ -286,14 +286,15 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		int error = 0;
 		error = bcc_elf_foreach_sym(uprobe_sym->binary_path, find_sym,
 					    &default_option, uprobe_sym);
-		if (!feature_flags[FEATURE_GO_NO_SYMBOL] && error) {
+		if (!feature_flags[FEATURE_UPROBE_GOLANG_SYMBOL] && error) {
 			goto invalid;
 		}
 	}
 
-	// If bcc_elf_foreach_sym is successful, uprobe_sym->entry will 
+	// If bcc_elf_foreach_sym is successful, uprobe_sym->entry will
 	// not be 0. try GoReSym
-	if (feature_flags[FEATURE_GO_NO_SYMBOL] && uprobe_sym->name && uprobe_sym->entry == 0x0) {
+	if (feature_flags[FEATURE_UPROBE_GOLANG_SYMBOL] && uprobe_sym->name &&
+	    uprobe_sym->entry == 0x0) {
 		struct function_address_return func = {};
 		func = function_address((char *)uprobe_sym->binary_path,
 					(char *)uprobe_sym->name);
@@ -398,7 +399,7 @@ uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 
 	bcc_elf_foreach_sym(bin, find_sym, &default_option, &tmp);
 
-	if (feature_flags[FEATURE_GO_NO_SYMBOL] && !tmp.entry) {
+	if (feature_flags[FEATURE_UPROBE_GOLANG_SYMBOL] && !tmp.entry) {
 		// The function address is used to set the hook point.
 		// itab is used for http2 to obtain fd. Currently only
 		// net_TCPConn_itab can be obtained for HTTPS.

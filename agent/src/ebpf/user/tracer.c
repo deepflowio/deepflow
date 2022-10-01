@@ -360,9 +360,8 @@ static struct ebpf_link *exec_attach_uprobe(struct ebpf_prog *prog,
 	struct ebpf_link *link = NULL;
 	char ev_name[EV_NAME_SIZE];
 	int ret;
-	ret =
-	    get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr,
-				  isret);
+	ret = get_uprobe_event_name(bin_path, ev_name, sizeof(ev_name), addr,
+				    isret);
 	if (ret != ETR_OK)
 		return NULL;
 
@@ -426,9 +425,8 @@ static int probe_attach(struct probe *p)
 		if (usym->type == GO_UPROBE && usym->isret)
 			ret = false;
 
-		link =
-		    exec_attach_uprobe(p->prog, usym->binary_path, usym->entry,
-				       ret, -1);
+		link = exec_attach_uprobe(p->prog, usym->binary_path,
+					  usym->entry, ret, usym->pid);
 	}
 
 	p->link = link;

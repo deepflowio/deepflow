@@ -40,6 +40,7 @@ OBJS := user/elf.o \
 	user/common.o \
 	user/symbol.o \
 	user/go_tracer.o \
+	user/ssl_tracer.o \
 	user/ring.o \
 	user/btf_vmlinux.o \
 	user/load.o \

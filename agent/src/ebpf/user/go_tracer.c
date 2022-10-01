@@ -48,21 +48,31 @@
 #include "socket.h"
 #include "elf.h"
 
+// For process execute/exit events.
+struct process_event {
+	struct list_head list;          // list add to proc_events_head
+	struct bpf_tracer *tracer;      // link to struct bpf_tracer
+	uint8_t type;                   // EVENT_TYPE_PROC_EXEC or EVENT_TYPE_PROC_EXIT
+	char *path;                     // Full path "/proc/<pid>/root/..."
+	int pid;                        // Process ID
+	uint32_t expire_time;           // Expiration Date, the number of seconds since the system started.
+};
+
 #define MAP_PROC_INFO_MAP_NAME	"proc_info_map"
 #define PROCFS_CHECK_PERIOD  60	// 60 seconds
 static uint64_t procfs_check_count;
 
 static char build_info_magic[] = "\xff Go buildinf:";
 
-struct list_head proc_info_head;	// For pid-offsets correspondence lists.
+static struct list_head proc_info_head;	// For pid-offsets correspondence lists.
 
-struct list_head proc_events_head;     // For process execute/exit events list.
+static struct list_head proc_events_head;     // For process execute/exit events list.
 #define PROC_EVENT_DELAY_HANDLE_DEF	120 // execute/exit events delayed processing time, unit: second
-pthread_mutex_t mutex_proc_events_lock;
+static pthread_mutex_t mutex_proc_events_lock;
 
 /* *INDENT-OFF* */
 /* ------------- offsets info -------------- */
-struct data_members offsets[] = {
+static struct data_members offsets[] = {
 	{
 		.structure = "runtime.g",
 		.field_name = "goid",
@@ -634,47 +644,15 @@ bool is_go_process(int pid)
 	return ret;
 }
 
-// pid is process or thread ?
-static bool is_process(int pid)
-{
-	char file[PATH_MAX], buff[4096];
-	int fd;
-	int read_tgid = -1, read_pid = -1;
-
-	snprintf(file, sizeof(file), "/proc/%d/status", pid);
-	if (access(file, F_OK))
-		return false;
-
-	fd = open(file, O_RDONLY);
-	if (fd < 0)
-		return false;
-
-	read(fd, buff, sizeof(buff));
-	close(fd);
-
-	char *p = strstr(buff, "Tgid:");
-	sscanf(p, "Tgid:\t%d", &read_tgid);
-
-	p = strstr(buff, "Pid:");
-	sscanf(p, "Pid:\t%d", &read_pid);
-
-	if (read_tgid == -1 || read_pid == -1)
-		return false;
-
-	if (read_tgid != -1 && read_pid != -1 && read_tgid == read_pid)
-		return true;
-
-	return false;
-}
 
 /**
- * collect_uprobe_syms_from_procfs -- Find all golang binary executables from Procfs,
+ * collect_go_uprobe_syms_from_procfs -- Find all golang binary executables from Procfs,
  * 				      parse and register uprobe symbols.
  *
  * @tps Where probe was registered.
  * @return ETR_OK if ok, else an error
  */
-int collect_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
+int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 {
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
@@ -800,6 +778,10 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 		if (!(probe->type == UPROBE && probe->private_data != NULL))
 			continue;
 		sym_uprobe = probe->private_data;
+
+		if (sym_uprobe->type != GO_UPROBE)
+			continue;
+
 		if (sym_uprobe->pid == pid) {
 			if (probe_detach(probe) != 0) {
 				ebpf_warning
@@ -1033,45 +1015,41 @@ void go_process_exit(int pid)
 }
 
 /**
- * go_process_events_handle - process exec/exit events handle for thread entry.
+ * go_process_events_handle - process exec/exit events handle, called by process_events_handle_main().
  */
 void go_process_events_handle(void)
 {
 	struct process_event *pe;
+	do {
+		// Multithreaded safe fetch 'struct process_event'
+		pthread_mutex_lock(&mutex_proc_events_lock);
+		if (!list_empty(&proc_events_head)) {
+			pe = list_first_entry(&proc_events_head,
+					      struct process_event, list);
+		} else {
+			pe = NULL;
+		}
+		pthread_mutex_unlock(&mutex_proc_events_lock);
 
-	for(;;) {
-		do {
-			// Multithreaded safe fetch 'struct process_event'
+		if (pe == NULL)
+			break;
+
+		if (get_sys_uptime() >= pe->expire_time) {
 			pthread_mutex_lock(&mutex_proc_events_lock);
-			if (!list_empty(&proc_events_head)) {
-				pe = list_first_entry(&proc_events_head,
-						      struct process_event, list);
-			} else {
-				pe = NULL;
-			}
+			list_head_del(&pe->list);
 			pthread_mutex_unlock(&mutex_proc_events_lock);
 
-			if (pe == NULL)
-				break;
-
-			if (get_sys_uptime() >= pe->expire_time) {
-				pthread_mutex_lock(&mutex_proc_events_lock);
-				list_head_del(&pe->list);
-				pthread_mutex_unlock(&mutex_proc_events_lock);
-
-				if (pe->type == EVENT_TYPE_PROC_EXEC) {
-					if (access(pe->path, F_OK) == 0) {
-						process_execute_handle(pe->pid, pe->tracer);
-					}
+			if (pe->type == EVENT_TYPE_PROC_EXEC) {
+				if (access(pe->path, F_OK) == 0) {
+					process_execute_handle(pe->pid,
+							       pe->tracer);
 				}
-
-				free(pe->path);
-				free(pe);
-			} else {
-				break;
 			}
-		} while(true);
 
-		usleep(LOOP_DELAY_US);
-	}
+			free(pe->path);
+			free(pe);
+		} else {
+			break;
+		}
+	} while (true);
 }

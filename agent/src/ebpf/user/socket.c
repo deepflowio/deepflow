@@ -26,6 +26,7 @@
 #include "socket.h"
 #include "log.h"
 #include "go_tracer.h"
+#include "ssl_tracer.h"
 #include "load.h"
 #include "btf_vmlinux.h"
 
@@ -111,7 +112,7 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_writev");
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_exit_readv");
 	// process execute
-	tps_set_symbol(tps, "tracepoint/sched/sched_process_exec");
+	tps_set_symbol(tps, "tracepoint/sched/sched_process_fork");
 
 	// 周期性触发用于缓存的数据的超时检查
 	tps_set_symbol(tps, "tracepoint/syscalls/sys_enter_getppid");
@@ -125,7 +126,9 @@ static void socket_tracer_set_probes(struct tracer_probes_conf *tps)
 	tps->tps_nr = index;
 
 	// 收集go可执行文件uprobe符号信息
-	collect_uprobe_syms_from_procfs(tps);
+	collect_go_uprobe_syms_from_procfs(tps);
+
+	collect_ssl_uprobe_syms_from_procfs(tps);
 }
 
 /* ==========================================================
@@ -340,10 +343,13 @@ static inline bool need_proto_reconfirm(uint16_t l7_proto)
 
 static void process_event(struct process_event_t *e)
 {
-	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC)
+	if (e->meta.event_type == EVENT_TYPE_PROC_EXEC) {
 		go_process_exec(e->pid);
-	else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT)
+		ssl_process_exec(e->pid);
+	} else if (e->meta.event_type == EVENT_TYPE_PROC_EXIT) {
 		go_process_exit(e->pid);
+		ssl_process_exit(e->pid);
+	}
 }
 
 static inline int dispatch_queue_index(uint64_t val, int count)
@@ -723,7 +729,11 @@ static int check_kern_adapt_and_state_update(void)
 static void process_events_handle_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "proc-events");
-	go_process_events_handle();
+	for(;;) {
+		go_process_events_handle();
+		ssl_events_handle();
+		usleep(LOOP_DELAY_US);
+	}
 }
 
 static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)

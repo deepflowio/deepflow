@@ -359,29 +359,22 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 	return 0;
 }
 
-// /sys/kernel/debug/tracing/events/sched/sched_process_exec/format
-SEC("tracepoint/sched/sched_process_exec")
-int bpf_func_sched_process_exec(struct sched_comm_exec_ctx *ctx)
+// /sys/kernel/debug/tracing/events/sched/sched_process_fork/format
+SEC("tracepoint/sched/sched_process_fork")
+int bpf_func_sched_process_fork(struct sched_comm_fork_ctx *ctx)
 {
 	struct process_event_t data;
-	__u64 id = bpf_get_current_pid_tgid();
-	pid_t pid = id >> 32;
-	pid_t tid = (__u32)id;
 
-	if (pid == tid) {
-		data.meta.event_type = EVENT_TYPE_PROC_EXEC;
-		data.pid = pid;
-		bpf_get_current_comm(data.name, sizeof(data.name));
-		int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
-						BPF_F_CURRENT_CPU, &data,
-						sizeof(data));
+	data.meta.event_type = EVENT_TYPE_PROC_EXEC;
+	data.pid = ctx->child_pid;
+	bpf_get_current_comm(data.name, sizeof(data.name));
+	int ret = bpf_perf_event_output(ctx, &NAME(socket_data),
+					BPF_F_CURRENT_CPU, &data, sizeof(data));
 
-		if (ret) {
-			bpf_debug
-			    ("bpf_func_sys_exit_execve event output() failed: %d\n",
-			     ret);
-		}
+	if (ret) {
+		bpf_debug(
+			"bpf_func_sys_exit_execve event output() failed: %d\n",
+			ret);
 	}
-
 	return 0;
 }
