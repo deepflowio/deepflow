@@ -25,7 +25,7 @@ struct tracer_probes_conf;
 
 enum uprobe_type {
 	GO_UPROBE = 0,
-	C_UPROBE,
+	OPENSSL_UPROBE,
 	OTHER_UPROBE
 };
 

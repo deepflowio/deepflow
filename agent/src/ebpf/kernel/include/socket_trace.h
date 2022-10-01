@@ -137,6 +137,7 @@ enum process_data_extra_source {
 	DATA_SOURCE_SYSCALL,
 	DATA_SOURCE_GO_TLS_UPROBE,
 	DATA_SOURCE_GO_HTTP2_UPROBE,
+	DATA_SOURCE_OPENSSL_UPROBE,
 };
 
 struct process_data_extra {
@@ -211,6 +212,14 @@ struct sched_comm_exit_ctx {
 	char comm[16];          /*     offset:8;       size:16 */
 	pid_t pid;        	/*     offset:24;      size:4  */
 	int prio;		/*     offset:28;      size:4  */
+};
+
+struct sched_comm_fork_ctx {
+	__u64 __pad_0;
+	char parent_comm[16];
+	__u32 parent_pid;
+	char child_comm[16];
+	__u32 child_pid;
 };
 
 struct sched_comm_exec_ctx {

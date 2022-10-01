@@ -662,6 +662,12 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			return;
 	}
 
+	if (extra->source == DATA_SOURCE_OPENSSL_UPROBE) {
+		if (conn_info->protocol != PROTO_HTTP1 &&
+		    conn_info->protocol != PROTO_HTTP2)
+			return;
+	}
+
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
 		return;
 	}
@@ -802,8 +808,14 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->tuple.num = conn_info->tuple.num;
 	v->data_type = conn_info->protocol;
 
-	if (conn_info->protocol == PROTO_HTTP1 && extra->source == DATA_SOURCE_GO_TLS_UPROBE)
+	if (conn_info->protocol == PROTO_HTTP1 &&
+	    (extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
+	     extra->source == DATA_SOURCE_OPENSSL_UPROBE))
 		v->data_type = PROTO_TLS_HTTP1;
+
+	if (conn_info->protocol == PROTO_HTTP2 &&
+	    (extra->source == DATA_SOURCE_OPENSSL_UPROBE))
+		v->data_type = PROTO_TLS_HTTP2;
 
 	v->socket_id = sk_info.uid;
 	v->data_seq = sk_info.seq;
@@ -828,7 +840,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	} else
 		v->extra_data_count = 0;
 
-	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE)
+	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
+	    extra->source == DATA_SOURCE_OPENSSL_UPROBE)
 		v->tcp_seq = extra->tcp_seq;
 
 	v->coroutine_id = extra->coroutine_id;
@@ -1437,5 +1450,6 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 //Refer to the eBPF programs here
 #include "go_tls_bpf.c"
 #include "go_http2_bpf.c"
+#include "openssl_bpf.c"
 
 char _license[] SEC("license") = "GPL";
