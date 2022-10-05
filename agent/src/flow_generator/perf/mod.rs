@@ -164,10 +164,8 @@ impl FlowPerf {
         if let Some(payload) = packet.get_l4_payload() {
             let mut parser = self.l7_protocol_log_parser.take().unwrap();
             let ret = parser.parse_payload(payload, parse_param);
-            if ret.is_ok() {
-                parser.reset();
-                self.l7_protocol_log_parser.replace(parser);
-            }
+            parser.reset();
+            self.l7_protocol_log_parser.replace(parser);
 
             if !self.is_success {
                 if ret.is_ok() {
@@ -208,9 +206,10 @@ impl FlowPerf {
                     return self._l7_parse_log(packet, app_table, &param);
                 }
             }
+
+            self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
         }
 
-        self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
         return Err(Error::L7ProtocolUnknown);
     }
 
