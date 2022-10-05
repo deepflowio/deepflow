@@ -47,7 +47,7 @@ pub enum L7Protocol {
     Mqtt = L7_PROTOCOL_MQTT,
     Dns = L7_PROTOCOL_DNS,
 
-    // add new protocol here
+    // add new protocol below
     Postgresql = L7_PROTOCOL_POSTGRESQL,
 
     Max = L7_PROTOCOL_MAX,
@@ -76,7 +76,7 @@ impl From<u8> for L7Protocol {
             L7_PROTOCOL_MQTT => L7Protocol::Mqtt,
             L7_PROTOCOL_DNS => L7Protocol::Dns,
 
-            // add new protocol here
+            // add new protocol below
             L7_PROTOCOL_POSTGRESQL => L7Protocol::Postgresql,
 
             _ => L7Protocol::Unknown,

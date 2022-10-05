@@ -341,7 +341,7 @@ pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
         L7Protocol::Mqtt => Some(L7ProtocolParser::DubboParser(DubboLog::default())),
         L7Protocol::Dns => Some(L7ProtocolParser::MqttParser(MqttLog::default())),
 
-        // add new protocol here
+        // add new protocol below
         L7Protocol::Postgresql => Some(L7ProtocolParser::PostgresLog(PostgresqlLog::default())),
 
         _ => None,
@@ -363,8 +363,8 @@ pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
         L7ProtocolParser::RedisParser(RedisLog::default()),
         L7ProtocolParser::DubboParser(DubboLog::default()),
         L7ProtocolParser::MqttParser(MqttLog::default()),
-        
-        // add new protocol here
+        //
+        // add new protocol below
         L7ProtocolParser::PostgresLog(PostgresqlLog::default()),
     ];
 

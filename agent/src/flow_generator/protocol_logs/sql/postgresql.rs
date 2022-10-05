@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-use public::{bytes::read_u32_be, l7_protocol::L7Protocol};
+use public::{
+    bytes::{read_u32_be, read_u64_be},
+    l7_protocol::L7Protocol,
+};
 use serde::Serialize;
 
 use crate::{
@@ -33,6 +36,8 @@ use crate::{
     },
     ignore_ebpf,
 };
+
+const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct PostgresInfo {
@@ -114,8 +119,8 @@ impl L7ProtocolInfoInterface for PostgresInfo {
             resp: L7Response {
                 status: self.status,
                 code: Some(self.resp_type as i32),
-                result: self.error_message,
-                ..Default::default()
+                result: get_response_result(self.resp_type).unwrap_or_default(),
+                exception: self.error_message,
             },
             ext_info: Some(ExtendedInfo {
                 row_effect: Some(self.affected_rows as u32),
@@ -138,6 +143,10 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.info.start_time = param.time;
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
+        if self.check_is_ssl_req(payload) {
+            return true;
+        }
+
         if self.parse(payload).is_ok() {
             self.parsed = true;
             return true;
@@ -150,6 +159,11 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::PostgresInfo(self.info.clone())]);
         }
+
+        if self.check_is_ssl_req(payload) {
+            return Ok(vec![]);
+        }
+
         self.info.start_time = param.time;
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
@@ -188,6 +202,7 @@ impl PostgresqlLog {
         if payload.len() < 5 {
             return Err(Error::L7ProtocolUnknown);
         }
+
         let typ = payload[0];
         if !check_type(self.info.msg_type, typ) {
             return Err(Error::L7ProtocolUnknown);
@@ -206,7 +221,7 @@ impl PostgresqlLog {
             LogMessageType::Response => {
                 self.info.resp_type = typ;
                 match char::from(self.info.resp_type) {
-                    RESP_ERROR => {
+                    'E' => {
                         self.info.status = L7ResponseStatus::Error;
                         /*
                         type: 1B
@@ -234,7 +249,7 @@ impl PostgresqlLog {
 
                         return Ok(());
                     }
-                    RESP_COMM_COMPLETE => {
+                    'C' => {
                         self.info.status = L7ResponseStatus::Ok;
                         // INSERT xxx xxx0x0 where last xxx is row effect.
                         // DELETE xxx0x0
@@ -271,23 +286,30 @@ impl PostgresqlLog {
 
         return Ok(());
     }
+
+    fn check_is_ssl_req(&self, payload: &[u8]) -> bool {
+        if payload.len() != 8 {
+            return false;
+        }
+        return self.info.msg_type == LogMessageType::Request && read_u64_be(payload) == SSL_REQ;
+    }
 }
 
 /*
 req:
-case 'Q':            simple query
-case 'P':            parse
-case 'B':            bind
-case 'E':            execute
-case 'F':            fastpath function call
-case 'C':            close
-case 'D':            describe
-case 'H':            flush
-case 'S':            sync
-case 'X':            exit
-case 'd':            copy data
-case 'c':            copy done
-case 'f':            copy fail
+case 'Q'            simple query
+case 'P'            parse
+case 'B'            bind
+case 'E'            execute
+case 'F'            fastpath function call
+case 'C'            close
+case 'D'            describe
+case 'H'            flush
+case 'S'            sync
+case 'X'            exit
+case 'd'            copy data
+case 'c'            copy done
+case 'f'            copy fail
 
 resp:
 case 'C':        command complete
@@ -301,6 +323,7 @@ case 'S':        parameter status
 case 'K':        secret key data from the backend
 case 'T':        Row Description
 case 'n':        No Data
+case 'N':        No Data
 case 't':        Parameter Description
 case 'D':        Data Row
 case 'G':        Start Copy In
@@ -308,27 +331,48 @@ case 'H':        Start Copy Out
 case 'W':        Start Copy Both
 case 'd':        Copy Data
 case 'c':        Copy Done
-case 'R':        Authentication Reques
+case 'R':        Authentication Reques, should ignore
 */
-const QUERY_SIMPLE_QUERY: char = 'Q';
-const QUERY_EXEC: char = 'E';
-
-const RESP_ERROR: char = 'E';
-const RESP_COMM_COMPLETE: char = 'C';
-const RESP_ROW_DESC: char = 'T';
-const RESP_DATA_ROW: char = 'D';
 
 fn check_type(msg_type: LogMessageType, typ: u8) -> bool {
     let c = char::from(typ);
     match msg_type {
         LogMessageType::Request => match c {
-            QUERY_SIMPLE_QUERY | QUERY_EXEC => return true,
+            'Q' | 'P' | 'B' | 'E' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => {
+                return true
+            }
             _ => return false,
         },
         LogMessageType::Response => match c {
-            RESP_ERROR | RESP_COMM_COMPLETE | RESP_ROW_DESC | RESP_DATA_ROW => return true,
+            'C' | 'E' | 'Z' | 'I' | '1' | '2' | '3' | 'S' | 'K' | 'T' | 'n' | 'N' | 't' | 'D'
+            | 'G' | 'H' | 'W' | 'd' | 'c' => return true,
             _ => return false,
         },
         _ => return false,
     }
+}
+
+fn get_response_result(typ: u8) -> Option<String> {
+    return match char::from(typ) {
+        'C' => Some(String::from("command complete")),
+        'E' => Some(String::from("error return")),
+        'Z' => Some(String::from("backend is ready for new query")),
+        'I' => Some(String::from("empty query")),
+        '1' => Some(String::from("Parse Complete")),
+        '2' => Some(String::from("Bind Complete")),
+        '3' => Some(String::from("Close Complete")),
+        'S' => Some(String::from("parameter status")),
+        'K' => Some(String::from("secret key data from the backend")),
+        'T' => Some(String::from("Row Description")),
+        'n' => Some(String::from("No Data")),
+        'N' => Some(String::from("No Data")),
+        't' => Some(String::from("Parameter Description")),
+        'D' => Some(String::from("Data Row")),
+        'G' => Some(String::from("Start Copy In")),
+        'H' => Some(String::from("Start Copy Out")),
+        'W' => Some(String::from("Start Copy Both")),
+        'd' => Some(String::from("Copy Data")),
+        'c' => Some(String::from("Copy Done")),
+        _ => None,
+    };
 }
