@@ -96,6 +96,7 @@ enum Status {
     SUCCESS = 0;
     FAILED = 1;
     HEARTBEAT = 2;
+    CLUSTER_ID_NOT_FOUND = 10;
 }
 
 enum TapMode {
