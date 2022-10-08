@@ -30,7 +30,7 @@ func (t *Tencent) getAZs(region tencentRegion) ([]model.AZ, error) {
 	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeZones", region.name, "ZoneSet", false, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("az request tencent api error: (%s)", err.Error())
-		return []model.AZ{}, nil
+		return []model.AZ{}, err
 	}
 	for _, aData := range resp {
 		if !t.checkRequiredAttributes(aData, attrs) {
