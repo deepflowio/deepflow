@@ -93,8 +93,7 @@ struct SessionPeer {
     win_size: u16,
     win_scale: u8,
 
-    ack_received: bool, // ack_retrans check
-    syn_received: bool,
+    syn_transmitted: bool,
 
     is_handshake_ack_packet: bool,
     srt_calculable: bool,
@@ -623,11 +622,11 @@ impl TcpPerf {
                 same_dir.seq_threshold = p.tcp_data.seq + 1;
                 same_dir.first_syn_timestamp = p.lookup_key.timestamp;
                 self.handshaking = true;
-            } else if same_dir.syn_received {
+            } else if same_dir.syn_transmitted {
                 self.perf_data.calc_retrans_syn(fpd);
                 self.perf_data.calc_retran_syn();
             }
-            same_dir.syn_received = true;
+            same_dir.syn_transmitted = true;
             return (false, false);
         }
 
@@ -649,15 +648,11 @@ impl TcpPerf {
         }
 
         if p.is_ack() {
-            if p.tcp_data.seq == same_dir.seq_threshold && p.tcp_data.ack == oppo_dir.seq_threshold
-            {
-                if !same_dir.ack_received {
-                    same_dir.ack_received = true;
-                } else if p.tcp_data.win_size == same_dir.win_size {
-                    // window update包不计重传
-                    self.perf_data.calc_retrans_syn(fpd);
-                }
-            }
+            // It is impossible to distinguish retransmission between ACK and ACK 
+            // keepalive. To avoid misunderstanding, retransmission of pure ACK 
+            // packets is not calculated.
+            // ==================================================================
+            // 无法区分 ACK 重传和 ACK Keepalive，为了避免误解不计算纯 ACK 包的重传。
             return (false, false);
         }
 
