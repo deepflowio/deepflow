@@ -537,7 +537,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 		}
 	}
 	return &api.SyncResponse{
-		Status: &STATUS_FAILED,
+		Status: &STATUS_SUCCESS,
 		Config: configInfo,
 	}
 }
