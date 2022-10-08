@@ -36,7 +36,7 @@ func (t *Tencent) getPeerConnections(region tencentRegion, peerConnections []mod
 	resp, err := t.getResponse("bmvpc", "2018-06-25", "DescribeVpcPeerConnections", region.name, "VpcPeerConnectionSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("peer connection request tencent api error: (%s)", err.Error())
-		return []model.PeerConnection{}, nil
+		return []model.PeerConnection{}, err
 	}
 	for _, pData := range resp {
 		if !t.checkRequiredAttributes(pData, attrs) {

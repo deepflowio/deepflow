@@ -30,7 +30,7 @@ func (t *Tencent) getVPCs(region tencentRegion) ([]model.VPC, error) {
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeVpcs", region.name, "VpcSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("vpc request tencent api error: (%s)", err.Error())
-		return []model.VPC{}, nil
+		return []model.VPC{}, err
 	}
 	for _, vData := range resp {
 		if !t.checkRequiredAttributes(vData, attrs) {

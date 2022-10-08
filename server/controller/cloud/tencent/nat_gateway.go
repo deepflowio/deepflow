@@ -35,7 +35,7 @@ func (t *Tencent) getNatGateways(region tencentRegion) ([]model.NATGateway, []mo
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGateways", region.name, "NatGatewaySet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("nat gateway request tencent api error: (%s)", err.Error())
-		return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, nil
+		return []model.NATGateway{}, []model.VInterface{}, []model.IP{}, err
 	}
 	for _, nData := range resp {
 		if !t.checkRequiredAttributes(nData, attrs) {

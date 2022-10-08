@@ -32,7 +32,7 @@ func (t *Tencent) getRegions() ([]tencentRegion, error) {
 	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeRegions", "", "RegionSet", false, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("region request tencent api error: (%s)", err.Error())
-		return []tencentRegion{}, nil
+		return []tencentRegion{}, err
 	}
 	for _, rData := range resp {
 		if !t.checkRequiredAttributes(rData, attrs) {

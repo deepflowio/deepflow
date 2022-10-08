@@ -32,7 +32,7 @@ func (t *Tencent) getNetworks(region tencentRegion) ([]model.Network, []model.Su
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeSubnets", region.name, "SubnetSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("network request tencent api error: (%s)", err.Error())
-		return []model.Network{}, []model.Subnet{}, []model.VInterface{}, nil
+		return []model.Network{}, []model.Subnet{}, []model.VInterface{}, err
 	}
 	for _, nData := range resp {
 		if !t.checkRequiredAttributes(nData, attrs) {

@@ -359,7 +359,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 		sgs, sgRules, err := t.getSecurityGroups(region)
 		if err != nil {
-			return model.Resource{}, nil
+			return model.Resource{}, err
 		}
 		if len(sgs) > 0 || len(sgRules) > 0 {
 			regionFlag = true
@@ -369,7 +369,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 		routers, routerTables, err := t.getRouterAndTables(region)
 		if err != nil {
-			return model.Resource{}, nil
+			return model.Resource{}, err
 		}
 		if len(routers) > 0 || len(routerTables) > 0 {
 			regionFlag = true
@@ -379,7 +379,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 		networks, subnets, netVinterfaces, err := t.getNetworks(region)
 		if err != nil {
-			return model.Resource{}, nil
+			return model.Resource{}, err
 		}
 		if len(networks) > 0 || len(subnets) > 0 || len(netVinterfaces) > 0 {
 			regionFlag = true
@@ -390,7 +390,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 		vms, vmSGs, err := t.getVMs(region)
 		if err != nil {
-			return model.Resource{}, nil
+			return model.Resource{}, err
 		}
 		if len(vms) > 0 || len(vmSGs) > 0 {
 			regionFlag = true
@@ -400,7 +400,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 		vinterfaces, ips, vNatRules, err := t.getVInterfacesAndIPs(region)
 		if err != nil {
-			return model.Resource{}, nil
+			return model.Resource{}, err
 		}
 		if len(vinterfaces) > 0 || len(ips) > 0 || len(vNatRules) > 0 {
 			regionFlag = true
@@ -411,7 +411,7 @@ func (t *Tencent) GetCloudData() (model.Resource, error) {
 
 		fIPs, err := t.getFloatingIPs()
 		if err != nil {
-			return model.Resource{}, nil
+			return model.Resource{}, err
 		}
 		if len(fIPs) > 0 {
 			regionFlag = true

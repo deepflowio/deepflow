@@ -43,7 +43,7 @@ func (t *Tencent) getNatRules(region tencentRegion) ([]model.NATRule, error) {
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNatGatewayDestinationIpPortTranslationNatRules", region.name, "NatGatewayDestinationIpPortTranslationNatRuleSet", true, params)
 	if err != nil {
 		log.Errorf("nat rule request tencent api error: (%s)", err.Error())
-		return []model.NATRule{}, nil
+		return []model.NATRule{}, err
 	}
 	for _, nData := range resp {
 		if !t.checkRequiredAttributes(nData, attrs) {
