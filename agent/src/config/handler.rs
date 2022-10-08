@@ -954,7 +954,7 @@ impl ConfigHandler {
         mut components: Option<&mut Components>,
     ) -> Vec<fn(&ConfigHandler, &mut Components)> {
         let candidate_config = &mut self.candidate_config;
-        let static_config = &mut self.static_config;
+        let static_config = &self.static_config;
         let yaml_config = &candidate_config.yaml_config;
         let mut new_config: ModuleConfig = (static_config.clone(), new_config).try_into().unwrap();
         let mut callbacks: Vec<fn(&ConfigHandler, &mut Components)> = vec![];
@@ -1385,6 +1385,15 @@ impl ConfigHandler {
                     new_config.platform.kubernetes_api_enabled
                 );
             }
+            if candidate_config.platform.kubernetes_cluster_id
+                != new_config.platform.kubernetes_cluster_id
+            {
+                info!(
+                    "kubernetes_cluster_id set to {}",
+                    new_config.platform.kubernetes_cluster_id
+                );
+            }
+
             info!(
                 "platform config change from {:#?} to {:#?}",
                 candidate_config.platform, new_config.platform

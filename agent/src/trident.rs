@@ -90,15 +90,22 @@ use crate::{
 
 const MINUTE: Duration = Duration::from_secs(60);
 
+pub struct ChangedConfig {
+    pub runtime_config: RuntimeConfig,
+    pub blacklist: Vec<u64>,
+    pub vm_mac_addrs: Vec<MacAddr>,
+    pub kubernetes_cluster_id: Option<String>,
+}
+
 pub enum State {
     Running,
-    ConfigChanged((RuntimeConfig, Vec<u64>, Vec<MacAddr>)), // (runtime_config, blacklist, vm_mac_addrs)
+    ConfigChanged(ChangedConfig),
     Terminated,
     Disabled, // 禁用状态
 }
 
 impl State {
-    fn unwrap_config(self) -> (RuntimeConfig, Vec<u64>, Vec<MacAddr>) {
+    fn unwrap_config(self) -> ChangedConfig {
         match self {
             Self::ConfigChanged(c) => c,
             _ => panic!("not config type"),
@@ -370,9 +377,14 @@ impl Trident {
             mem::swap(&mut new_state, &mut *state_guard);
             mem::drop(state_guard);
 
-            let (new_conf, blacklist, vm_mac_addrs) = new_state.unwrap_config();
+            let ChangedConfig {
+                runtime_config,
+                blacklist,
+                vm_mac_addrs,
+                kubernetes_cluster_id,
+            } = new_state.unwrap_config();
             if let Some(old_yaml) = yaml_conf {
-                if old_yaml != new_conf.yaml_config {
+                if old_yaml != runtime_config.yaml_config {
                     if let Some(mut c) = components.take() {
                         c.stop();
                     }
@@ -383,9 +395,12 @@ impl Trident {
                     process::exit(NORMAL_EXIT_WITH_RESTART);
                 }
             }
-            yaml_conf = Some(new_conf.yaml_config.clone());
+            yaml_conf = Some(runtime_config.yaml_config.clone());
+            if let Some(id) = kubernetes_cluster_id {
+                config_handler.static_config.kubernetes_cluster_id = id;
+            }
             let callbacks =
-                config_handler.on_config(new_conf, &exception_handler, components.as_mut());
+                config_handler.on_config(runtime_config, &exception_handler, components.as_mut());
             match components.as_mut() {
                 None => {
                     let mut comp = Components::new(
