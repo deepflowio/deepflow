@@ -52,8 +52,8 @@ const (
 	TELEGRAF_POD            = "pod_name"
 	PROMETHEUS_POD          = "pod"
 	PROMETHEUS_INSTANCE     = "instance"
-	TABLE_PREFIX_TELEGRAF   = "telegraf_"
-	TABLE_PREFIX_PROMETHEUS = "prometheus_"
+	TABLE_PREFIX_TELEGRAF   = "influxdb."
+	TABLE_PREFIX_PROMETHEUS = "prometheus."
 )
 
 type Counter struct {
@@ -249,39 +249,12 @@ func StatsToExtMetrics(vtapID uint16, s *pb.Stats) *dbwriter.ExtMetrics {
 	m.Tag.GlobalThreadID = uint8(vtapID)
 	m.Database = dbwriter.DEEPFLOW_SYSTEM_DB
 	m.TableName = s.Name
+	m.VirtualTableName = ""
 	m.TagNames = s.TagNames
 	m.TagValues = s.TagValues
 	m.MetricsFloatNames = s.MetricsFloatNames
 	m.MetricsFloatValues = s.MetricsFloatValues
 	return m
-}
-
-// return the index of the character in 'str', which is the 'n' th same as 'c'
-func findNthChar(str string, c byte, nth int) int {
-	if nth <= 0 {
-		return -1
-	}
-	for i := 0; i < len(str); i++ {
-		if str[i] == c {
-			nth--
-			if nth == 0 {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
-func (d *Decoder) prometheusSplitMetricNameLabel(label string) (string, string) {
-	if !strings.HasPrefix(label, TABLE_PREFIX_PROMETHEUS[:len(TABLE_PREFIX_PROMETHEUS)-1]) {
-		label = TABLE_PREFIX_PROMETHEUS + label
-	}
-	index := findNthChar(label, '_', d.config.PrometheusSeparatePos+1)
-	if index > 0 && index < len(label)-1 {
-		return label[:index], label[index+1:]
-	}
-
-	return label, "value"
 }
 
 func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) ([]*dbwriter.ExtMetrics, error) {
@@ -307,13 +280,14 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 		return nil, fmt.Errorf("prometheum metric name label is null")
 	}
 
-	tableName, metricName := d.prometheusSplitMetricNameLabel(metricNameLabel)
+	virtualTableName := TABLE_PREFIX_PROMETHEUS + metricNameLabel
 	for _, s := range ts.Samples {
 		m := dbwriter.AcquireExtMetrics()
 
 		m.Timestamp = uint32(model.Time(s.Timestamp).Unix())
 		m.Database = dbwriter.EXT_METRICS_DB
-		m.TableName = tableName
+		m.TableName = dbwriter.EXT_METRICS_TABLE
+		m.VirtualTableName = virtualTableName
 
 		m.TagNames = tagNames
 		m.TagValues = tagValues
@@ -323,7 +297,7 @@ func (d *Decoder) TimeSeriesToExtMetrics(vtapID uint16, ts *prompb.TimeSeries) (
 			dbwriter.ReleaseExtMetrics(m)
 			continue
 		}
-		m.MetricsFloatNames = append(m.MetricsFloatNames, metricName)
+		m.MetricsFloatNames = append(m.MetricsFloatNames, metricNameLabel)
 		m.MetricsFloatValues = append(m.MetricsFloatValues, v)
 
 		d.fillExtMetricsBase(m, vtapID, podName, instance, false)
@@ -427,11 +401,8 @@ func (d *Decoder) PointToExtMetrics(vtapID uint16, point models.Point) (*dbwrite
 	m.Timestamp = uint32(point.Time().Unix())
 	m.Database = dbwriter.EXT_METRICS_DB
 	tableName := string(point.Name())
-	if strings.HasPrefix(tableName, TABLE_PREFIX_TELEGRAF[:len(TABLE_PREFIX_TELEGRAF)-1]) {
-		m.TableName = tableName
-	} else {
-		m.TableName = TABLE_PREFIX_TELEGRAF + tableName
-	}
+	m.TableName = dbwriter.EXT_METRICS_TABLE
+	m.VirtualTableName = TABLE_PREFIX_TELEGRAF + tableName
 	podName := ""
 	for _, tag := range point.Tags() {
 		tagName := string(tag.Key)
