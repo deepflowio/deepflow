@@ -46,13 +46,13 @@ use super::ntp::{NtpMode, NtpPacket, NtpTime};
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
-use crate::config::RuntimeConfig;
+use crate::config::{Config, RuntimeConfig};
 use crate::exception::ExceptionHandler;
 use crate::policy::PolicySetter;
 use crate::proto::common::TridentType;
 use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
-use crate::trident::{self, TridentState, VersionInfo};
+use crate::trident::{self, ChangedConfig, TridentState, VersionInfo};
 use crate::utils::{
     self,
     environment::{get_executable_path, is_tt_pod, running_in_container},
@@ -72,8 +72,6 @@ pub struct StaticConfig {
 
     pub tap_mode: tp::TapMode,
     pub vtap_group_id_request: String,
-    pub kubernetes_cluster_id: String,
-
     pub controller_ip: String,
 
     pub env: RuntimeEnvironment,
@@ -96,7 +94,6 @@ impl Default for StaticConfig {
             boot_time: SystemTime::now(),
             tap_mode: Default::default(),
             vtap_group_id_request: Default::default(),
-            kubernetes_cluster_id: Default::default(),
             controller_ip: Default::default(),
             env: Default::default(),
         }
@@ -106,6 +103,7 @@ impl Default for StaticConfig {
 pub struct RunningConfig {
     pub ctrl_mac: String,
     pub ctrl_ip: String,
+    pub kubernetes_cluster_id: String,
 }
 
 impl Default for RunningConfig {
@@ -113,6 +111,7 @@ impl Default for RunningConfig {
         Self {
             ctrl_ip: Default::default(),
             ctrl_mac: Default::default(),
+            kubernetes_cluster_id: Default::default(),
         }
     }
 }
@@ -426,11 +425,14 @@ impl Synchronizer {
                 boot_time: SystemTime::now(),
                 tap_mode: tp::TapMode::Local,
                 vtap_group_id_request,
-                kubernetes_cluster_id,
                 controller_ip,
                 env: RuntimeEnvironment::new(),
             }),
-            running_config: Arc::new(RwLock::new(RunningConfig { ctrl_mac, ctrl_ip })),
+            running_config: Arc::new(RwLock::new(RunningConfig {
+                ctrl_mac,
+                ctrl_ip,
+                kubernetes_cluster_id,
+            })),
             trident_state,
             status: Default::default(),
             session,
@@ -534,7 +536,7 @@ impl Synchronizer {
             os: Some(static_config.env.os.clone()),
             kernel_version: Some(static_config.env.kernel_version.clone()),
             vtap_group_id_request: Some(static_config.vtap_group_id_request.clone()),
-            kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
+            kubernetes_cluster_id: Some(running_config.kubernetes_cluster_id.clone()),
 
             ..Default::default()
         }
@@ -602,7 +604,7 @@ impl Synchronizer {
         return (segments, macs);
     }
 
-    fn on_response(
+    async fn on_response(
         remote: &IpAddr,
         mut resp: tp::SyncResponse,
         trident_state: &TridentState,
@@ -612,9 +614,12 @@ impl Synchronizer {
         max_memory: &Arc<AtomicU64>,
         exception_handler: &ExceptionHandler,
         escape_tx: &UnboundedSender<Duration>,
+        running_config: &Arc<RwLock<RunningConfig>>,
+        session: &Session,
     ) {
         Self::parse_upgrade(&resp, static_config, status);
 
+        let mut kubernetes_cluster_id = None;
         match resp.status() {
             tp::Status::Failed => warn!(
                 "trisolaris (ip: {}) responded with {:?}",
@@ -622,6 +627,13 @@ impl Synchronizer {
                 tp::Status::Failed
             ),
             tp::Status::Heartbeat => return,
+            tp::Status::ClusterIdNotFound => {
+                let k8s_cluster_id = Config::async_get_k8s_cluster_id(session).await;
+                info!("get latest kubernetes_cluster_id={}, because the old kubernetes_cluster_id {} is no longer valid", 
+                    k8s_cluster_id, running_config.read().kubernetes_cluster_id);
+                kubernetes_cluster_id.replace(k8s_cluster_id.clone());
+                running_config.write().kubernetes_cluster_id = k8s_cluster_id;
+            }
             _ => (),
         }
 
@@ -703,8 +715,12 @@ impl Synchronizer {
         if !runtime_config.enabled {
             *trident_state.lock().unwrap() = trident::State::Disabled;
         } else {
-            *trident_state.lock().unwrap() =
-                trident::State::ConfigChanged((runtime_config, blacklist, macs));
+            *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
+                runtime_config,
+                blacklist,
+                vm_mac_addrs: macs,
+                kubernetes_cluster_id,
+            });
         }
         cvar.notify_one();
     }
@@ -773,6 +789,7 @@ impl Synchronizer {
                         // 如果没有同步过（trident重启），trisolaris下发的数据仅有版本号，此时应由trident主动请求
                         continue;
                     }
+
                     Self::on_response(
                         &session.get_current_server(),
                         message,
@@ -783,7 +800,10 @@ impl Synchronizer {
                         &max_memory,
                         &exception_handler,
                         &escape_tx,
-                    );
+                        &running_config,
+                        &session,
+                    )
+                    .await;
                 }
             }
         }));
@@ -1114,7 +1134,6 @@ impl Synchronizer {
                 }
 
                 let changed = session.update_current_server().await;
-
                 let request = Synchronizer::generate_sync_request(
                     &running_config,
                     &static_config,
@@ -1173,7 +1192,9 @@ impl Synchronizer {
                     &max_memory,
                     &exception_handler,
                     &escape_tx,
-                );
+                    &running_config,
+                    &session,
+                ).await;
                 let (new_revision, proxy_ip, proxy_port, new_sync_interval) = {
                     let status = status.read();
                     (

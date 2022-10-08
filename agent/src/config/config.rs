@@ -18,7 +18,6 @@ use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::thread;
 use std::time::Duration;
 
 use log::{error, info, warn};
@@ -99,15 +98,7 @@ impl Config {
         }
     }
 
-    // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
-    // 如果agent在容器中运行且ConfigMap中kubernetes-cluster-id为空,
-    // 调用GetKubernetesClusterID RPC，获取cluster-id, 如果RPC调用失败，sleep 1分钟后再次调用，直到成功
-    // ======================================================================================================
-    // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
-    // If agent is running in container and the kubernetes-cluster-id in the
-    // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
-    // after 1 minute of sleep until it succeeds
-    pub fn get_k8s_cluster_id(session: &Session) -> String {
+    pub async fn async_get_k8s_cluster_id(session: &Session) -> String {
         let ca_md5 = loop {
             match fs::read_to_string(K8S_CA_CRT_PATH) {
                 Ok(c) => {
@@ -122,59 +113,70 @@ impl Config {
                         "get kubernetes_cluster_id error: failed to read {} error: {}",
                         K8S_CA_CRT_PATH, e
                     );
-                    thread::sleep(MINUTE);
+                    tokio::time::sleep(MINUTE).await;
                 }
             }
         };
-        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
-        runtime.block_on(async {
-            loop {
-                session.update_current_server().await;
-                let client = match session.get_client() {
-                    Some(c) => c,
-                    None => {
-                        session.set_request_failed(true);
-                        warn!("rpc client not connected");
+
+        loop {
+            session.update_current_server().await;
+            let client = match session.get_client() {
+                Some(c) => c,
+                None => {
+                    session.set_request_failed(true);
+                    warn!("rpc client not connected");
+                    tokio::time::sleep(MINUTE).await;
+                    continue;
+                }
+            };
+            let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+            let request = KubernetesClusterIdRequest {
+                ca_md5: ca_md5.clone(),
+            };
+
+            match client.get_kubernetes_cluster_id(request).await {
+                Ok(response) => {
+                    let cluster_id_response = response.into_inner();
+                    if !cluster_id_response.error_msg().is_empty() {
+                        error!(
+                            "failed to get kubernetes_cluster_id from server error: {}",
+                            cluster_id_response.error_msg()
+                        );
                         tokio::time::sleep(MINUTE).await;
                         continue;
                     }
-                };
-                let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-                let request = KubernetesClusterIdRequest {
-                    ca_md5: ca_md5.clone(),
-                };
-
-                match client.get_kubernetes_cluster_id(request).await {
-                    Ok(response) => {
-                        let cluster_id_response = response.into_inner();
-                        if !cluster_id_response.error_msg().is_empty() {
-                            error!(
-                                "failed to get kubernetes_cluster_id from server error: {}",
-                                cluster_id_response.error_msg()
-                            );
-                            tokio::time::sleep(MINUTE).await;
-                            continue;
+                    match cluster_id_response.cluster_id {
+                        Some(id) => {
+                            if id.is_empty() {
+                                error!("call get_kubernetes_cluster_id return cluster_id is empty string");
+                                tokio::time::sleep(MINUTE).await;
+                                continue;
+                            }
+                            info!("set kubernetes_cluster_id to {}", id);
+                            return id;
                         }
-                        match cluster_id_response.cluster_id {
-                            Some(id) => {
-                                if id.is_empty() {
-                                    error!("call get_kubernetes_cluster_id return cluster_id is empty string");
-                                    tokio::time::sleep(MINUTE).await;
-                                    continue;
-                                }
-                                info!("set kubernetes_cluster_id to {}", id);
-                                return id;
-                            }
-                            None => {
-                                error!("call get_kubernetes_cluster_id return response is none")
-                            }
+                        None => {
+                            error!("call get_kubernetes_cluster_id return response is none")
                         }
                     }
-                    Err(e) => error!("failed to call get_kubernetes_cluster_id error: {}", e),
                 }
-                tokio::time::sleep(MINUTE).await;
+                Err(e) => error!("failed to call get_kubernetes_cluster_id error: {}", e),
             }
-        })
+            tokio::time::sleep(MINUTE).await;
+        }
+    }
+
+    // 目的是为了k8s采集器configmap中不配置k8s-cluster-id也能实现注册。
+    // 如果agent在容器中运行且ConfigMap中kubernetes-cluster-id为空,
+    // 调用GetKubernetesClusterID RPC，获取cluster-id, 如果RPC调用失败，sleep 1分钟后再次调用，直到成功
+    // ======================================================================================================
+    // The purpose is to enable registration without configuring k8s-cluster-id in the k8s collector configmap.
+    // If agent is running in container and the kubernetes-cluster-id in the
+    // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
+    // after 1 minute of sleep until it succeeds
+    pub fn get_k8s_cluster_id(session: &Session) -> String {
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+        runtime.block_on(Self::async_get_k8s_cluster_id(session))
     }
 }
 
