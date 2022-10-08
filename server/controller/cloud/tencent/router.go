@@ -92,8 +92,8 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 				Lcuuid:        common.GetUUID(key, uuid.Nil),
 				VRouterLcuuid: rLcuuid,
 				Destination:   destination4 + destination6,
-				Nexthop:       gwTypeDesc,
-				NexthopType:   gwID,
+				Nexthop:       gwID,
+				NexthopType:   gwTypeDesc,
 			})
 		}
 	}
