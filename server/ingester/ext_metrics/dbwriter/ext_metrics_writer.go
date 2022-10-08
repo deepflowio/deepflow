@@ -40,6 +40,7 @@ var log = logging.MustGetLogger("ext_metrics.dbwriter")
 const (
 	QUEUE_BATCH_SIZE   = 1024
 	EXT_METRICS_DB     = "ext_metrics"
+	EXT_METRICS_TABLE  = "metrics"
 	DEEPFLOW_SYSTEM_DB = "deepflow_system"
 )
 
@@ -71,10 +72,11 @@ type ExtMetricsWriter struct {
 
 	ckdbConn *sql.DB
 
-	createTable   sync.Mutex
-	tablesLock    sync.RWMutex
-	tables        map[string]*tableInfo
-	flowTagWriter *flow_tag.FlowTagWriter
+	createTable        sync.Mutex
+	tablesLock         sync.RWMutex
+	tables             map[string]*tableInfo
+	metricsWriterCache *ckwriter.CKWriter
+	flowTagWriter      *flow_tag.FlowTagWriter
 
 	counter *Counter
 	utils.Closable
@@ -93,10 +95,17 @@ func (w *ExtMetricsWriter) InitDatabase() error {
 }
 
 func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWriter, error) {
+	// fast find
+	if s.TableName == EXT_METRICS_TABLE && w.metricsWriterCache != nil {
+		return w.metricsWriterCache, nil
+	}
 	w.tablesLock.RLock()
 	if info, ok := w.tables[s.TableName]; ok {
 		if info.ckwriter != nil {
 			w.tablesLock.RUnlock()
+			if s.TableName == EXT_METRICS_TABLE {
+				w.metricsWriterCache = info.ckwriter
+			}
 			return info.ckwriter, nil
 		}
 	}

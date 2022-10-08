@@ -259,9 +259,6 @@ ingester:
   #  l7-flow-log: 3
   #  l4-packet: 3
 
-  ## split prometheus metrics name lable to table name and metrics name, on the nth position of '_'
-  # prometheus-separate-pos: 1
-
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
 
