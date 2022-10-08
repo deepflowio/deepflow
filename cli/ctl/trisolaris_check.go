@@ -38,6 +38,7 @@ import (
 type ParamData struct {
 	CtrlIP  string
 	CtrlMac string
+	GroupID string
 	RpcIP   string
 	RpcPort string
 	Type    string
@@ -126,6 +127,7 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	}
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "vtap ctrl ip")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "vtap ctrl mac")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "vtap group ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
@@ -146,9 +148,12 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		return
 	}
 	defer conn.Close()
-	var name string
+	var name, groupID string
 	switch paramData.Type {
-	case "trident", "analyzer":
+	case "trident":
+		name = paramData.Type
+		groupID = paramData.GroupID
+	case "analyzer":
 		name = paramData.Type
 	default:
 		fmt.Printf("type(%s) muste be in [trident, analyzer]", paramData.Type)
@@ -157,9 +162,10 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", addr, paramData)
 	c := trident.NewSynchronizerClient(conn)
 	reqData := &trident.SyncRequest{
-		CtrlIp:      &paramData.CtrlIP,
-		CtrlMac:     &paramData.CtrlMac,
-		ProcessName: &name,
+		CtrlIp:             &paramData.CtrlIP,
+		CtrlMac:            &paramData.CtrlMac,
+		VtapGroupIdRequest: &groupID,
+		ProcessName:        &name,
 	}
 	var response *trident.SyncResponse
 	if paramData.Type == "trident" {
