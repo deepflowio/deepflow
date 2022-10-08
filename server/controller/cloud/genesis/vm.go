@@ -45,6 +45,7 @@ func (g *Genesis) getVMs() ([]model.VM, error) {
 			Lcuuid:       v.Lcuuid,
 			Name:         v.Name,
 			Label:        v.Label,
+			HType:        common.VM_HTYPE_VM_C,
 			VPCLcuuid:    vpcLcuuid,
 			State:        int(v.State),
 			LaunchServer: launchServer,

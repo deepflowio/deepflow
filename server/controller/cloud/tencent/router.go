@@ -45,7 +45,7 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 	rResp, err := t.getResponse("vpc", "2017-03-12", "DescribeRouteTables", region.name, "RouteTableSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("router request tencent api error: (%s)", err.Error())
-		return []model.VRouter{}, []model.RoutingTable{}, nil
+		return []model.VRouter{}, []model.RoutingTable{}, err
 	}
 	for _, rData := range rResp {
 		if !t.checkRequiredAttributes(rData, rAttrs) {
@@ -92,8 +92,8 @@ func (t *Tencent) getRouterAndTables(region tencentRegion) ([]model.VRouter, []m
 				Lcuuid:        common.GetUUID(key, uuid.Nil),
 				VRouterLcuuid: rLcuuid,
 				Destination:   destination4 + destination6,
-				Nexthop:       gwTypeDesc,
-				NexthopType:   gwID,
+				Nexthop:       gwID,
+				NexthopType:   gwTypeDesc,
 			})
 		}
 	}
