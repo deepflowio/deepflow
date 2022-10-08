@@ -94,7 +94,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 	sgResp, err := t.getResponse("vpc", "2017-03-12", "DescribeSecurityGroups", region.name, "SecurityGroupSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("security group request tencent api error: (%s)", err.Error())
-		return []model.SecurityGroup{}, []model.SecurityGroupRule{}, nil
+		return []model.SecurityGroup{}, []model.SecurityGroupRule{}, err
 	}
 	for _, sData := range sgResp {
 		if !t.checkRequiredAttributes(sData, sgAttrs) {
@@ -115,7 +115,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 		sgPolicyResp, err := t.getResponse("vpc", "2017-03-12", "DescribeSecurityGroupPolicies", region.name, "SecurityGroupPolicySet", false, params)
 		if err != nil {
 			log.Errorf("security group policy request tencent api error: (%s)", err.Error())
-			return []model.SecurityGroup{}, []model.SecurityGroupRule{}, nil
+			return []model.SecurityGroup{}, []model.SecurityGroupRule{}, err
 		}
 		for _, sgPData := range sgPolicyResp {
 			ingressRules := sgPData.Get("Ingress")
@@ -176,7 +176,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 				stgResp, err := t.getResponse("vpc", "2017-03-12", "DescribeServiceTemplateGroups", region.name, "ServiceTemplateGroupSet", true, map[string]interface{}{}, sFilters)
 				if err != nil {
 					log.Errorf("security group service template groups request tencent api error: (%s)", err.Error())
-					return []model.SecurityGroup{}, []model.SecurityGroupRule{}, nil
+					return []model.SecurityGroup{}, []model.SecurityGroupRule{}, err
 				}
 				for _, stgData := range stgResp {
 					stgs := stgData.Get("ServiceTemplateIdSet")
@@ -204,7 +204,7 @@ func (t *Tencent) getSecurityGroups(region tencentRegion) ([]model.SecurityGroup
 				atgResp, err := t.getResponse("vpc", "2017-03-12", "DescribeAddressTemplateGroups", region.name, "AddressTemplateGroupSet", true, map[string]interface{}{}, aFilters)
 				if err != nil {
 					log.Errorf("security group address template groups request tencent api error: (%s)", err.Error())
-					return []model.SecurityGroup{}, []model.SecurityGroupRule{}, nil
+					return []model.SecurityGroup{}, []model.SecurityGroupRule{}, err
 				}
 				for _, atgData := range atgResp {
 					atgs := atgData.Get("AddressTemplateIdSet")

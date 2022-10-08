@@ -37,7 +37,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 	resp, err := t.getResponse("cvm", "2017-03-12", "DescribeInstances", region.name, "InstanceSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("vm request tencent api error: (%s)", err.Error())
-		return []model.VM{}, []model.VMSecurityGroup{}, nil
+		return []model.VM{}, []model.VMSecurityGroup{}, err
 	}
 	for _, vData := range resp {
 		if !t.checkRequiredAttributes(vData, attrs) {
@@ -71,6 +71,7 @@ func (t *Tencent) getVMs(region tencentRegion) ([]model.VM, []model.VMSecurityGr
 			Lcuuid:       vmLcuuid,
 			Name:         vmName,
 			Label:        vmID,
+			HType:        common.VM_HTYPE_VM_C,
 			State:        state,
 			CreatedAt:    createAt,
 			VPCLcuuid:    common.GetUUID(vpcID, uuid.Nil),

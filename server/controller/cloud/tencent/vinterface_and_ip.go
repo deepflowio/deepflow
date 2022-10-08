@@ -36,7 +36,7 @@ func (t *Tencent) getVInterfacesAndIPs(region tencentRegion) ([]model.VInterface
 	resp, err := t.getResponse("vpc", "2017-03-12", "DescribeNetworkInterfaces", region.name, "NetworkInterfaceSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("vinterface request tencent api error: (%s)", err.Error())
-		return []model.VInterface{}, []model.IP{}, []model.NATRule{}, nil
+		return []model.VInterface{}, []model.IP{}, []model.NATRule{}, err
 	}
 	for _, vData := range resp {
 		if !t.checkRequiredAttributes(vData, vAttrs) {

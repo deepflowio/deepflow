@@ -42,7 +42,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 	lbResp, err := t.getResponse("clb", "2018-03-17", "DescribeLoadBalancers", region.name, "LoadBalancerSet", true, map[string]interface{}{})
 	if err != nil {
 		log.Errorf("load balance request tencent api error: (%s)", err.Error())
-		return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, nil
+		return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 	}
 	for _, lbData := range lbResp {
 		if !t.checkRequiredAttributes(lbData, lbAttrs) {
@@ -84,7 +84,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			lbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeListeners", region.name, "Listeners", false, params)
 			if err != nil {
 				log.Errorf("application load balance listener request tencent api error: (%s)", err.Error())
-				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, nil
+				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 			}
 
 			listenerTargetServers := []tencentTargetServer{}
@@ -112,7 +112,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			lbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeTargets", region.name, "Listeners", false, params)
 			if err != nil {
 				log.Errorf("application load balance target request tencent api error: (%s)", err.Error())
-				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, nil
+				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 			}
 			for _, lbTargetServerData := range lbTargetServerResp {
 				targetServerID := lbTargetServerData.Get("ListenerId").MustString()
@@ -173,7 +173,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			clbListenerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBListeners", region.name, "Listeners", false, params)
 			if err != nil {
 				log.Errorf("classic load balance listener request tencent api error: (%s)", err.Error())
-				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, nil
+				return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 			}
 			for _, clbListenerData := range clbListenerResp {
 				if !t.checkRequiredAttributes(clbListenerData, lbListenerAttrs) {
@@ -195,7 +195,7 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 				clbTargetServerResp, err := t.getResponse("clb", "2018-03-17", "DescribeClassicalLBTargets", region.name, "Targets", false, params)
 				if err != nil {
 					log.Errorf("classic load balance classic target request tencent api error: (%s)", err.Error())
-					return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, nil
+					return []model.LB{}, []model.LBListener{}, []model.LBTargetServer{}, []model.VInterface{}, []model.IP{}, err
 				}
 				for _, clbTargetServerData := range clbTargetServerResp {
 					if !t.checkRequiredAttributes(clbTargetServerData, lbTargetServerAttrs) {
