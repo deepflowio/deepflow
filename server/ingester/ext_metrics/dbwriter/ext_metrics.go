@@ -32,8 +32,9 @@ type ExtMetrics struct {
 
 	Tag zerodoc.Tag
 
-	Database  string
-	TableName string
+	Database         string
+	TableName        string
+	VirtualTableName string
 
 	TagNames  []string
 	TagValues []string
@@ -47,6 +48,11 @@ func (m *ExtMetrics) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 
+	if m.VirtualTableName != "" {
+		if err := block.WriteString(m.VirtualTableName); err != nil {
+			return err
+		}
+	}
 	if err := block.WriteArrayString(m.TagNames); err != nil {
 		return err
 	}
@@ -65,6 +71,9 @@ func (m *ExtMetrics) WriteBlock(block *ckdb.Block) error {
 
 func (m *ExtMetrics) Columns() []*ckdb.Column {
 	columns := zerodoc.GenTagColumns(m.Tag.Code)
+	if m.VirtualTableName != "" {
+		columns = append(columns, ckdb.NewColumn("virtual_table_name", ckdb.LowCardinalityString).SetComment("虚拟表名k"))
+	}
 	columns = append(columns,
 		ckdb.NewColumn("tag_names", ckdb.ArrayString).SetComment("额外的tag"),
 		ckdb.NewColumn("tag_values", ckdb.ArrayString).SetComment("额外的tag对应的值"),
@@ -112,11 +121,11 @@ func (m *ExtMetrics) ToFlowTags() ([]interface{}, []interface{}) {
 	fields := make([]interface{}, len(m.TagNames)+len(m.MetricsFloatNames))
 	fieldValues := make([]interface{}, len(m.TagNames))
 	for i, name := range m.TagNames {
-		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.TableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
-		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, m.TableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
+		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.VirtualTableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
+		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, m.VirtualTableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
 	}
 	for _, name := range m.MetricsFloatNames {
-		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.TableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
+		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.VirtualTableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
 	}
 	return fields, fieldValues
 }
