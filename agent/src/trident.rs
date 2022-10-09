@@ -284,6 +284,7 @@ impl Trident {
 
         if running_in_container() && config.kubernetes_cluster_id.is_empty() {
             config.kubernetes_cluster_id = Config::get_k8s_cluster_id(&session);
+            warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
 
         let default_runtime_config = RuntimeConfig::default();
