@@ -26,6 +26,7 @@ import (
 
 	"github.com/deepflowys/deepflow/message/trident"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/pushmanager"
 )
 
 var log = logging.MustGetLogger("trisolaris/metadata")
@@ -180,11 +181,13 @@ func (m *MetaData) timedRefreshMetaData() {
 			m.groupDataOP.generateGroupData()
 			m.policyDataOP.generatePolicyData()
 			log.Info("end generate policy from rpc")
+			pushmanager.Broadcast()
 		case <-m.chGroup:
 			log.Info("start generate group from rpc")
 			m.generateDbDataCache()
 			m.groupDataOP.generateGroupData()
 			log.Info("end generate group from rpc")
+			pushmanager.Broadcast()
 		}
 	}
 }
@@ -202,6 +205,7 @@ func (m *MetaData) timedRefreshTapType() {
 			log.Info("start generate tap type from rpc")
 			m.tapType.generateTapTypes()
 			log.Info("end generate tap type from rpc")
+			pushmanager.Broadcast()
 		}
 	}
 }
