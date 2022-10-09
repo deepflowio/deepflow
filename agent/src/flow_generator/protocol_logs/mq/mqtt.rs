@@ -30,6 +30,7 @@ use super::super::{
     value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
 };
 
+use crate::common::l7_protocol_log::ParseParam;
 use crate::common::{
     flow::L7Protocol,
     l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
@@ -44,7 +45,6 @@ use crate::{
     },
     proto::flow_log::MqttTopic,
 };
-use crate::{common::l7_protocol_log::ParseParam, ignore_non_raw_protocol};
 
 #[derive(Serialize, Clone, Debug)]
 pub struct MqttInfo {
@@ -225,7 +225,9 @@ pub struct MqttLog {
 
 impl L7ProtocolParserInterface for MqttLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        ignore_non_raw_protocol!(param);
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
         return Self::mqtt_check_protocol(payload, param);
     }
 
@@ -246,7 +248,7 @@ impl L7ProtocolParserInterface for MqttLog {
         return (L7Protocol::Mqtt, "MQTT");
     }
 
-    fn parse_on_udp(&self) -> bool {
+    fn parsable_on_udp(&self) -> bool {
         return false;
     }
 
@@ -779,7 +781,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/mqtt";
 
@@ -810,7 +815,8 @@ mod tests {
                 None,
                 None,
             );
-            let is_mqtt = MqttLog::mqtt_check_protocol(payload, &ParseParam::from(packet));
+            let is_mqtt =
+                MqttLog::mqtt_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             for i in mqtt.info.iter() {
                 output.push_str(&format!("{:?} is_mqtt: {}\r\n", i, is_mqtt));
             }

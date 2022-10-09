@@ -22,7 +22,6 @@ use super::super::{
     consts::*, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
 };
 
-use crate::__parse_common;
 use crate::common::enums::IpProtocol;
 use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
@@ -33,8 +32,9 @@ use crate::common::l7_protocol_log::ParseParam;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
+use crate::log_info_merge;
+use crate::parse_common;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
-use crate::{__log_info_merge, ignore_non_raw_protocol};
 
 const TRACE_ID_MAX_LEN: usize = 51;
 
@@ -94,7 +94,7 @@ impl L7ProtocolInfoInterface for DubboInfo {
     }
 
     fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
-        __log_info_merge!(self, DubboInfo, other);
+        log_info_merge!(self, DubboInfo, other);
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -153,12 +153,14 @@ impl L7ProtocolParserInterface for DubboLog {
     }
 
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        ignore_non_raw_protocol!(param);
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
         return Self::dubbo_check_protocol(payload, param);
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        __parse_common!(self, param);
+        parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         return Ok(vec![L7ProtocolInfo::DubboInfo((&self.info).clone())]);
     }
@@ -167,7 +169,7 @@ impl L7ProtocolParserInterface for DubboLog {
         return (L7Protocol::Dubbo, "DUBBO");
     }
 
-    fn parse_on_udp(&self) -> bool {
+    fn parsable_on_udp(&self) -> bool {
         return false;
     }
 
@@ -444,7 +446,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
 
@@ -476,7 +481,8 @@ mod tests {
                 None,
                 None,
             );
-            let is_dubbo = DubboLog::dubbo_check_protocol(payload, &ParseParam::from(packet));
+            let is_dubbo =
+                DubboLog::dubbo_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_dubbo: {}\r\n", dubbo.info, is_dubbo));
         }
         output

@@ -19,7 +19,6 @@ use std::net::IpAddr;
 use enum_dispatch::enum_dispatch;
 use public::enums::IpProtocol;
 use public::l7_protocol::L7Protocol;
-use serde::Serialize;
 
 use super::ebpf::EbpfType;
 use super::flow::PacketDirection;
@@ -30,7 +29,6 @@ use crate::config::handler::LogParserAccess;
 use crate::flow_generator::protocol_logs::{
     DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog, RedisLog,
 };
-use crate::flow_generator::Error;
 use crate::flow_generator::Result;
 
 /*
@@ -149,33 +147,8 @@ about bitmap:
 
 */
 
-// 忽略非原始数据类型
-// ignore non raw protocol.
 #[macro_export]
-macro_rules! ignore_non_raw_protocol {
-    ($parse_param:ident) => {
-        if !$parse_param.ebpf_type.is_raw_protocol() {
-            return false;
-        }
-    };
-}
-
-// 忽略ebpf数据类型
-// 由于ebpf需要在ebpf上报, 所以拓展协议可能需要忽略.
-
-// ignore check the payload from ebpf.
-// data from ebpf need submit from kernel, the extend protocol should ignore.
-#[macro_export]
-macro_rules! ignore_ebpf {
-    ($parse_param:ident) => {
-        if !($parse_param.ebpf_type == EbpfType::None) {
-            return false;
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! __parse_common {
+macro_rules! parse_common {
     ($self:ident,$parse_param:ident) => {
         $self.info.start_time = $parse_param.time;
         $self.info.end_time = $parse_param.time;
@@ -185,10 +158,141 @@ macro_rules! __parse_common {
     };
 }
 
+macro_rules! all_protocol {
+    ($( $l7_proto:ident : $parser:ident : $log:ident : $new_func:ident),+$(,)*) => {
+        #[enum_dispatch]
+        pub enum L7ProtocolParser {
+            HttpParser(HttpLog),
+
+            $(
+                $parser($log),
+            )+
+        }
+
+        pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
+            match p {
+                L7Protocol::Http1 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
+                L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2())),
+
+                $(
+                    L7Protocol::$l7_proto=>Some(L7ProtocolParser::$parser($log::$new_func())),
+                )+
+                _=>None,
+            }
+
+        }
+
+        pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
+            Vec::from([
+                L7ProtocolParser::HttpParser(HttpLog::new_v1()),
+                L7ProtocolParser::HttpParser(HttpLog::new_v2()),
+
+                $(
+                    L7ProtocolParser::$parser($log::$new_func()),
+                )+
+            ])
+        }
+    };
+}
+
+/*
+macro expand result like:
+
+#[enum_dispatch]
+pub enum L7ProtocolParser {
+    HttpParser(HttpLog),
+    DnsParser(DnsLog),
+    MysqlParser(MysqlLog),
+    ...
+}
+
+pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
+    match p {
+        L7Protocol::Http1 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
+        L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2())),
+        L7Protocol::Dns => Some(L7ProtocolParser::DnsParser(DnsLog::default())),
+        L7Protocol::Mysql => Some(L7ProtocolParser::MysqlParser(MysqlLog::default())),
+        ...
+
+    }
+}
+
+pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
+    Vec::from([
+        L7ProtocolParser::HttpParser(HttpLog::new_v1()),
+        L7ProtocolParser::HttpParser(HttpLog::new_v2()),
+        L7ProtocolParser::DnsParser(DnsLog::default()),
+        L7ProtocolParser::MysqlParser(MysqlLog::default()),
+        ...
+    ])
+
+}
+
+*/
+
+// 内部实现的协议
+// log的具体结构和实现在 src/flow_generator/protocol_logs/** 下
+// =========================================================
+// the inner implement protocol source code in src/flow_generator/protocol_logs/**
+
+// l7Protocol : enumName : ParserImplement : newFuncName
+all_protocol!(
+    Dns: DnsParser: DnsLog: default,
+    Mysql: MysqlParser: MysqlLog: default,
+    Kafka: KafkaParser: KafkaLog: default,
+    Redis: RedisParser: RedisLog: default,
+    Postgresql: PostgresParser: PostgresqlLog: default,
+    Dubbo: DubboParser: DubboLog: default,
+    Mqtt: MqttParser: MqttLog: default,
+    // add protocol below
+);
+
+impl L7ProtocolParser {
+    pub fn is_skip_parse(&self, bitmap: u128) -> bool {
+        return bitmap & (1 << (self.protocol().0 as u8)) == 0;
+    }
+
+    pub fn set_bitmap_skip_parse(&self, bitmap: &mut u128) {
+        *bitmap &= !(1 << (self.protocol().0 as u8));
+    }
+}
+
+#[enum_dispatch(L7ProtocolParser)]
+pub trait L7ProtocolParserInterface {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
+    // 协议解析
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>>;
+    // 返回协议号和协议名称，由于的bitmap使用u128，所以协议号不能超过128.
+    // 其中 crates/public/src/l7_protocol.rs 里面的 pub const L7_PROTOCOL_xxx 是已实现的协议号.
+    // ===========================================================================================
+    // return protocol number and protocol string. because of bitmap use u128, so the max protocol number can not exceed 128
+    // crates/public/src/l7_protocol.rs, pub const L7_PROTOCOL_xxx is the implemented protocol.
+    fn protocol(&self) -> (L7Protocol, &str);
+    // 仅http和dubbo协议会有log_parser_config，其他协议可以忽略。
+    // ================================================================
+    // only http and dubbo use config. other protocol should do nothing.
+    fn set_parse_config(&mut self, _log_parser_config: &LogParserAccess) {}
+    // l4是tcp时是否解析，用于快速过滤协议
+    // ==============================
+    // whether l4 is parsed when tcp, use for quickly protocol filter
+    fn parsable_on_tcp(&self) -> bool {
+        true
+    }
+    // l4是udp是是否解析，用于快速过滤协议
+    // ==============================
+    // whether l4 is parsed when udp, use for quickly protocol filter
+    fn parsable_on_udp(&self) -> bool {
+        true
+    }
+    fn reset(&mut self);
+}
+
 #[derive(Clone, Copy)]
 pub struct EbpfParam {
     pub is_tls: bool,
     // 目前仅 http2 uprobe 有意义
+    // ==========================
+    // now only http2 uprobe uses
     pub is_req_end: bool,
     pub is_resp_end: bool,
 }
@@ -205,13 +309,14 @@ pub struct ParseParam {
     pub direction: PacketDirection,
     pub ebpf_type: EbpfType,
     // ebpf_type 不为 EBPF_TYPE_NONE 会有值
+    // ===================================
     // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam>,
     pub time: u64,
 }
 
-impl ParseParam {
-    pub fn from(packet: &MetaPacket) -> Self {
+impl From<&MetaPacket<'_>> for ParseParam {
+    fn from(packet: &MetaPacket<'_>) -> Self {
         let mut param = Self {
             l4_protocol: packet.lookup_key.proto,
             ip_src: packet.lookup_key.src_ip,
@@ -233,7 +338,7 @@ impl ParseParam {
                 },
             };
             param.ebpf_param = Some(EbpfParam {
-                is_tls: is_tls,
+                is_tls,
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
             });
@@ -242,131 +347,18 @@ impl ParseParam {
     }
 }
 
-#[enum_dispatch(L7ProtocolParser)]
-pub trait L7ProtocolParserInterface {
-    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool;
-    // 协议解析
-    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>>;
-    // 返回协议号和协议名称, 由于的bitmap使用u128,所以协议号不能超过128.
-    // 其中 crates/public/src/l7_protocol.rs 里面的 pub const L7_PROTOCOL_xxx 是已实现的协议号.
-    // return protocol number and protocol string. because of bitmap use u128, so the max protocol number can not exceed 128
-    // crates/public/src/l7_protocol.rs, pub const L7_PROTOCOL_xxx is the implemented protocol.
-    fn protocol(&self) -> (L7Protocol, &str);
-    // 仅http和dubbo协议会有log_parser_config，其他协议可以忽略。
-    // only http and dubbo use config. other protocol should do nothing.
-    fn set_parse_config(&mut self, _log_parser_config: &LogParserAccess) {}
-    // l4是tcp是是否解析，用于快速过滤协议
-    // just parse on tcp.
-    fn parse_on_tcp(&self) -> bool {
-        return true;
-    }
-    // l4是udp是是否解析，用于快速过滤协议
-    // just parse on udp.
-    fn parse_on_udp(&self) -> bool {
-        return true;
-    }
-    fn reset(&mut self);
-}
-
-#[enum_dispatch]
-pub enum L7ProtocolParser {
-    L7ProtocolUnknown(L7ProtocolLogUnknown),
-    DnsParser(DnsLog),
-    HttpParser(HttpLog),
-    MysqlParser(MysqlLog),
-    RedisParser(RedisLog),
-    DubboParser(DubboLog),
-    KafkaParser(KafkaLog),
-    MqttParser(MqttLog),
-
-    // add new protocol here
-    PostgresLog(PostgresqlLog),
-}
-
-impl L7ProtocolParser {
-    pub fn is_skip_parse(&self, bitmap: u128) -> bool {
-        return bitmap & (1 << (self.protocol().0 as u8)) == 0;
-    }
-
-    pub fn set_bitmap_skip_parse(&self, bitmap: &mut u128) {
-        *bitmap &= !(1 << (self.protocol().0 as u8));
-    }
-}
-#[derive(Clone, Copy, Default, Debug, Serialize)]
-pub struct L7ProtocolLogUnknown {}
-impl L7ProtocolParserInterface for L7ProtocolLogUnknown {
-    fn check_payload(&mut self, _payload: &[u8], _param: &ParseParam) -> bool {
-        return true;
-    }
-
-    fn parse_payload(
-        &mut self,
-        _payload: &[u8],
-        _param: &ParseParam,
-    ) -> Result<Vec<L7ProtocolInfo>> {
-        return Err(Error::L7ProtocolUnknown);
-    }
-
-    fn protocol(&self) -> (L7Protocol, &str) {
-        return (L7Protocol::Unknown, "UNKNOWN");
-    }
-
-    fn reset(&mut self) {}
-}
-
 pub fn get_bitmap(protocol: IpProtocol) -> u128 {
     let mut bitmap: u128 = 0;
     for i in get_all_protocol().iter() {
         match protocol {
-            IpProtocol::Tcp if i.parse_on_tcp() => {
+            IpProtocol::Tcp if i.parsable_on_tcp() => {
                 bitmap |= 1 << (i.protocol().0 as u8);
             }
-            IpProtocol::Udp if i.parse_on_udp() => {
+            IpProtocol::Udp if i.parsable_on_udp() => {
                 bitmap |= 1 << (i.protocol().0 as u8);
             }
             _ => {}
         }
     }
     return bitmap;
-}
-
-pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
-    let parser = match p {
-        L7Protocol::Http1 => Some(L7ProtocolParser::DnsParser(DnsLog::default())),
-        L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
-        L7Protocol::Dubbo => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2())),
-        L7Protocol::Mysql => Some(L7ProtocolParser::KafkaParser(KafkaLog::default())),
-        L7Protocol::Redis => Some(L7ProtocolParser::MysqlParser(MysqlLog::default())),
-        L7Protocol::Kafka => Some(L7ProtocolParser::RedisParser(RedisLog::default())),
-        L7Protocol::Mqtt => Some(L7ProtocolParser::DubboParser(DubboLog::default())),
-        L7Protocol::Dns => Some(L7ProtocolParser::MqttParser(MqttLog::default())),
-
-        // add new protocol below
-        L7Protocol::Postgresql => Some(L7ProtocolParser::PostgresLog(PostgresqlLog::default())),
-
-        _ => None,
-    };
-
-    return parser;
-}
-
-// 内部实现的协议
-// log的具体结构和实现在 src/flow_generator/protocol_logs/** 下
-// the inner implement protocol source code in src/flow_generator/protocol_logs/**
-pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
-    let all_proto = vec![
-        L7ProtocolParser::DnsParser(DnsLog::default()),
-        L7ProtocolParser::HttpParser(HttpLog::new_v1()),
-        L7ProtocolParser::HttpParser(HttpLog::new_v2()),
-        L7ProtocolParser::KafkaParser(KafkaLog::default()),
-        L7ProtocolParser::MysqlParser(MysqlLog::default()),
-        L7ProtocolParser::RedisParser(RedisLog::default()),
-        L7ProtocolParser::DubboParser(DubboLog::default()),
-        L7ProtocolParser::MqttParser(MqttLog::default()),
-        //
-        // add new protocol below
-        L7ProtocolParser::PostgresLog(PostgresqlLog::default()),
-    ];
-
-    return all_proto;
 }

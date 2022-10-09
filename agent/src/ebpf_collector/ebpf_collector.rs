@@ -110,7 +110,6 @@ impl SessionAggr {
             return;
         }
         debug!("ebpf_collector out: {}", log);
-
         if !self.log_rate.acquire(1) {
             self.counter.counter().throttle_drop += 1;
             return;
@@ -440,7 +439,7 @@ impl FlowItem {
             return Err(LogError::L7ProtocolCheckLimit);
         }
 
-        let param = ParseParam::from(packet);
+        let param = ParseParam::from(packet as &MetaPacket);
         for mut protocol_log in get_all_protocol().into_iter() {
             if protocol_log.is_skip_parse(self.protocol_bitmap) {
                 continue;
@@ -451,9 +450,6 @@ impl FlowItem {
                 self.server_port = packet.lookup_key.dst_port;
                 self.parser = Some(protocol_log);
                 return self._parse(packet, local_epc, app_table);
-            } else {
-                // 解析不通过，flowitem之后会忽略该协议的解析
-                protocol_log.set_bitmap_skip_parse(&mut self.protocol_bitmap);
             }
         }
         self.is_skip = app_table.set_protocol_from_ebpf(
@@ -482,14 +478,13 @@ impl FlowItem {
             PacketDirection::ServerToClient
         };
 
-        let mut l7_parser = self.parser.take().unwrap();
+        let l7_parser = self.parser.as_mut().unwrap();
+        let ret = l7_parser.parse_payload(
+            packet.raw_from_ebpf.as_ref(),
+            &ParseParam::from(packet as &MetaPacket),
+        );
 
-        let ret =
-            l7_parser.parse_payload(packet.raw_from_ebpf.as_ref(), &ParseParam::from(&packet));
-        if ret.is_ok() {
-            l7_parser.reset();
-            self.parser.replace(l7_parser);
-        }
+        l7_parser.reset();
 
         if !self.is_success {
             if ret.is_ok() {
@@ -906,7 +901,6 @@ impl EbpfCollector {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
-
             let packet = MetaPacket::from_ebpf(sd, CAPTURE_SIZE);
             if packet.is_err() {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());

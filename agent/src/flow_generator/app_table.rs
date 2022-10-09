@@ -112,7 +112,16 @@ impl AppTable {
                 return None;
             }
             v.last = time_in_sec;
-            return Some(v.l7_protocol);
+            // 如果第一次check就失败会设置为unknown，所以需要加上count判断
+            // ====================================================
+            // if first check fail will set to unknown, need to add count determine
+            if v.l7_protocol == L7Protocol::Unknown
+                && v.unknown_count < self.l7_protocol_inference_max_fail_count
+            {
+                return None;
+            } else {
+                return Some(v.l7_protocol);
+            }
         }
         return None;
     }
@@ -131,7 +140,16 @@ impl AppTable {
                 return None;
             }
             v.last = time_in_sec;
-            return Some(v.l7_protocol);
+            // 如果第一次check就失败会设置为unknown，所以需要加上count判断
+            // ====================================================
+            // if first check fail will set to unknown, need to add count determine
+            if v.l7_protocol == L7Protocol::Unknown
+                && v.unknown_count < self.l7_protocol_inference_max_fail_count
+            {
+                return None;
+            } else {
+                return Some(v.l7_protocol);
+            }
         }
         return None;
     }
@@ -219,14 +237,7 @@ impl AppTable {
                 key,
                 AppTableValue {
                     unknown_count: 0,
-                    // 第一次失败不写unknown,因为协判断不一定是支持完整解析,这里允许一定的容错
-                    l7_protocol: {
-                        if protocol == L7Protocol::Unknown {
-                            L7Protocol::Other
-                        } else {
-                            protocol
-                        }
-                    },
+                    l7_protocol: protocol,
                     last: time_in_sec,
                 },
             );
@@ -261,14 +272,7 @@ impl AppTable {
                 key,
                 AppTableValue {
                     unknown_count: 0,
-                    // 第一次失败不写unknown,因为协判断不一定是支持完整解析,这里允许一定的容错
-                    l7_protocol: {
-                        if protocol == L7Protocol::Unknown {
-                            L7Protocol::Other
-                        } else {
-                            protocol
-                        }
-                    },
+                    l7_protocol: protocol,
                     last: time_in_sec,
                 },
             );

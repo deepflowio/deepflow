@@ -37,7 +37,7 @@ use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::L7ProtoRawDataType;
 use crate::utils::bytes::{read_u32_be, read_u32_le};
 use crate::utils::net::h2pack;
-use crate::{__log_info_merge, __parse_common};
+use crate::{log_info_merge, parse_common};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
@@ -89,7 +89,7 @@ impl L7ProtocolInfoInterface for HttpInfo {
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
-        __log_info_merge!(self, HttpInfo, other);
+        log_info_merge!(self, HttpInfo, other);
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -253,7 +253,7 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        __parse_common!(self, param);
+        parse_common!(self, param);
         match param.ebpf_type {
             EbpfType::GoHttp2Uprobe => {
                 self.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
@@ -287,7 +287,7 @@ impl L7ProtocolParserInterface for HttpLog {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
         }
-        __parse_common!(self, param);
+        parse_common!(self, param);
         match param.ebpf_type {
             EbpfType::GoHttp2Uprobe => {
                 self.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
@@ -341,7 +341,7 @@ impl L7ProtocolParserInterface for HttpLog {
         }
     }
 
-    fn parse_on_udp(&self) -> bool {
+    fn parsable_on_udp(&self) -> bool {
         return false;
     }
 
@@ -1060,6 +1060,7 @@ pub fn get_http_resp_info(line_info: &str) -> Result<(String, u16)> {
 
 #[cfg(test)]
 mod tests {
+    use crate::common::MetaPacket;
     use crate::utils::test::Capture;
     use std::fs;
     use std::mem::size_of;
@@ -1108,8 +1109,7 @@ mod tests {
                 None,
                 None,
             );
-            // let mut is_http = http1_check_protocol(&mut bitmap, packet);
-            let param = &ParseParam::from(packet);
+            let param = &ParseParam::from(packet as &MetaPacket);
             let mut is_http = http.http1_check_protocol(payload, param);
             is_http |= http.http2_check_protocol(payload, param);
 

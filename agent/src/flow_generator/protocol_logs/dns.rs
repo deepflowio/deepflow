@@ -19,7 +19,6 @@ use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
 use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
-use crate::{__log_info_merge, __parse_common, ignore_non_raw_protocol};
 use crate::{
     common::{enums::IpProtocol, flow::PacketDirection, IPV4_ADDR_LEN, IPV6_ADDR_LEN},
     flow_generator::{
@@ -28,6 +27,7 @@ use crate::{
     },
     utils::{bytes::read_u16_be, net::parse_ip_slice},
 };
+use crate::{log_info_merge, parse_common};
 use public::l7_protocol::L7Protocol;
 
 #[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
@@ -63,7 +63,7 @@ impl L7ProtocolInfoInterface for DnsInfo {
     }
 
     fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
-        __log_info_merge!(self, DnsInfo, other);
+        log_info_merge!(self, DnsInfo, other);
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -152,8 +152,10 @@ pub struct DnsLog {
 //解析器接口实现
 impl L7ProtocolParserInterface for DnsLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        ignore_non_raw_protocol!(param);
-        __parse_common!(self, param);
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
+        parse_common!(self, param);
         return self.dns_check_protocol(payload, param);
     }
 
@@ -161,7 +163,7 @@ impl L7ProtocolParserInterface for DnsLog {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
         }
-        __parse_common!(self, param);
+        parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
     }
@@ -465,7 +467,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/dns";
 
@@ -497,7 +502,7 @@ mod tests {
                 None,
                 None,
             );
-            let is_dns = dns.dns_check_protocol(payload, &ParseParam::from(packet));
+            let is_dns = dns.dns_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_dns: {}\r\n", dns.info, is_dns));
         }
         output
