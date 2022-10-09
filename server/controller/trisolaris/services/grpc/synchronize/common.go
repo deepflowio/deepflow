@@ -21,7 +21,8 @@ import (
 )
 
 var (
-	STATUS_SUCCESS   = api.Status_SUCCESS
-	STATUS_FAILED    = api.Status_FAILED
-	STATUS_HEARTBEAT = api.Status_HEARTBEAT
+	STATUS_SUCCESS       = api.Status_SUCCESS
+	STATUS_FAILED        = api.Status_FAILED
+	STATUS_HEARTBEAT     = api.Status_HEARTBEAT
+	CLUSTER_ID_NOT_FOUND = api.Status_CLUSTER_ID_NOT_FOUND
 )
