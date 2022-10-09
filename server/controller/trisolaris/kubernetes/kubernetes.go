@@ -69,6 +69,13 @@ func (k *KubernetesInfo) refresh() {
 	return
 }
 
+func (k *KubernetesInfo) CheckDomainByClusterID(clusterID string) bool {
+	k.mutex.Lock()
+	_, ok := k.clusterIDToDomain[clusterID]
+	k.mutex.Unlock()
+	return ok
+}
+
 func (k *KubernetesInfo) CacheClusterID(clusterID string) {
 	log.Infof("start cache cluster_id (%s)", clusterID)
 	k.mutex.Lock()
