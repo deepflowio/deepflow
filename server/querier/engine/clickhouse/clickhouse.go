@@ -231,19 +231,29 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
 			table := sqlparser.String(from)
+			e.Table = table
+			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
+			if e.DB == "ext_metrics" {
+				table = "metrics"
+			}
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
 			} else {
 				e.AddTable(fmt.Sprintf("%s.%s", e.DB, table))
 			}
-			e.Table = table
 			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
 			if err != nil {
 				log.Error(err)
 			}
 			e.Model.Time.DatasourceInterval = interval
+			virtualTableFilter, ok := GetVirtualTableFilter(e.DB, e.Table)
+			if ok {
+				whereStmt := Where{}
+				filter := view.Filters{Expr: virtualTableFilter}
+				whereStmt.filter = &filter
+				e.Statements = append(e.Statements, &whereStmt)
+			}
 		}
-
 	}
 	return nil
 }
@@ -396,14 +406,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		if err != nil {
 			return err
 		}
-		whereStmt := Where{}
-		notNullExpr, ok := GetSelectNotNullFilter(chCommon.ParseAlias(expr), as, e.DB, e.Table)
-		if !ok {
-			return nil
-		}
-		filter := view.Filters{Expr: notNullExpr}
-		whereStmt.filter = &filter
-		e.Statements = append(e.Statements, &whereStmt)
+		return nil
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
 		// 二级运算符
