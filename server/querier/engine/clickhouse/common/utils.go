@@ -200,7 +200,12 @@ func GetExtTables(db string) (values []interface{}) {
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       db,
 	}
-	sql := "show tables"
+	sql := ""
+	if db == "ext_metrics" {
+		sql = "select virtual_table_name from ext_metrics.metrics group by virtual_table_name"
+	} else {
+		sql = "show tables"
+	}
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 	if err != nil {
 		log.Error(err)

@@ -17,6 +17,7 @@
 package clickhouse
 
 import (
+	"fmt"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -26,4 +27,12 @@ type Table struct {
 
 func (t *Table) Format(m *view.Model) {
 	m.AddTable(t.Value)
+}
+
+func GetVirtualTableFilter(db, table string) (view.Node, bool) {
+	if db == "ext_metrics" {
+		filter := fmt.Sprintf("virtual_table_name='%s'", table)
+		return &view.Expr{Value: "(" + filter + ")"}, true
+	}
+	return nil, false
 }
