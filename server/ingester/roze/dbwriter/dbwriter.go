@@ -38,9 +38,9 @@ type DbWriter struct {
 	ckwriters []*ckwriter.CKWriter
 }
 
-func NewDbWriter(primaryAddr, user, password, clusterName, storagePolicy string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl rozeconfig.FlowMetricsTTL) (*DbWriter, error) {
+func NewDbWriter(primaryAddr, user, password, clusterName, storagePolicy string, ckWriterCfg config.CKWriterConfig, flowMetricsTtl rozeconfig.FlowMetricsTTL, coldStorages map[string]*ckdb.ColdStorage) (*DbWriter, error) {
 	ckwriters := []*ckwriter.CKWriter{}
-	tables := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S)
+	tables := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, clusterName, storagePolicy, flowMetricsTtl.VtapFlow1M, flowMetricsTtl.VtapFlow1S, flowMetricsTtl.VtapApp1M, flowMetricsTtl.VtapApp1S, coldStorages)
 	for _, table := range tables {
 		counterName := "metrics_1m"
 		if table.ID >= uint8(zerodoc.VTAP_FLOW_PORT_1S) && table.ID <= uint8(zerodoc.VTAP_FLOW_EDGE_PORT_1S) {

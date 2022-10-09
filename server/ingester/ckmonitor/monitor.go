@@ -31,15 +31,12 @@ import (
 
 var log = logging.MustGetLogger("monitor")
 
-const (
-	DFDiskPrefix   = "path_" // clickhouse的config.xml配置文件中，deepflow写入数据的disk名称以‘path_’开头
-	DFS3DiskPrefix = "s3"    // clickhouse的config.xml配置文件中，deepflow写入数据的对象存储disk名称以‘s3’开头
-)
-
 type Monitor struct {
+	cfg                        *config.Config
 	checkInterval              int
 	freeSpaceThreshold         int
 	usedPercentThreshold       int
+	diskPrefix                 string
 	primaryConn, secondaryConn *sql.DB
 	primaryAddr, secondaryAddr string
 	username, password         string
@@ -57,17 +54,19 @@ type Partition struct {
 	rows, bytesOnDisk          uint64
 }
 
-func NewCKMonitor(cfg *config.CKDiskMonitor, primaryAddr, username, password string) (*Monitor, error) {
+func NewCKMonitor(cfg *config.Config) (*Monitor, error) {
 	m := &Monitor{
-		checkInterval:        cfg.CheckInterval,
-		usedPercentThreshold: cfg.UsedPercent,
-		freeSpaceThreshold:   cfg.FreeSpace << 30, // GB
-		primaryAddr:          primaryAddr,
-		username:             username,
-		password:             password,
+		cfg:                  cfg,
+		checkInterval:        cfg.CKDiskMonitor.CheckInterval,
+		usedPercentThreshold: cfg.CKDiskMonitor.UsedPercent,
+		freeSpaceThreshold:   cfg.CKDiskMonitor.FreeSpace << 30, // GB
+		diskPrefix:           cfg.CKDiskMonitor.DiskPrefix,
+		primaryAddr:          cfg.CKDB.ActualAddr,
+		username:             cfg.CKDBAuth.Username,
+		password:             cfg.CKDBAuth.Password,
 	}
 	var err error
-	m.primaryConn, err = common.NewCKConnection(primaryAddr, username, password)
+	m.primaryConn, err = common.NewCKConnection(m.primaryAddr, m.username, m.password)
 	if err != nil {
 		return nil, err
 	}
@@ -99,11 +98,10 @@ func (m *Monitor) updateConnections() {
 	m.secondaryConn = m.updateConnection(m.secondaryConn, m.secondaryAddr)
 }
 
-func getDFDiskInfos(connect *sql.DB) ([]*DiskInfo, bool, error) {
-	hasS3Disk := false
+func (m *Monitor) getDiskInfos(connect *sql.DB) ([]*DiskInfo, error) {
 	rows, err := connect.Query("SELECT name,path,free_space,total_space,keep_free_space FROM system.disks")
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	diskInfos := []*DiskInfo{}
@@ -114,20 +112,17 @@ func getDFDiskInfos(connect *sql.DB) ([]*DiskInfo, bool, error) {
 		)
 		err := rows.Scan(&name, &path, &freeSpace, &totalSpace, &keepFreeSpace)
 		if err != nil {
-			return nil, false, nil
+			return nil, nil
 		}
 		log.Debugf("name: %s, path: %s, freeSpace: %d, totalSpace: %d, keepFreeSpace: %d", name, path, freeSpace, totalSpace, keepFreeSpace)
-		// deepflow的数据, 写入`path_` 开头的disk下
-		if strings.HasPrefix(name, DFDiskPrefix) {
+		if strings.HasPrefix(name, m.diskPrefix) {
 			diskInfos = append(diskInfos, &DiskInfo{name, path, freeSpace, totalSpace, keepFreeSpace})
-		} else if strings.HasPrefix(name, DFS3DiskPrefix) {
-			hasS3Disk = true
 		}
 	}
 	if len(diskInfos) == 0 {
-		return nil, hasS3Disk, fmt.Errorf("can not find any deepflow data disk like '%s'", DFDiskPrefix)
+		return nil, fmt.Errorf("can not find any deepflow data disk like '%s'", m.diskPrefix)
 	}
-	return diskInfos, hasS3Disk, nil
+	return diskInfos, nil
 }
 
 func (m *Monitor) isDiskNeedClean(diskInfo *DiskInfo) bool {
@@ -159,9 +154,9 @@ func (m *Monitor) isDisksNeedClean(diskInfos []*DiskInfo) bool {
 	return true
 }
 
-func getMinPartitions(connect *sql.DB) ([]Partition, error) {
+func (m *Monitor) getMinPartitions(connect *sql.DB) ([]Partition, error) {
 	sql := fmt.Sprintf("SELECT min(partition),count(distinct partition),database,table,min(min_time),max(max_time),sum(rows),sum(bytes_on_disk) FROM system.parts WHERE disk_name LIKE '%s' and active=1 GROUP BY database,table ORDER BY database,table ASC",
-		DFDiskPrefix+"%")
+		m.diskPrefix+"%")
 	rows, err := connect.Query(sql)
 	if err != nil {
 		return nil, err
@@ -187,7 +182,7 @@ func getMinPartitions(connect *sql.DB) ([]Partition, error) {
 }
 
 func (m *Monitor) dropMinPartitions(connect *sql.DB) error {
-	partitions, err := getMinPartitions(connect)
+	partitions, err := m.getMinPartitions(connect)
 	if err != nil {
 		return err
 	}
@@ -204,13 +199,12 @@ func (m *Monitor) dropMinPartitions(connect *sql.DB) error {
 }
 
 func (m *Monitor) moveMinPartitions(connect *sql.DB) error {
-	partitions, err := getMinPartitions(connect)
+	partitions, err := m.getMinPartitions(connect)
 	if err != nil {
 		return err
 	}
-
 	for _, p := range partitions {
-		sql := fmt.Sprintf("ALTER TABLE %s.`%s` MOVE PARTITION '%s' TO VOLUME '%s'", p.database, p.table, p.partition, config.DefaultCKDBS3Volume)
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` MOVE PARTITION '%s' TO %s '%s'", p.database, p.table, p.partition, m.cfg.ColdStorage.ColdDisk.Type, m.cfg.ColdStorage.ColdDisk.Name)
 		log.Warningf("move partition: %s, database: %s, table: %s, minTime: %s, maxTime: %s, rows: %d, bytesOnDisk: %d", p.partition, p.database, p.table, p.minTime, p.maxTime, p.rows, p.bytesOnDisk)
 		_, err := connect.Exec(sql)
 		if err != nil {
@@ -240,13 +234,13 @@ func (m *Monitor) start() {
 			if connect == nil {
 				continue
 			}
-			diskInfos, hasS3Disk, err := getDFDiskInfos(connect)
+			diskInfos, err := m.getDiskInfos(connect)
 			if err != nil {
 				log.Warning(err)
 				continue
 			}
 			if m.isDisksNeedClean(diskInfos) {
-				if hasS3Disk {
+				if m.cfg.ColdStorage.Enabled {
 					if err := m.moveMinPartitions(connect); err != nil {
 						log.Warning("move partition failed.", err)
 					}

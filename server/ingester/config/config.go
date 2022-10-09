@@ -41,8 +41,7 @@ const (
 	DefaultCheckInterval   = 600 // clickhouse是异步删除
 	DefaultDiskUsedPercent = 90
 	DefaultDiskFreeSpace   = 50
-	DefaultCKDBS3Volume    = "vol_s3"
-	DefaultCKDBS3TTLTimes  = 3 // 对象存储的保留时长是本地存储的3倍
+	DefaultDFDiskPrefix    = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
 	DefaultInfluxdbHost    = "influxdb"
 	DefaultInfluxdbPort    = "20044"
 	EnvK8sNodeIP           = "K8S_NODE_IP_FOR_DEEPFLOW"
@@ -54,15 +53,27 @@ const (
 )
 
 type CKDiskMonitor struct {
-	CheckInterval int `yaml:"check-interval"` // s
-	UsedPercent   int `yaml:"used-percent"`   // 0-100
-	FreeSpace     int `yaml:"free-space"`     // Gb
+	CheckInterval int    `yaml:"check-interval"` // s
+	UsedPercent   int    `yaml:"used-percent"`   // 0-100
+	FreeSpace     int    `yaml:"free-space"`     // Gb
+	DiskPrefix    string `yaml:"disk-prefix"`
 }
 
-type CKS3Storage struct {
-	Enabled  bool   `yaml:"enabled"`
-	Volume   string `yaml:"volume"`
-	TTLTimes int    `yaml:"ttl-times"`
+type Disk struct {
+	Type string `yaml:"type"`
+	Name string `yaml:"name"`
+}
+
+type StorageSetting struct {
+	Db        string   `yaml:"db"`
+	Tables    []string `yaml:"tables,flow"`
+	TTLToMove int      `yaml:"ttl-to-move"`
+}
+
+type CKDBColdStorage struct {
+	Enabled  bool             `yaml:"enabled"`
+	ColdDisk Disk             `yaml:"cold-disk"`
+	Settings []StorageSetting `yaml:"settings,flow"`
 }
 
 type HostPort struct {
@@ -93,22 +104,23 @@ type CKDB struct {
 }
 
 type Config struct {
-	ListenPort            uint16        `yaml:"listen-port"`
-	CKDB                  CKDB          `yaml:"ckdb"`
-	ControllerIPs         []string      `yaml:"controller-ips,flow"`
-	ControllerPort        uint16        `yaml:"controller-port"`
-	CKDBAuth              Auth          `yaml:"ckdb-auth"`
-	StreamRozeEnabled     bool          `yaml:"stream-roze-enabled"`
-	UDPReadBuffer         int           `yaml:"udp-read-buffer"`
-	TCPReadBuffer         int           `yaml:"tcp-read-buffer"`
-	Profiler              bool          `yaml:"profiler"`
-	MaxCPUs               int           `yaml:"max-cpus"`
-	CKDiskMonitor         CKDiskMonitor `yaml:"ck-disk-monitor"`
-	CKS3Storage           CKS3Storage   `yaml:"ckdb-s3"`
-	InfluxdbWriterEnabled bool          `yaml:"influxdb-writer-enabled"`
-	Influxdb              HostPort      `yaml:"influxdb"`
-	NodeIP                string        `yaml:"node-ip"`
-	GrpcBufferSize        int           `yaml:"grpc-buffer-size"`
+	ListenPort            uint16          `yaml:"listen-port"`
+	CKDB                  CKDB            `yaml:"ckdb"`
+	ControllerIPs         []string        `yaml:"controller-ips,flow"`
+	ControllerPort        uint16          `yaml:"controller-port"`
+	CKDBAuth              Auth            `yaml:"ckdb-auth"`
+	StreamRozeEnabled     bool            `yaml:"stream-roze-enabled"`
+	UDPReadBuffer         int             `yaml:"udp-read-buffer"`
+	TCPReadBuffer         int             `yaml:"tcp-read-buffer"`
+	Profiler              bool            `yaml:"profiler"`
+	MaxCPUs               int             `yaml:"max-cpus"`
+	CKDiskMonitor         CKDiskMonitor   `yaml:"ck-disk-monitor"`
+	ColdStorage           CKDBColdStorage `yaml:"ckdb-cold-storage"`
+	ckdbColdStorages      map[string]*ckdb.ColdStorage
+	InfluxdbWriterEnabled bool     `yaml:"influxdb-writer-enabled"`
+	Influxdb              HostPort `yaml:"influxdb"`
+	NodeIP                string   `yaml:"node-ip"`
+	GrpcBufferSize        int      `yaml:"grpc-buffer-size"`
 	LogFile               string
 	LogLevel              string
 }
@@ -232,7 +244,58 @@ func (c *Config) Validate() error {
 		c.GrpcBufferSize = DefaultGrpcBufferSize
 	}
 
+	return c.ValidateAndSetckdbColdStorages()
+}
+
+func (c *Config) ValidateAndSetckdbColdStorages() error {
+	c.ckdbColdStorages = make(map[string]*ckdb.ColdStorage)
+	if !c.ColdStorage.Enabled {
+		return nil
+	}
+
+	var diskType ckdb.DiskType
+	if c.ColdStorage.ColdDisk.Type == "disk" {
+		diskType = ckdb.Disk
+	} else if c.ColdStorage.ColdDisk.Type == "volume" {
+		diskType = ckdb.Volume
+	} else {
+		return fmt.Errorf("'ingester.ckdb-cold-storage.cold-disk.type' is '%s', should be 'volume' or 'disk'", c.ColdStorage.ColdDisk.Type)
+	}
+
+	if c.ColdStorage.ColdDisk.Name == "" {
+		return errors.New("'ingester.ckdb-cold-storage.cold-disk.name' is empty")
+	}
+
+	for i, setting := range c.ColdStorage.Settings {
+		if setting.Db == "" {
+			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].db' is empty", i)
+		}
+		if setting.TTLToMove < 1 {
+			return fmt.Errorf("'ingester.ckdb-cold-storage.settings[%d].ttl-to-move' is '%d', should > 0", i, setting.TTLToMove)
+		}
+		for _, table := range setting.Tables {
+			c.ckdbColdStorages[setting.Db+table] = &ckdb.ColdStorage{
+				Enabled:   true,
+				Type:      diskType,
+				Name:      c.ColdStorage.ColdDisk.Name,
+				TTLToMove: setting.TTLToMove,
+			}
+		}
+		// If only 'db' is configured and 'talbles' is not configured, then the same settings are made to the tables under db
+		if len(c.ckdbColdStorages) == 0 {
+			c.ckdbColdStorages[setting.Db] = &ckdb.ColdStorage{
+				Enabled:   true,
+				Type:      diskType,
+				Name:      c.ColdStorage.ColdDisk.Name,
+				TTLToMove: setting.TTLToMove,
+			}
+		}
+	}
 	return nil
+}
+
+func (c *Config) GetCKDBColdStorages() map[string]*ckdb.ColdStorage {
+	return c.ckdbColdStorages
 }
 
 func Load(path string) *Config {
@@ -247,8 +310,7 @@ func Load(path string) *Config {
 			StreamRozeEnabled: true,
 			UDPReadBuffer:     64 << 20,
 			TCPReadBuffer:     4 << 20,
-			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace},
-			CKS3Storage:       CKS3Storage{false, DefaultCKDBS3Volume, DefaultCKDBS3TTLTimes},
+			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace, DefaultDFDiskPrefix},
 			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
 			ListenPort:        DefaultListenPort,
 			GrpcBufferSize:    DefaultGrpcBufferSize,

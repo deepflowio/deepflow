@@ -66,6 +66,7 @@ type ExtMetricsWriter struct {
 	ckdbPassword      string
 	ckdbCluster       string
 	ckdbStoragePolicy string
+	ckdbColdStorages  map[string]*ckdb.ColdStorage
 	ttl               int
 	writerConfig      baseconfig.CKWriterConfig
 	ckdbWatcher       *baseconfig.Watcher
@@ -128,7 +129,7 @@ func (w *ExtMetricsWriter) getOrCreateCkwriter(s *ExtMetrics) (*ckwriter.CKWrite
 	}
 
 	// 将要创建的表信息
-	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl)
+	table := s.GenCKTable(w.ckdbCluster, w.ckdbStoragePolicy, w.ttl, ckdb.GetColdStorage(w.ckdbColdStorages, s.Database, s.TableName))
 
 	ckwriter, err := ckwriter.NewCKWriter(w.ckdbAddr, "", w.ckdbUsername, w.ckdbPassword,
 		s.TableName, table, false, w.writerConfig.QueueCount, w.writerConfig.QueueSize, w.writerConfig.BatchSize, w.writerConfig.FlushTimeout)
@@ -245,6 +246,7 @@ func NewExtMetricsWriter(
 		ckdbPassword:      config.Base.CKDBAuth.Password,
 		ckdbCluster:       config.Base.CKDB.ClusterName,
 		ckdbStoragePolicy: config.Base.CKDB.StoragePolicy,
+		ckdbColdStorages:  config.Base.GetCKDBColdStorages(),
 		tables:            make(map[string]*tableInfo),
 		ttl:               config.TTL,
 		ckdbWatcher:       config.Base.CKDB.Watcher,

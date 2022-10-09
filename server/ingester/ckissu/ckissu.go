@@ -26,6 +26,7 @@ import (
 	"database/sql"
 
 	"github.com/deepflowys/deepflow/server/ingester/common"
+	"github.com/deepflowys/deepflow/server/ingester/config"
 	"github.com/deepflowys/deepflow/server/ingester/datasource"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/zerodoc"
@@ -34,6 +35,7 @@ import (
 var log = logging.MustGetLogger("issu")
 
 type Issu struct {
+	cfg                *config.Config
 	tableRenames       []*TableRename
 	columnRenames      []*ColumnRename
 	columnMods         []*ColumnMod
@@ -618,7 +620,7 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 		return nil, fmt.Errorf("invalid table name %s", d.name)
 	}
 	dstTableName := d.name[lastUnderlineIndex+1:]
-	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, 7, 1, 7, 1)[zerodoc.MetricsTableNameToID(d.baseTable)]
+	rawTable := zerodoc.GetMetricsTables(ckdb.MergeTree, common.CK_VERSION, ckdb.DF_CLUSTER, ckdb.DF_STORAGE_POLICY, 7, 1, 7, 1, i.cfg.GetCKDBColdStorages())[zerodoc.MetricsTableNameToID(d.baseTable)]
 	// create table mv
 	createMvSql := datasource.MakeMVTableCreateSQL(
 		rawTable, dstTableName,
@@ -650,11 +652,12 @@ func (i *Issu) addColumnDatasource(connect *sql.DB, d *DatasourceInfo) ([]*Colum
 	return dones, nil
 }
 
-func NewCKIssu(primaryAddr, username, password string) (*Issu, error) {
+func NewCKIssu(cfg *config.Config) (*Issu, error) {
 	i := &Issu{
-		primaryAddr: primaryAddr,
-		username:    username,
-		password:    password,
+		cfg:         cfg,
+		primaryAddr: cfg.CKDB.ActualAddr,
+		username:    cfg.CKDBAuth.Username,
+		password:    cfg.CKDBAuth.Password,
 		// columnRenames: ColumnRename572,
 	}
 
@@ -668,7 +671,7 @@ func NewCKIssu(primaryAddr, username, password string) (*Issu, error) {
 	i.columnAdds = columnAdds
 
 	var err error
-	i.primaryConnection, err = common.NewCKConnection(primaryAddr, username, password)
+	i.primaryConnection, err = common.NewCKConnection(i.primaryAddr, i.username, i.password)
 	if err != nil {
 		return nil, err
 	}

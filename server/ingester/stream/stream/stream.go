@@ -74,7 +74,7 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	flowLogWriter, err := dbwriter.NewFlowLogWriter(
 		config.Base.CKDB.ActualAddr, config.Base.CKDBAuth.Username, config.Base.CKDBAuth.Password,
 		config.Base.CKDB.ClusterName, config.Base.CKDB.StoragePolicy,
-		config.CKWriterConfig, config.FlowLogTTL)
+		config.CKWriterConfig, config.FlowLogTTL, config.Base.GetCKDBColdStorages())
 	if err != nil {
 		return nil, err
 	}
