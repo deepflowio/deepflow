@@ -665,23 +665,14 @@ impl FlowMap {
         (self.policy_getter).lookup(meta_packet, self.id as usize);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
-        let mut l7proto = self.app_table.get_protocol(meta_packet);
-        let l7_parser = if let Some(p) = l7proto {
-            // 如果是Other 说明是协议没能正确判断.
-            if p == L7Protocol::Other {
-                l7proto = None;
-            }
-            get_parser(p)
-        } else {
-            None
-        };
+        let l7_proto = self.app_table.get_protocol(meta_packet);
 
         if self.config.load().collector_enabled {
             node.meta_flow_perf = FlowPerf::new(
                 self.rrt_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
-                l7proto,
-                l7_parser,
+                l7_proto,
+                get_parser(l7_proto.unwrap_or_default()),
                 self.counter.clone(),
             )
         }
@@ -825,7 +816,7 @@ impl FlowMap {
         meta_packet: &MetaPacket,
         is_first_packet_direction: bool,
     ) {
-        let mut infos = None;
+        let mut info = None;
         if let Some(perf) = node.meta_flow_perf.as_mut() {
             let flow_id = node.tagged_flow.flow.flow_id;
             match perf.parse(
@@ -836,8 +827,8 @@ impl FlowMap {
                 self.l7_metrics_enabled(),
                 &mut self.app_table,
             ) {
-                Ok(info) => {
-                    infos = Some(info);
+                Ok(i) => {
+                    info = Some(i);
                 }
                 Err(Error::L7ReqNotFound(c)) => {
                     self.counter
@@ -848,14 +839,9 @@ impl FlowMap {
             }
         }
         if self.config.load().app_proto_log_enabled && meta_packet.packet_len > 0 {
-            if let Some(info) = infos {
+            if let Some(info) = info {
                 for i in info.into_iter() {
-                    self.write_to_app_proto_log(
-                        node,
-                        &meta_packet,
-                        i,
-                        self.config.load().l7_log_packet_size as u16,
-                    );
+                    self.write_to_app_proto_log(node, &meta_packet, i);
                 }
             }
         }
@@ -1042,7 +1028,6 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
-        _pkt_size: u16,
     ) {
         let lookup_key = &meta_packet.lookup_key; //  trisolaris接口定义: 0(TAP_ANY)表示所有都需要
         if !self.config.load().l7_log_tap_types[u16::from(TapType::Any) as usize]

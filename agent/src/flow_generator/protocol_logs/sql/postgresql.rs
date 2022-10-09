@@ -22,7 +22,6 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        ebpf::EbpfType,
         flow::PacketDirection,
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
@@ -34,7 +33,6 @@ use crate::{
         },
         AppProtoHead, Error, LogMessageType, Result,
     },
-    ignore_ebpf,
 };
 
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
@@ -139,7 +137,6 @@ pub struct PostgresqlLog {
 
 impl L7ProtocolParserInterface for PostgresqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        ignore_ebpf!(param);
         self.info.start_time = param.time;
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
@@ -179,7 +176,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         *self = Self::default();
     }
 
-    fn parse_on_udp(&self) -> bool {
+    fn parsable_on_udp(&self) -> bool {
         return false;
     }
 }

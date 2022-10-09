@@ -52,6 +52,7 @@ impl EbpfType {
 
     // 是否原始协议数据，目前除了GoHttp2Uprobe是自定一数据格式，其他都是原始协议数据。
     // 这个主要用于 ebpf 协议遍历解析的时候快速过滤一些协议，例如GoHttp2Uprobe，除了http以外其他协议都会跳过。
+    // ==========================================================================================
     // is raw protocol? now only GoHttp2Uprobe is custom format.
     // it use for fast filter some protocol.
     pub fn is_raw_protocol(&self) -> bool {

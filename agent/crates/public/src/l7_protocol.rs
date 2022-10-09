@@ -16,41 +16,58 @@
 
 use serde::Serialize;
 
-const L7_PROTOCOL_UNKNOWN: u8 = 0;
-const L7_PROTOCOL_OTHER: u8 = 1;
-const L7_PROTOCOL_HTTP1: u8 = 20;
-const L7_PROTOCOL_HTTP2: u8 = 21;
-const L7_PROTOCOL_HTTP1_TLS: u8 = 22;
-const L7_PROTOCOL_HTTP2_TLS: u8 = 23;
-const L7_PROTOCOL_DUBBO: u8 = 40;
-const L7_PROTOCOL_MYSQL: u8 = 60;
-const L7_PROTOCOL_POSTGRESQL: u8 = 61;
-const L7_PROTOCOL_REDIS: u8 = 80;
-const L7_PROTOCOL_KAFKA: u8 = 100;
-const L7_PROTOCOL_MQTT: u8 = 101;
-const L7_PROTOCOL_DNS: u8 = 120;
-const L7_PROTOCOL_MAX: u8 = 255;
+macro_rules! l7_protocol {
+    ($($proto:ident = $num:literal),+$(,)*) => {
 
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
-#[repr(u8)]
-pub enum L7Protocol {
-    Unknown = L7_PROTOCOL_UNKNOWN,
-    Other = L7_PROTOCOL_OTHER,
-    Http1 = L7_PROTOCOL_HTTP1,
-    Http2 = L7_PROTOCOL_HTTP2,
-    Http1TLS = L7_PROTOCOL_HTTP1_TLS,
-    Http2TLS = L7_PROTOCOL_HTTP2_TLS,
-    Dubbo = L7_PROTOCOL_DUBBO,
-    Mysql = L7_PROTOCOL_MYSQL,
-    Redis = L7_PROTOCOL_REDIS,
-    Kafka = L7_PROTOCOL_KAFKA,
-    Mqtt = L7_PROTOCOL_MQTT,
-    Dns = L7_PROTOCOL_DNS,
+        /*
+        expand like:
 
-    // add new protocol below
-    Postgresql = L7_PROTOCOL_POSTGRESQL,
+        pub enum L7Protocol {
+            Dns = 120,
+            ...
+        }
 
-    Max = L7_PROTOCOL_MAX,
+        */
+        #[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
+        #[repr(u8)]
+        pub enum L7Protocol {
+            $(
+                $proto = $num,
+            )+
+        }
+
+        /*
+        expand like:
+
+        impl From<u8> for L7Protocol {
+            fn from(v: u8) -> Self {
+                match v {
+                    120 => L7Protocol::Dns,
+                    ...
+
+                    _ => L7Protocol::Unknown,
+                }
+            }
+        }
+
+        */
+
+        // 这个仅用于ebpf从l7_protocol_hint获取对应L7Protocol.
+        // ======================================================
+        // only use for ebpf get l7 protocol from l7_protocol_hint
+        impl From<u8> for L7Protocol {
+            fn from(v: u8) -> Self {
+                match v {
+                    $(
+                        $num=>L7Protocol::$proto,
+                    )+
+
+                    _ => L7Protocol::Unknown,
+                }
+            }
+        }
+
+    };
 }
 
 impl Default for L7Protocol {
@@ -59,27 +76,20 @@ impl Default for L7Protocol {
     }
 }
 
-// 这个仅用与ebpf, 从l7_protocol_hint获取对应L7Protocol.
-// only use for ebpf get l7 protocol from l7_protocol_hint
-impl From<u8> for L7Protocol {
-    fn from(v: u8) -> Self {
-        match v {
-            L7_PROTOCOL_OTHER => L7Protocol::Other,
-            L7_PROTOCOL_HTTP1 => L7Protocol::Http1,
-            L7_PROTOCOL_HTTP2 => L7Protocol::Http2,
-            L7_PROTOCOL_HTTP1_TLS => L7Protocol::Http1TLS,
-            L7_PROTOCOL_HTTP2_TLS => L7Protocol::Http2TLS,
-            L7_PROTOCOL_DUBBO => L7Protocol::Dubbo,
-            L7_PROTOCOL_MYSQL => L7Protocol::Mysql,
-            L7_PROTOCOL_REDIS => L7Protocol::Redis,
-            L7_PROTOCOL_KAFKA => L7Protocol::Kafka,
-            L7_PROTOCOL_MQTT => L7Protocol::Mqtt,
-            L7_PROTOCOL_DNS => L7Protocol::Dns,
-
-            // add new protocol below
-            L7_PROTOCOL_POSTGRESQL => L7Protocol::Postgresql,
-
-            _ => L7Protocol::Unknown,
-        }
-    }
-}
+l7_protocol!(
+    Unknown = 0,
+    Other = 1,
+    Max = 255,
+    Http1 = 20,
+    Http2 = 21,
+    Http1TLS = 22,
+    Http2TLS = 23,
+    Dubbo = 40,
+    Mysql = 60,
+    Postgresql = 61,
+    Redis = 80,
+    Kafka = 100,
+    Mqtt = 101,
+    Dns = 120,
+    // add protocol below
+);
