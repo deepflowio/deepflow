@@ -129,7 +129,7 @@ impl FlowPerf {
         }
     }
 
-    fn _l7_parse_perf(
+    fn l7_parse_perf(
         &mut self,
         packet: &MetaPacket,
         flow_id: u64,
@@ -151,7 +151,7 @@ impl FlowPerf {
         return ret;
     }
 
-    fn _l7_parse_log(
+    fn l7_parse_log(
         &mut self,
         packet: &MetaPacket,
         app_table: &mut AppTable,
@@ -162,10 +162,9 @@ impl FlowPerf {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let mut parser = self.l7_protocol_log_parser.take().unwrap();
+            let parser = self.l7_protocol_log_parser.as_mut().unwrap();
             let ret = parser.parse_payload(payload, parse_param);
             parser.reset();
-            self.l7_protocol_log_parser.replace(parser);
 
             if !self.is_success {
                 if ret.is_ok() {
@@ -196,14 +195,14 @@ impl FlowPerf {
             for mut i in get_all_protocol() {
                 if i.check_payload(payload, &param) {
                     self.l7_protocol = i.protocol().0;
-                    // perf 没有抽象出来,这里可能返回None,对于返回None即不解析perf,只解析log
+                    // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
                     self.l7 = Self::l7_new(i.protocol().0, self.rrt_cache.clone());
                     if self.l7.is_some() {
-                        self._l7_parse_perf(packet, flow_id, app_table)?;
+                        self.l7_parse_perf(packet, flow_id, app_table)?;
                     }
 
                     self.l7_protocol_log_parser = Some(i);
-                    return self._l7_parse_log(packet, app_table, &param);
+                    return self.l7_parse_log(packet, app_table, &param);
                 }
             }
 
@@ -220,11 +219,11 @@ impl FlowPerf {
         app_table: &mut AppTable,
     ) -> Result<Vec<L7ProtocolInfo>> {
         if self.l7.is_some() {
-            self._l7_parse_perf(packet, flow_id, app_table)?;
+            self.l7_parse_perf(packet, flow_id, app_table)?;
         }
 
         if self.l7_protocol_log_parser.is_some() {
-            return self._l7_parse_log(packet, app_table, &ParseParam::from(packet));
+            return self.l7_parse_log(packet, app_table, &ParseParam::from(packet));
         }
 
         if self.is_from_app {
@@ -297,7 +296,7 @@ impl FlowPerf {
             // 抛出错误由flowMap.FlowPerfCounter处理
             return self.l7_parse(packet, flow_id, app_table);
         }
-        return Ok(vec![]);
+        Ok(vec![])
     }
 
     pub fn copy_and_reset_perf_data(

@@ -26,13 +26,13 @@ use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
-use crate::{__log_info_merge, __parse_common, ignore_non_raw_protocol};
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
     flow_generator::error::{Error, Result},
     utils::bytes::{read_u16_be, read_u32_be},
 };
+use crate::{log_info_merge, parse_common};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct KafkaInfo {
@@ -67,7 +67,7 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     }
 
     fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
-        __log_info_merge!(self, KafkaInfo, other);
+        log_info_merge!(self, KafkaInfo, other);
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -218,12 +218,14 @@ pub struct KafkaLog {
 
 impl L7ProtocolParserInterface for KafkaLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        ignore_non_raw_protocol!(param);
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
         return Self::kafka_check_protocol(payload, param);
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        __parse_common!(self, param);
+        parse_common!(self, param);
         Self::parse(
             self,
             payload,
@@ -239,7 +241,7 @@ impl L7ProtocolParserInterface for KafkaLog {
         return (L7Protocol::Kafka, "KAFKA");
     }
 
-    fn parse_on_udp(&self) -> bool {
+    fn parsable_on_udp(&self) -> bool {
         return false;
     }
 
@@ -357,7 +359,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/kafka";
 
@@ -389,7 +394,8 @@ mod tests {
                 None,
                 None,
             );
-            let is_kafka = KafkaLog::kafka_check_protocol(payload, &ParseParam::from(packet));
+            let is_kafka =
+                KafkaLog::kafka_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_kafka: {}\r\n", kafka.info, is_kafka));
         }
         output

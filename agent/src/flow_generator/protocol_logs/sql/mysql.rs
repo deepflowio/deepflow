@@ -23,7 +23,6 @@ use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
-use crate::{__log_info_merge, __parse_common, ignore_non_raw_protocol};
 use crate::{
     common::enums::IpProtocol,
     common::flow::L7Protocol,
@@ -31,6 +30,7 @@ use crate::{
     flow_generator::error::{Error, Result},
     utils::bytes,
 };
+use crate::{log_info_merge, parse_common};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
@@ -72,7 +72,7 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     }
 
     fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
-        __log_info_merge!(self, MysqlInfo, other);
+        log_info_merge!(self, MysqlInfo, other);
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -182,17 +182,19 @@ pub struct MysqlLog {
 
 impl L7ProtocolParserInterface for MysqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        ignore_non_raw_protocol!(param);
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
         return Self::mysql_check_protocol(payload, param);
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
-        __parse_common!(self, param);
+        parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         return Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())]);
     }
 
-    fn parse_on_udp(&self) -> bool {
+    fn parsable_on_udp(&self) -> bool {
         return false;
     }
 
@@ -475,7 +477,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";
 
@@ -507,7 +512,8 @@ mod tests {
                 None,
                 None,
             );
-            let is_mysql = MysqlLog::mysql_check_protocol(payload, &ParseParam::from(packet));
+            let is_mysql =
+                MysqlLog::mysql_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
         }
         output

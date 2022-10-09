@@ -26,16 +26,16 @@ use crate::flow_generator::{
 };
 
 #[macro_export]
-macro_rules! __log_info_merge {
+macro_rules! log_info_merge {
     ($self:ident,$log_type:ident,$other:ident) => {
-        if let L7ProtocolInfo::$log_type(__other) = $other {
-            if __other.start_time < $self.start_time {
-                $self.start_time = __other.start_time;
+        if let L7ProtocolInfo::$log_type(other) = $other {
+            if other.start_time < $self.start_time {
+                $self.start_time = other.start_time;
             }
-            if __other.end_time > $self.end_time {
-                $self.end_time = __other.end_time;
+            if other.end_time > $self.end_time {
+                $self.end_time = other.end_time;
             }
-            $self.merge(__other);
+            $self.merge(other);
         }
         return Ok(());
     };
@@ -43,12 +43,13 @@ macro_rules! __log_info_merge {
 
 #[enum_dispatch(L7ProtocolInfo)]
 pub trait L7ProtocolInfoInterface {
-    // 个别协议一个连接可能有子流, 这里需要返回流标识, 例如http2的stream id
-    // distinguish stream from some protocl. such as http2 streamid, dns transaction id
+    // 个别协议一个连接可能有子流，这里需要返回流标识，例如http2的stream id
+    // ============================================================
+    // Returns the stream ID, distinguishing substreams. such as http2 stream id, dns transaction id
     fn session_id(&self) -> Option<u32>;
     // 协议字段合并
-    // enum_dispatch 不能使用&Self 参数, 这里只能使用&L7Protocol.
     // 返回的错误暂时无视
+    // =============================================================
     // merge request and response. now return err will have no effect.
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()>;
 
@@ -56,15 +57,17 @@ pub trait L7ProtocolInfoInterface {
     fn is_tls(&self) -> bool;
     fn skip_send(&self) -> bool;
 
-    // 是否需要进一步合并, 目前只有在ebpf有意义, 内置协议也只有 EBPF_TYPE_GO_HTTP2_UPROBE 会用到.
-    // 除非确实需要多次log合并,否则应该一律返回false
+    // 是否需要进一步合并，目前只有在ebpf有意义，内置协议也只有 EBPF_TYPE_GO_HTTP2_UPROBE 会用到.
+    // 除非确实需要多次log合并，否则应该一律返回false
+    // =================================================================================
     // should need merge more than once? only ebpf will need merge many times.
     // should always return false when non ebpf.
     fn need_merge(&self) -> bool {
         return false;
     }
-    // 对于需要多次merge的情况下,判断流是否已经结束,只有在need_merge->true的情况下有用
+    // 对于需要多次merge的情况下，判断流是否已经结束，只有在need_merge->true的情况下有用
     // 返回 req_end,resp_end
+    // ========================================================================
     // when need merge more than once, use to determine if the stream has ended.
     fn is_req_resp_end(&self) -> (bool, bool) {
         return (false, false);
@@ -84,7 +87,7 @@ pub enum L7ProtocolInfo {
     KafkaInfo(KafkaInfo),
     MqttInfo(MqttInfo),
 
-    // add new protocol info here
+    // add new protocol info below
     PostgresInfo(PostgresInfo),
 }
 
@@ -95,8 +98,8 @@ impl L7ProtocolInfo {
     }
 }
 
-impl Into<L7ProtocolSendLog> for L7ProtocolInfo {
-    fn into(self) -> L7ProtocolSendLog {
-        return self.into_l7_protocol_send_log();
+impl From<L7ProtocolInfo> for L7ProtocolSendLog {
+    fn from(f: L7ProtocolInfo) -> Self {
+        return f.into_l7_protocol_send_log();
     }
 }
