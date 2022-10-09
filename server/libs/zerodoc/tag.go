@@ -290,7 +290,7 @@ type Field struct {
 	TagValue uint16
 }
 
-func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy string, ttl int) *ckdb.Table {
+func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, cluster, storagePolicy string, ttl int, coldStorage *ckdb.ColdStorage) *ckdb.Table {
 	timeKey := "time"
 
 	var orderKeys []string
@@ -330,42 +330,44 @@ func newMetricsMinuteTable(id MetricsTableID, engine ckdb.EngineType, version, c
 		Engine:          engine,
 		Cluster:         cluster,
 		StoragePolicy:   storagePolicy,
+		ColdStorage:     *coldStorage,
 		OrderKeys:       orderKeys,
 		PrimaryKeyCount: len(orderKeys),
 	}
 }
 
 // 由分钟表生成秒表
-func newMetricsSecondTable(minuteTable *ckdb.Table, ttl int) *ckdb.Table {
+func newMetricsSecondTable(minuteTable *ckdb.Table, ttl int, coldStorages *ckdb.ColdStorage) *ckdb.Table {
 	t := *minuteTable
 	t.ID = minuteTable.ID + uint8(VTAP_FLOW_PORT_1S)
 	t.LocalName = MetricsTableID(t.ID).TableName() + ckdb.LOCAL_SUBFFIX
 	t.GlobalName = MetricsTableID(t.ID).TableName()
 	t.TTL = ttl
+	t.ColdStorage = *coldStorages
 	t.PartitionFunc = ckdb.TimeFuncFourHour
 	t.Engine = ckdb.MergeTree // 秒级数据不用支持使用replica
 
 	return &t
 }
 
-func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy string, flowMinuteTtl, flowSecondTtl, appMinuteTtl, appSecondTtl int) []*ckdb.Table {
+func GetMetricsTables(engine ckdb.EngineType, version, cluster, storagePolicy string, flowMinuteTtl, flowSecondTtl, appMinuteTtl, appSecondTtl int, coldStorages map[string]*ckdb.ColdStorage) []*ckdb.Table {
 	var metricsTables []*ckdb.Table
 
 	minuteTables := []*ckdb.Table{}
 	for i := VTAP_FLOW_PORT_1M; i <= VTAP_FLOW_EDGE_PORT_1M; i++ {
-		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, flowMinuteTtl))
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, flowMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
 	for i := VTAP_APP_PORT_1M; i <= VTAP_APP_EDGE_PORT_1M; i++ {
-		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, appMinuteTtl))
+		minuteTables = append(minuteTables, newMetricsMinuteTable(i, engine, version, cluster, storagePolicy, appMinuteTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
-	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 7)) // vtap_acl ttl is always 7 day
+	minuteTables = append(minuteTables, newMetricsMinuteTable(VTAP_ACL_1M, engine, version, cluster, storagePolicy, 7, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, VTAP_ACL_1M.TableName()))) // vtap_acl ttl is always 7 day
 
 	secondTables := []*ckdb.Table{}
 	for i := VTAP_FLOW_PORT_1S; i <= VTAP_FLOW_EDGE_PORT_1S; i++ {
-		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_PORT_1S], flowSecondTtl))
+		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_PORT_1S], flowSecondTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
 	for i := VTAP_APP_PORT_1S; i <= VTAP_APP_EDGE_PORT_1S; i++ {
-		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_PORT_1S], appSecondTtl))
+		secondTables = append(secondTables, newMetricsSecondTable(minuteTables[i-VTAP_FLOW_PORT_1S], appSecondTtl, ckdb.GetColdStorage(coldStorages, ckdb.METRICS_DB, i.TableName())))
 	}
 	metricsTables = append(minuteTables, secondTables...)
 	return metricsTables

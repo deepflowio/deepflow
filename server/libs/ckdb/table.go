@@ -26,6 +26,24 @@ const (
 	LOCAL_SUBFFIX = "_local"
 )
 
+type ColdStorage struct {
+	Enabled   bool
+	Type      DiskType
+	Name      string
+	TTLToMove int // after 'TTLToMove' days, then move data to cold storage
+}
+
+func GetColdStorage(coldStorages map[string]*ColdStorage, db, table string) *ColdStorage {
+	if coldStorage, ok := coldStorages[db+table]; ok {
+		return coldStorage
+	}
+
+	if coldStorage, ok := coldStorages[db]; ok {
+		return coldStorage
+	}
+	return &ColdStorage{}
+}
+
 type Table struct {
 	Version         string       // 表版本，用于表结构变更时，做自动更新
 	ID              uint8        // id
@@ -36,6 +54,7 @@ type Table struct {
 	TimeKey         string       // 时间字段名，用来设置partition和ttl
 	SummingKey      string       // When using SummingMergeEngine, this field is used for Summing aggregation
 	TTL             int          // 数据默认保留时长。 单位:天
+	ColdStorage     ColdStorage  // 冷存储配置
 	PartitionFunc   TimeFuncType // partition函数作用于Time,
 	Cluster         string       // 对应的cluster
 	StoragePolicy   string       // 存储策略
@@ -82,6 +101,9 @@ func (t *Table) MakeLocalTableCreateSQL() string {
 	ttl := ""
 	if t.TTL > 0 {
 		ttl = fmt.Sprintf("TTL %s +  toIntervalDay(%d)", t.TimeKey, t.TTL)
+		if t.ColdStorage.Enabled {
+			ttl += fmt.Sprintf(", %s + toIntervalDay(%d) TO %s '%s'", t.TimeKey, t.ColdStorage.TTLToMove, t.ColdStorage.Type, t.ColdStorage.Name)
+		}
 	}
 
 	createTable := fmt.Sprintf(`
