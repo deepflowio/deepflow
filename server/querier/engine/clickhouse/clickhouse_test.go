@@ -141,11 +141,11 @@ var (
 		output: "SELECT attribute_values[indexOf(attribute_names,'cc')] AS `attribute.abc` FROM flow_log.l7_flow_log PREWHERE attribute_values[indexOf(attribute_names,'cc')] = 'opensource-loki-0' AND (`attribute.abc` != '') GROUP BY `attribute.abc`",
 	}, {
 		input:  "select `tag.cc` as `tag.abc` from cpu where `tag.abc`='opensource-loki-0' group by `tag.abc`",
-		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.cpu PREWHERE tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' AND (`tag.abc` != '') GROUP BY `tag.abc`",
+		output: "SELECT tag_values[indexOf(tag_names,'cc')] AS `tag.abc` FROM ext_metrics.metrics PREWHERE (virtual_table_name='cpu') AND tag_values[indexOf(tag_names,'cc')] = 'opensource-loki-0' AND (`tag.abc` != '') GROUP BY `tag.abc`",
 		db:     "ext_metrics",
 	}, {
 		input:  "select `metrics.storageclass_annotations` AS `job_info` from prometheus_kube",
-		output: "SELECT if(indexOf(metrics_float_names, 'storageclass_annotations')=0,null,metrics_float_values[indexOf(metrics_float_names, 'storageclass_annotations')]) AS `job_info` FROM ext_metrics.prometheus_kube PREWHERE (job_info is not null)",
+		output: "SELECT if(indexOf(metrics_float_names, 'storageclass_annotations')=0,null,metrics_float_values[indexOf(metrics_float_names, 'storageclass_annotations')]) AS `job_info` FROM ext_metrics.metrics PREWHERE (virtual_table_name='prometheus_kube')",
 		db:     "ext_metrics",
 	}, {
 		input:  "select Sum(`metrics.pending`) from `deepflow_server.queue`",
@@ -159,7 +159,7 @@ var (
 		output: "SELECT if(indexOf(metrics_names, 'xxx.yyy')=0,null,metrics_values[indexOf(metrics_names, 'xxx.yyy')]) AS `xxx` FROM flow_log.l7_flow_log",
 	}, {
 		input:  "select `metrics.xxx` as xxx from cpu",
-		output: "SELECT if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')]) AS `xxx` FROM ext_metrics.cpu PREWHERE (xxx is not null)",
+		output: "SELECT if(indexOf(metrics_float_names, 'xxx')=0,null,metrics_float_values[indexOf(metrics_float_names, 'xxx')]) AS `xxx` FROM ext_metrics.metrics PREWHERE (virtual_table_name='cpu')",
 		db:     "ext_metrics",
 	}, {
 		input:  "select Sum(packet_count) as count from l4_packet",
