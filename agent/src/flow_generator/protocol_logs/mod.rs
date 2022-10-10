@@ -32,7 +32,7 @@ pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 pub use parser::{AppProtoLogsParser, MetaAppProto};
 pub use rpc::{DubboHeader, DubboInfo, DubboLog};
 pub use sql::{
-    decode, MysqlHeader, MysqlInfo, MysqlLog, PostgresInfo, PostgresqlLog, RedisInfo, RedisLog,
+    decode, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
 };
 
 use std::{
@@ -466,7 +466,7 @@ impl AppProtoLogsData {
     }
 
     pub fn is_request(&self) -> bool {
-        return self.base_info.head.msg_type == LogMessageType::Request;
+        self.base_info.head.msg_type == LogMessageType::Request
     }
 
     pub fn is_response(&self) -> bool {
@@ -481,7 +481,6 @@ impl AppProtoLogsData {
 
         let log: L7ProtocolSendLog = self.special_info.into();
         log.fill_app_proto_log(&mut pb_proto_logs_data);
-
         pb_proto_logs_data
             .encode(buf)
             .map(|_| pb_proto_logs_data.encoded_len())
@@ -520,8 +519,7 @@ impl AppProtoLogsData {
     // 是否需要进一步聚合
     // 目前仅http2 uprobe 需要聚合多个请求
     pub fn need_protocol_merge(&self) -> bool {
-        // return self.base_info.ebpf_type == EbpfType::GoHttp2Uprobe;
-        return self.special_info.need_merge();
+        self.special_info.need_merge()
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {

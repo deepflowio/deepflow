@@ -57,18 +57,14 @@ impl EbpfType {
     // it use for fast filter some protocol.
     pub fn is_raw_protocol(&self) -> bool {
         match self {
-            EbpfType::GoHttp2Uprobe => {
-                return false;
-            }
-            _ => {
-                return true;
-            }
+            EbpfType::GoHttp2Uprobe => false,
+            _ => true,
         }
     }
 }
 
 impl Default for EbpfType {
     fn default() -> Self {
-        return Self::None;
+        Self::None
     }
 }

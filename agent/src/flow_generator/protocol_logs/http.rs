@@ -41,8 +41,8 @@ use crate::{log_info_merge, parse_common};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
-    // 流是否结束, 用于 http2 ebpf uprobe 处理.
-    // 由于ebpf有可能响应会比请求先到,所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
+    // 流是否结束，用于 http2 ebpf uprobe 处理.
+    // 由于ebpf有可能响应会比请求先到，所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
     is_req_end: bool,
     is_resp_end: bool,
     proto: L7Protocol,
@@ -50,7 +50,7 @@ pub struct HttpInfo {
     end_time: u64,
     is_tls: bool,
     msg_type: LogMessageType,
-    // 数据原始类型, 标准的协议格式或者是ebpf上报的自定义格式
+    // 数据原始类型，标准的协议格式或者是ebpf上报的自定义格式
     #[serde(skip)]
     raw_data_type: L7ProtoRawDataType,
 
@@ -85,46 +85,39 @@ pub struct HttpInfo {
 
 impl L7ProtocolInfoInterface for HttpInfo {
     fn session_id(&self) -> Option<u32> {
-        return Some(self.stream_id);
+        Some(self.stream_id)
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         log_info_merge!(self, HttpInfo, other);
+        Ok(())
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
+        Some(AppProtoHead {
             proto: self.get_l7_protocol_with_tls(),
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
-        });
+        })
     }
 
     fn is_tls(&self) -> bool {
-        return self.is_tls;
+        self.is_tls
     }
 
     fn skip_send(&self) -> bool {
-        return self.is_empty();
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.into();
+        self.is_empty()
     }
 
     fn need_merge(&self) -> bool {
         match self.raw_data_type {
-            L7ProtoRawDataType::GoHttp2Uprobe => {
-                return true;
-            }
-            _ => {
-                return false;
-            }
+            L7ProtoRawDataType::GoHttp2Uprobe => true,
+            _ => false,
         }
     }
 
     fn is_req_resp_end(&self) -> (bool, bool) {
-        return (self.is_req_end, self.is_resp_end);
+        (self.is_req_end, self.is_resp_end)
     }
 }
 
@@ -178,7 +171,7 @@ impl HttpInfo {
 
     // return (is_req_end, is_resp_end)
     pub fn is_req_resp_end(&self) -> (bool, bool) {
-        return (self.is_req_end, self.is_resp_end);
+        (self.is_req_end, self.is_resp_end)
     }
 
     fn get_l7_protocol_with_tls(&self) -> L7Protocol {
@@ -204,7 +197,7 @@ impl HttpInfo {
 
 impl From<HttpInfo> for L7ProtocolSendLog {
     fn from(f: HttpInfo) -> Self {
-        let log = L7ProtocolSendLog {
+        L7ProtocolSendLog {
             // http2 可能没有:content-length头. 默认长度设置-1 防止server判断为0
             req_len: f.req_content_length,
             resp_len: f.resp_content_length,
@@ -231,8 +224,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             ..Default::default()
-        };
-        return log;
+        }
     }
 }
 
@@ -240,7 +232,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
 pub struct HttpLog {
     info: HttpInfo,
 
-    // check 是否已经解析过,已经解析过parse会跳过
+    // check 是否已经解析过，已经解析过parse会跳过
     parsed: bool,
     #[serde(skip)]
     l7_log_dynamic_config: L7LogDynamicConfig,
@@ -267,16 +259,16 @@ impl L7ProtocolParserInterface for HttpLog {
                             Some(p.is_resp_end),
                         )
                         .is_ok();
-                    return self.parsed;
+                    self.parsed
                 } else {
-                    return false;
+                    false
                 }
             }
             _ => {
                 // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
                 match self.proto {
-                    L7Protocol::Http1 => return self.http1_check_protocol(payload, param),
-                    L7Protocol::Http2 => return self.http2_check_protocol(payload, param),
+                    L7Protocol::Http1 => self.http1_check_protocol(payload, param),
+                    L7Protocol::Http2 => self.http2_check_protocol(payload, param),
                     _ => unreachable!(),
                 }
             }
@@ -310,39 +302,34 @@ impl L7ProtocolParserInterface for HttpLog {
                     L7Protocol::Http2 => self.parse_http_v2(payload, param.direction)?,
                     _ => unreachable!(),
                 }
-                return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
+                Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())])
             }
         }
     }
 
-    fn protocol(&self) -> (L7Protocol, &str) {
+    fn protocol(&self) -> L7Protocol {
         match self.proto {
             L7Protocol::Http1 => {
-                return (
-                    L7Protocol::Http1,
-                    if self.info.is_tls() {
-                        "HTTP1TLS"
-                    } else {
-                        "HTTP1"
-                    },
-                );
+                if self.info.is_tls() {
+                    L7Protocol::Http1TLS
+                } else {
+                    L7Protocol::Http1
+                }
             }
+
             L7Protocol::Http2 => {
-                return (
-                    L7Protocol::Http2,
-                    if self.info.is_tls() {
-                        "HTTP2TLS"
-                    } else {
-                        "HTTP2"
-                    },
-                );
+                if self.info.is_tls() {
+                    L7Protocol::Http2TLS
+                } else {
+                    L7Protocol::Http2
+                }
             }
             _ => unreachable!(),
         }
     }
 
     fn parsable_on_udp(&self) -> bool {
-        return false;
+        false
     }
 
     fn reset(&mut self) {
@@ -387,25 +374,25 @@ impl HttpLog {
     }
 
     pub fn new_v1() -> Self {
-        return Self {
+        Self {
             proto: L7Protocol::Http1,
             info: HttpInfo {
                 proto: L7Protocol::Http1,
                 ..Default::default()
             },
             ..Default::default()
-        };
+        }
     }
 
     pub fn new_v2() -> Self {
-        return Self {
+        Self {
             proto: L7Protocol::Http2,
             info: HttpInfo {
                 proto: L7Protocol::Http2,
                 ..Default::default()
             },
             ..Default::default()
-        };
+        }
     }
 
     pub fn set_config(&mut self, config: &LogParserAccess) {
@@ -429,7 +416,7 @@ impl HttpLog {
             self.proto = L7Protocol::Http1;
             return true;
         }
-        return false;
+        false
     }
 
     pub fn http2_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
@@ -442,7 +429,7 @@ impl HttpLog {
         if self.parsed {
             self.proto = L7Protocol::Http2;
         }
-        return self.parsed;
+        self.parsed
     }
 
     pub fn update_config(&mut self, config: &LogParserAccess) {
