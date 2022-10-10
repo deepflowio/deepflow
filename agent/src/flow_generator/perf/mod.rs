@@ -193,10 +193,13 @@ impl FlowPerf {
         if let Some(payload) = packet.get_l4_payload() {
             let param = ParseParam::from(packet);
             for mut i in get_all_protocol() {
+                if i.is_skip_parse(self.protocol_bitmap) {
+                    continue;
+                }
                 if i.check_payload(payload, &param) {
-                    self.l7_protocol = i.protocol().0;
+                    self.l7_protocol = i.protocol();
                     // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
-                    self.l7 = Self::l7_new(i.protocol().0, self.rrt_cache.clone());
+                    self.l7 = Self::l7_new(i.protocol(), self.rrt_cache.clone());
                     if self.l7.is_some() {
                         self.l7_parse_perf(packet, flow_id, app_table)?;
                     }

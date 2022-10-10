@@ -90,37 +90,34 @@ impl DubboInfo {
 
 impl L7ProtocolInfoInterface for DubboInfo {
     fn session_id(&self) -> Option<u32> {
-        return Some(self.request_id as u32);
+        Some(self.request_id as u32)
     }
 
     fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
         log_info_merge!(self, DubboInfo, other);
+        Ok(())
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
+        Some(AppProtoHead {
             proto: L7Protocol::Dubbo,
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
-        });
+        })
     }
 
     fn is_tls(&self) -> bool {
-        return self.is_tls;
+        self.is_tls
     }
 
     fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.into();
+        false
     }
 }
 
 impl From<DubboInfo> for L7ProtocolSendLog {
     fn from(f: DubboInfo) -> Self {
-        let log = L7ProtocolSendLog {
+        L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
             version: Some(f.dubbo_version),
@@ -135,8 +132,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 ..Default::default()
             },
             ..Default::default()
-        };
-        return log;
+        }
     }
 }
 
@@ -156,21 +152,21 @@ impl L7ProtocolParserInterface for DubboLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        return Self::dubbo_check_protocol(payload, param);
+        Self::dubbo_check_protocol(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
-        return Ok(vec![L7ProtocolInfo::DubboInfo((&self.info).clone())]);
+        Ok(vec![L7ProtocolInfo::DubboInfo((&self.info).clone())])
     }
 
-    fn protocol(&self) -> (L7Protocol, &str) {
-        return (L7Protocol::Dubbo, "DUBBO");
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Dubbo
     }
 
     fn parsable_on_udp(&self) -> bool {
-        return false;
+        false
     }
 
     fn reset(&mut self) {
@@ -343,7 +339,7 @@ impl DubboLog {
             return false;
         }
 
-        return header.check();
+        header.check()
     }
 
     fn parse(
@@ -370,7 +366,7 @@ impl DubboLog {
                 self.response(&dubbo_header);
             }
         }
-        return Ok(());
+        Ok(())
     }
 }
 

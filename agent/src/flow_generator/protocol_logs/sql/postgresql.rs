@@ -38,7 +38,7 @@ use crate::{
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
 
 #[derive(Debug, Default, Clone, Serialize)]
-pub struct PostgresInfo {
+pub struct PostgreInfo {
     msg_type: LogMessageType,
     start_time: u64,
     end_time: u64,
@@ -57,13 +57,13 @@ pub struct PostgresInfo {
     pub status: L7ResponseStatus,
 }
 
-impl L7ProtocolInfoInterface for PostgresInfo {
+impl L7ProtocolInfoInterface for PostgreInfo {
     fn session_id(&self) -> Option<u32> {
-        return None;
+        None
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
-        if let L7ProtocolInfo::PostgresInfo(pg) = other {
+        if let L7ProtocolInfo::PostgreInfo(pg) = other {
             if pg.start_time < self.start_time {
                 self.start_time = pg.start_time;
             }
@@ -86,52 +86,54 @@ impl L7ProtocolInfoInterface for PostgresInfo {
                 _ => {}
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
+        Some(AppProtoHead {
             proto: L7Protocol::Postgresql,
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
-        });
+        })
     }
 
     fn is_tls(&self) -> bool {
-        return self.is_tls;
+        self.is_tls
     }
 
     fn skip_send(&self) -> bool {
-        return false;
+        false
     }
+}
 
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return L7ProtocolSendLog {
+impl From<PostgreInfo> for L7ProtocolSendLog {
+    fn from(p: PostgreInfo) -> L7ProtocolSendLog {
+        L7ProtocolSendLog {
             req_len: None,
             resp_len: None,
             req: L7Request {
-                req_type: String::from(char::from(self.req_type)),
+                req_type: String::from(char::from(p.req_type)),
                 domain: String::new(),
-                resource: self.context,
+                resource: p.context,
             },
             resp: L7Response {
-                status: self.status,
-                code: Some(self.resp_type as i32),
-                result: get_response_result(self.resp_type).unwrap_or_default(),
-                exception: self.error_message,
+                status: p.status,
+                code: Some(p.resp_type as i32),
+                result: get_response_result(p.resp_type).unwrap_or_default(),
+                exception: p.error_message,
             },
             ext_info: Some(ExtendedInfo {
-                row_effect: Some(self.affected_rows as u32),
+                row_effect: Some(p.affected_rows as u32),
                 ..Default::default()
             }),
             ..Default::default()
-        };
+        }
     }
 }
 
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct PostgresqlLog {
-    info: PostgresInfo,
+    info: PostgreInfo,
     parsed: bool,
 }
 
@@ -154,7 +156,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         if self.parsed {
-            return Ok(vec![L7ProtocolInfo::PostgresInfo(self.info.clone())]);
+            return Ok(vec![L7ProtocolInfo::PostgreInfo(self.info.clone())]);
         }
 
         if self.check_is_ssl_req(payload) {
@@ -165,11 +167,11 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
         self.parse(payload)?;
-        return Ok(vec![L7ProtocolInfo::PostgresInfo(self.info.clone())]);
+        Ok(vec![L7ProtocolInfo::PostgreInfo(self.info.clone())])
     }
 
-    fn protocol(&self) -> (L7Protocol, &str) {
-        return (L7Protocol::Postgresql, "POSTGRESQL");
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Postgresql
     }
 
     fn reset(&mut self) {
@@ -177,7 +179,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
     }
 
     fn parsable_on_udp(&self) -> bool {
-        return false;
+        false
     }
 }
 
@@ -281,14 +283,14 @@ impl PostgresqlLog {
             _ => {}
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn check_is_ssl_req(&self, payload: &[u8]) -> bool {
         if payload.len() != 8 {
             return false;
         }
-        return self.info.msg_type == LogMessageType::Request && read_u64_be(payload) == SSL_REQ;
+        self.info.msg_type == LogMessageType::Request && read_u64_be(payload) == SSL_REQ
     }
 }
 
@@ -338,14 +340,14 @@ fn check_type(msg_type: LogMessageType, typ: u8) -> bool {
             'Q' | 'P' | 'B' | 'E' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => {
                 return true
             }
-            _ => return false,
+            _ => false,
         },
         LogMessageType::Response => match c {
             'C' | 'E' | 'Z' | 'I' | '1' | '2' | '3' | 'S' | 'K' | 'T' | 'n' | 'N' | 't' | 'D'
-            | 'G' | 'H' | 'W' | 'd' | 'c' => return true,
-            _ => return false,
+            | 'G' | 'H' | 'W' | 'd' | 'c' => true,
+            _ => false,
         },
-        _ => return false,
+        _ => false,
     }
 }
 
