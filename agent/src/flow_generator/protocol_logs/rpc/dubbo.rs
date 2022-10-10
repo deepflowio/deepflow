@@ -199,7 +199,7 @@ impl DubboLog {
         for tag in &trace_id_tags {
             if let Some(index) = payload_str.find(tag.as_str()) {
                 offset += index + tag.len();
-                if offset+20 <= payload_str.len() {
+                if offset + 20 <= payload_str.len() {
                     continue;
                 }
                 // sw8匹配 以'1-'开头'-'结尾的部分
