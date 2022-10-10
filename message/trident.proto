@@ -191,7 +191,7 @@ message Config {
     optional bool    vtap_flow_1s_enabled   = 27 [default = true];
     optional bool    debug_enabled        = 28 [default = true];
 
-    optional string  analyzer_ip          = 31 [default = "127.0.0.1"];
+    optional string  analyzer_ip          = 31;
     optional uint32  max_escape_seconds   = 32 [default = 3600];
 
     optional string  proxy_controller_ip   = 34; // 控制器代理IP
