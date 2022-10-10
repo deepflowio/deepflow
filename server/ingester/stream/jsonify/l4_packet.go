@@ -18,6 +18,7 @@ package jsonify
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/codec"
@@ -25,8 +26,7 @@ import (
 )
 
 type L4Packet struct {
-	StartTime   uint32
-	EndTime     uint32
+	EndTime     uint64
 	FlowID      uint64
 	VtapID      uint16
 	PacketCount uint32
@@ -36,8 +36,7 @@ type L4Packet struct {
 func L4PacketColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime).SetComment("精度: 秒"),
-		ckdb.NewColumn("start_time", ckdb.DateTime).SetComment("精度: 秒"),
-		ckdb.NewColumn("end_time", ckdb.DateTime).SetComment("精度: 秒"),
+		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
@@ -46,13 +45,10 @@ func L4PacketColumns() []*ckdb.Column {
 }
 
 func (s *L4Packet) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteDateTime(s.EndTime); err != nil {
+	if err := block.WriteDateTime(uint32(s.EndTime / uint64(time.Microsecond))); err != nil {
 		return err
 	}
-	if err := block.WriteDateTime(s.StartTime); err != nil {
-		return err
-	}
-	if err := block.WriteDateTime(s.EndTime); err != nil {
+	if err := block.WriteUInt64(s.EndTime); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(s.FlowID); err != nil {
@@ -103,9 +99,9 @@ func DecodePacketSequence(decoder *codec.SimpleDecoder, vtapID uint16) *L4Packet
 	l4Packet.VtapID = vtapID
 	blockSize := decoder.ReadU32()
 	l4Packet.FlowID = decoder.ReadU64()
-	l4Packet.StartTime = decoder.ReadU32()
-	l4Packet.EndTime = l4Packet.StartTime + uint32(decoder.ReadU16())
-	l4Packet.PacketCount = uint32(decoder.ReadU16())
+	endTimePacketCount := decoder.ReadU64()
+	l4Packet.EndTime = endTimePacketCount << 8
+	l4Packet.PacketCount = uint32(endTimePacketCount >> 56)
 	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-16)...)
 
 	return l4Packet
