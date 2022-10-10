@@ -20,7 +20,7 @@ use serde::Serialize;
 use crate::flow_generator::{
     protocol_logs::{
         pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
-        MysqlInfo, PostgresInfo, RedisInfo,
+        MysqlInfo, PostgreInfo, RedisInfo,
     },
     AppProtoHead, Result,
 };
@@ -37,12 +37,46 @@ macro_rules! log_info_merge {
             }
             $self.merge(other);
         }
-        return Ok(());
     };
 }
 
+macro_rules! all_protocol_info {
+    ($($name:ident($info_struct:ident)),+$(,)?) => {
+        #[derive(Serialize, Debug, Clone)]
+        #[enum_dispatch]
+        pub enum L7ProtocolInfo {
+            $(
+                $name($info_struct),
+            )+
+        }
+
+        impl From<L7ProtocolInfo> for L7ProtocolSendLog{
+            fn from(f:L7ProtocolInfo)->L7ProtocolSendLog{
+                match f{
+                    $(
+                        L7ProtocolInfo::$name(info)=>info.into(),
+                    )+
+                }
+            }
+        }
+    };
+}
+
+all_protocol_info!(
+    DnsInfo(DnsInfo),
+    HttpInfo(HttpInfo),
+    MysqlInfo(MysqlInfo),
+    RedisInfo(RedisInfo),
+    DubboInfo(DubboInfo),
+    KafkaInfo(KafkaInfo),
+    MqttInfo(MqttInfo),
+    //
+    // add new protocol info below
+    PostgreInfo(PostgreInfo),
+);
+
 #[enum_dispatch(L7ProtocolInfo)]
-pub trait L7ProtocolInfoInterface {
+pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     // 个别协议一个连接可能有子流，这里需要返回流标识，例如http2的stream id
     // ============================================================
     // Returns the stream ID, distinguishing substreams. such as http2 stream id, dns transaction id
@@ -63,43 +97,20 @@ pub trait L7ProtocolInfoInterface {
     // should need merge more than once? only ebpf will need merge many times.
     // should always return false when non ebpf.
     fn need_merge(&self) -> bool {
-        return false;
+        false
     }
     // 对于需要多次merge的情况下，判断流是否已经结束，只有在need_merge->true的情况下有用
     // 返回 req_end,resp_end
     // ========================================================================
     // when need merge more than once, use to determine if the stream has ended.
     fn is_req_resp_end(&self) -> (bool, bool) {
-        return (false, false);
+        (false, false)
     }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog;
-}
-
-#[derive(Serialize, Debug, Clone)]
-#[enum_dispatch]
-pub enum L7ProtocolInfo {
-    DnsInfo(DnsInfo),
-    HttpInfo(HttpInfo),
-    MysqlInfo(MysqlInfo),
-    RedisInfo(RedisInfo),
-    DubboInfo(DubboInfo),
-    KafkaInfo(KafkaInfo),
-    MqttInfo(MqttInfo),
-
-    // add new protocol info below
-    PostgresInfo(PostgresInfo),
 }
 
 impl L7ProtocolInfo {
     pub fn is_session_end(&self) -> bool {
         let (req_end, resp_end) = self.is_req_resp_end();
-        return req_end && resp_end;
-    }
-}
-
-impl From<L7ProtocolInfo> for L7ProtocolSendLog {
-    fn from(f: L7ProtocolInfo) -> Self {
-        return f.into_l7_protocol_send_log();
+        req_end && resp_end
     }
 }

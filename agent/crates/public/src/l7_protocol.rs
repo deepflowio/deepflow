@@ -14,69 +14,13 @@
  * limitations under the License.
  */
 
+use num_enum::FromPrimitive;
 use serde::Serialize;
 
-macro_rules! l7_protocol {
-    ($($proto:ident = $num:literal),+$(,)*) => {
-
-        /*
-        expand like:
-
-        pub enum L7Protocol {
-            Dns = 120,
-            ...
-        }
-
-        */
-        #[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
-        #[repr(u8)]
-        pub enum L7Protocol {
-            $(
-                $proto = $num,
-            )+
-        }
-
-        /*
-        expand like:
-
-        impl From<u8> for L7Protocol {
-            fn from(v: u8) -> Self {
-                match v {
-                    120 => L7Protocol::Dns,
-                    ...
-
-                    _ => L7Protocol::Unknown,
-                }
-            }
-        }
-
-        */
-
-        // 这个仅用于ebpf从l7_protocol_hint获取对应L7Protocol.
-        // ======================================================
-        // only use for ebpf get l7 protocol from l7_protocol_hint
-        impl From<u8> for L7Protocol {
-            fn from(v: u8) -> Self {
-                match v {
-                    $(
-                        $num=>L7Protocol::$proto,
-                    )+
-
-                    _ => L7Protocol::Unknown,
-                }
-            }
-        }
-
-    };
-}
-
-impl Default for L7Protocol {
-    fn default() -> Self {
-        L7Protocol::Unknown
-    }
-}
-
-l7_protocol!(
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq, FromPrimitive, num_enum::Default)]
+#[repr(u8)]
+pub enum L7Protocol {
+    #[num_enum(default)]
     Unknown = 0,
     Other = 1,
     Max = 255,
@@ -92,4 +36,4 @@ l7_protocol!(
     Mqtt = 101,
     Dns = 120,
     // add protocol below
-);
+}

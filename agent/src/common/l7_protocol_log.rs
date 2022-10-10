@@ -33,15 +33,15 @@ use crate::flow_generator::Result;
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.
- 其中,check_payload 用于MetaPacket判断应用层协议, parse_payload 用于解析具体协议.
- 更具体就是遍历ALL_PROTOCOL的协议,用check判断协议,再用parse解析整个payload, 实现的结构应该在parse的时候记录关键字段.
- 最后发送到server之前, 调用into() 转成通用结构L7ProtocolLogData.
+ 其中，check_payload 用于MetaPacket判断应用层协议，parse_payload 用于解析具体协议.
+ 更具体就是遍历ALL_PROTOCOL的协议，用check判断协议，再用parse解析整个payload，得到L7ProtocolInfo.
+ 最后发送到server之前，调用into() 转成通用结构L7ProtocolSendLog.
 
  all protocol need implement L7ProtocolLogInterface trait.
  check_payload use to determine what protocol the payload is.
  parse_payload use to parse whole payload.
  more specifically, traversal all protocol from get_all_protocol,check the payload and then parse it,
- convert to L7ProtocolLogData struct and send to server.
+ get the L7ProtocolInfo enum, finally convert to L7ProtocolSendLog struct and send to server.
 
 
  ebpf处理过程为:
@@ -127,22 +127,20 @@ about parse_payload()
 about bitmap:
     u128, every bit repersent the protocol shoud check or not(1 indicate check, 0 for ignore), the number of protocol as follow:
 
-    const L7_PROTOCOL_UNKNOWN: u8 = 0;
-    const L7_PROTOCOL_HTTP1: u8 = 20;
-    const L7_PROTOCOL_HTTP2: u8 = 21;
-    const L7_PROTOCOL_HTTP1_TLS: u8 = 22;
-    const L7_PROTOCOL_HTTP2_TLS: u8 = 23;
-    const L7_PROTOCOL_DUBBO: u8 = 40;
-    const L7_PROTOCOL_MYSQL: u8 = 60;
-    const L7_PROTOCOL_REDIS: u8 = 80;
-    const L7_PROTOCOL_KAFKA: u8 = 100;
-    const L7_PROTOCOL_MQTT: u8 = 101;
-    const L7_PROTOCOL_DNS: u8 = 120;
-
-
+    Http1 = 20,
+    Http2 = 21,
+    Http1TLS = 22,
+    Http2TLS = 23,
+    Dubbo = 40,
+    Mysql = 60,
+    Postgresql = 61,
+    Redis = 80,
+    Kafka = 100,
+    Mqtt = 101,
+    Dns = 120,
 
  TODO: cbpf 处理过程
- hint: check 和 parse 是同一个结构, check可以把解析结果保存下来,避免重复解析.
+ hint: check 和 parse 是同一个结构，check可以把解析结果保存下来,避免重复解析.
        check and parse use same struct. so it can save information and prevent duplicate parse.
 
 */
@@ -159,7 +157,7 @@ macro_rules! parse_common {
 }
 
 macro_rules! all_protocol {
-    ($( $l7_proto:ident : $parser:ident : $log:ident : $new_func:ident),+$(,)*) => {
+    ($( $l7_proto:ident , $parser:ident , $log:ident::$new_func:ident);+$(;)?) => {
         #[enum_dispatch]
         pub enum L7ProtocolParser {
             HttpParser(HttpLog),
@@ -235,25 +233,26 @@ pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
 // =========================================================
 // the inner implement protocol source code in src/flow_generator/protocol_logs/**
 
-// l7Protocol : enumName : ParserImplement : newFuncName
+// l7Protocol , enumName , ParserImplement::newFuncName
 all_protocol!(
-    Dns: DnsParser: DnsLog: default,
-    Mysql: MysqlParser: MysqlLog: default,
-    Kafka: KafkaParser: KafkaLog: default,
-    Redis: RedisParser: RedisLog: default,
-    Postgresql: PostgresParser: PostgresqlLog: default,
-    Dubbo: DubboParser: DubboLog: default,
-    Mqtt: MqttParser: MqttLog: default,
+    // http have two version but one parser, can not place in macro param.
+    Dns,DnsParser,DnsLog::default;
+    Mysql,MysqlParser,MysqlLog::default;
+    Kafka,KafkaParser,KafkaLog::default;
+    Redis,RedisParser,RedisLog::default;
+    Postgresql,PostgresParser,PostgresqlLog::default;
+    Dubbo,DubboParser,DubboLog::default;
+    Mqtt,MqttParser,MqttLog::default;
     // add protocol below
 );
 
 impl L7ProtocolParser {
     pub fn is_skip_parse(&self, bitmap: u128) -> bool {
-        return bitmap & (1 << (self.protocol().0 as u8)) == 0;
+        bitmap & (1 << (self.protocol() as u8)) == 0
     }
 
     pub fn set_bitmap_skip_parse(&self, bitmap: &mut u128) {
-        *bitmap &= !(1 << (self.protocol().0 as u8));
+        *bitmap &= !(1 << (self.protocol() as u8));
     }
 }
 
@@ -267,7 +266,7 @@ pub trait L7ProtocolParserInterface {
     // ===========================================================================================
     // return protocol number and protocol string. because of bitmap use u128, so the max protocol number can not exceed 128
     // crates/public/src/l7_protocol.rs, pub const L7_PROTOCOL_xxx is the implemented protocol.
-    fn protocol(&self) -> (L7Protocol, &str);
+    fn protocol(&self) -> L7Protocol;
     // 仅http和dubbo协议会有log_parser_config，其他协议可以忽略。
     // ================================================================
     // only http and dubbo use config. other protocol should do nothing.
@@ -343,7 +342,8 @@ impl From<&MetaPacket<'_>> for ParseParam {
                 is_resp_end: packet.is_response_end,
             });
         }
-        return param;
+
+        param
     }
 }
 
@@ -352,13 +352,14 @@ pub fn get_bitmap(protocol: IpProtocol) -> u128 {
     for i in get_all_protocol().iter() {
         match protocol {
             IpProtocol::Tcp if i.parsable_on_tcp() => {
-                bitmap |= 1 << (i.protocol().0 as u8);
+                bitmap |= 1 << (i.protocol() as u8);
             }
             IpProtocol::Udp if i.parsable_on_udp() => {
-                bitmap |= 1 << (i.protocol().0 as u8);
+                bitmap |= 1 << (i.protocol() as u8);
             }
             _ => {}
         }
     }
-    return bitmap;
+
+    bitmap
 }

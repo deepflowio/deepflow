@@ -68,11 +68,12 @@ pub struct MysqlInfo {
 
 impl L7ProtocolInfoInterface for MysqlInfo {
     fn session_id(&self) -> Option<u32> {
-        return None;
+        None
     }
 
     fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
         log_info_merge!(self, MysqlInfo, other);
+        Ok(())
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
@@ -84,15 +85,11 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     }
 
     fn is_tls(&self) -> bool {
-        return self.is_tls;
+        self.is_tls
     }
 
     fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.into();
+        false
     }
 }
 
@@ -185,21 +182,21 @@ impl L7ProtocolParserInterface for MysqlLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        return Self::mysql_check_protocol(payload, param);
+        Self::mysql_check_protocol(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
-        return Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())]);
+        Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())])
     }
 
     fn parsable_on_udp(&self) -> bool {
-        return false;
+        false
     }
 
-    fn protocol(&self) -> (L7Protocol, &str) {
-        return (L7Protocol::Mysql, "MYSQL");
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Mysql
     }
 
     fn reset(&mut self) {
@@ -366,7 +363,7 @@ impl MysqlLog {
             }
             _ => {}
         }
-        return false;
+        false
     }
 
     fn parse(
@@ -400,7 +397,7 @@ impl MysqlLog {
         };
         self.info.msg_type = msg_type;
 
-        return Ok(());
+        Ok(())
     }
 }
 

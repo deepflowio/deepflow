@@ -123,7 +123,7 @@ impl AppTable {
                 return Some(v.l7_protocol);
             }
         }
-        return None;
+        None
     }
 
     fn get_ipv6_protocol(
@@ -151,7 +151,7 @@ impl AppTable {
                 return Some(v.l7_protocol);
             }
         }
-        return None;
+        None
     }
 
     pub fn get_protocol(&mut self, packet: &MetaPacket) -> Option<L7Protocol> {

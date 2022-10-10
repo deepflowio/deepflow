@@ -77,7 +77,7 @@ pub struct MqttInfo {
 
 impl L7ProtocolInfoInterface for MqttInfo {
     fn session_id(&self) -> Option<u32> {
-        return None;
+        None
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
@@ -90,27 +90,23 @@ impl L7ProtocolInfoInterface for MqttInfo {
             }
             self.merge(mqtt);
         }
-        return Ok(());
+        Ok(())
     }
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
-        return Some(AppProtoHead {
+        Some(AppProtoHead {
             proto: L7Protocol::Mqtt,
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
-        });
+        })
     }
 
     fn is_tls(&self) -> bool {
-        return false;
+        false
     }
 
     fn skip_send(&self) -> bool {
-        return false;
-    }
-
-    fn into_l7_protocol_send_log(self) -> L7ProtocolSendLog {
-        return self.into();
+        false
     }
 }
 
@@ -228,7 +224,7 @@ impl L7ProtocolParserInterface for MqttLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
-        return Self::mqtt_check_protocol(payload, param);
+        Self::mqtt_check_protocol(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
@@ -241,15 +237,15 @@ impl L7ProtocolParserInterface for MqttLog {
             info.end_time = self.end_time;
             v.push(L7ProtocolInfo::MqttInfo(info));
         }
-        return Ok(v);
+        Ok(v)
     }
 
-    fn protocol(&self) -> (L7Protocol, &str) {
-        return (L7Protocol::Mqtt, "MQTT");
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Mqtt
     }
 
     fn parsable_on_udp(&self) -> bool {
-        return false;
+        false
     }
 
     fn reset(&mut self) {
@@ -437,10 +433,11 @@ impl MqttLog {
         }
         self.status = L7ResponseStatus::Ok;
         self.info.clear();
-        return self.parse_mqtt_info(payload).map_err(|e| {
+
+        self.parse_mqtt_info(payload).map_err(|e| {
             self.status = L7ResponseStatus::Error;
             e
-        });
+        })
     }
 }
 

@@ -19,5 +19,5 @@ mod postgresql;
 mod redis;
 
 pub use mysql::{MysqlHeader, MysqlInfo, MysqlLog};
-pub use postgresql::{PostgresInfo, PostgresqlLog};
+pub use postgresql::{PostgreInfo, PostgresqlLog};
 pub use redis::{decode, RedisInfo, RedisLog};

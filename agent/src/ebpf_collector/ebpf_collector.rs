@@ -446,7 +446,7 @@ impl FlowItem {
             }
             protocol_log.set_parse_config(log_parser_config);
             if protocol_log.check_payload(&packet.raw_from_ebpf.as_ref(), &param) {
-                self.l7_protocol = protocol_log.protocol().0;
+                self.l7_protocol = protocol_log.protocol();
                 self.server_port = packet.lookup_key.dst_port;
                 self.parser = Some(protocol_log);
                 return self._parse(packet, local_epc, app_table);
