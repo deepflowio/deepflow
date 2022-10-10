@@ -101,9 +101,9 @@ func PutGroup() {
 func (t *Trisolaris) Start() {
 	t.metaData.InitData() // 需要先初始化
 	go t.metaData.TimedRefreshMetaData()
+	go t.kubernetesInfo.TimedRefreshClusterID()
 	go t.vTapInfo.TimedRefreshVTapCache()
 	go t.nodeInfo.TimedRefreshNodeCache()
-	go t.kubernetesInfo.TimedRefreshClusterID()
 	go t.refreshOP.TimedRefreshIPs()
 }
 
