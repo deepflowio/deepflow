@@ -48,7 +48,6 @@ use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::{Config, RuntimeConfig};
 use crate::exception::ExceptionHandler;
-use crate::policy::PolicySetter;
 use crate::proto::common::TridentType;
 use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
@@ -416,7 +415,6 @@ impl Synchronizer {
         controller_ip: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
-        policy_setter: PolicySetter,
         exception_handler: ExceptionHandler,
     ) -> Synchronizer {
         Synchronizer {
@@ -443,7 +441,7 @@ impl Synchronizer {
                 .build()
                 .unwrap(),
             threads: Default::default(),
-            flow_acl_listener: Arc::new(sync::Mutex::new(vec![Box::new(policy_setter)])),
+            flow_acl_listener: Arc::new(sync::Mutex::new(vec![])),
             exception_handler,
 
             max_memory: Default::default(),
@@ -462,7 +460,7 @@ impl Synchronizer {
         self.status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
     }
 
-    pub fn add_flow_acl_listener(&mut self, module: Box<dyn FlowAclListener>) {
+    pub fn add_flow_acl_listener(&self, module: Box<dyn FlowAclListener>) {
         let mut listeners = self.flow_acl_listener.lock().unwrap();
         for item in listeners.iter() {
             if item.id() == module.id() {

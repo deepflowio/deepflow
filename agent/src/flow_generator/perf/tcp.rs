@@ -648,8 +648,8 @@ impl TcpPerf {
         }
 
         if p.is_ack() {
-            // It is impossible to distinguish retransmission between ACK and ACK 
-            // keepalive. To avoid misunderstanding, retransmission of pure ACK 
+            // It is impossible to distinguish retransmission between ACK and ACK
+            // keepalive. To avoid misunderstanding, retransmission of pure ACK
             // packets is not calculated.
             // ==================================================================
             // 无法区分 ACK 重传和 ACK Keepalive，为了避免误解不计算纯 ACK 包的重传。

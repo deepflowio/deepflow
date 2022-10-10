@@ -70,7 +70,7 @@ use crate::{
     flow_generator::{AppProtoLogsParser, PacketSequenceParser},
     monitor::Monitor,
     platform::LibvirtXmlExtractor,
-    policy::{Policy, PolicyGetter, PolicySetter},
+    policy::Policy,
     proto::trident::TapMode,
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
@@ -287,16 +287,6 @@ impl Trident {
             warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
 
-        let default_runtime_config = RuntimeConfig::default();
-        // 目前仅支持local-mod + ebpf-collector，ebpf-collector不适用fast, 所以队列数为1
-        let (policy_setter, policy_getter) = Policy::new(
-            1,
-            default_runtime_config.yaml_config.first_path_level as usize,
-            default_runtime_config.yaml_config.fast_path_map_size,
-            false,
-            FeatureFlags::from(&default_runtime_config.yaml_config.feature_flags),
-        );
-
         let mut config_handler = ConfigHandler::new(
             config,
             ctrl_ip,
@@ -324,7 +314,6 @@ impl Trident {
             config_handler.static_config.controller_ips[0].clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
-            policy_setter,
             exception_handler.clone(),
         ));
         stats_collector.register_countable(
@@ -409,8 +398,6 @@ impl Trident {
                         stats_collector.clone(),
                         &session,
                         &synchronizer,
-                        policy_setter,
-                        policy_getter,
                         exception_handler.clone(),
                         remote_log_config.clone(),
                         vm_mac_addrs,
@@ -707,8 +694,6 @@ impl Components {
         stats_collector: Arc<stats::Collector>,
         session: &Arc<Session>,
         synchronizer: &Arc<Synchronizer>,
-        policy_setter: PolicySetter,
-        policy_getter: PolicyGetter,
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
         vm_mac_addrs: Vec<MacAddr>,
@@ -742,6 +727,18 @@ impl Components {
             }
         }
 
+        // Currently, only loca-mode + ebpf collector is supported, and ebpf collector is not
+        // applicable to fastpath, so the number of queues is 1
+        // =================================================================================
+        // 目前仅支持local-mode + ebpf-collector，ebpf-collector不适用fastpath, 所以队列数为1
+        let (policy_setter, policy_getter) = Policy::new(
+            1,
+            yaml_config.first_path_level as usize,
+            yaml_config.fast_path_map_size,
+            false,
+            FeatureFlags::from(&yaml_config.feature_flags),
+        );
+        synchronizer.add_flow_acl_listener(Box::new(policy_setter));
         // TODO: collector enabled
         // TODO: packet handler builders
 

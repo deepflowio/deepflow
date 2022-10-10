@@ -776,7 +776,13 @@ impl RuntimeConfig {
 
 impl Default for RuntimeConfig {
     fn default() -> Self {
-        trident::Config::default().try_into().unwrap()
+        let mut config = trident::Config::default();
+        // It is only used for initialization, and the real IP will
+        // be obtained after communication with the controller
+        // ============================================================
+        // 仅用于初始化，和控制器通信后会获取真实的IP
+        config.analyzer_ip = Some("127.0.0.1".to_string());
+        config.try_into().unwrap()
     }
 }
 
