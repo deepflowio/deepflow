@@ -511,7 +511,6 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 			}
 		}
 		configInfo.TridentType = &tridentType
-		configInfo.AnalyzerIp = proto.String("127.0.0.1")
 		configInfo.Enabled = proto.Bool(true)
 		value := gVTapInfo.GetKubernetesClusterID(in.GetKubernetesClusterId(), vtapCacheKey)
 		if value == vtapCacheKey {
@@ -536,7 +535,6 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 			}
 		}
 		configInfo.TridentType = &tridentType
-		configInfo.AnalyzerIp = proto.String("127.0.0.1")
 		configInfo.PlatformEnabled = proto.Bool(true)
 
 		return &api.SyncResponse{
