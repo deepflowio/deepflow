@@ -498,9 +498,10 @@ func GetVTapGroupDetailedConfig(lcuuid string) (*model.DetailedConfig, error) {
 	if ret.Error != nil {
 		ret = db.Where("vtap_group_lcuuid = ?", lcuuid).First(realConfig)
 		if ret.Error != nil {
-			return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
+			log.Errorf("vtap group configuration(%s) not found", lcuuid)
 		}
 	}
+	realConfig = common.DefaultVTapGroupConfig
 	var tapTypes []*mysql.TapType
 	var domains []*mysql.Domain
 	idToTapTypeName := make(map[int]string)

@@ -32,9 +32,10 @@ import (
 var log = logging.MustGetLogger("trisolaris/refresh")
 
 type RefreshOP struct {
-	db         *gorm.DB
-	nodeIP     string
-	refreshIPs []string
+	db               *gorm.DB
+	nodeIP           string
+	localRefreshIPs  []string
+	remoteRefreshIPs []string
 }
 
 var refreshOP *RefreshOP = nil
@@ -57,27 +58,40 @@ func RefreshCache(dataTypes []string) {
 }
 
 func (r *RefreshOP) refreshCache(dataTypes []string) {
-	controllerIPs := r.refreshIPs
-	if len(dataTypes) == 0 || len(controllerIPs) == 0 {
+	localControllerIPs := r.localRefreshIPs
+	remoteControllerIPs := r.remoteRefreshIPs
+	if len(dataTypes) == 0 || (len(localControllerIPs) == 0 && len(remoteControllerIPs) == 0) {
 		return
 	}
-	log.Infof("refresh cache for trisolaris(%v)", controllerIPs)
+	log.Infof("refresh cache for trisolaris(%v %v)", localControllerIPs, remoteControllerIPs)
 	params := url.Values{}
 	for _, dataType := range dataTypes {
 		params.Add("type", dataType)
 	}
-	for _, controllerIP := range controllerIPs {
+	paramsEncode := params.Encode()
+	for _, controllerIP := range localControllerIPs {
 		err := common.IsTCPActive(controllerIP, common.GConfig.HTTPPort)
 		if err != nil {
 			log.Errorf("%s:%d unreachable, err(%s)", controllerIP, common.GConfig.HTTPPort, err)
 			continue
 		}
-		trisolaris_url := fmt.Sprintf(urlFormat, controllerIP, common.GConfig.HTTPPort) + params.Encode()
+		trisolaris_url := fmt.Sprintf(urlFormat, controllerIP, common.GConfig.HTTPPort) + paramsEncode
 		resp, err := common.CURLPerform("PUT", trisolaris_url, nil)
 		if err != nil {
 			log.Errorf("request trisolaris failed: %s, URL: %s", resp, trisolaris_url)
 		}
-
+	}
+	for _, controllerIP := range remoteControllerIPs {
+		err := common.IsTCPActive(controllerIP, common.GConfig.HTTPNodePort)
+		if err != nil {
+			log.Errorf("%s:%d unreachable, err(%s)", controllerIP, common.GConfig.HTTPNodePort, err)
+			continue
+		}
+		trisolaris_url := fmt.Sprintf(urlFormat, controllerIP, common.GConfig.HTTPNodePort) + paramsEncode
+		resp, err := common.CURLPerform("PUT", trisolaris_url, nil)
+		if err != nil {
+			log.Errorf("request trisolaris failed: %s, URL: %s", resp, trisolaris_url)
+		}
 	}
 }
 
@@ -101,16 +115,18 @@ func (r *RefreshOP) generateRefreshIPs() {
 		controllerIPToRegion[azCon.ControllerIP] = azCon.Region
 	}
 
-	refreshIPs := make([]string, 0, len(dbControllers))
+	localRefreshIPs := make([]string, 0, len(dbControllers))
+	remoteRefreshIPs := make([]string, 0, len(dbControllers))
 	for _, controller := range dbControllers {
 		region, ok := controllerIPToRegion[controller.IP]
 		if ok && localRegion == region {
-			refreshIPs = append(refreshIPs, controller.PodIP)
+			localRefreshIPs = append(localRefreshIPs, controller.PodIP)
 		} else {
-			refreshIPs = append(refreshIPs, controller.IP)
+			remoteRefreshIPs = append(remoteRefreshIPs, controller.IP)
 		}
 	}
-	r.refreshIPs = refreshIPs
+	r.localRefreshIPs = localRefreshIPs
+	r.remoteRefreshIPs = remoteRefreshIPs
 }
 
 func (r *RefreshOP) TimedRefreshIPs() {
