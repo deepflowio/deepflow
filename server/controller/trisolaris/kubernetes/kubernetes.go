@@ -66,6 +66,7 @@ func (k *KubernetesInfo) refresh() {
 	}
 	k.mutex.Unlock()
 	log.Infof("refresh cache cluster_id completed")
+	log.Debugf("cluster_id domain map: %v", k.clusterIDToDomain)
 	return
 }
 
@@ -73,6 +74,7 @@ func (k *KubernetesInfo) CheckDomainByClusterID(clusterID string) bool {
 	k.mutex.Lock()
 	_, ok := k.clusterIDToDomain[clusterID]
 	k.mutex.Unlock()
+	log.Debugf("cluster_id domain map: %v", k.clusterIDToDomain)
 	return ok
 }
 
