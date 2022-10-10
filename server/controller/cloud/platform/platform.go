@@ -23,6 +23,7 @@ import (
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowys/deepflow/server/controller/cloud/aliyun"
+	"github.com/deepflowys/deepflow/server/controller/cloud/aws"
 	"github.com/deepflowys/deepflow/server/controller/cloud/baidubce"
 	"github.com/deepflowys/deepflow/server/controller/cloud/config"
 	"github.com/deepflowys/deepflow/server/controller/cloud/genesis"
@@ -50,6 +51,8 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) 
 	switch domain.Type {
 	case common.ALIYUN:
 		platform, err = aliyun.NewAliyun(domain)
+	case common.AWS:
+		platform, err = aws.NewAws(domain)
 	case common.AGENT_SYNC:
 		platform, err = genesis.NewGenesis(domain, cfg)
 	case common.QINGCLOUD:

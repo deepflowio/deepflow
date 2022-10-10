@@ -33,6 +33,7 @@ import (
 
 var domainTypeIntToStr = map[int]string{
 	common.TENCENT:    common.TENCENT_EN,
+	common.AWS:        common.AWS_EN,
 	common.ALIYUN:     common.ALIYUN_EN,
 	common.KUBERNETES: common.KUBERNETES_EN,
 	common.QINGCLOUD:  common.QINGCLOUD_EN,
@@ -42,6 +43,7 @@ var domainTypeIntToStr = map[int]string{
 
 var domainTypeStrToInt = map[string]int{
 	common.TENCENT_EN:    common.TENCENT,
+	common.AWS_EN:        common.AWS,
 	common.ALIYUN_EN:     common.ALIYUN,
 	common.KUBERNETES_EN: common.KUBERNETES,
 	common.QINGCLOUD_EN:  common.QINGCLOUD,
@@ -105,7 +107,7 @@ func RegisterDomainCommand() *cobra.Command {
 	exampleCmd := &cobra.Command{
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
-		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.ALIYUN_EN, common.TENCENT_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.AGENT_SYNC_EN}, ",")),
+		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.AWS_EN, common.ALIYUN_EN, common.TENCENT_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.AGENT_SYNC_EN}, ",")),
 		Example: "deepflow-ctl domain example agent_sync",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
@@ -270,6 +272,8 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		fmt.Printf(string(example.YamlDomainKubernetes))
 	case common.ALIYUN_EN:
 		fmt.Printf(string(example.YamlDomainAliYun))
+	case common.AWS_EN:
+		fmt.Printf(string(example.YamlDomainAws))
 	case common.TENCENT_EN:
 		fmt.Printf(string(example.YamlDomainTencent))
 	case common.QINGCLOUD_EN:

@@ -16,19 +16,19 @@
 
 package example
 
-var YamlDomainTencent = []byte(`
+var YamlDomainAws = []byte(`
 # 名称
-name: tencent
+name: aws
 # 云平台类型
-type: tencent
+type: aws
 config:
   # 所属区域标识 [按需指定]
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
   # 资源同步控制器 [按需指定,不指定时随机分配]
-  #controller_ip: 127.0.0.1
-  # API 密钥 ID [必需参数], 在腾讯云页面 访问管理-云API密钥-API密钥管理 页面上的SecretId
+  # controller_ip: 127.0.0.1
+  # API 密钥 ID [必需参数], 在AWS控制台页面-我的安全凭证-API的访问密钥 获取
   secret_id: xxxxxxxx
-  # API 密钥 KEY [必需参数], 在腾讯云页面 访问管理-云API密钥-API密钥管理 页面上的SecretKey
+  # API 密钥 KEY [必需参数], 在AWS控制台页面-我的安全凭证-API的访问密钥KEY 获取
   secret_key: xxxxxxx
   # 区域白名单, 多个区域名称之间以英文逗号分隔 [按需指定]
   include_regions:

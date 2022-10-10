@@ -24,6 +24,7 @@ const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
 
 	TENCENT_EN    = "tencent"
+	AWS_EN        = "aws"
 	ALIYUN_EN     = "aliyun"
 	KUBERNETES_EN = "kubernetes"
 	QINGCLOUD_EN  = "qingcloud"
@@ -31,6 +32,7 @@ const (
 	BAIDU_BCE_EN  = "baidu_bce"
 
 	TENCENT    = 4
+	AWS        = 6
 	ALIYUN     = 9
 	KUBERNETES = 11
 	QINGCLOUD  = 14
