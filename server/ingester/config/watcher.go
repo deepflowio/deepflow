@@ -19,6 +19,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -31,7 +32,8 @@ import (
 )
 
 const (
-	TIMEOUT = 60
+	TIMEOUT        = 60
+	NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 )
 
 type Endpoint struct {
@@ -62,14 +64,22 @@ func NewWatcher(myName, serverPodKey, clickhouseEndpointKey string) (*Watcher, e
 		return nil, errMsg
 	}
 
-	podWatcher, err := libs.StartCoreV1PodWatcher(context.Background(), libs.NewKubernetesWatchClient(kubernetesClient), "deepflow")
+	namespace := corev1.NamespaceAll
+	content, err := os.ReadFile(NAMESPACE_FILE)
+	if err != nil {
+		log.Warning("read my namespace from '%s' failed, err: %s", NAMESPACE_FILE, err)
+	} else {
+		namespace = string(content)
+	}
+
+	podWatcher, err := libs.StartCoreV1PodWatcher(context.Background(), libs.NewKubernetesWatchClient(kubernetesClient), namespace)
 	if err != nil {
 		errMsg := fmt.Errorf("create pod watcher failed: %v", err)
 		log.Warning(errMsg)
 		return nil, errMsg
 	}
 
-	endpointsWatcher, err := libs.StartCoreV1EndpointsWatcher(context.Background(), libs.NewKubernetesWatchClient(kubernetesClient), "deepflow")
+	endpointsWatcher, err := libs.StartCoreV1EndpointsWatcher(context.Background(), libs.NewKubernetesWatchClient(kubernetesClient), namespace)
 	if err != nil {
 		errMsg := fmt.Errorf("create endpoints watcher failed: %v", err)
 		log.Warning(errMsg)
@@ -92,10 +102,12 @@ func (w *Watcher) Run() {
 	for range ticker.C {
 		endpoint, err := w.GetMyClickhouseEndpoint()
 		if err != nil {
-			panic(err)
+			log.Error(err)
+			continue
 		}
 		if endpoint != w.myEndpoint {
-			panic(fmt.Sprintf("endpoint change from %v to %v", w.myEndpoint, endpoint))
+			log.Warningf("endpoint change from %v to %v", w.myEndpoint, endpoint)
+			sleepAndExit()
 		}
 	}
 }
