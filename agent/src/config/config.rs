@@ -702,13 +702,6 @@ impl RuntimeConfig {
             )));
         }
 
-        if self.analyzer_ip.parse::<IpAddr>().is_err() || self.analyzer_ip == "0.0.0.0" {
-            return Err(ConfigError::RuntimeConfigInvalid(format!(
-                "analyzer-ip({}) invalid",
-                self.analyzer_ip
-            )));
-        }
-
         if self.analyzer_port == 0 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "analyzer-port({}) invalid",
@@ -776,13 +769,7 @@ impl RuntimeConfig {
 
 impl Default for RuntimeConfig {
     fn default() -> Self {
-        let mut config = trident::Config::default();
-        // It is only used for initialization, and the real IP will
-        // be obtained after communication with the controller
-        // ============================================================
-        // 仅用于初始化，和控制器通信后会获取真实的IP
-        config.analyzer_ip = Some("127.0.0.1".to_string());
-        config.try_into().unwrap()
+        trident::Config::default().try_into().unwrap()
     }
 }
 

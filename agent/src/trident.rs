@@ -295,16 +295,6 @@ impl Trident {
             remote_log_config.clone(),
         );
 
-        let mut stats_sender = UniformSenderThread::new(
-            stats::DFSTATS_SENDER_ID,
-            "stats",
-            stats_collector.get_receiver(),
-            config_handler.sender(),
-            stats_collector.clone(),
-            exception_handler.clone(),
-        );
-        stats_sender.start();
-
         let synchronizer = Arc::new(Synchronizer::new(
             session.clone(),
             state.clone(),
@@ -604,6 +594,7 @@ pub struct Components {
     pub l4_flow_uniform_sender: UniformSenderThread,
     pub metrics_uniform_sender: UniformSenderThread,
     pub l7_flow_uniform_sender: UniformSenderThread,
+    pub stats_sender: UniformSenderThread,
     #[cfg(target_os = "linux")]
     pub platform_synchronizer: PlatformSynchronizer,
     #[cfg(target_os = "linux")]
@@ -704,6 +695,16 @@ impl Components {
         let ctrl_ip = config_handler.ctrl_ip;
         let ctrl_mac = config_handler.ctrl_mac;
         let max_memory = config_handler.candidate_config.environment.max_memory;
+
+        let mut stats_sender = UniformSenderThread::new(
+            stats::DFSTATS_SENDER_ID,
+            "stats",
+            stats_collector.get_receiver(),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
+        stats_sender.start();
 
         trident_process_check();
         controller_ip_check(&static_config.controller_ips);
@@ -1254,6 +1255,7 @@ impl Components {
             l4_flow_uniform_sender,
             metrics_uniform_sender,
             l7_flow_uniform_sender,
+            stats_sender,
             #[cfg(target_os = "linux")]
             platform_synchronizer,
             #[cfg(target_os = "linux")]
