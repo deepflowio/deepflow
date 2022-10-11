@@ -17,22 +17,29 @@
 package tagrecorder
 
 import (
+	"context"
 	"time"
 
 	logging "github.com/op/go-logging"
 
-	// "github.com/deepflowys/deepflow/server/controller/tagrecorder/config"
 	"github.com/deepflowys/deepflow/server/controller/config"
 )
 
 var log = logging.MustGetLogger("tagrecorder")
 
 type TagRecorder struct {
-	cfg config.ControllerConfig
+	tCtx    context.Context
+	tCancel context.CancelFunc
+	cfg     config.ControllerConfig
 }
 
-func NewTagRecorder(cfg config.ControllerConfig) *TagRecorder {
-	return &TagRecorder{cfg: cfg}
+func NewTagRecorder(cfg config.ControllerConfig, ctx context.Context) *TagRecorder {
+	tCtx, tCancel := context.WithCancel(ctx)
+	return &TagRecorder{
+		tCtx:    tCtx,
+		tCancel: tCancel,
+		cfg:     cfg,
+	}
 }
 
 // 每次执行需要做的事情
@@ -58,6 +65,13 @@ func (c *TagRecorder) Start() {
 			c.run()
 		}
 	}()
+}
+
+func (t *TagRecorder) Stop() {
+	if t.tCancel != nil {
+		t.tCancel()
+	}
+	log.Info("tagrecorder stopped")
 }
 
 func (c *TagRecorder) refresh(domainLcuuidToIconID map[string]int, resourceTypeToIconID map[IconKey]int) {

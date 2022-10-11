@@ -146,37 +146,43 @@ func Start(ctx context.Context, configPath string) {
 	go t.Start()
 
 	router.SetInitStageForHealthChecker("TagRecorder init")
-	tr := tagrecorder.NewTagRecorder(*cfg)
+	tr := tagrecorder.NewTagRecorder(*cfg, ctx)
 	go tr.StartChDictionaryUpdate()
 
-	controllerCheck := monitor.NewControllerCheck(cfg)
-	analyzerCheck := monitor.NewAnalyzerCheck(cfg)
-	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg)
+	controllerCheck := monitor.NewControllerCheck(cfg, ctx)
+	analyzerCheck := monitor.NewAnalyzerCheck(cfg, ctx)
+	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg, ctx)
 	go func() {
 		// 定时检查当前是否为master controller
 		// 仅master controller才启动以下goroutine
 		// - tagrecorder
 		// - 控制器和数据节点检查
 		// - license分配和检查
-		// 除非进程重启，才会出现master controller切换的情况，所以暂时无需进行goroutine的停止
+		// - resource id manager
+		// - clean deleted resources
 
 		// 从区域控制器无需判断是否为master controller
 		if cfg.TrisolarisCfg.NodeType != "master" {
 			return
 		}
-		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg)
-		masterController := ""
+
+		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
+
 		// TODO start as soon as possible
+		masterController := ""
+		thisIsMasterController := false
 		for range time.Tick(time.Minute) {
-			isMasterController, curMasterController, err := election.IsMasterControllerAndReturnIP()
+			newThisIsMasterController, newMasterController, err := election.IsMasterControllerAndReturnIP()
 			if err != nil {
 				continue
 			}
-			if masterController != curMasterController {
-				log.Infof("current master controller is %s", curMasterController)
-				masterController = curMasterController
-				if isMasterController {
+			if masterController != newMasterController {
+				if newThisIsMasterController {
+					thisIsMasterController = true
+					log.Infof("I am the master controller now, previous master controller is %s", masterController)
+
 					// 启动资源ID管理器
+					// TODO: use ctx start @zhengya
 					startResourceIDManager(cfg)
 
 					// 启动tagrecorder
@@ -195,6 +201,7 @@ func Start(ctx context.Context, configPath string) {
 					vtapLicenseAllocation.Start()
 
 					// 启动软删除数据清理
+					// TODO: use ctx start @zhengya
 					recorder.TimedCleanDeletedResources(
 						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceCleanInterval),
 						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceRetentionTime),
@@ -204,8 +211,32 @@ func Start(ctx context.Context, configPath string) {
 						// 自动切换domain控制器
 						service.TimedCheckDomain()
 					}
+				} else if thisIsMasterController {
+					thisIsMasterController = false
+					log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
+
+					// stop tagrecorder
+					tr.Stop()
+
+					// stop controller check
+					controllerCheck.Stop()
+
+					// stop analyzer check
+					analyzerCheck.Stop()
+
+					// stop vtap check
+					vtapCheck.Stop()
+
+					// stop vtap license allocation and check
+					vtapLicenseAllocation.Stop()
+				} else {
+					log.Infof(
+						"current master controller is %s, previous master controller is %s",
+						newMasterController, masterController,
+					)
 				}
 			}
+			masterController = newMasterController
 		}
 	}()
 
