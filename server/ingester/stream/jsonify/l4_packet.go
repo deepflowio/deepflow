@@ -99,7 +99,7 @@ func DecodePacketSequence(decoder *codec.SimpleDecoder, vtapID uint16) *L4Packet
 	blockSize := decoder.ReadU32()
 	l4Packet.FlowID = decoder.ReadU64()
 	endTimePacketCount := decoder.ReadU64()
-	l4Packet.EndTime = int64(endTimePacketCount << 8)
+	l4Packet.EndTime = int64(endTimePacketCount << 8 >> 8)
 	l4Packet.PacketCount = uint32(endTimePacketCount >> 56)
 	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-16)...)
 
