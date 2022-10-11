@@ -168,7 +168,7 @@ func Start(ctx context.Context, configPath string) {
 		masterController := ""
 		// TODO start as soon as possible
 		for range time.Tick(time.Minute) {
-			isMasterController, curMasterController, err := election.IsMasterControllerAndReturnName()
+			isMasterController, curMasterController, err := election.IsMasterControllerAndReturnIP()
 			if err != nil {
 				continue
 			}
