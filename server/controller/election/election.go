@@ -142,7 +142,7 @@ func Start(ctx context.Context, cfg *config.ControllerConfig) {
 			OnStoppedLeading: func() {
 				// we can do cleanup here
 				log.Infof("leader lost: %s", id)
-				os.Exit(0)
+				//os.Exit(0)
 			},
 			OnNewLeader: func(identity string) {
 				leaderData.SetLeader(identity)
