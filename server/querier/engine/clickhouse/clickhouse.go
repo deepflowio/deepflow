@@ -230,7 +230,7 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 		switch from := from.(type) {
 		case *sqlparser.AliasedTableExpr:
 			// 解析Table类型
-			table := sqlparser.String(from)
+			table := strings.Trim(sqlparser.String(from), "`")
 			e.Table = table
 			// ext_metrics只有metrics表，使用virtual_table_name做过滤区分
 			if e.DB == "ext_metrics" {

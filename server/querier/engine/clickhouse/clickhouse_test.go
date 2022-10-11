@@ -149,7 +149,7 @@ var (
 		db:     "ext_metrics",
 	}, {
 		input:  "select Sum(`metrics.pending`) from `deepflow_server.queue`",
-		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) FROM deepflow_system.`deepflow_server.queue`",
+		output: "SELECT SUM(if(indexOf(metrics_float_names, 'pending')=0,null,metrics_float_values[indexOf(metrics_float_names, 'pending')])) FROM deepflow_system.deepflow_server.queue",
 		db:     "deepflow_system",
 	}, {
 		input:  "select labels_0 from l7_flow_log",
