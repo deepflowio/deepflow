@@ -17,6 +17,7 @@
 package monitor
 
 import (
+	"context"
 	"sort"
 	"time"
 
@@ -30,6 +31,8 @@ import (
 )
 
 type ControllerCheck struct {
+	cCtx                    context.Context
+	cCancel                 context.CancelFunc
 	cfg                     mconfig.MonitorConfig
 	healthCheckPort         int
 	healthCheckNodePort     int
@@ -38,8 +41,11 @@ type ControllerCheck struct {
 	exceptionControllerDict map[string]*dfHostCheck
 }
 
-func NewControllerCheck(cfg *config.ControllerConfig) *ControllerCheck {
+func NewControllerCheck(cfg *config.ControllerConfig, ctx context.Context) *ControllerCheck {
+	cCtx, cCancel := context.WithCancel(ctx)
 	return &ControllerCheck{
+		cCtx:                    cCtx,
+		cCancel:                 cCancel,
 		cfg:                     cfg.MonitorCfg,
 		healthCheckPort:         cfg.ListenPort,
 		healthCheckNodePort:     cfg.ListenNodePort,
@@ -50,6 +56,7 @@ func NewControllerCheck(cfg *config.ControllerConfig) *ControllerCheck {
 }
 
 func (c *ControllerCheck) Start() {
+	log.Info("controller check start")
 	go func() {
 		for range time.Tick(time.Duration(c.cfg.HealthCheckInterval) * time.Second) {
 			// 控制器健康检查
@@ -70,6 +77,13 @@ func (c *ControllerCheck) Start() {
 			refresh.RefreshCache([]string{common.VTAP_CHANGED})
 		}
 	}()
+}
+
+func (c *ControllerCheck) Stop() {
+	if c.cCancel != nil {
+		c.cCancel()
+	}
+	log.Info("controller check stopped")
 }
 
 func (c *ControllerCheck) healthCheck() {

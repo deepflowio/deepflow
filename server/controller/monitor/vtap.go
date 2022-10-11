@@ -17,6 +17,7 @@
 package monitor
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"time"
@@ -27,14 +28,22 @@ import (
 )
 
 type VTapCheck struct {
-	cfg config.MonitorConfig
+	vCtx    context.Context
+	vCancel context.CancelFunc
+	cfg     config.MonitorConfig
 }
 
-func NewVTapCheck(cfg config.MonitorConfig) *VTapCheck {
-	return &VTapCheck{cfg: cfg}
+func NewVTapCheck(cfg config.MonitorConfig, ctx context.Context) *VTapCheck {
+	vCtx, vCancel := context.WithCancel(ctx)
+	return &VTapCheck{
+		vCtx:    vCtx,
+		vCancel: vCancel,
+		cfg:     cfg,
+	}
 }
 
 func (v *VTapCheck) Start() {
+	log.Info("controller check start")
 	go func() {
 		for range time.Tick(time.Duration(v.cfg.VTapCheckInterval) * time.Second) {
 			// check launch_server resource if exist
@@ -43,6 +52,13 @@ func (v *VTapCheck) Start() {
 			v.typeCheck()
 		}
 	}()
+}
+
+func (v *VTapCheck) Stop() {
+	if v.vCancel != nil {
+		v.vCancel()
+	}
+	log.Info("vtap check stopped")
 }
 
 func (v *VTapCheck) launchServerCheck() {
