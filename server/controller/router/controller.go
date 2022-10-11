@@ -75,9 +75,9 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 		var controllerUpdate model.ControllerUpdate
 
 		// 如果不是masterController，将请求转发至是masterController
-		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
+		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			forwardMasterController(c, masterControllerName, cfg.ListenPort)
+			forwardMasterController(c, masterControllerIP, cfg.ListenPort)
 			return
 		}
 
@@ -102,9 +102,9 @@ func updateController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) 
 func deleteController(m *monitor.ControllerCheck, cfg *config.ControllerConfig) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
 		// if not master controller，should forward to master controller
-		isMasterController, masterControllerName, _ := election.IsMasterControllerAndReturnName()
+		isMasterController, masterControllerIP, _ := election.IsMasterControllerAndReturnIP()
 		if !isMasterController {
-			forwardMasterController(c, masterControllerName, cfg.ListenPort)
+			forwardMasterController(c, masterControllerIP, cfg.ListenPort)
 			return
 		}
 
