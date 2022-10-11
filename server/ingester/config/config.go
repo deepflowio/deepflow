@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
@@ -49,7 +50,6 @@ const (
 	DefaultCKDBService     = "deepflow-clickhouse"
 	DefaultCKDBServicePort = 9000
 	DefaultListenPort      = 20033
-	ServerPodNameKey       = "deepflow-server"
 	DefaultGrpcBufferSize  = 41943040
 )
 
@@ -134,14 +134,16 @@ func (c *Config) Validate() error {
 	if c.NodeIP == "" && c.ControllerIPs[0] == DefaultContrallerIP {
 		nodeIP, exist := os.LookupEnv(EnvK8sNodeIP)
 		if !exist {
-			panic(fmt.Sprintf("Can't get env %s", EnvK8sNodeIP))
+			log.Errorf("Can't get env %s", EnvK8sNodeIP)
+			os.Exit(0)
 		}
 		c.NodeIP = nodeIP
 	}
 
 	podName, exist := os.LookupEnv(EnvK8sPodName)
 	if !exist {
-		panic(fmt.Sprintf("Can't get pod name env %s", EnvK8sPodName))
+		log.Errorf("Can't get pod name env %s", EnvK8sPodName)
+		os.Exit(0)
 	}
 
 	if c.CKDB.Host == "" {
@@ -167,30 +169,50 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	watcher, err := NewWatcher(podName, ServerPodNameKey, c.CKDB.Host)
-	if err != nil {
-		panic(fmt.Sprintf("get kubernetes watcher failed %s", err))
+	serverPodNameKey := ""
+	lastSeparateIndex := strings.LastIndex(podName, "-")
+	if lastSeparateIndex > 0 {
+		serverPodNameKey = podName[:lastSeparateIndex]
+	} else {
+		log.Errorf("my pod name is '%s', can't be splitted by '-', ", podName)
+		os.Exit(0)
 	}
 
-	endpoint, err := watcher.GetMyClickhouseEndpoint()
-	if err != nil {
-		panic(fmt.Sprintf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err))
-	}
-	c.CKDB.ActualAddr = fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
-	c.CKDB.Watcher = watcher
-	log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddr)
+	for retryTimes := 0; ; retryTimes++ {
+		if retryTimes > 0 {
+			time.Sleep(time.Second * 30)
+		}
+		watcher, err := NewWatcher(podName, serverPodNameKey, c.CKDB.Host)
+		if err != nil {
+			log.Errorf("get kubernetes watcher failed %s", err)
+			continue
+		}
 
-	conn, err := common.NewCKConnection(c.CKDB.ActualAddr, c.CKDBAuth.Username, c.CKDBAuth.Password)
-	if err != nil {
-		panic(fmt.Sprintf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddr, err))
-	}
+		endpoint, err := watcher.GetMyClickhouseEndpoint()
+		if err != nil {
+			log.Errorf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err)
+			continue
+		}
+		c.CKDB.ActualAddr = fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
+		c.CKDB.Watcher = watcher
+		log.Infof("get clickhouse actual address: %s", c.CKDB.ActualAddr)
 
-	if err := CheckCluster(conn, c.CKDB.ClusterName); err != nil {
-		panic(fmt.Sprintf("get clickhouse cluster (%s) info from table 'system.clusters' failed, err: %s", c.CKDB.ClusterName, err))
-	}
+		conn, err := common.NewCKConnection(c.CKDB.ActualAddr, c.CKDBAuth.Username, c.CKDBAuth.Password)
+		if err != nil {
+			log.Errorf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddr, err)
+			continue
+		}
 
-	if err := CheckStoragePolicy(conn, c.CKDB.StoragePolicy); err != nil {
-		panic(fmt.Sprintf("get clickhouse storage policy(%s) info from table 'system.storage_polices' failed, err: %s", c.CKDB.StoragePolicy, err))
+		if err := CheckCluster(conn, c.CKDB.ClusterName); err != nil {
+			log.Errorf("get clickhouse cluster(%s) info from table 'system.clusters' failed, err: %s", c.CKDB.ClusterName, err)
+			continue
+		}
+
+		if err := CheckStoragePolicy(conn, c.CKDB.StoragePolicy); err != nil {
+			log.Errorf("get clickhouse storage policy(%s) info from table 'system.storage_polices' failed, err: %s", c.CKDB.StoragePolicy, err)
+			continue
+		}
+		break
 	}
 
 	level := strings.ToLower(c.LogLevel)
