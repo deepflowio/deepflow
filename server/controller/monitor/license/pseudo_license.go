@@ -17,6 +17,7 @@
 package license
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -37,19 +38,34 @@ var VTAP_LICENSE_FUNCTIONS = []string{
 }
 
 type VTapLicenseAllocation struct {
-	cfg config.MonitorConfig
+	vCtx    context.Context
+	vCancel context.CancelFunc
+	cfg     config.MonitorConfig
 }
 
-func NewVTapLicenseAllocation(cfg config.MonitorConfig) *VTapLicenseAllocation {
-	return &VTapLicenseAllocation{cfg: cfg}
+func NewVTapLicenseAllocation(cfg config.MonitorConfig, ctx context.Context) *VTapLicenseAllocation {
+	vCtx, vCancel := context.WithCancel(ctx)
+	return &VTapLicenseAllocation{
+		vCtx:    vCtx,
+		vCancel: vCancel,
+		cfg:     cfg,
+	}
 }
 
 func (v *VTapLicenseAllocation) Start() {
+	log.Info("vtap license allocation and check start")
 	go func() {
 		for range time.Tick(time.Duration(v.cfg.LicenseCheckInterval) * time.Second) {
 			v.allocLicense()
 		}
 	}()
+}
+
+func (v *VTapLicenseAllocation) Stop() {
+	if v.vCancel != nil {
+		v.vCancel()
+	}
+	log.Info("vtap license allocation and check stopped")
 }
 
 func (v *VTapLicenseAllocation) allocLicense() {
