@@ -27,40 +27,40 @@ import (
 
 // 功能：判断当前控制器是否为masterController
 func IsMasterController() (bool, error) {
-	// 获取本机hostname
-	hostName := os.Getenv(common.POD_NAME_KEY)
-	if len(hostName) == 0 {
-		log.Error("hostname is null")
-		return false, errors.New("hostname is null")
+	// get self host_ip
+	hostIP := os.Getenv(common.POD_IP_KEY)
+	if len(hostIP) == 0 {
+		log.Error("pod_ip is null")
+		return false, errors.New("pod_ip is null")
 	}
 
 	// get leader
 	leaderID := GetLeader()
 	// node_name/node_ip/pod_name/pod_ip
 	leaderInfo := strings.Split(leaderID, "/")
-	if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
+	if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[3] == "" {
 		return false, errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
 	}
-	return hostName == leaderInfo[2], nil
+	return hostIP == leaderInfo[3], nil
 }
 
-func IsMasterControllerAndReturnName() (bool, string, error) {
-	// get self hostname
-	hostName := os.Getenv(common.POD_NAME_KEY)
-	if len(hostName) == 0 {
-		log.Error("hostname is null")
-		return false, "", errors.New("hostname is null")
+func IsMasterControllerAndReturnIP() (bool, string, error) {
+	// get self host_ip
+	hostIP := os.Getenv(common.POD_IP_KEY)
+	if len(hostIP) == 0 {
+		log.Error("pod_ip is null")
+		return false, "", errors.New("pod_ip is null")
 	}
 
 	// get leader
 	leaderID := GetLeader()
 	// node_name/node_ip/pod_name/pod_ip
 	leaderInfo := strings.Split(leaderID, "/")
-	if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
+	if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[3] == "" {
 		return false, "", errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
 	}
-	if hostName != leaderInfo[2] {
-		return false, leaderInfo[2], nil
+	if hostIP != leaderInfo[3] {
+		return false, leaderInfo[3], nil
 	}
-	return true, hostName, nil
+	return true, hostIP, nil
 }
