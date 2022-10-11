@@ -514,6 +514,65 @@ out:
 }
 
 /*
+ref: https://developer.aliyun.com/article/751984
+
+| char tag | int32 len | payload |
+
+len = len(payload) + 4 
+
+tag 的取值参考 src/flow_generator/protocol_logs/sql/postgresql.rs
+
+*/
+static __inline enum message_type infer_postgre_message(const char *buf,
+						      size_t count,
+						      struct conn_info_t
+						      *conn_info)
+{
+	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
+		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
+			return MSG_UNKNOWN;
+	}
+	char tag = buf[0];
+
+	switch (tag)
+	{
+		// req
+		case 'Q': 
+		case 'P': 
+		case 'B': 
+		case 'F': 
+		case 'X': 
+		case 'f': 
+
+		// common, can not infer msg type, return MSG_REQUEST
+		case 'C':
+		case 'E':
+		case 'S':
+		case 'D':
+		case 'H':
+		case 'd':
+		case 'c': return MSG_REQUEST;
+
+		// resp
+		case 'Z': 
+		case 'I': 
+		case '1': 
+		case '2': 
+		case '3': 
+		case 'K': 
+		case 'T': 
+		case 'n': 
+		case 'N': 
+		case 't': 
+		case 'G': 
+		case 'W': 
+		case 'R': return MSG_RESPONSE;
+		
+		default: return MSG_UNKNOWN;
+	}
+}
+
+/*
 0                   15 16                     31
 |---------------------|-----------------------|
 |    标识 ID          |     标志 flags        |
@@ -1153,6 +1212,10 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		    infer_redis_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_REDIS;
+	} else if ((inferred_message.type =
+		    infer_postgre_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN){
+		inferred_message.protocol = PROTO_POSTGRESQL;
 	} else if ((inferred_message.type =
 		    infer_mqtt_message(infer_buf, count,
 				       conn_info)) != MSG_UNKNOWN) {
