@@ -708,10 +708,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 		tagResourceMap[enum_name] = map[string]*Tag{
 			"enum": NewTag(
-				"dictGet(flow_tag.int_enum_map, 'name', ('"+enum_name+"',toUInt64(%s)))",
+				"dictGet(flow_tag.int_enum_map, 'name', ('"+enum_name+"',toUInt64("+enum_name+")))",
 				"",
-				enum_name+" IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='"+enum_name+"')",
-				enum_name+" IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='"+enum_name+"')",
+				"toUInt64("+enum_name+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='"+enum_name+"')",
+				"toUInt64("+enum_name+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='"+enum_name+"')",
 			),
 		}
 	}
