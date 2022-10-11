@@ -1,6 +1,6 @@
 # deepflow-agent 协议开发文档
 
-这里是 deepflow-agent 的协议开发文档，帮助开发者在 deepflow 快速添加用层协议。
+这里是 deepflow-agent 的协议开发文档，帮助开发者在 deepflow 快速添加应用层协议。
 
 ## 第一步：了解包处理过程
 
@@ -13,85 +13,14 @@
   
 整体流程大概是：
 
-```text
-                                                                                
-                                                                                
-                                                                                
-                                            payload: [u8]                       
-                                                  |                             
-                                                  |                             
-                                                  |                             
-                                                  v                             
-                                             MetaPacket                         
-                                                  |                             
-                                                  |                             
-                                                  |                             
-                                                  v                             
-                                            遍历所有协议解析器                           
-                                                  |                             
-                                                  |                             
-                                                  |                             
-                                                  v                             
-                                    L7ProtocolParser::check_payload()           
-                                                  |                             
-                                                  |                             
-                                                  |                             
-                                                  v                             
-                                   true  <-----------------> false              
-                                    |                          |                
-                                    |                          |                
-                                    |                          |                
-                                    |                          v                
-                                    |                 解析失败，丢弃这段数据。              
-                                    |                 如果多次失败这个流会标记成unknown      
-                                    v                                           
-                           l4/l7 perf parse，用于                                  
-                           后续输出性能指标，目前不能                                        
-                           拓展。                                                 
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    v                                           
-                     L7ProtocolParser::parse_payload()                          
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    v                                           
-                             L7ProtocolInfo                                     
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    v                                           
-                        加入到session聚合，等待请求/响应                                         
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    |                                           
-     长时间没有收到对应请求/响应-------   <------------------ 收到对应的请求/相应            
-               |                    |                                           
-               |                    |                                           
-               |                    |                                           
-               |                    |                                           
-               v                    |                                           
- 直接发送到server，丢失对应请求/响应     |                                           
-                                    |                                           
-                                    |                                           
-                                    v                                           
-                       L7ProtocolInfo::merge_log()                              
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    v                                           
-                   L7ProtocolSendLog::from<L7protocolInfo>()                    
-                                    |                                           
-                                    |                                           
-                                    |                                           
-                                    v                                           
-                               发送到server                                        
-                                                                                
-                                                                                
+```mermaid
+graph TB;
+    id1(["payload: &[u8]"])-->MetaPacket-->流协议被标记-->id7(["L7ProtocolParser::reset()"])-->id5;
+    MetaPacket-->遍历所有协议解析器-->id2(["L7ProtocolParser::check_payload()"]);
+    id2-->false-->id3(["解析失败，丢弃这段数据"])-->如果多次失败这个流会标记成unknown;
+    id2-->true-->标记流协议-->id4("l4/l7 perf parse，用于后续输出性能指标，目前不能拓展")-->id5(["L7ProtocolParser::parse_payload()"])-->L7ProtocolInfo-->id6(["加入到session聚合，等待请求/响应"]);
+    id6-->id8(["长时间没有收到对应请求/响应"])-->id9(["直接发送到server，丢失对应请求/响应"]);
+    id6-->id10(["收到对应的请求/相应"])-->id11(["L7ProtocolInfo::merge_log()"])-->id12(["L7ProtocolSendLog::from#60;L7protocolInfo#62;()"])-->发送到server;
 ```
 
 ## 第二步： 开始开发
