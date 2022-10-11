@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
-	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
 // 功能：判断当前控制器是否为masterController
@@ -35,37 +34,14 @@ func IsMasterController() (bool, error) {
 		return false, errors.New("hostname is null")
 	}
 
-	if _, enabled := os.LookupEnv("FEATURE_FLAG_ELECTION"); enabled {
-		// get leader
-		leaderID := GetLeader()
-		// node_name/node_ip/pod_name/pod_ip
-		leaderInfo := strings.Split(leaderID, "/")
-		if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
-			return false, errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
-		}
-		return hostName == leaderInfo[2], nil
+	// get leader
+	leaderID := GetLeader()
+	// node_name/node_ip/pod_name/pod_ip
+	leaderInfo := strings.Split(leaderID, "/")
+	if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
+		return false, errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
 	}
-
-	// get node name
-	nodeName := os.Getenv(common.NODE_NAME_KEY)
-	if len(nodeName) == 0 {
-		log.Error("nodename is null")
-		return false, errors.New("nodename is null")
-	}
-
-	// 通过sideCar API获取MasterControllerName
-	url := fmt.Sprintf("http://%s:%d", common.LOCALHOST, common.MASTER_CONTROLLER_CHECK_PORT)
-	response, err := common.CURLPerform("GET", url, nil)
-	if err != nil {
-		return false, err
-	}
-	masterControllerName := response.Get("name").MustString()
-
-	// 比较是否相同返回结果
-	if hostName != masterControllerName && nodeName != masterControllerName {
-		return false, nil
-	}
-	return true, nil
+	return hostName == leaderInfo[2], nil
 }
 
 func IsMasterControllerAndReturnName() (bool, string, error) {
@@ -76,38 +52,15 @@ func IsMasterControllerAndReturnName() (bool, string, error) {
 		return false, "", errors.New("hostname is null")
 	}
 
-	if _, enabled := os.LookupEnv("FEATURE_FLAG_ELECTION"); enabled {
-		// get leader
-		leaderID := GetLeader()
-		// node_name/node_ip/pod_name/pod_ip
-		leaderInfo := strings.Split(leaderID, "/")
-		if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
-			return false, "", errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
-		}
-		if hostName != leaderInfo[2] {
-			return false, leaderInfo[2], nil
-		}
-		return true, hostName, nil
+	// get leader
+	leaderID := GetLeader()
+	// node_name/node_ip/pod_name/pod_ip
+	leaderInfo := strings.Split(leaderID, "/")
+	if len(leaderInfo) != ID_ITEM_NUM || leaderInfo[2] == "" {
+		return false, "", errors.New(fmt.Sprintf("id (%s) is not expected", leaderID))
 	}
-
-	// 通过sideCar API获取MasterControllerName
-	url := fmt.Sprintf("http://%s:%d", common.LOCALHOST, common.MASTER_CONTROLLER_CHECK_PORT)
-	response, err := common.CURLPerform("GET", url, nil)
-	if err != nil {
-		return false, "", err
-	}
-	masterControllerName := response.Get("name").MustString()
-
-	var masterController mysql.Controller
-	if ret := mysql.Db.Where(
-		"node_name = ? OR name = ?", masterControllerName, masterControllerName,
-	).First(&masterController); ret.Error != nil {
-		return false, "", err
-	}
-
-	// 比较是否相同返回结果
-	if hostName != masterController.Name {
-		return false, masterController.Name, nil
+	if hostName != leaderInfo[2] {
+		return false, leaderInfo[2], nil
 	}
 	return true, hostName, nil
 }

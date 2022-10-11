@@ -82,11 +82,9 @@ func Start(ctx context.Context, configPath string) {
 	defer router.SetInitStageForHealthChecker(router.OK)
 
 	// start election
-	if _, enabled := os.LookupEnv("FEATURE_FLAG_ELECTION"); enabled {
-		go election.Start(ctx, cfg)
-	}
-	isMasterController := IsMasterController(cfg)
+	go election.Start(ctx, cfg)
 
+	isMasterController := IsMasterController(cfg)
 	if isMasterController {
 		router.SetInitStageForHealthChecker("MySQL migration")
 		migrateDB(cfg)
