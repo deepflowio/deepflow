@@ -18,7 +18,6 @@ package jsonify
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/codec"
@@ -26,7 +25,7 @@ import (
 )
 
 type L4Packet struct {
-	EndTime     uint64
+	EndTime     int64
 	FlowID      uint64
 	VtapID      uint16
 	PacketCount uint32
@@ -45,10 +44,10 @@ func L4PacketColumns() []*ckdb.Column {
 }
 
 func (s *L4Packet) WriteBlock(block *ckdb.Block) error {
-	if err := block.WriteDateTime(uint32(s.EndTime / uint64(time.Microsecond))); err != nil {
+	if err := block.WriteDateTime(uint32(s.EndTime / US_TO_S_DEVISOR)); err != nil {
 		return err
 	}
-	if err := block.WriteUInt64(s.EndTime); err != nil {
+	if err := block.WriteInt64(s.EndTime); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(s.FlowID); err != nil {
@@ -100,7 +99,7 @@ func DecodePacketSequence(decoder *codec.SimpleDecoder, vtapID uint16) *L4Packet
 	blockSize := decoder.ReadU32()
 	l4Packet.FlowID = decoder.ReadU64()
 	endTimePacketCount := decoder.ReadU64()
-	l4Packet.EndTime = endTimePacketCount << 8
+	l4Packet.EndTime = int64(endTimePacketCount << 8)
 	l4Packet.PacketCount = uint32(endTimePacketCount >> 56)
 	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-16)...)
 
