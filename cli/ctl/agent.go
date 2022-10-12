@@ -17,16 +17,19 @@
 package ctl
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 
+	"github.com/bitly/go-simplejson"
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
+	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
 )
 
 func RegisterAgentCommand() *cobra.Command {
@@ -58,8 +61,22 @@ func RegisterAgentCommand() *cobra.Command {
 		},
 	}
 
+	var typeStr string
+	rebalanceCmd := &cobra.Command{
+		Use:     "rebalance",
+		Short:   "rebalance controller or analyzer",
+		Example: "deepflow-ctl agent rebalance --type=controller\ndeepflow-ctl agent rebalance --type=analyzer",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := rebalance(cmd, args, typeStr); err != nil {
+				fmt.Println(err)
+			}
+		},
+	}
+	rebalanceCmd.Flags().StringVarP(&typeStr, "type", "t", "", "request type controller/analyzer")
+
 	agent.AddCommand(list)
 	agent.AddCommand(delete)
+	agent.AddCommand(rebalanceCmd)
 	return agent
 }
 
@@ -318,4 +335,83 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	}
 	fmt.Printf("send upgrade data to server:%v\n", sendHosts)
 	fmt.Printf("set agent %s revision(%s) success\n", vtapName, expectedVersion)
+}
+
+func rebalance(cmd *cobra.Command, args []string, typeStr string) error {
+	if len(args) > 0 {
+		typeStr = args[0]
+	}
+
+	server := common.GetServerInfo(cmd)
+	isBalance, err := ifNeedRebalance(server, typeStr)
+	if err != nil {
+		return err
+	}
+	if !isBalance {
+		fmt.Println("no balance required")
+		return nil
+	}
+	resp, err := execRebalance(server, typeStr)
+	if err != nil {
+		return err
+	}
+	printDetail(resp)
+	return nil
+}
+
+func ifNeedRebalance(server *common.Server, typeStr string) (bool, error) {
+	url := fmt.Sprintf("http://%s:%d/v1/rebalance-vtap/?check=false&type=%s", server.IP, server.Port, typeStr)
+	resp, err := common.CURLPerform("POST", url, nil, "")
+	if err != nil {
+		return false, err
+	}
+	if resp.Get("DATA").Get("TOTAL_SWITCH_VTAP_NUM").MustInt() == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
+func execRebalance(server *common.Server, typeStr string) (*simplejson.Json, error) {
+	url := fmt.Sprintf("http://%s:%d/v1/rebalance-vtap/?check=true&type=%s", server.IP, server.Port, typeStr)
+	resp, err := common.CURLPerform("POST", url, nil, "")
+	if err != nil {
+		return nil, err
+	}
+
+	details := resp.Get("DATA").Get("DETAILS")
+	if len(details.MustArray()) == 0 {
+		return nil, errors.New("return details is empty")
+	}
+	return resp, nil
+}
+
+func printDetail(resp *simplejson.Json) {
+	details := resp.Get("DATA").Get("DETAILS")
+	ipMaxSize := jsonparser.GetTheMaxSizeOfAttr(details, "IP")
+	azMaxSize := jsonparser.GetTheMaxSizeOfAttr(details, "AZ")
+	stateMaxSize := jsonparser.GetTheMaxSizeOfAttr(details, "STATE")
+	beforeVTapNumMaxSize := jsonparser.GetTheMaxSizeOfAttr(details, "BEFORE_VTAP_NUM")
+	afertVTapNumMaxSize := jsonparser.GetTheMaxSizeOfAttr(details, "AFTER_VTAP_NUM")
+	switchVTapNumMaxSize := jsonparser.GetTheMaxSizeOfAttr(details, "SWITCH_VTAP_NUM")
+
+	cmdFormat := "%-*v %-*v %-*v %-*v %-*v %-*v\n"
+	fmt.Printf(cmdFormat,
+		ipMaxSize, "IP",
+		azMaxSize, "AZ",
+		stateMaxSize, "STATE",
+		beforeVTapNumMaxSize, "BEFORE_VTAP_NUM",
+		afertVTapNumMaxSize, "AFTER_VTAP_NUM",
+		switchVTapNumMaxSize, "SWITCH_VTAP_NUM")
+
+	for i := range details.MustArray() {
+		detail := resp.Get("DATA").Get("DETAILS").GetIndex(i)
+		detail.Get("IP")
+		fmt.Printf(cmdFormat,
+			ipMaxSize, detail.Get("IP").MustString(),
+			azMaxSize, detail.Get("AZ").MustString(),
+			stateMaxSize, detail.Get("STATE").MustInt(),
+			beforeVTapNumMaxSize, detail.Get("BEFORE_VTAP_NUM").MustInt(),
+			afertVTapNumMaxSize, detail.Get("AFTER_VTAP_NUM").MustInt(),
+			switchVTapNumMaxSize, detail.Get("SWITCH_VTAP_NUM").MustInt())
+	}
 }
