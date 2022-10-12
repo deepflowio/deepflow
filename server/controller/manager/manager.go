@@ -214,7 +214,22 @@ func (m *Manager) run(ctx context.Context) {
 			oldDomainName := m.taskMap[lcuuid].DomainName
 			newDomainName := lcuuidToDomain[lcuuid].Name
 			if oldDomainName != newDomainName {
-				m.taskMap[lcuuid].UpdateDomainName(newDomainName)
+				if m.taskMap[lcuuid].Cloud.GetBasicInfo().Type == common.KUBERNETES {
+					m.taskMap[lcuuid].Stop()
+					task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
+					if task == nil {
+						log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
+						continue
+					}
+
+					m.mutex.Lock()
+					delete(m.taskMap, lcuuid)
+					m.taskMap[lcuuid] = task
+					m.taskMap[lcuuid].Start()
+					m.mutex.Unlock()
+				} else {
+					m.taskMap[lcuuid].UpdateDomainName(newDomainName)
+				}
 			}
 		}
 	}
