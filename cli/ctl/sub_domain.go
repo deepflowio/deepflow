@@ -16,15 +16,15 @@ var ErrDomainDataIsNull = errors.New("ErrDomainDataIsNull")
 
 func RegisterSubDomainCommand() *cobra.Command {
 	subDomain := &cobra.Command{
-		Use:   "sub-domain",
-		Short: "sub-domain operation commands",
+		Use:   "subdomain",
+		Short: "subdomain operation commands",
 	}
 
 	var listOutput string
 	listCmd := &cobra.Command{
 		Use:     "list [name]",
-		Short:   "list sub-domain info",
-		Example: "deepflow-ctl sub-domain list",
+		Short:   "list subdomain info",
+		Example: "deepflow-ctl subdomain list",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := listSubDomain(cmd, args, listOutput); err != nil {
 				fmt.Println(err)
@@ -35,8 +35,8 @@ func RegisterSubDomainCommand() *cobra.Command {
 
 	exampleCmd := &cobra.Command{
 		Use:     "example",
-		Short:   "example sub-domain create yaml",
-		Example: "deepflow-ctl domain example",
+		Short:   "example subdomain create yaml",
+		Example: "deepflow-ctl subdomain example",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf(string(example.YamlSubDomain))
 		},
@@ -45,15 +45,15 @@ func RegisterSubDomainCommand() *cobra.Command {
 	var createFilename string
 	createCmd := &cobra.Command{
 		Use:     "create",
-		Short:   "create sub-domain",
-		Example: "deepflow-ctl sub-domain create -f filename",
+		Short:   "create subdomain",
+		Example: "deepflow-ctl subdomain create -f filename",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := createSubDomain(cmd, createFilename); err != nil {
 				fmt.Println(err)
 			}
 		},
 	}
-	createCmd.Flags().StringVarP(&createFilename, "filename", "f", "", "create sub-domain from file or stdin")
+	createCmd.Flags().StringVarP(&createFilename, "filename", "f", "", "create subdomain from file or stdin")
 	if err := createCmd.MarkFlagRequired("filename"); err != nil {
 		fmt.Println(err)
 	}
@@ -61,8 +61,8 @@ func RegisterSubDomainCommand() *cobra.Command {
 	var updateFilename string
 	updateCmd := &cobra.Command{
 		Use:     "update",
-		Short:   "update sub-domain",
-		Example: "deepflow-ctl sub-domain update -f k8s.yaml",
+		Short:   "update subdomain",
+		Example: "deepflow-ctl subdomain update -f k8s.yaml",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := updateSubDomain(cmd, updateFilename); err != nil {
 				fmt.Println(err)
@@ -76,8 +76,8 @@ func RegisterSubDomainCommand() *cobra.Command {
 
 	deleteCmd := &cobra.Command{
 		Use:     "delete [lcuuid]",
-		Short:   "delete sub-domain",
-		Example: "deepflow-ctl sub-domain delete deepflow-sub-domain",
+		Short:   "delete subdomain",
+		Example: "deepflow-ctl subdomain delete deepflow-sub-domain",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := deleteSubDomain(cmd, args); err != nil {
 				fmt.Println(err)
@@ -183,7 +183,7 @@ func updateSubDomain(cmd *cobra.Command, fileName string) error {
 	}
 
 	if len(response.Get("DATA").MustArray()) == 0 {
-		return fmt.Errorf("cannot to get sub-domain, domain=%v", domainLuccid)
+		return fmt.Errorf("cannot to get subdomain, domain=%v", domainLuccid)
 	}
 	lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
 	url = fmt.Sprintf("http://%s:%d/v2/sub-domains/%s/", server.IP, server.Port, lcuuid)
