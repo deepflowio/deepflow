@@ -302,6 +302,7 @@ pub enum TapType {
     Isp(u8),
     Tor,
     Max,
+    Unknown,
 }
 
 impl PartialOrd for TapType {
@@ -316,6 +317,7 @@ impl TryFrom<u16> for TapType {
         match t {
             0 => Ok(TapType::Any),
             3 => Ok(TapType::Tor),
+            0xffff => Ok(TapType::Unknown),
             v if v < 256 => Ok(TapType::Isp(v as u8)),
             _ => Err("TapType not in [0, 256)"),
         }
@@ -329,6 +331,7 @@ impl From<TapType> for u16 {
             TapType::Isp(v) => v as u16,
             TapType::Tor => 3,
             TapType::Max => 256,
+            TapType::Unknown => 0xffff,
         }
     }
 }
@@ -346,6 +349,7 @@ impl fmt::Display for TapType {
             TapType::Isp(n) => write!(f, "isp{}", n),
             TapType::Tor => write!(f, "tor"),
             TapType::Max => write!(f, "max"),
+            TapType::Unknown => write!(f, "unknown"),
         }
     }
 }
