@@ -23,17 +23,29 @@ pub enum L7Protocol {
     #[num_enum(default)]
     Unknown = 0,
     Other = 1,
-    Max = 255,
+
+    // HTTP
     Http1 = 20,
     Http2 = 21,
     Http1TLS = 22,
     Http2TLS = 23,
+
+    // RPC
     Dubbo = 40,
+
+    // SQL
     Mysql = 60,
     Postgresql = 61,
+
+    // NoSQL
     Redis = 80,
+
+    // MQ
     Kafka = 100,
     Mqtt = 101,
+
+    // INFRA
     Dns = 120,
-    // add protocol below
+
+    Max = 255,
 }
