@@ -262,7 +262,6 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 
 	uprobe_sym->type = sym->type;
 	uprobe_sym->isret = sym->is_probe_ret;
-	uprobe_sym->name = strdup(sym->symbol);
 	uprobe_sym->pid = pid;
 	uprobe_sym->probe_func = strdup(sym->probe_func);
 	/*
