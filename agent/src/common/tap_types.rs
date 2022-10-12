@@ -56,6 +56,7 @@ impl TapTyper {
 
         if packet_guard[vlan] == TapType::Any {
             warn!("vlan {}'s tap_type is unknown", vlan);
+            self.packet.lock().unwrap()[vlan] = TapType::Unknown;
             return None;
         }
 
