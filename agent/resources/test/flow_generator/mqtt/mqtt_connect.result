@@ -1,2 +1,2 @@
-MqttInfo { client_id: Some("test-1"), version: 4, pkt_type: Connect, req_msg_size: 41, res_msg_size: -1, subscribe_topics: None, publish_topic: None, code: 0, status: Ok } is_mqtt: true
-MqttInfo { client_id: None, version: 4, pkt_type: Connack, req_msg_size: -1, res_msg_size: 2, subscribe_topics: None, publish_topic: None, code: 0, status: Ok } is_mqtt: false
+MqttInfo { start_time: 0, end_time: 0, msg_type: Other, client_id: Some("test-1"), version: 4, pkt_type: Connect, req_msg_size: Some(41), res_msg_size: None, subscribe_topics: None, publish_topic: None, code: None, status: Ok } is_mqtt: true
+MqttInfo { start_time: 0, end_time: 0, msg_type: Other, client_id: None, version: 4, pkt_type: Connack, req_msg_size: None, res_msg_size: Some(2), subscribe_topics: None, publish_topic: None, code: Some(0), status: Ok } is_mqtt: false
