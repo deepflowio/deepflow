@@ -85,6 +85,8 @@ func (c *AnalyzerCheck) Stop() {
 	log.Info("analyzer check stopped")
 }
 
+var checkExceptionAnalyzers = make(map[string]*dfHostCheck)
+
 func (c *AnalyzerCheck) healthCheck() {
 	var controllers []mysql.Controller
 	var analyzers []mysql.Analyzer
@@ -120,6 +122,7 @@ func (c *AnalyzerCheck) healthCheck() {
 				if _, ok := c.exceptionAnalyzerDict[analyzer.IP]; ok {
 					delete(c.exceptionAnalyzerDict, analyzer.IP)
 				}
+				delete(checkExceptionAnalyzers, analyzer.IP)
 			} else {
 				if _, ok := c.exceptionAnalyzerDict[analyzer.IP]; ok {
 					if c.exceptionAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
@@ -129,18 +132,25 @@ func (c *AnalyzerCheck) healthCheck() {
 						log.Infof("set analyzer (%s) state to exception", analyzer.IP)
 						// 根据exceptionIP，重新分配对应采集器的数据节点
 						c.TriggerReallocAnalyzer(analyzer.IP)
+						if _, ok := checkExceptionAnalyzers[analyzer.IP]; ok == false {
+							checkExceptionAnalyzers[analyzer.IP] = newDFHostCheck()
+						}
 					}
 				} else {
 					c.exceptionAnalyzerDict[analyzer.IP] = newDFHostCheck()
 				}
 			}
 		} else {
+			if _, ok := checkExceptionAnalyzers[analyzer.IP]; ok == false {
+				checkExceptionAnalyzers[analyzer.IP] = newDFHostCheck()
+			}
 			if active {
 				if _, ok := c.normalAnalyzerDict[analyzer.IP]; ok {
 					if c.normalAnalyzerDict[analyzer.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalAnalyzerDict, analyzer.IP)
 						mysql.Db.Model(&analyzer).Update("state", common.HOST_STATE_COMPLETE)
 						log.Infof("set analyzer (%s) state to normal", analyzer.IP)
+						delete(checkExceptionAnalyzers, analyzer.IP)
 					}
 				} else {
 					c.normalAnalyzerDict[analyzer.IP] = newDFHostCheck()
@@ -152,6 +162,17 @@ func (c *AnalyzerCheck) healthCheck() {
 				if _, ok := c.exceptionAnalyzerDict[analyzer.IP]; ok {
 					delete(c.exceptionAnalyzerDict, analyzer.IP)
 				}
+			}
+		}
+	}
+	for ip, dfhostCheck := range checkExceptionAnalyzers {
+		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
+			err := mysql.Db.Delete(mysql.Analyzer{}, "ip = ?", ip).Error
+			if err != nil {
+				log.Errorf("delete analyzer(%s) failed, err:%s", ip, err)
+			} else {
+				log.Infof("delete analyzer(%s), exception lasts for %d seconds", ip, dfhostCheck.duration())
+				delete(checkExceptionAnalyzers, ip)
 			}
 		}
 	}
