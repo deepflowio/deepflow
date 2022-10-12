@@ -152,6 +152,7 @@ const (
 	L7_PROTOCOL_HTTP_2_TLS L7Protocol = 23
 	L7_PROTOCOL_DUBBO      L7Protocol = 40
 	L7_PROTOCOL_MYSQL      L7Protocol = 60
+	L7_PROTOCOL_POSTGRE    L7Protocol = 61
 	L7_PROTOCOL_REDIS      L7Protocol = 80
 	L7_PROTOCOL_KAFKA      L7Protocol = 100
 	L7_PROTOCOL_MQTT       L7Protocol = 101
@@ -598,6 +599,8 @@ func (p L7Protocol) String() string {
 		formatted = "dns"
 	case L7_PROTOCOL_MYSQL:
 		formatted = "mysql"
+	case L7_PROTOCOL_POSTGRE:
+		formatted = "postgresql"
 	case L7_PROTOCOL_REDIS:
 		formatted = "redis"
 	case L7_PROTOCOL_DUBBO:
