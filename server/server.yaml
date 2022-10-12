@@ -69,7 +69,7 @@ controller:
 
   # monitor module config
   monitor:
-    # controller/analyzer health_check interval, unit: s
+    # controller/analyzer health_check interval, unit:s
     health_check_interval: 60
     # 健康检查异常/控制器切换处理channel的长度
     health_check_handle_channel_len: 1000
@@ -77,6 +77,8 @@ controller:
     license_check_interval: 60
     # vtap检查的时间间隔，单位: 秒
     vtap_check_interval: 60
+    # exception_time_frame, unit:s
+    exception_time_frame: 3600
     # warrant
     warrant:
       host: warrant
