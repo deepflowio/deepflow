@@ -239,7 +239,7 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
 			} else {
-				e.AddTable(fmt.Sprintf("%s.%s", e.DB, table))
+				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
 			}
 			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
 			if err != nil {
