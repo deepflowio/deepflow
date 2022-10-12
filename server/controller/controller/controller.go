@@ -167,6 +167,7 @@ func Start(ctx context.Context, configPath string) {
 		}
 
 		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
+		softDeletedResourceCleaner := recorder.NewSoftDeletedResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
 
 		// TODO start as soon as possible
 		masterController := ""
@@ -181,9 +182,11 @@ func Start(ctx context.Context, configPath string) {
 					thisIsMasterController = true
 					log.Infof("I am the master controller now, previous master controller is %s", masterController)
 
-					// 启动资源ID管理器
-					// TODO: use ctx start @zhengya
-					startResourceIDManager(cfg)
+					if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
+						// 启动资源ID管理器
+						// TODO: use ctx start @zhengya
+						startResourceIDManager(cfg)
+					}
 
 					// 启动tagrecorder
 					tr.Start()
@@ -201,11 +204,7 @@ func Start(ctx context.Context, configPath string) {
 					vtapLicenseAllocation.Start()
 
 					// 启动软删除数据清理
-					// TODO: use ctx start @zhengya
-					recorder.TimedCleanDeletedResources(
-						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceCleanInterval),
-						int(cfg.ManagerCfg.TaskCfg.RecorderCfg.DeletedResourceRetentionTime),
-					)
+					softDeletedResourceCleaner.Start()
 
 					if _, enabled := os.LookupEnv("FEATURE_FLAG_CHECK_DOMAIN_CONTROLLER"); enabled {
 						// 自动切换domain控制器
@@ -229,6 +228,8 @@ func Start(ctx context.Context, configPath string) {
 
 					// stop vtap license allocation and check
 					vtapLicenseAllocation.Stop()
+
+					softDeletedResourceCleaner.Stop()
 				} else {
 					log.Infof(
 						"current master controller is %s, previous master controller is %s",

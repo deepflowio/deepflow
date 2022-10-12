@@ -18,12 +18,47 @@
 package recorder
 
 import (
+	"context"
 	"time"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	. "github.com/deepflowys/deepflow/server/controller/recorder/config"
 	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 )
+
+type SoftDeletedResourceCleaner struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	cfg    *RecorderConfig
+}
+
+func NewSoftDeletedResourceCleaner(cfg *RecorderConfig, ctx context.Context) *SoftDeletedResourceCleaner {
+	cCtx, cCancel := context.WithCancel(ctx)
+	return &SoftDeletedResourceCleaner{cfg: cfg, ctx: cCtx, cancel: cCancel}
+}
+
+func (c *SoftDeletedResourceCleaner) Start() {
+	log.Info("soft deleted resources clean started")
+	c.TimedClean(int(c.cfg.DeletedResourceCleanInterval), int(c.cfg.DeletedResourceRetentionTime))
+}
+
+func (c *SoftDeletedResourceCleaner) Stop() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+	log.Info("soft deleted resources clean stopped")
+}
+
+func (c *SoftDeletedResourceCleaner) TimedClean(cleanInterval, retentionInterval int) {
+	// 在启动cleaner前先清理一次数据
+	c.clean(retentionInterval)
+	go func() {
+		for range time.Tick(time.Duration(cleanInterval) * time.Hour) {
+			c.clean(retentionInterval)
+		}
+	}()
+}
 
 func delete[MT constraint.MySQLSoftDeleteModel](expiredAt time.Time) {
 	err := mysql.Db.Unscoped().Where("deleted_at < ?", expiredAt).Delete(new(MT)).Error
@@ -32,8 +67,8 @@ func delete[MT constraint.MySQLSoftDeleteModel](expiredAt time.Time) {
 	}
 }
 
-func clean(expireInterval int) {
-	expiredAt := time.Now().Add(time.Duration(-expireInterval) * time.Hour)
+func (c *SoftDeletedResourceCleaner) clean(retentionInterval int) {
+	expiredAt := time.Now().Add(time.Duration(-retentionInterval) * time.Hour)
 	log.Infof("clean soft deleted resources (deleted_at < %s) started", expiredAt.Format(common.GO_BIRTHDAY))
 	delete[mysql.Region](expiredAt)
 	delete[mysql.AZ](expiredAt)
@@ -60,14 +95,4 @@ func clean(expireInterval int) {
 	delete[mysql.PodReplicaSet](expiredAt)
 	delete[mysql.Pod](expiredAt)
 	log.Info("clean soft deleted resources completed")
-}
-
-func TimedCleanDeletedResources(cleanInterval, expireInterval int) {
-	// 在启动cleaner前先清理一次数据
-	clean(expireInterval)
-	go func() {
-		for range time.Tick(time.Duration(cleanInterval) * time.Hour) {
-			clean(expireInterval)
-		}
-	}()
 }
