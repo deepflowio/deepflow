@@ -61,11 +61,13 @@ func loadConfig(path string) *Config {
 	config := &Config{}
 	configBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		panic(fmt.Sprintf("Read config file path: %s, error: %s", err, path))
+		fmt.Println("Read config file path: %s, error: %s", err, path)
+		os.Exit(1)
 	}
 
 	if err = yaml.Unmarshal(configBytes, &config); err != nil {
-		panic(fmt.Sprintf("Unmarshal yaml error: %s", err))
+		fmt.Println("Unmarshal yaml(%s) error: %s", path, err)
+		os.Exit(1)
 	}
 	return config
 }
