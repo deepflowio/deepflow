@@ -117,12 +117,12 @@ func getCurrentLeader(ctx context.Context, lock *resourcelock.LeaseLock) string 
 func checkLeaderValid(ctx context.Context, lock *resourcelock.LeaseLock) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	for {
 		select {
 		case <-ticker.C:
 			now := metav1.Now()
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
 			record, _, err := lock.Get(ctx)
 			if err != nil {
 				log.Error(err)
