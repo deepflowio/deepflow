@@ -589,7 +589,9 @@ impl PlatformSynchronizer {
 
             if cur_version == init_version {
                 // 避免信息同步先于信息采集
-                if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
+                // ====
+                // wait 5 seconds to check version change
+                if Self::wait_timeout(&args.running, &args.timer, Duration::from_secs(5)) {
                     break;
                 }
                 continue;
