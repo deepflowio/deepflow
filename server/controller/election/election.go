@@ -35,6 +35,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils/atomicbool"
 )
 
 const (
@@ -43,7 +44,8 @@ const (
 
 type LeaderData struct {
 	sync.RWMutex
-	Name string
+	Name     string
+	isValide atomicbool.Bool
 }
 
 func (l *LeaderData) SetLeader(name string) {
@@ -59,8 +61,18 @@ func (l *LeaderData) GetLeader() string {
 	return name
 }
 
+func (l *LeaderData) setValide() {
+	l.isValide.Set()
+}
+
+func (l *LeaderData) getValide() bool {
+	return l.isValide.IsSet()
+}
+
 var log = logging.MustGetLogger("election")
-var leaderData = &LeaderData{}
+var leaderData = &LeaderData{
+	isValide: atomicbool.NewBool(false),
+}
 
 func buildConfig(kubeconfig string) (*rest.Config, error) {
 	if kubeconfig != "" {
@@ -88,6 +100,43 @@ func getID() string {
 
 func GetLeader() string {
 	return leaderData.GetLeader()
+}
+
+func getCurrentLeader(ctx context.Context, lock *resourcelock.LeaseLock) string {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	record, _, err := lock.Get(ctx)
+	if err != nil {
+		log.Error(err)
+		return ""
+	}
+
+	return record.HolderIdentity
+}
+
+func checkLeaderValid(ctx context.Context, lock *resourcelock.LeaseLock) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			now := metav1.Now()
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			record, _, err := lock.Get(ctx)
+			if err != nil {
+				log.Error(err)
+			}
+			if record.RenewTime.Add(60 * time.Second).After(now.Time) {
+				leaderData.setValide()
+				leaderData.SetLeader(record.HolderIdentity)
+				log.Infof("check leader finish, leader is %s", record.HolderIdentity)
+				return
+			} else {
+				log.Warningf("leader(%v) validity has expired", record)
+			}
+		}
+	}
 }
 
 func Start(ctx context.Context, cfg *config.ControllerConfig) {
@@ -119,6 +168,8 @@ func Start(ctx context.Context, cfg *config.ControllerConfig) {
 		},
 	}
 
+	go checkLeaderValid(ctx, lock)
+
 	// start the leader election code loop
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock: lock,
@@ -142,12 +193,14 @@ func Start(ctx context.Context, cfg *config.ControllerConfig) {
 			OnStoppedLeading: func() {
 				// we can do cleanup here
 				log.Infof("leader lost: %s", id)
-				//os.Exit(0)
+				leaderData.SetLeader(getCurrentLeader(ctx, lock))
 			},
 			OnNewLeader: func(identity string) {
-				leaderData.SetLeader(identity)
-				// we're notified when new leader elected
-				log.Infof("new leader elected: %s", identity)
+				if leaderData.getValide() {
+					leaderData.SetLeader(identity)
+					// we're notified when new leader elected
+					log.Infof("new leader elected: %s", identity)
+				}
 			},
 		},
 	})
