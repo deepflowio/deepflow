@@ -71,7 +71,7 @@ use crate::{
     monitor::Monitor,
     platform::LibvirtXmlExtractor,
     policy::Policy,
-    proto::trident::TapMode,
+    proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
@@ -95,6 +95,7 @@ pub struct ChangedConfig {
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
     pub kubernetes_cluster_id: Option<String>,
+    pub tap_types: Vec<trident::TapType>,
 }
 
 pub enum State {
@@ -362,6 +363,7 @@ impl Trident {
                 blacklist,
                 vm_mac_addrs,
                 kubernetes_cluster_id,
+                tap_types,
             } = new_state.unwrap_config();
             if let Some(old_yaml) = yaml_conf {
                 if old_yaml != runtime_config.yaml_config {
@@ -406,6 +408,7 @@ impl Trident {
                         &components,
                         blacklist,
                         vm_mac_addrs,
+                        tap_types,
                     );
                     for callback in callbacks {
                         callback(&config_handler, components);
@@ -437,26 +440,52 @@ fn dispatcher_listener_callback(
     components: &Components,
     blacklist: Vec<u64>,
     vm_mac_addrs: Vec<MacAddr>,
+    tap_types: Vec<trident::TapType>,
 ) {
-    let if_mac_source = conf.if_mac_source;
-    let links = match links_by_name_regex(&conf.tap_interface_regex) {
-        Err(e) => {
-            warn!("get interfaces by name regex failed: {}", e);
-            vec![]
-        }
-        Ok(links) => {
-            if links.is_empty() {
-                warn!(
-                    "tap-interface-regex({}) do not match any interface, in local mode",
-                    conf.tap_interface_regex
+    match conf.tap_mode {
+        TapMode::Local => {
+            let if_mac_source = conf.if_mac_source;
+            let links = match links_by_name_regex(&conf.tap_interface_regex) {
+                Err(e) => {
+                    warn!("get interfaces by name regex failed: {}", e);
+                    vec![]
+                }
+                Ok(links) => {
+                    if links.is_empty() {
+                        warn!(
+                            "tap-interface-regex({}) do not match any interface, in local mode",
+                            conf.tap_interface_regex
+                        );
+                    }
+                    links
+                }
+            };
+            for listener in components.dispatcher_listeners.iter() {
+                listener.on_tap_interface_change(
+                    &links,
+                    if_mac_source,
+                    conf.trident_type,
+                    &blacklist,
                 );
+                listener.on_vm_change(&vm_mac_addrs);
             }
-            links
         }
-    };
-    for listener in components.dispatcher_listeners.iter() {
-        listener.on_tap_interface_change(&links, if_mac_source, conf.trident_type, &blacklist);
-        listener.on_vm_change(&vm_mac_addrs);
+        TapMode::Mirror => {
+            todo!()
+        }
+        TapMode::Analyzer => {
+            for listener in components.dispatcher_listeners.iter() {
+                listener.on_tap_interface_change(
+                    &vec![],
+                    IfMacSource::IfMac,
+                    conf.trident_type,
+                    &blacklist,
+                );
+                listener.on_vm_change(&vm_mac_addrs);
+            }
+            components.tap_typer.on_tap_types_change(tap_types); // FIXME: it is necessary to judge whether the tap_types are updated
+        }
+        _ => {}
     }
 }
 

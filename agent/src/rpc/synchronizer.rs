@@ -718,6 +718,7 @@ impl Synchronizer {
                 blacklist,
                 vm_mac_addrs: macs,
                 kubernetes_cluster_id,
+                tap_types: resp.tap_types,
             });
         }
         cvar.notify_one();
