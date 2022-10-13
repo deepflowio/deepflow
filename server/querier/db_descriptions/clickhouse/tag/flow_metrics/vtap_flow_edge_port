@@ -43,4 +43,4 @@ vtap                       , vtap                      , vtap                   
 ip                         , ip_0                      , ip_1                      , IP地址                     , ip            ,                    , 网络层      , 111        ,
 is_ipv4                    , is_ipv4                   , is_ipv4                   , IP类型                     , int_enum      , ip_type            , 网络层      , 111        ,
 tunnel_type                , tunnel_type               , tunnel_type               , 隧道类型                   , int_enum      , tunnel_type        , 网络层      , 111        ,
-labels                     , labels_0                  , labels_1                  , labels                    , map           ,                    , 标签        , 111        ,
+labels                     , labels_0                  , labels_1                  , K8s Labels                , map           ,                    , K8s Labels  , 111        ,
