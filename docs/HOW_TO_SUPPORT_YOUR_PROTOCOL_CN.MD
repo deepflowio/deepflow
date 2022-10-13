@@ -14,12 +14,13 @@
 整体流程大概是：
 ```mermaid
 graph TB;
-    id1(["payload: &[u8]"])-->MetaPacket-->流协议被标记-->id7(["L7ProtocolParser::reset()"])-->id5;
+    id1(["payload: &[u8]"])-->MetaPacket-->流协议被标记-->id5;
     MetaPacket-->foreach-->id2(["L7ProtocolParser::check_payload()"]);
     id2-->false-->id3(["解析失败，丢弃这段数据"])-->如果多次失败这个流会标记成unknown;
     id2-->true-->标记流协议-->id4("l4/l7 perf parse，用于后续输出性能指标，目前不能拓展")-->id5(["L7ProtocolParser::parse_payload()"])-->L7ProtocolInfo-->id6(["加入到session聚合，等待请求/响应"]);
+    L7ProtocolInfo-->id7(["L7ProtocolParser::reset()"]);
     id6-->id8(["长时间没有收到对应请求/响应"])-->id9(["直接发送到server，丢失对应请求/响应"]);
-    id6-->id10(["收到对应的请求/相应"])-->id11(["L7ProtocolInfo::merge_log()"])-->id12(["L7ProtocolSendLog::from#60;L7protocolInfo#62;()"])-->发送到server;
+    id6-->id10(["收到对应的请求/响应"])-->id11(["L7ProtocolInfo::merge_log()"])-->id12(["L7ProtocolSendLog::from#60;L7protocolInfo#62;()"])-->L7ProtocolSendLog-->发送到server;
 ```
 
 ## 2. 如何开发
@@ -39,7 +40,7 @@ graph TB;
 
 在 [l7_protocol.rs](../agent/crates/public/src/l7_protocol.rs) 添加对应协议名称和协议号：
 ```rust
-// 协议号不能重复并且必须小于等于 255
+// 协议号不能重复并且必须小于等于 127
 pub enum L7Protocol {
     // ... other protocol
     Postgresql = 61,
@@ -102,7 +103,7 @@ impl impl From<PostgreInfo> for L7ProtocolSendLog {
 }
 ```
 
-定义 L7ProtocolSendLog 结构，主要用于将不同的应用层协议转换成统一的结构发送到 deepflow-server：
+L7ProtocolSendLog 结构，主要用于将不同的应用层协议转换成统一的结构发送到 deepflow-server：
 ```rust
 pub struct L7ProtocolSendLog {
     // 请求长度，不需要可以填 None
@@ -191,10 +192,14 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 
             // eBPF 类型，有以下4个值：
             //   TracePoint：
-            //       来源于 eBPF tracepoint 的 syscalls:sys_exit_read
-            //                               syscalls:sys_enter_read
-            //                               syscalls:sys_exit_write
-            //                               syscalls:sys_enter_write
+            //       主要来源于 eBPF tracepoint 的 syscalls:sys_enter_read
+            //                                   syscalls:sys_exit_read
+            //                                   syscalls:sys_enter_write
+            //                                   syscalls:sys_exit_write
+            //                                   syscalls:sys_enter_recvfrom
+            //                                   syscalls:sys_exit_recvfrom
+            //                                   syscalls:sys_enter_sendto
+            //                                   syscalls:sys_exit_sendto                           
             //   TlsUprobe:
             //       来源于 uprobe tls 相关库的 hook 点， 例如 golang 的 tls库，OpenSSL 的共享 so 库等等
             //   GoHttp2Uprobe：
@@ -263,16 +268,49 @@ all_protocol!(
 );
 ```
 
-### 3.5. 在 deepflow-server 中增加常量
+## 4. deepflow-server 中添加协议常量和名称（可选）
 
-为 Querier 增加协议常量定义：[l7_protocol](server/querier/db_descriptions/clickhouse/tag/enum/l7_protocol)
+在 deepflow-server 添加协议常量和名称，用于搜索。这一步是可选操作，如果省略这一步，所有新增协议的协议名称都会记录为unknown，流日志中只能通过协议号搜索。
 
-## 4. 一些说明
+### 4.1.
+
+在 [flow.go](../server/libs/datatype/flow.go) 中，添加对应常量和字符串
+```go
+type L7Protocol uint8
+
+const (
+	// ... other protocol
+	L7_PROTOCOL_POSTGRE    L7Protocol = 61
+	// ... other protocol
+)
+
+
+// ... 
+
+func (p L7Protocol) String() string {
+	formatted := ""
+	switch p {
+	// ... other case
+	case L7_PROTOCOL_POSTGRE:
+		formatted = "postgresql"
+	// ... other case
+	}
+	return formatted
+}
+
+```
+
+### 4.2. 在 deepflow-server 中增加常量
+
+为 Querier 增加协议常量定义：[l7_protocol](../server/querier/db_descriptions/clickhouse/tag/enum/l7_protocol)
+
+## 5. 一些说明
 
 - 数据的抓取主要有两个来源：
   - eBPF 的 hook 点，主要来源于 read/write 系统调用
   - AF_PACKET 抓取网卡数据
+- eBPF 由于在内核端有简单的协议过滤，目前eBPF采集的数据不支持添加协议
 - 由于网络环境和协议的复杂性，有可能会接收到不完整的应用层数据帧
-  - 例如 MTU 限制导致 IP 分片，TCP 对端接受窗口或者流控拥堵窗口收缩，MSS 过小等原因导致获取不到完整的应用层数据帧
+  - 例如 MTU 限制导致 IP 分片，TCP 对端接收窗口或者流控拥堵窗口收缩，MSS 过小等原因导致获取不到完整的应用层数据帧
   - 目前尚未实现传输层连接跟踪
 - 数据可能乱序或丢失，例如 HTTP 可能有先收到响应再收到请求，但乱序并不会影响 Session 聚合
