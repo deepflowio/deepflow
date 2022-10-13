@@ -527,7 +527,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 
-	// k8s标签
+	// K8s Labels
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 	for _, suffix := range []string{"", "_0", "_1"} {
 		k8sLabelSuffix := "k8s_label" + suffix
