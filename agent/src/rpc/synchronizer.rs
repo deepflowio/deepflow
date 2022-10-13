@@ -42,7 +42,6 @@ use tokio::task::JoinHandle;
 use tokio::time;
 
 use super::ntp::{NtpMode, NtpPacket, NtpTime};
-
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
@@ -53,11 +52,10 @@ use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
 use crate::trident::{self, ChangedConfig, TridentState, VersionInfo};
 use crate::utils::{
-    self,
     environment::{get_executable_path, is_tt_pod, running_in_container},
-    net::{is_unicast_link_local, MacAddr},
     stats,
 };
+use public::utils::net::{addr_list, is_unicast_link_local, MacAddr};
 
 const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
@@ -517,7 +515,7 @@ impl Synchronizer {
             ctrl_ip: Some(running_config.ctrl_ip.clone()),
             tap_mode: Some(static_config.tap_mode.into()),
             host: Some(status.hostname.clone()),
-            host_ips: utils::net::addr_list().map_or(vec![], |xs| {
+            host_ips: addr_list().map_or(vec![], |xs| {
                 xs.into_iter()
                     .filter_map(|x| {
                         if is_excluded_ip_addr(x.ip_addr) {

@@ -48,6 +48,7 @@ pub use {
         EndpointData as _EndpointData, EndpointInfo as _EndpointInfo, FeatureFlags as _FeatureFlags,
     },
     common::enums::TcpFlags as _TcpFlags,
+    common::feature as _feature,
     common::lookup_key::LookupKey as _LookupKey,
     common::platform_data::{IpSubnet as _IpSubnet, PlatformData as _PlatformData},
     common::policy::{Acl as _Acl, Cidr as _Cidr, IpGroupData as _IpGroupData},
@@ -67,6 +68,4 @@ pub use {
     policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,
     proto::common::TridentType as _TridentType,
-    public::{leaky_bucket::LeakyBucket as _LeakyBucket, queue::bounded as _queue_bounded},
-    utils::net::MacAddr as _MacAddr,
 };

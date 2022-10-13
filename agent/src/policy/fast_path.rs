@@ -427,7 +427,7 @@ mod test {
 
     use super::*;
     use crate::common::platform_data::{IpSubnet, PlatformData};
-    use crate::utils::net::MacAddr;
+    use public::utils::net::MacAddr;
 
     #[test]
     fn test_fast_interest_1() {

@@ -48,9 +48,9 @@ use crate::ebpf::{
     SOCK_DIR_RCV, SOCK_DIR_SND,
 };
 use crate::error;
-use crate::utils::net::{is_unicast_link_local, MacAddr};
 use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
+use public::utils::net::{is_unicast_link_local, MacAddr};
 
 #[derive(Clone, Debug, Default)]
 pub struct MetaPacket<'a> {

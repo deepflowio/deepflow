@@ -425,7 +425,7 @@ mod test {
     use crate::common::feature;
     use crate::common::platform_data::IpSubnet;
     use crate::common::policy::{Cidr, CidrType};
-    use crate::utils::net::MacAddr;
+    use public::utils::net::MacAddr;
 
     #[test]
     fn test_policy_normal() {

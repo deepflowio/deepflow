@@ -17,18 +17,22 @@ use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
 use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
-use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
-use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::{
-    common::{enums::IpProtocol, flow::PacketDirection, IPV4_ADDR_LEN, IPV6_ADDR_LEN},
+    common::{
+        enums::IpProtocol,
+        flow::PacketDirection,
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        IPV4_ADDR_LEN, IPV6_ADDR_LEN,
+    },
     flow_generator::{
         error::{Error, Result},
         perf::DNS_PORT,
     },
-    utils::{bytes::read_u16_be, net::parse_ip_slice},
+    log_info_merge, parse_common,
+    utils::bytes::read_u16_be,
 };
-use crate::{log_info_merge, parse_common};
-use public::l7_protocol::L7Protocol;
+use public::{l7_protocol::L7Protocol, utils::net::parse_ip_slice};
 
 #[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct DnsInfo {

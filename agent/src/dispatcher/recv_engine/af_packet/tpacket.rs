@@ -33,10 +33,8 @@ use socket2::Socket;
 
 use super::{bpf, header, options};
 
-use crate::utils::{
-    net::{self, link_by_name},
-    stats,
-};
+use crate::utils::stats;
+use public::utils::net::{self, link_by_name};
 
 const PACKET_VERSION: c_int = 10;
 const PACKET_RX_RING: c_int = 5;
