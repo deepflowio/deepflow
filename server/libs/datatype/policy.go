@@ -46,6 +46,7 @@ const (
 	NPB_TUNNEL_TYPE_VXLAN = iota
 	NPB_TUNNEL_TYPE_GRE_ERSPAN
 	NPB_TUNNEL_TYPE_PCAP
+	NPB_TUNNEL_TYPE_NPB_DROP
 )
 
 const (
@@ -182,8 +183,12 @@ func (a NpbActions) GetAclGid() []uint16 {
 	return a.aclGids
 }
 
+func (a NpbActions) isTunnelType(tunnelType uint8) bool {
+	return a.TunnelType() == tunnelType
+}
+
 func (a NpbActions) doTridentPcap() bool {
-	return a.TunnelType() == NPB_TUNNEL_TYPE_PCAP
+	return a.isTunnelType(NPB_TUNNEL_TYPE_PCAP)
 }
 
 func (a *NpbActions) ReverseTapSide() NpbActions {
@@ -204,12 +209,20 @@ func ToNpbActions(aclGid, id uint32, tunnelType, tapSide uint8, slice uint16) Np
 
 const (
 	ACTION_PCAP ActionFlag = 1 << iota
+	ACTION_NPB
+	ACTION_NPB_DROP
 )
 
 func (f ActionFlag) String() string {
 	s := "|"
 	if f&ACTION_PCAP != 0 {
 		s += "PCAP|"
+	}
+	if f&ACTION_NPB != 0 {
+		s += "NPB|"
+	}
+	if f&ACTION_NPB_DROP != 0 {
+		s += "NPB_DROP|"
 	}
 	return s
 }
@@ -322,7 +335,7 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 				continue
 			}
 			// PCAP相同aclgid的合并为一个，不同aclgid的不能合并
-			if n.TunnelType() == NPB_TUNNEL_TYPE_PCAP {
+			if n.TunnelType() == NPB_TUNNEL_TYPE_PCAP || n.TunnelType() == NPB_TUNNEL_TYPE_NPB_DROP {
 				// 应该有且仅有一个
 				aclGid := n.GetAclGid()[0]
 				repeatPcapAclGid := false
@@ -354,8 +367,12 @@ func (d *PolicyData) MergeNpbAction(actions []NpbActions, aclID uint32, directio
 			if len(directions) > 0 {
 				npbAction.SetTapSide(int(directions[0]))
 			}
-			if npbAction.doTridentPcap() {
+			if npbAction.isTunnelType(NPB_TUNNEL_TYPE_PCAP) {
 				d.ActionFlags |= ACTION_PCAP
+			} else if npbAction.isTunnelType(NPB_TUNNEL_TYPE_VXLAN) || npbAction.isTunnelType(NPB_TUNNEL_TYPE_GRE_ERSPAN) {
+				d.ActionFlags |= ACTION_NPB
+			} else if npbAction.isTunnelType(NPB_TUNNEL_TYPE_NPB_DROP) {
+				d.ActionFlags |= ACTION_NPB_DROP
 			}
 			d.NpbActions = append(d.NpbActions, npbAction)
 		}
@@ -377,6 +394,14 @@ func (d *PolicyData) MergeNpbAndSwapDirection(actions []NpbActions, aclID uint32
 
 func (d *PolicyData) MergeAndSwapDirection(npbActions []NpbActions, aclID uint32) {
 	d.MergeNpbAndSwapDirection(npbActions, aclID)
+}
+
+func (d *PolicyData) ContainNpb() bool {
+	return d.ActionFlags&ACTION_NPB_DROP == 0 && d.ActionFlags&ACTION_NPB != 0
+}
+
+func (d *PolicyData) ContainPcap() bool {
+	return d.ActionFlags&ACTION_PCAP != 0
 }
 
 func (d *PolicyData) String() string {

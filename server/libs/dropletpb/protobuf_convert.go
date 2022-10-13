@@ -174,7 +174,9 @@ func updateTunnelIpMap(flowAcls []*trident.FlowAcl) {
 		for _, npb := range acl.GetNpbActions() {
 			tunnelType := uint8(npb.GetTunnelType())
 			ip := net.ParseIP(npb.GetTunnelIp())
-			if ip == nil || tunnelType == datatype.NPB_TUNNEL_TYPE_PCAP {
+			if ip == nil ||
+				tunnelType == datatype.NPB_TUNNEL_TYPE_PCAP ||
+				tunnelType == datatype.NPB_TUNNEL_TYPE_NPB_DROP {
 				continue
 			}
 			aclGid := uint16(npb.GetNpbAclGroupId())
