@@ -18,7 +18,6 @@ use std::str;
 
 use arc_swap::access::Access;
 use log::debug;
-use regex::Regex;
 use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
@@ -42,13 +41,13 @@ use crate::{
     utils::bytes::{read_u32_be, read_u32_le},
 };
 use public::utils::net::h2pack;
-
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct HttpInfo {
     // 流是否结束，用于 http2 ebpf uprobe 处理.
     // 由于ebpf有可能响应会比请求先到，所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
     is_req_end: bool,
     is_resp_end: bool,
+
     proto: L7Protocol,
     start_time: u64,
     end_time: u64,
@@ -73,6 +72,10 @@ pub struct HttpInfo {
     pub path: String,
     #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
     pub host: String,
+    #[serde(rename = "user_agent", skip_serializing_if = "value_is_default")]
+    pub user_agent: Option<String>,
+    #[serde(rename = "referer", skip_serializing_if = "value_is_default")]
+    pub referer: Option<String>,
     #[serde(rename = "http_proxy_client", skip_serializing_if = "value_is_default")]
     pub client_ip: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -127,6 +130,9 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
 impl HttpInfo {
     pub fn merge(&mut self, other: Self) {
+        if self.is_grpc() {
+            self.proto = L7Protocol::Grpc;
+        }
         if self.trace_id.is_empty() {
             self.trace_id = other.trace_id;
         }
@@ -136,36 +142,53 @@ impl HttpInfo {
         if self.x_request_id.is_empty() {
             self.x_request_id = other.x_request_id;
         }
-        // 下面用于请求合并
-        if self.path.is_empty() {
-            self.path = other.path;
-        }
-        if self.host.is_empty() {
-            self.host = other.host;
-        }
-        if self.method.is_empty() {
-            self.method = other.method;
-        }
 
-        if other.status != L7ResponseStatus::default() {
-            self.status = other.status;
-        }
-        if self.status_code.is_none() {
-            self.status_code = other.status_code;
-        }
+        match other.msg_type {
+            // merge with request
+            LogMessageType::Request => {
+                if self.path.is_empty() {
+                    self.path = other.path;
+                }
+                if self.host.is_empty() {
+                    self.host = other.host;
+                }
+                if self.method.is_empty() {
+                    self.method = other.method;
+                }
+                if self.user_agent.is_some() {
+                    self.user_agent = other.user_agent;
+                }
+                if self.referer.is_some() {
+                    self.referer = other.referer;
+                }
+                // 下面用于判断是否结束
+                // ================
+                // determine whether request is end
+                if other.is_req_end {
+                    self.is_req_end = true;
+                }
+                if self.req_content_length.is_none() {
+                    self.req_content_length = other.req_content_length;
+                }
+            }
+            // merge with response
+            LogMessageType::Response => {
+                if other.status != L7ResponseStatus::default() {
+                    self.status = other.status;
+                }
+                if self.status_code.is_none() {
+                    self.status_code = other.status_code;
+                }
 
-        if self.req_content_length.is_none() {
-            self.req_content_length = other.req_content_length;
-        }
-        if self.resp_content_length.is_none() {
-            self.resp_content_length = other.resp_content_length;
-        }
-        // 下面用于判断是否结束
-        if other.is_req_end {
-            self.is_req_end = true;
-        }
-        if other.is_resp_end {
-            self.is_resp_end = true;
+                if self.resp_content_length.is_none() {
+                    self.resp_content_length = other.resp_content_length;
+                }
+
+                if other.is_resp_end {
+                    self.is_resp_end = true;
+                }
+            }
+            _ => {}
         }
     }
 
@@ -194,22 +217,71 @@ impl HttpInfo {
                     L7Protocol::Http2
                 }
             }
+
+            L7Protocol::Grpc => L7Protocol::Grpc,
             _ => unreachable!(),
         }
+    }
+
+    fn is_grpc(&self) -> bool {
+        self.proto == L7Protocol::Grpc
+    }
+    // grpc path: /packageName.Servicename/rcpMethodName
+    // return packetName, ServiceName
+    fn grpc_package_service_name(&self) -> Option<(String, String)> {
+        if !self.is_grpc() || self.path.len() < 6 {
+            return None;
+        }
+
+        let idx: Vec<_> = self.path.match_indices("/").collect();
+        if idx.len() != 2 {
+            return None;
+        }
+        let (start, end) = (idx[0].0, idx[1].0);
+        if let Some((p, _)) = self.path.match_indices(".").next() {
+            if p > start && p < end {
+                return Some((
+                    String::from(&self.path[start + 1..p]),
+                    String::from(&self.path[p + 1..end]),
+                ));
+            }
+        }
+        None
     }
 }
 
 impl From<HttpInfo> for L7ProtocolSendLog {
     fn from(f: HttpInfo) -> Self {
+        let is_grpc = f.is_grpc();
+        let service_name = if let Some((package, service)) = f.grpc_package_service_name() {
+            let svc_name = format!("{}.{}", package, service);
+            Some(svc_name)
+        } else {
+            None
+        };
+
+        // grpc protocol special treatment
+        let (req_type, resource, domain, endpoint) = if is_grpc {
+            // server endpoint = req_type
+            (
+                String::new(),
+                service_name.unwrap_or_default(),
+                f.host,
+                f.path,
+            )
+        } else {
+            (f.method, f.path, f.host, String::new())
+        };
+
         L7ProtocolSendLog {
-            // http2 可能没有:content-length头. 默认长度设置-1 防止server判断为0
             req_len: f.req_content_length,
             resp_len: f.resp_content_length,
             version: Some(f.version),
             req: L7Request {
-                req_type: f.method,
-                resource: f.path,
-                domain: f.host,
+                req_type,
+                resource,
+                domain,
+                endpoint,
             },
             resp: L7Response {
                 status: f.status,
@@ -225,6 +297,8 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 request_id: Some(f.stream_id),
                 x_request_id: Some(f.x_request_id),
                 client_ip: Some(f.client_ip),
+                user_agent: f.user_agent,
+                referer: f.referer,
                 ..Default::default()
             }),
             ..Default::default()
@@ -251,32 +325,28 @@ impl L7ProtocolParserInterface for HttpLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
-        match param.ebpf_type {
-            EbpfType::GoHttp2Uprobe => {
-                self.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
-                if let Some(p) = &param.ebpf_param {
-                    self.parsed = self
-                        .parse_http2_go_uprobe(
-                            payload,
-                            param.direction,
-                            false,
-                            Some(p.is_req_end),
-                            Some(p.is_resp_end),
-                        )
-                        .is_ok();
-                    self.parsed
-                } else {
-                    false
+        // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
+        match self.proto {
+            L7Protocol::Http1 => self.http1_check_protocol(payload, param),
+            L7Protocol::Http2 | L7Protocol::Grpc => match param.ebpf_type {
+                EbpfType::GoHttp2Uprobe => {
+                    if let Some(p) = &param.ebpf_param {
+                        self.parsed = self
+                            .parse_http2_go_uprobe(
+                                payload,
+                                param.direction,
+                                Some(p.is_req_end),
+                                Some(p.is_resp_end),
+                            )
+                            .is_ok();
+                        self.parsed
+                    } else {
+                        false
+                    }
                 }
-            }
-            _ => {
-                // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
-                match self.proto {
-                    L7Protocol::Http1 => self.http1_check_protocol(payload, param),
-                    L7Protocol::Http2 => self.http2_check_protocol(payload, param),
-                    _ => unreachable!(),
-                }
-            }
+                _ => self.http2_check_protocol(payload, param),
+            },
+            _ => unreachable!(),
         }
     }
 
@@ -288,12 +358,10 @@ impl L7ProtocolParserInterface for HttpLog {
         self.info.is_tls = param.is_tls();
         match param.ebpf_type {
             EbpfType::GoHttp2Uprobe => {
-                self.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
                 if let Some(p) = &param.ebpf_param {
                     self.parse_http2_go_uprobe(
                         payload,
                         param.direction,
-                        false,
                         Some(p.is_req_end),
                         Some(p.is_resp_end),
                     )?;
@@ -330,6 +398,8 @@ impl L7ProtocolParserInterface for HttpLog {
                     L7Protocol::Http2
                 }
             }
+
+            L7Protocol::Grpc => L7Protocol::Grpc,
             _ => unreachable!(),
         }
     }
@@ -339,11 +409,15 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 
     fn reset(&mut self) {
-        let mut log = Self::default();
-        log.l7_log_dynamic_config = self.l7_log_dynamic_config.clone();
-        log.proto = self.proto;
-        log.info.proto = self.proto;
-        *self = log;
+        self.info = HttpInfo::default();
+        let conf = self.l7_log_dynamic_config.clone();
+        match self.proto {
+            L7Protocol::Http1 => *self = Self::new_v1(),
+            L7Protocol::Http2 => *self = Self::new_v2(false),
+            L7Protocol::Grpc => *self = Self::new_v2(true),
+            _ => unreachable!(),
+        }
+        self.l7_log_dynamic_config = conf;
     }
 }
 
@@ -390,11 +464,16 @@ impl HttpLog {
         }
     }
 
-    pub fn new_v2() -> Self {
+    pub fn new_v2(is_grpc: bool) -> Self {
+        let l7_protcol = if is_grpc {
+            L7Protocol::Grpc
+        } else {
+            L7Protocol::Http2
+        };
         Self {
-            proto: L7Protocol::Http2,
+            proto: l7_protcol,
             info: HttpInfo {
-                proto: L7Protocol::Http2,
+                proto: l7_protcol,
                 ..Default::default()
             },
             ..Default::default()
@@ -416,9 +495,8 @@ impl HttpLog {
             return false;
         }
 
-        let regex = Regex::new("^(GET|POST|HEAD|PUT|DELETE|CONNECT|TRACE|OPTIONS|LINK|UNLINK|COPY|MOVE|PATCH|WRAPPED|EXTENSION\\-METHOD).+HTTP/1.[01]$").unwrap();
         let line = String::from_utf8_lossy(lines[0]).into_owned();
-        if regex.is_match(line.as_str()) {
+        if is_http_req_line(line) {
             self.proto = L7Protocol::Http1;
             return true;
         }
@@ -485,7 +563,6 @@ impl HttpLog {
         &mut self,
         payload: &[u8],
         direction: PacketDirection,
-        check_only: bool,
         is_req_end: Option<bool>,
         is_resp_end: Option<bool>,
     ) -> Result<()> {
@@ -499,14 +576,19 @@ impl HttpLog {
             // 长度不够
             return Err(Error::HttpHeaderParseFailed);
         }
-        if check_only {
-            return Ok(());
+
+        self.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
+
+        // adjuest msg type
+        match direction {
+            PacketDirection::ClientToServer => self.info.msg_type = LogMessageType::Request,
+            PacketDirection::ServerToClient => self.info.msg_type = LogMessageType::Response,
         }
 
         let val_offset = HTTPV2_CUSTOM_DATA_MIN_LENGTH + key_len;
         let key = Vec::from(&payload[HTTPV2_CUSTOM_DATA_MIN_LENGTH..val_offset]);
         let val = Vec::from(&payload[val_offset..val_offset + val_len]);
-        self.on_http2_header(&key, &val, direction);
+        self.on_header(&key, &val, direction);
         if key.as_slice() == b"content-length" {
             self.info.req_content_length = Some(
                 str::from_utf8(val.as_slice())
@@ -520,7 +602,6 @@ impl HttpLog {
         self.info.is_resp_end = is_resp_end.unwrap_or_default();
         self.info.version = String::from("2");
         self.info.stream_id = stream_id;
-        self.proto = L7Protocol::Http2;
         return Ok(());
     }
 
@@ -569,34 +650,13 @@ impl HttpLog {
             }
             let key = str::from_utf8(&body_line[..col_index])?.to_lowercase();
             let value = str::from_utf8(&body_line[col_index + 1..])?.trim();
+            self.on_header(
+                &(((&key).to_lowercase()).as_bytes().to_vec()),
+                &String::from(value).as_bytes().to_vec(),
+                direction,
+            );
             if &key == "content-length" {
                 content_length = Some(value.parse::<u32>().unwrap_or_default());
-            } else if self.l7_log_dynamic_config.is_trace_id(key.as_str()) {
-                if let Some(id) = Self::decode_id(value, key.as_str(), Self::TRACE_ID) {
-                    self.info.trace_id = id;
-                }
-                // 存在配置相同字段的情况，如“sw8”
-                if self.l7_log_dynamic_config.is_span_id(key.as_str()) {
-                    if let Some(id) = Self::decode_id(value, key.as_str(), Self::SPAN_ID) {
-                        self.info.span_id = id;
-                    }
-                }
-            } else if self.l7_log_dynamic_config.is_span_id(key.as_str()) {
-                if let Some(id) = Self::decode_id(value, key.as_str(), Self::SPAN_ID) {
-                    self.info.span_id = id;
-                }
-            } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
-                && key == self.l7_log_dynamic_config.x_request_id_lower
-            {
-                self.info.x_request_id = value.to_owned();
-            } else if direction == PacketDirection::ClientToServer {
-                if &key == "host" {
-                    self.info.host = value.to_owned();
-                } else if !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
-                    && key == self.l7_log_dynamic_config.proxy_client_lower
-                {
-                    self.info.client_ip = value.to_owned();
-                }
             }
         }
 
@@ -680,7 +740,7 @@ impl HttpLog {
                 let header_list = parse_rst.unwrap();
 
                 for (key, val) in header_list.iter() {
-                    self.on_http2_header(key, val, direction);
+                    self.on_header(key, val, direction);
                     if key.as_slice() == b"content-length" {
                         content_length = Some(
                             str::from_utf8(val.as_slice())
@@ -754,11 +814,12 @@ impl HttpLog {
         Err(Error::HttpHeaderParseFailed)
     }
 
-    fn on_http2_header(&mut self, key: &Vec<u8>, val: &Vec<u8>, direction: PacketDirection) {
+    fn on_header(&mut self, key: &Vec<u8>, val: &Vec<u8>, direction: PacketDirection) {
+        let val_str = String::from_utf8_lossy(val.as_slice()).into_owned();
         match key.as_slice() {
             b":method" => {
                 self.info.msg_type = LogMessageType::Request;
-                self.info.method = String::from_utf8_lossy(val.as_slice()).into_owned()
+                self.info.method = val_str
             }
             b":status" => {
                 self.info.msg_type = LogMessageType::Response;
@@ -769,10 +830,21 @@ impl HttpLog {
                 self.info.status_code = Some(code as i32);
                 self.set_status(code);
             }
-            b"host" | b":authority" => {
-                self.info.host = String::from_utf8_lossy(val.as_slice()).into_owned()
+            b"host" | b":authority" => self.info.host = val_str,
+            b":path" => self.info.path = val_str,
+            b"content-type" => {
+                // change to grpc protocol
+                if val_str.starts_with("application/grpc") {
+                    self.proto = L7Protocol::Grpc;
+                    self.info.proto = L7Protocol::Grpc;
+                }
             }
-            b":path" => self.info.path = String::from_utf8_lossy(val.as_slice()).into_owned(),
+            b"user-agent" => {
+                self.info.user_agent = Some(val_str);
+            }
+            b"referer" => {
+                self.info.referer = Some(val_str);
+            }
             _ => {}
         }
 
@@ -792,17 +864,8 @@ impl HttpLog {
             ) {
                 self.info.trace_id = id;
             }
-            // 存在配置相同字段的情况，如“sw8”
-            if self.l7_log_dynamic_config.is_span_id(key_str) {
-                if let Some(id) = Self::decode_id(
-                    &String::from_utf8_lossy(val.as_ref()),
-                    key_str,
-                    Self::SPAN_ID,
-                ) {
-                    self.info.span_id = id;
-                }
-            }
-        } else if self.l7_log_dynamic_config.is_span_id(key_str) {
+        }
+        if self.l7_log_dynamic_config.is_span_id(key_str) {
             if let Some(id) = Self::decode_id(
                 &String::from_utf8_lossy(val.as_ref()),
                 key_str,
@@ -810,11 +873,13 @@ impl HttpLog {
             ) {
                 self.info.span_id = id;
             }
-        } else if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
+        }
+        if !self.l7_log_dynamic_config.x_request_id_origin.is_empty()
             && key_bytes == self.l7_log_dynamic_config.x_request_id_lower.as_bytes()
         {
             self.info.x_request_id = String::from_utf8_lossy(val.as_ref()).into_owned();
-        } else if direction == PacketDirection::ClientToServer
+        }
+        if direction == PacketDirection::ClientToServer
             && !self.l7_log_dynamic_config.proxy_client_origin.is_empty()
             && key_bytes == self.l7_log_dynamic_config.proxy_client_lower.as_bytes()
         {
@@ -918,7 +983,7 @@ impl HttpLog {
 
         match self.info.raw_data_type {
             L7ProtoRawDataType::GoHttp2Uprobe => {
-                self.parse_http2_go_uprobe(payload, direction, false, is_req_end, is_resp_end)?;
+                self.parse_http2_go_uprobe(payload, direction, is_req_end, is_resp_end)?;
             }
             _ => {
                 self.parse_http_v1(payload, direction)
@@ -968,8 +1033,22 @@ impl Httpv2Headers {
     }
 }
 
-const HTTP_METHODS: [&'static str; 9] = [
-    "OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT", "PATCH",
+const HTTP_METHODS: [&'static str; 15] = [
+    "GET",
+    "POST",
+    "PUT",
+    "DELETE",
+    "OPTIONS",
+    "HEAD",
+    "TRACE",
+    "CONNECT",
+    "PATCH",
+    "LINK",
+    "UNLINK",
+    "COPY",
+    "MOVE",
+    "WRAPPED",
+    "EXTENSION-METHOD",
 ];
 const RESPONSE_PREFIX: &'static str = "HTTP/";
 
@@ -987,6 +1066,26 @@ pub fn is_http_v1_payload(buf: &[u8]) -> bool {
         }
     }
     false
+}
+
+// check first line is http request line
+pub fn is_http_req_line(line: String) -> bool {
+    if line.len() < 14 {
+        // less len: `GET / HTTP/1.1`
+        return false;
+    }
+
+    // consider use prefix tree in future
+    for i in HTTP_METHODS.iter() {
+        if line.starts_with(i) {
+            let end = &line.as_str()[line.len() - 8..];
+            match end {
+                "HTTP/0.9" | "HTTP/1.0" | "HTTP/1.1" => return true,
+                _ => return false,
+            }
+        }
+    }
+    return false;
 }
 
 // 参考：https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
@@ -1170,13 +1269,8 @@ mod tests {
                 let payload = hdr.to_bytes(key, val);
                 let mut h = HttpLog::default();
                 h.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
-                let res = h.parse_http2_go_uprobe(
-                    &payload,
-                    PacketDirection::ClientToServer,
-                    true,
-                    None,
-                    None,
-                );
+                let res =
+                    h.parse_http2_go_uprobe(&payload, PacketDirection::ClientToServer, None, None);
                 assert_eq!(res.is_ok(), false);
                 println!("{:#?}", res.err().unwrap());
             }
@@ -1205,13 +1299,8 @@ mod tests {
             let payload = hdr.to_bytes(key, val);
             let mut h = HttpLog::default();
             h.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe;
-            let res = h.parse_http2_go_uprobe(
-                &payload,
-                PacketDirection::ClientToServer,
-                false,
-                None,
-                None,
-            );
+            let res =
+                h.parse_http2_go_uprobe(&payload, PacketDirection::ClientToServer, None, None);
             assert_eq!(res.is_ok(), true);
             println!("{:#?}", h);
         }

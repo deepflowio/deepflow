@@ -489,12 +489,18 @@ impl AppProtoLogsData {
     pub fn ebpf_flow_session_id(&self) -> u64 {
         // 取flow_id(即ebpf底层的socket id)的高8位(cpu id)+低24位(socket id的变化增量), 作为聚合id的高32位
         // |flow_id 高8位| flow_id 低24位|proto 8 位|session 低24位|
+
+        // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
+        let proto = if self.base_info.head.proto == L7Protocol::Grpc {
+            L7Protocol::Http2
+        } else {
+            self.base_info.head.proto
+        };
+
         let flow_id_part =
             (self.base_info.flow_id >> 56 << 56) | (self.base_info.flow_id << 40 >> 8);
         if let Some(session_id) = self.special_info.session_id() {
-            flow_id_part
-                | (self.base_info.head.proto as u64) << 24
-                | ((session_id as u64) & 0xffffff)
+            flow_id_part | (proto as u64) << 24 | ((session_id as u64) & 0xffffff)
         } else {
             let mut cap_seq = self
                 .base_info
@@ -503,7 +509,7 @@ impl AppProtoLogsData {
             if self.base_info.head.msg_type == LogMessageType::Request {
                 cap_seq += 1;
             };
-            flow_id_part | ((self.base_info.head.proto as u64) << 24) | (cap_seq & 0xffffff)
+            flow_id_part | ((proto as u64) << 24) | (cap_seq & 0xffffff)
         }
     }
 

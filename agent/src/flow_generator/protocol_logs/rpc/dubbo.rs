@@ -31,6 +31,7 @@ use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
+use crate::flow_generator::protocol_logs::pb_adapter::ExtendedInfo;
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
 use crate::log_info_merge;
 use crate::parse_common;
@@ -117,13 +118,15 @@ impl L7ProtocolInfoInterface for DubboInfo {
 
 impl From<DubboInfo> for L7ProtocolSendLog {
     fn from(f: DubboInfo) -> Self {
+        let endpoint = format!("{}/{}", f.service_name, f.method_name);
         L7ProtocolSendLog {
             req_len: f.req_msg_size,
             resp_len: f.resp_msg_size,
             version: Some(f.dubbo_version),
             req: L7Request {
-                domain: f.service_name,
-                resource: f.method_name,
+                resource: f.service_name.clone(),
+                req_type: f.method_name.clone(),
+                endpoint,
                 ..Default::default()
             },
             resp: L7Response {
@@ -131,6 +134,10 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 code: f.status_code,
                 ..Default::default()
             },
+            ext_info: Some(ExtendedInfo {
+                rpc_service: Some(f.service_name),
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }
