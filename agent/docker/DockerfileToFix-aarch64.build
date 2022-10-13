@@ -1,0 +1,67 @@
+# Compile phase
+# Use Centos as the base image and install the required dependencies
+# aarch64 agent Compile the image, you need to make this image in the aarch64 machine
+FROM centos:centos7.9.2009
+
+# Configure rust environment variables
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+# Install base dependencies
+RUN yum install make epel-release centos-release-scl -y && yum -y install jq
+RUN yum install gcc gcc-c++ curl devtoolset-8-gcc devtoolset-8-gdb devtoolset-8-gcc-c++ devtoolset-8-binutils openssl-devel libpcap-devel perl-Digest-MD5 elfutils-libelf-devel-static glibc-static zlib-static git emacs-filesystem -y && \
+    curl https://sh.rustup.rs -so restup.sh; bash restup.sh -y && \
+    source /opt/rh/devtoolset-8/enable && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-devel-1.2.2-el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-filesystem-1.2.2-el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-gcc-1.2.2-el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-libc-1.2.2-el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-libc-static-1.2.2-el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-debugsource-1.2.2-el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-libc-debuginfo-1.2.2-el7.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./musl-*.rpm --skip-broken && rm -rf musl-*.rpm && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/bcc-bpf-0.25.0-2.el7.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./bcc-bpf-*.rpm && rm -rf bcc-bpf-*.rpm && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/libdwarf-0.4.1-1.el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/libdwarf-debuginfo-0.4.1-1.el7.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./libdwarf-*.rpm && rm -rf libdwarf-*.rpm && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/libGoReSym-0.0.1-2.el8.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./libGoReSym-*.rpm && rm -rf libGoReSym-*.rpm && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/protobuf-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/protobuf-compiler-3.6.1-4.el7.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ./protobuf-*.rpm && rm -rf protobuf-*.rpm && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/ebpftoolsbuilder-llvm-clang-11.0.0-2.el7.aarch64.rpm --silent -O && \
+    yum --disablerepo=* localinstall -y ebpftoolsbuilder-llvm-clang-*.rpm && rm -rf ebpftoolsbuilder-llvm-clang-*.rpm && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl-clang-1.2.2-el7.aarch64.rpm --silent -O && \
+    rpm -ivh musl-clang-*.rpm --force --nodeps && rm -rf musl-clang-*.rpm && \
+    yum clean all
+
+
+# musl static library and header files
+RUN cd /usr/aarch64-linux-musl/lib64  && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl/libbcc_bpf.a --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl/libpcap.a --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl/libelf.a --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl/libz.a --silent -O && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl/libGoReSym.a --silent -O && \
+    cp /usr/lib64/libdwarf.a ./ && \
+    cd /usr/aarch64-linux-musl/include  && \
+    curl http://cloud.deepservice.yunshan.net:1080/compile/aarch64/musl/elf.h --silent -O && \
+    ln -s /usr/include/bcc bcc && \
+    ln -s /usr/include/asm asm  && \
+    ln -s /usr/include/asm-generic asm-generic  && \
+    ln -s /usr/include/bddisasm bddisasm  && \
+    ln -s /usr/include/gelf.h gelf.h  && \
+    ln -s /usr/include/libdwarf-0 libdwarf-0  && \
+    ln -s /usr/include/libelf.h libelf.h  && \
+    ln -s /usr/include/libGoReSym.h libGoReSym.h  && \
+    ln -s /usr/include/linux linux  && \
+    ln -s /usr/include/sys/queue.h sys/queue.h && \
+    ln -s /usr/include/zlib.h zlib.h && \
+    ln -s /usr/bin/musl-gcc /usr/bin/aarch64-linux-musl-gcc
+
+RUN rustup target add aarch64-unknown-linux-musl
+# rust uses dependency cache
+RUN cargo install sccache
+CMD bash

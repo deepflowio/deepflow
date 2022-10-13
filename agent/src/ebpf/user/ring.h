@@ -82,7 +82,6 @@
 #include <stdint.h>
 #include <sys/queue.h>
 #include <errno.h>
-#include <emmintrin.h>
 #include "common.h"
 #include "atomic.h"
 

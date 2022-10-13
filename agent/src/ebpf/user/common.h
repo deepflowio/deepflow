@@ -19,7 +19,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <fcntl.h>
-#include <emmintrin.h>
 #include <time.h>
 
 #define __unused __attribute__((__unused__))
@@ -74,10 +73,20 @@ extern int sysinfo(struct sysinfo *__info);
 #define CACHE_LINE_SIZE   64
 #define CACHE_LINE_MASK (CACHE_LINE_SIZE-1)
 
+#if defined(__x86_64__)
+#include <emmintrin.h>
 static inline void __pause(void)
 {
 	_mm_pause();
 }
+#elif defined(__aarch64__)
+static inline void __pause(void)
+{
+	asm volatile("yield" ::: "memory");
+}
+#else
+_Pragma("GCC error \"__pause()\"");
+#endif
 
 #define CACHE_LINE_ROUNDUP(size) \
    (CACHE_LINE_SIZE * ((size + CACHE_LINE_SIZE - 1) / CACHE_LINE_SIZE))
