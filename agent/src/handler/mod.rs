@@ -23,10 +23,9 @@ use std::time::Duration;
 
 use crate::common::meta_packet::MetaPacket;
 use crate::pcap::PcapPacket;
-use crate::utils::net::MacAddr;
 use npb_handler::{NpbHandler, NpbMode};
 use npb_pcap_policy::PolicyData;
-use public::queue::DebugSender;
+use public::{queue::DebugSender, utils::net::MacAddr};
 
 pub struct IpInfo {
     pub mac: MacAddr,

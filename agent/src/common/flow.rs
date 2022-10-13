@@ -34,7 +34,6 @@ use super::{
 };
 
 use crate::proto::flow_log;
-use crate::utils::net::MacAddr;
 use crate::{
     common::endpoint::EPC_FROM_INTERNET, metric::document::Direction, proto::common::TridentType,
 };
@@ -43,6 +42,7 @@ use crate::{
     flow_generator::FlowState,
     metric::document::TapSide,
 };
+use public::utils::net::MacAddr;
 
 pub use public::enums::L4Protocol;
 pub use public::l7_protocol::*;

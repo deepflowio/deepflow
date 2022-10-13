@@ -43,8 +43,8 @@ fn bench_flow_map(c: &mut Criterion) {
                 })
                 .collect::<Vec<_>>();
             let start = Instant::now();
-            for pkt in packets {
-                map.inject_meta_packet(pkt);
+            for mut pkt in packets {
+                map.inject_meta_packet(&mut pkt);
             }
             start.elapsed()
         })
@@ -85,8 +85,8 @@ fn bench_flow_map(c: &mut Criterion) {
             }
 
             let start = Instant::now();
-            for pkt in packets {
-                map.inject_meta_packet(pkt);
+            for mut pkt in packets {
+                map.inject_meta_packet(&mut pkt);
             }
             start.elapsed()
         })

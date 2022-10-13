@@ -25,8 +25,8 @@ use super::{
     matched_field::{MatchedField, MatchedFieldv4, MatchedFieldv6, MatchedFlag},
 };
 
-use crate::utils::net::MacAddr;
 use npb_pcap_policy::{DedupOperator, TapSide};
+use public::utils::net::MacAddr;
 
 #[derive(Clone, Debug)]
 pub struct LookupKey {

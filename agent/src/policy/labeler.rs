@@ -25,7 +25,7 @@ use crate::common::endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::{IfType, PlatformData};
 use crate::common::policy::{Cidr, CidrType, PeerConnection};
-use crate::utils::net::is_unicast_link_local;
+use public::utils::net::is_unicast_link_local;
 
 const BROADCAST_MAC: u64 = 0xffffffffffff;
 const MULTICAST_MAC: u64 = 0x010000000000;
@@ -648,7 +648,7 @@ mod tests {
 
     use super::*;
     use crate::common::platform_data::IpSubnet;
-    use crate::utils::net::MacAddr;
+    use public::utils::net::MacAddr;
 
     #[test]
     fn test_mac_normal() {

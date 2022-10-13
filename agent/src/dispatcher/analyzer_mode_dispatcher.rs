@@ -41,11 +41,9 @@ use crate::{
     handler::{MiniPacket, PacketHandler},
     proto::trident::IfMacSource,
     rpc::get_timestamp,
-    utils::{
-        net::{Link, MacAddr},
-        stats::{Countable, RefCountable, StatsOption},
-    },
+    utils::stats::{Countable, RefCountable, StatsOption},
 };
+use public::utils::net::{Link, MacAddr};
 
 // BILD to reduce the processing flow of Trident tunnel traffic, the tunnel traffic will be marked
 // Use the first byte of the source MAC to mark the ERSPAN traffic, which is 0xff

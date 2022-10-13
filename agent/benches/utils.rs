@@ -21,12 +21,12 @@ use std::time::{Duration, Instant};
 
 use criterion::*;
 
-use deepflow_agent::{_LeakyBucket as LeakyBucket, _queue_bounded as queue_bounded};
+use public::{queue, LeakyBucket};
 
 fn queue(c: &mut Criterion) {
     c.bench_function("queue_send", |b| {
         b.iter_custom(|iters| {
-            let (s, _r, _) = queue_bounded(iters as usize);
+            let (s, _r, _) = queue::bounded(iters as usize);
             let start = Instant::now();
             for i in 0..iters {
                 s.send(i).unwrap();
@@ -36,7 +36,7 @@ fn queue(c: &mut Criterion) {
     });
     c.bench_function("queue_receive", |b| {
         b.iter_custom(|iters| {
-            let (s, r, _) = queue_bounded(iters as usize);
+            let (s, r, _) = queue::bounded(iters as usize);
             for i in 0..iters {
                 s.send(i).unwrap();
             }
@@ -48,7 +48,7 @@ fn queue(c: &mut Criterion) {
     });
     c.bench_function("queue_receive_n", |b| {
         b.iter_custom(|iters| {
-            let (s, r, _) = queue_bounded(iters as usize);
+            let (s, r, _) = queue::bounded(iters as usize);
             for i in 0..iters {
                 s.send(i).unwrap();
             }

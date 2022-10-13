@@ -39,14 +39,14 @@ use crate::common::{
 use crate::config::NpbConfig;
 use crate::dispatcher::af_packet::{Options, Tpacket};
 use crate::proto::trident::SocketType;
-use crate::utils::{
-    net::{
+use crate::utils::stats::{self, StatsOption};
+use public::{
+    queue::Receiver,
+    utils::net::{
         get_route_src_ip_and_mac, get_route_src_ip_interface_name, neighbor_lookup, MacAddr,
         MAC_ADDR_LEN,
     },
-    stats::{self, StatsOption},
 };
-use public::queue::Receiver;
 
 fn serialize_seq(
     packet: &mut Vec<u8>,

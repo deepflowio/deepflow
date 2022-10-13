@@ -35,16 +35,14 @@ use crate::common::{
 use crate::config::NpbConfig;
 use crate::proto::trident::VlanMode;
 use crate::sender::npb_sender::NpbPacketSender;
-use crate::utils::{
-    net::MacAddr,
-    stats::{self, StatsOption},
-};
+use crate::utils::stats::{self, StatsOption};
 use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter};
 use public::{
     counter::Countable,
     debug::QueueDebugger,
     leaky_bucket::LeakyBucket,
     queue::{bounded_with_debug, DebugSender},
+    utils::net::MacAddr,
 };
 
 pub struct NpbBuilder {

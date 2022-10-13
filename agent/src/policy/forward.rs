@@ -33,7 +33,7 @@ use crate::common::platform_data::PlatformData;
 use crate::common::TapPort;
 use crate::proto::common::TridentType;
 use crate::utils::environment::is_tt_workload;
-use crate::utils::net::MacAddr;
+use public::utils::net::MacAddr;
 
 pub const FROM_CONTROLLER: u16 = 1;
 pub const FROM_CONFIG: u16 = 2;

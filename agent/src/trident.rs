@@ -75,16 +75,20 @@ use crate::{
     sender::{uniform_sender::UniformSenderThread, SendItem},
     utils::{
         environment::{
-            check, controller_ip_check, free_memory_check, free_space_checker, kernel_check,
-            running_in_container, tap_interface_check, trident_process_check,
+            check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
+            kernel_check, running_in_container, tap_interface_check, trident_process_check,
         },
         guard::Guard,
         logger::{LogLevelWriter, LogWriterAdapter, RemoteLogConfig, RemoteLogWriter},
-        net::{get_ctrl_ip_and_mac, get_route_src_ip, links_by_name_regex, MacAddr},
         stats::{self, Countable, RefCountable, StatsOption},
     },
 };
-use public::{debug::QueueDebugger, queue, LeakyBucket};
+use public::{
+    debug::QueueDebugger,
+    queue,
+    utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
+    LeakyBucket,
+};
 
 const MINUTE: Duration = Duration::from_secs(60);
 

@@ -56,14 +56,15 @@ use crate::{
     policy::PolicyGetter,
     proto::trident::{Exception, IfMacSource, TapMode},
     rpc::get_timestamp,
-    utils::{
-        bytes::read_u16_be,
-        net::{self, get_route_src_ip, Link, MacAddr},
-        stats::Collector,
-    },
+    utils::{bytes::read_u16_be, stats::Collector},
 };
 
-use public::{packet::Packet, queue::DebugSender, LeakyBucket};
+use public::{
+    packet::Packet,
+    queue::DebugSender,
+    utils::net::{self, get_route_src_ip, Link, MacAddr},
+    LeakyBucket,
+};
 
 pub(super) struct BaseDispatcher {
     pub(super) engine: RecvEngine,

@@ -29,9 +29,9 @@ use crate::{
         TapPort,
     },
     proto::common::TridentType,
-    utils::net::MacAddr,
 };
 use npb_pcap_policy::PolicyData;
+use public::utils::net::MacAddr;
 
 #[repr(u8)]
 enum MatchMac {

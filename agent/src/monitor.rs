@@ -31,13 +31,13 @@ use sysinfo::{
 use crate::{
     error::{Error, Result},
     utils::{
-        net::link_list,
         process::{get_current_sys_free_memory_percentage, get_file_and_size_sum},
         stats::{
             Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
         },
     },
 };
+use public::utils::net::link_list;
 
 #[derive(Default)]
 struct NetMetricArg {

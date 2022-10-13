@@ -14,12 +14,8 @@
  * limitations under the License.
  */
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::time::Duration;
-use std::{fmt, str};
+use std::{cell::RefCell, fmt, rc::Rc, str, time::Duration};
 
-use crate::utils::net::h2pack;
 use crate::{
     common::{
         enums::IpProtocol,
@@ -37,6 +33,7 @@ use crate::{
         },
     },
 };
+use public::utils::net::h2pack;
 
 struct HttpSessionData {
     // HTTPv2 Header

@@ -18,17 +18,11 @@ use std::{
     array::TryFromSliceError,
     fmt,
     net::{IpAddr, Ipv6Addr},
-    process,
     str::FromStr,
-    thread,
-    time::Duration,
 };
 
 use bitflags::bitflags;
-use log::error;
 use serde::Serialize;
-
-use super::environment::get_k8s_local_node_ip;
 
 pub mod h2pack;
 
@@ -294,30 +288,6 @@ pub fn get_mac_by_ip(ip: IpAddr) -> Result<MacAddr> {
         )))?;
 
     Ok(mac)
-}
-
-pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
-    // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
-    match get_k8s_local_node_ip() {
-        Some(ip) => {
-            let ctrl_mac = get_mac_by_ip(ip);
-            if ctrl_mac.is_err() {
-                error!("failed getting ctrl_mac from {}: {:?}", ip, ctrl_mac);
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
-            }
-            (ip, ctrl_mac.unwrap())
-        }
-        None => {
-            let tuple = get_route_src_ip_and_mac(&dest);
-            if tuple.is_err() {
-                error!("failed getting control ip and mac");
-                thread::sleep(Duration::from_secs(1));
-                process::exit(-1);
-            }
-            tuple.unwrap()
-        }
-    }
 }
 
 pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {

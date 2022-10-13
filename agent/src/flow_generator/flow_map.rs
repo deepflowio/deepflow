@@ -67,12 +67,12 @@ use crate::{
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
     rpc::get_timestamp,
-    utils::net::MacAddr,
 };
 use npb_pcap_policy::PolicyData;
 use public::{
     debug::QueueDebugger,
     queue::{self, DebugSender, Receiver},
+    utils::net::MacAddr,
 };
 
 // not thread-safe
@@ -1339,14 +1339,14 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
 mod tests {
     use std::{net::IpAddr, ops::Add, time};
 
+    use super::*;
+
     use crate::{
         common::{enums::EthernetType, flow::CloseType, tap_port::TapPort},
-        utils::{net::MacAddr, test::Capture},
+        utils::test::Capture,
     };
-
     use npb_pcap_policy::{NpbAction, NpbTunnelType, TapSide};
-
-    use super::*;
+    use public::utils::net::MacAddr;
 
     const DEFAULT_DURATION: Duration = Duration::from_millis(10);
 

@@ -41,12 +41,12 @@ use crate::{
     platform::LibvirtXmlExtractor,
     proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
-    utils::stats::{Countable, RefCountable, StatsOption},
     utils::{
         bytes::read_u16_be,
-        net::{link_list, Link, MacAddr},
+        stats::{Countable, RefCountable, StatsOption},
     },
 };
+use public::utils::net::{link_list, Link, MacAddr};
 
 pub(super) struct LocalModeDispatcher {
     pub(super) base: BaseDispatcher,

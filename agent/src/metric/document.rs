@@ -28,7 +28,7 @@ use crate::common::{
     tap_port::TapPort,
 };
 use crate::proto::metric;
-use crate::utils::net::MacAddr;
+use public::utils::net::MacAddr;
 
 #[derive(Debug)]
 pub struct Document {

@@ -38,8 +38,6 @@ use super::{
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 
-#[cfg(target_os = "windows")]
-use crate::utils::net::links_by_name_regex;
 use crate::{
     common::decapsulate::TunnelTypeBitmap,
     dispatcher::recv_engine,
@@ -52,9 +50,8 @@ use crate::{
     },
     trident::Components,
     utils::{
-        environment::free_memory_check,
+        environment::{free_memory_check, get_ctrl_ip_and_mac},
         logger::RemoteLogConfig,
-        net::{get_ctrl_ip_and_mac, MacAddr},
     },
 };
 #[cfg(target_os = "linux")]
@@ -64,6 +61,9 @@ use crate::{
     ebpf::CAP_LEN_MAX,
     utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
 };
+#[cfg(target_os = "windows")]
+use public::utils::net::links_by_name_regex;
+use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
 const MINUTE: Duration = Duration::from_secs(60);
