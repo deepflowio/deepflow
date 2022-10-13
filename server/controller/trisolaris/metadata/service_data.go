@@ -295,10 +295,10 @@ func serviceToProto(
 }
 
 func (s *ServiceDataOP) generateService() {
-	dbDatCache := s.metaData.GetDBDataCache()
+	dbDataCache := s.metaData.GetDBDataCache()
 	services := []*trident.Service{}
 	rData := s.serviceRawData
-	for _, podGroup := range dbDatCache.GetPodGroups() {
+	for _, podGroup := range dbDataCache.GetPodGroups() {
 		vpcID := rData.podClusterIDToVPCID[podGroup.PodClusterID]
 		ports, ok := rData.podGroupIDToPodGroupPorts[podGroup.ID]
 		if ok == false {
@@ -324,7 +324,7 @@ func (s *ServiceDataOP) generateService() {
 		}
 	}
 
-	for _, podService := range dbDatCache.GetPodServices() {
+	for _, podService := range dbDataCache.GetPodServices() {
 		ports, ok := rData.podServiceIDToPodServicePorts[podService.ID]
 		if ok == false {
 			continue
@@ -364,7 +364,7 @@ func (s *ServiceDataOP) generateService() {
 		}
 	}
 
-	for _, lbListener := range dbDatCache.GetLBListeners() {
+	for _, lbListener := range dbDataCache.GetLBListeners() {
 		vpcID := rData.lbIDToVPCID[lbListener.LBID]
 		var ips []string
 		if lbListener.IPs != "" {
@@ -382,7 +382,7 @@ func (s *ServiceDataOP) generateService() {
 		}
 	}
 
-	for _, lbts := range dbDatCache.GetLBTargetServers() {
+	for _, lbts := range dbDataCache.GetLBTargetServers() {
 		vpcID := rData.lbIDToVPCID[lbts.LBID]
 		var ips []string
 		if lbts.IP == "" {
