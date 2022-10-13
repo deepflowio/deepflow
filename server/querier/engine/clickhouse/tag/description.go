@@ -242,13 +242,13 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		labelKey := "label." + key.(string)
 		if db == "ext_metrics" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response["values"] = append(response["values"], []interface{}{
-				labelKey, labelKey, labelKey, labelKey, "label",
-				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
+				labelKey, labelKey, labelKey, "K8s Labels", "label",
+				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" {
 			response["values"] = append(response["values"], []interface{}{
-				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
-				"标签", tagTypeToOperators["string"], []bool{true, true, true}, "",
+				labelKey, labelKey + "_0", labelKey + "_1", "K8s Labels", "label",
+				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "",
 			})
 		}
 
@@ -290,8 +290,8 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
-				externalTag, externalTag, externalTag, externalTag, "attribute",
-				"原始Attribute", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
+				externalTag, externalTag, externalTag, "Attributes", "attribute",
+				"Attributes", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		}
 	}
@@ -332,7 +332,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		}
 		return response, nil
 	}
-	// 标签是动态的,不需要去tag_description里确认
+	// K8s Labels是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
 		return GetTagResourceValues(sql)
 	}
