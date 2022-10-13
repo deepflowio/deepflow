@@ -167,10 +167,10 @@ func (g *GroupDataOP) getDropletGroupsVersion() uint64 {
 // The data traversal must be kept in order to ensure
 // that the calculation hash is consistent when the data is unchanged
 func (g *GroupDataOP) generateGroupRawData() {
-	dbDatCache := g.metaData.GetDBDataCache()
+	dbDataCache := g.metaData.GetDBDataCache()
 
 	podServiceIDToPodGroupIDs := make(map[int][]int)
-	for _, podGroupPort := range dbDatCache.GetPodGroupPorts() {
+	for _, podGroupPort := range dbDataCache.GetPodGroupPorts() {
 		if _, ok := podServiceIDToPodGroupIDs[podGroupPort.PodServiceID]; ok {
 			podServiceIDToPodGroupIDs[podGroupPort.PodServiceID] = append(
 				podServiceIDToPodGroupIDs[podGroupPort.PodServiceID], podGroupPort.PodGroupID)
@@ -180,7 +180,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 	}
 
 	groupIDsUsedByNpbPcap := mapset.NewSet()
-	for _, acl := range dbDatCache.GetACLs() {
+	for _, acl := range dbDataCache.GetACLs() {
 		if Find[int](tridentGroup, acl.BusinessID) {
 			if acl.SrcGroupIDs != "" {
 				id, err := strconv.Atoi(acl.SrcGroupIDs)
@@ -202,7 +202,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 	}
 
 	idToExtraInfo := make(map[int]*models.ResourceGroupExtraInfo)
-	resourceGroupExtraInfos := dbDatCache.GetResourceGroupExtraInfos()
+	resourceGroupExtraInfos := dbDataCache.GetResourceGroupExtraInfos()
 	for _, resourceGroupExtraInfo := range resourceGroupExtraInfos {
 		idToExtraInfo[resourceGroupExtraInfo.ID] = resourceGroupExtraInfo
 	}
@@ -212,13 +212,13 @@ func (g *GroupDataOP) generateGroupRawData() {
 	groupIDToPodGroupIDs := make(map[int][]int)
 	groupIDToPodIDs := make(map[int][]int)
 	groupIDToPodServiceIDs := make(map[int][]int)
-	resourceGroups := dbDatCache.GetResourceGroups()
+	resourceGroups := dbDataCache.GetResourceGroups()
 	tridentGroups := make([]*models.ResourceGroup, 0, len(resourceGroups))
 	dropletGroups := make([]*models.ResourceGroup, 0, len(resourceGroups))
 	idToGroup := make(map[int]*models.ResourceGroup)
 	for _, resourceGroup := range resourceGroups {
 		idToGroup[resourceGroup.ID] = resourceGroup
-		if Find[int](tridentGroup, resourceGroup.BusinessID) || groupIDsUsedByNpbPcap.Contains(resourceGroup.ID) {
+		if Find[int](tridentGroup, resourceGroup.BusinessID) && groupIDsUsedByNpbPcap.Contains(resourceGroup.ID) {
 			tridentGroups = append(tridentGroups, resourceGroup)
 		}
 		dropletGroups = append(dropletGroups, resourceGroup)
@@ -273,7 +273,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 
 	pgidToPids := make(map[int][]int)
 	groupPodIDs := mapset.NewSet()
-	for _, pod := range dbDatCache.GetPods() {
+	for _, pod := range dbDataCache.GetPods() {
 		if podGroupIDs.Contains(pod.PodGroupID) {
 			groupPodIDs.Add(pod.ID)
 			if _, ok := pgidToPids[pod.PodGroupID]; ok {
@@ -288,7 +288,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 	allPodVifs := mapset.NewSet()
 	podVifs := mapset.NewSet()
 	pidToVifIDs := make(map[int][]int)
-	for _, vif := range dbDatCache.GetVInterfaces() {
+	for _, vif := range dbDataCache.GetVInterfaces() {
 		if vif.DeviceType == VIF_DEVICE_TYPE_POD &&
 			(groupPodIDs.Contains(vif.DeviceID) || podIDs.Contains(vif.DeviceID)) {
 			podVifs.Add(vif.ID)
@@ -307,7 +307,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 	}
 
 	vifidToIPs := make(map[int][]string)
-	for _, lanIP := range dbDatCache.GetLANIPs() {
+	for _, lanIP := range dbDataCache.GetLANIPs() {
 		if allPodVifs.Contains(lanIP.VInterfaceID) {
 			if _, ok := vifidToIPs[lanIP.VInterfaceID]; ok {
 				vifidToIPs[lanIP.VInterfaceID] = append(
@@ -342,7 +342,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 	}
 
 	podClusterIDToPodNodeIPs := make(map[int][]string)
-	for _, podNode := range dbDatCache.GetPodNodes() {
+	for _, podNode := range dbDataCache.GetPodNodes() {
 		if podNode.IP != "" {
 			if _, ok := podClusterIDToPodNodeIPs[podNode.PodClusterID]; ok {
 				podClusterIDToPodNodeIPs[podNode.PodClusterID] = append(
@@ -353,7 +353,7 @@ func (g *GroupDataOP) generateGroupRawData() {
 
 	rawData := g.metaData.GetPlatformDataOP().GetRawData()
 	groupIDToIPs := make(map[int]*GroupIP)
-	for _, resourceGroup := range dbDatCache.GetResourceGroups() {
+	for _, resourceGroup := range dbDataCache.GetResourceGroups() {
 		var ips, ipRange []string
 		switch resourceGroup.Type {
 		case RESOURCE_GROUP_TYPE_VM, RESOURCE_GROUP_TYPE_ANONYMOUS_VM:
