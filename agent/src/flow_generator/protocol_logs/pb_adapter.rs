@@ -15,6 +15,7 @@
  */
 
 use super::L7ResponseStatus;
+
 use crate::proto::flow_log;
 
 #[derive(Default, Debug)]
@@ -22,6 +23,7 @@ pub struct L7Request {
     pub req_type: String,
     pub domain: String,
     pub resource: String,
+    pub endpoint: String,
 }
 
 #[derive(Default, Debug)]
@@ -39,12 +41,22 @@ pub struct TraceInfo {
     pub parent_span_id: Option<String>,
 }
 
+#[derive(Debug)]
+pub struct KeyVal {
+    pub key: String,
+    pub val: String,
+}
+
 #[derive(Default, Debug)]
 pub struct ExtendedInfo {
     pub service_name: Option<String>,
+    pub rpc_service: Option<String>,
     pub client_ip: Option<String>,
     pub request_id: Option<u32>,
     pub x_request_id: Option<String>,
+    pub user_agent: Option<String>,
+    pub referer: Option<String>,
+    pub attributes: Option<Vec<KeyVal>>,
 }
 
 /*
@@ -88,8 +100,7 @@ impl L7ProtocolSendLog {
             req_type: self.req.req_type.into(),
             domain: self.req.domain.into(),
             resource: self.req.resource.into(),
-            // FIXME @dexian
-            endpoint: "FIXME".into(),
+            endpoint: self.req.endpoint.into(),
         });
         log.resp = Some(flow_log::L7Response {
             code: self.resp.code.unwrap_or(i16::MIN as i32),
@@ -116,11 +127,15 @@ impl L7ProtocolSendLog {
 
             log.trace_info = Some(t);
         }
+
         if let Some(ext) = self.ext_info {
             let mut ext_info = flow_log::ExtendedInfo::default();
 
             if let Some(s) = ext.service_name {
                 ext_info.service_name = s.into();
+            }
+            if let Some(s) = ext.rpc_service {
+                ext_info.rpc_service = s.into();
             }
             if let Some(s) = ext.client_ip {
                 ext_info.client_ip = s.into();
@@ -131,7 +146,18 @@ impl L7ProtocolSendLog {
             if let Some(s) = ext.x_request_id {
                 ext_info.x_request_id = s.into();
             }
-
+            if let Some(ua) = ext.user_agent {
+                ext_info.http_user_agent = ua;
+            }
+            if let Some(referer) = ext.referer {
+                ext_info.http_referer = referer;
+            }
+            if let Some(attr) = ext.attributes {
+                for kv in attr.into_iter() {
+                    ext_info.attribute_names.push(kv.key);
+                    ext_info.attribute_values.push(kv.val);
+                }
+            }
             log.ext_info = Some(ext_info);
         }
     }
