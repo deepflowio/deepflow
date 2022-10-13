@@ -170,7 +170,8 @@ macro_rules! all_protocol {
         pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
             match p {
                 L7Protocol::Http1 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
-                L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2())),
+                L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(false))),
+                L7Protocol::Grpc => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(true))),
 
                 $(
                     L7Protocol::$l7_proto=>Some(L7ProtocolParser::$parser($log::$new_func())),
@@ -183,7 +184,7 @@ macro_rules! all_protocol {
         pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
             Vec::from([
                 L7ProtocolParser::HttpParser(HttpLog::new_v1()),
-                L7ProtocolParser::HttpParser(HttpLog::new_v2()),
+                L7ProtocolParser::HttpParser(HttpLog::new_v2(false)),
 
                 $(
                     L7ProtocolParser::$parser($log::$new_func()),
