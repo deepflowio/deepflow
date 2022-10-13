@@ -1,0 +1,39 @@
+# TODO aarch64 need update rust-build image
+on: 
+   pull_request:
+      paths:
+        - 'agent/**'
+        - 'message/**'
+
+name: verify agent
+
+jobs:
+  verify_agent:
+    name: verify agent
+    runs-on: [self-hosted, 16c16g]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "ghcr.io" 
+          username: "${{ github.repository_owner }}"
+          password: "${{ secrets.GITHUB_TOKEN }}" 
+
+      - name: verify agent
+        run: |
+          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.14 "-c" "\
+          source /opt/rh/devtoolset-8/enable && \
+          cd  agent/src/ebpf && \
+          CC=musl-gcc CLANG=musl-clang make clean && \
+          CC=musl-gcc CLANG=musl-clang make rust-sample && \
+          CC=musl-gcc CLANG=musl-clang make test && \
+          CC=musl-gcc CLANG=musl-clang make tools && \
+          cd ../../ && \
+          RUSTFLAGS='-D warnings' cargo check && \
+          cargo fmt --all -- --check"

@@ -824,6 +824,10 @@ impl<'a> MetaPacket<'a> {
         let cap_len = capture_size.min(data.cap_len as usize);
 
         packet.raw_from_ebpf = vec![0u8; cap_len as usize];
+        #[cfg(target_arch = "aarch64")]
+        data.cap_data
+            .copy_to_nonoverlapping(packet.raw_from_ebpf.as_mut_ptr() as *mut u8, cap_len);
+        #[cfg(target_arch = "x86_64")]
         data.cap_data
             .copy_to_nonoverlapping(packet.raw_from_ebpf.as_mut_ptr() as *mut i8, cap_len);
         packet.packet_len = data.syscall_len as usize + 54; // 目前仅支持TCP
@@ -834,9 +838,15 @@ impl<'a> MetaPacket<'a> {
         packet.process_id = data.process_id;
         packet.thread_id = data.thread_id;
         packet.syscall_trace_id = data.syscall_trace_id_call;
-        packet.process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
+        #[cfg(target_arch = "aarch64")]
+        let process_name = CStr::from_ptr(data.process_name.as_ptr() as *const u8)
             .to_str()?
             .to_string();
+        #[cfg(target_arch = "x86_64")]
+        let process_name = CStr::from_ptr(data.process_name.as_ptr() as *const i8)
+            .to_str()?
+            .to_string();
+        packet.process_name = process_name;
         packet.socket_id = data.socket_id;
         packet.tcp_data.seq = data.tcp_seq as u32;
         packet.ebpf_type = EbpfType::from(data.source);

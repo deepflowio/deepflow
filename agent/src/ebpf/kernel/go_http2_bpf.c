@@ -5,7 +5,7 @@ static __inline void *get_the_first_parameter(struct pt_regs *ctx,
 	if (is_register_based_call(info)) {
 		ptr = (void *)PT_GO_REGS_PARM1(ctx);
 	} else {
-		bpf_probe_read(&ptr, sizeof(ptr), (void *)(ctx->rsp + 8));
+		bpf_probe_read(&ptr, sizeof(ptr), (void *)(PT_REGS_SP(ctx) + 8));
 	}
 	return ptr;
 }
@@ -490,13 +490,13 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 		data.value.len = PT_GO_REGS_PARM5(ctx);
 	} else {
 		bpf_probe_read(&data.name.ptr, sizeof(data.name.ptr),
-			       (void *)(ctx->rsp + 16));
+			       (void *)(PT_REGS_SP(ctx) + 16));
 		bpf_probe_read(&data.name.len, sizeof(data.name.len),
-			       (void *)(ctx->rsp + 24));
+			       (void *)(PT_REGS_SP(ctx) + 24));
 		bpf_probe_read(&data.value.ptr, sizeof(data.value.ptr),
-			       (void *)(ctx->rsp + 32));
+			       (void *)(PT_REGS_SP(ctx) + 32));
 		bpf_probe_read(&data.value.len, sizeof(data.value.len),
-			       (void *)(ctx->rsp + 40));
+			       (void *)(PT_REGS_SP(ctx) + 40));
 	}
 	http2_fill_buffer_and_send(&data, buffer, send_buffer);
 	return 0;
@@ -520,7 +520,7 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 		data.stream = (__u32)PT_GO_REGS_PARM2(ctx);
 	} else {
 		bpf_probe_read(&(data.stream), sizeof(data.stream),
-			       (void *)(ctx->rsp + 16));
+			       (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	data.read = false;
@@ -559,7 +559,7 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
+		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
@@ -611,7 +611,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		ptr = (void *)PT_GO_REGS_PARM3(ctx);
 	} else {
-		bpf_probe_read(&ptr, sizeof(ptr), (void *)(ctx->rsp + 24));
+		bpf_probe_read(&ptr, sizeof(ptr), (void *)(PT_REGS_SP(ctx) + 24));
 	}
 
 	bpf_probe_read(&(data.stream), sizeof(data.stream), ptr + 0x0);
@@ -681,7 +681,7 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM3(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 24));
+		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 24));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
@@ -718,7 +718,7 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 	} else {
 		// 8 + 8 + 4 + 4
 		bpf_probe_read(&fields, sizeof(fields),
-			       (void *)(ctx->rsp + 24));
+			       (void *)(PT_REGS_SP(ctx) + 24));
 	}
 
 	struct http2_headers_data headers = { 0 };
@@ -731,7 +731,7 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 		headers.stream = (__u32)PT_GO_REGS_PARM2(ctx);
 	} else {
 		bpf_probe_read(&headers.stream, sizeof(headers.stream),
-			       (void *)(ctx->rsp + 16));
+			       (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	int is_server_side = get_side_from_grpc_loopyWriter(ctx, info);
@@ -757,7 +757,7 @@ int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
+		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);
@@ -793,7 +793,7 @@ int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
-		bpf_probe_read(&frame, sizeof(frame), (void *)(ctx->rsp + 16));
+		bpf_probe_read(&frame, sizeof(frame), (void *)(PT_REGS_SP(ctx) + 16));
 	}
 
 	void *fields_ptr = get_fields_from_http2MetaHeadersFrame(frame, info);

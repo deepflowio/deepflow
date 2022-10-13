@@ -278,11 +278,21 @@ impl BpfOptions {
             bf_insns: std::ptr::null_mut(),
         };
         unsafe {
+            #[cfg(target_arch = "x86_64")]
             let ret = pcap_compile_nopcap(
                 0xffff as c_int,
                 1,
                 &mut prog,
                 self.capture_bpf.as_ptr() as *const i8,
+                1,
+                0xffffffff,
+            );
+            #[cfg(target_arch = "aarch64")]
+            let ret = pcap_compile_nopcap(
+                0xffff as c_int,
+                1,
+                &mut prog,
+                self.capture_bpf.as_ptr() as *const u8,
                 1,
                 0xffffffff,
             );

@@ -48,7 +48,7 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 		return 0;
 	}
 
-	c.sp = (void *)ctx->rsp;
+	c.sp = (void *)PT_REGS_SP(ctx);
 
 	if (is_register_based_call(info)) {
 		c.fd = get_fd_from_tls_conn_struct((void *)PT_GO_REGS_PARM1(ctx), info);
@@ -145,7 +145,7 @@ int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 	struct tls_conn c = {};
 	struct tls_conn_key key = {};
 
-	c.sp = (void *)ctx->rsp;
+	c.sp = (void *)PT_REGS_SP(ctx);
 
 	if (is_register_based_call(info)) {
 		c.fd = get_fd_from_tls_conn_struct((void *)PT_GO_REGS_PARM1(ctx), info);
