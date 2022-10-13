@@ -36,4 +36,4 @@ tap                        , tap                       , tap                    
 vtap                       , vtap                      , vtap                      , 采集器                     , resource      ,                    , 流信息      , 111        ,
 ip                         , ip                        , ip                        , IP地址                     , ip            ,                    , 网络层      , 111        ,
 is_ipv4                    , is_ipv4                   , is_ipv4                   , IP类型                     , int_enum      , ip_type            , 网络层      , 111        ,
-labels                     , labels                    , labels                    , labels                     , map           ,                    , 标签        , 111        ,
+labels                     , labels                    , labels                    , labels                     , map           ,                    , K8s Labels , 111        ,
