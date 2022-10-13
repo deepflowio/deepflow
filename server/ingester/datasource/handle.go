@@ -231,11 +231,12 @@ func stringSliceHas(items []string, item string) bool {
 	return false
 }
 
-func makeTTLString(timeKey string, duration int, ckdbEnabled bool, ckdbVolume string, ckdbTTLTimes int) string {
-	if ckdbEnabled {
-		return fmt.Sprintf("%s + toIntervalDay(%d), %s +  toIntervalDay(%d) TO VOLUME '%s'",
-			timeKey, duration*(ckdbTTLTimes+1),
-			timeKey, duration, ckdbVolume)
+func (m *DatasourceManager) makeTTLString(timeKey, db, table string, duration int) string {
+	coldStorage := ckdb.GetColdStorage(m.ckdbColdStorages, db, table)
+	if coldStorage.Enabled {
+		return fmt.Sprintf("%s + toIntervalDay(%d), %s +  toIntervalDay(%d) TO %s '%s'",
+			timeKey, duration,
+			timeKey, coldStorage.TTLToMove, coldStorage.Type, coldStorage.Name)
 	}
 	return fmt.Sprintf("%s + toIntervalDay(%d)", timeKey, duration)
 }
@@ -288,7 +289,7 @@ func (m *DatasourceManager) makeAggTableCreateSQL(t *ckdb.Table, dstTable, aggrS
 		strings.Join(t.OrderKeys[:t.PrimaryKeyCount], ","),
 		strings.Join(orderKeys, ","), // 以order by的字段排序, 相同的做聚合
 		partitionTime.String(t.TimeKey),
-		makeTTLString(t.TimeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes),
+		m.makeTTLString(t.TimeKey, ckdb.METRICS_DB, t.GlobalName, duration),
 		t.StoragePolicy)
 }
 
@@ -377,7 +378,7 @@ func MakeGlobalTableCreateSQL(t *ckdb.Table, dstTable string) string {
 }
 
 func (m *DatasourceManager) getMetricsTable(id zerodoc.MetricsTableID) *ckdb.Table {
-	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1)[id]
+	return zerodoc.GetMetricsTables(ckdb.MergeTree, basecommon.CK_VERSION, m.ckdbCluster, m.ckdbStoragePolicy, 7, 1, 7, 1, m.ckdbColdStorages)[id]
 }
 
 func (m *DatasourceManager) createTableMV(ck clickhouse.Conn, tableId zerodoc.MetricsTableID, baseTable, dstTable, aggrSummable, aggrUnsummable string, aggInterval IntervalEnum, duration int) error {
@@ -417,7 +418,7 @@ func (m *DatasourceManager) modTableMV(ck clickhouse.Conn, tableId zerodoc.Metri
 		tableMod = getMetricsTableName(uint8(tableId), dstTable, AGG)
 	}
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
-		tableMod, makeTTLString(table.TimeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes))
+		tableMod, m.makeTTLString(table.TimeKey, ckdb.METRICS_DB, table.GlobalName, duration))
 
 	return ckwriter.ExecSQL(ck, modTable)
 }
@@ -426,7 +427,7 @@ func (m *DatasourceManager) modFlowLogLocalTable(ck clickhouse.Conn, tableID com
 	timeKey := tableID.TimeKey()
 	tableLocal := fmt.Sprintf("%s.%s_%s", common.FLOW_LOG_DB, tableID.String(), LOCAL)
 	modTable := fmt.Sprintf("ALTER TABLE %s MODIFY TTL %s",
-		tableLocal, makeTTLString(timeKey, duration, m.ckdbS3Enabled, m.ckdbS3Volume, m.ckdbS3TTLTimes))
+		tableLocal, m.makeTTLString(timeKey, common.FLOW_LOG_DB, tableID.String(), duration))
 	return ckwriter.ExecSQL(ck, modTable)
 }
 

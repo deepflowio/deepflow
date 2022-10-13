@@ -57,7 +57,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.72"
 serde_yaml = "0.8"
 signal-hook = "0.3"
-socket2 = "0.4.7"
+socket2 = "0.4.4"
 sysinfo = { version = "0.23", default-features = false }
 thiserror = "1.0"
 time = "0.3.9"

@@ -466,6 +466,23 @@ func (t EngineType) String() string {
 	return engineTypeString[t]
 }
 
+type DiskType uint8
+
+const (
+	Volume DiskType = iota
+	Disk
+)
+
+func (t DiskType) String() string {
+	switch t {
+	case Volume:
+		return "VOLUME"
+	case Disk:
+		return "DISK"
+	}
+	return "Unknown"
+}
+
 const (
 	DF_STORAGE_POLICY     = "df_storage"
 	DF_CLUSTER            = "df_cluster"
