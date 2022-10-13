@@ -205,7 +205,7 @@ static void resolve_func_ret_addr(struct symbol_uprobe *uprobe_sym)
 	memset(uprobe_sym->rets, 0, sizeof(uprobe_sym->rets));
 	while (cnt < FUNC_RET_MAX &&
 	       offset <= uprobe_sym->size - ARM64_INS_LEN) {
-		code = *(*uint32_t)(buffer + offset);
+		code = *(uint32_t *)(buffer + offset);
 		if (is_a64_ret_ins(code)) {
 			uprobe_sym->rets[cnt++] = uprobe_sym->entry + offset;
 		}
@@ -379,15 +379,17 @@ char *get_elf_path_by_pid(int pid)
 
 }
 
-// bddisasm 库要求定义的函数
+#if defined(__x86_64__)
+// The bddisasm library requires defined functions
 void *nd_memset(void *s, int c, ND_SIZET n)
 {
 	return memset(s, c, n);
 }
+#endif
 
 uint64_t get_symbol_addr_from_binary(const char *bin, const char *symname)
 {
-	if (!bin) {
+	if (!bin && !symname) {
 		return 0;
 	}
 

@@ -20,6 +20,8 @@ else
 	msg = @printf '  %-8s %s%s\n' "$(1)" "$(notdir $(2))" "$(if $(3), $(3))";
 endif
 
+ARCH := $(shell uname -m)
+
 CLANG ?= /usr/bin/clang
 CC ?= gcc
 OBJDIR ?= .
@@ -52,12 +54,9 @@ OBJS := user/elf.o \
 	user/offset.o
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
-
-CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -m64 -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
-# -DBPF_DEBUG
+CFLAGS ?= -std=gnu99 -g -O0 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
+# -DBPF_DEBUG for parse and load ebpf probes.
 CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
-LDFLAGS ?= -lGoReSym -lbddisasm -ldwarf -lelf -lz -lpthread
-
 all: build
 
 ELFFILES = ./.data_done
@@ -68,7 +67,7 @@ $(ELFFILES):
         fi
 	@rm -rf data
 	$(call msg,Tools,,tools/ebpftobuffer)
-	@gcc tools/ebpftobuffer.c -o tools/ebpftobuffer
+	@$(CC) tools/ebpftobuffer.c -o tools/ebpftobuffer
 	$(call compile_socket_trace_elf, common)
 	$(call compile_socket_trace_elf, 5_2, LINUX_VER_5_2=1)
 	@touch $(ELFFILES)
@@ -95,9 +94,22 @@ rust-sample: $(ELFFILES) $(LIBTRACE)
 	$(call msg,Current-DIR,,$(CURR))
 	$(Q)rm -rf samples/rust/src/ebpf.rs
 	$(Q)cp mod.rs samples/rust/src/ebpf.rs
+	$(Q)rm -rf samples/rust/build.rs
 	$(Q)rm -rf samples/rust/target
-	$(Q)cd samples/rust/ && cargo build --release && cd ../../
-	$(call msg,RUST-SAMPLE,,samples/rust/target/release/rust_sample)
+	@if [[ $(ARCH) == *"aarch64"* ]]; then \
+            echo "  Architecture is aarch64"; \
+            cp samples/rust/build-aarch64.rs samples/rust/build.rs; \
+            cd samples/rust/ && cargo build --release --target aarch64-unknown-linux-musl && cd ../../; \
+            echo "  samples/rust/target/aarch64-unknown-linux-musl/release/rust_sample"; \
+        elif [[ $(ARCH) == *"x86_64"* ]]; then \
+            echo "  Architecture is x86_64"; \
+            cp samples/rust/build-x86.rs samples/rust/build.rs; \
+            cd samples/rust/ && cargo build --release && cd ../../; \
+            echo "  samples/rust/target/release/rust_sample"; \
+        else \
+            echo "  Error: Invalid arch. $(ARCH) is not support!"; \
+            exit 1; \
+        fi
 
 clean:
 	$(Q)$(MAKE) -C kernel clean --no-print-directory

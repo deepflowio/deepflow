@@ -69,6 +69,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <sys/queue.h>
 
 #include "ring.h"

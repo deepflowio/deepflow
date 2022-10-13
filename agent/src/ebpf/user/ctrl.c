@@ -112,8 +112,10 @@ static inline int sockopt_init(void)
 
 	memset(&srv_addr, 0, sizeof(struct sockaddr_un));
 	srv_addr.sun_family = AF_UNIX;
-	strncpy(srv_addr.sun_path, ipc_unix_domain,
-		sizeof(srv_addr.sun_path) - 1);
+
+	ipc_unix_domain[sizeof(srv_addr.sun_path) - 1] = '\0'; // avoid strncpy(), which generates warnings
+	strcpy(srv_addr.sun_path, ipc_unix_domain);
+
 	unlink(ipc_unix_domain);
 
 	if (-1 == bind(srv_fd, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {

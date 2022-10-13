@@ -101,11 +101,7 @@ extern bool feature_flags[FEATURE_MAX];
 
 static inline unsigned int min_log2(unsigned int x)
 {
-#ifdef __x86_64__
 #define count_leading_zeros(x) __builtin_clzll (x)
-#elif __i386__
-#define count_leading_zeros(x) __builtin_clzl (x)
-#endif
 	unsigned int n;
 	n = count_leading_zeros(x);
 	return 64 - n - 1;
