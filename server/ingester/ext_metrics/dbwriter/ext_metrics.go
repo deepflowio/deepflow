@@ -120,12 +120,16 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int) *ckdb.Ta
 func (m *ExtMetrics) ToFlowTags() ([]interface{}, []interface{}) {
 	fields := make([]interface{}, len(m.TagNames)+len(m.MetricsFloatNames))
 	fieldValues := make([]interface{}, len(m.TagNames))
+	tableName := m.TableName
+	if m.VirtualTableName != "" {
+		tableName = m.VirtualTableName
+	}
 	for i, name := range m.TagNames {
-		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.VirtualTableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
-		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, m.VirtualTableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
+		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name))
+		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldTag, name, m.TagValues[i]))
 	}
 	for _, name := range m.MetricsFloatNames {
-		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, m.VirtualTableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
+		fields = append(fields, flow_tag.NewTagField(m.Timestamp, m.Database, tableName, int32(m.Tag.L3EpcID), m.Tag.PodNSID, flow_tag.FieldMetrics, name))
 	}
 	return fields, fieldValues
 }
