@@ -83,8 +83,8 @@ int check_kernel_version(int maj_limit, int min_limit)
 		return ETR_INVAL;
 	}
 
-	if (!strstr(uts.machine, "x86_64")) {
-		ebpf_warning("Current machine is \"%s\", not support.\n");
+	if (!strstr(uts.machine, "x86_64") && !strstr(uts.machine, "aarch64")) {
+		ebpf_warning("Current machine is \"%s\", not support.\n", uts.machine);
 		return ETR_INVAL;
 	}
 
