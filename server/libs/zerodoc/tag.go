@@ -1444,7 +1444,11 @@ const TAP_PORT_STR_LEN = 8
 func putTAPPort(bs []byte, tapPort uint64) int {
 	copy(bs, "00000000")
 	s := strconv.FormatUint(tapPort, 16)
-	copy(bs[TAP_PORT_STR_LEN-len(s):], s)
+	if TAP_PORT_STR_LEN >= len(s) {
+		copy(bs[TAP_PORT_STR_LEN-len(s):], s)
+	} else {
+		copy(bs, s[len(s)-TAP_PORT_STR_LEN:])
+	}
 	return TAP_PORT_STR_LEN
 }
 
