@@ -27,7 +27,7 @@ use std::{
 use log::{debug, error};
 use roxmltree::Document;
 
-use crate::utils::net::MacAddr;
+use public::utils::net::MacAddr;
 
 use super::InterfaceEntry;
 

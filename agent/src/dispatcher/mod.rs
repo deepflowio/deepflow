@@ -66,12 +66,13 @@ use crate::{
     platform::LibvirtXmlExtractor,
     policy::PolicyGetter,
     proto::{common::TridentType, trident::IfMacSource, trident::TapMode},
-    utils::{
-        net::{Link, MacAddr},
-        stats::{self, Collector},
-    },
+    utils::stats::{self, Collector},
 };
-use public::{queue::DebugSender, LeakyBucket};
+use public::{
+    queue::DebugSender,
+    utils::net::{Link, MacAddr},
+    LeakyBucket,
+};
 
 enum DispatcherFlavor {
     Analyzer(AnalyzerModeDispatcher), // Enterprise Edition Feature: analyzer_mode

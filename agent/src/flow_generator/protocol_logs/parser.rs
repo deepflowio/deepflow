@@ -49,13 +49,11 @@ use crate::{
     flow_generator::{protocol_logs::HttpLog, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     metric::document::TapSide,
     sender::SendItem,
-    utils::{
-        net::MacAddr,
-        stats::{Counter, CounterType, CounterValue, RefCountable},
-    },
+    utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
     queue::{DebugSender, Error, Receiver},
+    utils::net::MacAddr,
     LeakyBucket,
 };
 

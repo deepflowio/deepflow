@@ -24,5 +24,6 @@ pub mod l7_protocol;
 pub mod leaky_bucket;
 pub mod packet;
 pub mod queue;
+pub mod utils;
 
 pub use leaky_bucket::LeakyBucket;

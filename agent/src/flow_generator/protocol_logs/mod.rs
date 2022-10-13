@@ -57,8 +57,8 @@ use crate::{
     flow_generator::error::Result,
     metric::document::TapSide,
     proto::flow_log,
-    utils::net::MacAddr,
 };
+use public::utils::net::MacAddr;
 
 const NANOS_PER_MICRO: u64 = 1000;
 

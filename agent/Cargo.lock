@@ -569,7 +569,6 @@ dependencies = [
  "flexi_logger",
  "futures",
  "hostname",
- "hpack",
  "http",
  "humantime-serde",
  "hyper",
@@ -581,7 +580,6 @@ dependencies = [
  "log 0.4.17",
  "lru",
  "md-5",
- "neli",
  "nix 0.23.1",
  "nom",
  "npb_handler",
@@ -615,7 +613,6 @@ dependencies = [
  "tonic",
  "tonic-build",
  "uluru",
- "windows",
  "windows_recv_engine",
 ]
 
@@ -2040,14 +2037,21 @@ dependencies = [
  "bincode",
  "bitflags",
  "cadence",
+ "hpack",
  "log 0.4.17",
+ "neli",
+ "nix 0.23.1",
  "num_enum",
  "parking_lot 0.11.2",
+ "pnet",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml",
+ "socket2",
  "thiserror",
  "tonic",
+ "windows",
 ]
 
 [[package]]

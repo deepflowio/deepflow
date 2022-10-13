@@ -33,7 +33,7 @@ use nix::sched::{setns, CloneFlags};
 
 use super::{ls_ns_net, Poller};
 use crate::platform::InterfaceInfo;
-use crate::utils::net::{addr_list, link_list};
+use public::utils::net::{addr_list, link_list};
 
 #[derive(Debug)]
 pub struct ActivePoller {
