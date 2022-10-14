@@ -174,7 +174,7 @@ func updateSubDomain(cmd *cobra.Command, args []string, fileName string) error {
 	}
 	clusterID := args[0]
 	server := common.GetServerInfo(cmd)
-	lcuuid, err := getLCUUIDByClusterID(server, clusterID)
+	lcuuid, err := getLcuuidByClusterID(server, clusterID)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func deleteSubDomain(cmd *cobra.Command, args []string) error {
 	clusterID := args[0]
 
 	server := common.GetServerInfo(cmd)
-	lcuuid, err := getLCUUIDByClusterID(server, clusterID)
+	lcuuid, err := getLcuuidByClusterID(server, clusterID)
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func getLcuuidByDomainName(server *common.Server, domainName string,
 	return domainLcuuid, nil
 }
 
-func getLCUUIDByClusterID(server *common.Server, clusterID string) (string, error) {
+func getLcuuidByClusterID(server *common.Server, clusterID string) (string, error) {
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains", server.IP, server.Port)
 	response, err := common.GetByFilter(url, nil, common.Filter{"cluster_id": clusterID})
 	if err != nil {
