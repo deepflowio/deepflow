@@ -140,16 +140,6 @@ func initTables(db *gorm.DB) error {
 		log.Errorf("create procedure failed: %v", err)
 		return err
 	}
-	err = db.Exec(migration.CREATE_TRIGGER_RESOURCE_GROUP).Error
-	if err != nil {
-		log.Errorf("create trigger failed: %v", err)
-		return err
-	}
-	err = db.Exec(migration.CREATE_TRIGGER_NPB_TUNNEL).Error
-	if err != nil {
-		log.Errorf("create trigger failed: %v", err)
-		return err
-	}
 	err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECT)).Error
 	if err != nil {
 		log.Errorf("init db version failed: %v", err)
