@@ -536,6 +536,9 @@ func GetSubDomains(filter map[string]interface{}) ([]*model.SubDomain, error) {
 	if _, ok := filter["domain"]; ok {
 		Db = Db.Where("domain = ?", filter["domain"])
 	}
+	if _, ok := filter["cluster_id"]; ok {
+		Db = Db.Where("cluster_id = ?", filter["cluster_id"])
+	}
 	Db.Order("created_at DESC").Find(&subDomains)
 
 	mysql.Db.Select("name", "lcuuid").Find(&vpcs)

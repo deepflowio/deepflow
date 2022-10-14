@@ -12,8 +12,6 @@ import (
 	"github.com/deepflowys/deepflow/cli/ctl/example"
 )
 
-var ErrDomainDataIsNull = errors.New("ErrDomainDataIsNull")
-
 func RegisterSubDomainCommand() *cobra.Command {
 	subDomain := &cobra.Command{
 		Use:   "subdomain",
@@ -62,14 +60,14 @@ func RegisterSubDomainCommand() *cobra.Command {
 	updateCmd := &cobra.Command{
 		Use:     "update",
 		Short:   "update subdomain",
-		Example: "deepflow-ctl subdomain update -f k8s.yaml",
+		Example: "deepflow-ctl subdomain update -f ${file_name} ${cluster_id}",
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := updateSubDomain(cmd, updateFilename); err != nil {
+			if err := updateSubDomain(cmd, args, updateFilename); err != nil {
 				fmt.Println(err)
 			}
 		},
 	}
-	updateCmd.Flags().StringVarP(&updateFilename, "filename", "f", "", "update domain from file or stdin")
+	updateCmd.Flags().StringVarP(&updateFilename, "filename", "f", "", "update subdomain from file or stdin")
 	if err := updateCmd.MarkFlagRequired("filename"); err != nil {
 		fmt.Println(err)
 	}
@@ -77,7 +75,7 @@ func RegisterSubDomainCommand() *cobra.Command {
 	deleteCmd := &cobra.Command{
 		Use:     "delete [lcuuid]",
 		Short:   "delete subdomain",
-		Example: "deepflow-ctl subdomain delete deepflow-sub-domain",
+		Example: "deepflow-ctl subdomain delete ${cluster_id}",
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := deleteSubDomain(cmd, args); err != nil {
 				fmt.Println(err)
@@ -101,11 +99,11 @@ func listSubDomain(cmd *cobra.Command, args []string, output string) error {
 
 	server := common.GetServerInfo(cmd)
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/", server.IP, server.Port)
+	var filter common.Filter
 	if domain != "" {
-		url += fmt.Sprintf("?domain=%s", domain)
+		filter["domain"] = domain
 	}
-
-	response, err := common.CURLPerform("GET", url, nil, "")
+	response, err := common.GetByFilter(url, nil, filter)
 	if err != nil {
 		return err
 	}
@@ -119,28 +117,41 @@ func listSubDomain(cmd *cobra.Command, args []string, output string) error {
 	var (
 		nameMaxSize       = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "NAME")
 		lcuuidMaxSize     = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "LCUUID")
-		domainMaxSize     = jsonparser.GetTheMaxSizeOfAttr(response.Get("DOMAIN"), "DOMAIN")
-		domainNameMaxSize = jsonparser.GetTheMaxSizeOfAttr(response.Get("DOMAIN_NAME"), "DOMAIN_NAME")
+		domainMaxSize     = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "DOMAIN")
+		domainNameMaxSize = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "DOMAIN_NAME")
+		clusterIDMaxSize  = jsonparser.GetTheMaxSizeOfAttr(response.Get("DATA"), "CLUSTER_ID")
 	)
-	cmdFormat := "%-*s %-*s %-*s %-*s\n"
-	fmt.Printf(cmdFormat, nameMaxSize, "NAME", lcuuidMaxSize, "LCUUID",
+	cmdFormat := "%-*s %-*s %-*s %-*s %-*s\n"
+	fmt.Printf(cmdFormat, nameMaxSize, "NAME", clusterIDMaxSize, "CLUSTER_ID", lcuuidMaxSize, "LCUUID",
 		domainNameMaxSize, "DOMAIN_NAME", domainMaxSize, "DOMAIN")
 	for i := range response.Get("DATA").MustArray() {
 		sb := response.Get("DATA").GetIndex(i)
 		fmt.Printf(cmdFormat,
-			nameMaxSize, sb.Get("NAME").MustString(), lcuuidMaxSize, sb.Get("LCUUID").MustString(),
-			domainNameMaxSize, sb.Get("DOMAIN_NAME").MustString(), domainMaxSize, sb.Get("DOMAIN").MustString())
+			nameMaxSize, sb.Get("NAME").MustString(),
+			clusterIDMaxSize, sb.Get("CLUSTER_ID").MustString(),
+			lcuuidMaxSize, sb.Get("LCUUID").MustString(),
+			domainNameMaxSize, sb.Get("DOMAIN_NAME").MustString(),
+			domainMaxSize, sb.Get("DOMAIN").MustString())
 	}
 	return nil
 }
 
 func createSubDomain(cmd *cobra.Command, fileName string) error {
-	server := common.GetServerInfo(cmd)
-	body, domainLuccid, err := validateAndFormatBody(server, fileName)
+	body, err := formatBody(fileName)
 	if err != nil {
 		return err
 	}
-	body["DOMAIN"] = domainLuccid
+	if err = validateSubDomainConfig(body); err != nil {
+		return err
+	}
+
+	server := common.GetServerInfo(cmd)
+	domainLcuuid, err := getLcuuidByDomainName(server, body["DOMAIN_NAME"].(string), body)
+	if err != nil {
+		return err
+	}
+	body["DOMAIN"] = domainLcuuid
+
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/", server.IP, server.Port)
 	_, err = common.CURLPerform("POST", url, body, "")
 	if err != nil {
@@ -149,44 +160,25 @@ func createSubDomain(cmd *cobra.Command, fileName string) error {
 	return nil
 }
 
-func validateAndFormatBody(server *common.Server, fileName string) (map[string]interface{}, string, error) {
+func updateSubDomain(cmd *cobra.Command, args []string, fileName string) error {
 	body, err := formatBody(fileName)
 	if err != nil {
-		return nil, "", err
+		return err
 	}
 	if err = validateSubDomainConfig(body); err != nil {
-		return nil, "", err
+		return err
 	}
 
-	// 校验是否存在同名的 domain
-	domainLuccid, err := getLCUUIDByDomain(server, body["DOMAIN_NAME"].(string), body)
-	// 如果 err 有错并不是 ErrDomainDataIsNull 错误，则返回 err
-	if err != nil && !errors.Is(err, ErrDomainDataIsNull) {
-		return nil, "", err
+	if len(args) == 0 {
+		return errors.New("cluster_id is required")
 	}
-	if len(domainLuccid) == 0 {
-		return nil, "", errors.New("domain lcuuid corresponding to the domain name is null")
-	}
-	return body, domainLuccid, nil
-}
-
-func updateSubDomain(cmd *cobra.Command, fileName string) error {
+	clusterID := args[0]
 	server := common.GetServerInfo(cmd)
-	body, domainLuccid, err := validateAndFormatBody(server, fileName)
+	lcuuid, err := getLcuuidByClusterID(server, clusterID)
 	if err != nil {
 		return err
 	}
-	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/?domain=%s", server.IP, server.Port, domainLuccid)
-	response, err := common.CURLPerform("GET", url, body, "")
-	if err != nil {
-		return err
-	}
-
-	if len(response.Get("DATA").MustArray()) == 0 {
-		return fmt.Errorf("cannot to get subdomain, domain=%v", domainLuccid)
-	}
-	lcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
-	url = fmt.Sprintf("http://%s:%d/v2/sub-domains/%s/", server.IP, server.Port, lcuuid)
+	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/%s/", server.IP, server.Port, lcuuid)
 	_, err = common.CURLPerform("PATCH", url, body, "")
 	if err != nil {
 		return err
@@ -220,27 +212,53 @@ func validateSubDomainConfig(body map[string]interface{}) error {
 
 func deleteSubDomain(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("must specify lcuuid.\nExample: %s", cmd.Example)
+		return errors.New("cluster_id is required")
 	}
+	clusterID := args[0]
 
 	server := common.GetServerInfo(cmd)
-	lcuuid := args[0]
+	lcuuid, err := getLcuuidByClusterID(server, clusterID)
+	if err != nil {
+		return err
+	}
 	url := fmt.Sprintf("http://%s:%d/v2/sub-domains/%s/", server.IP, server.Port, lcuuid)
-	_, err := common.CURLPerform("DELETE", url, nil, "")
+	_, err = common.CURLPerform("DELETE", url, nil, "")
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func getLCUUIDByDomain(server *common.Server, domainName string, body map[string]interface{}) (string, error) {
-	url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, domainName)
-	response, err := common.CURLPerform("GET", url, body, "")
+func getLcuuidByDomainName(server *common.Server, domainName string,
+	body map[string]interface{}) (string, error) {
+	url := fmt.Sprintf("http://%s:%d/v2/domains", server.IP, server.Port)
+	response, err := common.GetByFilter(url, body, common.Filter{"name": domainName})
 	if err != nil {
 		return "", err
 	}
 	if len(response.Get("DATA").MustArray()) == 0 {
-		return "", fmt.Errorf("cannot get domain luccid by name, name=%v, %w", domainName, ErrDomainDataIsNull)
+		return "", fmt.Errorf("invalid domain name: %v", domainName)
+	}
+
+	domainLcuuid := response.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+	if len(domainLcuuid) == 0 {
+		return "", errors.New("domain lcuuid corresponding to the domain name is null")
+	}
+	domainType := response.Get("DATA").GetIndex(0).Get("TYPE").MustInt()
+	if domainType == common.KUBERNETES {
+		return "", fmt.Errorf("domain_type=%v is not supported", domainType)
+	}
+	return domainLcuuid, nil
+}
+
+func getLcuuidByClusterID(server *common.Server, clusterID string) (string, error) {
+	url := fmt.Sprintf("http://%s:%d/v2/sub-domains", server.IP, server.Port)
+	response, err := common.GetByFilter(url, nil, common.Filter{"cluster_id": clusterID})
+	if err != nil {
+		return "", err
+	}
+	if len(response.Get("DATA").MustArray()) == 0 {
+		return "", fmt.Errorf("invalid cluster_id: %v", clusterID)
 	}
 	return response.Get("DATA").GetIndex(0).Get("LCUUID").MustString(), nil
 }
