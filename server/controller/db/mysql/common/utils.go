@@ -109,16 +109,16 @@ func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
 	}
 }
 
-func RollbackIfInitTablesFailed(db *gorm.DB, database string) bool {
-	err := initTables(db)
+func RollbackIfInitTablesFailed(db *gorm.DB, cfg MySqlConfig) bool {
+	err := initTables(db, cfg)
 	if err != nil {
-		DropDatabase(db, database)
+		DropDatabase(db, cfg.Database)
 		return false
 	}
 	return true
 }
 
-func initTables(db *gorm.DB) error {
+func initTables(db *gorm.DB, cfg MySqlConfig) error {
 	log.Info("init db tables start")
 	initSQL, err := ioutil.ReadFile("/etc/mysql/init.sql")
 	if err != nil {
@@ -140,12 +140,12 @@ func initTables(db *gorm.DB) error {
 		log.Errorf("create procedure failed: %v", err)
 		return err
 	}
-	err = db.Exec(migration.CREATE_TRIGGER_RESOURCE_GROUP).Error
+	err = db.Exec(fmt.Sprintf(migration.CREATE_TRIGGER_RESOURCE_GROUP, cfg.UserName)).Error
 	if err != nil {
 		log.Errorf("create trigger failed: %v", err)
 		return err
 	}
-	err = db.Exec(migration.CREATE_TRIGGER_NPB_TUNNEL).Error
+	err = db.Exec(fmt.Sprintf(migration.CREATE_TRIGGER_NPB_TUNNEL, cfg.UserName)).Error
 	if err != nil {
 		log.Errorf("create trigger failed: %v", err)
 		return err
