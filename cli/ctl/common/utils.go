@@ -33,6 +33,9 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// Filter query string parameters
+type Filter map[string]interface{}
+
 // 功能：调用其他模块API并获取返回结果
 func CURLPerform(method string, url string, body map[string]interface{}, strBody string) (*simplejson.Json, error) {
 	errResponse, _ := simplejson.NewJson([]byte("{}"))
@@ -179,4 +182,24 @@ func JsonFormat(jsonStr string) (string, error) {
 		return "", err
 	}
 	return str.String(), nil
+}
+
+// GetByFilter 通过 Get 方法获取数据，自动拼接 url param 参数
+func GetByFilter(url string, body, filters map[string]interface{}) (*simplejson.Json, error) {
+	if !strings.HasSuffix(url, "/") {
+		url = url + "/"
+	}
+	if !strings.HasSuffix(url, "?") {
+		url = url + "?"
+	}
+
+	i, count := 0, len(filters)
+	for k, v := range filters {
+		url += fmt.Sprintf("%v=%v", k, v)
+		if i < count-1 {
+			url += "&"
+		}
+		i++
+	}
+	return CURLPerform("GET", url, body, "")
 }
