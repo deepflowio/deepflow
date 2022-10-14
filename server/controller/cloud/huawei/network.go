@@ -19,7 +19,7 @@ package huawei
 import (
 	"fmt"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
@@ -43,7 +43,7 @@ func (h *HuaWei) getNetworks() ([]model.Network, []model.Subnet, []model.VInterf
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jNetworks {
 			jn := jNetworks[i]
-			if !CheckAttributes(jn, requiredAttrs) {
+			if !cloudcommon.CheckJsonAttributes(jn, requiredAttrs) {
 				continue
 			}
 			id := jn.Get("id").MustString()

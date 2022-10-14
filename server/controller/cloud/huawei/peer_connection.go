@@ -19,7 +19,7 @@ package huawei
 import (
 	"fmt"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 )
 
@@ -36,7 +36,7 @@ func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
 
 		for i := range jpns {
 			jpn := jpns[i]
-			if !CheckAttributes(jpn, []string{"id", "name", "request_vpc_info", "accept_vpc_info"}) {
+			if !cloudcommon.CheckJsonAttributes(jpn, []string{"id", "name", "request_vpc_info", "accept_vpc_info"}) {
 				continue
 			}
 			id := jpn.Get("id").MustString()
