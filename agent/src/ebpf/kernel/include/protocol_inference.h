@@ -528,6 +528,9 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (conn_info->tuple.l4_protocol != IPPROTO_TCP){
+		return MSG_UNKNOWN;
+	}
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_POSTGRESQL)
 			return MSG_UNKNOWN;
