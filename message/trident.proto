@@ -436,6 +436,11 @@ message SkipInterface {
     optional uint64 mac = 1;
 }
 
+message DeepFlowServerInstanceInfo {
+   optional string pod_name = 1;
+   optional string node_name = 2;
+}
+
 message SyncResponse {
     optional Status status = 1;
     optional Config config = 2;
@@ -455,6 +460,7 @@ message SyncResponse {
     repeated PodIp  pod_ips = 17; // pod_name到vpc + ip的映射关系, 仅下发给数据节点
     repeated VtapIp vtap_ips = 18; // vtap_id到vpc + ip的映射关系, 仅下发给数据节点
     repeated SkipInterface skip_interface = 19;
+    repeated DeepFlowServerInstanceInfo deepflow_server_instances = 20; // Only return the normal deepflow-servers of current Region for Ingester
 }
 
 message UpgradeRequest  {
