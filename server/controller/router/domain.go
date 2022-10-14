@@ -116,6 +116,9 @@ func getSubDomains(c *gin.Context) {
 	if value, ok := c.GetQuery("domain"); ok {
 		args["domain"] = value
 	}
+	if value, ok := c.GetQuery("cluster_id"); ok {
+		args["cluster_id"] = value
+	}
 	data, err := service.GetSubDomains(args)
 	JsonResponse(c, data, err)
 }
