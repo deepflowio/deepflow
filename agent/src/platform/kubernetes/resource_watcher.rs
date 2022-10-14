@@ -19,7 +19,7 @@ use std::{
     fmt::Debug,
     io::{self, Write},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
     time::{Duration, SystemTime},
@@ -72,6 +72,7 @@ pub trait Watcher {
     fn entries(&self) -> Vec<Vec<u8>>;
     fn kind(&self) -> String;
     fn version(&self) -> u64;
+    fn ready(&self) -> bool;
 }
 
 #[enum_dispatch(Watcher)]
@@ -101,6 +102,7 @@ pub struct ResourceWatcher<K> {
     kind: &'static str,
     version: Arc<AtomicU64>,
     runtime: Handle,
+    ready: Arc<AtomicBool>,
 }
 
 impl<K> Watcher for ResourceWatcher<K>
@@ -113,12 +115,13 @@ where
         let version = self.version.clone();
         let kind = self.kind;
         let err_msg = self.err_msg.clone();
+        let ready = self.ready.clone();
 
         let api = self.api.clone();
 
         let handle = self
             .runtime
-            .spawn(Self::process(entries, version, api, kind, err_msg));
+            .spawn(Self::process(entries, version, api, kind, err_msg, ready));
 
         info!("{} watcher started", self.kind);
         Some(handle)
@@ -143,6 +146,10 @@ where
             .map(Clone::clone)
             .collect::<Vec<_>>()
     }
+
+    fn ready(&self) -> bool {
+        self.ready.load(Ordering::Relaxed)
+    }
 }
 
 impl<K> ResourceWatcher<K>
@@ -158,6 +165,7 @@ where
             kind,
             err_msg: Arc::new(Mutex::new(None)),
             runtime,
+            ready: Default::default(),
         }
     }
 
@@ -167,9 +175,12 @@ where
         api: Api<K>,
         kind: &'static str,
         err_msg: Arc<Mutex<Option<String>>>,
+        ready: Arc<AtomicBool>,
     ) {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         Self::get_list_entry(&mut encoder, &entries, &version, kind, &api, &err_msg).await;
+        ready.store(true, Ordering::Relaxed);
+        info!("{} watcher ready", kind);
 
         let mut ticker = time::interval(LIST_INTERVAL);
 

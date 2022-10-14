@@ -17,6 +17,7 @@
 use std::{
     collections::HashMap,
     io::prelude::*,
+    mem,
     ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -694,6 +695,32 @@ impl ApiWatcher {
         let resource_watchers = watchers.clone();
 
         let sync_interval = context.config.load().sync_interval;
+
+        // send info as soon as node first queried
+        const INIT_WAIT_INTERVAL: Duration = Duration::from_secs(5);
+        let mut wait_count = 0;
+        while !Self::ready_stop(&running, &timer, INIT_WAIT_INTERVAL) {
+            let ws = resource_watchers.lock().unwrap();
+            if !ws.get("nodes").map(|w| w.ready()).unwrap_or(false) {
+                wait_count += 1;
+                if wait_count >= sync_interval.as_secs() / INIT_WAIT_INTERVAL.as_secs() {
+                    break;
+                }
+                continue;
+            }
+            mem::drop(ws);
+            Self::process(
+                &context,
+                &apiserver_version,
+                &session,
+                &err_msgs,
+                &mut watcher_versions,
+                &resource_watchers,
+                &exception_handler,
+            );
+            break;
+        }
+
         // 等一等watcher，第一个tick再上报
         while !Self::ready_stop(&running, &timer, sync_interval) {
             Self::process(
