@@ -69,7 +69,7 @@ controller:
 
   # monitor module config
   monitor:
-    # controller/analyzer health_check interval, unit: s
+    # controller/analyzer health_check interval, unit:s
     health_check_interval: 60
     # 健康检查异常/控制器切换处理channel的长度
     health_check_handle_channel_len: 1000
@@ -77,6 +77,8 @@ controller:
     license_check_interval: 60
     # vtap检查的时间间隔，单位: 秒
     vtap_check_interval: 60
+    # exception_time_frame, unit:s
+    exception_time_frame: 3600
     # warrant
     warrant:
       host: warrant
@@ -182,6 +184,26 @@ ingester:
   #  # if `external` is 'true', default value 'default', else 'df_storage'
   #  storage-policy:
 
+  ## This configuration is only valid when the ClickHouse tables have not yet been created. If the tables have been created, you need to delete the databases/tables and restart to create the tables according to the configuration
+  #ckdb-cold-storage:
+  #  enabled: false
+  #  cold-disk: # have configured in clickhouse
+  #    type: volume  # 'volume' or 'disk'
+  #    name: xxx
+  #  settings:
+  #  - db: flow_log
+  #    # if 'tables' is empty, will set all tables under the DB
+  #    tables:
+  #    - l4_flow_log
+  #    - l7_flow_log
+  #    # uint: day, move data to cold disk after 'ttl-to-move' day
+  #    ttl-to-move: 1
+  #  - db: flow_metrics
+  #    tables:
+  #    - vtap_flow_port.1m
+  #    - vtap_flow_edge_port.1m
+  #    ttl-to-move: 7
+
   #ckdb-auth:
   #  username: default
   #  # '#','@' special characters are not supported in passwords
@@ -204,12 +226,6 @@ ingester:
   #es-auth:
   #  user:
   #  password:
-
-  ## ckdb若使用对象存储,需要设置将数据转移至对象存储
-  #ckdb-s3:
-  #  enabled: false  #是否使用了对象存储
-  #  volume: vol_s3  #ckdb中对象存储的卷名
-  #  ttl-times: 3    #对象存储中数据的存储时长是本地存储的几倍
 
   ## whether write stats data to influxdb
   #influxdb-writer-enabled: false
@@ -267,6 +283,7 @@ ingester:
   #  check-interval: 600 # 检查时间间隔(单位: 秒)
   #  used-percent: 90    # 磁盘占用率阈值
   #  free-space: 50      # 磁盘空闲阈值(单位: GB)
+  #  disk-prefix: path_  # Only monitor the disks starting with 'disk-prefix', check the disks 'select * from system.disks'
 
   ## stream,roze模块是否启用，默认启用, 若不启用(表示处于单独的控制器)
   #stream-roze-enabled: true

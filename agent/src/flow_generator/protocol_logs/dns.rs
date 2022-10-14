@@ -16,24 +16,23 @@
 use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
-use super::{
-    consts::*, value_is_default, AppProtoHead, AppProtoHeadEnum, AppProtoLogsInfo,
-    AppProtoLogsInfoEnum, L7LogParse, L7ResponseStatus, LogMessageType,
-};
-
+use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 use crate::{
     common::{
         enums::IpProtocol,
-        flow::{L7Protocol, PacketDirection},
-        meta_packet::MetaPacket,
+        flow::PacketDirection,
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
+        l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
     flow_generator::{
         error::{Error, Result},
         perf::DNS_PORT,
     },
-    utils::{bytes::read_u16_be, net::parse_ip_slice},
+    log_info_merge, parse_common,
+    utils::bytes::read_u16_be,
 };
+use public::{l7_protocol::L7Protocol, utils::net::parse_ip_slice};
 
 #[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct DnsInfo {
@@ -55,6 +54,38 @@ pub struct DnsInfo {
 
     pub status: L7ResponseStatus,
     pub status_code: Option<i32>,
+
+    start_time: u64,
+    end_time: u64,
+    msg_type: LogMessageType,
+    is_tls: bool,
+}
+
+impl L7ProtocolInfoInterface for DnsInfo {
+    fn session_id(&self) -> Option<u32> {
+        Some(self.trans_id as u32)
+    }
+
+    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+        log_info_merge!(self, DnsInfo, other);
+        Ok(())
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        Some(AppProtoHead {
+            proto: L7Protocol::Dns,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        })
+    }
+
+    fn is_tls(&self) -> bool {
+        self.is_tls
+    }
+
+    fn skip_send(&self) -> bool {
+        false
+    }
 }
 
 impl DnsInfo {
@@ -112,10 +143,39 @@ impl From<DnsInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct DnsLog {
     info: DnsInfo,
-    msg_type: LogMessageType,
+    // 是否已经解析过,避免check后重复解析
+    parsed: bool,
+}
+
+//解析器接口实现
+impl L7ProtocolParserInterface for DnsLog {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
+        parse_common!(self, param);
+        self.dns_check_protocol(payload, param)
+    }
+
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        if self.parsed {
+            return Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())]);
+        }
+        parse_common!(self, param);
+        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        Ok(vec![L7ProtocolInfo::DnsInfo(self.info.clone())])
+    }
+
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Dns
+    }
+
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 impl DnsLog {
@@ -125,6 +185,15 @@ impl DnsLog {
         self.info.query_name = String::new();
         self.info.answers = String::new();
         self.info.status_code = None;
+    }
+
+    pub fn dns_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if param.port_dst != DNS_PORT && param.port_src != DNS_PORT {
+            return false;
+        }
+        let ret = self.parse(payload, param.l4_protocol, param.direction, None, None);
+        self.parsed = ret.is_ok() && self.info.msg_type == LogMessageType::Request;
+        self.parsed
     }
 
     fn decode_name(&self, payload: &[u8], g_offset: usize) -> Result<(String, usize)> {
@@ -217,7 +286,7 @@ impl DnsLog {
         self.info.query_name.push_str(&name);
         if self.info.query_type == DNS_REQUEST {
             self.info.domain_type = read_u16_be(&payload[offset..]);
-            self.msg_type = LogMessageType::Request;
+            self.info.msg_type = LogMessageType::Request;
         }
 
         Ok(offset + QUESTION_CLASS_TYPE_SIZE)
@@ -324,7 +393,7 @@ impl DnsLog {
         }
     }
 
-    fn decode_payload(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
+    fn decode_payload(&mut self, payload: &[u8]) -> Result<()> {
         if payload.len() <= DNS_HEADER_SIZE {
             let err_msg = format!("dns payload length too short:{}", payload.len());
             return Err(Error::DNSLogParseFailed(err_msg));
@@ -355,19 +424,12 @@ impl DnsLog {
                 g_offset = self.decode_resource_record(payload, g_offset)?;
             }
 
-            self.msg_type = LogMessageType::Response;
+            self.info.msg_type = LogMessageType::Response;
         }
 
-        Ok(AppProtoHead {
-            proto: L7Protocol::Dns,
-            msg_type: self.msg_type,
-            rrt: 0,
-            ..Default::default()
-        })
+        Ok(())
     }
-}
 
-impl L7LogParse for DnsLog {
     fn parse(
         &mut self,
         payload: &[u8],
@@ -375,10 +437,10 @@ impl L7LogParse for DnsLog {
         _direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         self.reset_logs();
         match proto {
-            IpProtocol::Udp => Ok(AppProtoHeadEnum::Single(self.decode_payload(payload)?)),
+            IpProtocol::Udp => self.decode_payload(payload),
             IpProtocol::Tcp => {
                 if payload.len() <= DNS_TCP_PAYLOAD_OFFSET {
                     let err_msg = format!("dns payload length error:{}", payload.len());
@@ -389,50 +451,14 @@ impl L7LogParse for DnsLog {
                     let err_msg = format!("dns payload length error:{}", size);
                     return Err(Error::DNSLogParseFailed(err_msg));
                 }
-                Ok(AppProtoHeadEnum::Single(
-                    self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])?,
-                ))
+                self.decode_payload(&payload[DNS_TCP_PAYLOAD_OFFSET..])
             }
             _ => {
                 let err_msg = format!("dns payload length error:{}", payload.len());
-                return Err(Error::DNSLogParseFailed(err_msg));
+                Err(Error::DNSLogParseFailed(err_msg))
             }
         }
     }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Dns(self.info.clone()))
-    }
-}
-
-// 通过请求来识别DNS
-pub fn dns_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.dst_port != DNS_PORT {
-        if packet.lookup_key.src_port != DNS_PORT {
-            *bitmap &= !(1 << u8::from(L7Protocol::Dns));
-        }
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-
-    let payload = payload.unwrap();
-    let mut dns = DnsLog::default();
-    let ret = dns.parse(
-        payload,
-        packet.lookup_key.proto,
-        packet.direction,
-        None,
-        None,
-    );
-    if ret.is_err() && packet.lookup_key.proto == IpProtocol::Udp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Dns));
-        return false;
-    }
-    return ret.is_ok() && dns.msg_type == LogMessageType::Request;
 }
 
 #[cfg(test)]
@@ -442,7 +468,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/dns";
 
@@ -455,7 +484,6 @@ mod tests {
 
         let mut output = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -475,7 +503,7 @@ mod tests {
                 None,
                 None,
             );
-            let is_dns = dns_check_protocol(&mut bitmap, packet);
+            let is_dns = dns.dns_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_dns: {}\r\n", dns.info, is_dns));
         }
         output

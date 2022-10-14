@@ -23,19 +23,16 @@ pub mod pb_adapter;
 mod rpc;
 mod sql;
 pub use self::http::{
-    check_http_method, get_http_request_version, get_http_resp_info, http1_check_protocol,
-    http2_check_protocol, is_http_v1_payload, HttpInfo, HttpLog, Httpv2Headers,
+    check_http_method, get_http_request_version, get_http_resp_info, is_http_v1_payload, HttpInfo,
+    HttpLog, Httpv2Headers,
 };
 use self::pb_adapter::L7ProtocolSendLog;
-pub use dns::{dns_check_protocol, DnsInfo, DnsLog};
-pub use mq::{
-    kafka_check_protocol, mqtt, mqtt_check_protocol, KafkaInfo, KafkaLog, MqttInfo, MqttLog,
-};
+pub use dns::{DnsInfo, DnsLog};
+pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 pub use parser::{AppProtoLogsParser, MetaAppProto};
-pub use rpc::{dubbo_check_protocol, DubboHeader, DubboInfo, DubboLog};
+pub use rpc::{DubboHeader, DubboInfo, DubboLog};
 pub use sql::{
-    decode, mysql_check_protocol, redis_check_protocol, MysqlHeader, MysqlInfo, MysqlLog,
-    RedisInfo, RedisLog,
+    decode, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
 };
 
 use std::{
@@ -48,6 +45,7 @@ use std::{
 use prost::Message;
 use serde::{Serialize, Serializer};
 
+use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::{
     common::{
         ebpf::EbpfType,
@@ -59,8 +57,8 @@ use crate::{
     flow_generator::error::Result,
     metric::document::TapSide,
     proto::flow_log,
-    utils::net::MacAddr,
 };
+use public::utils::net::MacAddr;
 
 const NANOS_PER_MICRO: u64 = 1000;
 
@@ -106,7 +104,7 @@ impl From<PacketDirection> for LogMessageType {
 }
 
 // 应用层协议原始数据类型
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize)]
 #[repr(u8)]
 pub enum L7ProtoRawDataType {
     // 标准协议类型, 从af_packet, ebpf 的 tracepoint 或者 部分 uprobe(read/write等获取原始数据的hook点) 上报的数据都属于这个类型
@@ -137,8 +135,6 @@ pub struct AppProtoHead {
     pub msg_type: LogMessageType, // HTTP，DNS: request/response
     #[serde(rename = "response_duration")]
     pub rrt: u64, // HTTP，DNS时延: response-request
-    #[serde(skip)]
-    pub version: u8,
 }
 
 impl From<AppProtoHead> for flow_log::AppProtoHead {
@@ -447,79 +443,22 @@ impl AppProtoLogsBaseInfo {
 }
 
 #[derive(Serialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum AppProtoLogsInfo {
-    Dns(DnsInfo),
-    Mysql(MysqlInfo),
-    Redis(RedisInfo),
-    Kafka(KafkaInfo),
-    Mqtt(MqttInfo),
-    Dubbo(DubboInfo),
-    HttpV1(HttpInfo),
-    HttpV2(HttpInfo),
-    HttpV1TLS(HttpInfo),
-}
-
-impl AppProtoLogsInfo {
-    fn session_id(&self) -> Option<u32> {
-        match self {
-            AppProtoLogsInfo::Dns(t) if t.trans_id > 0 => Some(t.trans_id as u32),
-            AppProtoLogsInfo::Kafka(t) if t.correlation_id > 0 => Some(t.correlation_id),
-            AppProtoLogsInfo::Dubbo(t) if t.serial_id > 0 => Some(t.serial_id as u32),
-            AppProtoLogsInfo::HttpV2(t) if t.stream_id > 0 => Some(t.stream_id),
-            _ => None,
-        }
-    }
-
-    fn merge(&mut self, other: Self) {
-        match (self, other) {
-            (Self::Dns(m), Self::Dns(o)) => m.merge(o),
-            (Self::Mysql(m), Self::Mysql(o)) => m.merge(o),
-            (Self::Redis(m), Self::Redis(o)) => m.merge(o),
-            (Self::Kafka(m), Self::Kafka(o)) => m.merge(o),
-            (Self::Mqtt(m), Self::Mqtt(o)) => m.merge(o),
-            (Self::Dubbo(m), Self::Dubbo(o)) => m.merge(o),
-            (Self::HttpV1(m), Self::HttpV1(o)) => m.merge(o),
-            (Self::HttpV2(m), Self::HttpV2(o)) => m.merge(o),
-            (Self::HttpV1TLS(m), Self::HttpV1TLS(o)) => m.merge(o),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl fmt::Display for AppProtoLogsInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Dns(l) => write!(f, "{:?}", l),
-            Self::Mysql(l) => write!(f, "{:?}", l),
-            Self::Redis(l) => write!(f, "{}", l),
-            Self::Dubbo(l) => write!(f, "{:?}", l),
-            Self::Kafka(l) => write!(f, "{:?}", l),
-            Self::Mqtt(l) => write!(f, "{:?}", l),
-            Self::HttpV1(l) => write!(f, "{:?}", l),
-            Self::HttpV2(l) => write!(f, "{:?}", l),
-            Self::HttpV1TLS(l) => write!(f, "{:?}", l),
-        }
-    }
-}
-
-#[derive(Serialize, Debug, Clone)]
 pub struct AppProtoLogsData {
     #[serde(flatten)]
     pub base_info: AppProtoLogsBaseInfo,
     #[serde(flatten)]
-    pub special_info: AppProtoLogsInfo,
+    pub special_info: L7ProtocolInfo,
 }
 
 impl fmt::Display for AppProtoLogsData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\n", self.base_info)?;
-        write!(f, "\t{}", self.special_info)
+        write!(f, "\t{:?}", self.special_info)
     }
 }
 
 impl AppProtoLogsData {
-    pub fn new(base_info: AppProtoLogsBaseInfo, special_info: AppProtoLogsInfo) -> Self {
+    pub fn new(base_info: AppProtoLogsBaseInfo, special_info: L7ProtocolInfo) -> Self {
         Self {
             base_info,
             special_info,
@@ -527,36 +466,7 @@ impl AppProtoLogsData {
     }
 
     pub fn is_request(&self) -> bool {
-        return self.base_info.head.msg_type == LogMessageType::Request;
-    }
-
-    // return (is_req_end, is_resp_end)
-    pub fn is_req_resp_end(&self) -> (bool, bool) {
-        match &self.special_info {
-            AppProtoLogsInfo::HttpV2(d) => {
-                return d.is_req_resp_end();
-            }
-            _ => {
-                return (false, false);
-            }
-        }
-    }
-
-    pub fn is_session_end(&self) -> bool {
-        let (e1, e2) = self.is_req_resp_end();
-        return e1 && e2;
-    }
-
-    //是否忽略不发送, 目前仅用于过滤http2 uprobe 收到多余结束标识,导致空数据.
-    pub fn omit_send(&self) -> bool {
-        match &self.special_info {
-            AppProtoLogsInfo::HttpV2(d) => {
-                return d.is_empty();
-            }
-            _ => {
-                return false;
-            }
-        }
+        self.base_info.head.msg_type == LogMessageType::Request
     }
 
     pub fn is_response(&self) -> bool {
@@ -568,17 +478,8 @@ impl AppProtoLogsData {
             base: Some(self.base_info.into()),
             ..Default::default()
         };
-        let log: L7ProtocolSendLog = match self.special_info {
-            AppProtoLogsInfo::Dns(t) => t.into(),
-            AppProtoLogsInfo::Mysql(t) => t.into(),
-            AppProtoLogsInfo::Redis(t) => t.into(),
-            AppProtoLogsInfo::Kafka(t) => t.into(),
-            AppProtoLogsInfo::Mqtt(t) => t.into(),
-            AppProtoLogsInfo::Dubbo(t) => t.into(),
-            AppProtoLogsInfo::HttpV1(t)
-            | AppProtoLogsInfo::HttpV2(t)
-            | AppProtoLogsInfo::HttpV1TLS(t) => t.into(),
-        };
+
+        let log: L7ProtocolSendLog = self.special_info.into();
         log.fill_app_proto_log(&mut pb_proto_logs_data);
         pb_proto_logs_data
             .encode(buf)
@@ -611,14 +512,14 @@ impl AppProtoLogsData {
         self.protocol_merge(log.special_info);
     }
 
-    fn protocol_merge(&mut self, log_info: AppProtoLogsInfo) {
-        self.special_info.merge(log_info);
+    fn protocol_merge(&mut self, log: L7ProtocolInfo) {
+        if let Ok(_) = self.special_info.merge_log(log) {}
     }
 
     // 是否需要进一步聚合
     // 目前仅http2 uprobe 需要聚合多个请求
     pub fn need_protocol_merge(&self) -> bool {
-        return self.base_info.ebpf_type == EbpfType::GoHttp2Uprobe;
+        self.special_info.need_merge()
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {
@@ -669,64 +570,5 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.head.msg_type,
             self.head.rrt
         )
-    }
-}
-
-pub trait L7LogParse: Send + Sync {
-    fn parse(
-        &mut self,
-        payload: &[u8],
-        proto: IpProtocol,
-        direction: PacketDirection,
-        is_req_end: Option<bool>,
-        is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum>;
-    fn info(&self) -> AppProtoLogsInfoEnum;
-}
-
-#[derive(Debug, Clone)]
-pub enum AppProtoHeadEnum {
-    Single(AppProtoHead),
-    Multi(Vec<AppProtoHead>),
-}
-
-#[derive(Debug, Clone)]
-pub enum AppProtoLogsInfoEnum {
-    Single(AppProtoLogsInfo),
-    Multi(Vec<AppProtoLogsInfo>),
-}
-
-impl AppProtoLogsInfoEnum {
-    /// 假设所有应用日志都只携带一个info，如果有多个则不要用该方法
-    /// Assuming that all application logs carry only one info, do not use this method if there are multiple
-    pub fn into_inner(self) -> AppProtoLogsInfo {
-        match self {
-            Self::Single(v) => v,
-            Self::Multi(_) => unreachable!(),
-        }
-    }
-}
-
-impl IntoIterator for AppProtoHeadEnum {
-    type Item = AppProtoHead;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::Single(v) => vec![v].into_iter(),
-            Self::Multi(v) => v.into_iter(),
-        }
-    }
-}
-
-impl IntoIterator for AppProtoLogsInfoEnum {
-    type Item = AppProtoLogsInfo;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::Single(v) => vec![v].into_iter(),
-            Self::Multi(v) => v.into_iter(),
-        }
     }
 }

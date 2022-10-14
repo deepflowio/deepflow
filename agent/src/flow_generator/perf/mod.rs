@@ -35,16 +35,16 @@ use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::AppProtoHead;
 
+use crate::common::l7_protocol_info::L7ProtocolInfo;
+use crate::common::l7_protocol_log::{
+    get_all_protocol, get_bitmap, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
+};
 use crate::common::{
     enums::IpProtocol,
     flow::{FlowPerfStats, L4Protocol, L7Protocol},
     meta_packet::MetaPacket,
 };
 
-use super::protocol_logs::{
-    dns_check_protocol, dubbo_check_protocol, http1_check_protocol, http2_check_protocol,
-    kafka_check_protocol, mqtt_check_protocol, mysql_check_protocol, redis_check_protocol,
-};
 use {
     self::http::HttpPerfData,
     dns::DnsPerfData,
@@ -98,6 +98,9 @@ pub struct FlowPerf {
     l4: L4FlowPerfTable,
     l7: Option<L7FlowPerfTable>,
 
+    // perf 目前还没有抽象出来,自定义协议需要添加字段区分,以后抽出来后 l7可以去掉.
+    l7_protocol_log_parser: Option<L7ProtocolParser>,
+
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
     protocol_bitmap: u128,
@@ -126,21 +129,7 @@ impl FlowPerf {
         }
     }
 
-    fn _l7_check(&mut self, protocol: L7Protocol, packet: &MetaPacket) -> bool {
-        match protocol {
-            L7Protocol::Dns => dns_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Dubbo => dubbo_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Kafka => kafka_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Mqtt => mqtt_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Mysql => mysql_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Redis => redis_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http1 => http1_check_protocol(&mut self.protocol_bitmap, packet),
-            L7Protocol::Http2 => http2_check_protocol(&mut self.protocol_bitmap, packet),
-            _ => false,
-        }
-    }
-
-    fn _l7_parse(
+    fn l7_parse_perf(
         &mut self,
         packet: &MetaPacket,
         flow_id: u64,
@@ -162,44 +151,68 @@ impl FlowPerf {
         return ret;
     }
 
+    fn l7_parse_log(
+        &mut self,
+        packet: &MetaPacket,
+        app_table: &mut AppTable,
+        parse_param: &ParseParam,
+    ) -> Result<Vec<L7ProtocolInfo>> {
+        if self.is_skip {
+            return Err(Error::L7ProtocolParseLimit);
+        }
+
+        if let Some(payload) = packet.get_l4_payload() {
+            let parser = self.l7_protocol_log_parser.as_mut().unwrap();
+            let ret = parser.parse_payload(payload, parse_param);
+            parser.reset();
+
+            if !self.is_success {
+                if ret.is_ok() {
+                    app_table.set_protocol(packet, self.l7_protocol);
+                    self.is_success = true;
+                } else {
+                    self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+                }
+            }
+            return ret;
+        }
+
+        return Err(Error::L7ProtocolUnknown);
+    }
+
     fn l7_check(
         &mut self,
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
-    ) -> Result<()> {
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
         }
 
-        let protocols = if packet.lookup_key.proto == IpProtocol::Tcp {
-            vec![
-                L7Protocol::Http1,
-                L7Protocol::Http2,
-                L7Protocol::Dubbo,
-                L7Protocol::Mysql,
-                L7Protocol::Redis,
-                L7Protocol::Kafka,
-                L7Protocol::Mqtt,
-                L7Protocol::Dns,
-            ]
-        } else {
-            vec![L7Protocol::Dns]
-        };
+        if let Some(payload) = packet.get_l4_payload() {
+            let param = ParseParam::from(packet);
+            for mut i in get_all_protocol() {
+                if i.is_skip_parse(self.protocol_bitmap) {
+                    continue;
+                }
+                if i.check_payload(payload, &param) {
+                    self.l7_protocol = i.protocol();
+                    // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
+                    self.l7 = Self::l7_new(i.protocol(), self.rrt_cache.clone());
+                    if self.l7.is_some() {
+                        self.l7_parse_perf(packet, flow_id, app_table)?;
+                    }
 
-        for i in protocols {
-            if self.protocol_bitmap & 1 << u8::from(i) == 0 {
-                continue;
+                    self.l7_protocol_log_parser = Some(i);
+                    return self.l7_parse_log(packet, app_table, &param);
+                }
             }
-            if self._l7_check(i, packet) {
-                self.l7_protocol = i;
-                self.l7 = Self::l7_new(i, self.rrt_cache.clone());
-                return self._l7_parse(packet, flow_id, app_table);
-            }
+
+            self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
         }
-        self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
 
-        Err(Error::L7ProtocolUnknown)
+        return Err(Error::L7ProtocolUnknown);
     }
 
     fn l7_parse(
@@ -207,9 +220,13 @@ impl FlowPerf {
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
-    ) -> Result<()> {
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if self.l7.is_some() {
-            return self._l7_parse(packet, flow_id, app_table);
+            self.l7_parse_perf(packet, flow_id, app_table)?;
+        }
+
+        if self.l7_protocol_log_parser.is_some() {
+            return self.l7_parse_log(packet, app_table, &ParseParam::from(packet));
         }
 
         if self.is_from_app {
@@ -227,6 +244,7 @@ impl FlowPerf {
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         l4_proto: L4Protocol,
         l7_proto: Option<L7Protocol>,
+        l7_parser: Option<L7ProtocolParser>,
         counter: Arc<FlowPerfCounter>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
@@ -242,18 +260,13 @@ impl FlowPerf {
         Some(Self {
             l4,
             l7: Self::l7_new(l7_protocol, rrt_cache.clone()),
-            protocol_bitmap: if l4_proto == L4Protocol::Tcp {
-                1 << u8::from(L7Protocol::Http1)
-                    | 1 << u8::from(L7Protocol::Http2)
-                    | 1 << u8::from(L7Protocol::Dns)
-                    | 1 << u8::from(L7Protocol::Mysql)
-                    | 1 << u8::from(L7Protocol::Redis)
-                    | 1 << u8::from(L7Protocol::Dubbo)
-                    | 1 << u8::from(L7Protocol::Kafka)
-                    | 1 << u8::from(L7Protocol::Mqtt)
-            } else {
-                1 << u8::from(L7Protocol::Dns)
+            protocol_bitmap: {
+                match l4_proto {
+                    L4Protocol::Tcp => get_bitmap(IpProtocol::Tcp),
+                    _ => get_bitmap(IpProtocol::Udp),
+                }
             },
+            l7_protocol_log_parser: l7_parser,
             rrt_cache,
             l7_protocol,
             is_from_app: l7_proto.is_some(),
@@ -278,15 +291,15 @@ impl FlowPerf {
         l4_performance_enabled: bool,
         l7_performance_enabled: bool,
         app_table: &mut AppTable,
-    ) -> Result<()> {
+    ) -> Result<Vec<L7ProtocolInfo>> {
         if l4_performance_enabled {
             self.l4.parse(packet, is_first_packet_direction)?;
         }
         if l7_performance_enabled {
             // 抛出错误由flowMap.FlowPerfCounter处理
-            self.l7_parse(packet, flow_id, app_table)?;
+            return self.l7_parse(packet, flow_id, app_table);
         }
-        Ok(())
+        Ok(vec![])
     }
 
     pub fn copy_and_reset_perf_data(
@@ -317,16 +330,5 @@ impl FlowPerf {
         }
 
         stats
-    }
-
-    pub fn app_proto_head(&mut self, l7_performance_enabled: bool) -> Option<(AppProtoHead, u16)> {
-        if !l7_performance_enabled {
-            return None;
-        }
-        if let Some(l7) = self.l7.as_mut() {
-            l7.app_proto_head()
-        } else {
-            None
-        }
     }
 }

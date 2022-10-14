@@ -1,7 +1,5 @@
 use serde::Serialize;
 
-use super::flow::L7Protocol;
-
 //ebpf 上报的数据类型
 #[allow(dead_code)]
 // tracepoint 类型
@@ -51,44 +49,22 @@ impl EbpfType {
             }
         }
     }
+
+    // 是否原始协议数据，目前除了GoHttp2Uprobe是自定一数据格式，其他都是原始协议数据。
+    // 这个主要用于 ebpf 协议遍历解析的时候快速过滤一些协议，例如GoHttp2Uprobe，除了http以外其他协议都会跳过。
+    // ==========================================================================================
+    // is raw protocol? now only GoHttp2Uprobe is custom format.
+    // it use for fast filter some protocol.
+    pub fn is_raw_protocol(&self) -> bool {
+        match self {
+            EbpfType::GoHttp2Uprobe => false,
+            _ => true,
+        }
+    }
 }
 
 impl Default for EbpfType {
     fn default() -> Self {
-        return Self::TracePoint;
+        Self::None
     }
-}
-
-pub fn get_all_protocols_by_ebpf_type(ebpf_type: EbpfType, is_tls: bool) -> Vec<L7Protocol> {
-    let mut protocols;
-    match ebpf_type {
-        // ebpf 类型 GoHttp2Uprobe 是自定义数据格式,目前只有http2
-        EbpfType::GoHttp2Uprobe => {
-            if is_tls {
-                protocols = vec![L7Protocol::Http2TLS];
-            } else {
-                protocols = vec![L7Protocol::Http2];
-            }
-        }
-        // ebpf 类型 TracePoint 和 TlsUprobe 通过遍历所有支持的协议判断应用层协议.
-        EbpfType::TracePoint | EbpfType::TlsUprobe => {
-            protocols = vec![
-                L7Protocol::Dubbo,
-                L7Protocol::Mysql,
-                L7Protocol::Redis,
-                L7Protocol::Kafka,
-                L7Protocol::Mqtt,
-                L7Protocol::Dns,
-            ];
-            if is_tls {
-                protocols.push(L7Protocol::Http1TLS);
-                protocols.push(L7Protocol::Http2TLS);
-            } else {
-                protocols.push(L7Protocol::Http1);
-                protocols.push(L7Protocol::Http2);
-            }
-        }
-        _ => unreachable!(),
-    }
-    return protocols;
 }

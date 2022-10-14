@@ -18,22 +18,29 @@ use serde::{Serialize, Serializer};
 
 use std::{fmt, str};
 
-use super::super::{
-    value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus,
-    LogMessageType,
-};
+use super::super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
 use crate::common::enums::IpProtocol;
+use crate::common::flow::L7Protocol;
 use crate::common::flow::PacketDirection;
-use crate::common::meta_packet::MetaPacket;
+use crate::common::l7_protocol_info::L7ProtocolInfo;
+use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
+use crate::common::l7_protocol_log::L7ProtocolParserInterface;
+use crate::common::l7_protocol_log::ParseParam;
 use crate::flow_generator::error::{Error, Result};
 use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
-use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
+use crate::log_info_merge;
+use crate::parse_common;
 
 const SEPARATOR_SIZE: usize = 2;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct RedisInfo {
+    msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+    is_tls: bool,
+
     #[serde(
         rename = "request_resource",
         skip_serializing_if = "value_is_default",
@@ -60,6 +67,33 @@ pub struct RedisInfo {
     )]
     pub error: Vec<u8>, // '-'
     pub resp_status: L7ResponseStatus,
+}
+
+impl L7ProtocolInfoInterface for RedisInfo {
+    fn session_id(&self) -> Option<u32> {
+        None
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        log_info_merge!(self, RedisInfo, other);
+        Ok(())
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        Some(AppProtoHead {
+            proto: L7Protocol::Redis,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        })
+    }
+
+    fn is_tls(&self) -> bool {
+        self.is_tls
+    }
+
+    fn skip_send(&self) -> bool {
+        false
+    }
 }
 
 pub fn vec_u8_to_string<S>(v: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
@@ -128,11 +162,36 @@ impl From<RedisInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct RedisLog {
     info: RedisInfo,
-    l7_proto: L7Protocol,
-    msg_type: LogMessageType,
+}
+
+impl L7ProtocolParserInterface for RedisLog {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
+        Self::redis_check_protocol(payload, param)
+    }
+
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        parse_common!(self, param);
+        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        Ok(vec![L7ProtocolInfo::RedisInfo(self.info.clone())])
+    }
+
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Redis
+    }
+
+    fn parsable_on_udp(&self) -> bool {
+        false
+    }
+
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
 }
 
 impl RedisLog {
@@ -145,12 +204,12 @@ impl RedisLog {
             Some(i) if i > 0 => Vec::from(&context[..i]),
             _ => context.clone(),
         };
-        self.msg_type = LogMessageType::Request;
+        self.info.msg_type = LogMessageType::Request;
         self.info.request = context;
     }
 
     fn fill_response(&mut self, context: Vec<u8>, error_response: bool) {
-        self.msg_type = LogMessageType::Response;
+        self.info.msg_type = LogMessageType::Response;
         if context.is_empty() {
             return;
         }
@@ -166,9 +225,18 @@ impl RedisLog {
             _ => self.info.response = context,
         }
     }
-}
 
-impl L7LogParse for RedisLog {
+    pub fn redis_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
+            return false;
+        }
+
+        if payload[0] != b'*' {
+            return false;
+        }
+        decode_asterisk(payload, true).is_some()
+    }
+
     fn parse(
         &mut self,
         payload: &[u8],
@@ -176,7 +244,7 @@ impl L7LogParse for RedisLog {
         direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -189,16 +257,7 @@ impl L7LogParse for RedisLog {
             PacketDirection::ClientToServer => self.fill_request(context),
             PacketDirection::ServerToClient => self.fill_response(context, error_response),
         };
-        Ok(AppProtoHeadEnum::Single(AppProtoHead {
-            proto: L7Protocol::Redis,
-            msg_type: self.msg_type,
-            rrt: 0,
-            ..Default::default()
-        }))
-    }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Redis(self.info.clone()))
+        Ok(())
     }
 }
 
@@ -352,25 +411,6 @@ pub fn decode_error_code(context: &[u8]) -> Option<&[u8]> {
     None
 }
 
-// 通过请求识别REDIS
-pub fn redis_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Redis));
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-    let payload = payload.unwrap();
-
-    if payload[0] != b'*' {
-        return false;
-    }
-    return decode_asterisk(payload, true).is_some();
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -378,7 +418,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/redis";
 
@@ -392,7 +435,6 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -412,7 +454,8 @@ mod tests {
                 None,
                 None,
             );
-            let is_redis = redis_check_protocol(&mut bitmap, packet);
+            let is_redis =
+                RedisLog::redis_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output

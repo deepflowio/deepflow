@@ -32,7 +32,7 @@ pub enum MatchedFlag {
     TapType,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum MatchedField {
     V4(MatchedFieldv4),
     V6(MatchedFieldv6),

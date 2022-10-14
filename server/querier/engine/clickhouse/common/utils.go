@@ -59,7 +59,7 @@ func ParseAlias(node sqlparser.SQLNode) string {
 	if _, err := strconv.ParseInt(alias, 10, 64); err == nil {
 		return fmt.Sprintf("`%s`", alias)
 	}
-	// k8s标签字带上``
+	// K8s Labels字带上``
 	if strings.HasPrefix(alias, "label.") {
 		return fmt.Sprintf("`%s`", alias)
 	}

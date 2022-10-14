@@ -1,1 +1,1 @@
-MqttInfo { client_id: None, version: 0, pkt_type: Connack, req_msg_size: -1, res_msg_size: 156, subscribe_topics: None, publish_topic: None, code: 0, status: Ok } is_mqtt: false
+MqttInfo { start_time: 0, end_time: 0, msg_type: Other, client_id: None, version: 0, pkt_type: Connack, req_msg_size: None, res_msg_size: Some(156), subscribe_topics: None, publish_topic: None, code: Some(0), status: Ok } is_mqtt: false

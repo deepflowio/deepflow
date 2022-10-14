@@ -17,7 +17,8 @@
 use std::{
     ffi::{CStr, CString},
     io::ErrorKind,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    mem::MaybeUninit,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV6},
     time::Duration,
 };
 
@@ -37,27 +38,19 @@ use pnet::{
         arp::{ArpHardwareTypes, ArpOperations, ArpPacket, MutableArpPacket},
         ethernet::{EtherTypes, EthernetPacket, MutableEthernetPacket},
         icmpv6::{
-            ndp::{
-                Icmpv6Codes, MutableNeighborSolicitPacket, NdpOption, NdpOptionTypes,
-                NeighborAdvertPacket,
-            },
-            Icmpv6Types,
+            ndp::{MutableNeighborSolicitPacket, NdpOption, NdpOptionTypes, NeighborAdvertPacket},
+            Icmpv6Code, Icmpv6Types,
         },
-        ip::IpNextHeaderProtocols,
         Packet,
-    },
-    transport::{
-        icmpv6_packet_iter, transport_channel, TransportChannelType, TransportProtocol,
-        TransportReceiver, TransportSender,
     },
 };
 use regex::Regex;
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
 use super::parse_ip_slice;
 use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
 use super::{Error, Result};
 
-const BUFFER_SIZE: usize = 512;
 const RCV_TIMEOUT: Duration = Duration::from_millis(500);
 
 const NETLINK_ERROR_NOADDR: i32 = -19;
@@ -134,30 +127,87 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
 }
 
 fn ndp_lookup(selected_interface: &NetworkInterface, dest_addr: Ipv6Addr) -> Result<MacAddr> {
-    let protocol =
-        TransportChannelType::Layer4(TransportProtocol::Ipv6(IpNextHeaderProtocols::Icmpv6));
+    let socket = Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6));
+    if socket.is_err() {
+        return Err(Error::NeighborLookup("raw socket".to_string()));
+    }
+    let socket = socket.unwrap();
 
-    let (mut tx, mut rx) = match transport_channel(BUFFER_SIZE, protocol) {
-        Ok((tx, rx)) => (tx, rx),
-        Err(err) => {
-            return Err(Error::NeighborLookup(format!(
-                "create ndp transport channel error: {}",
-                err
-            )));
-        }
-    };
-
-    // 用默认值(64)不能接收response, 因为 solicitation packet 强制设置为255
-    // https://mirrors.ustc.edu.cn/rfc/rfc4861.html#section-4.1
-    if let Err(err) = tx.set_ttl(255) {
-        return Err(Error::NeighborLookup(format!(
-            "config ttl on ndp transport channel error: {}",
-            err
-        )));
+    let ret = socket.bind_device(Some(selected_interface.name.as_bytes()));
+    if ret.is_err() {
+        return Err(Error::NeighborLookup("bind device".to_string()));
+    }
+    let ret = socket.set_multicast_hops_v6(255);
+    if ret.is_err() {
+        return Err(Error::NeighborLookup("multi hops limit".to_string()));
+    }
+    let ret = socket.set_unicast_hops_v6(255);
+    if ret.is_err() {
+        return Err(Error::NeighborLookup("unicast hops limit".to_string()));
+    }
+    let ret = socket.set_read_timeout(Some(Duration::from_millis(200)));
+    if ret.is_err() {
+        return Err(Error::NeighborLookup("read timeout".to_string()));
     }
 
-    send_ndp_request(&mut tx, selected_interface, dest_addr)?;
-    receive_ndp_response(&mut rx)
+    for ip_net in selected_interface.ips.iter() {
+        match ip_net.ip() {
+            IpAddr::V6(addr) if ip_net.contains(IpAddr::from(dest_addr)) => {
+                let ret = socket.bind(&SockAddr::from(SocketAddrV6::new(addr, 0, 0, 0)));
+                if ret.is_err() {
+                    warn!("bind {:?}", ret.unwrap_err());
+                }
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    let mut request = [0u8; 32];
+    let mut ns_packet = MutableNeighborSolicitPacket::new(&mut request[..]).unwrap();
+    ns_packet.set_icmpv6_type(Icmpv6Types::NeighborSolicit);
+    ns_packet.set_icmpv6_code(Icmpv6Code(0));
+    ns_packet.set_target_addr(dest_addr.clone());
+    let mac = selected_interface.mac.unwrap().octets();
+    // length = size_of(type) + size_of(length) + size_of(data) 单位是8字节，所以是1
+    // https://mirrors.ustc.edu.cn/rfc/rfc4861.html#section-4.6.1
+    let ndp_option = NdpOption {
+        option_type: NdpOptionTypes::SourceLLAddr,
+        length: 1,
+        data: Vec::from(mac),
+    };
+    ns_packet.set_options(&[ndp_option]);
+    let ret = socket.send_to(&request, &to_multi_address(dest_addr));
+    if ret.is_err() {
+        return Err(Error::NeighborLookup("send to".to_string()));
+    }
+
+    let mut response: [MaybeUninit<u8>; 1000] = unsafe { MaybeUninit::uninit().assume_init() };
+
+    let ret = socket.recv(&mut response);
+    if ret.is_err() {
+        return Err(Error::NeighborLookup("recv".to_string()));
+    }
+    let n = ret.unwrap();
+    let response = response[..n]
+        .iter()
+        .map(|x| unsafe { x.assume_init_read() })
+        .collect::<Vec<u8>>();
+
+    NeighborAdvertPacket::new(response.as_slice())
+        .and_then(|pkt| {
+            pkt.get_options()
+                .into_iter()
+                .find(|option| option.option_type == NdpOptionTypes::TargetLLAddr)
+                .and_then(|option| {
+                    <&[u8; 6]>::try_from(option.data.as_slice())
+                        .ok()
+                        .map(|m| MacAddr(*m))
+                })
+        })
+        .ok_or(Error::NeighborLookup(String::from(
+            "parse neighbor advertisement packet failed and get none MAC address",
+        )))
 }
 
 // lo ip，MAC地址返为 MAC_ADDR_ZERO
@@ -195,90 +245,11 @@ fn arp_lookup(
     receive_arp_response(&mut rx)
 }
 
-fn receive_ndp_response(rx: &mut TransportReceiver) -> Result<MacAddr> {
-    let mut iter = icmpv6_packet_iter(rx);
-    match iter.next_with_timeout(RCV_TIMEOUT) {
-        Ok(Some((pkt, addr))) => {
-            if pkt.get_icmpv6_type() == Icmpv6Types::NeighborAdvert {
-                NeighborAdvertPacket::new(pkt.packet())
-                    .and_then(|pkt| {
-                        pkt.get_options()
-                            .into_iter()
-                            .find(|option| option.option_type == NdpOptionTypes::TargetLLAddr)
-                            .and_then(|option| {
-                                <&[u8; 6]>::try_from(option.data.as_slice())
-                                    .ok()
-                                    .map(|m| MacAddr(*m))
-                            })
-                    })
-                    .ok_or(Error::NeighborLookup(String::from(
-                        "parse neighbor advertisement packet failed and get none MAC address",
-                    )))
-            } else {
-                let err_msg = format!(
-                    "ICMP type other than neighbor advertisement received from {:?} {:?}",
-                    addr,
-                    pkt.get_icmpv6_type()
-                );
-                return Err(Error::NeighborLookup(err_msg));
-            }
-        }
-        Ok(_) => {
-            return Err(Error::NeighborLookup(format!(
-                "receive neighbor advertisement packet timeout ({:?})",
-                RCV_TIMEOUT
-            )));
-        }
-        Err(e) => {
-            return Err(Error::NeighborLookup(format!(
-                "receive neighbor advertisement packet error: {}",
-                e
-            )));
-        }
-    }
-}
-
-// W: 不需要指定source address
-// A: `tx`发包指定target address 自动寻找 source address和 interface
-// W: 不需要计算请求节点的组播地址
-// A: 因为在lookup 函数已计算出获得mac接口的的ipv6 address
-fn send_ndp_request(
-    tx: &mut TransportSender,
-    interface: &NetworkInterface,
-    dest_addr: Ipv6Addr,
-) -> Result<()> {
-    // NeighborSolicit packet length = 24bytes , option 字段 8bytes, 共32bytes
-    let mut ns_buf = [0u8; 32];
-    let mut packet = match MutableNeighborSolicitPacket::new(&mut ns_buf) {
-        Some(p) => p,
-        None => {
-            return Err(Error::NeighborLookup(format!(
-                "failed to create neighbor solicit packet"
-            )));
-        }
-    };
-
-    packet.set_target_addr(dest_addr);
-    packet.set_icmpv6_type(Icmpv6Types::NeighborSolicit);
-    packet.set_icmpv6_code(Icmpv6Codes::NoCode);
-
-    let mac = interface.mac.unwrap().octets();
-    // length = size_of(type) + size_of(length) + size_of(data) 单位是8字节，所以是1
-    // https://mirrors.ustc.edu.cn/rfc/rfc4861.html#section-4.6.1
-    let ndp_option = NdpOption {
-        option_type: NdpOptionTypes::SourceLLAddr,
-        length: 1,
-        data: Vec::from(mac),
-    };
-    packet.set_options(&[ndp_option]);
-
-    if let Err(err) = tx.send_to(packet, IpAddr::from(dest_addr)) {
-        return Err(Error::NeighborLookup(format!(
-            "send ndp request packet error: {}",
-            err
-        )));
-    }
-    Ok(())
+fn to_multi_address(addr: Ipv6Addr) -> SockAddr {
+    let suffix = addr.segments();
+    let multi = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 1, 0xff00 | suffix[6], suffix[7]);
+    warn!("npb xxxxxxxxx {}", multi);
+    SockAddr::from(SocketAddrV6::new(multi, 0, 0, 0))
 }
 
 fn send_arp_request(
@@ -685,6 +656,17 @@ fn get_route_src_ip_and_ifindex(dest: &IpAddr) -> Result<(IpAddr, u32)> {
         return Err(Error::NoRouteToHost(dest.to_string()));
     }
     Ok((routes[0].src_ip, routes[0].oif_index))
+}
+
+pub fn get_route_src_ip_interface_name(dest_addr: &IpAddr) -> Result<String> {
+    let if_index = get_route_src_ip_and_ifindex(dest_addr).map(|r| r.1)?;
+    let links = link_list()?;
+    for link in links {
+        if link.if_index == if_index {
+            return Ok(link.name.clone());
+        }
+    }
+    return Err(Error::LinkNotFound("name".to_string()));
 }
 
 #[cfg(test)]

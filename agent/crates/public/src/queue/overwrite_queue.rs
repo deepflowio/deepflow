@@ -25,7 +25,7 @@ use std::sync::{
 use std::time::{Duration, Instant};
 
 use super::Error;
-use crate::utils::stats;
+use crate::counter as stats;
 
 pub fn bounded<T>(size: usize) -> (Sender<T>, Receiver<T>, StatsHandle<T>) {
     RefCounter::new(OverwriteQueue::with_capacity(size))

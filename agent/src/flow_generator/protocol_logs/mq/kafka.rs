@@ -17,23 +17,30 @@ use serde::Serialize;
 
 use super::super::{
     consts::KAFKA_REQ_HEADER_LEN, value_is_default, value_is_negative, AppProtoHead,
-    AppProtoLogsInfo, L7LogParse, L7Protocol, L7ResponseStatus, LogMessageType,
+    L7ResponseStatus, LogMessageType,
 };
 
+use crate::common::flow::L7Protocol;
+use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
+use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
-use crate::flow_generator::protocol_logs::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
-    common::meta_packet::MetaPacket,
     flow_generator::error::{Error, Result},
     utils::bytes::{read_u16_be, read_u32_be},
 };
+use crate::{log_info_merge, parse_common};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct KafkaInfo {
+    msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+    is_tls: bool,
+
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
     pub correlation_id: u32,
 
@@ -52,6 +59,33 @@ pub struct KafkaInfo {
     pub resp_msg_size: Option<u32>,
     pub status: L7ResponseStatus,
     pub status_code: Option<i32>,
+}
+
+impl L7ProtocolInfoInterface for KafkaInfo {
+    fn session_id(&self) -> Option<u32> {
+        Some(self.correlation_id)
+    }
+
+    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+        log_info_merge!(self, KafkaInfo, other);
+        Ok(())
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        Some(AppProtoHead {
+            proto: L7Protocol::Kafka,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        })
+    }
+
+    fn is_tls(&self) -> bool {
+        self.is_tls
+    }
+
+    fn skip_send(&self) -> bool {
+        false
+    }
 }
 
 impl KafkaInfo {
@@ -174,12 +208,44 @@ impl From<KafkaInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct KafkaLog {
     info: KafkaInfo,
-    msg_type: LogMessageType,
 }
 
+impl L7ProtocolParserInterface for KafkaLog {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
+        Self::kafka_check_protocol(payload, param)
+    }
+
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        parse_common!(self, param);
+        Self::parse(
+            self,
+            payload,
+            param.l4_protocol,
+            param.direction,
+            None,
+            None,
+        )?;
+        Ok(vec![L7ProtocolInfo::KafkaInfo(self.info.clone())])
+    }
+
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Kafka
+    }
+
+    fn parsable_on_udp(&self) -> bool {
+        false
+    }
+
+    fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
 impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
     fn reset_logs(&mut self) {
@@ -211,7 +277,7 @@ impl KafkaLog {
             return Err(Error::KafkaLogParseFailed);
         }
 
-        self.msg_type = LogMessageType::Request;
+        self.info.msg_type = LogMessageType::Request;
         self.info.api_key = read_u16_be(&payload[4..]);
         self.info.api_version = read_u16_be(&payload[6..]);
         self.info.correlation_id = read_u32_be(&payload[8..]);
@@ -225,7 +291,7 @@ impl KafkaLog {
 
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
-            msg_type: self.msg_type,
+            msg_type: self.info.msg_type,
             rrt: 0,
             ..Default::default()
         })
@@ -234,18 +300,32 @@ impl KafkaLog {
     fn response(&mut self, payload: &[u8]) -> Result<AppProtoHead> {
         self.info.resp_msg_size = Some(read_u32_be(payload));
         self.info.correlation_id = read_u32_be(&payload[4..]);
-        self.msg_type = LogMessageType::Response;
+        self.info.msg_type = LogMessageType::Response;
 
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
-            msg_type: self.msg_type,
+            msg_type: self.info.msg_type,
             rrt: 0,
-            version: 0,
         })
     }
-}
 
-impl L7LogParse for KafkaLog {
+    pub fn kafka_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
+            return false;
+        }
+
+        if payload.len() < KAFKA_REQ_HEADER_LEN {
+            return false;
+        }
+        let mut kafka = KafkaLog::default();
+
+        let ret = kafka.request(payload, true);
+        if ret.is_err() {
+            return false;
+        }
+        kafka.info.check()
+    }
+
     fn parse(
         &mut self,
         payload: &[u8],
@@ -253,7 +333,7 @@ impl L7LogParse for KafkaLog {
         direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -261,39 +341,12 @@ impl L7LogParse for KafkaLog {
         if payload.len() < KAFKA_REQ_HEADER_LEN {
             return Err(Error::KafkaLogParseFailed);
         }
-        let head = match direction {
+        match direction {
             PacketDirection::ClientToServer => self.request(payload, false),
             PacketDirection::ServerToClient => self.response(payload),
         }?;
-        Ok(AppProtoHeadEnum::Single(head))
+        Ok(())
     }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Kafka(self.info.clone()))
-    }
-}
-
-pub fn kafka_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Kafka));
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-    let payload = payload.unwrap();
-    if payload.len() < KAFKA_REQ_HEADER_LEN {
-        return false;
-    }
-    let mut kafka = KafkaLog::default();
-
-    let ret = kafka.request(payload, true);
-    if ret.is_err() {
-        return false;
-    }
-    return kafka.info.check();
 }
 
 #[cfg(test)]
@@ -303,7 +356,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/kafka";
 
@@ -316,7 +372,6 @@ mod tests {
 
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -336,7 +391,8 @@ mod tests {
                 None,
                 None,
             );
-            let is_kafka = kafka_check_protocol(&mut bitmap, packet);
+            let is_kafka =
+                KafkaLog::kafka_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_kafka: {}\r\n", kafka.info, is_kafka));
         }
         output

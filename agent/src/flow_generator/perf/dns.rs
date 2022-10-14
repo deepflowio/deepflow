@@ -157,7 +157,6 @@ impl L7FlowPerf for DnsPerfData {
                 proto: self.session_data.l7_proto,
                 msg_type: self.session_data.msg_type,
                 rrt,
-                version: 0,
             },
             0,
         ))

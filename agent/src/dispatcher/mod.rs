@@ -50,7 +50,7 @@ use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use mirror_mode_dispatcher::MirrorModeDispatcher;
 use recv_engine::RecvEngine;
 #[cfg(target_os = "linux")]
-use recv_engine::{
+pub use recv_engine::{
     af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
     DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
@@ -66,12 +66,12 @@ use crate::{
     platform::LibvirtXmlExtractor,
     policy::PolicyGetter,
     proto::{common::TridentType, trident::IfMacSource, trident::TapMode},
-    utils::{
-        net::{Link, MacAddr},
-        queue::DebugSender,
-        stats::{self, Collector},
-        LeakyBucket,
-    },
+    utils::stats::{self, Collector},
+};
+use public::{
+    queue::DebugSender,
+    utils::net::{Link, MacAddr},
+    LeakyBucket,
 };
 
 enum DispatcherFlavor {
@@ -322,7 +322,6 @@ impl BpfOptions {
 
 #[derive(Default)]
 pub struct Options {
-    pub handler_builders: Vec<PacketHandlerBuilder>,
     #[cfg(target_os = "windows")]
     pub win_packet_blocks: usize,
     #[cfg(target_os = "linux")]
@@ -334,6 +333,7 @@ pub struct Options {
     pub dpdk_conf: DpdkRingPortConf,
     pub tap_mac_script: String,
     pub is_ipv6: bool,
+    pub vxlan_flags: u8,
     pub vxlan_port: u16,
     pub controller_port: u16,
     pub controller_tls_port: u16,
@@ -441,6 +441,7 @@ pub struct DispatcherBuilder {
     ctrl_mac: Option<MacAddr>,
     leaky_bucket: Option<Arc<LeakyBucket>>,
     options: Option<Arc<Options>>,
+    handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
     bpf_options: Option<Arc<Mutex<BpfOptions>>>,
     default_tap_type: Option<TapType>,
     mirror_traffic_pcp: Option<u16>,
@@ -578,6 +579,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn handler_builders(mut self, v: Arc<Mutex<Vec<PacketHandlerBuilder>>>) -> Self {
+        self.handler_builders = v.clone();
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         let options = self
             .options
@@ -670,6 +676,7 @@ impl DispatcherBuilder {
             leaky_bucket: self
                 .leaky_bucket
                 .ok_or(Error::ConfigIncomplete("no leaky_bucket".into()))?,
+            handler_builder: self.handler_builders.clone(),
             pipelines: Default::default(),
             tap_interfaces: Default::default(),
             tunnel_type_bitmap: Default::default(),

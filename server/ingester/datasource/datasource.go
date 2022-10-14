@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/deepflowys/deepflow/server/ingester/config"
+	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/gorilla/mux"
 	logging "github.com/op/go-logging"
 )
@@ -35,14 +37,12 @@ const (
 )
 
 type DatasourceManager struct {
-	ckAddr         string // 需要修改数据源的clickhouse地址, 支持多个
-	user           string
-	password       string
-	readTimeout    int
-	replicaEnabled bool
-	ckdbS3Enabled  bool
-	ckdbS3Volume   string
-	ckdbS3TTLTimes int
+	ckAddr           string // 需要修改数据源的clickhouse地址, 支持多个
+	user             string
+	password         string
+	readTimeout      int
+	replicaEnabled   bool
+	ckdbColdStorages map[string]*ckdb.ColdStorage
 
 	ckdbCluster       string
 	ckdbStoragePolicy string
@@ -50,17 +50,15 @@ type DatasourceManager struct {
 	server *http.Server
 }
 
-func NewDatasourceManager(ckAddr string, user, password, ckdbCluster, ckdbStoragePolicy string, readTimeout int, ckdbS3Enabled bool, ckdbS3Volume string, ckdbS3TTLTimes int) *DatasourceManager {
+func NewDatasourceManager(cfg *config.Config, readTimeout int) *DatasourceManager {
 	return &DatasourceManager{
-		ckAddr:            ckAddr,
-		user:              user,
-		password:          password,
+		ckAddr:            cfg.CKDB.ActualAddr,
+		user:              cfg.CKDBAuth.Username,
+		password:          cfg.CKDBAuth.Password,
 		readTimeout:       readTimeout,
-		ckdbS3Enabled:     ckdbS3Enabled,
-		ckdbS3Volume:      ckdbS3Volume,
-		ckdbS3TTLTimes:    ckdbS3TTLTimes,
-		ckdbCluster:       ckdbCluster,
-		ckdbStoragePolicy: ckdbStoragePolicy,
+		ckdbCluster:       cfg.CKDB.ClusterName,
+		ckdbStoragePolicy: cfg.CKDB.StoragePolicy,
+		ckdbColdStorages:  cfg.GetCKDBColdStorages(),
 		server: &http.Server{
 			Addr:    ":" + strconv.Itoa(DATASOURCE_PORT),
 			Handler: mux.NewRouter(),

@@ -86,6 +86,8 @@ func (c *ControllerCheck) Stop() {
 	log.Info("controller check stopped")
 }
 
+var checkExceptionControllers = make(map[string]*dfHostCheck)
+
 func (c *ControllerCheck) healthCheck() {
 	var controllers []mysql.Controller
 	var exceptionIPs []string
@@ -132,6 +134,7 @@ func (c *ControllerCheck) healthCheck() {
 				if _, ok := c.exceptionControllerDict[controller.IP]; ok {
 					delete(c.exceptionControllerDict, controller.IP)
 				}
+				delete(checkExceptionControllers, controller.IP)
 			} else {
 				if _, ok := c.exceptionControllerDict[controller.IP]; ok {
 					if c.exceptionControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
@@ -141,18 +144,25 @@ func (c *ControllerCheck) healthCheck() {
 						log.Infof("set controller (%s) state to exception", controller.IP)
 						// 根据exceptionIP，重新分配对应采集器的控制器
 						c.TriggerReallocController(controller.IP)
+						if _, ok := checkExceptionControllers[controller.IP]; ok == false {
+							checkExceptionControllers[controller.IP] = newDFHostCheck()
+						}
 					}
 				} else {
 					c.exceptionControllerDict[controller.IP] = newDFHostCheck()
 				}
 			}
 		} else {
+			if _, ok := checkExceptionControllers[controller.IP]; ok == false {
+				checkExceptionControllers[controller.IP] = newDFHostCheck()
+			}
 			if active {
 				if _, ok := c.normalControllerDict[controller.IP]; ok {
 					if c.normalControllerDict[controller.IP].duration() >= int64(3*common.HEALTH_CHECK_INTERVAL.Seconds()) {
 						delete(c.normalControllerDict, controller.IP)
 						mysql.Db.Model(&controller).Update("state", common.HOST_STATE_COMPLETE)
 						log.Infof("set controller (%s) state to normal", controller.IP)
+						delete(checkExceptionControllers, controller.IP)
 					}
 				} else {
 					c.normalControllerDict[controller.IP] = newDFHostCheck()
@@ -164,6 +174,18 @@ func (c *ControllerCheck) healthCheck() {
 				if _, ok := c.exceptionControllerDict[controller.IP]; ok {
 					delete(c.exceptionControllerDict, controller.IP)
 				}
+			}
+		}
+	}
+
+	for ip, dfhostCheck := range checkExceptionControllers {
+		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
+			err := mysql.Db.Delete(mysql.Controller{}, "ip = ?", ip).Error
+			if err != nil {
+				log.Errorf("delete controller(%s) failed, err:%s", ip, err)
+			} else {
+				log.Infof("delete controller(%s), exception lasts for %d seconds", ip, dfhostCheck.duration())
+				delete(checkExceptionControllers, ip)
 			}
 		}
 	}

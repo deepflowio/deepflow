@@ -36,23 +36,19 @@ use parking_lot::RwLock;
 
 #[cfg(target_os = "linux")]
 use super::platform::{PlatformDebugger, PlatformMessage};
-
 use super::{
-    error::{Error, Result},
     policy::{PolicyDebugger, PolicyMessage},
-    queue::{QueueDebugger, QueueMessage},
     rpc::{RpcDebugger, RpcMessage},
-    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, DEEPFLOW_AGENT_BEACON, MAX_BUF_SIZE,
+    Beacon, Message, Module, BEACON_INTERVAL, BEACON_PORT, DEEPFLOW_AGENT_BEACON,
 };
-
 #[cfg(target_os = "linux")]
 use crate::platform::{ApiWatcher, GenericPoller};
-
 use crate::{
     config::handler::DebugAccess,
     policy::PolicySetter,
     rpc::{RunningConfig, Session, StaticConfig, Status},
 };
+use public::debug::{send_to, Error, QueueDebugger, QueueMessage, Result, MAX_BUF_SIZE};
 
 struct ModuleDebuggers {
     #[cfg(target_os = "linux")]
@@ -549,22 +545,5 @@ where
     for msg in msgs {
         send_to(sock, addr.clone(), msg, conf)?
     }
-    Ok(())
-}
-
-pub(super) fn send_to(
-    sock: &UdpSocket,
-    addr: impl ToSocketAddrs + Clone,
-    msg: impl Encode,
-    conf: Configuration,
-) -> Result<()> {
-    let encoded = encode_to_vec(msg, conf)?;
-    if encoded.len() > MAX_BUF_SIZE {
-        return Err(Error::IoError(io::Error::new(
-            ErrorKind::Other,
-            "too large packets to send",
-        )));
-    }
-    sock.send_to(encoded.as_slice(), addr)?;
     Ok(())
 }

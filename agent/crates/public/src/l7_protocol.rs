@@ -14,22 +14,38 @@
  * limitations under the License.
  */
 
-use thiserror::Error;
+use num_enum::FromPrimitive;
+use serde::Serialize;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error(transparent)]
-    BinCodeDecode(#[from] bincode::error::DecodeError),
-    #[error(transparent)]
-    BinCodeEncode(#[from] bincode::error::EncodeError),
-    #[error(transparent)]
-    Tonic(#[from] tonic::Status),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-    #[error("{0}")]
-    NotFound(String),
-    #[error("{0}")]
-    FromUtf8(String),
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq, FromPrimitive, num_enum::Default)]
+#[repr(u8)]
+pub enum L7Protocol {
+    #[num_enum(default)]
+    Unknown = 0,
+    Other = 1,
+
+    // HTTP
+    Http1 = 20,
+    Http2 = 21,
+    Http1TLS = 22,
+    Http2TLS = 23,
+
+    // RPC
+    Dubbo = 40,
+
+    // SQL
+    Mysql = 60,
+    Postgresql = 61,
+
+    // NoSQL
+    Redis = 80,
+
+    // MQ
+    Kafka = 100,
+    Mqtt = 101,
+
+    // INFRA
+    Dns = 120,
+
+    Max = 255,
 }
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;

@@ -29,7 +29,7 @@ pub use libvirt_xml_extractor::LibvirtXmlExtractor;
 #[cfg(target_os = "linux")]
 pub use platform_synchronizer::PlatformSynchronizer;
 
-use crate::utils::net::MacAddr;
+use public::utils::net::MacAddr;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct InterfaceEntry {

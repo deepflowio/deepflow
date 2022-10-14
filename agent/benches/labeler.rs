@@ -31,12 +31,13 @@ use deepflow_agent::_FirstPath as FirstPath;
 use deepflow_agent::_IpGroupData as IpGroupData;
 use deepflow_agent::_Labeler as Labeler;
 use deepflow_agent::_LookupKey as LookupKey;
-use deepflow_agent::_MacAddr as MacAddr;
 use deepflow_agent::_NpbAction as NpbAction;
 use deepflow_agent::_NpbTunnelType as NpbTunnelType;
 use deepflow_agent::_PortRange as PortRange;
 use deepflow_agent::_TapSide as TapSide;
+use deepflow_agent::_feature as feature;
 use deepflow_agent::{_IpSubnet as IpSubnet, _PlatformData as PlatformData};
+use public::utils::net::MacAddr;
 
 fn bench_labeler(c: &mut Criterion) {
     c.bench_function("labeler", |b| {
@@ -90,7 +91,7 @@ fn bench_labeler(c: &mut Criterion) {
 
 fn bench_policy(c: &mut Criterion) {
     fn generate_table() -> FirstPath {
-        let mut first = FirstPath::new(1, 8, 1 << 16, false);
+        let mut first = FirstPath::new(1, 8, 1 << 16, false, feature::FeatureFlags::NONE);
         let acl = Acl::new(
             1,
             vec![10],

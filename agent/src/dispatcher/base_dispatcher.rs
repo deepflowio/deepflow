@@ -52,19 +52,19 @@ use crate::{
     config::{handler::FlowAccess, DispatcherConfig},
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
+    handler::PacketHandlerBuilder,
     policy::PolicyGetter,
     proto::trident::{Exception, IfMacSource, TapMode},
     rpc::get_timestamp,
-    utils::{
-        bytes::read_u16_be,
-        net::{self, get_route_src_ip, Link, MacAddr},
-        queue::DebugSender,
-        stats::Collector,
-        LeakyBucket,
-    },
+    utils::{bytes::read_u16_be, stats::Collector},
 };
 
-use public::packet::Packet;
+use public::{
+    packet::Packet,
+    queue::DebugSender,
+    utils::net::{self, get_route_src_ip, Link, MacAddr},
+    LeakyBucket,
+};
 
 pub(super) struct BaseDispatcher {
     pub(super) engine: RecvEngine,
@@ -78,6 +78,7 @@ pub(super) struct BaseDispatcher {
     pub(super) bpf_options: Arc<Mutex<BpfOptions>>,
 
     pub(super) leaky_bucket: Arc<LeakyBucket>,
+    pub(super) handler_builder: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
     pub(super) pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
@@ -434,13 +435,12 @@ impl BaseDispatcher {
             analyzer_ip: Ipv4Addr::UNSPECIFIED.into(),
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
+            handler_builders: self.handler_builder.clone(),
         }
     }
 
-    pub fn terminate_queue(&self) {
-        for sender in self.options.handler_builders.iter() {
-            sender.send_terminated();
-        }
+    pub fn terminate_handler(&mut self) {
+        self.pipelines.lock().unwrap().clear();
     }
 
     pub(super) fn check_and_update_bpf(&mut self) {
@@ -600,6 +600,7 @@ pub(super) struct BaseDispatcherListener {
     pub src_interface: String,
     pub options: Arc<Options>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
+    pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,
     pub pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub need_update_bpf: Arc<AtomicBool>,
@@ -654,6 +655,7 @@ impl BaseDispatcherListener {
 
         let bpf_builder = bpf::Builder {
             is_ipv6: self.options.is_ipv6,
+            vxlan_flags: self.options.vxlan_flags,
             vxlan_port: self.options.vxlan_port,
             controller_port: self.options.controller_port,
             controller_tls_port: self.options.controller_tls_port,
@@ -719,8 +721,9 @@ impl BaseDispatcherListener {
             let vm_mac = vm_macs[i];
             added.push(vm_mac);
             let handlers = self
-                .options
                 .handler_builders
+                .lock()
+                .unwrap()
                 .iter()
                 .map(|b| b.build_with(self.id, *key, vm_mac))
                 .collect();

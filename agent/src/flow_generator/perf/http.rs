@@ -14,12 +14,7 @@
  * limitations under the License.
  */
 
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::time::Duration;
-use std::{fmt, str};
-
-use crate::utils::net::h2pack;
+use std::{cell::RefCell, fmt, rc::Rc, str, time::Duration};
 
 use crate::{
     common::{
@@ -38,6 +33,7 @@ use crate::{
         },
     },
 };
+use public::utils::net::h2pack;
 
 struct HttpSessionData {
     // HTTPv2 Header
@@ -162,7 +158,6 @@ impl L7FlowPerf for HttpPerfData {
                 proto: self.session_data.l7_proto,
                 msg_type: self.session_data.msg_type,
                 rrt,
-                version: 0,
             },
             0,
         ))

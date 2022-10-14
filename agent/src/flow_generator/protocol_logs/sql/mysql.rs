@@ -16,25 +16,29 @@
 
 use serde::Serialize;
 
-use super::super::{
-    consts::*, value_is_default, AppProtoHead, AppProtoLogsInfo, L7LogParse, L7Protocol,
-    L7ResponseStatus, LogMessageType,
-};
+use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
 
+use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
+use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 use crate::flow_generator::protocol_logs::pb_adapter::{
     ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
 };
-use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::{
     common::enums::IpProtocol,
+    common::flow::L7Protocol,
     common::flow::PacketDirection,
-    common::meta_packet::MetaPacket,
     flow_generator::error::{Error, Result},
     utils::bytes,
 };
+use crate::{log_info_merge, parse_common};
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
+    msg_type: LogMessageType,
+    start_time: u64,
+    end_time: u64,
+    is_tls: bool,
+
     // Server Greeting
     #[serde(rename = "version", skip_serializing_if = "value_is_default")]
     pub protocol_version: u8,
@@ -60,6 +64,33 @@ pub struct MysqlInfo {
     )]
     pub error_message: String,
     pub status: L7ResponseStatus,
+}
+
+impl L7ProtocolInfoInterface for MysqlInfo {
+    fn session_id(&self) -> Option<u32> {
+        None
+    }
+
+    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+        log_info_merge!(self, MysqlInfo, other);
+        Ok(())
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        Some(AppProtoHead {
+            proto: L7Protocol::Mysql,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        })
+    }
+
+    fn is_tls(&self) -> bool {
+        self.is_tls
+    }
+
+    fn skip_send(&self) -> bool {
+        false
+    }
 }
 
 impl MysqlInfo {
@@ -140,12 +171,40 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct MysqlLog {
     info: MysqlInfo,
-
     l7_proto: L7Protocol,
-    msg_type: LogMessageType,
+}
+
+impl L7ProtocolParserInterface for MysqlLog {
+    fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
+        if !param.ebpf_type.is_raw_protocol() {
+            return false;
+        }
+        Self::mysql_check_protocol(payload, param)
+    }
+
+    fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
+        parse_common!(self, param);
+        self.parse(payload, param.l4_protocol, param.direction, None, None)?;
+        Ok(vec![L7ProtocolInfo::MysqlInfo(self.info.clone())])
+    }
+
+    fn parsable_on_udp(&self) -> bool {
+        false
+    }
+
+    fn protocol(&self) -> L7Protocol {
+        L7Protocol::Mysql
+    }
+
+    fn reset(&mut self) {
+        *self = Self {
+            l7_proto: self.l7_proto,
+            ..Default::default()
+        };
+    }
 }
 
 fn mysql_string(payload: &[u8]) -> String {
@@ -279,9 +338,34 @@ impl MysqlLog {
         }
         Ok(())
     }
-}
 
-impl L7LogParse for MysqlLog {
+    pub fn mysql_check_protocol(payload: &[u8], param: &ParseParam) -> bool {
+        if param.l4_protocol != IpProtocol::Tcp {
+            return false;
+        }
+
+        let mut header = MysqlHeader::default();
+        let offset = header.decode(payload);
+        if offset < 0 {
+            return false;
+        }
+        let offset = offset as usize;
+
+        if header.number != 0 || offset + header.length as usize > payload.len() {
+            return false;
+        }
+
+        let protocol_version_or_query_type = payload[offset];
+        match protocol_version_or_query_type {
+            COM_QUERY | COM_STMT_PREPARE => {
+                let context = mysql_string(&payload[offset + 1..]);
+                return context.is_ascii();
+            }
+            _ => {}
+        }
+        false
+    }
+
     fn parse(
         &mut self,
         payload: &[u8],
@@ -289,7 +373,7 @@ impl L7LogParse for MysqlLog {
         direction: PacketDirection,
         _is_req_end: Option<bool>,
         _is_resp_end: Option<bool>,
-    ) -> Result<AppProtoHeadEnum> {
+    ) -> Result<()> {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
@@ -311,18 +395,9 @@ impl L7LogParse for MysqlLog {
             LogMessageType::Other => self.greeting(&payload[offset..])?,
             _ => return Err(Error::MysqlLogParseFailed),
         };
-        self.msg_type = msg_type;
+        self.info.msg_type = msg_type;
 
-        Ok(AppProtoHeadEnum::Single(AppProtoHead {
-            proto: L7Protocol::Mysql,
-            msg_type,
-            rrt: 0,
-            ..Default::default()
-        }))
-    }
-
-    fn info(&self) -> AppProtoLogsInfoEnum {
-        AppProtoLogsInfoEnum::Single(AppProtoLogsInfo::Mysql(self.info.clone()))
+        Ok(())
     }
 }
 
@@ -392,42 +467,6 @@ impl MysqlHeader {
     }
 }
 
-// 通过请求和Greeting来识别MYSQL
-pub fn mysql_check_protocol(bitmap: &mut u128, packet: &MetaPacket) -> bool {
-    if packet.lookup_key.proto != IpProtocol::Tcp {
-        *bitmap &= !(1 << u8::from(L7Protocol::Mysql));
-        return false;
-    }
-
-    let payload = packet.get_l4_payload();
-    if payload.is_none() {
-        return false;
-    }
-    let payload = payload.unwrap();
-
-    let mut header = MysqlHeader::default();
-    let offset = header.decode(payload);
-    if offset < 0 {
-        *bitmap &= !(1 << u8::from(L7Protocol::Mysql));
-        return false;
-    }
-    let offset = offset as usize;
-
-    if header.number != 0 || offset + header.length as usize > payload.len() {
-        return false;
-    }
-
-    let protocol_version_or_query_type = payload[offset];
-    match protocol_version_or_query_type {
-        COM_QUERY | COM_STMT_PREPARE => {
-            let context = mysql_string(&payload[offset + 1..]);
-            return context.is_ascii();
-        }
-        _ => {}
-    }
-    return false;
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -435,7 +474,10 @@ mod tests {
 
     use super::*;
 
-    use crate::{common::flow::PacketDirection, utils::test::Capture};
+    use crate::{
+        common::{flow::PacketDirection, MetaPacket},
+        utils::test::Capture,
+    };
 
     const FILE_DIR: &str = "resources/test/flow_generator/mysql";
 
@@ -450,7 +492,6 @@ mod tests {
         let mut mysql = MysqlLog::default();
         let mut output: String = String::new();
         let first_dst_port = packets[0].lookup_key.dst_port;
-        let mut bitmap = 0;
         for packet in packets.iter_mut() {
             packet.direction = if packet.lookup_key.dst_port == first_dst_port {
                 PacketDirection::ClientToServer
@@ -468,7 +509,8 @@ mod tests {
                 None,
                 None,
             );
-            let is_mysql = mysql_check_protocol(&mut bitmap, packet);
+            let is_mysql =
+                MysqlLog::mysql_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
         }
         output

@@ -14,13 +14,18 @@
  * limitations under the License.
  */
 
+mod npb;
+pub use npb::NpbBuilder;
+
 use std::net::IpAddr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::common::meta_packet::MetaPacket;
 use crate::pcap::PcapPacket;
-use crate::utils::net::MacAddr;
-use crate::utils::queue::DebugSender;
+use npb_handler::{NpbHandler, NpbMode};
+use npb_pcap_policy::PolicyData;
+use public::{queue::DebugSender, utils::net::MacAddr};
 
 pub struct IpInfo {
     pub mac: MacAddr,
@@ -40,31 +45,94 @@ pub struct LldpDuInfo {
     pub ttl: u32,
 }
 
+#[derive(Debug)]
+pub struct MiniPacket<'a> {
+    policy: Option<Arc<PolicyData>>,
+    timestamp: u64,
+    packet: &'a [u8],
+    npb_mode: NpbMode,
+    l2_opt_size: usize,
+    l3_opt_size: usize,
+    l4_opt_size: usize,
+    packet_size: usize,
+    // IPV6
+    ipv6_last_option_offset: usize,
+    ipv6_fragment_option_offset: usize,
+}
+
+impl<'a> MiniPacket<'a> {
+    pub fn new(overlay_packet: &'a [u8], meta_packet: &MetaPacket) -> MiniPacket<'a> {
+        MiniPacket {
+            policy: meta_packet.policy_data.clone(),
+            packet: overlay_packet,
+            timestamp: meta_packet.lookup_key.timestamp.as_nanos() as u64,
+            npb_mode: meta_packet.npb_mode(),
+            l2_opt_size: meta_packet.vlan_tag_size,
+            l3_opt_size: meta_packet.l2_l3_opt_size - meta_packet.vlan_tag_size,
+            l4_opt_size: meta_packet.l4_opt_size,
+            packet_size: if meta_packet.packet_len > overlay_packet.len() {
+                overlay_packet.len()
+            } else {
+                meta_packet.packet_len
+            },
+            ipv6_last_option_offset: meta_packet.offset_ipv6_last_option,
+            ipv6_fragment_option_offset: meta_packet.offset_ipv6_fragment_option,
+        }
+    }
+}
+
 pub enum PacketHandler {
     Pcap(DebugSender<PcapPacket>),
+    Npb(NpbHandler),
 }
 
 impl PacketHandler {
-    pub fn handle(&mut self, _overlay_packet: &[u8], _meta_packet: &MetaPacket) {
-        // TODO
+    pub fn handle(&mut self, packet: &MiniPacket) {
+        match self {
+            Self::Pcap(_) => {}
+            Self::Npb(n) => n.handle(
+                packet.policy.as_ref(),
+                &packet.npb_mode,
+                packet.timestamp,
+                packet.packet,
+                packet.packet_size,
+                packet.l2_opt_size,
+                packet.l3_opt_size,
+                packet.l4_opt_size,
+                packet.ipv6_last_option_offset,
+                packet.ipv6_fragment_option_offset,
+            ),
+        }
     }
 }
 
 pub enum PacketHandlerBuilder {
     Pcap(DebugSender<PcapPacket>),
+    Npb(Box<NpbBuilder>),
 }
 
 impl PacketHandlerBuilder {
-    pub fn build_with(&self, _id: usize, _if_index: u32, _mac: MacAddr) -> PacketHandler {
+    pub fn build_with(&self, id: usize, if_index: u32, mac: MacAddr) -> PacketHandler {
         match self {
             PacketHandlerBuilder::Pcap(s) => PacketHandler::Pcap(s.clone()),
+            PacketHandlerBuilder::Npb(b) => PacketHandler::Npb(b.build_with(id, if_index, mac)),
         }
     }
 
-    pub fn send_terminated(&self) {
+    pub fn stop(&mut self) {
         match self {
-            PacketHandlerBuilder::Pcap(s) => {
-                let _ = s.send(PcapPacket::Terminated);
+            PacketHandlerBuilder::Pcap(_) => {}
+            PacketHandlerBuilder::Npb(b) => {
+                b.stop();
+            }
+        }
+    }
+
+    pub fn start(&mut self) {
+        match self {
+            PacketHandlerBuilder::Pcap(_s) => {}
+            PacketHandlerBuilder::Npb(b) => {
+                b.start();
             }
         }
     }

@@ -32,9 +32,10 @@ use crate::error::{Error, Result};
 use crate::exception::ExceptionHandler;
 use crate::proto::{common::TridentType, trident::Exception};
 
-#[cfg(target_os = "linux")]
-use super::net::get_link_enabled_features;
 use super::process::{get_memory_rss, get_process_num_by_name};
+#[cfg(target_os = "linux")]
+use public::utils::net::get_link_enabled_features;
+use public::utils::net::{get_mac_by_ip, get_route_src_ip_and_mac, MacAddr};
 
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
@@ -286,6 +287,30 @@ pub fn get_executable_path() -> Result<PathBuf, io::Error> {
         io::ErrorKind::NotFound,
         "executable path not found",
     ))
+}
+
+pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
+    // Directlly use env.K8S_NODE_IP_FOR_DEEPFLOW as the ctrl_ip reported by deepflow-agent if available
+    match get_k8s_local_node_ip() {
+        Some(ip) => {
+            let ctrl_mac = get_mac_by_ip(ip);
+            if ctrl_mac.is_err() {
+                error!("failed getting ctrl_mac from {}: {:?}", ip, ctrl_mac);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
+            }
+            (ip, ctrl_mac.unwrap())
+        }
+        None => {
+            let tuple = get_route_src_ip_and_mac(&dest);
+            if tuple.is_err() {
+                error!("failed getting control ip and mac");
+                thread::sleep(Duration::from_secs(1));
+                process::exit(-1);
+            }
+            tuple.unwrap()
+        }
+    }
 }
 
 //TODO Windows 相关

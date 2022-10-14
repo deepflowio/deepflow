@@ -14,24 +14,27 @@
  * limitations under the License.
  */
 
+use std::fmt::{Debug, Formatter, Result as DebugResult};
 use std::io;
+use std::mem;
+use std::net::Shutdown;
+use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use libc::{
-    c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, size_t, sockaddr,
-    sockaddr_ll, socklen_t, AF_PACKET, ETH_P_ALL, MAP_LOCKED, MAP_NORESERVE, MAP_SHARED, POLLERR,
-    POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET, SO_ATTACH_FILTER,
+    c_int, c_uint, c_void, getsockopt, mmap, munmap, off_t, poll, pollfd, setsockopt, size_t,
+    sockaddr, sockaddr_ll, socket, socklen_t, write, AF_PACKET, ETH_P_ALL, MAP_LOCKED,
+    MAP_NORESERVE, MAP_SHARED, POLLERR, POLLIN, PROT_READ, PROT_WRITE, SOL_PACKET, SOL_SOCKET,
+    SO_ATTACH_FILTER,
 };
 use log::warn;
 use public::error::*;
 use public::packet::Packet;
-use socket::{self, Socket};
+use socket2::Socket;
 
 use super::{bpf, header, options};
 
-use crate::utils::{
-    net::{self, link_by_name},
-    stats,
-};
+use crate::utils::stats;
+use public::utils::net::{self, link_by_name};
 
 const PACKET_VERSION: c_int = 10;
 const PACKET_RX_RING: c_int = 5;
@@ -66,7 +69,7 @@ pub struct TpacketStatsV3 {
 pub struct Tpacket {
     _stats: Stats,
 
-    raw_socket: socket::Socket,
+    raw_socket: Socket,
     ring: *mut u8,
     opts: options::Options,
 
@@ -79,6 +82,15 @@ pub struct Tpacket {
     tp_version: options::OptTpacketVersion,
 
     v3: Option<*mut header::V3Wrapper>,
+}
+
+impl Debug for Tpacket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> DebugResult {
+        f.write_fmt(format_args!(
+            "Tpacket {{ socket: {:?}, ring: {:?}, opts: {:?}, offset: {:?}, tp_version: {:?} }}",
+            self.raw_socket, self.ring, self.opts, self.offset, self.tp_version
+        ))
+    }
 }
 
 // it's safe because ring points to mmap'ed buffer
@@ -104,7 +116,7 @@ impl Tpacket {
             sa.sll_ifindex = if_index as i32;
 
             let res = libc::bind(
-                self.raw_socket.fileno(),
+                self.raw_socket.as_raw_fd(),
                 &sa as *const sockaddr_ll as *const sockaddr,
                 std::mem::size_of::<sockaddr_ll>() as u32,
             );
@@ -131,10 +143,27 @@ impl Tpacket {
         Ok(())
     }
 
+    fn setsockopt<T>(&self, level: i32, name: i32, value: T) -> af_packet::Result<()> {
+        unsafe {
+            let value = &value as *const T as *const c_void;
+            if setsockopt(
+                self.raw_socket.as_raw_fd(),
+                level,
+                name,
+                value,
+                mem::size_of::<T>() as socklen_t,
+            ) == -1
+            {
+                return Err(io::Error::last_os_error().into());
+            }
+
+            Ok(())
+        }
+    }
+
     fn set_version_internal(&mut self, tp_version: options::OptTpacketVersion) -> bool {
         // 设置af packet版本
-        self.raw_socket
-            .setsockopt(SOL_PACKET, PACKET_VERSION, tp_version as c_int)
+        self.setsockopt(SOL_PACKET, PACKET_VERSION, tp_version as c_int)
             .is_ok()
     }
 
@@ -165,8 +194,7 @@ impl Tpacket {
             req.tp_block_size = self.opts.block_size;
             req.tp_frame_nr = self.opts.frames_per_block() * self.opts.num_blocks;
             req.tp_frame_size = self.opts.frame_size;
-            self.raw_socket
-                .setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
+            self.setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
             Ok(())
         } else if self.tp_version == options::OptTpacketVersion::TpacketVersion3 {
             let mut req: header::TpacketReq3 = Default::default();
@@ -175,8 +203,7 @@ impl Tpacket {
             req.tp_frame_size = self.opts.frame_size;
             req.tp_frame_nr = self.opts.frames_per_block() * self.opts.num_blocks;
             req.tp_retire_blk_tov = self.opts.block_timeout / MILLI_SECONDS;
-            self.raw_socket
-                .setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
+            self.setsockopt(SOL_PACKET, PACKET_RX_RING, req)?;
             Ok(())
         } else {
             Err(af_packet::Error::InvalidTpVersion(self.tp_version as isize))
@@ -191,7 +218,7 @@ impl Tpacket {
                 (self.opts.block_size * self.opts.num_blocks) as size_t,
                 (PROT_READ | PROT_WRITE) as c_int,
                 (MAP_SHARED | MAP_LOCKED | MAP_NORESERVE) as c_int,
-                self.raw_socket.fileno() as c_int,
+                self.raw_socket.as_raw_fd(),
                 0 as off_t,
             ) as isize;
             if ret == -1 {
@@ -201,7 +228,7 @@ impl Tpacket {
                     (self.opts.block_size * self.opts.num_blocks) as size_t,
                     (PROT_READ | PROT_WRITE) as c_int,
                     MAP_SHARED as c_int,
-                    self.raw_socket.fileno() as c_int,
+                    self.raw_socket.as_raw_fd(),
                     0 as off_t,
                 ) as isize;
                 if ret == -1 {
@@ -247,7 +274,7 @@ impl Tpacket {
         if let Some(header) = self.current.as_ref() {
             while (header.get_status() & header::TP_STATUS_USER) == 0 {
                 let mut poll_fd = pollfd {
-                    fd: self.raw_socket.fileno(),
+                    fd: self.raw_socket.as_raw_fd(),
                     events: POLLIN | POLLERR,
                     revents: 0,
                 };
@@ -304,28 +331,42 @@ impl Tpacket {
         return None;
     }
 
-    pub fn set_bpf(&self, ins: Vec<bpf::RawInstruction>) -> Result<()> {
+    pub fn write(&self, packet: &[u8]) -> isize {
+        unsafe {
+            write(
+                self.raw_socket.as_raw_fd(),
+                packet.as_ptr() as *const c_void,
+                packet.len() as size_t,
+            ) as isize
+        }
+    }
+
+    pub fn set_bpf(&self, ins: Vec<bpf::RawInstruction>) -> af_packet::Result<()> {
         let prog = bpf::Prog::new(ins);
-        self.raw_socket
-            .setsockopt(SOL_SOCKET, SO_ATTACH_FILTER, prog)?;
-        Ok(())
+        self.setsockopt(SOL_SOCKET, SO_ATTACH_FILTER, prog)
     }
 
     pub fn get_counter_handle(&self) -> TpacketCounter {
         TpacketCounter {
             tp_version: self.tp_version,
-            fd: self.raw_socket.fileno(),
+            fd: self.raw_socket.as_raw_fd(),
         }
     }
 
     pub fn new(opts: options::Options) -> Result<Self> {
         opts.check()?;
         // 创建原始socket
-        let raw_socket = Socket::new(
-            AF_PACKET,
-            opts.socket_type.to_i32(),
-            (ETH_P_ALL as u16).to_be() as i32,
-        )?;
+        let raw_socket = unsafe {
+            socket(
+                AF_PACKET,
+                opts.socket_type.to_i32(),
+                (ETH_P_ALL as u16).to_be() as i32,
+            )
+        };
+        if raw_socket == -1 {
+            return Err(io::Error::last_os_error().into());
+        }
+        let raw_socket = unsafe { Socket::from_raw_fd(raw_socket) };
         let mut tpacket = Tpacket {
             _stats: Stats {
                 packets: 0,
@@ -358,7 +399,7 @@ impl Drop for Tpacket {
                     (self.opts.block_size * self.opts.num_blocks) as size_t,
                 );
             }
-            if let Err(_e) = self.raw_socket.close() {}
+            if let Err(_e) = self.raw_socket.shutdown(Shutdown::Both) {}
             self.ring = std::ptr::null_mut();
         }
     }

@@ -46,9 +46,9 @@ use crate::rpc::get_timestamp;
 use crate::utils::{
     lru::Lru,
     possible_host::PossibleHost,
-    queue::{DebugSender, Error, Receiver},
     stats::{Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption},
 };
+use public::queue::{DebugSender, Error, Receiver};
 
 #[derive(Debug, Default)]
 pub struct QgCounter {
@@ -1136,8 +1136,7 @@ mod test {
 
     use super::*;
 
-    use crate::debug::QueueDebugger;
-    use crate::utils::queue;
+    use public::{debug::QueueDebugger, queue};
 
     fn new_acc_flow(tagged_flow: Arc<TaggedFlow>) -> AccumulatedFlow {
         AccumulatedFlow {

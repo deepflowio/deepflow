@@ -34,8 +34,8 @@ use super::{
     Packet, PcapPacket, TapType,
 };
 use crate::rpc::get_timestamp;
-use crate::utils::queue::{self, Error};
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
+use public::queue::{self, Error};
 
 #[derive(Default)]
 pub struct WorkerCounter {

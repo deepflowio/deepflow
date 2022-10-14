@@ -112,9 +112,18 @@ impl AppTable {
                 return None;
             }
             v.last = time_in_sec;
-            return Some(v.l7_protocol);
+            // 如果第一次check就失败会设置为unknown，所以需要加上count判断
+            // ====================================================
+            // if first check fail will set to unknown, need to add count determine
+            if v.l7_protocol == L7Protocol::Unknown
+                && v.unknown_count < self.l7_protocol_inference_max_fail_count
+            {
+                return None;
+            } else {
+                return Some(v.l7_protocol);
+            }
         }
-        return None;
+        None
     }
 
     fn get_ipv6_protocol(
@@ -131,9 +140,18 @@ impl AppTable {
                 return None;
             }
             v.last = time_in_sec;
-            return Some(v.l7_protocol);
+            // 如果第一次check就失败会设置为unknown，所以需要加上count判断
+            // ====================================================
+            // if first check fail will set to unknown, need to add count determine
+            if v.l7_protocol == L7Protocol::Unknown
+                && v.unknown_count < self.l7_protocol_inference_max_fail_count
+            {
+                return None;
+            } else {
+                return Some(v.l7_protocol);
+            }
         }
-        return None;
+        None
     }
 
     pub fn get_protocol(&mut self, packet: &MetaPacket) -> Option<L7Protocol> {

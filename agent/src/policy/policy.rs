@@ -38,8 +38,8 @@ use crate::common::FeatureFlags;
 use crate::common::FlowAclListener;
 use crate::common::MetaPacket;
 use crate::proto::common::TridentType;
-use crate::utils::queue::Sender;
 use npb_pcap_policy::PolicyData;
+use public::queue::Sender;
 
 pub struct PolicyMonitor {
     sender: Arc<Sender<String>>,
@@ -425,7 +425,7 @@ mod test {
     use crate::common::feature;
     use crate::common::platform_data::IpSubnet;
     use crate::common::policy::{Cidr, CidrType};
-    use crate::utils::net::MacAddr;
+    use public::utils::net::MacAddr;
 
     #[test]
     fn test_policy_normal() {
