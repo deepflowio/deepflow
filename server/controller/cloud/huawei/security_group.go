@@ -22,23 +22,9 @@ import (
 	"strings"
 
 	"github.com/bitly/go-simplejson"
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-)
-
-const (
-	SECURITY_GROUP_RULE_ACCEPT  = 1
-	SECURITY_GROUP_RULE_DROP    = 2
-	SECURITY_GROUP_RULE_INGRESS = 1
-	SECURITY_GROUP_RULE_EGRESS  = 2
-	SECURITY_GROUP_IPV4         = 1
-	SECURITY_GROUP_IPV6         = 2
-
-	PORT_RANGE_ALL           = "0-65535"
-	PROTOCOL_ALL             = "ALL"
-	SUBNET_DEFAULT_CIDR_IPV4 = "0.0.0.0/0"
-	SUBNET_DEFAULT_CIDR_IPV6 = "::/0"
 )
 
 func (h *HuaWei) getSecurityGroups() ([]model.SecurityGroup, []model.SecurityGroupRule, error) {
@@ -56,7 +42,7 @@ func (h *HuaWei) getSecurityGroups() ([]model.SecurityGroup, []model.SecurityGro
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jSecurityGroups {
 			jSG := jSecurityGroups[i]
-			if !CheckAttributes(jSG, []string{"id", "name"}) {
+			if !cloudcommon.CheckJsonAttributes(jSG, []string{"id", "name"}) {
 				continue
 			}
 			id := jSG.Get("id").MustString()
@@ -87,27 +73,27 @@ func (h *HuaWei) formatSecurityGroupRules(jRules *simplejson.Json, sgLcuuid stri
 	requiredAttrs := []string{"id", "direction", "ethertype", "protocol", "port_range_max", "port_range_max", "port_range_min", "remote_group_id", "remote_ip_prefix"}
 	for i := range jRules.MustArray() {
 		jRule := jRules.GetIndex(i)
-		if !CheckAttributes(jRule, requiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
 			continue
 		}
 		id := jRule.Get("id").MustString()
 		rule := model.SecurityGroupRule{
 			Lcuuid:              id,
 			SecurityGroupLcuuid: sgLcuuid,
-			LocalPortRange:      PORT_RANGE_ALL,
-			Action:              SECURITY_GROUP_RULE_ACCEPT,
+			LocalPortRange:      cloudcommon.PORT_RANGE_ALL,
+			Action:              cloudcommon.SECURITY_GROUP_RULE_ACCEPT,
 		}
 
 		var local, remote string
 		etherType := jRule.Get("ethertype").MustString()
 		if etherType == "IPv6" {
-			rule.EtherType = SECURITY_GROUP_IPV6
-			local = SUBNET_DEFAULT_CIDR_IPV6
-			remote = SUBNET_DEFAULT_CIDR_IPV6
+			rule.EtherType = cloudcommon.SECURITY_GROUP_IPV6
+			local = cloudcommon.SUBNET_DEFAULT_CIDR_IPV6
+			remote = cloudcommon.SUBNET_DEFAULT_CIDR_IPV6
 		} else {
-			rule.EtherType = SECURITY_GROUP_IPV4
-			local = SUBNET_DEFAULT_CIDR_IPV4
-			remote = SUBNET_DEFAULT_CIDR_IPV4
+			rule.EtherType = cloudcommon.SECURITY_GROUP_IPV4
+			local = cloudcommon.SUBNET_DEFAULT_CIDR_IPV4
+			remote = cloudcommon.SUBNET_DEFAULT_CIDR_IPV4
 		}
 
 		remoteGID := jRule.Get("remote_group_id").MustString()
@@ -120,12 +106,12 @@ func (h *HuaWei) formatSecurityGroupRules(jRules *simplejson.Json, sgLcuuid stri
 
 		direction := jRule.Get("direction").MustString()
 		if direction == "ingress" {
-			rule.Direction = SECURITY_GROUP_RULE_INGRESS
+			rule.Direction = cloudcommon.SECURITY_GROUP_RULE_INGRESS
 			rule.Priority = ingressPriority
 			local, remote = remote, local
 			ingressPriority++
 		} else {
-			rule.Direction = SECURITY_GROUP_RULE_EGRESS
+			rule.Direction = cloudcommon.SECURITY_GROUP_RULE_EGRESS
 			rule.Priority = egressPriority
 			egressPriority++
 		}
@@ -136,7 +122,7 @@ func (h *HuaWei) formatSecurityGroupRules(jRules *simplejson.Json, sgLcuuid stri
 		if protocol != "" {
 			rule.Protocol = strings.ToUpper(protocol)
 		} else {
-			rule.Protocol = PROTOCOL_ALL
+			rule.Protocol = cloudcommon.PROTOCOL_ALL
 		}
 
 		minPort := jRule.Get("port_range_min").MustInt()
@@ -144,27 +130,27 @@ func (h *HuaWei) formatSecurityGroupRules(jRules *simplejson.Json, sgLcuuid stri
 		if minPort != 0 && maxPort != 0 {
 			rule.RemotePortRange = fmt.Sprintf("%d-%d", minPort, maxPort)
 		} else {
-			rule.RemotePortRange = PORT_RANGE_ALL
+			rule.RemotePortRange = cloudcommon.PORT_RANGE_ALL
 		}
 
 		rules = append(rules, rule)
 	}
 
-	directions := []int{SECURITY_GROUP_RULE_EGRESS, SECURITY_GROUP_RULE_INGRESS}
-	etherTypeToRemote := map[int]string{SECURITY_GROUP_IPV4: SUBNET_DEFAULT_CIDR_IPV4, SECURITY_GROUP_IPV6: SUBNET_DEFAULT_CIDR_IPV6}
+	directions := []int{cloudcommon.SECURITY_GROUP_RULE_EGRESS, cloudcommon.SECURITY_GROUP_RULE_INGRESS}
+	etherTypeToRemote := map[int]string{cloudcommon.SECURITY_GROUP_IPV4: cloudcommon.SUBNET_DEFAULT_CIDR_IPV4, cloudcommon.SECURITY_GROUP_IPV6: cloudcommon.SUBNET_DEFAULT_CIDR_IPV6}
 	for _, direction := range directions {
 		for etherType, remote := range etherTypeToRemote {
 			rule := model.SecurityGroupRule{
 				Lcuuid:              common.GenerateUUID(sgLcuuid + strconv.Itoa(direction) + remote),
 				SecurityGroupLcuuid: sgLcuuid,
-				Action:              SECURITY_GROUP_RULE_DROP,
+				Action:              cloudcommon.SECURITY_GROUP_RULE_DROP,
 				Direction:           direction,
 				EtherType:           etherType,
-				Protocol:            PROTOCOL_ALL,
+				Protocol:            cloudcommon.PROTOCOL_ALL,
 				Local:               remote,
 				Remote:              remote,
-				LocalPortRange:      PORT_RANGE_ALL,
-				RemotePortRange:     PORT_RANGE_ALL,
+				LocalPortRange:      cloudcommon.PORT_RANGE_ALL,
+				RemotePortRange:     cloudcommon.PORT_RANGE_ALL,
 				Priority:            1000,
 			}
 			rules = append(rules, rule)
