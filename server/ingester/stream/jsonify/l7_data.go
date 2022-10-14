@@ -253,6 +253,7 @@ type L7Logger struct {
 	RequestType     string
 	RequestDomain   string
 	RequestResource string
+	Endpoint        string
 
 	// 数据库nullabled类型的字段, 需使用指针传值写入。如果值无意义，应传递nil.
 	RequestId *uint64
@@ -302,6 +303,7 @@ func L7LoggerColumns() []*ckdb.Column {
 		ckdb.NewColumn("request_type", ckdb.LowCardinalityString).SetComment("请求类型, HTTP请求方法、SQL命令类型、NoSQL命令类型、MQ命令类型、DNS查询类型"),
 		ckdb.NewColumn("request_domain", ckdb.String).SetComment("请求域名, HTTP主机名、RPC服务名称、DNS查询域名"),
 		ckdb.NewColumn("request_resource", ckdb.String).SetComment("请求资源, HTTP路径、RPC方法名称、SQL命令、NoSQL命令"),
+		ckdb.NewColumn("endpoint", ckdb.String).SetComment("端点"),
 		ckdb.NewColumn("request_id", ckdb.UInt64Nullable).SetComment("请求ID, HTTP请求ID、RPC请求ID、MQ请求ID、DNS请求ID"),
 
 		ckdb.NewColumn("response_status", ckdb.UInt8).SetComment("响应状态 0:正常, 1:异常 ,2:不存在，3:服务端异常, 4:客户端异常"),
@@ -362,6 +364,9 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteString(h.RequestResource); err != nil {
+		return err
+	}
+	if err := block.WriteString(h.Endpoint); err != nil {
 		return err
 	}
 
@@ -476,7 +481,9 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 		if h.requestLength != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
 			h.RequestLength = &h.requestLength
 		}
+		h.Endpoint = l.Req.Endpoint
 	}
+
 	if l.Resp != nil && h.Type != uint8(datatype.MSG_T_REQUEST) {
 		h.ResponseResult = l.Resp.Result
 		h.responseCode = int16(l.Resp.Code)
@@ -499,6 +506,20 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 		h.ServiceName = l.ExtInfo.ServiceName
 		h.XRequestId = l.ExtInfo.XRequestId
 		h.HttpProxyClient = l.ExtInfo.ClientIp
+		if l.ExtInfo.HttpUserAgent != "" {
+			h.AttributeNames = append(h.AttributeNames, "http_user_agent")
+			h.AttributeValues = append(h.AttributeValues, l.ExtInfo.HttpUserAgent)
+		}
+		if l.ExtInfo.HttpReferer != "" {
+			h.AttributeNames = append(h.AttributeNames, "http_referer")
+			h.AttributeValues = append(h.AttributeValues, l.ExtInfo.HttpReferer)
+		}
+		if l.ExtInfo.RpcService != "" {
+			h.AttributeNames = append(h.AttributeNames, "rpc_service")
+			h.AttributeValues = append(h.AttributeValues, l.ExtInfo.RpcService)
+		}
+		h.AttributeNames = append(h.AttributeNames, l.ExtInfo.AttributeNames...)
+		h.AttributeValues = append(h.AttributeValues, l.ExtInfo.AttributeValues...)
 	}
 	if l.TraceInfo != nil {
 		h.SpanId = l.TraceInfo.SpanId
