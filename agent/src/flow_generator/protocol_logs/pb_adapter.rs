@@ -86,6 +86,8 @@ impl L7ProtocolSendLog {
             req_type: self.req.req_type.into(),
             domain: self.req.domain.into(),
             resource: self.req.resource.into(),
+            // FIXME @dexian
+            endpoint: "FIXME".into(),
         });
         log.resp = Some(flow_log::L7Response {
             code: self.resp.code.unwrap_or(i16::MIN as i32),
