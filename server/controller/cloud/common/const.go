@@ -16,26 +16,31 @@
 
 package common
 
-import (
-	"github.com/bitly/go-simplejson"
+const (
+	SECURITY_GROUP_RULE_ACCEPT  = 1
+	SECURITY_GROUP_RULE_DROP    = 2
+	SECURITY_GROUP_RULE_INGRESS = 1
+	SECURITY_GROUP_RULE_EGRESS  = 2
+	SECURITY_GROUP_IPV4         = 1
+	SECURITY_GROUP_IPV6         = 2
 )
 
-func CheckAttributes(json *simplejson.Json, attrs []string) bool {
-	for _, attr := range attrs {
-		if _, ok := json.CheckGet(attr); !ok {
-			log.Infof("no attr: %s", attr)
-			return false
-		}
-	}
-	return true
-}
+const (
+	PORT_RANGE_ALL = "0-65535"
+	PROTOCOL_ALL   = "ALL"
+)
 
-func CheckMapAttributes(data map[string]interface{}, attrs []string) bool {
-	for _, attr := range attrs {
-		if _, ok := data[attr]; !ok {
-			log.Infof("no attr: %s", attr)
-			return false
-		}
-	}
-	return true
-}
+const (
+	SUBNET_DEFAULT_CIDR_IPV4 = "0.0.0.0/0"
+	SUBNET_DEFAULT_CIDR_IPV6 = "::/0"
+)
+
+const (
+	NAT_RULE_TYPE_DNAT = "DNAT"
+	NAT_RULE_TYPE_SNAT = "SNAT"
+)
+
+const (
+	LB_MODEL_INTERNAL = 1 + iota
+	LB_MODEL_EXTERNAL
+)

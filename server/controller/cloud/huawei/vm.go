@@ -22,7 +22,6 @@ import (
 
 	"github.com/bitly/go-simplejson"
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
@@ -49,7 +48,7 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jVMs {
 			jVM := jVMs[i]
-			if !CheckAttributes(jVM, []string{"id", "name", "addresses", "status", "OS-EXT-AZ:availability_zone"}) {
+			if !cloudcommon.CheckJsonAttributes(jVM, []string{"id", "name", "addresses", "status", "OS-EXT-AZ:availability_zone"}) {
 				continue
 			}
 			id := jVM.Get("id").MustString()
@@ -136,7 +135,7 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 	for vpcLcuuid, jVIFs := range addrs.MustMap() {
 		for _, jVIF := range jVIFs.([]interface{}) {
 			jV := jVIF.(map[string]interface{})
-			if !CheckMapAttributes(jV, requiredAttrs) {
+			if !cloudcommon.CheckMapAttributes(jV, requiredAttrs) {
 				continue
 			}
 			if jV["OS-EXT-IPS:type"].(string) != "floating" {

@@ -19,7 +19,7 @@ package huawei
 import (
 	"fmt"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
@@ -38,7 +38,7 @@ func (h *HuaWei) getRegions() ([]model.Region, error) {
 	var regions []model.Region
 	for i := range jRegions {
 		jr := jRegions[i]
-		if !CheckAttributes(jr, []string{"id", "locales"}) {
+		if !cloudcommon.CheckJsonAttributes(jr, []string{"id", "locales"}) {
 			continue
 		}
 		id := jr.Get("id").MustString()

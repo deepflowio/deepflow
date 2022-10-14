@@ -21,14 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-)
-
-const (
-	NAT_RULE_TYPE_DNAT = "DNAT"
-	NAT_RULE_TYPE_SNAT = "SNAT"
 )
 
 func (h *HuaWei) getNATGateways() (
@@ -49,7 +44,7 @@ func (h *HuaWei) getNATGateways() (
 			jNG := jNGs[i]
 			id := jNG.Get("id").MustString()
 			name := jNG.Get("name").MustString()
-			if !CheckAttributes(jNG, requiredAttrs) {
+			if !cloudcommon.CheckJsonAttributes(jNG, requiredAttrs) {
 				log.Infof("exclude nat_gateway: %s, missing attr", name)
 				continue
 			}
@@ -129,14 +124,14 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 	for i := range jRules {
 		jRule := jRules[i]
 		id := jRule.Get("id").MustString()
-		if !CheckAttributes(jRule, requiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
 			log.Infof("exclude nat_gateway: %s, missing attr", id)
 			continue
 		}
 		natGatewayID := jRule.Get("nat_gateway_id").MustString()
 		protocol := strings.ToUpper(jRule.Get("protocol").MustString())
 		if protocol == "ANY" {
-			protocol = PROTOCOL_ALL
+			protocol = cloudcommon.PROTOCOL_ALL
 		}
 		floatingIPPortStr := jRule.Get("external_service_port").MustString()
 		floatingIPPort, err := strconv.Atoi(floatingIPPortStr)
@@ -166,7 +161,7 @@ func (h *HuaWei) formatDNATRules(project Project, token string) (natRules []mode
 			model.NATRule{
 				Lcuuid:           id,
 				NATGatewayLcuuid: natGatewayID,
-				Type:             NAT_RULE_TYPE_DNAT,
+				Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
 				Protocol:         protocol,
 				VInterfaceLcuuid: jRule.Get("port_id").MustString(),
 				FloatingIP:       floatingIP,
@@ -195,7 +190,7 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 	for i := range jRules {
 		jRule := jRules[i]
 		id := jRule.Get("id").MustString()
-		if !CheckAttributes(jRule, requiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
 			log.Infof("exclude nat_gateway: %s, missing attr", id)
 			continue
 		}
@@ -214,8 +209,8 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 			model.NATRule{
 				Lcuuid:           id,
 				NATGatewayLcuuid: natGatewayID,
-				Type:             NAT_RULE_TYPE_SNAT,
-				Protocol:         PROTOCOL_ALL,
+				Type:             cloudcommon.NAT_RULE_TYPE_SNAT,
+				Protocol:         cloudcommon.PROTOCOL_ALL,
 				FloatingIP:       floatingIP,
 				FixedIP:          fixedIP,
 			},

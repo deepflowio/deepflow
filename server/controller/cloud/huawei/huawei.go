@@ -25,7 +25,6 @@ import (
 
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/config"
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -187,7 +186,7 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 
 	noLimitKeys := []string{"projects", "regions", "availabilityZoneInfo"}
 	if common.Contains(noLimitKeys, resultKey) {
-		resp, err := RequestGet(url, token)
+		resp, err := cloudcommon.RequestGet(url, token)
 		if err != nil {
 			return []*simplejson.Json{}, err
 		}
@@ -204,7 +203,7 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 			} else {
 				url += fmt.Sprintf("?limit=%d&marker=%s", limit, marker)
 			}
-			resp, err := RequestGet(url, token)
+			resp, err := cloudcommon.RequestGet(url, token)
 			if err != nil {
 				return []*simplejson.Json{}, err
 			}

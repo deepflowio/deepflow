@@ -26,17 +26,14 @@ import (
 	"time"
 
 	"github.com/bitly/go-simplejson"
-	"github.com/op/go-logging"
 )
-
-var log = logging.MustGetLogger("cloud.huwei.common")
 
 func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
 	log.Infof("url: %s", url)
 	log.Debugf("token: %s", token)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Errorf("new request failed: %+v", err)
+		log.Errorf("new request failed: %s", err.Error())
 		return
 	}
 	req.Header.Set("content-type", "application/json")
@@ -47,7 +44,7 @@ func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
 	client := &http.Client{Timeout: time.Second * 60}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("request failed: %+v", err)
+		log.Errorf("request failed: %s", err.Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -59,16 +56,15 @@ func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Errorf("read failed: %+v", err)
+		log.Errorf("read failed: %s", err.Error())
 		return
 	}
 	jsonResp, err = simplejson.NewJson(respBody)
 	if err != nil {
-		log.Errorf("jsonify failed: %+v", err)
+		log.Errorf("jsonify failed: %s", err.Error())
 		return
 	}
 	return
-
 }
 
 func RequestPost(url string, body map[string]interface{}) (jsonResp *simplejson.Json, err error) {
@@ -77,7 +73,7 @@ func RequestPost(url string, body map[string]interface{}) (jsonResp *simplejson.
 	bodyStr, _ := json.Marshal(&body)
 	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyStr))
 	if err != nil {
-		log.Errorf("new request failed: %v", err)
+		log.Errorf("new request failed: %s", err.Error())
 		return
 	}
 	req.Header.Set("content-type", "application/json")
@@ -86,7 +82,7 @@ func RequestPost(url string, body map[string]interface{}) (jsonResp *simplejson.
 	client := &http.Client{Timeout: time.Second * 60}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("request failed: %+v", err)
+		log.Errorf("request failed: %s", err.Error())
 		return
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -97,12 +93,12 @@ func RequestPost(url string, body map[string]interface{}) (jsonResp *simplejson.
 	defer resp.Body.Close()
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Errorf("read failed: %+v", err)
+		log.Errorf("read failed: %s", err.Error())
 		return
 	}
 	jsonResp, err = simplejson.NewJson(respBody)
 	if err != nil {
-		log.Errorf("jsonify failed: %+v", err)
+		log.Errorf("jsonify failed: %s", err.Error())
 		return
 	}
 	jsonResp.Set("X-Subject-Token", resp.Header.Get("X-Subject-Token"))

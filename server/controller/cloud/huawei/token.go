@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
 
@@ -83,7 +83,7 @@ func (h *HuaWei) createToken(projectName, projectID string) (*Token, error) {
 			},
 		},
 	}
-	resp, err := RequestPost(fmt.Sprintf("https://iam.%s.%s/v3/auth/tokens", projectName, h.config.URLDomain), authBody)
+	resp, err := cloudcommon.RequestPost(fmt.Sprintf("https://iam.%s.%s/v3/auth/tokens", projectName, h.config.URLDomain), authBody)
 	if err != nil {
 		log.Errorf("request failed: %+v", err)
 		return nil, err
@@ -108,7 +108,7 @@ func (h *HuaWei) refreshTokenMap() (err error) {
 	}
 	for i := range jProjects {
 		jp := jProjects[i]
-		if !CheckAttributes(jp, []string{"id", "name"}) {
+		if !cloudcommon.CheckJsonAttributes(jp, []string{"id", "name"}) {
 			continue
 		}
 		name := jp.Get("name").MustString()

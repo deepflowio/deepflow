@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/bitly/go-simplejson"
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
@@ -42,7 +42,7 @@ func (h *HuaWei) getVPCs() ([]model.VPC, []model.VRouter, []model.RoutingTable, 
 		for i := range jvpcs {
 			jv := jvpcs[i]
 			name := jv.Get("name").MustString()
-			if !CheckAttributes(jv, []string{"id", "name"}) {
+			if !cloudcommon.CheckJsonAttributes(jv, []string{"id", "name"}) {
 				log.Infof("exclude vpc: %s, missing attr", name)
 				continue
 			}
@@ -89,7 +89,7 @@ func (h *HuaWei) formatRoutingTables(jVPC *simplejson.Json, vpcLcuuid, vrouterLc
 	}
 	for i := range jRTs.MustArray() {
 		jRT := jRTs.GetIndex(i)
-		if !CheckAttributes(jRT, []string{"destination", "nexthop"}) {
+		if !cloudcommon.CheckJsonAttributes(jRT, []string{"destination", "nexthop"}) {
 			continue
 		}
 		destination := jRT.Get("destination").MustString()
@@ -129,7 +129,7 @@ func (h *HuaWei) getPartialRoutingTables(projectName, token string) (routingTabl
 	for i := range jRoutes {
 		jR := jRoutes[i]
 		id := jR.Get("id").MustString()
-		if !CheckAttributes(jR, requiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jR, requiredAttrs) {
 			log.Infof("exclude routing_table: %s, missing attr", id)
 			continue
 		}

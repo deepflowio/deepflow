@@ -20,14 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
-)
-
-const (
-	LB_MODEL_INTERNAL = 1 + iota
-	LB_MODEL_EXTERNAL
 )
 
 func (h *HuaWei) getLBs() (
@@ -47,7 +42,7 @@ func (h *HuaWei) getLBs() (
 		for i := range jLBs {
 			jLB := jLBs[i]
 			name := jLB.Get("name").MustString()
-			if !CheckAttributes(jLB, requiredAttrs) {
+			if !cloudcommon.CheckJsonAttributes(jLB, requiredAttrs) {
 				log.Infof("exclude lb: %s, missing attr", name)
 				continue
 			}
@@ -63,12 +58,12 @@ func (h *HuaWei) getLBs() (
 			var ip string
 			publicIP, ok := h.toolDataSet.vinterfaceLcuuidToPublicIP[jLB.Get("vip_port_id").MustString()]
 			if ok {
-				lbModel = LB_MODEL_EXTERNAL
+				lbModel = cloudcommon.LB_MODEL_EXTERNAL
 				vifType = common.VIF_TYPE_WAN
 				networkLcuuid = common.NETWORK_ISP_LCUUID
 				ip = publicIP
 			} else {
-				lbModel = LB_MODEL_INTERNAL
+				lbModel = cloudcommon.LB_MODEL_INTERNAL
 				vifType = common.VIF_TYPE_LAN
 				networkLcuuid = network.Lcuuid
 				ip = jLB.Get("vip_address").MustString()
@@ -136,7 +131,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 	for i := range jLs {
 		jL := jLs[i]
 		name := jL.Get("name").MustString()
-		if !CheckAttributes(jL, listenerRequiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jL, listenerRequiredAttrs) {
 			log.Infof("exclude lb_listener: %s, missing attr", name)
 			continue
 		}
@@ -186,7 +181,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 			for i := range jTSs {
 				jTS := jTSs[i]
 				tsID := jTS.Get("id").MustString()
-				if !CheckAttributes(jTS, tsRequiredAttrs) {
+				if !cloudcommon.CheckJsonAttributes(jTS, tsRequiredAttrs) {
 					log.Infof("exclude lb_target_server: %s, missing attr", tsID)
 					continue
 				}

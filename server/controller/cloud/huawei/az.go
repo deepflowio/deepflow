@@ -19,7 +19,7 @@ package huawei
 import (
 	"fmt"
 
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
@@ -38,7 +38,7 @@ func (h *HuaWei) getAZs() ([]model.AZ, error) {
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jAZs {
 			ja := jAZs[i]
-			if !CheckAttributes(ja, []string{"zoneName"}) {
+			if !cloudcommon.CheckJsonAttributes(ja, []string{"zoneName"}) {
 				continue
 			}
 			zname := ja.Get("zoneName").MustString()
