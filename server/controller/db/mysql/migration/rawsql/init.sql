@@ -1601,6 +1601,7 @@ CREATE TABLE IF NOT EXISTS controller (
     region_domain_prefix VARCHAR(256) DEFAULT '',
     node_name           CHAR(64),
     pod_ip              CHAR(64),
+    pod_name            CHAR(64),
     lcuuid              CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE controller;

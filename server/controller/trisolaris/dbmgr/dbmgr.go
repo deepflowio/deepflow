@@ -152,6 +152,11 @@ func (obj *_DBMgr[M]) GetFromRegion(region string) (result *M, err error) {
 	return
 }
 
+func (obj *_DBMgr[M]) GetBatchFromRegion(region string) (result []*M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`region` = ?", region).Find(&result).Error
+	return
+}
+
 func (obj *_DBMgr[M]) GetVInterfaceFromDeviceIDs(ctrlMac string, region string, deviceType int, deviceIDs []int) (result *M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`mac` = ?", ctrlMac).Where(
 		"`region` = ?", region).Where("`devicetype` = ?", deviceType).Where(

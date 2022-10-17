@@ -826,6 +826,7 @@ type Controller struct {
 	RegionDomainPrefix string    `gorm:"column:region_domain_prefix;type:varchar(256);default:''" json:"REGION_DOMAIN_PREFIX"`
 	NodeName           string    `gorm:"column:node_name;type:char(64);default:null" json:"NODE_NAME"`
 	PodIP              string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
+	PodName            string    `gorm:"column:pod_name;type:char(64);default:null" json:"POD_NAME"`
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 

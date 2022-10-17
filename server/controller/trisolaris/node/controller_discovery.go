@@ -54,13 +54,18 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		return nil
 	}
 	nodeName := os.Getenv(NODE_NAME_KEY)
-	if name == "" {
+	if nodeName == "" {
 		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
 		return nil
 	}
 	podIP := os.Getenv(POD_IP_KEY)
-	if name == "" {
+	if podIP == "" {
 		log.Errorf("get env(%s) data failed", POD_IP_KEY)
+		return nil
+	}
+	podName := os.Getenv(POD_NAME_KEY)
+	if podName == "" {
+		log.Errorf("get env(%s) data failed", POD_NAME_KEY)
 		return nil
 	}
 
@@ -80,5 +85,6 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		RegionDomainPrefix: c.regionDomainPrefix,
 		NodeName:           nodeName,
 		PodIP:              podIP,
+		PodName:            podName,
 	}
 }
