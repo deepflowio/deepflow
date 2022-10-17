@@ -240,7 +240,7 @@ all_protocol!(
     Mysql,MysqlParser,MysqlLog::default;
     Kafka,KafkaParser,KafkaLog::default;
     Redis,RedisParser,RedisLog::default;
-    Postgresql,PostgresParser,PostgresqlLog::default;
+    Postgresql,PostgresParser,PostgresqlLog::new;
     Dubbo,DubboParser,DubboLog::default;
     Mqtt,MqttParser,MqttLog::default;
     // add protocol below
