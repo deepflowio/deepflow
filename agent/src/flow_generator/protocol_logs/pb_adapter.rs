@@ -45,7 +45,6 @@ pub struct ExtendedInfo {
     pub client_ip: Option<String>,
     pub request_id: Option<u32>,
     pub x_request_id: Option<String>,
-    pub row_effect: Option<u32>,
 }
 
 /*
@@ -59,6 +58,7 @@ server的协议适配结构,用于把所有协议转换成统一的结构发送�
 pub struct L7ProtocolSendLog {
     pub req_len: Option<u32>,
     pub resp_len: Option<u32>,
+    pub row_effect: u32,
     pub req: L7Request,
     pub resp: L7Response,
     pub version: Option<String>,
@@ -82,6 +82,8 @@ impl L7ProtocolSendLog {
 
         log.req_len = req_len;
         log.resp_len = resp_len;
+        log.row_effect = self.row_effect;
+
         log.req = Some(flow_log::L7Request {
             req_type: self.req.req_type.into(),
             domain: self.req.domain.into(),
@@ -128,9 +130,6 @@ impl L7ProtocolSendLog {
             }
             if let Some(s) = ext.x_request_id {
                 ext_info.x_request_id = s.into();
-            }
-            if let Some(s) = ext.row_effect {
-                ext_info.row_effect = s;
             }
 
             log.ext_info = Some(ext_info);
