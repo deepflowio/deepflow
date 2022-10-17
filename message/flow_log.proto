@@ -183,23 +183,16 @@ message ExtendedInfo {
     string client_ip = 2;
     uint32 request_id = 3;
     string x_request_id = 4;
-    uint32 row_effect = 5;
-    repeated string attribute_names = 6;
-    repeated string attribute_values= 7;
+    string http_user_agent = 6;
+    string http_referer = 7;
+    string rpc_service = 8;
+
+    repeated string attribute_names = 16;
+    repeated string attribute_values= 17;
 }
 
 message AppProtoLogsData {
     AppProtoLogsBaseInfo base = 1;
-
-    // 后面使用统一适配结构,
-    // 不再为每个协议单独定义结构,下面这些结构不应该再使用,后面会去掉
-    HttpInfo http = 2;
-    DnsInfo dns = 3;
-    DubboInfo dubbo = 4;
-    KafkaInfo kafka = 5;
-    MysqlInfo mysql = 6;
-    RedisInfo redis = 7;
-    MqttInfo mqtt = 8;
 
     int32 req_len = 9;
     int32 resp_len = 10;
@@ -208,6 +201,8 @@ message AppProtoLogsData {
     string version = 13;
     TraceInfo trace_info = 14;
     ExtendedInfo ext_info = 15;
+
+    uint32 row_effect = 16;
 }
 
 message AppProtoLogsBaseInfo {
@@ -259,95 +254,11 @@ message AppProtoHead {
     uint32 proto = 1;
     uint32 msg_type = 2;
 
-    //这两个字段不再使用,响应码和响应状态放到L7Response
-    uint32 status = 3;
-    uint32 code = 4;
-
     uint64 rrt = 5;
-}
-
-message HttpInfo {
-    uint32 stream_id = 1;
-    string version = 3;
-    string method = 4;
-    string path = 5;
-    string host = 6;
-    string client_ip = 7;
-    string trace_id = 8;
-    string span_id = 9;
-
-    int64 req_content_length = 10;
-    int64 resp_content_length = 11;
-    string x_request_id = 12;
-}
-
-message DnsInfo {
-    uint32 trans_id = 1;
-    uint32 query_type = 2;
-    string query_name = 3;
-    string answers = 4;
-}
-
-message DubboInfo {
-    uint32 serial_id = 1;
-    uint32 type = 2;
-    uint32 id = 4;
-
-    string version = 5;
-    string service_name = 6;
-    string service_version = 7;
-    string method_name = 8;
-
-    int32 req_body_len = 9;
-    int32 resp_body_len = 10;
-
-    string trace_id = 11;
-}
-
-message KafkaInfo {
-    uint32 correlation_id = 1;
-
-    int32 req_msg_size = 2;
-    uint32 api_version = 3;
-    uint32 api_key = 4;
-    string client_id = 5;
-
-    int32 resp_msg_size = 6;
-}
-
-message MysqlInfo {
-    uint32 protocol_version = 1;
-    string server_version = 2;
-    uint32 server_thread_id = 3;
-
-    uint32 command = 4;
-    string context = 5;
-
-    uint32 response_code = 6;
-    uint64 affected_rows = 7;
-    uint32 error_code = 8;
-    string error_message = 9;
-}
-
-message RedisInfo {
-    bytes request = 1;
-    bytes request_type = 2;
-
-    bytes response = 3;
-    bytes status = 4;
-    bytes error = 5;
-}
-
-message MqttInfo {
-    string mqtt_type = 1;
-    int32 req_msg_size = 2;
-    uint32 proto_version = 3;
-    string client_id = 4;
-    int32 resp_msg_size = 5;
-    repeated MqttTopic topics = 6;
 }
 
 message MqttTopic {
     string name = 1;
     int32 qos = 2; // -1 mean not exist qos
 }
+
