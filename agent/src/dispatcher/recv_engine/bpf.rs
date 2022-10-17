@@ -18,15 +18,16 @@ use std::net::IpAddr;
 
 #[cfg(target_os = "linux")]
 use super::af_packet::bpf::*;
+#[cfg(target_os = "linux")]
 use crate::common::{
-    enums::EthernetType, enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III, ETH_TYPE_LEN,
-    ETH_TYPE_OFFSET, GRE4_PROTO_OFFSET, GRE6_PROTO_OFFSET, GRE_PROTO_LEN, IPV4_ADDR_LEN,
-    IPV4_DST_OFFSET, IPV4_FLAGS_FRAG_OFFSET_LEN, IPV4_FLAGS_OFFSET, IPV4_PROTO_LEN,
-    IPV4_PROTO_OFFSET, IPV4_SRC_OFFSET, IPV6_DST_OFFSET, IPV6_PROTO_LEN, IPV6_PROTO_OFFSET,
-    IPV6_SRC_OFFSET, PORT_LEN, TCP6_DST_OFFSET, TCP6_SRC_OFFSET, TCP_DST_OFFSET, TCP_SRC_OFFSET,
-    UDP6_DST_OFFSET, UDP6_SRC_OFFSET, UDP_DST_OFFSET, UDP_SRC_OFFSET, VLAN_HEADER_SIZE,
-    VXLAN6_FLAGS_OFFSET, VXLAN_FLAGS_OFFSET,
+    enums::EthernetType, ETH_TYPE_LEN, ETH_TYPE_OFFSET, GRE4_PROTO_OFFSET, GRE6_PROTO_OFFSET,
+    GRE_PROTO_LEN, IPV4_ADDR_LEN, IPV4_DST_OFFSET, IPV4_FLAGS_FRAG_OFFSET_LEN, IPV4_FLAGS_OFFSET,
+    IPV4_PROTO_LEN, IPV4_PROTO_OFFSET, IPV4_SRC_OFFSET, IPV6_DST_OFFSET, IPV6_PROTO_LEN,
+    IPV6_PROTO_OFFSET, IPV6_SRC_OFFSET, PORT_LEN, TCP6_DST_OFFSET, TCP6_SRC_OFFSET, TCP_DST_OFFSET,
+    TCP_SRC_OFFSET, UDP6_DST_OFFSET, UDP6_SRC_OFFSET, UDP_DST_OFFSET, UDP_SRC_OFFSET,
+    VLAN_HEADER_SIZE, VXLAN6_FLAGS_OFFSET, VXLAN_FLAGS_OFFSET,
 };
+use crate::common::{enums::IpProtocol, erspan::GRE_PROTO_ERSPAN_III};
 
 #[cfg(target_os = "linux")]
 type JumpModifier = fn(jumpIf: JumpIf, index: usize, total: usize) -> JumpIf;
@@ -695,7 +696,7 @@ impl Builder {
         // 不采集分发的VXLAN流量
         conditions.push(format!(
             "not (udp and dst port {} and udp[8:1]={:#x})",
-            self.vxlan_port, NPB_VXLAN_FLAGS
+            self.vxlan_port, self.vxlan_flags
         ));
 
         // 不采集分发的ERSPANIII

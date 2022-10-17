@@ -613,6 +613,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "uluru",
+ "windows",
  "windows_recv_engine",
 ]
 
@@ -2043,6 +2044,7 @@ dependencies = [
  "nix 0.23.1",
  "num_enum",
  "parking_lot 0.11.2",
+ "pcap 0.10.1",
  "pnet",
  "regex",
  "serde",

@@ -666,7 +666,7 @@ pub fn get_route_src_ip_interface_name(dest_addr: &IpAddr) -> Result<String> {
             return Ok(link.name.clone());
         }
     }
-    return Err(Error::LinkNotFound("name".to_string()));
+    return Err(Error::LinkNotFound(dest_addr.to_string()));
 }
 
 #[cfg(test)]

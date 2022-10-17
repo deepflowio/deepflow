@@ -17,36 +17,48 @@
 use std::collections::HashMap;
 use std::io::{Error as IOError, ErrorKind, Result as IOResult};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
+#[cfg(unix)]
+use std::os::unix::io::FromRawFd;
+#[cfg(windows)]
+use std::os::windows::io::{FromRawSocket, RawSocket};
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc, Mutex, Weak,
 };
 
+#[cfg(unix)]
 use libc::{c_int, socket, AF_INET, AF_INET6, SOCK_RAW};
 use log::{info, warn};
 use public::counter::{Countable, CounterType, CounterValue, OwnedCountable};
 use socket2::{SockAddr, Socket};
-#[cfg(unix)]
-use std::os::unix::io::FromRawFd;
 #[cfg(windows)]
-use std::os::windows::io::{FromRawSocket, IntoRawSocket, RawSocket};
+use windows::Win32::Networking::WinSock::socket;
 
 use crate::common::{
     enums::IpProtocol, erspan, vxlan, IPV4_ADDR_LEN, IPV4_DST_OFFSET, IPV4_PACKET_SIZE,
-    IPV4_PROTO_OFFSET, IPV4_SRC_OFFSET, IPV6_ADDR_LEN, IPV6_DST_OFFSET, IPV6_PACKET_SIZE,
-    IPV6_PROTO_OFFSET, IPV6_SRC_OFFSET, UDP6_PACKET_SIZE, UDP_PACKET_SIZE,
+    IPV4_PROTO_OFFSET, IPV6_ADDR_LEN, IPV6_DST_OFFSET, IPV6_PACKET_SIZE, IPV6_PROTO_OFFSET,
+    UDP6_PACKET_SIZE, UDP_PACKET_SIZE,
 };
+#[cfg(unix)]
+use crate::common::{IPV4_SRC_OFFSET, IPV6_SRC_OFFSET};
 use crate::config::NpbConfig;
+#[cfg(unix)]
 use crate::dispatcher::af_packet::{Options, Tpacket};
 use crate::proto::trident::SocketType;
 use crate::utils::stats::{self, StatsOption};
-use public::{
-    queue::Receiver,
-    utils::net::{
-        get_route_src_ip_and_mac, get_route_src_ip_interface_name, neighbor_lookup, MacAddr,
-        MAC_ADDR_LEN,
-    },
+use public::queue::Receiver;
+#[cfg(unix)]
+use public::utils::net::{
+    get_route_src_ip_and_mac, get_route_src_ip_interface_name, neighbor_lookup, MacAddr,
+    MAC_ADDR_LEN,
 };
+
+#[cfg(windows)]
+const AF_INET: i32 = 2;
+#[cfg(windows)]
+const AF_INET6: i32 = 23;
+#[cfg(windows)]
+const SOCK_RAW: i32 = 3;
 
 fn serialize_seq(
     packet: &mut Vec<u8>,
@@ -156,6 +168,34 @@ struct IpSender {
 }
 
 impl IpSender {
+    #[cfg(windows)]
+    fn new(remote: IpAddr, protocol: u8) -> IOResult<Self> {
+        let socket = unsafe {
+            if remote.is_ipv6() {
+                socket(AF_INET6, SOCK_RAW as i32, protocol as i32)
+            } else {
+                socket(AF_INET, SOCK_RAW as i32, protocol as i32)
+            }
+        };
+        if socket.0 == 0 {
+            return Err(IOError::new(ErrorKind::Other, "socket error."));
+        }
+        let socket = unsafe { Socket::from_raw_socket(socket.0 as RawSocket) };
+        socket.set_send_buffer_size(30 << 20)?;
+
+        info!("Npb IpSender init with {} {}.", remote, protocol);
+        Ok(Self {
+            socket,
+            seq: 1,
+            underlay_is_ipv6: remote.is_ipv6(),
+            remote: match remote {
+                IpAddr::V4(ip) => SockAddr::from(SocketAddrV4::new(ip, 0)),
+                IpAddr::V6(ip) => SockAddr::from(SocketAddrV6::new(ip, 0, 0, 0)),
+            },
+        })
+    }
+
+    #[cfg(unix)]
     fn new(remote: IpAddr, protocol: u8) -> IOResult<Self> {
         let fd = unsafe {
             if remote.is_ipv6() {
@@ -167,9 +207,6 @@ impl IpSender {
         if fd < 0 {
             return Err(IOError::new(ErrorKind::Other, "socket error."));
         }
-        #[cfg(windows)]
-        let socket = Socket::from_raw_socket(fd as RawSocket);
-        #[cfg(unix)]
         let socket = unsafe { Socket::from_raw_fd(fd) };
         socket.set_send_buffer_size(30 << 20)?;
 
@@ -216,6 +253,7 @@ impl IpSender {
 #[derive(Debug)]
 enum NpbSender {
     IpSender(IpSender),
+    #[cfg(unix)]
     RawSender(AfpacketSender),
 }
 
@@ -228,6 +266,7 @@ impl NpbSender {
     ) -> IOResult<usize> {
         match self {
             Self::IpSender(s) => s.send(underlay_l2_opt_size, header_size, packet),
+            #[cfg(unix)]
             Self::RawSender(s) => s.send(underlay_l2_opt_size, packet),
         }
     }
@@ -298,6 +337,16 @@ impl NpbConnectionPool {
             vec![StatsOption::Tag("id", id.to_string())],
         );
 
+        #[cfg(windows)]
+        let mut socket_type = socket_type;
+        #[cfg(windows)]
+        {
+            if socket_type == SocketType::RawUdp {
+                info!("Npb socket type is not support RawUDP change to udp.");
+                socket_type = SocketType::Udp
+            }
+        }
+
         Self {
             connections: HashMap::new(),
             socket_type,
@@ -315,6 +364,7 @@ impl NpbConnectionPool {
                 }
                 Ok(NpbSender::IpSender(sender.unwrap()))
             }
+            #[cfg(unix)]
             SocketType::RawUdp => {
                 let local_addr = get_route_src_ip_and_mac(&remote);
                 if local_addr.is_err() {

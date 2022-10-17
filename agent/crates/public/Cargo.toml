@@ -28,4 +28,5 @@ neli = "0.5.3"
 nix = "0.23"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+pcap = "0.10.1"
 windows = { version = "0.30", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_NetworkManagement_IpHelper", "Win32_Networking_WinSock", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_System_ProcessStatus"] }

@@ -17,7 +17,7 @@
 use std::{mem::size_of, path::PathBuf, process};
 use sysinfo::{System, SystemExt};
 
-use ::windows::Win32::{
+use windows::Win32::{
     Foundation::{GetLastError, BOOL, CHAR, HINSTANCE, INVALID_HANDLE_VALUE, PWSTR},
     System::{
         Diagnostics::ToolHelp::{
