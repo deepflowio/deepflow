@@ -593,22 +593,18 @@ func (f *TagFunction) Format(m *view.Model) {
 	}
 	node := f.Trans(m)
 	m.AddTag(node)
-	// metric分层的情况下 function需加入metric外层group
-	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && node.(*view.Tag).Flag != view.NODE_FLAG_METRICS_TOP {
-		m.AddGroup(&view.Group{Value: f.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
-	}
 	if f.Name == "icon_id" {
 		for resourceStr := range tag.DEVICE_MAP {
 			// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 			for _, suffix := range []string{"", "_0", "_1"} {
 				resourceNameSuffix := resourceStr + suffix
 				if f.Args[0] == resourceNameSuffix {
-					m.AddGroup(&view.Group{Value: f.Alias})
+					m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`"))})
 				}
 			}
 		}
-	}
-	if f.Name == "enum" {
-		m.AddGroup(&view.Group{Value: f.Alias})
+	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && node.(*view.Tag).Flag != view.NODE_FLAG_METRICS_TOP {
+		// metric分层的情况下 function需加入metric外层group
+		m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`")), Flag: view.GROUP_FLAG_METRICS_OUTER})
 	}
 }
