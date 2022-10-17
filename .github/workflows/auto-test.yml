@@ -16,635 +16,640 @@ env:
   AGENT_IMAGE: "deepflow-agent"
 
 jobs:
-  build_server:
-    name: build server
-    runs-on: [self-hosted, 16c16g]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: get changes
-        run: |
-          set +e
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
-          if [ $? -eq 0 ] 
-            then
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          set -e
-
-      - name: Set up Go
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        uses: actions/setup-go@master
-        with:
-          go-version: 1.18.x
-
-      - name: Install Protoc
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        uses: arduino/setup-protoc@v1
-        with:
-          version: '3.6.1'
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: build server
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        run: |
-          # sudo apt-get update
-          # sudo apt-get install tmpl
-          # pip install ujson
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
-          GO111MODULE="off" go get github.com/gogo/protobuf/proto
-          GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
-          GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gogo
-          GO111MODULE="off" go get github.com/gogo/protobuf/gogoproto
-          GO111MODULE="off" go get github.com/golang/protobuf/protoc-gen-go
-          cd server
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.amd64
-
-      - name: Package code build results
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        run: |
-          tar cvf server-artifact.tar server/bin/
-
-      - name: Archive code build results packager
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: build results
-          path: |
-            server-artifact.tar
-
-  build_server_image:
-    name: build server image
-    needs: [build_server]
+  ignore:
+    name: ignore
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
+      - run: 'echo "No build required" '
+  # build_server:
+#     name: build server
+#     runs-on: [self-hosted, 16c16g]
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+#         with:
+#           submodules: recursive
+#           fetch-depth: 0
 
-      - name: get changes
-        run: |
-          set +e
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
-          if [ $? -eq 0 ] 
-            then
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          set -e
+#       - name: get changes
+#         run: |
+#           set +e
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           set -e
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        with:
-          install: true
+#       - name: Set up Go
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         uses: actions/setup-go@master
+#         with:
+#           go-version: 1.18.x
 
-      - name: Download code build results
-        uses: actions/download-artifact@v3
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        with:
-          name: build results
-          path: .
+#       - name: Install Protoc
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         uses: arduino/setup-protoc@v1
+#         with:
+#           version: '3.6.1'
+#           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Unpack code build results
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        run: |
-          tar xvf server-artifact.tar
+#       - name: build server
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         run: |
+#           # sudo apt-get update
+#           # sudo apt-get install tmpl
+#           # pip install ujson
+#           GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
+#           GO111MODULE="off" go get github.com/gogo/protobuf/proto
+#           GO111MODULE="off" go get github.com/gogo/protobuf/jsonpb
+#           GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gogo
+#           GO111MODULE="off" go get github.com/gogo/protobuf/gogoproto
+#           GO111MODULE="off" go get github.com/golang/protobuf/protoc-gen-go
+#           cd server
+#           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.amd64
 
-      - name: Log in to GitHub Docker Registry
-        uses: docker/login-action@v2
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        with:
-          registry: "ghcr.io" 
-          username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
+#       - name: Package code build results
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         run: |
+#           tar cvf server-artifact.tar server/bin/
 
-      - name: Build and push deepflow images
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        uses: docker/build-push-action@v2
-        with:
-          context: server
-          push: true 
-          file: server/Dockerfile
-          platforms: linux/amd64
-          tags: |
-            "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ github.run_id }}"
+#       - name: Archive code build results packager
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: build results
+#           path: |
+#             server-artifact.tar
 
-  build_agent:
-    name: build agent
-    runs-on: [self-hosted, 16c16g]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
+#   build_server_image:
+#     name: build server image
+#     needs: [build_server]
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+#         with:
+#           submodules: recursive
+#           fetch-depth: 0
 
-      - name: get changes
-        run: |
-          set +e
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
-          if [ $? -eq 0 ] 
-            then
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          set -e
+#       - name: get changes
+#         run: |
+#           set +e
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           set -e
 
-      - name: Log in to GitHub Docker Registry
-        uses: docker/login-action@v2
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        with:
-          registry: "ghcr.io" 
-          username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v2
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         with:
+#           install: true
 
-      - name: Build  deepflow agent
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        uses: docker/build-push-action@v2
-        with:
-          builder: default
-          context: .
-          push: false 
-          file: agent/docker/dockerfile-build
-          platforms: linux/amd64
-          outputs: type=local,dest=./agent/output/
+#       - name: Download code build results
+#         uses: actions/download-artifact@v3
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         with:
+#           name: build results
+#           path: .
 
-      - name: Package code build results
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        run: |
-          tar cvf agent-artifact.tar agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+#       - name: Unpack code build results
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         run: |
+#           tar xvf server-artifact.tar
 
-      - name: Archive code build results
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: agent build results
-          path: |
-            agent-artifact.tar
+#       - name: Log in to GitHub Docker Registry
+#         uses: docker/login-action@v2
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         with:
+#           registry: "ghcr.io" 
+#           username: "${{ github.repository_owner }}"
+#           password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
+
+#       - name: Build and push deepflow images
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         uses: docker/build-push-action@v2
+#         with:
+#           context: server
+#           push: true 
+#           file: server/Dockerfile
+#           platforms: linux/amd64
+#           tags: |
+#             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ github.run_id }}"
+
+#   build_agent:
+#     name: build agent
+#     runs-on: [self-hosted, 16c16g]
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+#         with:
+#           submodules: recursive
+#           fetch-depth: 0
+
+#       - name: get changes
+#         run: |
+#           set +e
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           set -e
+
+#       - name: Log in to GitHub Docker Registry
+#         uses: docker/login-action@v2
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         with:
+#           registry: "ghcr.io" 
+#           username: "${{ github.repository_owner }}"
+#           password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
+
+#       - name: Build  deepflow agent
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         uses: docker/build-push-action@v2
+#         with:
+#           builder: default
+#           context: .
+#           push: false 
+#           file: agent/docker/dockerfile-build
+#           platforms: linux/amd64
+#           outputs: type=local,dest=./agent/output/
+
+#       - name: Package code build results
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         run: |
+#           tar cvf agent-artifact.tar agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+
+#       - name: Archive code build results
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: agent build results
+#           path: |
+#             agent-artifact.tar
 
 
-  build_agent_image:
-    name: build agent image
-    needs: [build_agent]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
+#   build_agent_image:
+#     name: build agent image
+#     needs: [build_agent]
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+#         with:
+#           submodules: recursive
+#           fetch-depth: 0
 
-      - name: get changes
-        run: |
-          set +e
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
-          if [ $? -eq 0 ] 
-            then
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          set -e
+#       - name: get changes
+#         run: |
+#           set +e
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           set -e
 
-      - name: Download code build results
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        uses: actions/download-artifact@v3
-        with:
-          name: agent build results
-          path: .
+#       - name: Download code build results
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         uses: actions/download-artifact@v3
+#         with:
+#           name: agent build results
+#           path: .
 
-      - name: Unpack code build results
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        run: |
-          tar xvf agent-artifact.tar
+#       - name: Unpack code build results
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         run: |
+#           tar xvf agent-artifact.tar
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        with:
-          install: true
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v2
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         with:
+#           install: true
 
-      - name: Log in to GitHub Docker Registry
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        uses: docker/login-action@v2
-        with:
-          registry: "ghcr.io" 
-          username: "${{ github.repository_owner }}"
-          password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
+#       - name: Log in to GitHub Docker Registry
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         uses: docker/login-action@v2
+#         with:
+#           registry: "ghcr.io" 
+#           username: "${{ github.repository_owner }}"
+#           password: "${{ secrets.GHCR_PUSH_TOKEN }}" 
 
-      - name: Build and push deepflow agent images
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        uses: docker/build-push-action@v2
-        with:
-          context: agent
-          push: true 
-          file: agent/docker/dockerfile 
-          platforms: linux/amd64
-          tags: |
-            "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.AGENT_IMAGE }}:${{ github.run_id }}"
+#       - name: Build and push deepflow agent images
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         uses: docker/build-push-action@v2
+#         with:
+#           context: agent
+#           push: true 
+#           file: agent/docker/dockerfile 
+#           platforms: linux/amd64
+#           tags: |
+#             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.AGENT_IMAGE }}:${{ github.run_id }}"
  
-  auto_test_install:
-    name: auto test install
-    needs: 
-    - build_server
-    - build_agent
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
+#   auto_test_install:
+#     name: auto test install
+#     needs: 
+#     - build_server
+#     - build_agent
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+#         with:
+#           submodules: recursive
+#           fetch-depth: 0
 
-      - name: get changes
-        run: |
-          set +e
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
-          if [ $? -eq 0 ] 
-            then
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          set -e
+#       - name: get changes
+#         run: |
+#           set +e
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           set -e
 
-      # - name: start minikube
-      #   uses: medyagh/setup-minikube@master
-      #   with:
-      #     minikube-version: 1.24.0
-      #     driver: docker
-      #     container-runtime: containerd
-      #     kubernetes-version: v1.22.3
-      #     memory: 4000m
-      #     cni: bridge
-      - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v2.6.1
-        with:
-          minikube version: 'v1.26.0'
-          kubernetes version: 'v1.24.1'
-          github token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Interact with the cluster
-        run: |
-          kubectl get nodes
-          kubectl get sc
-      # - name: Create k8s Kind Cluster
-      #   uses: helm/kind-action@v1.3.0
-      # - name: Testing
-      #   run: |
-      #     kubectl cluster-info
-      #     kubectl get pods -n kube-system
-      #     kubectl get sc
-      #     echo "current-context:" $(kubectl config current-context)
-      #     echo "environment-kubeconfig:" ${KUBECONFIG}
+#       # - name: start minikube
+#       #   uses: medyagh/setup-minikube@master
+#       #   with:
+#       #     minikube-version: 1.24.0
+#       #     driver: docker
+#       #     container-runtime: containerd
+#       #     kubernetes-version: v1.22.3
+#       #     memory: 4000m
+#       #     cni: bridge
+#       - name: Setup Minikube
+#         uses: manusa/actions-setup-minikube@v2.6.1
+#         with:
+#           minikube version: 'v1.26.0'
+#           kubernetes version: 'v1.24.1'
+#           github token: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Interact with the cluster
+#         run: |
+#           kubectl get nodes
+#           kubectl get sc
+#       # - name: Create k8s Kind Cluster
+#       #   uses: helm/kind-action@v1.3.0
+#       # - name: Testing
+#       #   run: |
+#       #     kubectl cluster-info
+#       #     kubectl get pods -n kube-system
+#       #     kubectl get sc
+#       #     echo "current-context:" $(kubectl config current-context)
+#       #     echo "environment-kubeconfig:" ${KUBECONFIG}
 
-      - name: Install Helm
-        uses: azure/setup-helm@v1
-        with:
-          version: v3.8.1
+#       - name: Install Helm
+#         uses: azure/setup-helm@v1
+#         with:
+#           version: v3.8.1
 
-      - name: add deepflow helm repo
-        run: |
-          helm repo add deepflow https://deepflowys.github.io/deepflow-charts
-          helm repo update deepflow 
+#       - name: add deepflow helm repo
+#         run: |
+#           helm repo add deepflow https://deepflowys.github.io/deepflow-charts
+#           helm repo update deepflow 
 
-      - name: install and upgrade deepflow server 
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        run: |
-          helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
-              --set global.allInOneLocalStorage=true \
-              --set global.hostNetwork=true \
-              --set global.dnsPolicy=ClusterFirstWithHostNet \
-              --set global.nodePort.clickhouse="" \
-              --set global.nodePort.deepflowServerIngester="" \
-              --set global.nodePort.deepflowServerhealthCheck="" \
-              --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
-              --set-string image.server.tag=${{ github.run_id }}
+#       - name: install and upgrade deepflow server 
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         run: |
+#           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
+#               --set global.allInOneLocalStorage=true \
+#               --set global.hostNetwork=true \
+#               --set global.dnsPolicy=ClusterFirstWithHostNet \
+#               --set global.nodePort.clickhouse="" \
+#               --set global.nodePort.deepflowServerIngester="" \
+#               --set global.nodePort.deepflowServerhealthCheck="" \
+#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set-string image.server.tag=${{ github.run_id }}
 
-      - name: install and upgrade deepflow agent 
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        run: |
-          helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
-              --set global.allInOneLocalStorage=true \
-              --set global.hostNetwork=true \
-              --set global.dnsPolicy=ClusterFirstWithHostNet \
-              --set global.nodePort.clickhouse="" \
-              --set global.nodePort.deepflowServerIngester="" \
-              --set global.nodePort.deepflowServerhealthCheck="" \
-              --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
-              --set-string deepflow-agent.image.tag=${{ github.run_id }} \
-              --reuse-values
+#       - name: install and upgrade deepflow agent 
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         run: |
+#           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
+#               --set global.allInOneLocalStorage=true \
+#               --set global.hostNetwork=true \
+#               --set global.dnsPolicy=ClusterFirstWithHostNet \
+#               --set global.nodePort.clickhouse="" \
+#               --set global.nodePort.deepflowServerIngester="" \
+#               --set global.nodePort.deepflowServerhealthCheck="" \
+#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
+#               --reuse-values
      
-      - name:  delete agent
-        run: |
-          sleep 10
-          kubectl delete pod -n deepflow -l component=deepflow-agent
+#       - name:  delete agent
+#         run: |
+#           sleep 10
+#           kubectl delete pod -n deepflow -l component=deepflow-agent
 
-      - name: get nodeport
-        run: |
-          CHECKNODEPORT=$(kubectl get svc -n deepflow deepflow-server -o json |jq '.spec.ports[]|select (.name=="health-check")|.nodePort')
-          echo "CHECKNODEPORT=$CHECKNODEPORT" >> $GITHUB_ENV
+#       - name: get nodeport
+#         run: |
+#           CHECKNODEPORT=$(kubectl get svc -n deepflow deepflow-server -o json |jq '.spec.ports[]|select (.name=="health-check")|.nodePort')
+#           echo "CHECKNODEPORT=$CHECKNODEPORT" >> $GITHUB_ENV
 
-      - name: check deepflow 
-        run: | 
-          sudo curl -o /usr/bin/deepflow-ctl https://deepflow-ce.oss-accelerate.aliyuncs.com/bin/ctl/latest/linux/amd64/deepflow-ctl
-          sudo chmod a+x /usr/bin/deepflow-ctl
-          timeout 600 bash -c -- \
-             '\
-             while true 
-               do  
-                 kubectl get pods -n deepflow 
-                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} domain list 
-                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} agent list||true 
-                 AgentCount=$(deepflow-ctl  --api-port ${{ env.CHECKNODEPORT }}  agent list |wc -l ) 
-                    if [ "${AgentCount}" -eq "2" ] 
-                      then  
-                        echo "All Success." && break 
-                      else 
-                        echo "Something Wrong,Next loop " && sleep 2 
-                    fi 
-              done 
-            '
+#       - name: check deepflow 
+#         run: | 
+#           sudo curl -o /usr/bin/deepflow-ctl https://deepflow-ce.oss-accelerate.aliyuncs.com/bin/ctl/latest/linux/amd64/deepflow-ctl
+#           sudo chmod a+x /usr/bin/deepflow-ctl
+#           timeout 600 bash -c -- \
+#              '\
+#              while true 
+#                do  
+#                  kubectl get pods -n deepflow 
+#                  deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} domain list 
+#                  deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} agent list||true 
+#                  AgentCount=$(deepflow-ctl  --api-port ${{ env.CHECKNODEPORT }}  agent list |wc -l ) 
+#                     if [ "${AgentCount}" -eq "2" ] 
+#                       then  
+#                         echo "All Success." && break 
+#                       else 
+#                         echo "Something Wrong,Next loop " && sleep 2 
+#                     fi 
+#               done 
+#             '
             
-      - name: Check agent restart
-        run: |
-          set +e
-          kubectl get pods -n deepflow -l component=deepflow-agent -o jsonpath={.items[*].status.containerStatuses[*].restartCount}|awk -F" " '{for(i=1;i<=NF;i++) print $i}' |grep -v 0
-          if [ $? -eq 0 ] 
-            then
-              kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent  -p
-              kubectl get pods -n deepflow
-              echo "Agent has restart"
-              exit 2
-          fi
+#       - name: Check agent restart
+#         run: |
+#           set +e
+#           kubectl get pods -n deepflow -l component=deepflow-agent -o jsonpath={.items[*].status.containerStatuses[*].restartCount}|awk -F" " '{for(i=1;i<=NF;i++) print $i}' |grep -v 0
+#           if [ $? -eq 0 ] 
+#             then
+#               kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent  -p
+#               kubectl get pods -n deepflow
+#               echo "Agent has restart"
+#               exit 2
+#           fi
 
-      - name: logs deepflow
-        if: ${{ always() }}
-        run: |
-          kubectl logs -n deepflow deepflow-server-0  -c deepflow-server 
-          kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent 
+#       - name: logs deepflow
+#         if: ${{ always() }}
+#         run: |
+#           kubectl logs -n deepflow deepflow-server-0  -c deepflow-server 
+#           kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent 
 
-  auto_test_upgrade:
-    name: auto test upgrade
-    needs:
-    - build_server
-    - build_agent
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
+#   auto_test_upgrade:
+#     name: auto test upgrade
+#     needs:
+#     - build_server
+#     - build_agent
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+#         with:
+#           submodules: recursive
+#           fetch-depth: 0
 
-      - name: get changes
-        run: |
-          set +e
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
-          if [ $? -eq 0 ] 
-            then
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
-          if [ $? -eq 0 ] 
-            then
-              echo "SERVER_CHANGE=true" >> $GITHUB_ENV
-              echo "AGENT_CHANGE=true" >> $GITHUB_ENV
-          fi
-          set -e
+#       - name: get changes
+#         run: |
+#           set +e
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^server/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^agent/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           git diff-tree --no-commit-id --name-only --diff-filter=AMR -r origin/${GITHUB_HEAD_REF} |grep ^message/
+#           if [ $? -eq 0 ] 
+#             then
+#               echo "SERVER_CHANGE=true" >> $GITHUB_ENV
+#               echo "AGENT_CHANGE=true" >> $GITHUB_ENV
+#           fi
+#           set -e
 
-      # - name: start minikube
-      #   uses: medyagh/setup-minikube@master
-      #   with:
-      #     minikube-version: 1.24.0
-      #     driver: docker
-      #     container-runtime: containerd
-      #     kubernetes-version: v1.22.3
-      #     memory: 4000m
-      #     cni: bridge
-      - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v2.6.1
-        with:
-          minikube version: 'v1.26.0'
-          kubernetes version: 'v1.24.1'
-          github token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Interact with the cluster
-        run: |
-          kubectl get nodes
-          kubectl get sc
-      # - name: Create k8s Kind Cluster
-      #   uses: helm/kind-action@v1.3.0
-      - name: Testing
-        run: |
-          kubectl cluster-info
-          kubectl get pods -n kube-system
-          kubectl get sc
-          echo "current-context:" $(kubectl config current-context)
-          echo "environment-kubeconfig:" ${KUBECONFIG}
+#       # - name: start minikube
+#       #   uses: medyagh/setup-minikube@master
+#       #   with:
+#       #     minikube-version: 1.24.0
+#       #     driver: docker
+#       #     container-runtime: containerd
+#       #     kubernetes-version: v1.22.3
+#       #     memory: 4000m
+#       #     cni: bridge
+#       - name: Setup Minikube
+#         uses: manusa/actions-setup-minikube@v2.6.1
+#         with:
+#           minikube version: 'v1.26.0'
+#           kubernetes version: 'v1.24.1'
+#           github token: ${{ secrets.GITHUB_TOKEN }}
+#       - name: Interact with the cluster
+#         run: |
+#           kubectl get nodes
+#           kubectl get sc
+#       # - name: Create k8s Kind Cluster
+#       #   uses: helm/kind-action@v1.3.0
+#       - name: Testing
+#         run: |
+#           kubectl cluster-info
+#           kubectl get pods -n kube-system
+#           kubectl get sc
+#           echo "current-context:" $(kubectl config current-context)
+#           echo "environment-kubeconfig:" ${KUBECONFIG}
 
-      - name: Install Helm
-        uses: azure/setup-helm@v1
-        with:
-          version: v3.8.1
+#       - name: Install Helm
+#         uses: azure/setup-helm@v1
+#         with:
+#           version: v3.8.1
 
-      - name: install deepflow
-        run: |
-          helm repo add deepflow https://deepflowys.github.io/deepflow-charts
-          helm repo update deepflow 
-          helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
-              --set global.allInOneLocalStorage=true \
-              --set global.hostNetwork=true \
-              --set global.dnsPolicy=ClusterFirstWithHostNet \
-              --set global.nodePort.clickhouse="" \
-              --set global.nodePort.deepflowServerIngester="" \
-              --set global.nodePort.deepflowServerhealthCheck="" \
-              --set global.image.repository="ghcr.io/deepflowys/deepflow-ce"  \
-              --set-string image.server.tag="latest-6081"
-          sudo curl -o /usr/bin/deepflow-ctl https://deepflow-ce.oss-accelerate.aliyuncs.com/bin/ctl/latest/linux/amd64/deepflow-ctl
-          sudo chmod a+x /usr/bin/deepflow-ctl
-          timeout 300 bash -c -- \
-             '\
-                while true 
-                  do 
-                    kubectl get pods -n deepflow 
-                    set +e
-                    kubectl exec -it -n deepflow deploy/deepflow-mysql -- mysql -u root -pdeepflow -e "select * from deepflow.db_version;"
-                    kubectl exec -it -n deepflow deploy/deepflow-mysql -- mysql -u root -pdeepflow -e "select count(*)  from deepflow.db_version;"|grep 1
-                    if [ $? -eq 0 ] 
-                      then
-                        break
-                    else
-                        continue   
-                    fi
-                    sleep 2
-                  done
-            '
+#       - name: install deepflow
+#         run: |
+#           helm repo add deepflow https://deepflowys.github.io/deepflow-charts
+#           helm repo update deepflow 
+#           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
+#               --set global.allInOneLocalStorage=true \
+#               --set global.hostNetwork=true \
+#               --set global.dnsPolicy=ClusterFirstWithHostNet \
+#               --set global.nodePort.clickhouse="" \
+#               --set global.nodePort.deepflowServerIngester="" \
+#               --set global.nodePort.deepflowServerhealthCheck="" \
+#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce"  \
+#               --set-string image.server.tag="latest-6081"
+#           sudo curl -o /usr/bin/deepflow-ctl https://deepflow-ce.oss-accelerate.aliyuncs.com/bin/ctl/latest/linux/amd64/deepflow-ctl
+#           sudo chmod a+x /usr/bin/deepflow-ctl
+#           timeout 300 bash -c -- \
+#              '\
+#                 while true 
+#                   do 
+#                     kubectl get pods -n deepflow 
+#                     set +e
+#                     kubectl exec -it -n deepflow deploy/deepflow-mysql -- mysql -u root -pdeepflow -e "select * from deepflow.db_version;"
+#                     kubectl exec -it -n deepflow deploy/deepflow-mysql -- mysql -u root -pdeepflow -e "select count(*)  from deepflow.db_version;"|grep 1
+#                     if [ $? -eq 0 ] 
+#                       then
+#                         break
+#                     else
+#                         continue   
+#                     fi
+#                     sleep 2
+#                   done
+#             '
 
-      - name: upgrade deepflow server
-        if: ${{ env.SERVER_CHANGE == 'true' }}
-        run: |
-          helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
-              --set global.allInOneLocalStorage=true \
-              --set global.hostNetwork=true \
-              --set global.dnsPolicy=ClusterFirstWithHostNet \
-              --set global.nodePort.clickhouse="" \
-              --set global.nodePort.deepflowServerIngester="" \
-              --set global.nodePort.deepflowServerhealthCheck="" \
-              --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
-              --set-string image.server.tag=${{ github.run_id }}
+#       - name: upgrade deepflow server
+#         if: ${{ env.SERVER_CHANGE == 'true' }}
+#         run: |
+#           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
+#               --set global.allInOneLocalStorage=true \
+#               --set global.hostNetwork=true \
+#               --set global.dnsPolicy=ClusterFirstWithHostNet \
+#               --set global.nodePort.clickhouse="" \
+#               --set global.nodePort.deepflowServerIngester="" \
+#               --set global.nodePort.deepflowServerhealthCheck="" \
+#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set-string image.server.tag=${{ github.run_id }}
 
-      - name: upgrade deepflow agent
-        if: ${{ env.AGENT_CHANGE == 'true' }}
-        run: |
-          helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
-              --set global.allInOneLocalStorage=true \
-              --set global.hostNetwork=true \
-              --set global.dnsPolicy=ClusterFirstWithHostNet \
-              --set global.nodePort.clickhouse="" \
-              --set global.nodePort.deepflowServerIngester="" \
-              --set global.nodePort.deepflowServerhealthCheck="" \
-              --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
-              --set-string deepflow-agent.image.tag=${{ github.run_id }} \
-              --reuse-values
+#       - name: upgrade deepflow agent
+#         if: ${{ env.AGENT_CHANGE == 'true' }}
+#         run: |
+#           helm upgrade --install deepflow -n deepflow deepflow/deepflow --create-namespace \
+#               --set global.allInOneLocalStorage=true \
+#               --set global.hostNetwork=true \
+#               --set global.dnsPolicy=ClusterFirstWithHostNet \
+#               --set global.nodePort.clickhouse="" \
+#               --set global.nodePort.deepflowServerIngester="" \
+#               --set global.nodePort.deepflowServerhealthCheck="" \
+#               --set global.image.repository="ghcr.io/deepflowys/deepflow-ce" \
+#               --set-string deepflow-agent.image.tag=${{ github.run_id }} \
+#               --reuse-values
 
-      - name:  delete agent
-        run: |
-          sleep 10
-          kubectl delete pod -n deepflow -l component=deepflow-agent
+#       - name:  delete agent
+#         run: |
+#           sleep 10
+#           kubectl delete pod -n deepflow -l component=deepflow-agent
 
-      - name: get nodeport
-        run: |
-          CHECKNODEPORT=$(kubectl get svc -n deepflow deepflow-server -o json |jq '.spec.ports[]|select (.name=="health-check")|.nodePort')
-          echo "CHECKNODEPORT=$CHECKNODEPORT" >> $GITHUB_ENV
+#       - name: get nodeport
+#         run: |
+#           CHECKNODEPORT=$(kubectl get svc -n deepflow deepflow-server -o json |jq '.spec.ports[]|select (.name=="health-check")|.nodePort')
+#           echo "CHECKNODEPORT=$CHECKNODEPORT" >> $GITHUB_ENV
 
-      - name: Check deepflow
-        run: |
-          timeout 600 bash -c -- \
-             '\
-             while true 
-               do  
-                 kubectl get pods -n deepflow 
-                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} domain list 
-                 deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} agent list||true 
-                 CrashCount=$(deepflow-ctl  --api-port ${{ env.CHECKNODEPORT }} agent list |wc -l ) 
-                    if [ "${CrashCount}" -eq "2" ] 
-                      then  
-                        echo "All Success." && break 
-                      else 
-                        echo "Something Wrong,Next loop " && sleep 2 
-                    fi 
-              done 
-            '
-      - name: Check agent restart
-        run: |
-          set +e
-          kubectl get pods -n deepflow -l component=deepflow-agent -o jsonpath={.items[*].status.containerStatuses[*].restartCount}|awk -F" " '{for(i=1;i<=NF;i++) print $i}' |grep -v 0
-          if [ $? -eq 0 ] 
-            then
-              kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent  -p
-              kubectl get pods -n deepflow
-              echo "Agent has restart"
-              exit 2
-          fi
+#       - name: Check deepflow
+#         run: |
+#           timeout 600 bash -c -- \
+#              '\
+#              while true 
+#                do  
+#                  kubectl get pods -n deepflow 
+#                  deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} domain list 
+#                  deepflow-ctl --api-port ${{ env.CHECKNODEPORT }} agent list||true 
+#                  CrashCount=$(deepflow-ctl  --api-port ${{ env.CHECKNODEPORT }} agent list |wc -l ) 
+#                     if [ "${CrashCount}" -eq "2" ] 
+#                       then  
+#                         echo "All Success." && break 
+#                       else 
+#                         echo "Something Wrong,Next loop " && sleep 2 
+#                     fi 
+#               done 
+#             '
+#       - name: Check agent restart
+#         run: |
+#           set +e
+#           kubectl get pods -n deepflow -l component=deepflow-agent -o jsonpath={.items[*].status.containerStatuses[*].restartCount}|awk -F" " '{for(i=1;i<=NF;i++) print $i}' |grep -v 0
+#           if [ $? -eq 0 ] 
+#             then
+#               kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent  -p
+#               kubectl get pods -n deepflow
+#               echo "Agent has restart"
+#               exit 2
+#           fi
 
-      - name: logs deepflow
-        if: ${{ always() }}
-        run: |
-          kubectl logs -n deepflow deepflow-server-0  -c deepflow-server 
-          kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent 
+#       - name: logs deepflow
+#         if: ${{ always() }}
+#         run: |
+#           kubectl logs -n deepflow deepflow-server-0  -c deepflow-server 
+#           kubectl logs -n deepflow -l app=deepflow -l component=deepflow-agent 
 
 
-  remove_temp_docker_image:
-    name: remove temp docker image
-    needs: 
-    - auto_test_upgrade
-    - auto_test_install
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
-    steps:
-      - name: clean temp packages use version id
-        if: ${{ always() }}
-        run: |
-          set +e
-          gh api \
-          -H "Accept: application/vnd.github+json"  \
-          /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions \
-          | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id'
-          PACKAGE_VERSION_ID=$(gh api \
-          -H "Accept: application/vnd.github+json"  \
-          /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions \
-          | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id')
-          curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions/$PACKAGE_VERSION_ID
-           gh api \
-           -H "Accept: application/vnd.github+json"  \
-           /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
-           | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id'
-           PACKAGE_VERSION_ID=$(gh api \
-           -H "Accept: application/vnd.github+json"  \
-           /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
-           | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id')
-           curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions/$PACKAGE_VERSION_ID
-        env:
-          GITHUB_TOKEN: ${{ secrets.DELETE_PACKAGES_TOKEN }}
+#   remove_temp_docker_image:
+#     name: remove temp docker image
+#     needs: 
+#     - auto_test_upgrade
+#     - auto_test_install
+#     if: ${{ always() }}
+#     runs-on: ubuntu-latest
+#     permissions:
+#       packages: write
+#     steps:
+#       - name: clean temp packages use version id
+#         if: ${{ always() }}
+#         run: |
+#           set +e
+#           gh api \
+#           -H "Accept: application/vnd.github+json"  \
+#           /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions \
+#           | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id'
+#           PACKAGE_VERSION_ID=$(gh api \
+#           -H "Accept: application/vnd.github+json"  \
+#           /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions \
+#           | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id')
+#           curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-server/versions/$PACKAGE_VERSION_ID
+#            gh api \
+#            -H "Accept: application/vnd.github+json"  \
+#            /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
+#            | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id'
+#            PACKAGE_VERSION_ID=$(gh api \
+#            -H "Accept: application/vnd.github+json"  \
+#            /orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions \
+#            | jq '.[]|select (.metadata.container.tags[] == "${{ github.run_id }}")|.id')
+#            curl -i -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: token ${{ secrets.DELETE_PACKAGES_TOKEN }}" https://api.github.com/orgs/deepflowys/packages/container/deepflow-ce%2Fdeepflow-agent/versions/$PACKAGE_VERSION_ID
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.DELETE_PACKAGES_TOKEN }}

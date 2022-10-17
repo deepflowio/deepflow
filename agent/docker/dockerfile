@@ -3,6 +3,7 @@ FROM docker.io/alpine
 ARG TZ='Asia/Harbin'
 ENV DEFAULT_TZ ${TZ}
 ENV IN_CONTAINER yes
+ARG TARGETARCH
 RUN --mount=target=/tmp-mount \
     apk upgrade --update \
     && apk add -U tzdata \
@@ -14,9 +15,10 @@ RUN --mount=target=/tmp-mount \
     echo "root:root" | chpasswd; \
     chmod 000 /etc/passwd; \
     mkdir -p /lib64 && \
-    cp -raf /tmp-mount/output/target/x86_64-unknown-linux-musl/release/deepflow-agent /bin/  && \
-    cp -raf /tmp-mount/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl /bin/  && \
-    cp -raf /tmp-mount/output/src/ebpf/deepflow-ebpfctl /bin/  && \
+    AGENT_BUILD_ARCH=$(echo ${TARGETARCH}|sed 's|amd64|x86_64|'|sed 's|arm64|aarch64|') && \
+    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/${AGENT_BUILD_ARCH}-unknown-linux-musl/release/deepflow-agent /bin/  && \
+    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/target/${AGENT_BUILD_ARCH}-unknown-linux-musl/release/deepflow-agent-ctl /bin/  && \
+    cp -raf /tmp-mount/${AGENT_BUILD_ARCH}/agent/output/src/ebpf/deepflow-ebpfctl /bin/  && \
     chmod 4755 /bin/busybox 
 
 USER root
