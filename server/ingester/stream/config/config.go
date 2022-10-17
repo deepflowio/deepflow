@@ -36,18 +36,6 @@ const (
 	DefaultFlowLogTTL        = 3
 )
 
-type FlowLogDisabled struct {
-	L4    bool `yaml:"l4"`
-	L7    bool `yaml:"l7"`
-	Http  bool `yaml:"http"`
-	Dns   bool `yaml:"dns"`
-	Mysql bool `yaml:"mysql"`
-	Redis bool `yaml:"redis"`
-	Dubbo bool `yaml:"dubbo"`
-	Kafka bool `yaml:"kafka"`
-	Mqtt  bool `yaml:"mqtt"`
-}
-
 type FlowLogTTL struct {
 	L4FlowLog int `yaml:"l4-flow-log"`
 	L7FlowLog int `yaml:"l7-flow-log"`
@@ -61,7 +49,6 @@ type Config struct {
 	L4Throttle        int                   `yaml:"l4-throttle"`
 	L7Throttle        int                   `yaml:"l7-throttle"`
 	FlowLogTTL        FlowLogTTL            `yaml:"flow-log-ttl"`
-	FlowLogDisabled   FlowLogDisabled       `yaml:"flow-log-disabled"`
 	DecoderQueueCount int                   `yaml:"decoder-queue-count"`
 	DecoderQueueSize  int                   `yaml:"decoder-queue-size"`
 }
