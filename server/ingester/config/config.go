@@ -46,6 +46,7 @@ const (
 	DefaultInfluxdbPort    = "20044"
 	EnvK8sNodeIP           = "K8S_NODE_IP_FOR_DEEPFLOW"
 	EnvK8sPodName          = "K8S_POD_NAME_FOR_DEEPFLOW"
+	EnvK8sNamespace        = "K8S_NAMESPACE_FOR_DEEPFLOW"
 	DefaultCKDBService     = "deepflow-clickhouse"
 	DefaultCKDBServicePort = 9000
 	DefaultListenPort      = 20033
@@ -157,9 +158,14 @@ func (c *Config) Validate() error {
 		c.NodeIP = nodeIP
 	}
 
-	podName, exist := os.LookupEnv(EnvK8sPodName)
+	myPodName, exist := os.LookupEnv(EnvK8sPodName)
 	if !exist {
 		log.Errorf("Can't get pod name env %s", EnvK8sPodName)
+		sleepAndExit()
+	}
+	myNamespace, exist := os.LookupEnv(EnvK8sNamespace)
+	if !exist {
+		log.Errorf("Can't get pod namespace env %s", EnvK8sNamespace)
 		sleepAndExit()
 	}
 
@@ -186,28 +192,23 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	serverPodNameKey := ""
-	lastSeparateIndex := strings.LastIndex(podName, "-")
-	if lastSeparateIndex > 0 {
-		serverPodNameKey = podName[:lastSeparateIndex]
-	} else {
-		log.Errorf("my pod name is '%s', can't be splitted by '-', ", podName)
-		sleepAndExit()
-	}
-
+	var watcher *Watcher
+	var err error
 	for retryTimes := 0; ; retryTimes++ {
 		if retryTimes > 0 {
 			time.Sleep(time.Second * 30)
 		}
-		watcher, err := NewWatcher(podName, serverPodNameKey, c.CKDB.Host)
-		if err != nil {
-			log.Errorf("get kubernetes watcher failed %s", err)
-			continue
+		if watcher == nil {
+			watcher, err = NewWatcher(myPodName, myNamespace, c.CKDB.Host, c.ControllerIPs, int(c.ControllerPort), c.GrpcBufferSize)
+			if err != nil {
+				log.Warningf("get kubernetes watcher failed %s", err)
+				continue
+			}
 		}
 
 		endpoint, err := watcher.GetMyClickhouseEndpoint()
 		if err != nil {
-			log.Errorf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err)
+			log.Warningf("get clickhouse endpoints(%s) failed, err: %s", c.CKDB.Host, err)
 			continue
 		}
 		c.CKDB.ActualAddr = fmt.Sprintf("%s:%d", endpoint.Host, endpoint.Port)
@@ -216,7 +217,7 @@ func (c *Config) Validate() error {
 
 		conn, err := common.NewCKConnection(c.CKDB.ActualAddr, c.CKDBAuth.Username, c.CKDBAuth.Password)
 		if err != nil {
-			log.Errorf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddr, err)
+			log.Warningf("connect to clickhouse %s failed, err: %s", c.CKDB.ActualAddr, err)
 			continue
 		}
 

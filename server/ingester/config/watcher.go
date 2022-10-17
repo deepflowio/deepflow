@@ -19,9 +19,8 @@ package config
 import (
 	"context"
 	"fmt"
-	"os"
+	"net"
 	"sort"
-	"strings"
 	"time"
 
 	"k8s.io/client-go/kubernetes"
@@ -32,8 +31,7 @@ import (
 )
 
 const (
-	TIMEOUT        = 60
-	NAMESPACE_FILE = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+	TIMEOUT = 60
 )
 
 type Endpoint struct {
@@ -42,15 +40,15 @@ type Endpoint struct {
 }
 
 type Watcher struct {
-	Pod                   libs.Watcher
-	Endpoints             libs.Watcher
-	serverPodKey          string
+	ServerPodNamesWatch   *ServerInstanceInfo
+	EndpointWatch         libs.Watcher
 	clickhouseEndpointKey string
-	myName                string
-	myEndpoint            Endpoint
+	myPodName             string
+	myClickhouseEndpoint  Endpoint
+	lastServerPodNames    []string
 }
 
-func NewWatcher(myName, serverPodKey, clickhouseEndpointKey string) (*Watcher, error) {
+func NewWatcher(myPodName, myPodNamespace, clickhouseEndpointKey string, controllerIPs []string, controllerPort, grpcBufferSize int) (*Watcher, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		errMsg := fmt.Errorf("get cluster config failed: %v", err)
@@ -64,34 +62,25 @@ func NewWatcher(myName, serverPodKey, clickhouseEndpointKey string) (*Watcher, e
 		return nil, errMsg
 	}
 
-	namespace := corev1.NamespaceAll
-	content, err := os.ReadFile(NAMESPACE_FILE)
-	if err != nil {
-		log.Warning("read my namespace from '%s' failed, err: %s", NAMESPACE_FILE, err)
-	} else {
-		namespace = string(content)
-	}
-
-	podWatcher, err := libs.StartCoreV1PodWatcher(context.Background(), libs.NewKubernetesWatchClient(kubernetesClient), namespace)
-	if err != nil {
-		errMsg := fmt.Errorf("create pod watcher failed: %v", err)
-		log.Warning(errMsg)
-		return nil, errMsg
-	}
-
-	endpointsWatcher, err := libs.StartCoreV1EndpointsWatcher(context.Background(), libs.NewKubernetesWatchClient(kubernetesClient), namespace)
+	endpointsWatcher, err := libs.StartCoreV1EndpointsWatcher(context.Background(), libs.NewKubernetesWatchClient(kubernetesClient), myPodNamespace)
 	if err != nil {
 		errMsg := fmt.Errorf("create endpoints watcher failed: %v", err)
 		log.Warning(errMsg)
 		return nil, errMsg
 	}
 
-	watcher := &Watcher{podWatcher, endpointsWatcher, serverPodKey, clickhouseEndpointKey, myName, Endpoint{}}
-	watcher.myEndpoint, err = watcher.GetMyClickhouseEndpoint()
-	if err != nil {
-		return nil, err
+	controllers := make([]net.IP, len(controllerIPs))
+	for i, ipString := range controllerIPs {
+		controllers[i] = net.ParseIP(ipString)
+		if controllers[i].To4() != nil {
+			controllers[i] = controllers[i].To4()
+		}
 	}
+	serverPodNamesWatch := NewServerInstranceInfo(controllers, controllerPort, grpcBufferSize)
+
+	watcher := &Watcher{serverPodNamesWatch, endpointsWatcher, clickhouseEndpointKey, myPodName, Endpoint{}, []string{}}
 	go watcher.Run()
+
 	return watcher, nil
 }
 
@@ -102,11 +91,16 @@ func (w *Watcher) Run() {
 	for range ticker.C {
 		endpoint, err := w.GetMyClickhouseEndpoint()
 		if err != nil {
-			log.Error(err)
+			log.Warning(err)
 			continue
 		}
-		if endpoint != w.myEndpoint {
-			log.Warningf("endpoint change from %v to %v", w.myEndpoint, endpoint)
+
+		if w.myClickhouseEndpoint.Host == "" && w.myClickhouseEndpoint.Port == 0 {
+			w.myClickhouseEndpoint = endpoint
+		}
+
+		if endpoint != w.myClickhouseEndpoint {
+			log.Warningf("my clickhouse endpoint change from %v to %v", w.myClickhouseEndpoint, endpoint)
 			sleepAndExit()
 		}
 	}
@@ -127,13 +121,13 @@ func indexOf(ss []string, s string) int {
 // 3, my corresponding 'clickhouse endpoint' is on position 'index%len'  in the 'clickhouse endpoints list'
 func (w *Watcher) GetMyClickhouseEndpoint() (Endpoint, error) {
 	endpoint := Endpoint{}
-	podNames, err := w.getPodNames(w.serverPodKey)
+	podNames, err := w.getServerPodNames()
 	if err != nil {
 		return endpoint, err
 	}
-	myIndex := indexOf(podNames, w.myName)
+	myIndex := indexOf(podNames, w.myPodName)
 	if myIndex < 0 {
-		return endpoint, fmt.Errorf("can't find my pod name(%s) in pods(%v)", w.myName, podNames)
+		return endpoint, fmt.Errorf("can't find my pod name(%s) in pods(%v)", w.myPodName, podNames)
 	}
 	endpoints, err := w.getEndpoints(w.clickhouseEndpointKey)
 	if err != nil {
@@ -151,7 +145,7 @@ func (w *Watcher) GetClickhouseEndpointsWithoutMyself() ([]Endpoint, error) {
 	}
 	endpointsWithoutMyself := []Endpoint{}
 	for _, e := range endpoints {
-		if e == w.myEndpoint {
+		if e == w.myClickhouseEndpoint {
 			continue
 		}
 		endpointsWithoutMyself = append(endpointsWithoutMyself, e)
@@ -159,36 +153,35 @@ func (w *Watcher) GetClickhouseEndpointsWithoutMyself() ([]Endpoint, error) {
 	return endpointsWithoutMyself, nil
 }
 
-func (w *Watcher) getPodNames(key string) ([]string, error) {
-	for i := 0; i < TIMEOUT; i++ {
-		entries := w.Pod.Entries()
-		pods := []string{}
-		for _, v := range entries {
-			if p, ok := v.(*corev1.Pod); ok {
-				pod := p.GetName()
-				if strings.Contains(pod, key) {
-					pods = append(pods, pod)
-				}
-			}
-		}
-
-		if len(pods) == 0 {
-			time.Sleep(time.Second)
-			continue
-		}
-
-		sort.Slice(pods, func(i, j int) bool {
-			return pods[i] < pods[j]
-		})
-		log.Debugf("get pods %v", pods)
-		return pods, nil
+func stringsEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
 	}
-	return nil, fmt.Errorf("get pod(%s) empty, timeout is %ds", key, TIMEOUT)
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (w *Watcher) getServerPodNames() ([]string, error) {
+	podNames := w.ServerPodNamesWatch.GetServerPodNames()
+	if len(podNames) == 0 {
+		return nil, fmt.Errorf("get server pod names empty")
+	}
+
+	if !stringsEqual(podNames, w.lastServerPodNames) {
+		log.Warningf("server pod names change from '%v' to '%v'", w.lastServerPodNames, podNames)
+		w.lastServerPodNames = podNames
+	}
+
+	return podNames, nil
 }
 
 func (w *Watcher) getEndpoints(key string) ([]Endpoint, error) {
 	for i := 0; i < TIMEOUT; i++ {
-		entries := w.Endpoints.Entries()
+		entries := w.EndpointWatch.Entries()
 		endpoints := []Endpoint{}
 		for _, v := range entries {
 			e, ok := v.(*corev1.Endpoints)
