@@ -169,7 +169,7 @@ var (
 		output: "SELECT SUM(byte_tx) AS `max_byte` FROM flow_log.`l4_flow_log` ORDER BY length(tap_side) desc,`length(tap_side)` asc",
 	}, {
 		input:  "select Enum(tap_side) from l7_flow_log limit 0, 50",
-		output: "SELECT dictGet(flow_tag.string_enum_map, 'name', ('tap_side',tap_side)) FROM flow_log.`l7_flow_log` LIMIT 0, 50",
+		output: "WITH dictGet(flow_tag.string_enum_map, 'name', ('tap_side',tap_side)) AS `Enum(tap_side)` SELECT `Enum(tap_side)` FROM flow_log.`l7_flow_log` GROUP BY `Enum(tap_side)` LIMIT 0, 50",
 	},
 	}
 )
