@@ -64,6 +64,8 @@ pub const SOCK_DATA_DNS: u16 = 120;
 pub const FEATURE_UPROBE_GOLANG_SYMBOL: c_int = 0;
 #[allow(dead_code)]
 pub const FEATURE_UPROBE_OPENSSL: c_int = 1;
+#[allow(dead_code)]
+pub const FEATURE_UPROBE_GOLANG: c_int = 2;
 
 //L7层协议是否需要重新核实
 #[allow(dead_code)]
@@ -305,8 +307,8 @@ pub struct SK_TRACE_STATS {
 }
 
 extern "C" {
-    pub fn set_feature_flag(flag: c_int) -> c_int;
-    pub fn clear_feature_flag(flag: c_int) -> c_int;
+    pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
+    pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
 
     // 初始化tracer用于设置eBPF环境初始化。
     // 参数：

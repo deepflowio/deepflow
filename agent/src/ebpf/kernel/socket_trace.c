@@ -59,6 +59,9 @@ MAP_PERARRAY(trace_uid_map, __u32, struct trace_uid_t, 1)
  */
 MAP_PERARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 
+// key: protocol id, value: is protocol enabled, size: PROTO_NUM
+MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
+
 // write() syscall's input argument.
 // Key is {tgid, pid}.
 BPF_HASH(active_write_args_map, __u64, struct data_args_t)
@@ -73,6 +76,12 @@ BPF_HASH(socket_info_map, __u64, struct socket_info_t)
 
 // Key is {tgid, pid}. value is trace_info_t
 BPF_HASH(trace_map, __u64, struct trace_info_t)
+
+static __inline bool is_protocol_enabled(int protocol)
+{
+	int *enabled = protocol_filter__lookup(&protocol);
+	return (enabled) ? (*enabled) : (0);
+}
 
 static __inline void delete_socket_info(__u64 conn_key,
 					struct socket_info_t *socket_info_ptr)
