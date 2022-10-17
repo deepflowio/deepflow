@@ -51,12 +51,12 @@ impl TapTyper {
             return None;
         }
 
-        let packet_guard = self.packet.lock().unwrap();
+        let mut packet_guard = self.packet.lock().unwrap();
         let vlan = vlan as usize;
 
         if packet_guard[vlan] == TapType::Any {
             warn!("vlan {}'s tap_type is unknown", vlan);
-            self.packet.lock().unwrap()[vlan] = TapType::Unknown;
+            packet_guard[vlan] = TapType::Unknown;
             return None;
         }
 
