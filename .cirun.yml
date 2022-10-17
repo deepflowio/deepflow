@@ -2,7 +2,6 @@ runners:
   - name: "aws-amd64-32c"
     cloud: "aws"
     instance_type:
-      - "c3.8xlarge"
       - "c5a.8xlarge"
       - "c5ad.8xlarge"
       - "c6a.8xlarge"
@@ -10,7 +9,6 @@ runners:
       - "c6id.8xlarge"
       - "cc2.8xlarge"
 
-      - "c3.8xlarge"
       - "c5a.8xlarge"
       - "c5ad.8xlarge"
       - "c6a.8xlarge"
@@ -18,7 +16,6 @@ runners:
       - "c6id.8xlarge"
       - "cc2.8xlarge"
 
-      - "c3.8xlarge"
       - "c5a.8xlarge"
       - "c5ad.8xlarge"
       - "c6a.8xlarge"
@@ -26,7 +23,6 @@ runners:
       - "c6id.8xlarge"
       - "cc2.8xlarge"
 
-      - "c3.8xlarge"
       - "c5a.8xlarge"
       - "c5ad.8xlarge"
       - "c6a.8xlarge"
@@ -40,9 +36,7 @@ runners:
       - "ami-0b6d47878d0d5797b"
       - "ami-0b6d47878d0d5797b"
       - "ami-0b6d47878d0d5797b"
-      - "ami-0b6d47878d0d5797b"
 
-      - "ami-05e311eefc76f7e7a"
       - "ami-05e311eefc76f7e7a"
       - "ami-05e311eefc76f7e7a"
       - "ami-05e311eefc76f7e7a"
@@ -56,9 +50,7 @@ runners:
       - "ami-05d0f31079cacc1e8"
       - "ami-05d0f31079cacc1e8"
       - "ami-05d0f31079cacc1e8"
-      - "ami-05d0f31079cacc1e8"
 
-      - "ami-0e5a8659475f55a69"
       - "ami-0e5a8659475f55a69"
       - "ami-0e5a8659475f55a69"
       - "ami-0e5a8659475f55a69"
@@ -72,9 +64,7 @@ runners:
       - "us-east-2"
       - "us-east-2"
       - "us-east-2"
-      - "us-east-2"
 
-      - "us-west-1"
       - "us-west-1"
       - "us-west-1"
       - "us-west-1"
@@ -88,9 +78,7 @@ runners:
       - "us-west-2"
       - "us-west-2"
       - "us-west-2"
-      - "us-west-2"
 
-      - "en-west-1"
       - "en-west-1"
       - "en-west-1"
       - "en-west-1"
@@ -162,7 +150,8 @@ runners:
       - "en-west-1"
       - "en-west-1"
       - "en-west-1"
-    preemptible: true
+    # arm64 architecture spot instances may not be created smoothly
+    preemptible: false
     labels:
       - "cirun-aws-arm64-32c"
   - name: "aws-amd64-16c"

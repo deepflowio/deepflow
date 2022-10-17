@@ -27,13 +27,23 @@ env:
 jobs:
   build_agent:
     name: build agent
-    runs-on: [self-hosted, 16c16g]
+    runs-on: [cirun-aws-amd64-32c]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: install docker
+        run: |
+          sudo systemctl stop unattended-upgrades
+          curl -fsSL https://get.docker.com | bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          install: true
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
@@ -45,53 +55,236 @@ jobs:
       - name: Build  deepflow agent
         uses: docker/build-push-action@v2
         with:
-          builder: default
           context: .
           push: false 
           file: agent/docker/dockerfile-build
           platforms: linux/amd64
           outputs: type=local,dest=./agent/output/
 
-  #     - name: Package code build results
-  #       run: |
-  #         tar cvf agent-artifact.tar agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+      - name: Package code build results
+        run: |
+          tar cvf agent-artifact-amd64.tar agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
 
-  #     - name: Archive code build results
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: build results
-  #         path: |
-  #           agent-artifact.tar
+      - name: Archive code build results
+        uses: actions/upload-artifact@v3
+        with:
+          name: agent build results amd64
+          path: |
+            agent-artifact-amd64.tar
 
-  # build_agent_image:
-  #   name: build agent image
-  #   needs: [build_agent]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v3
-  #       with:
-  #         submodules: recursive
-  #         fetch-depth: 0
+      - name: set env
+        run: |
+          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
 
-  #     - name: Download code build results
-  #       uses: actions/download-artifact@v3
-  #       with:
-  #         name: build results
-  #         path: .
+      - name: build rpm
+        run: |
+          sudo apt update
+          sudo apt -y install rpm zip
+          cd agent
+          rpmbuild -bb pkg/centos/deepflow-agent.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+          zip -r -q artifacts-rpm.zip x86_64/*.rpm
+      - name: build deb
+        run: |
+          cd agent
+          mkdir -p pkg/debian/systemd/usr/sbin/
+          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/systemd/usr/sbin/
+          mkdir -p pkg/debian/systemd/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
+          mkdir -p pkg/debian/systemd/etc/systemd/system/
+          cp -af pkg/deepflow-agent.service pkg/debian/systemd/etc/systemd/system/
+          sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
+          dpkg-deb --no-uniform-compression -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
+          mkdir -p pkg/debian/upstart/usr/sbin/
+          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/upstart/usr/sbin/
+          mkdir -p pkg/debian/upstart/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
+          mkdir -p pkg/debian/upstart/etc/init/
+          cp -af pkg/deepflow-agent.conf pkg/debian/upstart/etc/init/
+          sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/upstart/DEBIAN/control
+          dpkg-deb --no-uniform-compression -b pkg/debian/upstart x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
+          zip -r -q artifacts-deb.zip x86_64/*.deb
+      - name: build binary package  
+        run: |
+          mkdir -p agent/bin-package
+          cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
+          cd agent/bin-package/
+          tar -czvf deepflow-agent.tar.gz *
+      - uses: manyuanrong/setup-ossutil@v2.0
+        with:
+          endpoint: "oss-accelerate.aliyuncs.com"
+          access-key-id: "${{ secrets.ALIYUN_OSS_ACCESS_KEY }}"
+          access-key-secret: "${{ secrets.ALIYUN_OSS_SECRETS_KEY }}"
 
-  #     - name: Unpack code build results
-  #       run: |
-  #         tar xvf agent-artifact.tar
+      - name: upload agent artifacts
+        run: |
+          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-deb.zip
+          ossutil cp -rf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
+          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent.tar.gz
+      - name: upload agent stable artifacts
+        if: "startsWith(github.ref, 'refs/tags/')"
+        run: |
+          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/amd64/deepflow-agent-rpm.zip
+          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/amd64/deepflow-agent-deb.zip
+          ossutil cp -rf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/amd64/deepflow-agent-ctl
+          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/amd64/deepflow-agent.tar.gz
+
+  build_agent_arm64:
+    name: build agent arm64
+    runs-on: [cirun-aws-arm64-32c]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: install docker
+        run: |
+          sudo systemctl stop unattended-upgrades
+          curl -fsSL https://get.docker.com | bash
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
           install: true
-          driver-opts: |
-            env.http_proxy=${{ secrets.HTTP_PROXY }}
-            env.https_proxy=${{ secrets.HTTP_PROXY }}
-            "env.no_proxy='localhost,127.0.0.1,localaddress,.localdomain.com,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,100.64.0.0/10,17.0.0.0/8,.local,169.254.0.0/16,224.0.0.0/4,240.0.0.0/4,.docker.io,docker.io,.github.com,.ghcr.io,ghcr.io,.amazonaws.com,registry-1.docker.io'"
+
+      - name: Log in to GitHub Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: "ghcr.io" 
+          username: "${{ github.repository_owner }}"
+          password: "${{ secrets.GITHUB_TOKEN }}" 
+
+      - name: Build  deepflow agent
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: false 
+          file: agent/docker/dockerfile-build-aarch64
+          platforms: linux/arm64
+          outputs: type=local,dest=./agent/output/
+
+      - name: Package code build results
+        run: |
+          tar cvf agent-artifact-arm64.tar agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent-ctl agent/output/src/ebpf/deepflow-ebpfctl
+
+      - name: Archive code build results
+        uses: actions/upload-artifact@v3
+        with:
+          name: agent build results arm64
+          path: |
+            agent-artifact-arm64.tar
+
+      - name: set env
+        run: |
+          echo "IMAGE_TAG_PREFIX=${{ github.ref_name }}"|sed 's|main|latest|' >> $GITHUB_ENV
+          echo "IMAGE_TAG=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+
+      - name: build rpm
+        run: |
+          sudo apt update
+          sudo apt -y install rpm zip
+          cd agent
+          rpmbuild -bb pkg/centos/deepflow-agent-arm64.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
+          zip -r -q artifacts-rpm.zip aarch64/*.rpm
+
+      - name: build deb
+        run: |
+          cd agent
+          mkdir -p pkg/debian/systemd/usr/sbin/
+          cp -af output/target/aarch64-unknown-linux-musl/release/deepflow-agent pkg/debian/systemd/usr/sbin/
+          mkdir -p pkg/debian/systemd/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
+          mkdir -p pkg/debian/systemd/etc/systemd/system/
+          cp -af pkg/deepflow-agent.service pkg/debian/systemd/etc/systemd/system/
+          sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
+          dpkg-deb --no-uniform-compression -b pkg/debian/systemd aarch64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
+          mkdir -p pkg/debian/upstart/usr/sbin/
+          cp -af output/target/aarch64-unknown-linux-musl/release/deepflow-agent pkg/debian/upstart/usr/sbin/
+          mkdir -p pkg/debian/upstart/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
+          cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
+          mkdir -p pkg/debian/upstart/etc/init/
+          cp -af pkg/deepflow-agent.conf pkg/debian/upstart/etc/init/
+          sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/upstart/DEBIAN/control
+          dpkg-deb --no-uniform-compression -b pkg/debian/upstart aarch64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
+          zip -r -q artifacts-deb.zip aarch64/*.deb
+
+      - name: build binary package  
+        run: |
+          mkdir -p agent/bin-package
+          cp -raf agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
+          cd agent/bin-package/
+          tar -czvf deepflow-agent.tar.gz *
+
+      - name: install mc
+        run: |
+          sudo curl https://dl.min.io/client/mc/release/linux-arm64/mc -o /usr/bin/mc 
+          sudo chmod a+x /usr/bin/mc
+          mc alias set aliyun https://oss-cn-beijing.aliyuncs.com ${{ secrets.ALIYUN_OSS_ACCESS_KEY }} ${{ secrets.ALIYUN_OSS_SECRETS_KEY }}
+
+
+      - name: upload agent artifacts
+        run: |
+          mc cp agent/artifacts-rpm.zip aliyun/deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-rpm.zip
+          mc cp agent/artifacts-deb.zip aliyun/deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-deb.zip
+          mc cp agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent-ctl aliyun/deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent-ctl
+          mc cp agent/bin-package/deepflow-agent.tar.gz  aliyun/deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/arm64/deepflow-agent.tar.gz
+
+      - name: upload agent stable artifacts
+        if: "startsWith(github.ref, 'refs/tags/')"
+        run: |
+          mc cp agent/artifacts-rpm.zip aliyun/deepflow-ce/rpm/agent/stable/linux/arm64/deepflow-agent-rpm.zip
+          mc cp agent/artifacts-deb.zip aliyun/deepflow-ce/deb/agent/stable/linux/arm64/deepflow-agent-deb.zip
+          mc cp agent/output/target/aarch64-unknown-linux-musl/release/deepflow-agent-ctl aliyun/deepflow-ce/bin/ctl/stable/linux/arm64/deepflow-agent-ctl
+          mc cp agent/bin-package/deepflow-agent.tar.gz  aliyun/deepflow-ce/bin/agent/stable/linux/arm64/deepflow-agent.tar.gz
+
+  build_agent_image:
+    name: build agent image
+    needs: 
+    - build_agent
+    - build_agent_arm64
+    runs-on: cirun-aws-amd64-16c
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: install docker
+        run: |
+          sudo systemctl stop unattended-upgrades
+          curl -fsSL https://get.docker.com | bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          install: true
+
+      - name: Download code build results
+        uses: actions/download-artifact@v3
+        with:
+          name: agent build results arm64
+          path: .
+
+      - name: Download code build results
+        uses: actions/download-artifact@v3
+        with:
+          name: agent build results amd64
+          path: .
+
+      - name: Unpack code build results
+        run: |
+          mkdir -p x86_64
+          mkdir -p aarch64
+          tar xvf agent-artifact-amd64.tar -C x86_64
+          tar xvf agent-artifact-arm64.tar -C aarch64
 
       - name: Log in to GitHub Docker Registry
         uses: docker/login-action@v2
@@ -121,70 +314,13 @@ jobs:
       - name: Build and push deepflow agent images
         uses: docker/build-push-action@v2
         with:
-          context: agent
+          context: .
           push: true 
           file: agent/docker/dockerfile 
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: |
             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "ghcr.io/${{ github.repository_owner }}/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}-${{ env.IMAGE_TAG }}"
             "registry.cn-beijing.aliyuncs.com/deepflow-ce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
             "deepflowce/${{ env.IMAGE }}:${{ env.IMAGE_TAG_PREFIX }}"
-
-      - name: build rpm
-        run: |
-          cd agent
-          rpmbuild -bb pkg/centos/deepflow-agent.spec -D '_rpmdir .' --buildroot $(pwd)/.rpmbuild
-          zip -r -q artifacts-rpm.zip x86_64/*.rpm
-
-      - name: build deb
-        run: |
-          cd agent
-          mkdir -p pkg/debian/systemd/usr/sbin/
-          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/systemd/usr/sbin/
-          mkdir -p pkg/debian/systemd/etc/
-          cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/
-          cp -af config/deepflow-agent.yaml pkg/debian/systemd/etc/deepflow-agent.yaml.sample
-          mkdir -p pkg/debian/systemd/etc/systemd/system/
-          cp -af pkg/deepflow-agent.service pkg/debian/systemd/etc/systemd/system/
-          sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/systemd/DEBIAN/control
-          dpkg-deb --no-uniform-compression -b pkg/debian/systemd x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.systemd.deb
-          mkdir -p pkg/debian/upstart/usr/sbin/
-          cp -af output/target/x86_64-unknown-linux-musl/release/deepflow-agent pkg/debian/upstart/usr/sbin/
-          mkdir -p pkg/debian/upstart/etc/
-          cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/
-          cp -af config/deepflow-agent.yaml pkg/debian/upstart/etc/deepflow-agent.yaml.sample
-          mkdir -p pkg/debian/upstart/etc/init/
-          cp -af pkg/deepflow-agent.conf pkg/debian/upstart/etc/init/
-          sed -i "s/Version.*/Version: 1.0-${{ env.IMAGE_TAG }}/g" pkg/debian/upstart/DEBIAN/control
-          dpkg-deb --no-uniform-compression -b pkg/debian/upstart x86_64/deepflow-agent-1.0-${{ env.IMAGE_TAG }}.upstart.deb
-          zip -r -q artifacts-deb.zip x86_64/*.deb
-
-      - name: build binary package  
-        run: |
-          mkdir -p agent/bin-package
-          cp -raf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent agent/bin-package/
-          cd agent/bin-package/
-          tar -czvf deepflow-agent.tar.gz *
-
-      - uses: manyuanrong/setup-ossutil@v2.0
-        with:
-          endpoint: "oss-accelerate.aliyuncs.com"
-          access-key-id: "${{ secrets.ALIYUN_OSS_ACCESS_KEY }}"
-          access-key-secret: "${{ secrets.ALIYUN_OSS_SECRETS_KEY }}"
-
-      - name: upload agent artifacts
-        run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent-ctl
-          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/${{ env.IMAGE_TAG_PREFIX }}/linux/amd64/deepflow-agent.tar.gz
-
-      - name: upload agent stable artifacts
-        if: "startsWith(github.ref, 'refs/tags/')"
-        run: |
-          ossutil cp -rf agent/artifacts-rpm.zip oss://deepflow-ce/rpm/agent/stable/linux/amd64/deepflow-agent-rpm.zip
-          ossutil cp -rf agent/artifacts-deb.zip oss://deepflow-ce/deb/agent/stable/linux/amd64/deepflow-agent-deb.zip
-          ossutil cp -rf agent/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl oss://deepflow-ce/bin/ctl/stable/linux/amd64/deepflow-agent-ctl
-          ossutil cp -rf agent/bin-package/deepflow-agent.tar.gz  oss://deepflow-ce/bin/agent/stable/linux/amd64/deepflow-agent.tar.gz

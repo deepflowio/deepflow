@@ -1,5 +1,5 @@
 # TODO : aarch64 env rust-build update
-FROM ghcr.io/deepflowys/rust-build:1.14 as builder
+FROM ghcr.io/deepflowys/rust-build:1.14-arm64 as builder
 COPY .  /deepflow/
 WORKDIR /deepflow/agent
 RUN source /opt/rh/devtoolset-8/enable && RUSTFLAGS="-D warnings" && cargo build --release --target=aarch64-unknown-linux-musl && \
