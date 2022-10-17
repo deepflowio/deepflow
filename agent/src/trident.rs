@@ -485,7 +485,19 @@ fn dispatcher_listener_callback(
                 );
                 listener.on_vm_change(&vm_mac_addrs);
             }
-            components.tap_typer.on_tap_types_change(tap_types); // FIXME: it is necessary to judge whether the tap_types are updated
+            let mut updated = true;
+            if components.cur_tap_types.len() != tap_types.len() {
+                updated = false;
+            } else {
+                for i in 0..tap_types.len() {
+                    if components.cur_tap_types[i] != tap_types[i] {
+                        updated = false;
+                    }
+                }
+            }
+            if updated {
+                components.tap_typer.on_tap_types_change(tap_types);
+            }
         }
         _ => {}
     }
@@ -618,6 +630,7 @@ pub struct Components {
     pub l7_log_rate: Arc<LeakyBucket>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
     pub tap_typer: Arc<TapTyper>,
+    pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
     pub dispatcher_listeners: Vec<DispatcherListener>,
     pub log_parsers: Vec<AppProtoLogsParser>,
@@ -1315,6 +1328,7 @@ impl Components {
             l7_log_rate,
             libvirt_xml_extractor,
             tap_typer,
+            cur_tap_types: vec![],
             dispatchers,
             dispatcher_listeners,
             collectors,

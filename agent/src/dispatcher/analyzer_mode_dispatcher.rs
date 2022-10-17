@@ -290,7 +290,7 @@ impl AnalyzerModeDispatcher {
             {
                 // FIXME: just in case
                 base.counter.retired.fetch_add(1, Ordering::Relaxed);
-                return;
+                continue;
             } else if timestamp.lt(&pipeline.timestamp) {
                 timestamp = pipeline.timestamp;
             }
@@ -309,7 +309,7 @@ impl AnalyzerModeDispatcher {
             ) {
                 base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
                 warn!("meta_packet update failed: {:?}", e);
-                return;
+                continue;
             }
 
             if base.tunnel_info.tunnel_type != TunnelType::None {
