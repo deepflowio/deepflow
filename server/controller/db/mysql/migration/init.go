@@ -51,7 +51,7 @@ const (
 		
 			END IF;
 		END`
-	CREATE_TRIGGER_RESOURCE_GROUP = `CREATE DEFINER='%s'@'localhost' TRIGGER resource_group_id AFTER INSERT
+	CREATE_TRIGGER_RESOURCE_GROUP = `CREATE DEFINER='root'@'localhost' TRIGGER resource_group_id AFTER INSERT
 		ON resource_group FOR EACH ROW
 		BEGIN
 			IF (new.id > 64000) THEN
@@ -60,7 +60,7 @@ const (
 		END
 		`
 	CREATE_TRIGGER_NPB_TUNNEL = `
-		CREATE DEFINER='%s'@'localhost' TRIGGER npb_tunnel_id AFTER INSERT
+		CREATE DEFINER='root'@'localhost' TRIGGER npb_tunnel_id AFTER INSERT
 		ON npb_tunnel FOR EACH ROW
 		BEGIN
 			IF (new.id > 64000) THEN
