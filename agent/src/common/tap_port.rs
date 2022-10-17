@@ -42,6 +42,8 @@ impl TapPort {
 
     const TUNNEL_TYPE_OFFSET: u64 = 32;
     const FROM_OFFSET: u64 = 60;
+    const RESERVED_OFFSET: u8 = 40;
+    const RESERVED_MASK: u32 = 0xfffff;
 
     pub fn is_from(&self, w: u8) -> bool {
         (self.0 >> Self::FROM_OFFSET) as u8 == w
@@ -105,9 +107,10 @@ impl TapPort {
         )
     }
 
-    pub fn set_u16_into_reserved_bytes(&self, tap_type: u16) -> TapPort {
-        const RESERVED_OFFSET: u8 = 40;
-        TapPort(self.0 | (tap_type as u64) << RESERVED_OFFSET)
+    // 用于编码后做为Map Key
+    // Used as Map Key after encoding
+    pub fn set_reserved_bytes(&self, tap_type: u32) -> TapPort {
+        TapPort(self.0 | ((tap_type & Self::RESERVED_MASK) as u64) << Self::RESERVED_OFFSET)
     }
 }
 

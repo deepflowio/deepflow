@@ -165,100 +165,124 @@ impl StashKey {
 
     fn new(tagger: &Tagger, src_ip: IpAddr, dst_ip: Option<IpAddr>) -> Self {
         let mut fast_id = 0;
-        let code_id = match tagger.code {
+        match tagger.code {
+            // single point
+            // fast_id
+            // 128          72        64    59       56        48           32          24         16        0
+            // +-------------+---------+-----+--------+---------+------------+-----------+----------+---------+
+            // |             | L7Proto | MAC | CodeID | TapType | ServerPort | Direction | Protocol | L3EpcId |
+            // +-------------+---------+-----+--------+---------+------------+-----------+----------+---------+
             Self::SINGLE_MAC_IP_PORT_APP => {
                 fast_id |= (tagger.l7_protocol as u128) << 64;
-                fast_id |= 1 << 124;
-                fast_id |= ((tagger.l3_epc_id) as u16 as u128)
+                fast_id |= 1 << 59;
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
                     | (tagger.protocol as u128) << 16
-                    | (tagger.server_port as u128) << 24
-                    | (tagger.direction as u128 & 0x1) << 40
-                    | (u16::from(tagger.tap_type) as u128) << 41;
-                1
+                    | (tagger.direction as u128) << 24
+                    | (tagger.server_port as u128) << 32
+                    | (u16::from(tagger.tap_type) as u128) << 48
+                    | 3 << 56;
+            }
+            Self::SINGLE_MAC_IP_PORT => {
+                fast_id |= 1 << 59;
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
+                    | (tagger.protocol as u128) << 16
+                    | (tagger.direction as u128) << 24
+                    | (tagger.server_port as u128) << 32
+                    | (u16::from(tagger.tap_type) as u128) << 48
+                    | 2 << 56;
             }
             Self::SINGLE_IP_PORT => {
-                fast_id |= 1 << 124;
-                fast_id |= ((tagger.l3_epc_id) as u16 as u128)
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
                     | (tagger.protocol as u128) << 16
-                    | (tagger.server_port as u128) << 24
-                    | (tagger.direction as u128 & 0x1) << 40
-                    | (u16::from(tagger.tap_type) as u128) << 41;
-                1
+                    | (tagger.direction as u128) << 24
+                    | (tagger.server_port as u128) << 32
+                    | (u16::from(tagger.tap_type) as u128) << 48
+                    | 1 << 56;
             }
             Self::SINGLE_IP_PORT_APP => {
-                fast_id |= ((tagger.l3_epc_id) as u16 as u128)
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
                     | (tagger.protocol as u128) << 16
-                    | (tagger.server_port as u128) << 24
-                    | (u16::from(tagger.tap_type) as u128) << 32;
+                    | (tagger.direction as u128) << 24
+                    | (tagger.server_port as u128) << 32
+                    | (u16::from(tagger.tap_type) as u128) << 48
+                    | 4 << 56;
 
-                fast_id |= (tagger.l7_protocol as u128) << 64 | (tagger.server_port as u128) << 88;
-                0
+                fast_id |= (tagger.l7_protocol as u128) << 64;
             }
+            // edge data
+            // fast_id
+            //
+            // 128    124        104        96          64          56           40         32         16        0
+            // +------+----------+----------+-----------+-----------+------------+----------+----------+---------+
+            // | from | RESERVED | TUN_TYPE | ip/id/mac | Direction | ServerPort | Protocol | L3EpcID1 | L3EpcId |
+            // +------+----------+----------+-----------+-----------+------------+----------+----------+---------+
+            //          /
+            //         /
+            //        /
+            // RESERVED
+            // 20    19       16        8         0
+            // ------------------------------------
+            // | MAC | CodeID | L7Proto | TapType |
+            // ------------------------------------
             Self::EDGE_MAC_IP_PORT_APP => {
-                fast_id |= (tagger.l7_protocol as u128) << 112;
-                fast_id |= 1 << 124;
-                fast_id |= ((tagger.l3_epc_id) as u16 as u128)
-                    | ((tagger.l3_epc_id1) as u16 as u128) << 16
+                let tap_port_reserve = (tagger.l7_protocol as u32) << 8 | 3 << 16 | 1 << 19;
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
+                    | (tagger.l3_epc_id1 as u16 as u128) << 16
                     | (tagger.protocol as u128) << 32
                     | (tagger.server_port as u128) << 40
-                    | (tagger.direction as u128 & 0x1) << 56;
+                    | (tagger.direction as u128) << 56;
                 fast_id |= (tagger
                     .tap_port
-                    .set_u16_into_reserved_bytes(u16::from(tagger.tap_type))
+                    .set_reserved_bytes((u16::from(tagger.tap_type) as u32) | tap_port_reserve)
                     .0 as u128)
                     << 64;
-                1
             }
             Self::EDGE_MAC_IP_PORT => {
-                fast_id |= 1 << 124;
-                fast_id |= ((tagger.l3_epc_id) as u16 as u128)
-                    | ((tagger.l3_epc_id1) as u16 as u128) << 16
+                let tap_port_reserve = 2 << 16 | 1 << 19;
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
+                    | (tagger.l3_epc_id1 as u16 as u128) << 16
                     | (tagger.protocol as u128) << 32
                     | (tagger.server_port as u128) << 40
-                    | (tagger.direction as u128 & 0x1) << 56;
+                    | (tagger.direction as u128) << 56;
                 fast_id |= (tagger
                     .tap_port
-                    .set_u16_into_reserved_bytes(u16::from(tagger.tap_type))
+                    .set_reserved_bytes((u16::from(tagger.tap_type) as u32) | tap_port_reserve)
                     .0 as u128)
                     << 64;
-                1
             }
             Self::EDGE_IP_PORT => {
-                fast_id |= ((tagger.l3_epc_id) as u16 as u128)
-                    | ((tagger.l3_epc_id1) as u16 as u128) << 16
+                let tap_port_reserve = 1 << 16;
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
+                    | (tagger.l3_epc_id1 as u16 as u128) << 16
                     | (tagger.protocol as u128) << 32
                     | (tagger.server_port as u128) << 40
-                    | (tagger.direction as u128 & 0x1) << 56;
+                    | (tagger.direction as u128) << 56;
                 fast_id |= (tagger
                     .tap_port
-                    .set_u16_into_reserved_bytes(u16::from(tagger.tap_type))
+                    .set_reserved_bytes((u16::from(tagger.tap_type) as u32) | tap_port_reserve)
                     .0 as u128)
                     << 64;
-                1
             }
             Self::EDGE_IP_PORT_APP => {
-                fast_id |= ((tagger.l3_epc_id) as u16 as u128)
-                    | ((tagger.l3_epc_id1) as u16 as u128) << 16
+                let tap_port_reserve = 4 << 16;
+                fast_id |= (tagger.l3_epc_id as u16 as u128)
+                    | (tagger.l3_epc_id1 as u16 as u128) << 16
                     | (tagger.protocol as u128) << 32
                     | (tagger.server_port as u128) << 40
-                    | (tagger.direction as u128 & 0x1) << 56;
+                    | (tagger.direction as u128) << 56;
                 fast_id |= (tagger
                     .tap_port
-                    .set_u16_into_reserved_bytes(u16::from(tagger.tap_type))
+                    .set_reserved_bytes((u16::from(tagger.tap_type) as u32) | tap_port_reserve)
                     .0 as u128)
                     << 64;
-                2
             }
             Self::ACL => {
                 fast_id |= tagger.acl_gid as u128
                     | (tagger.tag_type as u128) << 16
                     | (tagger.tag_value as u128) << 24;
-                0
             }
             _ => panic!("没有符合，需要更新tagger.code: {:?}", tagger.code),
         };
-
-        fast_id |= (code_id & 0x7) << 125;
 
         Self {
             fast_id,
@@ -286,12 +310,14 @@ impl Stash {
             _ => (60, DocumentFlag::NONE),
         };
 
+        let start_time = Duration::from_secs(
+            get_timestamp(ctx.ntp_diff.load(Ordering::Relaxed)).as_secs() / MINUTE * MINUTE
+                - 2 * MINUTE,
+        );
         Self {
             sender,
             counter,
-            start_time: Duration::from_secs(
-                get_timestamp(ctx.ntp_diff.load(Ordering::Relaxed)).as_secs() / MINUTE * MINUTE,
-            ),
+            start_time,
             global_thread_id: ctx.id as u8 + 1,
             slot_interval,
             inner: HashMap::new(),
@@ -397,8 +423,8 @@ impl Stash {
         }
         let flow = &acc_flow.tagged_flow.flow;
 
-        let inactive_ip_enabeld = self.context.config.load().inactive_ip_enabled;
-        if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 && !inactive_ip_enabeld {
+        let inactive_ip_enabled = self.context.config.load().inactive_ip_enabled;
+        if !acc_flow.is_active_host0 && !acc_flow.is_active_host1 && !inactive_ip_enabled {
             self.counter.drop_inactive.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -411,12 +437,12 @@ impl Stash {
         );
         let directions = [src, dst];
 
-        self.fill_stats(&acc_flow, directions, false, inactive_ip_enabeld);
+        self.fill_stats(&acc_flow, directions, false, inactive_ip_enabled);
         self.fill_tracing_stats(
             &acc_flow,
             directions,
             is_extra_tracing_doc,
-            inactive_ip_enabeld,
+            inactive_ip_enabled,
         );
     }
 
@@ -425,7 +451,7 @@ impl Stash {
         acc_flow: &AccumulatedFlow,
         directions: [Direction; 2],
         is_extra_tracing_doc: bool,
-        inactive_ip_enabeld: bool,
+        inactive_ip_enabled: bool,
     ) {
         for ep in 0..2 {
             // 不统计未知direction的数据
@@ -438,7 +464,7 @@ impl Stash {
                 acc_flow.is_active_host1
             };
             // 单端统计量：不统计非活跃的一端（Internet/不回包的内网IP）；不统计链路追踪额外增加的doc
-            if (inactive_ip_enabeld || is_active_host) && !is_extra_tracing_doc {
+            if (inactive_ip_enabled || is_active_host) && !is_extra_tracing_doc {
                 if ep == FLOW_METRICS_PEER_DST {
                     let reversed_meter = acc_flow.flow_meter.to_reversed();
                     self.fill_single_stats(
@@ -446,7 +472,7 @@ impl Stash {
                         reversed_meter,
                         ep,
                         directions[ep],
-                        inactive_ip_enabeld,
+                        inactive_ip_enabled,
                     );
                 } else {
                     self.fill_single_stats(
@@ -454,7 +480,7 @@ impl Stash {
                         acc_flow.flow_meter.clone(),
                         ep,
                         directions[ep],
-                        inactive_ip_enabeld,
+                        inactive_ip_enabled,
                     );
                 }
             }
@@ -463,7 +489,7 @@ impl Stash {
                 acc_flow,
                 directions[ep],
                 is_extra_tracing_doc,
-                inactive_ip_enabeld,
+                inactive_ip_enabled,
             );
         }
         let flow = &acc_flow.tagged_flow.flow;
@@ -476,7 +502,7 @@ impl Stash {
                 acc_flow,
                 Direction::None,
                 is_extra_tracing_doc,
-                inactive_ip_enabeld,
+                inactive_ip_enabled,
             );
         }
     }
@@ -500,7 +526,7 @@ impl Stash {
         flow_meter: FlowMeter,
         ep: usize,
         direction: Direction,
-        inactive_ip_enabeld: bool,
+        inactive_ip_enabled: bool,
     ) {
         let flow = &acc_flow.tagged_flow.flow;
         let flow_key = &flow.flow_key;
@@ -513,7 +539,7 @@ impl Stash {
         let has_mac = side.is_vip_interface || direction == Direction::LocalToLocal;
         let is_ipv6 = flow.eth_type == EthernetType::Ipv6;
 
-        let ip = if !is_active_host && !inactive_ip_enabeld {
+        let ip = if !is_active_host && !inactive_ip_enabled {
             if is_ipv6 {
                 Ipv6Addr::UNSPECIFIED.into()
             } else {
@@ -605,7 +631,7 @@ impl Stash {
         acc_flow: &AccumulatedFlow,
         direction: Direction,
         is_extra_tracing_doc: bool,
-        inactive_ip_enabeld: bool,
+        inactive_ip_enabled: bool,
     ) {
         let flow = &acc_flow.tagged_flow.flow;
         let flow_key = &flow.flow_key;
@@ -625,7 +651,7 @@ impl Stash {
                 }
             }
 
-            if !inactive_ip_enabeld {
+            if !inactive_ip_enabled {
                 if !acc_flow.is_active_host0 {
                     src_ip = if is_ipv6 {
                         Ipv6Addr::UNSPECIFIED.into()
@@ -743,7 +769,7 @@ impl Stash {
         acc_flow: &AccumulatedFlow,
         directions: [Direction; 2],
         is_extra_tracing_doc: bool,
-        inactive_ip_enabeld: bool,
+        inactive_ip_enabled: bool,
     ) {
         // 目前有两种场景需要增加追踪数据：
         // VIP场景：
@@ -754,7 +780,7 @@ impl Stash {
         {
             return;
         }
-        self.fill_stats(acc_flow, directions, true, inactive_ip_enabeld)
+        self.fill_stats(acc_flow, directions, true, inactive_ip_enabled)
     }
 
     fn add(&mut self, key: StashKey, tagger: Tagger, meter: Meter) {
