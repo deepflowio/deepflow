@@ -1012,7 +1012,7 @@ impl ConfigHandler {
     ) -> Vec<fn(&ConfigHandler, &mut Components)> {
         let candidate_config = &mut self.candidate_config;
         let static_config = &self.static_config;
-        let yaml_config = &candidate_config.yaml_config;
+        let yaml_config = &mut candidate_config.yaml_config;
         let mut new_config: ModuleConfig = (static_config.clone(), new_config).try_into().unwrap();
         let mut callbacks: Vec<fn(&ConfigHandler, &mut Components)> = vec![];
         let mut restart_dispatcher = false;
@@ -1020,6 +1020,16 @@ impl ConfigHandler {
         // Check and send out exceptions in time
         if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler) {
             warn!("{}", e);
+        }
+
+        if !yaml_config
+            .src_interfaces
+            .eq(&new_config.yaml_config.src_interfaces)
+        {
+            yaml_config
+                .src_interfaces
+                .clone_from(&new_config.yaml_config.src_interfaces);
+            info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
         }
 
         if candidate_config.dispatcher != new_config.dispatcher {

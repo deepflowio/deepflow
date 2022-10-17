@@ -210,4 +210,9 @@ int max_rlim_open_files_set(int num);
 int fetch_kernel_version(int *major, int *minor, int *patch);
 unsigned int fetch_kernel_version_code(void);
 int get_num_possible_cpus(void);
+
+// Check if task is the main thread based on pid.
+// Ignore threads other than the main thread in uprobe to avoid repeating hooks
+bool is_process(int pid);
+
 #endif /* DF_COMMON_H */

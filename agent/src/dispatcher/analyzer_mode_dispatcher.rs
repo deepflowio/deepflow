@@ -157,6 +157,11 @@ impl AnalyzerModeDispatcher {
             let (mut packet, mut timestamp) = recved.unwrap();
 
             // From here on, ANALYZER mode is different from LOCAL mode
+            base.counter.rx.fetch_add(1, Ordering::Relaxed);
+            base.counter
+                .rx_bytes
+                .fetch_add(packet.capture_length as u64, Ordering::Relaxed);
+
             // parseProcesser
             let raw_length = if packet.capture_length as usize > self.pool_raw_size {
                 self.pool_raw_size

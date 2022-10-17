@@ -529,8 +529,11 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_TOP
 		return node
 	case TAG_FUNCTION_ENUM:
+		if f.Alias == "" {
+			f.Alias = fmt.Sprintf("Enum(%s)", f.Args[0])
+		}
 		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
-		f.Value = tagDes.TagTranslator
+		f.Withs = []view.Node{&view.With{Value: tagDes.TagTranslator, Alias: f.Alias}}
 		return f.getViewNode()
 	}
 	values := make([]string, len(fields))
@@ -604,5 +607,8 @@ func (f *TagFunction) Format(m *view.Model) {
 				}
 			}
 		}
+	}
+	if f.Name == "enum" {
+		m.AddGroup(&view.Group{Value: f.Alias})
 	}
 }
