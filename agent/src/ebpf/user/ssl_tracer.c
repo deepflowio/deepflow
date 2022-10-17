@@ -310,11 +310,11 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	struct dirent *entry = NULL;
 	DIR *fddir = NULL;
 	int pid = 0;
-
-	if (!feature_flags[FEATURE_UPROBE_OPENSSL])
+	char *path = NULL;
+	if (!can_hook_openssl())
 		return ETR_OK;
 
-	if (!can_hook_openssl())
+	if (!is_feature_enabled(FEATURE_UPROBE_OPENSSL))
 		return ETR_OK;
 
 	init_list_head(&proc_events_list);
@@ -331,7 +331,11 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 			continue;
 
 		pid = atoi(entry->d_name);
-		openssl_parse_and_register(pid, conf);
+		path = get_elf_path_by_pid(pid);
+		if (is_feature_matched(FEATURE_UPROBE_OPENSSL, path)) {
+			openssl_parse_and_register(pid, conf);
+		}
+		free(path);
 	}
 
 	closedir(fddir);
@@ -341,7 +345,14 @@ int collect_ssl_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 void ssl_process_exec(int pid)
 {
 	struct bpf_tracer *tracer = NULL;
-	if (!feature_flags[FEATURE_UPROBE_OPENSSL])
+	char *path = NULL;
+	int matched = false;
+	
+	path = get_elf_path_by_pid(pid);
+	matched = is_feature_matched(FEATURE_UPROBE_OPENSSL, path);
+	free(path);
+
+	if (!matched)
 		return;
 
 	if (!can_hook_openssl())
@@ -367,7 +378,7 @@ void ssl_process_exit(int pid)
 {
 	struct bpf_tracer *tracer = NULL;
 
-	if (!feature_flags[FEATURE_UPROBE_OPENSSL])
+	if (!is_feature_enabled(FEATURE_UPROBE_OPENSSL))
 		return;
 
 	if (!can_hook_openssl())

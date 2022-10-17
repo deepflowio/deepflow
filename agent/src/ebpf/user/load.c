@@ -673,7 +673,8 @@ int ebpf_obj_load(struct ebpf_object *obj)
 				   map->def.value_size, map->def.max_entries,
 				   0);
 		if (map->fd < 0) {
-			ebpf_warning("bcc_create_map() failed\n");
+			ebpf_warning("bcc_create_map() failed, name:%s\n",
+				     map->name);
 			goto failed;
 		}
 		ebpf_debug

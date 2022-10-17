@@ -802,6 +802,14 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 	return ETR_OK;
 }
 
+static void update_protocol_filter_array(struct bpf_tracer *tracer)
+{
+	for (int idx = 0; idx < PROTO_NUM; ++idx) {
+		bpf_table_set_value(tracer, "__protocol_filter", idx,
+				    &ebpf_config_protocol_filter[idx]);
+	}
+}
+
 /**
  * Start socket tracer
  *
@@ -926,6 +934,9 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	// Update go offsets to eBPF "proc_info_map" 
 	update_proc_info_to_map(tracer);
+
+	// Update protocol filter array
+	update_protocol_filter_array(tracer);
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;

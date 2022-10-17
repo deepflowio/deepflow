@@ -329,6 +329,10 @@ static __inline enum message_type infer_http2_message(const char *buf_src,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_HTTP2)) {
+		return MSG_UNKNOWN;
+	}
+
 	// When go uprobe http2 cannot be used, use kprobe/tracepoint to collect data
 	if (skip_http2_kprobe()) {
 		if (conn_info->direction == T_INGRESS &&
@@ -372,6 +376,10 @@ static __inline enum message_type infer_http_message(const char *buf,
 						     struct conn_info_t
 						     *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_HTTP1)) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_HTTP1)
 			return MSG_UNKNOWN;
@@ -410,6 +418,10 @@ static __inline enum message_type infer_mysql_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_MYSQL)) {
+		return MSG_UNKNOWN;
+	}
+
 	static const __u8 kComQuery = 0x03;
 	static const __u8 kComConnect = 0x0b;
 	static const __u8 kComStmtPrepare = 0x16;
@@ -528,6 +540,10 @@ static __inline enum message_type infer_postgre_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_POSTGRESQL)) {
+		return MSG_UNKNOWN;
+	}
+
 	if (conn_info->tuple.l4_protocol != IPPROTO_TCP){
 		return MSG_UNKNOWN;
 	}
@@ -611,6 +627,10 @@ static __inline enum message_type infer_dns_message(const char *buf,
 						    struct conn_info_t
 						    *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_DNS)) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DNS)
 			return MSG_UNKNOWN;
@@ -686,6 +706,10 @@ static __inline enum message_type infer_redis_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_REDIS)) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_REDIS)
 			return MSG_UNKNOWN;
@@ -774,6 +798,10 @@ static __inline enum message_type infer_mqtt_message(const char *buf,
 						     struct conn_info_t
 						     *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_MQTT)) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr))
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_MQTT)
 			return MSG_UNKNOWN;
@@ -892,6 +920,10 @@ static __inline enum message_type infer_dubbo_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_DUBBO)) {
+		return MSG_UNKNOWN;
+	}
+
 	if (is_socket_info_valid(conn_info->socket_info_ptr)) {
 		if (conn_info->socket_info_ptr->l7_proto != PROTO_DUBBO)
 			return MSG_UNKNOWN;
@@ -1052,6 +1084,10 @@ static __inline enum message_type infer_kafka_message(const char *buf,
 						      struct conn_info_t
 						      *conn_info)
 {
+	if (!is_protocol_enabled(PROTO_KAFKA)) {
+		return MSG_UNKNOWN;
+	}
+
 	bool is_first = true, use_prev_buf;
 	if (!kafka_data_check_len(count, buf, conn_info, &use_prev_buf))
 		return MSG_UNKNOWN;
