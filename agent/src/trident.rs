@@ -676,7 +676,11 @@ impl Components {
         }
 
         match self.tap_mode {
-            TapMode::Analyzer => (),
+            TapMode::Analyzer => {
+                for dispatcher in self.dispatchers.iter() {
+                    dispatcher.start();
+                }
+            }
             _ => match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {
                     for dispatcher in self.dispatchers.iter() {
@@ -1096,6 +1100,11 @@ impl Components {
             ]));
             handler_builders.push(handler_builder.clone());
 
+            let mut src_interface = String::new();
+            if yaml_config.src_interfaces.len() > i {
+                src_interface = yaml_config.src_interfaces[i].clone();
+            }
+
             let dispatcher_builder = DispatcherBuilder::new()
                 .id(i)
                 .handler_builders(handler_builder)
@@ -1138,7 +1147,8 @@ impl Components {
                 .flow_map_config(config_handler.flow())
                 .policy_getter(policy_getter)
                 .exception_handler(exception_handler.clone())
-                .ntp_diff(synchronizer.ntp_diff());
+                .ntp_diff(synchronizer.ntp_diff())
+                .src_interface(src_interface);
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder
