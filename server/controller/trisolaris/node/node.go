@@ -19,9 +19,11 @@ package node
 import (
 	"errors"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
@@ -45,6 +47,7 @@ type NodeInfo struct {
 	tsdbToPodIP             map[string]string
 	controllerToNATIP       map[string]string
 	controllerToPodIP       map[string]string
+	localServers            *atomic.Value // []*trident.DeepFlowServerInstanceInfo
 	sysConfigurationToValue map[string]string
 	pcapDataRetention       uint32
 	metaData                *metadata.MetaData
@@ -53,12 +56,12 @@ type NodeInfo struct {
 	chRegister              chan struct{} // 数据节点注册通知channel
 	config                  *config.Config
 	chNodeInfo              chan struct{} // node变化通知channel
-	groups                  []byte        // 数据节点资源组信息
-	groupHash               uint64        // 资源组数据hash值
 	db                      *gorm.DB
 }
 
 func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *NodeInfo {
+	localServers := &atomic.Value{}
+	localServers.Store([]*trident.DeepFlowServerInstanceInfo{})
 	return &NodeInfo{
 		tsdbCaches:              newTSDBCacheMap(),
 		tsdbRegion:              make(map[string]uint32),
@@ -66,6 +69,7 @@ func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		tsdbToPodIP:             make(map[string]string),
 		controllerToNATIP:       make(map[string]string),
 		controllerToPodIP:       make(map[string]string),
+		localServers:            localServers,
 		sysConfigurationToValue: make(map[string]string),
 		metaData:                metaData,
 		tsdbRegister:            newTSDBDiscovery(),
@@ -195,15 +199,40 @@ func (n *NodeInfo) generateControllerInfo() {
 	if len(dbControllers) == 0 {
 		return
 	}
+	localIPs := make(map[string]struct{})
+	localConn, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetFromControllerIP(n.config.NodeIP)
+	if err != nil {
+		log.Errorf("find local controller(%s) region failed, err:%s", n.config.NodeIP, err)
+	} else {
+		azControllerconns, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetBatchFromRegion(localConn.Region)
+		if err == nil {
+			for _, conn := range azControllerconns {
+				if conn.ControllerIP != "" {
+					localIPs[conn.ControllerIP] = struct{}{}
+				}
+			}
+		} else {
+			log.Error(err)
+		}
+	}
 
+	localServers := make([]*trident.DeepFlowServerInstanceInfo, 0, len(dbControllers))
 	controllerToNATIP := make(map[string]string)
 	controllerToPodIP := make(map[string]string)
 	for _, controller := range dbControllers {
+		if _, ok := localIPs[controller.IP]; ok {
+			server := &trident.DeepFlowServerInstanceInfo{
+				PodName:  proto.String(controller.PodName),
+				NodeName: proto.String(controller.NodeName),
+			}
+			localServers = append(localServers, server)
+		}
 		controllerToNATIP[controller.IP] = controller.NATIP
 		controllerToPodIP[controller.IP] = controller.PodIP
 	}
 	n.controllerToNATIP = controllerToNATIP
 	n.controllerToPodIP = controllerToPodIP
+	n.updateLocalServers(localServers)
 }
 
 func (n *NodeInfo) initTSDBInfo() {
@@ -303,6 +332,14 @@ func (n *NodeInfo) GetControllerNatIP(ip string) string {
 
 func (n *NodeInfo) GetControllerPodIP(ip string) string {
 	return n.controllerToPodIP[ip]
+}
+
+func (n *NodeInfo) updateLocalServers(servers []*trident.DeepFlowServerInstanceInfo) {
+	n.localServers.Store(servers)
+}
+
+func (n *NodeInfo) GetLocalControllers() []*trident.DeepFlowServerInstanceInfo {
+	return n.localServers.Load().([]*trident.DeepFlowServerInstanceInfo)
 }
 
 func (n *NodeInfo) updateTSDBInfo() {
@@ -446,6 +483,10 @@ func (n *NodeInfo) isRegisterController() {
 		}
 		if dbController.PodIP != data.PodIP {
 			dbController.PodIP = data.PodIP
+			changed = true
+		}
+		if dbController.PodName != data.PodName {
+			dbController.PodName = data.PodName
 			changed = true
 		}
 		if changed {
