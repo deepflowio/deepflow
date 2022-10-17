@@ -614,6 +614,9 @@ static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
 	if (path == NULL)
 		return syms_count;
 
+	if (!is_feature_matched(FEATURE_UPROBE_GOLANG, path))
+		goto out;
+
 	struct version_info go_version;
 	memset(&go_version, 0, sizeof(go_version));
 	if (fetch_go_elf_version(path, &go_version)) {
@@ -623,6 +626,7 @@ static int proc_parse_and_register(int pid, struct tracer_probes_conf *conf)
 		return syms_count;
 	}
 
+out:
 	free((void *)path);
 	return syms_count;
 }
@@ -660,6 +664,9 @@ int collect_go_uprobe_syms_from_procfs(struct tracer_probes_conf *conf)
 	init_list_head(&proc_events_head);
 	init_list_head(&proc_info_head);
 	pthread_mutex_init(&mutex_proc_events_lock, NULL);
+
+	if (!is_feature_enabled(FEATURE_UPROBE_GOLANG))
+		return ETR_OK;
 
 	fddir = opendir("/proc/");
 	if (fddir == NULL) {
@@ -956,8 +963,15 @@ static void process_exit_handle(int pid, struct bpf_tracer *tracer)
 static void add_event_to_proc_header(struct bpf_tracer *tracer, int pid, uint8_t type)
 {
 	char *path = get_elf_path_by_pid(pid);
-	if (path == NULL)
+	if (path == NULL) {
 		return;
+	}
+
+	if (!is_feature_matched(FEATURE_UPROBE_GOLANG, path)) {
+		free(path);
+		return;
+	}
+
 	struct process_event *pe = calloc(1, sizeof(struct process_event));
 	if (pe == NULL) {
 		free(path);
@@ -1004,7 +1018,11 @@ void go_process_exec(int pid)
  */
 void go_process_exit(int pid)
 {
-	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	struct bpf_tracer *tracer;
+	if (!is_feature_enabled(FEATURE_UPROBE_GOLANG))
+		return;
+
+	tracer = find_bpf_tracer(SK_TRACER_NAME);
 	if (tracer == NULL)
 		return;
 
