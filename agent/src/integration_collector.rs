@@ -135,40 +135,46 @@ async fn aggregate_with_catch_exception(
 
 fn decode_otel_trace_data(peer_addr: SocketAddr, data: Vec<u8>) -> Result<Vec<u8>, GenericError> {
     let mut d = TracesData::decode(data.as_slice())?;
-    // 因为collector传过来traceData的全部span都有"app.host.ip"的属性，所以只检查第一个span有没有“app.host.ip”即可，
+    // 因为collector传过来traceData的全部resource都有"app.host.ip"的属性，所以只检查第一个resource有没有“app.host.ip”即可，
     // sdk传过来的traceData因没有该属性则要补上(key: “app.host.ip”, value: 对端IP)属性值
     // =======================================================================
-    // Because all the spans of the traceData passed by the collector have the attribute "app.host.ip",
-    // only check whether the first span has "app.host.ip". The traceData passed by the sdk does not have this attribute.
+    // Because all the resources of the traceData passed by the collector have the attribute "app.host.ip",
+    // only check whether the first resource has "app.host.ip". The traceData passed by the sdk does not have this attribute.
     //  Fill in the (key: "app.host.ip", value: peer IP) attribute value
     let mut skip_verify_ip = false;
     let host_ip = KeyValue {
         key: "app.host.ip".into(),
         value: Some(AnyValue {
-            value: Some(Value::StringValue(peer_addr.ip().to_string())),
+            value: {
+                let ip_str = match peer_addr.ip() {
+                    IpAddr::V4(s) => s.to_string(),
+                    IpAddr::V6(s) => match s.to_ipv4() {
+                        Some(v4) => v4.to_string(),
+                        None => s.to_string(),
+                    },
+                };
+                Some(Value::StringValue(ip_str))
+            },
         }),
     };
     for resource_span in d.resource_spans.iter_mut() {
-        for scope_span in resource_span.scope_spans.iter_mut() {
-            for span in scope_span.spans.iter_mut() {
-                if skip_verify_ip {
-                    span.attributes.push(host_ip.clone());
-                } else if span
-                    .attributes
-                    .iter()
-                    .find(|attr| attr.key.as_str() == "app.host.ip")
-                    .is_some()
-                {
-                    debug!("send otel collector traces_data to sender: {:?}", d);
-                    return Ok(data);
-                } else {
-                    skip_verify_ip = true;
-                    span.attributes.push(host_ip.clone());
-                }
+        if let Some(resource) = resource_span.resource.as_mut() {
+            if skip_verify_ip {
+                resource.attributes.push(host_ip.clone());
+            } else if resource
+                .attributes
+                .iter()
+                .find(|attr| attr.key.as_str() == "app.host.ip")
+                .is_some()
+            {
+                debug!("send otel collector traces_data to sender: {:?}", d);
+                return Ok(data);
+            } else {
+                skip_verify_ip = true;
+                resource.attributes.push(host_ip.clone());
             }
         }
     }
-
     let sdk_data = d.encode_to_vec();
     debug!("send otel sdk traces_data to sender: {:?}", d);
     return Ok(sdk_data);
