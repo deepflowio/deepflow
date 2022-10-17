@@ -396,14 +396,3 @@ ingester:
 
   #decoder-queue-count: 2
   #decoder-queue-size: 10000
-
-  #flow-log-disabled:
-  #  l4: false
-  #  l7: false
-  #  http: false
-  #  dns: false
-  #  mysql: false
-  #  redis: false
-  #  dubbo: false
-  #  kafka: false
-  #  mqtt: false
