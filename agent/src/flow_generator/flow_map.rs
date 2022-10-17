@@ -271,6 +271,7 @@ impl FlowMap {
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                     time_set.insert(time_key);
                     nodes.push(node);
+                    self.total_flow += 1;
                     self.node_map.replace(node_map);
                     self.time_set.replace(time_set);
                     return;
