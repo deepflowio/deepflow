@@ -46,7 +46,7 @@ func MigrateMySQL(cfg MySqlConfig) bool {
 		return false
 	}
 	if !existed {
-		return RollbackIfInitTablesFailed(db, cfg)
+		return RollbackIfInitTablesFailed(db, cfg.Database)
 	} else {
 		var version string
 		err = db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
@@ -71,7 +71,7 @@ func MigrateMySQL(cfg MySqlConfig) bool {
 			if db == nil {
 				return false
 			}
-			return RollbackIfInitTablesFailed(db, cfg)
+			return RollbackIfInitTablesFailed(db, cfg.Database)
 		} else if version != migration.CREATE_TABLE_DB_VERSION {
 			err = ExecuteIssus(db, version)
 			if err != nil {
