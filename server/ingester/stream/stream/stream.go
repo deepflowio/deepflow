@@ -129,7 +129,6 @@ func NewLogger(msgType datatype.MessageType, config *config.Config, controllers 
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
 			flowTagWriter,
-			&config.FlowLogDisabled,
 		)
 	}
 	return &Logger{
@@ -180,7 +179,6 @@ func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
 			nil,
-			&config.FlowLogDisabled,
 		)
 	}
 	return &Logger{
@@ -229,7 +227,6 @@ func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
 			nil,
-			&config.FlowLogDisabled,
 		)
 	}
 
