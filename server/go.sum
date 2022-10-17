@@ -102,8 +102,8 @@ github.com/deckarep/golang-set v1.8.0 h1:sk9/l/KqpunDwP7pSjUg0keiOOLEnOBHzykLrsP
 github.com/deckarep/golang-set v1.8.0/go.mod h1:5nI87KwE7wgsBU1F4GKAw2Qod7p5kyS383rP6+o6qqo=
 github.com/deckarep/golang-set/v2 v2.1.0 h1:g47V4Or+DUdzbs8FxCCmgb6VYd+ptPAngjM6dtGktsI=
 github.com/deckarep/golang-set/v2 v2.1.0/go.mod h1:VAky9rY/yGXJOLEDv3OMci+7wtDpOF4IN+y82NBOac4=
-github.com/deepflowys/deepflow/message v0.0.0-20220915023244-98d8d6c05bcf h1:D++iXMaT5XXEIMyEotiyw6QOTeAQB6m0nLQl/6vzXJ8=
-github.com/deepflowys/deepflow/message v0.0.0-20220915023244-98d8d6c05bcf/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
+github.com/deepflowys/deepflow/message v0.0.0-20221017080743-043a7a66ab01 h1:TycMG9dgQ3Ao7V7nF+NP+uCuYyq3qV2avC0SMdUvX80=
+github.com/deepflowys/deepflow/message v0.0.0-20221017080743-043a7a66ab01/go.mod h1:mSlcdrl/mmrjBdG+xcqhGXC0BTK26G98ekXxNDgOyQ4=
 github.com/dennwc/varint v1.0.0 h1:kGNFFSSw8ToIy3obO/kKr8U9GZYUAxQEVuix4zfDWzE=
 github.com/dennwc/varint v1.0.0/go.mod h1:hnItb35rvZvJrbTALZtY/iQfDs48JKRG1RPpgziApxA=
 github.com/digitalocean/godo v1.80.0 h1:ZULJ/fWDM97YtO7Fa+K6hzJLd7+smCu4N+0n+B/xtj4=
