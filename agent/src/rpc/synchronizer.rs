@@ -625,7 +625,7 @@ impl Synchronizer {
             tp::Status::Heartbeat => return,
             tp::Status::ClusterIdNotFound => {
                 let k8s_cluster_id = Config::async_get_k8s_cluster_id(session).await;
-                info!("get latest kubernetes_cluster_id={}, because the old kubernetes_cluster_id {} is no longer valid",
+                warn!("get latest kubernetes_cluster_id={}, because the old kubernetes_cluster_id {} is no longer valid",
                     k8s_cluster_id, running_config.read().kubernetes_cluster_id);
                 kubernetes_cluster_id.replace(k8s_cluster_id.clone());
                 running_config.write().kubernetes_cluster_id = k8s_cluster_id;
