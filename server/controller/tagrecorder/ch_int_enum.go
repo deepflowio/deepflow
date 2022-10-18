@@ -42,7 +42,7 @@ func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) 
 	db := "tagrecorder"
 	table := "tagrecorder"
 	keyToItem := make(map[IntEnumTagKey]mysql.ChIntEnum)
-	respMap, err := tag.GetTagValues(db, table, sql)
+	respMap, err := tag.GetEnumTagValues(db, table, sql)
 	if err != nil {
 		log.Errorf("read failed: %v", err)
 	}

@@ -603,11 +603,85 @@ type WhereFunction struct {
 }
 
 func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
+	opName := expr.(*sqlparser.ComparisonExpr).Operator
 	op, opType := view.GetOperator(expr.(*sqlparser.ComparisonExpr).Operator)
+	right := view.Expr{Value: ""}
 	if opType == view.OPERATOER_UNKNOWN {
 		return nil, errors.New(fmt.Sprintf("opeartor: %s not support", expr.(*sqlparser.ComparisonExpr).Operator))
 	}
-	right := view.Expr{Value: f.Value}
+	function := strings.Trim(f.Function.ToString(), "`")
+	if strings.HasPrefix(function, "Enum(") {
+		var isIntEnum = true
+		tagName := strings.TrimLeft(function, "Enum(")
+		tagName = strings.TrimRight(tagName, ")")
+		tagEnum := strings.TrimSuffix(tagName, "_0")
+		tagEnum = strings.TrimSuffix(tagEnum, "_1")
+		tagDescription, ok := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
+			DB: db, Table: table, TagName: tagEnum,
+		}]
+		if !ok {
+			return nil, errors.New(fmt.Sprintf("no tag %s in %s.%s", tagName, db, table))
+		}
+		_, isStringEnumOK := tag.TAG_STRING_ENUMS[tagDescription.EnumFile]
+		if isStringEnumOK {
+			isIntEnum = false
+		}
+		tagItem, ok := tag.GetTag(tagName, db, table, "enum")
+		if !ok {
+			right = view.Expr{Value: f.Value}
+		} else {
+			whereFilter := tagItem.WhereTranslator
+			if strings.ToLower(opName) == "like" || strings.ToLower(opName) == "not like" {
+				f.Value = strings.ReplaceAll(f.Value, "*", "%")
+				if strings.ToLower(opName) == "like" {
+					opName = "ilike"
+				} else {
+					opName = "not ilike"
+				}
+			}
+			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {
+			case "regexp":
+				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value)
+			case "not regexp":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value) + ")"
+			case "like", "in":
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value)
+			case "not in":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", f.Value) + ")"
+			case "=":
+				//when enum function operator is '=' , add 'or tag = xxx'
+				if isIntEnum {
+					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
+					if err == nil {
+						// when value type is int, add toUInt64() function
+						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+					} else {
+						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value)
+					}
+				} else {
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + " OR " + tagName + " = " + f.Value
+				}
+			case "!=":
+				//when enum function operator is '!=', add 'and tag != xxx'
+				if isIntEnum {
+					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
+					if err == nil {
+						// when value type is int, add toUInt64() function
+						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + ") AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+					} else {
+						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + ")"
+					}
+				} else {
+					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + ") AND " + tagName + " != " + f.Value
+				}
+			default:
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value)
+			}
+			return &view.Expr{Value: "(" + whereFilter + ")"}, nil
+		}
+	} else {
+		right = view.Expr{Value: f.Value}
+	}
 	w.withs = append(w.withs, f.Function.GetWiths()...)
 	return &view.BinaryExpr{Left: f.Function, Right: &right, Op: op}, nil
 }

@@ -30,6 +30,8 @@ const (
 	LTE
 	EQ
 	NEQ
+	LIKE
+	NLIKE
 )
 
 type Operator struct {
@@ -53,6 +55,10 @@ func (n *Operator) ToString() string {
 		return " = "
 	case NEQ:
 		return " != "
+	case LIKE:
+		return " LIKE "
+	case NLIKE:
+		return " NOT LIKE "
 	}
 	return ""
 }
@@ -80,6 +86,10 @@ func GetOperator(op string) (*Operator, int) {
 		opType = EQ
 	case "!=":
 		opType = NEQ
+	case "like":
+		opType = LIKE
+	case "not like":
+		opType = NLIKE
 	}
 	return &Operator{Type: opType}, opType
 }
