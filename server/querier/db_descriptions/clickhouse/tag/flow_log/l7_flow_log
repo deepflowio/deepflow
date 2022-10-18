@@ -52,6 +52,7 @@ type                      , type                      , type                    
 request_type              , request_type              , request_type              , 请求类型               , string        ,                    , 应用层      , 111        ,
 request_domain            , request_domain            , request_domain            , 请求域名               , string        ,                    , 应用层      , 111        ,
 request_resource          , request_resource          , request_resource          , 请求资源               , string        ,                    , 应用层      , 111        ,
+endpoint                  , endpoint                  , endpoint                  , 端点                   , string        ,                    , 应用层      , 111        ,
 request_id                , request_id                , request_id                , 请求ID                 , int           ,                    , 应用层      , 111        ,
 response_status           , response_status           , response_status           , 响应状态               , int_enum      , response_status    , 应用层      , 111        ,
 response_code             , response_code             , response_code             , 响应码                 , int           ,                    , 应用层      , 111        ,

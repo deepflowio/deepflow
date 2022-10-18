@@ -509,6 +509,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			return GetBinaryFunc(sqlparser.String(expr.Name), args)
 		}
 		name, args, err := e.parseFunction(expr)
+		name = strings.Trim(name, "`")
 		if err != nil {
 			return nil, err
 		}

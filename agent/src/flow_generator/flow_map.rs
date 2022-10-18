@@ -267,11 +267,10 @@ impl FlowMap {
                     .iter()
                     .position(|node| node.match_node(meta_packet, config_ignore, trident_type));
                 if index.is_none() {
-                    let node = Box::new(self.new_flow_node(meta_packet, self.total_flow));
+                    let node = Box::new(self.new_flow_node(meta_packet));
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                     time_set.insert(time_key);
                     nodes.push(node);
-                    self.total_flow += 1;
                     self.node_map.replace(node_map);
                     self.time_set.replace(time_set);
                     return;
@@ -295,8 +294,7 @@ impl FlowMap {
             }
             // 未找到Flow，需要插入新的节点
             None => {
-                self.total_flow += 1;
-                let node = Box::new(self.new_flow_node(meta_packet, self.total_flow));
+                let node = Box::new(self.new_flow_node(meta_packet));
 
                 let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
                 time_set.insert(time_key);
@@ -420,10 +418,11 @@ impl FlowMap {
         slot_nodes.push(node);
     }
 
-    fn generate_flow_id(timestamp: Duration, thread_id: u32, total_flow: usize) -> u64 {
+    fn generate_flow_id(&mut self, timestamp: Duration, thread_id: u32) -> u64 {
+        self.total_flow += 1;
         (timestamp.as_nanos() as u64 >> 30 & TIMER_FLOW_ID_MASK) << 32
             | thread_id as u64 & THREAD_FLOW_ID_MASK << 24
-            | total_flow as u64 & COUNTER_FLOW_ID_MASK
+            | self.total_flow as u64 & COUNTER_FLOW_ID_MASK
     }
 
     fn update_tcp_flow(&mut self, meta_packet: &mut MetaPacket, node: &mut FlowNode) -> bool {
@@ -552,7 +551,7 @@ impl FlowMap {
         self.config.load().l4_performance_enabled
     }
 
-    fn init_flow(&mut self, meta_packet: &mut MetaPacket, total_flow: usize) -> FlowNode {
+    fn init_flow(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         meta_packet.direction = PacketDirection::ClientToServer;
 
         let mut tagged_flow = TaggedFlow::default();
@@ -585,7 +584,7 @@ impl FlowMap {
             } else {
                 TunnelField::default()
             },
-            flow_id: Self::generate_flow_id(lookup_key.timestamp, self.id, total_flow),
+            flow_id: self.generate_flow_id(lookup_key.timestamp, self.id),
             start_time: lookup_key.timestamp,
             flow_stat_time: Duration::from_nanos(
                 (lookup_key.timestamp.as_nanos() / TIME_UNIT.as_nanos() * TIME_UNIT.as_nanos())
@@ -768,8 +767,8 @@ impl FlowMap {
         }
     }
 
-    fn new_tcp_node(&mut self, meta_packet: &mut MetaPacket, total_flow: usize) -> FlowNode {
-        let mut node = self.init_flow(meta_packet, total_flow);
+    fn new_tcp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
+        let mut node = self.init_flow(meta_packet);
         let reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
         meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
@@ -848,8 +847,8 @@ impl FlowMap {
         }
     }
 
-    fn new_udp_node(&mut self, meta_packet: &mut MetaPacket, total_flow: usize) -> FlowNode {
-        let mut node = self.init_flow(meta_packet, total_flow);
+    fn new_udp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
+        let mut node = self.init_flow(meta_packet);
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = self.config.load().flow_timeout.opening;
@@ -861,19 +860,19 @@ impl FlowMap {
         node
     }
 
-    fn new_other_node(&mut self, meta_packet: &mut MetaPacket, total_flow: usize) -> FlowNode {
-        let mut node = self.init_flow(meta_packet, total_flow);
+    fn new_other_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
+        let mut node = self.init_flow(meta_packet);
         node.flow_state = FlowState::Established;
         // opening timeout
         node.timeout = self.config.load().flow_timeout.opening;
         node
     }
 
-    fn new_flow_node(&mut self, meta_packet: &mut MetaPacket, total_flow: usize) -> FlowNode {
+    fn new_flow_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         match meta_packet.lookup_key.proto {
-            IpProtocol::Tcp => self.new_tcp_node(meta_packet, total_flow),
-            IpProtocol::Udp => self.new_udp_node(meta_packet, total_flow),
-            _ => self.new_other_node(meta_packet, total_flow),
+            IpProtocol::Tcp => self.new_tcp_node(meta_packet),
+            IpProtocol::Udp => self.new_udp_node(meta_packet),
+            _ => self.new_other_node(meta_packet),
         }
     }
 
@@ -1502,12 +1501,7 @@ mod tests {
         packet1.direction = PacketDirection::ServerToClient;
         packet1.policy_data.replace(Arc::new(policy_data1));
 
-        let total_flow = flow_map
-            .node_map
-            .as_ref()
-            .map(|map| map.len())
-            .unwrap_or_default();
-        let mut node = flow_map.init_flow(&mut packet0, total_flow);
+        let mut node = flow_map.init_flow(&mut packet0);
         node.policy_in_tick.fill(false);
         flow_map.update_flow(&mut node, &mut packet1);
 
@@ -1639,12 +1633,7 @@ mod tests {
 
         let mut packet0 = _new_meta_packet();
         // test handshake
-        let total_flow = flow_map
-            .node_map
-            .as_ref()
-            .map(|map| map.len())
-            .unwrap_or_default();
-        let mut node = flow_map.init_flow(&mut packet0, total_flow);
+        let mut node = flow_map.init_flow(&mut packet0);
         let peer_src = &mut node.tagged_flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC];
         peer_src.tcp_flags = TcpFlags::SYN;
         flow_map.update_flow_state_machine(
