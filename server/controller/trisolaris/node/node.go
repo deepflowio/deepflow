@@ -163,6 +163,10 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 			dbTSDB.PodIP = cacheTSDB.GetPodIP()
 			filter = true
 		}
+		if dbTSDB.PodName != cacheTSDB.GetPodName() {
+			dbTSDB.PodName = cacheTSDB.GetPodName()
+			filter = true
+		}
 		if filter == true {
 			updateTSDB = append(updateTSDB, dbTSDB)
 		}
@@ -479,6 +483,10 @@ func (n *NodeInfo) isRegisterController() {
 		}
 		if dbController.NodeName != data.NodeName {
 			dbController.NodeName = data.NodeName
+			changed = true
+		}
+		if dbController.PodName != data.PodName {
+			dbController.PodName = data.PodName
 			changed = true
 		}
 		if dbController.PodIP != data.PodIP {

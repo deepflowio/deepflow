@@ -862,6 +862,7 @@ type Analyzer struct {
 	NATIPEnabled      int       `gorm:"column:nat_ip_enabled;default:0" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	PodIP             string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
 	Lcuuid            string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
+	PodName           string    `gorm:"column:pod_name;type:char(64);default:null" json:"pod_name"`
 }
 
 type AZAnalyzerConnection struct {

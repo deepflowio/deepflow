@@ -41,6 +41,7 @@ type TSDBCache struct {
 	pcapDataMountPath *string
 	name              *string
 	podIP             *string
+	podName           *string
 	syncFlag          atomicbool.Bool
 }
 
@@ -59,6 +60,7 @@ func newTSDBCache(tsdb *models.Analyzer) *TSDBCache {
 		name:              proto.String(tsdb.Name),
 		podIP:             proto.String(tsdb.PodIP),
 		syncFlag:          atomicbool.NewBool(false),
+		podName:           proto.String(tsdb.PodName),
 	}
 }
 
@@ -111,6 +113,14 @@ func (c *TSDBCache) GetPodIP() string {
 		return *c.podIP
 	}
 	// just upgrade to 613 or env pod_ip not rendering, pod_ip is null
+	return ""
+}
+
+func (c *TSDBCache) GetPodName() string {
+	if c.podName != nil {
+		return *c.podName
+	}
+
 	return ""
 }
 

@@ -49,6 +49,11 @@ func (a *TSDBDiscovery) register(request *trident.SyncRequest) {
 		log.Errorf("get env(%s) data failed", POD_IP_KEY)
 		return
 	}
+	podName := os.Getenv(POD_NAME_KEY)
+	if podName == "" {
+		log.Errorf("get env(%s) data failed", POD_NAME_KEY)
+		return
+	}
 	tsdb := &models.Analyzer{
 		IP:                request.GetCtrlIp(),
 		NATIPEnabled:      0,
@@ -64,6 +69,7 @@ func (a *TSDBDiscovery) register(request *trident.SyncRequest) {
 		Lcuuid:            uuid.NewString(),
 		PcapDataMountPath: pcapDataMountPath,
 		PodIP:             podIP,
+		PodName:           podName,
 	}
 	a.Lock()
 	defer a.Unlock()

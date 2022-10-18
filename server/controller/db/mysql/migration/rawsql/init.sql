@@ -1628,6 +1628,7 @@ CREATE TABLE IF NOT EXISTS analyzer (
     synced_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     nat_ip_enabled          TINYINT(1) DEFAULT 0 COMMENT '0: disabled 1:enabled',
     pod_ip                  CHAR(64),
+    pod_name                CHAR(64),
     lcuuid                  CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE analyzer;

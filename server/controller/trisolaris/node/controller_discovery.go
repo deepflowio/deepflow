@@ -48,9 +48,9 @@ func newControllerDiscovery(masterIP string, nodeType string, regionDomainPrefix
 
 func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 	envData := utils.GetRuntimeEnv()
-	name := os.Getenv(POD_NAME_KEY)
+	name := os.Getenv(NODE_NAME_KEY)
 	if name == "" {
-		log.Errorf("get env(%s) data failed", POD_NAME_KEY)
+		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
 		return nil
 	}
 	nodeName := os.Getenv(NODE_NAME_KEY)
