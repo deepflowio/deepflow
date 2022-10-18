@@ -168,6 +168,10 @@ func (n *NodeInfo) updateTSDBSyncedToDB() {
 			dbTSDB.PodName = cacheTSDB.GetPodName()
 			filter = true
 		}
+		if dbTSDB.CAMD5 != GetCAMD5() {
+			dbTSDB.CAMD5 = GetCAMD5()
+			filter = true
+		}
 		if filter == true {
 			updateTSDB = append(updateTSDB, dbTSDB)
 		}
@@ -401,24 +405,59 @@ func (n *NodeInfo) generateNodeCache() {
 
 func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 	tsdbMgr := dbmgr.DBMgr[models.Analyzer](n.db)
+	tsdbs, err := tsdbMgr.Gets()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	var azConns []*models.AZAnalyzerConnection
+	tsdbCount := len(tsdbs)
 	option := tsdbMgr.WithIP(tsdb.IP)
-	_, err := tsdbMgr.GetByOption(option)
+	_, err = tsdbMgr.GetByOption(option)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		switch {
+		case tsdbCount == 0 || tsdb.CAMD5 == "":
+			azConn := &models.AZAnalyzerConnection{
+				AZ:         CONN_DEFAULT_AZ,
+				Region:     CONN_DEFAULT_REGION,
+				AnalyzerIP: tsdb.IP,
+				Lcuuid:     uuid.NewString(),
+			}
+			azConns = append(azConns, azConn)
+		case tsdbCount > 0:
+			localTSDB, err := tsdbMgr.GetFromCAMD5(tsdb.CAMD5)
+			if err == nil {
+				conns, err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).GetBatchFromControllerIP(localTSDB.IP)
+				if err == nil {
+					for _, conn := range conns {
+						azConn := &models.AZAnalyzerConnection{
+							AZ:         conn.AZ,
+							Region:     conn.Region,
+							AnalyzerIP: tsdb.IP,
+							Lcuuid:     uuid.NewString(),
+						}
+						azConns = append(azConns, azConn)
+					}
+				} else {
+					log.Error(err)
+				}
+			} else {
+				log.Error(err)
+			}
+		}
 		err = tsdbMgr.Insert(tsdb)
 		if err != nil {
 			log.Error(err)
 			return
 		}
 		n.AddTSDBCache(tsdb)
-		azConn := &models.AZAnalyzerConnection{
-			AZ:         CONN_DEFAULT_AZ,
-			Region:     CONN_DEFAULT_REGION,
-			AnalyzerIP: tsdb.IP,
-			Lcuuid:     uuid.NewString(),
-		}
-		err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).Insert(azConn)
-		if err != nil {
-			log.Error(err)
+		if len(azConns) > 0 {
+			for _, azConn := range azConns {
+				err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).Insert(azConn)
+				if err != nil {
+					log.Error(err)
+				}
+			}
 		}
 		err = service.ConfigAnalyzerDataSource(tsdb.IP)
 		if err != nil {
@@ -500,6 +539,10 @@ func (n *NodeInfo) isRegisterController() {
 			dbController.PodName = data.PodName
 			changed = true
 		}
+		if dbController.CAMD5 != data.CAMD5 {
+			dbController.CAMD5 = data.CAMD5
+			changed = true
+		}
 		if changed {
 			controllerMgr.Save(dbController)
 		}
@@ -528,20 +571,57 @@ func (n *NodeInfo) GetPolicyVersion() uint64 {
 
 func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 	log.Infof("resiter controller(%+v)", data)
-	err := dbmgr.DBMgr[models.Controller](n.db).Insert(data)
+	controllerDBMgr := dbmgr.DBMgr[models.Controller](n.db)
+	controllers, err := controllerDBMgr.Gets()
 	if err != nil {
 		log.Error(err)
 		return
 	}
-	azConn := &models.AZControllerConnection{
-		AZ:           CONN_DEFAULT_AZ,
-		Region:       CONN_DEFAULT_REGION,
-		ControllerIP: data.IP,
-		Lcuuid:       uuid.NewString(),
+	controllerCount := len(controllers)
+	var azConns []*models.AZControllerConnection
+	switch {
+	case controllerCount == 0 || data.CAMD5 == "":
+		azConn := &models.AZControllerConnection{
+			AZ:           CONN_DEFAULT_AZ,
+			Region:       CONN_DEFAULT_REGION,
+			ControllerIP: data.IP,
+			Lcuuid:       uuid.NewString(),
+		}
+		azConns = append(azConns, azConn)
+	case controllerCount > 0:
+		localController, err := controllerDBMgr.GetFromCAMD5(data.CAMD5)
+		if err == nil {
+			conns, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetBatchFromControllerIP(localController.IP)
+			if err == nil {
+				for _, conn := range conns {
+					azConn := &models.AZControllerConnection{
+						AZ:           conn.AZ,
+						Region:       conn.Region,
+						ControllerIP: data.IP,
+						Lcuuid:       uuid.NewString(),
+					}
+					azConns = append(azConns, azConn)
+				}
+			} else {
+				log.Error(err)
+			}
+		} else {
+			log.Error(err)
+		}
 	}
-	err = dbmgr.DBMgr[models.AZControllerConnection](n.db).Insert(azConn)
+	err = controllerDBMgr.Insert(data)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+	if len(azConns) != 0 {
+		connDBMgr := dbmgr.DBMgr[models.AZControllerConnection](n.db)
+		for _, azConn := range azConns {
+			err := connDBMgr.Insert(azConn)
+			if err != nil {
+				log.Error(err)
+			}
+		}
 	}
 }
 
