@@ -142,6 +142,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.info.start_time = param.time;
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
+        self.info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload) {
             return true;
         }
@@ -158,7 +159,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         if self.parsed {
             return Ok(vec![L7ProtocolInfo::PostgreInfo(self.info.clone())]);
         }
-
+        self.info.is_tls = param.is_tls();
         if self.check_is_ssl_req(payload) {
             return Ok(vec![]);
         }

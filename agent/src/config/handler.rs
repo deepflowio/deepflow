@@ -38,6 +38,7 @@ use super::{
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 
+use crate::common::feature::FeatureFlags;
 use crate::{
     common::decapsulate::TunnelTypeBitmap,
     dispatcher::recv_engine,
@@ -422,6 +423,7 @@ pub struct EbpfConfig {
     pub ctrl_mac: MacAddr,
     pub ebpf_uprobe_golang_symbol_enabled: bool,
     pub ebpf_disabled: bool,
+    pub feature: FeatureFlags,
 }
 
 #[cfg(target_os = "linux")]
@@ -848,6 +850,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 ebpf_uprobe_golang_symbol_enabled: conf
                     .yaml_config
                     .ebpf_uprobe_golang_symbol_enabled,
+                feature: FeatureFlags::from(&conf.yaml_config.feature_flags),
                 ebpf_disabled: conf.yaml_config.ebpf_disabled,
             },
             metric_server: MetricServerConfig {
