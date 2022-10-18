@@ -1035,6 +1035,14 @@ impl ConfigHandler {
             info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
         }
 
+        if yaml_config.analyzer_dedup_disabled != new_config.yaml_config.analyzer_dedup_disabled {
+            yaml_config.analyzer_dedup_disabled = new_config.yaml_config.analyzer_dedup_disabled;
+            info!(
+                "analyzer_dedup_disabled set to {:?}",
+                yaml_config.analyzer_dedup_disabled
+            );
+        }
+
         if candidate_config.dispatcher != new_config.dispatcher {
             if candidate_config.dispatcher.if_mac_source != new_config.dispatcher.if_mac_source {
                 if candidate_config.tap_mode != TapMode::Local {
