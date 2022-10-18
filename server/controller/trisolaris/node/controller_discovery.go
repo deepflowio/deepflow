@@ -84,5 +84,6 @@ func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 		NodeName:           nodeName,
 		PodIP:              podIP,
 		PodName:            podName,
+		CAMD5:              GetCAMD5(),
 	}
 }

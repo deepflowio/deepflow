@@ -17,6 +17,12 @@ import (
 	"github.com/deepflowys/deepflow/message/controller"
 )
 
+var CAMD5 string
+
+func init() {
+	CAMD5 = getCAMD5()
+}
+
 func GenerateAesKey(input []byte) string {
 	return fmt.Sprintf("%x", md5.Sum(input))
 }
@@ -134,11 +140,15 @@ func GetLocalClusterID() (string, error) {
 	return GenerateKuberneteClusterIDByMD5(GenerateAesKey(caData))
 }
 
-func GetCAMD5() string {
+func getCAMD5() string {
 	caData, err := ioutil.ReadFile(K8S_CA_CRT_PATH)
 	if err != nil {
 		log.Error(err)
 		return ""
 	}
 	return GenerateAesKey(caData)
+}
+
+func GetCAMD5() string {
+	return CAMD5
 }

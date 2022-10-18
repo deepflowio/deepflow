@@ -827,6 +827,7 @@ type Controller struct {
 	NodeName           string    `gorm:"column:node_name;type:char(64);default:null" json:"NODE_NAME"`
 	PodIP              string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
 	PodName            string    `gorm:"column:pod_name;type:char(64);default:null" json:"POD_NAME"`
+	CAMD5              string    `gorm:"column:ca_md5;type:char(64);default:null" json:"CA_MD5"`
 	Lcuuid             string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 
@@ -861,8 +862,9 @@ type Analyzer struct {
 	SyncedAt          time.Time `gorm:"column:synced_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_AT"`
 	NATIPEnabled      int       `gorm:"column:nat_ip_enabled;default:0" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	PodIP             string    `gorm:"column:pod_ip;type:char(64);default:null" json:"POD_IP"`
-	Lcuuid            string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 	PodName           string    `gorm:"column:pod_name;type:char(64);default:null" json:"pod_name"`
+	CAMD5             string    `gorm:"column:ca_md5;type:char(64);default:null" json:"CA_MD5"`
+	Lcuuid            string    `gorm:"column:lcuuid;type:char(64);not null" json:"LCUUID"`
 }
 
 type AZAnalyzerConnection struct {

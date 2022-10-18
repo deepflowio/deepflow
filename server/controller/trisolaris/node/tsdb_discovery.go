@@ -69,6 +69,7 @@ func (a *TSDBDiscovery) register(request *trident.SyncRequest) {
 		PcapDataMountPath: pcapDataMountPath,
 		PodIP:             podIP,
 		PodName:           podName,
+		CAMD5:             GetCAMD5(),
 	}
 	a.Lock()
 	defer a.Unlock()

@@ -1603,6 +1603,7 @@ CREATE TABLE IF NOT EXISTS controller (
     node_name           CHAR(64),
     pod_ip              CHAR(64),
     pod_name            CHAR(64),
+    ca_md5              CHAR(64),
     lcuuid              CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE controller;
@@ -1630,6 +1631,7 @@ CREATE TABLE IF NOT EXISTS analyzer (
     nat_ip_enabled          TINYINT(1) DEFAULT 0 COMMENT '0: disabled 1:enabled',
     pod_ip                  CHAR(64),
     pod_name                CHAR(64),
+    ca_md5                  CHAR(64),
     lcuuid                  CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE analyzer;
