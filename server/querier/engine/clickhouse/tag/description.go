@@ -19,6 +19,7 @@ package tag
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -304,7 +305,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	return response, nil
 }
 
-func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
+func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	// 获取tagEnumFile
@@ -320,7 +321,6 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 			}
 			response[key] = tagValues
 		}
-		return response, nil
 	}
 	if tag == "all_string_enum" {
 		for key, tagValue := range TAG_STRING_ENUMS {
@@ -330,9 +330,35 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 			}
 			response[key] = tagValues
 		}
-		return response, nil
 	}
-	// K8s Labels是动态的,不需要去tag_description里确认
+	return response, nil
+}
+
+func GetTagValues(db, table, sql string) ([]string, error) {
+	// 把`1m`的反引号去掉
+	table = strings.Trim(table, "`")
+	// 获取tagEnumFile
+	sqlSplit := strings.Split(sql, " ")
+	tag := sqlSplit[2]
+	tag = strings.Trim(tag, "'")
+	var sqlList []string
+	var rgx = regexp.MustCompile(`(?i)show|SHOW +tag +\S+ +values +from|FROM +\S+( +(where|WHERE \S+ like|LIKE \S+))?`)
+	sqlOk := rgx.MatchString(sql)
+	if !sqlOk {
+		return nil, errors.New(fmt.Sprintf("sql synax error: %s ", tag, sql))
+	}
+	showSqlList := strings.Split(sql, "WHERE")
+	if len(showSqlList) == 1 {
+		showSqlList = strings.Split(sql, "where")
+	}
+	//Enum($tag_name) replace in with column 'display_name'
+	//$tag_name replace in with column 'value'
+	if len(showSqlList) > 1 {
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "Enum("+tag+")", "display_name")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag, "value")
+		sql = showSqlList[0] + " WHERE " + showSqlList[1]
+	}
+	// 标签是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
 		return GetTagResourceValues(sql)
 	}
@@ -372,13 +398,6 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	var likeSql string
 	var whereSql string
 	var orderBy = "value"
-	chClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       "flow_tag",
-	}
 	limitList := strings.Split(sql, "LIMIT")
 	if len(limitList) <= 1 {
 		limitList = strings.Split(sql, "limit")
@@ -400,28 +419,18 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, error) {
 		orderBy = "length(display_name)"
 	}
 	sql = fmt.Sprintf("SELECT value,name AS display_name FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
-	sql = strings.ReplaceAll(sql, " like ", " ilike ")
-	sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 	log.Debug(sql)
-	response, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-	if err != nil {
-		return nil, err
-	}
-	return response, err
+	sqlList = append(sqlList, sql)
+	return sqlList, nil
 
 }
 
-func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
-	chClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       "flow_tag",
-	}
+func GetTagResourceValues(rawSql string) ([]string, error) {
+
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
+	var sqlList []string
 	var sql string
 	var dictTag = "''"
 	var whereSql string
@@ -463,7 +472,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 	if !isAdminFlag {
 		switch tag {
 		case "resource_gl0", "resource_gl1", "resource_gl2":
-			results := map[string][]interface{}{}
+			// results := map[string][]interface{}{}
 			for resourceKey, resourceType := range AutoMap {
 				// 增加资源ID
 				switch resourceKey {
@@ -475,17 +484,8 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
-				sql = strings.ReplaceAll(sql, " like ", " ilike ")
-				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-				if err != nil {
-					return nil, err
-				}
-
-				for _, value := range rst["values"] {
-					results["values"] = append(results["values"], value)
-				}
+				sqlList = append(sqlList, sql)
 			}
 			autoMap := map[string]map[string]int{
 				"resource_gl0": AutoPodMap,
@@ -500,19 +500,10 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 					resourceName = "pod_service_name"
 				}
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
-				sql = strings.ReplaceAll(sql, " like ", " ilike ")
-				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
-				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-				if err != nil {
-					return nil, err
-				}
-				for _, value := range rst["values"] {
-					results["values"] = append(results["values"], value)
-				}
-				results["columns"] = rst["columns"]
+				sqlList = append(sqlList, sql)
 			}
-			return results, nil
+			return sqlList, nil
 		}
 
 		switch tag {
@@ -547,23 +538,18 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 			if strings.HasPrefix(tag, "label.") {
 				labelTag := strings.TrimPrefix(tag, "label.")
 				if whereSql != "" {
-					whereSql += fmt.Sprintf("AND key='%s'", labelTag)
+					whereSql += fmt.Sprintf("AND 'key'='%s'", labelTag)
 				} else {
-					whereSql = fmt.Sprintf("WHERE key='%s'", labelTag)
+					whereSql = fmt.Sprintf("WHERE 'key'='%s'", labelTag)
 				}
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 			} else {
-				return map[string][]interface{}{}, nil
+				return sqlList, nil
 			}
 		}
-		sql = strings.ReplaceAll(sql, " like ", " ilike ")
-		sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-		if err != nil {
-			return nil, err
-		}
-		return rst, err
+		sqlList = append(sqlList, sql)
+		return sqlList, nil
 	} else {
 		deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
 		if ok {
@@ -612,39 +598,28 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, error) {
 		} else if strings.HasPrefix(tag, "label.") {
 			labelTag := strings.TrimPrefix(tag, "label.")
 			if whereSql != "" {
-				whereSql += fmt.Sprintf("AND key='%s'", labelTag)
+				whereSql += fmt.Sprintf("AND 'key'='%s'", labelTag)
 			} else {
-				whereSql = fmt.Sprintf("WHERE key='%s'", labelTag)
+				whereSql = fmt.Sprintf("WHERE 'key'='%s'", labelTag)
 			}
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		}
 		if sql == "" {
-			return map[string][]interface{}{}, nil
+			return sqlList, nil
 		}
-		sql = strings.ReplaceAll(sql, " like ", " ilike ")
-		sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 		log.Debug(sql)
-		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-		if err != nil {
-			return nil, err
-		}
-		return rst, err
+		sqlList = append(sqlList, sql)
+		return sqlList, nil
 	}
 }
 
-func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, error) {
-	chClient := client.Client{
-		Host:     config.Cfg.Clickhouse.Host,
-		Port:     config.Cfg.Clickhouse.Port,
-		UserName: config.Cfg.Clickhouse.User,
-		Password: config.Cfg.Clickhouse.Password,
-		DB:       "flow_tag",
-	}
+func GetExternalTagValues(db, table, rawSql string) ([]string, error) {
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
 	tag = strings.TrimPrefix(tag, "tag.")
 	tag = strings.TrimPrefix(tag, "attribute.")
+	var sqlList []string
 	var whereSql string
 	var orderBy = "sum(count) DESC"
 	if strings.Contains(strings.ToLower(rawSql), "like") || strings.Contains(strings.ToLower(rawSql), "regexp") {
@@ -679,12 +654,7 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, e
 	} else {
 		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE table='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY %s %s", db, table, tag, orderBy, limitSql)
 	}
-	sql = strings.ReplaceAll(sql, " like ", " ilike ")
-	sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 	log.Debug(sql)
-	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
-	if err != nil {
-		return nil, err
-	}
-	return rst, err
+	sqlList = append(sqlList, sql)
+	return sqlList, nil
 }

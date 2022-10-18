@@ -40,7 +40,7 @@ func (e *ChStringEnum) generateNewData() (map[StringEnumTagKey]mysql.ChStringEnu
 	db := "tagrecorder"
 	table := "tagrecorder"
 	keyToItem := make(map[StringEnumTagKey]mysql.ChStringEnum)
-	respMap, err := tag.GetTagValues(db, table, sql)
+	respMap, err := tag.GetEnumTagValues(db, table, sql)
 	if err != nil {
 		log.Errorf("read failed: %v", err)
 	}
