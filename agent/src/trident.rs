@@ -402,12 +402,12 @@ impl Trident {
                     }
                     components.replace(comp);
                 }
-                Some(components) => {
+                Some(mut components) => {
                     components.start();
                     components.config = config_handler.candidate_config.clone();
                     dispatcher_listener_callback(
                         &config_handler.candidate_config.dispatcher,
-                        &components,
+                        &mut components,
                         blacklist,
                         vm_mac_addrs,
                         tap_types,
@@ -439,7 +439,7 @@ impl Trident {
 
 fn dispatcher_listener_callback(
     conf: &DispatcherConfig,
-    components: &Components,
+    components: &mut Components,
     blacklist: Vec<u64>,
     vm_mac_addrs: Vec<MacAddr>,
     tap_types: Vec<trident::TapType>,
@@ -485,7 +485,22 @@ fn dispatcher_listener_callback(
                 );
                 listener.on_vm_change(&vm_mac_addrs);
             }
-            components.tap_typer.on_tap_types_change(tap_types); // FIXME: it is necessary to judge whether the tap_types are updated
+            let mut updated = false;
+            if components.cur_tap_types.len() != tap_types.len() {
+                updated = true;
+            } else {
+                for i in 0..tap_types.len() {
+                    if components.cur_tap_types[i] != tap_types[i] {
+                        updated = true;
+                        break;
+                    }
+                }
+            }
+            if updated {
+                components.tap_typer.on_tap_types_change(tap_types.clone());
+                components.cur_tap_types.clear();
+                components.cur_tap_types.clone_from(&tap_types);
+            }
         }
         _ => {}
     }
@@ -618,6 +633,7 @@ pub struct Components {
     pub l7_log_rate: Arc<LeakyBucket>,
     pub libvirt_xml_extractor: Arc<LibvirtXmlExtractor>,
     pub tap_typer: Arc<TapTyper>,
+    pub cur_tap_types: Vec<trident::TapType>,
     pub dispatchers: Vec<Dispatcher>,
     pub dispatcher_listeners: Vec<DispatcherListener>,
     pub log_parsers: Vec<AppProtoLogsParser>,
@@ -1315,6 +1331,7 @@ impl Components {
             l7_log_rate,
             libvirt_xml_extractor,
             tap_typer,
+            cur_tap_types: vec![],
             dispatchers,
             dispatcher_listeners,
             collectors,

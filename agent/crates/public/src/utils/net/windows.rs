@@ -20,6 +20,7 @@ use std::{
 };
 
 use log::warn;
+use pcap;
 use regex::Regex;
 use windows::Win32::{
     Foundation::{CHAR, ERROR_BUFFER_OVERFLOW, NO_ERROR},
@@ -37,7 +38,7 @@ use windows::Win32::{
 
 use super::{Addr, Link, LinkFlags, MacAddr, NeighborEntry, Route};
 use super::{Error, Result};
-use crate::{common::enums::IfType, utils::WIN_ERROR_CODE_STR};
+use crate::{enums::IfType, utils::WIN_ERROR_CODE_STR};
 
 /*
 * TODO
@@ -201,11 +202,13 @@ pub fn get_route_src_ip(dest_addr: &IpAddr) -> Result<IpAddr> {
 
 pub fn get_route_src_ip_interface_name(dest_addr: &IpAddr) -> Result<String> {
     let if_index = route_get(*dest_addr).map(|r| r.oif_index)?;
-    let src_ip = get_route_src_ip(dest_addr)?;
-    Ok(link_list()?
-        .into_iter()
-        .filter(|link| link.if_index == if_index)?
-        .map(|f| Ok(f.name.clone())))
+    let links = link_list()?;
+    for link in links {
+        if link.if_index == if_index {
+            return Ok(link.name.clone());
+        }
+    }
+    return Err(Error::LinkNotFound(dest_addr.to_string()));
 }
 
 pub fn route_get(dest_addr: IpAddr) -> Result<Route> {
