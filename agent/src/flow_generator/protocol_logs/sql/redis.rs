@@ -172,11 +172,13 @@ impl L7ProtocolParserInterface for RedisLog {
         if !param.ebpf_type.is_raw_protocol() {
             return false;
         }
+        self.info.is_tls = param.is_tls();
         Self::redis_check_protocol(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
+        self.info.is_tls = param.is_tls();
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         Ok(vec![L7ProtocolInfo::RedisInfo(self.info.clone())])
     }
