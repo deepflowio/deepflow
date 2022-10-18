@@ -91,6 +91,7 @@ use public::{
 };
 
 const MINUTE: Duration = Duration::from_secs(60);
+const COMMON_DELAY: u32 = 5;
 
 pub struct ChangedConfig {
     pub runtime_config: RuntimeConfig,
@@ -1435,12 +1436,12 @@ impl Components {
         let second_quadruple_tolerable_delay = (yaml_config.packet_delay.as_secs()
             + 1
             + yaml_config.flow.flush_interval.as_secs()
-            + 5)
+            + COMMON_DELAY as u64)
             + yaml_config.second_flow_extra_delay.as_secs();
         let minute_quadruple_tolerable_delay = (60 + yaml_config.packet_delay.as_secs())
             + 1
             + yaml_config.flow.flush_interval.as_secs()
-            + 5;
+            + COMMON_DELAY as u64;
 
         let quadruple_generator = QuadrupleGeneratorThread::new(
             id,
@@ -1472,7 +1473,7 @@ impl Components {
                 second_receiver,
                 metrics_sender.clone(),
                 MetricsType::SECOND,
-                second_quadruple_tolerable_delay as u32,
+                second_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
@@ -1484,7 +1485,7 @@ impl Components {
                 minute_receiver,
                 metrics_sender,
                 MetricsType::MINUTE,
-                minute_quadruple_tolerable_delay as u32,
+                minute_quadruple_tolerable_delay as u32 + COMMON_DELAY, // qg processing is delayed and requires the collector component to increase the window size
                 &stats_collector,
                 config_handler.collector(),
                 synchronizer.ntp_diff(),
