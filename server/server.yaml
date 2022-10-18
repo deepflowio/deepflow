@@ -166,6 +166,7 @@ controller:
 querier:
   # querier http listenport
   listen-port: 20416
+  language: en
 
   # clickhouse相关配置
   clickhouse:

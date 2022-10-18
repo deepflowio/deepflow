@@ -71,3 +71,5 @@ var AutoServiceMap = map[string]int{
 	"pod_group": VIF_DEVICE_TYPE_POD_GROUP,
 	"service":   VIF_DEVICE_TYPE_SERVICE,
 }
+
+var NoLanguageTag = []string{"ip_type", "l7_ip_protocol", "server_port", "span_kind", "tcp_flags_bit", "tunnel_tier"}

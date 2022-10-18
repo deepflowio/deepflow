@@ -128,8 +128,11 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 		}
 		for table, tableTagData := range dbTagData.(map[string]interface{}) {
 			// 遍历文件内容进行赋值
-			for _, tag := range tableTagData.([][]interface{}) {
-				if len(tag) < 9 {
+			for i, tag := range tableTagData.([][]interface{}) {
+				if strings.Contains(table, ".") {
+					continue
+				}
+				if len(tag) < 6 {
 					return errors.New(
 						fmt.Sprintf("get tag failed! db:%s table:%s, tag:%v", db, table, tag),
 					)
@@ -143,7 +146,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 6 - Category
 				// 7 - Permissions
 				// 8 - Description
-				permissions, err := ckcommon.ParsePermission(tag[7])
+				permissions, err := ckcommon.ParsePermission(tag[5])
 				if err != nil {
 					return errors.New(
 						fmt.Sprintf(
@@ -154,13 +157,21 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				}
 
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
+				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
+				enumFile := tag[4].(string)
+				if !common.IsValueInSliceString(enumFile, NoLanguageTag) {
+					enumFile = tag[4].(string) + "." + config.Cfg.Language
+				}
+				displayName := tagLanguage[1].(string)
+				category := tagLanguage[2].(string)
+				des := tagLanguage[3].(string)
 				description := NewTagDescription(
-					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
-					tag[4].(string), tag[5].(string), tag[6].(string), permissions, tag[8].(string),
+					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
+					tag[3].(string), enumFile, category, permissions, des,
 				)
 				TAG_DESCRIPTIONS[key] = description
-				enumFileToTagType[tag[5].(string)] = tag[4].(string)
+				enumFileToTagType[enumFile] = tag[3].(string)
 			}
 		}
 	}
@@ -386,12 +397,12 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
 	if isStringEnumOK {
 		table = "string_enum_map"
-		tag = tagDescription.EnumFile
+		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 	}
 	_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
 	if isIntEnumOK {
 		table = "int_enum_map"
-		tag = tagDescription.EnumFile
+		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 	}
 
 	var limitSql string
