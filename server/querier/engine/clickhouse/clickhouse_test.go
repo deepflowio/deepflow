@@ -174,6 +174,9 @@ var (
 		input:  "select Avg(`byte_tx`) AS `Avg(byte_tx)`,icon_id(chost_0) as `xx`,region_0 from vtap_flow_edge_port group by region_0 limit 1",
 		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))) AS `xx`, toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, _time FROM flow_metrics.`vtap_flow_edge_port` WHERE (region_id_0!=0) GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `_time`) GROUP BY `xx`, `region_0` LIMIT 1",
 		db:     "flow_metrics",
+	}, {
+		input:  "select request from l7_flow_log where Enum(tap_side)='xxx' limit 0, 50",
+		output: "WITH dictGet(flow_tag.string_enum_map, 'name', ('tap_side',tap_side)) AS `Enum(tap_side)` SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE `Enum(tap_side)` = 'xxx' LIMIT 0, 50",
 	},
 	}
 )
