@@ -21,8 +21,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
@@ -448,209 +446,6 @@ func base64ToHexString(str string) string {
 	return str
 }
 
-func (h *L7Logger) fillHttp(l *pb.AppProtoLogsData) {
-	if l.Http == nil {
-		return
-	}
-	info := l.Http
-	h.Version = info.Version
-	h.RequestType = info.Method
-	h.RequestDomain = info.Host
-	h.RequestResource = info.Path
-
-	if info.StreamId != 0 {
-		h.requestId = uint64(info.StreamId)
-		h.RequestId = &h.requestId
-	}
-
-	h.HttpProxyClient = info.ClientIp
-	h.XRequestId = info.XRequestId
-	h.TraceId = info.TraceId
-	h.SpanId = info.SpanId
-
-	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
-		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
-
-		h.ResponseException = GetHTTPExceptionDesc(uint16(l.Base.Head.Code))
-	}
-
-	if info.ReqContentLength != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = info.ReqContentLength
-		h.RequestLength = &h.requestLength
-	}
-
-	if info.RespContentLength != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = info.RespContentLength
-		h.ResponseLength = &h.responseLength
-	}
-}
-
-func (h *L7Logger) fillDns(l *pb.AppProtoLogsData) {
-	if l.Dns == nil {
-		return
-	}
-	info := l.Dns
-	h.RequestType = GetDNSQueryType(uint8(info.QueryType))
-	h.RequestResource = info.QueryName
-
-	if info.TransId != 0 {
-		requestId := uint64(info.TransId)
-		h.RequestId = &requestId
-	}
-
-	h.ResponseResult = info.Answers
-	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
-		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
-
-		h.ResponseException = GetDNSExceptionDesc(uint16(l.Base.Head.Code))
-	}
-}
-
-func (h *L7Logger) fillMysql(l *pb.AppProtoLogsData) {
-	if l.Mysql == nil {
-		return
-	}
-	info := l.Mysql
-	if info.ProtocolVersion != 0 {
-		h.Version = strconv.Itoa(int(info.ProtocolVersion))
-	}
-	if h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.RequestType = MysqlCommand(info.Command).String()
-	}
-	h.RequestResource = info.Context
-
-	if h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseCode = int16(info.ErrorCode)
-		h.ResponseCode = &h.responseCode
-	}
-	h.ResponseException = info.ErrorMessage
-
-	if info.AffectedRows != 0 {
-		h.sqlAffectedRows = info.AffectedRows
-		h.SqlAffectedRows = &h.sqlAffectedRows
-	}
-}
-
-func (h *L7Logger) fillRedis(l *pb.AppProtoLogsData) {
-	if l.Redis == nil {
-		return
-	}
-	info := l.Redis
-	h.RequestType = string(info.RequestType)
-	h.RequestResource = string(info.Request)
-
-	h.ResponseException = string(info.Error)
-	h.ResponseResult = string(info.Response)
-}
-
-func (h *L7Logger) fillDubbo(l *pb.AppProtoLogsData) {
-	if l.Dubbo == nil {
-		return
-	}
-	info := l.Dubbo
-	h.Version = info.Version
-	h.RequestDomain = info.ServiceName
-	h.RequestResource = info.MethodName
-	if info.Id != 0 {
-		h.requestId = uint64(info.Id)
-		h.RequestId = &h.requestId
-	}
-
-	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
-		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
-		h.ResponseException = GetDubboExceptionDesc(uint16(l.Base.Head.Code))
-	}
-	// FIXME: Confirm the format of Dubbo traceID?
-	h.TraceId = info.TraceId
-
-	if info.ReqBodyLen != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = int64(info.ReqBodyLen)
-		h.RequestLength = &h.requestLength
-	}
-	if info.RespBodyLen != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = int64(info.RespBodyLen)
-		h.ResponseLength = &h.responseLength
-	}
-}
-func (h *L7Logger) fillKafka(l *pb.AppProtoLogsData) {
-	if l.Kafka == nil {
-		return
-	}
-	info := l.Kafka
-	if h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.RequestType = KafkaCommand(info.ApiKey).String()
-	}
-	if info.CorrelationId != 0 {
-		h.requestId = uint64(info.CorrelationId)
-		h.RequestId = &h.requestId
-	}
-	// 除fetch命令外，其他命令响应码不存在，状态也置为不存在
-	if h.responseCode == 0 && info.ApiKey != uint32(Fetch) {
-		h.ResponseStatus = uint8(datatype.STATUS_NOT_EXIST)
-		h.ResponseCode = nil
-	}
-
-	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
-		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
-		h.ResponseException = GetKafkaExceptionDesc(int16(l.Base.Head.Code))
-	}
-
-	if info.ReqMsgSize != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = int64(info.ReqMsgSize)
-		h.RequestLength = &h.requestLength
-	}
-	if info.RespMsgSize != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = int64(info.RespMsgSize)
-		h.ResponseLength = &h.responseLength
-	}
-}
-func (h *L7Logger) fillMqtt(l *pb.AppProtoLogsData) {
-	if l.Mqtt == nil {
-		return
-	}
-	info := l.Mqtt
-	h.RequestType = info.MqttType
-	h.RequestDomain = info.ClientId
-	if len(info.Topics) == 1 {
-		h.RequestResource = info.Topics[0].Name
-	} else if len(info.Topics) > 1 {
-		var topics_string strings.Builder
-		topics_string.WriteString(info.Topics[0].Name)
-		for i := 1; i < len(info.Topics); i++ {
-			topics_string.WriteByte(',')
-			topics_string.WriteString(info.Topics[i].Name)
-		}
-		h.RequestResource = topics_string.String()
-	}
-
-	switch info.ProtoVersion {
-	case 3:
-		h.Version = "3.1"
-	case 4:
-		h.Version = "3.1.1"
-	case 5:
-		h.Version = "5.0"
-	}
-
-	if h.ResponseStatus == datatype.STATUS_SERVER_ERROR ||
-		h.ResponseStatus == datatype.STATUS_CLIENT_ERROR {
-		if info.ProtoVersion != 5 {
-			h.ResponseException = GetMQTTV3ExceptionDesc(uint16(l.Base.Head.Code))
-		} else {
-			h.ResponseException = GetMQTTV5ExceptionDesc(uint16(l.Base.Head.Code))
-		}
-	}
-
-	if info.ReqMsgSize != -1 && h.Type != uint8(datatype.MSG_T_RESPONSE) {
-		h.requestLength = int64(info.ReqMsgSize)
-		h.RequestLength = &h.requestLength
-	}
-	if info.RespMsgSize != -1 && h.Type != uint8(datatype.MSG_T_REQUEST) {
-		h.responseLength = int64(info.RespMsgSize)
-		h.ResponseLength = &h.responseLength
-	}
-}
-
 func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	h.L7Base.Fill(l, platformData)
 
@@ -669,6 +464,10 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 	h.Version = l.Version
 	h.requestLength = int64(l.ReqLen)
 	h.responseLength = int64(l.RespLen)
+	h.sqlAffectedRows = uint64(l.RowEffect)
+	if h.sqlAffectedRows != 0 {
+		h.SqlAffectedRows = &h.sqlAffectedRows
+	}
 
 	if l.Req != nil {
 		h.RequestDomain = l.Req.Domain
@@ -699,10 +498,6 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 		}
 		h.ServiceName = l.ExtInfo.ServiceName
 		h.XRequestId = l.ExtInfo.XRequestId
-		h.sqlAffectedRows = uint64(l.ExtInfo.RowEffect)
-		if h.sqlAffectedRows != 0 {
-			h.SqlAffectedRows = &h.sqlAffectedRows
-		}
 		h.HttpProxyClient = l.ExtInfo.ClientIp
 	}
 	if l.TraceInfo != nil {

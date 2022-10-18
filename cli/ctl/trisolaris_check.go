@@ -107,16 +107,24 @@ func regiterCommand() []*cobra.Command {
 			initCmd(cmd, []CmdExecute{skipInterface})
 		},
 	}
+	localServersCmd := &cobra.Command{
+		Use:   "localServers",
+		Short: "get localServers from deepflow-server",
+		Run: func(cmd *cobra.Command, args []string) {
+			initCmd(cmd, []CmdExecute{localServers})
+		},
+	}
 	allCmd := &cobra.Command{
 		Use:   "all",
 		Short: "get all data from deepflow-server",
 		Run: func(cmd *cobra.Command, args []string) {
-			initCmd(cmd, []CmdExecute{platformData, ipGroups, flowAcls, tapTypes, segments, vpcIP, configData, skipInterface})
+			initCmd(cmd, []CmdExecute{platformData, ipGroups, flowAcls, tapTypes,
+				segments, vpcIP, configData, skipInterface, localServers})
 		},
 	}
 
 	commands := []*cobra.Command{platformDataCmd, ipGroupsCmd, flowAclsCmd,
-		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd, allCmd}
+		tapTypesCmd, configCmd, segmentsCmd, vpcIPCmd, skipInterfaceCmd, localServersCmd, allCmd}
 	return commands
 }
 
@@ -288,8 +296,14 @@ func configData(response *trident.SyncResponse) {
 func skipInterface(response *trident.SyncResponse) {
 	fmt.Println("SkipInterface:")
 	for index, skipInterface := range response.GetSkipInterface() {
-		JsonFormat(index+1,
-			fmt.Sprintf("mac: %s", Uint64ToMac(skipInterface.GetMac())))
+		JsonFormat(index+1, fmt.Sprintf("mac: %s", Uint64ToMac(skipInterface.GetMac())))
+	}
+}
+
+func localServers(response *trident.SyncResponse) {
+	fmt.Println("localServers:")
+	for index, entry := range response.GetDeepflowServerInstances() {
+		JsonFormat(index+1, entry)
 	}
 }
 

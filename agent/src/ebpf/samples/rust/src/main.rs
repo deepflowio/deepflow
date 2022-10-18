@@ -152,11 +152,13 @@ extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
         } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP1 {
             proto_tag.push_str("TLS_HTTP1");
         } else if sk_proto_safe(sd) == SOCK_DATA_TLS_HTTP2 {
-		proto_tag.push_str("TLS_HTTP2");
+            proto_tag.push_str("TLS_HTTP2");
         } else if sk_proto_safe(sd) == SOCK_DATA_DNS {
             proto_tag.push_str("DNS");
         } else if sk_proto_safe(sd) == SOCK_DATA_MYSQL {
             proto_tag.push_str("MYSQL");
+        } else if sk_proto_safe(sd) == SOCK_DATA_POSTGRESQL {
+            proto_tag.push_str("POSTGRESQL");
         } else if sk_proto_safe(sd) == SOCK_DATA_REDIS {
             proto_tag.push_str("REDIS");
         } else if sk_proto_safe(sd) == SOCK_DATA_KAFKA {
@@ -248,26 +250,24 @@ fn main() {
     let log_file = CString::new("/var/log/deepflow-ebpf.log".as_bytes()).unwrap();
     let log_file_c = log_file.as_c_str();
     unsafe {
-        // feature flag example
-        //let FEATURE_GO_NO_SYMBOL = 0;
-        //set_feature_flag(FEATURE_GO_NO_SYMBOL);
+        set_feature_flag(FEATURE_UPROBE_OPENSSL);
 
-        // The first parameter passed by a null pointer can be 
-	// filled with std::ptr::null()
+        // The first parameter passed by a null pointer can be
+        // filled with std::ptr::null()
         if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
             println!("bpf_tracer_init() file:{:?} error", log_file);
             ::std::process::exit(1);
         }
-/*
-        if register_event_handle(
-            EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
-            process_event_handle,
-        ) != 0
-        {
-            println!("register_event_handle() faild");
-            ::std::process::exit(1);
-        }
-*/
+        /*
+                if register_event_handle(
+                    EVENT_TYPE_PROC_EXEC | EVENT_TYPE_PROC_EXIT,
+                    process_event_handle,
+                ) != 0
+                {
+                    println!("register_event_handle() faild");
+                    ::std::process::exit(1);
+                }
+        */
         if running_socket_tracer(
             socket_trace_callback, /* 回调接口 rust -> C */
             1,                     /* 工作线程数，是指用户态有多少线程参与数据处理 */

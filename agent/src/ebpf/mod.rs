@@ -49,6 +49,8 @@ pub const SOCK_DATA_DUBBO: u16 = 40;
 #[allow(dead_code)]
 pub const SOCK_DATA_MYSQL: u16 = 60;
 #[allow(dead_code)]
+pub const SOCK_DATA_POSTGRESQL: u16 = 61;
+#[allow(dead_code)]
 pub const SOCK_DATA_REDIS: u16 = 80;
 #[allow(dead_code)]
 pub const SOCK_DATA_KAFKA: u16 = 100;
@@ -60,6 +62,8 @@ pub const SOCK_DATA_DNS: u16 = 120;
 // Feature
 #[allow(dead_code)]
 pub const FEATURE_UPROBE_GOLANG_SYMBOL: c_int = 0;
+#[allow(dead_code)]
+pub const FEATURE_UPROBE_OPENSSL: c_int = 1;
 
 //L7层协议是否需要重新核实
 #[allow(dead_code)]

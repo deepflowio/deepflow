@@ -25,7 +25,6 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
-	"github.com/deepflowys/deepflow/server/ingester/stream/config"
 	"github.com/deepflowys/deepflow/server/ingester/stream/jsonify"
 	"github.com/deepflowys/deepflow/server/ingester/stream/throttler"
 	"github.com/deepflowys/deepflow/server/libs/codec"
@@ -79,10 +78,6 @@ type Decoder struct {
 	flowTagWriter *flow_tag.FlowTagWriter
 	debugEnabled  bool
 
-	l7Disableds [L7_PROTO_MAX]bool
-	l7Disabled  bool
-	l4Disabled  bool
-
 	counter *Counter
 	utils.Closable
 }
@@ -93,7 +88,6 @@ func NewDecoder(
 	inQueue queue.QueueReader,
 	throttler *throttler.ThrottlingQueue,
 	flowTagWriter *flow_tag.FlowTagWriter,
-	flowLogDisabled *config.FlowLogDisabled,
 ) *Decoder {
 	return &Decoder{
 		index:         index,
@@ -104,23 +98,7 @@ func NewDecoder(
 		flowTagWriter: flowTagWriter,
 		debugEnabled:  log.IsEnabledFor(logging.DEBUG),
 		counter:       &Counter{},
-		l7Disableds:   getL7Disables(flowLogDisabled),
-		l7Disabled:    flowLogDisabled.L7,
-		l4Disabled:    flowLogDisabled.L4,
 	}
-}
-
-func getL7Disables(flowLogConfig *config.FlowLogDisabled) [L7_PROTO_MAX]bool {
-	l7Disableds := [L7_PROTO_MAX]bool{}
-	l7Disableds[datatype.L7_PROTOCOL_HTTP_1] = flowLogConfig.Http
-	l7Disableds[datatype.L7_PROTOCOL_HTTP_2] = flowLogConfig.Http
-	l7Disableds[datatype.L7_PROTOCOL_DNS] = flowLogConfig.Dns
-	l7Disableds[datatype.L7_PROTOCOL_MYSQL] = flowLogConfig.Mysql
-	l7Disableds[datatype.L7_PROTOCOL_REDIS] = flowLogConfig.Redis
-	l7Disableds[datatype.L7_PROTOCOL_DUBBO] = flowLogConfig.Dubbo
-	l7Disableds[datatype.L7_PROTOCOL_KAFKA] = flowLogConfig.Kafka
-	l7Disableds[datatype.L7_PROTOCOL_MQTT] = flowLogConfig.Mqtt
-	return l7Disableds
 }
 
 func (d *Decoder) GetCounter() interface{} {
@@ -151,9 +129,9 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
-			if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG && !d.l7Disabled {
+			if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
 				d.handleProtoLog(decoder)
-			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW && !d.l4Disabled {
+			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW {
 				d.handleTaggedFlow(decoder, pbTaggedFlow)
 			} else if d.msgType == datatype.MESSAGE_TYPE_OPENTELEMETRY {
 				d.handleOpenTelemetry(recvBytes.VtapID, decoder, pbTracesData)
@@ -272,26 +250,21 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 
 	d.counter.L7Count++
 	drop := int64(0)
-	if proto.Base.Head.Proto < uint32(L7_PROTO_MAX) &&
-		d.l7Disableds[proto.Base.Head.Proto] {
+	l := jsonify.ProtoLogToL7Logger(proto, d.platformData)
+	if !d.throttler.Send(l) {
+		d.counter.L7DropCount++
 		drop = 1
-	} else {
-		l := jsonify.ProtoLogToL7Logger(proto, d.platformData)
-		if !d.throttler.Send(l) {
-			d.counter.L7DropCount++
-			drop = 1
-		}
 	}
 	proto.Release()
 
 	switch datatype.L7Protocol(proto.Base.Head.Proto) {
-	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2:
+	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
 		d.counter.L7HTTPCount++
 		d.counter.L7HTTPDropCount += drop
 	case datatype.L7_PROTOCOL_DNS:
 		d.counter.L7DNSCount++
 		d.counter.L7DNSDropCount += drop
-	case datatype.L7_PROTOCOL_MYSQL:
+	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_POSTGRE:
 		d.counter.L7SQLCount++
 		d.counter.L7SQLDropCount += drop
 	case datatype.L7_PROTOCOL_REDIS:

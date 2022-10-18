@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/bitly/go-simplejson"
-	. "github.com/deepflowys/deepflow/server/controller/cloud/huawei/common"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
@@ -55,7 +55,7 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jPorts {
 			jPort := jPorts[i]
-			if !CheckAttributes(jPort, vifRequiredAttrs) {
+			if !cloudcommon.CheckJsonAttributes(jPort, vifRequiredAttrs) {
 				continue
 			}
 			id := jPort.Get("id").MustString()
@@ -132,7 +132,7 @@ func (h *HuaWei) formatVInterfaceRelatedToolDataSet(jPort *simplejson.Json, devi
 	ipRequiredAttrs := []string{"ip_address"}
 	for i := range jIPs.MustArray() {
 		jIP := jIPs.GetIndex(i)
-		if !CheckAttributes(jIP, ipRequiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jIP, ipRequiredAttrs) {
 			continue
 		}
 		ipAddr := jIP.Get("ip_address").MustString()
@@ -164,7 +164,7 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 	}
 	for i := range jIPs.MustArray() {
 		jIP := jIPs.GetIndex(i)
-		if !CheckAttributes(jIP, ipRequiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jIP, ipRequiredAttrs) {
 			continue
 		}
 		ipAddr := jIP.Get("ip_address").MustString()
@@ -182,8 +182,8 @@ func (h *HuaWei) formatIPsAndNATRules(jPort *simplejson.Json, vif model.VInterfa
 		if i == 0 && floatingIP != "" {
 			natRule = model.NATRule{
 				Lcuuid:           common.GenerateUUID(floatingIP + "_" + ipAddr),
-				Type:             NAT_RULE_TYPE_DNAT,
-				Protocol:         PROTOCOL_ALL,
+				Type:             cloudcommon.NAT_RULE_TYPE_DNAT,
+				Protocol:         cloudcommon.PROTOCOL_ALL,
 				FloatingIP:       floatingIP,
 				FixedIP:          ipAddr,
 				VInterfaceLcuuid: vif.Lcuuid,
@@ -205,7 +205,7 @@ func (h *HuaWei) formatPublicIPs(project Project, token string) error {
 	requiredAttrs := []string{"port_id", "public_ip_address"}
 	for i := range jIPs {
 		jIP := jIPs[i]
-		if !CheckAttributes(jIP, requiredAttrs) {
+		if !cloudcommon.CheckJsonAttributes(jIP, requiredAttrs) {
 			log.Infof("exclude public ip, missing attr")
 			continue
 		}

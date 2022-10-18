@@ -51,20 +51,4 @@ const (
 		
 			END IF;
 		END`
-	CREATE_TRIGGER_RESOURCE_GROUP = `CREATE DEFINER='root'@'localhost' TRIGGER resource_group_id AFTER INSERT
-		ON resource_group FOR EACH ROW
-		BEGIN
-			IF (new.id > 64000) THEN
-				signal sqlstate 'HY000' SET message_text = "resource_group id is above 64000, cannot insert.";
-			END IF;
-		END
-		`
-	CREATE_TRIGGER_NPB_TUNNEL = `
-		CREATE DEFINER='root'@'localhost' TRIGGER npb_tunnel_id AFTER INSERT
-		ON npb_tunnel FOR EACH ROW
-		BEGIN
-			IF (new.id > 64000) THEN
-				signal sqlstate 'HY000' SET message_text = "npb_tunnel id is above 64000, cannot insert.";
-			END IF;
-		END`
 )

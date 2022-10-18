@@ -111,6 +111,7 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
         L7ProtocolSendLog {
             req_len: None,
             resp_len: None,
+            row_effect: p.affected_rows as u32,
             req: L7Request {
                 req_type: String::from(char::from(p.req_type)),
                 domain: String::new(),
@@ -123,7 +124,6 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
                 exception: p.error_message,
             },
             ext_info: Some(ExtendedInfo {
-                row_effect: Some(p.affected_rows as u32),
                 ..Default::default()
             }),
             ..Default::default()

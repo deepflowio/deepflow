@@ -147,6 +147,13 @@ func (e *SimpleEncoder) ReplaceU32At(offset int, v uint32) {
 	binary.LittleEndian.PutUint32(e.buf[offset:], v)
 }
 
+func (e *SimpleEncoder) ReplaceU64At(offset int, v uint64) {
+	if offset+8 >= len(e.buf) {
+		return
+	}
+	binary.LittleEndian.PutUint64(e.buf[offset:], v)
+}
+
 func (e *SimpleEncoder) Reset() {
 	e.buf = e.buf[:0]
 }

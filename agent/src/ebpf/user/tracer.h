@@ -90,7 +90,8 @@ enum probe_type {
 };
 
 enum feature_flag {
-	FEATURE_GO_NO_SYMBOL,
+	FEATURE_UPROBE_GOLANG_SYMBOL,
+	FEATURE_UPROBE_OPENSSL,
 	FEATURE_MAX,
 };
 

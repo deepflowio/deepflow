@@ -14,9 +14,28 @@
  * limitations under the License.
  */
 
-package migration
+package common
 
-const (
-	DB_VERSION_TABLE  = "db_version"
-	DB_VERSION_EXPECT = "6.1.5.0" // TODO add array to implement step-by-step migration
+import (
+	"github.com/bitly/go-simplejson"
 )
+
+func CheckJsonAttributes(json *simplejson.Json, requiredAttrs []string) bool {
+	for _, attr := range requiredAttrs {
+		if _, ok := json.CheckGet(attr); !ok {
+			log.Infof("no attr: %s", attr)
+			return false
+		}
+	}
+	return true
+}
+
+func CheckMapAttributes(data map[string]interface{}, requiredAttrs []string) bool {
+	for _, attr := range requiredAttrs {
+		if _, ok := data[attr]; !ok {
+			log.Infof("no attr: %s", attr)
+			return false
+		}
+	}
+	return true
+}

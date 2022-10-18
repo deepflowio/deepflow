@@ -38,6 +38,8 @@ const (
 	_FROM_OFFSET        = 60
 	_TUNNEL_TYPE_OFFSET = 32
 	_RESERVED_OFFSET    = 40
+
+	_RESERVED_MASK = 0xfffff
 )
 
 // 64     60         40         32                                    0
@@ -83,8 +85,8 @@ func (p TapPort) SplitToPortTypeTunnel() (uint32, uint8, TunnelType) {
 }
 
 // 用于编码后做为Map Key
-func (p TapPort) SetU16IntoReservedBytes(v uint16) TapPort {
-	return p | TapPort(v)<<_RESERVED_OFFSET
+func (p TapPort) SetReservedBytes(v uint32) TapPort {
+	return p | TapPort(v&_RESERVED_MASK)<<_RESERVED_OFFSET
 }
 
 func (p TapPort) String() string {
