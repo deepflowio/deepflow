@@ -87,6 +87,7 @@ fn serialize_seq(
     }
 }
 
+#[cfg(unix)]
 #[derive(Debug)]
 struct AfpacketSender {
     af_packet: Tpacket,
@@ -96,6 +97,7 @@ struct AfpacketSender {
     seq: u32,
 }
 
+#[cfg(unix)]
 impl AfpacketSender {
     fn new(
         if_name: String,
