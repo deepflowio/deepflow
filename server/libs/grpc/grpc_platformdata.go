@@ -747,7 +747,7 @@ func (t *PlatformInfoTable) HandleSimpleCommand(op uint16, arg string) string {
 	return strings.Join(newLines, "\n")
 }
 
-func lookup(host net.IP) (net.IP, error) {
+func Lookup(host net.IP) (net.IP, error) {
 	routes, err := netlink.RouteGet(host)
 	if err != nil {
 		return nil, fmt.Errorf("RouteGet %v %s", host, err)
@@ -887,7 +887,7 @@ func (t *PlatformInfoTable) Reload() error {
 		if t.ctlIP == "" {
 			var local net.IP
 			// 根据remote ip获取本端ip
-			if local, err = lookup(remote); err != nil {
+			if local, err = Lookup(remote); err != nil {
 				return err
 			}
 			t.ctlIP = local.String()
