@@ -41,28 +41,34 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 			DB:       "flow_tag",
 		}
 		var externalMetricSql string
-		if where != "" {
-			externalMetricSql = fmt.Sprintf("SELECT field_name FROM %s_custom_field WHERE table='%s' AND field_type='metrics' AND (%s) GROUP BY field_name ORDER BY field_name ASC", db, table, where)
-		} else {
-			externalMetricSql = fmt.Sprintf("SELECT field_name FROM %s_custom_field WHERE table='%s' AND field_type='metrics' GROUP BY field_name ORDER BY field_name ASC", db, table)
+		var tableFilter string
+		var whereSql string
+		externalMetricSql = "SELECT field_name,table FROM %s_custom_field WHERE %sfield_type='metrics'%s GROUP BY field_name,table ORDER BY table, field_name ASC"
+		if table != "" {
+			tableFilter = fmt.Sprintf("table='%s' AND ", table)
 		}
+		if where != "" {
+			whereSql = fmt.Sprintf(" AND (%s)", where)
+		}
+		externalMetricSql = fmt.Sprintf(externalMetricSql, db, tableFilter, whereSql)
 
 		externalMetricFloatRst, err := externalChClient.DoQuery(&client.QueryParams{Sql: externalMetricSql})
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
-		for i, _tagName := range externalMetricFloatRst["values"] {
-			tagName := _tagName.([]interface{})[0]
+		for i, value := range externalMetricFloatRst["values"] {
+			tagName := value.([]interface{})[0]
+			tableName := value.([]interface{})[1].(string)
 			externalTag := tagName.(string)
 			metrics_names_field, metrics_values_field := METRICS_ARRAY_NAME_MAP[db][0], METRICS_ARRAY_NAME_MAP[db][1]
 			dbField := fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, externalTag, metrics_values_field, metrics_names_field, externalTag)
 			metricName := fmt.Sprintf("%s.%s", "metrics", externalTag)
 			lm := NewMetrics(
 				i, dbField, metricName, "", METRICS_TYPE_COUNTER,
-				"指标", []bool{true, true, true}, "", table,
+				"指标", []bool{true, true, true}, "", tableName,
 			)
-			loadMetrics[metricName] = lm
+			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}
 	}
 	return loadMetrics, err
