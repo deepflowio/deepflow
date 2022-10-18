@@ -128,6 +128,11 @@ func (obj *_DBMgr[M]) GetFromControllerIP(controllerIP string) (result *M, err e
 	return
 }
 
+func (obj *_DBMgr[M]) GetBatchFromControllerIP(controllerIP string) (result []*M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`controller_ip` = ?", controllerIP).Find(&result).Error
+	return
+}
+
 // GetBatchFromPodNodeIDs 通过podNodeID获取内容
 func (obj *_DBMgr[M]) GetBatchFromPodNodeIDs(podNodeIDs []int) (result []*M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`pod_node_id` IN (?)", podNodeIDs).Find(&result).Error
@@ -149,6 +154,11 @@ func (obj *_DBMgr[M]) GetFromName(name string) (result *M, err error) {
 // GetFromRegion 通过region获取内容
 func (obj *_DBMgr[M]) GetFromRegion(region string) (result *M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`region` = ?", region).First(&result).Error
+	return
+}
+
+func (obj *_DBMgr[M]) GetFromCAMD5(md5 string) (result *M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`ca_md5` = ?", md5).First(&result).Error
 	return
 }
 
