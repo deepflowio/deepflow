@@ -402,12 +402,12 @@ impl Trident {
                     }
                     components.replace(comp);
                 }
-                Some(components) => {
+                Some(mut components) => {
                     components.start();
                     components.config = config_handler.candidate_config.clone();
                     dispatcher_listener_callback(
                         &config_handler.candidate_config.dispatcher,
-                        &components,
+                        &mut components,
                         blacklist,
                         vm_mac_addrs,
                         tap_types,
@@ -439,7 +439,7 @@ impl Trident {
 
 fn dispatcher_listener_callback(
     conf: &DispatcherConfig,
-    components: &Components,
+    components: &mut Components,
     blacklist: Vec<u64>,
     vm_mac_addrs: Vec<MacAddr>,
     tap_types: Vec<trident::TapType>,
@@ -485,18 +485,21 @@ fn dispatcher_listener_callback(
                 );
                 listener.on_vm_change(&vm_mac_addrs);
             }
-            let mut updated = true;
+            let mut updated = false;
             if components.cur_tap_types.len() != tap_types.len() {
-                updated = false;
+                updated = true;
             } else {
                 for i in 0..tap_types.len() {
                     if components.cur_tap_types[i] != tap_types[i] {
-                        updated = false;
+                        updated = true;
+                        break;
                     }
                 }
             }
             if updated {
-                components.tap_typer.on_tap_types_change(tap_types);
+                components.tap_typer.on_tap_types_change(tap_types.clone());
+                components.cur_tap_types.clear();
+                components.cur_tap_types.clone_from(&tap_types);
             }
         }
         _ => {}
