@@ -172,6 +172,9 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string) ([]i
 	} */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
+		if db == "ext_metrics" || db == "deepflow_system" {
+			field = metrics.DisplayName
+		}
 		values[metrics.Index] = []interface{}{
 			field, metrics.IsAgg, metrics.DisplayName, metrics.Unit, metrics.Type,
 			metrics.Category, METRICS_OPERATORS, metrics.Permissions, metrics.Table,
@@ -184,7 +187,9 @@ func GetMetricsDescriptions(db string, table string, where string) (map[string][
 	var values []interface{}
 	if table == "" {
 		var tables []interface{}
-		if db == "ext_metrics" || db == "deepflow_system" {
+		if db == "ext_metrics" {
+			tables = append(tables, table)
+		} else if db == "deepflow_system" {
 			for _, extTables := range ckcommon.GetExtTables(db) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
