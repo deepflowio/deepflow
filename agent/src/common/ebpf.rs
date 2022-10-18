@@ -10,6 +10,9 @@ pub const GO_TLS_UPROBE: u8 = 1;
 #[allow(dead_code)]
 // hook在 go 的 http2 ReadHeader/WriteHeader 获取原始头信息
 pub const GO_HTTP2_UPROBE: u8 = 2;
+#[allow(dead_code)]
+// hook in openssl lib
+pub const OPENSSL_UPROBE: u8 = 3;
 
 const EBPF_TYPE_TRACEPOINT: u8 = 0;
 const EBPF_TYPE_TLS_UPROBE: u8 = 1;
@@ -41,7 +44,7 @@ pub enum EbpfType {
 impl EbpfType {
     pub fn from(v: u8) -> Self {
         match v {
-            GO_TLS_UPROBE => Self::TlsUprobe,
+            GO_TLS_UPROBE | OPENSSL_UPROBE => Self::TlsUprobe,
             GO_HTTP2_UPROBE => Self::GoHttp2Uprobe,
             _ => {
                 // 默认当作tracepoint

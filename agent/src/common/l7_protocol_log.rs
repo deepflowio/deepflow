@@ -347,6 +347,15 @@ impl From<&MetaPacket<'_>> for ParseParam {
     }
 }
 
+impl ParseParam {
+    pub fn is_tls(&self) -> bool {
+        if let Some(ebpf_param) = self.ebpf_param {
+            return ebpf_param.is_tls;
+        }
+        false
+    }
+}
+
 pub fn get_bitmap(protocol: IpProtocol) -> u128 {
     let mut bitmap: u128 = 0;
     for i in get_all_protocol().iter() {

@@ -250,6 +250,7 @@ impl L7ProtocolParserInterface for HttpLog {
 
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         parse_common!(self, param);
+        self.info.is_tls = param.is_tls();
         match param.ebpf_type {
             EbpfType::GoHttp2Uprobe => {
                 self.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
@@ -284,6 +285,7 @@ impl L7ProtocolParserInterface for HttpLog {
             return Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())]);
         }
         parse_common!(self, param);
+        self.info.is_tls = param.is_tls();
         match param.ebpf_type {
             EbpfType::GoHttp2Uprobe => {
                 self.info.raw_data_type = L7ProtoRawDataType::GoHttp2Uprobe; // 用于区分是否需要多段merge
