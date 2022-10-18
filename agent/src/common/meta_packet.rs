@@ -423,15 +423,13 @@ impl<'a> MetaPacket<'a> {
                 error::Error::ParsePacketFailed(format!("parse eth_type failed: {}", e))
             })?;
             if eth_type == EthernetType::Dot1Q {
-                vlan_tag_size = VLAN_HEADER_SIZE;
+                vlan_tag_size += VLAN_HEADER_SIZE;
                 size_checker -= VLAN_HEADER_SIZE as isize;
                 if size_checker < 0 {
                     return Err(error::Error::ParsePacketFailed("packet truncated".into()));
                 }
-                let vlan_tag = read_u16_be(
-                    &packet
-                        [FIELD_OFFSET_ETH_TYPE + ETH_TYPE_LEN + ETH_TYPE_LEN + VLAN_HEADER_SIZE..],
-                );
+                let vlan_tag =
+                    read_u16_be(&packet[FIELD_OFFSET_ETH_TYPE + VLAN_HEADER_SIZE + ETH_TYPE_LEN..]);
                 self.vlan = vlan_tag & VLAN_ID_MASK;
                 eth_type = EthernetType::try_from(read_u16_be(
                     &packet[FIELD_OFFSET_ETH_TYPE + vlan_tag_size..],

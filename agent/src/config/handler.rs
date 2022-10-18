@@ -1041,6 +1041,14 @@ impl ConfigHandler {
             );
         }
 
+        if yaml_config.mirror_traffic_pcp != new_config.yaml_config.mirror_traffic_pcp {
+            yaml_config.mirror_traffic_pcp = new_config.yaml_config.mirror_traffic_pcp;
+            info!(
+                "mirror_traffic_pcp set to {:?}",
+                yaml_config.mirror_traffic_pcp
+            );
+        }
+
         if candidate_config.dispatcher != new_config.dispatcher {
             if candidate_config.dispatcher.if_mac_source != new_config.dispatcher.if_mac_source {
                 if candidate_config.tap_mode != TapMode::Local {

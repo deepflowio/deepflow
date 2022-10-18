@@ -398,6 +398,9 @@ impl Trident {
                         vm_mac_addrs,
                     )?;
                     comp.start();
+                    if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer {
+                        parse_tap_type(&mut comp, tap_types);
+                    }
                     for callback in callbacks {
                         callback(&config_handler, &mut comp);
                     }
@@ -486,24 +489,28 @@ fn dispatcher_listener_callback(
                 );
                 listener.on_vm_change(&vm_mac_addrs);
             }
-            let mut updated = false;
-            if components.cur_tap_types.len() != tap_types.len() {
-                updated = true;
-            } else {
-                for i in 0..tap_types.len() {
-                    if components.cur_tap_types[i] != tap_types[i] {
-                        updated = true;
-                        break;
-                    }
-                }
-            }
-            if updated {
-                components.tap_typer.on_tap_types_change(tap_types.clone());
-                components.cur_tap_types.clear();
-                components.cur_tap_types.clone_from(&tap_types);
-            }
+            parse_tap_type(components, tap_types);
         }
         _ => {}
+    }
+}
+
+fn parse_tap_type(components: &mut Components, tap_types: Vec<trident::TapType>) {
+    let mut updated = false;
+    if components.cur_tap_types.len() != tap_types.len() {
+        updated = true;
+    } else {
+        for i in 0..tap_types.len() {
+            if components.cur_tap_types[i] != tap_types[i] {
+                updated = true;
+                break;
+            }
+        }
+    }
+    if updated {
+        components.tap_typer.on_tap_types_change(tap_types.clone());
+        components.cur_tap_types.clear();
+        components.cur_tap_types.clone_from(&tap_types);
     }
 }
 

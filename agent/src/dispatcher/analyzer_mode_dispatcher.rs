@@ -22,7 +22,7 @@ use std::{
 };
 
 use arc_swap::access::Access;
-use log::{info, warn};
+use log::{debug, info, warn};
 use packet_dedup::PacketDedupMap;
 
 use super::base_dispatcher::BaseDispatcher;
@@ -216,11 +216,11 @@ impl AnalyzerModeDispatcher {
                 && !base.analyzer_dedup_disabled
                 && self.dedup.duplicate(overlay_packet, timestamp)
             {
-                warn!("packet is duplicate");
+                debug!("packet is duplicate");
                 continue;
             }
 
-            let (sa_key, da_key) =
+            let (da_key, sa_key) =
                 if base.tunnel_info.tier == 0 && overlay_packet.len() >= L2_MAC_ADDR_OFFSET {
                     let mut da_mac: [u8; 6] = [0; 6];
                     let mut sa_mac: [u8; 6] = [0; 6];
@@ -231,7 +231,7 @@ impl AnalyzerModeDispatcher {
                         MacAddr::from(sa_mac).to_lower_32b(),
                     )
                 } else {
-                    (base.tunnel_info.mac_src, base.tunnel_info.mac_dst)
+                    (base.tunnel_info.mac_dst, base.tunnel_info.mac_src)
                 };
             let vm_mac_addrs = self.vm_mac_addrs.lock().unwrap().clone();
             let (dst_remote, src_remote) = (
@@ -274,7 +274,7 @@ impl AnalyzerModeDispatcher {
                     let pipeline = AnalyzerPipeline {
                         tap_type,
                         handlers,
-                        timestamp: Default::default(),
+                        timestamp: Duration::ZERO,
                     };
                     self.tap_pipelines
                         .insert(tap_type, Arc::new(Mutex::new(pipeline)));
@@ -283,8 +283,7 @@ impl AnalyzerModeDispatcher {
                 Some(p) => p.lock().unwrap(),
             };
 
-            if packet
-                .timestamp
+            if timestamp
                 .add(Duration::from_millis(1))
                 .lt(&pipeline.timestamp)
             {
@@ -308,7 +307,7 @@ impl AnalyzerModeDispatcher {
                 original_length,
             ) {
                 base.counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                warn!("meta_packet update failed: {:?}", e);
+                debug!("meta_packet update failed: {:?}", e);
                 continue;
             }
 
@@ -353,6 +352,7 @@ impl AnalyzerModeDispatcher {
                     return Err(e);
                 }
             };
+            *tunnel_info = TunnelInfo::default();
             return Ok((overlay_offset, tap_type));
         }
 
