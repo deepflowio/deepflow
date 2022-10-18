@@ -317,7 +317,8 @@ func (b *DiffBaseDataSet) deleteRoutingTable(lcuuid string) {
 	log.Info(deleteDiffBase(common.RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid))
 }
 
-func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int) {
+func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int, toolDataSet *ToolDataSet) {
+	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
 	b.DHCPPorts[dbItem.Lcuuid] = &DHCPPort{
 		DiffBase: DiffBase{
 			Sequence: seq,
@@ -326,6 +327,7 @@ func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int) {
 		Name:         dbItem.Name,
 		RegionLcuuid: dbItem.Region,
 		AZLcuuid:     dbItem.AZ,
+		VPCLcuuid:    vpcLcuuid,
 	}
 	log.Info(addDiffBase(common.RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
 }
@@ -390,13 +392,15 @@ func (b *DiffBaseDataSet) deleteLANIP(lcuuid string) {
 	log.Info(deleteDiffBase(common.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 }
 
-func (b *DiffBaseDataSet) addFloatingIP(dbItem *mysql.FloatingIP, seq int) {
+func (b *DiffBaseDataSet) addFloatingIP(dbItem *mysql.FloatingIP, seq int, toolDataSet *ToolDataSet) {
+	vpcLcuuid, _ := toolDataSet.GetVPCLcuuidByID(dbItem.VPCID)
 	b.FloatingIPs[dbItem.Lcuuid] = &FloatingIP{
 		DiffBase: DiffBase{
 			Sequence: seq,
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		RegionLcuuid: dbItem.Region,
+		VPCLcuuid:    vpcLcuuid,
 	}
 	log.Info(addDiffBase(common.RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
 }
@@ -1106,12 +1110,14 @@ type DHCPPort struct {
 	Name         string `json:"name"`
 	RegionLcuuid string `json:"region_lcuuid"`
 	AZLcuuid     string `json:"az_lcuuid"`
+	VPCLcuuid    string `json:"vpc_lcuuid"`
 }
 
 func (d *DHCPPort) Update(cloudItem *cloudmodel.DHCPPort) {
 	d.Name = cloudItem.Name
 	d.RegionLcuuid = cloudItem.RegionLcuuid
 	d.AZLcuuid = cloudItem.AZLcuuid
+	d.VPCLcuuid = cloudItem.VPCLcuuid
 	log.Info(updateDiffBase(common.RESOURCE_TYPE_DHCP_PORT_EN, d))
 }
 
@@ -1160,10 +1166,12 @@ func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
 type FloatingIP struct {
 	DiffBase
 	RegionLcuuid string `json:"region_lcuuid"`
+	VPCLcuuid    string `json:"vpc_lcuuid"`
 }
 
 func (f *FloatingIP) Update(cloudItem *cloudmodel.FloatingIP) {
 	f.RegionLcuuid = cloudItem.RegionLcuuid
+	f.VPCLcuuid = cloudItem.VPCLcuuid
 	log.Info(updateDiffBase(common.RESOURCE_TYPE_FLOATING_IP_EN, f))
 }
 

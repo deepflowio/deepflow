@@ -143,7 +143,7 @@ type VInterface struct {
 	DeviceLcuuid    string `json:"device_lcuuid" binding:"required"`
 	DeviceType      int    `json:"device_type" binding:"required"`
 	NetworkLcuuid   string `json:"network_lcuuid" binding:"required"`
-	VPCLcuuid       string `json:"vpc_lcuuid" binding:"required"`
+	VPCLcuuid       string `json:"vpc_lcuuid" binding:"required"` // TODO not used
 	RegionLcuuid    string `json:"region_lcuuid" binding:"required"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }

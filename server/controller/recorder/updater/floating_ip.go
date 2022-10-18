@@ -86,6 +86,17 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 
 func (f *FloatingIP) generateUpdateInfo(diffBase *cache.FloatingIP, cloudItem *cloudmodel.FloatingIP) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
+	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
+		vpcID, exists := f.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+		if !exists {
+			log.Errorf(resourceAForResourceBNotFound(
+				common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				common.RESOURCE_TYPE_FLOATING_IP_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
+		updateInfo["epc_id"] = vpcID
+	}
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
 	}

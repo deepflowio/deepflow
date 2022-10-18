@@ -49,6 +49,17 @@ func (p *DHCPPort) getDiffBaseByCloudItem(cloudItem *cloudmodel.DHCPPort) (diffB
 
 func (p *DHCPPort) generateUpdateInfo(diffBase *cache.DHCPPort, cloudItem *cloudmodel.DHCPPort) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
+	if diffBase.VPCLcuuid != cloudItem.VPCLcuuid {
+		vpcID, exists := p.cache.ToolDataSet.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
+		if !exists {
+			log.Errorf(resourceAForResourceBNotFound(
+				common.RESOURCE_TYPE_VPC_EN, cloudItem.VPCLcuuid,
+				common.RESOURCE_TYPE_DHCP_PORT_EN, cloudItem.Lcuuid,
+			))
+			return nil, false
+		}
+		updateInfo["epc_id"] = vpcID
+	}
 	if diffBase.Name != cloudItem.Name {
 		updateInfo["name"] = cloudItem.Name
 	}

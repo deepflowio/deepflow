@@ -554,7 +554,7 @@ func (c *Cache) refreshRoutingTables(vrouterIDs []int) {
 
 func (c *Cache) AddDHCPPorts(items []*mysql.DHCPPort) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addDHCPPort(item, c.Sequence)
+		c.DiffBaseDataSet.addDHCPPort(item, c.Sequence, &c.ToolDataSet)
 		c.ToolDataSet.addDHCPPort(item)
 	}
 }
@@ -662,7 +662,7 @@ func (c *Cache) refreshLANIPs() {
 
 func (c *Cache) AddFloatingIPs(items []*mysql.FloatingIP) {
 	for _, item := range items {
-		c.DiffBaseDataSet.addFloatingIP(item, c.Sequence)
+		c.DiffBaseDataSet.addFloatingIP(item, c.Sequence, &c.ToolDataSet)
 	}
 }
 
