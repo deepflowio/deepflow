@@ -32,23 +32,29 @@ struct task_struct;
 /*
  * bpf helpers
  */
-static void *(*bpf_map_lookup_elem)(void *map, const void *key) = (void *) 1;
-static long (*bpf_map_update_elem)(void *map, const void *key, const void *value, __u64 flags) = (void *) 2;
-static long (*bpf_map_delete_elem)(void *map, const void *key) = (void *) 3;
-static long (*bpf_probe_read)(void *dst, __u32 size, const void *unsafe_ptr) = (void *) 4;
-static __u64 (*bpf_ktime_get_ns)(void) = (void *) 5;
-static long (*bpf_trace_printk)(const char *fmt, __u32 fmt_size, ...) = (void *) 6;
-static __u32 (*bpf_get_prandom_u32)(void) = (void *) 7;
-static __u32 (*bpf_get_smp_processor_id)(void) = (void *) 8;
-static long (*bpf_tail_call)(void *ctx, void *prog_array_map, __u32 index) = (void *) 12;
-static __u64 (*bpf_get_current_pid_tgid)(void) = (void *) 14;
-static __u64 (*bpf_get_current_uid_gid)(void) = (void *) 15;
-static long (*bpf_get_current_comm)(void *buf, __u32 size_of_buf) = (void *) 16;
-static __u64 (*bpf_get_current_task)(void) = (void *) 35;
-static long (*bpf_perf_event_output)(void *ctx, void *map, __u64 flags, void *data, __u64 size) = (void *) 25;
-static long (*bpf_probe_read_str)(void *dst, __u32 size, const void *unsafe_ptr) = (void *) 45;
+static void *(*bpf_map_lookup_elem) (void *map, const void *key) = (void *)1;
+static long (*bpf_map_update_elem) (void *map, const void *key,
+				    const void *value, __u64 flags) = (void *)2;
+static long (*bpf_map_delete_elem) (void *map, const void *key) = (void *)3;
+static long (*bpf_probe_read) (void *dst, __u32 size, const void *unsafe_ptr) =
+    (void *)4;
+static __u64(*bpf_ktime_get_ns) (void) = (void *)5;
+static long (*bpf_trace_printk) (const char *fmt, __u32 fmt_size, ...) =
+    (void *)6;
+static __u32(*bpf_get_prandom_u32) (void) = (void *)7;
+static __u32(*bpf_get_smp_processor_id) (void) = (void *)8;
+static long (*bpf_tail_call) (void *ctx, void *prog_array_map, __u32 index) =
+    (void *)12;
+static __u64(*bpf_get_current_pid_tgid) (void) = (void *)14;
+static __u64(*bpf_get_current_uid_gid) (void) = (void *)15;
+static long (*bpf_get_current_comm) (void *buf, __u32 size_of_buf) = (void *)16;
+static __u64(*bpf_get_current_task) (void) = (void *)35;
+static long (*bpf_perf_event_output) (void *ctx, void *map, __u64 flags,
+				      void *data, __u64 size) = (void *)25;
+static long (*bpf_probe_read_str) (void *dst, __u32 size,
+				   const void *unsafe_ptr) = (void *)45;
 // bpf_probe_read_user added in Linux 5.5, Instead of bpf_probe_read_user(), use bpf_probe_read() here.
-static long (*bpf_probe_read_user)(void *dst, __u32 size, const void *unsafe_ptr) = (void *)4; // real value is 112
+static long (*bpf_probe_read_user) (void *dst, __u32 size, const void *unsafe_ptr) = (void *)4;	// real value is 112
 
 #if __GNUC__ && !__clang__
 #define SEC(name) __attribute__((section(name), used))
@@ -99,6 +105,41 @@ static long (*bpf_probe_read_user)(void *dst, __u32 size, const void *unsafe_ptr
 #define PT_REGS_IP(x) ((x)->rip)
 #endif
 #endif
+#elif defined(__aarch64__)
+struct pt_regs {
+	union {
+		struct user_pt_regs user_regs;
+		struct {
+			__u64 regs[31];
+			__u64 sp;
+			__u64 pc;
+			__u64 pstate;
+		};
+	};
+	__u64 orig_x0;
+#ifdef __AARCH64EB__
+	__u32 unused2;
+	__s32 syscallno;
+#else
+	__s32 syscallno;
+	__u32 unused2;
+#endif
+
+	__u64 orig_addr_limit;
+	__u64 unused;		// maintain 16 byte alignment
+	__u64 stackframe[2];
+};
+
+#define PT_REGS_PARM1(x) ((x)->regs[0])
+#define PT_REGS_PARM2(x) ((x)->regs[1])
+#define PT_REGS_PARM3(x) ((x)->regs[2])
+#define PT_REGS_PARM4(x) ((x)->regs[3])
+#define PT_REGS_PARM5(x) ((x)->regs[4])
+#define PT_REGS_RET(x) ((x)->regs[30])
+#define PT_REGS_FP(x) ((x)->regs[29])	/* Works only with CONFIG_FRAME_POINTER */
+#define PT_REGS_RC(x) ((x)->regs[0])
+#define PT_REGS_SP(x) ((x)->sp)
+#define PT_REGS_IP(x) ((x)->pc)
 #else
 _Pragma("GCC error \"Must specify a BPF target arch\"");
 #endif
@@ -137,15 +178,17 @@ _Pragma("GCC error \"Must specify a BPF target arch\"");
 #define PT_GO_REGS_PARM8(x) ((x)->r10)
 #define PT_GO_REGS_PARM9(x) ((x)->rdx)
 #elif defined(__aarch64__)
-#define PT_GO_REGS_PARM1(x) ((x)->r0)
-#define PT_GO_REGS_PARM2(x) ((x)->r1)
-#define PT_GO_REGS_PARM3(x) ((x)->r2)
-#define PT_GO_REGS_PARM4(x) ((x)->r3)
-#define PT_GO_REGS_PARM5(x) ((x)->r4)
-#define PT_GO_REGS_PARM6(x) ((x)->r5)
-#define PT_GO_REGS_PARM7(x) ((x)->r6)
-#define PT_GO_REGS_PARM8(x) ((x)->r7)
-#define PT_GO_REGS_PARM9(x) ((x)->r8)
+#define PT_GO_REGS_PARM1(x) ((x)->regs[0])
+#define PT_GO_REGS_PARM2(x) ((x)->regs[1])
+#define PT_GO_REGS_PARM3(x) ((x)->regs[2])
+#define PT_GO_REGS_PARM4(x) ((x)->regs[3])
+#define PT_GO_REGS_PARM5(x) ((x)->regs[4])
+#define PT_GO_REGS_PARM6(x) ((x)->regs[5])
+#define PT_GO_REGS_PARM7(x) ((x)->regs[6])
+#define PT_GO_REGS_PARM8(x) ((x)->regs[7])
+#define PT_GO_REGS_PARM9(x) ((x)->regs[8])
+#else
+_Pragma("GCC error \"PT_GO_REGS_PARM\"");
 #endif
 
 #define __stringify_1(x) #x
@@ -169,7 +212,6 @@ _Pragma("GCC error \"Must specify a BPF target arch\"");
 #ifndef __always_inline
 #define __always_inline inline __attribute__((always_inline))
 #endif
-
 
 #define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
 

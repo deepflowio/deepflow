@@ -44,8 +44,8 @@ impl fmt::Display for AccumulatedFlow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "AccumulatedFlow: time: {:?}, flow_meter: {:?}, app_meter: {:?}, nat_src_ip: {:?}, nat_dst_ip: {:?}\n",
-            self.time_in_second, &self.flow_meter, &self.app_meter, &self.nat_src_ip, &self.nat_dst_ip
+            "AccumulatedFlow: time: {:?}, flow_meter: {:?}, app_meter: {:?}, nat_src_ip: {:?}, nat_dst_ip: {:?}", 
+            self.time_in_second, &self.flow_meter, &self.app_meter, &self.nat_src_ip, &self.nat_dst_ip,
         )
     }
 }

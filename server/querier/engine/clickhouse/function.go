@@ -603,7 +603,8 @@ func (f *TagFunction) Format(m *view.Model) {
 				}
 			}
 		}
-	} else if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && node.(*view.Tag).Flag != view.NODE_FLAG_METRICS_TOP {
+	}
+	if m.MetricsLevelFlag == view.MODEL_METRICS_LEVEL_FLAG_LAYERED && node.(*view.Tag).Flag != view.NODE_FLAG_METRICS_TOP {
 		// metric分层的情况下 function需加入metric外层group
 		m.AddGroup(&view.Group{Value: fmt.Sprintf("`%s`", strings.Trim(f.Alias, "`")), Flag: view.GROUP_FLAG_METRICS_OUTER})
 	}

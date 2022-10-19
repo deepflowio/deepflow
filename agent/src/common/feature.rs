@@ -20,6 +20,7 @@ bitflags! {
     pub struct FeatureFlags: u64 {
         const NONE = 0;
         const POLICY = 1<<0;
+        const OPENSSL = 1<<1;
    }
 }
 
@@ -27,8 +28,10 @@ impl From<&Vec<String>> for FeatureFlags {
     fn from(flags: &Vec<String>) -> Self {
         let mut features = FeatureFlags::NONE;
         for flag in flags {
-            if flag.to_lowercase() == "policy" {
-                features.set(FeatureFlags::POLICY, true);
+            match flag.to_lowercase().as_str() {
+                "policy" => features.set(FeatureFlags::POLICY, true),
+                "openssl" => features.set(FeatureFlags::OPENSSL, true),
+                _ => {}
             }
         }
 

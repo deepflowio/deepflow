@@ -33,7 +33,8 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
     tonic_build::configure()
         .build_server(false)
         .out_dir("src/proto/integration")
-        .include_file("mod.rs")
+        // FIXME: wait for newer api to pin codegen file
+        // .include_file("mod.rs")
         .compile(
             &["../message/opentelemetry/opentelemetry/proto/trace/v1/trace.proto"],
             &["../message/opentelemetry"],
@@ -93,13 +94,20 @@ fn set_build_libtrace() -> Result<(), Box<dyn Error>> {
 fn set_linkage() -> Result<(), Box<dyn Error>> {
     let target_env = env::var("CARGO_CFG_TARGET_ENV")?;
     if target_env.as_str() == "musl" {
+        #[cfg(target_arch = "x86_64")]
         println!("cargo:rustc-link-search=native=/usr/x86_64-linux-musl/lib64");
+
+        #[cfg(target_arch = "aarch64")]
+        println!("cargo:rustc-link-search=native=/usr/aarch64-linux-musl/lib64");
     }
     println!("cargo:rustc-link-search=native=/usr/lib");
     println!("cargo:rustc-link-search=native=/usr/lib64");
 
     println!("cargo:rustc-link-lib=static=GoReSym");
+
+    #[cfg(target_arch = "x86_64")]
     println!("cargo:rustc-link-lib=static=bddisasm");
+
     println!("cargo:rustc-link-lib=static=dwarf");
     println!("cargo:rustc-link-lib=static=bcc_bpf");
 

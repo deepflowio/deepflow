@@ -19,13 +19,18 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	// "github.com/k0kubun/pp"
+	//"github.com/k0kubun/pp"
+	"io/ioutil"
+
 	//logging "github.com/op/go-logging"
 	"github.com/deepflowys/deepflow/server/querier/service"
+	"github.com/golang/snappy"
+	"github.com/prometheus/prometheus/prompb"
 )
 
 func QueryRouter(e *gin.Engine) {
 	e.POST("/v1/query/", executeQuery())
+	e.POST("/api/v1/prom/read", promReader())
 }
 
 func executeQuery() gin.HandlerFunc {
@@ -51,5 +56,35 @@ func executeQuery() gin.HandlerFunc {
 			debug = nil
 		}
 		JsonResponse(c, result, debug, err)
+	})
+}
+
+func promReader() gin.HandlerFunc {
+	return gin.HandlerFunc(func(c *gin.Context) {
+		compressed, _ := ioutil.ReadAll(c.Request.Body)
+		reqBuf, err := snappy.Decode(nil, compressed)
+		if err != nil {
+			c.JSON(500, err)
+			return
+		}
+		var req prompb.ReadRequest
+		if err := req.Unmarshal(reqBuf); err != nil {
+			c.JSON(500, err)
+			return
+		}
+		//pp.Println(req)
+		resp, err := service.PromReaderExecute(&req)
+		//pp.Println(resp)
+		if err != nil {
+			c.JSON(500, err)
+			return
+		}
+		data, err := resp.Marshal()
+		if err != nil {
+			c.JSON(500, err)
+			return
+		}
+		compressed = snappy.Encode(nil, data)
+		c.Writer.Write([]byte(compressed))
 	})
 }

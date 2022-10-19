@@ -310,9 +310,9 @@ int runtime_casgstatus(struct pt_regs *ctx)
 		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
 		newval = (__s32)PT_GO_REGS_PARM3(ctx);
 	} else {
-		bpf_probe_read(&g_ptr, sizeof(g_ptr), (void *)(ctx->rsp + 8));
+		bpf_probe_read(&g_ptr, sizeof(g_ptr), (void *)(PT_REGS_SP(ctx) + 8));
 		bpf_probe_read(&newval, sizeof(newval),
-			       (void *)(ctx->rsp + 20));
+			       (void *)(PT_REGS_SP(ctx) + 20));
 	}
 
 	if (newval != 2) {
@@ -337,7 +337,7 @@ int bpf_func_sched_process_exit(struct sched_comm_exit_ctx *ctx)
 	pid = id >> 32;
 	tid = (__u32)id;
 
-	// If is a process, clear uprobe_offsets_map element and submit event.
+	// If is a process, clear proc_info_map element and submit event.
 	if (pid == tid) {
 		bpf_map_delete_elem(&proc_info_map, &pid);
 		struct process_event_t data;

@@ -38,6 +38,7 @@ use super::{
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 
+use crate::common::feature::FeatureFlags;
 use crate::{
     common::decapsulate::TunnelTypeBitmap,
     dispatcher::recv_engine,
@@ -67,8 +68,6 @@ use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
 const MINUTE: Duration = Duration::from_secs(60);
-const SECOND: Duration = Duration::from_secs(1);
-const INFLUX_DB_PORT: u16 = 8086;
 
 type Access<C> = Map<Arc<ArcSwap<ModuleConfig>>, ModuleConfig, fn(&ModuleConfig) -> &C>;
 
@@ -422,6 +421,7 @@ pub struct EbpfConfig {
     pub ctrl_mac: MacAddr,
     pub ebpf_uprobe_golang_symbol_enabled: bool,
     pub ebpf_disabled: bool,
+    pub feature: FeatureFlags,
 }
 
 #[cfg(target_os = "linux")]
@@ -848,6 +848,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 ebpf_uprobe_golang_symbol_enabled: conf
                     .yaml_config
                     .ebpf_uprobe_golang_symbol_enabled,
+                feature: FeatureFlags::from(&conf.yaml_config.feature_flags),
                 ebpf_disabled: conf.yaml_config.ebpf_disabled,
             },
             metric_server: MetricServerConfig {
@@ -1030,6 +1031,14 @@ impl ConfigHandler {
                 .src_interfaces
                 .clone_from(&new_config.yaml_config.src_interfaces);
             info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
+        }
+
+        if yaml_config.analyzer_dedup_disabled != new_config.yaml_config.analyzer_dedup_disabled {
+            yaml_config.analyzer_dedup_disabled = new_config.yaml_config.analyzer_dedup_disabled;
+            info!(
+                "analyzer_dedup_disabled set to {:?}",
+                yaml_config.analyzer_dedup_disabled
+            );
         }
 
         if candidate_config.dispatcher != new_config.dispatcher {

@@ -938,6 +938,7 @@ impl Collector {
 
 #[cfg(test)]
 mod tests {
+
     use std::collections::HashSet;
 
     use crate::common::enums::TapType;

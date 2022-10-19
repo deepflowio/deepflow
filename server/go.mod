@@ -17,6 +17,11 @@ require (
 	github.com/Workiva/go-datastructures v1.0.53
 	github.com/agiledragon/gomonkey/v2 v2.8.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1633
+	github.com/aws/aws-sdk-go-v2/config v1.17.8
+	github.com/aws/aws-sdk-go-v2/credentials v1.12.21
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.1
+	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing v1.14.18
+	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.18.20
 	github.com/baidubce/bce-sdk-go v0.9.123
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
@@ -78,6 +83,16 @@ require (
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/aws/aws-sdk-go v1.44.20 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.16.16 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.23 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.17 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.24 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.17 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.11.23 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.13.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.16.19 // indirect
+	github.com/aws/smithy-go v1.13.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
@@ -100,7 +115,7 @@ require (
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/goccy/go-json v0.9.7 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/golang/snappy v0.0.4
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect
