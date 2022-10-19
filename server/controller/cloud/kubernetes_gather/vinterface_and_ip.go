@@ -269,11 +269,14 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		v4ipNet := ipaddr.NewPrefix(v4Prefix.IPNet())
 		aggFlag4 := false
 		for i, v4CIDR := range noMaskPodV4CIDRs {
+			intersecFlag4 := false
 			pSlisce := []ipaddr.Prefix{*v4ipNet, *v4CIDR}
 			v4AggCIDR := ipaddr.Supernet(pSlisce)
-			intersecFlag4 := false
+			if v4AggCIDR == nil {
+				continue
+			}
 			v4AggCIDRMask, _ := v4AggCIDR.IPNet.Mask.Size()
-			if v4AggCIDR == nil || v4AggCIDRMask < k.PodNetIPv4CIDRMaxMask {
+			if v4AggCIDRMask < k.PodNetIPv4CIDRMaxMask {
 				continue
 			}
 			for _, cidr := range existCIDR {
@@ -304,11 +307,14 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		v6ipNet := ipaddr.NewPrefix(v6Prefix.IPNet())
 		aggFlag6 := false
 		for i, v6CIDR := range noMaskPodV6CIDRs {
+			intersecFlag6 := false
 			pSlisce := []ipaddr.Prefix{*v6ipNet, *v6CIDR}
 			v6AggCIDR := ipaddr.Supernet(pSlisce)
-			intersecFlag6 := false
+			if v6AggCIDR == nil {
+				continue
+			}
 			v6AggCIDRMask, _ := v6AggCIDR.IPNet.Mask.Size()
-			if v6AggCIDR == nil || v6AggCIDRMask < k.PodNetIPv6CIDRMaxMask {
+			if v6AggCIDRMask < k.PodNetIPv6CIDRMaxMask {
 				continue
 			}
 			for _, cidr := range existCIDR {
