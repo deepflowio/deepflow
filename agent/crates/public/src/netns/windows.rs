@@ -14,17 +14,10 @@
  * limitations under the License.
  */
 
-pub mod bytes;
-pub mod consts;
-pub mod counter;
-pub mod debug;
-pub mod enums;
-pub mod error;
-pub mod l7_protocol;
-pub mod leaky_bucket;
-pub mod netns;
-pub mod packet;
-pub mod queue;
-pub mod utils;
+#[derive(Clone, Debug, Default)]
+pub enum NsFile {
+    Root,
+}
 
-pub use leaky_bucket::LeakyBucket;
+#[derive(Default)]
+pub struct NetNs;

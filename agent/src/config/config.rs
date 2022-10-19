@@ -610,6 +610,7 @@ pub struct RuntimeConfig {
     pub sync_interval: Duration,
     pub stats_interval: Duration,
     pub global_pps_threshold: u64,
+    pub extra_netns_regex: String,
     pub tap_interface_regex: String,
     pub host: String,
     pub rsyslog_enabled: bool,
@@ -716,6 +717,13 @@ impl RuntimeConfig {
             )));
         }
 
+        if regex::Regex::new(&self.extra_netns_regex).is_err() {
+            return Err(ConfigError::RuntimeConfigInvalid(format!(
+                "malformed extra-netns-regex({})",
+                self.extra_netns_regex
+            )));
+        }
+
         if regex::Regex::new(&self.tap_interface_regex).is_err() {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "malformed tap-interface-regex({})",
@@ -791,6 +799,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             sync_interval: Duration::from_secs(conf.sync_interval() as u64),
             stats_interval: Duration::from_secs(conf.stats_interval() as u64),
             global_pps_threshold: conf.global_pps_threshold(),
+            extra_netns_regex: conf.extra_netns_regex().to_owned(),
             tap_interface_regex: conf.tap_interface_regex().to_owned(),
             host: conf.host().to_owned(),
             rsyslog_enabled: conf.rsyslog_enabled(),

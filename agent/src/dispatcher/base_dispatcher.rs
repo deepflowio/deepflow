@@ -60,6 +60,7 @@ use crate::{
 };
 
 use public::{
+    netns::NsFile,
     packet::Packet,
     queue::DebugSender,
     utils::net::{self, get_route_src_ip, Link, MacAddr},
@@ -111,6 +112,8 @@ pub(super) struct BaseDispatcher {
     // Enterprise Edition Feature: packet-sequence
     pub(super) packet_sequence_output_queue:
         DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>,
+
+    pub(super) netns: NsFile,
 }
 
 impl BaseDispatcher {
@@ -436,6 +439,7 @@ impl BaseDispatcher {
             analyzer_port: DEFAULT_INGESTER_PORT,
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
+            netns: self.netns.clone(),
         }
     }
 
@@ -612,6 +616,7 @@ pub(super) struct BaseDispatcherListener {
     analyzer_ip: IpAddr,
     proxy_controller_port: u16,
     analyzer_port: u16,
+    pub netns: NsFile,
 }
 
 impl BaseDispatcherListener {

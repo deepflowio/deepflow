@@ -37,8 +37,7 @@ pub enum GenericPoller {
 #[enum_dispatch(GenericPoller)]
 pub trait Poller {
     fn get_version(&self) -> u64;
-    // if ns is `None`, return interfaces in default namespace
-    fn get_interface_info_in(&self, ns: &Option<NsFile>) -> Option<Vec<InterfaceInfo>>;
+    fn get_interface_info_in(&self, ns: &NsFile) -> Option<Vec<InterfaceInfo>>;
     fn get_interface_info(&self) -> Vec<InterfaceInfo>;
     fn set_netns_regex(&self, re: Regex);
     fn start(&self);
@@ -58,7 +57,7 @@ impl Poller for PassivePoller {
     fn get_version(&self) -> u64 {
         0
     }
-    fn get_interface_info_in(&self, _: &Option<NsFile>) -> Option<Vec<InterfaceInfo>> {
+    fn get_interface_info_in(&self, _: &NsFile) -> Option<Vec<InterfaceInfo>> {
         None
     }
     fn get_interface_info(&self) -> Vec<InterfaceInfo> {

@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 #[cfg(target_os = "linux")]
 use std::process;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
@@ -31,6 +32,7 @@ use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
+use regex::Regex;
 
 use super::config::PortConfig;
 use super::{
@@ -40,7 +42,7 @@ use super::{
 
 use crate::common::feature::FeatureFlags;
 use crate::{
-    common::decapsulate::TunnelTypeBitmap,
+    common::{decapsulate::TunnelTypeBitmap, NORMAL_EXIT_WITH_RESTART},
     dispatcher::recv_engine,
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
@@ -64,7 +66,10 @@ use crate::{
 };
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
-use public::utils::net::MacAddr;
+use public::{
+    netns::{NetNs, NsFile},
+    utils::net::MacAddr,
+};
 
 const MB: u64 = 1048576;
 const MINUTE: Duration = Duration::from_secs(60);
@@ -244,6 +249,7 @@ pub struct DispatcherConfig {
     pub trident_type: TridentType,
     pub vtap_id: u16,
     pub capture_socket_type: CaptureSocketType,
+    pub extra_netns: Vec<NsFile>,
     pub tap_interface_regex: String,
     pub packet_header_enabled: bool,
     pub if_mac_source: IfMacSource,
@@ -691,6 +697,12 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 trident_type: conf.trident_type,
                 vtap_id: conf.vtap_id as u16,
                 capture_socket_type: conf.capture_socket_type,
+                extra_netns: {
+                    let re = Regex::new(&conf.extra_netns_regex).unwrap(); // regex validated in protobuf
+                    let mut ns = NetNs::find_ns_files_by_regex(&re);
+                    ns.sort_unstable();
+                    ns
+                },
                 tap_interface_regex: conf.tap_interface_regex.to_string(),
                 packet_header_enabled: conf.packet_header_enabled,
                 if_mac_source: conf.if_mac_source,
@@ -1050,6 +1062,19 @@ impl ConfigHandler {
         }
 
         if candidate_config.dispatcher != new_config.dispatcher {
+            if candidate_config.dispatcher.extra_netns != new_config.dispatcher.extra_netns {
+                info!(
+                    "dispatcher extra net namespace: {:?}",
+                    new_config.dispatcher.extra_netns
+                );
+                if components.is_some() {
+                    info!("restart agent to create dispatcher for extra namespaces");
+                    thread::sleep(Duration::from_secs(1));
+                    process::exit(NORMAL_EXIT_WITH_RESTART);
+                }
+                candidate_config.dispatcher.extra_netns = new_config.dispatcher.extra_netns.clone();
+            }
+
             if candidate_config.dispatcher.if_mac_source != new_config.dispatcher.if_mac_source {
                 if candidate_config.tap_mode != TapMode::Local {
                     info!(
