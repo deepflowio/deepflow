@@ -228,6 +228,8 @@ impl PostgresqlLog {
 
     fn parse(&mut self, payload: &[u8]) -> Result<()> {
         let mut offset = 0;
+        // is at lease one validate block in payload, prevent miscalculate to other protocol
+        let mut at_lease_one_block = false;
         loop {
             if offset >= payload.len() {
                 break;
@@ -243,11 +245,18 @@ impl PostgresqlLog {
 
                     _ => {}
                 }
+
+                if !at_lease_one_block {
+                    at_lease_one_block = true;
+                }
             } else {
                 break;
             }
         }
-        Ok(())
+        if at_lease_one_block {
+            return Ok(());
+        }
+        Err(Error::L7ProtocolUnknown)
     }
 
     fn check_is_ssl_req(&self, payload: &[u8]) -> bool {
@@ -511,9 +520,10 @@ mod test {
 
     use crate::{
         common::{
+            flow::PacketDirection,
             l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
             l7_protocol_log::L7ProtocolParserInterface,
-            l7_protocol_log::ParseParam, flow::PacketDirection,
+            l7_protocol_log::ParseParam,
         },
         flow_generator::protocol_logs::PostgreInfo,
         flow_generator::protocol_logs::PostgresqlLog,
@@ -559,8 +569,8 @@ mod test {
         let pcap_file = Path::new(FILE_DIR).join(file_name);
         let capture = Capture::load_pcap(pcap_file, None);
         let mut p = capture.as_meta_packets();
-        p[0].direction= PacketDirection::ClientToServer;
-        p[1].direction= PacketDirection::ServerToClient;
+        p[0].direction = PacketDirection::ClientToServer;
+        p[1].direction = PacketDirection::ServerToClient;
 
         let mut parser = PostgresqlLog::new();
         let req_param = &mut ParseParam::from(&p[0]);
