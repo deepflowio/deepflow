@@ -260,8 +260,8 @@ type L7Logger struct {
 	requestId uint64
 
 	ResponseStatus    uint8
-	ResponseCode      *int16
-	responseCode      int16
+	ResponseCode      *int32
+	responseCode      int32
 	ResponseException string
 	ResponseResult    string
 
@@ -376,7 +376,7 @@ func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt8(h.ResponseStatus); err != nil {
 		return err
 	}
-	if err := block.WriteInt16Nullable(h.ResponseCode); err != nil {
+	if err := block.WriteInt32Nullable(h.ResponseCode); err != nil {
 		return err
 	}
 	if err := block.WriteString(h.ResponseException); err != nil {
@@ -486,7 +486,7 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 
 	if l.Resp != nil && h.Type != uint8(datatype.MSG_T_REQUEST) {
 		h.ResponseResult = l.Resp.Result
-		h.responseCode = int16(l.Resp.Code)
+		h.responseCode = l.Resp.Code
 		h.ResponseStatus = uint8(l.Resp.Status)
 		h.fillExceptionDesc(l)
 

@@ -84,7 +84,7 @@ func spanStatusToResponseStatus(status *v1.Status) uint8 {
 	return datatype.STATUS_NOT_EXIST
 }
 
-func httpCodeToResponseStatus(code int16) uint8 {
+func httpCodeToResponseStatus(code int32) uint8 {
 	if code >= 400 && code <= 499 {
 		return datatype.STATUS_CLIENT_ERROR
 	} else if code >= 500 && code <= 600 {
@@ -225,7 +225,7 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 				h.Version = value.GetStringValue()
 			case "http.status_code":
 				v, _ := strconv.Atoi(getValueString(value))
-				h.responseCode = int16(v)
+				h.responseCode = int32(v)
 				h.ResponseCode = &h.responseCode
 			case "http.host", "db.connection_string":
 				h.RequestDomain = value.GetStringValue()
@@ -334,7 +334,7 @@ func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformD
 				h.ResponseException = l.Status.Message
 			}
 			if l.Status.Code != v1.Status_STATUS_CODE_UNSET {
-				h.responseCode = int16(l.Status.Code)
+				h.responseCode = int32(l.Status.Code)
 				h.ResponseCode = &h.responseCode
 			}
 		}
