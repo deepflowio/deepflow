@@ -140,7 +140,7 @@ func initTables(db *gorm.DB) error {
 		log.Errorf("create procedure failed: %v", err)
 		return err
 	}
-	err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECT)).Error
+	err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
 	if err != nil {
 		log.Errorf("init db version failed: %v", err)
 		return err
@@ -156,6 +156,7 @@ func ExecuteIssus(db *gorm.DB, curVersion string) error {
 		return err
 	}
 	nextVersions := getAscSortedNextVersions(issus, curVersion)
+	log.Infof("issus to be executed: %v", nextVersions)
 	for _, nv := range nextVersions {
 		err = executeIssu(db, nv)
 		if err != nil {

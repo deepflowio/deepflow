@@ -37,11 +37,9 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/grpc"
 	"github.com/deepflowys/deepflow/server/controller/manager"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
-	"github.com/deepflowys/deepflow/server/controller/monitor/license"
-	"github.com/deepflowys/deepflow/server/controller/recorder"
+	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
 	"github.com/deepflowys/deepflow/server/controller/report"
 	"github.com/deepflowys/deepflow/server/controller/router"
-	"github.com/deepflowys/deepflow/server/controller/service"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
@@ -87,24 +85,29 @@ func Start(ctx context.Context, configPath string) {
 	isMasterController := IsMasterController(cfg)
 	if isMasterController {
 		router.SetInitStageForHealthChecker("MySQL migration")
-		migrateDB(cfg)
+		migrateMySQL(cfg)
 	}
 
 	router.SetInitStageForHealthChecker("MySQL init")
 	// 初始化MySQL
-	mysql.Db = mysql.Gorm(cfg.MySqlCfg)
-	if mysql.Db == nil {
-		log.Error("connect mysql failed")
+	err := mysql.InitMySQL(cfg.MySqlCfg)
+	if err != nil {
+		log.Errorf("init mysql failed: %s", err.Error())
 		time.Sleep(time.Second)
 		os.Exit(0)
 	}
 
-	// TODO move to goroutine
 	// 启动资源ID管理器
 	if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
+		router.SetInitStageForHealthChecker("Resource ID manager init")
+		recorderdb.InitIDManager(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
 		if isMasterController {
-			router.SetInitStageForHealthChecker("Resource ID manager init")
-			startResourceIDManager(cfg)
+			err := recorderdb.IDMNG.Start()
+			if err != nil {
+				log.Error("resource id mananger start failed")
+				time.Sleep(time.Second)
+				os.Exit(0)
+			}
 		}
 	}
 
@@ -122,7 +125,7 @@ func Start(ctx context.Context, configPath string) {
 
 	router.SetInitStageForHealthChecker("Statsd init")
 	// start statsd
-	err := statsd.NewStatsdMonitor(cfg.StatsdCfg)
+	err = statsd.NewStatsdMonitor(cfg.StatsdCfg)
 	if err != nil {
 		log.Error("cloud statsd connect telegraf failed")
 		time.Sleep(time.Second)
@@ -151,95 +154,7 @@ func Start(ctx context.Context, configPath string) {
 
 	controllerCheck := monitor.NewControllerCheck(cfg, ctx)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg, ctx)
-	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg, ctx)
-	go func() {
-		// 定时检查当前是否为master controller
-		// 仅master controller才启动以下goroutine
-		// - tagrecorder
-		// - 控制器和数据节点检查
-		// - license分配和检查
-		// - resource id manager
-		// - clean deleted resources
-
-		// 从区域控制器无需判断是否为master controller
-		if cfg.TrisolarisCfg.NodeType != "master" {
-			return
-		}
-
-		vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
-		softDeletedResourceCleaner := recorder.NewSoftDeletedResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
-
-		// TODO start as soon as possible
-		masterController := ""
-		thisIsMasterController := false
-		for range time.Tick(time.Minute) {
-			newThisIsMasterController, newMasterController, err := election.IsMasterControllerAndReturnIP()
-			if err != nil {
-				continue
-			}
-			if masterController != newMasterController {
-				if newThisIsMasterController {
-					thisIsMasterController = true
-					log.Infof("I am the master controller now, previous master controller is %s", masterController)
-
-					if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-						// 启动资源ID管理器
-						// TODO: use ctx start @zhengya
-						startResourceIDManager(cfg)
-					}
-
-					// 启动tagrecorder
-					tr.Start()
-
-					// 控制器检查
-					controllerCheck.Start()
-
-					// 数据节点检查
-					analyzerCheck.Start()
-
-					// vtap check
-					vtapCheck.Start()
-
-					// license分配和检查
-					vtapLicenseAllocation.Start()
-
-					// 启动软删除数据清理
-					softDeletedResourceCleaner.Start()
-
-					if _, enabled := os.LookupEnv("FEATURE_FLAG_CHECK_DOMAIN_CONTROLLER"); enabled {
-						// 自动切换domain控制器
-						service.TimedCheckDomain()
-					}
-				} else if thisIsMasterController {
-					thisIsMasterController = false
-					log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
-
-					// stop tagrecorder
-					tr.Stop()
-
-					// stop controller check
-					controllerCheck.Stop()
-
-					// stop analyzer check
-					analyzerCheck.Stop()
-
-					// stop vtap check
-					vtapCheck.Stop()
-
-					// stop vtap license allocation and check
-					vtapLicenseAllocation.Stop()
-
-					softDeletedResourceCleaner.Stop()
-				} else {
-					log.Infof(
-						"current master controller is %s, previous master controller is %s",
-						newMasterController, masterController,
-					)
-				}
-			}
-			masterController = newMasterController
-		}
-	}()
+	go checkAndStartMasterFunctions(cfg, ctx, tr, controllerCheck, analyzerCheck)
 
 	router.SetInitStageForHealthChecker("Register routers init")
 	router.ElectionRouter(r)

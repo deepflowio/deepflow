@@ -17,6 +17,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -701,16 +702,38 @@ func forceDelete[MT constraint.MySQLSoftDeleteModel](query interface{}, args ...
 	}
 }
 
-func TimedCheckDomain() {
-	CheckAndAllocateDomainController()
+type DomainChecker struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func NewDomainCheck(ctx context.Context) *DomainChecker {
+	cCtx, cCancel := context.WithCancel(ctx)
+	return &DomainChecker{ctx: cCtx, cancel: cCancel}
+}
+
+func (c *DomainChecker) Start() {
+	log.Info("domain check startted")
+	c.TimedCheck()
+}
+
+func (c *DomainChecker) Stop() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+	log.Info("domain check stopped")
+}
+
+func (c *DomainChecker) TimedCheck() {
+	c.checkAndAllocateController()
 	go func() {
 		for range time.Tick(time.Duration(5) * time.Minute) {
-			CheckAndAllocateDomainController()
+			c.checkAndAllocateController()
 		}
 	}()
 }
 
-func CheckAndAllocateDomainController() {
+func (c *DomainChecker) checkAndAllocateController() {
 	log.Infof("check domain controller health started")
 	controllerIPToRegionLcuuid := make(map[string]string)
 	var azCConns []*mysql.AZControllerConnection

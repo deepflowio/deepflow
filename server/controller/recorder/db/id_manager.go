@@ -37,12 +37,17 @@ import (
 var IDMNG *IDManager
 
 type IDManager struct {
+	ctx                  context.Context
+	cancel               context.CancelFunc
 	resourceTypeToIDPool map[string]IDPoolUpdater
 }
 
-func InitIDManager(cfg *RecorderConfig) (err error) {
+func InitIDManager(cfg *RecorderConfig, ctx context.Context) (err error) {
 	log.Info("init id mananger")
+	mCtx, mCancel := context.WithCancel(ctx)
 	IDMNG = &IDManager{
+		ctx:    mCtx,
+		cancel: mCancel,
 		resourceTypeToIDPool: map[string]IDPoolUpdater{
 			RESOURCE_TYPE_REGION_EN:        &IDPool[mysql.Region]{resourceType: RESOURCE_TYPE_REGION_EN, max: cfg.ResourceMaxID0},
 			RESOURCE_TYPE_AZ_EN:            &IDPool[mysql.AZ]{resourceType: RESOURCE_TYPE_AZ_EN, max: cfg.ResourceMaxID0},
@@ -67,11 +72,23 @@ func InitIDManager(cfg *RecorderConfig) (err error) {
 			RESOURCE_TYPE_POD_REPLICA_SET_EN: &IDPool[mysql.PodReplicaSet]{resourceType: RESOURCE_TYPE_POD_REPLICA_SET_EN, max: cfg.ResourceMaxID1},
 		},
 	}
-	return IDMNG.refreshByTicker()
+	return
+}
+
+func (m *IDManager) Start() error {
+	log.Info("resource id manager startted")
+	return m.timedRefresh()
+}
+
+func (m *IDManager) Stop() {
+	if m.cancel != nil {
+		m.cancel()
+	}
+	log.Info("resource id manager stopped")
 }
 
 // 定时刷新ID池，恢复/修复被永久删除的ID（页面删除domain/sub_domain，定时永久删除）
-func (m *IDManager) refreshByTicker() error {
+func (m *IDManager) timedRefresh() error {
 	log.Info("refresh id pools")
 	for _, idPool := range m.resourceTypeToIDPool {
 		err := idPool.refresh()
@@ -278,6 +295,6 @@ func ReleaseIDs(resourceType string, ids []int) (err error) {
 	if err != nil {
 		log.Error("request id failed: %s", err.Error())
 	}
-	log.Infof("rlease ids: %v", ids)
+	log.Infof("release ids: %v", ids)
 	return
 }

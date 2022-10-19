@@ -17,15 +17,35 @@
 package mysql
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/op/go-logging"
 	"gorm.io/gorm"
 
 	. "github.com/deepflowys/deepflow/server/controller/db/mysql/common"
 	. "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql/migration"
 )
 
 var log = logging.MustGetLogger("db.mysql")
 var Db *gorm.DB
+
+func InitMySQL(cfg MySqlConfig) error {
+	Db = Gorm(cfg)
+	if Db == nil {
+		return errors.New("connect mysql failed")
+	}
+	var version string
+	err := Db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
+	if err != nil {
+		return errors.New("get current db version failed")
+	}
+	if version != migration.DB_VERSION_EXPECTED {
+		return errors.New(fmt.Sprintf("current db version: %s != expected db version: %s", version, migration.DB_VERSION_EXPECTED))
+	}
+	return nil
+}
 
 func Gorm(cfg MySqlConfig) *gorm.DB {
 	dsn := GetDSN(cfg, cfg.Database, cfg.TimeOut, false)
