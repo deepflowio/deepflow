@@ -911,14 +911,10 @@ impl Collector {
                             stash.collect(Some(*flow), time_in_second);
                         }
                     }
-                    Err(Error::Timeout) => {
-                        // qg会延时delay_seconds，这再多延时2秒刷新数据
-                        stash.collect(
-                            None,
-                            get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs()
-                                - 2,
-                        )
-                    }
+                    Err(Error::Timeout) => stash.collect(
+                        None,
+                        get_timestamp(stash.context.ntp_diff.load(Ordering::Relaxed)).as_secs(),
+                    ),
                     Err(Error::Terminated(..)) => break,
                 }
             }
@@ -942,6 +938,7 @@ impl Collector {
 
 #[cfg(test)]
 mod tests {
+
     use std::collections::HashSet;
 
     use crate::common::enums::TapType;

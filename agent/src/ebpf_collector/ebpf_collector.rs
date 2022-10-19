@@ -27,6 +27,7 @@ use lru::LruCache;
 use super::{Error, Result};
 
 use crate::common::enums::IpProtocol;
+use crate::common::feature::FeatureFlags;
 use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
@@ -399,18 +400,7 @@ impl FlowItem {
         let l7_protocol = app_table.get_protocol_from_ebpf(packet, local_epc, remote_epc);
         let is_from_app = l7_protocol.is_some();
         let (l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
-        let mut protocol_bitmap = get_bitmap(l4_protocol);
-        match packet.l7_protocol_from_ebpf {
-            L7Protocol::Http1TLS => {
-                protocol_bitmap |= 1 << (L7Protocol::Http1TLS as u8);
-                protocol_bitmap &= !(1 << (L7Protocol::Http1 as u8));
-            }
-            L7Protocol::Http2TLS => {
-                protocol_bitmap |= 1 << (L7Protocol::Http2TLS as u8);
-                protocol_bitmap &= !(1 << (L7Protocol::Http2 as u8));
-            }
-            _ => {}
-        }
+        let protocol_bitmap = get_bitmap(l4_protocol);
 
         FlowItem {
             last_policy: time_in_sec,
@@ -916,6 +906,7 @@ impl EbpfCollector {
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
         ebpf_uprobe_golang_symbol_enabled: bool,
+        _feature: FeatureFlags,
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
@@ -932,6 +923,8 @@ impl EbpfCollector {
             if ebpf_uprobe_golang_symbol_enabled {
                 ebpf::set_feature_flag(ebpf::FEATURE_UPROBE_GOLANG_SYMBOL);
             }
+
+            ebpf::set_feature_flag(ebpf::FEATURE_UPROBE_OPENSSL);
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
                 info!("ebpf bpf_tracer_init error: {}", config.log_path);
@@ -1006,7 +999,12 @@ impl EbpfCollector {
         let (sender, receiver, _) =
             bounded_with_debug(4096, "1-ebpf-packet-to-ebpf-collector", queue_debugger);
 
-        Self::ebpf_init(config, sender, config.ebpf_uprobe_golang_symbol_enabled)?;
+        Self::ebpf_init(
+            config,
+            sender,
+            config.ebpf_uprobe_golang_symbol_enabled,
+            config.feature,
+        )?;
         info!("ebpf collector initialized.");
         return Ok(Box::new(EbpfCollector {
             thread_runner: EbpfRunner {

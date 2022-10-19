@@ -26,14 +26,12 @@ config:
   region_uuid: ffffffff-ffff-ffff-ffff-ffffffffffff
   # 资源同步控制器 [按需指定,不指定时随机分配]
   #controller_ip: 127.0.0.1
-  # API 密钥 ID [必需参数]
-  # 在腾讯云页面 访问管理-云API密钥-API密钥管理 页面上的SecretId
+  # API 密钥 ID [必需参数], 在腾讯云页面 访问管理-云API密钥-API密钥管理 页面上的SecretId
   secret_id: xxxxxxxx
-  # API 密钥 KEY [必需参数]
-  # 在腾讯云页面 访问管理-云API密钥-API密钥管理 页面上的SecretKey
+  # API 密钥 KEY [必需参数], 在腾讯云页面 访问管理-云API密钥-API密钥管理 页面上的SecretKey
   secret_key: xxxxxxx
-  # 区域白名单，多个区域名称之间以英文逗号分隔 [按需指定]
+  # 区域白名单, 多个区域名称之间以英文逗号分隔 [按需指定]
   include_regions:
-  # 区域黑名单，多个区域名称之间以英文逗号分隔 [按需指定]
+  # 区域黑名单, 多个区域名称之间以英文逗号分隔 [按需指定]
   exclude_regions:
 `)

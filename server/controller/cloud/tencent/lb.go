@@ -256,6 +256,6 @@ func (t *Tencent) getLoadBalances(region tencentRegion) ([]model.LB, []model.LBL
 			})
 		}
 	}
-	log.Debug("get nat load balances complete")
+	log.Debug("get load balances complete")
 	return lbs, lbListeners, lbTargetServers, lbVinterfaces, lbIPs, nil
 }
