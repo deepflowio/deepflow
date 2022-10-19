@@ -19,6 +19,8 @@ package service
 import (
 	"github.com/deepflowys/deepflow/server/querier/engine"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse"
+	"github.com/deepflowys/deepflow/server/querier/prometheus"
+	"github.com/prometheus/prometheus/prompb"
 )
 
 func Execute(args map[string]string) (result map[string][]interface{}, debug map[string]interface{}, err error) {
@@ -36,4 +38,8 @@ func Execute(args map[string]string) (result map[string][]interface{}, debug map
 
 func getDbBy() string {
 	return "clickhouse"
+}
+
+func PromReaderExecute(req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
+	return prometheus.PromReaderExecute(req)
 }
