@@ -328,7 +328,7 @@ impl PostgresqlLog {
                 Ok(())
             }
             'E' => {
-                self.info.status = L7ResponseStatus::Error;
+                self.info.status = L7ResponseStatus::ClientError;
                 self.info.resp_type = tag;
                 self.info.ignore = false;
                 /*
