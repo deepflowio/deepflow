@@ -44,6 +44,7 @@ use tokio::time;
 use super::ntp::{NtpMode, NtpPacket, NtpTime};
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
+use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
 use crate::config::{Config, RuntimeConfig};
 use crate::exception::ExceptionHandler;
@@ -61,7 +62,6 @@ const DEFAULT_SYNC_INTERVAL: Duration = Duration::from_secs(60);
 const RPC_RETRY_INTERVAL: Duration = Duration::from_secs(60);
 const NANOS_IN_SECOND: i64 = Duration::from_secs(1).as_nanos() as i64;
 const SECOND: Duration = Duration::from_secs(1);
-const NORMAL_EXIT_WITH_RESTART: i32 = 3;
 
 pub struct StaticConfig {
     pub version_info: &'static VersionInfo,
