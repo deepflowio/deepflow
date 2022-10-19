@@ -33,7 +33,7 @@ use tokio::runtime::{Builder, Runtime};
 use super::kubernetes::{
     check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, PassivePoller, Poller,
 };
-use super::{InterfaceEntry, InterfaceInfo, LibvirtXmlExtractor};
+use super::{InterfaceEntry, LibvirtXmlExtractor};
 
 use crate::{
     config::{handler::PlatformAccess, KubernetesPollerType},
@@ -43,6 +43,7 @@ use crate::{
     utils::environment::is_tt_pod,
 };
 use crate::{exception::ExceptionHandler, rpc::Session};
+use public::netns::InterfaceInfo;
 
 const SHA1_DIGEST_LEN: usize = 20;
 
@@ -416,10 +417,8 @@ impl PlatformSynchronizer {
             }
 
             if new_kubernetes_version != *self_kubernetes_version {
-                if let Some(interface_info) = process_args.kubernetes_poller.get_interface_info() {
-                    *self_interface_infos = interface_info;
-                    *self_kubernetes_version = new_kubernetes_version;
-                }
+                *self_interface_infos = process_args.kubernetes_poller.get_interface_info();
+                *self_kubernetes_version = new_kubernetes_version;
             }
 
             if xml_interface_hash != hash_args.xml_interfaces_hash {

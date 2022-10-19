@@ -105,7 +105,8 @@ pub struct Link {
     pub flags: LinkFlags,
     #[cfg(target_os = "linux")]
     pub if_type: Option<String>,
-    pub parent_index: Option<u32>,
+    pub peer_index: Option<u32>,
+    pub link_netnsid: Option<u32>,
 }
 
 impl PartialEq for Link {

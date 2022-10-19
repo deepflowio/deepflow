@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, fs, io, os::unix::io::AsRawFd, time::Duration};
+use std::{fs, os::unix::io::AsRawFd, time::Duration};
 
 use enum_dispatch::enum_dispatch;
 use nix::sched::{setns, CloneFlags};
+use regex::Regex;
 
 mod active_poller;
 mod api_watcher;
@@ -25,7 +26,7 @@ mod resource_watcher;
 pub use active_poller::ActivePoller;
 pub use api_watcher::ApiWatcher;
 
-use super::InterfaceInfo;
+use public::netns::{InterfaceInfo, NsFile};
 
 #[enum_dispatch]
 pub enum GenericPoller {
@@ -36,7 +37,10 @@ pub enum GenericPoller {
 #[enum_dispatch(GenericPoller)]
 pub trait Poller {
     fn get_version(&self) -> u64;
-    fn get_interface_info(&self) -> Option<Vec<InterfaceInfo>>;
+    // if ns is `None`, return interfaces in default namespace
+    fn get_interface_info_in(&self, ns: &Option<NsFile>) -> Option<Vec<InterfaceInfo>>;
+    fn get_interface_info(&self) -> Vec<InterfaceInfo>;
+    fn set_netns_regex(&self, re: Regex);
     fn start(&self);
     fn stop(&self);
 }
@@ -54,52 +58,17 @@ impl Poller for PassivePoller {
     fn get_version(&self) -> u64 {
         0
     }
-    fn get_interface_info(&self) -> Option<Vec<InterfaceInfo>> {
+    fn get_interface_info_in(&self, _: &Option<NsFile>) -> Option<Vec<InterfaceInfo>> {
         None
     }
+    fn get_interface_info(&self) -> Vec<InterfaceInfo> {
+        vec![]
+    }
+    fn set_netns_regex(&self, _: Regex) {}
     fn start(&self) {}
     fn stop(&self) {}
 }
 //END
-
-fn ls_ns_net() -> io::Result<Vec<Vec<u32>>> {
-    let mut seen = HashMap::new();
-
-    for entry in fs::read_dir("/proc")? {
-        let entry = entry?;
-        if !entry.file_type()?.is_dir() {
-            continue;
-        }
-
-        let pid = entry
-            .file_name()
-            .to_str()
-            .and_then(|pid| pid.parse::<u32>().ok());
-        if pid.is_none() {
-            continue;
-        }
-        let pid = pid.unwrap();
-
-        let linked = fs::read_link(format!("/proc/{}/ns/net", pid));
-        if linked.is_err() {
-            continue;
-        }
-
-        seen.entry(linked.unwrap()).or_insert(vec![]).push(pid);
-    }
-
-    let mut ret: Vec<Vec<u32>> = seen
-        .into_values()
-        .map(|mut v| {
-            v.sort_unstable();
-            v
-        })
-        .collect();
-
-    ret.sort_unstable_by(|a, b| a[0].cmp(&b[0]));
-
-    Ok(ret)
-}
 
 pub fn check_set_ns() -> bool {
     match fs::File::open("/proc/self/ns/net") {
