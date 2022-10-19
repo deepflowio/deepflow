@@ -69,6 +69,7 @@ use crate::{
     utils::stats::{self, Collector},
 };
 use public::{
+    netns::{NetNs, NsFile},
     queue::DebugSender,
     utils::net::{Link, MacAddr},
     LeakyBucket,
@@ -184,6 +185,13 @@ pub enum DispatcherListener {
 }
 
 impl DispatcherListener {
+    pub(super) fn netns(&self) -> NsFile {
+        match self {
+            Self::Local(l) => l.netns(),
+            _ => NsFile::Root,
+        }
+    }
+
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         match self {
             Self::Local(l) => l.on_config_change(config),
@@ -471,6 +479,7 @@ pub struct DispatcherBuilder {
     ntp_diff: Option<Arc<AtomicI64>>,
     #[cfg(target_os = "windows")]
     pcap_interfaces: Option<Vec<Link>>,
+    netns: Option<NsFile>,
 }
 
 impl DispatcherBuilder {
@@ -594,7 +603,20 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn netns(mut self, v: NsFile) -> Self {
+        self.netns = Some(v);
+        self
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
+        let netns = self.netns.unwrap_or_default();
+        let mut current_ns = None;
+        #[cfg(target_os = "linux")]
+        if netns != NsFile::Root {
+            current_ns = Some(NetNs::open_current_ns()?);
+            // set ns before creating af packet socket
+            let _ = NetNs::open_named_and_setns(&netns)?;
+        };
         let options = self
             .options
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
@@ -750,6 +772,7 @@ impl DispatcherBuilder {
                 .packet_sequence_output_queue
                 .take()
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
+            netns,
         };
         collector.register_countable(
             "dispatcher",
@@ -811,6 +834,10 @@ impl DispatcherBuilder {
             }
         };
         dispatcher.init();
+        #[cfg(target_os = "linux")]
+        if let Some(ns) = current_ns {
+            let _ = NetNs::setns(&ns)?;
+        }
         Ok(Dispatcher {
             flavor: Mutex::new(Some(dispatcher)),
             terminated,

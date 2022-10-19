@@ -46,7 +46,10 @@ use crate::{
         stats::{Countable, RefCountable, StatsOption},
     },
 };
-use public::utils::net::{link_list, Link, MacAddr};
+use public::{
+    netns::NsFile,
+    utils::net::{link_list, Link, MacAddr},
+};
 
 pub(super) struct LocalModeDispatcher {
     pub(super) base: BaseDispatcher,
@@ -295,6 +298,10 @@ impl LocalModeDispatcherListener {
         }
     }
 
+    pub(super) fn netns(&self) -> NsFile {
+        self.base.netns.clone()
+    }
+
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         self.base.on_config_change(config)
     }
@@ -356,7 +363,8 @@ impl LocalModeDispatcherListener {
         #[cfg(target_os = "windows")]
         let index_to_mac_map = Self::get_if_index_to_inner_mac_map();
         #[cfg(target_os = "linux")]
-        let index_to_mac_map = Self::get_if_index_to_inner_mac_map(&self.base.platform_poller);
+        let index_to_mac_map =
+            Self::get_if_index_to_inner_mac_map(&self.base.platform_poller, &self.base.netns);
         let name_to_mac_map = self.get_if_name_to_mac_map(tap_mac_script);
 
         for iface in interfaces.iter() {
@@ -418,10 +426,10 @@ impl LocalModeDispatcherListener {
     }
 
     #[cfg(target_os = "linux")]
-    fn get_if_index_to_inner_mac_map(poller: &GenericPoller) -> HashMap<u32, MacAddr> {
+    fn get_if_index_to_inner_mac_map(poller: &GenericPoller, ns: &NsFile) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
-        if let Some(entries) = poller.get_interface_info_in(&None) {
+        if let Some(entries) = poller.get_interface_info_in(ns) {
             debug!("Poller Mac:");
             for entry in entries {
                 debug!("\tif_index: {}, mac: {}", entry.tap_idx, entry.mac);
