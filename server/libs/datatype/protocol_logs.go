@@ -158,6 +158,32 @@ type AppProtoLogsData struct {
 	pool.ReferenceCount
 }
 
+var httpInfoPool = pool.NewLockFreePool(func() interface{} {
+	return new(HTTPInfo)
+})
+
+func AcquireHTTPInfo() *HTTPInfo {
+	return httpInfoPool.Get().(*HTTPInfo)
+}
+
+func ReleaseHTTPInfo(h *HTTPInfo) {
+	*h = HTTPInfo{}
+	httpInfoPool.Put(h)
+}
+
+var dnsInfoPool = pool.NewLockFreePool(func() interface{} {
+	return new(DNSInfo)
+})
+
+func AcquireDNSInfo() *DNSInfo {
+	return dnsInfoPool.Get().(*DNSInfo)
+}
+
+func ReleaseDNSInfo(d *DNSInfo) {
+	*d = DNSInfo{}
+	dnsInfoPool.Put(d)
+}
+
 var appProtoLogsDataPool = pool.NewLockFreePool(func() interface{} {
 	return new(AppProtoLogsData)
 })
@@ -172,6 +198,24 @@ func AcquireAppProtoLogsData() *AppProtoLogsData {
 func ReleaseAppProtoLogsData(d *AppProtoLogsData) {
 	if d.SubReferenceCount() {
 		return
+	}
+	switch d.Proto {
+	case L7_PROTOCOL_HTTP_2:
+		fallthrough
+	case L7_PROTOCOL_HTTP_1:
+		ReleaseHTTPInfo(d.Detail.(*HTTPInfo))
+	case L7_PROTOCOL_DNS:
+		ReleaseDNSInfo(d.Detail.(*DNSInfo))
+	case L7_PROTOCOL_MYSQL:
+		ReleaseMYSQLInfo(d.Detail.(*MysqlInfo))
+	case L7_PROTOCOL_REDIS:
+		ReleaseREDISInfo(d.Detail.(*RedisInfo))
+	case L7_PROTOCOL_DUBBO:
+		ReleaseDubboInfo(d.Detail.(*DubboInfo))
+	case L7_PROTOCOL_KAFKA:
+		ReleaseKafkaInfo(d.Detail.(*KafkaInfo))
+	case L7_PROTOCOL_MQTT:
+		ReleaseMqttInfo(d.Detail.(*MqttInfo))
 	}
 
 	*d = zeroAppProtoLogsData
@@ -241,9 +285,166 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 		p.Base = &pb.AppProtoLogsBaseInfo{}
 	}
 	l.AppProtoLogsBaseInfo.WriteToPB(p.Base)
+	switch l.Proto {
+	case L7_PROTOCOL_HTTP_1:
+		fallthrough
+	case L7_PROTOCOL_HTTP_2:
+		if http, ok := l.Detail.(*HTTPInfo); ok {
+			http.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	case L7_PROTOCOL_DNS:
+		if dns, ok := l.Detail.(*DNSInfo); ok {
+			dns.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	case L7_PROTOCOL_MYSQL:
+		if mysql, ok := l.Detail.(*MysqlInfo); ok {
+			mysql.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	case L7_PROTOCOL_REDIS:
+		if redis, ok := l.Detail.(*RedisInfo); ok {
+			redis.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	case L7_PROTOCOL_DUBBO:
+		if dubbo, ok := l.Detail.(*DubboInfo); ok {
+			dubbo.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	case L7_PROTOCOL_KAFKA:
+		if kafka, ok := l.Detail.(*KafkaInfo); ok {
+			kafka.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	case L7_PROTOCOL_MQTT:
+		if mqtt, ok := l.Detail.(*MqttInfo); ok {
+			mqtt.WriteToPB(p, l.AppProtoLogsBaseInfo.MsgType)
+		}
+	}
 }
 
 type ProtoSpecialInfo interface {
 	String() string
 	Merge(interface{})
+}
+
+// HTTPv2根据需要添加
+type HTTPInfo struct {
+	StreamID uint32 // HTTPv2
+	Version  string
+	TraceID  string
+	SpanID   string
+
+	Method     string
+	Path       string
+	Host       string
+	ClientIP   string
+	XRequestId string
+
+	ReqContentLength  int64
+	RespContentLength int64
+}
+
+func (h *HTTPInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
+	/*
+		p.StreamId = h.StreamID
+		p.Version = h.Version
+		p.TraceId = h.TraceID
+		p.SpanId = h.SpanID
+
+		switch msgType {
+		case MSG_T_REQUEST:
+			p.Method = h.Method
+			p.Path = h.Path
+			p.Host = h.Host
+			p.ClientIp = h.ClientIP
+			p.XRequestId = h.XRequestId
+			p.ReqContentLength = h.ReqContentLength
+			p.RespContentLength = 0
+		case MSG_T_RESPONSE:
+			p.RespContentLength = h.RespContentLength
+			p.Method = ""
+			p.Path = ""
+			p.Host = ""
+			p.ClientIp = ""
+			p.XRequestId = h.XRequestId
+			p.ReqContentLength = 0
+		case MSG_T_SESSION:
+			p.Method = h.Method
+			p.Path = h.Path
+			p.Host = h.Host
+			p.ClientIp = h.ClientIP
+			p.XRequestId = h.XRequestId
+			p.ReqContentLength = h.ReqContentLength
+
+			p.RespContentLength = h.RespContentLength
+		}
+	*/
+}
+
+func (h *HTTPInfo) String() string {
+	return fmt.Sprintf("%#v", h)
+}
+
+func (h *HTTPInfo) Merge(r interface{}) {
+	if http, ok := r.(*HTTPInfo); ok {
+		h.RespContentLength = http.RespContentLength
+		if h.XRequestId == "" {
+			h.XRequestId = http.XRequestId
+		}
+		if h.TraceID == "" {
+			h.TraceID = http.TraceID
+		}
+		if h.SpanID == "" {
+			h.SpanID = http.SpanID
+		}
+	}
+}
+
+// | type | 查询类型 | 说明|
+// | ---- | -------- | --- |
+// | 1	  | A	     |由域名获得IPv4地址|
+// | 2	  | NS	     |查询域名服务器|
+// | 5	  | CNAME    |查询规范名称|
+// | 6	  | SOA	     |开始授权|
+// | 11	  | WKS	     |熟知服务|
+// | 12	  | PTR	     |把IP地址转换成域名|
+// | 13	  | HINFO	 |主机信息|
+// | 15	  | MX	     |邮件交换|
+// | 28	  | AAAA	 |由域名获得IPv6地址|
+// | 252  | AXFR	 |传送整个区的请求|
+// | 255  | ANY      |对所有记录的请求|
+type DNSInfo struct {
+	TransID   uint16
+	QueryType uint16
+	QueryName string
+	// 根据查询类型的不同而不同，如：
+	// A: ipv4/ipv6地址
+	// NS: name server
+	// SOA: primary name server
+	Answers string
+}
+
+func (h *DNSInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
+	/*
+		p.TransId = uint32(h.TransID)
+		p.QueryType = uint32(h.QueryType)
+
+		if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
+			p.QueryName = h.QueryName
+		} else {
+			p.QueryName = ""
+		}
+		if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
+			p.Answers = h.Answers
+		} else {
+			p.Answers = ""
+		}
+	*/
+}
+
+func (d *DNSInfo) String() string {
+	return fmt.Sprintf("%#v", d)
+}
+
+func (d *DNSInfo) Merge(r interface{}) {
+	if response, ok := r.(*DNSInfo); ok {
+		d.Answers = response.Answers
+	}
 }
