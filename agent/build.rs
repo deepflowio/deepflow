@@ -33,7 +33,8 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
     tonic_build::configure()
         .build_server(false)
         .out_dir("src/proto/integration")
-        .include_file("mod.rs")
+        // FIXME: wait for newer api to pin codegen file
+        // .include_file("mod.rs")
         .compile(
             &["../message/opentelemetry/opentelemetry/proto/trace/v1/trace.proto"],
             &["../message/opentelemetry"],
