@@ -19,6 +19,7 @@ package qingcloud
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
@@ -193,7 +194,12 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 			return nil, err
 		}
 
-		client := &http.Client{Timeout: time.Second * 30}
+		client := &http.Client{
+			Timeout: time.Second * 300,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Errorf("curl (%s) failed, (%v)", url, err)
