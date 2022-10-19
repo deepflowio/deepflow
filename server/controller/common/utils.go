@@ -39,6 +39,16 @@ import (
 
 var log = logging.MustGetLogger("common")
 
+var NodeName string
+
+func init() {
+	NodeName = os.Getenv(NODE_NAME_KEY)
+}
+
+func GetNodeName() string {
+	return NodeName
+}
+
 var osDict = map[string]int{
 	"centos":  OS_CENTOS,
 	"red hat": OS_REDHAT,
