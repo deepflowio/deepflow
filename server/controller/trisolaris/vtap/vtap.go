@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"sort"
 	"sync"
@@ -34,6 +33,7 @@ import (
 	"github.com/op/go-logging"
 
 	"github.com/deepflowys/deepflow/message/trident"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
@@ -863,7 +863,7 @@ func (v *VTapInfo) putChVTapChangedForPD() {
 
 func (v *VTapInfo) updateCacheToDB() {
 	log.Info("update vtap cache to db")
-	hostName := os.Getenv(NODE_NAME_KEY)
+	hostName := common.GetNodeName()
 	if len(hostName) == 0 {
 		log.Errorf("hostname is null")
 		return

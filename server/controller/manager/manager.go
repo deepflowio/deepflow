@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -133,7 +132,7 @@ func (m *Manager) GetRecorder(domainLcuuid string) (recorder.Recorder, error) {
 func (m *Manager) run(ctx context.Context) {
 	// 获取所在控制器的IP
 	var controller mysql.Controller
-	hostName := os.Getenv(common.NODE_NAME_KEY)
+	hostName := common.GetNodeName()
 	if len(hostName) == 0 {
 		log.Error("hostname is null")
 		return
