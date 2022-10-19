@@ -66,9 +66,8 @@ const NANOS_PER_MICRO: u64 = 1000;
 #[repr(u8)]
 pub enum L7ResponseStatus {
     Ok,
-    // deprecate
-    Error,
-    NotExist,
+    Error,    // deprecate
+    NotExist, // deprecate
     ServerError,
     ClientError,
 }
