@@ -275,12 +275,20 @@ func (s *Segment) generateBaseSegmentsFromDB(rawData *PlatformRawData) {
 		for vif := range vifs.Iter() {
 			netWorkMacs.add(vif)
 		}
-		if podVifs, ok := s.vmIDToPodNodeAllVifs[vmID]; ok {
-			for podVif := range podVifs.Iter() {
-				netWorkMacs.add(podVif)
-			}
-		}
 		vmIDToSegments[vmID] = netWorkMacs
+	}
+
+	for vmID, podVifs := range s.vmIDToPodNodeAllVifs {
+		netWorkMacs, ok := vmIDToSegments[vmID]
+		if ok == false {
+			netWorkMacs = newNetworkMacs()
+		}
+		for podVif := range podVifs.Iter() {
+			netWorkMacs.add(podVif)
+		}
+		if ok == false {
+			vmIDToSegments[vmID] = netWorkMacs
+		}
 	}
 
 	for podNodeID, vifs := range s.podNodeIDToAllVifs {
