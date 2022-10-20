@@ -103,6 +103,7 @@ var (
 	PlatformEnabled               = 0
 	IfMacSource                   = 0
 	VMXMLPath                     = "/etc/libvirt/qemu/"
+	ExtraNetnsRegex               = ""
 	NatIPEnabled                  = 0
 	CapturePacketSize             = 65535
 	InactiveServerPortEnabled     = 1

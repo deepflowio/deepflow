@@ -973,6 +973,7 @@ type VTapGroupConfiguration struct {
 	PlatformEnabled               *int    `gorm:"column:platform_enabled;type:tinyint(1);default:null" json:"PLATFORM_ENABLED"`         // 0: disabled 1:enabled
 	IfMacSource                   *int    `gorm:"column:if_mac_source;type:int;default:null" json:"IF_MAC_SOURCE"`                      // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
 	VMXMLPath                     *string `gorm:"column:vm_xml_path;type:text;default:null" json:"VM_XML_PATH"`
+	ExtraNetnsRegex               *string `gorm:"column:extra_netns_regex;type:text;default:null" json:"EXTRA_NETNS_REGEX"`
 	NatIPEnabled                  *int    `gorm:"column:nat_ip_enabled;type:tinyint(1);default:null" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	CapturePacketSize             *int    `gorm:"column:capture_packet_size;type:int;default:null" json:"CAPTURE_PACKET_SIZE"`
 	InactiveServerPortEnabled     *int    `gorm:"column:inactive_server_port_enabled;type:tinyint(1);default:null" json:"INACTIVE_SERVER_PORT_ENABLED"` // 0: disabled 1:enabled
@@ -1040,6 +1041,7 @@ type RVTapGroupConfiguration struct {
 	PlatformEnabled               int    `gorm:"column:platform_enabled;type:tinyint(1);default:null" json:"PLATFORM_ENABLED"`         // 0: disabled 1:enabled
 	IfMacSource                   int    `gorm:"column:if_mac_source;type:int;default:null" json:"IF_MAC_SOURCE"`                      // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
 	VMXMLPath                     string `gorm:"column:vm_xml_path;type:text;default:null" json:"VM_XML_PATH"`
+	ExtraNetnsRegex               string `gorm:"column:extra_netns_regex;type:text;default:null" json:"EXTRA_NETNS_REGEX"`
 	NatIPEnabled                  int    `gorm:"column:nat_ip_enabled;type:tinyint(1);default:null" json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	CapturePacketSize             int    `gorm:"column:capture_packet_size;type:int;default:null" json:"CAPTURE_PACKET_SIZE"`
 	InactiveServerPortEnabled     int    `gorm:"column:inactive_server_port_enabled;type:tinyint(1);default:null" json:"INACTIVE_SERVER_PORT_ENABLED"` // 0: disabled 1:enabled
