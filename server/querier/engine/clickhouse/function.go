@@ -529,11 +529,29 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_TOP
 		return node
 	case TAG_FUNCTION_ENUM:
+		var tagFilter string
+		tagEnum := strings.TrimSuffix(f.Args[0], "_0")
+		tagEnum = strings.TrimSuffix(tagEnum, "_1")
+		tagDes, getTagOK := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+		tagDescription, tagOK := tag.TAG_DESCRIPTIONS[tag.TagDescriptionKey{
+			DB: f.DB, Table: f.Table, TagName: f.Args[0],
+		}]
+
+		if getTagOK {
+			if tagOK {
+				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, ".ch")
+				enumFileName = strings.TrimSuffix(enumFileName, ".en")
+				tagFilter = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
+			} else {
+				tagFilter = fmt.Sprintf(tagDes.TagTranslator, f.Args[0])
+			}
+		} else {
+			tagFilter = fmt.Sprintf("Enum(%s)", f.Args[0])
+		}
 		if f.Alias == "" {
 			f.Alias = fmt.Sprintf("Enum(%s)", f.Args[0])
 		}
-		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
-		f.Withs = []view.Node{&view.With{Value: tagDes.TagTranslator, Alias: f.Alias}}
+		f.Withs = []view.Node{&view.With{Value: tagFilter, Alias: f.Alias}}
 		return f.getViewNode()
 	}
 	values := make([]string, len(fields))
