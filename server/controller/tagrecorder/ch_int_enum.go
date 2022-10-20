@@ -18,6 +18,7 @@ package tagrecorder
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
@@ -47,7 +48,9 @@ func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) 
 		log.Errorf("read failed: %v", err)
 	}
 
-	for tagName, tagValues := range respMap {
+	for name, tagValues := range respMap {
+		tagName := strings.TrimSuffix(name, ".en")
+		tagName = strings.TrimSuffix(tagName, ".ch")
 		for _, valueAndName := range tagValues {
 			tagValue := valueAndName.([]interface{})[0]
 			tagDisplayName := valueAndName.([]interface{})[1]
