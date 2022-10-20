@@ -14,24 +14,10 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
-mod kubernetes;
-mod libvirt_xml_extractor;
-#[cfg(target_os = "linux")]
-mod platform_synchronizer;
-
-#[cfg(target_os = "linux")]
-pub use kubernetes::{ActivePoller, ApiWatcher, GenericPoller, Poller};
-pub use libvirt_xml_extractor::LibvirtXmlExtractor;
-#[cfg(target_os = "linux")]
-pub use platform_synchronizer::PlatformSynchronizer;
-
-use public::utils::net::MacAddr;
-
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct InterfaceEntry {
-    pub name: String,
-    pub mac: MacAddr,
-    pub domain_uuid: String,
-    pub domain_name: String,
+#[derive(Clone, Debug, Default)]
+pub enum NsFile {
+    Root,
 }
+
+#[derive(Default)]
+pub struct NetNs;

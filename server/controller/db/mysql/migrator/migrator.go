@@ -54,6 +54,7 @@ func MigrateMySQL(cfg MySqlConfig) bool {
 			log.Errorf("check db version failed: %v", err)
 			return false
 		}
+		log.Infof("current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED)
 		if version == "" {
 			// TODO drop database is a dangerous operation
 			DropDatabase(db, cfg.Database)
@@ -72,7 +73,7 @@ func MigrateMySQL(cfg MySqlConfig) bool {
 				return false
 			}
 			return RollbackIfInitTablesFailed(db, cfg.Database)
-		} else if version != migration.CREATE_TABLE_DB_VERSION {
+		} else if version != migration.DB_VERSION_EXPECTED {
 			err = ExecuteIssus(db, version)
 			if err != nil {
 				return false

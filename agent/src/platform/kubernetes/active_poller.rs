@@ -16,9 +16,6 @@
 
 use std::{
     collections::HashMap,
-    fs,
-    os::unix::io::AsRawFd,
-    path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
@@ -28,18 +25,17 @@ use std::{
 };
 
 use log::{debug, info, log_enabled, warn, Level};
-use nix::errno::Errno;
-use nix::sched::{setns, CloneFlags};
+use regex::Regex;
 
-use super::{ls_ns_net, Poller};
-use crate::platform::InterfaceInfo;
-use public::utils::net::{addr_list, link_list};
+use super::Poller;
+use public::netns::{InterfaceInfo, NetNs, NsFile};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ActivePoller {
     interval: Duration,
     version: Arc<AtomicU64>,
-    entries: Arc<Mutex<Option<Vec<InterfaceInfo>>>>,
+    entries: Arc<Mutex<HashMap<NsFile, Vec<InterfaceInfo>>>>,
+    netns_regex: Arc<Mutex<Option<Regex>>>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -49,161 +45,66 @@ impl ActivePoller {
     pub fn new(interval: Duration) -> Self {
         Self {
             interval,
-            version: Arc::new(AtomicU64::new(0)),
-            entries: Arc::new(Mutex::new(None)),
-            running: Arc::new(Mutex::new(false)),
-            timer: Arc::new(Condvar::new()),
-            thread: Mutex::new(None),
+            version: Default::default(),
+            entries: Default::default(),
+            netns_regex: Default::default(),
+            running: Default::default(),
+            timer: Default::default(),
+            thread: Default::default(),
         }
     }
 
-    fn query(priv_logged: &mut bool) -> Option<Vec<InterfaceInfo>> {
-        let netns = fs::File::open("/proc/self/ns/net");
-        if netns.is_err() {
-            warn!("get self net namespace failed: {:?}", netns.unwrap_err());
-            return None;
-        }
-        let netns = netns.unwrap();
+    fn query(ns_regex: &Option<Regex>) -> HashMap<NsFile, Vec<InterfaceInfo>> {
+        let mut net_ns = NetNs::default();
+        let mut map = HashMap::new();
 
-        let net_nss = ls_ns_net();
-        if net_nss.is_err() {
-            warn!("get net namespaces failed: {:?}", net_nss.unwrap_err());
-            return None;
-        }
-        let net_nss = net_nss.unwrap();
-
-        if net_nss.len() <= 1 {
-            if !*priv_logged {
-                // 只能拿到global namespace的时候，可能权限配置不对，也有可能节点上没有容器
-                warn!("no net namespaces found, check trident container privileges if this is not the expected behaviour");
-                *priv_logged = true;
-            }
-        } else {
-            *priv_logged = false;
+        let mut ns_files = match ns_regex {
+            Some(re) => NetNs::find_ns_files_by_regex(re),
+            None => vec![],
+        };
+        // always query root ns (/proc/1/ns/net)
+        ns_files.push(NsFile::Root);
+        if ns_files.is_empty() {
+            warn!("no net namespace found");
+            return map;
         }
 
-        let mut new_interface_info = vec![];
+        // for restore
+        let current_ns = NetNs::open_current_ns();
+        if let Err(e) = current_ns {
+            warn!("get self net namespace failed: {:?}", e);
+            return map;
+        }
+        let current_ns = current_ns.unwrap();
 
-        for nss in net_nss.into_iter() {
-            if nss.len() > 0 && nss[0] == 1 {
-                // skip global namespace
-                continue;
-            }
-
-            let mut current_ns_found = false;
-            for &pid in nss.iter() {
-                let ns_id = Self::get_net_ns_by(pid);
-                if ns_id.is_none() {
-                    continue;
+        for ns in ns_files {
+            match net_ns.get_ns_interfaces(&ns) {
+                Ok(mut ifs) => {
+                    ifs.sort_unstable();
+                    map.insert(ns.clone(), ifs);
                 }
-
-                if Self::set_net_ns_by(pid).is_err() {
-                    continue;
-                }
-
-                let links = link_list();
-                if links.is_err() {
-                    continue;
-                }
-
-                let addrs = addr_list();
-                if addrs.is_err() {
-                    continue;
-                }
-
-                let mut addr_map =
-                    addrs
-                        .unwrap()
-                        .into_iter()
-                        .fold(HashMap::new(), |mut map, addr| {
-                            map.entry(addr.if_index)
-                                .or_insert(vec![])
-                                .push(addr.ip_addr);
-
-                            map
-                        });
-
-                for link in links.unwrap() {
-                    let link_type = link
-                        .if_type
-                        .as_ref()
-                        .map(|t| t.as_str())
-                        .unwrap_or_default();
-                    match link_type {
-                        "veth" | "macvlan" | "ipvlan" => (),
-                        _ => continue,
-                    }
-
-                    if !addr_map.contains_key(&link.if_index) {
-                        // 忽略没有IP的接口
-                        continue;
-                    }
-
-                    let info = InterfaceInfo {
-                        tap_idx: link.parent_index.unwrap_or_else(|| {
-                            todo!("如果没有找到parent index 就要使用ioctl 查询")
-                        }),
-                        mac: link.mac_addr,
-                        ips: addr_map.remove(&link.if_index).unwrap(),
-                        name: link.name,
-                        device_id: ns_id
-                            .as_ref()
-                            .and_then(|p| p.to_str())
-                            .map(|s| s.to_string())
-                            .unwrap(),
-                    };
-                    new_interface_info.push(info);
-                }
-                // 当前命名空间正常查询完毕
-                current_ns_found = true;
-                break;
-            }
-            if !current_ns_found {
-                warn!("failed getting ips for namespace group: {:?}", nss);
+                Err(e) => warn!("get interfaces failed for {:?}: {:?}", ns, e),
             }
         }
 
-        if let Err(e) = setns(netns.as_raw_fd(), CloneFlags::CLONE_NEWNET) {
+        if let Err(e) = NetNs::setns(&current_ns) {
             warn!("restore net namespace failed: {}", e);
         }
-
-        new_interface_info.sort_unstable();
-        Some(new_interface_info)
-    }
-
-    fn get_net_ns_by(pid: u32) -> Option<PathBuf> {
-        match fs::read_link(format!("/proc/{}/ns/net", pid)) {
-            Ok(p) => Some(p),
-            Err(e) => {
-                warn!("get net namespace ({}) failed: {:?}", pid, e);
-                None
-            }
-        }
-    }
-
-    fn set_net_ns_by(pid: u32) -> nix::Result<()> {
-        match fs::OpenOptions::new()
-            .read(true)
-            .open(format!("/proc/{}/ns/net", pid))
-        {
-            Ok(file) => setns(file.as_raw_fd(), CloneFlags::CLONE_NEWNET),
-            Err(e) => {
-                warn!("set net namespace ({}) failed: {:?}", pid, e);
-                Err(Errno::EACCES)
-            }
-        }
+        map
     }
 
     fn process(
         timer: Arc<Condvar>,
         running: Arc<Mutex<bool>>,
         version: Arc<AtomicU64>,
-        entries: Arc<Mutex<Option<Vec<InterfaceInfo>>>>,
+        entries: Arc<Mutex<HashMap<NsFile, Vec<InterfaceInfo>>>>,
+        netns_regex: Arc<Mutex<Option<Regex>>>,
         timeout: Duration,
     ) {
-        let mut priv_logged = false;
         // 初始化
-        *entries.lock().unwrap() = Self::query(&mut priv_logged);
+        let re = netns_regex.lock().unwrap();
+        *entries.lock().unwrap() = Self::query(&re);
+        drop(re);
         version.store(1, Ordering::SeqCst);
 
         loop {
@@ -217,7 +118,8 @@ impl ActivePoller {
             }
             drop(guard);
 
-            let new_interface_info = Self::query(&mut priv_logged);
+            let re = netns_regex.lock().unwrap().clone();
+            let new_interface_info = Self::query(&re);
             // compare two lists
             let mut old_interface_info = entries.lock().unwrap();
             if old_interface_info.eq(&new_interface_info) {
@@ -231,8 +133,8 @@ impl ActivePoller {
                 version.load(Ordering::SeqCst)
             );
             if log_enabled!(Level::Debug) {
-                if let Some(old) = old_interface_info.as_ref() {
-                    for entry in old {
+                for ns in old_interface_info.values() {
+                    for entry in ns {
                         debug!("{}", entry);
                     }
                 }
@@ -246,8 +148,20 @@ impl Poller for ActivePoller {
         self.version.load(Ordering::SeqCst)
     }
 
-    fn get_interface_info(&self) -> Option<Vec<InterfaceInfo>> {
-        self.entries.lock().unwrap().as_ref().map(|e| e.clone())
+    fn get_interface_info_in(&self, ns: &NsFile) -> Option<Vec<InterfaceInfo>> {
+        self.entries.lock().unwrap().get(&ns).map(|e| e.clone())
+    }
+
+    fn get_interface_info(&self) -> Vec<InterfaceInfo> {
+        let mut info = vec![];
+        for v in self.entries.lock().unwrap().values() {
+            info.extend(v.clone());
+        }
+        info
+    }
+
+    fn set_netns_regex(&self, re: Regex) {
+        self.netns_regex.lock().unwrap().replace(re);
     }
 
     fn start(&self) {
@@ -262,13 +176,15 @@ impl Poller for ActivePoller {
 
         info!("starts kubernetes active poller");
         let entries = self.entries.clone();
+        let netns_regex = self.netns_regex.clone();
         let running = self.running.clone();
         let version = self.version.clone();
         let timeout = self.interval;
         let timer = self.timer.clone();
 
-        let handle =
-            thread::spawn(move || Self::process(timer, running, version, entries, timeout));
+        let handle = thread::spawn(move || {
+            Self::process(timer, running, version, entries, netns_regex, timeout)
+        });
         self.thread.lock().unwrap().replace(handle);
     }
 
@@ -287,29 +203,5 @@ impl Poller for ActivePoller {
             handle.join().expect("cannot wait thread");
         }
         info!("stops kubernetes poller");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn assert_poller_query() {
-        let mut priv_logged = false;
-        if let Some(infos) = ActivePoller::query(&mut priv_logged) {
-            println!("result interface infos: {:?}", infos);
-        }
-    }
-
-    #[test]
-    fn assert_poller() {
-        let poller = ActivePoller::new(Duration::from_secs(30));
-        poller.start();
-        thread::sleep(Duration::from_secs(1));
-        if let Some(infos) = poller.get_interface_info() {
-            println!("interface infos from active poller: {:?}", infos);
-        }
-        poller.stop();
     }
 }

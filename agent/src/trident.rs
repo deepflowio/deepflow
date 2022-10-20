@@ -83,8 +83,11 @@ use crate::{
         stats::{self, Countable, RefCountable, StatsOption},
     },
 };
+#[cfg(target_os = "linux")]
+use public::netns::links_by_name_regex_in_netns;
 use public::{
     debug::QueueDebugger,
+    netns::NsFile,
     queue,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
     LeakyBucket,
@@ -398,6 +401,9 @@ impl Trident {
                         vm_mac_addrs,
                     )?;
                     comp.start();
+                    if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer {
+                        parse_tap_type(&mut comp, tap_types);
+                    }
                     for callback in callbacks {
                         callback(&config_handler, &mut comp);
                     }
@@ -464,6 +470,36 @@ fn dispatcher_listener_callback(
                 }
             };
             for listener in components.dispatcher_listeners.iter() {
+                let netns = listener.netns();
+                #[cfg(target_os = "linux")]
+                if netns != NsFile::Root {
+                    let interfaces = match links_by_name_regex_in_netns(
+                        &conf.tap_interface_regex,
+                        &netns,
+                    ) {
+                        Err(e) => {
+                            warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
+                            vec![]
+                        }
+                        Ok(links) => {
+                            if links.is_empty() {
+                                warn!(
+                                    "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
+                                    conf.tap_interface_regex, netns,
+                                );
+                            }
+                            links
+                        }
+                    };
+                    info!("tap interface in namespace {:?}: {:?}", netns, interfaces);
+                    listener.on_tap_interface_change(
+                        &interfaces,
+                        if_mac_source,
+                        conf.trident_type,
+                        &blacklist,
+                    );
+                    continue;
+                }
                 listener.on_tap_interface_change(
                     &links,
                     if_mac_source,
@@ -486,24 +522,28 @@ fn dispatcher_listener_callback(
                 );
                 listener.on_vm_change(&vm_mac_addrs);
             }
-            let mut updated = false;
-            if components.cur_tap_types.len() != tap_types.len() {
-                updated = true;
-            } else {
-                for i in 0..tap_types.len() {
-                    if components.cur_tap_types[i] != tap_types[i] {
-                        updated = true;
-                        break;
-                    }
-                }
-            }
-            if updated {
-                components.tap_typer.on_tap_types_change(tap_types.clone());
-                components.cur_tap_types.clear();
-                components.cur_tap_types.clone_from(&tap_types);
-            }
+            parse_tap_type(components, tap_types);
         }
         _ => {}
+    }
+}
+
+fn parse_tap_type(components: &mut Components, tap_types: Vec<trident::TapType>) {
+    let mut updated = false;
+    if components.cur_tap_types.len() != tap_types.len() {
+        updated = true;
+    } else {
+        for i in 0..tap_types.len() {
+            if components.cur_tap_types[i] != tap_types[i] {
+                updated = true;
+                break;
+            }
+        }
+    }
+    if updated {
+        components.tap_typer.on_tap_types_change(tap_types.clone());
+        components.cur_tap_types.clear();
+        components.cur_tap_types.clone_from(&tap_types);
     }
 }
 
@@ -881,7 +921,6 @@ impl Components {
         };
 
         // TODO: collector enabled
-        let dispatcher_num = yaml_config.src_interfaces.len().max(1);
         let mut dispatchers = vec![];
         let mut dispatcher_listeners = vec![];
         let mut collectors = vec![];
@@ -1034,7 +1073,19 @@ impl Components {
             config_handler.candidate_config.npb.bps_threshold,
         )));
         let mut handler_builders = Vec::new();
-        for i in 0..dispatcher_num {
+
+        let mut src_interfaces_and_namespaces = vec![];
+        for src_if in yaml_config.src_interfaces.iter() {
+            src_interfaces_and_namespaces.push((src_if.clone(), NsFile::Root));
+        }
+        if src_interfaces_and_namespaces.is_empty() {
+            src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
+        }
+        for ns in candidate_config.dispatcher.extra_netns.iter() {
+            src_interfaces_and_namespaces.push(("".into(), ns.clone()));
+        }
+
+        for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
                 "1-tagged-flow-to-quadruple-generator",
@@ -1117,10 +1168,34 @@ impl Components {
             ]));
             handler_builders.push(handler_builder.clone());
 
-            let mut src_interface = String::new();
-            if yaml_config.src_interfaces.len() > i {
-                src_interface = yaml_config.src_interfaces[i].clone();
-            }
+            #[cfg(target_os = "linux")]
+            let tap_interfaces = if netns != NsFile::Root {
+                let interfaces = match links_by_name_regex_in_netns(
+                    &config_handler
+                        .candidate_config
+                        .dispatcher
+                        .tap_interface_regex,
+                    &netns,
+                ) {
+                    Err(e) => {
+                        warn!("get interfaces by name regex in {:?} failed: {}", netns, e);
+                        vec![]
+                    }
+                    Ok(links) => {
+                        if links.is_empty() {
+                            warn!(
+                                "tap-interface-regex({}) do not match any interface in {:?}, in local mode",
+                                config_handler.candidate_config.dispatcher.tap_interface_regex, netns,
+                            );
+                        }
+                        links
+                    }
+                };
+                info!("tap interface in namespace {:?}: {:?}", netns, interfaces);
+                interfaces
+            } else {
+                tap_interfaces.clone()
+            };
 
             let dispatcher_builder = DispatcherBuilder::new()
                 .id(i)
@@ -1165,7 +1240,8 @@ impl Components {
                 .policy_getter(policy_getter)
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
-                .src_interface(src_interface);
+                .src_interface(src_interface)
+                .netns(netns);
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder

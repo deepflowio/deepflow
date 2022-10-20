@@ -445,6 +445,23 @@ var ColumnAdd615 = []*ColumnAdds{
 	},
 }
 
+var ColumnMod615 = []*ColumnMod{
+	&ColumnMod{
+		Db:            "flow_log",
+		Table:         "l7_flow_log",
+		ColumnName:    "response_code",
+		NewColumnType: ckdb.Int32Nullable,
+		DropIndex:     false,
+	},
+	&ColumnMod{
+		Db:            "flow_log",
+		Table:         "l7_flow_log_local",
+		ColumnName:    "response_code",
+		NewColumnType: ckdb.Int32Nullable,
+		DropIndex:     false,
+	},
+}
+
 func getTables(connect *sql.DB, db, tableName string) ([]string, error) {
 	sql := fmt.Sprintf("SHOW TABLES IN %s", db)
 	rows, err := connect.Query(sql)
@@ -677,6 +694,8 @@ func NewCKIssu(cfg *config.Config) (*Issu, error) {
 			i.columnAdds = append(i.columnAdds, getColumnAdds(adds)...)
 		}
 	}
+
+	i.columnMods = ColumnMod615
 
 	var err error
 	i.primaryConnection, err = common.NewCKConnection(i.primaryAddr, i.username, i.password)

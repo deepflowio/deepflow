@@ -119,7 +119,8 @@ pub fn neighbor_lookup(mut dest_addr: IpAddr) -> Result<NeighborEntry> {
             name,
             flags: flags.into(),
             if_type: None,
-            parent_index: None,
+            peer_index: None,
+            link_netnsid: None,
         },
         dest_addr,
         dest_mac_addr: target_mac,
@@ -388,15 +389,15 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
         NlPayload::Payload(msg),
     );
     match name {
-        Some(_) => req.nl_flags.set(NlmF::Ack),
-        None => req.nl_flags.set(NlmF::Dump),
+        Some(_) => req.nl_flags.set(&NlmF::Ack),
+        None => req.nl_flags.set(&NlmF::Dump),
     }
 
     let mut socket = NlSocketHandle::connect(NlFamily::Route, None, &[])?;
     socket.send(req)?;
 
     let mut links = vec![];
-    for m in socket.iter::<Ifinfomsg>(false) {
+    for m in socket.iter::<NlTypeWrapper, Ifinfomsg>(false) {
         if let Err(Nlmsgerr(e)) = m.as_ref() {
             if e.error == NETLINK_ERROR_NOADDR && name.is_some() {
                 return Err(Error::LinkNotFound(name.unwrap().into()));
@@ -408,8 +409,9 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
 
             let mut mac_addr = None;
             let mut if_type = None;
-            let mut parent_index = None;
+            let mut peer_index = None;
             let mut if_name = None;
+            let mut link_netnsid = None;
 
             for attr in payload.rtattrs.iter() {
                 match attr.rta_type {
@@ -440,7 +442,13 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
                     }
                     Ifla::Link => {
                         if let Some(payload) = attr.rta_payload.as_ref().get(..4) {
-                            parent_index =
+                            peer_index =
+                                Some(u32::from_le_bytes(*<&[u8; 4]>::try_from(payload).unwrap()));
+                        }
+                    }
+                    Ifla::LinkNetnsid => {
+                        if let Some(payload) = attr.rta_payload.as_ref().get(..4) {
+                            link_netnsid =
                                 Some(u32::from_le_bytes(*<&[u8; 4]>::try_from(payload).unwrap()));
                         }
                     }
@@ -455,7 +463,8 @@ fn request_link_info(name: Option<&str>) -> Result<Vec<Link>> {
                     mac_addr: MacAddr(*mac),
                     flags: (&payload.ifi_flags).into(),
                     if_type,
-                    parent_index,
+                    peer_index,
+                    link_netnsid,
                 });
             }
         }
@@ -527,7 +536,7 @@ pub fn addr_list() -> Result<Vec<Addr>> {
     socket.send(req)?;
 
     let mut addrs = vec![];
-    for m in socket.iter::<Ifaddrmsg>(false) {
+    for m in socket.iter::<NlTypeWrapper, Ifaddrmsg>(false) {
         let m = m?;
         if m.nl_type != Rtm::Newaddr.into() {
             continue;
@@ -587,7 +596,7 @@ pub fn route_get(dest: &IpAddr) -> Result<Vec<Route>> {
     socket.send(req)?;
 
     let mut routes = vec![];
-    for m in socket.iter::<Rtmsg>(false) {
+    for m in socket.iter::<NlTypeWrapper, Rtmsg>(false) {
         let m = m?;
         if let NlTypeWrapper::Rtm(_) = m.nl_type {
             let payload = m.get_payload()?;

@@ -43,6 +43,7 @@
 #include "../kernel/include/socket_trace_common.h"
 #include <bcc/libbpf.h>
 #include "symbol.h"
+#include <regex.h>
 
 // TODO: 对内存拷贝进行硬件优化。
 
@@ -89,13 +90,24 @@ enum probe_type {
 	UPROBE
 };
 
-enum feature_flag {
+// index number of feature.
+enum cfg_feature_idx {
+	// Analyze go binary to get symbol address without symbol table
 	FEATURE_UPROBE_GOLANG_SYMBOL,
+	// openssl uprobe
 	FEATURE_UPROBE_OPENSSL,
+	// golang uprobe
+	FEATURE_UPROBE_GOLANG,
 	FEATURE_MAX,
 };
 
-extern bool feature_flags[FEATURE_MAX];
+struct cfg_feature_regex {
+	regex_t preg;
+	int ok;
+};
+
+extern struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
+extern int ebpf_config_protocol_filter[PROTO_NUM];
 
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_PORT 54583
@@ -422,8 +434,10 @@ prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 	}
 }
 
-int set_feature_flag(int flag);
-int clear_feature_flag(int flag);
+int enable_ebpf_protocol(int protocol);
+int set_feature_regex(int feature, const char *pattern);
+bool is_feature_enabled(int feature);
+bool is_feature_matched(int feature, const char *path);
 int bpf_tracer_init(const char *log_file, bool is_stdout);
 int tracer_bpf_load(struct bpf_tracer *tracer);
 int tracer_probes_init(struct bpf_tracer *tracer);

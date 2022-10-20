@@ -920,11 +920,33 @@ impl EbpfCollector {
                 std::ptr::null()
             };
 
-            if ebpf_uprobe_golang_symbol_enabled {
-                ebpf::set_feature_flag(ebpf::FEATURE_UPROBE_GOLANG_SYMBOL);
-            }
+            // TODO: Update according to configuration file
+            ebpf::set_feature_regex(
+                ebpf::FEATURE_UPROBE_GOLANG,
+                CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+            );
+            ebpf::set_feature_regex(
+                ebpf::FEATURE_UPROBE_OPENSSL,
+                CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+            );
 
-            ebpf::set_feature_flag(ebpf::FEATURE_UPROBE_OPENSSL);
+            if ebpf_uprobe_golang_symbol_enabled {
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_UPROBE_GOLANG_SYMBOL,
+                    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+                );
+            }
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_HTTP1 as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_HTTP2 as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_TLS_HTTP1 as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_TLS_HTTP2 as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_DUBBO as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_MYSQL as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_POSTGRESQL as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_REDIS as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_KAFKA as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_MQTT as ebpf::c_int);
+            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_DNS as ebpf::c_int);
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
                 info!("ebpf bpf_tracer_init error: {}", config.log_path);

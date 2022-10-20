@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	//"github.com/k0kubun/pp"
-	"regexp"
 	"strings"
 
 	logging "github.com/op/go-logging"
@@ -52,35 +51,111 @@ type CHEngine struct {
 func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]interface{}, map[string]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
+	var sqlList []string
+	var err error
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
-	result, isShow, err := e.ParseShowSql(sql)
-	if isShow {
-		if err != nil {
-			return nil, nil, err
+	// Parse showSql
+	sqlSplit := strings.Split(sql, " ")
+	if strings.ToLower(sqlSplit[0]) == "show" {
+		var table string
+		var where string
+		for i, item := range sqlSplit {
+			if strings.ToLower(item) == "from" {
+				table = sqlSplit[i+1]
+				break
+			}
+			if strings.ToLower(item) == "where" {
+				where = strings.Join(sqlSplit[i+1:], " ")
+			}
 		}
-		return result, nil, nil
-	}
-	sqlList := strings.SplitAfterN(sql, "WHERE", 2)
-	if len(sqlList) == 1 {
-		sqlList = strings.SplitAfterN(sql, "where", 2)
-	}
-	if len(sqlList) > 1 {
-		var rgx = regexp.MustCompile(`(Enum\(.*?\))`)
-		rs := rgx.FindAllStringSubmatch(sqlList[1], -1)
-		rMap := map[string]string{}
-		for _, r := range rs {
-			rMap[r[1]] = r[1]
+		switch strings.ToLower(sqlSplit[1]) {
+		case "metrics":
+			if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
+				funcs, err := metrics.GetFunctionDescriptions()
+				return funcs, nil, err
+			} else {
+				metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where)
+				return metrics, nil, err
+			}
+		case "tag":
+			// show tag {tag} values from table
+			if len(sqlSplit) < 6 {
+				return nil, nil, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
+			}
+			if strings.ToLower(sqlSplit[3]) == "values" {
+				sqlList, err = tagdescription.GetTagValues(e.DB, table, sql)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+		case "tags":
+			data, err := tagdescription.GetTagDescriptions(e.DB, table, sql)
+			return data, nil, err
+		case "tables":
+			return GetTables(e.DB), nil, nil
+		case "databases":
+			return GetDatabases(), nil, nil
+
 		}
-		for _, value := range rMap {
-			sqlList[1] = strings.ReplaceAll(sqlList[1], value, "`"+value+"`")
-		}
-		sql = sqlList[0] + sqlList[1]
 	}
 	debug := &client.Debug{
 		IP:        config.Cfg.Clickhouse.Host,
 		QueryUUID: query_uuid,
 	}
 	parser := parse.Parser{Engine: e}
+	if strings.ToLower(sqlSplit[0]) == "show" {
+		e.DB = "flow_tag"
+		results := map[string][]interface{}{}
+		chClient := client.Client{
+			Host:     config.Cfg.Clickhouse.Host,
+			Port:     config.Cfg.Clickhouse.Port,
+			UserName: config.Cfg.Clickhouse.User,
+			Password: config.Cfg.Clickhouse.Password,
+			DB:       e.DB,
+			Debug:    debug,
+		}
+		ColumnSchemaMap := make(map[string]*client.ColumnSchema)
+		for _, ColumnSchema := range e.ColumnSchemas {
+			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
+		}
+		if len(sqlList) > 0 {
+			for _, showSql := range sqlList {
+				err := parser.ParseSQL(showSql)
+				if err != nil {
+					log.Error(err)
+					return nil, nil, err
+				}
+				for _, stmt := range e.Statements {
+					stmt.Format(e.Model)
+				}
+				FormatInnerTime(e.Model)
+				// 使用Model生成View
+				e.View = view.NewView(e.Model)
+				chSql := e.ToSQLString()
+				callbacks := e.View.GetCallbacks()
+				debug.Sql = chSql
+				params := &client.QueryParams{
+					Sql:             chSql,
+					Callbacks:       callbacks,
+					QueryUUID:       query_uuid,
+					ColumnSchemaMap: ColumnSchemaMap,
+				}
+				result, err := chClient.DoQuery(params)
+				if err != nil {
+					log.Error(err)
+					return nil, nil, err
+				}
+				if result != nil {
+					for _, value := range result["values"] {
+						results["values"] = append(results["values"], value)
+					}
+					results["columns"] = result["columns"]
+				}
+
+			}
+		}
+		return results, debug.Get(), nil
+	}
 	err = parser.ParseSQL(sql)
 	if err != nil {
 		log.Error(err)
@@ -123,52 +198,6 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 func (e *CHEngine) Init() {
 	e.Model = view.NewModel()
 	e.Model.DB = e.DB
-}
-
-func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, bool, error) {
-	sqlSplit := strings.Split(sql, " ")
-	if strings.ToLower(sqlSplit[0]) != "show" {
-		return nil, false, nil
-	}
-	var table string
-	var where string
-	for i, item := range sqlSplit {
-		if strings.ToLower(item) == "from" {
-			table = sqlSplit[i+1]
-			break
-		}
-		if strings.ToLower(item) == "where" {
-			where = strings.Join(sqlSplit[i+1:], " ")
-		}
-	}
-	switch strings.ToLower(sqlSplit[1]) {
-	case "metrics":
-		if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
-			funcs, err := metrics.GetFunctionDescriptions()
-			return funcs, true, err
-		} else {
-			metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where)
-			return metrics, true, err
-		}
-	case "tag":
-		// show tag {tag} values from table
-		if len(sqlSplit) < 6 {
-			return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
-		}
-		if strings.ToLower(sqlSplit[3]) == "values" {
-			values, err := tagdescription.GetTagValues(e.DB, table, sql)
-			return values, true, err
-		}
-		return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
-	case "tags":
-		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql)
-		return data, true, err
-	case "tables":
-		return GetTables(e.DB), true, nil
-	case "databases":
-		return GetDatabases(), true, nil
-	}
-	return nil, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
@@ -527,6 +556,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			return aggfunction.(Function), nil
 		}
 		tagFunction, err := GetTagFunction(name, args, "", e.DB, e.Table)
+
 		if err != nil {
 			return nil, err
 		}

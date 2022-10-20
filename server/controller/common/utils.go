@@ -39,6 +39,16 @@ import (
 
 var log = logging.MustGetLogger("common")
 
+var NodeName string
+
+func init() {
+	NodeName = os.Getenv(NODE_NAME_KEY)
+}
+
+func GetNodeName() string {
+	return NodeName
+}
+
 var osDict = map[string]int{
 	"centos":  OS_CENTOS,
 	"red hat": OS_REDHAT,
@@ -122,6 +132,7 @@ func GetCURLIP(ip string) string {
 
 // 功能：调用其他模块API并获取返回结果
 func CURLPerform(method string, url string, body map[string]interface{}) (*simplejson.Json, error) {
+	log.Debugf("curl perform: %s %s %+v", method, url, body)
 	errResponse, _ := simplejson.NewJson([]byte("{}"))
 
 	// TODO: 通过配置文件获取API超时时间
@@ -211,25 +222,34 @@ func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err err
 	if err != nil {
 		return
 	}
+	var resp *simplejson.Json
 	if curController.NodeType == CONTROLLER_NODE_TYPE_MASTER {
 		host = LOCALHOST
 		httpPort = fmt.Sprintf("%d", GConfig.HTTPPort)
 		grpcPort = fmt.Sprintf("%d", GConfig.GRPCPort)
-	} else {
-		var controller *mysql.Controller
-		err = mysql.Db.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controller).Error
+		url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, httpPort))
+		resp, err = CURLPerform("GET", url, nil)
 		if err != nil {
 			return
 		}
-		host = controller.IP
+	} else {
+		var controllers []*mysql.Controller
+		err = mysql.Db.Where("node_type = ? AND state = ?", CONTROLLER_NODE_TYPE_MASTER, CONTROLLER_STATE_NORMAL).Find(&controllers).Error
+		if err != nil {
+			return
+		}
 		httpPort = fmt.Sprintf("%d", GConfig.HTTPNodePort)
 		grpcPort = fmt.Sprintf("%d", GConfig.GRPCNodePort)
-	}
-	url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, httpPort))
-	log.Info(url)
-	resp, err := CURLPerform("GET", url, nil)
-	if err != nil {
-		return
+		for _, c := range controllers {
+			host = c.IP
+			url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, httpPort))
+			resp, err = CURLPerform("GET", url, nil)
+			if err == nil {
+				break
+			}
+			log.Error("request all controllers in master reigon faield.")
+			return
+		}
 	}
 	if curController.NodeType == CONTROLLER_NODE_TYPE_MASTER {
 		masterIP = resp.Get("DATA").Get("POD_IP").MustString()

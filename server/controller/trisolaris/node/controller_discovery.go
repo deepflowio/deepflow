@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/deepflowys/deepflow/server/controller/common"
 	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
@@ -48,12 +49,12 @@ func newControllerDiscovery(masterIP string, nodeType string, regionDomainPrefix
 
 func (c *ControllerDiscovery) GetControllerData() *models.Controller {
 	envData := utils.GetRuntimeEnv()
-	name := os.Getenv(NODE_NAME_KEY)
+	name := common.GetNodeName()
 	if name == "" {
 		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
 		return nil
 	}
-	nodeName := os.Getenv(NODE_NAME_KEY)
+	nodeName := common.GetNodeName()
 	if nodeName == "" {
 		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
 		return nil

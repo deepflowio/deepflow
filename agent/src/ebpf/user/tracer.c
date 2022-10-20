@@ -29,6 +29,7 @@
 #include "tracer.h"
 #include "elf.h"
 #include "load.h"
+#include <libgen.h>
 
 int major, minor;		// Linux kernel主版本，次版本
 
@@ -39,8 +40,10 @@ volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳�
 volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
 uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
 
-// eBPF feature flags
-bool feature_flags[FEATURE_MAX] = { 0 };
+struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
+
+// eBPF protocol filter.
+int ebpf_config_protocol_filter[PROTO_NUM];
 
 /*
  * tracers
@@ -1142,22 +1145,64 @@ static struct tracer_sockopts trace_sockopts = {
 	.get = tracer_sockopt_get,
 };
 
-int set_feature_flag(int flag)
+int enable_ebpf_protocol(int protocol)
 {
-	if (flag < FEATURE_MAX) {
-		feature_flags[flag] = true;
+	if (protocol < PROTO_NUM) {
+		ebpf_config_protocol_filter[protocol] = true;
 		return 0;
 	}
 	return ETR_INVAL;
 }
 
-int clear_feature_flag(int flag)
+int set_feature_regex(int feature, const char *pattern)
 {
-	if (flag < FEATURE_MAX) {
-		feature_flags[flag] = false;
-		return 0;
+	if (feature < 0 || feature >= FEATURE_MAX) {
+		return ETR_INVAL;
 	}
-	return ETR_INVAL;
+
+	if (regcomp(&cfg_feature_regex_array[feature].preg, pattern,
+		    REG_EXTENDED)) {
+		return ETR_INVAL;
+	}
+
+	cfg_feature_regex_array[feature].ok = true;
+	return 0;
+}
+
+bool is_feature_enabled(int feature){
+	if (feature < 0 || feature >= FEATURE_MAX) {
+		return false;
+	}
+
+	return cfg_feature_regex_array[feature].ok;
+}
+
+bool is_feature_matched(int feature, const char *path)
+{
+	int error = 0;
+	char *path_for_basename = NULL;
+	char *process_name = NULL;
+
+	if (!is_feature_enabled(feature)) {
+		return false;
+	}
+
+	if (!path) {
+		return false;
+	}
+
+	// basename: This is the weird XPG version of this function.  It sometimes will
+	// modify its argument.
+	path_for_basename = strdup(path);
+	if (!path_for_basename) {
+		return false;
+	}
+
+	process_name = basename(path_for_basename);
+	error = regexec(&cfg_feature_regex_array[feature].preg, process_name, 0,
+			NULL, 0);
+	free(path_for_basename);
+	return !error;
 }
 
 int bpf_tracer_init(const char *log_file, bool is_stdout)
@@ -1267,8 +1312,6 @@ int tracer_stop(void)
 {
 	struct bpf_tracer *t = NULL;
 	int i, ret = 0;
-
-	memset(feature_flags, 0, sizeof(feature_flags));
 
 	for (i = 0; i < tracers_count; i++) {
 		t = tracers[i];
