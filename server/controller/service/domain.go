@@ -268,6 +268,10 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 			}
 
 			domainCreate.Config[key] = encryptKey
+			log.Debugf(
+				"domain (%s) %s: %s, encrypt %s: %s",
+				domainCreate.Name, key, domainCreate.Config[key].(string), key, encryptKey,
+			)
 		}
 	}
 	configStr, _ := json.Marshal(domainCreate.Config)
@@ -389,6 +393,10 @@ func UpdateDomain(
 						return nil, NewError(common.SERVER_ERROR, err.Error())
 					}
 					configUpdate[key] = encryptKey
+					log.Debugf(
+						"domain (%s) %s: %s, encrypt %s: %s",
+						domain.Name, key, configUpdate[key].(string), key, encryptKey,
+					)
 				}
 			}
 		}
