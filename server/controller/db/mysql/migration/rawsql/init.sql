@@ -1314,6 +1314,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     platform_enabled          TINYINT(1) COMMENT '0: disabled 1:enabled',
     if_mac_source             INTEGER COMMENT '0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析',
     vm_xml_path               TEXT,
+    extra_netns_regex         TEXT,
     nat_ip_enabled            TINYINT(1) COMMENT '0: disabled 1:enabled',
     capture_packet_size       INTEGER,
     inactive_server_port_enabled   TINYINT(1) COMMENT '0: disabled 1:enabled',

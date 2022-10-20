@@ -711,7 +711,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
-				"dictGet(flow_tag.int_enum_map, 'name', ('"+tagName+"',toUInt64("+enumName+")))",
+				"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('"+tagName+"',toUInt64("+enumName+")), "+enumName+")",
 				"",
 				"toUInt64("+enumName+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='"+tagName+"')",
 				"toUInt64("+enumName+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='"+tagName+"')",
@@ -724,7 +724,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			enumNameSuffix := enumName + suffix
 			tagResourceMap[enumNameSuffix] = map[string]*Tag{
 				"enum": NewTag(
-					"dictGet(flow_tag.int_enum_map, 'name', ('"+tagName+"',toUInt64("+enumNameSuffix+")))",
+					"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('"+tagName+"',toUInt64("+enumNameSuffix+")), "+enumNameSuffix+")",
 					"",
 					"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='"+tagName+"')",
 					"toUInt64("+enumNameSuffix+") IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='"+tagName+"')",
@@ -735,7 +735,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	for _, enumName := range []string{"tap_side"} {
 		tagResourceMap[enumName] = map[string]*Tag{
 			"enum": NewTag(
-				"dictGet(flow_tag.string_enum_map, 'name', ('"+enumName+"',"+enumName+"))",
+				"dictGetOrDefault(flow_tag.string_enum_map, 'name', ('"+enumName+"',"+enumName+"), "+enumName+")",
 				"",
 				enumName+" IN (SELECT value FROM flow_tag.string_enum_map WHERE name %s %s and tag_name='"+enumName+"')",
 				enumName+" IN (SELECT value FROM flow_tag.string_enum_map WHERE %s(name,%s) and tag_name='"+enumName+"')",
