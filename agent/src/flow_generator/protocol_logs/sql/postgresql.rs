@@ -35,6 +35,8 @@ use crate::{
     },
 };
 
+use super::postgre_convert::{get_code_desc, get_request_str};
+
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -67,8 +69,7 @@ pub struct PostgreInfo {
 
     // response
     pub resp_type: char,
-    pub response_code: u8,
-    pub error_code: Option<i32>,
+    pub result: String,
     pub affected_rows: u64,
     pub error_message: String,
     pub status: L7ResponseStatus,
@@ -94,8 +95,7 @@ impl L7ProtocolInfoInterface for PostgreInfo {
                 }
                 LogMessageType::Response => {
                     self.resp_type = pg.resp_type;
-                    self.response_code = pg.response_code;
-                    self.error_code = pg.error_code;
+                    self.result = pg.result;
                     self.error_message = pg.error_message;
                     self.status = pg.status;
                     self.affected_rows = pg.affected_rows;
@@ -136,9 +136,9 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
             },
             resp: L7Response {
                 status: p.status,
-                code: p.error_code,
-                result: String::from(get_response_result(p.resp_type)),
+                result: p.result,
                 exception: p.error_message,
+                ..Default::default()
             },
             ext_info: Some(ExtendedInfo {
                 ..Default::default()
@@ -274,15 +274,23 @@ impl PostgresqlLog {
                 Ok(())
             }
             'P' => {
-                // | statement 2B | query (len -4) B | param 2B |
-                let len = data.len();
-                if len < 5 {
-                    return Err(Error::L7ProtocolUnknown);
-                }
                 self.info.req_type = tag;
-                self.info.context = strip_string_end_with_zero(&data[2..len - 2])?;
                 self.info.ignore = false;
-                Ok(())
+
+                let mut data = data;
+
+                // | statement str, end with 0x0 | query str, end with 0x0 | param |
+                if let Some(idx) = data.iter().position(|x| *x == 0x0) {
+                    // skip statement
+                    data = &data[idx + 1..];
+
+                    // parse query
+                    if let Some(idx) = data.iter().position(|x| *x == 0x0) {
+                        self.info.context = String::from_utf8_lossy(&data[..idx]).to_string();
+                    }
+                    return Ok(());
+                }
+                Err(Error::L7ProtocolUnknown)
             }
             'B' | 'F' | 'C' | 'D' | 'H' | 'S' | 'X' | 'd' | 'c' | 'f' => Ok(()),
             _ => Err(Error::L7ProtocolUnknown),
@@ -351,19 +359,14 @@ impl PostgresqlLog {
                     if data[0] != b'C' {
                         return Err(Error::L7ProtocolUnknown);
                     }
-                    let err_code_str = String::from_utf8_lossy(&data[1..idx]).to_string();
-                    self.info.error_code =
-                        Some(err_code_str.parse().map_err(|_| Error::L7ProtocolUnknown)?);
-                    data = &data[idx + 1..];
+                    self.info.result = String::from_utf8_lossy(&data[1..idx]).to_string();
+                    let (err_desc, status) = get_code_desc(self.info.result.as_str());
+                    self.info.error_message = String::from(err_desc);
+                    self.info.status = status;
+                    return Ok(());
                 }
-                // message, start with "M"
-                if let Some(idx) = data.iter().position(|x| *x == 0) {
-                    if data[0] != b'M' {
-                        return Err(Error::L7ProtocolUnknown);
-                    }
-                    self.info.error_message = strip_string_end_with_zero(&data[1..idx])?;
-                }
-                Ok(())
+
+                Err(Error::L7ProtocolUnknown)
             }
 
             'Z' | 'I' | '1' | '2' | '3' | 'S' | 'K' | 'T' | 'n' | 'N' | 't' | 'D' | 'G' | 'H'
@@ -398,121 +401,6 @@ fn strip_string_end_with_zero(data: &[u8]) -> Result<String> {
         return Ok(String::from_utf8_lossy(&data[..data.len() - 1]).to_string());
     }
     Err(Error::L7ProtocolUnknown)
-}
-/*
-req:
-case 'Q'            simple query
-case 'P'            parse
-case 'B'            bind
-case 'E'            execute
-case 'F'            fastpath function call
-case 'C'            close
-case 'D'            describe
-case 'H'            flush
-case 'S'            sync
-case 'X'            exit
-case 'd'            copy data
-case 'c'            copy done
-case 'f'            copy fail
-
-resp:
-case 'C':        command complete
-case 'E':        error return
-case 'Z':        backend is ready for new query
-case 'I':        empty query
-case '1':        Parse Complete
-case '2':        Bind Complete
-case '3':        Close Complete
-case 'S':        parameter status
-case 'K':        secret key data from the backend
-case 'T':        Row Description
-case 'n':        No Data
-case 'N':        No Data
-case 't':        Parameter Description
-case 'D':        Data Row
-case 'G':        Start Copy In
-case 'H':        Start Copy Out
-case 'W':        Start Copy Both
-case 'd':        Copy Data
-case 'c':        Copy Done
-case 'R':        Authentication Reques, should ignore
-*/
-
-const RESP_STR_C: &'static str = "command complete";
-const RESP_STR_E: &'static str = "error return";
-const RESP_STR_Z: &'static str = "backend is ready for new query";
-const RESP_STR_I: &'static str = "empty query";
-const RESP_STR_1: &'static str = "Parse Complete";
-const RESP_STR_2: &'static str = "Bind Complete";
-const RESP_STR_3: &'static str = "Close Complete";
-const RESP_STR_S: &'static str = "parameter status";
-const RESP_STR_K: &'static str = "secret key data from the backend";
-const RESP_STR_T: &'static str = "Row Description";
-const RESP_STR_N: &'static str = "No Data";
-const RESP_STR_PARAM_DESC: &'static str = "Parameter Description";
-const RESP_STR_D: &'static str = "Data Row";
-const RESP_STR_G: &'static str = "Start Copy In";
-const RESP_STR_H: &'static str = "Start Copy Out";
-const RESP_STR_W: &'static str = "Start Copy Both";
-const RESP_STR_COPY_DATA: &'static str = "Copy Data";
-const RESP_STR_COPY_DONE: &'static str = "Copy Done";
-
-fn get_response_result(typ: char) -> &'static str {
-    return match typ {
-        'C' => RESP_STR_C,
-        'E' => RESP_STR_E,
-        'Z' => RESP_STR_Z,
-        'I' => RESP_STR_I,
-        '1' => RESP_STR_1,
-        '2' => RESP_STR_2,
-        '3' => RESP_STR_3,
-        'S' => RESP_STR_S,
-        'K' => RESP_STR_K,
-        'T' => RESP_STR_T,
-        'n' => RESP_STR_N,
-        'N' => RESP_STR_N,
-        't' => RESP_STR_PARAM_DESC,
-        'D' => RESP_STR_D,
-        'G' => RESP_STR_G,
-        'H' => RESP_STR_H,
-        'W' => RESP_STR_W,
-        'd' => RESP_STR_COPY_DATA,
-        'c' => RESP_STR_COPY_DONE,
-        _ => "",
-    };
-}
-
-const REQ_STR_Q: &'static str = "simple query";
-const REQ_STR_P: &'static str = "parse";
-const REQ_STR_B: &'static str = "bind";
-const REQ_STR_E: &'static str = "execute";
-const REQ_STR_F: &'static str = "fastpath function call";
-const REQ_STR_C: &'static str = "close";
-const REQ_STR_D: &'static str = "describe";
-const REQ_STR_H: &'static str = "flush";
-const REQ_STR_S: &'static str = "sync";
-const REQ_STR_X: &'static str = "exit";
-const REQ_STR_COPY_DATA: &'static str = "copy data";
-const REQ_STR_COPY_DONE: &'static str = "copy done";
-const REQ_STR_COPY_FAIL: &'static str = "copy fail";
-
-fn get_request_str(typ: char) -> &'static str {
-    match typ {
-        'Q' => REQ_STR_Q,
-        'P' => REQ_STR_P,
-        'B' => REQ_STR_B,
-        'E' => REQ_STR_E,
-        'F' => REQ_STR_F,
-        'C' => REQ_STR_C,
-        'D' => REQ_STR_D,
-        'H' => REQ_STR_H,
-        'S' => REQ_STR_S,
-        'X' => REQ_STR_X,
-        'd' => REQ_STR_COPY_DATA,
-        'c' => REQ_STR_COPY_DONE,
-        'f' => REQ_STR_COPY_FAIL,
-        _ => "",
-    }
 }
 
 #[cfg(test)]
@@ -560,10 +448,8 @@ mod test {
         assert_eq!(info.req_type, 'Q');
         assert_eq!(info.context.as_str(), "asdsdfdsf;");
         assert_eq!(info.resp_type, 'E');
-        assert_eq!(
-            info.error_message.as_str(),
-            "syntax error at or near \"asdsdfdsf\""
-        );
+        assert_eq!(info.result.as_str(), "42601");
+        assert_eq!(info.error_message.as_str(), "syntax_error",);
     }
 
     fn check_and_parse(file_name: &str) -> PostgreInfo {
