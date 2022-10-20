@@ -97,6 +97,10 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 		log.Error("decrypt secret_key failed (%s)", err.Error())
 		return nil, err
 	}
+	log.Debugf(
+		"domain (%s) secret_key: %s, decrypt secret_key: %s",
+		domain.Name, secretKey, decryptSecretKey,
+	)
 
 	url := config.Get("url").MustString()
 	if url == "" {
