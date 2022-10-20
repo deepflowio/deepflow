@@ -1,0 +1,10 @@
+# Value , DisplayName
+0       , 本地网卡
+1       , 云网关网卡
+2       , ERSPAN
+3       , ERSPAN（IPv6）
+4       , 分光镜像
+5       , NetFlow
+6       , sFlow
+7       , eBPF
+8       , OTel

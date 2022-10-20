@@ -2,7 +2,7 @@ MESSAGE = github.com/deepflowys/deepflow/message
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
-BRANCH = $(shell cat ../version)
+BRANCH = $(shell git branch  --show-current)
 COMPILE_TIME= $(shell date +"%Y-%m-%d %H:%M:%S")
 FLAGS = -gcflags "-l -l" -ldflags "-X main.Branch=${BRANCH} -X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE} \
 		-X 'main.goVersion=$(shell go version)' -X 'main.CompileTime=${COMPILE_TIME}'"

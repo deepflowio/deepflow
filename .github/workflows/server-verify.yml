@@ -30,9 +30,6 @@ jobs:
           
       - name: Install dependencies
         run: |
-          sudo systemctl stop unattended-upgrades
-          sudo apt-get update
-          sudo apt-get -y install tmpl python3 python3-pip
           pip3 install ujson
           GO111MODULE="off" go get github.com/gogo/protobuf/protoc-gen-gofast
           GO111MODULE="off" go get github.com/gogo/protobuf/proto

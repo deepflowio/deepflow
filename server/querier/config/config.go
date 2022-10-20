@@ -36,6 +36,7 @@ type QuerierConfig struct {
 	LogLevel   string     `default:"info" yaml:"log-level"`
 	ListenPort int        `default:"20416" yaml:"listen-port"`
 	Clickhouse Clickhouse `yaml:clickhouse`
+	Language   string     `default:"en" yaml:"language"`
 }
 
 type Clickhouse struct {
