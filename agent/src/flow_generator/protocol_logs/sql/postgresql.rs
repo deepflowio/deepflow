@@ -269,7 +269,7 @@ impl PostgresqlLog {
         match tag {
             'Q' => {
                 self.info.req_type = tag;
-                self.info.context = strip_string_end_with_zero(data);
+                self.info.context = strip_string_end_with_zero(data)?;
                 self.info.ignore = false;
                 Ok(())
             }
@@ -280,7 +280,7 @@ impl PostgresqlLog {
                     return Err(Error::L7ProtocolUnknown);
                 }
                 self.info.req_type = tag;
-                self.info.context = strip_string_end_with_zero(&data[2..len - 2]);
+                self.info.context = strip_string_end_with_zero(&data[2..len - 2])?;
                 self.info.ignore = false;
                 Ok(())
             }
@@ -361,7 +361,7 @@ impl PostgresqlLog {
                     if data[0] != b'M' {
                         return Err(Error::L7ProtocolUnknown);
                     }
-                    self.info.error_message = strip_string_end_with_zero(&data[1..idx]);
+                    self.info.error_message = strip_string_end_with_zero(&data[1..idx])?;
                 }
                 Ok(())
             }
@@ -392,11 +392,12 @@ fn read_block(payload: &[u8]) -> Option<(char, usize)> {
 }
 
 // strip the latest 0x0 in string
-fn strip_string_end_with_zero(data: &[u8]) -> String {
+// if not end with 0x0, presume it is not pg protocol
+fn strip_string_end_with_zero(data: &[u8]) -> Result<String> {
     if data.ends_with(&[0]) {
-        return String::from_utf8_lossy(&data[..data.len() - 1]).to_string();
+        return Ok(String::from_utf8_lossy(&data[..data.len() - 1]).to_string());
     }
-    String::from_utf8_lossy(&data[..data.len()]).to_string()
+    Err(Error::L7ProtocolUnknown)
 }
 /*
 req:
