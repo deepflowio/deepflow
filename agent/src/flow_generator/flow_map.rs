@@ -667,13 +667,15 @@ impl FlowMap {
 
         let l7_proto = self.app_table.get_protocol(meta_packet);
 
-        if self.config.load().collector_enabled {
+        let conf = self.config.load();
+        if conf.collector_enabled {
             node.meta_flow_perf = FlowPerf::new(
                 self.rrt_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto,
                 get_parser(l7_proto.unwrap_or_default()),
                 self.counter.clone(),
+                conf.l7_prorocol_enabled_bitmap,
             )
         }
         node

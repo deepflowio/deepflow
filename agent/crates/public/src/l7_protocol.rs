@@ -35,18 +35,18 @@ pub enum L7Protocol {
     Grpc = 41,
 
     // SQL
-    Mysql = 60,
-    Postgresql = 61,
+    MySQL = 60,
+    PostgreSQL = 61,
 
     // NoSQL
     Redis = 80,
 
     // MQ
     Kafka = 100,
-    Mqtt = 101,
+    MQTT = 101,
 
     // INFRA
-    Dns = 120,
+    DNS = 120,
 
     Max = 255,
 }

@@ -78,7 +78,7 @@ impl L7ProtocolInfoInterface for MysqlInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: L7Protocol::Mysql,
+            proto: L7Protocol::MySQL,
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
         })
@@ -198,7 +198,7 @@ impl L7ProtocolParserInterface for MysqlLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        L7Protocol::Mysql
+        L7Protocol::MySQL
     }
 
     fn reset(&mut self) {
@@ -254,7 +254,7 @@ impl MysqlLog {
         }
         let thread_id_offset = THREAD_ID_OFFSET_B + server_version_pos + 1;
         self.info.server_thread_id = bytes::read_u32_le(&payload[thread_id_offset..]);
-        self.l7_proto = L7Protocol::Mysql;
+        self.l7_proto = L7Protocol::MySQL;
         Ok(())
     }
 
@@ -270,7 +270,7 @@ impl MysqlLog {
             }
             _ => return Err(Error::MysqlLogParseFailed),
         }
-        self.l7_proto = L7Protocol::Mysql;
+        self.l7_proto = L7Protocol::MySQL;
         Ok(())
     }
 

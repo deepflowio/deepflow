@@ -73,7 +73,7 @@ impl L7ProtocolInfoInterface for DnsInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: L7Protocol::Dns,
+            proto: L7Protocol::DNS,
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
         })
@@ -170,7 +170,7 @@ impl L7ProtocolParserInterface for DnsLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        L7Protocol::Dns
+        L7Protocol::DNS
     }
 
     fn reset(&mut self) {
