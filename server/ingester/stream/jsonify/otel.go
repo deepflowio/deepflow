@@ -239,6 +239,8 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 				h.ParentSpanId = getValueString(value)
 			case "sw8.segment_id":
 				sw8SegmentId = getValueString(value)
+			case "name":
+				h.Endpoint = getValueString(value)
 			case "http.request_content_length":
 				h.requestLength = value.GetIntValue()
 				h.RequestLength = &h.requestLength
