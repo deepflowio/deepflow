@@ -48,12 +48,52 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn get_branch() -> Result<String, Box<dyn Error>> {
+    if let Ok(branch) = env::var("GITHUB_REF_NAME") {
+        return Ok(branch);
+    }
+
+    let output = Command::new("git")
+        .args(["branch", "--show-current"])
+        .output()?;
+    if output.status.success() {
+        return Ok(String::from_utf8(output.stdout)?);
+    }
+
+    let output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()?;
+    if output.status.success() && &output.stdout != "HEAD".as_bytes() {
+        return Ok(String::from_utf8(output.stdout)?);
+    }
+
+    let output = Command::new("git")
+        .args(["log", "-n", "1", "--pretty=%D", "HEAD"])
+        .output()?;
+    if output.status.success() {
+        // output: HEAD -> master, origin/main
+        return match output.stdout.iter().position(|x| *x == ',' as u8) {
+            Some(mut position) => {
+                while (output.stdout[position] as char).is_ascii_whitespace()
+                    && position < output.stdout.len()
+                {
+                    position += 1;
+                }
+                Ok(str::from_utf8(&output.stdout[position..])?.to_owned())
+            }
+            _ => Ok(String::from_utf8(output.stdout)?),
+        };
+    }
+
+    panic!("no branch name found")
+}
+
 struct EnvCommand(&'static str, Vec<&'static str>);
 
 fn set_build_info() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=AGENT_NAME=deepflow-agent-ce");
+    println!("cargo:rustc-env=BRANCH={}", get_branch()?);
     let entries = vec![
-        EnvCommand("BRANCH", vec!["git", "rev-parse", "--abbrev-ref", "HEAD"]),
         EnvCommand("COMMIT_ID", vec!["git", "rev-parse", "HEAD"]),
         EnvCommand("REV_COUNT", vec!["git", "rev-list", "--count", "HEAD"]),
         EnvCommand("RUSTC_VERSION", vec!["rustc", "--version"]),

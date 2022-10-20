@@ -4,10 +4,10 @@ SERVER = github.com/deepflowys/deepflow/server
 REV_COUNT = $(shell git rev-list --count HEAD)
 COMMIT_DATE = $(shell git show -s --format=%cd --date=short HEAD)
 REVISION = $(shell git rev-parse HEAD)
-Branch = $(shell git branch  --show-current)
+BRANCH = $(shell git branch  --show-current)
 COMPILE_TIME= $(shell date +"%Y-%m-%d %H:%M:%S")
 FLAGS = -gcflags "-l -l" -ldflags "-X main.RevCount=${REV_COUNT} -X main.Revision=${REVISION} -X main.CommitDate=${COMMIT_DATE} \
-		-X 'main.goVersion=$(shell go version)' -X main.Branch=${Branch} -X 'main.CompileTime=${COMPILE_TIME}'"
+		-X 'main.goVersion=$(shell go version)' -X main.Branch=${BRANCH} -X 'main.CompileTime=${COMPILE_TIME}'"
 BINARY_SUFFIX :=
 
 .PHONY: all
