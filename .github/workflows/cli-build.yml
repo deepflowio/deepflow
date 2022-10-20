@@ -54,8 +54,8 @@ jobs:
           GO111MODULE="off" go get github.com/golang/protobuf/protoc-gen-go
 
           cd cli
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.linux-amd64
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 make -e BINARY_SUFFIX=.linux-arm64
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make -e BINARY_SUFFIX=.linux-amd64 -e BRANCH=${{ github.ref_name }}
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 make -e BINARY_SUFFIX=.linux-arm64 -e BRANCH=${{ github.ref_name }}
           # CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 make -e BINARY_SUFFIX=.darwin-amd64
           # CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 make -e BINARY_SUFFIX=.darwin-arm64
           cd bin/

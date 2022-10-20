@@ -362,6 +362,7 @@ type VTapGroupConfiguration struct {
 	PlatformEnabled               *int          `json:"PLATFORM_ENABLED" yaml:"platform_enabled,omitempty"`         // 0: disabled 1:enabled
 	IfMacSource                   *int          `json:"IF_MAC_SOURCE" yaml:"if_mac_source,omitempty"`               // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
 	VMXMLPath                     *string       `json:"VM_XML_PATH" yaml:"vm_xml_path,omitempty"`
+	ExtraNetnsRegex               *string       `json:"EXTRA_NETNS_REGEX" yaml:"extra_netns_regex,omitempty"`
 	NatIPEnabled                  *int          `json:"NAT_IP_ENABLED" yaml:"nat_ip_enabled,omitempty"` // 0: disabled 1:enabled
 	CapturePacketSize             *int          `json:"CAPTURE_PACKET_SIZE" yaml:"capture_packet_size,omitempty"`
 	InactiveServerPortEnabled     *int          `json:"INACTIVE_SERVER_PORT_ENABLED" yaml:"inactive_server_port_enabled,omitempty"` // 0: disabled 1:enabled
@@ -432,6 +433,7 @@ type VTapGroupConfigurationResponse struct {
 	PlatformEnabled               *int          `json:"PLATFORM_ENABLED"`     // 0: disabled 1:enabled
 	IfMacSource                   *int          `json:"IF_MAC_SOURCE"`        // 0: 接口MAC 1: 接口名称 2: 虚拟机MAC解析
 	VMXMLPath                     *string       `json:"VM_XML_PATH"`
+	ExtraNetnsRegex               *string       `json:"EXTRA_NETNS_REGEX"`
 	NatIPEnabled                  *int          `json:"NAT_IP_ENABLED"` // 0: disabled 1:enabled
 	CapturePacketSize             *int          `json:"CAPTURE_PACKET_SIZE"`
 	InactiveServerPortEnabled     *int          `json:"INACTIVE_SERVER_PORT_ENABLED"` // 0: disabled 1:enabled
