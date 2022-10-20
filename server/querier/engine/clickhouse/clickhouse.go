@@ -55,47 +55,13 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 	var err error
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	// Parse showSql
-	sqlSplit := strings.Split(sql, " ")
-	if strings.ToLower(sqlSplit[0]) == "show" {
-		var table string
-		var where string
-		for i, item := range sqlSplit {
-			if strings.ToLower(item) == "from" {
-				table = sqlSplit[i+1]
-				break
-			}
-			if strings.ToLower(item) == "where" {
-				where = strings.Join(sqlSplit[i+1:], " ")
-			}
+	result, sqlList, isShow, err := e.ParseShowSql(sql)
+	if isShow {
+		if err != nil {
+			return nil, nil, err
 		}
-		switch strings.ToLower(sqlSplit[1]) {
-		case "metrics":
-			if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
-				funcs, err := metrics.GetFunctionDescriptions()
-				return funcs, nil, err
-			} else {
-				metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where)
-				return metrics, nil, err
-			}
-		case "tag":
-			// show tag {tag} values from table
-			if len(sqlSplit) < 6 {
-				return nil, nil, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
-			}
-			if strings.ToLower(sqlSplit[3]) == "values" {
-				sqlList, err = tagdescription.GetTagValues(e.DB, table, sql)
-				if err != nil {
-					return nil, nil, err
-				}
-			}
-		case "tags":
-			data, err := tagdescription.GetTagDescriptions(e.DB, table, sql)
-			return data, nil, err
-		case "tables":
-			return GetTables(e.DB), nil, nil
-		case "databases":
-			return GetDatabases(), nil, nil
-
+		if len(sqlList) == 0 {
+			return result, nil, nil
 		}
 	}
 	debug := &client.Debug{
@@ -103,7 +69,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		QueryUUID: query_uuid,
 	}
 	parser := parse.Parser{Engine: e}
-	if strings.ToLower(sqlSplit[0]) == "show" {
+	if len(sqlList) > 0 {
 		e.DB = "flow_tag"
 		results := map[string][]interface{}{}
 		chClient := client.Client{
@@ -118,40 +84,37 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		for _, ColumnSchema := range e.ColumnSchemas {
 			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 		}
-		if len(sqlList) > 0 {
-			for _, showSql := range sqlList {
-				err := parser.ParseSQL(showSql)
-				if err != nil {
-					log.Error(err)
-					return nil, nil, err
+		for _, showSql := range sqlList {
+			err := parser.ParseSQL(showSql)
+			if err != nil {
+				log.Error(err)
+				return nil, nil, err
+			}
+			for _, stmt := range e.Statements {
+				stmt.Format(e.Model)
+			}
+			FormatInnerTime(e.Model)
+			// 使用Model生成View
+			e.View = view.NewView(e.Model)
+			chSql := e.ToSQLString()
+			callbacks := e.View.GetCallbacks()
+			debug.Sql = chSql
+			params := &client.QueryParams{
+				Sql:             chSql,
+				Callbacks:       callbacks,
+				QueryUUID:       query_uuid,
+				ColumnSchemaMap: ColumnSchemaMap,
+			}
+			result, err := chClient.DoQuery(params)
+			if err != nil {
+				log.Error(err)
+				return nil, nil, err
+			}
+			if result != nil {
+				for _, value := range result["values"] {
+					results["values"] = append(results["values"], value)
 				}
-				for _, stmt := range e.Statements {
-					stmt.Format(e.Model)
-				}
-				FormatInnerTime(e.Model)
-				// 使用Model生成View
-				e.View = view.NewView(e.Model)
-				chSql := e.ToSQLString()
-				callbacks := e.View.GetCallbacks()
-				debug.Sql = chSql
-				params := &client.QueryParams{
-					Sql:             chSql,
-					Callbacks:       callbacks,
-					QueryUUID:       query_uuid,
-					ColumnSchemaMap: ColumnSchemaMap,
-				}
-				result, err := chClient.DoQuery(params)
-				if err != nil {
-					log.Error(err)
-					return nil, nil, err
-				}
-				if result != nil {
-					for _, value := range result["values"] {
-						results["values"] = append(results["values"], value)
-					}
-					results["columns"] = result["columns"]
-				}
-
+				results["columns"] = result["columns"]
 			}
 		}
 		return results, debug.Get(), nil
@@ -193,6 +156,52 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		return nil, debug.Get(), err
 	}
 	return rst, debug.Get(), err
+}
+
+func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, []string, bool, error) {
+	sqlSplit := strings.Split(sql, " ")
+	if strings.ToLower(sqlSplit[0]) != "show" {
+		return nil, []string{}, false, nil
+	}
+	var table string
+	var where string
+	for i, item := range sqlSplit {
+		if strings.ToLower(item) == "from" {
+			table = sqlSplit[i+1]
+			break
+		}
+		if strings.ToLower(item) == "where" {
+			where = strings.Join(sqlSplit[i+1:], " ")
+		}
+	}
+	switch strings.ToLower(sqlSplit[1]) {
+	case "metrics":
+		if len(sqlSplit) > 2 && strings.ToLower(sqlSplit[2]) == "functions" {
+			funcs, err := metrics.GetFunctionDescriptions()
+			return funcs, []string{}, true, err
+		} else {
+			metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where)
+			return metrics, []string{}, true, err
+		}
+	case "tag":
+		// show tag {tag} values from table
+		if len(sqlSplit) < 6 {
+			return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
+		}
+		if strings.ToLower(sqlSplit[3]) == "values" {
+			sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
+			return nil, sqlList, true, err
+		}
+		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
+	case "tags":
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql)
+		return data, []string{}, true, err
+	case "tables":
+		return GetTables(e.DB), []string{}, true, nil
+	case "databases":
+		return GetDatabases(), []string{}, true, nil
+	}
+	return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 }
 
 func (e *CHEngine) Init() {
@@ -467,6 +476,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			}
 			return nil
 		}
+		args[0] = strings.Trim(args[0], "`")
 		tagFunction, err := GetTagFunction(name, args, as, e.DB, e.Table)
 		if err != nil {
 			return err
@@ -556,7 +566,6 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 			return aggfunction.(Function), nil
 		}
 		tagFunction, err := GetTagFunction(name, args, "", e.DB, e.Table)
-
 		if err != nil {
 			return nil, err
 		}
