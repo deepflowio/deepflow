@@ -105,14 +105,12 @@ func checkAndStartMasterFunctions(
 
 				migrateMySQL(cfg)
 
-				if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-					// 启动资源ID管理器
-					err := recorderdb.IDMNG.Start()
-					if err != nil {
-						log.Error("resource id mananger start failed")
-						time.Sleep(time.Second)
-						os.Exit(0)
-					}
+				// 启动资源ID管理器
+				err := recorderdb.IDMNG.Start()
+				if err != nil {
+					log.Error("resource id mananger start failed")
+					time.Sleep(time.Second)
+					os.Exit(0)
 				}
 
 				// 启动tagrecorder
@@ -162,9 +160,7 @@ func checkAndStartMasterFunctions(
 					domainChecker.Stop()
 				}
 
-				if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-					recorderdb.IDMNG.Stop()
-				}
+				recorderdb.IDMNG.Stop()
 			} else {
 				log.Infof(
 					"current master controller is %s, previous master controller is %s",
