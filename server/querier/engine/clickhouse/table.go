@@ -17,6 +17,7 @@
 package clickhouse
 
 import (
+	"context"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 )
 
@@ -31,14 +32,14 @@ func GetDatabases() map[string][]interface{} {
 	}
 }
 
-func GetTables(db string) map[string][]interface{} {
+func GetTables(db string, ctx context.Context) map[string][]interface{} {
 	var values []interface{}
 	tables, ok := common.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
-		values = append(values, common.GetExtTables(db)...)
+		values = append(values, common.GetExtTables(db, ctx)...)
 	} else {
 		for _, table := range tables {
 			if table == "vtap_acl" {

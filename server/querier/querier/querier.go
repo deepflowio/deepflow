@@ -31,6 +31,7 @@ import (
 	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/router"
 	"github.com/deepflowys/deepflow/server/querier/statsd"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 var log = logging.MustGetLogger("querier")
@@ -51,12 +52,19 @@ func Start(configPath string) {
 		os.Exit(0)
 	}
 	// statsd
-	stats.SetMinInterval(10 * time.Second)
+	stats.SetMinInterval(60 * time.Second)
 	statsd.QuerierCounter = statsd.NewCounter()
 	statsd.RegisterCountableForIngester("querier_count", statsd.QuerierCounter)
 
+	// init opentelemetry
+	if cfg.OtelEndpoint != "" {
+		log.Info("init opentelemetry")
+		initTraceProvider(cfg.OtelEndpoint)
+	}
+
 	// 注册router
 	r := gin.Default()
+	r.Use(otelgin.Middleware("gin-web-server"))
 	r.Use(LoggerHandle)
 	r.Use(ErrHandle())
 	router.QueryRouter(r)

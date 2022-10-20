@@ -17,6 +17,7 @@
 package clickhouse
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -74,11 +75,11 @@ func GetTagFunction(name string, args []string, alias, db, table string) (Statem
 	}
 }
 
-func GetAggFunc(name string, args []string, alias string, db string, table string) (Statement, int, string, error) {
+func GetAggFunc(name string, args []string, alias string, db string, table string, ctx context.Context) (Statement, int, string, error) {
 	var levelFlag int
 	field := args[0]
 	field = strings.Trim(field, "`")
-	metricStruct, ok := metrics.GetMetrics(field, db, table)
+	metricStruct, ok := metrics.GetMetrics(field, db, table, ctx)
 	if !ok {
 		return nil, 0, "", nil
 	}

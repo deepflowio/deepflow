@@ -175,6 +175,8 @@ querier:
     port: 9000
     timeout: 60
     # user-password:
+  
+  otel-endpoint: otel-agent.open-telemetry:4317
 
 ingester:
   #ckdb:

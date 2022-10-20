@@ -17,6 +17,7 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -192,13 +193,14 @@ func GetDatasourceInterval(db string, table string, name string) (int, error) {
 	return int(body["DATA"].([]interface{})[0].(map[string]interface{})["INTERVAL"].(float64)), nil
 }
 
-func GetExtTables(db string) (values []interface{}) {
+func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       db,
+		Context:  ctx,
 	}
 	sql := ""
 	if db == "ext_metrics" {

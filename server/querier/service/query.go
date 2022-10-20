@@ -17,21 +17,23 @@
 package service
 
 import (
+	"context"
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse"
 	"github.com/deepflowys/deepflow/server/querier/prometheus"
 	"github.com/prometheus/prometheus/prompb"
 )
 
-func Execute(args map[string]string) (result map[string][]interface{}, debug map[string]interface{}, err error) {
+func Execute(args *common.QuerierParams) (result map[string][]interface{}, debug map[string]interface{}, err error) {
 	db := getDbBy()
 	var engine engine.Engine
 	switch db {
 	case "clickhouse":
-		engine = &clickhouse.CHEngine{DB: args["db"], DataSource: args["datasource"]}
+		engine = &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource, Context: args.Context}
 		engine.Init()
 	}
-	result, debug, err = engine.ExecuteQuery(args["sql"], args["query_uuid"])
+	result, debug, err = engine.ExecuteQuery(args)
 
 	return result, debug, err
 }
@@ -40,6 +42,6 @@ func getDbBy() string {
 	return "clickhouse"
 }
 
-func PromReaderExecute(req *prompb.ReadRequest) (resp *prompb.ReadResponse, err error) {
-	return prometheus.PromReaderExecute(req)
+func PromReaderExecute(req *prompb.ReadRequest, ctx context.Context) (resp *prompb.ReadResponse, err error) {
+	return prometheus.PromReaderExecute(req, ctx)
 }

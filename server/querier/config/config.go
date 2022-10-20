@@ -32,11 +32,12 @@ type Config struct {
 }
 
 type QuerierConfig struct {
-	LogFile    string     `default:"/var/log/querier.log" yaml:"log-file"`
-	LogLevel   string     `default:"info" yaml:"log-level"`
-	ListenPort int        `default:"20416" yaml:"listen-port"`
-	Clickhouse Clickhouse `yaml:clickhouse`
-	Language   string     `default:"en" yaml:"language"`
+	LogFile      string     `default:"/var/log/querier.log" yaml:"log-file"`
+	LogLevel     string     `default:"info" yaml:"log-level"`
+	ListenPort   int        `default:"20416" yaml:"listen-port"`
+	Clickhouse   Clickhouse `yaml:clickhouse`
+	Language     string     `default:"en" yaml:"language"`
+	OtelEndpoint string     `yaml:"otel-endpoint"`
 }
 
 type Clickhouse struct {

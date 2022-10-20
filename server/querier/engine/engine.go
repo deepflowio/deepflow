@@ -17,6 +17,7 @@
 package engine
 
 import (
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -30,5 +31,5 @@ type Engine interface {
 	TransLimit(*sqlparser.Limit) error
 	ToSQLString() string
 	Init()
-	ExecuteQuery(string, string) (map[string][]interface{}, map[string]interface{}, error)
+	ExecuteQuery(*common.QuerierParams) (map[string][]interface{}, map[string]interface{}, error)
 }

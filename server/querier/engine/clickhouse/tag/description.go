@@ -17,6 +17,7 @@
 package tag
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -211,7 +212,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, error) {
+func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[string][]interface{}, error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	response := map[string][]interface{}{
@@ -243,6 +244,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       "flow_tag",
+		Context:  ctx,
 	}
 	sql := "SELECT key FROM k8s_label_map GROUP BY key"
 	rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
@@ -276,6 +278,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 		UserName: config.Cfg.Clickhouse.User,
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       "flow_tag",
+		Context:  ctx,
 	}
 	var whereSql string
 	if strings.Contains(rawSql, "WHERE") {
@@ -356,7 +359,7 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	var rgx = regexp.MustCompile(`(?i)show|SHOW +tag +\S+ +values +from|FROM +\S+( +(where|WHERE \S+ like|LIKE \S+))?`)
 	sqlOk := rgx.MatchString(sql)
 	if !sqlOk {
-		return nil, errors.New(fmt.Sprintf("sql synax error: %s ", tag, sql))
+		return nil, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
 	}
 	showSqlList := strings.Split(sql, "WHERE")
 	if len(showSqlList) == 1 {
