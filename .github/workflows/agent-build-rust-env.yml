@@ -13,12 +13,16 @@ jobs:
     name: build agent env
     runs-on: cirun-aws-amd64-32c
     steps:
-      - name: install docker
-        run: |
-          curl -fsSL https://get.docker.com | bash
-          
       - name: Checkout
         uses: actions/checkout@v3
+
+      # - name: install docker
+      #   run: |
+      #     curl -fsSL https://get.docker.com | bash
+
+      - name: docker version
+        run: |
+          docker version
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -50,18 +54,22 @@ jobs:
             "ghcr.io/${{ github.repository_owner }}/rust-build:1.14"
             "ghcr.io/${{ github.repository_owner }}/rust-build:latest"
             "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:1.14"
-
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:latest"
 
   build_agent_env_arm64:
     name: build agent env arm64
     runs-on: cirun-aws-arm64-32c
     steps:
-      - name: install docker
-        run: |
-          curl -fsSL https://get.docker.com | bash
 
       - name: Checkout
         uses: actions/checkout@v3
+      # - name: install docker
+      #   run: |
+      #     curl -fsSL https://get.docker.com | bash
+
+      - name: docker version
+        run: |
+          docker version
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -93,3 +101,4 @@ jobs:
             "ghcr.io/${{ github.repository_owner }}/rust-build:1.14-arm64"
             "ghcr.io/${{ github.repository_owner }}/rust-build:latest-arm64"
             "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:1.14-arm64"
+            "${{ secrets.REGISTRY_ALIYUN_ADDR }}/public/rust-build:latest-arm64"
