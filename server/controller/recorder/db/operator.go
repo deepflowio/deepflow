@@ -17,8 +17,6 @@
 package db
 
 import (
-	"os"
-
 	"github.com/op/go-logging"
 	"gorm.io/gorm/clause"
 
@@ -62,10 +60,8 @@ func (o *OperatorBase[MT]) AddBatch(items []*MT) ([]*MT, bool) {
 		log.Errorf("add %s batch failed: %v", o.resourceTypeName, err)
 		log.Errorf("add %s (lcuuids: %v) failed", o.resourceTypeName, lcuuidsToAdd)
 
-		if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-			if o.allocateID && len(allocatedIDs) > 0 {
-				ReleaseIDs(o.resourceTypeName, allocatedIDs)
-			}
+		if o.allocateID && len(allocatedIDs) > 0 {
+			ReleaseIDs(o.resourceTypeName, allocatedIDs)
 		}
 		return nil, false
 	}
@@ -100,9 +96,7 @@ func (o *OperatorBase[MT]) DeleteBatch(lcuuids []string) bool {
 		log.Infof("delete %s (lcuuids: %v) success", o.resourceTypeName, lcuuids)
 	}
 
-	if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-		o.returnUsedIDs(deletedItems)
-	}
+	o.returnUsedIDs(deletedItems)
 	return true
 }
 
@@ -115,11 +109,9 @@ func (o *OperatorBase[MT]) formatItemsToAdd(items []*MT) ([]*MT, []string, []int
 	items, lcuuids, ok := o.dedupInDB(items, lcuuids, lcuuidToDBItem)
 
 	var allocatedIDs []int
-	if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-		// 按需请求分配器分配资源ID
-		// 批量分配，仅剩部分可用ID/分配失败，仅入库有ID的资源
-		items, allocatedIDs, ok = o.requestIDs(items)
-	}
+	// 按需请求分配器分配资源ID
+	// 批量分配，仅剩部分可用ID/分配失败，仅入库有ID的资源
+	items, allocatedIDs, ok = o.requestIDs(items)
 	return items, lcuuids, allocatedIDs, ok
 }
 

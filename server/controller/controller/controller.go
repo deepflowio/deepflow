@@ -98,16 +98,14 @@ func Start(ctx context.Context, configPath string) {
 	}
 
 	// 启动资源ID管理器
-	if _, enabled := os.LookupEnv("FEATURE_FLAG_ALLOCATE_ID"); enabled {
-		router.SetInitStageForHealthChecker("Resource ID manager init")
-		recorderdb.InitIDManager(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
-		if isMasterController {
-			err := recorderdb.IDMNG.Start()
-			if err != nil {
-				log.Error("resource id mananger start failed")
-				time.Sleep(time.Second)
-				os.Exit(0)
-			}
+	router.SetInitStageForHealthChecker("Resource ID manager init")
+	recorderdb.InitIDManager(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
+	if isMasterController {
+		err := recorderdb.IDMNG.Start()
+		if err != nil {
+			log.Error("resource id mananger start failed")
+			time.Sleep(time.Second)
+			os.Exit(0)
 		}
 	}
 

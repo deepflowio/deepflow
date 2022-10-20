@@ -40,6 +40,7 @@ type IDManager struct {
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	resourceTypeToIDPool map[string]IDPoolUpdater
+	inUse                bool
 }
 
 func InitIDManager(cfg *RecorderConfig, ctx context.Context) (err error) {
@@ -76,31 +77,38 @@ func InitIDManager(cfg *RecorderConfig, ctx context.Context) (err error) {
 }
 
 func (m *IDManager) Start() error {
-	log.Info("resource id manager startted")
-	return m.timedRefresh()
-}
-
-func (m *IDManager) Stop() {
-	if m.cancel != nil {
-		m.cancel()
+	if m.inUse {
+		return nil
 	}
-	log.Info("resource id manager stopped")
-}
-
-// 定时刷新ID池，恢复/修复被永久删除的ID（页面删除domain/sub_domain，定时永久删除）
-func (m *IDManager) timedRefresh() error {
-	log.Info("refresh id pools")
+	m.inUse = true
+	log.Info("resource id manager started")
 	for _, idPool := range m.resourceTypeToIDPool {
 		err := idPool.refresh()
 		if err != nil {
 			return err
 		}
 	}
+	m.timedRefresh()
+	return nil
+}
+
+func (m *IDManager) Stop() {
+	if m.cancel != nil {
+		m.cancel()
+	}
+	m.inUse = false
+	log.Info("resource id manager stopped")
+}
+
+// 定时刷新ID池，恢复/修复被永久删除的ID（页面删除domain/sub_domain，定时永久删除）
+func (m *IDManager) timedRefresh() {
+	log.Info("refresh id pools")
 	go func() {
 		ticker := time.NewTicker(time.Hour)
 		for {
 			select {
 			case <-ticker.C:
+				log.Info("refresh id pools")
 				for _, idPool := range m.resourceTypeToIDPool {
 					err := idPool.refresh()
 					if err != nil {
@@ -110,7 +118,6 @@ func (m *IDManager) timedRefresh() error {
 			}
 		}
 	}()
-	return nil
 }
 
 func (m *IDManager) AllocateIDs(resourceType string, count int) []int {
