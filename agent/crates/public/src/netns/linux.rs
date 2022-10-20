@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::fmt::{self, Debug};
+use std::fmt::Debug;
 use std::fs::{self, File};
 use std::io::{self, Cursor, Write};
-use std::net::IpAddr;
 use std::os::unix::{fs::MetadataExt, io::AsRawFd};
 use std::path::{Path, PathBuf};
 
@@ -27,7 +27,6 @@ use log::warn;
 use neli::{
     attr::Attribute,
     consts::{genl::*, nl::*, rtnl::*, socket::*},
-    err::{NlError, SerError},
     genl::Genlmsghdr,
     nl::{NlPayload, Nlmsghdr},
     rtnl::{Rtattr, Rtgenmsg},
@@ -38,90 +37,9 @@ use neli::{
 use nix::sched::{setns, CloneFlags};
 use num_enum::IntoPrimitive;
 use regex::Regex;
-use thiserror::Error;
 
-use super::utils::net::{self, addr_list, link_list, MacAddr};
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("io error: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error("neli error: {0}")]
-    NeliError(String),
-    #[error("net error: {0}")]
-    NetError(#[from] net::Error),
-    #[error("netns not found")]
-    NotFound,
-    #[error("syscall error: {0}")]
-    Syscall(#[from] nix::Error),
-}
-
-impl<T: Debug, P: Debug> From<NlError<T, P>> for Error {
-    fn from(e: NlError<T, P>) -> Self {
-        Self::NeliError(format!("{}", e))
-    }
-}
-
-impl From<SerError> for Error {
-    fn from(e: SerError) -> Self {
-        Self::NeliError(format!("{}", e))
-    }
-}
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;
-
-#[derive(Debug, Clone)]
-pub struct InterfaceInfo {
-    pub tap_ns: NsFile,
-    pub tap_idx: u32,
-    pub mac: MacAddr,
-    pub ips: Vec<IpAddr>,
-    pub name: String,
-    pub device_id: String,
-}
-
-impl fmt::Display for InterfaceInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ips_str = self
-            .ips
-            .iter()
-            .map(|ip| ip.to_string())
-            .collect::<Vec<String>>()
-            .as_slice()
-            .join(",");
-        write!(
-            f,
-            "{}: {}: {} [{}] device {}",
-            self.tap_idx, self.name, self.mac, ips_str, self.device_id
-        )
-    }
-}
-
-impl PartialEq for InterfaceInfo {
-    fn eq(&self, other: &Self) -> bool {
-        self.tap_idx.eq(&other.tap_idx) && self.mac.eq(&other.mac)
-    }
-}
-
-impl Eq for InterfaceInfo {}
-
-impl PartialOrd for InterfaceInfo {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (
-            self.tap_idx.partial_cmp(&other.tap_idx),
-            self.mac.partial_cmp(&other.mac),
-        ) {
-            (Some(std::cmp::Ordering::Equal), mac) => mac,
-            (tap, _) => tap,
-        }
-    }
-}
-
-impl Ord for InterfaceInfo {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
-    }
-}
+use super::{Error, InterfaceInfo, Result};
+use crate::utils::net::{addr_list, link_list, links_by_name_regex, Link};
 
 #[derive(IntoPrimitive)]
 #[repr(u16)]
@@ -136,13 +54,21 @@ pub enum Netnsa {
 
 #[derive(Clone, Debug, Hash)]
 pub enum NsFile {
+    Root,
     Named(OsString),
     Proc(u64),
+}
+
+impl Default for NsFile {
+    fn default() -> Self {
+        Self::Root
+    }
 }
 
 impl NsFile {
     fn get_inode(&self) -> Result<u64> {
         match self {
+            Self::Root => Ok(fs::metadata(NetNs::ROOT_NS_PATH)?.ino()),
             Self::Named(name) => {
                 let ns_file = Path::new(NetNs::NAMED_PATH).join(name);
                 Ok(fs::metadata(ns_file)?.ino())
@@ -152,9 +78,30 @@ impl NsFile {
     }
 }
 
+impl PartialOrd for NsFile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for NsFile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Root, Self::Root) => Ordering::Equal,
+            (Self::Root, _) => Ordering::Less,
+            (Self::Named(_), Self::Root) => Ordering::Greater,
+            (Self::Named(s), Self::Named(o)) => s.cmp(o),
+            (Self::Named(_), _) => Ordering::Less,
+            (Self::Proc(s), Self::Proc(o)) => s.cmp(o),
+            (Self::Proc(_), _) => Ordering::Greater,
+        }
+    }
+}
+
 impl PartialEq for NsFile {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (Self::Root, Self::Root) => true,
             (Self::Named(s), Self::Named(o)) if s == o => true,
             _ => {
                 if let (Ok(s), Ok(o)) = (self.get_inode(), other.get_inode()) {
@@ -184,6 +131,7 @@ pub struct NetNs {
 
 impl NetNs {
     const NAMED_PATH: &'static str = "/var/run/netns";
+    const ROOT_NS_PATH: &'static str = "/proc/1/ns/net";
     const PROC_PATH: &'static str = "/proc";
 
     // interface info in this net namespace
@@ -194,7 +142,7 @@ impl NetNs {
         let mut socket = WrappedSocket::new()?;
         let mut ns_map = self.load_named_ns_map(&mut socket);
         // add root ns
-        let root_map = self.load_ns_map(&mut socket, vec![Self::get_root_ns()?]);
+        let root_map = self.load_ns_map(&mut socket, vec![NsFile::Root]);
         ns_map.extend(root_map);
         let mut proc_map = None;
         let mut interfaces = vec![];
@@ -261,11 +209,6 @@ impl NetNs {
         Ok(interfaces)
     }
 
-    pub fn get_root_ns() -> Result<NsFile> {
-        let path: PathBuf = [Self::PROC_PATH, "1", "ns", "net"].iter().collect();
-        Ok(NsFile::Proc(fs::metadata(&path)?.ino()))
-    }
-
     pub fn get_current_ns() -> Result<NsFile> {
         let path: PathBuf = [Self::PROC_PATH, "self", "ns", "net"].iter().collect();
         Ok(NsFile::Proc(fs::metadata(&path)?.ino()))
@@ -300,6 +243,16 @@ impl NetNs {
     fn open_and_setns(&mut self, ns: &NsFile) -> Result<()> {
         let fp = self.open_ns_file(ns)?;
         Self::setns(&fp)
+    }
+
+    pub fn open_named_and_setns(ns: &NsFile) -> Result<()> {
+        match ns {
+            NsFile::Named(name) => {
+                let fp = File::open(Path::new(NetNs::NAMED_PATH).join(name))?;
+                Self::setns(&fp)
+            }
+            _ => unimplemented!(),
+        }
     }
 
     fn get_named_files() -> Vec<NsFile> {
@@ -368,6 +321,7 @@ impl NetNs {
 
     fn open_ns_file(&mut self, ns: &NsFile) -> Result<File> {
         match ns {
+            NsFile::Root => Ok(File::open(Self::ROOT_NS_PATH)?),
             NsFile::Named(name) => Ok(File::open(Path::new(NetNs::NAMED_PATH).join(name))?),
             NsFile::Proc(inode) => {
                 if self.proc_cache.is_empty() || !self.proc_cache.contains_key(inode) {
@@ -462,4 +416,12 @@ impl WrappedSocket {
         }
         Err(Error::NotFound)
     }
+}
+
+pub fn links_by_name_regex_in_netns<S: AsRef<str>>(regex: S, ns: &NsFile) -> Result<Vec<Link>> {
+    let current_ns = NetNs::open_current_ns()?;
+    let _ = NetNs::open_named_and_setns(ns)?;
+    let links = links_by_name_regex(regex.as_ref())?;
+    let _ = NetNs::setns(&current_ns)?;
+    Ok(links)
 }

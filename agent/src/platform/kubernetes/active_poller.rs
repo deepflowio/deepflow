@@ -63,10 +63,7 @@ impl ActivePoller {
             None => vec![],
         };
         // always query root ns (/proc/1/ns/net)
-        match NetNs::get_root_ns() {
-            Ok(ns) => ns_files.push(ns),
-            Err(e) => warn!("failed to get root net namespace: {:?}", e),
-        }
+        ns_files.push(NsFile::Root);
         if ns_files.is_empty() {
             warn!("no net namespace found");
             return map;
@@ -151,17 +148,7 @@ impl Poller for ActivePoller {
         self.version.load(Ordering::SeqCst)
     }
 
-    fn get_interface_info_in(&self, ns: &Option<NsFile>) -> Option<Vec<InterfaceInfo>> {
-        let ns = match ns {
-            Some(ns) => ns.clone(),
-            None => {
-                if let Ok(ns) = NetNs::get_current_ns() {
-                    ns
-                } else {
-                    return None;
-                }
-            }
-        };
+    fn get_interface_info_in(&self, ns: &NsFile) -> Option<Vec<InterfaceInfo>> {
         self.entries.lock().unwrap().get(&ns).map(|e| e.clone())
     }
 
