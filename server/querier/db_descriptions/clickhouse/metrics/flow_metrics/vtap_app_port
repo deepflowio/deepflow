@@ -1,14 +1,14 @@
-# Field                     , DBField              , DisplayName          , Unit , Type       , Category     , Permission , Description
-request                     , request              ,请求                  , 个   , counter    , 吞吐         , 111        ,
-response                    , response             ,响应                  , 个   , counter    , 吞吐         , 111        ,
+# Field                     , DBField              , Type       , Permission 
+request                     , request              , counter    , 111        
+response                    , response             , counter    , 111        
 
-rrt                         ,                      ,平均时延              , 微秒 , delay      , 时延         , 111        ,
-rrt_max                     , rrt_max              ,最大时延              , 微秒 , delay      , 时延         , 111        ,
+rrt                         ,                      , delay      , 111        
+rrt_max                     , rrt_max              , delay      , 111        
 
-error                       , error                ,异常                  , 个   , counter    , 异常         , 111        ,
-client_error                , client_error         ,客户端异常            , 个   , counter    , 异常         , 111        ,
-server_error                , server_error         ,服务端异常            , 个   , counter    , 异常         , 111        ,
-timeout                     , timeout              ,超时                  , 个   , counter    , 异常         , 111        ,
-error_ratio                 ,                      ,异常比例              , %    , percentage , 异常         , 111        ,
-client_error_ratio          ,                      ,客户端异常比例         , %    , percentage , 异常         , 111        ,
-server_error_ratio          ,                      ,服务端异常比例         , %    , percentage , 异常         , 111        ,
+error                       , error                , counter    , 111        
+client_error                , client_error         , counter    , 111        
+server_error                , server_error         , counter    , 111        
+timeout                     , timeout              , counter    , 111        
+error_ratio                 ,                      , percentage , 111        
+client_error_ratio          ,                      , percentage , 111        
+server_error_ratio          ,                      , percentage , 111        
