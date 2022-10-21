@@ -28,7 +28,7 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 	var vpcIdToCidr map[string]string
 	var regionIdToDefaultVPCLcuuid map[string]string
 
-	log.Debug("get vpcs starting")
+	log.Info("get vpcs starting")
 
 	vpcIds := mapset.NewSet()
 	regionLcuuidToDefaultVPCLcuuid := make(map[string]string)
@@ -54,6 +54,7 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 					continue
 				}
 
+				log.Debugf("get vpc (%s)", vpc.Get("router_id").MustString())
 				// 不同可用区会返回相同的vpc，需要做去重处理
 				vpcId := vpc.Get("router_id").MustString()
 				if vpcIds.Contains(vpcId) {
@@ -101,6 +102,6 @@ func (q *QingCloud) GetVPCs() ([]model.VPC, error) {
 	q.vpcIdToCidr = vpcIdToCidr
 	q.regionIdToDefaultVPCLcuuid = regionIdToDefaultVPCLcuuid
 
-	log.Debug("get vpcs complete")
+	log.Info("get vpcs complete")
 	return retVPCs, nil
 }
