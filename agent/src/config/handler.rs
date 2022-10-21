@@ -303,7 +303,7 @@ pub struct FlowConfig {
     pub packet_sequence_flag: u8,
     pub packet_sequence_block_size: usize,
 
-    pub l7_prorocol_enabled_bitmap: L7ProtocolBitmap,
+    pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -334,7 +334,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
             packet_sequence_flag: conf.yaml_config.packet_sequence_flag, // Enterprise Edition Feature: packet-sequence
             packet_sequence_block_size: conf.yaml_config.packet_sequence_block_size, // Enterprise Edition Feature: packet-sequence
-            l7_prorocol_enabled_bitmap: L7ProtocolBitmap::from(
+            l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
                 &conf.yaml_config.l7_protocol_enabled,
             ),
         }

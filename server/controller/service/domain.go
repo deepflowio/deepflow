@@ -268,6 +268,10 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 			}
 
 			domainCreate.Config[key] = encryptKey
+			log.Debugf(
+				"domain (%s) %s: %s, encrypt %s: %s",
+				domainCreate.Name, key, domainCreate.Config[key].(string), key, encryptKey,
+			)
 		}
 	}
 	configStr, _ := json.Marshal(domainCreate.Config)
@@ -389,6 +393,10 @@ func UpdateDomain(
 						return nil, NewError(common.SERVER_ERROR, err.Error())
 					}
 					configUpdate[key] = encryptKey
+					log.Debugf(
+						"domain (%s) %s: %s, encrypt %s: %s",
+						domain.Name, key, configUpdate[key].(string), key, encryptKey,
+					)
 				}
 			}
 		}
@@ -601,8 +609,15 @@ func GetSubDomains(filter map[string]interface{}) ([]*model.SubDomain, error) {
 }
 
 func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, error) {
-	var count int64
+	var domainCount int64
+	if err := mysql.Db.Model(&mysql.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).Count(&domainCount).Error; err != nil {
+		return nil, err
+	}
+	if domainCount == 0 {
+		return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
+	}
 
+	var count int64
 	mysql.Db.Model(&mysql.SubDomain{}).Where("name = ?", subDomainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))

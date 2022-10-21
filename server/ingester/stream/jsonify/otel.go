@@ -310,6 +310,7 @@ func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformD
 	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
 	h.TapSide = spanKindToTapSide(l.Kind)
+	h.Endpoint = l.Name
 	h.SpanKind = uint8(l.Kind)
 	h.spanKind = &h.SpanKind
 	h.StartTime = int64(l.StartTimeUnixNano) / int64(time.Microsecond)

@@ -128,8 +128,11 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 		}
 		for table, tableTagData := range dbTagData.(map[string]interface{}) {
 			// 遍历文件内容进行赋值
-			for _, tag := range tableTagData.([][]interface{}) {
-				if len(tag) < 9 {
+			for i, tag := range tableTagData.([][]interface{}) {
+				if strings.Contains(table, ".") {
+					continue
+				}
+				if len(tag) < 6 {
 					return errors.New(
 						fmt.Sprintf("get tag failed! db:%s table:%s, tag:%v", db, table, tag),
 					)
@@ -143,7 +146,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 6 - Category
 				// 7 - Permissions
 				// 8 - Description
-				permissions, err := ckcommon.ParsePermission(tag[7])
+				permissions, err := ckcommon.ParsePermission(tag[5])
 				if err != nil {
 					return errors.New(
 						fmt.Sprintf(
@@ -154,13 +157,21 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				}
 
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
+				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
+				enumFile := tag[4].(string)
+				if !common.IsValueInSliceString(enumFile, NoLanguageTag) {
+					enumFile = tag[4].(string) + "." + config.Cfg.Language
+				}
+				displayName := tagLanguage[1].(string)
+				category := tagLanguage[2].(string)
+				des := tagLanguage[3].(string)
 				description := NewTagDescription(
-					tag[0].(string), tag[1].(string), tag[2].(string), tag[3].(string),
-					tag[4].(string), tag[5].(string), tag[6].(string), permissions, tag[8].(string),
+					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
+					tag[3].(string), enumFile, category, permissions, des,
 				)
 				TAG_DESCRIPTIONS[key] = description
-				enumFileToTagType[tag[5].(string)] = tag[4].(string)
+				enumFileToTagType[enumFile] = tag[3].(string)
 			}
 		}
 	}
@@ -181,7 +192,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 					value, _ := strconv.Atoi(enumValue[0].(string))
 					tagIntEnums = append(tagIntEnums, NewTagEnum(enumValue[0], enumValue[1]))
 					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1]))
-				} else {
+				} else if tagType == "string_enum" {
 					tagStringEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 				}
@@ -286,7 +297,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
-				"原始Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
+				"Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
@@ -299,7 +310,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	if db == "ext_metrics" || db == "deepflow_system" {
 		response["values"] = append(response["values"], []interface{}{
 			"tags", "tags", "tags", "tags", "map",
-			"原始Tag", []string{}, []bool{true, true, true}, "tags",
+			"Tag", []string{}, []bool{true, true, true}, "tags",
 		})
 	}
 	return response, nil
@@ -358,7 +369,7 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag, "value")
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
-	// 标签是动态的,不需要去tag_description里确认
+	// K8s Labels是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
 		return GetTagResourceValues(sql)
 	}
@@ -386,12 +397,12 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
 	if isStringEnumOK {
 		table = "string_enum_map"
-		tag = tagDescription.EnumFile
+		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 	}
 	_, isIntEnumOK := TAG_INT_ENUMS[tagDescription.EnumFile]
 	if isIntEnumOK {
 		table = "int_enum_map"
-		tag = tagDescription.EnumFile
+		tag = strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 	}
 
 	var limitSql string
@@ -412,7 +423,7 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	}
 	if len(likeList) > 1 {
 		if strings.Trim(likeList[1], " ") != "" {
-			whereSql = " AND " + strings.ReplaceAll(likeList[1], "*", "%")
+			whereSql = " AND (" + strings.ReplaceAll(likeList[1], "*", "%") + ")"
 		}
 	}
 	if strings.Contains(strings.ToLower(sql), "like") || strings.Contains(strings.ToLower(sql), "regexp") {
@@ -483,7 +494,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 				}
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
@@ -499,7 +510,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 					resourceId = "pod_service_id"
 					resourceName = "pod_service_name"
 				}
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
@@ -511,10 +522,10 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
 			dictTag = fmt.Sprintf("dictGet(flow_tag.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(AutoMap[tag]))
-			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", resourceId, resourceName, dictTag, whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, dictTag, whereSql, orderBy, limitSql)
 
 		case "vpc", "l2_vpc":
-			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(flow_tag.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(flow_tag.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
 		case "service", "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
@@ -558,9 +569,9 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 			} else {
 				whereSql = fmt.Sprintf("WHERE devicetype=%d", deviceType)
 			}
-			sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM device_map %s ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT deviceid AS value,name AS display_name,uid FROM device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_DEFAULT) {
-			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value,name AS display_name FROM %s %s GROUP BY value, display_name ORDER BY %s ASC %s", tag+"_map", whereSql, orderBy, limitSql)
 		} else if common.IsValueInSliceString(tag, TAG_RESOURCE_TYPE_AUTO) {
 			var autoDeviceTypes []string
 			for _, deviceType := range AutoMap {
@@ -580,21 +591,21 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 				whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
 			}
 			sql = fmt.Sprintf(
-				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s ORDER BY %s ASC %s",
+				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s",
 				whereSql, orderBy, limitSql,
 			)
 		} else if tag == "vpc" || tag == "l2_vpc" {
-			sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM l3_epc_map %s ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value,name AS display_name,uid FROM l3_epc_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "ip" {
-			sql = fmt.Sprintf("SELECT ip as value,ip AS display_name FROM ip_relation_map %s ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT ip as value,ip AS display_name FROM ip_relation_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "tap" {
-			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT value, name AS display_name FROM tap_type_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "vtap" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM vtap_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "lb_listener" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM lb_listener_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if tag == "pod_ingress" {
-			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT id as value, name AS display_name FROM pod_ingress_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		} else if strings.HasPrefix(tag, "label.") {
 			labelTag := strings.TrimPrefix(tag, "label.")
 			if whereSql != "" {
@@ -650,9 +661,9 @@ func GetExternalTagValues(db, table, rawSql string) ([]string, error) {
 
 	var sql string
 	if whereSql != "" {
-		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE table='%s' AND field_type='tag' AND field_name='%s' %s GROUP BY value, display_name ORDER BY %s %s", db, table, tag, whereSql, orderBy, limitSql)
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE 'table'='%s' AND field_type='tag' AND field_name='%s' %s GROUP BY value, display_name ORDER BY %s %s", db, table, tag, whereSql, orderBy, limitSql)
 	} else {
-		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE table='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY %s %s", db, table, tag, orderBy, limitSql)
+		sql = fmt.Sprintf("SELECT field_value AS value, value AS display_name FROM %s_custom_field_value WHERE 'table'='%s' AND field_type='tag' AND field_name='%s' GROUP BY value, display_name ORDER BY %s %s", db, table, tag, orderBy, limitSql)
 	}
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)

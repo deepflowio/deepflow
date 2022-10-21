@@ -251,9 +251,13 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 	d.counter.L7Count++
 	drop := int64(0)
 	l := jsonify.ProtoLogToL7Logger(proto, d.platformData)
+	l.AddReferenceCount()
 	if !d.throttler.Send(l) {
 		d.counter.L7DropCount++
 		drop = 1
+	} else {
+		d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7LoggerToFlowTagInterfaces(l))
+		l.Release()
 	}
 	proto.Release()
 

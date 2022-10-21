@@ -33,6 +33,8 @@ spec:
             - name: logs
               mountPath: /var/log/deepflow-agent/
               subPath: ""
+            - name: netns # required to access net namespace info
+              mountPath: /var/run/netns
       volumes:
         - name: sys-kernel-debug
           hostPath:
@@ -44,6 +46,9 @@ spec:
           hostPath:
             type: DirectoryOrCreate
             path: /var/log/deepflow-agent
+        - name: netns
+          hostPath:
+            path: /var/run/netns
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1

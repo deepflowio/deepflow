@@ -1,85 +1,85 @@
-# Name              , ClientName           , ServerName            , DisplayName                   , Type         , EnumFile           , Category    , Permission , Description
-_id                 ,                      ,                       ,                               , id           ,                    ,             , 111        ,
-time                ,                      ,                       ,                               , time         ,                    ,             , 111        ,
-
-region              , region_0             , region_1              , 区域                          , resource     ,                    , 知识图谱    , 110        ,
-az                  , az_0                 , az_1                  , 可用区                        , resource     ,                    , 知识图谱    , 110        ,
-host                , host_0               , host_1                , 宿主机                        , resource     ,                    , 知识图谱    , 100        ,
-chost               , chost_0              , chost_1               , 云服务器                      , resource     ,                    , 知识图谱    , 111        ,
-vpc                 , vpc_0                , vpc_1                 , VPC                           , resource     ,                    , 知识图谱    , 111        ,
-l2_vpc              , l2_vpc_0             , l2_vpc_1              , 网卡VPC                       , resource     ,                    , 知识图谱    , 110        ,
-subnet              , subnet_0             , subnet_1              , 子网                          , resource     ,                    , 知识图谱    , 111        ,
-router              , router_0             , router_1              , 路由器                        , resource     ,                    , 知识图谱    , 110        ,
-dhcpgw              , dhcpgw_0             , dhcpgw_1              , DHCP网关                      , resource     ,                    , 知识图谱    , 110        ,
-lb                  , lb_0                 , lb_1                  , 负载均衡器                    , resource     ,                    , 知识图谱    , 110        ,
-lb_listener         , lb_listener_0        , lb_listener_1         , 负载均衡监听器                , resource     ,                    , 知识图谱    , 110        ,
-natgw               , natgw_0              , natgw_1               , NAT网关                       , resource     ,                    , 知识图谱    , 110        ,
-redis               , redis_0              , redis_1               , Redis                         , resource     ,                    , 知识图谱    , 110        ,
-rds                 , rds_0                , rds_1                 , RDS                           , resource     ,                    , 知识图谱    , 110        ,
-pod_cluster         , pod_cluster_0        , pod_cluster_1         , K8s容器集群                   , resource     ,                    , 知识图谱    , 111        ,
-pod_ns              , pod_ns_0             , pod_ns_1              , K8s命名空间                   , resource     ,                    , 知识图谱    , 111        ,
-pod_node            , pod_node_0           , pod_node_1            , K8s容器节点                   , resource     ,                    , 知识图谱    , 111        ,
-pod_ingress         , pod_ingress_0        , pod_ingress_1         , K8s Ingress                   , resource     ,                    , 知识图谱    , 111        ,
-pod_service         , pod_service_0        , pod_service_1         , K8s容器服务                   , resource     ,                    , 知识图谱    , 111        ,
-pod_group           , pod_group_0          , pod_group_1           , K8s工作负载                   , resource     ,                    , 知识图谱    , 111        ,
-pod                 , pod_0                , pod_1                 , K8s容器POD                    , resource     ,                    , 知识图谱    , 111        ,
-service             , service_0            , service_1             , 服务                          , resource     ,                    , 知识图谱    , 111        ,
-resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , 类型-容器POD优先              , int_enum     , resource_gl0_type  , 知识图谱    , 111        ,
-resource_gl0        , resource_gl0_0       , resource_gl0_1        , 资源-容器POD优先              , resource     ,                    , 知识图谱    , 111        ,
-resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , 类型-工作负载优先             , int_enum     , resource_gl1_type  , 知识图谱    , 111        ,
-resource_gl1        , resource_gl1_0       , resource_gl1_1        , 资源-工作负载优先             , resource     ,                    , 知识图谱    , 111        ,
-resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , 类型-服务优先                 , int_enum     , resource_gl2_type  , 知识图谱    , 111        ,
-resource_gl2        , resource_gl2_0       , resource_gl2_1        , 资源-服务优先                 , resource     ,                    , 知识图谱    , 111        ,
-is_internet         , is_internet_0        , is_internet_1         , Internet标志                  , bool         ,                    ,             , 111        ,
-
-mac                 , mac_0                , mac_1                 , MAC                           , mac          ,                    , 链路层      , 111        ,
-eth_type            , eth_type             , eth_type              , 链路协议                      , int_enum     , eth_type           , 链路层      , 111        ,
-vlan                , vlan                 , vlan                  , VLAN                          , int          ,                    , 链路层      , 111        ,
-
-ip                  , ip_0                 , ip_1                  , IP地址                        , ip           ,                    , 网络层      , 111        ,
-is_ipv4             , is_ipv4              , is_ipv4               , IP类型                        , int_enum     , ip_type            , 网络层      , 111        ,
-protocol            , protocol             , protocol              , 网络协议                      , int_enum     , protocol           , 网络层      , 111        ,
-tunnel_tier         , tunnel_tier          , tunnel_tier           , 隧道层数                      , int_enum     , tunnel_tier        , 网络层      , 111        ,
-tunnel_type         , tunnel_type          , tunnel_type           , 隧道类型                      , int_enum     , tunnel_type        , 网络层      , 111        ,
-tunnel_tx_id        , tunnel_tx_id         , tunnel_tx_id          , 请求隧道ID                    , int          ,                    , 网络层      , 111        ,
-tunnel_rx_id        , tunnel_rx_id         , tunnel_rx_id          , 响应隧道ID                    , int          ,                    , 网络层      , 111        ,
-tunnel_tx_ip_0      , tunnel_tx_ip_0       , tunnel_tx_ip_0        , 请求隧道源IP                  , ip           ,                    , 网络层      , 111        ,
-tunnel_tx_ip_1      , tunnel_tx_ip_1       , tunnel_tx_ip_1        , 请求隧道目IP                  , ip           ,                    , 网络层      , 111        ,
-tunnel_rx_ip_0      , tunnel_rx_ip_0       , tunnel_rx_ip_0        , 响应隧道源IP                  , ip           ,                    , 网络层      , 111        ,
-tunnel_rx_ip_1      , tunnel_rx_ip_1       , tunnel_rx_ip_1        , 响应隧道目IP                  , ip           ,                    , 网络层      , 111        ,
-tunnel_tx_mac_0     , tunnel_tx_mac_0      , tunnel_tx_mac_0       , 请求隧道源MAC                 , mac          ,                    , 网络层      , 111        ,
-tunnel_tx_mac_1     , tunnel_tx_mac_1      , tunnel_tx_mac_1       , 请求隧道目MAC                 , mac          ,                    , 网络层      , 111        ,
-tunnel_rx_mac_0     , tunnel_rx_mac_0      , tunnel_rx_mac_0       , 响应隧道源MAC                 , mac          ,                    , 网络层      , 111        ,
-tunnel_rx_mac_1     , tunnel_rx_mac_1      , tunnel_rx_mac_1       , 响应隧道目MAC                 , mac          ,                    , 网络层      , 111        ,
-
-
-client_port         , client_port          , client_port           , 客户端口                      , int          ,                    , 传输层      , 111        ,
-server_port         , server_port          , server_port           , 服务端口                      , int_enum     , server_port        , 传输层      , 111        ,
-tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , TCP标志位列表                 , bit_enum     , tcp_flags_bit      , 传输层      , 111        ,
-syn_seq             , syn_seq              , syn_seq               , SYN包SEQ                      , int          ,                    , 传输层      , 111        ,
-syn_ack_seq         , syn_ack_seq          , syn_ack_seq           , SYN-ACK包SEQ                  , int          ,                    , 传输层      , 111        ,
-last_keepalive_seq  , last_keepalive_seq   , last_keepalive_seq    , 心跳SEQ                       , int          ,                    , 传输层      , 111        ,
-last_keepalive_ack  , last_keepalive_ack   , last_keepalive_ack    , 心跳ACK                       , int          ,                    , 传输层      , 111        ,
-
-l7_protocol         , l7_protocol          , l7_protocol           , 应用协议                      , int_enum     , l7_protocol        , 应用层      , 111        ,
-
-province            , province_0           , province_1            , 省份                          , string       ,                    , 广域网      , 111        ,
-
-close_type          , close_type           , close_type            , 流结束类型                    , int_enum     , close_type         , 流信息      , 111        ,
-flow_source         , flow_source          , flow_source           , 流数据来源                    , int_enum     , flow_source        , 流信息      , 111        ,
-flow_id             , flow_id              , flow_id               , 流日志ID                      , int          ,                    , 流信息      , 111        ,
-tap                 , tap                  , tap                   , 采集点                        , resource     ,                    , 流信息      , 110        ,
-tap_port            , tap_port             , tap_port              , 采集位置标识                  , mac          ,                    , 流信息      , 111        ,
-tap_port_name       , tap_port_name        , tap_port_name         , 采集位置名称                  , string       ,                    , 流信息      , 111        ,
-tap_port_type       , tap_port_type        , tap_port_type         , 采集位置类型                  , int_enum     , tap_port_type      , 流信息      , 111        ,
-vtap                , vtap                 , vtap                  , 采集器                        , resource     ,                    , 流信息      , 111        ,
-
-tap_side            , tap_side             , tap_side              , 路径统计位置                  , string_enum  , tap_side           , 流信息      , 111        ,
-l2_end              , l2_end_0             , l2_end_1              , 二层边界                      , bool         ,                    , 流信息      , 111        ,
-l3_end              , l3_end_0             , l3_end_1              , 三层边界                      , bool         ,                    , 流信息      , 111        ,
-is_new_flow         , is_new_flow          , is_new_flow           , 新建流                        , bool         ,                    , 流信息      , 111        ,
-start_time          , start_time           , start_time            , 开始时间                      , int          ,                    , 流信息      , 111        ,
-end_time            , end_time             , end_time              , 结束时间                      , int          ,                    , 流信息      , 111        ,
-duration            , duration             , duration              , 流持续时间                    , int          ,                    , 流信息      , 111        , 单位: 微秒
-status              , status               , status                , 状态                          , int_enum     , status             , 流信息      , 111        , 由流结束类型决定。正常：正常结束、周期性上报。客户端异常：客户端SYN结束、客户端重置、客户端半关、客户端端口复用、客户端其他重置。服务端异常：服务端重置、连接超时、服务端半关、服务端SYN结束、服务端直接重置、服务端队列溢出、服务端其他重置。未知：其他结束方式。
-labels              , labels_0             , labels_1              , K8s Labels                    , map          ,                    , K8s Labels , 111        ,
+# Name              , ClientName           , ServerName            , Type         , EnumFile             , Permission 
+_id                 ,                      ,                       , id           ,                      , 111        
+time                ,                      ,                       , time         ,                      , 111        
+             
+region              , region_0             , region_1              , resource     ,                      , 110        
+az                  , az_0                 , az_1                  , resource     ,                      , 110        
+host                , host_0               , host_1                , resource     ,                      , 100        
+chost               , chost_0              , chost_1               , resource     ,                      , 111        
+vpc                 , vpc_0                , vpc_1                 , resource     ,                      , 111        
+l2_vpc              , l2_vpc_0             , l2_vpc_1              , resource     ,                      , 110        
+subnet              , subnet_0             , subnet_1              , resource     ,                      , 111        
+router              , router_0             , router_1              , resource     ,                      , 110        
+dhcpgw              , dhcpgw_0             , dhcpgw_1              , resource     ,                      , 110        
+lb                  , lb_0                 , lb_1                  , resource     ,                      , 110        
+lb_listener         , lb_listener_0        , lb_listener_1         , resource     ,                      , 110        
+natgw               , natgw_0              , natgw_1               , resource     ,                      , 110        
+redis               , redis_0              , redis_1               , resource     ,                      , 110        
+rds                 , rds_0                , rds_1                 , resource     ,                      , 110        
+pod_cluster         , pod_cluster_0        , pod_cluster_1         , resource     ,                      , 111        
+pod_ns              , pod_ns_0             , pod_ns_1              , resource     ,                      , 111        
+pod_node            , pod_node_0           , pod_node_1            , resource     ,                      , 111        
+pod_ingress         , pod_ingress_0        , pod_ingress_1         , resource     ,                      , 111        
+pod_service         , pod_service_0        , pod_service_1         , resource     ,                      , 111        
+pod_group           , pod_group_0          , pod_group_1           , resource     ,                      , 111        
+pod                 , pod_0                , pod_1                 , resource     ,                      , 111        
+service             , service_0            , service_1             , resource     ,                      , 111        
+resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , int_enum     , resource_gl0_type    , 111        
+resource_gl0        , resource_gl0_0       , resource_gl0_1        , resource     ,                      , 111        
+resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , int_enum     , resource_gl1_type    , 111        
+resource_gl1        , resource_gl1_0       , resource_gl1_1        , resource     ,                      , 111        
+resource_gl2_type   , resource_gl2_type_0  , resource_gl2_type_1   , int_enum     , resource_gl2_type    , 111        
+resource_gl2        , resource_gl2_0       , resource_gl2_1        , resource     ,                      , 111        
+is_internet         , is_internet_0        , is_internet_1         , bool         ,                      , 111        
+             
+mac                 , mac_0                , mac_1                 , mac          ,                      , 111        
+eth_type            , eth_type             , eth_type              , int_enum     , eth_type             , 111        
+vlan                , vlan                 , vlan                  , int          ,                      , 111        
+             
+ip                  , ip_0                 , ip_1                  , ip           ,                      , 111        
+is_ipv4             , is_ipv4              , is_ipv4               , int_enum     , ip_type              , 111        
+protocol            , protocol             , protocol              , int_enum     , protocol             , 111        
+tunnel_tier         , tunnel_tier          , tunnel_tier           , int_enum     , tunnel_tier          , 111        
+tunnel_type         , tunnel_type          , tunnel_type           , int_enum     , tunnel_type          , 111        
+tunnel_tx_id        , tunnel_tx_id         , tunnel_tx_id          , int          ,                      , 111        
+tunnel_rx_id        , tunnel_rx_id         , tunnel_rx_id          , int          ,                      , 111        
+tunnel_tx_ip_0      , tunnel_tx_ip_0       , tunnel_tx_ip_0        , ip           ,                      , 111        
+tunnel_tx_ip_1      , tunnel_tx_ip_1       , tunnel_tx_ip_1        , ip           ,                      , 111        
+tunnel_rx_ip_0      , tunnel_rx_ip_0       , tunnel_rx_ip_0        , ip           ,                      , 111        
+tunnel_rx_ip_1      , tunnel_rx_ip_1       , tunnel_rx_ip_1        , ip           ,                      , 111        
+tunnel_tx_mac_0     , tunnel_tx_mac_0      , tunnel_tx_mac_0       , mac          ,                      , 111        
+tunnel_tx_mac_1     , tunnel_tx_mac_1      , tunnel_tx_mac_1       , mac          ,                      , 111        
+tunnel_rx_mac_0     , tunnel_rx_mac_0      , tunnel_rx_mac_0       , mac          ,                      , 111        
+tunnel_rx_mac_1     , tunnel_rx_mac_1      , tunnel_rx_mac_1       , mac          ,                      , 111        
+             
+             
+client_port         , client_port          , client_port           , int          ,                      , 111        
+server_port         , server_port          , server_port           , int_enum     , server_port          , 111        
+tcp_flags_bit       , tcp_flags_bit_0      , tcp_flags_bit_1       , bit_enum     , tcp_flags_bit        , 111        
+syn_seq             , syn_seq              , syn_seq               , int          ,                      , 111        
+syn_ack_seq         , syn_ack_seq          , syn_ack_seq           , int          ,                      , 111        
+last_keepalive_seq  , last_keepalive_seq   , last_keepalive_seq    , int          ,                      , 111        
+last_keepalive_ack  , last_keepalive_ack   , last_keepalive_ack    , int          ,                      , 111        
+             
+l7_protocol         , l7_protocol          , l7_protocol           , int_enum     , l7_protocol          , 111        
+             
+province            , province_0           , province_1            , string       ,                      , 111        
+             
+close_type          , close_type           , close_type            , int_enum     , close_type           , 111        
+flow_source         , flow_source          , flow_source           , int_enum     , flow_source          , 111        
+flow_id             , flow_id              , flow_id               , int          ,                      , 111        
+tap                 , tap                  , tap                   , resource     ,                      , 110        
+tap_port            , tap_port             , tap_port              , mac          ,                      , 111        
+tap_port_name       , tap_port_name        , tap_port_name         , string       ,                      , 111        
+tap_port_type       , tap_port_type        , tap_port_type         , int_enum     , tap_port_type        , 111        
+vtap                , vtap                 , vtap                  , resource     ,                      , 111        
+             
+tap_side            , tap_side             , tap_side              , string_enum  , tap_side             , 111        
+l2_end              , l2_end_0             , l2_end_1              , bool         ,                      , 111        
+l3_end              , l3_end_0             , l3_end_1              , bool         ,                      , 111        
+is_new_flow         , is_new_flow          , is_new_flow           , bool         ,                      , 111        
+start_time          , start_time           , start_time            , int          ,                      , 111        
+end_time            , end_time             , end_time              , int          ,                      , 111        
+duration            , duration             , duration              , int          ,                      , 111        
+status              , status               , status                , int_enum     , status               , 111
+labels              , labels_0             , labels_1              , map          ,                      , 111        

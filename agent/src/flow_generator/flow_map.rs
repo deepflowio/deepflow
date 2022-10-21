@@ -675,7 +675,7 @@ impl FlowMap {
                 l7_proto,
                 get_parser(l7_proto.unwrap_or_default()),
                 self.counter.clone(),
-                conf.l7_prorocol_enabled_bitmap,
+                conf.l7_protocol_enabled_bitmap,
             )
         }
         node
