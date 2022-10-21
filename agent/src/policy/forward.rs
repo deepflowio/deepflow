@@ -110,8 +110,6 @@ impl fmt::Display for L3Item {
 
 type TableLruCache = LruCache<L3Key, L3Item>;
 
-const MAX_QUEUE_COUNT: usize = 16;
-
 type MacIpTables = UnsafeWrapper<Vec<Option<Box<TableLruCache>>>>;
 type VipDeviceTables = UnsafeWrapper<HashMap<u64, bool>>;
 
@@ -124,12 +122,13 @@ pub struct Forward {
 
 impl Forward {
     pub fn new(queue_count: usize) -> Self {
-        assert!(queue_count < MAX_QUEUE_COUNT && queue_count > 0);
+        assert!(queue_count < super::MAX_QUEUE_COUNT && queue_count > 0);
+        let mut list = Vec::new();
+        for _ in 0..super::MAX_QUEUE_COUNT {
+            list.push(None);
+        }
         Self {
-            mac_ip_tables: MacIpTables::from(vec![
-                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-                None, None,
-            ]),
+            mac_ip_tables: MacIpTables::from(list),
             vip_device_tables: VipDeviceTables::from(HashMap::new()),
             queue_count,
         }
