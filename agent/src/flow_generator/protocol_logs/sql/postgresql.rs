@@ -108,7 +108,7 @@ impl L7ProtocolInfoInterface for PostgreInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: L7Protocol::Postgresql,
+            proto: L7Protocol::PostgreSQL,
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
         })
@@ -200,7 +200,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        L7Protocol::Postgresql
+        L7Protocol::PostgreSQL
     }
 
     fn reset(&mut self) {

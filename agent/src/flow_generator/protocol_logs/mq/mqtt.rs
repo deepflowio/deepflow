@@ -95,7 +95,7 @@ impl L7ProtocolInfoInterface for MqttInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: L7Protocol::Mqtt,
+            proto: L7Protocol::MQTT,
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
         })
@@ -242,7 +242,7 @@ impl L7ProtocolParserInterface for MqttLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        L7Protocol::Mqtt
+        L7Protocol::MQTT
     }
 
     fn parsable_on_udp(&self) -> bool {
