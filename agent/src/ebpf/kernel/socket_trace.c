@@ -1463,5 +1463,3 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 #include "go_tls_bpf.c"
 #include "go_http2_bpf.c"
 #include "openssl_bpf.c"
-
-char _license[] SEC("license") = "GPL";
