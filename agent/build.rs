@@ -16,6 +16,8 @@
 
 use std::{env, error::Error, path::PathBuf, process::Command, str};
 
+use chrono::prelude::*;
+
 fn generate_protobuf() -> Result<(), Box<dyn Error>> {
     tonic_build::configure()
         .build_server(false)
@@ -93,11 +95,14 @@ struct EnvCommand(&'static str, Vec<&'static str>);
 fn set_build_info() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=AGENT_NAME=deepflow-agent-ce");
     println!("cargo:rustc-env=BRANCH={}", get_branch()?);
+    println!(
+        "cargo:rustc-env=COMPILE_TIME={}",
+        Local::now().format("%F %T")
+    );
     let entries = vec![
         EnvCommand("COMMIT_ID", vec!["git", "rev-parse", "HEAD"]),
         EnvCommand("REV_COUNT", vec!["git", "rev-list", "--count", "HEAD"]),
         EnvCommand("RUSTC_VERSION", vec!["rustc", "--version"]),
-        EnvCommand("COMPILE_TIME", vec!["date", "+%Y-%m-%d %H:%M:%S"]),
     ];
     for e in entries {
         let output = Command::new(e.1[0]).args(&e.1[1..]).output()?.stdout;

@@ -16,15 +16,14 @@
 
 //! Enterprise Edition Feature: windows-dispatcher
 
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::Arc;
 
-use ::pcap::{Active, Capture};
 use public::counter;
 use public::error::Result;
 use public::packet;
 
 #[derive(Default)]
-pub struct WinPcapCounter(AtomicU64);
+pub struct WinPcapCounter;
 
 impl counter::RefCountable for WinPcapCounter {
     fn get_counters(&self) -> Vec<counter::Counter> {
@@ -32,11 +31,7 @@ impl counter::RefCountable for WinPcapCounter {
     }
 }
 
-pub struct WinPacket {
-    captures: Vec<(Capture<Active>, isize, u64)>,
-    cur_read_offset: usize,
-    counter: Arc<WinPcapCounter>,
-}
+pub struct WinPacket;
 
 impl WinPacket {
     pub fn new(_: Vec<(&str, isize)>, _: usize, _: usize) -> Result<Self> {
