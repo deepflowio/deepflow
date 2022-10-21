@@ -28,7 +28,15 @@ impl Capture {
         let parse_len = parse_len.unwrap_or(128);
         let mut packets = vec![];
         let mut capture = pcap::Capture::from_file(path).unwrap();
+        #[cfg(target_os = "linux")]
         while let Ok(packet) = capture.next() {
+            packets.push((
+                packet.header.clone(),
+                Vec::from(&packet.data[..packet.data.len().min(parse_len)]),
+            ));
+        }
+        #[cfg(target_os = "windows")]
+        while let Ok(packet) = capture.next_packet() {
             packets.push((
                 packet.header.clone(),
                 Vec::from(&packet.data[..packet.data.len().min(parse_len)]),

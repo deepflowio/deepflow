@@ -41,13 +41,16 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::common::{ebpf::GO_HTTP2_UPROBE, IPV4_FRAG_MORE_FRAGMENT};
-#[cfg(target_os = "linux")]
-use crate::ebpf::{
-    MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
-    SOCK_DIR_RCV, SOCK_DIR_SND,
-};
+use crate::common::IPV4_FRAG_MORE_FRAGMENT;
 use crate::error;
+#[cfg(target_os = "linux")]
+use crate::{
+    common::ebpf::GO_HTTP2_UPROBE,
+    ebpf::{
+        MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
+        SOCK_DIR_RCV, SOCK_DIR_SND,
+    },
+};
 use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
 use public::utils::net::{is_unicast_link_local, MacAddr};

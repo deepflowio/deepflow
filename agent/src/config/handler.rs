@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 #[cfg(target_os = "linux")]
 use std::process;
 use std::sync::Arc;
+#[cfg(target_os = "linux")]
 use std::thread;
 use std::time::Duration;
 
@@ -32,6 +33,7 @@ use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
+#[cfg(target_os = "linux")]
 use regex::Regex;
 
 use super::config::{PortConfig, UprobeProcRegExp};
@@ -42,7 +44,7 @@ use super::{
 
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::{
-    common::{decapsulate::TunnelTypeBitmap, NORMAL_EXIT_WITH_RESTART},
+    common::decapsulate::TunnelTypeBitmap,
     dispatcher::recv_engine,
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
@@ -59,17 +61,16 @@ use crate::{
 };
 #[cfg(target_os = "linux")]
 use crate::{
-    common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US},
+    common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US, NORMAL_EXIT_WITH_RESTART},
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
     utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
 };
+#[cfg(target_os = "linux")]
+use public::netns::{NetNs, NsFile};
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
-use public::{
-    netns::{NetNs, NsFile},
-    utils::net::MacAddr,
-};
+use public::utils::net::MacAddr;
 
 const MB: u64 = 1048576;
 const MINUTE: Duration = Duration::from_secs(60);
@@ -249,6 +250,7 @@ pub struct DispatcherConfig {
     pub trident_type: TridentType,
     pub vtap_id: u16,
     pub capture_socket_type: CaptureSocketType,
+    #[cfg(target_os = "linux")]
     pub extra_netns: Vec<NsFile>,
     pub tap_interface_regex: String,
     pub packet_header_enabled: bool,
@@ -653,8 +655,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
 
     fn try_from(conf: (Config, RuntimeConfig)) -> Result<Self, Self::Error> {
         let (static_config, conf) = conf;
+        #[cfg(target_os = "linux")]
         let (ctrl_ip, ctrl_mac) =
             get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
+        #[cfg(target_os = "windows")]
+        let (ctrl_ip, _) = get_ctrl_ip_and_mac(static_config.controller_ips[0].parse().unwrap());
         let dest_ip = conf
             .analyzer_ip
             .parse::<IpAddr>()
@@ -698,6 +703,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 trident_type: conf.trident_type,
                 vtap_id: conf.vtap_id as u16,
                 capture_socket_type: conf.capture_socket_type,
+                #[cfg(target_os = "linux")]
                 extra_netns: {
                     let re = Regex::new(&conf.extra_netns_regex).unwrap(); // regex validated in protobuf
                     let mut ns = NetNs::find_ns_files_by_regex(&re);
@@ -1063,6 +1069,7 @@ impl ConfigHandler {
         }
 
         if candidate_config.dispatcher != new_config.dispatcher {
+            #[cfg(target_os = "linux")]
             if candidate_config.dispatcher.extra_netns != new_config.dispatcher.extra_netns {
                 info!(
                     "dispatcher extra net namespace: {:?}",

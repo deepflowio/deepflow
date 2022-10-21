@@ -470,6 +470,7 @@ fn dispatcher_listener_callback(
                 }
             };
             for listener in components.dispatcher_listeners.iter() {
+                #[cfg(target_os = "linux")]
                 let netns = listener.netns();
                 #[cfg(target_os = "linux")]
                 if netns != NsFile::Root {
@@ -831,7 +832,7 @@ impl Components {
         // =================================================================================
         // 目前仅支持local-mode + ebpf-collector，ebpf-collector不适用fastpath, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
-            1,
+            1.max(yaml_config.src_interfaces.len()),
             yaml_config.first_path_level as usize,
             yaml_config.fast_path_map_size,
             false,
@@ -1081,6 +1082,7 @@ impl Components {
         if src_interfaces_and_namespaces.is_empty() {
             src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
         }
+        #[cfg(target_os = "linux")]
         for ns in candidate_config.dispatcher.extra_netns.iter() {
             src_interfaces_and_namespaces.push(("".into(), ns.clone()));
         }
