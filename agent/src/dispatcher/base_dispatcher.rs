@@ -40,6 +40,7 @@ use super::{
 #[cfg(target_os = "windows")]
 use windows_recv_engine::WinPacket;
 
+use crate::config::handler::LogParserAccess;
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;
 use crate::{
@@ -83,6 +84,7 @@ pub(super) struct BaseDispatcher {
     pub(super) pipelines: Arc<Mutex<HashMap<u32, Arc<Mutex<Pipeline>>>>>,
     pub(super) tap_interfaces: Arc<Mutex<Vec<Link>>>,
     pub(super) flow_map_config: FlowAccess,
+    pub(super) log_parse_config: LogParserAccess,
 
     pub(super) tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
     pub(super) tunnel_info: TunnelInfo,
