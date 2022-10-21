@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/deepflowys/deepflow/server/querier/config"
 	ckcommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 
 	logging "github.com/op/go-logging"
@@ -232,23 +233,28 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 	}
 	if ok {
 		metricsData, ok := tableDate.(map[string]interface{})[table]
+		metricsDataLanguage, _ := tableDate.(map[string]interface{})[table+"."+config.Cfg.Language]
 		if ok {
 			loadMetrics = make(map[string]*Metrics)
 			for i, metrics := range metricsData.([][]interface{}) {
-				if len(metrics) < 7 {
+				if len(metrics) < 4 {
 					return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
-				metricType, ok := METRICS_TYPE_NAME_MAP[metrics[4].(string)]
+				metricType, ok := METRICS_TYPE_NAME_MAP[metrics[2].(string)]
 				if !ok {
 					return nil, errors.New(fmt.Sprintf("get metrics type failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
-				permissions, err := ckcommon.ParsePermission(metrics[6])
+				permissions, err := ckcommon.ParsePermission(metrics[3])
 				if err != nil {
 					return nil, errors.New(fmt.Sprintf("parse metrics permission failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
+				metricsLanguage := metricsDataLanguage.([][]interface{})[i]
+				displayName := metricsLanguage[1].(string)
+				unit := metricsLanguage[2].(string)
+				category := metricsLanguage[3].(string)
 				lm := NewMetrics(
-					i, metrics[1].(string), metrics[2].(string), metrics[3].(string), metricType,
-					metrics[5].(string), permissions, "", table,
+					i, metrics[1].(string), displayName, unit, metricType,
+					category, permissions, "", table,
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}

@@ -1,24 +1,24 @@
-# Field              , DBField              , DisplayName             , Unit , Type       , Category   , Permission , Description
-log_count            ,                      , 日志总量                , 个   , counter    , 日志数量   , 111        ,
-request              ,                      , 请求                    , 个   , counter    , 吞吐       , 111        ,
-response             ,                      , 响应                    , 个   , counter    , 吞吐       , 111        ,
-error                ,                      , 异常                    , 个   , counter    , 异常       , 111        ,
-client_error         ,                      , 客户端异常              , 个   , counter    , 异常       , 111        ,
-server_error         ,                      , 服务端异常              , 个   , counter    , 异常       , 111        ,
-error_ratio          ,                      , 异常比例                , %    , percentage , 异常       , 111        ,
-client_error_ratio   ,                      , 客户端异常比例          , %    , percentage , 异常       , 111        ,
-server_error_ratio   ,                      , 服务端异常比例          , %    , percentage , 异常       , 111        ,
-response_duration    , response_duration    , 响应时延                , 微秒 , delay      , 时延       , 111        ,
-ip_version           , is_ipv4              , IP类型                  , 个   , tag        , 其他属性   , 111        ,
-tap                  , tap_type             , 采集点                  , 个   , tag        , 其他属性   , 111        ,
-vtap                 , vtap_id              , 采集器                  , 个   , tag        , 其他属性   , 111        ,
-request_domain       , request_domain       , 请求域名                , 个   , tag        , 其他属性   , 111        ,
-version              , version              , 协议版本                , 个   , tag        , 其他属性   , 111        ,
-request_resource     , request_resource     , 请求资源                , 个   , tag        , 其他属性   , 111        ,
-response_code        , response_code        , 响应码                  , 个   , tag        , 其他属性   , 111        ,
-server_port          , server_port          , 服务端口                , 个   , tag        , 其他属性   , 111        ,
-request_type         , request_type         , 请求类型                , 个   , tag        , 其他属性   , 111        ,
-response_result      , response_result      , 响应结果                , 个   , tag        , 其他属性   , 111        ,
-request_length       , request_length       , 请求长度                , 字节 , counter    , 吞吐       , 111        ,
-response_length      , response_length      , 响应长度                , 字节 , counter    , 吞吐       , 111        ,
-sql_affected_rows    , sql_affected_rows    , SQL影响行数             , 行   , counter    , 吞吐       , 111        ,
+# Field              , DBField              , Type       , Permission 
+log_count            ,                      , counter    , 111        
+request              ,                      , counter    , 111        
+response             ,                      , counter    , 111        
+error                ,                      , counter    , 111        
+client_error         ,                      , counter    , 111        
+server_error         ,                      , counter    , 111        
+error_ratio          ,                      , percentage , 111        
+client_error_ratio   ,                      , percentage , 111        
+server_error_ratio   ,                      , percentage , 111        
+response_duration    , response_duration    , delay      , 111        
+ip_version           , is_ipv4              , tag        , 111        
+tap                  , tap_type             , tag        , 111        
+vtap                 , vtap_id              , tag        , 111        
+request_domain       , request_domain       , tag        , 111        
+version              , version              , tag        , 111        
+request_resource     , request_resource     , tag        , 111        
+response_code        , response_code        , tag        , 111        
+server_port          , server_port          , tag        , 111        
+request_type         , request_type         , tag        , 111        
+response_result      , response_result      , tag        , 111        
+request_length       , request_length       , counter    , 111        
+response_length      , response_length      , counter    , 111        
+sql_affected_rows    , sql_affected_rows    , counter    , 111        

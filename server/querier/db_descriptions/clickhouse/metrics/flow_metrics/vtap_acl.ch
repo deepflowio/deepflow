@@ -1,0 +1,13 @@
+# Field                     , DisplayName             , Unit , Category     , Description
+byte                        , 字节                    , 字节 , 网络层吞吐   ,
+byte_tx                     , 发送字节                , 字节 , 网络层吞吐   ,
+byte_rx                     , 接收字节                , 字节 , 网络层吞吐   ,
+packet                      , 包数                    , 包   , 网络层吞吐   ,
+packet_tx                   , 发送包数                , 包   , 网络层吞吐   ,
+packet_rx                   , 接收包数                , 包   , 网络层吞吐   ,
+l3_byte                     , 网络层载荷              , 字节 , 网络层吞吐   ,
+l3_byte_tx                  , 发送网络层载荷          , 字节 , 网络层吞吐   ,
+l3_byte_rx                  , 接收网络层载荷          , 字节 , 网络层吞吐   ,
+l4_byte                     , 传输层载荷              , 字节 , 网络层吞吐   ,
+l4_byte_tx                  , 发送传输层载荷          , 字节 , 网络层吞吐   ,
+l4_byte_rx                  , 接收传输层载荷          , 字节 , 网络层吞吐   ,

@@ -1,106 +1,106 @@
-# Field                     , DBField              , DisplayName             , Unit , Type       , Category     , Permission , Description
-byte                        , byte                 , 字节                    , 字节 , counter    , 网络层吞吐   , 111        ,
-byte_tx                     , byte_tx              , 发送字节                , 字节 , counter    , 网络层吞吐   , 111        ,
-byte_rx                     , byte_rx              , 接收字节                , 字节 , counter    , 网络层吞吐   , 111        ,
-packet                      , packet               , 包数                    , 包   , counter    , 网络层吞吐   , 111        ,
-packet_tx                   , packet_tx            , 发送包数                , 包   , counter    , 网络层吞吐   , 111        ,
-packet_rx                   , packet_rx            , 接收包数                , 包   , counter    , 网络层吞吐   , 111        ,
-l3_byte                     ,                      , 网络层载荷              , 字节 , counter    , 网络层吞吐   , 111        ,
-l3_byte_tx                  , l3_byte_tx           , 发送网络层载荷          , 字节 , counter    , 网络层吞吐   , 111        ,
-l3_byte_rx                  , l3_byte_rx           , 接收网络层载荷          , 字节 , counter    , 网络层吞吐   , 111        ,
-l4_byte                     ,                      , 传输层载荷              , 字节 , counter    , 网络层吞吐   , 111        ,
-l4_byte_tx                  , l4_byte_tx           , 发送传输层载荷          , 字节 , counter    , 网络层吞吐   , 111        ,
-l4_byte_rx                  , l4_byte_rx           , 接收传输层载荷          , 字节 , counter    , 网络层吞吐   , 111        ,
-bbp                         ,                      , 平均包长                , 字节 , quotient   , 网络层吞吐   , 111        ,
-bbp_tx                      ,                      , 平均发送包长            , 字节 , quotient   , 网络层吞吐   , 111        ,
-bbp_rx                      ,                      , 平均接收包长            , 字节 , quotient   , 网络层吞吐   , 111        ,
+# Field                     , DBField                   , Type       , Permission 
+byte                        , byte                      , counter    , 111        
+byte_tx                     , byte_tx                   , counter    , 111        
+byte_rx                     , byte_rx                   , counter    , 111        
+packet                      , packet                    , counter    , 111        
+packet_tx                   , packet_tx                 , counter    , 111        
+packet_rx                   , packet_rx                 , counter    , 111        
+l3_byte                     ,                           , counter    , 111        
+l3_byte_tx                  , l3_byte_tx                , counter    , 111        
+l3_byte_rx                  , l3_byte_rx                , counter    , 111        
+l4_byte                     ,                           , counter    , 111        
+l4_byte_tx                  , l4_byte_tx                , counter    , 111        
+l4_byte_rx                  , l4_byte_rx                , counter    , 111        
+bbp                         ,                           , quotient   , 111        
+bbp_tx                      ,                           , quotient   , 111        
+bbp_rx                      ,                           , quotient   , 111        
+     
+new_flow                    , new_flow                  , counter    , 111        
+closed_flow                 , closed_flow               , counter    , 111        
+flow_load                   , flow_load                 , gauge      , 111        
+syn_count                   , syn_count                 , counter    , 111        
+synack_count                , synack_count              , counter    , 111        
+     
+rtt                         ,                           , delay      , 111        
+rtt_client                  ,                           , delay      , 111        
+rtt_server                  ,                           , delay      , 111        
+srt                         ,                           , delay      , 111        
+art                         ,                           , delay      , 111        
+cit                         ,                           , delay      , 111        
+rtt_max                     , rtt_max                   , delay      , 111        
+rtt_client_max              , rtt_client_max            , delay      , 111        
+rtt_server_max              , rtt_server_max            , delay      , 111        
+srt_max                     , srt_max                   , delay      , 111        
+art_max                     , art_max                   , delay      , 111        
+cit_max                     , cit_max                    , delay      , 111       
+     
+retrans_syn                 , retrans_syn               , counter    , 111        
+retrans_synack              , retrans_synack            , counter    , 111        
+retrans                     , retrans                   , counter    , 111        
+retrans_tx                  , retrans_tx                , counter    , 111        
+retrans_rx                  , retrans_rx                , counter    , 111        
+zero_win                    , zero_win                  , counter    , 111        
+zero_win_tx                 , zero_win_tx               , counter    , 111        
+zero_win_rx                 , zero_win_rx               , counter    , 111        
+retrans_syn_ratio           ,                           , percentage , 111        
+retrans_synack_ratio        ,                           , percentage , 111        
+retrans_ratio               ,                           , percentage , 111        
+retrans_tx_ratio            ,                           , percentage , 111        
+retrans_rx_ratio            ,                           , percentage , 111        
+zero_win_ratio              ,                           , percentage , 111        
+zero_win_tx_ratio           ,                           , percentage , 111        
+zero_win_rx_ratio           ,                           , percentage , 111        
 
-new_flow                    , new_flow             , 新建连接                , 连接 , counter    , 传输层吞吐   , 111        ,
-closed_flow                 , closed_flow          , 关闭连接                , 连接 , counter    , 传输层吞吐   , 111        ,
-flow_load                   , flow_load            , 活跃连接                , 连接 , gauge      , 传输层吞吐   , 111        ,
-syn_count                   , syn_count            , SYN包数                 , 包   , counter    , 传输层吞吐   , 111        ,
-synack_count                , synack_count         , SYN-ACK包数             , 包   , counter    , 传输层吞吐   , 111        ,
+tcp_establish_fail          , tcp_establish_fail        , counter    , 111        
+client_establish_fail       , client_establish_fail     , counter    , 111        
+server_establish_fail       , server_establish_fail     , counter    , 111        
+tcp_establish_fail_ratio    ,                           , percentage , 111        
+client_establish_fail_ratio ,                           , percentage , 111        
+server_establish_fail_ratio ,                           , percentage , 111        
+tcp_transfer_fail           , tcp_transfer_fail         , counter    , 111        
+tcp_transfer_fail_ratio     ,                           , percentage , 111        
+tcp_rst_fail                , tcp_rst_fail              , counter    , 111        
+tcp_rst_fail_ratio          ,                           , percentage , 111        
+client_source_port_reuse    , client_source_port_reuse  , counter    , 111        
+client_syn_repeat           , client_syn_repeat         , counter    , 111        
+client_establish_other_rst  , client_establish_other_rst, counter    , 111        
+server_reset                , server_reset              , counter    , 111        
+server_syn_ack_repeat       , server_syn_ack_repeat     , counter    , 111        
+server_establish_other_rst  , server_establish_other_rst, counter    , 111        
+client_rst_flow             , client_rst_flow           , counter    , 111        
+server_queue_lack           , server_queue_lack         , counter    , 111        
+server_rst_flow             , server_rst_flow           , counter    , 111        
+client_half_close_flow      , client_half_close_flow    , counter    , 111        
+server_half_close_flow      , server_half_close_flow    , counter    , 111        
+tcp_timeout                 , tcp_timeout               , counter    , 111        
 
-rtt                         ,                      ,平均TCP建连时延          , 微秒 , delay      , 传输层时延   , 111        ,
-rtt_client                  ,                      ,平均TCP建连客户端时延    , 微秒 , delay      , 传输层时延   , 111        ,
-rtt_server                  ,                      ,平均TCP建连服务端时延    , 微秒 , delay      , 传输层时延   , 111        ,
-srt                         ,                      ,平均TCP系统时延          , 微秒 , delay      , 传输层时延   , 111        ,
-art                         ,                      ,平均数据时延             , 微秒 , delay      , 传输层时延   , 111        ,
-cit                         ,                      ,平均客户端等待时延       , 微秒 , delay      , 传输层时延   , 111        ,
-rtt_max                     , rtt_max              ,最大TCP建连时延          , 微秒 , delay      , 传输层时延   , 111        ,
-rtt_client_max              , rtt_client_max       ,最大TCP建连客户端时延    , 微秒 , delay      , 传输层时延   , 111        ,
-rtt_server_max              , rtt_server_max       ,最大TCP建连服务端时延    , 微秒 , delay      , 传输层时延   , 111        ,
-srt_max                     , srt_max              ,最大TCP系统时延          , 微秒 , delay      , 传输层时延   , 111        ,
-art_max                     , art_max              ,最大数据时延             , 微秒 , delay      , 传输层时延   , 111        ,
-cit_max                     , cit_max              ,最大客户端等待时延        , 微秒 , delay      , 传输层时延   , 111        ,
-
-retrans_syn                 , retrans_syn          , SYN重传                 , 包   , counter    , 传输层性能   , 111        ,
-retrans_synack              , retrans_synack       , SYN-ACK重传             , 包   , counter    , 传输层性能   , 111        ,
-retrans                     , retrans              , TCP重传                 , 包   , counter    , 传输层性能   , 111        ,
-retrans_tx                  , retrans_tx           , TCP客户端重传           , 包   , counter    , 传输层性能   , 111        ,
-retrans_rx                  , retrans_rx           , TCP服务端重传           , 包   , counter    , 传输层性能   , 111        ,
-zero_win                    , zero_win             , TCP零窗                 , 包   , counter    , 传输层性能   , 111        ,
-zero_win_tx                 , zero_win_tx          , TCP客户端零窗           , 包   , counter    , 传输层性能   , 111        ,
-zero_win_rx                 , zero_win_rx          , TCP服务端零窗           , 包   , counter    , 传输层性能   , 111        ,
-retrans_syn_ratio           ,                      , SYN重传比例             , %    , percentage , 传输层性能   , 111        ,
-retrans_synack_ratio        ,                      , SYN-ACK重传比例         , %    , percentage , 传输层性能   , 111        ,
-retrans_ratio               ,                      , TCP重传比例             , %    , percentage , 传输层性能   , 111        ,
-retrans_tx_ratio            ,                      , TCP客户端重传比例       , %    , percentage , 传输层性能   , 111        ,
-retrans_rx_ratio            ,                      , TCP服务端重传比例       , %    , percentage , 传输层性能   , 111        ,
-zero_win_ratio              ,                      , TCP零窗比例             , %    , percentage , 传输层性能   , 111        ,
-zero_win_tx_ratio           ,                      , TCP客户端零窗比例       , %    , percentage , 传输层性能   , 111        ,
-zero_win_rx_ratio           ,                      , TCP服务端零窗比例       , %    , percentage , 传输层性能   , 111        ,
-
-tcp_establish_fail          , tcp_establish_fail        , 建连-失败次数           , 次   , counter    , 传输层异常   , 111        ,
-client_establish_fail       , client_establish_fail     , 建连-客户端失败次数     , 次   , counter    , 传输层异常   , 111        ,
-server_establish_fail       , server_establish_fail     , 建连-服务端失败次数     , 次   , counter    , 传输层异常   , 111        ,
-tcp_establish_fail_ratio    ,                           , 建连-失败比例           , %    , percentage , 传输层异常   , 111        ,
-client_establish_fail_ratio ,                           , 建连-客户端失败比例     , %    , percentage , 传输层异常   , 111        ,
-server_establish_fail_ratio ,                           , 建连-服务端失败比例     , %    , percentage , 传输层异常   , 111        ,
-tcp_transfer_fail           , tcp_transfer_fail         , 传输-失败次数           , 次   , counter    , 传输层异常   , 111        ,  客户端重置 + 服务端队列溢出 + 服务端重置 + 客户端半关 + 服务端半关 + TCP连接超时
-tcp_transfer_fail_ratio     ,                           , 传输-失败比例           , %    , percentage , 传输层异常   , 111        ,  失败次数 / 关闭连接
-tcp_rst_fail                , tcp_rst_fail              , 重置次数                , 连接 , counter    , 传输层异常   , 111        ,  客户端其他重置 + 服务端其他重置 + 服务端直接重置 + 客户端重置 + 服务端重置
-tcp_rst_fail_ratio          ,                           , 重置比例                , %    , percentage , 传输层异常   , 111        ,  重置次数 / 关闭连接
-client_source_port_reuse    , client_source_port_reuse  , 建连-客户端端口复用     , 连接 , counter    , 传输层异常   , 111        ,
-client_syn_repeat           , client_syn_repeat         , 建连-客户端SYN结束      , 连接 , counter    , 传输层异常   , 111        ,
-client_establish_other_rst  , client_establish_other_rst, 建连-客户端其他重置     , 连接 , counter    , 传输层异常   , 111        ,
-server_reset                , server_reset              , 建连-服务端直接重置     , 连接 , counter    , 传输层异常   , 111        ,
-server_syn_ack_repeat       , server_syn_ack_repeat     , 建连-服务端SYN结束      , 连接 , counter    , 传输层异常   , 111        ,
-server_establish_other_rst  , server_establish_other_rst, 建连-服务端其他重置     , 连接 , counter    , 传输层异常   , 111        ,
-client_rst_flow             , client_rst_flow           , 传输-客户端重置         , 连接 , counter    , 传输层异常   , 111        ,
-server_queue_lack           , server_queue_lack         , 传输-服务端队列溢出     , 连接 , counter    , 传输层异常   , 111        ,
-server_rst_flow             , server_rst_flow           , 传输-服务端重置         , 连接 , counter    , 传输层异常   , 111        ,
-client_half_close_flow      , client_half_close_flow    , 断连-客户端半关         , 连接 , counter    , 传输层异常   , 111        ,
-server_half_close_flow      , server_half_close_flow    , 断连-服务端半关         , 连接 , counter    , 传输层异常   , 111        ,
-tcp_timeout                 , tcp_timeout               , 传输-TCP连接超时        , 连接 , counter    , 传输层异常   , 111        ,
-
-l7_request                  , l7_request           ,应用请求                 , 个   , counter    , 应用层性能   , 111        ,
-l7_response                 , l7_response          ,应用响应                 , 个   , counter    , 应用层性能   , 111        ,
-rrt                         ,                      ,平均应用时延             , 微秒 , delay      , 应用层性能   , 111        ,
-rrt_max                     , rrt_max              ,最大应用时延             , 微秒 , delay      , 应用层性能   , 111        ,
-l7_error                    , l7_error             ,应用异常                 , 个   , counter    , 应用层性能   , 111        ,
-l7_client_error             , l7_client_error      ,应用客户端异常           , 个   , counter    , 应用层性能   , 111        ,
-l7_server_error             , l7_server_error      ,应用服务端异常           , 个   , counter    , 应用层性能   , 111        ,
-l7_timeout                  , l7_timeout           ,应用超时                 , 个   , counter    , 应用层性能   , 111        ,
-l7_error_ratio              ,                      ,应用异常比例             , %    , percentage , 应用层性能   , 111        ,
-l7_client_error_ratio       ,                      ,应用客户端异常比例       , %    , percentage , 应用层性能   , 111        ,
-l7_server_error_ratio       ,                      ,应用服务端异常比例       , %    , percentage , 应用层性能   , 111        ,
-
-vpc                         ,                      ,VPC个数            , 个   , tag        , 资源属性     , 111        ,
-subnet                      ,                      ,子网个数           , 个   , tag        , 资源属性     , 111        ,
-ip                          ,                      ,IP地址个数         , 个   , tag        , 资源属性     , 111        ,
-pod_cluster                 ,                      ,容器集群个数       , 个   , tag        , 资源属性     , 111        ,
-pod_node                    ,                      ,容器节点个数       , 个   , tag        , 资源属性     , 111        ,
-pod_ns                      ,                      ,命名空间个数       , 个   , tag        , 资源属性     , 111        ,
-pod_group                   ,                      ,工作负载个数       , 个   , tag        , 资源属性     , 111        ,
-pod                         ,                      ,POD个数            , 个   , tag        , 资源属性     , 111        ,
-host                        ,                      ,宿主机个数         , 个   , tag        , 资源属性     , 111        ,
-chost                       ,                      ,云服务器个数       , 个   , tag        , 资源属性     , 111        ,
-region                      ,                      ,区域个数           , 个   , tag        , 资源属性     , 111        ,
-az                          ,                      ,可用区个数         , 个   , tag        , 资源属性     , 111        ,
-
-ip_version                  , is_ipv4              , IP类型            , 个   , tag        , 其他属性   , 111        ,
-tap_type                    , tap_type             , 采集点            , 个   , tag        , 其他属性   , 111        ,
-vtap_id                     , vtap_id              , 采集器            , 个   , tag        , 其他属性   , 111        ,
-protocol                    , protocol             , 网络协议          , 种   , tag        , 其他属性   , 111        ,
-server_port                 , server_port          , 服务端口          , 个   , tag        , 其他属性   , 111        ,
+l7_request                  , l7_request                , counter    , 111        
+l7_response                 , l7_response               , counter    , 111        
+rrt                         ,                           , delay      , 111        
+rrt_max                     , rrt_max                   , delay      , 111        
+l7_error                    , l7_error                  , counter    , 111        
+l7_client_error             , l7_client_error           , counter    , 111        
+l7_server_error             , l7_server_error           , counter    , 111        
+l7_timeout                  , l7_timeout                , counter    , 111        
+l7_error_ratio              ,                           , percentage , 111        
+l7_client_error_ratio       ,                           , percentage , 111        
+l7_server_error_ratio       ,                           , percentage , 111        
+    
+vpc                         ,                           , tag        , 111        
+subnet                      ,                           , tag        , 111        
+ip                          ,                           , tag        , 111        
+pod_cluster                 ,                           , tag        , 111        
+pod_node                    ,                           , tag        , 111        
+pod_ns                      ,                           , tag        , 111        
+pod_group                   ,                           , tag        , 111        
+pod                         ,                           , tag        , 111        
+host                        ,                           , tag        , 111        
+chost                       ,                           , tag        , 111        
+region                      ,                           , tag        , 111        
+az                          ,                           , tag        , 111        
+         
+ip_version                  , is_ipv4                   , tag        , 111        
+tap_type                    , tap_type                  , tag        , 111        
+vtap_id                     , vtap_id                   , tag        , 111        
+protocol                    , protocol                  , tag        , 111        
+server_port                 , server_port               , tag        , 111        
