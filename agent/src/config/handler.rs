@@ -36,12 +36,13 @@ use log::{info, warn, Level};
 #[cfg(target_os = "linux")]
 use regex::Regex;
 
-use super::config::PortConfig;
+use super::config::{PortConfig, UprobeProcRegExp};
 use super::{
     config::{Config, PcapConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 
+use crate::common::l7_protocol_log::L7ProtocolBitmap;
 use crate::{
     common::decapsulate::TunnelTypeBitmap,
     dispatcher::recv_engine,
@@ -60,9 +61,7 @@ use crate::{
 };
 #[cfg(target_os = "linux")]
 use crate::{
-    common::{
-        enums::TapType, feature::FeatureFlags, DEFAULT_CPU_CFS_PERIOD_US, NORMAL_EXIT_WITH_RESTART,
-    },
+    common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US, NORMAL_EXIT_WITH_RESTART},
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
     utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
@@ -305,6 +304,8 @@ pub struct FlowConfig {
     // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_flag: u8,
     pub packet_sequence_block_size: usize,
+
+    pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -335,6 +336,9 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_inference_ttl: conf.yaml_config.l7_protocol_inference_ttl,
             packet_sequence_flag: conf.yaml_config.packet_sequence_flag, // Enterprise Edition Feature: packet-sequence
             packet_sequence_block_size: conf.yaml_config.packet_sequence_block_size, // Enterprise Edition Feature: packet-sequence
+            l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
+                &conf.yaml_config.l7_protocol_enabled,
+            ),
         }
     }
 }
@@ -428,9 +432,9 @@ pub struct EbpfConfig {
     pub log_path: String,
     pub l7_log_tap_types: [bool; 256],
     pub ctrl_mac: MacAddr,
-    pub ebpf_uprobe_golang_symbol_enabled: bool,
     pub ebpf_disabled: bool,
-    pub feature: FeatureFlags,
+    pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
+    pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
 }
 
 #[cfg(target_os = "linux")]
@@ -459,10 +463,6 @@ impl fmt::Debug for EbpfConfig {
                     .collect::<Vec<_>>(),
             )
             .field("ctrl_mac", &self.ctrl_mac)
-            .field(
-                "ebpf-uprobe-golang-symbol-enabled",
-                &self.ebpf_uprobe_golang_symbol_enabled,
-            )
             .field("ebpf-disabled", &self.ebpf_disabled)
             .finish()
     }
@@ -864,11 +864,11 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 } else {
                     MacAddr::ZERO
                 },
-                ebpf_uprobe_golang_symbol_enabled: conf
-                    .yaml_config
-                    .ebpf_uprobe_golang_symbol_enabled,
-                feature: FeatureFlags::from(&conf.yaml_config.feature_flags),
                 ebpf_disabled: conf.yaml_config.ebpf_disabled,
+                ebpf_uprobe_proc_regexp: conf.yaml_config.ebpf_uprobe_proc_regexp,
+                l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
+                    &conf.yaml_config.l7_protocol_enabled,
+                ),
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
@@ -1790,4 +1790,3 @@ impl YamlConfig {
         }
     }
 }
-

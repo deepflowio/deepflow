@@ -103,7 +103,7 @@ impl L7FlowPerf for MqttPerfData {
     fn copy_and_reset_data(&mut self, timeout_count: u32) -> FlowPerfStats {
         if let Some(stats) = self.stats.take() {
             FlowPerfStats {
-                l7_protocol: L7Protocol::Mqtt,
+                l7_protocol: L7Protocol::MQTT,
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -118,7 +118,7 @@ impl L7FlowPerf for MqttPerfData {
             }
         } else {
             FlowPerfStats {
-                l7_protocol: L7Protocol::Mqtt,
+                l7_protocol: L7Protocol::MQTT,
                 l7: L7PerfStats {
                     err_timeout: timeout_count,
                     ..Default::default()
@@ -129,7 +129,7 @@ impl L7FlowPerf for MqttPerfData {
     }
 
     fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        if self.l7_proto != L7Protocol::Mqtt || !self.has_log_data {
+        if self.l7_proto != L7Protocol::MQTT || !self.has_log_data {
             return None;
         }
         self.has_log_data = false;
@@ -244,7 +244,7 @@ impl MqttPerfData {
             payload = &input[header.remaining_length as usize..];
         }
 
-        self.l7_proto = L7Protocol::Mqtt;
+        self.l7_proto = L7Protocol::MQTT;
         self.has_log_data = true;
 
         Ok(())

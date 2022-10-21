@@ -27,6 +27,7 @@ use thiserror::Error;
 use tokio::runtime::Builder;
 
 use crate::common::decapsulate::TunnelType;
+use crate::common::l7_protocol_log::get_all_protocol;
 use crate::common::{
     enums::TapType, DEFAULT_LOG_FILE, L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
     L7_PROTOCOL_INFERENCE_TTL,
@@ -196,6 +197,22 @@ impl Default for Config {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct UprobeProcRegExp {
+    pub golang_symbol: String,
+    pub golang: String,
+    pub openssl: String,
+}
+
+impl Default for UprobeProcRegExp {
+    fn default() -> Self {
+        Self {
+            golang_symbol: String::new(),
+            golang: String::from(".*"),
+            openssl: String::from(".*"),
+        }
+    }
+}
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
     #[serde(with = "LevelDef")]
@@ -254,9 +271,11 @@ pub struct YamlConfig {
     pub packet_sequence_queue_size: usize, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_queue_count: usize, // Enterprise Edition Feature: packet-sequence
     pub packet_sequence_flag: u8,          // Enterprise Edition Feature: packet-sequence
-    pub ebpf_uprobe_golang_symbol_enabled: bool,
     pub feature_flags: Vec<String>,
     pub ebpf_disabled: bool,
+    pub l7_protocol_enabled: Vec<String>,
+    #[serde(rename = "ebpf-uprobe-process-name-regexs")]
+    pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
 }
 
 impl YamlConfig {
@@ -424,9 +443,16 @@ impl Default for YamlConfig {
             packet_sequence_queue_size: 0,  // Enterprise Edition Feature: packet-sequence
             packet_sequence_queue_count: 1, // Enterprise Edition Feature: packet-sequence
             packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
-            ebpf_uprobe_golang_symbol_enabled: false,
             feature_flags: vec![],
             ebpf_disabled: false,
+            ebpf_uprobe_proc_regexp: UprobeProcRegExp::default(),
+            l7_protocol_enabled: {
+                let mut protos = vec![];
+                for i in get_all_protocol() {
+                    protos.push(i.as_string());
+                }
+                protos
+            },
         }
     }
 }

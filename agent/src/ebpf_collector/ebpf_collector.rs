@@ -27,16 +27,16 @@ use lru::LruCache;
 use super::{Error, Result};
 
 use crate::common::enums::IpProtocol;
-use crate::common::feature::FeatureFlags;
 use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
 use crate::common::l7_protocol_log::{
-    get_all_protocol, get_bitmap, get_parser, L7ProtocolParser, L7ProtocolParserInterface,
-    ParseParam,
+    get_all_protocol, get_parse_bitmap, get_parser, L7ProtocolBitmap, L7ProtocolParser,
+    L7ProtocolParserInterface, ParseParam,
 };
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
+use crate::config::UprobeProcRegExp;
 use crate::ebpf;
 use crate::flow_generator::{
     AppProtoLogsBaseInfo, AppProtoLogsData, AppTable, Error as LogError, Result as LogResult,
@@ -358,8 +358,8 @@ struct FlowItem {
     remote_epc: i32,
 
     // 应用识别
-    protocol_bitmap_image: u128,
-    protocol_bitmap: u128,
+    protocol_bitmap_image: L7ProtocolBitmap,
+    protocol_bitmap: L7ProtocolBitmap,
     l4_protocol: IpProtocol,
     l7_protocol: L7Protocol,
 
@@ -370,6 +370,8 @@ struct FlowItem {
     is_skip: bool,
 
     parser: Option<L7ProtocolParser>,
+    // from yaml static config, use for skip some protocol check
+    l7_enable_from_config: L7ProtocolBitmap,
 }
 
 impl FlowItem {
@@ -394,13 +396,14 @@ impl FlowItem {
         local_epc: i32,
         remote_epc: i32,
         log_parser_config: &LogParserAccess,
+        l7_enable_from_config: L7ProtocolBitmap,
     ) -> Self {
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         let l4_protocol = packet.lookup_key.proto;
         let l7_protocol = app_table.get_protocol_from_ebpf(packet, local_epc, remote_epc);
         let is_from_app = l7_protocol.is_some();
         let (l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
-        let protocol_bitmap = get_bitmap(l4_protocol);
+        let protocol_bitmap = get_parse_bitmap(l4_protocol, l7_enable_from_config);
 
         FlowItem {
             last_policy: time_in_sec,
@@ -415,6 +418,7 @@ impl FlowItem {
             protocol_bitmap,
             protocol_bitmap_image: protocol_bitmap,
             parser: Self::get_parser(l7_protocol, log_parser_config),
+            l7_enable_from_config,
         }
     }
 
@@ -431,7 +435,7 @@ impl FlowItem {
 
         let param = ParseParam::from(packet as &MetaPacket);
         for mut protocol_log in get_all_protocol().into_iter() {
-            if protocol_log.is_skip_parse(self.protocol_bitmap) {
+            if self.protocol_bitmap.is_disabled(protocol_log.protocol()) {
                 continue;
             }
             protocol_log.set_parse_config(log_parser_config);
@@ -507,7 +511,7 @@ impl FlowItem {
         self.protocol_bitmap = if self.l4_protocol == l4_protocol {
             self.protocol_bitmap_image
         } else {
-            get_bitmap(l4_protocol)
+            get_parse_bitmap(l4_protocol, self.l7_enable_from_config)
         };
         self.l4_protocol = l4_protocol;
         self.parser = None;
@@ -831,6 +835,7 @@ impl EbpfRunner {
                         self.config.epc_id as i32,
                         remote_epc,
                         &self.log_parser_config,
+                        self.config.l7_protocol_enabled_bitmap,
                     ),
                 );
                 flow_item = flow_map.get_mut(&key);
@@ -905,8 +910,8 @@ impl EbpfCollector {
     fn ebpf_init(
         config: &EbpfConfig,
         sender: DebugSender<Box<MetaPacket<'static>>>,
-        ebpf_uprobe_golang_symbol_enabled: bool,
-        _feature: FeatureFlags,
+        uprobe_proc_regexp: &UprobeProcRegExp,
+        l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
@@ -920,33 +925,60 @@ impl EbpfCollector {
                 std::ptr::null()
             };
 
-            // TODO: Update according to configuration file
-            ebpf::set_feature_regex(
-                ebpf::FEATURE_UPROBE_GOLANG,
-                CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-            );
-            ebpf::set_feature_regex(
-                ebpf::FEATURE_UPROBE_OPENSSL,
-                CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
-            );
+            if !uprobe_proc_regexp.golang.is_empty() {
+                info!(
+                    "ebpf set golang uprobe proc regexp: {}",
+                    uprobe_proc_regexp.golang.as_str()
+                );
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_UPROBE_GOLANG,
+                    CString::new(uprobe_proc_regexp.golang.as_str().as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
+            } else {
+                info!("ebpf golang uprobe proc regexp is empty, skip set")
+            }
 
-            if ebpf_uprobe_golang_symbol_enabled {
+            if !uprobe_proc_regexp.openssl.is_empty() {
+                info!(
+                    "ebpf set openssl uprobe proc regexp: {}",
+                    uprobe_proc_regexp.openssl.as_str()
+                );
+                ebpf::set_feature_regex(
+                    ebpf::FEATURE_UPROBE_OPENSSL,
+                    CString::new(uprobe_proc_regexp.openssl.as_str().as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
+                );
+            } else {
+                info!("ebpf openssl uprobe proc regexp is empty, skip set")
+            }
+
+            if !uprobe_proc_regexp.golang_symbol.is_empty() {
+                info!(
+                    "ebpf set golang symbol uprobe proc regexp: {}",
+                    uprobe_proc_regexp.golang_symbol.as_str()
+                );
                 ebpf::set_feature_regex(
                     ebpf::FEATURE_UPROBE_GOLANG_SYMBOL,
-                    CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
+                    CString::new(uprobe_proc_regexp.golang_symbol.as_str().as_bytes())
+                        .unwrap()
+                        .as_c_str()
+                        .as_ptr(),
                 );
+            } else {
+                info!("ebpf golang symbol proc regexp is empty, skip set")
             }
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_HTTP1 as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_HTTP2 as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_TLS_HTTP1 as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_TLS_HTTP2 as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_DUBBO as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_MYSQL as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_POSTGRESQL as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_REDIS as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_KAFKA as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_MQTT as ebpf::c_int);
-            ebpf::enable_ebpf_protocol(ebpf::SOCK_DATA_DNS as ebpf::c_int);
+
+            for i in get_all_protocol().into_iter() {
+                if l7_protocol_enabled_bitmap.is_enabled(i.protocol()) {
+                    info!("l7 protocol {:?} parse enabled", i.protocol());
+                    ebpf::enable_ebpf_protocol(i.protocol() as ebpf::c_int);
+                }
+            }
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
                 info!("ebpf bpf_tracer_init error: {}", config.log_path);
@@ -1024,8 +1056,8 @@ impl EbpfCollector {
         Self::ebpf_init(
             config,
             sender,
-            config.ebpf_uprobe_golang_symbol_enabled,
-            config.feature,
+            &config.ebpf_uprobe_proc_regexp,
+            config.l7_protocol_enabled_bitmap,
         )?;
         info!("ebpf collector initialized.");
         return Ok(Box::new(EbpfCollector {

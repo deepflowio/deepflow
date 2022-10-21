@@ -103,7 +103,7 @@ impl L7FlowPerf for DnsPerfData {
             _ => return Err(Error::DNSPerfParseFailed("dns translation type error")),
         }
 
-        self.session_data.l7_proto = L7Protocol::Dns;
+        self.session_data.l7_proto = L7Protocol::DNS;
         self.session_data.has_log_data = true;
 
         Ok(())
@@ -116,7 +116,7 @@ impl L7FlowPerf for DnsPerfData {
     fn copy_and_reset_data(&mut self, timeout_count: u32) -> FlowPerfStats {
         if let Some(stats) = self.perf_stats.take() {
             FlowPerfStats {
-                l7_protocol: L7Protocol::Dns,
+                l7_protocol: L7Protocol::DNS,
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -131,7 +131,7 @@ impl L7FlowPerf for DnsPerfData {
             }
         } else {
             FlowPerfStats {
-                l7_protocol: L7Protocol::Dns,
+                l7_protocol: L7Protocol::DNS,
                 l7: L7PerfStats {
                     err_timeout: timeout_count,
                     ..Default::default()
@@ -142,7 +142,7 @@ impl L7FlowPerf for DnsPerfData {
     }
 
     fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        if self.session_data.l7_proto != L7Protocol::Dns || !self.session_data.has_log_data {
+        if self.session_data.l7_proto != L7Protocol::DNS || !self.session_data.has_log_data {
             return None;
         }
         self.session_data.has_log_data = false;
@@ -309,7 +309,7 @@ mod tests {
                     status_code: 0,
                     status: L7ResponseStatus::Ok,
                     has_log_data: true,
-                    l7_proto: L7Protocol::Dns,
+                    l7_proto: L7Protocol::DNS,
                     msg_type: LogMessageType::Response,
                     rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(100))),
                 },
