@@ -237,14 +237,6 @@ impl IpSender {
             self.underlay_is_ipv6,
         );
         self.seq += 1;
-        info!(
-            "npb header size {}: port {:x}{:x} {:x}{:x}",
-            header_size,
-            packet.as_slice()[header_size],
-            packet.as_slice()[header_size + 1],
-            packet.as_slice()[header_size + 2],
-            packet.as_slice()[header_size + 3],
-        );
         self.socket
             .send_to(&packet.as_slice()[header_size..], &self.remote)
     }
