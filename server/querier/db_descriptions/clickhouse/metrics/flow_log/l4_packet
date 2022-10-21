@@ -1,2 +1,2 @@
-# Field              , DBField              , DisplayName             , Unit , Type       , Category   , Permission , Description
-packet_count         , packet_count         , 时序包数量               , 个   , counter    , 时序包数量  , 111        ,
+# Field              , DBField              , Type        , Permission 
+packet_count         , packet_count         , counter     , 111        

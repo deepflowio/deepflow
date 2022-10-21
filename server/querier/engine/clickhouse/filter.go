@@ -27,7 +27,7 @@ import (
 	"inet.af/netaddr"
 
 	"github.com/deepflowys/deepflow/server/libs/utils"
-
+	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
@@ -639,27 +639,26 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not ilike"
 				}
 			}
+			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {
 			case "regexp":
-				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value)
+				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value, enumFileName)
 			case "not regexp":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value) + ")"
-			case "like", "in":
-				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value)
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value, enumFileName) + ")"
 			case "not in":
-				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", f.Value) + ")"
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "in", f.Value, enumFileName) + ")"
 			case "=":
 				//when enum function operator is '=' , add 'or tag = xxx'
 				if isIntEnum {
 					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
 					if err == nil {
 						// when value type is int, add toUInt64() function
-						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 					} else {
-						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value)
+						whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName)
 					}
 				} else {
-					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + " OR " + tagName + " = " + f.Value
+					whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + " OR " + tagName + " = " + f.Value
 				}
 			case "!=":
 				//when enum function operator is '!=', add 'and tag != xxx'
@@ -667,15 +666,15 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					intValue, err := strconv.Atoi(strings.Trim(f.Value, "'"))
 					if err == nil {
 						// when value type is int, add toUInt64() function
-						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + ") AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
+						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + tagName + " != " + "toUInt64(" + strconv.Itoa(intValue) + ")"
 					} else {
-						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + ")"
+						whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ")"
 					}
 				} else {
-					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value) + ") AND " + tagName + " != " + f.Value
+					whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "=", f.Value, enumFileName) + ") AND " + tagName + " != " + f.Value
 				}
 			default:
-				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value)
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, opName, f.Value, enumFileName)
 			}
 			return &view.Expr{Value: "(" + whereFilter + ")"}, nil
 		}
