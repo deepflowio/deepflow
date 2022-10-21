@@ -34,7 +34,9 @@ use std::time::Duration;
 
 #[cfg(target_os = "linux")]
 use libc::c_int;
-use log::{debug, error, info, warn};
+#[cfg(target_os = "linux")]
+use log::debug;
+use log::{error, info, warn};
 use packet_dedup::*;
 #[cfg(target_os = "linux")]
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
@@ -68,8 +70,10 @@ use crate::{
     proto::{common::TridentType, trident::IfMacSource, trident::TapMode},
     utils::stats::{self, Collector},
 };
+#[cfg(target_os = "linux")]
+use public::netns::NetNs;
 use public::{
-    netns::{NetNs, NsFile},
+    netns::NsFile,
     queue::DebugSender,
     utils::net::{Link, MacAddr},
     LeakyBucket,
@@ -610,6 +614,7 @@ impl DispatcherBuilder {
 
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
+        #[cfg(target_os = "linux")]
         let mut current_ns = None;
         #[cfg(target_os = "linux")]
         if netns != NsFile::Root {

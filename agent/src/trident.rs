@@ -470,6 +470,7 @@ fn dispatcher_listener_callback(
                 }
             };
             for listener in components.dispatcher_listeners.iter() {
+                #[cfg(target_os = "linux")]
                 let netns = listener.netns();
                 #[cfg(target_os = "linux")]
                 if netns != NsFile::Root {
@@ -1081,6 +1082,7 @@ impl Components {
         if src_interfaces_and_namespaces.is_empty() {
             src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
         }
+        #[cfg(target_os = "linux")]
         for ns in candidate_config.dispatcher.extra_netns.iter() {
             src_interfaces_and_namespaces.push(("".into(), ns.clone()));
         }

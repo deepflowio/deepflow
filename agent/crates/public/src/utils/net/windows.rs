@@ -484,8 +484,7 @@ fn get_adapters_addresses() -> Result<(Vec<Link>, Vec<Addr>)> {
                 mac_addr,
                 if_index,
                 flags,
-                peer_index: None,
-                device_name: "".to_string(),
+                ..Default::default()
             });
 
             // 现在支持单播地址获取,组播/多播地址未支持

@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "linux")]
-use std::fmt;
 use std::{
     collections::HashSet,
-    io::Write,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, UdpSocket},
     time::Duration,
 };
+#[cfg(target_os = "linux")]
+use std::{fmt, io::Write};
 
 use anyhow::{anyhow, Result};
 use bincode::{config, decode_from_std_read};
 use clap::{ArgEnum, Parser, Subcommand};
+#[cfg(target_os = "linux")]
 use flate2::write::ZlibDecoder;
 
 #[cfg(target_os = "linux")]
@@ -480,6 +480,7 @@ impl Controller {
         Ok(())
     }
 
+    #[cfg(target_os = "linux")]
     fn decode_entry(decoder: &mut ZlibDecoder<Vec<u8>>, entry: &[u8]) -> Result<String> {
         decoder.write_all(entry)?;
         let b = decoder.reset(vec![])?;

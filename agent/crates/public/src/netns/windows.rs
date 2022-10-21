@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum NsFile {
+    #[default]
     Root,
 }
 

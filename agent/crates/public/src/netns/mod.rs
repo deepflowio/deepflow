@@ -22,7 +22,7 @@ pub use linux::{links_by_name_regex_in_netns, NetNs, NsFile};
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "windows")]
-pub use windows::{NetNs, NsFile};
+pub use self::windows::{NetNs, NsFile};
 
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
@@ -45,6 +45,7 @@ pub enum Error {
     NetError(#[from] net::Error),
     #[error("netns not found")]
     NotFound,
+    #[cfg(target_os = "linux")]
     #[error("syscall error: {0}")]
     Syscall(#[from] nix::Error),
 }

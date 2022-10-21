@@ -52,17 +52,12 @@ pub enum Netnsa {
     CurrentNsid = 5,
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Default, Hash)]
 pub enum NsFile {
+    #[default]
     Root,
     Named(OsString),
     Proc(u64),
-}
-
-impl Default for NsFile {
-    fn default() -> Self {
-        Self::Root
-    }
 }
 
 impl NsFile {
