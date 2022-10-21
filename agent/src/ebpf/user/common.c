@@ -179,6 +179,8 @@ static void exec_clear_residual_probes(const char *events_file,
 	while ((fgets(line, MAXLINE, fp)) != NULL) {
 		if ((lf = strchr(line, '\n')))
 			*lf = '\0';
+
+		// FIXME: pe may be NULL
 		pe = (struct probe_elem *)calloc(sizeof(*pe), 1);
 		snprintf(pe->event, sizeof(pe->event), "%s", line);
 		list_add_tail(&pe->list, &probe_head);
