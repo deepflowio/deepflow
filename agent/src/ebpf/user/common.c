@@ -180,8 +180,11 @@ static void exec_clear_residual_probes(const char *events_file,
 		if ((lf = strchr(line, '\n')))
 			*lf = '\0';
 
-		// FIXME: pe may be NULL
 		pe = (struct probe_elem *)calloc(sizeof(*pe), 1);
+		if (pe == NULL) {
+			ebpf_warning("calloc() failed.\n");
+			break;
+		}
 		snprintf(pe->event, sizeof(pe->event), "%s", line);
 		list_add_tail(&pe->list, &probe_head);
 	}

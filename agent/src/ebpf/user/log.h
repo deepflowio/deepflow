@@ -57,6 +57,9 @@ enum
 #define ebpf_warning(format,args...) \
 	_ebpf_error (ERROR_WARNING, ebpf_error_function, __LINE__, format, ## args)
 
+#define ebpf_error(format,args...) \
+	_ebpf_error (ERROR_ABORT, ebpf_error_function, __LINE__, format, ## args)
+
 void _ebpf_error(int how_to_die,
                  char *function_name,
                  uint32_t line_number,

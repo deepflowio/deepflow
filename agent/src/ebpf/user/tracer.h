@@ -127,37 +127,53 @@ static inline unsigned int max_log2(unsigned int x)
 		l++;
 	return l;
 }
-// FIXME: calloc return NULL (4)
+
 /* *INDENT-OFF* */
-#define probes_set_enter_symbol(t, fn)                      \
-do {                                                        \
-  curr_idx = index++;                  		            \
-  t->ksymbols[curr_idx].isret = false;                 	    \
-  char *func = (char*)calloc(PROBE_NAME_SZ, 1);             \
-  snprintf(func, PROBE_NAME_SZ, "kprobe/%s", fn);           \
-  t->ksymbols[curr_idx].func = func;                        \
+#define probes_set_enter_symbol(t, fn)						\
+do {                                                        			\
+	char *func = (char*)calloc(PROBE_NAME_SZ, 1);             		\
+	if (func != NULL) {                                       		\
+		curr_idx = index++;                  		            	\
+		t->ksymbols[curr_idx].isret = false;                 	    	\
+		snprintf(func, PROBE_NAME_SZ, "kprobe/%s", fn);           	\
+		t->ksymbols[curr_idx].func = func;                        	\
+	} else {								\
+		ebpf_error("no memory, probe (kprobe/%s) set failed", fn); 	\
+	} 									\
 } while(0)
 
-#define probes_set_symbol(t, fn)                            \
-do {                                                        \
-  curr_idx = index++;                                       \
-  t->ksymbols[curr_idx].isret = false;                 	    \
-  char *func = (char*)calloc(PROBE_NAME_SZ, 1);             \
-  snprintf(func, PROBE_NAME_SZ, "kprobe/%s", fn);           \
-  t->ksymbols[curr_idx].func = func;                        \
-  curr_idx = index++;                                 	    \
-  func = (char*)calloc(PROBE_NAME_SZ, 1);             	    \
-  snprintf(func, PROBE_NAME_SZ, "kretprobe/%s", fn);  	    \
-  t->ksymbols[curr_idx].isret = true;                       \
-  t->ksymbols[curr_idx].func = func;                        \
+#define probes_set_symbol(t, fn)						\
+do {                            						\
+	char *func = (char*)calloc(PROBE_NAME_SZ, 1);      			\
+	if (func != NULL) {							\
+		curr_idx = index++;						\
+		t->ksymbols[curr_idx].isret = false;				\
+		snprintf(func, PROBE_NAME_SZ, "kprobe/%s", fn);			\
+		t->ksymbols[curr_idx].func = func;				\
+	} else {								\
+		ebpf_error("no memory, probe (kprobe/%s) set failed", fn);  	\
+	}									\
+	func = (char*)calloc(PROBE_NAME_SZ, 1);					\
+	if (func != NULL) {							\
+		curr_idx = index++;						\
+		snprintf(func, PROBE_NAME_SZ, "kretprobe/%s", fn);		\
+		t->ksymbols[curr_idx].isret = true;				\
+		t->ksymbols[curr_idx].func = func;				\
+	} else {								\
+		ebpf_error("no memory, probe (kretprobe/%s) set failed", fn);	\
+	}									\
 } while(0)
 
-#define tps_set_symbol(t, tp)                               \
-do {                                                        \
-  curr_idx = index++;                                       \
-  char *name = (char*)calloc(PROBE_NAME_SZ, 1);             \
-  snprintf(name, PROBE_NAME_SZ, "%s", tp);  		    \
-  t->tps[curr_idx].name = name;                       	    \
+#define tps_set_symbol(t, tp)							\
+do {										\
+	char *name = (char*)calloc(PROBE_NAME_SZ, 1);				\
+	if (name != NULL) {							\
+		curr_idx = index++;						\
+		snprintf(name, PROBE_NAME_SZ, "%s", tp);			\
+		t->tps[curr_idx].name = name;					\
+	} else {								\
+		ebpf_error("no memory, probe (tp %s) set failed", tp);		\
+	}									\
 } while(0)
 /* *INDENT-ON* */
 

@@ -73,6 +73,12 @@ extern int sysinfo(struct sysinfo *__info);
 #define CACHE_LINE_SIZE   64
 #define CACHE_LINE_MASK (CACHE_LINE_SIZE-1)
 
+#define zfree(P)		\
+do {				\
+	free((void *)(P));      \
+	P = NULL;	        \
+} while(0)
+
 #if defined(__x86_64__)
 #include <emmintrin.h>
 static inline void __pause(void)

@@ -159,9 +159,9 @@ static int add_probe_sym_to_tracer_probes(int pid, const char *path,
 		    probe_sym->binary_path) {
 			add_uprobe_symbol(pid, probe_sym, conf);
 		} else {
-			free(probe_sym->probe_func);
-			free(probe_sym->name);
-			free(probe_sym->binary_path);
+			free((void *)probe_sym->probe_func);
+			free((void *)probe_sym->name);
+			free((void *)probe_sym->binary_path);
 		}
 	}
 	return 0;
