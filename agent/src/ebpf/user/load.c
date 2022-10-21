@@ -176,7 +176,7 @@ static void set_obj__license(struct ebpf_object *obj)
 {
 	struct sec_desc *desc = obj->elf_info.license_sec;
 	if (desc->d_buf != NULL && desc->size > 0) {
-		safe_buf_copy(obj->license, sizeof(obj->license), desc->d_buf, desc->size);
+		memcpy(obj->license, desc->d_buf, desc->size);
 		obj->license[sizeof(obj->license) - 1] = '\0';
 	}
 	ebpf_info("license: %s\n", obj->license);

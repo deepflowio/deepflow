@@ -37,7 +37,8 @@ use super::protocol_logs::AppProtoHead;
 
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
-    get_all_protocol, get_bitmap, L7ProtocolParser, L7ProtocolParserInterface, ParseParam,
+    get_all_protocol, get_parse_bitmap, L7ProtocolBitmap, L7ProtocolParser,
+    L7ProtocolParserInterface, ParseParam,
 };
 use crate::common::{
     enums::IpProtocol,
@@ -103,7 +104,7 @@ pub struct FlowPerf {
 
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
-    protocol_bitmap: u128,
+    protocol_bitmap: L7ProtocolBitmap,
     l7_protocol: L7Protocol,
 
     is_from_app: bool,
@@ -116,11 +117,11 @@ impl FlowPerf {
 
     fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<L7RrtCache>>) -> Option<L7FlowPerfTable> {
         match protocol {
-            L7Protocol::Dns => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
+            L7Protocol::DNS => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
             L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
             L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Mqtt => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Mysql => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
+            L7Protocol::MQTT => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),
+            L7Protocol::MySQL => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
             L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
             L7Protocol::Http1 | L7Protocol::Http2 => {
                 Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
@@ -193,7 +194,7 @@ impl FlowPerf {
         if let Some(payload) = packet.get_l4_payload() {
             let param = ParseParam::from(packet);
             for mut i in get_all_protocol() {
-                if i.is_skip_parse(self.protocol_bitmap) {
+                if self.protocol_bitmap.is_disabled(i.protocol()) {
                     continue;
                 }
                 if i.check_payload(payload, &param) {
@@ -246,6 +247,7 @@ impl FlowPerf {
         l7_proto: Option<L7Protocol>,
         l7_parser: Option<L7ProtocolParser>,
         counter: Arc<FlowPerfCounter>,
+        l7_prorocol_enable_bitmap: L7ProtocolBitmap,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),
@@ -262,8 +264,8 @@ impl FlowPerf {
             l7: Self::l7_new(l7_protocol, rrt_cache.clone()),
             protocol_bitmap: {
                 match l4_proto {
-                    L4Protocol::Tcp => get_bitmap(IpProtocol::Tcp),
-                    _ => get_bitmap(IpProtocol::Udp),
+                    L4Protocol::Tcp => get_parse_bitmap(IpProtocol::Tcp, l7_prorocol_enable_bitmap),
+                    _ => get_parse_bitmap(IpProtocol::Udp, l7_prorocol_enable_bitmap),
                 }
             },
             l7_protocol_log_parser: l7_parser,
