@@ -63,7 +63,10 @@ use crate::{
         tap_port::TapPort,
         FeatureFlags,
     },
-    config::{FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig},
+    config::{
+        handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
+        FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
+    },
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
     rpc::get_timestamp,
@@ -94,6 +97,7 @@ pub struct FlowMap {
     output_buffer: Vec<TaggedFlow>,
     last_queue_flush: Duration,
     config: FlowAccess,
+    parse_config: LogParserAccess,
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
@@ -108,6 +112,7 @@ impl FlowMap {
         app_proto_log_queue: DebugSender<Box<MetaAppProto>>,
         ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
+        parse_config: LogParserAccess,
         packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
     ) -> (Self, Arc<FlowPerfCounter>) {
         let counter = Arc::new(FlowPerfCounter::default());
@@ -136,6 +141,7 @@ impl FlowMap {
                 output_buffer: vec![],
                 last_queue_flush: Duration::ZERO,
                 config,
+                parse_config,
                 rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
                 counter: counter.clone(),
                 ntp_diff,
@@ -676,6 +682,7 @@ impl FlowMap {
                 get_parser(l7_proto.unwrap_or_default()),
                 self.counter.clone(),
                 conf.l7_protocol_enabled_bitmap,
+                self.parse_config.clone(),
             )
         }
         node
@@ -1257,6 +1264,11 @@ pub fn _new_flow_map_and_receiver(
             app_proto_log_enabled: true,
             ..(&RuntimeConfig::default()).into()
         },
+        log_parser: LogParserConfig {
+            l7_log_collect_nps_threshold: 0,
+            l7_log_session_aggr_timeout: Duration::new(0, 0),
+            l7_log_dynamic: L7LogDynamicConfig::default(),
+        },
         ..Default::default()
     };
     // Any
@@ -1271,6 +1283,9 @@ pub fn _new_flow_map_and_receiver(
         Arc::new(AtomicI64::new(0)),
         Map::new(current_config.clone(), |config| -> &FlowConfig {
             &config.flow
+        }),
+        Map::new(current_config.clone(), |config| -> &LogParserConfig {
+            &config.log_parser
         }),
         packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
     );
