@@ -729,7 +729,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 	// nullable int_enum tag do not return default value
 	tagResourceMap["span_kind"] = map[string]*Tag{
 		"enum": NewTag(
-			"dictGet(flow_tag.int_enum_map, 'name', ('%s',toUInt64(span_kind)))",
+			"if(isNull(span_kind), '', dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(span_kind)), span_kind))",
 			"",
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
 			"toUInt64(span_kind) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",

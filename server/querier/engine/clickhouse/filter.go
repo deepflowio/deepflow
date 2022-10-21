@@ -27,7 +27,7 @@ import (
 	"inet.af/netaddr"
 
 	"github.com/deepflowys/deepflow/server/libs/utils"
-
+	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
@@ -639,8 +639,7 @@ func (f *WhereFunction) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string
 					opName = "not ilike"
 				}
 			}
-			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, ".ch")
-			enumFileName = strings.TrimSuffix(enumFileName, ".en")
+			enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 			switch strings.ToLower(expr.(*sqlparser.ComparisonExpr).Operator) {
 			case "regexp":
 				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", f.Value, enumFileName)

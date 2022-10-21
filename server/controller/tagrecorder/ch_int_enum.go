@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 )
 
@@ -49,8 +50,7 @@ func (e *ChIntEnum) generateNewData() (map[IntEnumTagKey]mysql.ChIntEnum, bool) 
 	}
 
 	for name, tagValues := range respMap {
-		tagName := strings.TrimSuffix(name, ".en")
-		tagName = strings.TrimSuffix(tagName, ".ch")
+		tagName := strings.TrimSuffix(name, "."+config.Cfg.Language)
 		for _, valueAndName := range tagValues {
 			tagValue := valueAndName.([]interface{})[0]
 			tagDisplayName := valueAndName.([]interface{})[1]
