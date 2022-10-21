@@ -176,7 +176,10 @@ static struct ebpf_object *create_new_obj(const void *buf, size_t buf_sz,
 static void set_obj__license(struct ebpf_object *obj)
 {
 	struct sec_desc *desc = obj->elf_info.license_sec;
-	memcpy(obj->license, desc->d_buf, desc->size);
+	if (desc->d_buf != NULL && desc->size > 0) {
+		memcpy(obj->license, desc->d_buf, desc->size);
+		obj->license[sizeof(obj->license) - 1] = '\0';
+	}
 	ebpf_info("license: %s\n", obj->license);
 }
 
