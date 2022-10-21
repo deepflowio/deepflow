@@ -79,11 +79,11 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 		return nil, err
 	}
 	l4FlowLogger := NewL4FlowLogger(config, controllers, manager, recv, flowLogWriter)
-	l7FlowLogger := NewL7FlowLogger(config, controllers, manager, recv, flowLogWriter)
 	flowTagWriter, err := flow_tag.NewFlowTagWriter(common.FLOW_LOG_DB, common.FLOW_LOG_DB, config.FlowLogTTL.L7FlowLog, dbwriter.DefaultPartition, config.Base, &config.CKWriterConfig)
 	if err != nil {
 		return nil, err
 	}
+	l7FlowLogger := NewL7FlowLogger(config, controllers, manager, recv, flowLogWriter, flowTagWriter)
 	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
 	l4PacketLogger := NewLogger(datatype.MESSAGE_TYPE_PACKETSEQUENCE, config, nil, manager, recv, flowLogWriter, common.L4_PACKET_ID, nil)
 	return &Stream{
@@ -189,7 +189,7 @@ func NewL4FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 	}
 }
 
-func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter) *Logger {
+func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropletqueue.Manager, recv *receiver.Receiver, flowLogWriter *dbwriter.FlowLogWriter, flowTagWriter *flow_tag.FlowTagWriter) *Logger {
 	queueSuffix := "-l7"
 	queueCount := config.DecoderQueueCount
 	msgType := datatype.MESSAGE_TYPE_PROTOCOLLOG
@@ -226,7 +226,7 @@ func NewL7FlowLogger(config *config.Config, controllers []net.IP, manager *dropl
 			platformDatas[i],
 			queue.QueueReader(decodeQueues.FixedMultiQueue[i]),
 			throttlers[i],
-			nil,
+			flowTagWriter,
 		)
 	}
 
