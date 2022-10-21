@@ -609,8 +609,15 @@ func GetSubDomains(filter map[string]interface{}) ([]*model.SubDomain, error) {
 }
 
 func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, error) {
-	var count int64
+	var domainCount int64
+	if err := mysql.Db.Model(&mysql.Domain{}).Where("lcuuid = ?", subDomainCreate.Domain).Count(&domainCount).Error; err != nil {
+		return nil, err
+	}
+	if domainCount == 0 {
+		return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
+	}
 
+	var count int64
 	mysql.Db.Model(&mysql.SubDomain{}).Where("name = ?", subDomainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", subDomainCreate.Name))
