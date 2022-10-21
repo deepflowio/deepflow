@@ -192,7 +192,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 					value, _ := strconv.Atoi(enumValue[0].(string))
 					tagIntEnums = append(tagIntEnums, NewTagEnum(enumValue[0], enumValue[1]))
 					tagEnums = append(tagEnums, NewTagEnum(value, enumValue[1]))
-				} else {
+				} else if tagType == "string_enum" {
 					tagStringEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 					tagEnums = append(tagEnums, NewTagEnum(enumValue[0], enumValue[1]))
 				}
@@ -423,7 +423,7 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	}
 	if len(likeList) > 1 {
 		if strings.Trim(likeList[1], " ") != "" {
-			whereSql = " AND " + strings.ReplaceAll(likeList[1], "*", "%")
+			whereSql = " AND (" + strings.ReplaceAll(likeList[1], "*", "%") + ")"
 		}
 	}
 	if strings.Contains(strings.ToLower(sql), "like") || strings.Contains(strings.ToLower(sql), "regexp") {
