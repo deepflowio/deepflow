@@ -138,6 +138,8 @@ static int add_probe_sym_to_tracer_probes(int pid, const char *path,
 
 		// This memory will be maintained in conf, no need to release
 		probe_sym = calloc(1, sizeof(struct symbol_uprobe));
+		if (!probe_sym)
+			continue;
 
 		// Data comes from symbolic information
 		probe_sym->entry = payload.addr;
@@ -153,7 +155,14 @@ static int add_probe_sym_to_tracer_probes(int pid, const char *path,
 		probe_sym->binary_path = strdup(path);
 		probe_sym->pid = pid;
 
-		add_uprobe_symbol(pid, probe_sym, conf);
+		if (probe_sym->probe_func && probe_sym->name &&
+		    probe_sym->binary_path) {
+			add_uprobe_symbol(pid, probe_sym, conf);
+		} else {
+			free((void *)probe_sym->probe_func);
+			free((void *)probe_sym->name);
+			free((void *)probe_sym->binary_path);
+		}
 	}
 	return 0;
 }

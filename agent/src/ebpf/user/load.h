@@ -64,12 +64,6 @@ do {                                                            \
 #define add_new_map(V, N, P)  add_new_vec(V, N, P)
 #define add_new_prog(V, N, P)  add_new_vec(V, N, P)
 
-#define zfree(P)        \
-do {                    \
-	free((P));      \
-	P = NULL;       \
-} while(0)
-
 struct ebpf_object;
 
 struct ebpf_prog {
