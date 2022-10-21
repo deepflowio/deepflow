@@ -34,10 +34,11 @@ import (
 var log = logging.MustGetLogger("trisolaris.kubernetes")
 
 type KubernetesInfo struct {
-	mutex             sync.RWMutex
-	clusterIDToDomain map[string]string
-	db                *gorm.DB
-	cfg               *config.Config
+	mutex                sync.RWMutex
+	clusterIDToDomain    map[string]string
+	clusterIDToSubDomain map[string]string
+	db                   *gorm.DB
+	cfg                  *config.Config
 }
 
 func NewKubernetesInfo(db *gorm.DB, cfg *config.Config) *KubernetesInfo {
@@ -58,11 +59,18 @@ func (k *KubernetesInfo) TimedRefreshClusterID() {
 func (k *KubernetesInfo) refresh() {
 	log.Infof("refresh cache cluster_id started")
 	k.mutex.Lock()
-	DomainMgr := dbmgr.DBMgr[models.Domain](k.db)
-	dbDomains, _ := DomainMgr.GetBatchFromTypes([]int{KUBERNETES})
+	domainMgr := dbmgr.DBMgr[models.Domain](k.db)
+	dbDomains, _ := domainMgr.GetBatchFromTypes([]int{KUBERNETES})
 	k.clusterIDToDomain = make(map[string]string)
 	for _, dbDomain := range dbDomains {
 		k.clusterIDToDomain[dbDomain.ClusterID] = dbDomain.Lcuuid
+	}
+
+	subDomainMgr := dbmgr.DBMgr[model.SubDomain](k.db)
+	subDomains, _ := subDomainMgr.Gets()
+	k.clusterIDToSubDomain = make(map[string]string)
+	for _, sd := range subDomains {
+		k.clusterIDToSubDomain[sd.ClusterID] = sd.Lcuuid
 	}
 	k.mutex.Unlock()
 	log.Infof("refresh cache cluster_id completed")
@@ -70,12 +78,13 @@ func (k *KubernetesInfo) refresh() {
 	return
 }
 
-func (k *KubernetesInfo) CheckDomainByClusterID(clusterID string) bool {
+func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool {
 	k.mutex.Lock()
-	_, ok := k.clusterIDToDomain[clusterID]
+	_, dok := k.clusterIDToDomain[clusterID]
+	_, sdok := k.clusterIDToDomain[clusterID]
 	k.mutex.Unlock()
 	log.Debugf("cluster_id domain map: %v", k.clusterIDToDomain)
-	return ok
+	return dok || sdok
 }
 
 func (k *KubernetesInfo) CacheClusterID(clusterID string) {
