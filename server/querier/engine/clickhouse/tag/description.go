@@ -297,7 +297,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
-				"原始Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
+				"Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
@@ -310,7 +310,7 @@ func GetTagDescriptions(db, table, rawSql string) (map[string][]interface{}, err
 	if db == "ext_metrics" || db == "deepflow_system" {
 		response["values"] = append(response["values"], []interface{}{
 			"tags", "tags", "tags", "tags", "map",
-			"原始Tag", []string{}, []bool{true, true, true}, "tags",
+			"Tag", []string{}, []bool{true, true, true}, "tags",
 		})
 	}
 	return response, nil
@@ -369,7 +369,7 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag, "value")
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
-	// 标签是动态的,不需要去tag_description里确认
+	// K8s Labels是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
 		return GetTagResourceValues(sql)
 	}
