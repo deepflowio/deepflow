@@ -121,6 +121,7 @@ impl AnalyzerModeDispatcher {
             base.log_output_queue.clone(),
             base.ntp_diff.clone(),
             base.flow_map_config.clone(),
+            base.log_parse_config.clone(),
             base.packet_sequence_output_queue.clone(), // Enterprise Edition Feature: packet-sequence
         );
 
