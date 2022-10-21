@@ -44,7 +44,33 @@ func ReleasePbAppProtoLogsData(d *AppProtoLogsData) {
 	basicInfo.Reset()
 	basicInfo.Head = head
 
+	req := d.Req
+	resp := d.Resp
+	traceInfo := d.TraceInfo
+	extInfo := d.ExtInfo
+
+	d.Reset()
 	d.Base = basicInfo
+
+	if req != nil {
+		req.Reset()
+		d.Req = req
+	}
+
+	if resp != nil {
+		resp.Reset()
+		d.Resp = resp
+	}
+
+	if traceInfo != nil {
+		traceInfo.Reset()
+		d.TraceInfo = traceInfo
+	}
+
+	if extInfo != nil {
+		extInfo.Reset()
+		d.ExtInfo = extInfo
+	}
 
 	pbAppProtoLogsDataPool.Put(d)
 }
