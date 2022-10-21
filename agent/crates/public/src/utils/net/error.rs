@@ -16,6 +16,7 @@
 
 use std::fmt::Debug;
 
+#[cfg(target_os = "linux")]
 use neli::err::{NlError, SerError};
 use thiserror::Error;
 
@@ -49,12 +50,14 @@ pub enum Error {
     Ethtool(String),
 }
 
+#[cfg(target_os = "linux")]
 impl<T: Debug, P: Debug> From<NlError<T, P>> for Error {
     fn from(e: NlError<T, P>) -> Self {
         Self::NetlinkError(format!("{}", e))
     }
 }
 
+#[cfg(target_os = "linux")]
 impl From<SerError> for Error {
     fn from(e: SerError) -> Self {
         Self::NetlinkError(format!("{}", e))

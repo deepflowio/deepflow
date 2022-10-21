@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/deepflowys/deepflow/server/querier/common"
+	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/metrics"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
@@ -539,8 +540,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 
 		if getTagOK {
 			if tagOK {
-				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, ".ch")
-				enumFileName = strings.TrimSuffix(enumFileName, ".en")
+				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 				tagFilter = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
 			} else {
 				tagFilter = fmt.Sprintf(tagDes.TagTranslator, f.Args[0])

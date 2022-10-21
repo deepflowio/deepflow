@@ -73,10 +73,15 @@ func (w *FlowTagWriter) Write(t TagType, values ...interface{}) {
 }
 
 func (w *FlowTagWriter) WriteFieldsAndFieldValues(fields, fieldValues []interface{}) {
-	w.ckwriters[TagField].Put(fields...)
-	w.counter.FieldCount += int64(len(fields))
-	w.ckwriters[TagFieldValue].Put(fieldValues...)
-	w.counter.FieldValueCount += int64(len(fieldValues))
+	if len(fields) != 0 {
+		w.ckwriters[TagField].Put(fields...)
+		w.counter.FieldCount += int64(len(fields))
+	}
+
+	if len(fieldValues) != 0 {
+		w.ckwriters[TagFieldValue].Put(fieldValues...)
+		w.counter.FieldValueCount += int64(len(fieldValues))
+	}
 }
 
 func (w *FlowTagWriter) GetCounter() interface{} {
