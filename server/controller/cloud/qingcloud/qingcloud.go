@@ -232,7 +232,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 			if curRespLens < limit {
 				break
 			}
-			offset += 1
+			offset += limit
 		} else {
 			err := errors.New(fmt.Sprintf("get (%s) response (%s) failed, (%v)", action, resultKey, respJson))
 			log.Error(respJson)
