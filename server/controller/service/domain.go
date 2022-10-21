@@ -792,7 +792,13 @@ func (c *DomainChecker) checkAndAllocateController() {
 		if !common.Contains(healthyControllerIPs, domain.ControllerIP) {
 			length := len(healthyControllerIPs)
 			if length > 0 {
-				domain.ControllerIP = healthyControllerIPs[rand.Intn(length)]
+				ip := healthyControllerIPs[rand.Intn(length)]
+				domain.ControllerIP = ip
+				config := make(map[string]interface{})
+				json.Unmarshal([]byte(domain.Config), &config)
+				config["controller_ip"] = ip
+				configStr, _ := json.Marshal(config)
+				domain.Config = string(configStr)
 				mysql.Db.Save(&domain)
 				log.Infof("change domain (name: %s) controller ip to %s", domain.Name, domain.ControllerIP)
 			}
