@@ -20,6 +20,7 @@
 
 #include "offset.h"
 #include "common.h"
+#include "log.h"
 #include <fcntl.h>
 #include <libdwarf-0/dwarf.h>
 #include <libdwarf-0/libdwarf.h>
