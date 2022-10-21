@@ -30,11 +30,9 @@ use crate::common::policy::{Acl, Cidr, IpGroupData};
 use crate::common::port_range::{PortRange, PortRangeList};
 use npb_pcap_policy::{NpbAction, PolicyData};
 
-const MAX_QUEUE_COUNT: usize = 16;
 const MAX_ACL_PROTOCOL: usize = 255;
-// 定义在 crate::common::enums::TapType;
 const MAX_TAP_TYPE: usize = 256;
-const MAX_FAST_PATH: usize = MAX_TAP_TYPE * (MAX_QUEUE_COUNT + 1);
+const MAX_FAST_PATH: usize = MAX_TAP_TYPE * (super::MAX_QUEUE_COUNT + 1);
 
 type TableLruCache = LruCache<u128, PolicyTableItem>;
 
@@ -52,7 +50,7 @@ pub struct FastPath {
 
     netmask_table: Vec<u32>,
 
-    policy_table_flush_flags: [bool; MAX_QUEUE_COUNT + 1],
+    policy_table_flush_flags: [bool; super::MAX_QUEUE_COUNT + 1],
 
     mask_from_interface: Vec<u32>,
     mask_from_ipgroup: Vec<u32>,
@@ -69,7 +67,7 @@ impl FastPath {
     // 策略相关等内容更新后必须执行该函数以清空策略表
     pub fn flush(&mut self) {
         self.generate_mask_table();
-        self.policy_table_flush_flags = [true; MAX_QUEUE_COUNT + 1];
+        self.policy_table_flush_flags = [true; super::MAX_QUEUE_COUNT + 1];
         self.policy_count = 0;
     }
 
@@ -386,7 +384,7 @@ impl FastPath {
 
     pub fn new(queue_count: usize, map_size: usize) -> Self {
         assert!(
-            queue_count <= MAX_QUEUE_COUNT,
+            queue_count <= super::MAX_QUEUE_COUNT,
             "Fastpath queue count over limit."
         );
         FastPath {
@@ -412,7 +410,7 @@ impl FastPath {
                 table
             },
 
-            policy_table_flush_flags: [false; MAX_QUEUE_COUNT + 1],
+            policy_table_flush_flags: [false; super::MAX_QUEUE_COUNT + 1],
 
             // 统计计数
             policy_count: 0,

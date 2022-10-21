@@ -41,6 +41,7 @@ struct UnsafeWrapper<T> {
 }
 
 const MEM_SAFE_TIME: Duration = Duration::from_millis(50);
+const MAX_QUEUE_COUNT: usize = 128;
 
 impl<T> From<T> for UnsafeWrapper<T> {
     fn from(value: T) -> Self {
