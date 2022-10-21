@@ -127,7 +127,7 @@ static inline unsigned int max_log2(unsigned int x)
 		l++;
 	return l;
 }
-
+// FIXME: calloc return NULL (4)
 /* *INDENT-OFF* */
 #define probes_set_enter_symbol(t, fn)                      \
 do {                                                        \
