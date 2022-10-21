@@ -81,14 +81,41 @@ int copy_uprobe_symbol(struct symbol_uprobe *src, struct symbol_uprobe *dst)
 		return ETR_NOTEXIST;
 
 	memcpy((void *)dst, src, sizeof(struct symbol_uprobe));
-	if (src->name)
+	dst->name = dst->binary_path = dst->probe_func = NULL;
+	if (src->name) {
 		dst->name = strdup(src->name);
-	if (src->binary_path)
+		if (dst->name == NULL)
+			goto failed;
+	}
+
+	if (src->binary_path) {
 		dst->binary_path = strdup(src->binary_path);
-	if (src->probe_func)
+		if (dst->binary_path == NULL)
+			goto failed;
+	}
+
+	if (src->probe_func) {
 		dst->probe_func = strdup(src->probe_func);
+		if (dst->probe_func == NULL)
+			goto failed;
+	}
 
 	return ETR_OK;
+
+failed:
+	if (dst->name) {
+		zfree(dst->name);
+	}
+
+	if (dst->binary_path) {
+		zfree(dst->binary_path);
+	}
+
+	if (dst->probe_func) {
+		zfree(dst->probe_func);
+	}
+
+	return ETR_NOMEM;
 }
 
 static int find_sym(const char *symname, uint64_t addr, uint64_t size,
@@ -264,9 +291,10 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 	uprobe_sym->isret = sym->is_probe_ret;
 	uprobe_sym->pid = pid;
 	uprobe_sym->probe_func = strdup(sym->probe_func);
-
-	if (uprobe_sym->probe_func == NULL)
+	if (uprobe_sym->probe_func == NULL) {
+		ebpf_warning("strdup() failed.\n");
 		goto invalid;
+	}
 
 	/*
 	 * 判断是可执行目标文件还是库文件。
@@ -280,10 +308,17 @@ struct symbol_uprobe *resolve_and_gen_uprobe_symbol(const char *bin_file,
 		 */
 		uprobe_sym->binary_path = bcc_procutils_which_so(bin_file, pid);
 
-	if (uprobe_sym->binary_path == NULL)
+	if (uprobe_sym->binary_path == NULL) {
+		ebpf_warning("uprobe_sym->binary_path == NULL\n");
 		goto invalid;
+	}
 
 	uprobe_sym->name = strdup(sym->symbol);
+	if (uprobe_sym->name == NULL) {
+		ebpf_warning("uprobe_sym->name == NULL\n");
+		goto invalid;
+	}
+
 	uprobe_sym->entry = addr;
 
 	if (uprobe_sym->name && uprobe_sym->entry == 0x0) {
