@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <malloc.h>
+#include <unistd.h>
 
 static unsigned char *read_bin_file(char *name, int *len)
 {

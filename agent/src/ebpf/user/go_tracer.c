@@ -472,6 +472,9 @@ static int resolve_bin_file(const char *path, int pid,
 
 		if (!binary_path){
 			binary_path = strdup(probe_sym->binary_path);
+			if (binary_path == NULL) {
+				goto failed;
+			}
 		}
 
 		probe_sym->ver = *go_ver;
