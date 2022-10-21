@@ -831,7 +831,7 @@ impl Components {
         // =================================================================================
         // 目前仅支持local-mode + ebpf-collector，ebpf-collector不适用fastpath, 所以队列数为1
         let (policy_setter, policy_getter) = Policy::new(
-            1,
+            1.max(yaml_config.src_interfaces.len()),
             yaml_config.first_path_level as usize,
             yaml_config.fast_path_map_size,
             false,
