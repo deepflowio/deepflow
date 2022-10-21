@@ -193,6 +193,20 @@ func GetDomains(filter map[string]interface{}) (resp []model.Domain, err error) 
 	return response, nil
 }
 
+func maskDomainInfo(domainCreate model.DomainCreate) model.DomainCreate {
+	log.Debugf("domain request raw data: %v", domainCreate)
+	info := domainCreate
+	info.Config = map[string]interface{}{}
+	for k, v := range domainCreate.Config {
+		if common.Contains(DOMAIN_PASSWORD_KEYS, k) {
+			info.Config[k] = "******"
+		} else {
+			info.Config[k] = v
+		}
+	}
+	return info
+}
+
 func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig) (*model.Domain, error) {
 	var count int64
 
@@ -206,7 +220,7 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", domainCreate.Name))
 	}
 
-	log.Infof("create domain (%v)", domainCreate)
+	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
 
 	domain := mysql.Domain{}
 	displayName := common.GetUUID(domainCreate.KubernetesClusterID, uuid.Nil)
