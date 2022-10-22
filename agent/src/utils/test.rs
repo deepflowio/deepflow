@@ -69,4 +69,3 @@ impl From<Capture> for Vec<Vec<u8>> {
         c.0.into_iter().map(|(_, p)| p).collect()
     }
 }
-

@@ -167,6 +167,39 @@ macro_rules! all_protocol {
             )+
         }
 
+        impl L7ProtocolParser{
+            pub fn as_string(&self) -> String{
+                match self {
+                    L7ProtocolParser::HttpParser(http) => {
+                        match http.protocol(){
+                            L7Protocol::Http1 => return String::from("HTTP"),
+                            L7Protocol::Http2 => return String::from("HTTP2"),
+                            _=> unreachable!()
+                        }
+                    },
+                    $(
+                        L7ProtocolParser::$parser(_) => String::from(stringify!($l7_proto)),
+                    )+
+
+                }
+            }
+        }
+
+        impl TryFrom<&str> for L7ProtocolParser {
+            type Error = String;
+
+            fn try_from(value: &str) -> Result<Self, Self::Error> {
+                match value {
+                    "HTTP" => Ok(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
+                    "HTTP2" => Ok(L7ProtocolParser::HttpParser(HttpLog::new_v2(false))),
+                    $(
+                        stringify!($l7_proto) => Ok(L7ProtocolParser::$parser($log::$new_func())),
+                    )+
+                    _=> Err(String::from(format!("unknown protocol {}",value))),
+                }
+            }
+        }
+
         pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
             match p {
                 L7Protocol::Http1 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
@@ -235,27 +268,18 @@ pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
 // the inner implement protocol source code in src/flow_generator/protocol_logs/**
 
 // l7Protocol , enumName , ParserImplement::newFuncName
+// l7Protocol will act as the protocol string
 all_protocol!(
     // http have two version but one parser, can not place in macro param.
-    Dns,DnsParser,DnsLog::default;
-    Mysql,MysqlParser,MysqlLog::default;
+    DNS,DnsParser,DnsLog::default;
+    MySQL,MysqlParser,MysqlLog::default;
     Kafka,KafkaParser,KafkaLog::default;
     Redis,RedisParser,RedisLog::default;
-    Postgresql,PostgresParser,PostgresqlLog::new;
+    PostgreSQL,PostgresParser,PostgresqlLog::new;
     Dubbo,DubboParser,DubboLog::default;
-    Mqtt,MqttParser,MqttLog::default;
+    MQTT,MqttParser,MqttLog::default;
     // add protocol below
 );
-
-impl L7ProtocolParser {
-    pub fn is_skip_parse(&self, bitmap: u128) -> bool {
-        bitmap & (1 << (self.protocol() as u8)) == 0
-    }
-
-    pub fn set_bitmap_skip_parse(&self, bitmap: &mut u128) {
-        *bitmap &= !(1 << (self.protocol() as u8));
-    }
-}
 
 #[enum_dispatch(L7ProtocolParser)]
 pub trait L7ProtocolParserInterface {
@@ -357,19 +381,69 @@ impl ParseParam {
     }
 }
 
-pub fn get_bitmap(protocol: IpProtocol) -> u128 {
-    let mut bitmap: u128 = 0;
+/*
+    param:
+        protocol: the protocol which should check
+
+        l7_enabled: the protocol from static config indicate which protocol should check or skip
+
+    it will merge the bitmap from config and l4 protocol filter.
+
+    return the protocol bitmap indicate which protocol should check and parse.
+*/
+pub fn get_parse_bitmap(protocol: IpProtocol, l7_enabled: L7ProtocolBitmap) -> L7ProtocolBitmap {
+    let mut bitmap = L7ProtocolBitmap(0);
     for i in get_all_protocol().iter() {
-        match protocol {
-            IpProtocol::Tcp if i.parsable_on_tcp() => {
-                bitmap |= 1 << (i.protocol() as u8);
+        if l7_enabled.is_disabled(i.protocol()) {
+            match protocol {
+                IpProtocol::Tcp if i.parsable_on_tcp() => {
+                    bitmap.set_enabled(i.protocol());
+                }
+                IpProtocol::Udp if i.parsable_on_udp() => {
+                    bitmap.set_enabled(i.protocol());
+                }
+                _ => {}
             }
-            IpProtocol::Udp if i.parsable_on_udp() => {
-                bitmap |= 1 << (i.protocol() as u8);
-            }
-            _ => {}
         }
     }
 
     bitmap
+}
+
+/*
+    protocol is u128 bitmap indicate which protocol should check or skip.
+    when bit set 0 should skip the protocol check.
+    so the protocol number can not exceed 127.
+*/
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct L7ProtocolBitmap(u128);
+
+impl L7ProtocolBitmap {
+    pub fn set_enabled(&mut self, p: L7Protocol) {
+        self.0 |= 1 << (p as u128);
+    }
+
+    pub fn set_disabled(&mut self, p: L7Protocol) {
+        self.0 &= !(1 << (p as u128));
+    }
+
+    pub fn is_disabled(&self, p: L7Protocol) -> bool {
+        self.0 & (1 << (p as u128)) == 0
+    }
+
+    pub fn is_enabled(&self, p: L7Protocol) -> bool {
+        !self.is_disabled(p)
+    }
+}
+
+impl From<&Vec<String>> for L7ProtocolBitmap {
+    fn from(v: &Vec<String>) -> Self {
+        let mut bitmap = L7ProtocolBitmap(0);
+        for i in v.iter() {
+            if let Ok(p) = L7ProtocolParser::try_from(i.as_str()) {
+                bitmap.set_enabled(p.protocol());
+            }
+        }
+        bitmap
+    }
 }

@@ -107,7 +107,7 @@ impl L7FlowPerf for MysqlPerfData {
         match msg_type {
             LogMessageType::Request => {
                 self.parse_request(packet.lookup_key.timestamp, flow_id);
-                self.l7_proto = L7Protocol::Mysql;
+                self.l7_proto = L7Protocol::MySQL;
                 self.decode_response = true;
                 self.has_response = false;
                 Ok(())
@@ -115,7 +115,7 @@ impl L7FlowPerf for MysqlPerfData {
             LogMessageType::Response
                 if !self.has_response
                     && self.decode_response
-                    && self.l7_proto == L7Protocol::Mysql =>
+                    && self.l7_proto == L7Protocol::MySQL =>
             {
                 self.has_response = true;
                 if self.parse_response(packet.lookup_key.timestamp, flow_id, &payload[offset..]) {
@@ -134,7 +134,7 @@ impl L7FlowPerf for MysqlPerfData {
                 // 所以代码中会将Greeting后的Auth Switch请求响应报文忽略掉。
 
                 // Greeting一定是第一个包，通过Greeting来判断流是否为MYSQL
-                self.l7_proto = L7Protocol::Mysql;
+                self.l7_proto = L7Protocol::MySQL;
                 self.msg_type = LogMessageType::Other;
                 let _ = self.stats.get_or_insert(PerfStats::default());
                 self.has_log_data = true;
@@ -151,7 +151,7 @@ impl L7FlowPerf for MysqlPerfData {
     fn copy_and_reset_data(&mut self, timeout_count: u32) -> FlowPerfStats {
         if let Some(stats) = self.stats.take() {
             FlowPerfStats {
-                l7_protocol: L7Protocol::Mysql,
+                l7_protocol: L7Protocol::MySQL,
                 l7: L7PerfStats {
                     request_count: stats.req_count,
                     response_count: stats.resp_count,
@@ -166,7 +166,7 @@ impl L7FlowPerf for MysqlPerfData {
             }
         } else {
             FlowPerfStats {
-                l7_protocol: L7Protocol::Mysql,
+                l7_protocol: L7Protocol::MySQL,
                 l7: L7PerfStats {
                     err_timeout: timeout_count,
                     ..Default::default()
@@ -177,7 +177,7 @@ impl L7FlowPerf for MysqlPerfData {
     }
 
     fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
-        if self.l7_proto != L7Protocol::Mysql || !self.has_log_data {
+        if self.l7_proto != L7Protocol::MySQL || !self.has_log_data {
             return None;
         }
         self.has_log_data = false;
@@ -336,7 +336,7 @@ mod test {
                         rrt_sum: Duration::from_nanos(373000),
                         rrt_last: Duration::ZERO,
                     }),
-                    l7_proto: L7Protocol::Mysql,
+                    l7_proto: L7Protocol::MySQL,
                     msg_type: LogMessageType::Request,
                     active: 1,
                     status: L7ResponseStatus::Ok,
@@ -359,7 +359,7 @@ mod test {
                         rrt_sum: Duration::from_nanos(226000),
                         rrt_last: Duration::ZERO,
                     }),
-                    l7_proto: L7Protocol::Mysql,
+                    l7_proto: L7Protocol::MySQL,
                     msg_type: LogMessageType::Request,
                     active: 1,
                     status: L7ResponseStatus::ServerError,
@@ -382,7 +382,7 @@ mod test {
                         rrt_sum: Duration::from_nanos(127090000),
                         rrt_last: Duration::from_nanos(692000),
                     }),
-                    l7_proto: L7Protocol::Mysql,
+                    l7_proto: L7Protocol::MySQL,
                     msg_type: LogMessageType::Response,
                     active: 0,
                     status: L7ResponseStatus::Ok,
