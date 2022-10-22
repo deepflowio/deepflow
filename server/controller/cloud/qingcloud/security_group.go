@@ -28,7 +28,7 @@ func (q *QingCloud) GetSecurityGroups() ([]model.SecurityGroup, []model.Security
 	var retSecurityGroups []model.SecurityGroup
 	var retSecurityGroupRules []model.SecurityGroupRule
 
-	log.Debug("get security_groups starting")
+	log.Info("get security_groups starting")
 
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{{"zone", regionId}}
@@ -104,14 +104,14 @@ func (q *QingCloud) GetSecurityGroups() ([]model.SecurityGroup, []model.Security
 	}
 	retSecurityGroupRules = append(retSecurityGroupRules, tmpSecurityGroupRules...)
 
-	log.Debug("get security_groups complete")
+	log.Info("get security_groups complete")
 	return retSecurityGroups, retSecurityGroupRules, nil
 }
 
 func (q *QingCloud) getSecurityGroupRules() ([]model.SecurityGroupRule, error) {
 	var retSecurityGroupRules []model.SecurityGroupRule
 
-	log.Debug("get security_group rules starting")
+	log.Info("get security_group rules starting")
 
 	for regionId := range q.RegionIdToLcuuid {
 		kwargs := []*Param{{"zone", regionId}}
@@ -218,6 +218,6 @@ func (q *QingCloud) getSecurityGroupRules() ([]model.SecurityGroupRule, error) {
 			}
 		}
 	}
-	log.Debug("get security_group rules complete")
+	log.Info("get security_group rules complete")
 	return retSecurityGroupRules, nil
 }

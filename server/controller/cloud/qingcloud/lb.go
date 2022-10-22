@@ -35,7 +35,7 @@ func (q *QingCloud) GetLoadBalances() (
 	var retIPs []model.IP
 	var retLBVMConnections []model.LBVMConnection
 
-	log.Debug("get lbs starting")
+	log.Info("get lbs starting")
 
 	lbIdToVPCLcuuid := make(map[string]string)
 	lbIdToIP := make(map[string]string)
@@ -183,7 +183,7 @@ func (q *QingCloud) GetLoadBalances() (
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, err
 	}
-	log.Debug("get lbs complete")
+	log.Info("get lbs complete")
 	return retLBs, retLBListeners, retLBTargetServers, retVInterfaces, retIPs, retLBVMConnections, nil
 
 }
@@ -194,7 +194,7 @@ func (q *QingCloud) getLBListenerAndTargetServers(
 	var retLBListeners []model.LBListener
 	var retLBTargetServers []model.LBTargetServer
 
-	log.Debug("get lb listener and target_servers starting")
+	log.Info("get lb listener and target_servers starting")
 
 	for regionId := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
@@ -302,6 +302,6 @@ func (q *QingCloud) getLBListenerAndTargetServers(
 			}
 		}
 	}
-	log.Debug("get lb listener and target_servers complete")
+	log.Info("get lb listener and target_servers complete")
 	return retLBListeners, retLBTargetServers, nil
 }
