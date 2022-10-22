@@ -211,7 +211,7 @@ func (q *QingCloud) GetResponse(action string, resultKey string, kwargs []*Param
 		} else if resp.StatusCode != http.StatusOK {
 			log.Errorf("curl (%s) failed, (%v)", url, resp)
 			defer resp.Body.Close()
-			return nil, err
+			return nil, errors.New(fmt.Sprintf("curl (%s) failed, (%v)", url, resp))
 		}
 		defer resp.Body.Close()
 

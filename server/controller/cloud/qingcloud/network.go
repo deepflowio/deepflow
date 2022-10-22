@@ -33,7 +33,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 	var vxnetIdToVPCLcuuid map[string]string
 	var regionIdToVxnetIds map[string][]string
 
-	log.Debug("get networks starting")
+	log.Info("get networks starting")
 
 	vxnetIdToVPCLcuuid = make(map[string]string)
 	vxnetIdToSubnetLcuuid = make(map[string]string)
@@ -150,7 +150,7 @@ func (q *QingCloud) GetNetworks() ([]model.Network, []model.Subnet, error) {
 	q.regionIdToVxnetIds = regionIdToVxnetIds
 	q.vxnetIdToVPCLcuuid = vxnetIdToVPCLcuuid
 	q.vxnetIdToSubnetLcuuid = vxnetIdToSubnetLcuuid
-	log.Debug("get networks complete")
+	log.Info("get networks complete")
 	return retNetworks, retSubnets, nil
 }
 

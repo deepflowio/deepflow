@@ -26,7 +26,7 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 	var retIPs []model.IP
 	var retFloatingIPs []model.FloatingIP
 
-	log.Debug("get floating_ips starting")
+	log.Info("get floating_ips starting")
 
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
@@ -90,6 +90,6 @@ func (q *QingCloud) GetFloatingIPs() ([]model.VInterface, []model.IP, []model.Fl
 		}
 	}
 
-	log.Debug("get floating_ips complete")
+	log.Info("get floating_ips complete")
 	return retVInterfaces, retIPs, retFloatingIPs, nil
 }

@@ -38,7 +38,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 	var vxnetIdToSubnetLcuuid map[string]string
 	var vmIdToVPCLcuuid map[string]string
 
-	log.Debug("get vms starting")
+	log.Info("get vms starting")
 
 	vmIdToVPCLcuuid = make(map[string]string)
 	vxnetIdToSubnetLcuuid = make(map[string]string)
@@ -195,7 +195,10 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 		} else {
 			vpcLcuuid, ok := q.vxnetIdToVPCLcuuid[vxnetId]
 			if !ok {
-				log.Infof("vxnetId (%s) vpc not found", vxnetId)
+				log.Debugf(
+					"vm (%s) vxnetId (%s) vpc not found",
+					vm.Get("instance_id").MustString(), vxnetId,
+				)
 				continue
 			} else {
 				retVPCLcuuid = vpcLcuuid
@@ -306,6 +309,6 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 			}
 		}
 	}
-	log.Debug("get vm nics complete")
+	log.Info("get vm nics complete")
 	return retVInterfaces, retIPs, nil
 }

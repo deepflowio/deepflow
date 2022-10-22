@@ -32,7 +32,7 @@ func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {
 	var regionIdToLcuuid map[string]string
 	var zoneNames []string
 
-	log.Debug("get region and azs starting")
+	log.Info("get region and azs starting")
 
 	kwargs := []*Param{{"status.1", "active"}}
 	response, err := q.GetResponse("DescribeZones", "zone_set", kwargs)
@@ -89,6 +89,6 @@ func (q *QingCloud) getRegionAndAZs() ([]model.Region, []model.AZ, error) {
 		})
 	}
 
-	log.Debug("get region and azs complete")
+	log.Info("get region and azs complete")
 	return retRegions, retAZs, nil
 }

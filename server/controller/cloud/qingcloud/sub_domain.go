@@ -27,7 +27,7 @@ import (
 func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 	var retSubDomains []model.SubDomain
 
-	log.Debug("get sub_domains starting")
+	log.Info("get sub_domains starting")
 
 	for regionId := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
@@ -80,7 +80,7 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 		}
 	}
 
-	log.Debug("get sub_domains complete")
+	log.Info("get sub_domains complete")
 	return retSubDomains, nil
 
 }

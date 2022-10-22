@@ -31,7 +31,7 @@ func (q *QingCloud) GetNATGateways() (
 	var retIPs []model.IP
 	var retNATVMConns []model.NATVMConnection
 
-	log.Debug("get nat_gateways starting")
+	log.Info("get nat_gateways starting")
 
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
@@ -132,6 +132,6 @@ func (q *QingCloud) GetNATGateways() (
 		}
 	}
 
-	log.Debug("get nat_gateways complete")
+	log.Info("get nat_gateways complete")
 	return retNATGateways, retVInterfaces, retIPs, retNATVMConns, nil
 }

@@ -29,7 +29,7 @@ func (q *QingCloud) getRouterAndTables() (
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get routers starting")
+	log.Info("get routers starting")
 
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		// 获取普通路由表
@@ -210,6 +210,6 @@ func (q *QingCloud) getRouterAndTables() (
 			}
 		}
 	}
-	log.Debug("get routers complete")
+	log.Info("get routers complete")
 	return retVRouters, retRoutingTables, retVInterfaces, retIPs, nil
 }
