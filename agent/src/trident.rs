@@ -1098,10 +1098,10 @@ impl Components {
         if src_interfaces_and_namespaces.is_empty() {
             src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
         }
-        #[cfg(target_os = "linux")]
-        for ns in candidate_config.dispatcher.extra_netns.iter() {
-            src_interfaces_and_namespaces.push(("".into(), ns.clone()));
-        }
+        // #[cfg(target_os = "linux")]
+        // for ns in candidate_config.dispatcher.extra_netns.iter() {
+        //     src_interfaces_and_namespaces.push(("".into(), ns.clone()));
+        // }
 
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
