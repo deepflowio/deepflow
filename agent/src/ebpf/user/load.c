@@ -161,15 +161,14 @@ static struct ebpf_object *create_new_obj(const void *buf, size_t buf_sz,
 	if (obj->elf_info.path == NULL) {
 		zfree(obj);
 	}
-
-	memcpy(obj->name, name, sizeof(obj->name));
+	safe_buf_copy(obj->name, sizeof(obj->name), (void *)name, strlen(name));
 	obj->name[sizeof(obj->name) - 1] = '\0';
 	obj->elf_info.fd = -1;
 	obj->elf_info.obj_buf = (void *)buf;
 	obj->elf_info.obj_buf_sz = buf_sz;
 	obj->kern_version = fetch_kernel_version_code();
-	memcpy(obj->license, LICENSE_DEF, sizeof(LICENSE_DEF));
-
+	safe_buf_copy(obj->license, sizeof(obj->license), LICENSE_DEF, sizeof(LICENSE_DEF));
+	obj->license[sizeof(obj->license) - 1] = '\0';
 	return obj;
 }
 
@@ -555,7 +554,7 @@ static int ebpf_obj__maps_collect(struct ebpf_object *obj)
 		new_map->fd = -1;
 		// Symbol value is offset into ELF maps section data area.
 		new_map->elf_offset = sym.st_value;
-		memcpy(new_map->name, map_name, sizeof(new_map->name));
+		safe_buf_copy(new_map->name, sizeof(new_map->name), map_name, strlen(map_name));
 		new_map->name[sizeof(new_map->name) - 1] = '\0';
 		def =
 		    (struct bpf_load_map_def *)(map_desc->d_buf +
