@@ -52,8 +52,6 @@ const BILD_FLAGS: usize = 0xff;
 const BILD_FLAGS_OFFSET: usize = 6;
 const BILD_OVERLAY_OFFSET: usize = 7;
 
-const L2_MAC_ADDR_OFFSET: usize = 12;
-
 #[derive(Clone)]
 pub struct AnalyzerModeDispatcherListener {
     vm_mac_addrs: Arc<Mutex<HashMap<u32, MacAddr>>>,
@@ -221,19 +219,20 @@ impl AnalyzerModeDispatcher {
                 continue;
             }
 
-            let (da_key, sa_key) =
-                if base.tunnel_info.tier == 0 && overlay_packet.len() >= L2_MAC_ADDR_OFFSET {
-                    let mut da_mac: [u8; 6] = [0; 6];
-                    let mut sa_mac: [u8; 6] = [0; 6];
-                    da_mac.copy_from_slice(&overlay_packet[..6]);
-                    sa_mac.copy_from_slice(&overlay_packet[6..12]);
-                    (
-                        MacAddr::from(da_mac).to_lower_32b(),
-                        MacAddr::from(sa_mac).to_lower_32b(),
-                    )
-                } else {
-                    (base.tunnel_info.mac_dst, base.tunnel_info.mac_src)
-                };
+            let (da_key, sa_key) = if base.tunnel_info.tier == 0
+                && overlay_packet.len() >= super::L2_MAC_ADDR_OFFSET
+            {
+                let mut da_mac: [u8; 6] = [0; 6];
+                let mut sa_mac: [u8; 6] = [0; 6];
+                da_mac.copy_from_slice(&overlay_packet[..6]);
+                sa_mac.copy_from_slice(&overlay_packet[6..12]);
+                (
+                    MacAddr::from(da_mac).to_lower_32b(),
+                    MacAddr::from(sa_mac).to_lower_32b(),
+                )
+            } else {
+                (base.tunnel_info.mac_dst, base.tunnel_info.mac_src)
+            };
             let vm_mac_addrs = self.vm_mac_addrs.lock().unwrap().clone();
             let (dst_remote, src_remote) = (
                 vm_mac_addrs.contains_key(&da_key),

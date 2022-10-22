@@ -25,12 +25,15 @@ mod mirror_mode_dispatcher;
 
 #[cfg(target_os = "windows")]
 use std::process;
-use std::sync::{
-    atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
-    Arc, Mutex, Weak,
-};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
+        Arc, Mutex, Weak,
+    },
+};
 
 #[cfg(target_os = "linux")]
 use libc::c_int;
@@ -49,7 +52,7 @@ use analyzer_mode_dispatcher::{AnalyzerModeDispatcher, AnalyzerModeDispatcherLis
 use base_dispatcher::{BaseDispatcher, TapTypeHandler};
 use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
-use mirror_mode_dispatcher::MirrorModeDispatcher;
+use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
 use recv_engine::RecvEngine;
 #[cfg(target_os = "linux")]
 pub use recv_engine::{
@@ -81,7 +84,6 @@ use public::{
     utils::net::{Link, MacAddr},
     LeakyBucket,
 };
-
 enum DispatcherFlavor {
     Analyzer(AnalyzerModeDispatcher), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcher),
@@ -110,7 +112,7 @@ impl DispatcherFlavor {
             // Enterprise Edition Feature: analyzer_mode
             DispatcherFlavor::Analyzer(d) => DispatcherListener::Analyzer(d.listener()),
             DispatcherFlavor::Local(d) => DispatcherListener::Local(d.listener()),
-            _ => todo!(),
+            DispatcherFlavor::Mirror(d) => DispatcherListener::Mirror(d.listener()),
         }
     }
 
@@ -189,6 +191,7 @@ impl Dispatcher {
 pub enum DispatcherListener {
     Analyzer(AnalyzerModeDispatcherListener), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcherListener),
+    Mirror(MirrorModeDispatcherListener),
 }
 
 impl DispatcherListener {
@@ -203,6 +206,7 @@ impl DispatcherListener {
         match self {
             Self::Local(l) => l.on_config_change(config),
             Self::Analyzer(l) => l.on_config_change(config), // Enterprise Edition Feature: analyzer_mode
+            Self::Mirror(l) => l.on_config_change(config),
         }
     }
 
@@ -210,6 +214,9 @@ impl DispatcherListener {
         match self {
             // Enterprise Edition Feature: analyzer_mode
             Self::Analyzer(l) => {
+                l.on_vm_change(vm_mac_addrs);
+            }
+            Self::Mirror(l) => {
                 l.on_vm_change(vm_mac_addrs);
             }
             _ => {}
@@ -229,6 +236,9 @@ impl DispatcherListener {
             }
             // Enterprise Edition Feature: analyzer_mode
             Self::Analyzer(l) => {
+                l.on_tap_interface_change(interfaces, if_mac_source);
+            }
+            Self::Mirror(l) => {
                 l.on_tap_interface_change(interfaces, if_mac_source);
             }
         }
@@ -621,6 +631,77 @@ impl DispatcherBuilder {
         self
     }
 
+    #[cfg(target_os = "linux")]
+    fn get_engine(
+        src_interface: &mut Option<String>,
+        tap_mode: TapMode,
+        options: &Arc<Options>,
+    ) -> Result<RecvEngine> {
+        match tap_mode {
+            TapMode::Mirror if options.dpdk_conf.enabled => {
+                #[cfg(target_arch = "s390x")]
+                return Err(Error::ConfigInvalid(
+                    "cpu arch s390x does not support DPDK!".into(),
+                ));
+                #[cfg(all(target_os = "linux", not(target_arch = "s390x")))]
+                {
+                    Ok(RecvEngine::Dpdk())
+                }
+            }
+            TapMode::Local | TapMode::Mirror | TapMode::Analyzer => {
+                let afp = af_packet::Options {
+                    frame_size: if options.tap_mode == TapMode::Analyzer {
+                        FRAME_SIZE_MIN as u32
+                    } else {
+                        FRAME_SIZE_MAX as u32
+                    },
+                    block_size: DEFAULT_BLOCK_SIZE as u32,
+                    num_blocks: options.af_packet_blocks as u32,
+                    poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
+                    version: options.af_packet_version,
+                    iface: src_interface.take().unwrap_or("".to_string()),
+                    ..Default::default()
+                };
+                info!("Afpacket init with {:?}", afp);
+                Ok(RecvEngine::AfPacket(Tpacket::new(afp).unwrap()))
+            }
+            _ => {
+                return Err(Error::ConfigInvalid("Tap-mode not support.".into()));
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn get_engine(
+        pcap_interfaces: &Option<Vec<Link>>,
+        tap_mode: TapMode,
+        options: &Arc<Options>,
+    ) -> Result<RecvEngine> {
+        match tap_mode {
+            TapMode::Mirror | TapMode::Local => {
+                if pcap_interfaces.is_none() || pcap_interfaces.as_ref().unwrap().is_empty() {
+                    return Err(error::Error::WinPcap(
+                        "windows pcap capture must give interface to capture packet".into(),
+                    ));
+                }
+                let src_ifaces = pcap_interfaces
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
+                    .collect();
+                let win_packet =
+                    WinPacket::new(src_ifaces, options.win_packet_blocks, options.snap_len)
+                        .map_err(|e| error::Error::WinPcap(e.to_string()))?;
+                info!("WinPacket init");
+                Ok(RecvEngine::WinPcap(Some(win_packet)))
+            }
+            _ => {
+                return Err(Error::ConfigInvalid("Tap-mode not support.".into()));
+            }
+        }
+    }
+
     pub fn build(mut self) -> Result<Dispatcher> {
         let netns = self.netns.unwrap_or_default();
         #[cfg(target_os = "linux")]
@@ -636,64 +717,11 @@ impl DispatcherBuilder {
             .ok_or(Error::ConfigIncomplete("no options".into()))?;
         let tap_mode = options.tap_mode;
         let snap_len = options.snap_len;
-        let engine = if tap_mode == TapMode::Mirror && options.dpdk_conf.enabled {
-            #[cfg(all(target_os = "linux", not(target_arch = "s390x")))]
-            {
-                RecvEngine::Dpdk()
-            }
-            #[cfg(target_os = "windows")]
-            return Err(Error::ConfigInvalid(
-                "windows does not support DPDK!".into(),
-            ));
-            #[cfg(target_arch = "s390x")]
-            return Err(Error::ConfigInvalid(
-                "cpu arch s390x does not support DPDK!".into(),
-            ));
-        } else {
-            #[cfg(target_os = "windows")]
-            let engine = if tap_mode == TapMode::Local {
-                if self.pcap_interfaces.is_none()
-                    || self.pcap_interfaces.as_ref().unwrap().is_empty()
-                {
-                    return Err(error::Error::WinPcap(
-                        "windows pcap capture must give interface to capture packet".into(),
-                    ));
-                }
-                let src_ifaces = self
-                    .pcap_interfaces
-                    .as_ref()
-                    .unwrap()
-                    .iter()
-                    .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
-                    .collect();
-                let win_packet =
-                    WinPacket::new(src_ifaces, options.win_packet_blocks, options.snap_len)
-                        .map_err(|e| error::Error::WinPcap(e.to_string()))?;
-                info!("WinPacket init");
-                RecvEngine::WinPcap(Some(win_packet))
-            } else {
-                todo!()
-            };
-            #[cfg(target_os = "linux")]
-            let engine = {
-                let afp = af_packet::Options {
-                    frame_size: if options.tap_mode == TapMode::Analyzer {
-                        FRAME_SIZE_MIN as u32
-                    } else {
-                        FRAME_SIZE_MAX as u32
-                    },
-                    block_size: DEFAULT_BLOCK_SIZE as u32,
-                    num_blocks: options.af_packet_blocks as u32,
-                    poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
-                    version: options.af_packet_version,
-                    iface: self.src_interface.take().unwrap_or("".to_string()),
-                    ..Default::default()
-                };
-                info!("Afpacket init with {:?}", afp);
-                RecvEngine::AfPacket(Tpacket::new(afp).unwrap())
-            };
-            engine
-        };
+        #[cfg(target_os = "windows")]
+        let engine = Self::get_engine(&self.pcap_interfaces, tap_mode, &options)?;
+        #[cfg(target_os = "linux")]
+        let engine = Self::get_engine(&mut self.src_interface, tap_mode, &options)?;
+
         let kernel_counter = engine.get_counter_handle();
         let id = self.id.ok_or(Error::ConfigIncomplete("no id".into()))?;
         let terminated = Arc::new(AtomicBool::new(false));
@@ -701,6 +729,12 @@ impl DispatcherBuilder {
         let collector = self
             .stats_collector
             .ok_or(Error::StatsCollector("no stats collector"))?;
+
+        #[cfg(target_os = "linux")]
+        let platform_poller = self
+            .platform_poller
+            .take()
+            .ok_or(Error::ConfigIncomplete("no platform poller".into()))?;
 
         let base = BaseDispatcher {
             engine,
@@ -773,10 +807,7 @@ impl DispatcherBuilder {
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,
             #[cfg(target_os = "linux")]
-            platform_poller: self
-                .platform_poller
-                .take()
-                .ok_or(Error::ConfigIncomplete("no platform poller".into()))?,
+            platform_poller: platform_poller.clone(),
             exception_handler: self
                 .exception_handler
                 .take()
@@ -804,7 +835,17 @@ impl DispatcherBuilder {
                     .ok_or(Error::ConfigIncomplete("no libvirt xml extractor".into()))?;
                 DispatcherFlavor::Local(LocalModeDispatcher { base, extractor })
             }
-            TapMode::Mirror => DispatcherFlavor::Mirror(MirrorModeDispatcher { base }),
+            TapMode::Mirror => DispatcherFlavor::Mirror(MirrorModeDispatcher {
+                base,
+                dedup: PacketDedupMap::new(),
+                local_vm_mac_set: Arc::new(Mutex::new(HashMap::new())),
+                local_segment_macs: vec![],
+                tap_bridge_macs: vec![],
+                pipelines: HashMap::new(),
+                #[cfg(target_os = "linux")]
+                poller: Some(platform_poller),
+                updated: Arc::new(AtomicBool::new(false)),
+            }),
             TapMode::Analyzer => {
                 #[cfg(target_os = "linux")]
                 {
@@ -864,3 +905,5 @@ impl DispatcherBuilder {
         })
     }
 }
+
+const L2_MAC_ADDR_OFFSET: usize = 12;

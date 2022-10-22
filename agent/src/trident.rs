@@ -511,7 +511,15 @@ fn dispatcher_listener_callback(
             }
         }
         TapMode::Mirror => {
-            todo!()
+            for listener in components.dispatcher_listeners.iter() {
+                listener.on_tap_interface_change(
+                    &vec![],
+                    IfMacSource::IfMac,
+                    conf.trident_type,
+                    &blacklist,
+                );
+                listener.on_vm_change(&vm_mac_addrs);
+            }
         }
         TapMode::Analyzer => {
             for listener in components.dispatcher_listeners.iter() {
@@ -1090,10 +1098,10 @@ impl Components {
         if src_interfaces_and_namespaces.is_empty() {
             src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
         }
-        // #[cfg(target_os = "linux")]
-        // for ns in candidate_config.dispatcher.extra_netns.iter() {
-        //     src_interfaces_and_namespaces.push(("".into(), ns.clone()));
-        // }
+        #[cfg(target_os = "linux")]
+        for ns in candidate_config.dispatcher.extra_netns.iter() {
+            src_interfaces_and_namespaces.push(("".into(), ns.clone()));
+        }
 
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
@@ -1260,14 +1268,10 @@ impl Components {
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
-            let dispatcher = if candidate_config.tap_mode == TapMode::Local {
-                dispatcher_builder
-                    .pcap_interfaces(tap_interfaces.clone())
-                    .build()
-                    .unwrap()
-            } else {
-                todo!()
-            };
+            let dispatcher = dispatcher_builder
+                .pcap_interfaces(tap_interfaces.clone())
+                .build()
+                .unwrap();
 
             // TODO: 创建dispatcher的时候处理这些
             let mut dispatcher_listener = dispatcher.listener();

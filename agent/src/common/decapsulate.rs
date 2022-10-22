@@ -127,7 +127,7 @@ const LE_TEB_PROTO: u16 = 0x5865; // 0x6558(25944)'s LittleEndian
 const VXLAN_FLAGS: u8 = 8;
 const TUNNEL_TIER_LIMIT: u8 = 2;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TunnelInfo {
     pub src: Ipv4Addr,
     pub dst: Ipv4Addr,
