@@ -415,7 +415,7 @@ char *get_elf_path_by_pid(int pid)
 
 	if (access(path, F_OK) != 0) {
 		memset(path, 0, PATH_MAX);
-		memcpy(path, bin_path, sizeof(bin_path));
+		safe_buf_copy(path, PATH_MAX, bin_path, sizeof(bin_path));
 	}
 
 	return path;
