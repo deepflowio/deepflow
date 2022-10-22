@@ -20,6 +20,9 @@
 #include <stdint.h>
 #include <fcntl.h>
 #include <time.h>
+#include <string.h>
+#include <stdlib.h>
+#include "log.h"
 
 #define __unused __attribute__((__unused__))
 
@@ -78,6 +81,38 @@ do {				\
 	free((void *)(P));      \
 	P = NULL;	        \
 } while(0)
+
+#define etr_max(x,y)                            \
+({                                              \
+	__typeof__ (x) _x = (x);                \
+	__typeof__ (y) _y = (y);                \
+	_x > _y ? _x : _y;                      \
+})
+
+#define etr_min(x,y)                            \
+({                                              \
+	__typeof__ (x) _x = (x);                \
+	__typeof__ (y) _y = (y);                \
+	_x < _y ? _x : _y;                      \
+})
+
+static __always_inline void safe_buf_copy(void *dst, int dst_len,
+					  void *src, int src_len)
+{
+	if (dst == NULL || src == NULL) {
+		ebpf_error("dst:%p, src:%p\n", dst, src);
+		return;
+	}
+
+	int copy_count = etr_min(dst_len, src_len);
+	if (copy_count <= 0) {
+		ebpf_error("dst_len:%d, src_len:%d\n", dst_len, src_len);
+		return;
+	}
+
+	memset(dst, 0, dst_len);
+	memcpy(dst, src, copy_count);
+}
 
 #if defined(__x86_64__)
 #include <emmintrin.h>

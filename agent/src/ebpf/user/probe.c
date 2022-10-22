@@ -67,7 +67,7 @@ int bpf_get_program_fd(void *obj, const char *name, void **p)
 			return -1;
 		}
 	} else
-		memcpy(prog_name, __name, sizeof(prog_name));
+		safe_buf_copy(prog_name, sizeof(prog_name), __name, strlen(__name));
 
 	prog = ebpf_obj__get_prog_by_name((struct ebpf_object *)obj, prog_name);
 	if (prog == NULL) {
