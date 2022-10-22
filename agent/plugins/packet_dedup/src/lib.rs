@@ -25,6 +25,6 @@ impl PacketDedupMap {
     }
 
     pub fn duplicate(&mut self, _: &mut [u8], _: Duration) -> bool {
-        false
+        unimplemented!();
     }
 }
