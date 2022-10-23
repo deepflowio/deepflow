@@ -394,7 +394,7 @@ impl ParseParam {
 pub fn get_parse_bitmap(protocol: IpProtocol, l7_enabled: L7ProtocolBitmap) -> L7ProtocolBitmap {
     let mut bitmap = L7ProtocolBitmap(0);
     for i in get_all_protocol().iter() {
-        if l7_enabled.is_disabled(i.protocol()) {
+        if l7_enabled.is_enabled(i.protocol()) {
             match protocol {
                 IpProtocol::Tcp if i.parsable_on_tcp() => {
                     bitmap.set_enabled(i.protocol());
