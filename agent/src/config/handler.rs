@@ -1038,14 +1038,16 @@ impl ConfigHandler {
         let mut callbacks: Vec<fn(&ConfigHandler, &mut Components)> = vec![];
         let mut restart_dispatcher = false;
 
-        // Check and send out exceptions in time
-        if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler) {
-            warn!("{}", e);
-        }
-
         if candidate_config.tap_mode != new_config.tap_mode {
             info!("tap_mode set to {:?}", new_config.tap_mode);
             candidate_config.tap_mode = new_config.tap_mode;
+        }
+
+        if candidate_config.tap_mode != TapMode::Analyzer {
+            // Check and send out exceptions in time
+            if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler) {
+                warn!("{}", e);
+            }
         }
 
         if !yaml_config
@@ -1322,11 +1324,11 @@ impl ConfigHandler {
             candidate_config.diagnose = new_config.diagnose;
         }
 
-        if candidate_config.tap_mode == TapMode::Analyzer {
-            info!("memory set ulimit when tap_mode=analyzer");
+        if candidate_config.tap_mode == TapMode::Analyzer || !static_config.kubernetes_cluster_id.is_empty() {
+            info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
             candidate_config.environment.max_memory = 0;
 
-            info!("cpu set ulimit when tap_mode=analyzer");
+            info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
             let mut system = sysinfo::System::new();
             system.refresh_cpu();
             candidate_config.environment.max_cpus =
@@ -1741,17 +1743,23 @@ impl ConfigHandler {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
                 }
-                match free_memory_check(
-                    handler.candidate_config.environment.max_memory,
-                    &components.exception_handler,
-                ) {
-                    Ok(()) => {
-                        for dispatcher in components.dispatchers.iter() {
-                            dispatcher.start();
+                if handler.candidate_config.tap_mode != TapMode::Analyzer {
+                    match free_memory_check(
+                        handler.candidate_config.environment.max_memory,
+                        &components.exception_handler,
+                    ) {
+                        Ok(()) => {
+                            for dispatcher in components.dispatchers.iter() {
+                                dispatcher.start();
+                            }
+                        }
+                        Err(e) => {
+                            warn!("{}", e);
                         }
                     }
-                    Err(e) => {
-                        warn!("{}", e);
+                } else {
+                    for dispatcher in components.dispatchers.iter() {
+                        dispatcher.start();
                     }
                 }
             }

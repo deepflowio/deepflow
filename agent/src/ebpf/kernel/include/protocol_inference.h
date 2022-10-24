@@ -164,6 +164,19 @@ static __inline __u8 find_idx_from_block_fragment(const __u8 *buf,
 	return table_idx;
 }
 
+static bool is_http2_magic(const char *buf_src, size_t count)
+{
+	static const char magic[] = "PRI * HTTP/2";
+	char buffer[sizeof(magic)] = { 0 };
+	bpf_probe_read(buffer, sizeof(buffer) - 1, buf_src);
+	for (int idx = 0; idx < sizeof(magic); ++idx) {
+		if (magic[idx] == buffer[idx])
+			continue;
+		return false;
+	}
+	return true;
+}
+
 // https://tools.ietf.org/html/rfc7540#section-4.1
 // 帧的结构:
 // +-----------------------------------------------+
@@ -237,6 +250,14 @@ static __inline enum message_type parse_http2_headers_frame(const char *buf_src,
 	__u8 type = 0, reserve = 0, static_table_idx, i, block_fragment_offset;
 	__u8 msg_type = MSG_UNKNOWN;
 	__u8 buf[HTTPV2_FRAME_READ_SZ] = { 0 };
+
+	// When Magic and header are in the same TCP packet, it will cause
+	// packet loss. When Magic is detected, the offset is corrected to the
+	// starting position of the header.
+	if (is_first && is_http2_magic(buf_src, count)) {
+		static const int HTTP2_MAGIC_SIZE = 24;
+		offset = HTTP2_MAGIC_SIZE;
+	}
 
 #pragma unroll
 	for (i = 0; i < HTTPV2_LOOP_MAX; i++) {

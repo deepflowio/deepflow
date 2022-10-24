@@ -1059,7 +1059,7 @@ CREATE TABLE IF NOT EXISTS alarm_policy (
     deleted                 TINYINT(1) DEFAULT 0 COMMENT '0-not deleted; 1-deleted',
     created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted_at              TIMESTAMP DEFAULT NULL,
+    deleted_at              DATETIME DEFAULT NULL,
     contrast_type           TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1.abs 2.baseline',
     target_line_uid         TEXT,
     target_line_name        TEXT,
