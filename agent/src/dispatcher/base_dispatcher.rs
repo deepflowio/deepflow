@@ -536,7 +536,9 @@ impl TapTypeHandler {
             if pcp == self.mirror_traffic_pcp && self.tap_mode == TapMode::Analyzer {
                 let vid = vlan_tag & VLAN_ID_MASK;
                 if let Some(t) = self.tap_typer.get_tap_type_by_vlan(vid) {
-                    tap_type = t;
+                    if t != TapType::Unknown {
+                        tap_type = t;
+                    }
                 }
             }
             l2_len += VLAN_HEADER_SIZE;
@@ -548,7 +550,9 @@ impl TapTypeHandler {
             }
         } else if self.tap_mode == TapMode::Analyzer {
             if let Some(t) = self.tap_typer.get_tap_type_by_vlan(0) {
-                tap_type = t;
+                if t != TapType::Unknown {
+                    tap_type = t;
+                }
             }
         }
         Ok((tap_type, eth_type.try_into()?, l2_len))
