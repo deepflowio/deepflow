@@ -353,6 +353,8 @@ static_config:
   ## 当开启此开关时，对于 Golang >= 1.13 且 < 1.18 的 Golang 进程，
   ## 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
   ebpf-uprobe-golang-symbol-enabled: false
+  ## 用于开启集成采集器压缩数据开关，现在仅支持 opentelemetry trace 数据压缩
+  external_agent_http_proxy_compressed: false
   ## 开发过程中的功能控制开关，支持多个
   feature-flags:
 `)
