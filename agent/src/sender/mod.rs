@@ -27,7 +27,9 @@ use std::time::Duration;
 
 use crate::common::tagged_flow::TaggedFlow;
 use crate::flow_generator::AppProtoLogsData;
-use crate::integration_collector::{OpenTelemetry, PrometheusMetric, TelegrafMetric};
+use crate::integration_collector::{
+    OpenTelemetry, OpenTelemetryCompressed, PrometheusMetric, TelegrafMetric,
+};
 use crate::metric::document::Document;
 use crate::utils::stats::Batch;
 
@@ -37,6 +39,7 @@ const ERR_INTERVAL: Duration = Duration::from_secs(30);
 const FLOW_LOG_VERSION: u32 = 20220128;
 const METRICS_VERSION: u32 = 20220117;
 const OPEN_TELEMETRY: u32 = 20220607;
+const OPEN_TELEMETRY_COMPRESSED: u32 = 20221024;
 const PROMETHEUS: u32 = 20220613;
 const TELEGRAF: u32 = 20220613;
 const PACKET_SEQUENCE_BLOCK: u32 = 20220712; // Enterprise Edition Feature: packet-sequence
@@ -53,6 +56,7 @@ pub enum SendItem {
     ExternalTelegraf(TelegrafMetric),
     PacketSequenceBlock(Box<packet_sequence_block::PacketSequenceBlock>), // Enterprise Edition Feature: packet-sequence
     DeepflowStats(Arc<Batch>),
+    ExternalOtelCompressed(OpenTelemetryCompressed),
 }
 
 impl SendItem {
@@ -66,6 +70,7 @@ impl SendItem {
             Self::ExternalTelegraf(p) => p.encode(buf),
             Self::PacketSequenceBlock(p) => p.encode(buf), // Enterprise Edition Feature: packet-sequence
             Self::DeepflowStats(b) => b.encode(buf),
+            Self::ExternalOtelCompressed(o) => o.encode(buf),
         }
     }
 
@@ -95,6 +100,7 @@ impl SendItem {
             Self::ExternalTelegraf(_) => SendMessageType::Telegraf,
             Self::PacketSequenceBlock(_) => SendMessageType::PacketSequenceBlock, // Enterprise Edition Feature: packet-sequence
             Self::DeepflowStats(_) => SendMessageType::DeepflowStats,
+            Self::ExternalOtelCompressed(_) => SendMessageType::OpenTelemetryCompressed,
         }
     }
 
@@ -107,6 +113,7 @@ impl SendItem {
             Self::ExternalProm(_) => PROMETHEUS,
             Self::ExternalTelegraf(_) => TELEGRAF,
             Self::PacketSequenceBlock(_) => PACKET_SEQUENCE_BLOCK, // Enterprise Edition Feature: packet-sequence
+            Self::ExternalOtelCompressed(_) => OPEN_TELEMETRY_COMPRESSED,
             _ => 0,
         }
     }
@@ -123,6 +130,7 @@ impl fmt::Display for SendItem {
             Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
             Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
             Self::DeepflowStats(s) => write!(f, "deepflow_stats: {:?}", s),
+            Self::ExternalOtelCompressed(o) => write!(f, "open_telemetry compressed: {:?}", o),
         }
     }
 }
@@ -138,6 +146,7 @@ impl fmt::Debug for SendItem {
             Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
             Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
             Self::DeepflowStats(s) => write!(f, "deepflow_stats: {:?}", s),
+            Self::ExternalOtelCompressed(o) => write!(f, "open_telemetry compressed: {:?}", o),
         }
     }
 }
@@ -156,6 +165,7 @@ pub enum SendMessageType {
     Telegraf = 8,
     PacketSequenceBlock = 9, // Enterprise Edition Feature: packet-sequence
     DeepflowStats = 10,
+    OpenTelemetryCompressed = 11,
 }
 
 impl fmt::Display for SendMessageType {
@@ -172,6 +182,7 @@ impl fmt::Display for SendMessageType {
             Self::Telegraf => write!(f, "telegraf"),
             Self::PacketSequenceBlock => write!(f, "packet_sequence_block"), // Enterprise Edition Feature: packet-sequence
             Self::DeepflowStats => write!(f, "deepflow_stats"),
+            Self::OpenTelemetryCompressed => write!(f, "open_telemetry compressed"),
         }
     }
 }

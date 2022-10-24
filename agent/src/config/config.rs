@@ -276,6 +276,7 @@ pub struct YamlConfig {
     pub l7_protocol_enabled: Vec<String>,
     #[serde(rename = "ebpf-uprobe-process-name-regexs")]
     pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
+    pub external_agent_http_proxy_compressed: bool,
 }
 
 impl YamlConfig {
@@ -453,6 +454,7 @@ impl Default for YamlConfig {
                 }
                 protos
             },
+            external_agent_http_proxy_compressed: false,
         }
     }
 }
