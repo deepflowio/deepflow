@@ -238,7 +238,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				}
 				vpcLcuuid, ok := q.vmIdToVPCLcuuid[instanceId]
 				if !ok {
-					log.Infof("nic (%s) instance_id (%s) vpc not found", nicId, instanceId)
+					log.Debugf("nic (%s) instance_id (%s) vpc not found", nicId, instanceId)
 					continue
 				}
 				// 如果接口属于基础网络，则生成基础网络对应的NetworkLcuuid
