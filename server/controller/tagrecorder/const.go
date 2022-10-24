@@ -51,6 +51,7 @@ const (
 	RESOURCE_TYPE_LB_VM_CONNECTION  = "lb_vm_connection"
 	RESOURCE_TYPE_POD_GROUP_PORT    = "pod_group_port"
 	RESOURCE_TYPE_POD_INGRESS       = "pod_ingress"
+	RESOURCE_TYPE_SERVICE           = "service"
 )
 
 const (
@@ -81,6 +82,7 @@ const (
 	RESOURCE_TYPE_CH_LB_LISTENER   = "ch_lb_listener"
 	RESOURCE_TYPE_CH_STRING_ENUM   = "ch_string_enum"
 	RESOURCE_TYPE_CH_INT_ENUM      = "ch_int_enum"
+	RESOURCE_TYPE_CH_NODE_TYPE     = "ch_node_type"
 )
 
 const (
@@ -114,6 +116,8 @@ const (
 
 	CH_STRING_DICTIONARY_ENUM = "string_enum_map"
 	CH_INT_DICTIONARY_ENUM    = "int_enum_map"
+
+	CH_DICTIONARY_NODE_TYPE = "node_type_map"
 )
 
 const (
@@ -386,6 +390,15 @@ const (
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
 		"LIFETIME(MIN 0 MAX 60)\n" +
 		"LAYOUT(COMPLEX_KEY_HASHED())"
+	CREATE_NODE_TYPE_DICTIONARY_SQL = "CREATE DICTIONARY %s.%s\n" +
+		"(\n" +
+		"    `resource_type` UInt64,\n" +
+		"    `node_type` String\n" +
+		")\n" +
+		"PRIMARY KEY resource_type\n" +
+		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
+		"LIFETIME(MIN 0 MAX 60)\n" +
+		"LAYOUT(FLAT())"
 )
 
 var DBNodeTypeToResourceType = map[string]string{
@@ -455,6 +468,7 @@ var CREATE_SQL_MAP = map[string]string{
 	CH_DICTIONARY_K8S_LABEL:      CREATE_K8S_LABEL_DICTIONARY_SQL,
 	CH_DICTIONARY_K8S_LABELS:     CREATE_K8S_LABELS_DICTIONARY_SQL,
 	CH_DICTIONARY_IP_RESOURCE:    CREATE_IP_RESOURCE_DICTIONARY_SQL,
+	CH_DICTIONARY_NODE_TYPE:      CREATE_NODE_TYPE_DICTIONARY_SQL,
 	CH_STRING_DICTIONARY_ENUM:    CREATE_STRING_ENUM_SQL,
 	CH_INT_DICTIONARY_ENUM:       CREATE_INT_ENUM_SQL,
 }
@@ -467,4 +481,22 @@ var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
 	common.VTAP_TYPE_POD_HOST:   common.VIF_DEVICE_TYPE_POD_NODE,
 	common.VTAP_TYPE_POD_VM:     common.VIF_DEVICE_TYPE_POD_NODE,
 	common.VTAP_TYPE_HYPER_V:    common.VIF_DEVICE_TYPE_HOST,
+}
+
+var RESOURCE_TYPE_TO_NODE_TYPE = map[int]string{
+	common.VIF_DEVICE_TYPE_VM:             RESOURCE_TYPE_VM,
+	common.VIF_DEVICE_TYPE_VROUTER:        RESOURCE_TYPE_VGW,
+	common.VIF_DEVICE_TYPE_HOST:           RESOURCE_TYPE_HOST,
+	common.VIF_DEVICE_TYPE_DHCP_PORT:      RESOURCE_TYPE_DHCP_PORT,
+	common.VIF_DEVICE_TYPE_POD:            RESOURCE_TYPE_POD,
+	common.VIF_DEVICE_TYPE_POD_SERVICE:    RESOURCE_TYPE_POD_SERVICE,
+	common.VIF_DEVICE_TYPE_REDIS_INSTANCE: RESOURCE_TYPE_REDIS,
+	common.VIF_DEVICE_TYPE_RDS_INSTANCE:   RESOURCE_TYPE_RDS,
+	common.VIF_DEVICE_TYPE_POD_NODE:       RESOURCE_TYPE_POD_NODE,
+	common.VIF_DEVICE_TYPE_LB:             RESOURCE_TYPE_LB,
+	common.VIF_DEVICE_TYPE_NAT_GATEWAY:    RESOURCE_TYPE_NAT_GATEWAY,
+	common.VIF_DEVICE_TYPE_INTERNET:       RESOURCE_TYPE_INTERNET,
+	common.VIF_DEVICE_TYPE_POD_GROUP:      RESOURCE_TYPE_POD_GROUP,
+	common.VIF_DEVICE_TYPE_SERVICE:        RESOURCE_TYPE_SERVICE,
+	common.VIF_DEVICE_TYPE_IP:             RESOURCE_TYPE_IP,
 }

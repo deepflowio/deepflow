@@ -1959,6 +1959,13 @@ CREATE TABLE IF NOT EXISTS ch_pod_ingress (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_pod_ingress;
 
+CREATE TABLE IF NOT EXISTS ch_node_type (
+    resource_type           INTEGER NOT NULL DEFAULT 0 PRIMARY KEY,
+    node_type               VARCHAR(256),
+    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+)ENGINE=innodb DEFAULT CHARSET=utf8;
+TRUNCATE TABLE ch_node_type;
+
 INSERT INTO vl2(state, name, net_type, isp, lcuuid, domain) values(0, 'PublicNetwork', 3, 7, 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff');
 
 set @lcuuid = (select uuid());

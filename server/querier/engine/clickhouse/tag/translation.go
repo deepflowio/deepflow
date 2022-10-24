@@ -271,38 +271,11 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			autoIDSuffix := autoStr + "_id" + suffix
 			autoTypeSuffix := autoStr + "_type" + suffix
 			autoNameSuffix := autoStr + suffix
-			nodeTypeStrSuffix := ""
-			for nodeType, autoTypeValue := range AutoMap {
-				autoTypeValueStr := strconv.Itoa(autoTypeValue)
-				nodeTypeStrSuffix = nodeTypeStrSuffix + autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "',"
-			}
-			// internet IP
-			internetIPTypeStr := strconv.Itoa(VIF_DEVICE_TYPE_INTERNET)
-			nodeTypeStrSuffix = nodeTypeStrSuffix + autoTypeSuffix + "=" + internetIPTypeStr + ",'internet_ip',"
-			// IP
-			nodeTypeStrSuffix = nodeTypeStrSuffix + "'ip')"
-			switch autoStr {
-			case "resource_gl0":
-				for nodeType, autoTypeValue := range AutoPodMap {
-					autoTypeValueStr := strconv.Itoa(autoTypeValue)
-					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
-				}
-			case "resource_gl1":
-				for nodeType, autoTypeValue := range AutoPodGroupMap {
-					autoTypeValueStr := strconv.Itoa(autoTypeValue)
-					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
-				}
-			case "resource_gl2":
-				for nodeType, autoTypeValue := range AutoServiceMap {
-					autoTypeValueStr := strconv.Itoa(autoTypeValue)
-					nodeTypeStrSuffix = autoTypeSuffix + "=" + autoTypeValueStr + ",'" + nodeType + "'," + nodeTypeStrSuffix
-				}
-			}
+			nodeTypeStrSuffix := "dictGet(flow_tag.node_type_map, 'node_type', toUInt64(" + autoTypeSuffix + "))"
 			internetIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
 			ipIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
 			autoIconDictGet := fmt.Sprintf("dictGet(flow_tag.device_map, 'icon_id', (toUInt64(%s),toUInt64(%s)))", autoTypeSuffix, autoIDSuffix)
 			iconIDStrSuffix := fmt.Sprintf("multiIf(%s=%d,%s,%s=%d,%s,%s)", autoTypeSuffix, VIF_DEVICE_TYPE_INTERNET, internetIconDictGet, autoTypeSuffix, VIF_DEVICE_TYPE_IP, ipIconDictGet, autoIconDictGet)
-			nodeTypeStrSuffix = "multiIf(" + nodeTypeStrSuffix
 			deviceTypeFilter := ""
 			if strings.HasPrefix(autoNameSuffix, "resource_gl0") {
 				deviceTypeFilter = "devicetype not in (101,102)"

@@ -298,3 +298,8 @@ type ChIntEnum struct {
 	Value   int    `gorm:"primaryKey;column:value;type:int;default:0" json:"VALUE"`
 	Name    string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
 }
+
+type ChNodeType struct {
+	ResourceType int    `gorm:"primaryKey;column:resource_type;type:int;not null" json:"RESOURCE_TYPE"`
+	NodeType     string `gorm:"column:node_type;type:varchar(256);default:null" json:"NODE_TYPE"`
+}

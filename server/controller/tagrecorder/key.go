@@ -82,3 +82,7 @@ type IntEnumTagKey struct {
 	TagName  string
 	TagValue int
 }
+
+type NodeTypeKey struct {
+	ResourceType int
+}
