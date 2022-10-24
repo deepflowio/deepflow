@@ -237,10 +237,10 @@ func (p *IDPool[MT]) allocate(count int) (ids []int, err error) {
 		for _, item := range dbItems {
 			inUseIDs = append(inUseIDs, (*item).GetID())
 		}
-		log.Infof("ids: %+v are in use.", inUseIDs)
+		log.Infof("%s ids: %+v are in use.", p.resourceType, inUseIDs)
 		ids = mapset.NewSet(ids...).Difference(mapset.NewSet(inUseIDs...)).ToSlice()
 	}
-	log.Infof("allocate %s ids: %v (count: %d)", p.resourceType, ids, len(ids))
+	log.Infof("allocate %s ids: %v (expected count: %d, true count: %d)", p.resourceType, ids, count, len(ids))
 	return
 }
 
@@ -270,13 +270,13 @@ func GetIDs(resourceType string, count int) (ids []int, err error) {
 	uCount := uint32(count)
 	resp, err := client.GetResourceID(context.Background(), &api.GetResourceIDRequest{Type: &resourceType, Count: &uCount})
 	if err != nil {
-		log.Error("request id failed: %s", err.Error())
+		log.Error("get %s id failed: %s", resourceType, err.Error())
 		return
 	}
 	for _, uID := range resp.GetIds() {
 		ids = append(ids, int(uID))
 	}
-	log.Infof("request ids: %v (count: %d)", ids, len(ids))
+	log.Infof("get %s ids: %v (expected count: %d, true count: %d)", resourceType, ids, count, len(ids))
 	return
 }
 
@@ -300,8 +300,8 @@ func ReleaseIDs(resourceType string, ids []int) (err error) {
 	client := api.NewControllerClient(conn)
 	_, err = client.ReleaseResourceID(context.Background(), &api.ReleaseResourceIDRequest{Ids: uIDs})
 	if err != nil {
-		log.Error("request id failed: %s", err.Error())
+		log.Error("release %s id failed: %s", resourceType, err.Error())
 	}
-	log.Infof("release ids: %v", ids)
+	log.Infof("release %s ids: %v (count: %d)", resourceType, ids, len(ids))
 	return
 }

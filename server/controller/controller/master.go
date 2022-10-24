@@ -88,7 +88,7 @@ func checkAndStartMasterFunctions(
 
 	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
-	softDeletedResourceCleaner := recorder.NewSoftDeletedResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
+	resourceCleaner := recorder.NewResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
 	domainChecker := service.NewDomainCheck(ctx)
 
 	masterController := ""
@@ -128,8 +128,8 @@ func checkAndStartMasterFunctions(
 				// license分配和检查
 				vtapLicenseAllocation.Start()
 
-				// 启动软删除数据清理
-				softDeletedResourceCleaner.Start()
+				// 资源数据清理
+				resourceCleaner.Start()
 
 				// domain检查及自愈
 				domainChecker.Start()
@@ -152,7 +152,7 @@ func checkAndStartMasterFunctions(
 				// stop vtap license allocation and check
 				vtapLicenseAllocation.Stop()
 
-				softDeletedResourceCleaner.Stop()
+				resourceCleaner.Stop()
 
 				domainChecker.Stop()
 

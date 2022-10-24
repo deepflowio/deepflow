@@ -442,7 +442,7 @@ func (c *Cache) DeleteNetworks(lcuuids []string) {
 func (c *Cache) refreshNetworks() []int {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_NETWORK_EN))
 	var networks []*mysql.Network
-	networkIDs := make([]int, len(networks))
+	networkIDs := []int{}
 
 	err := mysql.Db.Where(c.getConditonDomainSubDomainCreateMethod()).Find(&networks).Error
 	if err != nil {
@@ -512,7 +512,7 @@ func (c *Cache) DeleteVRouters(lcuuids []string) {
 func (c *Cache) refreshVRouters() []int {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_VROUTER_EN))
 	var vrouters []*mysql.VRouter
-	vrouterIDs := make([]int, len(vrouters))
+	vrouterIDs := []int{}
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&vrouters).Error
 	if err != nil {
@@ -706,7 +706,7 @@ func (c *Cache) DeleteSecurityGroups(lcuuids []string) {
 func (c *Cache) refreshSecurityGroups() []int {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_SECURITY_GROUP_EN))
 	var securityGroups []*mysql.SecurityGroup
-	securityGroupIDs := make([]int, len(securityGroups))
+	securityGroupIDs := []int{}
 
 	err := mysql.Db.Where(c.getConditionDomain()).Find(&securityGroups).Error
 	if err != nil {
@@ -1183,19 +1183,19 @@ func (c *Cache) DeletePodIngresses(lcuuids []string) {
 func (c *Cache) refreshPodIngresses() []int {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_POD_INGRESS_EN))
 	var podIngresses []*mysql.PodIngress
-	podIngresseIDs := []int{}
+	podIngressIDs := []int{}
 
 	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podIngresses).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_INGRESS_EN, err))
-		return podIngresseIDs
+		return podIngressIDs
 	}
 
 	for _, item := range podIngresses {
-		podIngresseIDs = append(podIngresseIDs, item.ID)
+		podIngressIDs = append(podIngressIDs, item.ID)
 		c.AddPodIngress(item)
 	}
-	return podIngresseIDs
+	return podIngressIDs
 }
 
 func (c *Cache) AddPodIngressRules(items []*mysql.PodIngressRule) {

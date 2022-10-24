@@ -33,9 +33,9 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/test"
 )
 
-const (
-	TEST_DB_FILE = "./recorder_test.db"
-)
+// const (
+// 	TEST_DB_FILE = "./recorder_test.db"
+// )
 
 var cloudData []cloudmodel.Resource
 var domainLcuuids []string
