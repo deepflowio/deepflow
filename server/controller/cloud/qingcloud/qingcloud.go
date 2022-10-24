@@ -345,7 +345,7 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	}
 
 	// 路由表及规则
-	vrouters, routingTables, tmpVInterfaces, tmpIPs, err := q.getRouterAndTables()
+	vrouters, routingTables, tmpVInterfaces, tmpIPs, err := q.GetRouterAndTables()
 	if err != nil {
 		log.Error("get router and rule data failed")
 		return resource, err
