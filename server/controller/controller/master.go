@@ -131,10 +131,8 @@ func checkAndStartMasterFunctions(
 				// 启动软删除数据清理
 				softDeletedResourceCleaner.Start()
 
-				if _, enabled := os.LookupEnv("FEATURE_FLAG_CHECK_DOMAIN_CONTROLLER"); enabled {
-					// 自动切换domain控制器
-					domainChecker.Start()
-				}
+				// domain检查及自愈
+				domainChecker.Start()
 			} else if thisIsMasterController {
 				thisIsMasterController = false
 				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
@@ -156,9 +154,7 @@ func checkAndStartMasterFunctions(
 
 				softDeletedResourceCleaner.Stop()
 
-				if _, enabled := os.LookupEnv("FEATURE_FLAG_CHECK_DOMAIN_CONTROLLER"); enabled {
-					domainChecker.Stop()
-				}
+				domainChecker.Stop()
 
 				recorderdb.IDMNG.Stop()
 			} else {
