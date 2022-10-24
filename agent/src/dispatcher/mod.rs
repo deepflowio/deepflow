@@ -61,7 +61,10 @@ pub use recv_engine::{
 use crate::platform::GenericPoller;
 use crate::{
     common::{enums::TapType, TaggedFlow, TapTyper},
-    config::{handler::FlowAccess, DispatcherConfig},
+    config::{
+        handler::{FlowAccess, LogParserAccess},
+        DispatcherConfig,
+    },
     exception::ExceptionHandler,
     flow_generator::MetaAppProto,
     handler::{PacketHandler, PacketHandlerBuilder},
@@ -476,6 +479,7 @@ pub struct DispatcherBuilder {
         Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
     stats_collector: Option<Arc<Collector>>,
     flow_map_config: Option<FlowAccess>,
+    log_parse_config: Option<LogParserAccess>,
     policy_getter: Option<PolicyGetter>,
     #[cfg(target_os = "linux")]
     platform_poller: Option<Arc<GenericPoller>>,
@@ -572,6 +576,11 @@ impl DispatcherBuilder {
 
     pub fn flow_map_config(mut self, v: FlowAccess) -> Self {
         self.flow_map_config = Some(v);
+        self
+    }
+
+    pub fn log_parse_config(mut self, v: LogParserAccess) -> Self {
+        self.log_parse_config = Some(v);
         self
     }
 
@@ -756,6 +765,10 @@ impl DispatcherBuilder {
                 .flow_map_config
                 .take()
                 .ok_or(Error::ConfigIncomplete("no flow map config".into()))?,
+            log_parse_config: self
+                .log_parse_config
+                .take()
+                .ok_or(Error::ConfigIncomplete("no log parse config".into()))?,
             policy_getter: self
                 .policy_getter
                 .ok_or(Error::ConfigIncomplete("no policy".into()))?,

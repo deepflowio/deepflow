@@ -33,7 +33,7 @@ use enum_dispatch::enum_dispatch;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
-use super::protocol_logs::AppProtoHead;
+use super::protocol_logs::{AppProtoHead, PostgresqlLog};
 
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
@@ -45,6 +45,7 @@ use crate::common::{
     flow::{FlowPerfStats, L4Protocol, L7Protocol},
     meta_packet::MetaPacket,
 };
+use crate::config::handler::LogParserAccess;
 
 use {
     self::http::HttpPerfData,
@@ -58,6 +59,7 @@ use {
 
 pub use l7_rrt::L7RrtCache;
 pub use stats::FlowPerfCounter;
+pub use stats::PerfStats;
 
 pub use dns::DNS_PORT;
 
@@ -93,6 +95,7 @@ pub enum L7FlowPerfTable {
     DubboPerfData,
     MysqlPerfData,
     HttpPerfData,
+    PostgresqlLog,
 }
 
 pub struct FlowPerf {
@@ -110,6 +113,8 @@ pub struct FlowPerf {
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
+
+    parse_config: LogParserAccess,
 }
 
 impl FlowPerf {
@@ -122,6 +127,7 @@ impl FlowPerf {
             L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
             L7Protocol::MQTT => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),
             L7Protocol::MySQL => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
+            L7Protocol::PostgreSQL => Some(L7FlowPerfTable::from(PostgresqlLog::new())),
             L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
             L7Protocol::Http1 | L7Protocol::Http2 => {
                 Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
@@ -197,6 +203,7 @@ impl FlowPerf {
                 if self.protocol_bitmap.is_disabled(i.protocol()) {
                     continue;
                 }
+                i.set_parse_config(&self.parse_config);
                 if i.check_payload(payload, &param) {
                     self.l7_protocol = i.protocol();
                     // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
@@ -248,6 +255,7 @@ impl FlowPerf {
         l7_parser: Option<L7ProtocolParser>,
         counter: Arc<FlowPerfCounter>,
         l7_prorocol_enable_bitmap: L7ProtocolBitmap,
+        parse_config: LogParserAccess,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),
@@ -274,6 +282,7 @@ impl FlowPerf {
             is_from_app: l7_proto.is_some(),
             is_success: false,
             is_skip: false,
+            parse_config,
         })
     }
 

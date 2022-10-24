@@ -151,7 +151,7 @@ runners:
       - "en-west-1"
       - "en-west-1"
     # arm64 architecture spot instances may not be created smoothly
-    preemptible: true
+    preemptible: false
     labels:
       - "cirun-aws-arm64-32c"
   - name: "aws-amd64-16c"
