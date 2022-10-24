@@ -285,6 +285,13 @@ func (l *AppProtoLogsData) WriteToPB(p *pb.AppProtoLogsData) {
 		p.Base = &pb.AppProtoLogsBaseInfo{}
 	}
 	l.AppProtoLogsBaseInfo.WriteToPB(p.Base)
+	if l.AppProtoLogsBaseInfo.MsgType == MSG_T_RESPONSE ||
+		l.AppProtoLogsBaseInfo.MsgType == MSG_T_SESSION {
+		p.Resp = &pb.L7Response{
+			Status: uint32(l.AppProtoLogsBaseInfo.AppProtoHead.Status),
+			Code:   int32(l.AppProtoLogsBaseInfo.AppProtoHead.Code),
+		}
+	}
 	switch l.Proto {
 	case L7_PROTOCOL_HTTP_1:
 		fallthrough
@@ -342,40 +349,36 @@ type HTTPInfo struct {
 }
 
 func (h *HTTPInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	/*
-		p.StreamId = h.StreamID
-		p.Version = h.Version
-		p.TraceId = h.TraceID
-		p.SpanId = h.SpanID
+	p.Version = h.Version
+	p.TraceInfo = &pb.TraceInfo{
+		TraceId: h.TraceID,
+		SpanId:  h.SpanID,
+	}
 
-		switch msgType {
-		case MSG_T_REQUEST:
-			p.Method = h.Method
-			p.Path = h.Path
-			p.Host = h.Host
-			p.ClientIp = h.ClientIP
-			p.XRequestId = h.XRequestId
-			p.ReqContentLength = h.ReqContentLength
-			p.RespContentLength = 0
-		case MSG_T_RESPONSE:
-			p.RespContentLength = h.RespContentLength
-			p.Method = ""
-			p.Path = ""
-			p.Host = ""
-			p.ClientIp = ""
-			p.XRequestId = h.XRequestId
-			p.ReqContentLength = 0
-		case MSG_T_SESSION:
-			p.Method = h.Method
-			p.Path = h.Path
-			p.Host = h.Host
-			p.ClientIp = h.ClientIP
-			p.XRequestId = h.XRequestId
-			p.ReqContentLength = h.ReqContentLength
-
-			p.RespContentLength = h.RespContentLength
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			ReqType:  h.Method,
+			Domain:   h.Host,
+			Resource: h.Path,
 		}
-	*/
+
+		p.ExtInfo = &pb.ExtendedInfo{
+			ClientIp:   h.ClientIP,
+			RequestId:  h.StreamID,
+			XRequestId: h.XRequestId,
+		}
+		p.ReqLen = int32(h.ReqContentLength)
+	}
+
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		if h.XRequestId != "" {
+			if p.ExtInfo == nil {
+				p.ExtInfo = &pb.ExtendedInfo{}
+			}
+			p.ExtInfo.XRequestId = h.XRequestId
+		}
+		p.RespLen = int32(h.RespContentLength)
+	}
 }
 
 func (h *HTTPInfo) String() string {
@@ -422,21 +425,21 @@ type DNSInfo struct {
 }
 
 func (h *DNSInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	/*
-		p.TransId = uint32(h.TransID)
-		p.QueryType = uint32(h.QueryType)
+	if h.TransID != 0 {
+		p.ExtInfo = &pb.ExtendedInfo{
+			RequestId: uint32(h.TransID),
+		}
+	}
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			ReqType:  GetDNSQueryType(uint8(h.QueryType)),
+			Resource: h.QueryName,
+		}
+	}
 
-		if msgType == MSG_T_SESSION || msgType == MSG_T_REQUEST {
-			p.QueryName = h.QueryName
-		} else {
-			p.QueryName = ""
-		}
-		if msgType == MSG_T_SESSION || msgType == MSG_T_RESPONSE {
-			p.Answers = h.Answers
-		} else {
-			p.Answers = ""
-		}
-	*/
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		p.Resp.Result = h.Answers
+	}
 }
 
 func (d *DNSInfo) String() string {

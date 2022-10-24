@@ -530,7 +530,7 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 	switch datatype.L7Protocol(h.L7Protocol) {
 	case datatype.L7_PROTOCOL_KAFKA:
 		if l.Req != nil {
-			if h.responseCode == 0 && l.Req.ReqType != KafkaCommandString[Fetch] {
+			if h.responseCode == 0 && l.Req.ReqType != datatype.KafkaCommandString[datatype.Fetch] {
 				h.ResponseStatus = datatype.STATUS_NOT_EXIST
 				h.ResponseCode = nil
 			}

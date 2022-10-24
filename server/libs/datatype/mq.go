@@ -18,6 +18,7 @@ package datatype
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
 	"github.com/deepflowys/deepflow/server/libs/pool"
@@ -50,30 +51,22 @@ type KafkaInfo struct {
 }
 
 func (i *KafkaInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	/*
-		switch msgType {
-		case MSG_T_REQUEST:
-			p.CorrelationId = i.CorrelationId
-			p.ReqMsgSize = i.ReqMsgSize
-			p.ApiVersion = uint32(i.ApiVersion)
-			p.ApiKey = uint32(i.ApiKey)
-			p.ClientId = i.ClientID
-
-			p.RespMsgSize = 0
-		case MSG_T_RESPONSE:
-			*p = pb.KafkaInfo{}
-			p.CorrelationId = i.CorrelationId
-			p.RespMsgSize = i.RespMsgSize
-		case MSG_T_SESSION:
-			p.CorrelationId = i.CorrelationId
-			p.ReqMsgSize = i.ReqMsgSize
-			p.ApiVersion = uint32(i.ApiVersion)
-			p.ApiKey = uint32(i.ApiKey)
-			p.ClientId = i.ClientID
-
-			p.RespMsgSize = i.RespMsgSize
+	if i.CorrelationId != 0 {
+		p.ExtInfo = &pb.ExtendedInfo{
+			RequestId: i.CorrelationId,
 		}
-	*/
+	}
+
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			ReqType: KafkaCommand(i.ApiKey).String(),
+		}
+		p.ReqLen = int32(i.ReqMsgSize)
+	}
+
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		p.RespLen = int32(i.RespMsgSize)
+	}
 }
 
 func (i *KafkaInfo) String() string {
@@ -112,26 +105,28 @@ type MqttInfo struct {
 }
 
 func (i *MqttInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	/*
-		*p = pb.MqttInfo{}
-		p.MqttType = i.MqttType
-		switch msgType {
-		case MSG_T_REQUEST:
-			p.ReqMsgSize = i.ReqMsgSize
-			p.ProtoVersion = uint32(i.ProtoVersion)
-			p.ClientId = i.ClientID
+	switch i.ProtoVersion {
+	case 3:
+		p.Version = "3.1"
+	case 4:
+		p.Version = "3.1.1"
+	case 5:
+		p.Version = "5.0"
+	default:
+		p.Version = strconv.Itoa(int(i.ProtoVersion))
+	}
 
-			p.RespMsgSize = 0
-		case MSG_T_RESPONSE:
-			p.RespMsgSize = i.RespMsgSize
-		case MSG_T_SESSION:
-			p.ReqMsgSize = i.ReqMsgSize
-			p.ProtoVersion = uint32(i.ProtoVersion)
-			p.ClientId = i.ClientID
-
-			p.RespMsgSize = i.RespMsgSize
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			ReqType: i.MqttType,
+			Domain:  i.ClientID,
 		}
-	*/
+		p.ReqLen = int32(i.ReqMsgSize)
+	}
+
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		p.RespLen = int32(i.RespMsgSize)
+	}
 }
 
 func (i *MqttInfo) String() string {
