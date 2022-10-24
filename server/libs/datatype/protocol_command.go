@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package jsonify
+package datatype
 
 import "strconv"
 
@@ -55,77 +55,77 @@ func GetDNSQueryType(query uint8) string {
 type MysqlCommand uint8
 
 const (
-	COM_SLEEP               MysqlCommand = 0x00
-	COM_QUIT                MysqlCommand = 0x01
-	COM_INIT_DB             MysqlCommand = 0x02
-	COM_QUERY               MysqlCommand = 0x03
-	COM_FIELD_LIST          MysqlCommand = 0x04
-	COM_CREATE_DB           MysqlCommand = 0x05
-	COM_DROP_DB             MysqlCommand = 0x06
-	COM_REFRESH             MysqlCommand = 0x07
-	COM_SHUTDOWN            MysqlCommand = 0x08
-	COM_STATISTICS          MysqlCommand = 0x09
-	COM_PROCESS_INFO        MysqlCommand = 0x0a
-	COM_CONNECT             MysqlCommand = 0x0b
-	COM_PROCESS_KILL        MysqlCommand = 0x0c
-	COM_DEBUG               MysqlCommand = 0x0d
-	COM_PING                MysqlCommand = 0x0e
-	COM_TIME                MysqlCommand = 0x0f
-	COM_DELAYED_INSERT      MysqlCommand = 0x10
-	COM_CHANGE_USER         MysqlCommand = 0x11
-	COM_BINLOG_DUMP         MysqlCommand = 0x12
-	COM_TABLE_DUMP          MysqlCommand = 0x13
-	COM_CONNECT_OUT         MysqlCommand = 0x14
-	COM_REGISTER_SLAVE      MysqlCommand = 0x15
-	COM_STMT_PREPARE        MysqlCommand = 0x16
-	COM_STMT_EXECUTE        MysqlCommand = 0x17
-	COM_STMT_SEND_LONG_DATA MysqlCommand = 0x18
-	COM_STMT_CLOSE          MysqlCommand = 0x19
-	COM_STMT_RESET          MysqlCommand = 0x1a
-	COM_SET_OPTION          MysqlCommand = 0x1b
-	COM_STMT_FETCH          MysqlCommand = 0x1c
-	COM_DAEMON              MysqlCommand = 0x1d
-	COM_BINLOG_DUMP_GTID    MysqlCommand = 0x1e
-	COM_RESET_CONNECTION    MysqlCommand = 0x1f
+	_COM_SLEEP               MysqlCommand = 0x00
+	_COM_QUIT                MysqlCommand = 0x01
+	_COM_INIT_DB             MysqlCommand = 0x02
+	_COM_QUERY               MysqlCommand = 0x03
+	_COM_FIELD_LIST          MysqlCommand = 0x04
+	_COM_CREATE_DB           MysqlCommand = 0x05
+	_COM_DROP_DB             MysqlCommand = 0x06
+	_COM_REFRESH             MysqlCommand = 0x07
+	_COM_SHUTDOWN            MysqlCommand = 0x08
+	_COM_STATISTICS          MysqlCommand = 0x09
+	_COM_PROCESS_INFO        MysqlCommand = 0x0a
+	_COM_CONNECT             MysqlCommand = 0x0b
+	_COM_PROCESS_KILL        MysqlCommand = 0x0c
+	_COM_DEBUG               MysqlCommand = 0x0d
+	_COM_PING                MysqlCommand = 0x0e
+	_COM_TIME                MysqlCommand = 0x0f
+	_COM_DELAYED_INSERT      MysqlCommand = 0x10
+	_COM_CHANGE_USER         MysqlCommand = 0x11
+	_COM_BINLOG_DUMP         MysqlCommand = 0x12
+	_COM_TABLE_DUMP          MysqlCommand = 0x13
+	_COM_CONNECT_OUT         MysqlCommand = 0x14
+	_COM_REGISTER_SLAVE      MysqlCommand = 0x15
+	_COM_STMT_PREPARE        MysqlCommand = 0x16
+	_COM_STMT_EXECUTE        MysqlCommand = 0x17
+	_COM_STMT_SEND_LONG_DATA MysqlCommand = 0x18
+	_COM_STMT_CLOSE          MysqlCommand = 0x19
+	_COM_STMT_RESET          MysqlCommand = 0x1a
+	_COM_SET_OPTION          MysqlCommand = 0x1b
+	_COM_STMT_FETCH          MysqlCommand = 0x1c
+	_COM_DAEMON              MysqlCommand = 0x1d
+	_COM_BINLOG_DUMP_GTID    MysqlCommand = 0x1e
+	_COM_RESET_CONNECTION    MysqlCommand = 0x1f
 )
 
 var MysqlCommandString = []string{
-	COM_SLEEP:               "COM_SLEEP",
-	COM_QUIT:                "COM_QUIT",
-	COM_INIT_DB:             "COM_INIT_DB",
-	COM_QUERY:               "COM_QUERY",
-	COM_FIELD_LIST:          "COM_FIELD_LIST",
-	COM_CREATE_DB:           "COM_CREATE_DB",
-	COM_DROP_DB:             "COM_DROP_DB",
-	COM_REFRESH:             "COM_REFRESH",
-	COM_SHUTDOWN:            "COM_SHUTDOWN",
-	COM_STATISTICS:          "COM_STATISTICS",
-	COM_PROCESS_INFO:        "COM_PROCESS_INFO",
-	COM_CONNECT:             "COM_CONNECT",
-	COM_PROCESS_KILL:        "COM_PROCESS_KILL",
-	COM_DEBUG:               "COM_DEBUG",
-	COM_PING:                "COM_PING",
-	COM_TIME:                "COM_TIME",
-	COM_DELAYED_INSERT:      "COM_DELAYED_INSERT",
-	COM_CHANGE_USER:         "COM_CHANGE_USER",
-	COM_BINLOG_DUMP:         "COM_BINLOG_DUMP",
-	COM_TABLE_DUMP:          "COM_TABLE_DUMP",
-	COM_CONNECT_OUT:         "COM_CONNECT_OUT",
-	COM_REGISTER_SLAVE:      "COM_REGISTER_SLAVE",
-	COM_STMT_PREPARE:        "COM_STMT_PREPARE",
-	COM_STMT_EXECUTE:        "COM_STMT_EXECUTE",
-	COM_STMT_SEND_LONG_DATA: "COM_STMT_SEND_LONG_DATA",
-	COM_STMT_CLOSE:          "COM_STMT_CLOSE",
-	COM_STMT_RESET:          "COM_STMT_RESET",
-	COM_SET_OPTION:          "COM_SET_OPTION",
-	COM_STMT_FETCH:          "COM_STMT_FETCH",
-	COM_DAEMON:              "COM_DAEMON",
-	COM_BINLOG_DUMP_GTID:    "COM_BINLOG_DUMP_GTID",
-	COM_RESET_CONNECTION:    "COM_RESET_CONNECTION",
+	_COM_SLEEP:               "COM_SLEEP",
+	_COM_QUIT:                "COM_QUIT",
+	_COM_INIT_DB:             "COM_INIT_DB",
+	_COM_QUERY:               "COM_QUERY",
+	_COM_FIELD_LIST:          "COM_FIELD_LIST",
+	_COM_CREATE_DB:           "COM_CREATE_DB",
+	_COM_DROP_DB:             "COM_DROP_DB",
+	_COM_REFRESH:             "COM_REFRESH",
+	_COM_SHUTDOWN:            "COM_SHUTDOWN",
+	_COM_STATISTICS:          "COM_STATISTICS",
+	_COM_PROCESS_INFO:        "COM_PROCESS_INFO",
+	_COM_CONNECT:             "COM_CONNECT",
+	_COM_PROCESS_KILL:        "COM_PROCESS_KILL",
+	_COM_DEBUG:               "COM_DEBUG",
+	_COM_PING:                "COM_PING",
+	_COM_TIME:                "COM_TIME",
+	_COM_DELAYED_INSERT:      "COM_DELAYED_INSERT",
+	_COM_CHANGE_USER:         "COM_CHANGE_USER",
+	_COM_BINLOG_DUMP:         "COM_BINLOG_DUMP",
+	_COM_TABLE_DUMP:          "COM_TABLE_DUMP",
+	_COM_CONNECT_OUT:         "COM_CONNECT_OUT",
+	_COM_REGISTER_SLAVE:      "COM_REGISTER_SLAVE",
+	_COM_STMT_PREPARE:        "COM_STMT_PREPARE",
+	_COM_STMT_EXECUTE:        "COM_STMT_EXECUTE",
+	_COM_STMT_SEND_LONG_DATA: "COM_STMT_SEND_LONG_DATA",
+	_COM_STMT_CLOSE:          "COM_STMT_CLOSE",
+	_COM_STMT_RESET:          "COM_STMT_RESET",
+	_COM_SET_OPTION:          "COM_SET_OPTION",
+	_COM_STMT_FETCH:          "COM_STMT_FETCH",
+	_COM_DAEMON:              "COM_DAEMON",
+	_COM_BINLOG_DUMP_GTID:    "COM_BINLOG_DUMP_GTID",
+	_COM_RESET_CONNECTION:    "COM_RESET_CONNECTION",
 }
 
 func (m MysqlCommand) String() string {
-	if m <= COM_RESET_CONNECTION {
+	if m <= _COM_RESET_CONNECTION {
 		return MysqlCommandString[m]
 	}
 	return strconv.Itoa(int(m))
