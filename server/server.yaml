@@ -16,7 +16,6 @@ controller:
   # kubeconfig
   kubeconfig:
   # election
-  election-namespace: deepflow
   election-name: deepflow-server
   # Once every 24 hours DeepFlow will report usage data to usage.deepflow.yunshan.net
   # The data includes a random ID, version, number of deepflow server and agent.
