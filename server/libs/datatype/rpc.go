@@ -55,38 +55,30 @@ type DubboInfo struct {
 }
 
 func (i *DubboInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	/*
-		p.SerialId = uint32(i.SerialID)
-		p.Type = uint32(i.Type)
-		p.Id = uint32(i.ID)
-		switch msgType {
-		case MSG_T_REQUEST:
-			p.ReqBodyLen = i.ReqBodyLen
-			p.Version = i.DubboVersion
-			p.ServiceName = i.ServiceName
-			p.ServiceVersion = i.ServiceVersion
-			p.MethodName = i.MethodName
-			p.TraceId = i.TraceId
-			p.RespBodyLen = 0
-		case MSG_T_RESPONSE:
-			p.RespBodyLen = i.RespBodyLen
-			p.ReqBodyLen = 0
-			p.Version = ""
-			p.ServiceName = ""
-			p.ServiceVersion = ""
-			p.MethodName = ""
-			p.TraceId = ""
-		case MSG_T_SESSION:
-			p.ReqBodyLen = i.ReqBodyLen
-			p.Version = i.DubboVersion
-			p.ServiceName = i.ServiceName
-			p.ServiceVersion = i.ServiceVersion
-			p.MethodName = i.MethodName
-			p.TraceId = i.TraceId
-
-			p.RespBodyLen = i.RespBodyLen
+	p.Version = i.DubboVersion
+	if i.TraceId != "" {
+		p.TraceInfo = &pb.TraceInfo{
+			TraceId: i.TraceId,
 		}
-	*/
+	}
+
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			Domain:   i.ServiceName,
+			Resource: i.MethodName,
+		}
+
+		if i.ID != 0 {
+			p.ExtInfo = &pb.ExtendedInfo{
+				RequestId: uint32(i.ID),
+			}
+		}
+		p.ReqLen = i.ReqBodyLen
+	}
+
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		p.RespLen = i.RespBodyLen
+	}
 }
 
 func (i *DubboInfo) String() string {
