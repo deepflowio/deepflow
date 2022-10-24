@@ -17,7 +17,6 @@
 package node
 
 import (
-	"os"
 	"sync"
 
 	"github.com/google/uuid"
@@ -44,12 +43,12 @@ func (a *TSDBDiscovery) register(request *trident.SyncRequest) {
 	if request.GetTsdbReportInfo() != nil {
 		pcapDataMountPath = request.GetTsdbReportInfo().GetPcapDataMountPath()
 	}
-	podIP := os.Getenv(POD_IP_KEY)
+	podIP := GetPodIP()
 	if podIP == "" {
 		log.Errorf("get env(%s) data failed", POD_IP_KEY)
 		return
 	}
-	podName := os.Getenv(POD_NAME_KEY)
+	podName := GetPodName()
 	if podName == "" {
 		log.Errorf("get env(%s) data failed", POD_NAME_KEY)
 		return

@@ -63,7 +63,7 @@ func (c *Config) Convert() {
 		}
 		log.Infof("%+v", c.Chrony)
 	}
-	nodeIP := os.Getenv(common.NODE_IP_KEY)
+	nodeIP := common.GetNodeIP()
 	if nodeIP == "" {
 		log.Errorf("get env(%s) data failed", common.NODE_IP_KEY)
 		return

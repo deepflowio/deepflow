@@ -21,7 +21,6 @@ package election
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -92,10 +91,10 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 
 func getID() string {
 	return fmt.Sprintf("%s/%s/%s/%s",
-		os.Getenv(common.NODE_NAME_KEY),
-		os.Getenv(common.NODE_IP_KEY),
-		os.Getenv(common.POD_NAME_KEY),
-		os.Getenv(common.POD_IP_KEY))
+		common.GetNodeName(),
+		common.GetNodeIP(),
+		common.GetPodName(),
+		common.GetPodIP())
 }
 
 func GetLeader() string {
@@ -142,7 +141,7 @@ func checkLeaderValid(ctx context.Context, lock *resourcelock.LeaseLock) {
 func Start(ctx context.Context, cfg *config.ControllerConfig) {
 	kubeconfig := cfg.Kubeconfig
 	electionName := cfg.ElectionName
-	electionNamespace := cfg.ElectionNamespace
+	electionNamespace := common.GetNameSpace()
 	id := getID()
 	log.Infof("election id is %s", id)
 	// leader election uses the Kubernetes API by writing to a

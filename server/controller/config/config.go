@@ -69,7 +69,6 @@ type ControllerConfig struct {
 	GrpcNodePort         string `default:"30035" yaml:"grpc-node-port"`
 	Kubeconfig           string `yaml:"kubeconfig"`
 	ElectionName         string `default:"deepflow-server" yaml:"election-name"`
-	ElectionNamespace    string `default:"deepflow" yaml:"election-namespace"`
 	ReportingDisabled    bool   `default:"false" yaml:"reporting-disabled"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`

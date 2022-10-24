@@ -39,14 +39,40 @@ import (
 
 var log = logging.MustGetLogger("common")
 
-var NodeName string
+var NodeName, NodeIP, PodName, PodIP, NameSpace string
 
 func init() {
 	NodeName = os.Getenv(NODE_NAME_KEY)
+	NodeIP = os.Getenv(NODE_IP_KEY)
+	PodName = os.Getenv(POD_NAME_KEY)
+	PodIP = os.Getenv(POD_IP_KEY)
+	NameSpace = os.Getenv(NAME_SPACE_KEY)
+	log.Infof("ENV %s=%s; %s=%s; %s=%s; %s=%s; %s=%s",
+		NODE_NAME_KEY, NodeName,
+		NODE_IP_KEY, NodeIP,
+		POD_NAME_KEY, PodName,
+		POD_IP_KEY, PodIP,
+		NAME_SPACE_KEY, NameSpace)
 }
 
 func GetNodeName() string {
 	return NodeName
+}
+
+func GetNodeIP() string {
+	return NodeIP
+}
+
+func GetPodName() string {
+	return PodName
+}
+
+func GetPodIP() string {
+	return PodIP
+}
+
+func GetNameSpace() string {
+	return NameSpace
 }
 
 var osDict = map[string]int{

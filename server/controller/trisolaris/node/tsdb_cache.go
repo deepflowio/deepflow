@@ -17,7 +17,6 @@
 package node
 
 import (
-	"os"
 	"sync"
 	"time"
 
@@ -156,7 +155,7 @@ func (c *TSDBCache) UpdateSystemInfo(cpuNum int, memorySize int64, arch string, 
 	c.pcapDataMountPath = &pcapDataMountPath
 	c.name = &name
 
-	podIP := os.Getenv(common.POD_IP_KEY)
+	podIP := common.GetPodIP()
 	if podIP == "" {
 		log.Errorf("get env(%s) data failed", common.POD_IP_KEY)
 	} else if podIP != *c.podIP {
