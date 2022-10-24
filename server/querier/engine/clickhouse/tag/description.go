@@ -469,7 +469,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 		}
 
 		if strings.Trim(whereLimitList[0], " ") != "" {
-			whereSql = " WHERE " + strings.ReplaceAll(whereLimitList[0], "*", "%")
+			whereSql = " WHERE (" + strings.ReplaceAll(whereLimitList[0], "*", "%") + ")"
 		}
 	}
 
@@ -494,7 +494,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 				}
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
@@ -510,7 +510,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 					resourceId = "pod_service_id"
 					resourceName = "pod_service_name"
 				}
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
@@ -591,7 +591,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 				whereSql = fmt.Sprintf("WHERE devicetype in (%s)", strings.Join(autoDeviceTypes, ","))
 			}
 			sql = fmt.Sprintf(
-				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s",
+				"SELECT deviceid AS value,name AS display_name,devicetype AS device_type,uid FROM device_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s",
 				whereSql, orderBy, limitSql,
 			)
 		} else if tag == "vpc" || tag == "l2_vpc" {
