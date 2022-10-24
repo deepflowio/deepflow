@@ -22,3 +22,64 @@ mod redis;
 pub use mysql::{MysqlHeader, MysqlInfo, MysqlLog};
 pub use postgresql::{PostgreInfo, PostgresqlLog};
 pub use redis::{decode, RedisInfo, RedisLog};
+
+/*
+pg sql start with:
+
+ABORT                      COMMIT                     END                        LOCK                       REVOKE                     TRUNCATE
+ALTER                      COPY                       EXECUTE                    MOVE                       ROLLBACK                   UNLISTEN
+ANALYZE                    CREATE                     EXPLAIN                    NOTIFY                     SAVEPOINT                  UPDATE
+BEGIN                      DEALLOCATE                 FETCH                      PREPARE                    SECURITY LABEL             VACUUM
+CALL                       DECLARE                    GRANT                      REASSIGN                   SELECT                     VALUES
+CHECKPOINT                 DELETE FROM                IMPORT                     REFRESH MATERIALIZED VIEW  SET                        WITH
+CLOSE                      DISCARD                    INSERT                     REINDEX                    SHOW
+CLUSTER                    DO                         LISTEN                     RELEASE                    START
+COMMENT                    DROP                       LOAD                       RESET                      TABLE
+*/
+
+// not full of pg sql start. only log some necessary sql.
+const POSTGRESQL_START: [&'static str; 33] = [
+    "ABORT",
+    "ALTER",
+    "ANALYZE",
+    "BEGIN",
+    "CALL",
+    "CHECKPOINT",
+    "CREATE",
+    "DECLARE",
+    "DELETE",
+    "DROP",
+    "EXECUTE",
+    "EXPLAIN",
+    "FETCH",
+    "GRANT",
+    "IMPORT",
+    "LOAD",
+    "LOCK",
+    "PREPARE",
+    "REFRESH",
+    "MATERIALIZED",
+    "REINDEX",
+    "RELEASE",
+    "RESET",
+    "REVOKE",
+    "SAVEPOINT",
+    "SELECT",
+    "SET",
+    "SHOW",
+    "START",
+    "TABLE",
+    "TRUNCATE",
+    "UPDATE",
+    "WITH",
+];
+
+pub fn is_postgresql(sql: &String) -> bool {
+    let upper = sql.to_ascii_uppercase();
+    for i in POSTGRESQL_START.iter() {
+        if upper.starts_with(i) {
+            return true;
+        }
+    }
+    false
+}

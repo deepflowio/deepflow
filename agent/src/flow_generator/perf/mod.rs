@@ -33,7 +33,7 @@ use enum_dispatch::enum_dispatch;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
-use super::protocol_logs::AppProtoHead;
+use super::protocol_logs::{AppProtoHead, PostgresqlLog};
 
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
@@ -58,6 +58,7 @@ use {
 
 pub use l7_rrt::L7RrtCache;
 pub use stats::FlowPerfCounter;
+pub use stats::PerfStats;
 
 pub use dns::DNS_PORT;
 
@@ -93,6 +94,7 @@ pub enum L7FlowPerfTable {
     DubboPerfData,
     MysqlPerfData,
     HttpPerfData,
+    PostgresqlLog,
 }
 
 pub struct FlowPerf {
@@ -122,6 +124,7 @@ impl FlowPerf {
             L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
             L7Protocol::MQTT => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),
             L7Protocol::MySQL => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
+            L7Protocol::PostgreSQL => Some(L7FlowPerfTable::from(PostgresqlLog::new())),
             L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
             L7Protocol::Http1 | L7Protocol::Http2 => {
                 Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))

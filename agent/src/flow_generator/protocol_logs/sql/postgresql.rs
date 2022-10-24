@@ -22,11 +22,13 @@ use serde::Serialize;
 
 use crate::{
     common::{
-        flow::PacketDirection,
+        flow::{FlowPerfStats, L7PerfStats, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
+        MetaPacket,
     },
     flow_generator::{
+        perf::{L7FlowPerf, PerfStats},
         protocol_logs::{
             pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
             L7ResponseStatus,
@@ -35,7 +37,10 @@ use crate::{
     },
 };
 
-use super::postgre_convert::{get_code_desc, get_request_str};
+use super::{
+    is_postgresql,
+    postgre_convert::{get_code_desc, get_request_str},
+};
 
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
 
@@ -119,7 +124,7 @@ impl L7ProtocolInfoInterface for PostgreInfo {
     }
 
     fn skip_send(&self) -> bool {
-        false
+        return self.context.is_empty();
     }
 }
 
@@ -151,6 +156,7 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct PostgresqlLog {
     info: PostgreInfo,
+    perf_stats: Option<PerfStats>,
     parsed: bool,
 }
 
@@ -212,11 +218,61 @@ impl L7ProtocolParserInterface for PostgresqlLog {
     }
 }
 
+impl L7FlowPerf for PostgresqlLog {
+    fn parse(&mut self, packet: &MetaPacket, _flow_id: u64) -> Result<()> {
+        if let Some(payload) = packet.get_l4_payload() {
+            self.parse_payload(payload, &ParseParam::from(packet))?;
+        }
+        Ok(())
+    }
+
+    fn data_updated(&self) -> bool {
+        return self.perf_stats.is_some();
+    }
+
+    fn copy_and_reset_data(&mut self, _l7_timeout_count: u32) -> FlowPerfStats {
+        FlowPerfStats {
+            l7_protocol: L7Protocol::PostgreSQL,
+            l7: if let Some(perf) = self.perf_stats.take() {
+                L7PerfStats {
+                    request_count: perf.req_count,
+                    response_count: perf.resp_count,
+                    rrt_count: perf.rrt_count,
+                    rrt_sum: perf.rrt_sum.as_micros() as u64,
+                    rrt_max: perf.rrt_max.as_micros() as u32,
+                    ..Default::default()
+                }
+            } else {
+                L7PerfStats::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
+        if let Some(h) = L7ProtocolInfoInterface::app_proto_head(&self.info) {
+            return Some((h, 0));
+        }
+        None
+    }
+}
+
 impl PostgresqlLog {
     pub fn new() -> Self {
         let mut s = Self::default();
         s.info.ignore = true;
         s
+    }
+
+    fn update_perf(&mut self, req_count: u32, resp_count: u32, req_err: u32, resp_err: u32) {
+        if self.perf_stats.is_none() {
+            self.perf_stats = Some(PerfStats::default());
+        }
+        let perf = self.perf_stats.as_mut().unwrap();
+        perf.req_count += req_count;
+        perf.resp_count += resp_count;
+        perf.req_err_count += req_err;
+        perf.resp_err_count += resp_err;
     }
 
     fn set_msg_type(&mut self, direction: PacketDirection) {
@@ -266,10 +322,14 @@ impl PostgresqlLog {
     }
 
     fn on_req_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
+        self.update_perf(1, 0, 0, 0);
         match tag {
             'Q' => {
                 self.info.req_type = tag;
                 self.info.context = strip_string_end_with_zero(data)?;
+                if !is_postgresql(&self.info.context) {
+                    return Err(Error::L7ProtocolUnknown);
+                }
                 self.info.ignore = false;
                 Ok(())
             }
@@ -287,8 +347,10 @@ impl PostgresqlLog {
                     // parse query
                     if let Some(idx) = data.iter().position(|x| *x == 0x0) {
                         self.info.context = String::from_utf8_lossy(&data[..idx]).to_string();
+                        if is_postgresql(&self.info.context) {
+                            return Ok(());
+                        }
                     }
-                    return Ok(());
                 }
                 Err(Error::L7ProtocolUnknown)
             }
@@ -299,6 +361,7 @@ impl PostgresqlLog {
 
     fn on_resp_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
         let mut data = data;
+        self.update_perf(0, 1, 0, 0);
         match tag {
             'C' => {
                 self.info.status = L7ResponseStatus::Ok;
@@ -363,6 +426,11 @@ impl PostgresqlLog {
                     let (err_desc, status) = get_code_desc(self.info.result.as_str());
                     self.info.error_message = String::from(err_desc);
                     self.info.status = status;
+                    match self.info.status {
+                        L7ResponseStatus::ClientError => self.update_perf(0, 0, 1, 0),
+                        L7ResponseStatus::ServerError => self.update_perf(0, 0, 0, 1),
+                        _ => {}
+                    }
                     return Ok(());
                 }
 

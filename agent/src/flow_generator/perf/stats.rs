@@ -17,10 +17,12 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
+use serde::Serialize;
+
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 
 // 每次获取统计数据后此结构体都会被清零，不能在其中保存Flow级别的信息避免被清空
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone, Serialize)]
 pub struct PerfStats {
     pub req_count: u32,
     pub resp_count: u32,
