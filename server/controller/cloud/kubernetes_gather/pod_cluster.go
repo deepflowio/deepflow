@@ -33,13 +33,12 @@ func (k *KubernetesGather) getPodCluster() (model.PodCluster, error) {
 		return model.PodCluster{}, vErr
 	}
 	podCluster := model.PodCluster{
-		Lcuuid:          common.GetUUID(k.UuidGenerate, uuid.Nil),
-		Version:         K8S_VERSION_PREFIX + " " + vJson.Get("gitVersion").MustString(),
-		Name:            k.Name,
-		VPCLcuuid:       k.VPCUuid,
-		AZLcuuid:        k.azLcuuid,
-		RegionLcuuid:    k.RegionUuid,
-		SubDomainLcuuid: common.GetUUID(k.UuidGenerate, uuid.Nil),
+		Lcuuid:       common.GetUUID(k.UuidGenerate, uuid.Nil),
+		Version:      K8S_VERSION_PREFIX + " " + vJson.Get("gitVersion").MustString(),
+		Name:         k.Name,
+		VPCLcuuid:    k.VPCUuid,
+		AZLcuuid:     k.azLcuuid,
+		RegionLcuuid: k.RegionUuid,
 	}
 	log.Debug("get pod cluster complete")
 	return podCluster, nil
