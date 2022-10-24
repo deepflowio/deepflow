@@ -609,6 +609,7 @@ impl L7LogDynamicConfig {
 pub struct MetricServerConfig {
     pub enabled: bool,
     pub port: u16,
+    pub compressed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -874,6 +875,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
                 port: conf.external_agent_http_proxy_port as u16,
+                compressed: conf.yaml_config.external_agent_http_proxy_compressed,
             },
             trident_type: conf.trident_type,
             port_config: PortConfig {
@@ -1710,6 +1712,14 @@ impl ConfigHandler {
                     c.external_metrics_server
                         .set_port(new_config.metric_server.port);
                 }
+            }
+            if candidate_config.metric_server.compressed != new_config.metric_server.compressed {
+                fn metric_server_callback(handler: &ConfigHandler, components: &mut Components) {
+                    components
+                        .external_metrics_server
+                        .enable_compressed(handler.candidate_config.metric_server.compressed);
+                }
+                callbacks.push(metric_server_callback);
             }
             info!(
                 "integration collector config change from {:#?} to {:#?}",
