@@ -68,9 +68,24 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 
 		podGroups := metaData.Get("ownerReferences")
 		generateName := metaData.Get("generateName").MustString()
-		if len(podGroups.MustArray()) == 0 && generateName != "" {
-			uid := common.GetUUID(namespace+generateName, uuid.Nil)
-			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "DaemonSet"}]`, uid)))
+		if len(podGroups.MustArray()) == 0 {
+			if generateName == "" {
+				pTempHash := metaData.Get("lables").Get("pod-template-hash").MustString()
+				if pTempHash == "" {
+					log.Debugf("pod (%s) pod template hash not found", name)
+					continue
+				}
+				pNameSlice := strings.Split(name, "-"+pTempHash+"-")
+				if len(pNameSlice) != 2 {
+					log.Debugf("pod (%s) not split by hash (%s)", name, pTempHash)
+					continue
+				}
+				uid := common.GetUUID(namespace+pNameSlice[0], uuid.Nil)
+				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "Deployment"}]`, uid)))
+			} else {
+				uid := common.GetUUID(namespace+generateName, uuid.Nil)
+				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "DaemonSet"}]`, uid)))
+			}
 		}
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
 		if len(podGroups.MustArray()) == 0 || ID == "" {
