@@ -647,12 +647,15 @@ impl Synchronizer {
             exception_handler.set(Exception::InvalidConfiguration);
             return;
         }
-        let mut runtime_config = runtime_config.unwrap();
+        let runtime_config = runtime_config.unwrap();
+        // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
         // will be true
+        /*
         if static_config.version_info.name == env!("AGENT_NAME") {
             runtime_config.platform_enabled = false;
         }
+         */
         let _ = escape_tx.send(runtime_config.max_escape);
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
