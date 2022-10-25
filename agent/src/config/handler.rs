@@ -1336,7 +1336,7 @@ impl ConfigHandler {
         }
 
         if candidate_config.environment != new_config.environment {
-            if candidate_config.tap_mode != TapMode::Analyzer {
+            if candidate_config.tap_mode != TapMode::Analyzer && static_config.kubernetes_cluster_id.is_empty() {
                 if candidate_config.environment.max_memory != new_config.environment.max_memory {
                     // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                     info!(
