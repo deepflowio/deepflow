@@ -274,10 +274,10 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 		}, nil
 	}
 	if vtapCache == nil {
-		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, host_ips: %s, kubernetes_cluster_id: %s) not found in cache. "+
+		log.Warningf("vtap (ctrl_ip: %s, ctrl_mac: %s, host_ips: %s, kubernetes_cluster_id: %s, group_id: %s) not found in cache. "+
 			"NAME:%s  REVISION:%s  BOOT_TIME:%d",
 			ctrlIP, ctrlMac, in.GetHostIps(), in.GetKubernetesClusterId(),
-			in.GetProcessName(), in.GetRevision(), in.GetBootTime())
+			in.GetVtapGroupIdRequest(), in.GetProcessName(), in.GetRevision(), in.GetBootTime())
 
 		gVTapInfo.Register(
 			int(in.GetTapMode()),
