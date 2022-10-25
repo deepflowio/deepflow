@@ -39,43 +39,47 @@ COMMENT                    DROP                       LOAD                      
 
 // not full of pg sql start. only log some necessary sql.
 const POSTGRESQL_START: [&'static str; 33] = [
-    "ABORT",
-    "ALTER",
-    "ANALYZE",
-    "BEGIN",
-    "CALL",
-    "CHECKPOINT",
-    "CREATE",
-    "DECLARE",
+    //crud
+    "SELECT",
+    "INSERT",
+    "UPDATE",
     "DELETE",
+    // table manipulate
+    "SHOW",
+    "CREATE",
     "DROP",
-    "EXECUTE",
+    "ALTER",
+    //sql explain
     "EXPLAIN",
-    "FETCH",
+    // other
     "GRANT",
+    "WITH",
+    "EXECUTE",
+    "SET",
+    "DECLARE",
+    "MATERIALIZED",
+    "SAVEPOINT",
+    "CHECKPOINT",
+    "ABORT",
+    "ANALYZE",
+    "CALL",
+    "FETCH",
     "IMPORT",
     "LOAD",
     "LOCK",
     "PREPARE",
     "REFRESH",
-    "MATERIALIZED",
     "REINDEX",
     "RELEASE",
     "RESET",
     "REVOKE",
-    "SAVEPOINT",
-    "SELECT",
-    "SET",
-    "SHOW",
     "START",
     "TABLE",
     "TRUNCATE",
-    "UPDATE",
-    "WITH",
 ];
 
 pub fn is_postgresql(sql: &String) -> bool {
-    let upper = sql.to_ascii_uppercase();
+    let upper = sql.trim_start().to_ascii_uppercase();
     for i in POSTGRESQL_START.iter() {
         if upper.starts_with(i) {
             return true;
