@@ -165,14 +165,7 @@ struct SysStatusBroker {
 impl SysStatusBroker {
     pub fn new(system: Arc<Mutex<System>>, log_dir: String) -> Result<Self> {
         let pid = get_current_pid().map_err(|e| Error::SysMonitor(String::from(e)))?;
-        let core_count = system
-            .lock()
-            .unwrap()
-            .physical_core_count()
-            .ok_or(Error::SysMonitor(format!(
-                "couldn't get physical core count with pid({})",
-                pid
-            )))?;
+        let core_count = system.lock().unwrap().cpus().len();
 
         let create_time = {
             let mut system_guard = system.lock().unwrap();
@@ -242,7 +235,7 @@ impl RefCountable for SysStatusBroker {
                     warn!("get cpu usage failed");
                     0.0
                 };
-                let mem_used = process.memory() << 10; // 单位：bytes
+                let mem_used = process.memory(); // in bytes
 
                 metrics.push((
                     "cpu_percent",
