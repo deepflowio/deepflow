@@ -1273,10 +1273,6 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_REDIS;
 	} else if ((inferred_message.type =
-		    infer_postgre_message(infer_buf, count,
-					conn_info)) != MSG_UNKNOWN){
-		inferred_message.protocol = PROTO_POSTGRESQL;
-	} else if ((inferred_message.type =
 		    infer_mqtt_message(infer_buf, count,
 				       conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_MQTT;
@@ -1336,6 +1332,10 @@ static __inline struct protocol_message_t infer_protocol(const char *buf,
 		    infer_kafka_message(infer_buf, count,
 					conn_info)) != MSG_UNKNOWN) {
 		inferred_message.protocol = PROTO_KAFKA;
+	} else if ((inferred_message.type =
+		    infer_postgre_message(infer_buf, count,
+					conn_info)) != MSG_UNKNOWN){
+		inferred_message.protocol = PROTO_POSTGRESQL;
 	}
 
 	return inferred_message;

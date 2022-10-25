@@ -94,8 +94,11 @@ impl DnsInfo {
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
         }
-        if self.status_code.is_none() {
-            self.status_code = other.status_code;
+
+        if let Some(code) = other.status_code {
+            if code != 0 {
+                self.status_code = Some(code);
+            }
         }
     }
 
