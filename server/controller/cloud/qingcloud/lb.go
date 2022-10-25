@@ -70,12 +70,12 @@ func (q *QingCloud) GetLoadBalances() (
 				vxnetId := lb.Get("vxnet_id").MustString()
 				vpcLcuuid, ok := q.vxnetIdToVPCLcuuid[vxnetId]
 				if !ok {
-					log.Infof("lb (%s) vpc not found", lbId)
+					log.Infof("lb (%s) vxnetId (%s) vpc not found", lbId, vxnetId)
 					continue
 				}
 				subnetLcuuid, ok := q.vxnetIdToSubnetLcuuid[vxnetId]
 				if !ok {
-					log.Infof("lb (%s) subnet not found", lbId)
+					log.Infof("lb (%s) vxnetId (%s) subnet not found", lbId, vxnetId)
 					continue
 				}
 
