@@ -3,6 +3,7 @@ FROM docker.io/alpine
 ARG TZ='Asia/Harbin'
 ENV DEFAULT_TZ ${TZ}
 ENV IN_CONTAINER yes
+ENV RUST_BACKTRACE 1
 ARG TARGETARCH
 RUN --mount=target=/tmp-mount \
     apk upgrade --update \
