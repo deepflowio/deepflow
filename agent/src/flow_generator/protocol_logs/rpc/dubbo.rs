@@ -28,7 +28,9 @@ use crate::common::flow::PacketDirection;
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
 use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
+use crate::flow_generator::protocol_logs::pb_adapter::{
+    L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+};
 use crate::flow_generator::{AppProtoHeadEnum, AppProtoLogsInfoEnum};
 use crate::utils::bytes::{read_u32_be, read_u64_be};
 
@@ -95,6 +97,10 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 code: f.status_code,
                 ..Default::default()
             },
+            trace_info: Some(TraceInfo {
+                trace_id: Some(f.trace_id),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         return log;
