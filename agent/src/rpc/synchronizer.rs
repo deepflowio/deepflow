@@ -1295,9 +1295,8 @@ impl RuntimeEnvironment {
         let mut sys = System::new();
         sys.refresh_memory();
         RuntimeEnvironment {
-            cpu_num: sys.physical_core_count().unwrap_or_default() as u32,
-            // 这里乘1000，因为库作者思路清奇换算成了10基底的KB
-            memory_size: sys.total_memory() * 1000,
+            cpu_num: sys.cpus().len() as u32,
+            memory_size: sys.total_memory(),
             arch: std::env::consts::ARCH.into(),
             os: format!(
                 "{} {}",

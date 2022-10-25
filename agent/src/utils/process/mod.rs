@@ -25,3 +25,20 @@ pub use linux::*;
 mod windows;
 #[cfg(target_os = "windows")]
 pub use self::windows::*;
+
+use sysinfo::{System, SystemExt};
+
+/// 返回当前系统的空闲内存数目，单位：%
+pub fn get_current_sys_free_memory_percentage() -> u32 {
+    // don't use new_all(), we only need meminfo, new_all() will refresh all things(include cpu, users, etc).
+    // It could be problematic for processes using a lot of files and using sysinfo at the same time.
+    // https://github.com/GuillaumeGomez/sysinfo/blob/master/src/linux/system.rs#L21
+    let mut s = System::new();
+    s.refresh_memory();
+    let total_memory = s.total_memory();
+    if total_memory > 0 {
+        (s.free_memory() * 100 / total_memory) as u32
+    } else {
+        0
+    }
+}
