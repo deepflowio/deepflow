@@ -273,7 +273,7 @@ all_protocol!(
     // http have two version but one parser, can not place in macro param.
     DNS,DnsParser,DnsLog::default;
     MySQL,MysqlParser,MysqlLog::default;
-    Kafka,KafkaParser,KafkaLog::default;
+    Kafka,KafkaParser,KafkaLog::new;
     Redis,RedisParser,RedisLog::default;
     PostgreSQL,PostgresParser,PostgresqlLog::new;
     Dubbo,DubboParser,DubboLog::default;
