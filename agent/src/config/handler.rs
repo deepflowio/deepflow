@@ -1045,7 +1045,8 @@ impl ConfigHandler {
 
         if candidate_config.tap_mode != TapMode::Analyzer {
             // Check and send out exceptions in time
-            if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler) {
+            if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler)
+            {
                 warn!("{}", e);
             }
         }
@@ -1324,7 +1325,9 @@ impl ConfigHandler {
             candidate_config.diagnose = new_config.diagnose;
         }
 
-        if candidate_config.tap_mode == TapMode::Analyzer || !static_config.kubernetes_cluster_id.is_empty() {
+        if candidate_config.tap_mode == TapMode::Analyzer
+            || !static_config.kubernetes_cluster_id.is_empty()
+        {
             info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
             candidate_config.environment.max_memory = 0;
 
@@ -1336,7 +1339,9 @@ impl ConfigHandler {
         }
 
         if candidate_config.environment != new_config.environment {
-            if candidate_config.tap_mode != TapMode::Analyzer && static_config.kubernetes_cluster_id.is_empty() {
+            if candidate_config.tap_mode != TapMode::Analyzer
+                && static_config.kubernetes_cluster_id.is_empty()
+            {
                 if candidate_config.environment.max_memory != new_config.environment.max_memory {
                     // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                     info!(

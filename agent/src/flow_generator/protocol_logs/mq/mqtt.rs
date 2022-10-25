@@ -143,7 +143,12 @@ impl MqttInfo {
         if self.res_msg_size.is_none() {
             self.res_msg_size = other.res_msg_size;
         }
-        self.status = other.status;
+        if self.status == L7ResponseStatus::default() {
+            self.status = other.status;
+        }
+        if self.code.is_none() {
+            self.code = other.code;
+        }
         match other.pkt_type {
             PacketKind::Publish { .. } => {
                 self.publish_topic = other.publish_topic;
@@ -250,7 +255,9 @@ impl L7ProtocolParserInterface for MqttLog {
     }
 
     fn reset(&mut self) {
-        *self = Self::default();
+        let mut s = Self::default();
+        s.version = self.version;
+        *self = s;
     }
 }
 
