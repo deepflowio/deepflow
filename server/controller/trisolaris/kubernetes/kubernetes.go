@@ -74,16 +74,16 @@ func (k *KubernetesInfo) refresh() {
 	}
 	k.mutex.Unlock()
 	log.Infof("refresh cache cluster_id completed")
-	log.Debugf("cluster_id domain map: %v", k.clusterIDToDomain)
+	log.Debugf("cluster_id domain map: %v, sub_domain map: %v", k.clusterIDToDomain, k.clusterIDToSubDomain)
 	return
 }
 
 func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool {
 	k.mutex.Lock()
 	_, dok := k.clusterIDToDomain[clusterID]
-	_, sdok := k.clusterIDToDomain[clusterID]
+	_, sdok := k.clusterIDToSubDomain[clusterID]
 	k.mutex.Unlock()
-	log.Debugf("cluster_id domain map: %v", k.clusterIDToDomain)
+	log.Debugf("cluster_id domain map: %v, sub_domain map: %v", k.clusterIDToDomain, k.clusterIDToSubDomain)
 	return dok || sdok
 }
 
