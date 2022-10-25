@@ -17,6 +17,8 @@
 package qingcloud
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"strings"
 
@@ -40,6 +42,13 @@ func (q *QingCloud) GetLoadBalances() (
 	lbIdToVPCLcuuid := make(map[string]string)
 	lbIdToIP := make(map[string]string)
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
+		regionVPCLcuuid, ok := q.regionIdToDefaultVPCLcuuid[regionId]
+		if !ok {
+			err := errors.New(fmt.Sprintf("(%s) default vpc not found", regionId))
+			log.Error(err)
+			return nil, nil, nil, nil, nil, nil, err
+		}
+
 		kwargs := []*Param{
 			{"zone", regionId},
 			{"status.1", "active"},
@@ -70,13 +79,13 @@ func (q *QingCloud) GetLoadBalances() (
 				vxnetId := lb.Get("vxnet_id").MustString()
 				vpcLcuuid, ok := q.vxnetIdToVPCLcuuid[vxnetId]
 				if !ok {
-					log.Infof("lb (%s) vxnetId (%s) vpc not found", lbId, vxnetId)
-					continue
+					log.Debugf("lb (%s) vxnetId (%s) vpc not found", lbId, vxnetId)
+					vpcLcuuid = regionVPCLcuuid
 				}
 				subnetLcuuid, ok := q.vxnetIdToSubnetLcuuid[vxnetId]
 				if !ok {
-					log.Infof("lb (%s) vxnetId (%s) subnet not found", lbId, vxnetId)
-					continue
+					log.Debugf("lb (%s) vxnetId (%s) subnet not found", lbId, vxnetId)
+					subnetLcuuid = ""
 				}
 
 				// 获取VIP
@@ -124,7 +133,7 @@ func (q *QingCloud) GetLoadBalances() (
 				q.regionLcuuidToResourceNum[regionLcuuid]++
 
 				// 添加VIP接口
-				if vip != "" {
+				if vip != "" && subnetLcuuid != "" {
 					vinterfaceLcuuid := common.GenerateUUID(lbLcuuid + vip)
 					networkLcuuid := common.GenerateUUID(vxnetId)
 					retVInterfaces = append(retVInterfaces, model.VInterface{

@@ -49,8 +49,8 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 					continue
 				}
 				// 针对私有云的特殊处理，私有云API会返回其他类型的集群信息，仅对接KubeSphere
-				appInfo := cluster.Get("app_info").MustString()
-				if appInfo != "" && !strings.Contains(appInfo, "KubeSphere") {
+				appName := cluster.Get("app_info").Get("app_name").MustString()
+				if appName == "" || (appName != "" && !strings.Contains(appName, "KubeSphere")) {
 					continue
 				}
 
