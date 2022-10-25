@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-package event
+package eventapi
+
+import "github.com/deepflowys/deepflow/server/libs/pool"
 
 const (
 	RESOURCE_EVENT_TYPE_CREATE       = "create"
@@ -33,4 +35,24 @@ type ResourceEvent struct {
 	ResourceID   uint32
 	ResourceName string
 	Description  string
+}
+
+func (r *ResourceEvent) Release() {
+	ReleaseResourceEvent(r)
+}
+
+var poolResourceEvent = pool.NewLockFreePool(func() interface{} {
+	return new(ResourceEvent)
+})
+
+func AcquireResourceEvent() *ResourceEvent {
+	return poolResourceEvent.Get().(*ResourceEvent)
+}
+
+func ReleaseResourceEvent(event *ResourceEvent) {
+	if event == nil {
+		return
+	}
+	*event = ResourceEvent{}
+	poolResourceEvent.Put(event)
 }
