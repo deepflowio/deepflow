@@ -25,7 +25,6 @@ use std::{
 
 use log::debug;
 use nix::sys::utsname::uname;
-use sysinfo::{System, SystemExt};
 
 //返回当前进程占用内存RSS单位（字节）
 pub fn get_memory_rss() -> Result<u64> {
@@ -246,18 +245,4 @@ fn get_num_from_status_file(pattern: &str, value: &str) -> Result<u32> {
     }
 
     Ok(num)
-}
-
-/// 返回当前系统的空闲内存数目，单位：%
-pub fn get_current_sys_free_memory_percentage() -> u32 {
-    // don't use new_all(), we only need meminfo, new_all() will refresh all things(include cpu, users, etc).
-    // It could be problematic for processes using a lot of files and using sysinfo at the same time.
-    // https://github.com/GuillaumeGomez/sysinfo/blob/master/src/linux/system.rs#L21
-    let mut s = System::new();
-    s.refresh_memory();
-    let total_memory = s.total_memory();
-    if total_memory > 100 {
-        return (s.free_memory() / (total_memory / 100)) as u32;
-    }
-    0
 }

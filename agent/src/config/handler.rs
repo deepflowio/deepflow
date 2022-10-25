@@ -1337,7 +1337,7 @@ impl ConfigHandler {
             let mut system = sysinfo::System::new();
             system.refresh_cpu();
             candidate_config.environment.max_cpus =
-                system.physical_core_count().unwrap_or(1) as u32;
+                1.max(system.cpus().len()) as u32;
         }
 
         if candidate_config.environment != new_config.environment {

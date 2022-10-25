@@ -123,7 +123,7 @@ pub fn free_memory_check(required: u64, exception_handler: &ExceptionHandler) ->
             let mut system = System::new();
             system.refresh_memory();
 
-            if still_need <= system.available_memory() * 1024 {
+            if still_need <= system.available_memory() {
                 exception_handler.clear(Exception::MemNotEnough);
                 Ok(())
             } else {

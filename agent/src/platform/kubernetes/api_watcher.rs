@@ -118,10 +118,7 @@ impl ApiWatcher {
         exception_handler: ExceptionHandler,
     ) -> Self {
         // worker_threads = min(min(3 * CPU_CORE + 0, THREAD_THRESHOLD), RESOURCES.len())
-        let worker_threads = System::new()
-            .physical_core_count()
-            .map(|c| c * 3)
-            .unwrap_or(RESOURCES.len())
+        let worker_threads = (System::new().cpus().len() * 3)
             .min(config.load().thread_threshold as usize)
             .min(RESOURCES.len());
 
