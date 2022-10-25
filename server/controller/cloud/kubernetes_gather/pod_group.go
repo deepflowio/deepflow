@@ -88,12 +88,23 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			case 3:
 				replicas = 0
 				generateName := metaData.Get("generateName").MustString()
-				if generateName == "" {
-					log.Debugf("podgroup (%s) generateName id not found", name)
+				pTempHash := metaData.Get("lables").Get("pod-template-hash").MustString()
+				if generateName == "" && pTempHash == "" {
+					log.Debugf("podgroup (%s) generatename or pod template hash not found", name)
 					continue
 				}
-				uID = common.GetUUID(namespace+generateName, uuid.Nil)
-				name = generateName[:strings.LastIndex(generateName, "-")]
+				if generateName == "" {
+					pNameSlice := strings.Split(name, "-"+pTempHash+"-")
+					if len(pNameSlice) != 2 {
+						log.Debugf("podgroup (%s) not split by hash (%s)", name, pTempHash)
+						continue
+					}
+					name = pNameSlice[0]
+					uID = common.GetUUID(namespace+name, uuid.Nil)
+				} else {
+					name = generateName[:strings.LastIndex(generateName, "-")]
+					uID = common.GetUUID(namespace+generateName, uuid.Nil)
+				}
 				if k.podGroupLcuuids.Contains(uID) {
 					log.Debugf("podgroup (%s) abstract workload already existed", name)
 					continue
