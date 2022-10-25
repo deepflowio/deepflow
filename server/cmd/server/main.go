@@ -28,6 +28,7 @@ import (
 
 	"io/ioutil"
 
+	"github.com/deepflowys/deepflow/server/common"
 	"github.com/deepflowys/deepflow/server/controller/controller"
 	"github.com/deepflowys/deepflow/server/controller/report"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
@@ -100,10 +101,13 @@ func main() {
 	}()
 
 	report.SetServerInfo(Branch, RevCount, Revision)
-	go controller.Start(ctx, *configPath)
+
+	shared := common.NewControllerIngesterShared()
+
+	go controller.Start(ctx, *configPath, shared)
 
 	go querier.Start(*configPath)
-	closers := ingester.Start(*configPath)
+	closers := ingester.Start(*configPath, shared)
 
 	// TODO: loghandle提取出来，并增加log
 	// setup system signal
