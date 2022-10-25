@@ -14,10 +14,10 @@ RUN --mount=target=/tmp-mount \
     echo "root:root" | chpasswd; \
     chmod 000 /etc/passwd; \
     mkdir -p /lib64 && \
-    cp -raf /tmp-mount/output/target/x86_64-unknown-linux-musl/release/deepflow-agent /bin/  && \
+    cp -raf /tmp-mount/output/target/x86_64-unknown-linux-musl/debug/deepflow-agent /bin/  && \
     cp -raf /tmp-mount/output/target/x86_64-unknown-linux-musl/release/deepflow-agent-ctl /bin/  && \
     cp -raf /tmp-mount/output/src/ebpf/deepflow-ebpfctl /bin/  && \
-    chmod 4755 /bin/busybox 
+    chmod 4755 /bin/busybox
 
 USER root
 

@@ -196,7 +196,9 @@ impl DubboLog {
             .map(|trace_type| trace_type.to_string())
             .collect::<Vec<String>>();
 
+        info!("dubbo payload: '{}'", payload_str);
         for tag in &trace_id_tags {
+            info!("dubbo tag: '{}'", tag.as_str());
             if let Some(index) = payload_str.find(tag.as_str()) {
                 offset += index + tag.len();
                 // sw8匹配 以'1-'开头'-'结尾的部分
@@ -206,17 +208,20 @@ impl DubboLog {
                     offset += begin_index + 2;
                     if let Some(end_index) = payload_str[offset..].find("-") {
                         self.info.trace_id = payload_str[offset..offset + end_index].to_string();
+                        info!("dubbo trace: '{}'", self.info.trace_id);
                         break;
                     }
                 // logId匹配到'.'
                 } else if let Some(end_index) = payload_str[offset..].find(".") {
                     self.info.trace_id =
                         payload_str[offset..offset + TRACE_ID_MAX_LEN.min(end_index)].to_string();
+                    info!("dubbo trace: '{}'", self.info.trace_id);
                     break;
                 } else {
                     self.info.trace_id = payload_str
                         [offset..payload_str.len().min(offset + TRACE_ID_MAX_LEN)]
                         .to_string();
+                    info!("dubbo trace: '{}'", self.info.trace_id);
                     break;
                 }
             }
