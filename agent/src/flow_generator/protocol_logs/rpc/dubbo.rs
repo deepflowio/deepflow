@@ -136,6 +136,7 @@ impl From<DubboInfo> for L7ProtocolSendLog {
             },
             ext_info: Some(ExtendedInfo {
                 rpc_service: Some(f.service_name),
+                request_id: Some(f.request_id as u32),
                 ..Default::default()
             }),
             ..Default::default()

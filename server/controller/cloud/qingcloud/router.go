@@ -21,7 +21,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 )
 
-func (q *QingCloud) getRouterAndTables() (
+func (q *QingCloud) GetRouterAndTables() (
 	[]model.VRouter, []model.RoutingTable, []model.VInterface, []model.IP, error,
 ) {
 	var retVRouters []model.VRouter

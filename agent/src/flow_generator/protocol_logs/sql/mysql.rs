@@ -149,7 +149,11 @@ impl MysqlInfo {
 impl From<MysqlInfo> for L7ProtocolSendLog {
     fn from(f: MysqlInfo) -> Self {
         let log = L7ProtocolSendLog {
-            version: Some(f.protocol_version.to_string()),
+            version: if f.protocol_version == 0 {
+                None
+            } else {
+                Some(f.protocol_version.to_string())
+            },
             row_effect: f.affected_rows as u32,
             req: L7Request {
                 req_type: String::from(f.get_command_str()),

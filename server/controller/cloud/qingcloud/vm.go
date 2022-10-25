@@ -19,7 +19,6 @@ package qingcloud
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"strconv"
 
@@ -36,12 +35,14 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 	var retDefaultVxnetSubnets []model.Subnet
 	var defaultVxnetIDs []string
 	var vxnetIdToSubnetLcuuid map[string]string
+	var vxnetIdToVPCLcuuid map[string]string
 	var vmIdToVPCLcuuid map[string]string
 
 	log.Info("get vms starting")
 
 	vmIdToVPCLcuuid = make(map[string]string)
 	vxnetIdToSubnetLcuuid = make(map[string]string)
+	vxnetIdToVPCLcuuid = make(map[string]string)
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
 			{"zone", regionId},
@@ -77,6 +78,9 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				for vxnetId, subnetLcuuid := range tmpVxnetIdToSubnetLcuuid {
 					vxnetIdToSubnetLcuuid[vxnetId] = subnetLcuuid
 				}
+				for _, vxnetId := range tmpDefaultVxnetIDs {
+					vxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
+				}
 
 				vmId := vm.Get("instance_id").MustString()
 				vmName := vm.Get("instance_name").MustString()
@@ -85,13 +89,14 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 				}
 				// 仅针对私有云判断launch_server
 				hostName := vm.Get("host_machine").MustString()
-				hostIP := ""
-				if _, ok := reflect.TypeOf(*q).FieldByName("bossURL"); ok {
-					hostIP, ok = q.HostNameToIP[hostName]
+				launchServer := ""
+				if !q.isPublicCloud {
+					hostIP, ok := q.HostNameToIP[hostName]
 					if !ok {
 						log.Infof("vm (%s) host ip not found", vmId)
 						continue
 					}
+					launchServer = hostIP
 				}
 
 				vmLcuuid := common.GenerateUUID(vmId)
@@ -111,7 +116,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 					Label:        vmId,
 					State:        vmState,
 					HType:        common.VM_HTYPE_VM_C,
-					LaunchServer: hostIP,
+					LaunchServer: launchServer,
 					VPCLcuuid:    vpcLcuuid,
 					AZLcuuid:     azLcuuid,
 					RegionLcuuid: regionLcuuid,
@@ -144,6 +149,9 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 	for vxnetId, subnetLcuuid := range vxnetIdToSubnetLcuuid {
 		q.vxnetIdToSubnetLcuuid[vxnetId] = subnetLcuuid
 	}
+	for vxnetId, vpcLcuuid := range vxnetIdToVPCLcuuid {
+		q.vxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
+	}
 	log.Debug("get vms complete")
 	return retVMs, retVMSecurityGroups, retDefaultVxnetSubnets, nil
 }
@@ -166,30 +174,29 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 	retVxnetIdToSubnetLcuuid = make(map[string]string)
 	for i := range vm.Get("vxnets").MustArray() {
 		vxnet := vm.Get("vxnets").GetIndex(i)
-		privateIP := vxnet.Get("private_ip").MustString()
-		if privateIP == "" {
-			continue
-		}
 
 		vxnetName := vxnet.Get("vxnet_name").MustString()
 		vxnetId := vxnet.Get("vxnet_id").MustString()
 		if vxnetName == q.defaultVxnetName {
 			subnetLcuuid := common.GenerateUUID(vxnetId)
-			cidrParse, _ := ipaddr.Parse(
-				privateIP + "/" + strconv.Itoa(common.IPV4_DEFAULT_NETMASK),
-			)
-			subnetCidr := cidrParse.First().IP.String() + "/" +
-				strconv.Itoa(common.IPV4_DEFAULT_NETMASK)
-			retDefaultVxnetSubnets = append(
-				retDefaultVxnetSubnets,
-				model.Subnet{
-					Lcuuid:        subnetLcuuid,
-					Name:          vxnetName,
-					CIDR:          subnetCidr,
-					NetworkLcuuid: common.GenerateUUID(vxnetName + regionLcuuid),
-					VPCLcuuid:     retVPCLcuuid,
-				},
-			)
+			privateIP := vxnet.Get("private_ip").MustString()
+			if privateIP != "" {
+				cidrParse, _ := ipaddr.Parse(
+					privateIP + "/" + strconv.Itoa(common.IPV4_DEFAULT_NETMASK),
+				)
+				subnetCidr := cidrParse.First().IP.String() + "/" +
+					strconv.Itoa(common.IPV4_DEFAULT_NETMASK)
+				retDefaultVxnetSubnets = append(
+					retDefaultVxnetSubnets,
+					model.Subnet{
+						Lcuuid:        subnetLcuuid,
+						Name:          vxnetName,
+						CIDR:          subnetCidr,
+						NetworkLcuuid: common.GenerateUUID(vxnetName + regionLcuuid),
+						VPCLcuuid:     retVPCLcuuid,
+					},
+				)
+			}
 			retDefaultVxnetIDs = append(retDefaultVxnetIDs, vxnetId)
 			retVxnetIdToSubnetLcuuid[vxnetId] = subnetLcuuid
 		} else {
@@ -199,7 +206,6 @@ func (q *QingCloud) getVMVPCLcuuid(regionId, regionLcuuid string, vm *simplejson
 					"vm (%s) vxnetId (%s) vpc not found",
 					vm.Get("instance_id").MustString(), vxnetId,
 				)
-				continue
 			} else {
 				retVPCLcuuid = vpcLcuuid
 			}
@@ -238,7 +244,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 				}
 				vpcLcuuid, ok := q.vmIdToVPCLcuuid[instanceId]
 				if !ok {
-					log.Infof("nic (%s) instance_id (%s) vpc not found", nicId, instanceId)
+					log.Debugf("nic (%s) instance_id (%s) vpc not found", nicId, instanceId)
 					continue
 				}
 				// 如果接口属于基础网络，则生成基础网络对应的NetworkLcuuid

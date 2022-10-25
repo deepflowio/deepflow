@@ -43,13 +43,14 @@ import (
 var log = logging.MustGetLogger("cloud.qingcloud")
 
 type QingCloud struct {
-	Uuid         string
-	UuidGenerate string
-	Name         string
-	RegionUuid   string
-	url          string
-	secretID     string
-	secretKey    string
+	Uuid          string
+	UuidGenerate  string
+	Name          string
+	RegionUuid    string
+	url           string
+	secretID      string
+	secretKey     string
+	isPublicCloud bool
 
 	defaultVPCName   string
 	defaultVxnetName string
@@ -110,12 +111,13 @@ func NewQingCloud(domain mysql.Domain) (*QingCloud, error) {
 	return &QingCloud{
 		Uuid: domain.Lcuuid,
 		// TODO: display_name后期需要修改为uuid_generate
-		UuidGenerate: domain.DisplayName,
-		Name:         domain.Name,
-		RegionUuid:   config.Get("region_uuid").MustString(),
-		url:          url,
-		secretID:     secretID,
-		secretKey:    decryptSecretKey,
+		UuidGenerate:  domain.DisplayName,
+		Name:          domain.Name,
+		RegionUuid:    config.Get("region_uuid").MustString(),
+		url:           url,
+		secretID:      secretID,
+		secretKey:     decryptSecretKey,
+		isPublicCloud: domain.Type == common.QINGCLOUD,
 
 		defaultVPCName:            domain.Name + "_default_vpc",
 		defaultVxnetName:          "vxnet-0",
@@ -345,7 +347,7 @@ func (q *QingCloud) GetCloudData() (model.Resource, error) {
 	}
 
 	// 路由表及规则
-	vrouters, routingTables, tmpVInterfaces, tmpIPs, err := q.getRouterAndTables()
+	vrouters, routingTables, tmpVInterfaces, tmpIPs, err := q.GetRouterAndTables()
 	if err != nil {
 		log.Error("get router and rule data failed")
 		return resource, err

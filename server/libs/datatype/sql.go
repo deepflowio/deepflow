@@ -18,6 +18,7 @@ package datatype
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
 	"github.com/deepflowys/deepflow/server/libs/pool"
@@ -70,38 +71,19 @@ type MysqlInfo struct {
 }
 
 func (i *MysqlInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	/*
-		switch msgType {
-		case MSG_T_OTHER:
-			*p = pb.MysqlInfo{}
-			p.ProtocolVersion = uint32(i.ProtocolVersion)
-			p.ServerVersion = i.ServerVersion
-			p.ServerThreadId = i.ServerThreadID
-		case MSG_T_REQUEST:
-			*p = pb.MysqlInfo{}
-			p.Command = uint32(i.Command)
-			p.Context = i.Context
-		case MSG_T_RESPONSE:
-			p.ResponseCode = uint32(i.ResponseCode)
-			p.AffectedRows = i.AffectedRows
-			p.ErrorCode = uint32(i.ErrorCode)
-			p.ErrorMessage = i.ErrorMessage
-
-			p.Command = 0
-			p.Context = ""
-			p.ProtocolVersion = 0
-		case MSG_T_SESSION:
-			p.Command = uint32(i.Command)
-			p.Context = i.Context
-
-			p.ResponseCode = uint32(i.ResponseCode)
-			p.AffectedRows = i.AffectedRows
-			p.ErrorCode = uint32(i.ErrorCode)
-			p.ErrorMessage = i.ErrorMessage
-
-			p.ProtocolVersion = 0
+	p.Version = strconv.Itoa(int(i.ProtocolVersion))
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			ReqType:  MysqlCommand(i.Command).String(),
+			Resource: i.Context,
 		}
-	*/
+	}
+
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		p.Resp.Code = int32(i.ErrorCode)
+		p.Resp.Exception = i.ErrorMessage
+	}
+	p.RowEffect = uint32(i.AffectedRows)
 }
 
 func (i *MysqlInfo) String() string {
@@ -140,33 +122,17 @@ type RedisInfo struct {
 }
 
 func (i *RedisInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	/*
-		switch msgType {
-		case MSG_T_REQUEST:
-			p.Request = []byte(i.Request)
-			p.RequestType = []byte(i.RequestType)
-
-			p.Response = nil
-			p.Status = nil
-			p.Error = nil
-		case MSG_T_RESPONSE:
-			p.Request = nil
-			p.RequestType = nil
-
-			p.Response = []byte(i.Response)
-			p.Status = []byte(i.Status)
-			p.Error = []byte(i.Error)
-		case MSG_T_SESSION:
-			p.Request = []byte(i.Request)
-			p.RequestType = []byte(i.RequestType)
-			p.Response = []byte(i.Response)
-			p.Status = []byte(i.Status)
-			p.Error = []byte(i.Error)
-		default:
-			panic("RedisInfo encode msg type error!")
+	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
+		p.Req = &pb.L7Request{
+			ReqType:  i.RequestType,
+			Resource: i.Request,
 		}
-	*/
+	}
 
+	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
+		p.Resp.Result = i.Response
+		p.Resp.Exception = i.Error
+	}
 }
 
 func (i *RedisInfo) String() string {
