@@ -29,10 +29,18 @@ import (
 
 func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error) {
 	log.Debug("get podgroups starting")
-	podControllers := [3][]string{}
+	podControllers := [4][]string{}
 	podControllers[0] = k.k8sInfo["*v1.Deployment"]
 	podControllers[1] = k.k8sInfo["*v1.StatefulSet"]
 	podControllers[2] = k.k8sInfo["*v1.DaemonSet"]
+	podControllers[3] = k.k8sInfo["*v1.Pod"]
+	pgNameToTypeID := map[string]int{
+		"deployment":            common.POD_GROUP_DEPLOYMENT,
+		"statefulset":           common.POD_GROUP_STATEFULSET,
+		"replicaset":            common.POD_GROUP_RC,
+		"daemonset":             common.POD_GROUP_DAEMON_SET,
+		"replicationcontroller": common.POD_GROUP_REPLICASET_CONTROLLER,
+	}
 	for t, podController := range podControllers {
 		for _, c := range podController {
 			cData, cErr := simplejson.NewJson([]byte(c))
@@ -77,7 +85,28 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				replicas = 0
 				serviceType = common.POD_GROUP_DAEMON_SET
 				label = "daemonset" + namespace + ":" + name
+			case 3:
+				replicas = 0
+				generateName := metaData.Get("generateName").MustString()
+				if generateName == "" {
+					log.Debugf("podgroup (%s) generateName id not found", name)
+					continue
+				}
+				uID = common.GetUUID(namespace+generateName, uuid.Nil)
+				name = generateName[:strings.LastIndex(generateName, "-")]
+				if k.podGroupLcuuids.Contains(uID) {
+					log.Debugf("podgroup (%s) abstract workload already existed", name)
+					continue
+				}
+				oReferences := metaData.Get("ownerReferences")
+				typeName := strings.ToLower(oReferences.GetIndex(0).Get("kind").MustString())
+				serviceType, ok = pgNameToTypeID[typeName]
+				if !ok {
+					serviceType = 1
+				}
+				label = typeName + ":" + namespace + ":" + name
 			}
+
 			_, ok = k.nsLabelToGroupLcuuids[namespace+label]
 			if ok {
 				k.nsLabelToGroupLcuuids[namespace+label].Add(uID)

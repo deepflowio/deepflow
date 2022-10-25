@@ -17,13 +17,14 @@
 package kubernetes_gather
 
 import (
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -64,10 +65,16 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			log.Infof("pod (%s) node not found", name)
 			continue
 		}
+
 		podGroups := metaData.Get("ownerReferences")
+		generateName := metaData.Get("generateName").MustString()
+		if len(podGroups.MustArray()) == 0 && generateName != "" {
+			uid := common.GetUUID(namespace+generateName, uuid.Nil)
+			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "DaemonSet"}]`, uid)))
+		}
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
 		if len(podGroups.MustArray()) == 0 || ID == "" {
-			log.Infof("pod (%s) ownerreferences not found", name)
+			log.Infof("pod (%s) pod group not found", name)
 			continue
 		}
 		kind := podGroups.GetIndex(0).Get("kind").MustString()
