@@ -272,25 +272,34 @@ impl DubboLog {
 
         for tag in &trace_id_tags {
             if let Some(index) = payload_str.find(tag.as_str()) {
+                let mut invalid = false;
+                let last_index = payload_str.len().min(TRACE_ID_MAX_LEN + index + tag.len());
+                for char_index in index..last_index {
+                    if !payload_str.is_char_boundary(char_index) {
+                        invalid = true;
+                        break;
+                    }
+                }
+                if invalid {
+                    continue;
+                }
+
                 offset += index + tag.len();
                 // sw8匹配 以'1-'开头'-'结尾的部分
                 if let Some(begin_index) =
                     payload_str[offset..(offset + 20).min(payload_str.len())].find("1-")
                 {
                     offset += begin_index + 2;
-                    if let Some(end_index) = payload_str[offset..].find("-") {
+                    if let Some(end_index) = payload_str[offset..last_index].find("-") {
                         self.info.trace_id = payload_str[offset..offset + end_index].to_string();
                         break;
                     }
                 // logId匹配到'.'
-                } else if let Some(end_index) = payload_str[offset..].find(".") {
-                    self.info.trace_id =
-                        payload_str[offset..offset + TRACE_ID_MAX_LEN.min(end_index)].to_string();
+                } else if let Some(end_index) = payload_str[offset..last_index].find(".") {
+                    self.info.trace_id = payload_str[offset..offset + end_index].to_string();
                     break;
                 } else {
-                    self.info.trace_id = payload_str
-                        [offset..payload_str.len().min(offset + TRACE_ID_MAX_LEN)]
-                        .to_string();
+                    self.info.trace_id = payload_str[offset..last_index].to_string();
                     break;
                 }
             }

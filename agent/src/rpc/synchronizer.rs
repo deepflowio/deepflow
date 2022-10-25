@@ -458,6 +458,14 @@ impl Synchronizer {
         self.status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
     }
 
+    pub fn reset_version(&self) {
+        let mut status = self.status.write();
+        status.version_acls = 0;
+        status.version_groups = 0;
+        status.version_platform_data = 0;
+        info!("Reset version of acls, groups and platform_data.");
+    }
+
     pub fn add_flow_acl_listener(&self, module: Box<dyn FlowAclListener>) {
         let mut listeners = self.flow_acl_listener.lock().unwrap();
         for item in listeners.iter() {
@@ -466,6 +474,10 @@ impl Synchronizer {
             }
         }
         listeners.push(module);
+        // make sure agent can get the latest policy data
+        // ===============================================
+        // 保证 Agent 可以获取最新策略
+        self.reset_version();
     }
 
     pub fn max_memory(&self) -> Arc<AtomicU64> {
