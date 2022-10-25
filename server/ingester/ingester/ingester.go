@@ -36,6 +36,7 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
+	servercommon "github.com/deepflowys/deepflow/server/common"
 	"github.com/deepflowys/deepflow/server/ingester/ckissu"
 	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/config"
@@ -58,7 +59,7 @@ const (
 	PROFILER_PORT       = 9526
 )
 
-func Start(configPath string) []io.Closer {
+func Start(configPath string, shared *servercommon.ControllerIngesterShared) []io.Closer {
 	cfg := config.Load(configPath)
 	bytes, _ := yaml.Marshal(cfg)
 
