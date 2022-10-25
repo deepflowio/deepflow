@@ -66,7 +66,7 @@ func (k *KubernetesInfo) refresh() {
 		k.clusterIDToDomain[dbDomain.ClusterID] = dbDomain.Lcuuid
 	}
 
-	subDomainMgr := dbmgr.DBMgr[model.SubDomain](k.db)
+	subDomainMgr := dbmgr.DBMgr[models.SubDomain](k.db)
 	subDomains, _ := subDomainMgr.Gets()
 	k.clusterIDToSubDomain = make(map[string]string)
 	for _, sd := range subDomains {
