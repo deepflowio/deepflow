@@ -4,6 +4,7 @@ After=syslog.target network-online.target
 
 [Service]
 Environment=GOTRACEBACK=single
+Environment=RUST_BACKTRACE=1
 LimitCORE=1G
 ExecStart=/usr/sbin/deepflow-agent
 Restart=always
