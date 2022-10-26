@@ -467,7 +467,7 @@ impl AppProtoLogsParser {
                 running: Default::default(),
                 thread: Mutex::new(None),
                 counter: counter.clone(),
-                l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(false)),
+                l7_log_dynamic_is_updated: Arc::new(AtomicBool::new(true)),
                 config,
                 log_rate,
             },
