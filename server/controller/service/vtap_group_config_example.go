@@ -342,9 +342,9 @@ static_config:
   ## the number of encoders for uniform collect sender
   #packet-sequence-queue-count: 1
   ##packet-sequence-flag determines which fields need to be reported, the default value is 0, which means the feature is disabled, and 255, which means all fields need to be reported
-  ## all fields corresponding to each bit: 
+  ## all fields corresponding to each bit:
   ## | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
-  ## 8      7     6     5              4             3         2        1          0 
+  ## 8      7     6     5              4             3         2        1          0
   #packet-sequence-flag: 255
   ## 是否开启ebpf
   ebpf-disabled: false
@@ -355,6 +355,29 @@ static_config:
   ebpf-uprobe-golang-symbol-enabled: false
   ## 用于开启集成采集器压缩数据开关，现在仅支持 opentelemetry trace 数据压缩
   external_agent_http_proxy_compressed: false
+  # eBPF、AF_PACKET、WINPCAP 开启的应用协议解析列表，默认包括支持的所有应用协议。
+  l7-protocol-enabled:
+    - HTTP # for both HTTP and HTTP_TLS
+    - HTTP2 # for HTTP2, HTTP2_TLS and gRPC
+    - Dubbo
+    - MySQL
+    - PostgreSQL
+    - Redis
+    - Kafka
+    - MQTT
+    - DNS
+  # eBPF uprobe 各项子功能生效的进程名，以正则表达式的方式配置
+  ebpf-uprobe-process-name-regexs:
+    # eBPF uprobe 开启 Golang 符号表解析的进程，默认为空表示不对任何进程开启。
+    # 作用于裁剪了标准符号表的 Golang 进程，例如 K8s 自身进程一般属于此类。
+    # 当关闭此开关时，无法采集此类进程的 uprobe 数据。
+    # 当开启此开关时，对于 Golang >= 1.13 且 < 1.18 的 Golang 进程，
+    # 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
+    golang-symbol:
+    # eBPF uprobe 开启应用协议数据采集的 Golang 进程，默认为 .* 表示对所有 Golang 进程开启。
+    golang: .*
+    # eBPF uprobe 开启应用协议数据采集的使用 openssl 库的进程，默认为 .* 表示对所有使用了 openssl 库的进程开启。
+    openssl: .*
   ## 开发过程中的功能控制开关，支持多个
   feature-flags:
 `)
