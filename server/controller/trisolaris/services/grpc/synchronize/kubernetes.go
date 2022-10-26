@@ -36,7 +36,7 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 	remote := ""
 	peerIP, _ := peer.FromContext(ctx)
 	remote = peerIP.Addr.String()
-	log.Infof("get kubernetes cluster_id from ip %s", remote)
+	log.Infof("get kubernetes cluster_id from ip: %s, ca_md5: %s", remote, in.GetCaMd5())
 
 	clusterID, err := common.GenerateKuberneteClusterIDByMD5(in.GetCaMd5())
 	if err != nil {
@@ -48,6 +48,6 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 	kubernetesInfo := trisolaris.GetGKubernetesInfo()
 	kubernetesInfo.CacheClusterID(clusterID)
 
-	log.Infof("response kubernetes cluster_id to ip %s", remote)
+	log.Infof("response kubernetes cluster_id to ip: %s, ca_md5: %s, cluster_id: %s", remote, in.GetCaMd5, clusterID)
 	return &api.KubernetesClusterIDResponse{ClusterId: &clusterID}, nil
 }
