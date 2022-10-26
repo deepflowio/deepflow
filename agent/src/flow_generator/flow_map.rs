@@ -56,7 +56,7 @@ use crate::{
             TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        l7_protocol_log::get_parser,
+        l7_protocol_log::{get_parser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
         tagged_flow::TaggedFlow,
@@ -679,7 +679,12 @@ impl FlowMap {
                 self.rrt_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
                 l7_proto,
-                get_parser(l7_proto.unwrap_or_default()),
+                if let Some(mut parser) = get_parser(l7_proto.unwrap_or_default()) {
+                    parser.set_parse_config(&self.parse_config);
+                    Some(parser)
+                } else {
+                    None
+                },
                 self.counter.clone(),
                 conf.l7_protocol_enabled_bitmap,
                 self.parse_config.clone(),
