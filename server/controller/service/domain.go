@@ -220,6 +220,18 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", domainCreate.Name))
 	}
 
+	if domainCreate.KubernetesClusterID != "" {
+		mysql.Db.Model(&mysql.Domain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
+		if count > 0 {
+			return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+		}
+
+		mysql.Db.Model(&mysql.SubDomain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
+		if count > 0 {
+			return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+		}
+	}
+
 	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
 
 	domain := mysql.Domain{}
