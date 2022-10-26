@@ -106,6 +106,8 @@ impl SessionAggr {
     }
 
     fn send(&self, log: AppProtoLogsData) {
+        println!("send: {:?}", log.special_info);
+        println!("---------------------------------");
         if log.special_info.skip_send() {
             debug!("ebpf_collector out omit: {}", log);
             return;
@@ -436,10 +438,13 @@ impl FlowItem {
         let param = ParseParam::from(packet as &MetaPacket);
         for mut protocol_log in get_all_protocol().into_iter() {
             if self.protocol_bitmap.is_disabled(protocol_log.protocol()) {
+                println!("unreach");
                 continue;
             }
+            println!("check protocol: {:?}",protocol_log.protocol());
             protocol_log.set_parse_config(log_parser_config);
             if protocol_log.check_payload(&packet.raw_from_ebpf.as_ref(), &param) {
+                println!("check protocol: {:?} success",protocol_log.protocol());
                 self.l7_protocol = protocol_log.protocol();
                 self.server_port = packet.lookup_key.dst_port;
                 self.parser = Some(protocol_log);
@@ -473,11 +478,14 @@ impl FlowItem {
         };
 
         let l7_parser = self.parser.as_mut().unwrap();
+        println!("parse");
         let ret = l7_parser.parse_payload(
             packet.raw_from_ebpf.as_ref(),
             &ParseParam::from(packet as &MetaPacket),
         );
-
+        if ret.is_ok(){
+            println!("parse success");
+        }
         l7_parser.reset();
 
         if !self.is_success {
@@ -841,9 +849,9 @@ impl EbpfRunner {
                 flow_item = flow_map.get_mut(&key);
             }
 
-            if self.config.epc_id == 0 {
-                continue;
-            }
+            // if self.config.epc_id == 0 {
+            //     continue;
+            // }
 
             flow_item.and_then(|flow_item| {
                 // 应用解析
@@ -896,11 +904,23 @@ impl EbpfCollector {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
+            if (*sd).source != 3 {
+                return;
+            }
+            if (*sd).tuple.lport != 443 && (*sd).tuple.rport != 443 {
+                return;
+            }
+            println!("recv: {:?}", (*sd));
+            
             let packet = MetaPacket::from_ebpf(sd, CAPTURE_SIZE);
             if packet.is_err() {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
                 return;
             }
+            if let Ok(p) = packet.as_ref(){
+                println!("pppppppppppp: {:?}",p.get_l4_payload());
+            }
+            println!("==========================");
             if let Err(e) = SENDER.as_mut().unwrap().send(Box::new(packet.unwrap())) {
                 warn!("meta packet send ebpf error: {:?}", e);
             }
