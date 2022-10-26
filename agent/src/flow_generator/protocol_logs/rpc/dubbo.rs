@@ -294,6 +294,7 @@ impl DubboLog {
                 info.trace_id = trace_id;
                 break;
             }
+            start += index + tag.len();
         }
 
         match trace_type {
@@ -340,6 +341,7 @@ impl DubboLog {
                 info.span_id = span_id;
                 break;
             }
+            start += index + tag.len();
         }
     }
 
