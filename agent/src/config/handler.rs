@@ -1327,19 +1327,6 @@ impl ConfigHandler {
             candidate_config.diagnose = new_config.diagnose;
         }
 
-        if candidate_config.tap_mode == TapMode::Analyzer
-            || !static_config.kubernetes_cluster_id.is_empty()
-        {
-            info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
-            candidate_config.environment.max_memory = 0;
-
-            info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
-            let mut system = sysinfo::System::new();
-            system.refresh_cpu();
-            candidate_config.environment.max_cpus =
-                system.physical_core_count().unwrap_or(1) as u32;
-        }
-
         if candidate_config.environment != new_config.environment {
             if candidate_config.tap_mode != TapMode::Analyzer
                 && static_config.kubernetes_cluster_id.is_empty()
@@ -1458,6 +1445,18 @@ impl ConfigHandler {
             );
 
             candidate_config.environment = new_config.environment;
+        }
+
+        if candidate_config.tap_mode == TapMode::Analyzer
+            || !static_config.kubernetes_cluster_id.is_empty()
+        {
+            info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
+            candidate_config.environment.max_memory = 0;
+
+            info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
+            let mut system = sysinfo::System::new();
+            system.refresh_cpu();
+            candidate_config.environment.max_cpus = 1.max(system.cpus().len()) as u32;
         }
 
         if candidate_config.flow != new_config.flow {

@@ -118,15 +118,28 @@ func checkLeaderValid(ctx context.Context, lock *resourcelock.LeaseLock) {
 	defer ticker.Stop()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	var observedTime metav1.Time
+	for {
+		record, _, err := lock.Get(ctx)
+		if err == nil {
+			observedTime = record.RenewTime
+			break
+		} else {
+			log.Error(err)
+			time.Sleep(5 * time.Second)
+		}
+	}
+
 	for {
 		select {
 		case <-ticker.C:
-			now := metav1.Now()
 			record, _, err := lock.Get(ctx)
 			if err != nil {
 				log.Error(err)
+				continue
 			}
-			if record.RenewTime.Add(60 * time.Second).After(now.Time) {
+			if !record.RenewTime.Equal(&observedTime) {
 				leaderData.setValide()
 				leaderData.SetLeader(record.HolderIdentity)
 				log.Infof("check leader finish, leader is %s", record.HolderIdentity)

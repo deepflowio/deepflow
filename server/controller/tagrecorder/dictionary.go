@@ -19,6 +19,7 @@ package tagrecorder
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/clickhouse"
 )
 
@@ -56,10 +58,14 @@ func (c *TagRecorder) UpdateChDictionary() {
 		return
 	}
 	ctx := context.Background()
-	endpoints, err := clientset.CoreV1().Endpoints("deepflow").List(ctx, metav1.ListOptions{})
+	namespace := os.Getenv(common.NAME_SPACE_KEY)
+	endpoints, err := clientset.CoreV1().Endpoints(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Error(err)
 		return
+	}
+	if len(endpoints.Items) == 0 {
+		log.Warningf("no endpoints in %s", namespace)
 	}
 	endpointName := c.cfg.ClickHouseCfg.Host
 	for _, endpoint := range endpoints.Items {
@@ -150,8 +156,10 @@ func (c *TagRecorder) UpdateChDictionary() {
 							CH_DICTIONARY_SERVER_PORT,
 							CH_DICTIONARY_LB_LISTENER,
 							CH_DICTIONARY_POD_INGRESS,
+							CH_DICTIONARY_NODE_TYPE,
 							CH_STRING_DICTIONARY_ENUM,
-							CH_INT_DICTIONARY_ENUM)
+							CH_INT_DICTIONARY_ENUM,
+						)
 						chDicts := mapset.NewSet()
 						for _, dictionary := range dictionaries {
 							chDicts.Add(dictionary)
