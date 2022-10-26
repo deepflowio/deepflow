@@ -32,6 +32,10 @@ import (
 	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
 )
 
+type RebalanceType string
+
+const RebalanceTypeNull RebalanceType = "null"
+
 func RegisterAgentCommand() *cobra.Command {
 	agent := &cobra.Command{
 		Use:   "agent",
@@ -70,16 +74,16 @@ deepflow-ctl agent rebalance --type=controller
 deepflow-ctl agent rebalance --type=analyzer`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if typeStr != "" {
-				if err := rebalance(cmd, typeStr); err != nil {
+				if err := rebalance(cmd, RebalanceType(typeStr), typeStr); err != nil {
 					fmt.Println(err)
 				}
 				return
 			}
 
-			if err := rebalance(cmd, "controller"); err != nil {
+			if err := rebalance(cmd, RebalanceTypeNull, "controller"); err != nil {
 				fmt.Println(err)
 			}
-			if err := rebalance(cmd, "analyzer"); err != nil {
+			if err := rebalance(cmd, RebalanceTypeNull, "analyzer"); err != nil {
 				fmt.Println(err)
 			}
 		},
@@ -349,19 +353,27 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	fmt.Printf("set agent %s revision(%s) success\n", vtapName, expectedVersion)
 }
 
-func rebalance(cmd *cobra.Command, typeStr string) error {
+func rebalance(cmd *cobra.Command, rebalanceType RebalanceType, typeVal string) error {
 	server := common.GetServerInfo(cmd)
-	isBalance, err := ifNeedRebalance(server, typeStr)
+
+	isBalance, err := ifNeedRebalance(server, typeVal)
 	if err != nil {
 		return err
 	}
 	if !isBalance {
+		if rebalanceType == RebalanceTypeNull {
+			fmt.Printf("%s: no balance required\n", typeVal)
+			return nil
+		}
 		fmt.Println("no balance required")
 		return nil
 	}
-	resp, err := execRebalance(server, typeStr)
+	resp, err := execRebalance(server, typeVal)
 	if err != nil {
 		return err
+	}
+	if rebalanceType == RebalanceTypeNull {
+		fmt.Printf("------------------------ %s ------------------------\n", typeVal)
 	}
 	printDetail(resp)
 	return nil
