@@ -896,6 +896,10 @@ impl EbpfCollector {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
+            if (*sd).source!=3{
+                return;
+            }
+            println!("recv: {:#?}",(*sd));
             let packet = MetaPacket::from_ebpf(sd, CAPTURE_SIZE);
             if packet.is_err() {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
