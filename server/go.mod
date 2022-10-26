@@ -13,7 +13,6 @@ replace (
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.1.0
-	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/OneOfOne/xxhash v1.2.8
 	github.com/Workiva/go-datastructures v1.0.53
 	github.com/agiledragon/gomonkey/v2 v2.8.0
