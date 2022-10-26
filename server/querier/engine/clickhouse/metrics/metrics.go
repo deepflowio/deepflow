@@ -17,6 +17,7 @@
 package metrics
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -87,7 +88,7 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 	}
 }
 
-func GetMetrics(field string, db string, table string) (*Metrics, bool) {
+func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
 	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
 		field = strings.Trim(field, "`")
 		fieldSplit := strings.Split(field, ".")
@@ -103,7 +104,7 @@ func GetMetrics(field string, db string, table string) (*Metrics, bool) {
 			}
 		}
 	}
-	allMetrics, err := GetMetricsByDBTable(db, table, "")
+	allMetrics, err := GetMetricsByDBTable(db, table, "", ctx)
 	if err != nil {
 		return nil, false
 	}
@@ -111,7 +112,7 @@ func GetMetrics(field string, db string, table string) (*Metrics, bool) {
 	return metric, ok
 }
 
-func GetMetricsByDBTable(db string, table string, where string) (map[string]*Metrics, error) {
+func GetMetricsByDBTable(db string, table string, where string, ctx context.Context) (map[string]*Metrics, error) {
 	var err error
 	switch db {
 	case "flow_log":
@@ -123,7 +124,7 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 		case "l7_flow_log":
 			metrics := make(map[string]*Metrics)
 			loads := GetL7FlowLogMetrics()
-			exts, err := GetExtMetrics(db, table, where)
+			exts, err := GetExtMetrics(db, table, where, ctx)
 			for k, v := range loads {
 				if _, ok := metrics[k]; !ok {
 					metrics[k] = v
@@ -157,13 +158,13 @@ func GetMetricsByDBTable(db string, table string, where string) (map[string]*Met
 			return GetVtapAclMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
-		return GetExtMetrics(db, table, where)
+		return GetExtMetrics(db, table, where, ctx)
 	}
 	return nil, err
 }
 
-func GetMetricsDescriptionsByDBTable(db string, table string, where string) ([]interface{}, error) {
-	allMetrics, err := GetMetricsByDBTable(db, table, where)
+func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx context.Context) ([]interface{}, error) {
+	allMetrics, err := GetMetricsByDBTable(db, table, where, ctx)
 	if allMetrics == nil || err != nil {
 		// TODO: metrics not found
 		return nil, err
@@ -184,14 +185,14 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string) ([]i
 	return values, nil
 }
 
-func GetMetricsDescriptions(db string, table string, where string) (map[string][]interface{}, error) {
+func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (map[string][]interface{}, error) {
 	var values []interface{}
 	if table == "" {
 		var tables []interface{}
 		if db == "ext_metrics" {
 			tables = append(tables, table)
 		} else if db == "deepflow_system" {
-			for _, extTables := range ckcommon.GetExtTables(db) {
+			for _, extTables := range ckcommon.GetExtTables(db, ctx) {
 				for i, extTable := range extTables.([]interface{}) {
 					if i == 0 {
 						tables = append(tables, extTable)
@@ -204,14 +205,14 @@ func GetMetricsDescriptions(db string, table string, where string) (map[string][
 			}
 		}
 		for _, dbTable := range tables {
-			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where)
+			metrics, err := GetMetricsDescriptionsByDBTable(db, dbTable.(string), where, ctx)
 			if err != nil {
 				return nil, err
 			}
 			values = append(values, metrics...)
 		}
 	} else {
-		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where)
+		metrics, err := GetMetricsDescriptionsByDBTable(db, table, where, ctx)
 		if err != nil {
 			return nil, err
 		}

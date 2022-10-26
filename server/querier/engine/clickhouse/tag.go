@@ -17,6 +17,7 @@
 package clickhouse
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -98,8 +99,8 @@ func GetSelectNotNullFilter(name, as, db, table string) (view.Node, bool) {
 	return &view.Expr{}, false
 }
 
-func GetMetricsTag(name string, alias string, db string, table string) (Statement, error) {
-	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), db, table)
+func GetMetricsTag(name string, alias string, db string, table string, ctx context.Context) (Statement, error) {
+	metricStruct, ok := metrics.GetMetrics(strings.Trim(name, "`"), db, table, ctx)
 	if !ok {
 		return nil, nil
 	}

@@ -114,12 +114,12 @@ impl KafkaInfo {
         match other.msg_type {
             LogMessageType::Response if self.api_key == KAFKA_FETCH && self.api_version >= 7 => {
                 if let Some(d) = other.resp_data {
-                    self.set_status_code(read_u16_be(&d) as i32)
+                    self.set_status_code(read_u16_be(&d[12..]) as i32)
                 }
             }
             LogMessageType::Request if other.api_key == KAFKA_FETCH && other.api_version >= 7 => {
                 if let Some(d) = self.resp_data {
-                    self.set_status_code(read_u16_be(&d) as i32)
+                    self.set_status_code(read_u16_be(&d[12..]) as i32)
                 }
             }
             _ => {}
@@ -282,6 +282,13 @@ impl L7ProtocolParserInterface for KafkaLog {
 }
 impl KafkaLog {
     const MSG_LEN_SIZE: usize = 4;
+
+    pub fn new() -> KafkaLog {
+        let mut log = KafkaLog::default();
+        log.reset();
+        log
+    }
+
     fn reset_logs(&mut self) {
         self.info.correlation_id = 0;
         self.info.req_msg_size = None;
@@ -302,12 +309,10 @@ impl KafkaLog {
         self.info.req_msg_size = Some(req_len);
         let client_id_len = read_u16_be(&payload[12..]) as usize;
         if payload.len() < KAFKA_REQ_HEADER_LEN + client_id_len {
-            self.reset_logs();
             return Err(Error::KafkaLogParseFailed);
         }
 
         if strict && req_len as usize != payload.len() - Self::MSG_LEN_SIZE {
-            self.reset_logs();
             return Err(Error::KafkaLogParseFailed);
         }
 
@@ -319,7 +324,6 @@ impl KafkaLog {
             String::from_utf8_lossy(&payload[14..14 + client_id_len]).into_owned();
 
         if !self.info.client_id.is_ascii() {
-            self.reset_logs();
             return Err(Error::KafkaLogParseFailed);
         }
 
@@ -336,8 +340,7 @@ impl KafkaLog {
         self.info.correlation_id = read_u32_be(&payload[4..]);
         self.info.msg_type = LogMessageType::Response;
         if payload.len() >= 14 {
-            self.info.resp_data = Some([0; 14]);
-            self.info.resp_data.unwrap().copy_from_slice(&payload[..14]);
+            self.info.resp_data = Some(payload[..14].try_into().unwrap())
         }
         Ok(AppProtoHead {
             proto: L7Protocol::Kafka,
@@ -374,7 +377,6 @@ impl KafkaLog {
         if proto != IpProtocol::Tcp {
             return Err(Error::InvalidIpProtocol);
         }
-        self.reset_logs();
         if payload.len() < KAFKA_REQ_HEADER_LEN {
             return Err(Error::KafkaLogParseFailed);
         }
