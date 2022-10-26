@@ -43,7 +43,7 @@ use crate::{
     utils::environment::is_tt_pod,
 };
 use crate::{exception::ExceptionHandler, rpc::Session};
-use public::netns::InterfaceInfo;
+use public::netns::{InterfaceInfo, NsFile};
 
 const SHA1_DIGEST_LEN: usize = 20;
 
@@ -99,6 +99,7 @@ impl PlatformSynchronizer {
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
         exception_handler: ExceptionHandler,
+        poller_netns: Vec<NsFile>,
     ) -> Self {
         let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
 
@@ -130,6 +131,7 @@ impl PlatformSynchronizer {
                 GenericPoller::from(PassivePoller::new(config_guard.sync_interval))
             }
         };
+        poller.set_netns(poller_netns);
         drop(config_guard);
 
         let kubernetes_poller = Arc::new(poller);
