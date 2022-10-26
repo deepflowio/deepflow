@@ -152,9 +152,11 @@ l7_metrics_enabled: 1
 # 秒粒度指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
 vtap_flow_1s_enabled: 1
 # 流日志开启采集点，默认值：0，表示全部，可选值：-1表示无/0表示全部/所有采集器点的数据标记值
-l4_log_tap_types: 0
+l4_log_tap_types:
+ - 0
 # 应用日志开启采集点，默认值：0，表示全部，可选值：-1表示无/0表示全部/所有采集器点的数据标记值
-l7_log_store_tap_types: 0
+l7_log_store_tap_types:
+  - 0
 # 数据集成HTTP代理，默认值：0，表示关闭，可选址：0表示关闭/1表示开启
 external_agent_http_proxy_enabled: 0
 # 数据集成HTTP代理端口，默认值：38086，可选值：1-65535
