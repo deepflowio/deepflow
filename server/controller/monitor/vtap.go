@@ -93,6 +93,14 @@ func (v *VTapCheck) launchServerCheck() {
 					)
 					mysql.Db.Model(&vtap).Update("launch_server_id", vm.ID)
 				}
+				// check and update region
+				if vtap.Region != vm.Region {
+					log.Infof(
+						"update vtap (%s) region from %s to %s",
+						vtap.Lcuuid, vtap.Region, vm.Region,
+					)
+					mysql.Db.Model(&vtap).Update("region", vm.Region)
+				}
 			}
 
 		case common.VTAP_TYPE_KVM, common.VTAP_TYPE_ESXI, common.VTAP_TYPE_HYPER_V:
@@ -117,6 +125,14 @@ func (v *VTapCheck) launchServerCheck() {
 						vtap.Lcuuid, vtap.LaunchServerID, host.ID,
 					)
 					mysql.Db.Model(&vtap).Update("launch_server_id", host.ID)
+				}
+				// check and update region
+				if vtap.Region != host.Region {
+					log.Infof(
+						"update vtap (%s) region from %s to %s",
+						vtap.Lcuuid, vtap.Region, host.Region,
+					)
+					mysql.Db.Model(&vtap).Update("region", host.Region)
 				}
 			}
 		case common.VTAP_TYPE_POD_HOST, common.VTAP_TYPE_POD_VM:
@@ -146,6 +162,14 @@ func (v *VTapCheck) launchServerCheck() {
 						vtap.Lcuuid, vtap.LaunchServerID, podNode.ID,
 					)
 					mysql.Db.Model(&vtap).Update("launch_server_id", podNode.ID)
+				}
+				// check and update region
+				if vtap.Region != podNode.Region {
+					log.Infof(
+						"update vtap (%s) region from %s to %s",
+						vtap.Lcuuid, vtap.Region, podNode.Region,
+					)
+					mysql.Db.Model(&vtap).Update("region", podNode.Region)
 				}
 			}
 		}
