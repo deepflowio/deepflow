@@ -706,7 +706,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 vtap_id: conf.vtap_id as u16,
                 capture_socket_type: conf.capture_socket_type,
                 #[cfg(target_os = "linux")]
-                extra_netns: {
+                extra_netns: if conf.extra_netns_regex == "" {
+                    vec![]
+                } else {
                     let re = Regex::new(&conf.extra_netns_regex).unwrap(); // regex validated in protobuf
                     let mut ns = NetNs::find_ns_files_by_regex(&re);
                     ns.sort_unstable();
