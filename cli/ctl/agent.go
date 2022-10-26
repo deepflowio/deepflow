@@ -63,11 +63,23 @@ func RegisterAgentCommand() *cobra.Command {
 
 	var typeStr string
 	rebalanceCmd := &cobra.Command{
-		Use:     "rebalance",
-		Short:   "rebalance controller or analyzer",
-		Example: "deepflow-ctl agent rebalance --type=controller\ndeepflow-ctl agent rebalance --type=analyzer",
+		Use:   "rebalance",
+		Short: "rebalance controller or analyzer",
+		Example: `deepflow-ctl agent rebalance (rebalance controller and analyzer)
+deepflow-ctl agent rebalance --type=controller
+deepflow-ctl agent rebalance --type=analyzer`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := rebalance(cmd, args, typeStr); err != nil {
+			if typeStr != "" {
+				if err := rebalance(cmd, typeStr); err != nil {
+					fmt.Println(err)
+				}
+				return
+			}
+
+			if err := rebalance(cmd, "controller"); err != nil {
+				fmt.Println(err)
+			}
+			if err := rebalance(cmd, "analyzer"); err != nil {
 				fmt.Println(err)
 			}
 		},
@@ -337,11 +349,7 @@ func upgadeAgent(cmd *cobra.Command, args []string) {
 	fmt.Printf("set agent %s revision(%s) success\n", vtapName, expectedVersion)
 }
 
-func rebalance(cmd *cobra.Command, args []string, typeStr string) error {
-	if len(args) > 0 {
-		typeStr = args[0]
-	}
-
+func rebalance(cmd *cobra.Command, typeStr string) error {
 	server := common.GetServerInfo(cmd)
 	isBalance, err := ifNeedRebalance(server, typeStr)
 	if err != nil {
