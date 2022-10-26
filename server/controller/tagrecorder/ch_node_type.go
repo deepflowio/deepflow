@@ -53,6 +53,7 @@ func (n *ChNodeType) generateUpdateInfo(oldItem, newItem mysql.ChNodeType) (map[
 	updateInfo := make(map[string]interface{})
 	if oldItem.NodeType != newItem.NodeType {
 		updateInfo["node_type"] = newItem.NodeType
+		updateInfo["resource_type"] = newItem.ResourceType
 	}
 	if len(updateInfo) > 0 {
 		return updateInfo, true
