@@ -19,10 +19,11 @@ package genesis
 import (
 	"context"
 	"fmt"
-	"inet.af/netaddr"
 	"strconv"
 	"strings"
 	"time"
+
+	"inet.af/netaddr"
 
 	tridentcommon "github.com/deepflowys/deepflow/message/common"
 	"github.com/deepflowys/deepflow/message/trident"
@@ -115,7 +116,12 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 	}
 	epoch := time.Now()
 	VIFs := []model.GenesisVinterface{}
-	parsedGlobalIPs, err := genesiscommon.ParseIPOutput(info.GetRawIpAddrs()[0])
+	ipAddrs := info.GetRawIpAddrs()
+	if len(ipAddrs) == 0 {
+		log.Errorf("get GenesisPlatformData raw ip addrs empty")
+		return VIFs
+	}
+	parsedGlobalIPs, err := genesiscommon.ParseIPOutput(ipAddrs[0])
 	if err != nil {
 		log.Errorf("parse ip output error: (%s)", err)
 		return VIFs
