@@ -23,14 +23,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/xwb1989/sqlparser"
-	"inet.af/netaddr"
-
+	"github.com/Knetic/govaluate"
 	"github.com/deepflowys/deepflow/server/libs/utils"
 	"github.com/deepflowys/deepflow/server/querier/config"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
+	"github.com/xwb1989/sqlparser"
+	"inet.af/netaddr"
 )
 
 type Where struct {
@@ -586,8 +586,17 @@ type TimeTag struct {
 func (t *TimeTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]string, db, table string) (view.Node, error) {
 	compareExpr := expr.(*sqlparser.ComparisonExpr)
 	time, err := strconv.ParseInt(t.Value, 10, 64)
-	if err != nil {
-		return nil, err
+	if err == nil {
+	} else {
+		timeExpr, err := govaluate.NewEvaluableExpression(t.Value)
+		if err != nil {
+			return nil, err
+		}
+		timeValue, err := timeExpr.Evaluate(nil)
+		if err != nil {
+			return nil, err
+		}
+		time = int64(timeValue.(float64))
 	}
 	if compareExpr.Operator == ">=" {
 		w.time.AddTimeStart(time)
