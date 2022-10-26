@@ -149,7 +149,9 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 
 	router.SetInitStageForHealthChecker("TagRecorder init")
 	tr := tagrecorder.NewTagRecorder(*cfg, ctx)
-	go tr.StartChDictionaryUpdate()
+	if isMasterController {
+		go tr.StartChDictionaryUpdate()
+	}
 
 	controllerCheck := monitor.NewControllerCheck(cfg, ctx)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg, ctx)
