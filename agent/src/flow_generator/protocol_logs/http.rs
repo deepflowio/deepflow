@@ -113,7 +113,8 @@ impl L7ProtocolInfoInterface for HttpInfo {
     }
 
     fn skip_send(&self) -> bool {
-        self.is_empty()
+        // filter the empty data from go http uprobe.
+        self.raw_data_type == L7ProtoRawDataType::GoHttp2Uprobe && self.is_empty()
     }
 
     fn need_merge(&self) -> bool {

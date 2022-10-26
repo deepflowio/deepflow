@@ -492,7 +492,15 @@ impl AppProtoLogsData {
 
         // due to grpc is init by http2 and modify during parse, it must reset to http2 when the protocol is grpc.
         let proto = if self.base_info.head.proto == L7Protocol::Grpc {
-            L7Protocol::Http2
+            if let L7ProtocolInfo::HttpInfo(http) = &self.special_info {
+                if http.is_tls() {
+                    L7Protocol::Http2TLS
+                } else {
+                    L7Protocol::Http2
+                }
+            } else {
+                unreachable!()
+            }
         } else {
             self.base_info.head.proto
         };
