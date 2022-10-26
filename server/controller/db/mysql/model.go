@@ -1198,7 +1198,7 @@ type PcapPolicy struct {
 	BusinessID       int       `gorm:"column:business_id;type:int;not null" json:"BUSINESS_ID"`
 	ACLID            int       `gorm:"column:acl_id;type:int;default:null" json:"ACL_ID"`
 	VtapIDs          string    `gorm:"column:vtap_ids;type:text;default:null" json:"VTAP_IDS"` // separated by ,
-	PayloadSlice     int       `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
+	PayloadSlice     *int      `gorm:"column:payload_slice;type:int;default:null" json:"PAYLOAD_SLICE"`
 	PolicyACLGroupID int       `gorm:"column:policy_acl_group_id;type:int;default:null" json:"POLICY_ACL_GROUP_ID"`
 	UserID           int       `gorm:"column:user_id;type:int;default:null" json:"USER_ID"`
 	CreatedAt        time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
