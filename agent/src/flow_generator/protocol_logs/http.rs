@@ -17,7 +17,7 @@
 use std::str;
 
 use arc_swap::access::Access;
-use log::debug;
+use log::{debug, info};
 use serde::Serialize;
 
 use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
@@ -448,6 +448,10 @@ impl HttpLog {
     const SPAN_ID: u8 = 1;
 
     pub fn new(config: &LogParserAccess) -> Self {
+        info!(
+            "lizf new http log l7_log_dynamic_config {:?}",
+            config.load().l7_log_dynamic.clone()
+        );
         Self {
             l7_log_dynamic_config: config.load().l7_log_dynamic.clone(),
             ..Default::default()
@@ -482,6 +486,10 @@ impl HttpLog {
     }
 
     pub fn set_config(&mut self, config: &LogParserAccess) {
+        info!(
+            "lizf set  http log l7_log_dynamic_config {:?}",
+            config.load().l7_log_dynamic.clone()
+        );
         self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
     }
 
@@ -519,8 +527,8 @@ impl HttpLog {
 
     pub fn update_config(&mut self, config: &LogParserAccess) {
         self.l7_log_dynamic_config = config.load().l7_log_dynamic.clone();
-        debug!(
-            "http log update l7 log dynamic config to {:#?}",
+        info!(
+            "lizf http log update l7 log dynamic config to {:#?}",
             self.l7_log_dynamic_config
         );
     }
@@ -865,6 +873,12 @@ impl HttpLog {
             ) {
                 self.info.trace_id = id;
             }
+        } else if key_str == "sw8" {
+            info!(
+                "lizf l7_log_dynamic_config {:?} value: {} ",
+                self.l7_log_dynamic_config,
+                &String::from_utf8_lossy(val.as_ref())
+            )
         }
         if self.l7_log_dynamic_config.is_span_id(key_str) {
             if let Some(id) = Self::decode_id(
