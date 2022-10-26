@@ -734,13 +734,10 @@ impl Components {
             packet_sequence_parser.start();
         }
 
-        match self.tap_mode {
-            TapMode::Analyzer => {
-                for dispatcher in self.dispatchers.iter() {
-                    dispatcher.start();
-                }
-            }
-            _ => match free_memory_check(self.max_memory, &self.exception_handler) {
+        if self.tap_mode != TapMode::Analyzer
+            && self.config.platform.kubernetes_cluster_id.is_empty()
+        {
+            match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {
                     for dispatcher in self.dispatchers.iter() {
                         dispatcher.start();
@@ -749,7 +746,11 @@ impl Components {
                 Err(e) => {
                     warn!("{}", e);
                 }
-            },
+            }
+        } else {
+            for dispatcher in self.dispatchers.iter() {
+                dispatcher.start();
+            }
         }
 
         for log_parser in self.log_parsers.iter() {
