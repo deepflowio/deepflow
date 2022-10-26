@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+use std::borrow::Cow;
+
 use arc_swap::access::Access;
 use log::debug;
 use serde::Serialize;
@@ -29,10 +31,9 @@ use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
 use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
-use crate::config::handler::{L7LogDynamicConfig, LogParserAccess};
+use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::ExtendedInfo;
-use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
+use crate::flow_generator::protocol_logs::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
 use crate::log_info_merge;
 use crate::parse_common;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
@@ -66,7 +67,9 @@ pub struct DubboInfo {
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub method_name: String,
     #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
+    pub trace_id: String,    
+    #[serde(skip_serializing_if = "value_is_default")]
+    pub span_id: String,
 
     // resp
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
@@ -134,6 +137,11 @@ impl From<DubboInfo> for L7ProtocolSendLog {
                 code: f.status_code,
                 ..Default::default()
             },
+            trace_info: Some(TraceInfo {
+                trace_id: Some(f.trace_id),
+                span_id: Some(f.span_id),
+                ..Default::default()
+            }),
             ext_info: Some(ExtendedInfo {
                 rpc_service: Some(f.service_name),
                 request_id: Some(f.request_id as u32),
@@ -213,6 +221,118 @@ impl DubboLog {
         self.info.status_code = None;
     }
 
+    fn check_char_boundary(payload: &Cow<'_, str>, start: usize, end: usize) -> bool {
+        let mut invalid = false;
+        for index in start..end {
+            if !payload.is_char_boundary(index) {
+                invalid = true;
+                break;
+            }
+        }
+        return invalid
+    }
+
+    fn decode_field(payload: &Cow<'_, str>, mut start: usize, end: usize) -> Option<String> {
+        if start + 2 >= payload.len() {
+            return None;
+        }
+
+        let bytes = payload.as_bytes();
+        match bytes[start] {
+            BC_STRING_SHORT => {
+                let field_len = bytes[start+1] as usize;
+                start += 2;
+                if start + field_len < end {
+                    return Some(payload[start..start + field_len].to_string());
+                }
+            },
+            0..=STRING_DIRECT_MAX => {
+                let field_len = bytes[start] as usize;
+                start += 1;
+                if start + field_len < end {
+                    return Some(payload[start..start + field_len].to_string());
+                }
+            }
+            _ => {},
+        };
+        return None;
+    }
+
+    // 注意 dubbo trace id 解析是区分大小写的
+    fn decode_trace_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
+        let tag = match trace_type {
+            TraceType::Sw8 => TraceType::Sw8.to_string(),
+            TraceType::Customize(tag) => tag.to_string(),
+            _ => return,
+        };
+
+        let mut start = 0;
+        while start < payload.len() {
+            let index = payload[start..].find(tag.as_str());
+            if index.is_none() {
+                break;
+            }
+            let index = index.unwrap();
+            // 注意这里tag长度不会超过256
+            if index == 0 || tag.len() != payload.as_bytes()[start+index-1] as usize {
+                start += index + tag.len();
+                continue
+            }
+            let last_index = payload.len().min(TRACE_ID_MAX_LEN + start + index + tag.len());
+            if Self::check_char_boundary(&payload, start+index, last_index) {
+                start += index + tag.len();
+                continue;
+            }
+    
+            if let Some(trace_id) = Self::decode_field(payload, start + index + tag.len(), last_index) {
+                info.trace_id = trace_id;
+                break;
+            }
+        }
+
+        match trace_type {
+            TraceType::Sw8 => {
+                if info.trace_id.len() > 2 {
+                    if let Some(index) = payload[2..].find("-") {
+                        info.trace_id = info.trace_id[2..2+index].to_string();
+                    }
+                }
+            },
+            _ => return,
+        };
+    }
+
+    fn decode_span_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
+        let tag = match trace_type {
+            TraceType::Customize(tag) => tag,
+            _ => return,
+        };
+
+        let mut start = 0;
+        while start < payload.len() {
+            let index = payload[start..].find(tag.as_str());
+            if index.is_none() {
+                break;
+            }
+            let index = index.unwrap();
+            // 注意这里tag长度不会超过256
+            if index == 0 || tag.len() != payload.as_bytes()[start+index-1] as usize {
+                start += index + tag.len();
+                continue
+            }
+            let last_index = payload.len().min(TRACE_ID_MAX_LEN + start + index + tag.len());
+            if Self::check_char_boundary(&payload, start+index, last_index) {
+                start += index + tag.len();
+                continue;
+            }
+    
+            if let Some(span_id) = Self::decode_field(payload, start + index + tag.len(), last_index) {
+                info.span_id = span_id;
+                break;
+            }
+        }
+    }
+
     // 尽力而为的去解析Dubbo请求中Body各参数
     fn get_req_body_info(&mut self, payload: &[u8]) {
         let mut n = BODY_PARAM_MIN;
@@ -260,49 +380,21 @@ impl DubboLog {
         if self.l7_log_dynamic_config.trace_types.is_empty() || para_index >= payload.len() {
             return;
         }
+
         let payload_str = String::from_utf8_lossy(&payload[para_index..]);
-        let mut offset = 0;
-
-        let trace_id_tags = self
-            .l7_log_dynamic_config
-            .trace_types
-            .iter()
-            .map(|trace_type| trace_type.to_string())
-            .collect::<Vec<String>>();
-
-        for tag in &trace_id_tags {
-            if let Some(index) = payload_str.find(tag.as_str()) {
-                let mut invalid = false;
-                let last_index = payload_str.len().min(TRACE_ID_MAX_LEN + index + tag.len());
-                for char_index in index..last_index {
-                    if !payload_str.is_char_boundary(char_index) {
-                        invalid = true;
-                        break;
-                    }
-                }
-                if invalid {
-                    continue;
-                }
-
-                offset += index + tag.len();
-                // sw8匹配 以'1-'开头'-'结尾的部分
-                if let Some(begin_index) =
-                    payload_str[offset..(offset + 20).min(payload_str.len())].find("1-")
-                {
-                    offset += begin_index + 2;
-                    if let Some(end_index) = payload_str[offset..last_index].find("-") {
-                        self.info.trace_id = payload_str[offset..offset + end_index].to_string();
-                        break;
-                    }
-                // logId匹配到'.'
-                } else if let Some(end_index) = payload_str[offset..last_index].find(".") {
-                    self.info.trace_id = payload_str[offset..offset + end_index].to_string();
-                    break;
-                } else {
-                    self.info.trace_id = payload_str[offset..last_index].to_string();
-                    break;
-                }
+        for trace_type in self.l7_log_dynamic_config.trace_types.iter() {
+            if trace_type.to_string().len() > u8::MAX as usize {
+                continue;
             }
+
+            Self::decode_trace_id(&payload_str, &trace_type, &mut self.info);
+        }
+        for span_type in self.l7_log_dynamic_config.span_types.iter() {
+            if span_type.to_string().len() > u8::MAX as usize {
+                continue;
+            }
+
+            Self::decode_span_id(&payload_str, &span_type, &mut self.info);
         }
     }
 
@@ -467,7 +559,7 @@ mod tests {
     const FILE_DIR: &str = "resources/test/flow_generator/dubbo";
 
     fn run(name: &str) -> String {
-        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), None);
+        let capture = Capture::load_pcap(Path::new(FILE_DIR).join(name), Some(1024));
         let mut packets = capture.as_meta_packets();
         if packets.is_empty() {
             return "".to_string();
@@ -487,6 +579,8 @@ mod tests {
             };
 
             let mut dubbo = DubboLog::default();
+            dubbo.l7_log_dynamic_config.trace_types = vec![TraceType::Customize("EagleEye-TraceID".to_string())];
+            dubbo.l7_log_dynamic_config.span_types = vec![TraceType::Customize("EagleEye-SpanID".to_string())];
             let _ = dubbo.parse(
                 payload,
                 packet.lookup_key.proto,
@@ -503,7 +597,7 @@ mod tests {
 
     #[test]
     fn check() {
-        let files = vec![("dubbo_hessian2.pcap", "dubbo_hessian.result")];
+        let files = vec![("dubbo_hessian2.pcap", "dubbo_hessian.result"), ("dubbo-eys.pcap", "dubbo-eys.result")];
 
         for item in files.iter() {
             let expected = fs::read_to_string(&Path::new(FILE_DIR).join(item.1)).unwrap();
@@ -514,7 +608,8 @@ mod tests {
                 fs::write(&output_path, &output).unwrap();
                 assert!(
                     output == expected,
-                    "output different from expected {}, written to {:?}",
+                    "{} output different from expected {}, written to {:?}",
+                    item.0,
                     item.1,
                     output_path
                 );
