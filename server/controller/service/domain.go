@@ -628,7 +628,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 		return nil, err
 	}
 	if domainCount == 0 {
-		return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
+		return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
 	}
 
 	var count int64
