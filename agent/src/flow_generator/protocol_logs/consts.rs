@@ -82,6 +82,8 @@ pub const BC_STRING: u8 = 0x73;
 pub const BC_STRING_CHUNK: u8 = 0x72;
 pub const BC_STRING_DIRECT: u8 = 0x00;
 pub const STRING_DIRECT_MAX: u8 = 0x1f;
+pub const BC_STRING_SHORT: u8 = 0x30;
+pub const STRING_SHORT_MAX: u16 = 0x3ff;
 
 // 参考：https://dubbo.apache.org/zh/docs/concepts/rpc-protocol/#protocol-spec
 // Dubbo Request Body
