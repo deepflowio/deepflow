@@ -85,7 +85,12 @@ func TestRefresh(t *testing.T) {
 }
 
 func TestCheckDomainSubDomainByClusterID(t *testing.T) {
-	k8sInfo := NewKubernetesInfo(nil, nil)
+	ClearDBFile(TEST_DB_FILE)
+	mysql.Db = GetDB(TEST_DB_FILE)
+	for _, val := range GetModels() {
+		mysql.Db.AutoMigrate(val)
+	}
+	k8sInfo := NewKubernetesInfo(mysql.Db, nil)
 	k8sInfo.clusterIDToDomain = map[string]string{"a": "b"}
 	k8sInfo.clusterIDToSubDomain = map[string]string{"b": "c"}
 	if !k8sInfo.CheckDomainSubDomainByClusterID("a") {
@@ -94,4 +99,14 @@ func TestCheckDomainSubDomainByClusterID(t *testing.T) {
 	if !k8sInfo.CheckDomainSubDomainByClusterID("b") {
 		fmt.Printf("check cluster id: %s should be ok\n", "b")
 	}
+	k8sInfo.clusterIDToDomain = make(map[string]string)
+	domain := mysql.Domain{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Type: 11, ClusterID: "a"}
+	mysql.Db.Create(&domain)
+	if !k8sInfo.CheckDomainSubDomainByClusterID("a") {
+		fmt.Printf("check cluster id: %s should be ok\n", "a")
+	}
+	if k8sInfo.CheckDomainSubDomainByClusterID("C") {
+		fmt.Printf("check cluster id: %s should not be ok\n", "a")
+	}
+	ClearDBFile(TEST_DB_FILE)
 }
