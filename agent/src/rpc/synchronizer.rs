@@ -1308,7 +1308,7 @@ pub struct RuntimeEnvironment {
 impl RuntimeEnvironment {
     fn new() -> RuntimeEnvironment {
         let mut sys = System::new();
-        sys.refresh_memory();
+        sys.refresh_system();
         RuntimeEnvironment {
             cpu_num: sys.cpus().len() as u32,
             memory_size: sys.total_memory(),

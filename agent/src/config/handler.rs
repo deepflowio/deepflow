@@ -1456,8 +1456,7 @@ impl ConfigHandler {
             info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
             let mut system = sysinfo::System::new();
             system.refresh_cpu();
-            candidate_config.environment.max_cpus =
-                1.max(system.cpus().len()) as u32;
+            candidate_config.environment.max_cpus = 1.max(system.cpus().len()) as u32;
         }
 
         if candidate_config.flow != new_config.flow {

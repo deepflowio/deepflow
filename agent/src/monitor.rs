@@ -165,6 +165,7 @@ struct SysStatusBroker {
 impl SysStatusBroker {
     pub fn new(system: Arc<Mutex<System>>, log_dir: String) -> Result<Self> {
         let pid = get_current_pid().map_err(|e| Error::SysMonitor(String::from(e)))?;
+        // refresh_cpu()'ed before
         let core_count = system.lock().unwrap().cpus().len();
 
         let create_time = {
