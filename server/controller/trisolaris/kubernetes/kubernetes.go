@@ -83,8 +83,21 @@ func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool 
 	_, dok := k.clusterIDToDomain[clusterID]
 	_, sdok := k.clusterIDToSubDomain[clusterID]
 	k.mutex.Unlock()
-	log.Infof("check cluster_id: %s, domain map: %v, sub_domain map: %v", clusterID, k.clusterIDToDomain, k.clusterIDToSubDomain)
-	return dok || sdok
+	ok := dok || sdok
+	if !ok {
+		log.Warningf("cluster_id: %s not found in cache, domain map: %v, sub_domain map: %v", clusterID, k.clusterIDToDomain, k.clusterIDToSubDomain)
+		var count int64
+		k.db.Model(&models.Domain{}).Where("cluster_id = ?", clusterID).Count(&count)
+		if count > 0 {
+			return true
+		}
+		k.db.Model(&models.SubDomain{}).Where("cluster_id = ?", clusterID).Count(&count)
+		if count > 0 {
+			return true
+		}
+		log.Warningf("cluster_id: %s not found in db", clusterID)
+	}
+	return ok
 }
 
 func (k *KubernetesInfo) CacheClusterID(clusterID string) {
