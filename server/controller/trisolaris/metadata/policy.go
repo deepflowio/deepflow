@@ -618,10 +618,12 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 			}
 		}
 	case APPLICATION_PCAP:
+		var payloadSlice int
 		for _, pcapPolicy := range rawData.aclIDToPcapPolices[acl.ID] {
-			payloadSlice := pcapPolicy.PayloadSlice
-			if payloadSlice == 0 {
+			if pcapPolicy.PayloadSlice == nil {
 				payloadSlice = MAX_PAYLOAD_SLICE
+			} else {
+				payloadSlice = *pcapPolicy.PayloadSlice
 			}
 			npbAction := &trident.NpbAction{
 				TapSide:       &tapSideSRC,
