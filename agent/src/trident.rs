@@ -851,6 +851,7 @@ impl Components {
             session.clone(),
             libvirt_xml_extractor.clone(),
             exception_handler.clone(),
+            candidate_config.dispatcher.extra_netns.clone(),
         );
 
         #[cfg(target_os = "linux")]

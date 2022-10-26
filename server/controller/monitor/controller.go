@@ -94,7 +94,7 @@ func (c *ControllerCheck) healthCheck() {
 
 	log.Info("controller health check start")
 
-	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Find(&controllers)
+	mysql.Db.Not("state = ?", common.HOST_STATE_MAINTENANCE).Order("state desc").Find(&controllers)
 	for _, controller := range controllers {
 		// 健康检查过程，为了防止网络抖动，(3 * interval)时间内都正常/异常才进行状态修改
 		// 如果数据库状态是正常，且检查正常
