@@ -83,12 +83,12 @@ func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool 
 	_, dok := k.clusterIDToDomain[clusterID]
 	_, sdok := k.clusterIDToSubDomain[clusterID]
 	k.mutex.Unlock()
-	log.Debugf("cluster_id domain map: %v, sub_domain map: %v", k.clusterIDToDomain, k.clusterIDToSubDomain)
+	log.Infof("check cluster_id: %s, domain map: %v, sub_domain map: %v", clusterID, k.clusterIDToDomain, k.clusterIDToSubDomain)
 	return dok || sdok
 }
 
 func (k *KubernetesInfo) CacheClusterID(clusterID string) {
-	log.Infof("start cache cluster_id (%s)", clusterID)
+	log.Infof("start cache cluster_id: %s", clusterID)
 	k.mutex.Lock()
 	_, ok := k.clusterIDToDomain[clusterID]
 	if !ok {
@@ -98,8 +98,8 @@ func (k *KubernetesInfo) CacheClusterID(clusterID string) {
 			for k.clusterIDToDomain[clusterID] == "" {
 				domainLcuuid, err := k.createDomain(clusterID)
 				if err != nil {
-					log.Errorf("auto create domain failed: %v", err)
-					time.Sleep(time.Second * 30)
+					log.Errorf("auto create domain failed: %s, try again after 3s", err.Error())
+					time.Sleep(time.Second * 3)
 				} else {
 					k.clusterIDToDomain[clusterID] = domainLcuuid
 				}
@@ -115,8 +115,8 @@ func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, er
 	azConMgr := dbmgr.DBMgr[models.AZControllerConnection](k.db)
 	azConn, err := azConMgr.GetFromControllerIP(k.cfg.NodeIP)
 	if err != nil {
-		log.Errorf("controller (%s) az connection not in DB", k.cfg.NodeIP)
-		return
+		log.Errorf("get az controller connection (node_ip: %s) from db failed: %s", k.cfg.NodeIP, err.Error())
+		return "", err
 	}
 	domainConf := map[string]interface{}{
 		"controller_ip":              k.cfg.NodeIP,
@@ -135,7 +135,8 @@ func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, er
 	}
 	domain, err := service.CreateDomain(domainCreate, nil)
 	if err != nil {
-		return
+		log.Errorf("create domain failed: %s", err.Error())
+		return "", err
 	}
 	return domain.Lcuuid, nil
 }
