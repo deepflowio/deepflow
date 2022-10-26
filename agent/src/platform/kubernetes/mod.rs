@@ -18,7 +18,6 @@ use std::{fs, os::unix::io::AsRawFd, time::Duration};
 
 use enum_dispatch::enum_dispatch;
 use nix::sched::{setns, CloneFlags};
-use regex::Regex;
 
 mod active_poller;
 mod api_watcher;
@@ -39,7 +38,7 @@ pub trait Poller {
     fn get_version(&self) -> u64;
     fn get_interface_info_in(&self, ns: &NsFile) -> Option<Vec<InterfaceInfo>>;
     fn get_interface_info(&self) -> Vec<InterfaceInfo>;
-    fn set_netns_regex(&self, re: Regex);
+    fn set_netns(&self, ns: Vec<NsFile>);
     fn start(&self);
     fn stop(&self);
 }
@@ -63,7 +62,7 @@ impl Poller for PassivePoller {
     fn get_interface_info(&self) -> Vec<InterfaceInfo> {
         vec![]
     }
-    fn set_netns_regex(&self, _: Regex) {}
+    fn set_netns(&self, _: Vec<NsFile>) {}
     fn start(&self) {}
     fn stop(&self) {}
 }
