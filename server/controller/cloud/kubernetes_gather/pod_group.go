@@ -88,7 +88,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			case 3:
 				replicas = 0
 				generateName := metaData.Get("generateName").MustString()
-				pTempHash := metaData.Get("lables").Get("pod-template-hash").MustString()
+				pTempHash := metaData.Get("labels").Get("pod-template-hash").MustString()
 				if generateName == "" && pTempHash == "" {
 					log.Debugf("podgroup (%s) generatename or pod template hash not found", name)
 					continue

@@ -65,7 +65,7 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 		generateName := metaData.Get("generateName").MustString()
 		if len(podGroups.MustArray()) == 0 {
 			if generateName == "" {
-				pTempHash := metaData.Get("lables").Get("pod-template-hash").MustString()
+				pTempHash := metaData.Get("labels").Get("pod-template-hash").MustString()
 				if pTempHash == "" {
 					log.Debugf("pod (%s) pod template hash not found", name)
 					continue
