@@ -78,8 +78,8 @@ var (
 		input:  "select Percentile(byte_tx, 50) as percentile_byte_tx from l4_flow_log",
 		output: "SELECT quantile(50)(byte_tx) AS `percentile_byte_tx` FROM flow_log.`l4_flow_log`",
 	}, {
-		input:  "select Avg(rtt) as avg_rtt from l4_flow_log where time >= 100+1 and time <= 102",
-		output: "SELECT AVGIf(rtt, rtt != 0) AS `avg_rtt` FROM flow_log.`l4_flow_log` PREWHERE `time` >= 100 + 1 AND `time` <= 102",
+		input:  "select Avg(rtt) as avg_rtt from l4_flow_log",
+		output: "SELECT AVGIf(rtt, rtt != 0) AS `avg_rtt` FROM flow_log.`l4_flow_log`",
 	}, {
 		input:  "select Max(byte_tx) as max_byte_tx, Avg(rtt) as avg_rtt from l4_flow_log",
 		output: "SELECT MAX(byte_tx) AS `max_byte_tx`, AVGIf(rtt, rtt != 0) AS `avg_rtt` FROM flow_log.`l4_flow_log`",
