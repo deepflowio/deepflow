@@ -14,7 +14,10 @@ message Voucher {
     optional uint32 recharge_amount = 7; // 充值金额
     optional string activation_time  = 8; // 生效日期 "2019-09-11"
     optional uint32 expiration_days = 9; // 有效时间
-    optional float tm_cloud_server_price = 10; // 流量监控-云服务器单价
-    optional float tm_container_node_price = 11; // 流量监控-容器节点单价
+    optional float tm_cloud_server_price = 10; // 云网分析-云服务器单价
+    optional float tm_container_node_price = 11; // 云网分析-全栈单价
+
+    optional float app_cloud_server_price = 12; // 应用分析-云服务器单价
+    optional float app_container_node_price = 13; // 应用分析-全栈单价
 }
 
