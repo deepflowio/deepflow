@@ -170,6 +170,7 @@ impl FlowPerf {
 
         if let Some(payload) = packet.get_l4_payload() {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
+            parser.set_parse_config(&self.parse_config);
             let ret = parser.parse_payload(payload, parse_param);
             parser.reset();
 
@@ -203,7 +204,6 @@ impl FlowPerf {
                 if self.protocol_bitmap.is_disabled(i.protocol()) {
                     continue;
                 }
-                i.set_parse_config(&self.parse_config);
                 if i.check_payload(payload, &param) {
                     self.l7_protocol = i.protocol();
                     // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
