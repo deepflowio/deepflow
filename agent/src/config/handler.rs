@@ -1047,7 +1047,9 @@ impl ConfigHandler {
             candidate_config.tap_mode = new_config.tap_mode;
         }
 
-        if candidate_config.tap_mode != TapMode::Analyzer {
+        if candidate_config.tap_mode != TapMode::Analyzer
+            && static_config.kubernetes_cluster_id.is_empty()
+        {
             // Check and send out exceptions in time
             if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler)
             {
@@ -1152,17 +1154,19 @@ impl ConfigHandler {
                                 }
                             }
                             _ => {
-                                match free_memory_check(
-                                    handler.candidate_config.environment.max_memory,
-                                    &components.exception_handler,
-                                ) {
-                                    Ok(()) => {
-                                        for dispatcher in components.dispatchers.iter() {
-                                            dispatcher.start();
+                                if handler.static_config.kubernetes_cluster_id.is_empty() {
+                                    match free_memory_check(
+                                        handler.candidate_config.environment.max_memory,
+                                        &components.exception_handler,
+                                    ) {
+                                        Ok(()) => {
+                                            for dispatcher in components.dispatchers.iter() {
+                                                dispatcher.start();
+                                            }
                                         }
-                                    }
-                                    Err(e) => {
-                                        warn!("{}", e);
+                                        Err(e) => {
+                                            warn!("{}", e);
+                                        }
                                     }
                                 }
                             }
@@ -1759,7 +1763,9 @@ impl ConfigHandler {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
                 }
-                if handler.candidate_config.tap_mode != TapMode::Analyzer {
+                if handler.candidate_config.tap_mode != TapMode::Analyzer
+                    && handler.static_config.kubernetes_cluster_id.is_empty()
+                {
                     match free_memory_check(
                         handler.candidate_config.environment.max_memory,
                         &components.exception_handler,
