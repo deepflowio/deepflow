@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package service
+package model
 
 var YamlVTapGroupConfig = []byte(`# 采集器组ID
 vtap_group_id: g-xxxxxx
@@ -350,11 +350,6 @@ static_config:
   #packet-sequence-flag: 255
   ## 是否开启ebpf
   ebpf-disabled: false
-  ## eBPF uprobe 开启 Golang 符号表解析，默认为 false# 作用于裁剪了标准符号表的 Golang 进程（例如 K8s 自身进程一般属于此类）。
-  ## 当关闭此开关时，无法采集此类进程的 uprobe 数据。
-  ## 当开启此开关时，对于 Golang >= 1.13 且 < 1.18 的 Golang 进程，
-  ## 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
-  ebpf-uprobe-golang-symbol-enabled: false
   ## 用于开启集成采集器压缩数据开关，现在仅支持 opentelemetry trace 数据压缩
   external_agent_http_proxy_compressed: false
   # eBPF、AF_PACKET、WINPCAP 开启的应用协议解析列表，默认包括支持的所有应用协议。

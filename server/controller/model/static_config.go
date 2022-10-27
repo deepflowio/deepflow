@@ -67,7 +67,6 @@ type StaticConfig struct {
 	PacketSequenceQueueCount        *int                               `yaml:"packet-sequence-queue-count,omitempty"`
 	PacketSequenceFlag              *uint8                             `yaml:"packet-sequence-flag,omitempty"`
 	EbpfDisabled                    *bool                              `yaml:"ebpf-disabled,omitempty"`
-	EbpfUprobeGolangSymbolEnabled   *bool                              `yaml:"ebpf-uprobe-golang-symbol-enabled,omitempty"`
 	L7ProtocolEnabled               []string                           `yaml:"l7-protocol-enabled,omitempty"`
 	EbpfUprobeProcessNameRegexs     *EbpfUprobeProcessNameRegexsConfig `yaml:"ebpf-uprobe-process-name-regexs,omitempty"`
 	FeatureFlags                    []string                           `yaml:"feature-flags,omitempty"`
