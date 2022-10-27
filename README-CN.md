@@ -22,7 +22,7 @@ DeepFlow 是一款面向云原生开发者的**高度自动化**的可观测性�
 - **全栈**：DeepFlow 使用 eBPF 和 cBPF 技术实现的 **AutoMetrics** 机制，可以自动采集任何应用的 RED（Request、Error、Delay）性能指标，精细至每一次应用调用，覆盖从应用到基础设施的所有软件技术栈。在云原生环境中，DeepFlow 的 **AutoTagging** 机制自动发现服务、实例、API 的属性信息，自动为每个观测数据注入丰富的标签，从而消除数据孤岛，并释放数据的下钻能力。
 - **全链路**：DeepFlow 使用 eBPF 技术创新的实现了 **AutoTracing** 机制，在云原生环境中自动追踪任意微服务、基础设施服务的分布式调用链。在此基础上，通过集成并自动关联来自 OpenTelemetry 的数据，DeepFlow 实现了完整的全栈、全链路分布式追踪，消除了所有盲点。
 - **高性能**：DeepFlow 创新的 **SmartEncoding** 标签注入机制，能够将数据存储性能提升 10 倍，从此告别高基数和采样的焦虑。DeepFlow 使用 Rust 实现 Agent，拥有极致处理性能的同时保证内存安全。DeepFlow 使用 Golang 实现 Server，重写了 Golang 的 map、pool 基础库，数据查询和内存 GC 均有近 10 倍的性能提升。
-- **可编程**：DeepFlow 目前支持了对 HTTP 1/2/S、Dubbo、MySQL、PostgreSQL、Redis、Kafka、MQTT、DNS 协议的解析，并将保持迭代增加更多的应用协议支持。除此之外，DeepFlow 基于 WASM 技术提供了可编程接口，让开发者可以快速具备对私有协议的解析能力，并可用于构建特定场景的业务分析能力，例如 5GC 信令分析、金融交易分析、车机通信分析等。
+- **可编程**：DeepFlow 目前支持了对 HTTP(S)、Dubbo、MySQL、PostgreSQL、Redis、Kafka、MQTT、DNS 协议的解析，并将保持迭代增加更多的应用协议支持。除此之外，DeepFlow 基于 WASM 技术提供了可编程接口，让开发者可以快速具备对私有协议的解析能力，并可用于构建特定场景的业务分析能力，例如 5GC 信令分析、金融交易分析、车机通信分析等。
 - **开放接口**：DeepFlow 拥抱开源社区，支持接收广泛的可观测数据源，并利用 AutoTagging 和 SmartEncoding 提供高性能、统一的标签注入能力。DeepFlow 支持插件式的数据库接口，开发者可自由增加和替换最合适的数据库。DeepFlow 为所有观测数据提供统一的标准 SQL 查询能力，便于使用者快速集成到自己的可观测性平台中。
 - **易于维护**：DeepFlow 的内核仅由 Agent、Server 两个组件构成，将复杂度隐藏在进程内部，将维护难度降低至极致。DeepFlow Server 集群可对多个 Kubernetes 集群、传统服务器集群、云服务器集群进行统一监控，且无需依赖任何外部组件即可实现水平扩展与负载均衡。
 
