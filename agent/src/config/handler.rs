@@ -1083,6 +1083,10 @@ impl ConfigHandler {
             );
         }
 
+        if *yaml_config != new_config.yaml_config {
+            *yaml_config = new_config.yaml_config;
+        }
+
         if candidate_config.dispatcher != new_config.dispatcher {
             #[cfg(target_os = "linux")]
             if candidate_config.dispatcher.extra_netns != new_config.dispatcher.extra_netns {

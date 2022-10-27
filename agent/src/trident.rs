@@ -830,6 +830,10 @@ impl Components {
             }
         }
 
+        info!(
+            "Agent run with feature-flags: {:?}.",
+            FeatureFlags::from(&yaml_config.feature_flags)
+        );
         // Currently, only loca-mode + ebpf collector is supported, and ebpf collector is not
         // applicable to fastpath, so the number of queues is 1
         // =================================================================================
