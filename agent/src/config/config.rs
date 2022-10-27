@@ -197,6 +197,7 @@ impl Default for Config {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "kebab-case")]
 pub struct UprobeProcRegExp {
     pub golang_symbol: String,
     pub golang: String,
