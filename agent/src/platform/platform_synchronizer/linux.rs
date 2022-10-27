@@ -32,19 +32,21 @@ use regex::Regex;
 use ring::digest;
 use tokio::runtime::{Builder, Runtime};
 
-use super::kubernetes::{
-    check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, PassivePoller, Poller,
-};
-use super::{InterfaceEntry, LibvirtXmlExtractor};
-
 use crate::{
     config::{handler::PlatformAccess, KubernetesPollerType},
+    exception::ExceptionHandler,
     handler,
+    platform::{
+        kubernetes::{
+            check_read_link_ns, check_set_ns, ActivePoller, GenericPoller, PassivePoller, Poller,
+        },
+        InterfaceEntry, LibvirtXmlExtractor,
+    },
     proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse},
-    utils::command::*,
-    utils::environment::is_tt_pod,
+    rpc::Session,
+    utils::{command::*, environment::is_tt_pod},
 };
-use crate::{exception::ExceptionHandler, rpc::Session};
+
 use public::{
     consts::NORMAL_EXIT_WITH_RESTART,
     netns::{InterfaceInfo, NetNs, NsFile},
