@@ -301,6 +301,28 @@ pub fn parse_ip_slice(bs: &[u8]) -> Option<IpAddr> {
     }
 }
 
+pub fn is_global(ip: &IpAddr) -> bool {
+    !ip.is_unspecified() && !ip.is_loopback() && !ip.is_multicast() && !is_link_local_unicast(ip)
+}
+
+pub fn is_link_local_unicast(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(addr) => addr.is_link_local(),
+        // Ipv6Addr::is_unicast_link_local() is the experiment API cannot be used
+        IpAddr::V6(addr) => is_unicast_link_local(&addr),
+    }
+}
+
+pub fn is_link_local_multicast(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(addr) => {
+            let ip_octets = addr.octets();
+            ip_octets[0] == 224 && ip_octets[1] == 0 && ip_octets[2] == 0
+        }
+        IpAddr::V6(addr) => addr.segments()[0] & 0xff0f == 0xff02,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

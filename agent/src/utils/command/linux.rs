@@ -18,8 +18,9 @@ use std::{
     fs,
     io::{Error, ErrorKind, Result},
     path::Path,
-    process::Command,
 };
+
+use super::exec_command;
 
 const OVS_INTERFACE_COLUMNS_OPTION: &str = "--columns=_uuid,external_ids,ifindex,mac,mac_in_use,name,ofport,options,other_config,status,type";
 const NEUTRON_OPENVSWITCH_AGENT: &str = "/usr/lib/systemd/system/neutron-openvswitch-agent.service";
@@ -65,10 +66,6 @@ pub fn get_ip_address() -> Result<String> {
 
 pub fn get_ip_link() -> Result<String> {
     exec_command("ip", &["link", "show"])
-}
-
-pub fn get_hostname() -> Result<String> {
-    exec_command("hostname", &[])
 }
 
 pub fn get_iptables_acls() -> Result<String> {
@@ -137,17 +134,6 @@ pub fn get_bridge_mapping() -> Result<String> {
     }
 
     Ok(bridge_mappings)
-}
-
-fn exec_command(program: &str, args: &[&str]) -> Result<String> {
-    let output = Command::new(program).args(args).output()?;
-    if output.status.success() {
-        Ok(String::from_utf8(output.stdout)
-            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?)
-    } else {
-        Ok(String::from_utf8(output.stderr)
-            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?)
-    }
 }
 
 pub fn get_all_vm_xml<P: AsRef<Path>>(xml_path: P) -> Result<String> {
