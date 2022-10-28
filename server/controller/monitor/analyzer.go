@@ -167,6 +167,7 @@ func (c *AnalyzerCheck) healthCheck() {
 	}
 	for ip, dfhostCheck := range checkExceptionAnalyzers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
+			mysql.Db.Delete(mysql.AZAnalyzerConnection{}, "analyzer_ip = ?", ip)
 			err := mysql.Db.Delete(mysql.Analyzer{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete analyzer(%s) failed, err:%s", ip, err)

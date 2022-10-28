@@ -180,6 +180,7 @@ func (c *ControllerCheck) healthCheck() {
 
 	for ip, dfhostCheck := range checkExceptionControllers {
 		if dfhostCheck.duration() > int64(c.cfg.ExceptionTimeFrame) {
+			mysql.Db.Delete(mysql.AZControllerConnection{}, "controller_ip = ?", ip)
 			err := mysql.Db.Delete(mysql.Controller{}, "ip = ?", ip).Error
 			if err != nil {
 				log.Errorf("delete controller(%s) failed, err:%s", ip, err)
