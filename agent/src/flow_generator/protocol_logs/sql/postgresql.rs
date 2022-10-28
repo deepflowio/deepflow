@@ -38,8 +38,8 @@ use crate::{
 };
 
 use super::{
-    is_postgresql,
     postgre_convert::{get_code_desc, get_request_str},
+    sql_check::is_postgresql,
 };
 
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
@@ -124,7 +124,8 @@ impl L7ProtocolInfoInterface for PostgreInfo {
     }
 
     fn skip_send(&self) -> bool {
-        return self.context.is_empty();
+        // if sql check fail and have no error response, very likely is protocol miscalculate.
+        self.status == L7ResponseStatus::default() && !is_postgresql(&self.context)
     }
 }
 
@@ -197,12 +198,11 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.set_msg_type(param.direction);
         self.parse(payload)?;
 
-        let r = if self.info.ignore {
+        Ok(if self.info.ignore {
             vec![]
         } else {
             vec![L7ProtocolInfo::PostgreInfo(self.info.clone())]
-        };
-        Ok(r)
+        })
     }
 
     fn protocol(&self) -> L7Protocol {
@@ -327,9 +327,6 @@ impl PostgresqlLog {
             'Q' => {
                 self.info.req_type = tag;
                 self.info.context = strip_string_end_with_zero(data)?;
-                if !is_postgresql(&self.info.context) {
-                    return Err(Error::L7ProtocolUnknown);
-                }
                 self.info.ignore = false;
                 Ok(())
             }
