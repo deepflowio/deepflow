@@ -458,7 +458,7 @@ impl MirrorModeDispatcher {
                     &mut flow_map,
                     &self.base.counter,
                 );
-                continue
+                continue;
             }
 
             if src_local {

@@ -232,7 +232,12 @@ impl NetNs {
     }
 
     pub fn setns(fp: &File) -> Result<()> {
-        Ok(setns(fp.as_raw_fd(), CloneFlags::CLONE_NEWNET)?)
+        if let Err(e) = setns(fp.as_raw_fd(), CloneFlags::CLONE_NEWNET) {
+            let inode = fp.metadata().ok().map(|m| m.ino());
+            warn!("setns() failed for fd {} inode {:?}: {:?}", fp.as_raw_fd(), inode, e);
+            return Err(e.into());
+        }
+        Ok(())
     }
 
     fn open_and_setns(&mut self, ns: &NsFile) -> Result<()> {
