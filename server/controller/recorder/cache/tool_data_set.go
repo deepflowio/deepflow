@@ -298,6 +298,7 @@ func (t *ToolDataSet) deleteDHCPPort(lcuuid string) {
 func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 	t.VInterfaceLcuuidToID[item.Lcuuid] = item.ID
 	t.VInterfaceIDToLcuuid[item.ID] = item.Lcuuid
+	t.VInterfaceIDToLcuuid[item.ID] = item.Lcuuid
 	t.VInterfaceLcuuidToNetworkID[item.Lcuuid] = item.NetworkID
 	t.VInterfaceLcuuidToDeviceType[item.Lcuuid] = item.DeviceType
 	t.VInterfaceLcuuidToDeviceID[item.Lcuuid] = item.DeviceID
