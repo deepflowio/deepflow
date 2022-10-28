@@ -472,16 +472,7 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 			lanSubnetIDs := vInterfaceIPToSubnetIDs[lbTargetServer.IP]
 			for _, lanSubnetID := range lanSubnetIDs {
 				if lanSubnetID == network.ID {
-					isData = true
-					break
-				}
-			}
-			wanSubnetIDs := ipResourceIPToSubnetIDs[lbTargetServer.IP]
-			for _, wanSubnetID := range wanSubnetIDs {
-				if isData {
-					break
-				}
-				if wanSubnetID == network.ID || !isData {
+					log.Infof("lan %s:%d", lbTargetServer.IP, lanSubnetID)
 					isData = true
 					break
 				}
@@ -490,6 +481,7 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 				wanSubnetIDs := ipResourceIPToSubnetIDs[lbTargetServer.IP]
 				for _, wanSubnetID := range wanSubnetIDs {
 					if wanSubnetID == network.ID {
+						log.Infof("wan %s:%d", lbTargetServer.IP, wanSubnetID)
 						isData = true
 						break
 					}
