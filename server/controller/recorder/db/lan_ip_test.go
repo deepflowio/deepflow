@@ -68,8 +68,8 @@ func (t *SuiteTest) TestLANIPCreateAndFind() {
 	}
 	t.db.Create(lanIP)
 	var resultLANIP *mysql.LANIP
-	err := t.db.Where("lcuuid = ? and ip='' and netmask='' and gateway=''" + 
-	"and sub_domain='' and domain=''", lcuuid).First(&resultLANIP).Error
+	err := t.db.Where("lcuuid = ? and ip='' and netmask='' and gateway=''"+
+		"and sub_domain='' and domain=''", lcuuid).First(&resultLANIP).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), lanIP.Base.Lcuuid, resultLANIP.Base.Lcuuid)
 

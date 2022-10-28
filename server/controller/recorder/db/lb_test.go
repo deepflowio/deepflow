@@ -78,8 +78,8 @@ func (t *SuiteTest) TestLBCreateAndFind() {
 	}
 	t.db.Create(lb)
 	var resultLB *mysql.LB
-	err := t.db.Where("lcuuid = ? and name='' and label='' and vip='' and az='' and " +
-	"region='' and uid='' and domain=''", lcuuid).First(&resultLB).Error
+	err := t.db.Where("lcuuid = ? and name='' and label='' and vip='' and az='' and "+
+		"region='' and uid='' and domain=''", lcuuid).First(&resultLB).Error
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), lb.Base.Lcuuid, resultLB.Base.Lcuuid)
 

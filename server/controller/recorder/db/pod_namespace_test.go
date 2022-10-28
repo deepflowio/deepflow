@@ -71,7 +71,6 @@ func (t *SuiteTest) TestDeletePodNamespaceBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
-
 func (t *SuiteTest) TestPodNamespaceCreateAndFind() {
 	lcuuid := uuid.New().String()
 	pn := &mysql.PodNamespace{
@@ -93,4 +92,3 @@ func (t *SuiteTest) TestPodNamespaceCreateAndFind() {
 	assert.Equal(t.T(), nil, err)
 	assert.Equal(t.T(), "", resultPodNamespace.Base.Lcuuid)
 }
-

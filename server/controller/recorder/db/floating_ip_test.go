@@ -71,7 +71,6 @@ func (t *SuiteTest) TestDeleteFloatingIPBatchSuccess() {
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
 
-
 func (t *SuiteTest) TestFloatingIPCreateAndFind() {
 	lcuuid := uuid.New().String()
 	floatingIP := &mysql.FloatingIP{
