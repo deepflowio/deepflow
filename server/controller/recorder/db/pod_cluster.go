@@ -40,4 +40,3 @@ func NewPodCluster() *PodCluster {
 func (a *PodCluster) setDBItemID(dbItem *mysql.PodCluster, id int) {
 	dbItem.ID = id
 }
-
