@@ -11,7 +11,7 @@ name: build agent env
 jobs:
   build_agent_env:
     name: build agent env
-    runs-on: cirun-aws-amd64-32c
+    runs-on: "cirun-aws-amd64-32c--${{ github.run_id }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -58,7 +58,7 @@ jobs:
 
   build_agent_env_arm64:
     name: build agent env arm64
-    runs-on: cirun-aws-arm64-32c
+    runs-on: "cirun-aws-arm64-32c--${{ github.run_id }}"
     steps:
 
       - name: Checkout

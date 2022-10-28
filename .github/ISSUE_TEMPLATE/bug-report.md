@@ -18,7 +18,7 @@ labels: kind/bug
 
 -  deepflow version:
 
-   **Output of `kubectl exec -it -n deepflow sts/deepflow-server -c deepflow-server -- deepflow-server -v`:**
+   **Output of `kubectl exec -it -n deepflow deploy/deepflow-server -- deepflow-server -v`:**
   
    **Output of `kubectl exec -it -n deepflow ds/deepflow-agent -- deepflow-agent -v`:**
 

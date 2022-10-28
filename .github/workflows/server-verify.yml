@@ -9,7 +9,7 @@ on:
 jobs:
   verify_server:
     name: verify server
-    runs-on: [cirun-aws-amd64-32c]
+    runs-on: "cirun-aws-amd64-32c--${{ github.run_id }}"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
