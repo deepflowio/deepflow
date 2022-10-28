@@ -17,7 +17,7 @@
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
-pub use linux::{links_by_name_regex_in_netns, NetNs, NsFile};
+pub use linux::{link_list_in_netns, links_by_name_regex_in_netns, NetNs, NsFile};
 
 #[cfg(target_os = "windows")]
 mod windows;
