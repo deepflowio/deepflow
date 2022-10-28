@@ -96,11 +96,11 @@ type Region struct {
 type AZ struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
-	Name           string `gorm:"column:name;type:varchar(64)" json:"NAME"`
+	Name           string `gorm:"column:name;type:varchar(64);default:''" json:"NAME"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
-	Region         string `gorm:"column:region;type:char(64)" json:"REGION"`
-	Domain         string `gorm:"column:domain;type:char(64)" json:"DOMAIN"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 }
 
 func (AZ) TableName() string {
