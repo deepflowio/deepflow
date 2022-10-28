@@ -27,6 +27,7 @@ const (
 	AWS_EN        = "aws"
 	ALIYUN_EN     = "aliyun"
 	KUBERNETES_EN = "kubernetes"
+	HUAWEI_EN     = "huawei"
 	QINGCLOUD_EN  = "qingcloud"
 	AGENT_SYNC_EN = "agent_sync"
 	BAIDU_BCE_EN  = "baidu_bce"
@@ -35,6 +36,7 @@ const (
 	AWS        = 6
 	ALIYUN     = 9
 	KUBERNETES = 11
+	HUAWEI     = 13
 	QINGCLOUD  = 14
 	AGENT_SYNC = 23
 	BAIDU_BCE  = 25
