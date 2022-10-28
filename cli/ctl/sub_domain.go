@@ -15,8 +15,8 @@ import (
 type SubDomainType uint8
 
 const (
-	SubDomainTypeCreate  SubDomainType = iota
-	SubDomainTypeUpdate 
+	SubDomainTypeCreate SubDomainType = iota
+	SubDomainTypeUpdate
 )
 
 func RegisterSubDomainCommand() *cobra.Command {
