@@ -95,34 +95,6 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 		specPorts := sData.Get("spec").Get("ports")
 		var hasPodGroup bool
 		for i := range specPorts.MustArray() {
-			ports := specPorts.GetIndex(i)
-			var targetPort int
-			if targetPortString := ports.Get("targetPort").MustString(); targetPortString != "" {
-				targetPort = k.podTargetPorts[targetPortString]
-			}
-			if targetPort == 0 {
-				targetPort = ports.Get("targetPort").MustInt()
-				if targetPort == 0 {
-					log.Infof("service (%s) target_port not match", name)
-					continue
-				}
-			}
-			nameToPort := map[string]int{}
-			nameToPort[ports.Get("name").MustString()] = ports.Get("port").MustInt()
-			uidToName := map[string]map[string]int{}
-			uidToName[uID] = nameToPort
-			k.nsServiceNameToService[namespace+name] = uidToName
-			key := strconv.Itoa(ports.Get("port").MustInt()) + ports.Get("protocol").MustString() + strconv.Itoa(ports.Get("nodePort").MustInt()) + strconv.Itoa(targetPort)
-			servicePort := model.PodServicePort{
-				Lcuuid:           common.GetUUID(uID+key, uuid.Nil),
-				Name:             ports.Get("name").MustString(),
-				Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
-				Port:             ports.Get("port").MustInt(),
-				TargetPort:       targetPort,
-				NodePort:         ports.Get("nodePort").MustInt(),
-				PodServiceLcuuid: uID,
-			}
-
 			labels, fErr := metaData.Get("annotations").Get("field.cattle.io/targetWorkloadIds").String()
 			podGroupLcuuids := mapset.NewSet()
 			if fErr == nil && labels != "[]" && labels != "null" {
@@ -173,6 +145,45 @@ func (k *KubernetesGather) getPodServices() (services []model.PodService, servic
 				continue
 			}
 			hasPodGroup = true
+
+			podTargetPorts := map[string]int{}
+			for _, pgLcuuid := range podGroupLcuuids.ToSlice() {
+				targetPorts, ok := k.pgLcuuidTopodTargetPorts[pgLcuuid.(string)]
+				if !ok {
+					continue
+				}
+				for name, port := range targetPorts {
+					podTargetPorts[name] = port
+				}
+			}
+			ports := specPorts.GetIndex(i)
+			var targetPort int
+			if targetPortString := ports.Get("targetPort").MustString(); targetPortString != "" {
+				targetPort = podTargetPorts[targetPortString]
+			}
+			if targetPort == 0 {
+				targetPort = ports.Get("targetPort").MustInt()
+				if targetPort == 0 {
+					log.Infof("service (%s) target_port not match", name)
+					continue
+				}
+			}
+			nameToPort := map[string]int{}
+			nameToPort[ports.Get("name").MustString()] = ports.Get("port").MustInt()
+			uidToName := map[string]map[string]int{}
+			uidToName[uID] = nameToPort
+			k.nsServiceNameToService[namespace+name] = uidToName
+			key := strconv.Itoa(ports.Get("port").MustInt()) + ports.Get("protocol").MustString() + strconv.Itoa(ports.Get("nodePort").MustInt()) + strconv.Itoa(targetPort)
+			servicePort := model.PodServicePort{
+				Lcuuid:           common.GetUUID(uID+key, uuid.Nil),
+				Name:             ports.Get("name").MustString(),
+				Protocol:         strings.ToUpper(ports.Get("protocol").MustString()),
+				Port:             ports.Get("port").MustInt(),
+				TargetPort:       targetPort,
+				NodePort:         ports.Get("nodePort").MustInt(),
+				PodServiceLcuuid: uID,
+			}
+
 			// 在service确定有pod group的时候添加pod service port
 			servicePorts = append(servicePorts, servicePort)
 			for _, Lcuuid := range podGroupLcuuids.ToSlice() {

@@ -43,6 +43,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 	}
 	for t, podController := range podControllers {
 		for _, c := range podController {
+			podTargetPorts := map[string]int{}
 			cData, cErr := simplejson.NewJson([]byte(c))
 			if cErr != nil {
 				err = cErr
@@ -138,19 +139,20 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 					k.nsLabelToGroupLcuuids[nsLabel] = nsGroupIDsSet
 				}
 			}
-			containersPorts := cData.Get("spec").Get("template").Get("spec").Get("containers")
-			for i := range containersPorts.MustArray() {
-				ports := containersPorts.GetIndex(i)
-				if _, ok := ports.MustMap()["ports"]; !ok {
+			containers := cData.Get("spec").Get("template").Get("spec").Get("containers")
+			for i := range containers.MustArray() {
+				container := containers.GetIndex(i)
+				cPorts, ok := container.CheckGet("ports")
+				if !ok {
 					continue
 				}
-				for j := range ports.MustArray() {
-					port := ports.GetIndex(j)
-					portName, err := port.Get("name").String()
+				for j := range cPorts.MustArray() {
+					cPort := cPorts.GetIndex(j)
+					cPortName, err := cPort.Get("name").String()
 					if err != nil {
 						continue
 					}
-					k.podTargetPorts[portName] = port.Get("containerPort").MustInt()
+					podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
 				}
 			}
 			labels := metaData.Get("labels").MustMap()
@@ -169,6 +171,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 			}
 			podGroups = append(podGroups, podGroup)
 			k.podGroupLcuuids.Add(uID)
+			k.pgLcuuidTopodTargetPorts[uID] = podTargetPorts
 		}
 	}
 	log.Debug("get podgroups complete")
@@ -178,6 +181,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGroup, err error) {
 	log.Debug("get replicationcontrollers starting")
 	for _, r := range k.k8sInfo["*v1.ReplicationController"] {
+		podTargetPorts := map[string]int{}
 		rData, rErr := simplejson.NewJson([]byte(r))
 		if rErr != nil {
 			err = rErr
@@ -227,19 +231,20 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 				k.nsLabelToGroupLcuuids[nsLabel] = nsRCLcuuidsSet
 			}
 		}
-		containersPorts := rData.Get("spec").Get("template").Get("spec").Get("containers")
-		for i := range containersPorts.MustArray() {
-			ports := containersPorts.GetIndex(i)
-			if _, ok := ports.MustMap()["ports"]; !ok {
+		containers := rData.Get("spec").Get("template").Get("spec").Get("containers")
+		for i := range containers.MustArray() {
+			container := containers.GetIndex(i)
+			cPorts, ok := container.CheckGet("ports")
+			if !ok {
 				continue
 			}
-			for j := range ports.MustArray() {
-				port := ports.GetIndex(j)
-				portName, err := port.Get("name").String()
+			for j := range cPorts.MustArray() {
+				cPort := cPorts.GetIndex(j)
+				cPortName, err := cPort.Get("name").String()
 				if err != nil {
 					continue
 				}
-				k.podTargetPorts[portName] = port.Get("containerPort").MustInt()
+				podTargetPorts[cPortName] = cPort.Get("containerPort").MustInt()
 			}
 		}
 		labelSlice := cloudcommon.StringInterfaceMapKVs(labels, ":")
@@ -258,6 +263,7 @@ func (k *KubernetesGather) getPodReplicationControllers() (podRCs []model.PodGro
 		}
 		podRCs = append(podRCs, podRC)
 		k.podGroupLcuuids.Add(uID)
+		k.pgLcuuidTopodTargetPorts[uID] = podTargetPorts
 	}
 	log.Debug("get replicationcontrollers complete")
 	return
