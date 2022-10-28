@@ -139,7 +139,7 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	router.SetInitStageForHealthChecker("Manager init")
 	// 启动resource manager
 	// 每个云平台启动一个cloud和recorder
-	m := manager.NewManager(cfg.ManagerCfg)
+	m := manager.NewManager(cfg.ManagerCfg, shared.ResourceEventQueue)
 	m.Start()
 
 	router.SetInitStageForHealthChecker("Trisolaris init")
