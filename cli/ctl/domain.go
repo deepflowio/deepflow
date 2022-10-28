@@ -36,6 +36,7 @@ var domainTypeIntToStr = map[int]string{
 	common.AWS:        common.AWS_EN,
 	common.ALIYUN:     common.ALIYUN_EN,
 	common.KUBERNETES: common.KUBERNETES_EN,
+	common.HUAWEI:     common.HUAWEI_EN,
 	common.QINGCLOUD:  common.QINGCLOUD_EN,
 	common.AGENT_SYNC: common.AGENT_SYNC_EN,
 	common.BAIDU_BCE:  common.BAIDU_BCE_EN,
@@ -46,6 +47,7 @@ var domainTypeStrToInt = map[string]int{
 	common.AWS_EN:        common.AWS,
 	common.ALIYUN_EN:     common.ALIYUN,
 	common.KUBERNETES_EN: common.KUBERNETES,
+	common.HUAWEI_EN:     common.HUAWEI,
 	common.QINGCLOUD_EN:  common.QINGCLOUD,
 	common.AGENT_SYNC_EN: common.AGENT_SYNC,
 	common.BAIDU_BCE_EN:  common.BAIDU_BCE,
@@ -276,6 +278,8 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		fmt.Printf(string(example.YamlDomainAws))
 	case common.TENCENT_EN:
 		fmt.Printf(string(example.YamlDomainTencent))
+	case common.HUAWEI_EN:
+		fmt.Printf(string(example.YamlDomainHuawei))
 	case common.QINGCLOUD_EN:
 		fmt.Printf(string(example.YamlDomainQingCloud))
 	case common.BAIDU_BCE_EN:
