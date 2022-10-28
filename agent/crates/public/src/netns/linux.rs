@@ -425,3 +425,11 @@ pub fn links_by_name_regex_in_netns<S: AsRef<str>>(regex: S, ns: &NsFile) -> Res
     let _ = NetNs::setns(&current_ns)?;
     Ok(links)
 }
+
+pub fn link_list_in_netns(ns: &NsFile) -> Result<Vec<Link>> {
+    let current_ns = NetNs::open_current_ns()?;
+    let _ = NetNs::open_named_and_setns(ns)?;
+    let links = link_list()?;
+    let _ = NetNs::setns(&current_ns)?;
+    Ok(links)
+}
