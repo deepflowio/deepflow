@@ -507,7 +507,7 @@ func (f *HistogramFunction) WriteTo(buf *bytes.Buffer) {
 	buf.WriteString("histogram(")
 	buf.WriteString(FormatField(f.Fields[1].ToString()))
 	buf.WriteString(")(")
-	buf.WriteString(FormatField(f.Fields[0].ToString()))
+	buf.WriteString(f.Fields[0].ToString())
 	buf.WriteString(")")
 	if f.Alias != "" {
 		buf.WriteString(" AS ")
