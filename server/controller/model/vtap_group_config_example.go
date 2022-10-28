@@ -375,6 +375,8 @@ static_config:
     golang: .*
     # eBPF uprobe 开启应用协议数据采集的使用 openssl 库的进程，默认为 .* 表示对所有使用了 openssl 库的进程开启。
     openssl: .*
+  ## 独立部署模式时, 数据文件大小，单位：M字节，默认值：200，值域[1, 10000]
+  standalone-data-file-size: 200
   ## 开发过程中的功能控制开关，支持多个
   feature-flags:
 `)
