@@ -155,6 +155,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		TridentType:       &tridentType,
 		EpcId:             &vpcID,
 		TapMode:           &tapMode,
+		RegionId:          proto.Uint32(uint32(c.GetRegionID())),
 		// 容器采集器所在容器集群ID
 		PodClusterId: &podClusterId,
 	}
@@ -191,11 +192,6 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	if configure.GetAnalyzerIp() == "" {
 		log.Errorf("vtap(%s) has no analyzer_ip", c.GetCtrlIP())
 	}
-	regionID := trisolaris.GetGNodeInfo().GetRegionIDByTSDBIP(c.GetTSDBIP())
-	if regionID != 0 {
-		configure.RegionId = &regionID
-	}
-
 	if vtapConfig.TapInterfaceRegex != "" {
 		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
 	}

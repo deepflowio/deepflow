@@ -60,7 +60,7 @@ type VTapInfo struct {
 	vTapPlatformData               *VTapPlatformData
 	groupData                      *GroupData
 	vTapPolicyData                 *VTapPolicyData
-	azToRegion                     map[string]string
+	lcuuidToRegionID               map[string]int
 	azToDomain                     map[string]string
 	domainIdToLcuuid               map[int]string
 	lcuuidToPodClusterID           map[string]int
@@ -115,7 +115,7 @@ func NewVTapInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		vTapPlatformData:               newVTapPlatformData(),
 		groupData:                      newGroupData(metaData),
 		vTapPolicyData:                 newVTapPolicyData(metaData),
-		azToRegion:                     make(map[string]string),
+		lcuuidToRegionID:               make(map[string]int),
 		azToDomain:                     make(map[string]string),
 		domainIdToLcuuid:               make(map[int]string),
 		lcuuidToPodClusterID:           make(map[string]int),
@@ -234,18 +234,23 @@ func vtapPortToStr(port int64) string {
 }
 
 func (v *VTapInfo) loadAzData() {
-	azToRegion := make(map[string]string)
 	azToDomain := make(map[string]string)
 	dbDataCache := v.metaData.GetDBDataCache()
 	azs := dbDataCache.GetAZs()
 	if azs != nil {
 		for _, az := range azs {
-			azToRegion[az.Lcuuid] = az.Region
 			azToDomain[az.Lcuuid] = az.Domain
 		}
 	}
-	v.azToRegion = azToRegion
+	lcuuidToRegionID := make(map[string]int)
+	regions := dbDataCache.GetRegions()
+	if regions != nil {
+		for _, region := range regions {
+			lcuuidToRegionID[region.Lcuuid] = region.ID
+		}
+	}
 	v.azToDomain = azToDomain
+	v.lcuuidToRegionID = lcuuidToRegionID
 }
 
 func (v *VTapInfo) loadDomainData() {
@@ -1021,6 +1026,10 @@ func (v *VTapInfo) getRegion() string {
 	}
 
 	return ""
+}
+
+func (v *VTapInfo) GetRegionIDByLcuuid(lcuuid string) int {
+	return v.lcuuidToRegionID[lcuuid]
 }
 
 func (v *VTapInfo) getDefaultVTapGroup() string {
