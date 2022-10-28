@@ -55,7 +55,6 @@ type KubernetesGather struct {
 	podGroupLcuuids              mapset.Set
 	podNetworkLcuuidCIDRs        networkLcuuidCIDRs
 	nodeNetworkLcuuidCIDRs       networkLcuuidCIDRs
-	podTargetPorts               map[string]int
 	podIPToLcuuid                map[string]string
 	nodeIPToLcuuid               map[string]string
 	namespaceToLcuuid            map[string]string
@@ -63,6 +62,7 @@ type KubernetesGather struct {
 	serviceLcuuidToIngressLcuuid map[string]string
 	k8sInfo                      map[string][]string
 	nsLabelToGroupLcuuids        map[string]mapset.Set
+	pgLcuuidTopodTargetPorts     map[string]map[string]int
 	nsServiceNameToService       map[string]map[string]map[string]int
 	cloudStatsd                  statsd.CloudStatsd
 }
@@ -141,7 +141,6 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 		podGroupLcuuids:              mapset.NewSet(),
 		nodeNetworkLcuuidCIDRs:       networkLcuuidCIDRs{},
 		podNetworkLcuuidCIDRs:        networkLcuuidCIDRs{},
-		podTargetPorts:               map[string]int{},
 		podIPToLcuuid:                map[string]string{},
 		nodeIPToLcuuid:               map[string]string{},
 		namespaceToLcuuid:            map[string]string{},
@@ -149,6 +148,7 @@ func NewKubernetesGather(domain *mysql.Domain, subDomain *mysql.SubDomain, isSub
 		serviceLcuuidToIngressLcuuid: map[string]string{},
 		k8sInfo:                      map[string][]string{},
 		nsLabelToGroupLcuuids:        map[string]mapset.Set{},
+		pgLcuuidTopodTargetPorts:     map[string]map[string]int{},
 		nsServiceNameToService:       map[string]map[string]map[string]int{},
 		cloudStatsd: statsd.CloudStatsd{
 			APICount: make(map[string][]int),
@@ -194,12 +194,12 @@ func (k *KubernetesGather) GetKubernetesGatherData() (model.KubernetesGatherReso
 	k.podNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.nodeNetworkLcuuidCIDRs = networkLcuuidCIDRs{}
 	k.podGroupLcuuids = mapset.NewSet()
-	k.podTargetPorts = map[string]int{}
 	k.nodeIPToLcuuid = map[string]string{}
 	k.namespaceToLcuuid = map[string]string{}
 	k.rsLcuuidToPodGroupLcuuid = map[string]string{}
 	k.serviceLcuuidToIngressLcuuid = map[string]string{}
 	k.nsLabelToGroupLcuuids = map[string]mapset.Set{}
+	k.pgLcuuidTopodTargetPorts = map[string]map[string]int{}
 	k.nsServiceNameToService = map[string]map[string]map[string]int{}
 	k.cloudStatsd.APICount = map[string][]int{}
 	k.cloudStatsd.APICost = map[string][]int{}
