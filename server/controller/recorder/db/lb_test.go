@@ -70,3 +70,26 @@ func (t *SuiteTest) TestDeleteLBBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestLBCreateAndFind() {
+	lcuuid := uuid.New().String()
+	lb := &mysql.LB{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(lb)
+	var resultLB *mysql.LB
+	err := t.db.Where("lcuuid = ? and name='' and label='' and vip='' and az='' and " +
+	"region='' and uid='' and domain=''", lcuuid).First(&resultLB).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), lb.Base.Lcuuid, resultLB.Base.Lcuuid)
+
+	resultLB = new(mysql.LB)
+	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultLB).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), lb.Base.Lcuuid, resultLB.Base.Lcuuid)
+
+	resultLB = new(mysql.LB)
+	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultLB).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), "", resultLB.Base.Lcuuid)
+}

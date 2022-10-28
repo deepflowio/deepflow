@@ -70,3 +70,26 @@ func (t *SuiteTest) TestDeleteNATGatewayBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestNATGatewayCreateAndFind() {
+	lcuuid := uuid.New().String()
+	natGateway := &mysql.NATGateway{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(natGateway)
+	var resultNATGateway *mysql.NATGateway
+	err := t.db.Where("lcuuid = ? and name='' and label='' and floating_ips='' "+
+		"and az='' and region='' and uid=''", lcuuid).First(&resultNATGateway).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), natGateway.Base.Lcuuid, resultNATGateway.Base.Lcuuid)
+
+	resultNATGateway = new(mysql.NATGateway)
+	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultNATGateway).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), natGateway.Base.Lcuuid, resultNATGateway.Base.Lcuuid)
+
+	resultNATGateway = new(mysql.NATGateway)
+	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNATGateway).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), "", resultNATGateway.Base.Lcuuid)
+}

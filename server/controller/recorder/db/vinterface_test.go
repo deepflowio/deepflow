@@ -70,3 +70,26 @@ func (t *SuiteTest) TestDeleteVInterfaceBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestVInterfaceCreateAndFind() {
+	lcuuid := uuid.New().String()
+	vInterface := &mysql.VInterface{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(vInterface)
+	var resultVInterface *mysql.VInterface
+	err := t.db.Where("lcuuid = ? and name='' and mac='' and tap_mac='' and "+
+		"sub_domain='' and region=''", lcuuid).First(&resultVInterface).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), vInterface.Base.Lcuuid, resultVInterface.Base.Lcuuid)
+
+	resultVInterface = new(mysql.VInterface)
+	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultVInterface).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), vInterface.Base.Lcuuid, resultVInterface.Base.Lcuuid)
+
+	resultVInterface = new(mysql.VInterface)
+	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVInterface).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), "", resultVInterface.Base.Lcuuid)
+}

@@ -77,3 +77,26 @@ func (t *SuiteTest) TestDeleteVMBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", vmPodNodeConn.Lcuuid).Find(&deletedVMPodNodeConn)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestVMCreateAndFind() {
+	lcuuid := uuid.New().String()
+	vm := &mysql.VM{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(vm)
+	var resultVM *mysql.VM
+	err := t.db.Where("lcuuid = ? and name='' and alias='' and label='' and launch_server='' "+
+		"and az='' and region='' and uid=''", lcuuid).First(&resultVM).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), vm.Base.Lcuuid, resultVM.Base.Lcuuid)
+
+	resultVM = new(mysql.VM)
+	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultVM).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), vm.Base.Lcuuid, resultVM.Base.Lcuuid)
+
+	resultVM = new(mysql.VM)
+	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVM).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), "", resultVM.Base.Lcuuid)
+}

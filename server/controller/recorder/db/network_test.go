@@ -70,3 +70,26 @@ func (t *SuiteTest) TestDeleteNetworkBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestNetworkCreateAndFind() {
+	lcuuid := uuid.New().String()
+	network := &mysql.Network{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(network)
+	var resultNetwork *mysql.Network
+	err := t.db.Where("lcuuid = ? and name='' and label='' and alias='' and description='' "+
+		"and sub_domain='' and region='' and az=''", lcuuid).First(&resultNetwork).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), network.Base.Lcuuid, resultNetwork.Base.Lcuuid)
+
+	resultNetwork = new(mysql.Network)
+	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultNetwork).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), network.Base.Lcuuid, resultNetwork.Base.Lcuuid)
+
+	resultNetwork = new(mysql.Network)
+	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNetwork).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), "", resultNetwork.Base.Lcuuid)
+}
