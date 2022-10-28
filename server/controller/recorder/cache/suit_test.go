@@ -30,23 +30,36 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 )
 
+const (
+	TEST_DB_FILE = "cache_test"
+)
+
 type SuiteTest struct {
 	suite.Suite
 	db *gorm.DB
 }
 
 func TestSuite(t *testing.T) {
-	mysql.Db = GetDB()
+	if _, err := os.Stat(TEST_DB_FILE); err == nil {
+		os.Remove(TEST_DB_FILE)
+	}
+	mysql.Db = GetDB(TEST_DB_FILE)
 	suite.Run(t, new(SuiteTest))
 }
 
 func (t *SuiteTest) SetupSuite() {
 	t.db = mysql.Db
+
+	for _, val := range getModels() {
+		t.db.AutoMigrate(val)
+	}
 }
 
 func (t *SuiteTest) TearDownSuite() {
 	sqlDB, _ := t.db.DB()
 	sqlDB.Close()
+
+	os.Remove(TEST_DB_FILE)
 }
 
 // Run Before a Test
@@ -59,9 +72,9 @@ func (t *SuiteTest) TearDownTest() {
 
 }
 
-func GetDB() *gorm.DB {
+func GetDB(dbFile string) *gorm.DB {
 	db, err := gorm.Open(
-		sqlite.Open("./cache_test.db"),
+		sqlite.Open(dbFile),
 		&gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}},
 	)
 	if err != nil {
@@ -74,4 +87,20 @@ func GetDB() *gorm.DB {
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 	return db
+}
+
+func getModels() []interface{} {
+	return []interface{}{
+		&mysql.Region{}, &mysql.AZ{}, &mysql.SubDomain{}, &mysql.Host{}, &mysql.VM{},
+		&mysql.VPC{}, &mysql.Network{}, &mysql.Subnet{}, &mysql.VRouter{}, &mysql.RoutingTable{},
+		&mysql.DHCPPort{}, &mysql.VInterface{}, &mysql.WANIP{}, &mysql.LANIP{}, &mysql.FloatingIP{},
+		&mysql.SecurityGroup{}, &mysql.SecurityGroupRule{}, &mysql.VMSecurityGroup{}, &mysql.LB{},
+		&mysql.LBListener{}, &mysql.LBTargetServer{}, &mysql.NATGateway{}, &mysql.NATRule{},
+		&mysql.NATVMConnection{}, &mysql.LBVMConnection{}, &mysql.CEN{}, &mysql.PeerConnection{},
+		&mysql.RDSInstance{}, &mysql.RedisInstance{},
+		&mysql.PodCluster{}, &mysql.PodNode{}, &mysql.PodNamespace{}, &mysql.VMPodNodeConnection{},
+		&mysql.PodIngress{}, &mysql.PodIngressRule{}, &mysql.PodIngressRuleBackend{},
+		&mysql.PodService{}, &mysql.PodServicePort{}, &mysql.PodGroup{}, &mysql.PodGroupPort{},
+		&mysql.PodReplicaSet{}, &mysql.Pod{},
+	}
 }

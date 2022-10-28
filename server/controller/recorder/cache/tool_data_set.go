@@ -25,6 +25,9 @@ import (
 
 // 各类资源的映射关系，用于刷新资源时，转换所需数据
 type ToolDataSet struct {
+	// 仅资源变更事件所需的数据
+	EventToolDataSet
+
 	RegionLcuuidToID map[string]int
 	RegionIDToLcuuid map[int]string
 
@@ -62,8 +65,6 @@ type ToolDataSet struct {
 	PodServiceIDToVinterfaceIndexes    map[int][]int
 	PodIDToVinterfaceIndexes           map[int][]int
 
-	IPLcuuidToSubnetLcuuid map[string]string
-
 	SecurityGroupLcuuidToID map[string]int
 
 	NATGatewayLcuuidToID map[string]int
@@ -98,6 +99,8 @@ type ToolDataSet struct {
 
 func NewToolDataSet() ToolDataSet {
 	return ToolDataSet{
+		EventToolDataSet: NewEventToolDataSet(),
+
 		RegionLcuuidToID: make(map[string]int),
 		RegionIDToLcuuid: make(map[int]string),
 
@@ -136,8 +139,6 @@ func NewToolDataSet() ToolDataSet {
 		PodNodeIDToVinterfaceIndexes:       make(map[int][]int),
 		PodServiceIDToVinterfaceIndexes:    make(map[int][]int),
 		PodIDToVinterfaceIndexes:           make(map[int][]int),
-
-		IPLcuuidToSubnetLcuuid: make(map[string]string),
 
 		SecurityGroupLcuuidToID: make(map[string]int),
 
@@ -199,10 +200,23 @@ func (t *ToolDataSet) deleteHost(lcuuid string) {
 
 func (t *ToolDataSet) addVM(item *mysql.VM) {
 	t.VMLcuuidToID[item.Lcuuid] = item.ID
+	t.VMIDToName[item.ID] = item.Name
 	log.Info(addToToolMap(rcommon.RESOURCE_TYPE_VM_EN, item.Lcuuid))
 }
 
+func (t *ToolDataSet) updateVM(cloudItem *cloudmodel.VM) {
+	id, exists := t.GetVMIDByLcuuid(cloudItem.Lcuuid)
+	if exists {
+		t.VMIDToName[id] = cloudItem.Name
+	}
+	log.Info(updateToolMap(rcommon.RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid))
+}
+
 func (t *ToolDataSet) deleteVM(lcuuid string) {
+	id, exists := t.GetVMIDByLcuuid(lcuuid)
+	if exists {
+		delete(t.VMIDToName, id)
+	}
 	delete(t.VMLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_VM_EN, lcuuid))
 }
@@ -225,13 +239,23 @@ func (t *ToolDataSet) deleteVPC(lcuuid string) {
 func (t *ToolDataSet) addNetwork(item *mysql.Network) {
 	t.NetworkLcuuidToID[item.Lcuuid] = item.ID
 	t.NetworkIDToLcuuid[item.ID] = item.Lcuuid
+	t.NetworkIDToName[item.ID] = item.Name
 	log.Info(addToToolMap(rcommon.RESOURCE_TYPE_NETWORK_EN, item.Lcuuid))
+}
+
+func (t *ToolDataSet) updateNetwork(cloudItem *cloudmodel.Network) {
+	id, exists := t.GetNetworkIDByLcuuid(cloudItem.Lcuuid)
+	if exists {
+		t.NetworkIDToName[id] = cloudItem.Name
+	}
+	log.Info(updateToolMap(rcommon.RESOURCE_TYPE_NETWORK_EN, cloudItem.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteNetwork(lcuuid string) {
 	id, exists := t.GetNetworkIDByLcuuid(lcuuid)
 	if exists {
 		delete(t.NetworkIDToLcuuid, id)
+		delete(t.NetworkIDToName, id)
 	}
 	delete(t.NetworkLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_NETWORK_EN, lcuuid))
@@ -259,11 +283,17 @@ func (t *ToolDataSet) deleteDHCPPort(lcuuid string) {
 
 func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 	t.VInterfaceLcuuidToID[item.Lcuuid] = item.ID
+	t.VInterfaceIDToLcuuid[item.ID] = item.Lcuuid
 	t.VInterfaceLcuuidToNetworkID[item.Lcuuid] = item.NetworkID
 	t.VInterfaceLcuuidToDeviceType[item.Lcuuid] = item.DeviceType
 	t.VInterfaceLcuuidToDeviceID[item.Lcuuid] = item.DeviceID
 	t.VInterfaceLcuuidToIndex[item.Lcuuid] = item.Index
 	t.VInterfaceLcuuidToType[item.Lcuuid] = item.Type
+	networkName, _ := t.GetNetworkNameByID(item.NetworkID)
+	t.VInterfaceLcuuidToNetworkInfo[item.Lcuuid] = &NetworkInfo{
+		ID:   item.NetworkID,
+		Name: networkName,
+	}
 
 	if item.DeviceType == common.VIF_DEVICE_TYPE_HOST {
 		t.HostIDToVinterfaceIndexes[item.DeviceID] = append(
@@ -273,6 +303,12 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 		t.VMIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.VMIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
+		vmName, _ := t.GetVMNameByID(item.DeviceID)
+		t.VInterfaceLcuuidToDeviceInfo[item.Lcuuid] = &DeviceInfo{
+			Type: item.DeviceType,
+			ID:   item.DeviceID,
+			Name: vmName,
+		}
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_VROUTER {
 		t.VRouterIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.VRouterIDToVinterfaceIndexes[item.DeviceID], item.ID,
@@ -319,13 +355,31 @@ func (t *ToolDataSet) updateVInterface(cloudItem *cloudmodel.VInterface) {
 }
 
 func (t *ToolDataSet) deleteVInterface(lcuuid string) {
+	id, exists := t.VInterfaceLcuuidToID[lcuuid]
+	if exists {
+		delete(t.VInterfaceIDToLcuuid, id)
+	}
 	delete(t.VInterfaceLcuuidToID, lcuuid)
 	delete(t.VInterfaceLcuuidToNetworkID, lcuuid)
 	delete(t.VInterfaceLcuuidToDeviceType, lcuuid)
 	delete(t.VInterfaceLcuuidToDeviceID, lcuuid)
 	delete(t.VInterfaceLcuuidToIndex, lcuuid)
 	delete(t.VInterfaceLcuuidToType, lcuuid)
+	delete(t.VInterfaceLcuuidToNetworkInfo, lcuuid)
+	delete(t.VInterfaceLcuuidToDeviceInfo, lcuuid)
 	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
+}
+
+func (t *ToolDataSet) addWANIP(item *mysql.WANIP) {
+	t.WANIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
+	t.WANIPLcuuidToIP[item.Lcuuid] = item.IP
+	log.Info(addToToolMap(rcommon.RESOURCE_TYPE_WAN_IP_EN, item.Lcuuid))
+}
+
+func (t *ToolDataSet) deleteWANIP(lcuuid string) {
+	delete(t.WANIPLcuuidToVInterfaceID, lcuuid)
+	delete(t.WANIPLcuuidToIP, lcuuid)
+	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addSecurityGroup(item *mysql.SecurityGroup) {
@@ -1052,5 +1106,127 @@ func (t *ToolDataSet) GetPodIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(rcommon.RESOURCE_TYPE_POD_EN, lcuuid))
 		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetVMNameByID(id int) (string, bool) {
+	name, exists := t.VMIDToName[id]
+	if exists {
+		return name, true
+	}
+	log.Warning(cacheNameByIDNotFound(rcommon.RESOURCE_TYPE_VM_EN, id))
+	var vm mysql.VM
+	result := mysql.Db.Where("id = ?", id).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.addVM(&vm)
+		return vm.Name, true
+	} else {
+		log.Error(dbResourceByIDNotFound(rcommon.RESOURCE_TYPE_VM_EN, id))
+		return name, false
+	}
+}
+
+func (t *ToolDataSet) GetNetworkNameByID(id int) (string, bool) {
+	name, exists := t.NetworkIDToName[id]
+	if exists {
+		return name, true
+	}
+	log.Warning(cacheNameByIDNotFound(rcommon.RESOURCE_TYPE_NETWORK_EN, id))
+	var network mysql.Network
+	result := mysql.Db.Where("id = ?", id).Find(&network)
+	if result.RowsAffected == 1 {
+		t.addNetwork(&network)
+		return network.Name, true
+	} else {
+		log.Error(dbResourceByIDNotFound(rcommon.RESOURCE_TYPE_NETWORK_EN, id))
+		return name, false
+	}
+}
+
+func (t *ToolDataSet) GetDeviceInfoByVInterfaceLcuuid(lcuuid string) (*DeviceInfo, bool) {
+	info, exists := t.VInterfaceLcuuidToDeviceInfo[lcuuid]
+	if exists {
+		return info, true
+	}
+	log.Warningf("cache device info (%s lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+	var vif mysql.VInterface
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vif)
+	if result.RowsAffected == 1 {
+		t.addVInterface(&vif)
+		info, exists = t.VInterfaceLcuuidToDeviceInfo[lcuuid]
+		return info, exists
+	} else {
+		log.Errorf("db %s (lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+		return info, false
+	}
+}
+
+func (t *ToolDataSet) GetNetworkInfoByVInterfaceLcuuid(lcuuid string) (*NetworkInfo, bool) {
+	info, exists := t.VInterfaceLcuuidToNetworkInfo[lcuuid]
+	if exists {
+		return info, true
+	}
+	log.Warningf("cache %s info (%s lcuuid: %s) not found", rcommon.RESOURCE_TYPE_NETWORK_EN, rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+	var vif mysql.VInterface
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vif)
+	if result.RowsAffected == 1 {
+		t.addVInterface(&vif)
+		info, exists = t.VInterfaceLcuuidToNetworkInfo[lcuuid]
+		return info, exists
+	} else {
+		log.Errorf("db %s (lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+		return info, false
+	}
+}
+
+func (t *ToolDataSet) GetVInterfaceLcuuidByID(id int) (string, bool) {
+	lcuuid, exists := t.VInterfaceIDToLcuuid[id]
+	if exists {
+		return lcuuid, true
+	}
+	log.Warning(cacheLcuuidByIDNotFound(rcommon.RESOURCE_TYPE_VINTERFACE_EN, id))
+	var vif mysql.VInterface
+	result := mysql.Db.Where("id = ?", id).Find(&vif)
+	if result.RowsAffected == 1 {
+		t.addVInterface(&vif)
+		return vif.Lcuuid, true
+	} else {
+		log.Error(dbResourceByIDNotFound(rcommon.RESOURCE_TYPE_VINTERFACE_EN, id))
+		return lcuuid, false
+	}
+}
+
+func (t *ToolDataSet) GetVInterfaceIDByWANIPLcuuid(lcuuid string) (int, bool) {
+	vifID, exists := t.WANIPLcuuidToVInterfaceID[lcuuid]
+	if exists {
+		return vifID, true
+	}
+	log.Warningf("cache %s id (%s lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, rcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid)
+	var wanIP mysql.WANIP
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&wanIP)
+	if result.RowsAffected == 1 {
+		t.addWANIP(&wanIP)
+		vifID, exists = t.WANIPLcuuidToVInterfaceID[lcuuid]
+		return vifID, exists
+	} else {
+		log.Errorf("db %s (lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+		return vifID, false
+	}
+}
+
+func (t *ToolDataSet) GetWANIPByLcuuid(lcuuid string) (string, bool) {
+	ip, exists := t.WANIPLcuuidToIP[lcuuid]
+	if exists {
+		return ip, true
+	}
+	log.Warning(cacheIPByLcuuidNotFound(rcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid))
+	var wanIP mysql.WANIP
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&wanIP)
+	if result.RowsAffected == 1 {
+		t.addWANIP(&wanIP)
+		return wanIP.IP, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(rcommon.RESOURCE_TYPE_WAN_IP_EN, lcuuid))
+		return ip, false
 	}
 }

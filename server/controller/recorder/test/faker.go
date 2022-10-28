@@ -40,6 +40,10 @@ func FormatLcuuid(lcuuid string) string {
 	return lcuuid
 }
 
+func RandName() string {
+	return uuid.NewString()[:7]
+}
+
 func NewCloudRegion() cloudmodel.Region {
 	return cloudmodel.Region{
 		Lcuuid: uuid.NewString(),

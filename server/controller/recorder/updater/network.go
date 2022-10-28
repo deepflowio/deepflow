@@ -121,6 +121,7 @@ func (n *Network) addCache(dbItems []*mysql.Network) {
 
 func (n *Network) updateCache(cloudItem *cloudmodel.Network, diffBase *cache.Network) {
 	diffBase.Update(cloudItem)
+	n.cache.UpdateNetwork(cloudItem)
 }
 
 func (n *Network) deleteCache(lcuuids []string) {

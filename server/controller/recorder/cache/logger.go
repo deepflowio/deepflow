@@ -71,3 +71,11 @@ func deleteFromToolMap(resource, lcuuid string) string {
 func refreshResource(resource string) string {
 	return fmt.Sprintf("refresh %s", resource)
 }
+
+func cacheNameByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s name (id: %d) not found", resource, id)
+}
+
+func cacheIPByLcuuidNotFound(resource, lcuuid string) string {
+	return fmt.Sprintf("cache %s ip (lcuuid: %s) not found", resource, lcuuid)
+}

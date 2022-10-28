@@ -49,7 +49,7 @@ func BenchmarkAdd(b *testing.B) {
 	fmt.Printf("第%d次\n", times)
 	cfg := config.RecorderConfig{CacheRefreshInterval: 3600}
 	for i := 0; i < len(cloudData); i++ {
-		recorder := NewRecorder(domainLcuuids[i], cfg, context.Background())
+		recorder := NewRecorder(domainLcuuids[i], cfg, context.Background(), nil)
 		recorder.Start()
 		time.Sleep(time.Second * 1)
 		recorder.Refresh(cloudData[i])

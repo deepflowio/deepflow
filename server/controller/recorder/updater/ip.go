@@ -21,25 +21,28 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	rcommon "github.com/deepflowys/deepflow/server/controller/recorder/common"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type IP struct {
 	cache        *cache.Cache
 	cloudData    []cloudmodel.IP
+	eventQueue   *queue.OverwriteQueue
 	wanIPUpdater *WANIP
 	lanIPUpdater *LANIP
 }
 
-func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP) *IP {
+func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *queue.OverwriteQueue) *IP {
 	return &IP{
-		cache:     cache,
-		cloudData: cloudData,
+		cache:      cache,
+		cloudData:  cloudData,
+		eventQueue: eventQueue,
 	}
 }
 
 func (i *IP) HandleAddAndUpdate() {
 	wanCloudData, lanCloudData := i.splitToWANAndLAN(i.cloudData)
-	i.wanIPUpdater = NewWANIP(i.cache, wanCloudData)
+	i.wanIPUpdater = NewWANIP(i.cache, wanCloudData, i.eventQueue)
 	i.lanIPUpdater = NewLANIP(i.cache, lanCloudData)
 	i.wanIPUpdater.HandleAddAndUpdate()
 	i.lanIPUpdater.HandleAddAndUpdate()
