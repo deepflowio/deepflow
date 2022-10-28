@@ -20,6 +20,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
 )
 
 // ResourceUpdater 实现资源进行新旧数据比对，并根据比对结果增删改资源
@@ -53,11 +54,12 @@ type CacheHandler[CT constraint.CloudModel, MT constraint.MySQLModel, BT constra
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
 	cache         *cache.Cache
-	dbOperator    db.Operator[MT]           // 数据库操作对象
-	diffBaseData  map[string]BT             // 用于比对的旧资源数据
-	cloudData     []CT                      // 定时获取的新资源数据
-	dataGenerator DataGenerator[CT, MT, BT] // 提供各类数据生成的方法
-	cacheHandler  CacheHandler[CT, MT, BT]  // 提供处理cache中特定资源的方法
+	dbOperator    db.Operator[MT]             // 数据库操作对象
+	diffBaseData  map[string]BT               // 用于比对的旧资源数据
+	cloudData     []CT                        // 定时获取的新资源数据
+	dataGenerator DataGenerator[CT, MT, BT]   // 提供各类数据生成的方法
+	cacheHandler  CacheHandler[CT, MT, BT]    // 提供处理cache中特定资源的方法
+	eventProducer event.EventProducer[CT, MT] // 提供资源变更事件管理接口
 }
 
 func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
@@ -119,6 +121,9 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 	addedDBItems, ok := u.dbOperator.AddBatch(dbItemsToAdd)
 	if ok {
 		u.cacheHandler.addCache(addedDBItems)
+		if u.eventProducer != nil {
+			u.eventProducer.ProduceByAdd(addedDBItems)
+		}
 	}
 }
 
@@ -127,6 +132,9 @@ func (u *UpdaterBase[CT, MT, BT]) update(cloudItem *CT, diffBase BT, updateInfo 
 	_, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo)
 	if ok {
 		u.cacheHandler.updateCache(cloudItem, diffBase)
+		if u.eventProducer != nil {
+			u.eventProducer.ProduceByUpdate(cloudItem)
+		}
 	}
 }
 
@@ -150,6 +158,9 @@ func (u *UpdaterBase[CT, MT, BT]) delete(lcuuids []string) {
 
 func (u *UpdaterBase[CT, MT, BT]) deletePage(lcuuids []string) {
 	if u.dbOperator.DeleteBatch(lcuuids) {
+		if u.eventProducer != nil {
+			u.eventProducer.ProduceByDelete(lcuuids)
+		}
 		u.cacheHandler.deleteCache(lcuuids)
 	}
 }
