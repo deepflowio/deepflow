@@ -58,7 +58,7 @@ func RegisterGenesisCommand() *cobra.Command {
 			k8sInfo(cmd, args, k8sType)
 		},
 	}
-	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type")
+	k8sInfo.Flags().StringVarP(&k8sType, "type", "t", "", "k8s info resource type: '*version.Info | *v1.Pod | *v1.ConfigMap | *v1.Namespace | \n*v1.Service | *v1.Deployment | *v1.DaemonSet | *v1.ReplicaSet | *v1beta1.Ingress'")
 
 	var serverIP string
 	agentInfo := &cobra.Command{
