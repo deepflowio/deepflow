@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -669,6 +670,9 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 }
 
 func UpdateSubDomain(lcuuid string, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
+	if _, ok := subDomainUpdate["NAME"]; ok {
+		return nil, errors.New("name field cannot be modified")
+	}
 	var subDomain mysql.SubDomain
 	var dbUpdateMap = make(map[string]interface{})
 
