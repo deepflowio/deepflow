@@ -251,7 +251,7 @@ func (t *Tencent) getResponse(service, version, action, regionName, resultKey st
 			totalCount = totalC.MustInt()
 		}
 		sumCount = totalCount + (limit * count)
-		if pages || (totalCount < limit) {
+		if !pages || (totalCount < limit) {
 			log.Debugf("request tencent action (%s): total count is (%v)", action, sumCount)
 			break
 		}
