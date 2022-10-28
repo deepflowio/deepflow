@@ -143,22 +143,25 @@ func (o OperatorBase[MT]) dedupInDB(items []*MT, lcuuids []string, lcuuidToItem 
 	if len(dupItems) != 0 {
 		if o.softDelete {
 			dupLcuuids := []string{}
+			dupItemIDs := []int{}
 			for _, dupItem := range dupItems {
 				lcuuid := (*dupItem).GetLcuuid()
+				id := (*dupItem).GetID()
 				item, exists := lcuuidToItem[lcuuid]
 				if !exists {
 					continue
 				}
 				if !common.Contains(dupLcuuids, lcuuid) {
 					dupLcuuids = append(dupLcuuids, lcuuid)
+					dupItemIDs = append(dupItemIDs, id)
 				}
-				o.setter.setDBItemID(item, (*dupItem).GetID())
+				o.setter.setDBItemID(item, id)
 				// (*dbItem).SetID((*dupItem).GetID()) // TODO 不可行
 			}
-			log.Infof("%s data is duplicated with db data (lcuuids: %v)", o.resourceTypeName, dupLcuuids)
+			log.Infof("%s data is duplicated with db data (lcuuids: %v, ids: %v), will learn again", o.resourceTypeName, dupLcuuids, dupItemIDs)
 			err = mysql.Db.Unscoped().Delete(&dupItems).Error
 			if err != nil {
-				log.Infof("delete duplicated data failed: %+v", err)
+				log.Errorf("delete duplicated data failed: %+v", err)
 				return items, lcuuids, false
 			}
 		} else {
@@ -199,17 +202,22 @@ func (o *OperatorBase[MT]) requestIDs(items []*MT) ([]*MT, []int, bool) {
 				itemsHasID = append(itemsHasID, item)
 			}
 		}
-		ids, err := GetIDs(o.resourceTypeName, count)
-		if err != nil {
-			log.Errorf("%s request ids failed", o.resourceTypeName)
-			return itemsHasID, []int{}, false
+		if count > 0 {
+			ids, err := GetIDs(o.resourceTypeName, count)
+			if err != nil {
+				log.Errorf("%s request ids failed", o.resourceTypeName)
+				return itemsHasID, []int{}, false
+			}
+			for i, id := range ids {
+				o.setter.setDBItemID(itemsHasNoID[i], id)
+				itemsHasID = append(itemsHasID, itemsHasNoID[i])
+			}
+			log.Infof("%s use ids: %v", o.resourceTypeName, ids)
+			return itemsHasID, ids, true
+		} else {
+			log.Infof("%s not use any id", o.resourceTypeName)
+			return itemsHasID, []int{}, true
 		}
-		for i, id := range ids {
-			o.setter.setDBItemID(itemsHasNoID[i], id)
-			itemsHasID = append(itemsHasID, itemsHasNoID[i])
-		}
-		log.Infof("%s use ids: %v", o.resourceTypeName, ids)
-		return itemsHasID, ids, true
 	}
 	return items, []int{}, true
 }
@@ -225,5 +233,6 @@ func (o *OperatorBase[MT]) returnUsedIDs(deletedItems []*MT) {
 		if err != nil {
 			log.Errorf("%s release ids: %v failed", o.resourceTypeName, ids)
 		}
+		log.Infof("%s return used ids: %v", o.resourceTypeName, ids)
 	}
 }

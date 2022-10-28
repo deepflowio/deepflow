@@ -17,6 +17,8 @@
 package client
 
 import (
+	"context"
+	//"database/sql"
 	"fmt"
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/jmoiron/sqlx"
@@ -24,6 +26,7 @@ import (
 	"github.com/deepflowys/deepflow/server/querier/statsd"
 	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
+	"github.com/signalfx/splunk-otel-go/instrumentation/github.com/jmoiron/sqlx/splunksqlx"
 	"time"
 	"unsafe"
 )
@@ -44,6 +47,7 @@ type Client struct {
 	Password   string
 	connection *sqlx.DB
 	DB         string
+	Context    context.Context
 	Debug      *Debug
 }
 
@@ -58,7 +62,7 @@ func (c *Client) init(query_uuid string) error {
 		}
 	}
 	url := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s?&query_id=%s", c.UserName, c.Password, c.Host, c.Port, c.DB, query_uuid)
-	conn, err := sqlx.Open(
+	conn, err := splunksqlx.Open(
 		"clickhouse", url,
 	)
 	if err != nil {
@@ -74,17 +78,23 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) {
-	sql, callbacks, query_uuid, columnSchemaMap := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap
+	sqlstr, callbacks, query_uuid, columnSchemaMap := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap
 	err := c.init(query_uuid)
 	if err != nil {
 		return nil, err
 	}
 	defer c.Close()
 	start := time.Now()
-	rows, err := c.connection.Queryx(sql)
-	c.Debug.Sql = sql
+	var rows *sqlx.Rows
+	if c.Context != nil {
+		rows, err = c.connection.QueryxContext(c.Context, sqlstr)
+	} else {
+		rows, err = c.connection.Queryx(sqlstr)
+	}
+
+	c.Debug.Sql = sqlstr
 	if err != nil {
-		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sql, c.Debug.QueryUUID)
+		log.Errorf("query clickhouse Error: %s, sql: %s, query_uuid: %s", err, sqlstr, c.Debug.QueryUUID)
 		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
 	}
@@ -114,7 +124,9 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 	var values []interface{}
 	resSize := 0
 	for rows.Next() {
-		row, err := rows.SliceScan()
+		// row, err := rows.SliceScan()
+		var row []interface{}
+		row, err = sqlx.SliceScan(rows)
 		if err != nil {
 			c.Debug.Error = fmt.Sprintf("%s", err)
 			return nil, err
@@ -145,7 +157,7 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 		values = callback(columnNames, values)
 	}
 	result["values"] = values
-	log.Debugf("sql: %s, query_uuid: %s", sql, c.Debug.QueryUUID)
+	log.Debugf("sql: %s, query_uuid: %s", sqlstr, c.Debug.QueryUUID)
 	log.Infof("res_rows: %v, res_columns: %v, res_size: %v", resRows, resColumns, resSize)
 	return result, nil
 }

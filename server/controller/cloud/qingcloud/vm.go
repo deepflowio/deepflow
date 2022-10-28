@@ -152,7 +152,7 @@ func (q *QingCloud) GetVMs() ([]model.VM, []model.VMSecurityGroup, []model.Subne
 	for vxnetId, vpcLcuuid := range vxnetIdToVPCLcuuid {
 		q.vxnetIdToVPCLcuuid[vxnetId] = vpcLcuuid
 	}
-	log.Debug("get vms complete")
+	log.Info("get vms complete")
 	return retVMs, retVMSecurityGroups, retDefaultVxnetSubnets, nil
 }
 
@@ -219,7 +219,7 @@ func (q *QingCloud) GetVMNics() ([]model.VInterface, []model.IP, error) {
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	log.Debug("get vm nics starting")
+	log.Info("get vm nics starting")
 
 	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{

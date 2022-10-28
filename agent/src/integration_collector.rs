@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr, TcpStream};
-use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
-use flate2::read::GzDecoder;
+use flate2::{read::GzDecoder, write::ZlibEncoder, Compression};
 use http::header::CONTENT_ENCODING;
 use http::HeaderMap;
 use hyper::{
@@ -48,6 +48,7 @@ use crate::proto::integration::opentelemetry::proto::{
 };
 use crate::proto::trident::Exception;
 use crate::sender::SendItem;
+use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
 use public::queue::{DebugSender, Error};
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
@@ -61,6 +62,17 @@ const GZIP: &str = "gzip";
 pub struct OpenTelemetry(Vec<u8>);
 
 impl OpenTelemetry {
+    pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+        let length = self.0.len();
+        buf.append(&mut self.0);
+        Ok(length)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct OpenTelemetryCompressed(Vec<u8>);
+
+impl OpenTelemetryCompressed {
     pub fn encode(mut self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         let length = self.0.len();
         buf.append(&mut self.0);
@@ -180,14 +192,23 @@ fn decode_otel_trace_data(peer_addr: SocketAddr, data: Vec<u8>) -> Result<Vec<u8
     return Ok(sdk_data);
 }
 
+fn compress_data(input: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+    e.write_all(input.as_slice())?;
+    e.finish()
+}
+
 /// 接收metric server发送的请求，根据路由处理分发
 async fn handler(
     peer_addr: SocketAddr,
     req: Request<Body>,
     otel_sender: DebugSender<SendItem>,
+    compressed_otel_sender: DebugSender<SendItem>,
     prometheus_sender: DebugSender<SendItem>,
     telegraf_sender: DebugSender<SendItem>,
     exception_handler: ExceptionHandler,
+    compressed: bool,
+    counter: Arc<CompressedMetric>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/") => {
@@ -207,15 +228,31 @@ async fn handler(
                 }
             };
             let tracing_data = decode_metric(whole_body, &part.headers)?;
-            let data = decode_otel_trace_data(peer_addr, tracing_data).map_err(|e| {
+            let decode_data = decode_otel_trace_data(peer_addr, tracing_data).map_err(|e| {
                 debug!("decode otel trace data error: {}", e);
                 e
             })?;
-            if let Err(Error::Terminated(..)) =
-                otel_sender.send(SendItem::ExternalOtel(OpenTelemetry(data)))
-            {
-                warn!("sender queue has terminated");
+            if compressed {
+                counter
+                    .uncompressed
+                    .fetch_add(decode_data.len() as u64, Ordering::Relaxed);
+                let compressed_data = compress_data(decode_data)?;
+                counter
+                    .compressed
+                    .fetch_add(compressed_data.len() as u64, Ordering::Relaxed);
+                if let Err(Error::Terminated(..)) = compressed_otel_sender.send(
+                    SendItem::ExternalOtelCompressed(OpenTelemetryCompressed(compressed_data)),
+                ) {
+                    warn!("sender queue has terminated");
+                }
+            } else {
+                if let Err(Error::Terminated(..)) =
+                    otel_sender.send(SendItem::ExternalOtel(OpenTelemetry(decode_data)))
+                {
+                    warn!("sender queue has terminated");
+                }
             }
+
             Ok(Response::builder().body(Body::empty()).unwrap())
         }
         // Prometheus integration
@@ -267,43 +304,101 @@ async fn handler(
     }
 }
 
+#[derive(Default)]
+struct CompressedMetric {
+    compressed: AtomicU64,   // unit (bytes)
+    uncompressed: AtomicU64, // unit (bytes)
+}
+
+#[derive(Default)]
+pub struct IntegrationCounter {
+    metrics: Arc<CompressedMetric>,
+    running: Arc<AtomicBool>,
+}
+
+impl IntegrationCounter {
+    pub fn new(running: Arc<AtomicBool>) -> Self {
+        Self {
+            running,
+            ..Default::default()
+        }
+    }
+}
+
+impl OwnedCountable for IntegrationCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        vec![
+            (
+                "compressed",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.metrics.compressed.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "uncompressed",
+                CounterType::Counted,
+                CounterValue::Unsigned(self.metrics.uncompressed.swap(0, Ordering::Relaxed)),
+            ),
+        ]
+    }
+    fn closed(&self) -> bool {
+        !self.running.load(Ordering::Relaxed)
+    }
+}
+
 /// 监听HTTP端口，接收OpenTelemetry的trace pb数据，然后发送到Sender
 pub struct MetricServer {
     running: Arc<AtomicBool>,
     rt: Runtime,
     thread: Arc<Mutex<Option<JoinHandle<()>>>>,
     otel_sender: DebugSender<SendItem>,
+    compressed_otel_sender: DebugSender<SendItem>,
     prometheus_sender: DebugSender<SendItem>,
     telegraf_sender: DebugSender<SendItem>,
     port: Arc<AtomicU16>,
     exception_handler: ExceptionHandler,
     server_shutdown_tx: Mutex<Option<mpsc::Sender<()>>>,
+    counter: Arc<CompressedMetric>,
+    compressed: Arc<AtomicBool>,
 }
 
 impl MetricServer {
     pub fn new(
         otel_sender: DebugSender<SendItem>,
+        compressed_otel_sender: DebugSender<SendItem>,
         prometheus_sender: DebugSender<SendItem>,
         telegraf_sender: DebugSender<SendItem>,
         port: u16,
         exception_handler: ExceptionHandler,
-    ) -> Self {
-        Self {
-            running: Arc::new(AtomicBool::new(false)),
-            rt: Builder::new_multi_thread()
-                .worker_threads(2)
-                .enable_all()
-                .thread_name("integration collector thread")
-                .build()
-                .unwrap(),
-            thread: Arc::new(Mutex::new(None)),
-            otel_sender,
-            prometheus_sender,
-            telegraf_sender,
-            port: Arc::new(AtomicU16::new(port)),
-            exception_handler,
-            server_shutdown_tx: Default::default(),
-        }
+        compressed: bool,
+    ) -> (Self, IntegrationCounter) {
+        let running = Arc::new(AtomicBool::new(false));
+        let counter = IntegrationCounter::new(running.clone());
+        (
+            Self {
+                running,
+                rt: Builder::new_multi_thread()
+                    .worker_threads(2)
+                    .enable_all()
+                    .thread_name("integration collector thread")
+                    .build()
+                    .unwrap(),
+                thread: Arc::new(Mutex::new(None)),
+                compressed: Arc::new(AtomicBool::new(compressed)),
+                otel_sender,
+                compressed_otel_sender,
+                prometheus_sender,
+                telegraf_sender,
+                port: Arc::new(AtomicU16::new(port)),
+                exception_handler,
+                server_shutdown_tx: Default::default(),
+                counter: counter.metrics.clone(),
+            },
+            counter,
+        )
+    }
+
+    pub fn enable_compressed(&self, enable: bool) {
+        self.compressed.store(enable, Ordering::Relaxed);
     }
 
     pub fn set_port(&self, port: u16) {
@@ -322,6 +417,7 @@ impl MetricServer {
         }
 
         let otel_sender = self.otel_sender.clone();
+        let compressed_otel_sender = self.compressed_otel_sender.clone();
         let prometheus_sender = self.prometheus_sender.clone();
         let telegraf_sender = self.telegraf_sender.clone();
         let port = self.port.clone();
@@ -329,6 +425,8 @@ impl MetricServer {
         let (mon_tx, mon_rx) = oneshot::channel();
         let exception_handler = self.exception_handler.clone();
         let running = self.running.clone();
+        let counter = self.counter.clone();
+        let compressed = self.compressed.clone();
         let (tx, mut rx) = mpsc::channel(8);
         self.rt
             .spawn(Self::alive_check(monitor_port.clone(), tx.clone(), mon_rx));
@@ -374,24 +472,33 @@ impl MetricServer {
                     };
 
                     let otel_sender = otel_sender.clone();
+                    let compressed_otel_sender = compressed_otel_sender.clone();
                     let prometheus_sender = prometheus_sender.clone();
                     let telegraf_sender = telegraf_sender.clone();
                     let exception_handler_inner = exception_handler.clone();
+                    let counter = counter.clone();
+                    let compressed = compressed.clone();
                     let service = make_service_fn(move |conn: &AddrStream| {
                         let otel_sender = otel_sender.clone();
+                        let compressed_otel_sender = compressed_otel_sender.clone();
                         let prometheus_sender = prometheus_sender.clone();
                         let telegraf_sender = telegraf_sender.clone();
                         let exception_handler = exception_handler_inner.clone();
                         let peer_addr = conn.remote_addr();
+                        let counter = counter.clone();
+                        let compressed = compressed.clone();
                         async move {
                             Ok::<_, GenericError>(service_fn(move |req| {
                                 handler(
                                     peer_addr,
                                     req,
                                     otel_sender.clone(),
+                                    compressed_otel_sender.clone(),
                                     prometheus_sender.clone(),
                                     telegraf_sender.clone(),
                                     exception_handler.clone(),
+                                    compressed.load(Ordering::Relaxed),
+                                    counter.clone(),
                                 )
                             }))
                         }

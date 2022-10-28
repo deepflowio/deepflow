@@ -458,6 +458,14 @@ impl Synchronizer {
         self.status.write().proxy_port = DEFAULT_CONTROLLER_PORT;
     }
 
+    pub fn reset_version(&self) {
+        let mut status = self.status.write();
+        status.version_acls = 0;
+        status.version_groups = 0;
+        status.version_platform_data = 0;
+        info!("Reset version of acls, groups and platform_data.");
+    }
+
     pub fn add_flow_acl_listener(&self, module: Box<dyn FlowAclListener>) {
         let mut listeners = self.flow_acl_listener.lock().unwrap();
         for item in listeners.iter() {
@@ -466,6 +474,10 @@ impl Synchronizer {
             }
         }
         listeners.push(module);
+        // make sure agent can get the latest policy data
+        // ===============================================
+        // 保证 Agent 可以获取最新策略
+        self.reset_version();
     }
 
     pub fn max_memory(&self) -> Arc<AtomicU64> {
@@ -647,12 +659,15 @@ impl Synchronizer {
             exception_handler.set(Exception::InvalidConfiguration);
             return;
         }
-        let mut runtime_config = runtime_config.unwrap();
+        let runtime_config = runtime_config.unwrap();
+        // FIXME: Confirm the kvm resource classification and then cancel the comment
         // When the ee version compiles the ce crate, it will be false, only ce version
         // will be true
+        /*
         if static_config.version_info.name == env!("AGENT_NAME") {
             runtime_config.platform_enabled = false;
         }
+         */
         let _ = escape_tx.send(runtime_config.max_escape);
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
@@ -1293,11 +1308,10 @@ pub struct RuntimeEnvironment {
 impl RuntimeEnvironment {
     fn new() -> RuntimeEnvironment {
         let mut sys = System::new();
-        sys.refresh_memory();
+        sys.refresh_system();
         RuntimeEnvironment {
-            cpu_num: sys.physical_core_count().unwrap_or_default() as u32,
-            // 这里乘1000，因为库作者思路清奇换算成了10基底的KB
-            memory_size: sys.total_memory() * 1000,
+            cpu_num: sys.cpus().len() as u32,
+            memory_size: sys.total_memory(),
             arch: std::env::consts::ARCH.into(),
             os: format!(
                 "{} {}",

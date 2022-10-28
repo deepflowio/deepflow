@@ -202,8 +202,8 @@ macro_rules! all_protocol {
 
         pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
             match p {
-                L7Protocol::Http1 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
-                L7Protocol::Http2 => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(false))),
+                L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
+                L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(false))),
                 L7Protocol::Grpc => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(true))),
 
                 $(
@@ -273,7 +273,7 @@ all_protocol!(
     // http have two version but one parser, can not place in macro param.
     DNS,DnsParser,DnsLog::default;
     MySQL,MysqlParser,MysqlLog::default;
-    Kafka,KafkaParser,KafkaLog::default;
+    Kafka,KafkaParser,KafkaLog::new;
     Redis,RedisParser,RedisLog::default;
     PostgreSQL,PostgresParser,PostgresqlLog::new;
     Dubbo,DubboParser,DubboLog::default;

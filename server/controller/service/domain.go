@@ -19,6 +19,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -218,6 +219,18 @@ func CreateDomain(domainCreate model.DomainCreate, cfg *config.ControllerConfig)
 	mysql.Db.Model(&mysql.SubDomain{}).Where("name = ?", domainCreate.Name).Count(&count)
 	if count > 0 {
 		return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain (%s) already exist", domainCreate.Name))
+	}
+
+	if domainCreate.KubernetesClusterID != "" {
+		mysql.Db.Model(&mysql.Domain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
+		if count > 0 {
+			return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+		}
+
+		mysql.Db.Model(&mysql.SubDomain{}).Where("cluster_id = ?", domainCreate.KubernetesClusterID).Count(&count)
+		if count > 0 {
+			return nil, NewError(common.RESOURCE_ALREADY_EXIST, fmt.Sprintf("sub_domain cluster_id (%s) already exist", domainCreate.KubernetesClusterID))
+		}
 	}
 
 	log.Infof("create domain (%v)", maskDomainInfo(domainCreate))
@@ -628,7 +641,7 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 		return nil, err
 	}
 	if domainCount == 0 {
-		return nil, NewError(common.INVALID_PARAMETERS, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
+		return nil, NewError(common.RESOURCE_NOT_FOUND, fmt.Sprintf("domain lcuuid (%s) does not exit", subDomainCreate.Domain))
 	}
 
 	var count int64
@@ -657,6 +670,12 @@ func CreateSubDomain(subDomainCreate model.SubDomainCreate) (*model.SubDomain, e
 }
 
 func UpdateSubDomain(lcuuid string, subDomainUpdate map[string]interface{}) (*model.SubDomain, error) {
+	if _, ok := subDomainUpdate["NAME"]; ok {
+		return nil, errors.New("name field cannot be modified")
+	}
+	if _, ok := subDomainUpdate["DOMAIN_NAME"]; ok {
+		return nil, errors.New("domain_name field cannot be modified")
+	}
 	var subDomain mysql.SubDomain
 	var dbUpdateMap = make(map[string]interface{})
 

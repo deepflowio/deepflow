@@ -28,6 +28,7 @@ import (
 	logging "github.com/op/go-logging"
 	yaml "gopkg.in/yaml.v2"
 
+	servercommon "github.com/deepflowys/deepflow/server/common"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -56,7 +57,7 @@ var log = logging.MustGetLogger("controller")
 
 type Controller struct{}
 
-func Start(ctx context.Context, configPath string) {
+func Start(ctx context.Context, configPath string, shared *servercommon.ControllerIngesterShared) {
 	flag.Parse()
 
 	serverCfg := config.DefaultConfig()
@@ -148,7 +149,9 @@ func Start(ctx context.Context, configPath string) {
 
 	router.SetInitStageForHealthChecker("TagRecorder init")
 	tr := tagrecorder.NewTagRecorder(*cfg, ctx)
-	go tr.StartChDictionaryUpdate()
+	if isMasterController {
+		go tr.StartChDictionaryUpdate()
+	}
 
 	controllerCheck := monitor.NewControllerCheck(cfg, ctx)
 	analyzerCheck := monitor.NewAnalyzerCheck(cfg, ctx)

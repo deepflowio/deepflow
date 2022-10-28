@@ -584,6 +584,7 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 	}
 	switch appInt {
 	case APPLICATION_NPB:
+		var payloadSlice int
 		for _, npbPolicy := range rawData.aclIDToNpbPolices[acl.ID] {
 			npbTunnel, ok := rawData.idToNpbTunnel[npbPolicy.NpbTunnelID]
 			if ok == false {
@@ -595,12 +596,17 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 			if npbPolicy.Distribute == NPB_POLICY_FLOW_DROP {
 				tunnelType = trident.TunnelType_NPB_DROP
 			}
+			if npbPolicy.PayloadSlice == nil {
+				payloadSlice = MAX_PAYLOAD_SLICE
+			} else {
+				payloadSlice = *npbPolicy.PayloadSlice
+			}
 			npbAction := &trident.NpbAction{
 				TunnelId:      proto.Uint32(uint32(npbPolicy.Vni)),
 				TunnelIp:      proto.String(npbTunnel.IP),
 				TapSide:       &tapSideSRC,
 				TunnelType:    &tunnelType,
-				PayloadSlice:  proto.Uint32(uint32(npbPolicy.PayloadSlice)),
+				PayloadSlice:  proto.Uint32(uint32(payloadSlice)),
 				TunnelIpId:    proto.Uint32(uint32(npbTunnel.ID)),
 				NpbAclGroupId: proto.Uint32(uint32(npbPolicy.PolicyACLGroupID)),
 			}
@@ -618,10 +624,12 @@ func (op *PolicyDataOP) generateProtoActions(acl *models.ACL) (map[int][]*triden
 			}
 		}
 	case APPLICATION_PCAP:
+		var payloadSlice int
 		for _, pcapPolicy := range rawData.aclIDToPcapPolices[acl.ID] {
-			payloadSlice := pcapPolicy.PayloadSlice
-			if payloadSlice == 0 {
+			if pcapPolicy.PayloadSlice == nil {
 				payloadSlice = MAX_PAYLOAD_SLICE
+			} else {
+				payloadSlice = *pcapPolicy.PayloadSlice
 			}
 			npbAction := &trident.NpbAction{
 				TapSide:       &tapSideSRC,

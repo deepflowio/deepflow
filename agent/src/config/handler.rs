@@ -609,6 +609,7 @@ impl L7LogDynamicConfig {
 pub struct MetricServerConfig {
     pub enabled: bool,
     pub port: u16,
+    pub compressed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -705,7 +706,9 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 vtap_id: conf.vtap_id as u16,
                 capture_socket_type: conf.capture_socket_type,
                 #[cfg(target_os = "linux")]
-                extra_netns: {
+                extra_netns: if conf.extra_netns_regex == "" {
+                    vec![]
+                } else {
                     let re = Regex::new(&conf.extra_netns_regex).unwrap(); // regex validated in protobuf
                     let mut ns = NetNs::find_ns_files_by_regex(&re);
                     ns.sort_unstable();
@@ -874,6 +877,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,
                 port: conf.external_agent_http_proxy_port as u16,
+                compressed: conf.yaml_config.external_agent_http_proxy_compressed,
             },
             trident_type: conf.trident_type,
             port_config: PortConfig {
@@ -1043,7 +1047,9 @@ impl ConfigHandler {
             candidate_config.tap_mode = new_config.tap_mode;
         }
 
-        if candidate_config.tap_mode != TapMode::Analyzer {
+        if candidate_config.tap_mode != TapMode::Analyzer
+            && static_config.kubernetes_cluster_id.is_empty()
+        {
             // Check and send out exceptions in time
             if let Err(e) = free_memory_check(new_config.environment.max_memory, exception_handler)
             {
@@ -1075,6 +1081,10 @@ impl ConfigHandler {
                 "mirror_traffic_pcp set to {:?}",
                 yaml_config.mirror_traffic_pcp
             );
+        }
+
+        if *yaml_config != new_config.yaml_config {
+            *yaml_config = new_config.yaml_config;
         }
 
         if candidate_config.dispatcher != new_config.dispatcher {
@@ -1148,17 +1158,19 @@ impl ConfigHandler {
                                 }
                             }
                             _ => {
-                                match free_memory_check(
-                                    handler.candidate_config.environment.max_memory,
-                                    &components.exception_handler,
-                                ) {
-                                    Ok(()) => {
-                                        for dispatcher in components.dispatchers.iter() {
-                                            dispatcher.start();
+                                if handler.static_config.kubernetes_cluster_id.is_empty() {
+                                    match free_memory_check(
+                                        handler.candidate_config.environment.max_memory,
+                                        &components.exception_handler,
+                                    ) {
+                                        Ok(()) => {
+                                            for dispatcher in components.dispatchers.iter() {
+                                                dispatcher.start();
+                                            }
                                         }
-                                    }
-                                    Err(e) => {
-                                        warn!("{}", e);
+                                        Err(e) => {
+                                            warn!("{}", e);
+                                        }
                                     }
                                 }
                             }
@@ -1325,19 +1337,6 @@ impl ConfigHandler {
             candidate_config.diagnose = new_config.diagnose;
         }
 
-        if candidate_config.tap_mode == TapMode::Analyzer
-            || !static_config.kubernetes_cluster_id.is_empty()
-        {
-            info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
-            candidate_config.environment.max_memory = 0;
-
-            info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
-            let mut system = sysinfo::System::new();
-            system.refresh_cpu();
-            candidate_config.environment.max_cpus =
-                system.physical_core_count().unwrap_or(1) as u32;
-        }
-
         if candidate_config.environment != new_config.environment {
             if candidate_config.tap_mode != TapMode::Analyzer
                 && static_config.kubernetes_cluster_id.is_empty()
@@ -1456,6 +1455,18 @@ impl ConfigHandler {
             );
 
             candidate_config.environment = new_config.environment;
+        }
+
+        if candidate_config.tap_mode == TapMode::Analyzer
+            || !static_config.kubernetes_cluster_id.is_empty()
+        {
+            info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
+            candidate_config.environment.max_memory = 0;
+
+            info!("cpu set ulimit when tap_mode=analyzer or running in a K8s pod");
+            let mut system = sysinfo::System::new();
+            system.refresh_cpu();
+            candidate_config.environment.max_cpus = 1.max(system.cpus().len()) as u32;
         }
 
         if candidate_config.flow != new_config.flow {
@@ -1718,6 +1729,14 @@ impl ConfigHandler {
                         .set_port(new_config.metric_server.port);
                 }
             }
+            if candidate_config.metric_server.compressed != new_config.metric_server.compressed {
+                fn metric_server_callback(handler: &ConfigHandler, components: &mut Components) {
+                    components
+                        .external_metrics_server
+                        .enable_compressed(handler.candidate_config.metric_server.compressed);
+                }
+                callbacks.push(metric_server_callback);
+            }
             info!(
                 "integration collector config change from {:#?} to {:#?}",
                 candidate_config.metric_server, new_config.metric_server
@@ -1748,7 +1767,9 @@ impl ConfigHandler {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
                 }
-                if handler.candidate_config.tap_mode != TapMode::Analyzer {
+                if handler.candidate_config.tap_mode != TapMode::Analyzer
+                    && handler.static_config.kubernetes_cluster_id.is_empty()
+                {
                     match free_memory_check(
                         handler.candidate_config.environment.max_memory,
                         &components.exception_handler,

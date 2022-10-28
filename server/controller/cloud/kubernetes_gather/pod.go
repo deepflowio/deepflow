@@ -17,19 +17,21 @@
 package kubernetes_gather
 
 import (
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/bitly/go-simplejson"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
 )
 
-func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
+func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, err error) {
 	log.Debug("get pods starting")
-	podTypes := [4]string{"StatefulSet", "ReplicaSet", "ReplicationController", "DaemonSet"}
+	podTypes := [5]string{"StatefulSet", "ReplicaSet", "ReplicationController", "DaemonSet", "Deployment"}
+	abstractNodes := map[string]int{}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
 		pData, pErr := simplejson.NewJson([]byte(p))
 		if pErr != nil {
@@ -58,16 +60,32 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			log.Infof("pod (%s) namespace not found", name)
 			continue
 		}
-		hostIP := pData.Get("status").Get("hostIP").MustString()
-		nodeLcuuid, ok := k.nodeIPToLcuuid[hostIP]
-		if !ok {
-			log.Infof("pod (%s) node not found", name)
-			continue
-		}
+
 		podGroups := metaData.Get("ownerReferences")
+		generateName := metaData.Get("generateName").MustString()
+		if len(podGroups.MustArray()) == 0 {
+			if generateName == "" {
+				pTempHash := metaData.Get("labels").Get("pod-template-hash").MustString()
+				if pTempHash == "" {
+					log.Debugf("pod (%s) pod template hash not found", name)
+					continue
+				}
+				pNameSlice := strings.Split(name, "-"+pTempHash+"-")
+				if len(pNameSlice) != 2 {
+					log.Debugf("pod (%s) not split by hash (%s)", name, pTempHash)
+					continue
+				}
+				uid := common.GetUUID(namespace+pNameSlice[0], uuid.Nil)
+				// 适配平安 serverless pod, 需要抽象出一个对应的 node , 在这里添加一个参考值 abstract 作为判断标志
+				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "Deployment","abstract":true}]`, uid)))
+			} else {
+				uid := common.GetUUID(namespace+generateName, uuid.Nil)
+				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "DaemonSet","abstract":true}]`, uid)))
+			}
+		}
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
 		if len(podGroups.MustArray()) == 0 || ID == "" {
-			log.Infof("pod (%s) ownerreferences not found", name)
+			log.Infof("pod (%s) pod group not found", name)
 			continue
 		}
 		kind := podGroups.GetIndex(0).Get("kind").MustString()
@@ -82,6 +100,17 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 			log.Infof("pod group (%s) type not support", name)
 			continue
 		}
+		hostIP := pData.Get("status").Get("hostIP").MustString()
+		nodeLcuuid, ok := k.nodeIPToLcuuid[hostIP]
+		if !ok {
+			if podGroups.GetIndex(0).Get("abstract").MustBool() {
+				abstractNodes[hostIP] = 0
+			} else {
+				log.Infof("pod (%s) node not found", name)
+				continue
+			}
+		}
+
 		podRSLcuuid := ""
 		podGroupLcuuid := ""
 		podLcuuid := ""
@@ -161,6 +190,22 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, err error) {
 				k.podIPToLcuuid[ip] = podLcuuid
 			}
 		}
+	}
+
+	for nodeIP := range abstractNodes {
+		podClusterLcuuid := common.GetUUID(k.UuidGenerate, uuid.Nil)
+		nodes = append(nodes, model.PodNode{
+			Lcuuid:           common.GetUUID(nodeIP+podClusterLcuuid, uuid.Nil),
+			Name:             nodeIP,
+			Type:             common.POD_NODE_TYPE_NODE,
+			ServerType:       common.POD_NODE_SERVER_TYPE_HOST,
+			State:            common.POD_NODE_STATE_NORMAL,
+			IP:               nodeIP,
+			VPCLcuuid:        k.VPCUuid,
+			AZLcuuid:         k.azLcuuid,
+			RegionLcuuid:     k.RegionUuid,
+			PodClusterLcuuid: common.GetUUID(k.UuidGenerate, uuid.Nil),
+		})
 	}
 	log.Debug("get pods complete")
 	return

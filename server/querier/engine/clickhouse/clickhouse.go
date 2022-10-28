@@ -17,6 +17,7 @@
 package clickhouse
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	//"github.com/k0kubun/pp"
@@ -46,13 +47,16 @@ type CHEngine struct {
 	asTagMap      map[string]string
 	ColumnSchemas []*client.ColumnSchema
 	View          *view.View
+	Context       context.Context
 }
 
-func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]interface{}, map[string]interface{}, error) {
+func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interface{}, map[string]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
 	var sqlList []string
 	var err error
+	sql := args.Sql
+	query_uuid := args.QueryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
 	// Parse showSql
 	result, sqlList, isShow, err := e.ParseShowSql(sql)
@@ -79,6 +83,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 			Password: config.Cfg.Clickhouse.Password,
 			DB:       e.DB,
 			Debug:    debug,
+			Context:  e.Context,
 		}
 		ColumnSchemaMap := make(map[string]*client.ColumnSchema)
 		for _, ColumnSchema := range e.ColumnSchemas {
@@ -111,9 +116,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 				return nil, nil, err
 			}
 			if result != nil {
-				for _, value := range result["values"] {
-					results["values"] = append(results["values"], value)
-				}
+				results["values"] = append(results["values"], result["values"]...)
 				results["columns"] = result["columns"]
 			}
 		}
@@ -140,6 +143,7 @@ func (e *CHEngine) ExecuteQuery(sql string, query_uuid string) (map[string][]int
 		Password: config.Cfg.Clickhouse.Password,
 		DB:       e.DB,
 		Debug:    debug,
+		Context:  e.Context,
 	}
 	ColumnSchemaMap := make(map[string]*client.ColumnSchema)
 	for _, ColumnSchema := range e.ColumnSchemas {
@@ -180,7 +184,7 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, []string,
 			funcs, err := metrics.GetFunctionDescriptions()
 			return funcs, []string{}, true, err
 		} else {
-			metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where)
+			metrics, err := metrics.GetMetricsDescriptions(e.DB, table, where, e.Context)
 			return metrics, []string{}, true, err
 		}
 	case "tag":
@@ -194,10 +198,10 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, []string,
 		}
 		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 	case "tags":
-		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql)
+		data, err := tagdescription.GetTagDescriptions(e.DB, table, sql, e.Context)
 		return data, []string{}, true, err
 	case "tables":
-		return GetTables(e.DB), []string{}, true, nil
+		return GetTables(e.DB, e.Context), []string{}, true, nil
 	case "databases":
 		return GetDatabases(), []string{}, true, nil
 	}
@@ -276,14 +280,14 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 			}
 			if e.DataSource != "" {
 				e.AddTable(fmt.Sprintf("%s.`%s.%s`", e.DB, table, e.DataSource))
+				interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
+				if err != nil {
+					log.Error(err)
+				}
+				e.Model.Time.DatasourceInterval = interval
 			} else {
 				e.AddTable(fmt.Sprintf("%s.`%s`", e.DB, table))
 			}
-			interval, err := chCommon.GetDatasourceInterval(e.DB, e.Table, e.DataSource)
-			if err != nil {
-				log.Error(err)
-			}
-			e.Model.Time.DatasourceInterval = interval
 			virtualTableFilter, ok := GetVirtualTableFilter(e.DB, e.Table)
 			if ok {
 				whereStmt := Where{}
@@ -462,7 +466,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			return err
 		}
 		name = strings.Trim(name, "`")
-		function, levelFlag, unit, err := GetAggFunc(name, args, as, e.DB, e.Table)
+		function, levelFlag, unit, err := GetAggFunc(name, args, as, e.DB, e.Table, e.Context)
 		if err != nil {
 			return err
 		}
@@ -552,7 +556,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if err != nil {
 			return nil, err
 		}
-		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table)
+		aggfunction, levelFlag, unit, err := GetAggFunc(name, args, "", e.DB, e.Table, e.Context)
 		if err != nil {
 			return nil, err
 		}
@@ -591,7 +595,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if fieldFunc != nil {
 			return fieldFunc, nil
 		}
-		metricStruct, ok := metrics.GetMetrics(field, e.DB, e.Table)
+		metricStruct, ok := metrics.GetMetrics(field, e.DB, e.Table, e.Context)
 		if ok {
 			return &Field{Value: metricStruct.DBField}, nil
 		}
@@ -627,7 +631,7 @@ func (e *CHEngine) AddTag(tag string, alias string) error {
 		e.Statements = append(e.Statements, stmt)
 		return nil
 	}
-	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table)
+	stmt, err = GetMetricsTag(tag, alias, e.DB, e.Table, e.Context)
 	if err != nil {
 		return err
 	}
@@ -696,7 +700,7 @@ func (e *CHEngine) parseWhere(node sqlparser.Expr, w *Where, isCheck bool) (view
 		case *sqlparser.ColName, *sqlparser.SQLVal:
 			whereTag := chCommon.ParseAlias(node.Left)
 			if (e.DB == "ext_metrics" || e.DB == "deepflow_system") && strings.Contains(whereTag, "metrics.") {
-				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table)
+				metricStruct, ok := metrics.GetMetrics(whereTag, e.DB, e.Table, e.Context)
 				if ok {
 					whereTag = metricStruct.DBField
 				}

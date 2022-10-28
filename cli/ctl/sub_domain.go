@@ -12,6 +12,13 @@ import (
 	"github.com/deepflowys/deepflow/cli/ctl/example"
 )
 
+type SubDomainType uint8
+
+const (
+	SubDomainTypeCreate SubDomainType = iota
+	SubDomainTypeUpdate
+)
+
 func RegisterSubDomainCommand() *cobra.Command {
 	subDomain := &cobra.Command{
 		Use:   "subdomain",
@@ -141,7 +148,7 @@ func createSubDomain(cmd *cobra.Command, fileName string) error {
 	if err != nil {
 		return err
 	}
-	if err = validateSubDomainConfig(body); err != nil {
+	if err = validateSubDomainConfig(body, SubDomainTypeCreate); err != nil {
 		return err
 	}
 
@@ -165,7 +172,7 @@ func updateSubDomain(cmd *cobra.Command, args []string, fileName string) error {
 	if err != nil {
 		return err
 	}
-	if err = validateSubDomainConfig(body); err != nil {
+	if err = validateSubDomainConfig(body, SubDomainTypeUpdate); err != nil {
 		return err
 	}
 
@@ -186,14 +193,16 @@ func updateSubDomain(cmd *cobra.Command, args []string, fileName string) error {
 	return nil
 }
 
-func validateSubDomainConfig(body map[string]interface{}) error {
-	_, ok := body["NAME"]
-	if !ok {
-		return errors.New("name field is required")
-	}
-	_, ok = body["DOMAIN_NAME"]
-	if !ok {
-		return errors.New("domain_name field is required")
+func validateSubDomainConfig(body map[string]interface{}, subdomainType SubDomainType) error {
+	if subdomainType == SubDomainTypeCreate {
+		_, ok := body["NAME"]
+		if !ok {
+			return errors.New("name field is required")
+		}
+		_, ok = body["DOMAIN_NAME"]
+		if !ok {
+			return errors.New("domain_name field is required")
+		}
 	}
 
 	config, ok := body["CONFIG"]

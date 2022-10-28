@@ -170,6 +170,7 @@ impl FlowPerf {
 
         if let Some(payload) = packet.get_l4_payload() {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
+            parser.set_parse_config(&self.parse_config);
             let ret = parser.parse_payload(payload, parse_param);
             parser.reset();
 

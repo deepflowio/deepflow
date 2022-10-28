@@ -511,7 +511,15 @@ fn dispatcher_listener_callback(
             }
         }
         TapMode::Mirror => {
-            todo!()
+            for listener in components.dispatcher_listeners.iter() {
+                listener.on_tap_interface_change(
+                    &vec![],
+                    IfMacSource::IfMac,
+                    conf.trident_type,
+                    &blacklist,
+                );
+                listener.on_vm_change(&vm_mac_addrs);
+            }
         }
         TapMode::Analyzer => {
             for listener in components.dispatcher_listeners.iter() {
@@ -706,6 +714,7 @@ pub struct Components {
     pub domain_name_listener: DomainNameListener,
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
+    pub compressed_otel_uniform_sender: UniformSenderThread,
     max_memory: u64,
     tap_mode: TapMode,
 }
@@ -733,13 +742,10 @@ impl Components {
             packet_sequence_parser.start();
         }
 
-        match self.tap_mode {
-            TapMode::Analyzer => {
-                for dispatcher in self.dispatchers.iter() {
-                    dispatcher.start();
-                }
-            }
-            _ => match free_memory_check(self.max_memory, &self.exception_handler) {
+        if self.tap_mode != TapMode::Analyzer
+            && self.config.platform.kubernetes_cluster_id.is_empty()
+        {
+            match free_memory_check(self.max_memory, &self.exception_handler) {
                 Ok(()) => {
                     for dispatcher in self.dispatchers.iter() {
                         dispatcher.start();
@@ -748,7 +754,11 @@ impl Components {
                 Err(e) => {
                     warn!("{}", e);
                 }
-            },
+            }
+        } else {
+            for dispatcher in self.dispatchers.iter() {
+                dispatcher.start();
+            }
         }
 
         for log_parser in self.log_parsers.iter() {
@@ -765,6 +775,7 @@ impl Components {
         }
 
         self.otel_uniform_sender.start();
+        self.compressed_otel_uniform_sender.start();
         self.prometheus_uniform_sender.start();
         self.telegraf_uniform_sender.start();
         if self.config.metric_server.enabled {
@@ -827,6 +838,10 @@ impl Components {
             }
         }
 
+        info!(
+            "Agent run with feature-flags: {:?}.",
+            FeatureFlags::from(&yaml_config.feature_flags)
+        );
         // Currently, only loca-mode + ebpf collector is supported, and ebpf collector is not
         // applicable to fastpath, so the number of queues is 1
         // =================================================================================
@@ -849,6 +864,7 @@ impl Components {
             session.clone(),
             libvirt_xml_extractor.clone(),
             exception_handler.clone(),
+            candidate_config.dispatcher.extra_netns.clone(),
         );
 
         #[cfg(target_os = "linux")]
@@ -1252,14 +1268,10 @@ impl Components {
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
-            let dispatcher = if candidate_config.tap_mode == TapMode::Local {
-                dispatcher_builder
-                    .pcap_interfaces(tap_interfaces.clone())
-                    .build()
-                    .unwrap()
-            } else {
-                todo!()
-            };
+            let dispatcher = dispatcher_builder
+                .pcap_interfaces(tap_interfaces.clone())
+                .build()
+                .unwrap();
 
             // TODO: 创建dispatcher的时候处理这些
             let mut dispatcher_listener = dispatcher.listener();
@@ -1384,12 +1396,44 @@ impl Components {
             exception_handler.clone(),
         );
 
-        let external_metrics_server = MetricServer::new(
+        let sender_id = 6;
+        let compressed_otel_queue_name = "compressed-otel-to-sender";
+        let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
+            yaml_config.external_metrics_sender_queue_size,
+            otel_queue_name,
+            &queue_debugger,
+        );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(counter)),
+            vec![
+                StatsOption::Tag("module", compressed_otel_queue_name.to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let compressed_otel_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            compressed_otel_queue_name,
+            Arc::new(compressed_otel_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
+
+        let (external_metrics_server, external_metrics_counter) = MetricServer::new(
             otel_sender,
+            compressed_otel_sender,
             prometheus_sender,
             telegraf_sender,
             candidate_config.metric_server.port,
             exception_handler.clone(),
+            candidate_config.metric_server.compressed,
+        );
+
+        stats_collector.register_countable(
+            "integration_collector",
+            Countable::Owned(Box::new(external_metrics_counter)),
+            Default::default(),
         );
 
         remote_log_config.set_enabled(candidate_config.log.rsyslog_enabled);
@@ -1444,6 +1488,7 @@ impl Components {
             domain_name_listener,
             npb_bps_limit,
             handler_builders,
+            compressed_otel_uniform_sender,
         })
     }
 
@@ -1625,6 +1670,7 @@ impl Components {
 
         self.external_metrics_server.stop();
         self.otel_uniform_sender.stop();
+        self.compressed_otel_uniform_sender.stop();
         self.prometheus_uniform_sender.stop();
         self.telegraf_uniform_sender.stop();
         self.packet_sequence_uniform_sender.stop(); // Enterprise Edition Feature: packet-sequence

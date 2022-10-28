@@ -263,8 +263,11 @@ impl Forward {
         platforms: &Vec<Arc<PlatformData>>,
         interfaces: &Vec<NetworkInterface>,
     ) {
-        let mut mac_ip_tables = Vec::with_capacity(self.queue_count);
-        for _ in 0..self.queue_count {
+        let mut mac_ip_tables = vec![];
+        // FIXME: Use MAX_QUEUE_COUNT is a temporary scheme, which will be modified later
+        // =======================================================-----===================
+        // FIXME: 这里使用 MAX_QUEUE_COUNT 是临时方案，后面修改使用 self.queue_count
+        for _ in 0..super::MAX_QUEUE_COUNT {
             let mut mac_ip_table = TableLruCache::new(1 << 14);
             self.update_l3_from_platforms(&mut mac_ip_table, platforms);
             self.update_l3_from_interfaces(trident_type, &mut mac_ip_table, interfaces);

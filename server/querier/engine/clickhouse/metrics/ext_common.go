@@ -17,6 +17,7 @@
 package metrics
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/deepflowys/deepflow/server/querier/config"
@@ -25,7 +26,7 @@ import (
 
 var EXT_METRICS = map[string]*Metrics{}
 
-func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
+func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Metrics, error) {
 	loadMetrics := make(map[string]*Metrics)
 	var err error
 	if db == "ext_metrics" || db == "deepflow_system" || (db == "flow_log" && table == "l7_flow_log") {
@@ -39,6 +40,7 @@ func GetExtMetrics(db, table, where string) (map[string]*Metrics, error) {
 			UserName: config.Cfg.Clickhouse.User,
 			Password: config.Cfg.Clickhouse.Password,
 			DB:       "flow_tag",
+			Context:  ctx,
 		}
 		var externalMetricSql string
 		var tableFilter string
