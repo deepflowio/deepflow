@@ -72,13 +72,13 @@ type SubDomain struct {
 	Base         `gorm:"embedded"`
 	OperatedTime `gorm:"embedded"`
 	SyncedAt     *time.Time `gorm:"column:synced_at" json:"SYNCED_AT"`
-	Domain       string     `gorm:"column:domain;type:char(64)" json:"DOMAIN"`
-	Name         string     `gorm:"column:name;type:varchar(64)" json:"NAME"`
+	Domain       string     `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
+	Name         string     `gorm:"column:name;type:varchar(64);default:''" json:"NAME"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME"`
 	CreateMethod int        `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	ClusterID    string     `gorm:"column:cluster_id;type:char(32)" json:"CLUSTER_ID"`
-	Config       string     `gorm:"column:config;type:text" json:"CONFIG"`
-	ErrorMsg     string     `gorm:"column:error_msg;type:text" json:"ERROR_MSG"`
+	ClusterID    string     `gorm:"column:cluster_id;type:char(32);default:''" json:"CLUSTER_ID"`
+	Config       string     `gorm:"column:config;type:text;default:''" json:"CONFIG"`
+	ErrorMsg     string     `gorm:"column:error_msg;type:text;default:''" json:"ERROR_MSG"`
 	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED"` // 0.false 1.true
 	State        int        `gorm:"column:state;type:int;not null;default:1" json:"STATE"`     // 1.normal 2.deleting 3.exception
 }
@@ -112,21 +112,21 @@ type Host struct {
 	SoftDeleteBase `gorm:"embedded"`
 	Type           int       `gorm:"column:type;type:int" json:"TYPE"`   // 1.Server 3.Gateway 4.DFI
 	State          int       `gorm:"column:state;type:int" json:"STATE"` // 0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception
-	Name           string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	Alias          string    `gorm:"column:alias;type:char(64)" json:"ALIAS"`
-	Description    string    `gorm:"column:description;type:varchar(256)" json:"DESCRIPTION"`
-	IP             string    `gorm:"column:ip;type:char(64)" json:"IP"`
+	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
+	Alias          string    `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	Description    string    `gorm:"column:description;type:varchar(256);default:''" json:"DESCRIPTION"`
+	IP             string    `gorm:"column:ip;type:char(64);default:''" json:"IP"`
 	HType          int       `gorm:"column:htype;type:int" json:"HTYPE"`                           // 1. Xen host 2. VMware host 3. KVM host 4. Public cloud host 5. Hyper-V
 	CreateMethod   int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	UserName       string    `gorm:"column:user_name;type:varchar(64)" json:"USER_NAME"`
-	UserPasswd     string    `gorm:"column:user_passwd;type:varchar(64)" json:"USER_PASSWD"`
+	UserName       string    `gorm:"column:user_name;type:varchar(64);default:''" json:"USER_NAME"`
+	UserPasswd     string    `gorm:"column:user_passwd;type:varchar(64);default:''" json:"USER_PASSWD"`
 	VCPUNum        int       `gorm:"column:vcpu_num;type:int;default:0" json:"VCPU_NUM"`
 	MemTotal       int       `gorm:"column:mem_total;type:int;default:0" json:"MEM_TOTAL"` // unit: M
 	AZ             string    `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	Region         string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	SyncedAt       time.Time `gorm:"column:synced_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_AT"`
-	ExtraInfo      string    `gorm:"column:extra_info;type:text" json:"EXTRA_INFO"`
+	ExtraInfo      string    `gorm:"column:extra_info;type:text;default:''" json:"EXTRA_INFO"`
 }
 
 func (Host) TableName() string {
@@ -137,9 +137,9 @@ type VM struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	State          int    `gorm:"index:state_server_index;column:state;type:int;not null" json:"STATE"` // 0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying
-	Name           string `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64)" json:"ALIAS"`
-	Label          string `gorm:"column:label;type:char(64)" json:"LABEL"`
+	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	HType          int    `gorm:"column:htype;type:int;default:1" json:"HTYPE"`                 // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
 	LaunchServer   string `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER"`
@@ -532,7 +532,7 @@ type CEN struct {
 	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	VPCIDs         string `gorm:"column:epc_ids;type:text;default:''" json:"VPC_IDS"` // separated by ,
-	Domain         string `gorm:"column:domain;type:char(64);not ''" json:"DOMAIN"`
+	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
 func (CEN) TableName() string {

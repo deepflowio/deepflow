@@ -70,3 +70,26 @@ func (t *SuiteTest) TestDeleteHostSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestHostCreateAndFind() {
+	lcuuid := uuid.New().String()
+	host := &mysql.Host{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(host)
+	var resultHost *mysql.Host
+	err := t.db.Where("lcuuid = ? and name='' and alias='' and description='' and ip='' and user_name='' "+
+		"and user_passwd='' and az='' and region='' and domain=''", lcuuid).First(&resultHost).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), host.Base.Lcuuid, resultHost.Base.Lcuuid)
+
+	resultHost = new(mysql.Host)
+	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultHost).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), host.Base.Lcuuid, resultHost.Base.Lcuuid)
+
+	resultHost = new(mysql.Host)
+	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultHost).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), "", resultHost.Base.Lcuuid)
+}

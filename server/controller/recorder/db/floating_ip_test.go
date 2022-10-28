@@ -70,3 +70,26 @@ func (t *SuiteTest) TestDeleteFloatingIPBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+
+func (t *SuiteTest) TestFloatingIPCreateAndFind() {
+	lcuuid := uuid.New().String()
+	floatingIP := &mysql.FloatingIP{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(floatingIP)
+	var resultFloatingIP *mysql.FloatingIP
+	err := t.db.Where("lcuuid = ? and ip='' and region='' and domain=''", lcuuid).First(&resultFloatingIP).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), floatingIP.Base.Lcuuid, resultFloatingIP.Base.Lcuuid)
+
+	resultFloatingIP = new(mysql.FloatingIP)
+	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultFloatingIP).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), floatingIP.Base.Lcuuid, resultFloatingIP.Base.Lcuuid)
+
+	resultFloatingIP = new(mysql.FloatingIP)
+	err = t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultFloatingIP).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), "", resultFloatingIP.Base.Lcuuid)
+}
