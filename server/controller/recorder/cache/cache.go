@@ -357,6 +357,10 @@ func (c *Cache) AddVMs(items []*mysql.VM) {
 	}
 }
 
+func (c *Cache) UpdateVM(cloudItem *cloudmodel.VM) {
+	c.ToolDataSet.updateVM(cloudItem)
+}
+
 func (c *Cache) DeleteVM(lcuuid string) {
 	c.DiffBaseDataSet.deleteVM(lcuuid)
 	c.ToolDataSet.deleteVM(lcuuid)
@@ -417,6 +421,10 @@ func (c *Cache) AddNetworks(items []*mysql.Network) {
 	for _, item := range items {
 		c.AddNetwork(item)
 	}
+}
+
+func (c *Cache) UpdateNetwork(cloudItem *cloudmodel.Network) {
+	c.ToolDataSet.updateNetwork(cloudItem)
 }
 
 func (c *Cache) DeleteNetworks(lcuuids []string) {
@@ -600,12 +608,14 @@ func (c *Cache) refreshVInterfaces() {
 func (c *Cache) AddWANIPs(items []*mysql.WANIP) {
 	for _, item := range items {
 		c.DiffBaseDataSet.addWANIP(item, c.Sequence)
+		c.ToolDataSet.addWANIP(item)
 	}
 }
 
 func (c *Cache) DeleteWANIPs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteWANIP(lcuuid)
+		c.ToolDataSet.deleteWANIP(lcuuid)
 	}
 }
 

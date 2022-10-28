@@ -24,6 +24,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/manager/config"
 	"github.com/deepflowys/deepflow/server/controller/recorder"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type Task struct {
@@ -36,7 +37,7 @@ type Task struct {
 	DomainConfig string // 云平台配置字段config
 }
 
-func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context) *Task {
+func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context, resourceEventQueue *queue.OverwriteQueue) *Task {
 
 	tCtx, tCancel := context.WithCancel(ctx)
 	cloud := cloud.NewCloud(domain, cfg.CloudCfg, tCtx)
@@ -51,7 +52,7 @@ func NewTask(domain mysql.Domain, cfg config.TaskConfig, ctx context.Context) *T
 		tCancel:      tCancel,
 		cfg:          cfg,
 		Cloud:        cloud,
-		Recorder:     recorder.NewRecorder(domain.Lcuuid, cfg.RecorderCfg, tCtx),
+		Recorder:     recorder.NewRecorder(domain.Lcuuid, cfg.RecorderCfg, tCtx, resourceEventQueue),
 		DomainName:   domain.Name,
 		DomainConfig: domain.Config,
 	}
