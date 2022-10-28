@@ -134,6 +134,7 @@ type VTapCache struct {
 	expectedRevision *string
 	upgradePackage   *string
 	region           *string
+	regionID         int
 	domain           *string
 
 	// vtap group config
@@ -177,6 +178,7 @@ func NewVTapCache(vtap *models.VTap) *VTapCache {
 	vTapCache.launchServer = proto.String(vtap.LaunchServer)
 	vTapCache.launchServerID = vtap.LaunchServerID
 	vTapCache.az = proto.String(vtap.AZ)
+	vTapCache.region = proto.String(vtap.Region)
 	vTapCache.revision = proto.String(vtap.Revision)
 	syncedControllerAt := vtap.SyncedControllerAt
 	vTapCache.syncedControllerAt = &syncedControllerAt
@@ -612,6 +614,10 @@ func (c *VTapCache) updateRegion(region string) {
 	c.region = &region
 }
 
+func (c *VTapCache) GetRegionID() int {
+	return c.regionID
+}
+
 func (c *VTapCache) UpdateUpgradeInfo(expectedRevision string, upgradePackage string) {
 	c.expectedRevision = &expectedRevision
 	c.upgradePackage = &upgradePackage
@@ -691,12 +697,8 @@ func (c *VTapCache) modifyVTapCache(v *VTapInfo) {
 	if c.state == VTAP_STATE_PENDING {
 		c.enable = 0
 	}
-	region, ok := v.azToRegion[c.GetAZ()]
-	if ok == false {
-		log.Errorf("vtap(%s) az(%s) not found region", c.GetVTapHost(), c.GetAZ())
-	} else {
-		c.updateRegion(region)
-	}
+	var ok bool
+	c.regionID = v.GetRegionIDByLcuuid(c.GetRegion())
 	vTapType := c.GetVTapType()
 	if vTapType == VTAP_TYPE_POD_HOST || vTapType == VTAP_TYPE_POD_VM {
 		c.podClusterID, ok = v.lcuuidToPodClusterID[c.GetLcuuid()]
@@ -800,7 +802,12 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 		}
 	}
 	c.UpdateLaunchServerID(vtap.LaunchServerID)
-	c.updateAZ(vtap.AZ)
+	if c.GetAZ() != vtap.AZ {
+		c.updateAZ(vtap.AZ)
+	}
+	if c.GetRegion() != vtap.Region {
+		c.updateRegion(vtap.Region)
+	}
 	c.modifyVTapCache(v)
 	// 采集器组变化 重新生成平台数据
 	if c.GetVTapGroupLcuuid() != vtap.VtapGroupLcuuid {
