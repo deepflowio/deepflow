@@ -673,6 +673,9 @@ func UpdateSubDomain(lcuuid string, subDomainUpdate map[string]interface{}) (*mo
 	if _, ok := subDomainUpdate["NAME"]; ok {
 		return nil, errors.New("name field cannot be modified")
 	}
+	if _, ok := subDomainUpdate["DOMAIN_NAME"]; ok {
+		return nil, errors.New("domain_name field cannot be modified")
+	}
 	var subDomain mysql.SubDomain
 	var dbUpdateMap = make(map[string]interface{})
 
