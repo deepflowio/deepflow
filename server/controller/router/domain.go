@@ -161,6 +161,9 @@ func updateSubDomain(c *gin.Context) {
 	// 避免struct会有默认值，这里转为map作为函数入参
 	patchMap := map[string]interface{}{}
 	c.ShouldBindBodyWith(&patchMap, binding.JSON)
+	if _, ok := patchMap["NAME"]; ok {
+		BadRequestResponse(c, common.INVALID_PARAMETERS, "name field cannot be modified")
+	}
 
 	lcuuid := c.Param("lcuuid")
 	data, err := service.UpdateSubDomain(lcuuid, patchMap)
