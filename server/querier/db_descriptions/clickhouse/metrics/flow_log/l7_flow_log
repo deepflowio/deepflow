@@ -20,5 +20,6 @@ server_port          , server_port          , tag        , 111
 request_type         , request_type         , tag        , 111        
 response_result      , response_result      , tag        , 111        
 request_length       , request_length       , counter    , 111        
-response_length      , response_length      , counter    , 111        
+response_length      , response_length      , counter    , 111     
+session_length       ,                      , counter    , 111   
 sql_affected_rows    , sql_affected_rows    , counter    , 111        

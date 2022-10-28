@@ -48,6 +48,7 @@ var L7_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"error_ratio":        NewReplaceMetrics(DB_FIELD_ERROR+"/"+DB_FIELD_RESPONSE, fmt.Sprintf("%s>0", DB_FIELD_RESPONSE)),
 	"client_error_ratio": NewReplaceMetrics(DB_FIELD_CLIENT_ERROR+"/"+DB_FIELD_RESPONSE, fmt.Sprintf("%s>0", DB_FIELD_RESPONSE)),
 	"server_error_ratio": NewReplaceMetrics(DB_FIELD_SERVER_ERROR+"/"+DB_FIELD_RESPONSE, fmt.Sprintf("%s>0", DB_FIELD_RESPONSE)),
+	"session_length":     NewReplaceMetrics("request_length+response_length", ""),
 }
 
 func GetL7FlowLogMetrics() map[string]*Metrics {
