@@ -278,6 +278,7 @@ pub struct YamlConfig {
     #[serde(rename = "ebpf-uprobe-process-name-regexs")]
     pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
     pub external_agent_http_proxy_compressed: bool,
+    pub standalone_data_file_size: u32,
 }
 
 impl YamlConfig {
@@ -380,6 +381,10 @@ impl YamlConfig {
         }
         c.vxlan_flags |= 0x08;
 
+        if c.standalone_data_file_size == 0 {
+            c.standalone_data_file_size = 200
+        }
+
         if let Err(e) = c.validate() {
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
@@ -456,6 +461,7 @@ impl Default for YamlConfig {
                 protos
             },
             external_agent_http_proxy_compressed: false,
+            standalone_data_file_size: 200,
         }
     }
 }

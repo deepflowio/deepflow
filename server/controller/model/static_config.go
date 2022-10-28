@@ -69,6 +69,7 @@ type StaticConfig struct {
 	EbpfDisabled                    *bool                              `yaml:"ebpf-disabled,omitempty"`
 	L7ProtocolEnabled               []string                           `yaml:"l7-protocol-enabled,omitempty"`
 	EbpfUprobeProcessNameRegexs     *EbpfUprobeProcessNameRegexsConfig `yaml:"ebpf-uprobe-process-name-regexs,omitempty"`
+	StandaloneDataFileSize          *uint32                            `yaml:"standalone-data-file-size,omitempty"`
 	FeatureFlags                    []string                           `yaml:"feature-flags,omitempty"`
 }
 

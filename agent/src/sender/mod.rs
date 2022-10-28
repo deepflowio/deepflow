@@ -45,7 +45,6 @@ const TELEGRAF: u32 = 20220613;
 const PACKET_SEQUENCE_BLOCK: u32 = 20220712; // Enterprise Edition Feature: packet-sequence
 
 const PRE_FILE_SUFFIX: &str = ".pre";
-const MAX_FILE_SIZE: usize = 200_000_000;
 
 pub enum SendItem {
     L4FlowLog(Box<TaggedFlow>),
