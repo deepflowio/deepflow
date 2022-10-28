@@ -70,6 +70,7 @@ func (t *SuiteTest) TestDeleteFloatingIPBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
 func (t *SuiteTest) TestFloatingIPCreateAndFind() {
 	lcuuid := uuid.New().String()
 	floatingIP := &mysql.FloatingIP{
