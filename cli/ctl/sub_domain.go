@@ -12,11 +12,11 @@ import (
 	"github.com/deepflowys/deepflow/cli/ctl/example"
 )
 
-type SubDomainType int
+type SubDomainType uint8
 
 const (
-	SubDomainTypeCreate  SubDomainType =iota
-	SubDomainTypeUpdate  SubDomainType
+	SubDomainTypeCreate  SubDomainType = iota
+	SubDomainTypeUpdate 
 )
 
 func RegisterSubDomainCommand() *cobra.Command {
