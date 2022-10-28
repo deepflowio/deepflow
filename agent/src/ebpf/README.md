@@ -52,51 +52,51 @@ Note: The numbers in the figure below indicate the calling sequence.
 ```mermaid
 graph LR
 subgraph Symbols
-    style illustration-func fill:#ccff, stroke-width:2px
-    style illustration-info fill:#cf0,stroke:#360,stroke-width:2px
+    style illustration-func fill:#ccff,color:#000, stroke-width:2px
+    style illustration-info fill:#cf0,color:#000,stroke:#360,stroke-width:2px
     style illustration-code-block stroke-width:2px
     illustration-func(1 Function Name)
     illustration-info([Short description])
-    illustration-code-block(2 Code function block)
+    illustration-code-block(2 Code block)
     illustration_map[(eBPF map)]
 end
-    style enable_ebpf_protocol-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-10-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-11-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-13-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-14-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-15-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-16-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-3-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-4-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-1-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-8-i fill:#cf0,stroke:#360,stroke-width:2px
-    style running_socket_tracer-9-i fill:#cf0,stroke:#360,stroke-width:2px
-    style bpf_tracer_finish-i fill:#cf0,stroke:#360,stroke-width:2px
-    style FEATUER-i fill:#cf0,stroke:#360,stroke-width:2px
-    style start fill:#fff,stroke:#000,stroke-width:2px
-    style enable_ebpf_protocol fill:#ccff, stroke-width:2px
-    style FEATUER fill:#ccff, stroke-width:2px
-    style bpf_tracer_init fill:#ccff, stroke-width:2px
-    style running_socket_tracer fill:#ccff, stroke-width:2px
-    style running_socket_tracer-1 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-2 fill:#ccff, stroke-width:2px
+    style enable_ebpf_protocol-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-10-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-11-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-13-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-14-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-15-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-16-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-3-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-4-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-1-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-8-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style running_socket_tracer-9-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style bpf_tracer_finish-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style FEATUER-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style start fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style enable_ebpf_protocol fill:#ccff,color:#000, stroke-width:2px
+    style FEATUER fill:#ccff,color:#000, stroke-width:2px
+    style bpf_tracer_init fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-1 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-2 fill:#ccff,color:#000, stroke-width:2px
     style running_socket_tracer-3 stroke-width:2px
-    style running_socket_tracer-4 fill:#ccff, stroke-width:2px
+    style running_socket_tracer-4 fill:#ccff,color:#000, stroke-width:2px
     style running_socket_tracer-5 stroke-width:2px
-    style running_socket_tracer-6 fill:#ccff, stroke-width:2px
+    style running_socket_tracer-6 fill:#ccff,color:#000, stroke-width:2px
     style running_socket_tracer-7 stroke-width:2px
-    style running_socket_tracer-8 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-9 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-10 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-11 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-12 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-13 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-14 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-16 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-2-2 fill:#ccff, stroke-width:2px
-    style running_socket_tracer-2-3 fill:#ccff, stroke-width:2px
-    style bpf_tracer_finish fill:#ccff, stroke-width:2px
+    style running_socket_tracer-8 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-9 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-10 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-11 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-12 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-13 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-14 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-16 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-2-2 fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-2-3 fill:#ccff,color:#000, stroke-width:2px
+    style bpf_tracer_finish fill:#ccff,color:#000, stroke-width:2px
     style bpf_tracer_init-1 stroke-width:2px
     style bpf_tracer_init-2 stroke-width:2px
     style bpf_tracer_init-3 stroke-width:2px
@@ -139,7 +139,6 @@ end
     running_socket_tracer --> running_socket_tracer-17(4.17 register_extra_waiting_op server/client for getting kernel struct member offset)
     running_socket_tracer --> running_socket_tracer-18(4.18 register_period_event_op kick kernel for getting kernel struct member offset)
     running_socket_tracer --> running_socket_tracer-19(4.19 new thread for process events)
-
 ```
 
 ## Kernel eBPF process
@@ -147,31 +146,31 @@ end
 ```mermaid
 graph TD
 subgraph Symbols
-    style illustration-func fill:#ccff, stroke-width:2px
-    style illustration-info fill:#cf0,stroke:#360,stroke-width:2px
+    style illustration-func fill:#ccff,color:#000, stroke-width:2px
+    style illustration-info fill:#cf0,color:#000,stroke:#360,stroke-width:2px
     style illustration-code-block stroke-width:2px
     illustration-func(1 Function Name)
     illustration-info([Short description])
-    illustration-code-block(2 Code function block)
+    illustration-code-block(2 Code block)
     illustration_map[(eBPF map)]
 end
-    style check_data-i fill:#cf0,stroke:#360,stroke-width:2px
-    style drop_msg_by_comm-i fill:#cf0,stroke:#360,stroke-width:2px
-    style eBPF_start fill:#fff,stroke:#000,stroke-width:2px
-    style RET fill:#fff,stroke:#000,stroke-width:2px
-    style process_syscall_data fill:#ccff, stroke-width:2px
-    style get_tcp_read_seq_from_fd fill:#ccff, stroke-width:2px
-    style get_tcp_write_seq_from_fd fill:#ccff, stroke-width:2px
-    style process_data fill:#ccff, stroke-width:2px
+    style check_data-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style drop_msg_by_comm-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style eBPF_start fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style RET fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style process_syscall_data fill:#ccff,color:#000, stroke-width:2px
+    style get_tcp_read_seq_from_fd fill:#ccff,color:#000, stroke-width:2px
+    style get_tcp_write_seq_from_fd fill:#ccff,color:#000, stroke-width:2px
+    style process_data fill:#ccff,color:#000, stroke-width:2px
     style trace_map__update stroke-width:2px
     style trace_map__delete stroke-width:2px
-    style is_tcp_udp_data fill:#ccff, stroke-width:2px
-    style init_conn_info fill:#ccff, stroke-width:2px
-    style inferclass fill:#ccff, stroke-width:2px
-    style drop_msg_by_comm fill:#ccff, stroke-width:2px
-    style infer_protocol fill:#ccff, stroke-width:2px
-    style bpf_perf_event_output fill:#ccff, stroke-width:2px
-    style trace_process fill:#ccff, stroke-width:2px
+    style is_tcp_udp_data fill:#ccff,color:#000, stroke-width:2px
+    style init_conn_info fill:#ccff,color:#000, stroke-width:2px
+    style inferclass fill:#ccff,color:#000, stroke-width:2px
+    style drop_msg_by_comm fill:#ccff,color:#000, stroke-width:2px
+    style infer_protocol fill:#ccff,color:#000, stroke-width:2px
+    style bpf_perf_event_output fill:#ccff,color:#000, stroke-width:2px
+    style trace_process fill:#ccff,color:#000, stroke-width:2px
     style check_data stroke-width:2px
     style create_socket_info stroke-width:2px
     style set_data_from_socket_info stroke-width:2px
@@ -181,7 +180,7 @@ end
     style burst_send_data stroke-width:2px
     style if_socket_info stroke-width:2px
     style socket_id stroke-width:2px
-    style data_submit fill:#ccff, stroke-width:2px
+    style data_submit fill:#ccff,color:#000, stroke-width:2px
 
     eBPF_start[A syscall start]
     syscall_entry(1 syscall write/read entry hooks)
@@ -241,33 +240,33 @@ end
 ```mermaid
 graph TD
 subgraph Symbols
-    style illustration-thread fill:#fff,stroke:#000,stroke-width:2px
-    style illustration-func fill:#ccff, stroke-width:2px
+    style illustration-thread fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style illustration-func fill:#ccff,color:#000, stroke-width:2px
     style illustration-code-block stroke-width:2px
     illustration-func(1 Function Name)
-    illustration-code-block(2 Code function block)
+    illustration-code-block(2 Code block)
     illustration-thread>thread]
     illustration-ring{{ -- queue -- }}
 end
-    style poller fill:#ccff, stroke-width:2px
-    style start  fill:#fff,stroke:#000,stroke-width:2px
-    style worker  fill:#fff,stroke:#000,stroke-width:2px
-    style worker_1  fill:#fff,stroke:#000,stroke-width:2px
-    style worker_2  fill:#fff,stroke:#000,stroke-width:2px
-    style perf_reader_poll fill:#ccff, stroke-width:2px
-    style process_datas fill:#ccff, stroke-width:2px
-    style reader_raw_cb fill:#ccff, stroke-width:2px
-    style register_events_handle fill:#ccff, stroke-width:2px
-    style dispatch_queue_index fill:#ccff, stroke-width:2px
-    style prefetch_and_process_datas fill:#ccff, stroke-width:2px
+    style poller fill:#ccff,color:#000, stroke-width:2px
+    style start  fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style worker  fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style worker_1  fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style worker_2  fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style perf_reader_poll fill:#ccff,color:#000, stroke-width:2px
+    style process_datas fill:#ccff,color:#000, stroke-width:2px
+    style reader_raw_cb fill:#ccff,color:#000, stroke-width:2px
+    style register_events_handle fill:#ccff,color:#000, stroke-width:2px
+    style dispatch_queue_index fill:#ccff,color:#000, stroke-width:2px
+    style prefetch_and_process_datas fill:#ccff,color:#000, stroke-width:2px
     style rust_callback stroke-width:2px
     style free stroke-width:2px
 
     start>thread 'perf-reader'] --- poller(1 poller)-->|1|perf_reader_poll(2 perf_reader_poll)-->|2|reader_raw_cb(3 reader_raw_cb)
     reader_raw_cb-->|3|register_events_handle(4 register_events_handle)
     reader_raw_cb-->|4|dispatch_queue_index(5 dispatch_queue_index)
-    reader_raw_cb-->|5|copy_data_and_enqueue(6 Copy sockt data and enqueue)
-    subgraph Copy sockt data and enqueue
+    reader_raw_cb-->|5|copy_data_and_enqueue(6 Copy socket data and enqueue)
+    subgraph Copy socket data and enqueue
     id0((data))-->|ring_sp_enqueue_burst|ring0{{ -- queue 0 -- }}-.-worker>worker thread-1] --- process_datas(7 process_datas)
     id1((data))-->|ring_sp_enqueue_burst|ring1{{ -- queue 1 -- }}-.-worker_1>worker thread-2] --- process_datas
     idn((data))-->|ring_sp_enqueue_burst|ring2{{ -- queue n -- }}-.-worker_2>worker thread-n] --- process_datas
@@ -287,40 +286,40 @@ end
 ```mermaid
 graph TD
 subgraph Symbols
-    style illustration-func fill:#ccff, stroke-width:2px
-    style illustration-info fill:#cf0,stroke:#360,stroke-width:2px
+    style illustration-func fill:#ccff,color:#000, stroke-width:2px
+    style illustration-info fill:#cf0,color:#000,stroke:#360,stroke-width:2px
     style illustration-code-block stroke-width:2px
     illustration-func(1 Function Name)
     illustration-info([Short description])
-    illustration-code-block(2 Code function block)
+    illustration-code-block(2 Code block)
     illustration_map[(eBPF map)]
 end
-    style bcc_elf_foreach_sym-i fill:#cf0,stroke:#360,stroke-width:2px
-    style function_address-i fill:#cf0,stroke:#360,stroke-width:2px
-    style resolve_func_ret_addr-i fill:#cf0,stroke:#360,stroke-width:2px
-    style start fill:#fff,stroke:#000,stroke-width:2px
-    style running_socket_tracer fill:#ccff, stroke-width:2px
-    style running_socket_tracer-2 fill:#ccff, stroke-width:2px
-    style collect_go_uprobe_syms_from_procfs fill:#ccff, stroke-width:2px
-    style proc_parse_and_register fill:#ccff, stroke-width:2px
-    style fetch_go_elf_version fill:#ccff, stroke-width:2px
-    style collect_ssl_uprobe_syms_from_procfs fill:#ccff, stroke-width:2px
+    style bcc_elf_foreach_sym-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style function_address-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style resolve_func_ret_addr-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style start fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style running_socket_tracer fill:#ccff,color:#000, stroke-width:2px
+    style running_socket_tracer-2 fill:#ccff,color:#000, stroke-width:2px
+    style collect_go_uprobe_syms_from_procfs fill:#ccff,color:#000, stroke-width:2px
+    style proc_parse_and_register fill:#ccff,color:#000, stroke-width:2px
+    style fetch_go_elf_version fill:#ccff,color:#000, stroke-width:2px
+    style collect_ssl_uprobe_syms_from_procfs fill:#ccff,color:#000, stroke-width:2px
     style IFGETVER stroke-width:2px
     style collect_ssl_detail stroke-width:2px
-    style RET fill:#fff,stroke:#000,stroke-width:2px 
-    style resolve_bin_file fill:#ccff, stroke-width:2px
-    style resolve_and_gen_uprobe_symbol fill:#ccff, stroke-width:2px
-    style bcc_elf_foreach_sym fill:#ccff, stroke-width:2px
-    style function_address fill:#ccff, stroke-width:2px
-    style resolve_func_ret_addr fill:#ccff, stroke-width:2px
-    style add_uprobe_symbol fill:#ccff, stroke-width:2px
-    style struct_member_offset_analyze fill:#ccff, stroke-width:2px
-    style tracer_probes_init fill:#ccff, stroke-width:2px
-    style tracer_hooks_attach fill:#ccff, stroke-width:2px
-    style update_proc_info_to_map fill:#ccff, stroke-width:2px
-    style add_uprobe_symbol-i fill:#cf0,stroke:#360,stroke-width:2px
-    style tracer_hooks_attach-i fill:#cf0,stroke:#360,stroke-width:2px
-    style struct_member_offset_analyze-i fill:#cf0,stroke:#360,stroke-width:2px
+    style RET fill:#fff,color:#000,stroke:#000,stroke-width:2px 
+    style resolve_bin_file fill:#ccff,color:#000, stroke-width:2px
+    style resolve_and_gen_uprobe_symbol fill:#ccff,color:#000, stroke-width:2px
+    style bcc_elf_foreach_sym fill:#ccff,color:#000, stroke-width:2px
+    style function_address fill:#ccff,color:#000, stroke-width:2px
+    style resolve_func_ret_addr fill:#ccff,color:#000, stroke-width:2px
+    style add_uprobe_symbol fill:#ccff,color:#000, stroke-width:2px
+    style struct_member_offset_analyze fill:#ccff,color:#000, stroke-width:2px
+    style tracer_probes_init fill:#ccff,color:#000, stroke-width:2px
+    style tracer_hooks_attach fill:#ccff,color:#000, stroke-width:2px
+    style update_proc_info_to_map fill:#ccff,color:#000, stroke-width:2px
+    style add_uprobe_symbol-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style tracer_hooks_attach-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
+    style struct_member_offset_analyze-i fill:#cf0,color:#000,stroke:#360,stroke-width:2px
 
     start[tracer start]
     start --> running_socket_tracer(1 running_socket_tracer)
@@ -366,13 +365,13 @@ For all probes we provide two APIs(tracer_start()/tracer_stop()) to enable/disab
 
 ```mermaid
 graph LR
-    style poller fill:#ccff, stroke-width:2px
-    style perf_reader_poll fill:#ccff, stroke-width:2px
-    style reader_raw_cb fill:#ccff, stroke-width:2px
+    style poller fill:#ccff,color:#000, stroke-width:2px
+    style perf_reader_poll fill:#ccff,color:#000, stroke-width:2px
+    style reader_raw_cb fill:#ccff,color:#000, stroke-width:2px
     style perf_buffer stroke-width:2px
-    style hook fill:#fff,stroke:#000,stroke-width:2px
-    style hook1 fill:#fff,stroke:#000,stroke-width:2px
-    style hook2 fill:#fff,stroke:#000,stroke-width:2px
+    style hook fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style hook1 fill:#fff,color:#000,stroke:#000,stroke-width:2px
+    style hook2 fill:#fff,color:#000,stroke:#000,stroke-width:2px
     subgraph kernel
     hook[process events snoop]
     hook1[1 hook: sched_process_fork]
@@ -392,18 +391,18 @@ graph LR
 
 ```mermaid
 graph TD
-    style reader_raw_cb fill:#ccff, stroke-width:2px
-    style register_events_handle fill:#ccff, stroke-width:2px
-    style process_event fill:#ccff, stroke-width:2px
-    style go_process_exec fill:#ccff, stroke-width:2px
-    style ssl_process_exec fill:#ccff, stroke-width:2px
-    style go_process_exit fill:#ccff, stroke-width:2px
-    style ssl_process_exit fill:#ccff, stroke-width:2px
-    style add_event_to_proc_header fill:#ccff, stroke-width:2px
+    style reader_raw_cb fill:#ccff,color:#000, stroke-width:2px
+    style register_events_handle fill:#ccff,color:#000, stroke-width:2px
+    style process_event fill:#ccff,color:#000, stroke-width:2px
+    style go_process_exec fill:#ccff,color:#000, stroke-width:2px
+    style ssl_process_exec fill:#ccff,color:#000, stroke-width:2px
+    style go_process_exit fill:#ccff,color:#000, stroke-width:2px
+    style ssl_process_exit fill:#ccff,color:#000, stroke-width:2px
+    style add_event_to_proc_header fill:#ccff,color:#000, stroke-width:2px
     style list_add_tail stroke-width:2px
-    style clear_probes_by_pid  fill:#ccff, stroke-width:2px
-    style probe_detach fill:#ccff, stroke-width:2px
-    style free_probe_from_tracer fill:#ccff, stroke-width:2px
+    style clear_probes_by_pid  fill:#ccff,color:#000, stroke-width:2px
+    style probe_detach fill:#ccff,color:#000, stroke-width:2px
+    style free_probe_from_tracer fill:#ccff,color:#000, stroke-width:2px
     reader_raw_cb(5 reader_raw_cb)
     reader_raw_cb-->register_events_handle(6 register_events_handle)
     register_events_handle-->process_event(7 process_event)
@@ -421,16 +420,16 @@ graph TD
 
 ```mermaid
 graph LR
-    style process_events_handle_main fill:#ccff, stroke-width:2px
-    style go_process_events_handle fill:#ccff, stroke-width:2px
-    style ssl_events_handle fill:#ccff, stroke-width:2px
+    style process_events_handle_main fill:#ccff,color:#000, stroke-width:2px
+    style go_process_events_handle fill:#ccff,color:#000, stroke-width:2px
+    style ssl_events_handle fill:#ccff,color:#000, stroke-width:2px
     style list_first_entry stroke-width:2px
-    style process_execute_handle fill:#ccff, stroke-width:2px
-    style update_proc_info_to_map fill:#ccff, stroke-width:2px
-    style tracer_hooks_process fill:#ccff, stroke-width:2px
-    style tracer_uprobes_update fill:#ccff, stroke-width:2px
-    style proc_parse_and_register fill:#ccff, stroke-width:2px
-    style clear_probes_by_pid fill:#ccff, stroke-width:2px
+    style process_execute_handle fill:#ccff,color:#000, stroke-width:2px
+    style update_proc_info_to_map fill:#ccff,color:#000, stroke-width:2px
+    style tracer_hooks_process fill:#ccff,color:#000, stroke-width:2px
+    style tracer_uprobes_update fill:#ccff,color:#000, stroke-width:2px
+    style proc_parse_and_register fill:#ccff,color:#000, stroke-width:2px
+    style clear_probes_by_pid fill:#ccff,color:#000, stroke-width:2px
 
     subgraph process events
     start>thread 'proc-events']---process_events_handle_main(13 process_events_handle_main)
