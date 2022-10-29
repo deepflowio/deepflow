@@ -473,7 +473,7 @@ impl BaseDispatcher {
         #[cfg(target_os = "windows")]
         if let Err(e) = self
             .engine
-            .set_bpf(&CString::new(&*bpf_options.bpf_syntax_str).unwrap())
+            .set_bpf(&CString::new(bpf_options.get_bpf_instructions()).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
