@@ -234,7 +234,12 @@ impl NetNs {
     pub fn setns(fp: &File) -> Result<()> {
         if let Err(e) = setns(fp.as_raw_fd(), CloneFlags::CLONE_NEWNET) {
             let inode = fp.metadata().ok().map(|m| m.ino());
-            warn!("setns() failed for fd {} inode {:?}: {:?}", fp.as_raw_fd(), inode, e);
+            warn!(
+                "setns() failed for fd {} inode {:?}: {:?}",
+                fp.as_raw_fd(),
+                inode,
+                e
+            );
             return Err(e.into());
         }
         Ok(())
