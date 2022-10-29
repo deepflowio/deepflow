@@ -1260,7 +1260,8 @@ impl Components {
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
                 .src_interface(src_interface)
-                .netns(netns);
+                .netns(netns)
+                .trident_type(candidate_config.dispatcher.trident_type);
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder

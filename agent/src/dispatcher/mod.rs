@@ -60,6 +60,7 @@ pub use recv_engine::{
 
 #[cfg(target_os = "linux")]
 use crate::platform::GenericPoller;
+use crate::utils::environment::get_mac_by_name;
 use crate::{
     common::{enums::TapType, TaggedFlow, TapTyper},
     config::{
@@ -82,6 +83,7 @@ use public::{
     utils::net::{Link, MacAddr},
     LeakyBucket,
 };
+
 enum DispatcherFlavor {
     Analyzer(AnalyzerModeDispatcher), // Enterprise Edition Feature: analyzer_mode
     Local(LocalModeDispatcher),
@@ -518,6 +520,7 @@ pub struct DispatcherBuilder {
     #[cfg(target_os = "windows")]
     pcap_interfaces: Option<Vec<Link>>,
     netns: Option<NsFile>,
+    trident_type: Option<TridentType>,
 }
 
 impl DispatcherBuilder {
@@ -651,6 +654,11 @@ impl DispatcherBuilder {
         self
     }
 
+    pub fn trident_type(mut self, v: TridentType) -> Self {
+        self.trident_type = Some(v);
+        self
+    }
+
     #[cfg(target_os = "linux")]
     fn get_engine(
         src_interface: &mut Option<String>,
@@ -756,6 +764,7 @@ impl DispatcherBuilder {
             .take()
             .ok_or(Error::ConfigIncomplete("no platform poller".into()))?;
 
+        let src_interface = self.src_interface.unwrap_or("".to_string());
         let base = BaseDispatcher {
             engine,
 
@@ -763,7 +772,7 @@ impl DispatcherBuilder {
             src_interface: if tap_mode == TapMode::Local {
                 "".to_string()
             } else {
-                self.src_interface.unwrap_or("".to_string())
+                src_interface.clone()
             },
             src_interface_index: 0,
             ctrl_mac: self
@@ -865,6 +874,10 @@ impl DispatcherBuilder {
                 #[cfg(target_os = "linux")]
                 poller: Some(platform_poller),
                 updated: Arc::new(AtomicBool::new(false)),
+                trident_type: self
+                    .trident_type
+                    .ok_or(Error::ConfigIncomplete("no trident_type".into()))?,
+                mac: get_mac_by_name(src_interface),
             }),
             TapMode::Analyzer => {
                 #[cfg(target_os = "linux")]

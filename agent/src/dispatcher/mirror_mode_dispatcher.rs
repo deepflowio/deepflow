@@ -49,9 +49,12 @@ use crate::{
     flow_generator::FlowMap,
     handler::PacketHandlerBuilder,
     handler::{MiniPacket, PacketHandler},
-    proto::trident::IfMacSource,
+    proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
-    utils::stats::{Countable, RefCountable, StatsOption},
+    utils::{
+        environment::is_tt_hyper_v_compute,
+        stats::{Countable, RefCountable, StatsOption},
+    },
 };
 use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
@@ -169,6 +172,8 @@ pub(super) struct MirrorModeDispatcher {
     pub(super) poller: Option<Arc<GenericPoller>>,
     pub(super) pipelines: HashMap<u32, MirrorPipeline>,
     pub(super) updated: Arc<AtomicBool>,
+    pub(super) trident_type: TridentType,
+    pub(super) mac: u32,
 }
 
 impl MirrorModeDispatcher {
@@ -315,6 +320,8 @@ impl MirrorModeDispatcher {
         tunnel_info: &TunnelInfo,
         flow_map: &mut FlowMap,
         counter: &Arc<PacketCounter>,
+        trident_type: TridentType,
+        mac: u32,
     ) -> Result<()> {
         let pipeline = Self::get_pipeline(updated, pipelines, key, id, handler_builder, timestamp);
         if timestamp
@@ -341,7 +348,14 @@ impl MirrorModeDispatcher {
             original_length,
         )?;
 
-        Self::prepare_flow(&mut meta_packet, tunnel_info.tunnel_type, key, id as u8);
+        Self::prepare_flow(
+            &mut meta_packet,
+            tunnel_info.tunnel_type,
+            key,
+            id as u8,
+            trident_type,
+            mac,
+        );
         // flowProcesser
         flow_map.inject_meta_packet(&mut meta_packet);
         let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
@@ -397,7 +411,7 @@ impl MirrorModeDispatcher {
             #[cfg(target_os = "linux")]
             let (packet, timestamp) = recved.unwrap();
             #[cfg(target_os = "windows")]
-            let (mut packet, mut timestamp) = recved.unwrap();
+            let (mut packet, timestamp) = recved.unwrap();
 
             self.base.counter.rx.fetch_add(1, Ordering::Relaxed);
             self.base
@@ -457,6 +471,8 @@ impl MirrorModeDispatcher {
                     &self.base.tunnel_info,
                     &mut flow_map,
                     &self.base.counter,
+                    self.trident_type,
+                    self.mac,
                 );
                 continue;
             }
@@ -476,6 +492,8 @@ impl MirrorModeDispatcher {
                     &self.base.tunnel_info,
                     &mut flow_map,
                     &self.base.counter,
+                    self.trident_type,
+                    self.mac,
                 );
             }
             if dst_local {
@@ -493,6 +511,8 @@ impl MirrorModeDispatcher {
                     &self.base.tunnel_info,
                     &mut flow_map,
                     &self.base.counter,
+                    self.trident_type,
+                    self.mac,
                 );
             }
         }
@@ -506,8 +526,14 @@ impl MirrorModeDispatcher {
         tunnel_type: TunnelType,
         key: u32,
         queue_hash: u8,
+        trident_type: TridentType,
+        mac: u32,
     ) {
-        meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, key);
+        if is_tt_hyper_v_compute(trident_type) {
+            meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, mac);
+        } else {
+            meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, key);
+        }
 
         BaseDispatcher::prepare_flow(meta_packet, TapType::Tor, false, queue_hash)
     }
