@@ -37,9 +37,7 @@ use std::{
 
 #[cfg(target_os = "linux")]
 use libc::c_int;
-#[cfg(target_os = "linux")]
-use log::debug;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use packet_dedup::*;
 #[cfg(target_os = "linux")]
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
@@ -272,8 +270,8 @@ impl Default for BpfOptions {
     }
 }
 
-#[cfg(target_os = "linux")]
 impl BpfOptions {
+    #[cfg(target_os = "linux")]
     fn skip_tap_interface(&self, tap_interfaces: &Vec<Link>) -> Vec<BpfSyntax> {
         let mut bpf_syntax = self.bpf_syntax.clone();
 
@@ -297,6 +295,7 @@ impl BpfOptions {
         return bpf_syntax;
     }
 
+    #[cfg(target_os = "linux")]
     fn to_pcap_bpf_prog(&self) -> Option<bpf_program> {
         let mut prog: bpf_program = bpf_program {
             bf_len: 0,
@@ -329,29 +328,50 @@ impl BpfOptions {
         return Some(prog);
     }
 
+    #[cfg(target_os = "linux")]
     pub fn get_bpf_instructions(&self, tap_interfaces: &Vec<Link>) -> Vec<RawInstruction> {
-        if self.capture_bpf.len() == 0 {
-            let syntaxs = self.skip_tap_interface(tap_interfaces);
-            debug!("Capture bpf set to:");
-            for (i, syntax) in syntaxs.iter().enumerate() {
-                debug!("{:3}: {}", i + 1, syntax);
+        let mut syntaxs = vec![];
+        debug!("Capture bpf set to:");
+        if self.capture_bpf.len() != 0 {
+            let prog = self.to_pcap_bpf_prog();
+            if !prog.is_none() && prog.unwrap().bf_len > 0 {
+                let prog = prog.unwrap();
+                unsafe {
+                    let pcap_ins = Vec::from_raw_parts(
+                        prog.bf_insns,
+                        prog.bf_len as usize,
+                        prog.bf_len as usize,
+                    );
+                    for i in 0..pcap_ins.len() - 1 {
+                        debug!("Bpf custom {:?}", pcap_ins[i]);
+                        syntaxs.push(RawInstruction::from(pcap_ins[i]));
+                    }
+                }
+            } else {
+                error!(
+                    "Capture customized bpf({}) error, use default only.",
+                    self.capture_bpf
+                );
             }
-            return syntaxs.iter().map(|x| x.to_instruction()).collect();
         }
 
-        let prog = self.to_pcap_bpf_prog();
-        if prog.is_none() {
-            error!("Capture bpf {} error.", self.capture_bpf);
-            return vec![];
+        let default_syntaxs = self.skip_tap_interface(tap_interfaces);
+        for (i, syntax) in default_syntaxs.iter().enumerate() {
+            debug!("Bpf default {:3}: {}", i + 1, syntax);
+            syntaxs.push(syntax.to_instruction());
         }
-        debug!("Capture bpf set to: {}", self.capture_bpf);
+        return syntaxs;
+    }
 
-        let prog = prog.unwrap();
-        unsafe {
-            let pcap_ins =
-                Vec::from_raw_parts(prog.bf_insns, prog.bf_len as usize, prog.bf_len as usize);
-            return pcap_ins.iter().map(|&x| RawInstruction::from(x)).collect();
+    #[cfg(target_os = "windows")]
+    pub fn get_bpf_instructions(&self) -> String {
+        if self.capture_bpf.len() > 0 {
+            let syntax = format!("({}) and ({})", self.capture_bpf, self.bpf_syntax_str);
+            debug!("Capture bpf set to: {}", syntax);
+            return syntax;
         }
+        debug!("Capture bpf set to: {}", self.bpf_syntax_str);
+        return self.bpf_syntax_str.clone();
     }
 }
 
