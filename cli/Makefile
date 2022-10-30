@@ -21,14 +21,17 @@ vendor:
 	cp vendor/${MESSAGE}/metric.proto vendor/${LIBS}/zerodoc/pb
 	cp vendor/${MESSAGE}/flow_log.proto vendor/${LIBS}/datatype/pb
 	cp vendor/${MESSAGE}/stats.proto vendor/${LIBS}/stats/pb
+	cp vendor/${MESSAGE}/trident.proto vendor/${LIBS}/trident/pb
 	sed -i '6,10s/^...//' vendor/${LIBS}/zerodoc/pb/metric.proto
 	sed -i '6,10s/^...//' vendor/${LIBS}/datatype/pb/flow_log.proto
 	sed -i '6,10s/^...//' vendor/${LIBS}/stats/pb/stats.proto
+	sed -i '6,10s/^...//' vendor/${LIBS}/trident/pb/trident.proto
 	cd vendor/${MESSAGE} && go generate ./...
 	cd vendor/${LIBS} && go generate ./...
 
 .PHONY: cli
 cli: vendor
+	go generate ./...
 	go build -mod vendor ${FLAGS} -o bin/deepflow-ctl${BINARY_SUFFIX} cmd/ctl/main.go
 
 .PHONY: clean
