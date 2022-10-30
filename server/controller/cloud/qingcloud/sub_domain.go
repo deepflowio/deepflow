@@ -29,7 +29,7 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 
 	log.Info("get sub_domains starting")
 
-	for regionId := range q.RegionIdToLcuuid {
+	for regionId, regionLcuuid := range q.RegionIdToLcuuid {
 		kwargs := []*Param{
 			{"zone", regionId},
 			{"service", "qke"},
@@ -66,6 +66,7 @@ func (q *QingCloud) GetSubDomains() ([]model.SubDomain, error) {
 					"port_name_regex": common.DEFAULT_PORT_NAME_REGEX,
 					"vtap_id":         "",
 					"controller_ip":   "",
+					"region_uuid":     regionLcuuid,
 				}
 				configJson, _ := json.Marshal(config)
 				retSubDomains = append(retSubDomains, model.SubDomain{
