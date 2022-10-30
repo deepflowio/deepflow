@@ -18,42 +18,8 @@ package common
 
 const (
 	SUCCESS = "SUCCESS"
-)
 
-const (
 	DEFAULT_ENCRYPTION_PASSWORD = "******"
-
-	TENCENT_EN    = "tencent"
-	AWS_EN        = "aws"
-	ALIYUN_EN     = "aliyun"
-	KUBERNETES_EN = "kubernetes"
-	HUAWEI_EN     = "huawei"
-	QINGCLOUD_EN  = "qingcloud"
-	AGENT_SYNC_EN = "agent_sync"
-	BAIDU_BCE_EN  = "baidu_bce"
-
-	TENCENT    = 4
-	AWS        = 6
-	ALIYUN     = 9
-	KUBERNETES = 11
-	HUAWEI     = 13
-	QINGCLOUD  = 14
-	AGENT_SYNC = 23
-	BAIDU_BCE  = 25
-)
-
-const (
-	VTAP_STATE_NOT_CONNECTED = iota
-	VTAP_STATE_NORMAL
-	VTAP_STATE_DISABLE
-	VTAP_STATE_PENDING
-)
-
-const (
-	VTAP_STATE_NOT_CONNECTED_STR = "LOST"
-	VTAP_STATE_NORMAL_STR        = "RUNNING"
-	VTAP_STATE_DISABLE_STR       = "DISABLE"
-	VTAP_STATE_PENDING_STR       = "PENDING"
 )
 
 var RESOURCE_TYPES = []string{
@@ -66,27 +32,65 @@ var RESOURCE_TYPES = []string{
 	"PodIngresses", "PodIngressRules", "PodIngressRuleBackends",
 }
 
+//go:generate stringer -type=DomainType -trimprefix=DOMAIN_TYPE_ -linecomment
+type DomainType int
+
 const (
-	VTAP_TYPE_KVM = 1 + iota
-	VTAP_TYPE_ESXI
-	VTAP_TYPE_WORKLOAD_V
-	_ // 4
-	VTAP_TYPE_WORKLOAD_P
-	VTAP_TYPE_DEDICATED
-	VTAP_TYPE_POD_HOST
-	VTAP_TYPE_POD_VM
-	VTAP_TYPE_TUNNEL_DECAPSULATION
-	VTAP_TYPE_HYPER_V
+	// attention: following line comments are used by `stringer`
+	DOMAIN_TYPE_UNKNOWN    DomainType = -1
+	DOMAIN_TYPE_TENCENT    DomainType = 4  // tencent
+	DOMAIN_TYPE_AWS        DomainType = 6  // aws
+	DOMAIN_TYPE_ALIYUN     DomainType = 9  // aliyun
+	DOMAIN_TYPE_KUBERNETES DomainType = 11 // kubernetes
+	DOMAIN_TYPE_HUAWEI     DomainType = 13 // huawei
+	DOMAIN_TYPE_QINGCLOUD  DomainType = 14 // qingcloud
+	DOMAIN_TYPE_AGENT_SYNC DomainType = 23 // agent-sync
+	DOMAIN_TYPE_BAIDU_BCE  DomainType = 25 // baidu_bce
 )
 
-var VTapTypeName = map[int]string{
-	VTAP_TYPE_KVM:                  "KVM",
-	VTAP_TYPE_ESXI:                 "EXSI",
-	VTAP_TYPE_WORKLOAD_V:           "CHOST_VM",
-	VTAP_TYPE_WORKLOAD_P:           "CHOST_BM",
-	VTAP_TYPE_DEDICATED:            "DEDICATED",
-	VTAP_TYPE_POD_HOST:             "K8S_BM",
-	VTAP_TYPE_POD_VM:               "K8S_VM",
-	VTAP_TYPE_TUNNEL_DECAPSULATION: "TUN_DECAP",
-	VTAP_TYPE_HYPER_V:              "HYPER_V",
+var DomainTypes []DomainType = []DomainType{
+	DOMAIN_TYPE_TENCENT,
+	DOMAIN_TYPE_AWS,
+	DOMAIN_TYPE_ALIYUN,
+	DOMAIN_TYPE_KUBERNETES,
+	DOMAIN_TYPE_QINGCLOUD,
+	DOMAIN_TYPE_AGENT_SYNC,
+	DOMAIN_TYPE_BAIDU_BCE,
 }
+
+func GetDomainTypeByName(domainTypeName string) DomainType {
+	for i := 0; i < len(DomainTypes); i++ {
+		if DomainTypes[i].String() == domainTypeName {
+			return DomainTypes[i]
+		}
+	}
+	return DOMAIN_TYPE_UNKNOWN
+}
+
+//go:generate stringer -type=VtapState -trimprefix=VTAP_STATE_ -linecomment
+type VtapState int
+
+const (
+	// attention: following line comments are used by `stringer`
+	VTAP_STATE_NOT_CONNECTED VtapState = iota // LOST
+	VTAP_STATE_NORMAL
+	VTAP_STATE_DISABLE
+	VTAP_STATE_PENDING
+)
+
+//go:generate stringer -type=VtapType -trimprefix=VTAP_TYPE_ -linecomment
+type VtapType int
+
+const (
+	// attention: following line comments are used by `stringer`
+	VTAP_TYPE_KVM VtapType = 1 + iota
+	VTAP_TYPE_ESXI
+	VTAP_TYPE_WORKLOAD_V // CHOST_VM
+	_                    // 4
+	VTAP_TYPE_WORKLOAD_P // CHOST_BM
+	VTAP_TYPE_DEDICATED
+	VTAP_TYPE_POD_HOST             // K8S_BM
+	VTAP_TYPE_POD_VM               // K8S_VM
+	VTAP_TYPE_TUNNEL_DECAPSULATION // TUN_DECAP
+	VTAP_TYPE_HYPER_V
+)

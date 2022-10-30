@@ -254,7 +254,7 @@ func getLcuuidByDomainName(server *common.Server, domainName string,
 		return "", errors.New("domain lcuuid corresponding to the domain name is null")
 	}
 	domainType := response.Get("DATA").GetIndex(0).Get("TYPE").MustInt()
-	if domainType == common.KUBERNETES {
+	if common.DomainType(domainType) == common.DOMAIN_TYPE_KUBERNETES {
 		return "", fmt.Errorf("domain_type=%v is not supported", domainType)
 	}
 	return domainLcuuid, nil
