@@ -225,7 +225,7 @@ func (s *SyncStorage) run() {
 		hasChange = hasChange || s.genesisSyncInfo.Ports.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.Networks.Age(now, ageTime)
 		hasChange = hasChange || s.genesisSyncInfo.IPlastseens.Age(now, ageTime)
-		hasChange = hasChange || s.genesisSyncInfo.Vinterfaces.Age(now, ageTime)
+		hasChange = hasChange || s.genesisSyncInfo.Vinterfaces.Age(now, time.Duration(s.cfg.VinterfaceAgingTime)*time.Second)
 		hasChange = hasChange || s.dirty
 		s.dirty = false
 		s.mutex.Unlock()
