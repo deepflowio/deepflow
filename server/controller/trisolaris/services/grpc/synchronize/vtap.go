@@ -394,6 +394,7 @@ func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncRes
 	remoteSegments := vtapCache.GetVTapRemoteSegments()
 	upgradeRevision := vtapCache.GetExpectedRevision()
 	skipInterface := gVTapInfo.GetSkipInterface(vtapCache)
+	log.Infof("response to ctrl_ip is %s, ctrl_mac is %s", ctrlIP, ctrlMac)
 	return &api.SyncResponse{
 		Status:              &STATUS_SUCCESS,
 		LocalSegments:       localSegments,
