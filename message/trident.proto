@@ -501,6 +501,7 @@ message GenesisPlatformData {
 
     repeated Lldp lldp_info = 20;
 
+    repeated string raw_ip_netns = 30;
     repeated string raw_ip_addrs = 31;
     repeated InterfaceInfo interfaces = 32;
 }
@@ -531,6 +532,9 @@ message InterfaceInfo {
     optional uint32 tap_index = 5;
 
     optional string device_name = 6;
+
+    optional string netns = 7 [default = ""];
+;
 }
 
 message GenesisSyncRequest {

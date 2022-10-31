@@ -508,6 +508,7 @@ impl PlatformSynchronizer {
                 tap_index: Some(interface_info.tap_idx),
                 ip: interface_info.ips.iter().map(ToString::to_string).collect(),
                 device_name: None,
+                netns: None,
             })
             .chain(
                 self_xml_interfaces
@@ -519,6 +520,7 @@ impl PlatformSynchronizer {
                         device_name: Some(entry.domain_name.clone()),
                         ip: vec![],
                         tap_index: None,
+                        netns: None,
                     }),
             )
             .collect();
@@ -534,6 +536,7 @@ impl PlatformSynchronizer {
             raw_brctl_show,
             raw_vlan_config,
             lldp_info: lldp_infos,
+            raw_ip_netns: vec![],
             raw_ip_addrs: vec![platform_args.raw_ip_addr.clone().unwrap_or_default()],
             interfaces,
         };
