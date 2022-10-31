@@ -184,6 +184,8 @@ ingester:
   #  external: false
   #  host: deepflow-clickhouse
   #  port: 9000
+  #  # for get clickchouse endpoints tcp port value
+  #  endpoint-tcp-port-name: tcp-port
   #  # if `external` is 'true', default value is 'default', else 'df_cluster'
   #  cluster-name:
   #  # if `external` is 'true', default value 'default', else 'df_storage'

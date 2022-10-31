@@ -47,6 +47,16 @@ func (p *ServerInstanceInfo) GetServerPodNames() []string {
 	return podNames
 }
 
+func (p *ServerInstanceInfo) GetNodePodNames() map[string][]string {
+	nodePodNames := make(map[string][]string)
+	for _, v := range p.instanceInfos {
+		podName := v.PodName
+		nodeName := v.NodeName
+		nodePodNames[nodeName] = append(nodePodNames[nodeName], podName)
+	}
+	return nodePodNames
+}
+
 type InstanceInfo struct {
 	PodName  string
 	NodeName string
