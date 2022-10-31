@@ -73,3 +73,24 @@ func (t *SuiteTest) TestDeleteRegionSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestRegionCreateAndFind() {
+	lcuuid := uuid.New().String()
+	region := &mysql.Region{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(region)
+	var resultRegion *mysql.Region
+	err := t.db.Where("lcuuid = ? and name='' and label=''", lcuuid).First(&resultRegion).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), region.Base.Lcuuid, resultRegion.Base.Lcuuid)
+
+	resultRegion = new(mysql.Region)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultRegion)
+	assert.Equal(t.T(), region.Base.Lcuuid, resultRegion.Base.Lcuuid)
+
+	resultRegion = new(mysql.Region)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultRegion)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
+}
