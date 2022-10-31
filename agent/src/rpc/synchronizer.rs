@@ -716,12 +716,9 @@ impl Synchronizer {
                 status.acls.len(),
             );
         }
-
-        // TODO: bridge forward
-        // TODO: check trisolaris
-        // TODO: segments
-        // TODO: modify platform
         let blacklist = status.get_blacklist(&resp);
+        drop(status);
+
         let (trident_state, cvar) = &**trident_state;
         if !runtime_config.enabled {
             *trident_state.lock().unwrap() = trident::State::Disabled;
