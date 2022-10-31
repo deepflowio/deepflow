@@ -1326,128 +1326,105 @@ impl ConfigHandler {
             candidate_config.diagnose = new_config.diagnose;
         }
 
-        if candidate_config.environment != new_config.environment {
-            if candidate_config.tap_mode != TapMode::Analyzer
-                && static_config.kubernetes_cluster_id.is_empty()
-            {
-                if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                    // TODO policy.SetMemoryLimit(cfg.MaxMemory)
-                    info!(
-                        "memory limit set to {}",
-                        ByteSize::b(new_config.environment.max_memory).to_string_as(true)
-                    );
-                    candidate_config.environment.max_memory = new_config.environment.max_memory;
-                }
+        if candidate_config.tap_mode != TapMode::Analyzer
+            && static_config.kubernetes_cluster_id.is_empty()
+        {
+            if candidate_config.environment.max_memory != new_config.environment.max_memory {
+                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
+                info!(
+                    "memory limit set to {}",
+                    ByteSize::b(new_config.environment.max_memory).to_string_as(true)
+                );
+                candidate_config.environment.max_memory = new_config.environment.max_memory;
+            }
 
-                if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
-                    info!("cpu limit set to {}", new_config.environment.max_cpus);
-                    candidate_config.environment.max_cpus = new_config.environment.max_cpus;
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    let max_memory_change = candidate_config.environment.max_memory
-                        != new_config.environment.max_memory;
-                    let max_cpu_change =
-                        candidate_config.environment.max_cpus != new_config.environment.max_cpus;
-                    if max_memory_change || max_cpu_change {
-                        if static_config.kubernetes_cluster_id.is_empty() {
-                            // 非容器类型采集器才做资源限制
-                            fn cgroup_callback(
-                                handler: &ConfigHandler,
-                                components: &mut Components,
-                            ) {
-                                if components.cgroups_controller.cgroup.is_none() {
-                                    match Cgroups::new() {
-                                        Ok(cc) => {
-                                            if let Some(_) = &cc.cgroup {
-                                                match cc.init(process::id() as u64) {
-                                                    Ok(cgroup) => {
-                                                        components.cgroups_controller =
-                                                            Arc::new(cgroup);
-                                                    }
-                                                    Err(e) => {
-                                                        warn!("{}", e);
-                                                    }
+            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
+                info!("cpu limit set to {}", new_config.environment.max_cpus);
+                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
+            }
+            #[cfg(target_os = "linux")]
+            {
+                let max_memory_change =
+                    candidate_config.environment.max_memory != new_config.environment.max_memory;
+                let max_cpu_change =
+                    candidate_config.environment.max_cpus != new_config.environment.max_cpus;
+                if max_memory_change || max_cpu_change {
+                    if static_config.kubernetes_cluster_id.is_empty() {
+                        // 非容器类型采集器才做资源限制
+                        fn cgroup_callback(handler: &ConfigHandler, components: &mut Components) {
+                            if components.cgroups_controller.cgroup.is_none() {
+                                match Cgroups::new() {
+                                    Ok(cc) => {
+                                        if let Some(_) = &cc.cgroup {
+                                            match cc.init(process::id() as u64) {
+                                                Ok(cgroup) => {
+                                                    components.cgroups_controller =
+                                                        Arc::new(cgroup);
+                                                }
+                                                Err(e) => {
+                                                    warn!("{}", e);
                                                 }
                                             }
                                         }
-                                        Err(e) => {
-                                            warn!("{:?}", e);
-                                        }
-                                    };
-                                }
-
-                                let mut resources = Resources {
-                                    memory: Default::default(),
-                                    pid: Default::default(),
-                                    cpu: Default::default(),
-                                    devices: Default::default(),
-                                    network: Default::default(),
-                                    hugepages: Default::default(),
-                                    blkio: Default::default(),
-                                };
-                                if handler.candidate_config.environment.max_memory != 0 {
-                                    let memory_resources = MemoryResources {
-                                        kernel_memory_limit: None,
-                                        memory_hard_limit: Some(
-                                            handler.candidate_config.environment.max_memory as i64,
-                                        ),
-                                        memory_soft_limit: None,
-                                        kernel_tcp_memory_limit: None,
-                                        memory_swap_limit: None,
-                                        swappiness: None,
-                                        attrs: Default::default(),
-                                    };
-                                    resources.memory = memory_resources.clone();
-                                }
-                                if handler.candidate_config.environment.max_cpus != 0 {
-                                    let cpu_quota = handler.candidate_config.environment.max_cpus
-                                        * DEFAULT_CPU_CFS_PERIOD_US;
-                                    let cpu_resources = CpuResources {
-                                        cpus: None,
-                                        mems: None,
-                                        shares: None,
-                                        quota: Some(cpu_quota as i64),
-                                        period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
-                                        realtime_runtime: None,
-                                        realtime_period: None,
-                                        attrs: Default::default(),
-                                    };
-                                    resources.cpu = cpu_resources.clone();
-                                }
-                                match components.cgroups_controller.apply(&resources) {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        warn!("set cgroups failed: {}", e);
                                     }
+                                    Err(e) => {
+                                        warn!("{:?}", e);
+                                    }
+                                };
+                            }
+
+                            let mut resources = Resources {
+                                memory: Default::default(),
+                                pid: Default::default(),
+                                cpu: Default::default(),
+                                devices: Default::default(),
+                                network: Default::default(),
+                                hugepages: Default::default(),
+                                blkio: Default::default(),
+                            };
+                            if handler.candidate_config.environment.max_memory != 0 {
+                                let memory_resources = MemoryResources {
+                                    kernel_memory_limit: None,
+                                    memory_hard_limit: Some(
+                                        handler.candidate_config.environment.max_memory as i64,
+                                    ),
+                                    memory_soft_limit: None,
+                                    kernel_tcp_memory_limit: None,
+                                    memory_swap_limit: None,
+                                    swappiness: None,
+                                    attrs: Default::default(),
+                                };
+                                resources.memory = memory_resources.clone();
+                            }
+                            if handler.candidate_config.environment.max_cpus != 0 {
+                                let cpu_quota = handler.candidate_config.environment.max_cpus
+                                    * DEFAULT_CPU_CFS_PERIOD_US;
+                                let cpu_resources = CpuResources {
+                                    cpus: None,
+                                    mems: None,
+                                    shares: None,
+                                    quota: Some(cpu_quota as i64),
+                                    period: Some(DEFAULT_CPU_CFS_PERIOD_US as u64),
+                                    realtime_runtime: None,
+                                    realtime_period: None,
+                                    attrs: Default::default(),
+                                };
+                                resources.cpu = cpu_resources.clone();
+                            }
+                            match components.cgroups_controller.apply(&resources) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    warn!("set cgroups failed: {}", e);
                                 }
                             }
-                            callbacks.push(cgroup_callback);
                         }
+                        callbacks.push(cgroup_callback);
                     }
                 }
             }
-
-            if candidate_config.environment.sys_free_memory_limit
-                != new_config.environment.sys_free_memory_limit
-            {
-                info!(
-                    "sys_free_memory_limit set to {}",
-                    new_config.environment.sys_free_memory_limit
-                );
-                candidate_config.environment.sys_free_memory_limit =
-                    new_config.environment.sys_free_memory_limit;
-            }
-            info!(
-                "environment config change from {:#?} to {:#?}",
-                candidate_config.environment, new_config.environment
-            );
-
-            candidate_config.environment = new_config.environment;
-        }
-
-        if candidate_config.tap_mode == TapMode::Analyzer
-            || !static_config.kubernetes_cluster_id.is_empty()
+        } else if (candidate_config.tap_mode == TapMode::Analyzer
+            || !static_config.kubernetes_cluster_id.is_empty())
+            && candidate_config.environment.max_memory != 0
         {
             info!("memory set ulimit when tap_mode=analyzer or running in a K8s pod");
             candidate_config.environment.max_memory = 0;
@@ -1456,6 +1433,45 @@ impl ConfigHandler {
             let mut system = sysinfo::System::new();
             system.refresh_cpu();
             candidate_config.environment.max_cpus = 1.max(system.cpus().len()) as u32;
+        }
+
+        if candidate_config.environment.sys_free_memory_limit
+            != new_config.environment.sys_free_memory_limit
+        {
+            info!(
+                "sys_free_memory_limit set to {}",
+                new_config.environment.sys_free_memory_limit
+            );
+            candidate_config.environment.sys_free_memory_limit =
+                new_config.environment.sys_free_memory_limit;
+        }
+
+        if candidate_config.environment.process_threshold
+            != new_config.environment.process_threshold
+        {
+            info!(
+                "process_threshold set to {}",
+                new_config.environment.process_threshold
+            );
+            candidate_config.environment.process_threshold =
+                new_config.environment.process_threshold;
+        }
+
+        if candidate_config.environment.thread_threshold != new_config.environment.thread_threshold
+        {
+            info!(
+                "thread_threshold set to {}",
+                new_config.environment.thread_threshold
+            );
+            candidate_config.environment.thread_threshold = new_config.environment.thread_threshold;
+        }
+
+        if candidate_config.environment.log_file_size != new_config.environment.log_file_size {
+            info!(
+                "log_file_size set to {}",
+                new_config.environment.log_file_size
+            );
+            candidate_config.environment.log_file_size = new_config.environment.log_file_size;
         }
 
         if candidate_config.flow != new_config.flow {
