@@ -119,299 +119,6 @@ pub(super) struct BaseDispatcher {
 }
 
 impl BaseDispatcher {
-    #[cfg(target_os = "windows")]
-    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
-        self.engine = if self.options.tap_mode == TapMode::Local {
-            if pcap_interfaces.is_empty() {
-                return Err(Error::WinPcap(
-                    "windows pcap capture must give interface to capture packet".into(),
-                ));
-            }
-            let src_ifaces = pcap_interfaces
-                .iter()
-                .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
-                .collect();
-            let win_packet = WinPacket::new(
-                src_ifaces,
-                self.options.win_packet_blocks,
-                self.options.snap_len,
-            )
-            .map_err(|e| Error::WinPcap(e.to_string()))?;
-            info!("WinPacket init");
-            self.need_update_bpf.store(true, Ordering::Relaxed);
-            RecvEngine::WinPcap(Some(win_packet))
-        } else {
-            todo!()
-        };
-
-        Ok(())
-    }
-}
-
-impl BaseDispatcher {
-    #[cfg(all(target_os = "linux", not(target_arch = "s390x")))]
-    fn is_engine_dpdk(&self) -> bool {
-        match &self.engine {
-            RecvEngine::Dpdk(..) => true,
-            _ => false,
-        }
-    }
-
-    #[cfg(any(not(target_os = "linux"), target_arch = "s390x"))]
-    fn is_engine_dpdk(&self) -> bool {
-        false
-    }
-
-    #[cfg(target_os = "linux")]
-    pub(super) fn recv<'a>(
-        engine: &'a mut RecvEngine,
-        leaky_bucket: &LeakyBucket,
-        exception_handler: &ExceptionHandler,
-        prev_timestamp: &mut Duration,
-        counter: &PacketCounter,
-        ntp_diff: &AtomicI64,
-    ) -> Option<(Packet<'a>, Duration)> {
-        let packet = engine.recv();
-        if packet.is_err() {
-            if let recv_engine::Error::Timeout = packet.unwrap_err() {
-                return None;
-            }
-            counter.err.fetch_add(1, Ordering::Relaxed);
-            // Sleep to avoid wasting cpu during consequential errors
-            thread::sleep(Duration::from_millis(1));
-            return None;
-        }
-        let packet = packet.unwrap();
-        // Receiving incomplete eth header under some environments, unlikely to happen
-        if packet.data.len() < ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
-            counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-            return None;
-        }
-        let mut timestamp = packet.timestamp;
-        let time_diff = ntp_diff.load(Ordering::Relaxed);
-        if time_diff >= 0 {
-            timestamp += Duration::from_nanos(time_diff as u64);
-        } else {
-            timestamp -= Duration::from_nanos(-time_diff as u64);
-        }
-        if timestamp > *prev_timestamp {
-            if timestamp - *prev_timestamp > Duration::from_secs(60) {
-                // Correct invalid timestamp under some environments. Root cause unclear.
-                // A large timestamp will lead to discarding of following packets, correct
-                // this by setting it to present time
-                let now = get_timestamp(time_diff);
-                if timestamp > now && timestamp - now > Duration::from_secs(60) {
-                    timestamp = now;
-                }
-            }
-            *prev_timestamp = timestamp;
-        }
-        while !leaky_bucket.acquire(1) {
-            counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
-            exception_handler.set(Exception::RxPpsThresholdExceeded);
-            thread::sleep(Duration::from_millis(1));
-        }
-
-        counter.rx_all.fetch_add(1, Ordering::Relaxed);
-        counter
-            .rx_all_bytes
-            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
-
-        Some((packet, timestamp))
-    }
-
-    #[cfg(target_os = "windows")]
-    pub(super) fn recv(
-        engine: &mut RecvEngine,
-        leaky_bucket: &LeakyBucket,
-        exception_handler: &ExceptionHandler,
-        prev_timestamp: &mut Duration,
-        counter: &PacketCounter,
-        ntp_diff: &AtomicI64,
-    ) -> Option<(Packet, Duration)> {
-        let packet = engine.recv();
-        if packet.is_err() {
-            if let recv_engine::Error::Timeout = packet.unwrap_err() {
-                return None;
-            }
-            counter.err.fetch_add(1, Ordering::Relaxed);
-            // Sleep to avoid wasting cpu during consequential errors
-            thread::sleep(Duration::from_millis(1));
-            return None;
-        }
-        let packet = packet.unwrap();
-        // Receiving incomplete eth header under some environments, unlikely to happen
-        if packet.data.len() < ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
-            counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-            return None;
-        }
-        let mut timestamp = packet.timestamp;
-        let time_diff = ntp_diff.load(Ordering::Relaxed);
-        if time_diff >= 0 {
-            timestamp += Duration::from_nanos(time_diff as u64);
-        } else {
-            timestamp -= Duration::from_nanos(-time_diff as u64);
-        }
-        if timestamp > *prev_timestamp {
-            if timestamp - *prev_timestamp > Duration::from_secs(60) {
-                // Correct invalid timestamp under some environments. Root cause unclear.
-                // A large timestamp will lead to discarding of following packets, correct
-                // this by setting it to present time
-                let now = get_timestamp(time_diff);
-                if timestamp > now && timestamp - now > Duration::from_secs(60) {
-                    timestamp = now;
-                }
-            }
-            *prev_timestamp = timestamp;
-        }
-        while !leaky_bucket.acquire(1) {
-            counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
-            exception_handler.set(Exception::RxPpsThresholdExceeded);
-            thread::sleep(Duration::from_millis(1));
-        }
-
-        counter.rx_all.fetch_add(1, Ordering::Relaxed);
-        counter
-            .rx_all_bytes
-            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
-
-        Some((packet, timestamp))
-    }
-
-    #[cfg(target_os = "linux")]
-    pub(super) fn decapsulate(
-        packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
-        tunnel_info: &mut TunnelInfo,
-        bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
-        let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
-        let offset = match eth_type {
-            // 最外层隧道封装，可能是ERSPAN或VXLAN
-            EthernetType::Ipv4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
-            EthernetType::Ipv6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
-            _ => 0,
-        };
-        if offset == 0 {
-            Ok((0, tap_type))
-        } else {
-            Ok((l2_len + offset, tap_type))
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    pub(super) fn decapsulate(
-        packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
-        tunnel_info: &mut TunnelInfo,
-        bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
-        let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
-        let offset = match eth_type {
-            // 最外层隧道封装，可能是ERSPAN或VXLAN
-            EthernetType::Ipv4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
-            EthernetType::Ipv6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
-            _ => 0,
-        };
-        if offset == 0 {
-            Ok((0, tap_type))
-        } else {
-            Ok((l2_len + offset, tap_type))
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    pub(super) fn decap_tunnel_with_erspan(
-        packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
-        tunnel_info: &mut TunnelInfo,
-        bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
-        let mut decap_len = 0;
-        let mut tap_type = TapType::Any;
-        // 仅解析两层隧道
-        for i in 0..2 {
-            let (offset, t) = Self::decapsulate(
-                &mut packet[decap_len..],
-                tap_type_handler,
-                tunnel_info,
-                bitmap,
-            )?;
-            if i == 0 {
-                tap_type = t;
-            }
-            if tunnel_info.tunnel_type == TunnelType::None {
-                break;
-            }
-            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
-                // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
-                // vxlan-erspan：隧道信息为空
-                // erspan-vxlan；隧道信息为vxlan，隧道层数为1
-                // erspan-vxlan-erspan；隧道信息为空
-                *tunnel_info = Default::default();
-            }
-            decap_len += offset;
-        }
-        Ok((decap_len, tap_type))
-    }
-
-    #[cfg(target_os = "windows")]
-    pub(super) fn decap_tunnel_with_erspan(
-        packet: &mut Vec<u8>,
-        tap_type_handler: &TapTypeHandler,
-        tunnel_info: &mut TunnelInfo,
-        bitmap: &TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
-        let mut decap_len = 0;
-        let mut tap_type = TapType::Any;
-        // 仅解析两层隧道
-        for i in 0..2 {
-            let (offset, t) = Self::decapsulate(
-                &mut packet[decap_len..],
-                tap_type_handler,
-                tunnel_info,
-                bitmap,
-            )?;
-            if i == 0 {
-                tap_type = t;
-            }
-            if tunnel_info.tunnel_type == TunnelType::None {
-                break;
-            }
-            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
-                // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
-                // vxlan-erspan：隧道信息为空
-                // erspan-vxlan；隧道信息为vxlan，隧道层数为1
-                // erspan-vxlan-erspan；隧道信息为空
-                *tunnel_info = Default::default();
-            }
-            decap_len += offset;
-        }
-        Ok((decap_len, tap_type))
-    }
-
-    #[cfg(target_os = "linux")]
-    pub(super) fn decap_tunnel(
-        packet: &mut [u8],
-        tap_type_handler: &TapTypeHandler,
-        tunnel_info: &mut TunnelInfo,
-        bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
-        *tunnel_info = Default::default();
-        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
-    }
-
-    #[cfg(target_os = "windows")]
-    pub(super) fn decap_tunnel(
-        packet: &mut Vec<u8>,
-        tap_type_handler: &TapTypeHandler,
-        tunnel_info: &mut TunnelInfo,
-        bitmap: TunnelTypeBitmap,
-    ) -> Result<(usize, TapType)> {
-        *tunnel_info = Default::default();
-        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
-    }
-
     pub(super) fn prepare_flow(
         meta_packet: &mut MetaPacket,
         tap_type: TapType,
@@ -480,8 +187,183 @@ impl BaseDispatcher {
     }
 }
 
+#[cfg(target_os = "windows")]
+impl BaseDispatcher {
+    pub(super) fn init(&mut self) {
+        if let Err(e) = self.engine.init() {
+            error!(
+                "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
+                e
+            );
+            thread::sleep(Duration::from_secs(1));
+            process::exit(1);
+        }
+    }
+
+    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
+        self.engine = if self.options.tap_mode == TapMode::Local {
+            if pcap_interfaces.is_empty() {
+                return Err(Error::WinPcap(
+                    "windows pcap capture must give interface to capture packet".into(),
+                ));
+            }
+            let src_ifaces = pcap_interfaces
+                .iter()
+                .map(|src_iface| (src_iface.device_name.as_str(), src_iface.if_index as isize))
+                .collect();
+            let win_packet = WinPacket::new(
+                src_ifaces,
+                self.options.win_packet_blocks,
+                self.options.snap_len,
+            )
+            .map_err(|e| Error::WinPcap(e.to_string()))?;
+            info!("WinPacket init");
+            self.need_update_bpf.store(true, Ordering::Relaxed);
+            RecvEngine::WinPcap(Some(win_packet))
+        } else {
+            todo!()
+        };
+
+        Ok(())
+    }
+
+    pub(super) fn recv(
+        engine: &mut RecvEngine,
+        leaky_bucket: &LeakyBucket,
+        exception_handler: &ExceptionHandler,
+        prev_timestamp: &mut Duration,
+        counter: &PacketCounter,
+        ntp_diff: &AtomicI64,
+    ) -> Option<(Packet, Duration)> {
+        let packet = engine.recv();
+        if packet.is_err() {
+            if let recv_engine::Error::Timeout = packet.unwrap_err() {
+                return None;
+            }
+            counter.err.fetch_add(1, Ordering::Relaxed);
+            // Sleep to avoid wasting cpu during consequential errors
+            thread::sleep(Duration::from_millis(1));
+            return None;
+        }
+        let packet = packet.unwrap();
+        // Receiving incomplete eth header under some environments, unlikely to happen
+        if packet.data.len() < ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
+            counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+        let mut timestamp = packet.timestamp;
+        let time_diff = ntp_diff.load(Ordering::Relaxed);
+        if time_diff >= 0 {
+            timestamp += Duration::from_nanos(time_diff as u64);
+        } else {
+            timestamp -= Duration::from_nanos(-time_diff as u64);
+        }
+        if timestamp > *prev_timestamp {
+            if timestamp - *prev_timestamp > Duration::from_secs(60) {
+                // Correct invalid timestamp under some environments. Root cause unclear.
+                // A large timestamp will lead to discarding of following packets, correct
+                // this by setting it to present time
+                let now = get_timestamp(time_diff);
+                if timestamp > now && timestamp - now > Duration::from_secs(60) {
+                    timestamp = now;
+                }
+            }
+            *prev_timestamp = timestamp;
+        }
+        while !leaky_bucket.acquire(1) {
+            counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
+            exception_handler.set(Exception::RxPpsThresholdExceeded);
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        counter.rx_all.fetch_add(1, Ordering::Relaxed);
+        counter
+            .rx_all_bytes
+            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
+
+        Some((packet, timestamp))
+    }
+
+    pub(super) fn decapsulate(
+        packet: &mut [u8],
+        tap_type_handler: &TapTypeHandler,
+        tunnel_info: &mut TunnelInfo,
+        bitmap: &TunnelTypeBitmap,
+    ) -> Result<(usize, TapType)> {
+        let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
+        let offset = match eth_type {
+            // 最外层隧道封装，可能是ERSPAN或VXLAN
+            EthernetType::Ipv4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
+            EthernetType::Ipv6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
+            _ => 0,
+        };
+        if offset == 0 {
+            Ok((0, tap_type))
+        } else {
+            Ok((l2_len + offset, tap_type))
+        }
+    }
+
+    pub(super) fn decap_tunnel_with_erspan(
+        packet: &mut Vec<u8>,
+        tap_type_handler: &TapTypeHandler,
+        tunnel_info: &mut TunnelInfo,
+        bitmap: &TunnelTypeBitmap,
+    ) -> Result<(usize, TapType)> {
+        let mut decap_len = 0;
+        let mut tap_type = TapType::Any;
+        // 仅解析两层隧道
+        for i in 0..2 {
+            let (offset, t) = Self::decapsulate(
+                &mut packet[decap_len..],
+                tap_type_handler,
+                tunnel_info,
+                bitmap,
+            )?;
+            if i == 0 {
+                tap_type = t;
+            }
+            if tunnel_info.tunnel_type == TunnelType::None {
+                break;
+            }
+            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
+                // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
+                // vxlan-erspan：隧道信息为空
+                // erspan-vxlan；隧道信息为vxlan，隧道层数为1
+                // erspan-vxlan-erspan；隧道信息为空
+                *tunnel_info = Default::default();
+            }
+            decap_len += offset;
+        }
+        Ok((decap_len, tap_type))
+    }
+
+    pub(super) fn decap_tunnel(
+        packet: &mut Vec<u8>,
+        tap_type_handler: &TapTypeHandler,
+        tunnel_info: &mut TunnelInfo,
+        bitmap: TunnelTypeBitmap,
+    ) -> Result<(usize, TapType)> {
+        *tunnel_info = Default::default();
+        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
+    }
+}
+
 #[cfg(target_os = "linux")]
 impl BaseDispatcher {
+    #[cfg(not(target_arch = "s390x"))]
+    fn is_engine_dpdk(&self) -> bool {
+        match &self.engine {
+            RecvEngine::Dpdk(..) => true,
+            _ => false,
+        }
+    }
+
+    #[cfg(target_arch = "s390x")]
+    fn is_engine_dpdk(&self) -> bool {
+        false
+    }
+
     pub(super) fn init(&mut self) {
         match self.engine.init() {
             Ok(_) => {
@@ -501,19 +383,126 @@ impl BaseDispatcher {
             }
         }
     }
-}
 
-#[cfg(target_os = "windows")]
-impl BaseDispatcher {
-    pub(super) fn init(&mut self) {
-        if let Err(e) = self.engine.init() {
-            error!(
-                "dispatcher recv_engine init error: {:?}, deepflow-agent restart...",
-                e
-            );
-            thread::sleep(Duration::from_secs(1));
-            process::exit(1);
+    pub(super) fn recv<'a>(
+        engine: &'a mut RecvEngine,
+        leaky_bucket: &LeakyBucket,
+        exception_handler: &ExceptionHandler,
+        prev_timestamp: &mut Duration,
+        counter: &PacketCounter,
+        ntp_diff: &AtomicI64,
+    ) -> Option<(Packet<'a>, Duration)> {
+        let packet = engine.recv();
+        if packet.is_err() {
+            if let recv_engine::Error::Timeout = packet.unwrap_err() {
+                return None;
+            }
+            counter.err.fetch_add(1, Ordering::Relaxed);
+            // Sleep to avoid wasting cpu during consequential errors
+            thread::sleep(Duration::from_millis(1));
+            return None;
         }
+        let packet = packet.unwrap();
+        // Receiving incomplete eth header under some environments, unlikely to happen
+        if packet.data.len() < ETH_HEADER_SIZE + VLAN_HEADER_SIZE {
+            counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+        let mut timestamp = packet.timestamp;
+        let time_diff = ntp_diff.load(Ordering::Relaxed);
+        if time_diff >= 0 {
+            timestamp += Duration::from_nanos(time_diff as u64);
+        } else {
+            timestamp -= Duration::from_nanos(-time_diff as u64);
+        }
+        if timestamp > *prev_timestamp {
+            if timestamp - *prev_timestamp > Duration::from_secs(60) {
+                // Correct invalid timestamp under some environments. Root cause unclear.
+                // A large timestamp will lead to discarding of following packets, correct
+                // this by setting it to present time
+                let now = get_timestamp(time_diff);
+                if timestamp > now && timestamp - now > Duration::from_secs(60) {
+                    timestamp = now;
+                }
+            }
+            *prev_timestamp = timestamp;
+        }
+        while !leaky_bucket.acquire(1) {
+            counter.get_token_failed.fetch_add(1, Ordering::Relaxed);
+            exception_handler.set(Exception::RxPpsThresholdExceeded);
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        counter.rx_all.fetch_add(1, Ordering::Relaxed);
+        counter
+            .rx_all_bytes
+            .fetch_add(packet.data.len() as u64, Ordering::Relaxed);
+
+        Some((packet, timestamp))
+    }
+
+    pub(super) fn decapsulate(
+        packet: &mut [u8],
+        tap_type_handler: &TapTypeHandler,
+        tunnel_info: &mut TunnelInfo,
+        bitmap: &TunnelTypeBitmap,
+    ) -> Result<(usize, TapType)> {
+        let (tap_type, eth_type, l2_len) = tap_type_handler.get_l2_info(packet)?;
+        let offset = match eth_type {
+            // 最外层隧道封装，可能是ERSPAN或VXLAN
+            EthernetType::Ipv4 => tunnel_info.decapsulate(packet, l2_len, bitmap),
+            EthernetType::Ipv6 => tunnel_info.decapsulate_v6(packet, l2_len, bitmap),
+            _ => 0,
+        };
+        if offset == 0 {
+            Ok((0, tap_type))
+        } else {
+            Ok((l2_len + offset, tap_type))
+        }
+    }
+
+    pub(super) fn decap_tunnel_with_erspan(
+        packet: &mut [u8],
+        tap_type_handler: &TapTypeHandler,
+        tunnel_info: &mut TunnelInfo,
+        bitmap: &TunnelTypeBitmap,
+    ) -> Result<(usize, TapType)> {
+        let mut decap_len = 0;
+        let mut tap_type = TapType::Any;
+        // 仅解析两层隧道
+        for i in 0..2 {
+            let (offset, t) = Self::decapsulate(
+                &mut packet[decap_len..],
+                tap_type_handler,
+                tunnel_info,
+                bitmap,
+            )?;
+            if i == 0 {
+                tap_type = t;
+            }
+            if tunnel_info.tunnel_type == TunnelType::None {
+                break;
+            }
+            if tunnel_info.tunnel_type == TunnelType::ErspanOrTeb {
+                // 包括ERSPAN或TEB隧道前的所有隧道信息不保留，例如：
+                // vxlan-erspan：隧道信息为空
+                // erspan-vxlan；隧道信息为vxlan，隧道层数为1
+                // erspan-vxlan-erspan；隧道信息为空
+                *tunnel_info = Default::default();
+            }
+            decap_len += offset;
+        }
+        Ok((decap_len, tap_type))
+    }
+
+    pub(super) fn decap_tunnel(
+        packet: &mut [u8],
+        tap_type_handler: &TapTypeHandler,
+        tunnel_info: &mut TunnelInfo,
+        bitmap: TunnelTypeBitmap,
+    ) -> Result<(usize, TapType)> {
+        *tunnel_info = Default::default();
+        Self::decap_tunnel_with_erspan(packet, tap_type_handler, tunnel_info, &bitmap)
     }
 }
 
@@ -628,15 +617,6 @@ pub(super) struct BaseDispatcherListener {
 }
 
 impl BaseDispatcherListener {
-    #[cfg(target_os = "linux")]
-    fn on_afpacket_change(&mut self, config: &DispatcherConfig) {
-        if self.options.af_packet_version != config.capture_socket_type.into() {
-            // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
-            info!("Afpacket version update, deepflow-agent restart...");
-            process::exit(1);
-        }
-    }
-
     fn on_decap_type_change(&mut self, config: &DispatcherConfig) {
         let mut old_map = self.tunnel_type_bitmap.lock().unwrap();
         if *old_map != config.tunnel_type_bitmap {
@@ -770,5 +750,16 @@ impl BaseDispatcherListener {
         }
         *tap_interfaces = interfaces;
         self.need_update_bpf.store(true, Ordering::Release);
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl BaseDispatcherListener {
+    fn on_afpacket_change(&mut self, config: &DispatcherConfig) {
+        if self.options.af_packet_version != config.capture_socket_type.into() {
+            // TODO：目前通过进程退出的方式修改AfPacket版本，后面需要支持动态修改
+            info!("Afpacket version update, deepflow-agent restart...");
+            process::exit(1);
+        }
     }
 }
