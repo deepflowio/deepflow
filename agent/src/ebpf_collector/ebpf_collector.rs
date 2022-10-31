@@ -236,7 +236,11 @@ impl SessionAggr {
         // 若乱序，已存在响应，则可以匹配为会话，则聚合响应发送
         // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
         if item.is_response() {
-            log.session_merge(item);
+            // if can not merge, send req and resp directly.
+            // generally use for ebpf disorder.
+            if let Err(LogError::L7LogCanNotMerge(item)) = log.session_merge(item) {
+                self.send(item);
+            }
             self.cache_count -= 1;
             self.send(log);
         } else {
@@ -268,7 +272,7 @@ impl SessionAggr {
             return;
         }
         let mut item = value.unwrap();
-        item.session_merge(log);
+        let _ = item.session_merge(log);
 
         if item.special_info.is_session_end() {
             self.cache_count -= 1;
@@ -297,7 +301,11 @@ impl SessionAggr {
             self.insert(slot_index, key, log);
             self.send(item);
         } else {
-            item.session_merge(log);
+            // if can not merge, send req and resp directly.
+            // generally use for ebpf disorder.
+            if let Err(LogError::L7LogCanNotMerge(log)) = item.session_merge(log) {
+                self.send(log);
+            }
             self.cache_count -= 1;
             self.send(item);
         }
@@ -322,7 +330,7 @@ impl SessionAggr {
             return;
         }
         let mut item = value.unwrap();
-        item.session_merge(log);
+        let _ = item.session_merge(log);
 
         if item.special_info.is_session_end() {
             self.cache_count -= 1;
