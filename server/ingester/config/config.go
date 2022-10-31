@@ -36,21 +36,23 @@ import (
 var log = logging.MustGetLogger("config")
 
 const (
-	DefaultContrallerIP    = "127.0.0.1"
-	DefaultControllerPort  = 20035
-	DefaultCheckInterval   = 600 // clickhouse是异步删除
-	DefaultDiskUsedPercent = 90
-	DefaultDiskFreeSpace   = 50
-	DefaultDFDiskPrefix    = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
-	DefaultInfluxdbHost    = "influxdb"
-	DefaultInfluxdbPort    = "20044"
-	EnvK8sNodeIP           = "K8S_NODE_IP_FOR_DEEPFLOW"
-	EnvK8sPodName          = "K8S_POD_NAME_FOR_DEEPFLOW"
-	EnvK8sNamespace        = "K8S_NAMESPACE_FOR_DEEPFLOW"
-	DefaultCKDBService     = "deepflow-clickhouse"
-	DefaultCKDBServicePort = 9000
-	DefaultListenPort      = 20033
-	DefaultGrpcBufferSize  = 41943040
+	DefaultContrallerIP            = "127.0.0.1"
+	DefaultControllerPort          = 20035
+	DefaultCheckInterval           = 600 // clickhouse是异步删除
+	DefaultDiskUsedPercent         = 90
+	DefaultDiskFreeSpace           = 50
+	DefaultDFDiskPrefix            = "path_" // In the config.xml of ClickHouse, the disk name of the storage policy 'df_storage' written by deepflow-server starts with 'path_'
+	DefaultInfluxdbHost            = "influxdb"
+	DefaultInfluxdbPort            = "20044"
+	EnvK8sNodeIP                   = "K8S_NODE_IP_FOR_DEEPFLOW"
+	EnvK8sPodName                  = "K8S_POD_NAME_FOR_DEEPFLOW"
+	EnvK8sNodeName                 = "K8S_NODE_NAME_FOR_DEEPFLOW"
+	EnvK8sNamespace                = "K8S_NAMESPACE_FOR_DEEPFLOW"
+	DefaultCKDBService             = "deepflow-clickhouse"
+	DefaultCKDBServicePort         = 9000
+	DefaultListenPort              = 20033
+	DefaultGrpcBufferSize          = 41943040
+	DefaultCKDBEndpointTCPPortName = "tcp-port"
 )
 
 type CKDiskMonitor struct {
@@ -95,13 +97,14 @@ type CKWriterConfig struct {
 }
 
 type CKDB struct {
-	External      bool   `yaml:"external"`
-	Host          string `yaml:"host"`
-	ActualAddr    string
-	Watcher       *Watcher
-	Port          int    `yaml:"port"`
-	ClusterName   string `yaml:"cluster-name"`
-	StoragePolicy string `yaml:"storage-policy"`
+	External            bool   `yaml:"external"`
+	Host                string `yaml:"host"`
+	ActualAddr          string
+	Watcher             *Watcher
+	Port                int    `yaml:"port"`
+	EndpointTCPPortName string `yaml:"endpoint-tcp-port-name"`
+	ClusterName         string `yaml:"cluster-name"`
+	StoragePolicy       string `yaml:"storage-policy"`
 }
 
 type Config struct {
@@ -158,6 +161,11 @@ func (c *Config) Validate() error {
 		c.NodeIP = nodeIP
 	}
 
+	myNodeName, exist := os.LookupEnv(EnvK8sNodeName)
+	if !exist {
+		log.Errorf("Can't get node name env %s", EnvK8sNodeName)
+		sleepAndExit()
+	}
 	myPodName, exist := os.LookupEnv(EnvK8sPodName)
 	if !exist {
 		log.Errorf("Can't get pod name env %s", EnvK8sPodName)
@@ -174,6 +182,9 @@ func (c *Config) Validate() error {
 	}
 	if c.CKDB.Port == 0 {
 		c.CKDB.Port = DefaultCKDBServicePort
+	}
+	if c.CKDB.EndpointTCPPortName == "" {
+		c.CKDB.EndpointTCPPortName = DefaultCKDBEndpointTCPPortName
 	}
 	if c.CKDB.ClusterName == "" {
 		if c.CKDB.External {
@@ -199,7 +210,7 @@ func (c *Config) Validate() error {
 			time.Sleep(time.Second * 30)
 		}
 		if watcher == nil {
-			watcher, err = NewWatcher(myPodName, myNamespace, c.CKDB.Host, c.ControllerIPs, int(c.ControllerPort), c.GrpcBufferSize)
+			watcher, err = NewWatcher(myNodeName, myPodName, myNamespace, c.CKDB.Host, c.CKDB.EndpointTCPPortName, c.CKDB.External, c.ControllerIPs, int(c.ControllerPort), c.GrpcBufferSize)
 			if err != nil {
 				log.Warningf("get kubernetes watcher failed %s", err)
 				continue
