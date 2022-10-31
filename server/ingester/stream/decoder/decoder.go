@@ -17,6 +17,9 @@
 package decoder
 
 import (
+	"bytes"
+	"compress/zlib"
+	"io/ioutil"
 	"strconv"
 
 	"github.com/golang/protobuf/proto"
@@ -129,14 +132,20 @@ func (d *Decoder) Run() {
 				continue
 			}
 			decoder.Init(recvBytes.Buffer[recvBytes.Begin:recvBytes.End])
-			if d.msgType == datatype.MESSAGE_TYPE_PROTOCOLLOG {
+			switch d.msgType {
+			case datatype.MESSAGE_TYPE_PROTOCOLLOG:
 				d.handleProtoLog(decoder)
-			} else if d.msgType == datatype.MESSAGE_TYPE_TAGGEDFLOW {
+			case datatype.MESSAGE_TYPE_TAGGEDFLOW:
 				d.handleTaggedFlow(decoder, pbTaggedFlow)
-			} else if d.msgType == datatype.MESSAGE_TYPE_OPENTELEMETRY {
-				d.handleOpenTelemetry(recvBytes.VtapID, decoder, pbTracesData)
-			} else if d.msgType == datatype.MESSAGE_TYPE_PACKETSEQUENCE {
+			case datatype.MESSAGE_TYPE_OPENTELEMETRY:
+				d.handleOpenTelemetry(recvBytes.VtapID, decoder, pbTracesData, false)
+			case datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED:
+				d.handleOpenTelemetry(recvBytes.VtapID, decoder, pbTracesData, true)
+			case datatype.MESSAGE_TYPE_PACKETSEQUENCE:
 				d.handleL4Packet(recvBytes.VtapID, decoder)
+			default:
+				log.Warningf("unknown msg type: %d", d.msgType)
+
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
@@ -176,13 +185,28 @@ func (d *Decoder) handleProtoLog(decoder *codec.SimpleDecoder) {
 	}
 }
 
-func (d *Decoder) handleOpenTelemetry(vtapID uint16, decoder *codec.SimpleDecoder, pbTracesData *v1.TracesData) {
+func decompressOpenTelemetry(compressed []byte) ([]byte, error) {
+	reader, err := zlib.NewReader(bytes.NewReader(compressed))
+	defer reader.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadAll(reader)
+}
+
+func (d *Decoder) handleOpenTelemetry(vtapID uint16, decoder *codec.SimpleDecoder, pbTracesData *v1.TracesData, compressed bool) {
 	var err error
 	for !decoder.IsEnd() {
 		pbTracesData.Reset()
 		bytes := decoder.ReadBytes()
 		if len(bytes) > 0 {
-			err = proto.Unmarshal(bytes, pbTracesData)
+			if compressed {
+				bytes, err = decompressOpenTelemetry(bytes)
+			}
+			if err == nil {
+				err = proto.Unmarshal(bytes, pbTracesData)
+			}
 		}
 		if decoder.Failed() || err != nil {
 			if d.counter.ErrorCount == 0 {
