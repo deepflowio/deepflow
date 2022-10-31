@@ -1,0 +1,74 @@
+regions:
+  - name: region1
+
+azs:
+  - name: az-1
+    region: region1
+  - name: az-2
+    region: region1
+
+hosts:
+- ip: 10.30.1.100
+  memory_mb: 65536
+  vcpus: 10
+  az: az-1
+  region: region1
+
+tenants:
+- name: tenant1
+  region: region1
+- name: tenant2
+  region: region1
+
+networks:
+- name: network1
+  external: false
+  net_type: wan
+  shared: true
+  tenant_name: tenant1
+  segmentation_id: 0
+  region: region1
+  az: az-1
+- name: network2
+  external: false
+  net_type: lan
+  shared: false
+  tenant_name: tenant2
+  segmentation_id: 0
+  region: region1
+  az: az-1
+
+subnets:
+- name: subnet1
+  network_name: network1
+  cidr: 10.30.0.0/16
+  gateway_ip: 10.30.0.1
+- name: subnet2
+  network_name: network2
+  cidr: 192.168.1.0/24
+  gateway_ip: 192.168.1.1
+
+routers:
+- name: router1
+  tenant_name: tenant2
+  gw_launch_server: '10.30.1.100'
+  region: region1
+  az: az-1
+  ports:
+  - ip_address: '192.168.1.101'
+    subnet_name: subnet2
+    mac_address: '00:50:56:98:59:6f'
+  - ip_address: '10.30.1.103'
+    subnet_name: subnet1
+    mac_address: '00:50:56:98:59:7f'
+
+vms:
+- name: vm1
+  tenant_name: tenant2
+  launch_server: '10.30.1.100'
+  az: az-1
+  region: region1
+  ports:
+  - ip_address: '192.168.1.102'
+    subnet_name: subnet2
+    mac_address: '00:50:56:98:59:6e'

@@ -195,7 +195,7 @@ const (
 	VSPHERE           = 2
 	NSP               = 3
 	TENCENT           = 4
-	OTHERS            = 5
+	FILEREADER        = 5
 	AWS               = 6
 	PINGAN            = 7
 	ZSTACK            = 8
@@ -220,7 +220,7 @@ const (
 	VSPHERE_EN           = "vsphere"
 	NSP_EN               = "nsp"
 	TENCENT_EN           = "tencent"
-	OTHERS_EN            = "others"
+	FILEREADER_EN        = "filereader"
 	AWS_EN               = "aws"
 	PINGAN_EN            = "pingan"
 	ZSTACK_EN            = "zstack"
