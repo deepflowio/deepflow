@@ -28,7 +28,7 @@ use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
-use super::{SendItem, SendMessageType, MAX_FILE_SIZE, PRE_FILE_SUFFIX};
+use super::{SendItem, SendMessageType, PRE_FILE_SUFFIX};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::{Exception, SocketType};
@@ -256,7 +256,7 @@ pub struct UniformSender {
     buf_writer: Option<BufWriter<File>>,
     file_path: String,
     pre_file_path: String,
-    written_size: usize,
+    written_size: u64,
 }
 
 impl UniformSender {
@@ -490,10 +490,10 @@ impl UniformSender {
             .as_mut()
             .unwrap()
             .write_all(kv_string.as_bytes())?;
-        self.written_size += kv_string.len();
+        self.written_size += kv_string.len() as u64;
         kv_string.truncate(0);
 
-        if self.written_size > MAX_FILE_SIZE {
+        if self.written_size > (self.config.load().standalone_data_file_size as u64) << 20 {
             self.buf_writer.as_mut().unwrap().flush()?;
             self.buf_writer.take();
             rename(&self.file_path, &self.pre_file_path)?;

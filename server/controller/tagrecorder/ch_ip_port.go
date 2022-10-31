@@ -347,13 +347,24 @@ func (i *ChIPPort) generatePortPodServiceData(keyToItem map[PortIPKey]mysql.ChIP
 }
 
 func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bool {
+	var vInterfaceIPs []mysql.LANIP
 	var lbVInterfaces []mysql.VInterface
 	var ipResources []mysql.WANIP
 	var lbs []mysql.LB
 	var lbListeners []mysql.LBListener
 	var networks []mysql.Network
 	var lbTargetServers []mysql.LBTargetServer
-	err := mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_LB).Find(&lbVInterfaces).Error
+	err := mysql.Db.Find(&vInterfaceIPs).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
+		return false
+	}
+	err = mysql.Db.Find(&ipResources).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
+		return false
+	}
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_LB).Find(&lbVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
@@ -379,10 +390,21 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 		return false
 	}
 
+	vInterfaceIPToSubnetIDs := make(map[string][]int)
 	lbIDToName := make(map[int]string)
 	lbListenerIDToName := make(map[int]string)
 	vifIDToIPSubnetIDs := make(map[int][]IPSubnet)
 	lbIDToVifIDs := make(map[int][]int)
+	ipResourceIPToSubnetIDs := make(map[string][]int)
+	for _, vInterfaceIP := range vInterfaceIPs {
+		vInterfaceIPToSubnetIDs[vInterfaceIP.IP] = append(vInterfaceIPToSubnetIDs[vInterfaceIP.IP], vInterfaceIP.NetworkID)
+		for _, ipResource := range ipResources {
+			if vInterfaceIP.ID != ipResource.VInterfaceID {
+				continue
+			}
+			ipResourceIPToSubnetIDs[ipResource.IP] = append(ipResourceIPToSubnetIDs[ipResource.IP], vInterfaceIP.NetworkID)
+		}
+	}
 	for _, lbVInterface := range lbVInterfaces {
 		lbIDToVifIDs[lbVInterface.DeviceID] = append(lbIDToVifIDs[lbVInterface.DeviceID], lbVInterface.ID)
 		for _, ipResource := range ipResources {
@@ -444,6 +466,28 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 		}
 		for _, network := range networks {
 			if network.VPCID != lbTargetServer.VPCID || network.VPCID == 0 || lbTargetServer.VPCID == 0 || lbTargetServer.IP == "" {
+				continue
+			}
+			isData := false
+			lanSubnetIDs := vInterfaceIPToSubnetIDs[lbTargetServer.IP]
+			for _, lanSubnetID := range lanSubnetIDs {
+				if lanSubnetID == network.ID {
+					log.Infof("lan %s:%d", lbTargetServer.IP, lanSubnetID)
+					isData = true
+					break
+				}
+			}
+			if !isData {
+				wanSubnetIDs := ipResourceIPToSubnetIDs[lbTargetServer.IP]
+				for _, wanSubnetID := range wanSubnetIDs {
+					if wanSubnetID == network.ID {
+						log.Infof("wan %s:%d", lbTargetServer.IP, wanSubnetID)
+						isData = true
+						break
+					}
+				}
+			}
+			if !isData {
 				continue
 			}
 			key := PortIPKey{

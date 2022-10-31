@@ -46,6 +46,8 @@ use crate::{
         stats::{Countable, RefCountable, StatsOption},
     },
 };
+#[cfg(target_os = "linux")]
+use public::netns::link_list_in_netns;
 use public::{
     netns::NsFile,
     utils::net::{link_list, Link, MacAddr},
@@ -438,19 +440,33 @@ impl LocalModeDispatcherListener {
             }
         }
 
-        match link_list() {
-            Ok(links) => {
-                if result.len() == 0 {
-                    debug!("Poller Mac:");
-                }
-                for link in links {
-                    if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
-                        debug!("\tif_index: {}, mac: {}", link.if_index, link.mac_addr);
-                        result.insert(link.if_index, link.mac_addr);
-                    }
+        let links = if matches!(ns, NsFile::Root) {
+            match link_list() {
+                Ok(o) => Some(o),
+                Err(e) => {
+                    warn!("failed getting link list: {:?}", e);
+                    None
                 }
             }
-            Err(e) => warn!("failed getting link list: {:?}", e),
+        } else {
+            match link_list_in_netns(ns) {
+                Ok(o) => Some(o),
+                Err(e) => {
+                    warn!("failed getting link list: {:?}", e);
+                    None
+                }
+            }
+        };
+        if let Some(links) = links {
+            if result.len() == 0 {
+                debug!("Poller Mac:");
+            }
+            for link in links {
+                if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
+                    debug!("\tif_index: {}, mac: {}", link.if_index, link.mac_addr);
+                    result.insert(link.if_index, link.mac_addr);
+                }
+            }
         }
 
         result

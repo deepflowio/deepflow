@@ -70,3 +70,25 @@ func (t *SuiteTest) TestDeletePodBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestPodCreateAndFind() {
+	lcuuid := uuid.New().String()
+	pod := &mysql.Pod{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(pod)
+	var resultPod *mysql.Pod
+	err := t.db.Where("lcuuid = ? and name='' and alias='' and label='' and az='' and "+
+		"region='' and sub_domain=''", lcuuid).First(&resultPod).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), pod.Base.Lcuuid, resultPod.Base.Lcuuid)
+
+	resultPod = new(mysql.Pod)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPod)
+	assert.Equal(t.T(), pod.Base.Lcuuid, resultPod.Base.Lcuuid)
+
+	resultPod = new(mysql.Pod)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultPod)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
+}

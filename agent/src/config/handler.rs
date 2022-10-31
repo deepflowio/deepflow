@@ -185,6 +185,7 @@ pub struct SenderConfig {
     pub compressor_socket_type: trident::SocketType,
     pub collector_socket_type: trident::SocketType,
     pub log_dir: String,
+    pub standalone_data_file_size: u32,
     pub server_tx_bandwidth_threshold: u64,
     pub bandwidth_probe_interval: Duration,
     pub enabled: bool,
@@ -756,6 +757,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .to_str()
                     .unwrap()
                     .to_string(),
+                standalone_data_file_size: conf.yaml_config.standalone_data_file_size,
                 enabled: conf.collector_enabled,
             },
             npb: NpbConfig {

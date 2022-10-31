@@ -70,3 +70,24 @@ func (t *SuiteTest) TestDeleteDHCPPortBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestDHCPPortCreateAndFind() {
+	lcuuid := uuid.New().String()
+	dhcPort := &mysql.DHCPPort{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(dhcPort)
+	var resultDHCPPort *mysql.DHCPPort
+	err := t.db.Where("lcuuid = ? and name='' and az='' and region=''", lcuuid).First(&resultDHCPPort).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), dhcPort.Base.Lcuuid, resultDHCPPort.Base.Lcuuid)
+
+	resultDHCPPort = new(mysql.DHCPPort)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultDHCPPort)
+	assert.Equal(t.T(), dhcPort.Base.Lcuuid, resultDHCPPort.Base.Lcuuid)
+
+	resultDHCPPort = new(mysql.DHCPPort)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultDHCPPort)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
+}

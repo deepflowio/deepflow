@@ -427,6 +427,7 @@ impl BaseDispatcher {
         BaseDispatcherListener {
             id: self.id,
             src_interface: self.src_interface.clone(),
+            src_interface_index: self.src_interface_index as usize,
             options: self.options.clone(),
             bpf_options: self.bpf_options.clone(),
             pipelines: self.pipelines.clone(),
@@ -472,7 +473,7 @@ impl BaseDispatcher {
         #[cfg(target_os = "windows")]
         if let Err(e) = self
             .engine
-            .set_bpf(&CString::new(&*bpf_options.bpf_syntax_str).unwrap())
+            .set_bpf(&CString::new(bpf_options.get_bpf_instructions()).unwrap())
         {
             warn!("set_bpf failed: {}", e);
         }
@@ -608,6 +609,7 @@ impl TapInterfaceWhitelist {
 pub(super) struct BaseDispatcherListener {
     pub id: usize,
     pub src_interface: String,
+    pub src_interface_index: usize,
     pub options: Arc<Options>,
     pub bpf_options: Arc<Mutex<BpfOptions>>,
     pub handler_builders: Arc<Mutex<Vec<PacketHandlerBuilder>>>,

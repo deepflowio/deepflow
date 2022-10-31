@@ -511,7 +511,15 @@ fn dispatcher_listener_callback(
             }
         }
         TapMode::Mirror => {
-            todo!()
+            for listener in components.dispatcher_listeners.iter() {
+                listener.on_tap_interface_change(
+                    &vec![],
+                    IfMacSource::IfMac,
+                    conf.trident_type,
+                    &blacklist,
+                );
+                listener.on_vm_change(&vm_mac_addrs);
+            }
         }
         TapMode::Analyzer => {
             for listener in components.dispatcher_listeners.iter() {
@@ -1260,14 +1268,10 @@ impl Components {
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
-            let dispatcher = if candidate_config.tap_mode == TapMode::Local {
-                dispatcher_builder
-                    .pcap_interfaces(tap_interfaces.clone())
-                    .build()
-                    .unwrap()
-            } else {
-                todo!()
-            };
+            let dispatcher = dispatcher_builder
+                .pcap_interfaces(tap_interfaces.clone())
+                .build()
+                .unwrap();
 
             // TODO: 创建dispatcher的时候处理这些
             let mut dispatcher_listener = dispatcher.listener();

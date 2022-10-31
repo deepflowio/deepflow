@@ -70,3 +70,24 @@ func (t *SuiteTest) TestDeleteCENBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestCENCreateAndFind() {
+	lcuuid := uuid.New().String()
+	cen := &mysql.CEN{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(cen)
+	var resultCEN *mysql.CEN
+	err := t.db.Where("lcuuid = ? and name='' and label='' and alias='' and epc_ids=''", lcuuid).First(&resultCEN).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), cen.Base.Lcuuid, resultCEN.Base.Lcuuid)
+
+	resultCEN = new(mysql.CEN)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultCEN)
+	assert.Equal(t.T(), cen.Base.Lcuuid, resultCEN.Base.Lcuuid)
+
+	resultCEN = new(mysql.CEN)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultCEN)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
+}
