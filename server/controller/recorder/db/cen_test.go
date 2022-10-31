@@ -83,12 +83,11 @@ func (t *SuiteTest) TestCENCreateAndFind() {
 	assert.Equal(t.T(), cen.Base.Lcuuid, resultCEN.Base.Lcuuid)
 
 	resultCEN = new(mysql.CEN)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultCEN).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultCEN)
 	assert.Equal(t.T(), cen.Base.Lcuuid, resultCEN.Base.Lcuuid)
 
 	resultCEN = new(mysql.CEN)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultCEN).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultCEN.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultCEN)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

@@ -84,12 +84,11 @@ func (t *SuiteTest) TestNATGatewayCreateAndFind() {
 	assert.Equal(t.T(), natGateway.Base.Lcuuid, resultNATGateway.Base.Lcuuid)
 
 	resultNATGateway = new(mysql.NATGateway)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultNATGateway).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultNATGateway)
 	assert.Equal(t.T(), natGateway.Base.Lcuuid, resultNATGateway.Base.Lcuuid)
 
 	resultNATGateway = new(mysql.NATGateway)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNATGateway).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultNATGateway.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNATGateway)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

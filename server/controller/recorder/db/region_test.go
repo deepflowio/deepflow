@@ -86,12 +86,11 @@ func (t *SuiteTest) TestRegionCreateAndFind() {
 	assert.Equal(t.T(), region.Base.Lcuuid, resultRegion.Base.Lcuuid)
 
 	resultRegion = new(mysql.Region)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultRegion).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultRegion)
 	assert.Equal(t.T(), region.Base.Lcuuid, resultRegion.Base.Lcuuid)
 
 	resultRegion = new(mysql.Region)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultRegion).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultRegion.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultRegion)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

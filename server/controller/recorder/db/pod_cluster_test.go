@@ -84,12 +84,11 @@ func (t *SuiteTest) TestPodClusterCreateAndFind() {
 	assert.Equal(t.T(), podCluster.Base.Lcuuid, resultAZ.Base.Lcuuid)
 
 	resultAZ = new(mysql.PodCluster)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultAZ).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultAZ)
 	assert.Equal(t.T(), podCluster.Base.Lcuuid, resultAZ.Base.Lcuuid)
 
 	resultAZ = new(mysql.PodCluster)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultAZ).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultAZ.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultAZ)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

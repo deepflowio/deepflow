@@ -83,12 +83,11 @@ func (t *SuiteTest) TestPodNodeCreateAndFind() {
 	assert.Equal(t.T(), pd.Base.Lcuuid, resultPodNode.Base.Lcuuid)
 
 	resultPodNode = new(mysql.PodNode)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodNode).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodNode)
 	assert.Equal(t.T(), pd.Base.Lcuuid, resultPodNode.Base.Lcuuid)
 
 	resultPodNode = new(mysql.PodNode)
-	err = t.db.Where("lcuuid = ? and alias = null", lcuuid).Find(&resultPodNode).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultPodNode.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and alias = null", lcuuid).Find(&resultPodNode)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

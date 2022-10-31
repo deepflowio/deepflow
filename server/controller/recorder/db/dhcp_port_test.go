@@ -83,12 +83,11 @@ func (t *SuiteTest) TestDHCPPortCreateAndFind() {
 	assert.Equal(t.T(), dhcPort.Base.Lcuuid, resultDHCPPort.Base.Lcuuid)
 
 	resultDHCPPort = new(mysql.DHCPPort)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultDHCPPort).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultDHCPPort)
 	assert.Equal(t.T(), dhcPort.Base.Lcuuid, resultDHCPPort.Base.Lcuuid)
 
 	resultDHCPPort = new(mysql.DHCPPort)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultDHCPPort).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultDHCPPort.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultDHCPPort)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

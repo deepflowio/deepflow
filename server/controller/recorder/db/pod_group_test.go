@@ -84,12 +84,11 @@ func (t *SuiteTest) TestPodGroupCreateAndFind() {
 	assert.Equal(t.T(), az.Base.Lcuuid, resultPodGroup.Base.Lcuuid)
 
 	resultPodGroup = new(mysql.PodGroup)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodGroup).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultPodGroup)
 	assert.Equal(t.T(), az.Base.Lcuuid, resultPodGroup.Base.Lcuuid)
 
 	resultPodGroup = new(mysql.PodGroup)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultPodGroup).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultPodGroup.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultPodGroup)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

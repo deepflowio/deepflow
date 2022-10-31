@@ -84,12 +84,11 @@ func (t *SuiteTest) TestHostCreateAndFind() {
 	assert.Equal(t.T(), host.Base.Lcuuid, resultHost.Base.Lcuuid)
 
 	resultHost = new(mysql.Host)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultHost).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultHost)
 	assert.Equal(t.T(), host.Base.Lcuuid, resultHost.Base.Lcuuid)
 
 	resultHost = new(mysql.Host)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultHost).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultHost.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultHost)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

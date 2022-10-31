@@ -84,12 +84,11 @@ func (t *SuiteTest) TestVInterfaceCreateAndFind() {
 	assert.Equal(t.T(), vInterface.Base.Lcuuid, resultVInterface.Base.Lcuuid)
 
 	resultVInterface = new(mysql.VInterface)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultVInterface).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultVInterface)
 	assert.Equal(t.T(), vInterface.Base.Lcuuid, resultVInterface.Base.Lcuuid)
 
 	resultVInterface = new(mysql.VInterface)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVInterface).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultVInterface.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVInterface)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

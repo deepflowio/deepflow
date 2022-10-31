@@ -74,12 +74,11 @@ func (t *SuiteTest) TestLANIPCreateAndFind() {
 	assert.Equal(t.T(), lanIP.Base.Lcuuid, resultLANIP.Base.Lcuuid)
 
 	resultLANIP = new(mysql.LANIP)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultLANIP).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultLANIP)
 	assert.Equal(t.T(), lanIP.Base.Lcuuid, resultLANIP.Base.Lcuuid)
 
 	resultLANIP = new(mysql.LANIP)
-	err = t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultLANIP).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultLANIP.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultLANIP)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

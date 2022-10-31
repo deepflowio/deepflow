@@ -91,12 +91,11 @@ func (t *SuiteTest) TestVMCreateAndFind() {
 	assert.Equal(t.T(), vm.Base.Lcuuid, resultVM.Base.Lcuuid)
 
 	resultVM = new(mysql.VM)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultVM).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultVM)
 	assert.Equal(t.T(), vm.Base.Lcuuid, resultVM.Base.Lcuuid)
 
 	resultVM = new(mysql.VM)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVM).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultVM.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultVM)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

@@ -84,12 +84,11 @@ func (t *SuiteTest) TestNetworkCreateAndFind() {
 	assert.Equal(t.T(), network.Base.Lcuuid, resultNetwork.Base.Lcuuid)
 
 	resultNetwork = new(mysql.Network)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultNetwork).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultNetwork)
 	assert.Equal(t.T(), network.Base.Lcuuid, resultNetwork.Base.Lcuuid)
 
 	resultNetwork = new(mysql.Network)
-	err = t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNetwork).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultNetwork.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultNetwork)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }

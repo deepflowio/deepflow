@@ -83,12 +83,11 @@ func (t *SuiteTest) TestFloatingIPCreateAndFind() {
 	assert.Equal(t.T(), floatingIP.Base.Lcuuid, resultFloatingIP.Base.Lcuuid)
 
 	resultFloatingIP = new(mysql.FloatingIP)
-	err = t.db.Where("lcuuid = ?", lcuuid).Find(&resultFloatingIP).Error
-	assert.Equal(t.T(), nil, err)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultFloatingIP)
 	assert.Equal(t.T(), floatingIP.Base.Lcuuid, resultFloatingIP.Base.Lcuuid)
 
 	resultFloatingIP = new(mysql.FloatingIP)
-	err = t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultFloatingIP).Error
-	assert.Equal(t.T(), nil, err)
-	assert.Equal(t.T(), "", resultFloatingIP.Base.Lcuuid)
+	result := t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultFloatingIP)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
 }
