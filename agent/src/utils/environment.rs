@@ -35,7 +35,7 @@ use crate::proto::{common::TridentType, trident::Exception};
 use super::process::{get_memory_rss, get_process_num_by_name};
 #[cfg(target_os = "linux")]
 use public::utils::net::get_link_enabled_features;
-use public::utils::net::{get_mac_by_ip, get_route_src_ip_and_mac, MacAddr};
+use public::utils::net::{get_mac_by_ip, get_route_src_ip_and_mac, link_by_name, MacAddr};
 
 pub type Checker = Box<dyn Fn() -> Result<()>>;
 
@@ -234,6 +234,18 @@ pub fn trident_process_check() {
     }
 }
 
+pub fn is_tt_hyper_v_compute(trident_type: TridentType) -> bool {
+    trident_type == TridentType::TtHyperVCompute
+}
+
+pub fn is_tt_hyper_v_network(trident_type: TridentType) -> bool {
+    trident_type == TridentType::TtHyperVNetwork
+}
+
+pub fn is_tt_hyper_v(trident_type: TridentType) -> bool {
+    trident_type == TridentType::TtHyperVCompute || trident_type == TridentType::TtHyperVNetwork
+}
+
 pub fn is_tt_pod(trident_type: TridentType) -> bool {
     trident_type == TridentType::TtHostPod || trident_type == TridentType::TtVmPod
 }
@@ -287,6 +299,19 @@ pub fn get_executable_path() -> Result<PathBuf, io::Error> {
         io::ErrorKind::NotFound,
         "executable path not found",
     ))
+}
+
+pub fn get_mac_by_name(src_interface: String) -> u32 {
+    if src_interface.is_empty() {
+        return 0;
+    }
+    match link_by_name(src_interface) {
+        Ok(link) => MacAddr::to_lower_32b(&link.mac_addr),
+        Err(e) => {
+            warn!("get_mac_by_name failed, {}", e);
+            0
+        }
+    }
 }
 
 pub fn get_ctrl_ip_and_mac(dest: IpAddr) -> (IpAddr, MacAddr) {
