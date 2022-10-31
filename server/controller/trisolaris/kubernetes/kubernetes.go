@@ -59,6 +59,7 @@ func (k *KubernetesInfo) TimedRefreshClusterID() {
 func (k *KubernetesInfo) refresh() {
 	log.Infof("refresh cache cluster_id started")
 	k.mutex.Lock()
+	defer k.mutex.Unlock()
 	domainMgr := dbmgr.DBMgr[models.Domain](k.db)
 	dbDomains, _ := domainMgr.GetBatchFromTypes([]int{KUBERNETES})
 	k.clusterIDToDomain = make(map[string]string)
@@ -72,7 +73,6 @@ func (k *KubernetesInfo) refresh() {
 	for _, sd := range subDomains {
 		k.clusterIDToSubDomain[sd.ClusterID] = sd.Lcuuid
 	}
-	k.mutex.Unlock()
 	log.Infof("refresh cache cluster_id completed")
 	log.Debugf("cluster_id domain map: %v, sub_domain map: %v", k.clusterIDToDomain, k.clusterIDToSubDomain)
 	return
@@ -80,9 +80,9 @@ func (k *KubernetesInfo) refresh() {
 
 func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool {
 	k.mutex.Lock()
+	defer k.mutex.Unlock()
 	_, dok := k.clusterIDToDomain[clusterID]
 	_, sdok := k.clusterIDToSubDomain[clusterID]
-	k.mutex.Unlock()
 	ok := dok || sdok
 	if !ok {
 		log.Warningf("cluster_id: %s not found in cache, domain map: %v, sub_domain map: %v", clusterID, k.clusterIDToDomain, k.clusterIDToSubDomain)
@@ -103,6 +103,7 @@ func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool 
 func (k *KubernetesInfo) CacheClusterID(clusterID string) {
 	log.Infof("start cache cluster_id: %s", clusterID)
 	k.mutex.Lock()
+	defer k.mutex.Unlock()
 	_, ok := k.clusterIDToDomain[clusterID]
 	if !ok {
 		k.clusterIDToDomain[clusterID] = ""
@@ -119,7 +120,6 @@ func (k *KubernetesInfo) CacheClusterID(clusterID string) {
 			}
 		}()
 	}
-	k.mutex.Unlock()
 	return
 }
 

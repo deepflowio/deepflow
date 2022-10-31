@@ -48,7 +48,7 @@ pub struct PassivePoller;
 
 impl PassivePoller {
     pub fn new(_interval: Duration) -> Self {
-        todo!()
+        Self
     }
 }
 

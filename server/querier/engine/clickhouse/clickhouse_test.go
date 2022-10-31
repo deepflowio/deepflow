@@ -181,6 +181,9 @@ var (
 		// }, {
 		// 	input:  "select request from l7_flow_log where Enum(tap_side) like 'xxx' limit 0, 50",
 		// 	output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (tap_side IN (SELECT value FROM flow_tag.string_enum_map WHERE name ilike 'xxx' and tag_name='tap_side')) LIMIT 0, 50",
+	}, {
+		input:  "select Histogram(Sum(byte),10) AS histo from l4_flow_log",
+		output: "SELECT histogram(10)(`_sum_byte_tx+byte_rx`) AS `histo` FROM (SELECT SUM(byte_tx+byte_rx) AS `_sum_byte_tx+byte_rx` FROM flow_log.`l4_flow_log`)",
 	},
 	}
 )
