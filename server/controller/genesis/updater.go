@@ -119,52 +119,71 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 	ipAddrs := info.GetRawIpAddrs()
 	if len(ipAddrs) == 0 {
 		log.Errorf("get sync data (raw ip addrs) empty")
-		return VIFs
+		return []model.GenesisVinterface{}
 	}
-	parsedGlobalIPs, err := genesiscommon.ParseIPOutput(ipAddrs[0])
-	if err != nil {
-		log.Errorf("parse ip output error: (%s)", err)
-		return VIFs
+	netNSs := info.GetRawIpNetns()
+	if len(netNSs) == 0 {
+		netNSs = []string{""}
+		ipAddrs = ipAddrs[:1]
 	}
-	ifIDToInterface := map[uint32]genesiscommon.Iface{}
+	if len(ipAddrs) != len(netNSs) {
+		log.Error("the quantities of (raw ip addrs) and (raw ip netns) do not match")
+		return []model.GenesisVinterface{}
+	}
+	rootNSMacs := map[string]bool{}
+	ifIndexToInterface := map[string]genesiscommon.Iface{}
 	ifNameToInterface := map[string]genesiscommon.Iface{}
-	for _, item := range parsedGlobalIPs {
-		if item.Name == "lo" {
-			continue
+	for i, ipAddr := range ipAddrs {
+		nsName := netNSs[i]
+		parsedGlobalIPs, err := genesiscommon.ParseIPOutput(strings.Trim(ipAddr, " "))
+		if err != nil {
+			log.Errorf("parse ip output error: (%s)", err)
+			return []model.GenesisVinterface{}
 		}
-		if item.MAC == "" {
-			continue
-		}
-		ifIDToInterface[uint32(item.Index)] = item
-		ifNameToInterface[item.Name] = item
-		vIF := model.GenesisVinterface{
-			Name:    item.Name,
-			Mac:     item.MAC,
-			TapName: item.Name,
-			TapMac:  item.MAC,
-		}
-		// ignore interfaces without ip for container nodes
-		// but keep these for kvm hosts
-		if isContainer && len(item.IPs) == 0 {
-			continue
-		}
-		ipSlice := []string{}
-		for _, ip := range item.IPs {
-			if ip.Address == "" || ip.MaskLen == 0 {
+
+		for _, item := range parsedGlobalIPs {
+			if item.Name == "lo" {
 				continue
 			}
-			ipSlice = append(ipSlice, fmt.Sprintf("%s/%v", ip.Address, ip.MaskLen))
+			if item.MAC == "" {
+				continue
+			}
+			// Just take the mac of the root netns
+			if i == 0 {
+				rootNSMacs[item.MAC] = false
+			}
+			ifIndexToInterface[nsName+string(item.Index)] = item
+			ifNameToInterface[nsName+item.Name] = item
+			vIF := model.GenesisVinterface{
+				Name:    item.Name,
+				Mac:     item.MAC,
+				TapName: item.Name,
+				TapMac:  item.MAC,
+			}
+			// ignore interfaces without ip for container nodes
+			// but keep these for kvm hosts
+			if isContainer && len(item.IPs) == 0 {
+				continue
+			}
+			ipSlice := []string{}
+			for _, ip := range item.IPs {
+				if ip.Address == "" || ip.MaskLen == 0 {
+					continue
+				}
+				ipSlice = append(ipSlice, fmt.Sprintf("%s/%v", ip.Address, ip.MaskLen))
+			}
+			vIF.IPs = strings.Join(ipSlice, ",")
+			vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)), uuid.Nil)
+			vIF.DeviceLcuuid = common.GetUUID(vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)), uuid.Nil)
+			vIF.DeviceType = deviceType
+			vIF.HostIP = peer
+			vIF.LastSeen = epoch
+			vIF.VtapID = vtapID
+			vIF.KubernetesClusterID = k8sClusterID
+			VIFs = append(VIFs, vIF)
 		}
-		vIF.IPs = strings.Join(ipSlice, ",")
-		vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)), uuid.Nil)
-		vIF.DeviceLcuuid = common.GetUUID(vIF.Name+vIF.Mac+strconv.Itoa(int(vtapID)), uuid.Nil)
-		vIF.DeviceType = deviceType
-		vIF.HostIP = peer
-		vIF.LastSeen = epoch
-		vIF.VtapID = vtapID
-		vIF.KubernetesClusterID = k8sClusterID
-		VIFs = append(VIFs, vIF)
 	}
+
 	deviceIDToMinMAC := map[string]uint64{}
 	for _, iface := range info.Interfaces {
 		ifaceMAC := iface.GetMac()
@@ -193,7 +212,7 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 			netIP, err := netaddr.ParseIP(sIP)
 			if err != nil {
 				log.Errorf(err.Error())
-				return VIFs
+				return []model.GenesisVinterface{}
 			}
 			excludeFlag := false
 			for _, ipRange := range v.excludeIPRanges {
@@ -212,10 +231,11 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 			}
 		}
 		vIF.Lcuuid = common.GetUUID(vIF.Name+vIF.Mac+vIF.IPs+strconv.Itoa(int(vtapID)), uuid.Nil)
-		if gIF, ok := ifIDToInterface[iface.GetTapIndex()]; ok && isContainer {
+		ifaceNSName := iface.GetNetns()
+		if gIF, ok := ifIndexToInterface[ifaceNSName+string(iface.GetTapIndex())]; ok && isContainer {
 			vIF.TapName = gIF.Name
 			vIF.TapMac = gIF.MAC
-		} else if gIF, ok := ifNameToInterface[iface.GetName()]; ok && !isContainer {
+		} else if gIF, ok := ifNameToInterface[ifaceNSName+iface.GetName()]; ok && !isContainer {
 			vIF.TapName = gIF.Name
 			vIF.TapMac = gIF.MAC
 		}
@@ -226,6 +246,9 @@ func (v *GenesisSyncRpcUpdater) ParseVinterfaceInfo(info *trident.GenesisPlatfor
 			}
 			vIF.DeviceName = fmt.Sprintf("namespace-%s", iface.GetDeviceId())
 			vIF.DeviceType = genesiscommon.DEVICE_TYPE_DOCKER_CONTAINER
+			if _, ok := rootNSMacs[vIF.Mac]; ok {
+				vIF.DeviceType = genesiscommon.DEVICE_TYPE_DOCKER_HOST
+			}
 		} else if deviceType == genesiscommon.DEVICE_TYPE_KVM_HOST {
 			vIF.DeviceLcuuid = iface.GetDeviceId()
 			vIF.DeviceName = iface.GetDeviceName()
@@ -304,8 +327,8 @@ func (v *GenesisSyncRpcUpdater) ParseHostAsVmPlatformInfo(info *trident.GenesisP
 			continue
 		}
 		isExternal := false
-		for _, i := range ips {
-			pIP, err := netaddr.ParseIP(i.Address)
+		for _, ipItem := range ips {
+			pIP, err := netaddr.ParseIP(ipItem.Address)
 			if err != nil {
 				log.Error(err.Error())
 				return GenesisSyncDataOperation{}
