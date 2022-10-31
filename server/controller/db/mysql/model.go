@@ -72,13 +72,13 @@ type SubDomain struct {
 	Base         `gorm:"embedded"`
 	OperatedTime `gorm:"embedded"`
 	SyncedAt     *time.Time `gorm:"column:synced_at" json:"SYNCED_AT"`
-	Domain       string     `gorm:"column:domain;type:char(64)" json:"DOMAIN"`
-	Name         string     `gorm:"column:name;type:varchar(64)" json:"NAME"`
+	Domain       string     `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
+	Name         string     `gorm:"column:name;type:varchar(64);default:''" json:"NAME"`
 	DisplayName  string     `gorm:"column:display_name;type:varchar(64);default:''" json:"DISPLAY_NAME"`
 	CreateMethod int        `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	ClusterID    string     `gorm:"column:cluster_id;type:char(32)" json:"CLUSTER_ID"`
-	Config       string     `gorm:"column:config;type:text" json:"CONFIG"`
-	ErrorMsg     string     `gorm:"column:error_msg;type:text" json:"ERROR_MSG"`
+	ClusterID    string     `gorm:"column:cluster_id;type:char(32);default:''" json:"CLUSTER_ID"`
+	Config       string     `gorm:"column:config;type:text;default:''" json:"CONFIG"`
+	ErrorMsg     string     `gorm:"column:error_msg;type:text;default:''" json:"ERROR_MSG"`
 	Enabled      int        `gorm:"column:enabled;type:int;not null;default:1" json:"ENABLED"` // 0.false 1.true
 	State        int        `gorm:"column:state;type:int;not null;default:1" json:"STATE"`     // 1.normal 2.deleting 3.exception
 }
@@ -86,7 +86,7 @@ type SubDomain struct {
 type Region struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
-	Name           string  `gorm:"column:name;type:varchar(64);default:null" json:"NAME"`
+	Name           string  `gorm:"column:name;type:varchar(64);default:''" json:"NAME"`
 	CreateMethod   int     `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string  `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
 	Longitude      float64 `gorm:"column:longitude;type:double(7,4);default:null" json:"LONGITUDE"`
@@ -96,11 +96,11 @@ type Region struct {
 type AZ struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
-	Name           string `gorm:"column:name;type:varchar(64)" json:"NAME"`
+	Name           string `gorm:"column:name;type:varchar(64);default:''" json:"NAME"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
-	Region         string `gorm:"column:region;type:char(64)" json:"REGION"`
-	Domain         string `gorm:"column:domain;type:char(64)" json:"DOMAIN"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 }
 
 func (AZ) TableName() string {
@@ -112,21 +112,21 @@ type Host struct {
 	SoftDeleteBase `gorm:"embedded"`
 	Type           int       `gorm:"column:type;type:int" json:"TYPE"`   // 1.Server 3.Gateway 4.DFI
 	State          int       `gorm:"column:state;type:int" json:"STATE"` // 0.Temp 1.Creating 2.Complete 3.Modifying 4.Exception
-	Name           string    `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	Alias          string    `gorm:"column:alias;type:char(64)" json:"ALIAS"`
-	Description    string    `gorm:"column:description;type:varchar(256)" json:"DESCRIPTION"`
-	IP             string    `gorm:"column:ip;type:char(64)" json:"IP"`
+	Name           string    `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
+	Alias          string    `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	Description    string    `gorm:"column:description;type:varchar(256);default:''" json:"DESCRIPTION"`
+	IP             string    `gorm:"column:ip;type:char(64);default:''" json:"IP"`
 	HType          int       `gorm:"column:htype;type:int" json:"HTYPE"`                           // 1. Xen host 2. VMware host 3. KVM host 4. Public cloud host 5. Hyper-V
 	CreateMethod   int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	UserName       string    `gorm:"column:user_name;type:varchar(64)" json:"USER_NAME"`
-	UserPasswd     string    `gorm:"column:user_passwd;type:varchar(64)" json:"USER_PASSWD"`
+	UserName       string    `gorm:"column:user_name;type:varchar(64);default:''" json:"USER_NAME"`
+	UserPasswd     string    `gorm:"column:user_passwd;type:varchar(64);default:''" json:"USER_PASSWD"`
 	VCPUNum        int       `gorm:"column:vcpu_num;type:int;default:0" json:"VCPU_NUM"`
 	MemTotal       int       `gorm:"column:mem_total;type:int;default:0" json:"MEM_TOTAL"` // unit: M
 	AZ             string    `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	Region         string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	SyncedAt       time.Time `gorm:"column:synced_at;type:datetime;not null;default:CURRENT_TIMESTAMP" json:"SYNCED_AT"`
-	ExtraInfo      string    `gorm:"column:extra_info;type:text" json:"EXTRA_INFO"`
+	ExtraInfo      string    `gorm:"column:extra_info;type:text;default:''" json:"EXTRA_INFO"`
 }
 
 func (Host) TableName() string {
@@ -137,17 +137,17 @@ type VM struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	State          int    `gorm:"index:state_server_index;column:state;type:int;not null" json:"STATE"` // 0.Temp 1.Creating 2.Created 3.To run 4.Running 5.To suspend 6.Suspended 7.To resume 8. To stop 9.Stopped 10.Modifing 11.Exception 12.Destroying
-	Name           string `gorm:"column:name;type:varchar(256)" json:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64)" json:"ALIAS"`
-	Label          string `gorm:"column:label;type:char(64)" json:"LABEL"`
+	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	HType          int    `gorm:"column:htype;type:int;default:1" json:"HTYPE"`                 // 1.vm-c 2.bm-c 3.vm-n 4.bm-n 5.vm-s 6.bm-s
-	LaunchServer   string `gorm:"index:state_server_index;column:launch_server;type:char(64);default:null" json:"LAUNCH_SERVER"`
+	LaunchServer   string `gorm:"index:state_server_index;column:launch_server;type:char(64);default:''" json:"LAUNCH_SERVER"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
-	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
 }
 
 func (VM) TableName() string {
@@ -159,7 +159,7 @@ type VMPodNodeConnection struct {
 	VMID      int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID"`
 	PodNodeID int    `gorm:"column:pod_node_id;type:int;default:null" json:"POD_NODE_ID"`
 	Domain    string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	SubDomain string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 }
 
 func (VMPodNodeConnection) TableName() string {
@@ -210,14 +210,14 @@ type VPC struct {
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	TunnelID       int    `gorm:"column:tunnel_id;type:int;default:0" json:"TUNNEL_ID"`
 	Mode           int    `gorm:"column:mode;type:int;default:2" json:"MODE"` //  1:route, 2:transparent
 	CIDR           string `gorm:"column:cidr;type:char(64);default:''" json:"CIDR"`
-	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
 }
 
 func (VPC) TableName() string {
@@ -232,11 +232,11 @@ type Network struct {
 	Name           string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
 	CreateMethod   int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
-	Description    string `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	Description    string `gorm:"column:description;type:varchar(256);default:''" json:"DESCRIPTION"`
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	ISP            int    `gorm:"column:isp;type:int;default:0" json:"ISP"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
@@ -253,13 +253,13 @@ func (Network) TableName() string {
 
 type Subnet struct {
 	Base      `gorm:"embedded"`
-	Prefix    string `gorm:"column:prefix;type:char(64);default:null" json:"PREFIX"`
-	Netmask   string `gorm:"column:netmask;type:char(64);default:null" json:"NETMASK"`
+	Prefix    string `gorm:"column:prefix;type:char(64);default:''" json:"PREFIX"`
+	Netmask   string `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK"`
 	NetworkID int    `gorm:"column:vl2id;type:int;default:null" json:"VL2ID"`
 	NetIndex  int    `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX"`
-	Name      string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	Name      string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label     string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
-	SubDomain string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 }
 
 func (Subnet) TableName() string {
@@ -270,13 +270,13 @@ type VRouter struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	State          int    `gorm:"index:state_server_index;column:state;type:int;not null" json:"STATE"` // 0.Temp 1.Creating 2.Created 3.Exception 4.Modifing 5.Destroying 6.To run 7.Running 8.To stop 9.Stopped
-	Name           string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
-	Description    string `gorm:"column:description;type:varchar(256);default:null" json:"DESCRIPTION"`
+	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
+	Description    string `gorm:"column:description;type:varchar(256);default:''" json:"DESCRIPTION"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
-	GWLaunchServer string `gorm:"index:state_server_index;column:gw_launch_server;type:char(64);default:null" json:"GW_LAUNCH_SERVER"`
+	GWLaunchServer string `gorm:"index:state_server_index;column:gw_launch_server;type:char(64);default:''" json:"GW_LAUNCH_SERVER"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 }
 
@@ -287,17 +287,17 @@ func (VRouter) TableName() string {
 type RoutingTable struct {
 	Base        `gorm:"embedded"`
 	VRouterID   int    `gorm:"column:vnet_id;type:int;default:null" json:"VNET_ID"`
-	Destination string `gorm:"column:destination;type:text;default:null" json:"DESTINATION"`
-	NexthopType string `gorm:"column:nexthop_type;type:text;default:null" json:"NEXTHOP_TYPE"`
-	Nexthop     string `gorm:"column:nexthop;type:text;default:null" json:"NEXTHOP"`
+	Destination string `gorm:"column:destination;type:text;default:''" json:"DESTINATION"`
+	NexthopType string `gorm:"column:nexthop_type;type:text;default:''" json:"NEXTHOP_TYPE"`
+	Nexthop     string `gorm:"column:nexthop;type:text;default:''" json:"NEXTHOP"`
 }
 
 type DHCPPort struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
-	Name           string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 }
@@ -308,7 +308,7 @@ func (DHCPPort) TableName() string {
 
 type VInterface struct {
 	Base         `gorm:"embedded"`
-	Name         string `gorm:"column:name;type:char(64);default:null" json:"NAME"`
+	Name         string `gorm:"column:name;type:char(64);default:''" json:"NAME"`
 	Index        int    `gorm:"column:ifindex;type:int;not null" json:"IFINDEX"`
 	State        int    `gorm:"column:state;type:int;not null" json:"STATE"`                  // 1. Attached 2.Detached 3.Exception
 	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
@@ -319,9 +319,9 @@ type VInterface struct {
 	VlanTag      int    `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
 	DeviceType   int    `gorm:"column:devicetype;type:int;default:null" json:"DEVICETYPE"` // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
 	DeviceID     int    `gorm:"column:deviceid;type:int;default:null" json:"DEVICEID"`     // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region       string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region       string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 }
 
 func (VInterface) TableName() string {
@@ -330,13 +330,13 @@ func (VInterface) TableName() string {
 
 type LANIP struct { // TODO 添加region字段
 	Base         `gorm:"embedded"`
-	IP           string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
-	Netmask      string `gorm:"column:netmask;type:char(64);default:null" json:"NETMASK"`
-	Gateway      string `gorm:"column:gateway;type:char(64);default:null" json:"GATEWAY"`
+	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
+	Netmask      string `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK"`
+	Gateway      string `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
 	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	NetworkID    int    `gorm:"column:vl2id;type:int;default:null" json:"VL2ID"`
 	NetIndex     int    `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX"`
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 	VInterfaceID int    `gorm:"column:vifid;type:int;default:null" json:"VIFID"`
 	ISP          int    `gorm:"column:isp;type:int;default:0" json:"ISP"` // Used for multi-ISP access
@@ -348,16 +348,16 @@ func (LANIP) TableName() string {
 
 type WANIP struct {
 	Base         `gorm:"embedded"`
-	IP           string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
-	Alias        string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
+	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
+	Alias        string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	Netmask      int    `gorm:"column:netmask;type:int;default:null" json:"NETMASK"`
-	Gateway      string `gorm:"column:gateway;type:char(64);default:null" json:"GATEWAY"`
+	Gateway      string `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
 	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
 	ISP          int    `gorm:"column:isp;type:int;default:null" json:"ISP"`
 	VInterfaceID int    `gorm:"column:vifid;type:int;default:0" json:"VIFID"`
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region       string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region       string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 }
 
 func (WANIP) TableName() string {
@@ -367,11 +367,11 @@ func (WANIP) TableName() string {
 type FloatingIP struct {
 	Base      `gorm:"embedded"`
 	Domain    string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region    string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region    string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	VPCID     int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	NetworkID int    `gorm:"column:vl2_id;type:int;default:null" json:"VL2_ID"` // TODO json字段是否能修改，需返回给前端？
 	VMID      int    `gorm:"column:vm_id;type:int;default:null" json:"VM_ID"`
-	IP        string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	IP        string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
 }
 
 func (FloatingIP) TableName() string {
@@ -381,12 +381,12 @@ func (FloatingIP) TableName() string {
 type SecurityGroup struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
-	Name           string `gorm:"column:name;type:varchar(256);default:null" json:"NAME"`
+	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Label          string `gorm:"column:label;type:varchar(64);default:''" json:"LABEL"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Topped         int    `gorm:"column:topped;type:int;default:0" json:"TOPPED"`
 }
 
@@ -394,12 +394,12 @@ type SecurityGroupRule struct {
 	Base            `gorm:"embedded"`
 	SecurityGroupID int    `gorm:"column:sg_id;type:int;not null" json:"SG_ID"`
 	Direction       int    `gorm:"column:direction;type:tinyint(1);not null;default:0" json:"DIRECTION"` // 0.Unknow 1.Ingress 2.Egress
-	Protocol        string `gorm:"column:protocol;type:char(64);default:null" json:"PROTOCOL"`
+	Protocol        string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL"`
 	EtherType       int    `gorm:"column:ethertype;type:tinyint(1);not null;default:0" json:"ETHERTYPE"` // 0.Unknow 1.IPv4 2.IPv6
-	LocalPortRange  string `gorm:"column:local_port_range;type:text;default:null" json:"LOCAL_PORT_RANGE"`
-	RemotePortRange string `gorm:"column:remote_port_range;type:text;default:null" json:"REMOTE_PORT_RANGE"`
-	Local           string `gorm:"column:local;type:text;default:null" json:"LOCAL"`
-	Remote          string `gorm:"column:remote;type:text;default:null" json:"REMOTE"`
+	LocalPortRange  string `gorm:"column:local_port_range;type:text;default:''" json:"LOCAL_PORT_RANGE"`
+	RemotePortRange string `gorm:"column:remote_port_range;type:text;default:''" json:"REMOTE_PORT_RANGE"`
+	Local           string `gorm:"column:local;type:text;default:''" json:"LOCAL"`
+	Remote          string `gorm:"column:remote;type:text;default:''" json:"REMOTE"`
 	Priority        int    `gorm:"column:priority;type:int;not null" json:"PRIORITY"`
 	Action          int    `gorm:"column:action;type:tinyint(1);not null;default:0" json:"ACTION"` // 0.Unknow 1.Accept 2.Drop
 }
@@ -408,13 +408,13 @@ type NATGateway struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
-	FloatingIPs    string `gorm:"column:floating_ips;type:text;default:null" json:"FLOATING_IPS"` // separated by ,
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
+	FloatingIPs    string `gorm:"column:floating_ips;type:text;default:''" json:"FLOATING_IPS"` // separated by ,
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
 }
 
 func (NATGateway) TableName() string {
@@ -424,11 +424,11 @@ func (NATGateway) TableName() string {
 type NATRule struct {
 	Base           `gorm:"embedded"`
 	NATGatewayID   int    `gorm:"column:nat_id;type:int;default:0" json:"NAT_ID"`
-	Type           string `gorm:"column:type;type:char(16);default:null" json:"TYPE"`
-	Protocol       string `gorm:"column:protocol;type:char(64);default:null" json:"PROTOCOL"`
-	FloatingIP     string `gorm:"column:floating_ip;type:char(64);default:null" json:"FLOATING_IP"`
+	Type           string `gorm:"column:type;type:char(16);default:''" json:"TYPE"`
+	Protocol       string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL"`
+	FloatingIP     string `gorm:"column:floating_ip;type:char(64);default:''" json:"FLOATING_IP"`
 	FloatingIPPort int    `gorm:"column:floating_ip_port;type:int;default:null" json:"FLOATING_IP_PORT"`
-	FixedIP        string `gorm:"column:fixed_ip;type:char(64);default:null" json:"FIXED_IP"`
+	FixedIP        string `gorm:"column:fixed_ip;type:char(64);default:''" json:"FIXED_IP"`
 	FixedIPPort    int    `gorm:"column:fixed_ip_port;type:int;default:null" json:"FIXED_IP_PORT"`
 	VInterfaceID   int    `gorm:"column:port_id;type:int;default:null" json:"PORT_ID"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
@@ -453,14 +453,14 @@ type LB struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Model          int    `gorm:"column:model;type:int;default:0" json:"MODEL"` // 1.Internal 2.External
 	VIP            string `gorm:"column:vip;type:char(64);default:''" json:"VIP"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"` // TODO delete in future
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
 }
 
 func (LB) TableName() string {
@@ -472,9 +472,9 @@ type LBListener struct {
 	SoftDeleteBase `gorm:"embedded"`
 	LBID           int    `gorm:"column:lb_id;type:int;default:0" json:"LB_ID"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	IPs            string `gorm:"column:ips;type:text;default:null" json:"IPS"`           // separated by ,
-	SNATIPs        string `gorm:"column:snat_ips;type:text;default:null" json:"SNAT_IPS"` // separated by ,
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
+	IPs            string `gorm:"column:ips;type:text;default:''" json:"IPS"`           // separated by ,
+	SNATIPs        string `gorm:"column:snat_ips;type:text;default:''" json:"SNAT_IPS"` // separated by ,
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	Port           int    `gorm:"column:port;type:int;default:null" json:"PORT"`
 	Protocol       string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
@@ -490,7 +490,7 @@ type LBTargetServer struct {
 	LBListenerID int    `gorm:"column:lb_listener_id;type:int;default:0" json:"LB_LISTENER_ID"`
 	VPCID        int    `gorm:"column:epc_id;type:int;default:0" json:"VPC_ID"`
 	Type         int    `gorm:"column:type;type:int;default:0" json:"TYPE"` // 1.VM 2.IP
-	IP           string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
 	VMID         int    `gorm:"column:vm_id;type:int;default:0" json:"VM_ID"`
 	Port         int    `gorm:"column:port;type:int;default:null" json:"PORT"`
 	Protocol     string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL"`
@@ -516,7 +516,7 @@ type PeerConnection struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	LocalVPCID     int    `gorm:"column:local_epc_id;type:int;default:0" json:"LOCAL_VPC_ID"`
 	RemoteVPCID    int    `gorm:"column:remote_epc_id;type:int;default:0" json:"REMOTE_VPC_ID"`
 	LocalRegionID  int    `gorm:"column:local_region_id;type:int;default:0" json:"LOCAL_REGION_ID"`
@@ -529,9 +529,9 @@ type CEN struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
-	VPCIDs         string `gorm:"column:epc_ids;type:text;default:null" json:"VPC_IDS"` // separated by ,
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	VPCIDs         string `gorm:"column:epc_ids;type:text;default:''" json:"VPC_IDS"` // separated by ,
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
@@ -543,7 +543,7 @@ type RDSInstance struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	State          int    `gorm:"column:state;type:tinyint(1);not null;default:0" json:"STATE"` // 0. Unknown 1. Running 2. Recovering
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
@@ -553,7 +553,7 @@ type RDSInstance struct {
 	Version        string `gorm:"column:version;type:char(64);default:''" json:"VERSION"`
 	Series         int    `gorm:"column:series;type:tinyint(1);not null;default:0" json:"SERIES"` // 0. Unknown 1. basic 2. HA
 	Model          int    `gorm:"column:model;type:tinyint(1);not null;default:0" json:"MODEL"`   // 0. Unknown 1. Primary 2. Readonly 3. Temporary 4. Disaster recovery 5. share
-	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
 }
 
 func (RDSInstance) TableName() string {
@@ -564,7 +564,7 @@ type RedisInstance struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Label          string `gorm:"column:label;type:char(64);default:null" json:"LABEL"`
+	Label          string `gorm:"column:label;type:char(64);default:''" json:"LABEL"`
 	State          int    `gorm:"column:state;type:tinyint(1);not null;default:0" json:"STATE"` // 0. Unknown 1. Running 2. Recovering
 	Domain         string `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
 	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
@@ -573,7 +573,7 @@ type RedisInstance struct {
 	Version        string `gorm:"column:version;type:char(64);default:''" json:"VERSION"`
 	InternalHost   string `gorm:"column:internal_host;type:varchar(128);default:''" json:"INTERNAL_HOST"`
 	PublicHost     string `gorm:"column:public_host;type:varchar(128);default:''" json:"PUBLIC_HOST"`
-	UID            string `gorm:"column:uid;type:char(64);default:null" json:"UID"`
+	UID            string `gorm:"column:uid;type:char(64);default:''" json:"UID"`
 }
 
 type PodCluster struct {
@@ -584,8 +584,8 @@ type PodCluster struct {
 	Version        string `gorm:"column:version;type:varchar(256);default:''" json:"VERSION"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
@@ -593,11 +593,11 @@ type PodNamespace struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
@@ -605,18 +605,18 @@ type PodNode struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	Type           int    `gorm:"column:type;type:int;default:null" json:"TYPE"`               // 1: Master 2: Node
 	ServerType     int    `gorm:"column:server_type;type:int;default:null" json:"SERVER_TYPE"` // 1: Host 2: VM
 	State          int    `gorm:"column:state;type:int;default:1" json:"STATE"`                // 0: Exception 1: Normal
-	IP             string `gorm:"column:ip;type:char(64);default:null" json:"IP"`
+	IP             string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
 	VCPUNum        int    `gorm:"column:vcpu_num;type:int;default:0" json:"VCPU_NUM"`
 	MemTotal       int    `gorm:"column:mem_total;type:int;default:0" json:"MEM_TOTAL"` // unit: M
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
 	VPCID          int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
@@ -628,28 +628,28 @@ type PodIngress struct {
 	PodNamespaceID int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
 type PodIngressRule struct {
 	Base         `gorm:"embedded"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Protocol     string `gorm:"column:protocol;type:char(64);default:null" json:"PROTOCOL"`
-	Host         string `gorm:"column:host;type:text;default:null" json:"HOST"`
+	Protocol     string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL"`
+	Host         string `gorm:"column:host;type:text;default:''" json:"HOST"`
 	PodIngressID int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID"`
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 }
 
 type PodIngressRuleBackend struct {
 	Base             `gorm:"embedded"`
-	Path             string `gorm:"column:path;type:text;default:null" json:"PATH"`
+	Path             string `gorm:"column:path;type:text;default:''" json:"PATH"`
 	Port             int    `gorm:"column:port;type:int;default:null" json:"PORT"`
 	PodServiceID     int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
 	PodIngressRuleID int    `gorm:"column:pod_ingress_rule_id;type:int;default:null" json:"POD_INGRESS_RULE_ID"`
 	PodIngressID     int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID"`
-	SubDomain        string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain        string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 }
 
 type PodService struct {
@@ -657,69 +657,69 @@ type PodService struct {
 	SoftDeleteBase   `gorm:"embedded"`
 	Name             string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
 	Alias            string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	Type             int    `gorm:"column:type;type:int;default:null" json:"TYPE"`          // 1: ClusterIP 2: NodePort
-	Selector         string `gorm:"column:selector;type:text;default:null" json:"SELECTOR"` // separated by ,
+	Type             int    `gorm:"column:type;type:int;default:null" json:"TYPE"`        // 1: ClusterIP 2: NodePort
+	Selector         string `gorm:"column:selector;type:text;default:''" json:"SELECTOR"` // separated by ,
 	ServiceClusterIP string `gorm:"column:service_cluster_ip;type:char(64);default:''" json:"SERVICE_CLUSTER_IP"`
 	PodIngressID     int    `gorm:"column:pod_ingress_id;type:int;default:null" json:"POD_INGRESS_ID"`
 	PodNamespaceID   int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`
 	PodClusterID     int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	VPCID            int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
 	AZ               string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	Region           string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	SubDomain        string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Region           string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	SubDomain        string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain           string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
 type PodServicePort struct {
 	Base         `gorm:"embedded"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Protocol     string `gorm:"column:protocol;type:char(64);default:null" json:"PROTOCOL"`
+	Protocol     string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL"`
 	Port         int    `gorm:"column:port;type:int;default:null" json:"PORT"`
 	TargetPort   int    `gorm:"column:target_port;type:int;default:null" json:"TARGET_PORT"`
 	NodePort     int    `gorm:"column:node_port;type:int;default:null" json:"NODE_PORT"`
 	PodServiceID int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 }
 
 type PodGroup struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
 	Type           int    `gorm:"column:type;type:int;default:null" json:"TYPE"` // 1: Deployment 2: StatefulSet 3: ReplicationController
 	PodNum         int    `gorm:"column:pod_num;type:int;default:1" json:"POD_NUM"`
-	Label          string `gorm:"column:label;type:text;default:null" json:"LABEL"` // separated by ,
+	Label          string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
 	PodNamespaceID int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
 type PodGroupPort struct {
 	Base         `gorm:"embedded"`
 	Name         string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Protocol     string `gorm:"column:protocol;type:char(64);default:null" json:"PROTOCOL"`
+	Protocol     string `gorm:"column:protocol;type:char(64);default:''" json:"PROTOCOL"`
 	Port         int    `gorm:"column:port;type:int;default:null" json:"PORT"`
 	PodGroupID   int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
 	PodServiceID int    `gorm:"column:pod_service_id;type:int;default:null" json:"POD_SERVICE_ID"`
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 }
 
 type PodReplicaSet struct {
 	Base           `gorm:"embedded"`
 	SoftDeleteBase `gorm:"embedded"`
 	Name           string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Alias          string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
-	Label          string `gorm:"column:label;type:text;default:null" json:"LABEL"` // separated by ,
+	Alias          string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	Label          string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
 	PodNum         int    `gorm:"column:pod_num;type:int;default:1" json:"POD_NUM"`
 	PodGroupID     int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
 	PodNamespaceID int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`
 	PodClusterID   int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	AZ             string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	Region         string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Region         string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	SubDomain      string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain         string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 
@@ -731,9 +731,9 @@ type Pod struct {
 	Base            `gorm:"embedded"`
 	SoftDeleteBase  `gorm:"embedded"`
 	Name            string `gorm:"column:name;type:varchar(256);default:''" json:"NAME"`
-	Alias           string `gorm:"column:alias;type:char(64);default:null" json:"ALIAS"`
-	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`      // 0.Exception 1.Running
-	Label           string `gorm:"column:label;type:text;default:null" json:"LABEL"` // separated by ,
+	Alias           string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	State           int    `gorm:"column:state;type:int;not null" json:"STATE"`    // 0.Exception 1.Running
+	Label           string `gorm:"column:label;type:text;default:''" json:"LABEL"` // separated by ,
 	PodReplicaSetID int    `gorm:"column:pod_rs_id;type:int;default:null" json:"POD_RS_ID"`
 	PodGroupID      int    `gorm:"column:pod_group_id;type:int;default:null" json:"POD_GROUP_ID"`
 	PodNamespaceID  int    `gorm:"column:pod_namespace_id;type:int;default:null" json:"POD_NAMESPACE_ID"`
@@ -741,8 +741,8 @@ type Pod struct {
 	PodClusterID    int    `gorm:"column:pod_cluster_id;type:int;default:null" json:"POD_CLUSTER_ID"`
 	VPCID           int    `gorm:"column:epc_id;type:int;default:null" json:"VPC_ID"`
 	AZ              string `gorm:"column:az;type:char(64);default:''" json:"AZ"`
-	Region          string `gorm:"column:region;type:char(64);default:null" json:"REGION"`
-	SubDomain       string `gorm:"column:sub_domain;type:char(64);default:null" json:"SUB_DOMAIN"`
+	Region          string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	SubDomain       string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
 	Domain          string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
 }
 

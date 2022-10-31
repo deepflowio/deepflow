@@ -70,3 +70,24 @@ func (t *SuiteTest) TestDeleteSubnetBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestSubnetCreateAndFind() {
+	lcuuid := uuid.New().String()
+	subnet := &mysql.Subnet{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(subnet)
+	var resultSubnet *mysql.Subnet
+	err := t.db.Where("lcuuid = ? and name='' and label='' and prefix='' and netmask=''", lcuuid).First(&resultSubnet).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), subnet.Base.Lcuuid, resultSubnet.Base.Lcuuid)
+
+	resultSubnet = new(mysql.Subnet)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultSubnet)
+	assert.Equal(t.T(), subnet.Base.Lcuuid, resultSubnet.Base.Lcuuid)
+
+	resultSubnet = new(mysql.Subnet)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultSubnet)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
+}
