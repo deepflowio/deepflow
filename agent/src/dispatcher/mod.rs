@@ -40,6 +40,8 @@ use libc::c_int;
 use log::{debug, error, info, warn};
 use packet_dedup::*;
 #[cfg(target_os = "linux")]
+use pcap_sys::bpf_insn;
+#[cfg(target_os = "linux")]
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
 #[cfg(target_os = "linux")]
 use public::enums::LinuxSllPacketType::Outgoing;
@@ -337,14 +339,44 @@ impl BpfOptions {
             if !prog.is_none() && prog.unwrap().bf_len > 0 {
                 let prog = prog.unwrap();
                 unsafe {
-                    let pcap_ins = Vec::from_raw_parts(
+                    let mut pcap_ins = Vec::from_raw_parts(
                         prog.bf_insns,
                         prog.bf_len as usize,
                         prog.bf_len as usize,
                     );
-                    for i in 0..pcap_ins.len() - 1 {
-                        debug!("Bpf custom {:?}", pcap_ins[i]);
-                        syntaxs.push(RawInstruction::from(pcap_ins[i]));
+                    let bf_len = prog.bf_len as usize;
+                    if pcap_ins[bf_len - 1].code & OP_CLS_RETURN == OP_CLS_RETURN {
+                        if pcap_ins[bf_len - 1].k != 0 {
+                            // RetConstant 0
+                            // RetConstant 65535
+                            for i in 0..pcap_ins.len() - 1 {
+                                debug!("Bpf custom {:?}", pcap_ins[i]);
+                                syntaxs.push(RawInstruction::from(pcap_ins[i]));
+                            }
+                        } else if pcap_ins[bf_len - 2].code & OP_CLS_RETURN == OP_CLS_RETURN {
+                            // RetConstant 65535
+                            // RetConstant 0
+                            pcap_ins[bf_len - 2] = bpf_insn {
+                                code: OP_CLS_JUMP | OP_JUMP_EQUAL,
+                                jt: 1,
+                                jf: 1,
+                                k: 0,
+                            };
+                            for i in 0..pcap_ins.len() {
+                                debug!("Bpf custom {:?}", pcap_ins[i]);
+                                syntaxs.push(RawInstruction::from(pcap_ins[i]));
+                            }
+                        } else {
+                            error!(
+                                "Capture customized bpf({}) error, use default only.",
+                                self.capture_bpf
+                            );
+                        }
+                    } else {
+                        error!(
+                            "Capture customized bpf({}) error, use default only.",
+                            self.capture_bpf
+                        );
                     }
                 }
             } else {
