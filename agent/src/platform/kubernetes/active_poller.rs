@@ -15,7 +15,8 @@
  */
 
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
+    process,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
@@ -25,28 +26,32 @@ use std::{
 };
 
 use log::{debug, info, log_enabled, warn, Level};
+use regex::Regex;
 
 use super::Poller;
-use public::netns::{InterfaceInfo, NetNs, NsFile};
+use public::{
+    consts::NORMAL_EXIT_WITH_RESTART,
+    netns::{InterfaceInfo, NetNs, NsFile},
+};
 
 #[derive(Debug, Default)]
 pub struct ActivePoller {
     interval: Duration,
     version: Arc<AtomicU64>,
     entries: Arc<Mutex<HashMap<NsFile, Vec<InterfaceInfo>>>>,
-    netns: Arc<Mutex<Vec<NsFile>>>,
+    netns_regex: Arc<Mutex<Option<Regex>>>,
     running: Arc<Mutex<bool>>,
     timer: Arc<Condvar>,
     thread: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl ActivePoller {
-    pub fn new(interval: Duration) -> Self {
+    pub fn new(interval: Duration, netns_regex: Option<Regex>) -> Self {
         Self {
             interval,
             version: Default::default(),
             entries: Default::default(),
-            netns: Default::default(),
+            netns_regex: Arc::new(Mutex::new(netns_regex)),
             running: Default::default(),
             timer: Default::default(),
             thread: Default::default(),
@@ -90,13 +95,18 @@ impl ActivePoller {
         running: Arc<Mutex<bool>>,
         version: Arc<AtomicU64>,
         entries: Arc<Mutex<HashMap<NsFile, Vec<InterfaceInfo>>>>,
-        netns: Arc<Mutex<Vec<NsFile>>>,
+        netns_regex: Arc<Mutex<Option<Regex>>>,
         timeout: Duration,
     ) {
         // 初始化
-        let re = netns.lock().unwrap();
-        *entries.lock().unwrap() = Self::query(&re);
-        drop(re);
+        let mut nss = vec![NsFile::Root];
+        if let Some(re) = &*netns_regex.lock().unwrap() {
+            let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
+            extra_ns.sort_unstable();
+            nss.extend(extra_ns);
+        }
+        let new_entries = Self::query(&nss);
+        *entries.lock().unwrap() = new_entries;
         version.store(1, Ordering::SeqCst);
 
         loop {
@@ -110,12 +120,45 @@ impl ActivePoller {
             }
             drop(guard);
 
-            let re = netns.lock().unwrap().clone();
-            let new_interface_info = Self::query(&re);
+            let mut new_nss = vec![NsFile::Root];
+            if let Some(re) = &*netns_regex.lock().unwrap() {
+                let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
+                extra_ns.sort_unstable();
+                new_nss.extend(extra_ns);
+            }
+            if nss != new_nss {
+                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces", nss, new_nss);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(NORMAL_EXIT_WITH_RESTART);
+            }
+            let mut new_interface_info = Self::query(&nss);
             // compare two lists
             let mut old_interface_info = entries.lock().unwrap();
             if old_interface_info.eq(&new_interface_info) {
                 continue;
+            }
+
+            // use old_interface_info to supply new info in case of query failure
+            for (k, old_vs) in old_interface_info.iter() {
+                match new_interface_info.entry(k.clone()) {
+                    Entry::Vacant(v) => {
+                        v.insert(old_vs.to_vec());
+                    }
+                    Entry::Occupied(o) => {
+                        let new_vs = o.into_mut();
+                        let mut to_insert = vec![];
+                        for toi in old_vs.into_iter() {
+                            let contains = new_vs
+                                .binary_search_by_key(&toi.tap_idx, |v| v.tap_idx)
+                                .is_ok();
+                            if !contains {
+                                to_insert.push(toi.clone());
+                            }
+                        }
+                        new_vs.extend(to_insert);
+                        new_vs.sort_unstable();
+                    }
+                }
             }
 
             *old_interface_info = new_interface_info;
@@ -152,9 +195,8 @@ impl Poller for ActivePoller {
         info
     }
 
-    fn set_netns(&self, ns: Vec<NsFile>) {
-        info!("poller monitoring netns: {:?}", ns);
-        *self.netns.lock().unwrap() = ns;
+    fn set_netns_regex(&self, ns: Option<Regex>) {
+        *self.netns_regex.lock().unwrap() = ns;
     }
 
     fn start(&self) {
@@ -169,14 +211,15 @@ impl Poller for ActivePoller {
 
         info!("starts kubernetes active poller");
         let entries = self.entries.clone();
-        let netns = self.netns.clone();
+        let netns_regex = self.netns_regex.clone();
         let running = self.running.clone();
         let version = self.version.clone();
         let timeout = self.interval;
         let timer = self.timer.clone();
 
-        let handle =
-            thread::spawn(move || Self::process(timer, running, version, entries, netns, timeout));
+        let handle = thread::spawn(move || {
+            Self::process(timer, running, version, entries, netns_regex, timeout)
+        });
         self.thread.lock().unwrap().replace(handle);
     }
 

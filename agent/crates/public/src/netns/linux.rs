@@ -17,7 +17,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::fmt::Debug;
+use std::fmt::{self, Debug};
 use std::fs::{self, File};
 use std::io::{self, Cursor, Write};
 use std::os::unix::{fs::MetadataExt, io::AsRawFd};
@@ -69,6 +69,16 @@ impl NsFile {
                 Ok(fs::metadata(ns_file)?.ino())
             }
             Self::Proc(ino) => Ok(*ino),
+        }
+    }
+}
+
+impl fmt::Display for NsFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Root => write!(f, ""),
+            Self::Named(s) => write!(f, "{:?}", s),
+            Self::Proc(p) => write!(f, "net:[{}]", p),
         }
     }
 }
@@ -183,15 +193,12 @@ impl NetNs {
                     for peer_link in ns_links {
                         if peer_link.if_index == peer_index {
                             interfaces.push(InterfaceInfo {
-                                tap_ns: link_netns.clone(),
+                                tap_ns: ns.clone(),
                                 tap_idx: link.if_index,
                                 mac: peer_link.mac_addr,
                                 ips,
                                 name: peer_link.name,
-                                device_id: format!(
-                                    "net:[{}]",
-                                    link_netns.get_inode().unwrap_or_default()
-                                ),
+                                device_id: format!("{}", link_netns),
                             });
                             break;
                         }
