@@ -54,6 +54,7 @@ use crate::{
         meta_packet::MetaPacket,
         tap_port::TapPort,
     },
+    flow_generator::error::Error,
     flow_generator::error::Result,
     metric::document::TapSide,
     proto::flow_log,
@@ -521,13 +522,27 @@ impl AppProtoLogsData {
         }
     }
 
-    pub fn session_merge(&mut self, log: Self) {
+    pub fn session_merge(&mut self, log: Self) -> Result<()> {
+        if let Err(err) = self.protocol_merge(log.special_info) {
+            /*
+                if can not merge, return log which can not merge to self.
+                the follow circumstance can not merge:
+                    when ebpf disorder, http1 can not match req/resp.
+            */
+            if let Error::L7ProtocolCanNotMerge(special_info) = err {
+                return Err(Error::L7LogCanNotMerge(Self {
+                    special_info,
+                    ..log
+                }));
+            }
+            return Err(err);
+        };
         self.base_info.merge(log.base_info);
-        self.protocol_merge(log.special_info);
+        Ok(())
     }
 
-    fn protocol_merge(&mut self, log: L7ProtocolInfo) {
-        if let Ok(_) = self.special_info.merge_log(log) {}
+    fn protocol_merge(&mut self, log: L7ProtocolInfo) -> Result<()> {
+        self.special_info.merge_log(log)
     }
 
     // 是否需要进一步聚合

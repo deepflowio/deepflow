@@ -37,7 +37,7 @@ use crate::{
     config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType},
     flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::L7ProtoRawDataType,
-    log_info_merge, parse_common,
+    parse_common,
     utils::bytes::{read_u32_be, read_u32_le},
 };
 use public::utils::net::h2pack;
@@ -49,6 +49,8 @@ pub struct HttpInfo {
     is_req_end: bool,
     #[serde(skip)]
     is_resp_end: bool,
+    // from MetaPacket::cap_seq
+    cap_seq: Option<u64>,
 
     #[serde(skip)]
     proto: L7Protocol,
@@ -104,7 +106,15 @@ impl L7ProtocolInfoInterface for HttpInfo {
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
-        log_info_merge!(self, HttpInfo, other);
+        if let L7ProtocolInfo::HttpInfo(other) = other {
+            if other.start_time < self.start_time {
+                self.start_time = other.start_time;
+            }
+            if other.end_time > self.end_time {
+                self.end_time = other.end_time;
+            }
+            return self.merge(other);
+        }
         Ok(())
     }
 
@@ -138,23 +148,17 @@ impl L7ProtocolInfoInterface for HttpInfo {
 }
 
 impl HttpInfo {
-    pub fn merge(&mut self, other: Self) {
-        if self.is_grpc() {
-            self.proto = L7Protocol::Grpc;
-        }
-        if self.trace_id.is_empty() {
-            self.trace_id = other.trace_id;
-        }
-        if self.span_id.is_empty() {
-            self.span_id = other.span_id;
-        }
-        if self.x_request_id.is_empty() {
-            self.x_request_id = other.x_request_id;
-        }
+    pub fn merge(&mut self, other: Self) -> Result<()> {
+        let other_is_grpc = other.is_grpc();
 
         match other.msg_type {
             // merge with request
             LogMessageType::Request => {
+                if !other.can_merge(self) {
+                    return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::HttpInfo(
+                        other,
+                    )));
+                }
                 if self.path.is_empty() {
                     self.path = other.path;
                 }
@@ -182,6 +186,11 @@ impl HttpInfo {
             }
             // merge with response
             LogMessageType::Response => {
+                if !self.can_merge(&other) {
+                    return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::HttpInfo(
+                        other,
+                    )));
+                }
                 if other.status != L7ResponseStatus::default() {
                     self.status = other.status;
                 }
@@ -199,6 +208,40 @@ impl HttpInfo {
             }
             _ => {}
         }
+
+        if other_is_grpc {
+            self.proto = L7Protocol::Grpc;
+        }
+        if self.trace_id.is_empty() {
+            self.trace_id = other.trace_id;
+        }
+        if self.span_id.is_empty() {
+            self.span_id = other.span_id;
+        }
+        if self.x_request_id.is_empty() {
+            self.x_request_id = other.x_request_id.clone();
+        }
+        Ok(())
+    }
+
+    pub fn set_packet_seq(&mut self, param: &ParseParam) {
+        if let Some(p) = param.ebpf_param {
+            self.cap_seq = Some(p.cap_seq);
+        }
+    }
+
+    /*
+        if http1 with long live tcp connection, ebpf maybe disorder.
+        need to check the packet sequence when from ebpf and protocol is http1
+        self must req and other must resp.
+    */
+    pub fn can_merge(&self, resp: &Self) -> bool {
+        if self.proto == L7Protocol::Http1 || self.proto == L7Protocol::Http1TLS {
+            if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
+                return resp_seq > req_seq && resp_seq - req_seq == 1;
+            }
+        }
+        true
     }
 
     pub fn is_empty(&self) -> bool {
@@ -273,7 +316,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
         let (req_type, resource, domain, endpoint) = if is_grpc {
             // server endpoint = req_type
             (
-                String::new(),
+                String::from("POST"), // grpc method always post, reference https://chromium.googlesource.com/external/github.com/grpc/grpc/+/HEAD/doc/PROTOCOL-HTTP2.md
                 service_name.unwrap_or_default(),
                 f.host,
                 f.path,
@@ -334,6 +377,7 @@ impl L7ProtocolParserInterface for HttpLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
+        self.info.set_packet_seq(param);
         // http2 有两个版本, 现在可以直接通过proto区分解析哪个版本的协议.
         match self.proto {
             L7Protocol::Http1 => self.http1_check_protocol(payload, param),
@@ -365,6 +409,7 @@ impl L7ProtocolParserInterface for HttpLog {
         }
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
+        self.info.set_packet_seq(param);
         match param.ebpf_type {
             EbpfType::GoHttp2Uprobe => {
                 if let Some(p) = &param.ebpf_param {
@@ -382,7 +427,9 @@ impl L7ProtocolParserInterface for HttpLog {
             _ => {
                 match self.proto {
                     L7Protocol::Http1 => self.parse_http_v1(payload, param.direction)?,
-                    L7Protocol::Http2 => self.parse_http_v2(payload, param.direction)?,
+                    L7Protocol::Http2 | L7Protocol::Grpc => {
+                        self.parse_http_v2(payload, param.direction)?
+                    }
                     _ => unreachable!(),
                 }
                 Ok(vec![L7ProtocolInfo::HttpInfo(self.info.clone())])
@@ -506,7 +553,6 @@ impl HttpLog {
 
         let line = String::from_utf8_lossy(lines[0]).into_owned();
         if is_http_req_line(line) {
-            self.proto = L7Protocol::Http1;
             return true;
         }
         false
@@ -519,9 +565,6 @@ impl HttpLog {
         self.parsed = self
             .parse_http_v2(payload, PacketDirection::ClientToServer)
             .is_ok();
-        if self.parsed {
-            self.proto = L7Protocol::Http2;
-        }
         self.parsed
     }
 
@@ -675,7 +718,6 @@ impl HttpLog {
         } else {
             self.info.req_content_length = content_length;
         }
-        self.proto = L7Protocol::Http1;
         Ok(())
     }
 
@@ -817,7 +859,6 @@ impl HttpLog {
             }
             self.info.version = String::from("2");
             self.info.stream_id = httpv2_header.stream_id;
-            self.proto = L7Protocol::Http2;
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
