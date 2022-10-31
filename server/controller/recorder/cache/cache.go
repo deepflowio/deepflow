@@ -116,12 +116,6 @@ func (c *Cache) getConditionDomain() map[string]string {
 }
 
 func (c *Cache) getConditionDomainSubDomain() map[string]interface{} {
-	if c.SubDomainLcuuid == "" {
-		return map[string]interface{}{
-			"domain":     c.DomainLcuuid,
-			"sub_domain": nil,
-		}
-	}
 	return map[string]interface{}{
 		"domain":     c.DomainLcuuid,
 		"sub_domain": c.SubDomainLcuuid,
@@ -129,13 +123,6 @@ func (c *Cache) getConditionDomainSubDomain() map[string]interface{} {
 }
 
 func (c *Cache) getConditonDomainSubDomainCreateMethod() map[string]interface{} {
-	if c.SubDomainLcuuid == "" {
-		return map[string]interface{}{
-			"domain":        c.DomainLcuuid,
-			"sub_domain":    nil,
-			"create_method": common.CREATE_METHOD_LEARN,
-		}
-	}
 	return map[string]interface{}{
 		"domain":        c.DomainLcuuid,
 		"sub_domain":    c.SubDomainLcuuid,
@@ -444,7 +431,7 @@ func (c *Cache) refreshNetworks() []int {
 	var networks []*mysql.Network
 	networkIDs := []int{}
 
-	err := mysql.Db.Where(c.getConditonDomainSubDomainCreateMethod()).Find(&networks).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, common.CREATE_METHOD_LEARN).Find(&networks).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_NETWORK_EN, err))
 		return networkIDs
@@ -601,7 +588,7 @@ func (c *Cache) refreshVInterfaces() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_VINTERFACE_EN))
 	var vifs []*mysql.VInterface
 
-	err := mysql.Db.Where(c.getConditonDomainSubDomainCreateMethod()).Find(&vifs).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL) AND create_method = ?", c.DomainLcuuid, c.SubDomainLcuuid, common.CREATE_METHOD_LEARN).Find(&vifs).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_VINTERFACE_EN, err))
 		return
@@ -626,7 +613,7 @@ func (c *Cache) refreshWANIPs() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_WAN_IP_EN))
 	var wanIPs []*mysql.WANIP
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&wanIPs).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&wanIPs).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_WAN_IP_EN, err))
 		return
@@ -651,7 +638,7 @@ func (c *Cache) refreshLANIPs() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_LAN_IP_EN))
 	var lanIPs []*mysql.LANIP
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&lanIPs).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&lanIPs).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_LAN_IP_EN, err))
 		return
@@ -1074,7 +1061,7 @@ func (c *Cache) refreshPodClusters() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_POD_CLUSTER_EN))
 	var podClusters []*mysql.PodCluster
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podClusters).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podClusters).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_CLUSTER_EN, err))
 		return
@@ -1101,7 +1088,7 @@ func (c *Cache) refreshPodNodes() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_POD_NODE_EN))
 	var podNodes []*mysql.PodNode
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podNodes).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podNodes).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_NODE_EN, err))
 		return
@@ -1126,7 +1113,7 @@ func (c *Cache) refreshVMPodNodeConnections() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN))
 	var connections []*mysql.VMPodNodeConnection
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&connections).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&connections).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, err))
 		return
@@ -1153,7 +1140,7 @@ func (c *Cache) refreshPodNamespaces() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_POD_NAMESPACE_EN))
 	var podNamespaces []*mysql.PodNamespace
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podNamespaces).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podNamespaces).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_NAMESPACE_EN, err))
 		return
@@ -1185,7 +1172,7 @@ func (c *Cache) refreshPodIngresses() []int {
 	var podIngresses []*mysql.PodIngress
 	podIngressIDs := []int{}
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podIngresses).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podIngresses).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_INGRESS_EN, err))
 		return podIngressIDs
@@ -1279,7 +1266,7 @@ func (c *Cache) refreshPodServices() []int {
 	var podServices []*mysql.PodService
 	podServiceIDs := []int{}
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podServices).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podServices).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_SERVICE_EN, err))
 		return podServiceIDs
@@ -1338,7 +1325,7 @@ func (c *Cache) refreshPodGroups() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_POD_GROUP_EN))
 	var podGroups []*mysql.PodGroup
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podGroups).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podGroups).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_GROUP_EN, err))
 		return
@@ -1393,7 +1380,7 @@ func (c *Cache) refreshPodReplicaSets() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN))
 	var podReplicaSets []*mysql.PodReplicaSet
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&podReplicaSets).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&podReplicaSets).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_REPLICA_SET_EN, err))
 		return
@@ -1420,7 +1407,7 @@ func (c *Cache) refreshPods() {
 	log.Infof(refreshResource(rcommon.RESOURCE_TYPE_POD_EN))
 	var pods []*mysql.Pod
 
-	err := mysql.Db.Where(c.getConditionDomainSubDomain()).Find(&pods).Error
+	err := mysql.Db.Where("domain = ? AND (sub_domain = ? OR sub_domain IS NULL)", c.DomainLcuuid, c.SubDomainLcuuid).Find(&pods).Error
 	if err != nil {
 		log.Error(dbQueryResourceFailed(rcommon.RESOURCE_TYPE_POD_EN, err))
 		return
