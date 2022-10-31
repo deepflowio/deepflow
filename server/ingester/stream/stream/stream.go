@@ -46,11 +46,12 @@ const (
 )
 
 type Stream struct {
-	StreamConfig   *config.Config
-	L4FlowLogger   *Logger
-	L7FlowLogger   *Logger
-	OtelLogger     *Logger
-	L4PacketLogger *Logger
+	StreamConfig         *config.Config
+	L4FlowLogger         *Logger
+	L7FlowLogger         *Logger
+	OtelLogger           *Logger
+	OtelCompressedLogger *Logger
+	L4PacketLogger       *Logger
 }
 
 type Logger struct {
@@ -85,13 +86,15 @@ func NewStream(config *config.Config, recv *receiver.Receiver) (*Stream, error) 
 	}
 	l7FlowLogger := NewL7FlowLogger(config, controllers, manager, recv, flowLogWriter, flowTagWriter)
 	otelLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
+	otelCompressedLogger := NewLogger(datatype.MESSAGE_TYPE_OPENTELEMETRY_COMPRESSED, config, controllers, manager, recv, flowLogWriter, common.L7_FLOW_ID, flowTagWriter)
 	l4PacketLogger := NewLogger(datatype.MESSAGE_TYPE_PACKETSEQUENCE, config, nil, manager, recv, flowLogWriter, common.L4_PACKET_ID, nil)
 	return &Stream{
-		StreamConfig:   config,
-		L4FlowLogger:   l4FlowLogger,
-		L7FlowLogger:   l7FlowLogger,
-		OtelLogger:     otelLogger,
-		L4PacketLogger: l4PacketLogger,
+		StreamConfig:         config,
+		L4FlowLogger:         l4FlowLogger,
+		L7FlowLogger:         l7FlowLogger,
+		OtelLogger:           otelLogger,
+		OtelCompressedLogger: otelCompressedLogger,
+		L4PacketLogger:       l4PacketLogger,
 	}, nil
 }
 
@@ -262,6 +265,7 @@ func (s *Stream) Start() {
 	s.L7FlowLogger.Start()
 	s.L4PacketLogger.Start()
 	s.OtelLogger.Start()
+	s.OtelCompressedLogger.Start()
 }
 
 func (s *Stream) Close() error {
@@ -269,5 +273,6 @@ func (s *Stream) Close() error {
 	s.L7FlowLogger.Close()
 	s.L4PacketLogger.Close()
 	s.OtelLogger.Close()
+	s.OtelCompressedLogger.Close()
 	return nil
 }
