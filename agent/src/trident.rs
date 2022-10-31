@@ -36,6 +36,7 @@ use flexi_logger::{
     colored_opt_format, Age, Cleanup, Criterion, FileSpec, Logger, LoggerHandle, Naming,
 };
 use log::{info, warn};
+use regex::Regex;
 
 #[cfg(target_os = "linux")]
 use crate::ebpf_collector::EbpfCollector;
@@ -84,7 +85,7 @@ use crate::{
     },
 };
 #[cfg(target_os = "linux")]
-use public::netns::links_by_name_regex_in_netns;
+use public::netns::{links_by_name_regex_in_netns, NetNs};
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
@@ -864,7 +865,7 @@ impl Components {
             session.clone(),
             libvirt_xml_extractor.clone(),
             exception_handler.clone(),
-            candidate_config.dispatcher.extra_netns.clone(),
+            candidate_config.dispatcher.extra_netns_regex.clone(),
         );
 
         #[cfg(target_os = "linux")]
@@ -1099,8 +1100,13 @@ impl Components {
             src_interfaces_and_namespaces.push(("".into(), NsFile::Root));
         }
         #[cfg(target_os = "linux")]
-        for ns in candidate_config.dispatcher.extra_netns.iter() {
-            src_interfaces_and_namespaces.push(("".into(), ns.clone()));
+        if candidate_config.dispatcher.extra_netns_regex != "" {
+            let re = Regex::new(&candidate_config.dispatcher.extra_netns_regex).unwrap();
+            let mut nss = NetNs::find_ns_files_by_regex(&re);
+            nss.sort_unstable();
+            for ns in nss {
+                src_interfaces_and_namespaces.push(("".into(), ns));
+            }
         }
 
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {

@@ -22,8 +22,6 @@ use std::path::{Path, PathBuf};
 #[cfg(target_os = "linux")]
 use std::process;
 use std::sync::Arc;
-#[cfg(target_os = "linux")]
-use std::thread;
 use std::time::Duration;
 
 use arc_swap::{access::Map, ArcSwap};
@@ -33,8 +31,6 @@ use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
-#[cfg(target_os = "linux")]
-use regex::Regex;
 use sysinfo::SystemExt;
 
 use super::config::{PortConfig, UprobeProcRegExp};
@@ -62,13 +58,11 @@ use crate::{
 };
 #[cfg(target_os = "linux")]
 use crate::{
-    common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US, NORMAL_EXIT_WITH_RESTART},
+    common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US},
     dispatcher::recv_engine::af_packet::OptTpacketVersion,
     ebpf::CAP_LEN_MAX,
     utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
 };
-#[cfg(target_os = "linux")]
-use public::netns::{NetNs, NsFile};
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;
@@ -253,7 +247,7 @@ pub struct DispatcherConfig {
     pub vtap_id: u16,
     pub capture_socket_type: CaptureSocketType,
     #[cfg(target_os = "linux")]
-    pub extra_netns: Vec<NsFile>,
+    pub extra_netns_regex: String,
     pub tap_interface_regex: String,
     pub packet_header_enabled: bool,
     pub if_mac_source: IfMacSource,
@@ -707,14 +701,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 vtap_id: conf.vtap_id as u16,
                 capture_socket_type: conf.capture_socket_type,
                 #[cfg(target_os = "linux")]
-                extra_netns: if conf.extra_netns_regex == "" {
-                    vec![]
-                } else {
-                    let re = Regex::new(&conf.extra_netns_regex).unwrap(); // regex validated in protobuf
-                    let mut ns = NetNs::find_ns_files_by_regex(&re);
-                    ns.sort_unstable();
-                    ns
-                },
+                extra_netns_regex: conf.extra_netns_regex.to_string(),
                 tap_interface_regex: conf.tap_interface_regex.to_string(),
                 packet_header_enabled: conf.packet_header_enabled,
                 if_mac_source: conf.if_mac_source,
@@ -1091,17 +1078,17 @@ impl ConfigHandler {
 
         if candidate_config.dispatcher != new_config.dispatcher {
             #[cfg(target_os = "linux")]
-            if candidate_config.dispatcher.extra_netns != new_config.dispatcher.extra_netns {
+            if candidate_config.dispatcher.extra_netns_regex
+                != new_config.dispatcher.extra_netns_regex
+            {
                 info!(
-                    "dispatcher extra net namespace: {:?}",
-                    new_config.dispatcher.extra_netns
+                    "extra_netns_regex set to: {:?}",
+                    new_config.dispatcher.extra_netns_regex
                 );
-                if components.is_some() {
-                    info!("restart agent to create dispatcher for extra namespaces");
-                    thread::sleep(Duration::from_secs(1));
-                    process::exit(NORMAL_EXIT_WITH_RESTART);
+                if let Some(c) = components.as_ref() {
+                    c.platform_synchronizer
+                        .set_netns_regex(&new_config.dispatcher.extra_netns_regex);
                 }
-                candidate_config.dispatcher.extra_netns = new_config.dispatcher.extra_netns.clone();
             }
 
             if candidate_config.dispatcher.if_mac_source != new_config.dispatcher.if_mac_source {
