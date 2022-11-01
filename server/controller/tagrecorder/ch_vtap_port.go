@@ -19,9 +19,13 @@ package tagrecorder
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/bitly/go-simplejson"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
@@ -438,36 +442,48 @@ func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysql.ChVTapPort) (map[
 	return nil, false
 }
 
+func getGenesisInterface() *simplejson.Json {
+	url := fmt.Sprintf("http://%s/v1/sync/vinterface/", net.JoinHostPort(common.LOCALHOST, fmt.Sprintf("%d", common.GConfig.HTTPPort)))
+	resp, err := common.CURLPerform("GET", url, nil)
+	if err != nil || len(resp.Get("DATA").MustArray()) == 0 {
+		log.Errorf("get genesis vinterface failed: %s, %s", err.Error(), url)
+		return simplejson.New()
+	}
+	return resp.Get("DATA")
+}
+
 func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, error) {
 	var vtapVIFs []model.VTapInterface
-	var genesisVIFs []*mysql.GoGenesisVInterface
 	db := mysql.Db
 	if _, ok := filter["name"]; ok {
 		db = db.Where("name = ?", filter["name"])
 	}
-	if err := db.Select("id", "name", "mac", "tap_name", "tap_mac", "vtap_id", "host_ip", "node_ip", "last_seen").Find(&genesisVIFs).Error; err != nil {
-		log.Error(dbQueryResourceFailed("genesis_vinterface", err))
-		return nil, err
-	}
 
+	vifs := getGenesisInterface()
 	toolDS, err := newToolDataSet()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, gVIF := range genesisVIFs {
-		vtapVIF := model.VTapInterface{
-			ID:       gVIF.ID,
-			Name:     gVIF.Name,
-			MAC:      gVIF.MAC,
-			TapName:  gVIF.TapName,
-			TapMAC:   gVIF.TapMAC,
-			VTapID:   gVIF.VTapID,
-			HostIP:   gVIF.HostIP,
-			NodeIP:   gVIF.NodeIP,
-			LastSeen: gVIF.LastSeen.Format(common.GO_BIRTHDAY),
+	for i := range vifs.MustArray() {
+		jVIF := vifs.GetIndex(i)
+		vtapID := jVIF.Get("VTAP_ID").MustInt()
+		lastSeen, err := time.Parse(time.RFC3339, jVIF.Get("LAST_SEEN").MustString())
+		if err != nil {
+			log.Errorf("parse time (%s) failed: %s", jVIF.Get("LAST_SEEN").MustString(), err.Error())
 		}
-		vtap, ok := toolDS.idToVTap[gVIF.VTapID]
+		vtapVIF := model.VTapInterface{
+			ID:       jVIF.Get("ID").MustInt(),
+			Name:     jVIF.Get("NAME").MustString(),
+			MAC:      jVIF.Get("MAC").MustString(),
+			TapName:  jVIF.Get("TAP_NAME").MustString(),
+			TapMAC:   jVIF.Get("TAP_MAC").MustString(),
+			VTapID:   vtapID,
+			HostIP:   jVIF.Get("HOST_IP").MustString(),
+			NodeIP:   jVIF.Get("NODE_IP").MustString(),
+			LastSeen: lastSeen.Format(common.GO_BIRTHDAY),
+		}
+		vtap, ok := toolDS.idToVTap[vtapID]
 		if ok {
 			vtapVIF.VTapLaunchServer = vtap.LaunchServer
 			vtapVIF.VTapLaunchServerID = vtap.LaunchServerID
@@ -531,8 +547,8 @@ func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, er
 					vtapVIF.DeviceName = toolDS.podIDToName[vtapVIF.DeviceID]
 				}
 			}
-		} else if gVIF.VTapID != 0 {
-			log.Errorf("vtap (%d) not found", gVIF.VTapID)
+		} else if vtapID != 0 {
+			log.Errorf("vtap (%d) not found", vtapID)
 		}
 		vtapVIFs = append(vtapVIFs, vtapVIF)
 	}
