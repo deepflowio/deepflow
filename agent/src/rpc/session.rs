@@ -28,7 +28,11 @@ use crate::exception::ExceptionHandler;
 use crate::proto::trident::Exception;
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
-pub const SESSION_TIMEOUT: Duration = Duration::from_secs(30);
+// Sessions in use occasionally timeout for 60 seconds, The
+// timeout should be adjusted to be greater than 60 seconds.
+// ==========================================================
+// 使用中会话偶尔会超时60秒，这里调整超时时间需要大于60秒
+pub const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 
 struct Config {
     port: u16,
@@ -123,6 +127,12 @@ impl Session {
 
         self.reset_session.store(true, Ordering::Relaxed);
         self.reset_triggered_session.store(true, Ordering::Relaxed);
+    }
+
+    pub fn reset(&self) {
+        *self.client.write() = None;
+        self.reset_session.store(true, Ordering::Relaxed);
+        self.server_ip.write().reset();
     }
 
     async fn dial(&self, remote: &IpAddr) {
@@ -240,6 +250,15 @@ impl ServerIp {
 
             initialized: false,
         }
+    }
+
+    fn reset(&mut self) {
+        self.current_ip = self.controller_ips[0];
+        self.this_controller = 0;
+        self.proxied = false;
+        self.initialized = false;
+        self.proxy_ip = None;
+        self.request_failed = false;
     }
 
     fn update_controller_ips(&mut self, controller_ips: Vec<IpAddr>) {
