@@ -80,5 +80,6 @@ func NewEventWriter(eventType common.EventType, config *config.Config) (*EventWr
 		return nil, err
 	}
 	w.ckWriter = ckwriter
+	w.ckWriter.Run()
 	return w, nil
 }

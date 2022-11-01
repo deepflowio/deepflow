@@ -27,10 +27,6 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
-const (
-	CMD_PLATFORMDATA_EVENT = 36
-)
-
 type Event struct {
 	Config        *config.Config
 	ResourceEvent *Eventor
@@ -43,7 +39,6 @@ type Eventor struct {
 }
 
 func NewEvent(config *config.Config, resourceEventQueue *queue.OverwriteQueue) (*Event, error) {
-
 	resourceEvent, err := NewEventor(resourceEventQueue, common.RESOURCE_EVENT, config)
 	if err != nil {
 		return nil, err
