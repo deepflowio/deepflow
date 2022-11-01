@@ -242,7 +242,7 @@ func GetCurrentController() (*mysql.Controller, error) {
 	return controller, err
 }
 
-func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err error) {
+func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err error) {
 	var host string
 	curController, err := GetCurrentController()
 	if err != nil {
@@ -251,9 +251,9 @@ func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err err
 	var resp *simplejson.Json
 	if curController.NodeType == CONTROLLER_NODE_TYPE_MASTER {
 		host = LOCALHOST
-		httpPort = fmt.Sprintf("%d", GConfig.HTTPPort)
-		grpcPort = fmt.Sprintf("%d", GConfig.GRPCPort)
-		url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, httpPort))
+		httpPort = GConfig.HTTPPort
+		grpcPort = GConfig.GRPCPort
+		url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, fmt.Sprintf("%d", httpPort)))
 		resp, err = CURLPerform("GET", url, nil)
 		if err != nil {
 			return
@@ -264,16 +264,26 @@ func GetMasterControllerHostPort() (masterIP, httpPort, grpcPort string, err err
 		if err != nil {
 			return
 		}
-		httpPort = fmt.Sprintf("%d", GConfig.HTTPNodePort)
-		grpcPort = fmt.Sprintf("%d", GConfig.GRPCNodePort)
+		httpPort = GConfig.HTTPNodePort
+		grpcPort = GConfig.GRPCNodePort
+		var respGetted bool
 		for _, c := range controllers {
 			host = c.IP
-			url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, httpPort))
+			err = IsTCPActive(host, httpPort)
+			if err == nil {
+				log.Error(err.Error())
+				continue
+			}
+
+			url := fmt.Sprintf("http://%s/v1/election-leader/", net.JoinHostPort(host, fmt.Sprintf("%d", httpPort)))
 			resp, err = CURLPerform("GET", url, nil)
 			if err == nil {
+				respGetted = true
 				break
 			}
-			log.Error("request all controllers in master reigon faield.")
+		}
+		if !respGetted {
+			log.Error("request all controllers in master reigon faield")
 			return
 		}
 	}

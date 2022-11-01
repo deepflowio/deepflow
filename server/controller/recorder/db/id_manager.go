@@ -18,6 +18,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sort"
 	"sync"
@@ -200,6 +201,7 @@ func (p *IDPool[MT]) refresh() error {
 		usableIDs = append(usableIDs, usedIDs...)
 	} else {
 		usableIDs = allIDsSet.ToSlice()
+		sort.IntSlice(usableIDs).Sort()
 	}
 	p.usableIDs = usableIDs
 
@@ -256,9 +258,10 @@ func (p *IDPool[MT]) recycle(ids []int) {
 func GetIDs(resourceType string, count int) (ids []int, err error) {
 	host, _, grpcPort, err := common.GetMasterControllerHostPort()
 	if err != nil {
+		log.Error("get master controller host info failed")
 		return
 	}
-	grpcServer := net.JoinHostPort(host, grpcPort)
+	grpcServer := net.JoinHostPort(host, fmt.Sprintf("%d", grpcPort))
 	conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("create grpc connection faild: %s", err.Error())
@@ -283,9 +286,10 @@ func GetIDs(resourceType string, count int) (ids []int, err error) {
 func ReleaseIDs(resourceType string, ids []int) (err error) {
 	host, _, grpcPort, err := common.GetMasterControllerHostPort()
 	if err != nil {
+		log.Error("get master controller host info failed")
 		return
 	}
-	grpcServer := net.JoinHostPort(host, grpcPort)
+	grpcServer := net.JoinHostPort(host, fmt.Sprintf("%d", grpcPort))
 	conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("create grpc connection faild: %s", err.Error())
