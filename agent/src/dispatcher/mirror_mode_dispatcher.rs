@@ -521,7 +521,7 @@ impl MirrorModeDispatcher {
             meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, key);
         }
 
-        BaseDispatcher::prepare_flow(meta_packet, TapType::Tor, false, queue_hash)
+        BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash)
     }
 }
 

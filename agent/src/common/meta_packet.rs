@@ -818,7 +818,7 @@ impl<'a> MetaPacket<'a> {
             l2_end_0: data.direction == SOCK_DIR_SND,
             l2_end_1: data.direction == SOCK_DIR_RCV,
             proto: IpProtocol::try_from(data.tuple.protocol)?,
-            tap_type: TapType::Tor,
+            tap_type: TapType::Cloud,
             ..Default::default()
         };
 

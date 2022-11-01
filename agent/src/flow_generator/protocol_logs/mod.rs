@@ -313,7 +313,7 @@ impl AppProtoLogsBaseInfo {
             end_time: packet.lookup_key.timestamp,
             flow_id: packet.socket_id,
             tap_port: packet.tap_port,
-            tap_type: TapType::Tor,
+            tap_type: TapType::Cloud,
             is_ipv6: packet.lookup_key.dst_ip.is_ipv6(),
             tap_side: if is_src {
                 TapSide::ClientProcess

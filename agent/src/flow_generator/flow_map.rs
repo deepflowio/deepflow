@@ -1312,7 +1312,7 @@ pub fn _new_meta_packet<'a>() -> MetaPacket<'a> {
         dst_ip: Ipv4Addr::new(114, 114, 114, 114).into(),
         src_port: 12345,
         dst_port: 22,
-        tap_type: TapType::Isp(1),
+        tap_type: TapType::Idc(1),
         ..Default::default()
     };
     packet.header_type = HeaderType::Ipv4Tcp;
@@ -1600,11 +1600,11 @@ mod tests {
         let (mut flow_map, output_queue_receiver) =
             _new_flow_map_and_receiver(TridentType::TtHyperVCompute);
         let mut packet0 = _new_meta_packet();
-        packet0.lookup_key.tap_type = TapType::Tor;
+        packet0.lookup_key.tap_type = TapType::Cloud;
         flow_map.inject_meta_packet(&mut packet0);
 
         let mut packet1 = _new_meta_packet();
-        packet1.lookup_key.tap_type = TapType::Tor;
+        packet1.lookup_key.tap_type = TapType::Cloud;
         packet1.tcp_data.flags = TcpFlags::RST;
         _reverse_meta_packet(&mut packet1);
         let flush_timestamp = packet1.lookup_key.timestamp;
@@ -1622,14 +1622,14 @@ mod tests {
 
         let mut packet2 = _new_meta_packet();
         packet2.lookup_key.src_ip = Ipv4Addr::new(192, 168, 1, 2).into();
-        packet2.lookup_key.tap_type = TapType::Tor;
+        packet2.lookup_key.tap_type = TapType::Cloud;
         packet2.tap_port = TapPort(0x1234);
         flow_map.inject_meta_packet(&mut packet2);
 
         let mut packet3 = _new_meta_packet();
         packet3.lookup_key.src_ip = Ipv4Addr::new(192, 168, 1, 3).into();
         packet3.lookup_key.dst_mac = MacAddr::from([0x21, 0x43, 0x65, 0xaa, 0xaa, 0xaa]);
-        packet3.lookup_key.tap_type = TapType::Tor;
+        packet3.lookup_key.tap_type = TapType::Cloud;
         packet3.tap_port = TapPort(0x1234);
         packet3.lookup_key.l2_end_0 = true;
         packet3.lookup_key.l2_end_1 = false;

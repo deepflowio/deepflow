@@ -174,7 +174,7 @@ impl Forward {
                 }
                 let value = L3Item {
                     epc_id: platform.epc_id,
-                    tap_type: TapType::Tor,
+                    tap_type: TapType::Cloud,
                     tap_port: TapPort::from_local_mac(TunnelType::None, 0),
                     last: Duration::from_secs(0),
                     from: FROM_CONTROLLER,
@@ -244,7 +244,7 @@ impl Forward {
                 }
                 let value = L3Item {
                     epc_id: 0,
-                    tap_type: TapType::Tor,
+                    tap_type: TapType::Cloud,
                     tap_port: TapPort::from_local_mac(TunnelType::None, 0),
                     last: Duration::from_secs(0),
                     from: FROM_CONFIG,
