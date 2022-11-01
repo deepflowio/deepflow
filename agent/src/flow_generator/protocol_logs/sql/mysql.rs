@@ -17,6 +17,7 @@
 use serde::Serialize;
 
 use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use super::sql_check::is_mysql;
 
 use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
@@ -88,19 +89,39 @@ impl L7ProtocolInfoInterface for MysqlInfo {
         self.is_tls
     }
 
+    // use for filter the mysql protocol miscalculate.
     fn skip_send(&self) -> bool {
-        false
+        // if sql check fail and have no error response, very likely is protocol miscalculate.
+        self.status == L7ResponseStatus::default() && !is_mysql(&self.context)
     }
 }
 
 impl MysqlInfo {
     pub fn merge(&mut self, other: Self) {
-        self.response_code = other.response_code;
-        self.affected_rows = other.affected_rows;
-        self.error_message = other.error_message;
-        self.status = other.status;
-        if self.error_code.is_none() {
-            self.error_code = other.error_code;
+        if self.protocol_version == 0 {
+            self.protocol_version = other.protocol_version
+        }
+        if self.server_version.is_empty() {
+            self.server_version = other.server_version;
+        }
+        if self.server_thread_id == 0 {
+            self.server_thread_id = other.server_thread_id;
+        }
+        match other.msg_type {
+            LogMessageType::Request => {
+                self.command = other.command;
+                self.context = other.context;
+            }
+            LogMessageType::Response => {
+                self.response_code = other.response_code;
+                self.affected_rows = other.affected_rows;
+                self.error_message = other.error_message;
+                self.status = other.status;
+                if self.error_code.is_none() {
+                    self.error_code = other.error_code;
+                }
+            }
+            _ => {}
         }
     }
 

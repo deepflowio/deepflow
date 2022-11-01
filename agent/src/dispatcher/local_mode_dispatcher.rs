@@ -435,7 +435,7 @@ impl LocalModeDispatcherListener {
         if let Some(entries) = poller.get_interface_info_in(ns) {
             debug!("Poller Mac:");
             for entry in entries {
-                debug!("\tif_index: {}, mac: {}", entry.tap_idx, entry.mac);
+                debug!("\tif_index: {}, mac: {}, mapped", entry.tap_idx, entry.mac);
                 result.insert(entry.tap_idx, entry.mac);
             }
         }
@@ -463,7 +463,10 @@ impl LocalModeDispatcherListener {
             }
             for link in links {
                 if link.mac_addr != MacAddr::ZERO && !result.contains_key(&link.if_index) {
-                    debug!("\tif_index: {}, mac: {}", link.if_index, link.mac_addr);
+                    debug!(
+                        "\tif_index: {}, mac: {}, not mapped",
+                        link.if_index, link.mac_addr
+                    );
                     result.insert(link.if_index, link.mac_addr);
                 }
             }
