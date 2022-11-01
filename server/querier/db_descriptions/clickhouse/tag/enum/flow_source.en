@@ -1,4 +1,4 @@
 # Value , DisplayName
-0      , 原始流量
+0      , Raw Packet
 1      , sFlow
 2      , NetFlow/NetStream v5
