@@ -271,6 +271,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			autoIDSuffix := autoStr + "_id" + suffix
 			autoTypeSuffix := autoStr + "_type" + suffix
 			autoNameSuffix := autoStr + suffix
+			ip4Suffix := "ip4" + suffix
+			ip6Suffix := "ip6" + suffix
+			subnetIDSuffix := "subnet_id" + suffix
 			nodeTypeStrSuffix := "dictGet(flow_tag.node_type_map, 'node_type', toUInt64(" + autoTypeSuffix + "))"
 			internetIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(63999),toUInt64(63999)))"
 			ipIconDictGet := "dictGet(flow_tag.device_map, 'icon_id', (toUInt64(64000),toUInt64(64000)))"
@@ -286,10 +289,10 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			}
 			tagResourceMap[autoNameSuffix] = map[string]*Tag{
 				"default": NewTag(
-					"dictGet(flow_tag.device_map, 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+")))",
+					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")),dictGet(flow_tag.device_map, 'name', (toUInt64("+autoTypeSuffix+"),toUInt64("+autoIDSuffix+"))))",
 					"",
-					"(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+")",
-					"(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+")",
+					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE name %s %s AND "+deviceTypeFilter+"))",
+					"if("+autoTypeSuffix+" in (0,255),if(is_ipv4=1, IPv4NumToString("+ip4Suffix+"), IPv6NumToString("+ip6Suffix+")) %s %s,(toUInt64("+autoIDSuffix+"),toUInt64("+autoTypeSuffix+")) IN (SELECT deviceid,devicetype FROM flow_tag.device_map WHERE %s(name,%s) AND "+deviceTypeFilter+"))",
 				),
 				"node_type": NewTag(
 					nodeTypeStrSuffix,
@@ -301,6 +304,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 					iconIDStrSuffix,
 					"",
 					"",
+					"",
+				),
+			}
+			tagResourceMap[autoIDSuffix] = map[string]*Tag{
+				"default": NewTag(
+					"if("+autoTypeSuffix+" in (0,255),"+subnetIDSuffix+","+autoIDSuffix+")",
+					"",
+					"if("+autoTypeSuffix+" in (0,255),"+subnetIDSuffix+" %s %s,"+autoIDSuffix+" %s %s)",
 					"",
 				),
 			}

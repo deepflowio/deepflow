@@ -533,7 +533,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value)
 			}
 
-		case "pod_ingress_id", "pod_ingress_id_0", "pod_ingress_id_1", "pod_ingress", "pod_ingress_0", "pod_ingress_1", "pod_service", "pod_service_0", "pod_service_1":
+		case "pod_ingress_id", "pod_ingress_id_0", "pod_ingress_id_1", "pod_ingress", "pod_ingress_0", "pod_ingress_1", "pod_service", "pod_service_0", "pod_service_1", "resource_gl0", "resource_gl0_0", "resource_gl0_1", "resource_gl1", "resource_gl1_0", "resource_gl1_1", "resource_gl2", "resource_gl2_0", "resource_gl2_1", "resource_gl0_id", "resource_gl0_id_0", "resource_gl0_id_1", "resource_gl1_id", "resource_gl1_id_0", "resource_gl1_id_1", "resource_gl2_id", "resource_gl2_id_0", "resource_gl2_id_1":
 			switch strings.ToLower(op) {
 			case "regexp":
 				whereFilter = fmt.Sprintf(tagItem.WhereRegexpTranslator, "match", t.Value, "match", t.Value)
