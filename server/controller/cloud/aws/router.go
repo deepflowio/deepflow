@@ -113,7 +113,7 @@ func (a *Aws) getRouterAndTables(region awsRegion) ([]model.VRouter, []model.Rou
 			} else {
 				nextHopType = common.ROUTING_TABLE_TYPE_LOCAL
 			}
-			destination := a.getStringPointerValue(route.DestinationCidrBlock)
+			destination := a.getStringPointerValue(route.DestinationCidrBlock) + a.getStringPointerValue(route.DestinationIpv6CidrBlock)
 			routerTables = append(routerTables, model.RoutingTable{
 				Lcuuid:        common.GetUUID(routeTableLcuuid+destination+gatewayID, uuid.Nil),
 				VRouterLcuuid: routeTableLcuuid,
