@@ -18,6 +18,7 @@ package synchronize
 
 import (
 	"strings"
+	"time"
 
 	api "github.com/deepflowys/deepflow/message/trident"
 	context "golang.org/x/net/context"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/controller/genesis"
 	grpcserver "github.com/deepflowys/deepflow/server/controller/grpc"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/statsd"
 )
 
 type service struct {
@@ -54,6 +56,10 @@ func (s *service) Register(gs *grpc.Server) error {
 }
 
 func (s *service) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.Sync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return s.vTapEvent.Sync(ctx, in)
 }
 
@@ -68,25 +74,49 @@ func (s *service) Push(r *api.SyncRequest, in api.Synchronizer_PushServer) error
 }
 
 func (s *service) AnalyzerSync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.AnalyzerSync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return s.tsdbEvent.AnalyzerSync(ctx, in)
 }
 
 func (s *service) Upgrade(r *api.UpgradeRequest, in api.Synchronizer_UpgradeServer) error {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.Upgrade, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return s.upgradeEvent.Upgrade(r, in)
 }
 
 func (s *service) Query(ctx context.Context, in *api.NtpRequest) (*api.NtpResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.Query, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return s.ntpEvent.Query(ctx, in)
 }
 
 func (s *service) GetKubernetesClusterID(ctx context.Context, in *api.KubernetesClusterIDRequest) (*api.KubernetesClusterIDResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.GetKubernetesClusterID, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return s.kubernetesClusterIDEvent.GetKubernetesClusterID(ctx, in)
 }
 
 func (s *service) GenesisSync(ctx context.Context, in *api.GenesisSyncRequest) (*api.GenesisSyncResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.GenesisSync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return genesis.Synchronizer.GenesisSync(ctx, in)
 }
 
 func (s *service) KubernetesAPISync(ctx context.Context, in *api.KubernetesAPISyncRequest) (*api.KubernetesAPISyncResponse, error) {
+	startTime := time.Now()
+	defer func() {
+		statsd.AddGrpcCostStatsd(statsd.KubernetesAPISync, int(time.Now().Sub(startTime).Milliseconds()))
+	}()
 	return genesis.Synchronizer.KubernetesAPISync(ctx, in)
 }
