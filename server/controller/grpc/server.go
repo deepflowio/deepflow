@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/deepflowys/deepflow/server/controller/config"
+	"github.com/deepflowys/deepflow/server/controller/trisolaris/services/grpc/statsd"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris/utils"
 )
 
@@ -47,6 +48,7 @@ func Add(r interface{}) {
 }
 
 func Run(ctx context.Context, cfg *config.ControllerConfig) {
+
 	maxMsgSize := cfg.GrpcMaxMessageLength
 	server := grpc.NewServer(
 		grpc.MaxMsgSize(maxMsgSize),
@@ -62,7 +64,7 @@ func Run(ctx context.Context, cfg *config.ControllerConfig) {
 	if err != nil {
 		log.Fatalf("net.Listen err: %v", err)
 	}
-
+	statsd.Start()
 	go server.Serve(lis)
 	log.Infof("listening and serving GRPC on: %s", cfg.GrpcPort)
 
