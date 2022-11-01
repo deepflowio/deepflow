@@ -545,7 +545,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 				enumFileName := strings.TrimSuffix(tagDescription.EnumFile, "."+config.Cfg.Language)
 				tagFilter = fmt.Sprintf(tagDes.TagTranslator, enumFileName)
 			} else {
-				tagFilter = fmt.Sprintf(tagDes.TagTranslator, f.Args[0])
+				tagFilter = fmt.Sprintf(tagDes.TagTranslator, tagEnum)
 			}
 		} else {
 			tagFilter = fmt.Sprintf("Enum(%s)", f.Args[0])
