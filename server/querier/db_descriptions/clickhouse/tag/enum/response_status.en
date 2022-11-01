@@ -1,5 +1,5 @@
 # Value , DisplayName
-0       , 正常
-2       , 未知
-3       , 服务端异常
-4       , 客户端异常
+0       , Success
+2       , Unknown
+3       , Server Error
+4       , Client Error
