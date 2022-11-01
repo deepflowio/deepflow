@@ -185,7 +185,7 @@ impl SessionAggr {
      SessionAggr 主要用于匹配请求和响应,目前在 go http2 uprobe 也用于聚合请求.
      SessionAggr 本质是一个 数组+map的结构 数组是一个长度为 最大超时时间/slot时间间隔(最大16最小1)  的时序slot,每个slot时间间隔目前是60s.
      map 是一个session_id(AppProtoLogsData::ebpf_flow_session_id()) 为key 的字典.
-     一个AppProtoLogsData 的 slot index 等于 (AppProtoLogsData.base_info.start_time - solt.start_time) / 每个slot时间间隔.
+     一个AppProtoLogsData 的 slot index 等于 (AppProtoLogsData.base_info.start_time - slot.start_time) / 每个slot时间间隔.
      ebpf提交的请求和响应有可能乱序,另也有可能没有响应导致同一个key收到重复的请求,目前主要处理策略如下:
      情况1: 收到响应,
         1.1: 当前slot有对应请求,取出对应请求然后和响应聚合,然后send.
@@ -193,7 +193,7 @@ impl SessionAggr {
         1.2.1: 找到,取出对应请求然后和响应聚合,然后send.
         1.2.2: 找不到,由于ebpf可能响应比请求早,先存下来,等待请求到达.
      情况2: 收到请求
-        2.1: 当前solt找响应
+        2.1: 当前slot找响应
         2.1.1: 找到,聚合发送.
         2.1.2: 找不到, 先存下来,等待响应.
 
@@ -333,16 +333,16 @@ impl SessionAggr {
     }
 
     fn handle(&mut self, log: AppProtoLogsData) {
-        let solt_time = log.base_info.start_time.as_secs();
-        if solt_time < self.start_time {
+        let slot_time = log.base_info.start_time.as_secs();
+        if slot_time < self.start_time {
             self.send(log);
             return;
         }
         if self.start_time == 0 {
-            self.start_time = solt_time / Self::SLOT_WIDTH * Self::SLOT_WIDTH;
+            self.start_time = slot_time / Self::SLOT_WIDTH * Self::SLOT_WIDTH;
         }
 
-        let mut slot_index = (solt_time - self.start_time) / Self::SLOT_WIDTH;
+        let mut slot_index = (slot_time - self.start_time) / Self::SLOT_WIDTH;
         if slot_index >= self.slot_count {
             slot_index = self.flush(slot_index - self.slot_count + 1);
         }
