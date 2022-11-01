@@ -87,6 +87,7 @@ func (d *Decoder) GetCounter() interface{} {
 }
 
 func (d *Decoder) Run() {
+	log.Info("event decoder start")
 	d.resourceInfoTable.Start()
 	ingestercommon.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"event_type": d.eventType.String()})
