@@ -1166,8 +1166,6 @@ impl Synchronizer {
         let exception_handler = self.exception_handler.clone();
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
-            let mut client = None;
-            let version = session.get_version();
             while running.load(Ordering::SeqCst) {
                 match hostname::get() {
                     Ok(hostname) => {
@@ -1194,6 +1192,22 @@ impl Synchronizer {
                 }
 
                 let changed = session.update_current_server().await;
+                if changed {
+                    debug!(
+                        "grpc sync new rpc server {} available",
+                        session.get_current_server()
+                    );
+                }
+
+                let inner_client = session.get_client();
+                if inner_client.is_none() {
+                    session.set_request_failed(true);
+                    error!("grpc sync client not connected");
+                    time::sleep(RPC_RETRY_INTERVAL).await;
+                    continue;
+                }
+                let mut client = tp::synchronizer_client::SynchronizerClient::new(inner_client.unwrap());
+
                 let request = Synchronizer::generate_sync_request(
                     &running_config,
                     &static_config,
@@ -1203,21 +1217,8 @@ impl Synchronizer {
                 );
                 debug!("grpc sync request: {:?}", request);
 
-                if client.is_none() || version != session.get_version() {
-                    let inner_client = session.get_client();
-                    if inner_client.is_none() {
-                        session.set_request_failed(true);
-                        info!("grpc sync client not connected");
-                        time::sleep(RPC_RETRY_INTERVAL).await;
-                        continue;
-                    }
-
-                    client = Some(tp::synchronizer_client::SynchronizerClient::new(
-                        inner_client.unwrap(),
-                    ));
-                }
                 let now = Instant::now();
-                let response = client.as_mut().unwrap().sync(request).await;
+                let response = client.sync(request).await;
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
                     error!(
@@ -1233,14 +1234,6 @@ impl Synchronizer {
 
                 debug!("grpc sync took {:?}", now.elapsed());
                 session.set_request_failed(false);
-
-                if changed {
-                    info!(
-                        "grpc sync new rpc server {} available",
-                        session.get_current_server()
-                    );
-                    client = None;
-                }
 
                 Self::on_response(
                     &session.get_current_server(),
