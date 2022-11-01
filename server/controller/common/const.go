@@ -138,6 +138,7 @@ var VTapTypeName = map[int]string{
 	VTAP_TYPE_HYPER_V:              "HYPER_V",
 }
 
+// need synchronized update with the cli
 const (
 	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH     = 0x10000000
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED   = 0x40000000

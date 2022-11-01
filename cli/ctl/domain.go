@@ -87,7 +87,7 @@ func RegisterDomainCommand() *cobra.Command {
 	exampleCmd := &cobra.Command{
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
-		Long:    "supported types: " + fmt.Sprint(common.DomainTypes),
+		Long:    "supported types: " + strings.Trim(fmt.Sprint(common.DomainTypes), "[]"),
 		Example: "deepflow-ctl domain example agent_sync",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
@@ -159,7 +159,7 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 			fmt.Fprintln(os.Stderr, fmt.Sprintf("domain type (%s) not supported, use example to see supported types", domainTypeStr))
 			return
 		}
-		body["TYPE"] = int(domainType) // FIXME: need convert to int?
+		body["TYPE"] = int(domainType)
 	} else {
 		fmt.Fprintln(os.Stderr, "domain type must specify")
 		return

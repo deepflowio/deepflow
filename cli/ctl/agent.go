@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
@@ -202,7 +201,7 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 				if ok {
 					exceptionStrings = append(exceptionStrings, exceptionStr)
 				} else {
-					exceptionStrings = append(exceptionStrings, strconv.Itoa(exceptionInt))
+					exceptionStrings = append(exceptionStrings, string(common.VtapException(exceptionInt)))
 				}
 			}
 
