@@ -154,6 +154,10 @@ impl Config {
                                 continue;
                             }
                             info!("set kubernetes_cluster_id to {}", id);
+                            // FIXME: The channel in the session will become invalid after success here, so reset the session.
+                            // ==============================================================================================
+                            // FIXME: 这里获取成功后 Session 中的 Channel 会失效，所以在这里重置 Session
+                            session.reset();
                             return id;
                         }
                         None => {
