@@ -33,23 +33,23 @@ var log = logging.MustGetLogger("policy")
 
 /*
 查询逻辑：160~640~920ns + 160ns*N_group
-- 分别查询源端、目的端的如下信息：160~640~920ns + 80ns*N_group
-  - 根据MAC和IP组成MacIpKey，查询endPointCache：80~320~460ns
-    - 若Cache命中，则直接获取EndpointInfo：0ns
-    - 若Cache未命中：240~380ns
-      - 根据MAC查询macMap，获取EndpointInfo：80ns
-      - 根据EPC_ID和IP组成EpcIpKey查询epcIpMap，获取EndpointInfo，与上一步的结果合并：80ns
-      - 根据EPC_ID和IP组成EpcIpKey查询ipGroupCache：80~220ns
-        - 若Cache命中，则直接获取EndpointInfo，并与上一步的结果合并：0ns
-	- 若Cache未命中，则使用EpcIpKey查询ipGroupTree，并与上一步的结果合并：140ns
-  - 遍历GroupIds，与proto、port组成ServiceKey，查询serviceMap：80ns*n_group
-    - 通过interest_proto和interest_port数组避免肯定没有结果的查询
-  - 根据TTL修复L3End（FIXME：如何避免首包L3End错误）
-- 根据源端、目的端信息，获取PolicyId：80ns*N_group
-  - 使用源端GroupId、目的端ServiceId、VLAN组成PolicyKey，查询policyMap，获取PolicyId
-  - 使用源端ServiceId、目的端GroupId、VLAN组成PolicyKey，查询policyMap，获取PolicyId
-- 通过PolicyId找到Action
-- 合并Action，返回
+ 1. 分别查询源端、目的端的如下信息：160~640~920ns + 80ns*N_group
+    1.1. 根据MAC和IP组成MacIpKey，查询endPointCache：80~320~460ns
+    1.1.1. 若Cache命中，则直接获取EndpointInfo：0ns
+    1.1.2. 若Cache未命中：240~380ns
+    1.1.2.1. 根据MAC查询macMap，获取EndpointInfo：80ns
+    1.1.2.2. 根据EPC_ID和IP组成EpcIpKey查询epcIpMap，获取EndpointInfo，与上一步的结果合并：80ns
+    1.1.2.3. 根据EPC_ID和IP组成EpcIpKey查询ipGroupCache：80~220ns
+    1.1.2.3.1. 若Cache命中，则直接获取EndpointInfo，并与上一步的结果合并：0ns
+    1.1.2.3.2. 若Cache未命中，则使用EpcIpKey查询ipGroupTree，并与上一步的结果合并：140ns
+    1.2. 遍历GroupIds，与proto、port组成ServiceKey，查询serviceMap：80ns*n_group
+    1.2.1. 通过interest_proto和interest_port数组避免肯定没有结果的查询
+    1.3. 根据TTL修复L3End（FIXME：如何避免首包L3End错误）
+ 2. 根据源端、目的端信息，获取PolicyId：80ns*N_group
+    2.1. 使用源端GroupId、目的端ServiceId、VLAN组成PolicyKey，查询policyMap，获取PolicyId
+    2.2. 使用源端ServiceId、目的端GroupId、VLAN组成PolicyKey，查询policyMap，获取PolicyId
+ 3. 通过PolicyId找到Action
+ 4. 合并Action，返回
 */
 type MacKey uint64         // u64(mac)
 type IpKey uint32          // u32(ip)
@@ -275,9 +275,9 @@ func (t *PolicyTable) UpdateMemoryLimit(limit uint64) {
 func (t *PolicyTable) GetEndpointInfo(mac uint64, ip net.IP, inPort uint32) *EndpointInfo {
 	var endpointInfo *EndpointInfo
 	if PortInDeepflowExporter(inPort) {
-		endpointInfo, _ = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_TOR, false, 0)
+		endpointInfo, _ = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_CLOUD, false, 0)
 	} else {
-		endpointInfo, _ = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_ISP_MIN, false, 0)
+		endpointInfo, _ = t.cloudPlatformLabeler.GetEndpointInfo(mac, ip, TAP_IDC_MIN, false, 0)
 	}
 
 	return endpointInfo

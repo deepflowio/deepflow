@@ -107,7 +107,7 @@ pub struct EndpointData {
 
 impl EndpointData {
     pub fn set_l2_end(&mut self, key: &LookupKey) {
-        if key.tap_type == TapType::Tor {
+        if key.tap_type == TapType::Cloud {
             self.src_info.l2_end = key.l2_end_0;
             self.dst_info.l2_end = key.l2_end_1;
         }

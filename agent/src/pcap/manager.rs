@@ -75,7 +75,7 @@ impl WorkerManager {
         let example_filepath = get_temp_filename(
             &Path::new("yunshan"),
             1,
-            TapType::Tor,
+            TapType::Cloud,
             1233,
             Duration::from_secs(10),
             0,

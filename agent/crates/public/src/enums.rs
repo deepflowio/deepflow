@@ -205,8 +205,8 @@ impl PartialEq<LinkType> for u8 {
 #[repr(u16)]
 pub enum TapType {
     Any,
-    Isp(u8),
-    Tor,
+    Idc(u8),
+    Cloud,
     Max,
     Unknown,
 }
@@ -222,9 +222,9 @@ impl TryFrom<u16> for TapType {
     fn try_from(t: u16) -> Result<TapType, Self::Error> {
         match t {
             0 => Ok(TapType::Any),
-            3 => Ok(TapType::Tor),
+            3 => Ok(TapType::Cloud),
             0xffff => Ok(TapType::Unknown),
-            v if v < 256 => Ok(TapType::Isp(v as u8)),
+            v if v < 256 => Ok(TapType::Idc(v as u8)),
             _ => Err("TapType not in [0, 256)"),
         }
     }
@@ -234,8 +234,8 @@ impl From<TapType> for u16 {
     fn from(t: TapType) -> u16 {
         match t {
             TapType::Any => 0,
-            TapType::Isp(v) => v as u16,
-            TapType::Tor => 3,
+            TapType::Idc(v) => v as u16,
+            TapType::Cloud => 3,
             TapType::Max => 256,
             TapType::Unknown => 0xffff,
         }
@@ -252,8 +252,8 @@ impl fmt::Display for TapType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TapType::Any => write!(f, "any"),
-            TapType::Isp(n) => write!(f, "isp{}", n),
-            TapType::Tor => write!(f, "tor"),
+            TapType::Idc(n) => write!(f, "isp{}", n),
+            TapType::Cloud => write!(f, "tor"),
             TapType::Max => write!(f, "max"),
             TapType::Unknown => write!(f, "unknown"),
         }

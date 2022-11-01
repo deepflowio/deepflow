@@ -494,7 +494,7 @@ impl Stash {
         }
         let flow = &acc_flow.tagged_flow.flow;
         // 双端统计量：若双端direction都未知，则以direction=0（对应tap-side=rest）记录一次统计数据
-        if flow.flow_key.tap_type == TapType::Tor
+        if flow.flow_key.tap_type == TapType::Cloud
             && directions[0] == Direction::None
             && directions[1] == Direction::None
         {
@@ -979,7 +979,7 @@ mod tests {
         tagger.l3_epc_id = (tagger.l3_epc_id as u16 ^ 0x8000) as i16;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None);
         assert_eq!(map.insert(key), true);
-        tagger.tap_type = TapType::Isp(255);
+        tagger.tap_type = TapType::Idc(255);
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None);
         assert_eq!(map.insert(key), true);
         tagger.direction = Direction::ServerToClient;
@@ -1017,7 +1017,7 @@ mod tests {
         tagger.l3_epc_id1 = (tagger.l3_epc_id as u16 ^ 0x8000) as i16;
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None);
         assert_eq!(map.insert(key), true);
-        tagger.tap_type = TapType::Isp(200);
+        tagger.tap_type = TapType::Idc(200);
         let key = StashKey::new(&tagger, Ipv4Addr::UNSPECIFIED.into(), None);
         assert_eq!(map.insert(key), true);
         tagger.direction = Direction::ClientToServer;

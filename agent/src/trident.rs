@@ -1306,7 +1306,7 @@ impl Components {
                 .default_tap_type(
                     (yaml_config.default_tap_type as u16)
                         .try_into()
-                        .unwrap_or(TapType::Tor),
+                        .unwrap_or(TapType::Cloud),
                 )
                 .mirror_traffic_pcp(yaml_config.mirror_traffic_pcp)
                 .tap_typer(tap_typer.clone())

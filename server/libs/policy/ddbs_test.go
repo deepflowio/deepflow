@@ -882,7 +882,7 @@ func TestDdbsPcapNpbAction(t *testing.T) {
 
 	// key1: ip4:1000 -> ip3:1023 tcp
 	key1 := generateLookupKey(group1Mac, group1Mac, group1Ip1, group1Ip2, IPProtocolTCP, 1000, 1023, NPB)
-	key1.TapType = TAP_ISP_MIN
+	key1.TapType = TAP_IDC_MIN
 	_, policyData := table.lookupAllByKey(key1)
 	// 查询结果和预期结果比较
 	if !CheckPolicyResult(t, basicPolicyData, policyData) {

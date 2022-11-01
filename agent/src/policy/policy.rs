@@ -108,7 +108,7 @@ impl Policy {
     pub fn lookup_l3(&mut self, packet: &mut MetaPacket) {
         let key = &mut packet.lookup_key;
         let index = key.fast_index;
-        if key.tap_type != TapType::Tor {
+        if key.tap_type != TapType::Cloud {
             return;
         }
         if key.src_ip.is_loopback() {

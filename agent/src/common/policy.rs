@@ -455,7 +455,7 @@ impl Acl {
     ) -> Self {
         Acl {
             id,
-            tap_type: TapType::Tor,
+            tap_type: TapType::Cloud,
             src_groups,
             dst_groups,
             src_port_ranges,

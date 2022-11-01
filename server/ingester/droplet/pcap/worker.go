@@ -252,10 +252,10 @@ func (w *Worker) cleanTimeoutFile(timeNow time.Duration) {
 }
 
 func (w *Worker) toZerodocTAPType(packet *datatype.MetaPacket) zerodoc.TAPTypeEnum {
-	if packet.TapType != datatype.TAP_TOR {
+	if packet.TapType != datatype.TAP_CLOUD {
 		return zerodoc.TAPTypeEnum(packet.TapType)
 	}
-	return zerodoc.ToR
+	return zerodoc.CLOUD
 }
 
 func (w *Worker) Process() {

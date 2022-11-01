@@ -50,7 +50,9 @@ const (
 	MAC
 	PodClusterID
 	ServiceID
-	Resource // 1<< 14 支持最大偏移到19
+	Resource // 1<< 14
+
+	// Make sure the max offset <= 19
 )
 
 const (
@@ -68,7 +70,9 @@ const (
 	MACPath
 	PodClusterIDPath
 	ServiceIDPath
-	ResourcePath // 1<<34 支持最大偏移到39
+	ResourcePath // 1<<34
+
+	// Make sure the max offset <= 39
 )
 
 const (
@@ -201,14 +205,21 @@ func (d DirectionEnum) ToTAPSide() TAPSideEnum {
 	return TAPSideEnum(d)
 }
 
+// TAP: Traffic Access Point
+//
+// Indicates the flow data collection location.  Currently supports 255
+// acquisition locations. The traffic in cloud is uniformly represented by
+// a special value `3`, and the other values represent the traffic
+// collected from optical splitting and mirroring at different locations
+// in the IDC.
+//
+// Note: For historical reasons, we use the confusing term VTAP to refer
+// to deepflow-agent, and vtap_id to represent the id of a deepflow-agent.
 type TAPTypeEnum uint8
 
 const (
-	ISP0 TAPTypeEnum = iota
-	ISP1
-	ISP2
-	ToR
-	// 4~255 ISP
+	IDC_MIN TAPTypeEnum = 1 // 1~2, 4~255: IDC
+	CLOUD   TAPTypeEnum = 3
 )
 
 const (

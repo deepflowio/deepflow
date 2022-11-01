@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	EXAMPLE_TEMPNAME        = getTempFilename(zerodoc.ISP1, 0, time.Duration(time.Now().UnixNano()), 0)
+	EXAMPLE_TEMPNAME        = getTempFilename(zerodoc.CLOUD, 0, time.Duration(time.Now().UnixNano()), 0)
 	EXAMPLE_TEMPNAME_SPLITS = len(strings.Split(EXAMPLE_TEMPNAME, "_"))
 )
 
