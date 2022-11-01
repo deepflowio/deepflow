@@ -18,6 +18,7 @@ package event
 
 import (
 	"fmt"
+	"time"
 
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -61,6 +62,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 		}
 
 		event := i.createEvent()
+		event.Time = time.Now().Unix()
 		event.Type = eventapi.RESOURCE_EVENT_TYPE_ADD_IP
 		event.ResourceType = uint32(deviceInfo.Type)
 		event.ResourceID = uint32(deviceInfo.ID)
@@ -101,6 +103,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 		}
 
 		event := i.createEvent()
+		event.Time = time.Now().Unix()
 		event.Type = eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP
 		event.ResourceType = uint32(deviceInfo.Type)
 		event.ResourceID = uint32(deviceInfo.ID)
