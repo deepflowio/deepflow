@@ -60,3 +60,25 @@ func (t *SuiteTest) TestDeleteLANIPBatchSuccess() {
 	result = t.db.Where("lcuuid = ?", addedItem.Lcuuid).Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 }
+
+func (t *SuiteTest) TestLANIPCreateAndFind() {
+	lcuuid := uuid.New().String()
+	lanIP := &mysql.LANIP{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(lanIP)
+	var resultLANIP *mysql.LANIP
+	err := t.db.Where("lcuuid = ? and ip='' and netmask='' and gateway=''"+
+		"and sub_domain='' and domain=''", lcuuid).First(&resultLANIP).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), lanIP.Base.Lcuuid, resultLANIP.Base.Lcuuid)
+
+	resultLANIP = new(mysql.LANIP)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultLANIP)
+	assert.Equal(t.T(), lanIP.Base.Lcuuid, resultLANIP.Base.Lcuuid)
+
+	resultLANIP = new(mysql.LANIP)
+	result := t.db.Where("lcuuid = ? and ip = null", lcuuid).Find(&resultLANIP)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
+}

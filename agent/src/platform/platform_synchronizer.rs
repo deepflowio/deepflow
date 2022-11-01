@@ -16,6 +16,7 @@
 
 use std::{
     net::IpAddr,
+    process,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Condvar, Mutex,
@@ -27,6 +28,7 @@ use std::{
 
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
+use regex::Regex;
 use ring::digest;
 use tokio::runtime::{Builder, Runtime};
 
@@ -43,7 +45,10 @@ use crate::{
     utils::environment::is_tt_pod,
 };
 use crate::{exception::ExceptionHandler, rpc::Session};
-use public::netns::{InterfaceInfo, NsFile};
+use public::{
+    consts::NORMAL_EXIT_WITH_RESTART,
+    netns::{InterfaceInfo, NetNs, NsFile},
+};
 
 const SHA1_DIGEST_LEN: usize = 20;
 
@@ -57,6 +62,7 @@ struct ProcessArgs {
     xml_extractor: Arc<LibvirtXmlExtractor>,
     kubernetes_poller: Arc<GenericPoller>,
     exception_handler: ExceptionHandler,
+    extra_netns_regex: Arc<Mutex<Option<Regex>>>,
 }
 
 #[derive(Default)]
@@ -68,7 +74,8 @@ struct PlatformArgs {
     raw_ovs_ports: Option<String>,
     raw_brctl_show: Option<String>,
     raw_vlan_config: Option<String>,
-    raw_ip_addr: Option<String>,
+    raw_ip_netns: Vec<String>,
+    raw_ip_addrs: Vec<String>,
     ips: Vec<handler::IpInfo>,
     lldps: Vec<handler::LldpInfo>,
 }
@@ -91,6 +98,7 @@ pub struct PlatformSynchronizer {
     xml_extractor: Arc<LibvirtXmlExtractor>,
     sniffer: Arc<sniffer_builder::Sniffer>,
     exception_handler: ExceptionHandler,
+    extra_netns_regex: Arc<Mutex<Option<Regex>>>,
 }
 
 impl PlatformSynchronizer {
@@ -99,7 +107,7 @@ impl PlatformSynchronizer {
         session: Arc<Session>,
         xml_extractor: Arc<LibvirtXmlExtractor>,
         exception_handler: ExceptionHandler,
-        poller_netns: Vec<NsFile>,
+        extra_netns_regex: String,
     ) -> Self {
         let (can_set_ns, can_read_link_ns) = (check_set_ns(), check_read_link_ns());
 
@@ -115,23 +123,34 @@ impl PlatformSynchronizer {
             );
         }
 
+        let extra_netns_regex = if extra_netns_regex != "" {
+            info!("platform monitoring extra netns: /{}/", extra_netns_regex);
+            Some(Regex::new(&extra_netns_regex).unwrap())
+        } else {
+            info!("platform monitoring no extra netns");
+            None
+        };
+
         let config_guard = config.load();
         let poller = match config_guard.kubernetes_poller_type {
             KubernetesPollerType::Adaptive => {
                 if can_set_ns && can_read_link_ns {
-                    GenericPoller::from(ActivePoller::new(config_guard.sync_interval))
+                    GenericPoller::from(ActivePoller::new(
+                        config_guard.sync_interval,
+                        extra_netns_regex.clone(),
+                    ))
                 } else {
                     GenericPoller::from(PassivePoller::new(config_guard.sync_interval))
                 }
             }
-            KubernetesPollerType::Active => {
-                GenericPoller::from(ActivePoller::new(config_guard.sync_interval))
-            }
+            KubernetesPollerType::Active => GenericPoller::from(ActivePoller::new(
+                config_guard.sync_interval,
+                extra_netns_regex.clone(),
+            )),
             KubernetesPollerType::Passive => {
                 GenericPoller::from(PassivePoller::new(config_guard.sync_interval))
             }
         };
-        poller.set_netns(poller_netns);
         drop(config_guard);
 
         let kubernetes_poller = Arc::new(poller);
@@ -155,6 +174,7 @@ impl PlatformSynchronizer {
             xml_extractor,
             sniffer,
             exception_handler,
+            extra_netns_regex: Arc::new(Mutex::new(extra_netns_regex)),
         }
     }
 
@@ -164,6 +184,18 @@ impl PlatformSynchronizer {
 
     pub fn stop_kubernetes_poller(&self) {
         self.kubernetes_poller.stop()
+    }
+
+    pub fn set_netns_regex<S: AsRef<str>>(&self, regex: S) {
+        let regex = if regex.as_ref() != "" {
+            info!("platform monitoring extra netns: /{}/", regex.as_ref());
+            Some(Regex::new(regex.as_ref()).unwrap())
+        } else {
+            info!("platform monitoring no extra netns");
+            None
+        };
+        self.kubernetes_poller.set_netns_regex(regex.clone());
+        *self.extra_netns_regex.lock().unwrap() = regex;
     }
 
     pub fn is_running(&self) -> bool {
@@ -221,6 +253,7 @@ impl PlatformSynchronizer {
             xml_extractor: self.xml_extractor.clone(),
             sniffer: self.sniffer.clone(),
             exception_handler: self.exception_handler.clone(),
+            extra_netns_regex: self.extra_netns_regex.clone(),
         };
 
         let handle = thread::spawn(move || Self::process(process_args));
@@ -240,6 +273,7 @@ impl PlatformSynchronizer {
         process_args: &ProcessArgs,
         self_kubernetes_version: &mut u64,
         self_last_ip_update_timestamp: &mut Duration,
+        netns: &Vec<NsFile>,
     ) {
         let platform_enabled = process_args.config.load().enabled;
 
@@ -254,16 +288,45 @@ impl PlatformSynchronizer {
             hash_handle.update(hostname.as_bytes());
         }
 
-        let raw_host_ip_addr = get_ip_address()
-            .map_err(|err| debug!("get_ip_address error:{}", err))
-            .ok();
-        if let Some(ip_addr) = raw_host_ip_addr.as_ref() {
-            for line in ip_addr.lines() {
-                // 忽略可能变化的行避免version频繁更新
-                if line.contains("valid_lft") {
+        let mut raw_ip_netns = vec![];
+        let mut raw_ip_addrs = vec![];
+        let current_ns = if netns.len() > 1 {
+            // for restore
+            let current_ns = NetNs::open_current_ns();
+            if let Err(e) = current_ns {
+                warn!("get self net namespace failed: {:?}", e);
+                return;
+            }
+            current_ns.ok()
+        } else {
+            None
+        };
+        for ns in netns {
+            if ns != &NsFile::Root {
+                if let Err(e) = NetNs::open_named_and_setns(ns) {
+                    warn!("setns to {:?} failed: {}", ns, e);
                     continue;
                 }
-                hash_handle.update(line.as_bytes());
+            }
+            let raw_host_ip_addr = get_ip_address()
+                .map_err(|err| debug!("get_ip_address error:{}", err))
+                .ok();
+            if let Some(ip_addr) = raw_host_ip_addr.as_ref() {
+                for line in ip_addr.lines() {
+                    // 忽略可能变化的行避免version频繁更新
+                    if line.contains("valid_lft") {
+                        continue;
+                    }
+                    hash_handle.update(line.as_bytes());
+                }
+            }
+            raw_ip_netns.push(ns.to_string());
+            raw_ip_addrs.push(raw_host_ip_addr.unwrap_or_default());
+        }
+        if let Some(ns) = current_ns {
+            if let Err(e) = NetNs::setns(&ns) {
+                warn!("restore net namespace failed: {}", e);
+                return;
             }
         }
 
@@ -404,7 +467,8 @@ impl PlatformSynchronizer {
                     platform_args.raw_brctl_show = raw_brctl_show;
                     platform_args.raw_vlan_config = raw_vlan_config;
                 }
-                platform_args.raw_ip_addr = raw_host_ip_addr;
+                platform_args.raw_ip_netns = raw_ip_netns;
+                platform_args.raw_ip_addrs = raw_ip_addrs;
             }
 
             if platform_enabled {
@@ -508,6 +572,7 @@ impl PlatformSynchronizer {
                 tap_index: Some(interface_info.tap_idx),
                 ip: interface_info.ips.iter().map(ToString::to_string).collect(),
                 device_name: None,
+                netns: Some(interface_info.tap_ns.to_string()),
             })
             .chain(
                 self_xml_interfaces
@@ -519,6 +584,7 @@ impl PlatformSynchronizer {
                         device_name: Some(entry.domain_name.clone()),
                         ip: vec![],
                         tap_index: None,
+                        netns: None,
                     }),
             )
             .collect();
@@ -534,7 +600,8 @@ impl PlatformSynchronizer {
             raw_brctl_show,
             raw_vlan_config,
             lldp_info: lldp_infos,
-            raw_ip_addrs: vec![platform_args.raw_ip_addr.clone().unwrap_or_default()],
+            raw_ip_netns: platform_args.raw_ip_netns.clone(),
+            raw_ip_addrs: platform_args.raw_ip_addrs.clone(),
             interfaces,
         };
 
@@ -568,7 +635,22 @@ impl PlatformSynchronizer {
         let mut interface_infos = vec![];
         let mut xml_interfaces = vec![];
 
+        let mut netns = vec![];
+
         loop {
+            let mut new_netns = vec![NsFile::Root];
+            if let Some(re) = &*args.extra_netns_regex.lock().unwrap() {
+                let mut extra_ns = NetNs::find_ns_files_by_regex(&re);
+                extra_ns.sort_unstable();
+                new_netns.extend(extra_ns);
+            }
+            if netns.is_empty() {
+                netns = new_netns;
+            } else if netns != new_netns {
+                info!("query net namespaces changed from {:?} to {:?}, restart agent to create dispatcher for extra namespaces", netns, new_netns);
+                thread::sleep(Duration::from_secs(1));
+                process::exit(NORMAL_EXIT_WITH_RESTART);
+            }
             Self::query_platform(
                 &mut platform_args,
                 &mut hash_args,
@@ -577,6 +659,7 @@ impl PlatformSynchronizer {
                 &args,
                 &mut kubernetes_version,
                 &mut last_ip_update_timestamp,
+                &netns,
             );
 
             let cur_version = args.version.load(Ordering::SeqCst);

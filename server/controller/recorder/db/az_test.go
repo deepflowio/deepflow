@@ -98,3 +98,24 @@ func (t *SuiteTest) TestDeleteAZSuccess() {
 
 	clearDBData[mysql.AZ](t.db)
 }
+
+func (t *SuiteTest) TestAZCreateAndFind() {
+	lcuuid := uuid.New().String()
+	az := &mysql.AZ{
+		Base: mysql.Base{Lcuuid: lcuuid},
+	}
+	t.db.Create(az)
+	var resultAZ *mysql.AZ
+	err := t.db.Where("lcuuid = ? and name='' and label='' and region='' and domain=''", lcuuid).First(&resultAZ).Error
+	assert.Equal(t.T(), nil, err)
+	assert.Equal(t.T(), az.Base.Lcuuid, resultAZ.Base.Lcuuid)
+
+	resultAZ = new(mysql.AZ)
+	t.db.Where("lcuuid = ?", lcuuid).Find(&resultAZ)
+	assert.Equal(t.T(), az.Base.Lcuuid, resultAZ.Base.Lcuuid)
+
+	resultAZ = new(mysql.AZ)
+	result := t.db.Where("lcuuid = ? and name = null", lcuuid).Find(&resultAZ)
+	assert.Equal(t.T(), nil, result.Error)
+	assert.Equal(t.T(), int64(0), result.RowsAffected)
+}

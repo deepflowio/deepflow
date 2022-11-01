@@ -139,8 +139,8 @@ const OP_CLS_LOAD_X: u16 = 1;
 const OP_CLS_STORE_A: u16 = 2;
 const OP_CLS_STORE_X: u16 = 3;
 const OP_CLS_ALU: u16 = 4;
-const OP_CLS_JUMP: u16 = 5;
-const OP_CLS_RETURN: u16 = 6;
+pub const OP_CLS_JUMP: u16 = 5;
+pub const OP_CLS_RETURN: u16 = 6;
 const OP_CLS_MISC: u16 = 7;
 
 const OP_LOAD_WIDTH_4: u16 = 0;
@@ -341,7 +341,7 @@ impl Default for JumpIf {
 }
 
 const OP_JUMP_ALWAYS: u16 = 0;
-const OP_JUMP_EQUAL: u16 = 1 << 4;
+pub const OP_JUMP_EQUAL: u16 = 1 << 4;
 const OP_JUMP_GT: u16 = 2 << 4;
 const OP_JUMP_GE: u16 = 3 << 4;
 const OP_JUMP_SET: u16 = 4 << 4;

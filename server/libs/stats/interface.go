@@ -54,7 +54,7 @@ type Countable interface {
 func SetMinInterval(interval time.Duration) {
 	MinInterval = (interval + TICK_CYCLE - 1) / TICK_CYCLE * TICK_CYCLE
 	if MinInterval != interval {
-		log.Error("Bad stats-interval:", interval, ", should be integral multiple of", TICK_CYCLE, ",change to", MinInterval)
+		log.Warning("Bad stats-interval:", interval, ", should be integral multiple of", TICK_CYCLE, ",change to", MinInterval)
 	}
 }
 
