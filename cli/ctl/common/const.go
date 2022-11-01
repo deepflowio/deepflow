@@ -94,3 +94,14 @@ const (
 	VTAP_TYPE_TUNNEL_DECAPSULATION // TUN_DECAP
 	VTAP_TYPE_HYPER_V
 )
+
+//go:generate stringer -type=VtapException -trimprefix=VTAP_EXCEPTION_ -linecomment
+type VtapException uint64
+
+// need synchronized update with the server
+const (
+	// attention: following line comments are used by `stringer`
+	VTAP_EXCEPTION_LICENSE_NOT_ENGOUTH     VtapException = 0x10000000
+	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED   VtapException = 0x40000000
+	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED VtapException = 0x80000000
+)
