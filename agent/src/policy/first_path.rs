@@ -658,7 +658,7 @@ mod tests {
             src_port: 80,
             dst_port: 100,
             feature_flag: FeatureFlags::NONE,
-            tap_type: TapType::Tor,
+            tap_type: TapType::Cloud,
             ..Default::default()
         };
 
@@ -693,7 +693,7 @@ mod tests {
             src_port: 80,
             dst_port: 100,
             feature_flag: FeatureFlags::DEDUP,
-            tap_type: TapType::Tor,
+            tap_type: TapType::Cloud,
             ..Default::default()
         };
         let (_policy, _) = first.first_get(&mut key, endpotins).unwrap();

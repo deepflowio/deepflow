@@ -65,7 +65,7 @@ impl DedupOperator for LookupKey {
     }
 
     fn is_tor(&self) -> bool {
-        self.tap_type == TapType::Tor
+        self.tap_type == TapType::Cloud
     }
 }
 

@@ -846,8 +846,8 @@ impl QuadrupleGenerator {
         for i in 0..2 {
             let side = &tagged_flow.flow.flow_metrics_peers[i];
             let is_l2_and_l3_end = side.is_l3_end && side.is_l2_end;
-            if (tagged_flow.flow.flow_key.tap_type == TapType::Tor && is_l2_and_l3_end)
-                || (tagged_flow.flow.flow_key.tap_type != TapType::Tor
+            if (tagged_flow.flow.flow_key.tap_type == TapType::Cloud && is_l2_and_l3_end)
+                || (tagged_flow.flow.flow_key.tap_type != TapType::Cloud
                     && side.l3_epc_id != EPC_FROM_INTERNET)
             {
                 no_endpoint_flag = false;

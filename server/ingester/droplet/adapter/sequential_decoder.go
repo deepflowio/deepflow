@@ -383,7 +383,7 @@ func (d *SequentialDecoder) DecodeHeader(frameSize uint16) (bool, uint16) {
 	if inPort&ANALYZER_TRIDENT == ANALYZER_TRIDENT {
 		d.tapType = TapType(inPort & ANALYZER_TRIDNET_MASK)
 	} else {
-		d.tapType = TAP_TOR
+		d.tapType = TAP_CLOUD
 		d.tapPort = inPort
 	}
 	d.tridentDispatcherIndex = index

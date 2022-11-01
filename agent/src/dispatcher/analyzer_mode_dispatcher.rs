@@ -210,8 +210,8 @@ impl AnalyzerModeDispatcher {
             let original_length = packet.data.len() - decap_length;
 
             let overlay_packet = &mut packet.data[decap_length..raw_length];
-            // Only virtual network traffic goes to remove duplicates
-            if tap_type == TapType::Tor
+            // Only cloud traffic goes to de-duplication
+            if tap_type == TapType::Cloud
                 && !base.analyzer_dedup_disabled
                 && self.dedup.duplicate(overlay_packet, timestamp)
             {
@@ -361,7 +361,7 @@ impl AnalyzerModeDispatcher {
 
     pub(super) fn prepare_flow(meta_packet: &mut MetaPacket, tap_type: TapType, queue_hash: u8) {
         let mut reset_ttl = false;
-        if tap_type == TapType::Tor {
+        if tap_type == TapType::Cloud {
             reset_ttl = true;
         }
         BaseDispatcher::prepare_flow(meta_packet, tap_type, reset_ttl, queue_hash)

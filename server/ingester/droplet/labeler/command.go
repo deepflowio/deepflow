@@ -228,7 +228,7 @@ func parseUint(s string) (uint32, error) {
 func parseTapType(s string) datatype.TapType {
 	switch s {
 	case "tor":
-		return datatype.TAP_TOR
+		return datatype.TAP_CLOUD
 	default:
 		typeId, err := strconv.Atoi(s)
 		if err != nil {
@@ -503,7 +503,7 @@ func parseAcl(args []string) *policy.Acl {
 			case "any":
 				acl.TapType = datatype.TAP_ANY
 			case "tor":
-				acl.TapType = datatype.TAP_TOR
+				acl.TapType = datatype.TAP_CLOUD
 			default:
 				typeId, err := strconv.Atoi(keyValue[1])
 				if err != nil {

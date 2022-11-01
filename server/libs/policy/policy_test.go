@@ -771,7 +771,7 @@ func generatePolicyAcl(table *PolicyTable, action NpbActions, aclID uint32, args
 	}
 	acl := &Acl{
 		Id:           aclID,
-		TapType:      TAP_TOR,
+		TapType:      TAP_CLOUD,
 		SrcGroups:    srcGroups,
 		DstGroups:    dstGroups,
 		SrcPortRange: []PortRange{NewPortRange(0, 65535)},
@@ -792,7 +792,7 @@ func generateLookupKey6(srcMac, dstMac uint64, srcIp, dstIp net.IP,
 		Proto:       uint8(proto),
 		SrcPort:     srcPort,
 		DstPort:     dstPort,
-		TapType:     TAP_TOR,
+		TapType:     TAP_CLOUD,
 		FeatureFlag: NPM,
 	}
 	if len(flags) > 0 {
@@ -811,7 +811,7 @@ func generateLookupKey(srcMac, dstMac uint64, srcIp, dstIp uint32,
 		Proto:       uint8(proto),
 		SrcPort:     srcPort,
 		DstPort:     dstPort,
-		TapType:     TAP_TOR,
+		TapType:     TAP_CLOUD,
 		FeatureFlag: NPM,
 	}
 	if len(flags) > 0 {
@@ -849,7 +849,7 @@ func generateClassicLookupKey(srcMac, dstMac uint64, srcIp, dstIp uint32,
 		SrcPort:     srcPort,
 		DstPort:     dstPort,
 		EthType:     ethType,
-		TapType:     TAP_TOR,
+		TapType:     TAP_CLOUD,
 		FeatureFlag: NPM,
 	}
 	return key

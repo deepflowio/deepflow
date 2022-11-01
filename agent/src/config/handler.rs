@@ -468,13 +468,13 @@ impl fmt::Debug for EbpfConfig {
 #[cfg(target_os = "linux")]
 impl EbpfConfig {
     pub fn l7_log_enabled(&self) -> bool {
-        // Afpacket应用日志依赖l7_metrics_enabled和collector_enabled，这里统一逻辑
+        // disabled when metrics collection is turned off
         if !self.l7_metrics_enabled || !self.collector_enabled {
             return false;
         }
-        // Ebpf应用日志都是虚拟的，这里仅需要判断ANY和TOR
+        // eBPF data is only collected from Cloud-type TAP
         return self.l7_log_tap_types[u16::from(TapType::Any) as usize]
-            || self.l7_log_tap_types[u16::from(TapType::Tor) as usize];
+            || self.l7_log_tap_types[u16::from(TapType::Cloud) as usize];
     }
 }
 

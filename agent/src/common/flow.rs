@@ -1016,7 +1016,7 @@ pub fn get_direction(
         match trident_type {
             TridentType::TtDedicatedPhysicalMachine => {
                 //  接入网络
-                if tap_type != TapType::Tor {
+                if tap_type != TapType::Cloud {
                     if l3_epc_id != EPC_FROM_INTERNET {
                         return (
                             Direction::ClientToServer,
