@@ -105,3 +105,28 @@ const (
 	VTAP_EXCEPTION_ALLOC_ANALYZER_FAILED   VtapException = 0x40000000
 	VTAP_EXCEPTION_ALLOC_CONTROLLER_FAILED VtapException = 0x80000000
 )
+
+//go:generate stringer -type=VtapTapMode -trimprefix=VTAP_TAP_MODE_ -linecomment
+type VtapTapMode int
+
+const (
+	// attention: following line comments are used by `stringer`
+	VTAP_TAP_MODE_LOCAL     VtapTapMode = iota // local
+	VTAP_TAP_MODE_MIRROR                       //mirror
+	VTAP_TAP_MODE_DEDICATED                    // dedicated
+)
+
+var VtapTapModes []VtapTapMode = []VtapTapMode{
+	VTAP_TAP_MODE_LOCAL,
+	VTAP_TAP_MODE_MIRROR,
+	VTAP_TAP_MODE_DEDICATED,
+}
+
+func GetVtapTapModeByName(tapModeName string) VtapTapMode {
+	for i := 0; i < len(VtapTapModes); i++ {
+		if VtapTapModes[i].String() == tapModeName {
+			return VtapTapModes[i]
+		}
+	}
+	return VTAP_TAP_MODE_LOCAL
+}
