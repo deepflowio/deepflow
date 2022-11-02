@@ -1767,7 +1767,8 @@ impl ConfigHandler {
             restart_dispatcher = true;
         }
 
-        if restart_dispatcher && candidate_config.dispatcher.enabled {
+        // avoid first config changed to restart dispatcher
+        if components.is_some() && restart_dispatcher && candidate_config.dispatcher.enabled {
             fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
                 for dispatcher in components.dispatchers.iter() {
                     dispatcher.stop();
