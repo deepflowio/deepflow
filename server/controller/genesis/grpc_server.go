@@ -19,10 +19,7 @@ package genesis
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
-
-	"google.golang.org/grpc/peer"
 
 	tridentcommon "github.com/deepflowys/deepflow/message/common"
 	"github.com/deepflowys/deepflow/message/controller"
@@ -31,6 +28,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/genesis/common"
 	"github.com/deepflowys/deepflow/server/controller/genesis/config"
 	"github.com/deepflowys/deepflow/server/libs/queue"
+	"google.golang.org/grpc/peer"
 )
 
 func isInterestedHost(tType tridentcommon.TridentType) bool {
@@ -101,9 +99,8 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 	}
 	version := request.GetVersion()
 	if version == 0 {
-		msg := fmt.Sprintf("genesis sync ignore message with version 0 from %s", remote)
-		log.Warning(msg)
-		return &trident.GenesisSyncResponse{}, errors.New(msg)
+		log.Warningf("genesis sync ignore message with version 0 from %s", remote)
+		return &trident.GenesisSyncResponse{}, nil
 	}
 	vtapID := request.GetVtapId()
 	k8sClusterID := request.GetKubernetesClusterId()
@@ -126,9 +123,8 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		g.tridentStatsMap[vtapID] = stats
 	}
 	if !isInterestedHost(tType) {
-		msg := fmt.Sprintf("genesis sync ignore message from %s trident %s vtap_id %v", tType, remote, vtapID)
-		log.Debug(msg)
-		return &trident.GenesisSyncResponse{Version: &version}, errors.New(msg)
+		log.Debugf("genesis sync ignore message from %s trident %s vtap_id %v", tType, remote, vtapID)
+		return &trident.GenesisSyncResponse{Version: &version}, nil
 	}
 	var localVersion uint64
 	if vtapID != 0 {
@@ -195,15 +191,13 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	}
 	version := request.GetVersion()
 	if version == 0 {
-		msg := fmt.Sprintf("kubernetes api sync ignore message with version 0 from ip: %s, vtap id: %d", remote, vtapID)
-		log.Warning(msg)
-		return &trident.KubernetesAPISyncResponse{}, errors.New(msg)
+		log.Warningf("kubernetes api sync ignore message with version 0 from ip: %s, vtap id: %d", remote, vtapID)
+		return &trident.KubernetesAPISyncResponse{}, nil
 	}
 	clusterID := request.GetClusterId()
 	if clusterID == "" {
-		msg := fmt.Sprintf("kubernetes api sync ignore message with cluster id null from ip: %s, vtap id: %v", remote, vtapID)
-		log.Warningf(msg)
-		return &trident.KubernetesAPISyncResponse{}, errors.New(msg)
+		log.Warningf("kubernetes api sync ignore message with cluster id null from ip: %s, vtap id: %v", remote, vtapID)
+		return &trident.KubernetesAPISyncResponse{}, nil
 	}
 	entries := request.GetEntries()
 
