@@ -28,12 +28,12 @@ import (
 )
 
 type LANIP struct {
-	EventManager[cloudmodel.IP, mysql.LANIP, *cache.WANIP]
+	EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]
 }
 
 func NewLANIP(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 	mng := &LANIP{
-		EventManager[cloudmodel.IP, mysql.LANIP, *cache.WANIP]{
+		EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
 			resourceType: RESOURCE_TYPE_LAN_IP_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
