@@ -246,12 +246,12 @@ impl NpbBuilder {
         if !self.npb_packet_sender.is_running() {
             return;
         }
-        info!("Stop npb packet sender {}.", self.id);
         self.npb_packet_sender.stop();
 
         if let Some(handler) = self.thread_handle.lock().unwrap().take() {
             let _ = handler.join();
         }
+        info!("Stop npb packet sender {}.", self.id);
     }
 }
 

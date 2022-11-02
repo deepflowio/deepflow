@@ -108,8 +108,9 @@ impl LibvirtXmlExtractor {
         drop(running_lock);
         self.timer.notify_one();
 
-        //FIXME: Wait until you find out why it cannot be stopped, and then wait for the thread to release again
-        let _ = self.thread.lock().unwrap().take();
+        if let Some(handle) = self.thread.lock().unwrap().take() {
+            let _ = handle.join();
+        }
         info!("libvirt_xml_extractor stopped");
     }
 
