@@ -110,8 +110,11 @@ func (a *Aws) getSecurityGroups(region awsRegion) ([]model.SecurityGroup, []mode
 				remotes = append(remotes, common.GetUUID(a.getStringPointerValue(pair.GroupId), uuid.Nil))
 			}
 			ipSlice := []string{}
-			for _, ip := range r.rule.IpRanges {
-				ipSlice = append(ipSlice, a.getStringPointerValue(ip.CidrIp))
+			for _, ip4 := range r.rule.IpRanges {
+				ipSlice = append(ipSlice, a.getStringPointerValue(ip4.CidrIp))
+			}
+			for _, ip6 := range r.rule.Ipv6Ranges {
+				ipSlice = append(ipSlice, a.getStringPointerValue(ip6.CidrIpv6))
 			}
 			// 对该字段进行排序来保证每次生成的lcuuid相同
 			sort.Strings(ipSlice)
