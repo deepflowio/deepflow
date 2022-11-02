@@ -62,14 +62,13 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 				RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_LAN_IP_EN)
 		}
 
-		event := i.createEvent()
-		event.Time = time.Now().Unix()
-		event.Type = eventapi.RESOURCE_EVENT_TYPE_ADD_IP
-		event.ResourceType = uint32(deviceInfo.Type)
-		event.ResourceID = uint32(deviceInfo.ID)
-		event.ResourceName = deviceInfo.Name
-		event.Description = fmt.Sprintf("%s-%s", networkInfo.Name, item.IP)
-		i.put(event)
+		i.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+			deviceInfo.Type,
+			deviceInfo.ID,
+			deviceInfo.Name,
+			fmt.Sprintf("%s-%s", networkInfo.Name, item.IP),
+		)
 	}
 }
 
@@ -106,13 +105,12 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 			log.Error("%s (lcuuid: %s) ip not found", RESOURCE_TYPE_LAN_IP_EN, lcuuid)
 		}
 
-		event := i.createEvent()
-		event.Time = time.Now().Unix()
-		event.Type = eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP
-		event.ResourceType = uint32(deviceInfo.Type)
-		event.ResourceID = uint32(deviceInfo.ID)
-		event.ResourceName = deviceInfo.Name
-		event.Description = fmt.Sprintf("%s-%s", networkInfo.Name, ip)
-		i.put(event)
+		i.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+			deviceInfo.Type,
+			deviceInfo.ID,
+			deviceInfo.Name,
+			fmt.Sprintf("%s-%s", networkInfo.Name, ip)
+		)
 	}
 }
