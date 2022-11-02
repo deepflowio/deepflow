@@ -287,6 +287,7 @@ pub struct YamlConfig {
     pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
     pub external_agent_http_proxy_compressed: bool,
     pub standalone_data_file_size: u32,
+    pub standalone_data_file_dir: String,
     pub log_file: String,
 }
 
@@ -391,7 +392,16 @@ impl YamlConfig {
         c.vxlan_flags |= 0x08;
 
         if c.standalone_data_file_size == 0 {
-            c.standalone_data_file_size = 200
+            c.standalone_data_file_size = 200;
+        }
+
+        if c.standalone_data_file_dir.len() == 0 {
+            c.standalone_data_file_dir = Path::new(DEFAULT_LOG_FILE)
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
         }
 
         if let Err(e) = c.validate() {
@@ -471,6 +481,13 @@ impl Default for YamlConfig {
             },
             external_agent_http_proxy_compressed: false,
             standalone_data_file_size: 200,
+            standalone_data_file_dir: Path::new(DEFAULT_LOG_FILE)
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+
             log_file: DEFAULT_LOG_FILE.into(),
         }
     }
