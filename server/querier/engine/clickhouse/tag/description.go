@@ -84,11 +84,12 @@ type TagDescription struct {
 	Description string
 	Operators   []string
 	Permissions []bool
+	RelatedTag  string
 }
 
 func NewTagDescription(
 	name, clientName, serverName, displayName, tagType, enumFile, category string,
-	permissions []bool, description string,
+	permissions []bool, description, relatedTag string,
 ) *TagDescription {
 	operators, ok := tagTypeToOperators[tagType]
 	if !ok {
@@ -105,6 +106,7 @@ func NewTagDescription(
 		Operators:   operators,
 		Permissions: permissions,
 		Description: description,
+		RelatedTag:  relatedTag,
 	}
 }
 
@@ -147,6 +149,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 6 - Category
 				// 7 - Permissions
 				// 8 - Description
+				// 9 - RelatedTag
 				permissions, err := ckcommon.ParsePermission(tag[5])
 				if err != nil {
 					return errors.New(
@@ -156,7 +159,10 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 						),
 					)
 				}
-
+				relatedTag := ""
+				if db == "event" && common.IsValueInSliceString(tag[0].(string), []string{"ips", "subnets"}) {
+					relatedTag = strings.TrimSuffix(tag[0].(string), "s")
+				}
 				key := TagDescriptionKey{DB: db, Table: table, TagName: tag[0].(string)}
 				tagLanguage := dbTagData.(map[string]interface{})[table+"."+config.Cfg.Language].([][]interface{})[i]
 				TAG_DESCRIPTION_KEYS = append(TAG_DESCRIPTION_KEYS, key)
@@ -169,7 +175,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				des := tagLanguage[3].(string)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
-					tag[3].(string), enumFile, category, permissions, des,
+					tag[3].(string), enumFile, category, permissions, des, relatedTag,
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)
@@ -218,7 +224,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 	response := map[string][]interface{}{
 		"columns": []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
-			"operators", "permissions", "description",
+			"operators", "permissions", "description", "related_tag",
 		},
 		"values": []interface{}{},
 	}
@@ -232,7 +238,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 			response["values"],
 			[]interface{}{
 				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
-				tag.Category, tag.Operators, tag.Permissions, tag.Description,
+				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag,
 			},
 		)
 	}
@@ -300,20 +306,20 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 			externalTag := "tag." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
-				"Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
+				"Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
 			response["values"] = append(response["values"], []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "attribute",
-				"Attributes", tagTypeToOperators["string"], []bool{true, true, true}, externalTag,
+				"Attributes", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		}
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
 		response["values"] = append(response["values"], []interface{}{
 			"tags", "tags", "tags", "tags", "map",
-			"Tag", []string{}, []bool{true, true, true}, "tags",
+			"Tag", []string{}, []bool{true, true, true}, "tags", "",
 		})
 	}
 	return response, nil
