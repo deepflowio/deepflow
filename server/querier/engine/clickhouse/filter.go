@@ -548,6 +548,17 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
 			}
+		case "ips", "subnet_ids", "subnets":
+			t.Value = strings.TrimPrefix(t.Value, "(")
+			t.Value = strings.TrimSuffix(t.Value, ")")
+			switch strings.ToLower(op) {
+			case "not in":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "hasAny", t.Value) + ")"
+			case "!=":
+				whereFilter = "not(" + fmt.Sprintf(tagItem.WhereTranslator, "hasAny", t.Value) + ")"
+			default:
+				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, "hasAny", t.Value)
+			}
 		default:
 			switch strings.ToLower(op) {
 			case "regexp":
