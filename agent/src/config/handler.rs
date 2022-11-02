@@ -64,6 +64,8 @@ use crate::{
         logger::RemoteLogConfig,
     },
 };
+
+use public::bitmap::Bitmap;
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;
@@ -303,6 +305,9 @@ pub struct FlowConfig {
     pub packet_sequence_block_size: usize,
 
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
+
+    // vec<protocolName, port bitmap>
+    pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -345,6 +350,9 @@ impl From<&RuntimeConfig> for FlowConfig {
             packet_sequence_block_size: conf.yaml_config.packet_sequence_block_size, // Enterprise Edition Feature: packet-sequence
             l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
                 &conf.yaml_config.l7_protocol_enabled,
+            ),
+            l7_protocol_parse_port_bitmap: Arc::new(
+                (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
         }
     }
@@ -443,6 +451,7 @@ pub struct EbpfConfig {
     pub ebpf_disabled: bool,
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
+    pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 }
 
 #[cfg(target_os = "linux")]
@@ -678,6 +687,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
             .parse()
             .unwrap_or(static_config.controller_ips[0].parse::<IpAddr>().unwrap());
 
+        let l7_protocol_parse_port_bitmap =
+            Arc::new((&conf.yaml_config).get_protocol_port_parse_bitmap());
         let config = ModuleConfig {
             enabled: conf.enabled,
             yaml_config: conf.yaml_config.clone(),
@@ -890,6 +901,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_protocol_enabled_bitmap: L7ProtocolBitmap::from(
                     &conf.yaml_config.l7_protocol_enabled,
                 ),
+                l7_protocol_parse_port_bitmap,
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,

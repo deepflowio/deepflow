@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+pub mod bitmap;
 pub mod bytes;
 pub mod consts;
 pub mod counter;
