@@ -17,8 +17,10 @@
 package ctl
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -29,6 +31,7 @@ import (
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
 	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
+	"github.com/deepflowys/deepflow/cli/ctl/example"
 	agentpb "github.com/deepflowys/deepflow/message/trident"
 )
 
@@ -65,6 +68,27 @@ func RegisterAgentCommand() *cobra.Command {
 		},
 	}
 
+	var updateFilename string
+	update := &cobra.Command{
+		Use:     "update -f <filename>",
+		Short:   "update agent",
+		Example: "deepflow-ctl agent update -f agent.yaml",
+		Run: func(cmd *cobra.Command, args []string) {
+			updateAgent(cmd, args, updateFilename)
+		},
+	}
+	update.Flags().StringVarP(&updateFilename, "filename", "f", "", "file to use update agent")
+	update.MarkFlagRequired("filename")
+
+	updateExample := &cobra.Command{
+		Use:     "update-example",
+		Short:   "example agent update yaml",
+		Example: "deepflow-ctl agent update-example",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf(string(example.YamlVtapUpdateConfig))
+		},
+	}
+
 	var typeStr string
 	rebalanceCmd := &cobra.Command{
 		Use:   "rebalance",
@@ -92,6 +116,8 @@ deepflow-ctl agent rebalance --type=analyzer`,
 
 	agent.AddCommand(list)
 	agent.AddCommand(delete)
+	agent.AddCommand(update)
+	agent.AddCommand(updateExample)
 	agent.AddCommand(rebalanceCmd)
 	return agent
 }
@@ -242,6 +268,97 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
+	}
+}
+
+func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
+	yamlFile, err := ioutil.ReadFile(updateFilename)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	updateMap := make(map[string]interface{})
+	err = yaml.Unmarshal(yamlFile, &updateMap)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	vtapName, ok := updateMap["name"]
+	if !ok {
+		fmt.Fprintln(os.Stderr, "must specify vtap name")
+		return
+	}
+
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, vtapName)
+	// call vtap api, get lcuuid
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	if len(response.Get("DATA").MustArray()) == 0 {
+		fmt.Fprintln(os.Stderr, "agent (%s) not exist\n")
+	}
+	vtap := response.Get("DATA").GetIndex(0)
+	lcuuid := vtap.Get("LCUUID").MustString()
+
+	// modify tap_mode
+	if tapMode, ok := updateMap["tap_mode"]; ok {
+		url = fmt.Sprintf("http://%s:%d/v1/vtaps-tap-mode/", server.IP, server.Port)
+		updateBody := make(map[string]interface{})
+		updateBody["VTAP_LCUUIDS"] = []string{lcuuid}
+		updateBody["TAP_MODE"] = common.GetVtapTapModeByName(tapMode.(string))
+
+		updateJson, _ := json.Marshal(updateBody)
+		_, err := common.CURLPerform("PATCH", url, nil, string(updateJson))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		delete(updateMap, "tap_mode")
+	}
+
+	// return if only update tap_mode
+	if len(updateMap) == 0 {
+		return
+	}
+
+	// update vtap_group_id
+	if vtapGroupID, ok := updateMap["vtap_group_id"]; ok {
+		url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, vtapGroupID)
+		// call vtap-group api, get lcuuid
+		response, err := common.CURLPerform("GET", url, nil, "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+
+		if len(response.Get("DATA").MustArray()) == 0 {
+			fmt.Fprintln(os.Stderr, "agent-group (%s) not exist\n")
+		}
+		group := response.Get("DATA").GetIndex(0)
+		groupLcuuid := group.Get("LCUUID").MustString()
+		updateMap["VTAP_GROUP_LCUUID"] = groupLcuuid
+		delete(updateMap, "vtap_group_id")
+	}
+
+	// enable/disable
+	if enable, ok := updateMap["enable"]; ok {
+		updateMap["ENABLE"] = enable
+		delete(updateMap, "enable")
+	}
+
+	// call vtap update api
+	updateJson, _ := json.Marshal(updateMap)
+	url = fmt.Sprintf("http://%s:%d/v1/vtaps/%s/", server.IP, server.Port, lcuuid)
+	_, err = common.CURLPerform("PATCH", url, nil, string(updateJson))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
 	}
 }
 
