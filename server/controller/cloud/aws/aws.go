@@ -200,13 +200,6 @@ func (a *Aws) GetCloudData() (model.Resource, error) {
 		regionFlag := false
 		a.azLcuuidMap = map[string]int{}
 
-		if regionFlag && a.regionUUID == "" {
-			resource.Regions = append(resource.Regions, model.Region{
-				Name:   region.name,
-				Lcuuid: region.lcuuid,
-			})
-		}
-
 		vpcs, err := a.getVPCs(region)
 		if err != nil {
 			return model.Resource{}, err
