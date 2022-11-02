@@ -1700,7 +1700,6 @@ impl Components {
         #[cfg(target_os = "linux")]
         self.api_watcher.stop();
 
-        // TODO: collector
         for q in self.collectors.iter_mut() {
             q.stop();
         }
@@ -1714,7 +1713,6 @@ impl Components {
         self.l7_flow_uniform_sender.stop();
 
         self.libvirt_xml_extractor.stop();
-        self.pcap_manager.stop();
         self.debugger.stop();
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
@@ -1742,7 +1740,7 @@ impl Components {
                 y.stop();
             })
         });
-
+        self.pcap_manager.stop();
         info!("Stopped components.")
     }
 }
