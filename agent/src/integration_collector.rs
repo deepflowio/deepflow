@@ -313,16 +313,6 @@ struct CompressedMetric {
 #[derive(Default)]
 pub struct IntegrationCounter {
     metrics: Arc<CompressedMetric>,
-    running: Arc<AtomicBool>,
-}
-
-impl IntegrationCounter {
-    pub fn new(running: Arc<AtomicBool>) -> Self {
-        Self {
-            running,
-            ..Default::default()
-        }
-    }
 }
 
 impl OwnedCountable for IntegrationCounter {
@@ -340,8 +330,9 @@ impl OwnedCountable for IntegrationCounter {
             ),
         ]
     }
+
     fn closed(&self) -> bool {
-        !self.running.load(Ordering::Relaxed)
+        false
     }
 }
 
@@ -371,11 +362,10 @@ impl MetricServer {
         exception_handler: ExceptionHandler,
         compressed: bool,
     ) -> (Self, IntegrationCounter) {
-        let running = Arc::new(AtomicBool::new(false));
-        let counter = IntegrationCounter::new(running.clone());
+        let counter = IntegrationCounter::default();
         (
             Self {
-                running,
+                running: Default::default(),
                 rt: Builder::new_multi_thread()
                     .worker_threads(2)
                     .enable_all()
