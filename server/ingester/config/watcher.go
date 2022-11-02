@@ -369,6 +369,7 @@ func (w *Watcher) getServerEndpointMap(nodePodNamesMap map[string][]string, node
 	}
 
 	if len(unassignedServers) == 0 {
+		log.Infof("111111111111111111111111111111 from %+v to  %+v  %s %s", w.lastServerEndpointMap, serverEndpointMap, w.myNodeName, w.myPodName)
 		return serverEndpointMap
 	}
 
@@ -393,5 +394,6 @@ func (w *Watcher) getServerEndpointMap(nodePodNamesMap map[string][]string, node
 		}
 	}
 
+	log.Infof("2222222222222222222222222222222222222 from %+v to  %+v %s %s", w.lastServerEndpointMap, serverEndpointMap, w.myNodeName, w.myPodName)
 	return serverEndpointMap
 }
