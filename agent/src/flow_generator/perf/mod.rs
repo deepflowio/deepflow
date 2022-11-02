@@ -30,11 +30,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use enum_dispatch::enum_dispatch;
+use public::bitmap::Bitmap;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::{AppProtoHead, PostgresqlLog};
 
+use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
     get_all_protocol, get_parse_bitmap, L7ProtocolBitmap, L7ProtocolParser,
@@ -115,6 +117,9 @@ pub struct FlowPerf {
     is_skip: bool,
 
     parse_config: LogParserAccess,
+
+    // port bitmap max = 65535, indicate the l7 protocol in this port whether to parse
+    l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 }
 
 impl FlowPerf {
@@ -134,6 +139,13 @@ impl FlowPerf {
             }
             _ => None,
         }
+    }
+
+    fn is_skip_l7_protocol_parse(&self, proto: &L7ProtocolParser, port: u16) -> bool {
+        if self.protocol_bitmap.is_disabled(proto.protocol()) {
+            return true;
+        }
+        proto.is_skip_parse_by_port_bitmap(&self.l7_protocol_parse_port_bitmap, port)
     }
 
     fn l7_parse_perf(
@@ -201,7 +213,13 @@ impl FlowPerf {
         if let Some(payload) = packet.get_l4_payload() {
             let param = ParseParam::from(packet);
             for mut i in get_all_protocol() {
-                if self.protocol_bitmap.is_disabled(i.protocol()) {
+                if self.is_skip_l7_protocol_parse(
+                    &i,
+                    match packet.direction {
+                        PacketDirection::ClientToServer => packet.lookup_key.dst_port,
+                        PacketDirection::ServerToClient => packet.lookup_key.src_port,
+                    },
+                ) {
                     continue;
                 }
                 i.set_parse_config(&self.parse_config);
@@ -257,6 +275,7 @@ impl FlowPerf {
         counter: Arc<FlowPerfCounter>,
         l7_prorocol_enable_bitmap: L7ProtocolBitmap,
         parse_config: LogParserAccess,
+        l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
             L4Protocol::Tcp => L4FlowPerfTable::from(TcpPerf::new(counter)),
@@ -284,6 +303,7 @@ impl FlowPerf {
             is_success: false,
             is_skip: false,
             parse_config,
+            l7_protocol_parse_port_bitmap,
         })
     }
 

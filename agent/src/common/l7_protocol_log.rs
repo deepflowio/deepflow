@@ -17,8 +17,6 @@
 use std::net::IpAddr;
 
 use enum_dispatch::enum_dispatch;
-use public::enums::IpProtocol;
-use public::l7_protocol::L7Protocol;
 
 use super::ebpf::EbpfType;
 use super::flow::PacketDirection;
@@ -30,6 +28,10 @@ use crate::flow_generator::protocol_logs::{
     DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog, RedisLog,
 };
 use crate::flow_generator::Result;
+
+use public::bitmap::Bitmap;
+use public::enums::IpProtocol;
+use public::l7_protocol::L7Protocol;
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.
@@ -280,6 +282,23 @@ all_protocol!(
     MQTT,MqttParser,MqttLog::default;
     // add protocol below
 );
+
+impl L7ProtocolParser {
+    pub fn is_skip_parse_by_port_bitmap(
+        &self,
+        port_bitmap: &Vec<(String, Bitmap)>,
+        port: u16,
+    ) -> bool {
+        for (p, bitmap) in port_bitmap.iter() {
+            if self.as_string().eq(p) {
+                if let Ok(b) = bitmap.get(port as usize) {
+                    return !b;
+                }
+            }
+        }
+        false
+    }
+}
 
 #[enum_dispatch(L7ProtocolParser)]
 pub trait L7ProtocolParserInterface {

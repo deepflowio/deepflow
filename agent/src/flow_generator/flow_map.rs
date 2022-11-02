@@ -73,6 +73,7 @@ use crate::{
 };
 use npb_pcap_policy::PolicyData;
 use public::{
+    bitmap::Bitmap,
     debug::QueueDebugger,
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
@@ -102,6 +103,7 @@ pub struct FlowMap {
     counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
     packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
+    l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 }
 
 impl FlowMap {
@@ -116,7 +118,7 @@ impl FlowMap {
         packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
     ) -> (Self, Arc<FlowPerfCounter>) {
         let counter = Arc::new(FlowPerfCounter::default());
-
+        let l7_protocol_parse_port_bitmap = (&config.load()).l7_protocol_parse_port_bitmap.clone();
         (
             Self {
                 node_map: Some(HashMap::new()),
@@ -146,6 +148,7 @@ impl FlowMap {
                 counter: counter.clone(),
                 ntp_diff,
                 packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
+                l7_protocol_parse_port_bitmap,
             },
             counter,
         )
@@ -688,6 +691,7 @@ impl FlowMap {
                 self.counter.clone(),
                 conf.l7_protocol_enabled_bitmap,
                 self.parse_config.clone(),
+                self.l7_protocol_parse_port_bitmap.clone(),
             )
         }
         node
