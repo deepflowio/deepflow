@@ -277,9 +277,11 @@ impl LocalModeDispatcher {
     pub(super) fn listener(&self) -> LocalModeDispatcherListener {
         LocalModeDispatcherListener::new(self.base.listener(), self.extractor.clone())
     }
+}
 
-    /// Enterprise Edition Feature: windows-dispatcher
-    #[cfg(target_os = "windows")]
+/// Enterprise Edition Feature: windows-dispatcher
+#[cfg(target_os = "windows")]
+impl LocalModeDispatcher {
     pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
         self.base.switch_recv_engine(pcap_interfaces)
     }
@@ -406,7 +408,51 @@ impl LocalModeDispatcherListener {
         macs
     }
 
-    #[cfg(target_os = "windows")]
+    fn get_if_name_to_mac_map(&self, tap_mac_script: &str) -> HashMap<String, MacAddr> {
+        let mut result = HashMap::new();
+        if let Some(entries) = self.extractor.get_entries() {
+            debug!("Xml Mac:");
+            for entry in entries {
+                debug!("\tif_name: {}, mac: {}", entry.name, entry.mac);
+                result.insert(entry.name, entry.mac);
+            }
+        }
+        if tap_mac_script != "" {
+            match Command::new(&tap_mac_script).output() {
+                Ok(output) => Self::parse_tap_mac_script_output(&mut result, &output.stdout),
+                Err(e) => warn!("Exec {} failed: {:?}", tap_mac_script, e),
+            }
+        }
+        result
+    }
+
+    fn parse_tap_mac_script_output(result: &mut HashMap<String, MacAddr>, bytes: &[u8]) {
+        let mut iter = bytes.split(|x| *x == b'\n');
+        while let Some(line) = iter.next() {
+            let mut kvs = line.split(|x| *x == b',');
+            let name = kvs.next();
+            let mac = kvs.next();
+            if name.is_none() || mac.is_none() || kvs.next().is_some() {
+                warn!(
+                    "Static-config tap-mac-map has invalid item: {}",
+                    str::from_utf8(line).unwrap()
+                );
+            }
+            let name = str::from_utf8(name.unwrap()).unwrap();
+            if result.contains_key(name) {
+                debug!(
+                    "Ignore static-config tap-mac-map: {}",
+                    str::from_utf8(line).unwrap()
+                );
+            } else if let Ok(mac) = str::from_utf8(mac.unwrap()).unwrap().parse() {
+                result.insert(name.to_owned(), mac);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl LocalModeDispatcherListener {
     fn get_if_index_to_inner_mac_map() -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
@@ -427,8 +473,10 @@ impl LocalModeDispatcherListener {
 
         result
     }
+}
 
-    #[cfg(target_os = "linux")]
+#[cfg(target_os = "linux")]
+impl LocalModeDispatcherListener {
     fn get_if_index_to_inner_mac_map(poller: &GenericPoller, ns: &NsFile) -> HashMap<u32, MacAddr> {
         let mut result = HashMap::new();
 
@@ -473,48 +521,6 @@ impl LocalModeDispatcherListener {
         }
 
         result
-    }
-
-    fn get_if_name_to_mac_map(&self, tap_mac_script: &str) -> HashMap<String, MacAddr> {
-        let mut result = HashMap::new();
-        if let Some(entries) = self.extractor.get_entries() {
-            debug!("Xml Mac:");
-            for entry in entries {
-                debug!("\tif_name: {}, mac: {}", entry.name, entry.mac);
-                result.insert(entry.name, entry.mac);
-            }
-        }
-        if tap_mac_script != "" {
-            match Command::new(&tap_mac_script).output() {
-                Ok(output) => Self::parse_tap_mac_script_output(&mut result, &output.stdout),
-                Err(e) => warn!("Exec {} failed: {:?}", tap_mac_script, e),
-            }
-        }
-        result
-    }
-
-    fn parse_tap_mac_script_output(result: &mut HashMap<String, MacAddr>, bytes: &[u8]) {
-        let mut iter = bytes.split(|x| *x == b'\n');
-        while let Some(line) = iter.next() {
-            let mut kvs = line.split(|x| *x == b',');
-            let name = kvs.next();
-            let mac = kvs.next();
-            if name.is_none() || mac.is_none() || kvs.next().is_some() {
-                warn!(
-                    "Static-config tap-mac-map has invalid item: {}",
-                    str::from_utf8(line).unwrap()
-                );
-            }
-            let name = str::from_utf8(name.unwrap()).unwrap();
-            if result.contains_key(name) {
-                debug!(
-                    "Ignore static-config tap-mac-map: {}",
-                    str::from_utf8(line).unwrap()
-                );
-            } else if let Ok(mac) = str::from_utf8(mac.unwrap()).unwrap().parse() {
-                result.insert(name.to_owned(), mac);
-            }
-        }
     }
 }
 
