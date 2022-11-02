@@ -34,11 +34,8 @@ func RandID() int {
 	return rand.Intn(9999)
 }
 
-func FormatLcuuid(lcuuid string) string {
-	if lcuuid == "" {
-		return uuid.NewString()
-	}
-	return lcuuid
+func RandLcuuid() string {
+	return uuid.NewString()
 }
 
 func RandName() string {
@@ -48,7 +45,7 @@ func RandName() string {
 func (t *SuiteTest) TestAddVMInTDS() {
 	id := RandID()
 	name := RandName()
-	dbItem := &mysql.VM{Base: mysql.Base{ID: id, Lcuuid: FormatLcuuid("")}, Name: name}
+	dbItem := &mysql.VM{Base: mysql.Base{ID: id, Lcuuid: RandLcuuid()}, Name: name}
 	ds := NewToolDataSet()
 	ds.addVM(dbItem)
 	assert.Equal(t.T(), name, ds.VMIDToName[id])
@@ -56,7 +53,7 @@ func (t *SuiteTest) TestAddVMInTDS() {
 
 func (t *SuiteTest) TestUpdateVMInTDS() {
 	id := RandID()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.VMIDToName[id] = RandName()
 	ds.VMLcuuidToID[lcuuid] = id
@@ -68,7 +65,7 @@ func (t *SuiteTest) TestUpdateVMInTDS() {
 
 func (t *SuiteTest) TestDeleteVMInTDS() {
 	id := RandID()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.VMIDToName[id] = RandName()
 	ds.VMLcuuidToID[lcuuid] = id
@@ -80,7 +77,7 @@ func (t *SuiteTest) TestDeleteVMInTDS() {
 func (t *SuiteTest) TestAddNetworkInTDS() {
 	id := RandID()
 	name := RandName()
-	dbItem := &mysql.Network{Base: mysql.Base{ID: id, Lcuuid: FormatLcuuid("")}, Name: name}
+	dbItem := &mysql.Network{Base: mysql.Base{ID: id, Lcuuid: RandLcuuid()}, Name: name}
 	ds := NewToolDataSet()
 	ds.addNetwork(dbItem)
 	assert.Equal(t.T(), name, ds.NetworkIDToName[id])
@@ -88,7 +85,7 @@ func (t *SuiteTest) TestAddNetworkInTDS() {
 
 func (t *SuiteTest) TestUpdateNetworkInTDS() {
 	id := RandID()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.NetworkIDToName[id] = RandName()
 	ds.NetworkLcuuidToID[lcuuid] = id
@@ -100,7 +97,7 @@ func (t *SuiteTest) TestUpdateNetworkInTDS() {
 
 func (t *SuiteTest) TestDeleteNetworkInTDS() {
 	id := RandID()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.NetworkIDToName[id] = RandName()
 	ds.NetworkLcuuidToID[lcuuid] = id
@@ -111,7 +108,7 @@ func (t *SuiteTest) TestDeleteNetworkInTDS() {
 
 func (t *SuiteTest) TestAddVInterfaceInTDS() {
 	id := RandID()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	networkID := RandID()
 	vmID := RandID()
 	dbItem := &mysql.VInterface{Base: mysql.Base{ID: id, Lcuuid: lcuuid}, DeviceType: common.VIF_DEVICE_TYPE_VM, DeviceID: vmID, NetworkID: networkID}
@@ -126,7 +123,7 @@ func (t *SuiteTest) TestAddVInterfaceInTDS() {
 
 func (t *SuiteTest) TestDeleteVInterfaceInTDS() {
 	id := RandID()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.VInterfaceLcuuidToID[lcuuid] = id
 	ds.VInterfaceLcuuidToDeviceInfo[lcuuid] = &DeviceInfo{ID: RandID()}
@@ -139,7 +136,7 @@ func (t *SuiteTest) TestDeleteVInterfaceInTDS() {
 }
 
 func (t *SuiteTest) TestAddWANIPInTDS() {
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	vifID := RandID()
 	ip := faker.IPv4()
 	dbItem := &mysql.WANIP{Base: mysql.Base{ID: RandID(), Lcuuid: lcuuid}, VInterfaceID: vifID, IP: ip}
@@ -150,7 +147,7 @@ func (t *SuiteTest) TestAddWANIPInTDS() {
 }
 
 func (t *SuiteTest) TestDeleteWANIPInTDS() {
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.WANIPLcuuidToIP[lcuuid] = faker.IPv4()
 	ds.WANIPLcuuidToVInterfaceID[lcuuid] = RandID()
@@ -171,7 +168,7 @@ func (t *SuiteTest) TestGetVMNameByID() {
 
 	id2 := RandID()
 	name2 := RandName()
-	dbItem := &mysql.VM{Base: mysql.Base{ID: id2, Lcuuid: FormatLcuuid("")}, Name: name2}
+	dbItem := &mysql.VM{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
 	mysql.Db.Create(&dbItem)
 	rname2, _ := ds.GetVMNameByID(id2)
 	assert.Equal(t.T(), name2, rname2)
@@ -184,21 +181,65 @@ func (t *SuiteTest) TestGetNetworkNameByID() {
 	ds.NetworkIDToName[id] = name
 	rname, _ := ds.GetNetworkNameByID(id)
 	assert.Equal(t.T(), name, rname)
-	log.Info(id)
-	log.Info(ds.NetworkIDToName)
 
 	id2 := RandID()
 	name2 := RandName()
-	dbItem := &mysql.Network{Base: mysql.Base{ID: id2, Lcuuid: FormatLcuuid("")}, Name: name2}
+	dbItem := &mysql.Network{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
 	mysql.Db.Create(&dbItem)
-	log.Info(id2)
-	log.Info(ds.NetworkIDToName)
 	rname2, _ := ds.GetNetworkNameByID(id2)
 	assert.Equal(t.T(), name2, rname2)
 }
 
+func (t *SuiteTest) TestGetPodNodeNameByID() {
+	id := RandID()
+	name := RandName()
+	ds := NewToolDataSet()
+	ds.PodNodeIDToName[id] = name
+	rname, _ := ds.GetPodNodeNameByID(id)
+	assert.Equal(t.T(), name, rname)
+
+	id2 := RandID()
+	name2 := RandName()
+	dbItem := &mysql.PodNode{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
+	mysql.Db.Create(&dbItem)
+	rname2, _ := ds.GetPodNodeNameByID(id2)
+	assert.Equal(t.T(), name2, rname2)
+}
+
+func (t *SuiteTest) TestGetPodServiceNameByID() {
+	id := RandID()
+	name := RandName()
+	ds := NewToolDataSet()
+	ds.PodServiceIDToName[id] = name
+	rname, _ := ds.GetPodServiceNameByID(id)
+	assert.Equal(t.T(), name, rname)
+
+	id2 := RandID()
+	name2 := RandName()
+	dbItem := &mysql.PodService{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
+	mysql.Db.Create(&dbItem)
+	rname2, _ := ds.GetPodServiceNameByID(id2)
+	assert.Equal(t.T(), name2, rname2)
+}
+
+func (t *SuiteTest) TestGetPodNameByID() {
+	id := RandID()
+	name := RandName()
+	ds := NewToolDataSet()
+	ds.PodIDToName[id] = name
+	rname, _ := ds.GetPodNameByID(id)
+	assert.Equal(t.T(), name, rname)
+
+	id2 := RandID()
+	name2 := RandName()
+	dbItem := &mysql.Pod{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
+	mysql.Db.Create(&dbItem)
+	rname2, _ := ds.GetPodNameByID(id2)
+	assert.Equal(t.T(), name2, rname2)
+}
+
 func (t *SuiteTest) TestGetDeviceInfoByVInterfaceLcuuid() {
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	vmID := RandID()
 	info := &DeviceInfo{Type: common.VIF_DEVICE_TYPE_VM, ID: vmID}
 	ds := NewToolDataSet()
@@ -206,7 +247,7 @@ func (t *SuiteTest) TestGetDeviceInfoByVInterfaceLcuuid() {
 	rinfo, _ := ds.GetDeviceInfoByVInterfaceLcuuid(lcuuid)
 	assert.Equal(t.T(), vmID, rinfo.ID)
 
-	lcuuid2 := FormatLcuuid("")
+	lcuuid2 := RandLcuuid()
 	vmID2 := RandID()
 	vmName2 := RandName()
 	ds.VMIDToName[vmID2] = vmName2
@@ -217,7 +258,7 @@ func (t *SuiteTest) TestGetDeviceInfoByVInterfaceLcuuid() {
 }
 
 func (t *SuiteTest) TestGetNetworkInfoByVInterfaceLcuuid() {
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	netID := RandID()
 	info := &NetworkInfo{ID: netID}
 	ds := NewToolDataSet()
@@ -225,7 +266,7 @@ func (t *SuiteTest) TestGetNetworkInfoByVInterfaceLcuuid() {
 	rinfo, _ := ds.GetNetworkInfoByVInterfaceLcuuid(lcuuid)
 	assert.Equal(t.T(), netID, rinfo.ID)
 
-	lcuuid2 := FormatLcuuid("")
+	lcuuid2 := RandLcuuid()
 	netID2 := RandID()
 	netName2 := RandName()
 	ds.NetworkIDToName[netID2] = netName2
@@ -237,14 +278,14 @@ func (t *SuiteTest) TestGetNetworkInfoByVInterfaceLcuuid() {
 
 func (t *SuiteTest) TestGetVInterfaceLcuuidByID() {
 	id := RandID()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.VInterfaceIDToLcuuid[id] = lcuuid
 	rlcuuid, _ := ds.GetVInterfaceLcuuidByID(id)
 	assert.Equal(t.T(), lcuuid, rlcuuid)
 
 	id2 := RandID()
-	lcuuid2 := FormatLcuuid("")
+	lcuuid2 := RandLcuuid()
 	dbItem := &mysql.VInterface{Base: mysql.Base{ID: id2, Lcuuid: lcuuid2}}
 	mysql.Db.Create(&dbItem)
 	rlcuuid2, _ := ds.GetVInterfaceLcuuidByID(id2)
@@ -252,7 +293,7 @@ func (t *SuiteTest) TestGetVInterfaceLcuuidByID() {
 }
 
 func (t *SuiteTest) TestGetVInterfaceIDByWANIPLcuuid() {
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	vifID := RandID()
 	ds := NewToolDataSet()
 	ds.WANIPLcuuidToVInterfaceID[lcuuid] = vifID
@@ -260,7 +301,7 @@ func (t *SuiteTest) TestGetVInterfaceIDByWANIPLcuuid() {
 	assert.Equal(t.T(), vifID, rvifID)
 
 	vifID2 := RandID()
-	lcuuid2 := FormatLcuuid("")
+	lcuuid2 := RandLcuuid()
 	dbItem := &mysql.WANIP{Base: mysql.Base{Lcuuid: lcuuid2}, VInterfaceID: vifID2}
 	mysql.Db.Create(&dbItem)
 	rvifID2, _ := ds.GetVInterfaceIDByWANIPLcuuid(lcuuid2)
@@ -269,14 +310,14 @@ func (t *SuiteTest) TestGetVInterfaceIDByWANIPLcuuid() {
 
 func (t *SuiteTest) TestGetWANIPByLcuuid() {
 	ip := faker.IPv4()
-	lcuuid := FormatLcuuid("")
+	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.WANIPLcuuidToIP[lcuuid] = ip
 	rip, _ := ds.GetWANIPByLcuuid(lcuuid)
 	assert.Equal(t.T(), ip, rip)
 
 	ip2 := faker.IPv4()
-	lcuuid2 := FormatLcuuid("")
+	lcuuid2 := RandLcuuid()
 	dbItem := &mysql.WANIP{Base: mysql.Base{Lcuuid: lcuuid2}, IP: ip2}
 	mysql.Db.Create(&dbItem)
 	rip2, _ := ds.GetWANIPByLcuuid(lcuuid2)

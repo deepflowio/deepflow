@@ -25,14 +25,14 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
-type EventManager[CT constraint.CloudModel, MT constraint.MySQLModel] struct {
+type EventManager[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
 	resourceType string
 	ToolDataSet  cache.ToolDataSet
 	Queue        *queue.OverwriteQueue
-	EventProducer[CT, MT]
+	EventProducer[CT, MT, BT]
 }
 
-func (e *EventManager[CT, MT]) createAndPutEvent(eventType string, resourceType, resourceID int, resourceName, description string) {
+func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType string, resourceType, resourceID int, resourceName, description string) {
 	event := e.create()
 	event.Time = time.Now().Unix()
 	event.Type = eventType
@@ -43,11 +43,11 @@ func (e *EventManager[CT, MT]) createAndPutEvent(eventType string, resourceType,
 	e.put(event)
 }
 
-func (e *EventManager[CT, MT]) create() *eventapi.ResourceEvent {
+func (e *EventManager[CT, MT, BT]) create() *eventapi.ResourceEvent {
 	return eventapi.AcquireResourceEvent()
 }
 
-func (e *EventManager[CT, MT]) put(event *eventapi.ResourceEvent) {
+func (e *EventManager[CT, MT, BT]) put(event *eventapi.ResourceEvent) {
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(e.resourceType, err))
@@ -55,8 +55,8 @@ func (e *EventManager[CT, MT]) put(event *eventapi.ResourceEvent) {
 	log.Infof("put %s event: %+v into shared queue", e.resourceType, event)
 }
 
-type EventProducer[CT constraint.CloudModel, MT constraint.MySQLModel] interface {
+type EventProducer[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] interface {
 	ProduceByAdd([]*MT)
-	ProduceByUpdate(*CT)
+	ProduceByUpdate(*CT, BT)
 	ProduceByDelete([]string)
 }

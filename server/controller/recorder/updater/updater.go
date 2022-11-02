@@ -54,12 +54,12 @@ type CacheHandler[CT constraint.CloudModel, MT constraint.MySQLModel, BT constra
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
 	cache         *cache.Cache
-	dbOperator    db.Operator[MT]             // 数据库操作对象
-	diffBaseData  map[string]BT               // 用于比对的旧资源数据
-	cloudData     []CT                        // 定时获取的新资源数据
-	dataGenerator DataGenerator[CT, MT, BT]   // 提供各类数据生成的方法
-	cacheHandler  CacheHandler[CT, MT, BT]    // 提供处理cache中特定资源的方法
-	eventProducer event.EventProducer[CT, MT] // 提供资源变更事件管理接口
+	dbOperator    db.Operator[MT]                 // 数据库操作对象
+	diffBaseData  map[string]BT                   // 用于比对的旧资源数据
+	cloudData     []CT                            // 定时获取的新资源数据
+	dataGenerator DataGenerator[CT, MT, BT]       // 提供各类数据生成的方法
+	cacheHandler  CacheHandler[CT, MT, BT]        // 提供处理cache中特定资源的方法
+	eventProducer event.EventProducer[CT, MT, BT] // 提供资源变更事件管理接口
 }
 
 func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
@@ -131,10 +131,10 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 func (u *UpdaterBase[CT, MT, BT]) update(cloudItem *CT, diffBase BT, updateInfo map[string]interface{}) {
 	_, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo)
 	if ok {
-		u.cacheHandler.updateCache(cloudItem, diffBase)
 		if u.eventProducer != nil {
-			u.eventProducer.ProduceByUpdate(cloudItem)
+			u.eventProducer.ProduceByUpdate(cloudItem, diffBase)
 		}
+		u.cacheHandler.updateCache(cloudItem, diffBase)
 	}
 }
 
