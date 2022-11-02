@@ -1362,19 +1362,6 @@ impl ConfigHandler {
         if candidate_config.tap_mode != TapMode::Analyzer
             && static_config.kubernetes_cluster_id.is_empty()
         {
-            if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
-                info!(
-                    "memory limit set to {}",
-                    ByteSize::b(new_config.environment.max_memory).to_string_as(true)
-                );
-                candidate_config.environment.max_memory = new_config.environment.max_memory;
-            }
-
-            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
-                info!("cpu limit set to {}", new_config.environment.max_cpus);
-                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
-            }
             #[cfg(target_os = "linux")]
             {
                 let max_memory_change =
@@ -1454,6 +1441,20 @@ impl ConfigHandler {
                         callbacks.push(cgroup_callback);
                     }
                 }
+            }
+
+            if candidate_config.environment.max_memory != new_config.environment.max_memory {
+                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
+                info!(
+                    "memory limit set to {}",
+                    ByteSize::b(new_config.environment.max_memory).to_string_as(true)
+                );
+                candidate_config.environment.max_memory = new_config.environment.max_memory;
+            }
+
+            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
+                info!("cpu limit set to {}", new_config.environment.max_cpus);
+                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
             }
         } else if (candidate_config.tap_mode == TapMode::Analyzer
             || !static_config.kubernetes_cluster_id.is_empty())
