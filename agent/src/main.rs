@@ -29,6 +29,10 @@ struct Opts {
     #[clap(short = 'f', long, default_value = "/etc/deepflow-agent.yaml")]
     config_file: String,
 
+    /// Enable standalone mode, default config path is /etc/deepflow-agent-standalone.yaml
+    #[clap(long)]
+    standalone: bool,
+
     /// Display the version
     #[clap(short, long, action = ArgAction::SetTrue)]
     version: bool,
@@ -88,7 +92,15 @@ fn main() -> Result<()> {
         println!("{}", VERSION_INFO);
         return Ok(());
     }
-    let mut t = trident::Trident::start(&Path::new(&opts.config_file), VERSION_INFO)?;
+    let mut t = trident::Trident::start(
+        &Path::new(&opts.config_file),
+        VERSION_INFO,
+        if opts.standalone {
+            trident::RunningMode::Standalone
+        } else {
+            trident::RunningMode::Managed
+        },
+    )?;
     wait_on_signals();
     t.stop();
 
