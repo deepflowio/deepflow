@@ -25,10 +25,7 @@ use crate::{
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
-    flow_generator::{
-        error::{Error, Result},
-        perf::DNS_PORT,
-    },
+    flow_generator::error::{Error, Result},
     log_info_merge, parse_common,
     utils::bytes::read_u16_be,
 };
@@ -196,9 +193,6 @@ impl DnsLog {
     }
 
     pub fn dns_check_protocol(&mut self, payload: &[u8], param: &ParseParam) -> bool {
-        if param.port_dst != DNS_PORT && param.port_src != DNS_PORT {
-            return false;
-        }
         let ret = self.parse(payload, param.l4_protocol, param.direction, None, None);
         self.parsed = ret.is_ok() && self.info.msg_type == LogMessageType::Request;
         self.parsed
