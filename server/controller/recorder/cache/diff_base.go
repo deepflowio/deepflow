@@ -21,7 +21,7 @@ import (
 
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
-	"github.com/deepflowys/deepflow/server/controller/recorder/common"
+	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
 )
 
 // 所有资源的主要信息，用于与cloud数据比较差异，根据差异更新资源
@@ -127,12 +127,12 @@ func (b *DiffBaseDataSet) addRegion(dbItem *mysql.Region, seq int) {
 		Name:  dbItem.Name,
 		Label: dbItem.Label,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_REGION_EN, b.Regions[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRegion(lcuuid string) {
 	delete(b.Regions, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_REGION_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_REGION_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addAZ(dbItem *mysql.AZ, seq int) {
@@ -145,12 +145,12 @@ func (b *DiffBaseDataSet) addAZ(dbItem *mysql.AZ, seq int) {
 		Label:        dbItem.Label,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_AZ_EN, b.AZs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteAZ(lcuuid string) {
 	delete(b.AZs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_AZ_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_AZ_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addSubDomain(dbItem *mysql.SubDomain, seq int) {
@@ -160,12 +160,12 @@ func (b *DiffBaseDataSet) addSubDomain(dbItem *mysql.SubDomain, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_SUB_DOMAIN_EN, b.SubDomains[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSubDomain(lcuuid string) {
 	delete(b.SubDomains, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_SUB_DOMAIN_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_SUB_DOMAIN_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addHost(dbItem *mysql.Host, seq int) {
@@ -183,12 +183,12 @@ func (b *DiffBaseDataSet) addHost(dbItem *mysql.Host, seq int) {
 		MemTotal:     dbItem.MemTotal,
 		ExtraInfo:    dbItem.ExtraInfo,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_HOST_EN, b.Hosts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteHost(lcuuid string) {
 	delete(b.Hosts, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_HOST_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_HOST_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addVM(dbItem *mysql.VM, seq int, toolDataSet *ToolDataSet) {
@@ -208,12 +208,12 @@ func (b *DiffBaseDataSet) addVM(dbItem *mysql.VM, seq int, toolDataSet *ToolData
 		AZLcuuid:     dbItem.AZ,
 	}
 	b.VMs[dbItem.Lcuuid] = newItem
-	log.Info(addDiffBase(common.RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_VM_EN, b.VMs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVM(lcuuid string) {
 	delete(b.VMs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_VM_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_VM_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addVPC(dbItem *mysql.VPC, seq int) {
@@ -228,12 +228,12 @@ func (b *DiffBaseDataSet) addVPC(dbItem *mysql.VPC, seq int) {
 		CIDR:         dbItem.CIDR,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_VPC_EN, b.VPCs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVPC(lcuuid string) {
 	delete(b.VPCs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_VPC_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_VPC_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addNetwork(dbItem *mysql.Network, seq int, toolDataSet *ToolDataSet) {
@@ -253,12 +253,12 @@ func (b *DiffBaseDataSet) addNetwork(dbItem *mysql.Network, seq int, toolDataSet
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_NETWORK_EN, b.Networks[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNetwork(lcuuid string) {
 	delete(b.Networks, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_NETWORK_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_NETWORK_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addSubnet(dbItem *mysql.Subnet, seq int) {
@@ -271,12 +271,12 @@ func (b *DiffBaseDataSet) addSubnet(dbItem *mysql.Subnet, seq int) {
 		Label:           dbItem.Label,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_SUBNET_EN, b.Subnets[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSubnet(lcuuid string) {
 	delete(b.Subnets, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_SUBNET_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_SUBNET_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addVRouter(dbItem *mysql.VRouter, seq int, toolDataSet *ToolDataSet) {
@@ -291,12 +291,12 @@ func (b *DiffBaseDataSet) addVRouter(dbItem *mysql.VRouter, seq int, toolDataSet
 		VPCLcuuid:    vpcLcuuid,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_VROUTER_EN, b.VRouters[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVRouter(lcuuid string) {
 	delete(b.VRouters, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_VROUTER_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_VROUTER_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addRoutingTable(dbItem *mysql.RoutingTable, seq int) {
@@ -309,12 +309,12 @@ func (b *DiffBaseDataSet) addRoutingTable(dbItem *mysql.RoutingTable, seq int) {
 		Nexthop:     dbItem.Nexthop,
 		NexthopType: dbItem.NexthopType,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, b.RoutingTables[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRoutingTable(lcuuid string) {
 	delete(b.RoutingTables, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int, toolDataSet *ToolDataSet) {
@@ -329,12 +329,12 @@ func (b *DiffBaseDataSet) addDHCPPort(dbItem *mysql.DHCPPort, seq int, toolDataS
 		AZLcuuid:     dbItem.AZ,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, b.DHCPPorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteDHCPPort(lcuuid string) {
 	delete(b.DHCPPorts, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_DHCP_PORT_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolDataSet *ToolDataSet) {
@@ -351,12 +351,12 @@ func (b *DiffBaseDataSet) addVInterface(dbItem *mysql.VInterface, seq int, toolD
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_VINTERFACE_EN, b.VInterfaces[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVInterface(lcuuid string) {
 	delete(b.VInterfaces, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int) {
@@ -368,12 +368,12 @@ func (b *DiffBaseDataSet) addWANIP(dbItem *mysql.WANIP, seq int) {
 		RegionLcuuid:    dbItem.Region,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_WAN_IP_EN, b.WANIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteWANIP(lcuuid string) {
 	delete(b.WANIPs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_WAN_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addLANIP(dbItem *mysql.LANIP, seq int) {
@@ -384,12 +384,12 @@ func (b *DiffBaseDataSet) addLANIP(dbItem *mysql.LANIP, seq int) {
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_LAN_IP_EN, b.LANIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLANIP(lcuuid string) {
 	delete(b.LANIPs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addFloatingIP(dbItem *mysql.FloatingIP, seq int, toolDataSet *ToolDataSet) {
@@ -402,12 +402,12 @@ func (b *DiffBaseDataSet) addFloatingIP(dbItem *mysql.FloatingIP, seq int, toolD
 		RegionLcuuid: dbItem.Region,
 		VPCLcuuid:    vpcLcuuid,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, b.FloatingIPs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteFloatingIP(lcuuid string) {
 	delete(b.FloatingIPs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_FLOATING_IP_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addSecurityGroup(dbItem *mysql.SecurityGroup, seq int) {
@@ -420,12 +420,12 @@ func (b *DiffBaseDataSet) addSecurityGroup(dbItem *mysql.SecurityGroup, seq int)
 		Label:        dbItem.Label,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_SECURITY_GROUP_EN, b.SecurityGroups[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, b.SecurityGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSecurityGroup(lcuuid string) {
 	delete(b.SecurityGroups, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addSecurityGroupRule(dbItem *mysql.SecurityGroupRule, seq int) {
@@ -440,12 +440,12 @@ func (b *DiffBaseDataSet) addSecurityGroupRule(dbItem *mysql.SecurityGroupRule, 
 		Remote:          dbItem.Remote,
 		RemotePortRange: dbItem.RemotePortRange,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, b.SecurityGroupRules[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, b.SecurityGroupRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteSecurityGroupRule(lcuuid string) {
 	delete(b.SecurityGroupRules, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addVMSecurityGroup(dbItem *mysql.VMSecurityGroup, seq int) {
@@ -456,12 +456,12 @@ func (b *DiffBaseDataSet) addVMSecurityGroup(dbItem *mysql.VMSecurityGroup, seq 
 		},
 		Priority: dbItem.Priority,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, b.VMSecurityGroups[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, b.VMSecurityGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVMSecurityGroup(lcuuid string) {
 	delete(b.VMSecurityGroups, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addNATGateway(dbItem *mysql.NATGateway, seq int) {
@@ -474,12 +474,12 @@ func (b *DiffBaseDataSet) addNATGateway(dbItem *mysql.NATGateway, seq int) {
 		FloatingIPs:  dbItem.FloatingIPs,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_NAT_GATEWAY_EN, b.NATGateways[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, b.NATGateways[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATGateway(lcuuid string) {
 	delete(b.NATGateways, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addNATVMConnection(dbItem *mysql.NATVMConnection, seq int) {
@@ -489,12 +489,12 @@ func (b *DiffBaseDataSet) addNATVMConnection(dbItem *mysql.NATVMConnection, seq 
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_NAT_VM_CONNECTION_EN, b.NATVMConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATVMConnection(lcuuid string) {
 	delete(b.NATVMConnections, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_NAT_VM_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_NAT_VM_CONNECTION_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addNATRule(dbItem *mysql.NATRule, seq int) {
@@ -504,12 +504,12 @@ func (b *DiffBaseDataSet) addNATRule(dbItem *mysql.NATRule, seq int) {
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_NAT_RULE_EN, b.NATRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteNATRule(lcuuid string) {
 	delete(b.NATRules, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_NAT_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_NAT_RULE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addLB(dbItem *mysql.LB, seq int) {
@@ -523,12 +523,12 @@ func (b *DiffBaseDataSet) addLB(dbItem *mysql.LB, seq int) {
 		VIP:          dbItem.VIP,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_LB_EN, b.LBs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLB(lcuuid string) {
 	delete(b.LBs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_LB_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addLBVMConnection(dbItem *mysql.LBVMConnection, seq int) {
@@ -538,12 +538,12 @@ func (b *DiffBaseDataSet) addLBVMConnection(dbItem *mysql.LBVMConnection, seq in
 			Lcuuid:   dbItem.Lcuuid,
 		},
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_LB_VM_CONNECTION_EN, b.LBVMConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBVMConnection(lcuuid string) {
 	delete(b.LBVMConnections, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_LB_VM_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_VM_CONNECTION_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addLBListener(dbItem *mysql.LBListener, seq int) {
@@ -558,12 +558,12 @@ func (b *DiffBaseDataSet) addLBListener(dbItem *mysql.LBListener, seq int) {
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, b.LBListeners[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBListener(lcuuid string) {
 	delete(b.LBListeners, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_LB_LISTENER_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addLBTargetServer(dbItem *mysql.LBTargetServer, seq int) {
@@ -576,12 +576,12 @@ func (b *DiffBaseDataSet) addLBTargetServer(dbItem *mysql.LBTargetServer, seq in
 		Port:     dbItem.Port,
 		Protocol: dbItem.Protocol,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, b.LBTargetServers[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteLBTargetServer(lcuuid string) {
 	delete(b.LBTargetServers, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_LB_TARGET_SERVER_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPeerConnection(dbItem *mysql.PeerConnection, seq int, toolDataSet *ToolDataSet) {
@@ -596,17 +596,17 @@ func (b *DiffBaseDataSet) addPeerConnection(dbItem *mysql.PeerConnection, seq in
 		RemoteRegionLcuuid: remoteRegionLcuuid,
 		LocalRegionLcuuid:  localRegionLcuuid,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, b.PeerConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePeerConnection(lcuuid string) {
 	delete(b.PeerConnections, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_PEER_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addCEN(dbItem *mysql.CEN, seq int, toolDataSet *ToolDataSet) {
 	vpcLcuuids := []string{}
-	for _, vpcID := range common.StringToIntArray(dbItem.VPCIDs) {
+	for _, vpcID := range StringToIntArray(dbItem.VPCIDs) {
 		vpcLcuuid, exists := toolDataSet.GetVPCLcuuidByID(vpcID)
 		if exists {
 			vpcLcuuids = append(vpcLcuuids, vpcLcuuid)
@@ -620,12 +620,12 @@ func (b *DiffBaseDataSet) addCEN(dbItem *mysql.CEN, seq int, toolDataSet *ToolDa
 		Name:       dbItem.Name,
 		VPCLcuuids: vpcLcuuids,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_CEN_EN, b.CENs[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_CEN_EN, b.CENs[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteCEN(lcuuid string) {
 	delete(b.CENs, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_CEN_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_CEN_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addRDSInstance(dbItem *mysql.RDSInstance, seq int) {
@@ -641,12 +641,12 @@ func (b *DiffBaseDataSet) addRDSInstance(dbItem *mysql.RDSInstance, seq int) {
 		RegionLcuuid: dbItem.Region,
 		AZLcuuid:     dbItem.AZ,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, b.RDSInstances[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRDSInstance(lcuuid string) {
 	delete(b.RDSInstances, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addRedisInstance(dbItem *mysql.RedisInstance, seq int) {
@@ -660,12 +660,12 @@ func (b *DiffBaseDataSet) addRedisInstance(dbItem *mysql.RedisInstance, seq int)
 		PublicHost:   dbItem.PublicHost,
 		RegionLcuuid: dbItem.Region,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRedisInstance(lcuuid string) {
 	delete(b.RedisInstances, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodCluster(dbItem *mysql.PodCluster, seq int) {
@@ -680,12 +680,12 @@ func (b *DiffBaseDataSet) addPodCluster(dbItem *mysql.PodCluster, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, b.PodClusters[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodCluster(lcuuid string) {
 	delete(b.PodClusters, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodNode(dbItem *mysql.PodNode, seq int) {
@@ -701,12 +701,12 @@ func (b *DiffBaseDataSet) addPodNode(dbItem *mysql.PodNode, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_NODE_EN, b.PodNodes[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_NODE_EN, b.PodNodes[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodNode(lcuuid string) {
 	delete(b.PodNodes, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_NODE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_NODE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodNamespace(dbItem *mysql.PodNamespace, seq int) {
@@ -719,12 +719,12 @@ func (b *DiffBaseDataSet) addPodNamespace(dbItem *mysql.PodNamespace, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_NAMESPACE_EN, b.PodNamespaces[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_NAMESPACE_EN, b.PodNamespaces[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodNamespace(lcuuid string) {
 	delete(b.PodNamespaces, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_NAMESPACE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodIngress(dbItem *mysql.PodIngress, seq int) {
@@ -738,12 +738,12 @@ func (b *DiffBaseDataSet) addPodIngress(dbItem *mysql.PodIngress, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_INGRESS_EN, b.PodIngresses[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, b.PodIngresses[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngress(lcuuid string) {
 	delete(b.PodIngresses, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_INGRESS_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodIngressRule(dbItem *mysql.PodIngressRule, seq int) {
@@ -754,12 +754,12 @@ func (b *DiffBaseDataSet) addPodIngressRule(dbItem *mysql.PodIngressRule, seq in
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngressRule(lcuuid string) {
 	delete(b.PodIngressRules, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodIngressRuleBackend(dbItem *mysql.PodIngressRuleBackend, seq int) {
@@ -770,12 +770,12 @@ func (b *DiffBaseDataSet) addPodIngressRuleBackend(dbItem *mysql.PodIngressRuleB
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, b.PodIngressRuleBackends[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, b.PodIngressRuleBackends[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngressRuleBackend(lcuuid string) {
 	delete(b.PodIngressRuleBackends, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolDataSet *ToolDataSet) {
@@ -792,12 +792,12 @@ func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolD
 		AZLcuuid:         dbItem.AZ,
 		SubDomainLcuuid:  dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, b.PodServices[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodService(lcuuid string) {
 	delete(b.PodServices, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodServicePort(dbItem *mysql.PodServicePort, seq int) {
@@ -809,12 +809,12 @@ func (b *DiffBaseDataSet) addPodServicePort(dbItem *mysql.PodServicePort, seq in
 		Name:            dbItem.Name,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_SERVICE_PORT_EN, b.PodServicePorts[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_SERVICE_PORT_EN, b.PodServicePorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodServicePort(lcuuid string) {
 	delete(b.PodServicePorts, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_SERVICE_PORT_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_SERVICE_PORT_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodGroup(dbItem *mysql.PodGroup, seq int) {
@@ -831,12 +831,12 @@ func (b *DiffBaseDataSet) addPodGroup(dbItem *mysql.PodGroup, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_GROUP_EN, b.PodGroups[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodGroup(lcuuid string) {
 	delete(b.PodGroups, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_GROUP_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodGroupPort(dbItem *mysql.PodGroupPort, seq int) {
@@ -848,12 +848,12 @@ func (b *DiffBaseDataSet) addPodGroupPort(dbItem *mysql.PodGroupPort, seq int) {
 		Name:            dbItem.Name,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, b.PodGroupPorts[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodGroupPort(lcuuid string) {
 	delete(b.PodGroupPorts, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_GROUP_PORT_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int) {
@@ -868,12 +868,12 @@ func (b *DiffBaseDataSet) addPodReplicaSet(dbItem *mysql.PodReplicaSet, seq int)
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_REPLICA_SET_EN, b.PodReplicaSets[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, b.PodReplicaSets[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodReplicaSet(lcuuid string) {
 	delete(b.PodReplicaSets, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDataSet) {
@@ -898,12 +898,12 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 		AZLcuuid:            dbItem.AZ,
 		SubDomainLcuuid:     dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_POD_EN, b.Pods[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePod(lcuuid string) {
 	delete(b.Pods, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_POD_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_EN, lcuuid))
 }
 
 func (b *DiffBaseDataSet) addVMPodNodeConnection(dbItem *mysql.VMPodNodeConnection, seq int) {
@@ -914,12 +914,12 @@ func (b *DiffBaseDataSet) addVMPodNodeConnection(dbItem *mysql.VMPodNodeConnecti
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	log.Info(addDiffBase(common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, b.VMPodNodeConnections[dbItem.Lcuuid]))
+	log.Info(addDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, b.VMPodNodeConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVMPodNodeConnection(lcuuid string) {
 	delete(b.VMPodNodeConnections, lcuuid)
-	log.Info(deleteDiffBase(common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid))
 }
 
 type DiffBase struct {
@@ -948,7 +948,7 @@ type Region struct {
 func (r *Region) Update(cloudItem *cloudmodel.Region) {
 	r.Name = cloudItem.Name
 	r.Label = cloudItem.Label
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_REGION_EN, r))
+	log.Info(updateDiffBase(RESOURCE_TYPE_REGION_EN, r))
 }
 
 type AZ struct {
@@ -962,7 +962,7 @@ func (a *AZ) Update(cloudItem *cloudmodel.AZ) {
 	a.Name = cloudItem.Name
 	a.Label = cloudItem.Label
 	a.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_AZ_EN, a))
+	log.Info(updateDiffBase(RESOURCE_TYPE_AZ_EN, a))
 }
 
 type SubDomain struct {
@@ -990,7 +990,7 @@ func (h *Host) Update(cloudItem *cloudmodel.Host) {
 	h.ExtraInfo = cloudItem.ExtraInfo
 	h.RegionLcuuid = cloudItem.RegionLcuuid
 	h.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_HOST_EN, h))
+	log.Info(updateDiffBase(RESOURCE_TYPE_HOST_EN, h))
 }
 
 type VM struct {
@@ -1014,7 +1014,7 @@ func (v *VM) Update(cloudItem *cloudmodel.VM) {
 	v.VPCLcuuid = cloudItem.VPCLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	v.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_VM_EN, v))
+	log.Info(updateDiffBase(RESOURCE_TYPE_VM_EN, v))
 }
 
 type VPC struct {
@@ -1032,7 +1032,7 @@ func (v *VPC) Update(cloudItem *cloudmodel.VPC) {
 	v.TunnelID = cloudItem.TunnelID
 	v.CIDR = cloudItem.CIDR
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_VPC_EN, v))
+	log.Info(updateDiffBase(RESOURCE_TYPE_VPC_EN, v))
 }
 
 type Network struct {
@@ -1058,7 +1058,7 @@ func (n *Network) Update(cloudItem *cloudmodel.Network) {
 	n.RegionLcuuid = cloudItem.RegionLcuuid
 	n.AZLcuuid = cloudItem.AZLcuuid
 	n.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_NETWORK_EN, n))
+	log.Info(updateDiffBase(RESOURCE_TYPE_NETWORK_EN, n))
 }
 
 type Subnet struct {
@@ -1072,7 +1072,7 @@ func (s *Subnet) Update(cloudItem *cloudmodel.Subnet) {
 	s.Name = cloudItem.Name
 	s.Label = cloudItem.Label
 	s.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_SUBNET_EN, s))
+	log.Info(updateDiffBase(RESOURCE_TYPE_SUBNET_EN, s))
 }
 
 type VRouter struct {
@@ -1088,7 +1088,7 @@ func (v *VRouter) Update(cloudItem *cloudmodel.VRouter) {
 	v.Label = cloudItem.Label
 	v.VPCLcuuid = cloudItem.VPCLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_VROUTER_EN, v))
+	log.Info(updateDiffBase(RESOURCE_TYPE_VROUTER_EN, v))
 }
 
 type RoutingTable struct {
@@ -1102,7 +1102,7 @@ func (r *RoutingTable) Update(cloudItem *cloudmodel.RoutingTable) {
 	r.Destination = cloudItem.Destination
 	r.Nexthop = cloudItem.Nexthop
 	r.NexthopType = cloudItem.NexthopType
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_ROUTING_TABLE_EN, r))
+	log.Info(updateDiffBase(RESOURCE_TYPE_ROUTING_TABLE_EN, r))
 }
 
 type DHCPPort struct {
@@ -1118,7 +1118,7 @@ func (d *DHCPPort) Update(cloudItem *cloudmodel.DHCPPort) {
 	d.RegionLcuuid = cloudItem.RegionLcuuid
 	d.AZLcuuid = cloudItem.AZLcuuid
 	d.VPCLcuuid = cloudItem.VPCLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_DHCP_PORT_EN, d))
+	log.Info(updateDiffBase(RESOURCE_TYPE_DHCP_PORT_EN, d))
 }
 
 type VInterface struct {
@@ -1138,7 +1138,7 @@ func (v *VInterface) Update(cloudItem *cloudmodel.VInterface) {
 	v.NetworkLcuuid = cloudItem.NetworkLcuuid
 	v.RegionLcuuid = cloudItem.RegionLcuuid
 	v.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_VINTERFACE_EN, v))
+	log.Info(updateDiffBase(RESOURCE_TYPE_VINTERFACE_EN, v))
 }
 
 type WANIP struct {
@@ -1150,7 +1150,7 @@ type WANIP struct {
 func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
 	w.RegionLcuuid = cloudItem.RegionLcuuid
 	w.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_WAN_IP_EN, w))
+	log.Info(updateDiffBase(RESOURCE_TYPE_WAN_IP_EN, w))
 }
 
 type LANIP struct {
@@ -1160,7 +1160,7 @@ type LANIP struct {
 
 func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
 	l.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_LAN_IP_EN, l))
+	log.Info(updateDiffBase(RESOURCE_TYPE_LAN_IP_EN, l))
 }
 
 type FloatingIP struct {
@@ -1172,7 +1172,7 @@ type FloatingIP struct {
 func (f *FloatingIP) Update(cloudItem *cloudmodel.FloatingIP) {
 	f.RegionLcuuid = cloudItem.RegionLcuuid
 	f.VPCLcuuid = cloudItem.VPCLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_FLOATING_IP_EN, f))
+	log.Info(updateDiffBase(RESOURCE_TYPE_FLOATING_IP_EN, f))
 }
 
 type SecurityGroup struct {
@@ -1186,7 +1186,7 @@ func (s *SecurityGroup) Update(cloudItem *cloudmodel.SecurityGroup) {
 	s.Name = cloudItem.Name
 	s.Label = cloudItem.Label
 	s.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_SECURITY_GROUP_EN, s))
+	log.Info(updateDiffBase(RESOURCE_TYPE_SECURITY_GROUP_EN, s))
 }
 
 type SecurityGroupRule struct {
@@ -1204,7 +1204,7 @@ func (s *SecurityGroupRule) Update(cloudItem *cloudmodel.SecurityGroupRule) {
 	s.Local = cloudItem.Local
 	s.Remote = cloudItem.Remote
 	s.RemotePortRange = cloudItem.RemotePortRange
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, s))
+	log.Info(updateDiffBase(RESOURCE_TYPE_SECURITY_GROUP_RULE_EN, s))
 }
 
 type VMSecurityGroup struct {
@@ -1214,7 +1214,7 @@ type VMSecurityGroup struct {
 
 func (s *VMSecurityGroup) Update(cloudItem *cloudmodel.VMSecurityGroup) {
 	s.Priority = cloudItem.Priority
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_VM_SECURITY_GROUP_EN, s))
+	log.Info(updateDiffBase(RESOURCE_TYPE_VM_SECURITY_GROUP_EN, s))
 }
 
 type NATGateway struct {
@@ -1228,7 +1228,7 @@ func (n *NATGateway) Update(cloudItem *cloudmodel.NATGateway) {
 	n.Name = cloudItem.Name
 	n.FloatingIPs = cloudItem.FloatingIPs
 	n.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_NAT_GATEWAY_EN, n))
+	log.Info(updateDiffBase(RESOURCE_TYPE_NAT_GATEWAY_EN, n))
 }
 
 type NATRule struct {
@@ -1250,7 +1250,7 @@ func (l *LB) Update(cloudItem *cloudmodel.LB) {
 	l.VIP = cloudItem.VIP
 	l.VPCLcuuid = cloudItem.VPCLcuuid
 	l.RegionLcuuid = cloudItem.RegionLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_LB_EN, l))
+	log.Info(updateDiffBase(RESOURCE_TYPE_LB_EN, l))
 }
 
 type LBListener struct {
@@ -1268,7 +1268,7 @@ func (l *LBListener) Update(cloudItem *cloudmodel.LBListener) {
 	l.SNATIPs = cloudItem.SNATIPs
 	l.Port = cloudItem.Port
 	l.Protocol = cloudItem.Protocol
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_LB_LISTENER_EN, l))
+	log.Info(updateDiffBase(RESOURCE_TYPE_LB_LISTENER_EN, l))
 }
 
 type LBTargetServer struct {
@@ -1282,7 +1282,7 @@ func (l *LBTargetServer) Update(cloudItem *cloudmodel.LBTargetServer) {
 	l.IP = cloudItem.IP
 	l.Port = cloudItem.Port
 	l.Protocol = cloudItem.Protocol
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_LB_TARGET_SERVER_EN, l))
+	log.Info(updateDiffBase(RESOURCE_TYPE_LB_TARGET_SERVER_EN, l))
 }
 
 type PeerConnection struct {
@@ -1296,7 +1296,7 @@ func (p *PeerConnection) Update(cloudItem *cloudmodel.PeerConnection) {
 	p.Name = cloudItem.Name
 	p.RemoteRegionLcuuid = cloudItem.RemoteRegionLcuuid
 	p.LocalRegionLcuuid = cloudItem.LocalRegionLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_PEER_CONNECTION_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_PEER_CONNECTION_EN, p))
 }
 
 type CEN struct {
@@ -1308,7 +1308,7 @@ type CEN struct {
 func (c *CEN) Update(cloudItem *cloudmodel.CEN) {
 	c.Name = cloudItem.Name
 	c.VPCLcuuids = cloudItem.VPCLcuuids
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_CEN_EN, c))
+	log.Info(updateDiffBase(RESOURCE_TYPE_CEN_EN, c))
 }
 
 type RDSInstance struct {
@@ -1330,7 +1330,7 @@ func (r *RDSInstance) Update(cloudItem *cloudmodel.RDSInstance) {
 	r.VPCLcuuid = cloudItem.VPCLcuuid
 	r.RegionLcuuid = cloudItem.RegionLcuuid
 	r.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_RDS_INSTANCE_EN, r))
+	log.Info(updateDiffBase(RESOURCE_TYPE_RDS_INSTANCE_EN, r))
 }
 
 type RedisInstance struct {
@@ -1348,7 +1348,7 @@ func (r *RedisInstance) Update(cloudItem *cloudmodel.RedisInstance) {
 	r.PublicHost = cloudItem.PublicHost
 	r.RegionLcuuid = cloudItem.RegionLcuuid
 	r.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_REDIS_INSTANCE_EN, r))
+	log.Info(updateDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, r))
 }
 
 type PodCluster struct {
@@ -1366,7 +1366,7 @@ func (p *PodCluster) Update(cloudItem *cloudmodel.PodCluster) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_CLUSTER_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_CLUSTER_EN, p))
 }
 
 type PodNode struct {
@@ -1386,7 +1386,7 @@ func (p *PodNode) Update(cloudItem *cloudmodel.PodNode) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_NODE_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_NODE_EN, p))
 }
 
 type PodNamespace struct {
@@ -1400,7 +1400,7 @@ func (p *PodNamespace) Update(cloudItem *cloudmodel.PodNamespace) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_NAMESPACE_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_NAMESPACE_EN, p))
 }
 
 type PodIngress struct {
@@ -1416,7 +1416,7 @@ func (p *PodIngress) Update(cloudItem *cloudmodel.PodIngress) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_INGRESS_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, p))
 }
 
 type PodIngressRule struct {
@@ -1426,7 +1426,7 @@ type PodIngressRule struct {
 
 func (p *PodIngressRule) Update(cloudItem *cloudmodel.PodIngressRule) {
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_INGRESS_RULE_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, p))
 }
 
 type PodIngressRuleBackend struct {
@@ -1436,7 +1436,7 @@ type PodIngressRuleBackend struct {
 
 func (p *PodIngressRuleBackend) Update(cloudItem *cloudmodel.PodIngressRuleBackend) {
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_BACKEND_EN, p))
 }
 
 type PodService struct {
@@ -1458,7 +1458,7 @@ func (p *PodService) Update(cloudItem *cloudmodel.PodService) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_SERVICE_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_SERVICE_EN, p))
 }
 
 type PodServicePort struct {
@@ -1470,7 +1470,7 @@ type PodServicePort struct {
 func (p *PodServicePort) Update(cloudItem *cloudmodel.PodServicePort) {
 	p.Name = cloudItem.Name
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_SERVICE_PORT_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_SERVICE_PORT_EN, p))
 }
 
 type PodGroup struct {
@@ -1492,7 +1492,7 @@ func (p *PodGroup) Update(cloudItem *cloudmodel.PodGroup) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_GROUP_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_GROUP_EN, p))
 }
 
 type PodGroupPort struct {
@@ -1504,7 +1504,7 @@ type PodGroupPort struct {
 func (p *PodGroupPort) Update(cloudItem *cloudmodel.PodGroupPort) {
 	p.Name = cloudItem.Name
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_GROUP_PORT_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_GROUP_PORT_EN, p))
 }
 
 type PodReplicaSet struct {
@@ -1524,7 +1524,7 @@ func (p *PodReplicaSet) Update(cloudItem *cloudmodel.PodReplicaSet) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_REPLICA_SET_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_REPLICA_SET_EN, p))
 }
 
 type Pod struct {
@@ -1552,7 +1552,7 @@ func (p *Pod) Update(cloudItem *cloudmodel.Pod) {
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_POD_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_POD_EN, p))
 }
 
 type VMPodNodeConnection struct {
@@ -1562,7 +1562,7 @@ type VMPodNodeConnection struct {
 
 func (p *VMPodNodeConnection) Update(cloudItem *cloudmodel.VMPodNodeConnection) {
 	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(common.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, p))
+	log.Info(updateDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, p))
 }
 
 type NATVMConnection struct {

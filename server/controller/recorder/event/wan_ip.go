@@ -28,12 +28,12 @@ import (
 )
 
 type WANIP struct {
-	EventManager[cloudmodel.IP, mysql.WANIP]
+	EventManager[cloudmodel.IP, mysql.WANIP, *cache.WANIP]
 }
 
 func NewWANIP(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *WANIP {
 	mng := &WANIP{
-		EventManager[cloudmodel.IP, mysql.WANIP]{
+		EventManager[cloudmodel.IP, mysql.WANIP, *cache.WANIP]{
 			resourceType: RESOURCE_TYPE_WAN_IP_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -70,7 +70,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 	}
 }
 
-func (i *WANIP) ProduceByUpdate(items *cloudmodel.IP) {
+func (i *WANIP) ProduceByUpdate(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
 }
 
 func (i *WANIP) ProduceByDelete(lcuuids []string) {

@@ -18,43 +18,18 @@ package event
 
 import (
 	"fmt"
-	"math/rand"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/agiledragon/gomonkey/v2"
 	"github.com/bxcodec/faker/v3"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/libs/eventapi"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
-
-func RandID() int {
-	rand.Seed(time.Now().UnixNano())
-	time.Sleep(time.Millisecond)
-	return rand.Intn(9999)
-}
-
-func RandLcuuid() string {
-	return uuid.NewString()
-}
-
-func RandName() string {
-	return uuid.NewString()[:7]
-}
-
-func NewEventQueue() *queue.OverwriteQueue {
-	return queue.NewOverwriteQueue(
-		"controller-to-ingester-resource_event", 1<<4,
-		queue.OptionFlushIndicator(time.Second*3),
-		queue.OptionRelease(func(p interface{}) { p.(*eventapi.ResourceEvent).Release() }))
-}
 
 func TestAddWANIP(t *testing.T) {
 	ds := cache.NewToolDataSet()
