@@ -334,14 +334,14 @@ impl YamlConfig {
                 8 << 20
             } else {
                 1 << 16
-            }
+            };
         }
         if c.flow_sender_queue_size == 0 {
             c.flow_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
                 8 << 20
             } else {
                 1 << 16
-            }
+            };
         }
         if c.packet_delay < Duration::from_secs(1) || c.packet_delay > Duration::from_secs(10) {
             c.packet_delay = Duration::from_secs(1);
@@ -444,10 +444,10 @@ impl Default for YamlConfig {
             vxlan_port: 4789,
             vxlan_flags: 0xff,
             // default size changes according to tap_mode
-            collector_sender_queue_size: 0,
+            collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,
             // default size changes according to tap_mode
-            flow_sender_queue_size: 0,
+            flow_sender_queue_size: 1 << 16,
             flow_sender_queue_count: 1,
             second_flow_extra_delay: Duration::from_secs(0),
             packet_delay: Duration::from_secs(1),
@@ -462,11 +462,11 @@ impl Default for YamlConfig {
             cloud_gateway_traffic: false,
             ebpf_log_file: "".into(),
             kubernetes_namespace: "".into(),
-            external_metrics_sender_queue_size: 0,
+            external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
             packet_sequence_block_size: 64, // Enterprise Edition Feature: packet-sequence
-            packet_sequence_queue_size: 0,  // Enterprise Edition Feature: packet-sequence
+            packet_sequence_queue_size: 1 << 16, // Enterprise Edition Feature: packet-sequence
             packet_sequence_queue_count: 1, // Enterprise Edition Feature: packet-sequence
             packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
             feature_flags: vec![],
