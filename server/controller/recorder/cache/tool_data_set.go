@@ -407,13 +407,13 @@ func (t *ToolDataSet) deleteWANIP(lcuuid string) {
 func (t *ToolDataSet) addLANIP(item *mysql.LANIP) {
 	t.LANIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
 	t.LANIPLcuuidToIP[item.Lcuuid] = item.IP
-	log.Info(addToToolMap(rcommon.RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid))
+	log.Info(addToToolMap(RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteLANIP(lcuuid string) {
 	delete(t.LANIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.LANIPLcuuidToIP, lcuuid)
-	log.Info(deleteFromToolMap(rcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
+	log.Info(deleteFromToolMap(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addSecurityGroup(item *mysql.SecurityGroup) {
@@ -1512,7 +1512,7 @@ func (t *ToolDataSet) GetVInterfaceIDByLANIPLcuuid(lcuuid string) (int, bool) {
 	if exists {
 		return vifID, true
 	}
-	log.Warningf("cache %s id (%s lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, rcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid)
+	log.Warningf("cache %s id (%s lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, RESOURCE_TYPE_LAN_IP_EN, lcuuid)
 	var lanIP mysql.LANIP
 	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&lanIP)
 	if result.RowsAffected == 1 {
@@ -1520,7 +1520,7 @@ func (t *ToolDataSet) GetVInterfaceIDByLANIPLcuuid(lcuuid string) (int, bool) {
 		vifID, exists = t.LANIPLcuuidToVInterfaceID[lcuuid]
 		return vifID, exists
 	} else {
-		log.Errorf("db %s (lcuuid: %s) not found", rcommon.RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+		log.Errorf("db %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
 		return vifID, false
 	}
 }
@@ -1530,14 +1530,14 @@ func (t *ToolDataSet) GetLANIPByLcuuid(lcuuid string) (string, bool) {
 	if exists {
 		return ip, true
 	}
-	log.Warning(cacheIPByLcuuidNotFound(rcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
+	log.Warning(cacheIPByLcuuidNotFound(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 	var lanIP mysql.LANIP
 	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&lanIP)
 	if result.RowsAffected == 1 {
 		t.addLANIP(&lanIP)
 		return lanIP.IP, true
 	} else {
-		log.Error(dbResourceByLcuuidNotFound(rcommon.RESOURCE_TYPE_LAN_IP_EN, lcuuid))
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 		return ip, false
 	}
 }
