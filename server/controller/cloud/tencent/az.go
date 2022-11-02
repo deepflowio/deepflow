@@ -37,15 +37,16 @@ func (t *Tencent) getAZs(region tencentRegion) ([]model.AZ, error) {
 			continue
 		}
 		zone := aData.Get("Zone").MustString()
+		name := aData.Get("ZoneName").MustString()
 		lcuuid := common.GetUUID(t.uuidGenerate+"_"+zone, uuid.Nil)
 		if _, ok := t.azLcuuidMap[lcuuid]; !ok {
-			log.Debugf("az (%s) has no resource")
+			log.Debugf("az (%s) has no resource", name)
 			continue
 		}
 		azs = append(azs, model.AZ{
 			Lcuuid:       lcuuid,
 			Label:        zone,
-			Name:         aData.Get("ZoneName").MustString(),
+			Name:         name,
 			RegionLcuuid: t.getRegionLcuuid(region.lcuuid),
 		})
 	}
