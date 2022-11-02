@@ -200,8 +200,8 @@ impl UniformSenderThread {
     pub fn start(&mut self) {
         if self.running.swap(true, Ordering::Relaxed) {
             warn!(
-                "uniform sender id: {} already started, do nothing.",
-                self.id
+                "{} uniform sender id: {} already started, do nothing.",
+                self.name, self.id
             );
             return;
         }
@@ -216,7 +216,7 @@ impl UniformSenderThread {
             self.exception_handler.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || uniform_sender.process()));
-        info!("uniform sender id: {} started", self.id);
+        info!("{} uniform sender id: {} started", self.name, self.id);
     }
 
     pub fn stop(&mut self) {

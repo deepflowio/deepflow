@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/config"
 	"github.com/deepflowys/deepflow/server/controller/recorder/updater"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("recorder")
@@ -41,15 +42,17 @@ type Recorder struct {
 	domainName   string
 	cacheMng     *cache.CacheManager
 	canRefresh   chan bool // 一个recorder中需要保证，同一时间只有一个goroutine在操作cache
+	eventQueue   *queue.OverwriteQueue
 }
 
-func NewRecorder(domainLcuuid string, cfg config.RecorderConfig, ctx context.Context) *Recorder {
+func NewRecorder(domainLcuuid string, cfg config.RecorderConfig, ctx context.Context, eventQueue *queue.OverwriteQueue) *Recorder {
 	return &Recorder{
 		cfg:          cfg,
 		ctx:          ctx,
 		domainLcuuid: domainLcuuid,
 		cacheMng:     cache.NewCacheManager(domainLcuuid),
 		canRefresh:   make(chan bool, 1),
+		eventQueue:   eventQueue,
 	}
 }
 
@@ -173,17 +176,17 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewHost(r.cacheMng.DomainCache, cloudData.Hosts),
 		updater.NewVM(r.cacheMng.DomainCache, cloudData.VMs),
 		updater.NewPodCluster(r.cacheMng.DomainCache, cloudData.PodClusters),
-		updater.NewPodNode(r.cacheMng.DomainCache, cloudData.PodNodes),
+		updater.NewPodNode(r.cacheMng.DomainCache, cloudData.PodNodes, r.eventQueue),
 		updater.NewPodNamespace(r.cacheMng.DomainCache, cloudData.PodNamespaces),
 		updater.NewPodIngress(r.cacheMng.DomainCache, cloudData.PodIngresses),
 		updater.NewPodIngressRule(r.cacheMng.DomainCache, cloudData.PodIngressRules),
-		updater.NewPodService(r.cacheMng.DomainCache, cloudData.PodServices),
+		updater.NewPodService(r.cacheMng.DomainCache, cloudData.PodServices, r.eventQueue),
 		updater.NewPodIngressRuleBackend(r.cacheMng.DomainCache, cloudData.PodIngressRuleBackends),
 		updater.NewPodServicePort(r.cacheMng.DomainCache, cloudData.PodServicePorts),
 		updater.NewPodGroup(r.cacheMng.DomainCache, cloudData.PodGroups),
 		updater.NewPodGroupPort(r.cacheMng.DomainCache, cloudData.PodGroupPorts),
 		updater.NewPodReplicaSet(r.cacheMng.DomainCache, cloudData.PodReplicaSets),
-		updater.NewPod(r.cacheMng.DomainCache, cloudData.Pods),
+		updater.NewPod(r.cacheMng.DomainCache, cloudData.Pods, r.eventQueue),
 		updater.NewNetwork(r.cacheMng.DomainCache, cloudData.Networks),
 		updater.NewSubnet(r.cacheMng.DomainCache, cloudData.Subnets),
 		updater.NewVRouter(r.cacheMng.DomainCache, cloudData.VRouters),
@@ -205,7 +208,7 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewCEN(r.cacheMng.DomainCache, cloudData.CENs),
 		updater.NewVInterface(r.cacheMng.DomainCache, cloudData.VInterfaces),
 		updater.NewFloatingIP(r.cacheMng.DomainCache, cloudData.FloatingIPs),
-		updater.NewIP(r.cacheMng.DomainCache, cloudData.IPs),
+		updater.NewIP(r.cacheMng.DomainCache, cloudData.IPs, r.eventQueue),
 		updater.NewVMPodNodeConnection(r.cacheMng.DomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}
 }
@@ -257,21 +260,21 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 	}
 	return []updater.ResourceUpdater{
 		updater.NewPodCluster(subDomainCache, cloudData.PodClusters),
-		updater.NewPodNode(subDomainCache, cloudData.PodNodes),
+		updater.NewPodNode(subDomainCache, cloudData.PodNodes, r.eventQueue),
 		updater.NewPodNamespace(subDomainCache, cloudData.PodNamespaces),
 		updater.NewPodIngress(subDomainCache, cloudData.PodIngresses),
 		updater.NewPodIngressRule(subDomainCache, cloudData.PodIngressRules),
-		updater.NewPodService(subDomainCache, cloudData.PodServices),
+		updater.NewPodService(subDomainCache, cloudData.PodServices, r.eventQueue),
 		updater.NewPodIngressRuleBackend(subDomainCache, cloudData.PodIngressRuleBackends),
 		updater.NewPodServicePort(subDomainCache, cloudData.PodServicePorts),
 		updater.NewPodGroup(subDomainCache, cloudData.PodGroups),
 		updater.NewPodGroupPort(subDomainCache, cloudData.PodGroupPorts),
 		updater.NewPodReplicaSet(subDomainCache, cloudData.PodReplicaSets),
-		updater.NewPod(subDomainCache, cloudData.Pods),
+		updater.NewPod(subDomainCache, cloudData.Pods, r.eventQueue),
 		updater.NewNetwork(subDomainCache, cloudData.Networks),
 		updater.NewSubnet(subDomainCache, cloudData.Subnets),
 		updater.NewVInterface(subDomainCache, cloudData.VInterfaces),
-		updater.NewIP(subDomainCache, cloudData.IPs),
+		updater.NewIP(subDomainCache, cloudData.IPs, r.eventQueue),
 		updater.NewVMPodNodeConnection(subDomainCache, cloudData.VMPodNodeConnections), // VMPodNodeConnection需放在最后
 	}
 }

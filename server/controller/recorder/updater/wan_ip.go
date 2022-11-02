@@ -24,13 +24,15 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type WANIP struct {
 	UpdaterBase[cloudmodel.IP, mysql.WANIP, *cache.WANIP]
 }
 
-func NewWANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP) *WANIP {
+func NewWANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *queue.OverwriteQueue) *WANIP {
 	updater := &WANIP{
 		UpdaterBase[cloudmodel.IP, mysql.WANIP, *cache.WANIP]{
 			cache:        wholeCache,
@@ -41,16 +43,17 @@ func NewWANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP) *WANIP {
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
+	updater.eventProducer = event.NewWANIP(wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 
-func (l *WANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *cache.WANIP, exists bool) {
-	diffBase, exists = l.diffBaseData[cloudItem.Lcuuid]
+func (i *WANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *cache.WANIP, exists bool) {
+	diffBase, exists = i.diffBaseData[cloudItem.Lcuuid]
 	return
 }
 
-func (l *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, bool) {
-	vinterfaceID, exists := l.cache.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
+func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, bool) {
+	vinterfaceID, exists := i.cache.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
@@ -61,7 +64,7 @@ func (l *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 
 	dbItem := &mysql.WANIP{
 		IP:           common.FormatIP(cloudItem.IP),
-		Domain:       l.cache.DomainLcuuid,
+		Domain:       i.cache.DomainLcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		VInterfaceID: vinterfaceID,
 		Region:       cloudItem.RegionLcuuid,
@@ -78,7 +81,7 @@ func (l *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 	return dbItem, true
 }
 
-func (l *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
+func (i *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
 	updateInfo := make(map[string]interface{})
 	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
 		updateInfo["region"] = cloudItem.RegionLcuuid
@@ -86,14 +89,14 @@ func (l *WANIP) generateUpdateInfo(diffBase *cache.WANIP, cloudItem *cloudmodel.
 	return updateInfo, len(updateInfo) > 0
 }
 
-func (l *WANIP) addCache(dbItems []*mysql.WANIP) {
-	l.cache.AddWANIPs(dbItems)
+func (i *WANIP) addCache(dbItems []*mysql.WANIP) {
+	i.cache.AddWANIPs(dbItems)
 }
 
-func (l *WANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
+func (i *WANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
 	diffBase.Update(cloudItem)
 }
 
-func (l *WANIP) deleteCache(lcuuids []string) {
-	l.cache.DeleteWANIPs(lcuuids)
+func (i *WANIP) deleteCache(lcuuids []string) {
+	i.cache.DeleteWANIPs(lcuuids)
 }

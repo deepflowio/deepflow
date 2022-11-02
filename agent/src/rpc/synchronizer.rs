@@ -19,6 +19,7 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::mem;
 use std::net::IpAddr;
+use std::path::PathBuf;
 use std::process::{self, Command};
 use std::str::FromStr;
 use std::sync::{
@@ -51,7 +52,7 @@ use crate::exception::ExceptionHandler;
 use crate::proto::common::TridentType;
 use crate::proto::trident::{self as tp, Exception, TapMode};
 use crate::rpc::session::Session;
-use crate::trident::{self, ChangedConfig, TridentState, VersionInfo};
+use crate::trident::{self, ChangedConfig, RunningMode, TridentState, VersionInfo};
 use crate::utils::{
     environment::{get_executable_path, is_tt_pod, running_in_container},
     stats,
@@ -401,6 +402,8 @@ pub struct Synchronizer {
 
     max_memory: Arc<AtomicU64>,
     ntp_diff: Arc<AtomicI64>,
+    agent_mode: RunningMode,
+    standalone_runtime_config: Option<PathBuf>,
 }
 
 impl Synchronizer {
@@ -414,6 +417,8 @@ impl Synchronizer {
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
         exception_handler: ExceptionHandler,
+        agent_mode: RunningMode,
+        standalone_runtime_config: Option<PathBuf>,
     ) -> Synchronizer {
         Synchronizer {
             static_config: Arc::new(StaticConfig {
@@ -444,6 +449,8 @@ impl Synchronizer {
 
             max_memory: Default::default(),
             ntp_diff: Default::default(),
+            agent_mode,
+            standalone_runtime_config,
         }
     }
 
@@ -668,7 +675,7 @@ impl Synchronizer {
             runtime_config.platform_enabled = false;
         }
          */
-        let _ = escape_tx.send(runtime_config.max_escape);
+        let _ = escape_tx.send(Duration::from_secs(runtime_config.max_escape));
 
         max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
 
@@ -681,7 +688,7 @@ impl Synchronizer {
             static_config.controller_ip.parse().ok()
         };
         status.proxy_port = runtime_config.proxy_controller_port;
-        status.sync_interval = runtime_config.sync_interval;
+        status.sync_interval = Duration::from_secs(runtime_config.sync_interval);
         status.ntp_enabled = runtime_config.ntp_enabled;
         let updated_platform = status.get_platform_data(&resp);
         if updated_platform {
@@ -1102,6 +1109,50 @@ impl Synchronizer {
         Ok(())
     }
 
+    fn run_standalone(&self) {
+        let running = self.running.clone();
+        let trident_state = self.trident_state.clone();
+        let max_memory = self.max_memory.clone();
+        let mut sync_interval = DEFAULT_SYNC_INTERVAL;
+        let standalone_runtime_config = self.standalone_runtime_config.as_ref().unwrap().clone();
+        self.threads.lock().push(self.rt.spawn(async move {
+            while running.load(Ordering::SeqCst) {
+                let runtime_config =
+                    match RuntimeConfig::load_from_file(standalone_runtime_config.as_path()) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            error!(
+                                "load standalone runtime config from path={} failed: {}",
+                                standalone_runtime_config.as_path().display(),
+                                e
+                            );
+                            time::sleep(sync_interval).await;
+                            continue;
+                        }
+                    };
+
+                max_memory.store(runtime_config.max_memory, Ordering::Relaxed);
+                let new_sync_interval = Duration::from_secs(runtime_config.sync_interval);
+                let (trident_state, cvar) = &*trident_state;
+                if !runtime_config.enabled {
+                    *trident_state.lock().unwrap() = trident::State::Disabled;
+                } else {
+                    *trident_state.lock().unwrap() = trident::State::ConfigChanged(ChangedConfig {
+                        runtime_config,
+                        ..Default::default()
+                    });
+                }
+                cvar.notify_one();
+
+                if sync_interval != new_sync_interval {
+                    sync_interval = new_sync_interval;
+                    info!("sync interval set to {:?}", sync_interval);
+                }
+                time::sleep(sync_interval).await;
+            }
+        }));
+    }
+
     fn run(&self, escape_tx: UnboundedSender<Duration>) {
         let session = self.session.clone();
         let trident_state = self.trident_state.clone();
@@ -1254,10 +1305,17 @@ impl Synchronizer {
         if self.running.swap(true, Ordering::SeqCst) {
             return;
         }
-        self.run_ntp_sync();
-        let esc_tx = self.run_escape_timer();
-        //self.run_triggered_session(esc_tx.clone());
-        self.run(esc_tx);
+        match self.agent_mode {
+            RunningMode::Managed => {
+                self.run_ntp_sync();
+                let esc_tx = self.run_escape_timer();
+                //self.run_triggered_session(esc_tx.clone());
+                self.run(esc_tx);
+            }
+            RunningMode::Standalone => {
+                self.run_standalone();
+            }
+        }
     }
 
     pub fn stop(&self) {

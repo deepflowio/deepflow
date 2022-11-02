@@ -51,7 +51,7 @@ use crate::{
         common::TridentType,
         trident::{Exception, IfMacSource, SocketType, TapMode},
     },
-    trident::Components,
+    trident::{Components, RunningMode},
     utils::{
         environment::{free_memory_check, get_ctrl_ip_and_mac},
         logger::RemoteLogConfig,
@@ -313,7 +313,17 @@ impl From<&RuntimeConfig> for FlowConfig {
             trident_type: conf.trident_type,
             cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
             collector_enabled: conf.collector_enabled,
-            l7_log_tap_types: conf.l7_log_store_tap_types,
+            l7_log_tap_types: {
+                let mut tap_types = [false; 256];
+                for &t in conf.l7_log_store_tap_types.iter() {
+                    if (t as u16) >= u16::from(TapType::Max) {
+                        warn!("invalid tap type: {}", t);
+                    } else {
+                        tap_types[t as usize] = true;
+                    }
+                }
+                tap_types
+            },
             packet_delay: conf.yaml_config.packet_delay,
             flush_interval: flow_config.flush_interval,
             flow_timeout: FlowTimeout::from(TcpTimeout {
@@ -391,6 +401,7 @@ pub struct DebugConfig {
     pub enabled: bool,
     pub controller_ips: Vec<IpAddr>,
     pub listen_port: u16,
+    pub agent_mode: RunningMode,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -684,13 +695,13 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 log_file_size: conf.log_file_size,
             },
             synchronizer: SynchronizerConfig {
-                sync_interval: conf.sync_interval,
+                sync_interval: Duration::from_secs(conf.sync_interval),
                 output_vlan: conf.output_vlan,
                 ntp_enabled: conf.ntp_enabled,
-                max_escape: conf.max_escape,
+                max_escape: Duration::from_secs(conf.max_escape),
             },
             stats: StatsConfig {
-                interval: conf.stats_interval,
+                interval: Duration::from_secs(conf.stats_interval),
                 host: conf.host.clone(),
             },
             dispatcher: DispatcherConfig {
@@ -769,7 +780,17 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_metrics_enabled: conf.l7_metrics_enabled,
                 trident_type: conf.trident_type,
                 vtap_id: conf.vtap_id as u16,
-                l4_log_store_tap_types: conf.l4_log_store_tap_types,
+                l4_log_store_tap_types: {
+                    let mut tap_types = [false; 256];
+                    for &t in conf.l4_log_store_tap_types.iter() {
+                        if (t as u16) >= u16::from(TapType::Max) {
+                            warn!("invalid tap type: {}", t);
+                        } else {
+                            tap_types[t as usize] = true;
+                        }
+                    }
+                    tap_types
+                },
                 cloud_gateway_traffic: conf.yaml_config.cloud_gateway_traffic,
             },
             handler: HandlerConfig {
@@ -831,6 +852,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     .map(|c| c.parse::<IpAddr>().unwrap())
                     .collect(),
                 listen_port: conf.yaml_config.debug_listen_port,
+                agent_mode: static_config.agent_mode,
             },
             log: LogConfig {
                 log_level: conf.log_level,
@@ -848,7 +870,17 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 l7_log_session_timeout: conf.yaml_config.l7_log_session_aggr_timeout,
                 log_path: conf.yaml_config.ebpf_log_file.clone(),
                 l7_log_packet_size: CAP_LEN_MAX.min(conf.l7_log_packet_size as usize),
-                l7_log_tap_types: conf.l7_log_store_tap_types,
+                l7_log_tap_types: {
+                    let mut tap_types = [false; 256];
+                    for &t in conf.l7_log_store_tap_types.iter() {
+                        if (t as u16) >= u16::from(TapType::Max) {
+                            warn!("invalid tap type: {}", t);
+                        } else {
+                            tap_types[t as usize] = true;
+                        }
+                    }
+                    tap_types
+                },
                 l7_protocol_inference_max_fail_count: conf
                     .yaml_config
                     .l7_protocol_inference_max_fail_count,
@@ -1330,19 +1362,6 @@ impl ConfigHandler {
         if candidate_config.tap_mode != TapMode::Analyzer
             && static_config.kubernetes_cluster_id.is_empty()
         {
-            if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
-                info!(
-                    "memory limit set to {}",
-                    ByteSize::b(new_config.environment.max_memory).to_string_as(true)
-                );
-                candidate_config.environment.max_memory = new_config.environment.max_memory;
-            }
-
-            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
-                info!("cpu limit set to {}", new_config.environment.max_cpus);
-                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
-            }
             #[cfg(target_os = "linux")]
             {
                 let max_memory_change =
@@ -1422,6 +1441,20 @@ impl ConfigHandler {
                         callbacks.push(cgroup_callback);
                     }
                 }
+            }
+
+            if candidate_config.environment.max_memory != new_config.environment.max_memory {
+                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
+                info!(
+                    "memory limit set to {}",
+                    ByteSize::b(new_config.environment.max_memory).to_string_as(true)
+                );
+                candidate_config.environment.max_memory = new_config.environment.max_memory;
+            }
+
+            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
+                info!("cpu limit set to {}", new_config.environment.max_cpus);
+                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
             }
         } else if (candidate_config.tap_mode == TapMode::Analyzer
             || !static_config.kubernetes_cluster_id.is_empty())
@@ -1553,41 +1586,49 @@ impl ConfigHandler {
             );
             candidate_config.platform = new_config.platform;
 
-            fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
-                let conf = &handler.candidate_config.platform;
-                #[cfg(target_os = "windows")]
-                if handler.candidate_config.enabled
-                    && handler.candidate_config.tap_mode == TapMode::Local
-                {
-                    components.platform_synchronizer.start();
-                } else {
-                    components.platform_synchronizer.stop();
-                    info!("PlatformSynchronizer is not enabled");
-                }
-
-                #[cfg(target_os = "linux")]
-                if handler.candidate_config.enabled
-                    && (handler.candidate_config.tap_mode == TapMode::Local
-                    || is_tt_pod(conf.trident_type))
-                {
-                    components.platform_synchronizer.start();
-                    if is_tt_pod(conf.trident_type) {
-                        components.platform_synchronizer.start_kubernetes_poller();
+            if static_config.agent_mode == RunningMode::Managed {
+                fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
+                    let conf = &handler.candidate_config.platform;
+                    #[cfg(target_os = "windows")]
+                    if handler.candidate_config.enabled
+                        && handler.candidate_config.tap_mode == TapMode::Local
+                    {
+                        components.platform_synchronizer.start();
                     } else {
-                        components.platform_synchronizer.stop_kubernetes_poller();
+                        components.platform_synchronizer.stop();
+                        info!("PlatformSynchronizer is not enabled");
                     }
-                } else {
-                    components.platform_synchronizer.stop();
-                    info!("PlatformSynchronizer is not enabled");
+
+                    #[cfg(target_os = "linux")]
+                    if handler.candidate_config.enabled
+                        && (handler.candidate_config.tap_mode == TapMode::Local
+                            || is_tt_pod(conf.trident_type))
+                    {
+                        components.platform_synchronizer.start();
+                        if is_tt_pod(conf.trident_type) {
+                            components.platform_synchronizer.start_kubernetes_poller();
+                        } else {
+                            components.platform_synchronizer.stop();
+                            info!("PlatformSynchronizer is not enabled");
+                        }
+                        if conf.kubernetes_api_enabled {
+                            components.api_watcher.start();
+                        } else {
+                            components.api_watcher.stop();
+                        }
+                    } else {
+                        components.platform_synchronizer.stop();
+                        info!("PlatformSynchronizer is not enabled");
+                    }
+                    #[cfg(target_os = "linux")]
+                    if conf.kubernetes_api_enabled {
+                        components.api_watcher.start();
+                    } else {
+                        components.api_watcher.stop();
+                    }
                 }
-                #[cfg(target_os = "linux")]
-                if conf.kubernetes_api_enabled {
-                    components.api_watcher.start();
-                } else {
-                    components.api_watcher.stop();
-                }
+                callbacks.push(platform_callback);
             }
-            callbacks.push(platform_callback);
         }
 
         if candidate_config.sender != new_config.sender {

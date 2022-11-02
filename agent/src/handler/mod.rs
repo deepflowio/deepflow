@@ -121,7 +121,9 @@ impl PacketHandlerBuilder {
 
     pub fn stop(&mut self) {
         match self {
-            PacketHandlerBuilder::Pcap(_) => {}
+            PacketHandlerBuilder::Pcap(s) => {
+                let _ = s.send(PcapPacket::Terminated);
+            }
             PacketHandlerBuilder::Npb(b) => {
                 b.stop();
             }
