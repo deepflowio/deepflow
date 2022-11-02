@@ -25,6 +25,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc, Mutex, Weak,
 };
+use std::time::Duration;
 
 #[cfg(unix)]
 use libc::{c_int, socket, AF_INET, AF_INET6, SOCK_RAW};
@@ -483,7 +484,7 @@ impl NpbPacketSender {
 
     pub fn run(&self) {
         while !self.disable.load(Ordering::Relaxed) {
-            let packet = self.receiver.recv(None);
+            let packet = self.receiver.recv(Some(Duration::from_secs(1)));
             if packet.is_err() {
                 continue;
             }
