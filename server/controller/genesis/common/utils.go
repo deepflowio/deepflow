@@ -134,9 +134,9 @@ type XMLVM struct {
 	Interfaces []XMLInterface
 }
 
-var IfaceRegex = regexp.MustCompile(`^(\d+):\s+([\w\.-]+)(@.*)?:`)
-var MACRegex = regexp.MustCompile(`^\s+link/\S+\s+(([\dA-Za-z]{2}:){5}[\dA-Za-z]{2}) brd.*$`)
-var IPRegex = regexp.MustCompile(`^\s+inet6?\s+([\d\.A-Za-z:]+)/(\d+)\s+.*scope\s+(global|link|host)`)
+var IfaceRegex = regexp.MustCompile("^(\\d+):\\s+([(\u4e00-\u9fa5)?\\w?(\\s)?\\.-]+)(@.*)?\\:") // \u4e00-\u9fa5: support Chinese characters
+var MACRegex = regexp.MustCompile("^\\s+link/\\S+\\s+(([\\dA-Za-z]{2}:){5}[\\dA-Za-z]{2}) brd.*$")
+var IPRegex = regexp.MustCompile("^\\s+inet6?\\s+([\\d\\.A-Za-z:]+)/(\\d+)\\s+.*scope\\s+(global|link|host)")
 
 func ParseIPOutput(s string) ([]Iface, error) {
 	ifaces := []Iface{}

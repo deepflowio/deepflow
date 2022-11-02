@@ -31,28 +31,6 @@ import (
 	"github.com/deepflowys/deepflow/cli/ctl/example"
 )
 
-var domainTypeIntToStr = map[int]string{
-	common.TENCENT:    common.TENCENT_EN,
-	common.AWS:        common.AWS_EN,
-	common.ALIYUN:     common.ALIYUN_EN,
-	common.KUBERNETES: common.KUBERNETES_EN,
-	common.HUAWEI:     common.HUAWEI_EN,
-	common.QINGCLOUD:  common.QINGCLOUD_EN,
-	common.AGENT_SYNC: common.AGENT_SYNC_EN,
-	common.BAIDU_BCE:  common.BAIDU_BCE_EN,
-}
-
-var domainTypeStrToInt = map[string]int{
-	common.TENCENT_EN:    common.TENCENT,
-	common.AWS_EN:        common.AWS,
-	common.ALIYUN_EN:     common.ALIYUN,
-	common.KUBERNETES_EN: common.KUBERNETES,
-	common.HUAWEI_EN:     common.HUAWEI,
-	common.QINGCLOUD_EN:  common.QINGCLOUD,
-	common.AGENT_SYNC_EN: common.AGENT_SYNC,
-	common.BAIDU_BCE_EN:  common.BAIDU_BCE,
-}
-
 func RegisterDomainCommand() *cobra.Command {
 	Domain := &cobra.Command{
 		Use:   "domain",
@@ -109,7 +87,7 @@ func RegisterDomainCommand() *cobra.Command {
 	exampleCmd := &cobra.Command{
 		Use:     "example domain_type",
 		Short:   "example domain create yaml",
-		Long:    fmt.Sprintf("supported types: %v", strings.Join([]string{common.KUBERNETES_EN, common.AWS_EN, common.ALIYUN_EN, common.TENCENT_EN, common.QINGCLOUD_EN, common.BAIDU_BCE_EN, common.AGENT_SYNC_EN}, ",")),
+		Long:    "supported types: " + strings.Trim(fmt.Sprint(common.DomainTypes), "[]"),
 		Example: "deepflow-ctl domain example agent_sync",
 		Run: func(cmd *cobra.Command, args []string) {
 			exampleDomainConfig(cmd, args)
@@ -153,9 +131,8 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		)
 		for i := range response.Get("DATA").MustArray() {
 			d := response.Get("DATA").GetIndex(i)
-			domainTypeStr, _ := domainTypeIntToStr[d.Get("TYPE").MustInt()]
 			fmt.Printf(
-				format, d.Get("NAME").MustString(), d.Get("CLUSTER_ID").MustString(), domainTypeStr,
+				format, d.Get("NAME").MustString(), d.Get("CLUSTER_ID").MustString(), common.DomainType(d.Get("TYPE").MustInt()),
 				d.Get("CONTROLLER_NAME").MustString(), d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
 				strconv.Itoa(d.Get("ENABLED").MustInt()), strconv.Itoa(d.Get("STATE").MustInt()),
 			)
@@ -177,12 +154,12 @@ func createDomain(cmd *cobra.Command, args []string, filename string) {
 	}
 
 	if domainTypeStr, ok := body["TYPE"]; ok {
-		domainTypeInt, ok := domainTypeStrToInt[domainTypeStr.(string)]
-		if !ok {
+		domainType := common.GetDomainTypeByName(domainTypeStr.(string))
+		if domainType == common.DOMAIN_TYPE_UNKNOWN {
 			fmt.Fprintln(os.Stderr, fmt.Sprintf("domain type (%s) not supported, use example to see supported types", domainTypeStr))
 			return
 		}
-		body["TYPE"] = domainTypeInt
+		body["TYPE"] = int(domainType)
 	} else {
 		fmt.Fprintln(os.Stderr, "domain type must specify")
 		return
@@ -269,22 +246,22 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	switch args[0] {
-	case common.KUBERNETES_EN:
+	switch common.GetDomainTypeByName(args[0]) {
+	case common.DOMAIN_TYPE_KUBERNETES:
 		fmt.Printf(string(example.YamlDomainKubernetes))
-	case common.ALIYUN_EN:
+	case common.DOMAIN_TYPE_ALIYUN:
 		fmt.Printf(string(example.YamlDomainAliYun))
-	case common.AWS_EN:
+	case common.DOMAIN_TYPE_AWS:
 		fmt.Printf(string(example.YamlDomainAws))
-	case common.TENCENT_EN:
+	case common.DOMAIN_TYPE_TENCENT:
 		fmt.Printf(string(example.YamlDomainTencent))
-	case common.HUAWEI_EN:
+	case common.DOMAIN_TYPE_HUAWEI:
 		fmt.Printf(string(example.YamlDomainHuawei))
-	case common.QINGCLOUD_EN:
+	case common.DOMAIN_TYPE_QINGCLOUD:
 		fmt.Printf(string(example.YamlDomainQingCloud))
-	case common.BAIDU_BCE_EN:
+	case common.DOMAIN_TYPE_BAIDU_BCE:
 		fmt.Printf(string(example.YamlDomainBaiduBce))
-	case common.AGENT_SYNC_EN:
+	case common.DOMAIN_TYPE_AGENT_SYNC:
 		fmt.Printf(string(example.YamlDomainGenesis))
 	default:
 		err := fmt.Sprintf("domain_type %s not supported\n", args[0])

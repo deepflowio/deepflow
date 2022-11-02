@@ -44,7 +44,7 @@ use crate::handler::{NpbBuilder, PacketHandlerBuilder};
 use crate::integration_collector::MetricServer;
 use crate::pcap::WorkerManager;
 #[cfg(target_os = "linux")]
-use crate::platform::{ApiWatcher, PlatformSynchronizer};
+use crate::platform::ApiWatcher;
 #[cfg(target_os = "linux")]
 use crate::utils::cgroups::Cgroups;
 use crate::{
@@ -69,7 +69,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{AppProtoLogsParser, PacketSequenceParser},
     monitor::Monitor,
-    platform::LibvirtXmlExtractor,
+    platform::{LibvirtXmlExtractor, PlatformSynchronizer},
     policy::Policy,
     proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
@@ -693,7 +693,6 @@ pub struct Components {
     pub metrics_uniform_sender: UniformSenderThread,
     pub l7_flow_uniform_sender: UniformSenderThread,
     pub stats_sender: UniformSenderThread,
-    #[cfg(target_os = "linux")]
     pub platform_synchronizer: PlatformSynchronizer,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
@@ -728,8 +727,8 @@ impl Components {
         info!("Staring components.");
         self.libvirt_xml_extractor.start();
         self.pcap_manager.start();
-        #[cfg(target_os = "linux")]
         self.platform_synchronizer.start();
+
         #[cfg(target_os = "linux")]
         self.api_watcher.start();
         self.debugger.start();
@@ -866,6 +865,12 @@ impl Components {
             libvirt_xml_extractor.clone(),
             exception_handler.clone(),
             candidate_config.dispatcher.extra_netns_regex.clone(),
+        );
+        #[cfg(target_os = "windows")]
+        let platform_synchronizer = PlatformSynchronizer::new(
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
         );
 
         #[cfg(target_os = "linux")]
@@ -1266,7 +1271,8 @@ impl Components {
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
                 .src_interface(src_interface)
-                .netns(netns);
+                .netns(netns)
+                .trident_type(candidate_config.dispatcher.trident_type);
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder
@@ -1469,7 +1475,6 @@ impl Components {
             metrics_uniform_sender,
             l7_flow_uniform_sender,
             stats_sender,
-            #[cfg(target_os = "linux")]
             platform_synchronizer,
             #[cfg(target_os = "linux")]
             api_watcher,
@@ -1639,8 +1644,8 @@ impl Components {
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
-        #[cfg(target_os = "linux")]
         self.platform_synchronizer.stop();
+
         #[cfg(target_os = "linux")]
         self.api_watcher.stop();
 
