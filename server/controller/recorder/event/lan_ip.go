@@ -110,7 +110,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 			deviceInfo.Type,
 			deviceInfo.ID,
 			deviceInfo.Name,
-			fmt.Sprintf("%s-%s", networkInfo.Name, ip)
+			fmt.Sprintf("%s-%s", networkInfo.Name, ip),
 		)
 	}
 }
