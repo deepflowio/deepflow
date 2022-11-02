@@ -33,9 +33,10 @@ use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
 use sysinfo::SystemExt;
 
-use super::config::{PortConfig, UprobeProcRegExp};
+#[cfg(target_os = "linux")]
+use super::config::UprobeProcRegExp;
 use super::{
-    config::{Config, PcapConfig, YamlConfig},
+    config::{Config, PcapConfig, PortConfig, YamlConfig},
     ConfigError, IngressFlavour, KubernetesPollerType, RuntimeConfig,
 };
 
@@ -1552,12 +1553,22 @@ impl ConfigHandler {
             );
             candidate_config.platform = new_config.platform;
 
-            #[cfg(target_os = "linux")]
             fn platform_callback(handler: &ConfigHandler, components: &mut Components) {
                 let conf = &handler.candidate_config.platform;
+                #[cfg(target_os = "windows")]
+                if handler.candidate_config.enabled
+                    && handler.candidate_config.tap_mode == TapMode::Local
+                {
+                    components.platform_synchronizer.start();
+                } else {
+                    components.platform_synchronizer.stop();
+                    info!("PlatformSynchronizer is not enabled");
+                }
+
+                #[cfg(target_os = "linux")]
                 if handler.candidate_config.enabled
                     && (handler.candidate_config.tap_mode == TapMode::Local
-                        || is_tt_pod(conf.trident_type))
+                    || is_tt_pod(conf.trident_type))
                 {
                     components.platform_synchronizer.start();
                     if is_tt_pod(conf.trident_type) {
@@ -1569,13 +1580,13 @@ impl ConfigHandler {
                     components.platform_synchronizer.stop();
                     info!("PlatformSynchronizer is not enabled");
                 }
+                #[cfg(target_os = "linux")]
                 if conf.kubernetes_api_enabled {
                     components.api_watcher.start();
                 } else {
                     components.api_watcher.stop();
                 }
             }
-            #[cfg(target_os = "linux")]
             callbacks.push(platform_callback);
         }
 

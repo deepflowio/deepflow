@@ -14,7 +14,40 @@
  * limitations under the License.
  */
 
+use std::{
+    io::{Error, ErrorKind, Result},
+    process::Command,
+};
+
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "windows")]
+mod windows;
+
+#[cfg(target_os = "windows")]
+pub use self::windows::*;
 #[cfg(target_os = "linux")]
 pub use linux::*;
+
+fn exec_command(program: &str, args: &[&str]) -> Result<String> {
+    let output = Command::new(program).args(args).output()?;
+    if output.status.success() {
+        Ok(String::from_utf8(output.stdout)
+            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?)
+    } else {
+        Ok(String::from_utf8(output.stderr)
+            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?)
+    }
+}
+
+pub fn get_hostname() -> Result<String> {
+    match hostname::get() {
+        Ok(hostname) => {
+            return match hostname.into_string() {
+                Ok(s) => Ok(s),
+                Err(_) => Err(Error::new(ErrorKind::Other, "get hostname failed")),
+            };
+        }
+        Err(e) => Err(Error::new(ErrorKind::Other, e.to_string())),
+    }
+}
