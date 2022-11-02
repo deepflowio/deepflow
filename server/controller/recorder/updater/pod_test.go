@@ -82,7 +82,7 @@ func (t *SuiteTest) TestHandleAddPodSucess() {
 	})
 	defer monkey4.Reset()
 
-	updater := NewPod(c, []cloudmodel.Pod{cloudItem})
+	updater := NewPod(c, []cloudmodel.Pod{cloudItem}, nil)
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.Pod
@@ -99,7 +99,7 @@ func (t *SuiteTest) TestHandleUpdatePodSucess() {
 	cloudItem.Name = cloudItem.Name + "new"
 	cloudItem.Label = cloudItem.Label + "new"
 
-	updater := NewPod(cache, []cloudmodel.Pod{cloudItem})
+	updater := NewPod(cache, []cloudmodel.Pod{cloudItem}, nil)
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.Pod

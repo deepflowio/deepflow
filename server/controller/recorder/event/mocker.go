@@ -17,21 +17,31 @@
 package event
 
 import (
-	"fmt"
+	"math/rand"
+	"time"
 
-	"github.com/op/go-logging"
+	"github.com/deepflowys/deepflow/server/libs/eventapi"
+	"github.com/deepflowys/deepflow/server/libs/queue"
+	"github.com/google/uuid"
 )
 
-var log = logging.MustGetLogger("recorder.event")
-
-func putEventIntoQueueFailed(resource string, err error) string {
-	return fmt.Sprintf("put %s event into queue failed: %s", resource, err.Error())
+func RandID() int {
+	rand.Seed(time.Now().UnixNano())
+	time.Sleep(time.Millisecond)
+	return rand.Intn(9999)
 }
 
-func idByLcuuidNotFound(resource, lcuuid string) string {
-	return fmt.Sprintf("%s (lcuuid: %s) id not found", resource, lcuuid)
+func RandLcuuid() string {
+	return uuid.NewString()
 }
 
-func nameByIDNotFound(resource string, id int) string {
-	return fmt.Sprintf("%s (id: %d) name not found", resource, id)
+func RandName() string {
+	return uuid.NewString()[:7]
+}
+
+func NewEventQueue() *queue.OverwriteQueue {
+	return queue.NewOverwriteQueue(
+		"controller-to-ingester-resource_event", 1<<4,
+		queue.OptionFlushIndicator(time.Second*3),
+		queue.OptionRelease(func(p interface{}) { p.(*eventapi.ResourceEvent).Release() }))
 }
