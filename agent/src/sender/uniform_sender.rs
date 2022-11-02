@@ -17,6 +17,7 @@
 use std::fs::{rename, File, OpenOptions};
 use std::io::{BufWriter, ErrorKind, Write};
 use std::net::{IpAddr, Shutdown, TcpStream};
+use std::path::Path;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Weak,
@@ -473,7 +474,11 @@ impl UniformSender {
             return Ok(());
         }
         if self.file_path.is_empty() {
-            self.file_path = format!("{}/{}", &self.config.load().log_dir, send_item.file_name());
+            self.file_path = Path::new(&self.config.load().standalone_data_file_dir)
+                .join(send_item.file_name())
+                .to_str()
+                .unwrap()
+                .into();
             self.pre_file_path = format!("{}{}", &self.file_path, PRE_FILE_SUFFIX);
         }
 
