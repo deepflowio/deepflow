@@ -47,6 +47,7 @@ use crate::{
     config::handler::DebugAccess,
     policy::PolicySetter,
     rpc::{RunningConfig, Session, StaticConfig, Status},
+    trident::RunningMode,
 };
 use public::debug::{send_to, Error, QueueDebugger, QueueMessage, Result, MAX_BUF_SIZE};
 
@@ -107,6 +108,7 @@ impl Debugger {
             let sock_clone = sock.clone();
             let running_clone = running.clone();
             let serialize_conf = config::standard();
+            let agent_mode = conf.load().agent_mode;
             thread::spawn(move || {
                 while running_clone.load(Ordering::Relaxed) {
                     thread::sleep(BEACON_INTERVAL);
@@ -160,8 +162,14 @@ impl Debugger {
                         if addr.is_none() {
                             addr.replace(a);
                         }
-                        Self::dispatch((&sock, addr.unwrap()), &buf, &debuggers, serialize_conf)
-                            .unwrap_or_else(|e| warn!("handle client request error: {}", e));
+                        Self::dispatch(
+                            (&sock, addr.unwrap()),
+                            &buf,
+                            &debuggers,
+                            serialize_conf,
+                            agent_mode,
+                        )
+                        .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                     }
                     Err(e) => {
                         warn!(
@@ -224,6 +232,7 @@ impl Debugger {
             let sock_v6_clone = sock_v6.clone();
             let running_clone = running.clone();
             let serialize_conf = config::standard();
+            let agent_mode = conf.load().agent_mode;
             thread::spawn(move || {
                 while running_clone.load(Ordering::Relaxed) {
                     thread::sleep(BEACON_INTERVAL);
@@ -297,6 +306,7 @@ impl Debugger {
                                 &buf_v4,
                                 &debuggers,
                                 serialize_conf,
+                                agent_mode,
                             )
                             .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                         }
@@ -331,6 +341,7 @@ impl Debugger {
                                 &buf_v6,
                                 &debuggers,
                                 serialize_conf,
+                                agent_mode,
                             )
                             .unwrap_or_else(|e| warn!("handle client request error: {}", e));
                         }
@@ -360,6 +371,7 @@ impl Debugger {
         mut payload: &[u8],
         debuggers: &ModuleDebuggers,
         serialize_conf: Configuration,
+        agent_mode: RunningMode,
     ) -> Result<()> {
         let m = *payload.first().unwrap();
         let module = Module::try_from(m).unwrap_or_default();
@@ -367,6 +379,10 @@ impl Debugger {
         match module {
             #[cfg(target_os = "linux")]
             Module::Platform => {
+                if matches!(agent_mode, RunningMode::Standalone) {
+                    let msg = PlatformMessage::Fin;
+                    send_to(conn.0, conn.1, msg, serialize_conf)?;
+                }
                 let req: Message<PlatformMessage> =
                     decode_from_std_read(&mut payload, serialize_conf)?;
                 let debugger = &debuggers.platform;
