@@ -71,7 +71,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	}
 }
 
-func (i *LANIP) ProduceByUpdate(items *cloudmodel.IP) {
+func (i *LANIP) ProduceByUpdate(items *cloudmodel.IP, diffBase *cache.LANIP) {
 }
 
 func (i *LANIP) ProduceByDelete(lcuuids []string) {

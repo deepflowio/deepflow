@@ -41,6 +41,7 @@ func NewLANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *qu
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
+	// updater.eventProducer = event.NewLANIP(wholeCache.ToolDataSet, eventQueue)
 	updater.eventProducer = event.NewLANIP(wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
