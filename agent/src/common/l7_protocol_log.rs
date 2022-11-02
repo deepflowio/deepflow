@@ -82,7 +82,7 @@ use crate::flow_generator::Result;
                                                            |
                                                            |
                                                            v
-                           find the req/resp in SessionAggr, only find 2 solt(include current solt)
+                           find the req/resp in SessionAggr, only find 2 slot(include current slot)
                                                            |
                                                            |
                            | <------found req/resp <------ v------> not found ------->save in current slot , wait req/resp

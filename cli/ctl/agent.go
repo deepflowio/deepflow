@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
@@ -30,6 +29,7 @@ import (
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
 	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
+	agentpb "github.com/deepflowys/deepflow/message/trident"
 )
 
 type RebalanceType string
@@ -176,43 +176,43 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		dataYaml, _ := yaml.JSONToYAML(dataJson)
 		fmt.Printf(string(dataYaml))
 	} else {
-		nameMaxSize := 0
+		nameMaxSize, groupMaxSize := 0, 0
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
-			l := len(vtap.Get("NAME").MustString())
-			if l > nameMaxSize {
-				nameMaxSize = l
+			nameSize := len(vtap.Get("NAME").MustString())
+			if nameSize > nameMaxSize {
+				nameMaxSize = nameSize
+			}
+			groupSize := len(vtap.Get("VTAP_GROUP_NAME").MustString())
+			if groupSize > groupMaxSize {
+				groupMaxSize = groupSize
 			}
 		}
 
-		cmdFormat := "%-*s %-10s %-16s %-18s %-8s %-10s %s\n"
-		fmt.Printf(cmdFormat, nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", "EXCEPTIONS", "GROUP")
+		cmdFormat := "%-*s %-10s %-16s %-18s %-8s %-*s %s\n"
+		fmt.Printf(cmdFormat, nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
-			stateString := ""
-			switch vtap.Get("STATE").MustInt() {
-			case common.VTAP_STATE_NOT_CONNECTED:
-				stateString = common.VTAP_STATE_NOT_CONNECTED_STR
-			case common.VTAP_STATE_NORMAL:
-				stateString = common.VTAP_STATE_NORMAL_STR
-			case common.VTAP_STATE_DISABLE:
-				stateString = common.VTAP_STATE_DISABLE_STR
-			case common.VTAP_STATE_PENDING:
-				stateString = common.VTAP_STATE_PENDING_STR
-			}
-
-			vtapTypeString, _ := common.VTapTypeName[vtap.Get("TYPE").MustInt()]
 
 			exceptionStrings := []string{}
 			for i := range vtap.Get("EXCEPTIONS").MustArray() {
 				exceptionInt := vtap.Get("EXCEPTIONS").GetIndex(i).MustInt()
-				exceptionStrings = append(exceptionStrings, strconv.Itoa(exceptionInt))
+				exceptionStr, ok := agentpb.Exception_name[int32(exceptionInt)]
+				if ok {
+					exceptionStrings = append(exceptionStrings, exceptionStr)
+				} else {
+					exceptionStrings = append(exceptionStrings, string(common.VtapException(exceptionInt)))
+				}
 			}
 
-			fmt.Printf(
-				cmdFormat, nameMaxSize, vtap.Get("NAME").MustString(), vtapTypeString, vtap.Get("CTRL_IP").MustString(),
-				vtap.Get("CTRL_MAC").MustString(), stateString, strings.Join(exceptionStrings, ","),
-				vtap.Get("VTAP_GROUP_NAME").MustString(),
+			fmt.Printf(cmdFormat,
+				nameMaxSize, vtap.Get("NAME").MustString(),
+				common.VtapType(vtap.Get("TYPE").MustInt()),
+				vtap.Get("CTRL_IP").MustString(),
+				vtap.Get("CTRL_MAC").MustString(),
+				common.VtapState(vtap.Get("STATE").MustInt()),
+				groupMaxSize, vtap.Get("VTAP_GROUP_NAME").MustString(),
+				strings.Join(exceptionStrings, ","),
 			)
 		}
 	}
