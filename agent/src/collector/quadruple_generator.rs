@@ -829,39 +829,39 @@ impl QuadrupleGenerator {
         let mut second_inject = false;
         let mut minute_inject = false;
         if let Some(s) = self.second_quad_gen.as_mut() {
-            if self.vtap_flow_1s_enabled.load(Ordering::Relaxed) {
-                second_inject = s.move_window(time_in_second, &mut self.possible_host);
-            }
+           if self.vtap_flow_1s_enabled.load(Ordering::Relaxed) {
+               second_inject = s.move_window(time_in_second, &mut self.possible_host);
+           }
         }
         if let Some(s) = self.minute_quad_gen.as_mut() {
-            minute_inject = s.move_window(time_in_second, &mut self.possible_host);
+           minute_inject = s.move_window(time_in_second, &mut self.possible_host);
         }
 
         if tagged_flow.is_none() || !(second_inject || minute_inject) {
-            return;
+           return;
         }
         let tagged_flow = tagged_flow.unwrap();
 
         let mut no_endpoint_flag = true;
         for i in 0..2 {
-            let side = &tagged_flow.flow.flow_metrics_peers[i];
-            let is_l2_and_l3_end = side.is_l3_end && side.is_l2_end;
-            if (tagged_flow.flow.flow_key.tap_type == TapType::Cloud && is_l2_and_l3_end)
-                || (tagged_flow.flow.flow_key.tap_type != TapType::Cloud
-                    && side.l3_epc_id != EPC_FROM_INTERNET)
-            {
-                no_endpoint_flag = false;
-                break;
-            }
+           let side = &tagged_flow.flow.flow_metrics_peers[i];
+           let is_l2_and_l3_end = side.is_l3_end && side.is_l2_end;
+           if (tagged_flow.flow.flow_key.tap_type == TapType::Cloud && is_l2_and_l3_end)
+               || (tagged_flow.flow.flow_key.tap_type != TapType::Cloud
+                   && side.l3_epc_id != EPC_FROM_INTERNET)
+           {
+               no_endpoint_flag = false;
+               break;
+           }
         }
 
         if no_endpoint_flag {
-            if let Some(s) = self.second_quad_gen.as_mut() {
-                s.counter.no_endpoint.fetch_add(1, Ordering::Relaxed);
-            }
-            if let Some(s) = self.minute_quad_gen.as_mut() {
-                s.counter.no_endpoint.fetch_add(1, Ordering::Relaxed);
-            }
+           if let Some(s) = self.second_quad_gen.as_mut() {
+               s.counter.no_endpoint.fetch_add(1, Ordering::Relaxed);
+           }
+           if let Some(s) = self.minute_quad_gen.as_mut() {
+               s.counter.no_endpoint.fetch_add(1, Ordering::Relaxed);
+           }
         }
 
         let key = Self::get_key(&tagged_flow);
@@ -870,35 +870,35 @@ impl QuadrupleGenerator {
         self.policy_ids[1].clear();
 
         let (flow_meter, app_meter) =
-            Self::generate_meter(&tagged_flow, self.l7_metrics_enabled.clone());
+           Self::generate_meter(&tagged_flow, self.l7_metrics_enabled.clone());
 
         if second_inject {
-            self.second_quad_gen.as_mut().unwrap().inject_flow(
-                tagged_flow.clone(),
-                &flow_meter,
-                &app_meter,
-                &self.policy_ids,
-                time_in_second,
-                &mut self.key,
-            );
+           self.second_quad_gen.as_mut().unwrap().inject_flow(
+               tagged_flow.clone(),
+               &flow_meter,
+               &app_meter,
+               &self.policy_ids,
+               time_in_second,
+               &mut self.key,
+           );
         }
 
         if minute_inject {
-            for i in 0..2 {
-                for action in tagged_flow.tag.policy_data[i].npb_actions.iter() {
-                    for gid in action.acl_gids().iter() {
-                        self.policy_ids[i].add(*gid);
-                    }
-                }
-            }
-            self.minute_quad_gen.as_mut().unwrap().inject_flow(
-                tagged_flow,
-                &flow_meter,
-                &app_meter,
-                &self.policy_ids,
-                time_in_second,
-                &mut self.key,
-            );
+           for i in 0..2 {
+               for action in tagged_flow.tag.policy_data[i].npb_actions.iter() {
+                   for gid in action.acl_gids().iter() {
+                       self.policy_ids[i].add(*gid);
+                   }
+               }
+           }
+           self.minute_quad_gen.as_mut().unwrap().inject_flow(
+               tagged_flow,
+               &flow_meter,
+               &app_meter,
+               &self.policy_ids,
+               time_in_second,
+               &mut self.key,
+           );
         }
     }
 
