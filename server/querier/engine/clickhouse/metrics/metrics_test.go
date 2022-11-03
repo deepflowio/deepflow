@@ -76,6 +76,12 @@ func TestCheckDBField(t *testing.T) {
 						metrics = VTAP_ACL_METRICS
 						replaceMetrics = VTAP_ACL_METRICS_REPLACE
 					}
+				case "event":
+					switch table {
+					case "resource_event":
+						metrics = RESOURCE_EVENT_METRICS
+						replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
+					}
 				}
 				if metrics == nil {
 					t.Errorf("merge metrics failed! db:%s, table:%s", db, table)

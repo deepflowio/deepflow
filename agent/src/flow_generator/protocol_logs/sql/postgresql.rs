@@ -38,6 +38,7 @@ use crate::{
 };
 
 use super::{
+    super::value_is_default,
     postgre_convert::{get_code_desc, get_request_str},
     sql_check::is_postgresql,
 };
@@ -47,8 +48,11 @@ const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct PostgreInfo {
     msg_type: LogMessageType,
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
+    #[serde(skip)]
     is_tls: bool,
     /*
         ignore return this info, default is true.
@@ -66,16 +70,27 @@ pub struct PostgreInfo {
         it use for skip some prepare statement execute and param bind, let the session aggregate match the query and result.
 
     */
+    #[serde(skip)]
     ignore: bool,
 
     // request
+    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub context: String,
+    #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
     pub req_type: char,
 
     // response
+    #[serde(skip)]
     pub resp_type: char,
+
+    #[serde(rename = "response_result", skip_serializing_if = "value_is_default")]
     pub result: String,
+    #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
     pub affected_rows: u64,
+    #[serde(
+        rename = "response_execption",
+        skip_serializing_if = "value_is_default"
+    )]
     pub error_message: String,
     pub status: L7ResponseStatus,
 }

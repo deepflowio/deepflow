@@ -263,12 +263,12 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 		if db == "ext_metrics" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response["values"] = append(response["values"], []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "label",
-				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "",
+				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" {
 			response["values"] = append(response["values"], []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
-				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "",
+				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		}
 

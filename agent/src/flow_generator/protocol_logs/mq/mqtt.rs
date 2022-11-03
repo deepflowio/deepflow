@@ -48,7 +48,9 @@ use crate::{
 
 #[derive(Serialize, Clone, Debug)]
 pub struct MqttInfo {
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
     msg_type: LogMessageType,
 
@@ -70,7 +72,7 @@ pub struct MqttInfo {
     pub subscribe_topics: Option<Vec<MqttTopic>>,
     #[serde(skip)]
     pub publish_topic: Option<String>,
-    #[serde(skip)]
+    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub code: Option<i32>, // connect_ack packet return code
     pub status: L7ResponseStatus,
 }

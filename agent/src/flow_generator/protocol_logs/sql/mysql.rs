@@ -36,8 +36,11 @@ use crate::{log_info_merge, parse_common};
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct MysqlInfo {
     msg_type: LogMessageType,
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
+    #[serde(skip)]
     is_tls: bool,
 
     // Server Greeting
@@ -53,7 +56,6 @@ pub struct MysqlInfo {
     #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
     pub context: String,
     // response
-    #[serde(skip)]
     pub response_code: u8,
     #[serde(skip)]
     pub error_code: Option<i32>,
@@ -64,6 +66,7 @@ pub struct MysqlInfo {
         skip_serializing_if = "value_is_default"
     )]
     pub error_message: String,
+    #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
 }
 
@@ -361,7 +364,8 @@ impl MysqlLog {
             MYSQL_RESPONSE_CODE_OK => {
                 self.info.status = L7ResponseStatus::Ok;
                 if self.command == COM_QUERY {
-                    self.info.affected_rows = MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
+                    self.info.affected_rows =
+                        MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
                 }
             }
             _ => (),
