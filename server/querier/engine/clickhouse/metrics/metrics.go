@@ -157,6 +157,11 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		case "vtap_acl":
 			return GetVtapAclMetrics(), err
 		}
+	case "event":
+		switch table {
+		case "resource_event":
+			return GetResourceEventMetrics(), err
+		}
 	case "ext_metrics", "deepflow_system":
 		return GetExtMetrics(db, table, where, ctx)
 	}
@@ -299,6 +304,12 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "vtap_acl":
 			metrics = VTAP_ACL_METRICS
 			replaceMetrics = VTAP_ACL_METRICS_REPLACE
+		}
+	case "event":
+		switch table {
+		case "resource_event":
+			metrics = RESOURCE_EVENT_METRICS
+			replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
 		}
 	case "ext_metrics", "deepflow_system":
 		metrics = EXT_METRICS
