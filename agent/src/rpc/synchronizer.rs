@@ -120,7 +120,6 @@ pub struct Status {
     pub time_diff: i64,
 
     pub config_accepted: bool,
-    pub synced: bool,
     pub new_revision: Option<String>,
 
     pub proxy_ip: Option<IpAddr>,
@@ -148,7 +147,6 @@ impl Default for Status {
             time_diff: 0,
 
             config_accepted: false,
-            synced: false,
             new_revision: None,
 
             proxy_ip: None,
@@ -637,7 +635,7 @@ impl Synchronizer {
         let mut kubernetes_cluster_id = None;
         match resp.status() {
             tp::Status::Failed => warn!(
-                "trisolaris (ip: {}) responded with {:?}",
+                "server (ip: {}) responded with {:?}",
                 remote,
                 tp::Status::Failed
             ),
@@ -799,11 +797,35 @@ impl Synchronizer {
                         break;
                     }
                     let message = message.unwrap();
+                    match message.status() {
+                        tp::Status::Failed => {
+                            exception_handler.set(Exception::ControllerSocketError);
+                            warn!(
+                                "server (ip: {}) responded with {:?}",
+                                session.get_current_server(),
+                                tp::Status::Failed
+                            );
+                            continue;
+                        }
+                        tp::Status::Heartbeat => {
+                            continue;
+                        }
+                        _ => (),
+                    }
 
                     debug!("received realtime policy successfully");
-                    if !status.read().synced {
-                        // 如果没有同步过（trident重启），trisolaris下发的数据仅有版本号，此时应由trident主动请求
-                        continue;
+                    {
+                        let status = status.read();
+                        if status.version_acls
+                            + status.version_groups
+                            + status.version_platform_data
+                            == 0
+                        {
+                            // 如果没有同步过（agent重启），server下发的数据仅有版本号，此时应由agent主动请求
+                            //If the data is not synchronized (the agent restarts), the server sends only
+                            // the data version. In this case, the agent must actively request the data version
+                            continue;
+                        }
                     }
 
                     Self::on_response(
@@ -1302,7 +1324,7 @@ impl Synchronizer {
             RunningMode::Managed => {
                 self.run_ntp_sync();
                 let esc_tx = self.run_escape_timer();
-                //self.run_triggered_session(esc_tx.clone());
+                self.run_triggered_session(esc_tx.clone());
                 self.run(esc_tx);
             }
             RunningMode::Standalone => {
