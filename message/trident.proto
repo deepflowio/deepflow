@@ -38,7 +38,7 @@ enum Exception {
     INVALID_CONFIGURATION      = 256;
     THREAD_THRESHOLD_EXCEEDED  = 512;
     PROCESS_THRESHOLD_EXCEEDED = 1024;
-    INVALID_LOCAL_CONFIG_FILE  = 2048;
+    // _  = 2048; // deprecate
     TOO_MANY_POLICIES          = 4096;
     FREE_MEM_EXCEEDED          = 8192;
     LOG_FILE_EXCEEDED          = 16384;
