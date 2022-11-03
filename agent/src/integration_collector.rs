@@ -317,16 +317,25 @@ pub struct IntegrationCounter {
 
 impl OwnedCountable for IntegrationCounter {
     fn get_counters(&self) -> Vec<Counter> {
+        let (compressed, uncomressed) = (
+            self.metrics.compressed.swap(0, Ordering::Relaxed),
+            self.metrics.uncompressed.swap(0, Ordering::Relaxed),
+        );
         vec![
             (
                 "compressed",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.metrics.compressed.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(compressed),
             ),
             (
                 "uncompressed",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.metrics.uncompressed.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(uncomressed),
+            ),
+            (
+                "compressed_ratio",
+                CounterType::Gauged,
+                CounterValue::Float(uncomressed as f64 / compressed as f64),
             ),
         ]
     }
