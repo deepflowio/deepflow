@@ -75,7 +75,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		}
 
 		var newPodNodeName string
-		newPodNodeID, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(diffBase.PodNodeLcuuid)
+		newPodNodeID, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
 		if ok {
 			newPodNodeName, ok = p.ToolDataSet.GetPodNodeNameByID(newPodNodeID)
 			if !ok {
