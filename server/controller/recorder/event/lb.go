@@ -26,46 +26,46 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
-type PodService struct {
-	EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]
+type LB struct {
+	EventManager[cloudmodel.LB, mysql.LB, *cache.LB]
 	deviceType int
 }
 
-func NewPodService(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *PodService {
-	mng := &PodService{
-		EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]{
-			resourceType: RESOURCE_TYPE_POD_SERVICE_EN,
+func NewLB(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *LB {
+	mng := &LB{
+		EventManager[cloudmodel.LB, mysql.LB, *cache.LB]{
+			resourceType: RESOURCE_TYPE_LB_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
-		common.VIF_DEVICE_TYPE_POD_SERVICE,
+		common.VIF_DEVICE_TYPE_LB,
 	}
 	return mng
 }
 
-func (p *PodService) ProduceByAdd(items []*mysql.PodService) {
+func (l *LB) ProduceByAdd(items []*mysql.LB) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "")
+		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, l.deviceType, item.ID, item.Name, "")
 	}
 }
 
-func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
+func (l *LB) ProduceByUpdate(cloudItem *cloudmodel.LB, diffBase *cache.LB) {
 }
 
-func (p *PodService) ProduceByDelete(lcuuids []string) {
+func (l *LB) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		var id int
 		var name string
-		id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(lcuuid)
+		id, ok := l.ToolDataSet.GetLBIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodServiceNameByID(id)
+			name, ok = l.ToolDataSet.GetLBNameByID(id)
 			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+				log.Error(idByLcuuidNotFound(l.resourceType, lcuuid))
 			}
 		} else {
-			log.Error(nameByIDNotFound(p.resourceType, id))
+			log.Error(nameByIDNotFound(l.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "")
+		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, l.deviceType, id, name, "")
 	}
 }
