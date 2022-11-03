@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::fs::{rename, File, OpenOptions};
+use std::fs::{create_dir_all, rename, File, OpenOptions};
 use std::io::{BufWriter, ErrorKind, Write};
 use std::net::{IpAddr, Shutdown, TcpStream};
 use std::path::Path;
@@ -474,6 +474,7 @@ impl UniformSender {
             return Ok(());
         }
         if self.file_path.is_empty() {
+            create_dir_all(&self.config.load().standalone_data_file_dir)?;
             self.file_path = Path::new(&self.config.load().standalone_data_file_dir)
                 .join(send_item.file_name())
                 .to_str()
