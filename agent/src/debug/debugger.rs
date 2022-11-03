@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-#[cfg(target_os = "windows")]
-use std::net::Ipv4Addr;
 use std::{
     io::{self, ErrorKind},
-    net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -95,12 +93,19 @@ impl Debugger {
                 (IpAddr::from(Ipv6Addr::UNSPECIFIED), conf.load().listen_port).into();
             let sock = match UdpSocket::bind(addr) {
                 Ok(s) => Arc::new(s),
-                Err(e) => {
-                    error!(
-                        "failed to create debugger socket with addr={:?} error: {}",
-                        addr, e
-                    );
-                    return;
+                Err(_) => {
+                    let ipv4_addr: SocketAddr =
+                        (IpAddr::from(Ipv4Addr::UNSPECIFIED), conf.load().listen_port).into();
+                    match UdpSocket::bind(ipv4_addr) {
+                        Ok(s) => Arc::new(s),
+                        Err(e) => {
+                            error!(
+                                "failed to create debugger socket with addr={:?} error: {}",
+                                ipv4_addr, e
+                            );
+                            return;
+                        }
+                    }
                 }
             };
             info!("debugger listening on: {:?}", sock.local_addr().unwrap());

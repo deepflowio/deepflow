@@ -335,7 +335,12 @@ impl OwnedCountable for IntegrationCounter {
             (
                 "compressed_ratio",
                 CounterType::Gauged,
-                CounterValue::Float(uncomressed as f64 / compressed as f64),
+                CounterValue::Float(if compressed == 0 {
+                    // avoid divide by zero
+                    0.0f64
+                } else {
+                    uncomressed as f64 / compressed as f64
+                }),
             ),
         ]
     }
