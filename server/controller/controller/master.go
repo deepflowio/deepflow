@@ -167,3 +167,30 @@ func checkAndStartMasterFunctions(
 		masterController = newMasterController
 	}
 }
+
+func checkAndStartAllRegionMasterFunctions(tr *tagrecorder.TagRecorder) {
+	masterController := ""
+	thisIsMasterController := false
+	for range time.Tick(time.Minute) {
+		newThisIsMasterController, newMasterController, err := election.IsMasterControllerAndReturnIP()
+		if err != nil {
+			continue
+		}
+		if masterController != newMasterController {
+			if newThisIsMasterController {
+				thisIsMasterController = true
+				log.Infof("I am the master controller now, previous master controller is %s", masterController)
+				go tr.StartChDictionaryUpdate()
+			} else if thisIsMasterController {
+				thisIsMasterController = false
+				log.Infof("I am not the master controller anymore, new master controller is %s", newMasterController)
+			} else {
+				log.Infof(
+					"current master controller is %s, previous master controller is %s",
+					newMasterController, masterController,
+				)
+			}
+		}
+		masterController = newMasterController
+	}
+}
