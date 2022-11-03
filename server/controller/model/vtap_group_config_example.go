@@ -356,7 +356,7 @@ vtap_group_id: g-xxxxxx
   ## 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
   #ebpf-uprobe-golang-symbol-enabled: false
   ## 用于开启集成采集器压缩数据开关，现在仅支持 opentelemetry trace 数据压缩
-  #external_agent_http_proxy_compressed: false
+  #external-agent-http-proxy-compressed: false
   ## eBPF、AF_PACKET、WINPCAP 开启的应用协议解析列表，默认包括支持的所有应用协议。
   #l7-protocol-enabled:
     #- HTTP ## for both HTTP and HTTP_TLS
