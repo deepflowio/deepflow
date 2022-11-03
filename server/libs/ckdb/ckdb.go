@@ -246,6 +246,14 @@ func (b *Block) WriteArrayInt64(v []int64) error {
 	return nil
 }
 
+func (b *Block) WriteArrayUInt32(v []uint32) error {
+	if err := b.Batch.Column(b.index).Append([][]uint32{v}); err != nil {
+		return err
+	}
+	b.index++
+	return nil
+}
+
 func (b *Block) WriteArrayUInt64(v []uint64) error {
 	if err := b.Batch.Column(b.index).Append([][]uint64{v}); err != nil {
 		return err
