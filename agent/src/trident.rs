@@ -1462,7 +1462,7 @@ impl Components {
         let compressed_otel_queue_name = "compressed-otel-to-sender";
         let (compressed_otel_sender, compressed_otel_receiver, counter) = queue::bounded_with_debug(
             yaml_config.external_metrics_sender_queue_size,
-            otel_queue_name,
+            compressed_otel_queue_name,
             &queue_debugger,
         );
         stats_collector.register_countable(
