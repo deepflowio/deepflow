@@ -44,8 +44,8 @@ func NewWANIP(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *WANIP {
 
 func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 	for _, item := range items {
-		var deviceInfo *cache.DeviceInfo
-		var networkInfo *cache.NetworkInfo
+		deviceInfo := &cache.DeviceInfo{}
+		networkInfo := &cache.NetworkInfo{}
 		vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(item.VInterfaceID)
 		if ok {
 			deviceInfo, ok = i.ToolDataSet.GetDeviceInfoByVInterfaceLcuuid(vifLcuuid)
@@ -75,8 +75,8 @@ func (i *WANIP) ProduceByUpdate(cloudItem *cloudmodel.IP, diffBase *cache.WANIP)
 
 func (i *WANIP) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var deviceInfo *cache.DeviceInfo
-		var networkInfo *cache.NetworkInfo
+		deviceInfo := &cache.DeviceInfo{}
+		networkInfo := &cache.NetworkInfo{}
 		vifID, ok := i.ToolDataSet.GetVInterfaceIDByWANIPLcuuid(lcuuid)
 		if ok {
 			vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(vifID)
