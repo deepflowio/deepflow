@@ -548,7 +548,7 @@ func (t *WhereTag) Trans(expr sqlparser.Expr, w *Where, asTagMap map[string]stri
 			default:
 				whereFilter = fmt.Sprintf(tagItem.WhereTranslator, op, t.Value, op, t.Value)
 			}
-		case "ips", "subnet_ids", "subnets":
+		case "ips", "subnets_id", "subnets":
 			t.Value = strings.TrimPrefix(t.Value, "(")
 			t.Value = strings.TrimSuffix(t.Value, ")")
 			switch strings.ToLower(op) {
