@@ -116,7 +116,6 @@ func (d *Decoder) Run() {
 }
 
 func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
-	resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.ResourceType, event.ResourceID)
 	eventStore := dbwriter.AcquireResourceEventStore()
 	eventStore.Time = uint32(event.Time)
 
@@ -130,17 +129,20 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.SubnetIDs...)
 	eventStore.IPs = append(eventStore.IPs, event.IPs...)
 
-	eventStore.RegionID = uint16(resourceInfo.RegionID)
-	eventStore.AZID = uint16(resourceInfo.AZID)
-	eventStore.L3EpcID = resourceInfo.L3EpcID
-	eventStore.HostID = uint16(resourceInfo.HostID)
-	eventStore.PodID = resourceInfo.PodID
-	eventStore.PodNodeID = resourceInfo.PodNodeID
-	eventStore.PodNSID = uint16(resourceInfo.PodNSID)
-	eventStore.PodClusterID = uint16(resourceInfo.PodClusterID)
-	eventStore.PodGroupID = resourceInfo.PodGroupID
-	eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
-	eventStore.L3DeviceID = resourceInfo.L3DeviceID
+	resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.ResourceType, event.ResourceID)
+	if resourceInfo != nil {
+		eventStore.RegionID = uint16(resourceInfo.RegionID)
+		eventStore.AZID = uint16(resourceInfo.AZID)
+		eventStore.L3EpcID = resourceInfo.L3EpcID
+		eventStore.HostID = uint16(resourceInfo.HostID)
+		eventStore.PodID = resourceInfo.PodID
+		eventStore.PodNodeID = resourceInfo.PodNodeID
+		eventStore.PodNSID = uint16(resourceInfo.PodNSID)
+		eventStore.PodClusterID = uint16(resourceInfo.PodClusterID)
+		eventStore.PodGroupID = resourceInfo.PodGroupID
+		eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
+		eventStore.L3DeviceID = resourceInfo.L3DeviceID
+	}
 
 	d.eventWriter.Write(eventStore)
 }
