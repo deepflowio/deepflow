@@ -44,6 +44,7 @@ macro_rules! all_protocol_info {
     ($($name:ident($info_struct:ident)),+$(,)?) => {
         #[derive(Serialize, Debug, Clone)]
         #[enum_dispatch]
+        #[serde(untagged)]
         pub enum L7ProtocolInfo {
             $(
                 $name($info_struct),

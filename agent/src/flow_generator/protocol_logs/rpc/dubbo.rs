@@ -44,9 +44,12 @@ const TRACE_ID_MAX_LEN: usize = 51;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
     msg_type: LogMessageType,
+    #[serde(skip)]
     is_tls: bool,
 
     // header
@@ -74,9 +77,11 @@ pub struct DubboInfo {
     pub span_id: String,
 
     // resp
-    #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
+    #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_msg_size: Option<u32>,
+    #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
+    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
 }
 
