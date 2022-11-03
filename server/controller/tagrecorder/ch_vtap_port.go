@@ -445,8 +445,12 @@ func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysql.ChVTapPort) (map[
 func getGenesisInterface() *simplejson.Json {
 	url := fmt.Sprintf("http://%s/v1/sync/vinterface/", net.JoinHostPort(common.LOCALHOST, fmt.Sprintf("%d", common.GConfig.HTTPPort)))
 	resp, err := common.CURLPerform("GET", url, nil)
-	if err != nil || len(resp.Get("DATA").MustArray()) == 0 {
+	if err != nil {
 		log.Errorf("get genesis vinterface failed: %s, %s", err.Error(), url)
+		return simplejson.New()
+	}
+	if len(resp.Get("DATA").MustArray()) == 0 {
+		log.Warningf("no data in curl response: %s", url)
 		return simplejson.New()
 	}
 	return resp.Get("DATA")
