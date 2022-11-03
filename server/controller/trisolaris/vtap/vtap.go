@@ -547,8 +547,8 @@ func (v *VTapInfo) GetSelfUpdateUrl() string {
 	return v.config.SelfUpdateUrl
 }
 
-func (v *VTapInfo) GetTridentTypeForUnkonwVTap() uint16 {
-	return v.config.TridentTypeForUnkonwVtap
+func (v *VTapInfo) GetTridentTypeForUnknowVTap() uint16 {
+	return v.config.TridentTypeForUnknowVtap
 }
 
 func (v *VTapInfo) GetGroupData() []byte {
