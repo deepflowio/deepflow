@@ -818,6 +818,7 @@ impl RuntimeConfig {
             sync_interval: 60,
             stats_interval: 60,
             global_pps_threshold: 200,
+            #[cfg(target_os = "linux")]
             extra_netns_regex: Default::default(),
             tap_interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
                 .into(),

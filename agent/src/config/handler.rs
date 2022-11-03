@@ -41,8 +41,15 @@ use super::{
 };
 
 use crate::common::l7_protocol_log::L7ProtocolBitmap;
+#[cfg(target_os = "linux")]
 use crate::{
-    common::decapsulate::TunnelTypeBitmap,
+    common::DEFAULT_CPU_CFS_PERIOD_US,
+    dispatcher::recv_engine::af_packet::OptTpacketVersion,
+    ebpf::CAP_LEN_MAX,
+    utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
+};
+use crate::{
+    common::{decapsulate::TunnelTypeBitmap, enums::TapType},
     dispatcher::recv_engine,
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
@@ -56,13 +63,6 @@ use crate::{
         environment::{free_memory_check, get_ctrl_ip_and_mac},
         logger::RemoteLogConfig,
     },
-};
-#[cfg(target_os = "linux")]
-use crate::{
-    common::{enums::TapType, DEFAULT_CPU_CFS_PERIOD_US},
-    dispatcher::recv_engine::af_packet::OptTpacketVersion,
-    ebpf::CAP_LEN_MAX,
-    utils::{cgroups::Cgroups, environment::is_tt_pod, environment::is_tt_workload},
 };
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
