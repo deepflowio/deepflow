@@ -367,6 +367,27 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+	// Resource-event
+	tagResourceMap["resource"] = map[string]*Tag{
+		"default": NewTag(
+			"resource_name",
+			"",
+			"",
+			"",
+		),
+		"node_type": NewTag(
+			"dictGet(flow_tag.node_type_map, 'node_type', toUInt64(resource_type))",
+			"",
+			"",
+			"",
+		),
+		"icon_id": NewTag(
+			"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(resource_type),toUInt64(resource_id)))",
+			"",
+			"",
+			"",
+		),
+	}
 
 	// 广域网
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
