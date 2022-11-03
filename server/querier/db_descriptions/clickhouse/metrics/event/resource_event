@@ -1,0 +1,2 @@
+# Field              , DBField              , Type       , Permission 
+log_count            ,                      , counter    , 111    
