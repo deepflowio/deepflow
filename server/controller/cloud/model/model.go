@@ -73,6 +73,7 @@ type VPC struct {
 	TunnelID     int    `json:"tunnel_id"`
 	CIDR         string `json:"cidr"`
 	RegionLcuuid string `json:"region_lcuuid" binding:"required"`
+	AZLcuuid     string `json:"az_lcuuid"`
 }
 
 type Network struct {
@@ -202,6 +203,7 @@ type LB struct {
 	Model        int    `json:"model" binding:"required"`
 	VIP          string `json:"vip"`
 	VPCLcuuid    string `json:"vpc_lcuuid" binding:"required"`
+	AZLcuuid     string `json:"az_lcuuid"`
 	RegionLcuuid string `json:"region_lcuuid" binding:"required"`
 }
 

@@ -30,6 +30,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/genesis"
 	"github.com/deepflowys/deepflow/server/controller/cloud/huawei"
 	"github.com/deepflowys/deepflow/server/controller/cloud/kubernetes"
+	"github.com/deepflowys/deepflow/server/controller/cloud/microsoft_acs"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/cloud/qingcloud"
 	"github.com/deepflowys/deepflow/server/controller/cloud/tencent"
@@ -68,6 +69,8 @@ func NewPlatform(domain mysql.Domain, cfg config.CloudConfig) (Platform, error) 
 		platform, err = huawei.NewHuaWei(domain, &cfg)
 	case common.FILEREADER:
 		platform, err = filereader.NewFileReader(domain)
+	case common.MicrosoftAcs:
+		platform, err = microsoft_acs.NewMicrosoftAcs(domain)
 	// TODO: other platform
 	default:
 		return nil, errors.New(fmt.Sprintf("domain type (%d) not supported", domain.Type))

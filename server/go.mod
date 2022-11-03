@@ -23,6 +23,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.63.1
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing v1.14.18
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.18.20
+	github.com/axgle/mahonia v0.0.0-20180208002826-3358181d7394
 	github.com/baidubce/bce-sdk-go v0.9.123
 	github.com/bitly/go-simplejson v0.5.0
 	github.com/bxcodec/faker/v3 v3.8.0
@@ -54,6 +55,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.35.0
 	github.com/prometheus/prometheus v0.36.2
+	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/shirou/gopsutil/v3 v3.22.5
