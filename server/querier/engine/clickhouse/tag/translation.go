@@ -350,9 +350,9 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		),
 	}
 	// SubnetID-event
-	tagResourceMap["subnet_ids"] = map[string]*Tag{
+	tagResourceMap["subnets_id"] = map[string]*Tag{
 		"default": NewTag(
-			"",
+			"subnet_ids",
 			"",
 			"%s(subnet_ids,[%s])",
 			"",
