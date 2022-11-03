@@ -127,6 +127,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore.EventType = event.Type
 	eventStore.EventDescription = event.Description
 
+	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.SubnetIDs...)
+	eventStore.IPs = append(eventStore.IPs, event.IPs...)
+
 	eventStore.RegionID = uint16(resourceInfo.RegionID)
 	eventStore.AZID = uint16(resourceInfo.AZID)
 	eventStore.L3EpcID = resourceInfo.L3EpcID

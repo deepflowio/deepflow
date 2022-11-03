@@ -35,6 +35,8 @@ type ResourceEventStore struct {
 
 	EventType        string
 	EventDescription string
+	SubnetIDs        []uint32
+	IPs              []string
 
 	RegionID     uint16
 	AZID         uint16
@@ -66,6 +68,12 @@ func (e *ResourceEventStore) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteString(e.EventDescription); err != nil {
+		return err
+	}
+	if err := block.WriteArrayUInt32(e.SubnetIDs); err != nil {
+		return err
+	}
+	if err := block.WriteArrayString(e.IPs); err != nil {
 		return err
 	}
 
@@ -120,6 +128,8 @@ func ResourceEventColumns() []*ckdb.Column {
 		ckdb.NewColumn("resource_name", ckdb.LowCardinalityString).SetComment("资源名称"),
 		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型"),
 		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
+		ckdb.NewColumn("subnet_ids", ckdb.ArrayUInt32).SetComment("子网IDs"),
+		ckdb.NewColumn("ips", ckdb.ArrayString).SetComment("IPs"),
 
 		ckdb.NewColumn("region_id", ckdb.UInt16).SetComment("云平台区域ID"),
 		ckdb.NewColumn("az_id", ckdb.UInt16).SetComment("可用区ID"),
@@ -167,7 +177,10 @@ func GenEventCKTable(eventType common.EventType, cluster, storagePolicy string, 
 }
 
 var resourceEventPool = pool.NewLockFreePool(func() interface{} {
-	return &ResourceEventStore{}
+	return &ResourceEventStore{
+		SubnetIDs: []uint32{},
+		IPs:       []string{},
+	}
 })
 
 func AcquireResourceEventStore() *ResourceEventStore {
@@ -175,6 +188,13 @@ func AcquireResourceEventStore() *ResourceEventStore {
 }
 
 func ReleaseResourceEventStore(e *ResourceEventStore) {
+	if e == nil {
+		return
+	}
+	subnetIDs := e.SubnetIDs[:0]
+	ips := e.IPs[:0]
 	*e = ResourceEventStore{}
+	e.SubnetIDs = subnetIDs
+	e.IPs = ips
 	resourceEventPool.Put(e)
 }
