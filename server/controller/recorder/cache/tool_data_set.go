@@ -33,8 +33,7 @@ type ToolDataSet struct {
 
 	HostLcuuidToID map[string]int
 
-	VMLcuuidToID    map[string]int
-	VMLcuuidToState map[string]int
+	VMLcuuidToID map[string]int
 
 	VPCLcuuidToID map[string]int
 	VPCIDToLcuuid map[int]string
@@ -189,12 +188,25 @@ func (t *ToolDataSet) deleteRegion(lcuuid string) {
 
 func (t *ToolDataSet) addHost(item *mysql.Host) {
 	t.HostLcuuidToID[item.Lcuuid] = item.ID
+	t.HostIDToName[item.ID] = item.Name
 	log.Info(addToToolMap(RESOURCE_TYPE_HOST_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteHost(lcuuid string) {
 	delete(t.HostLcuuidToID, lcuuid)
+	id, exists := t.GetHostIDByLcuuid(lcuuid)
+	if exists {
+		delete(t.HostIDToName, id)
+	}
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_HOST_EN, lcuuid))
+}
+
+func (t *ToolDataSet) updateHost(cloudItem *cloudmodel.Host) {
+	id, exists := t.GetHostIDByLcuuid(cloudItem.Lcuuid)
+	if exists {
+		t.HostIDToName[id] = cloudItem.Name
+	}
+	log.Info(updateToolMap(RESOURCE_TYPE_HOST_EN, cloudItem.Lcuuid))
 }
 
 func (t *ToolDataSet) addVM(item *mysql.VM) {
@@ -707,23 +719,6 @@ func (t *ToolDataSet) GetVMIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VM_EN, lcuuid))
 		return id, false
-	}
-}
-
-func (t *ToolDataSet) GetVMStateByLcuuid(lcuuid string) (int, bool) {
-	state, exists := t.VMLcuuidToState[lcuuid]
-	if exists {
-		return state, true
-	}
-	log.Warning(cacheIDByLcuuidNotFound(RESOURCE_TYPE_VM_EN, lcuuid))
-	var vm mysql.VM
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vm)
-	if result.RowsAffected == 1 {
-		t.addVM(&vm)
-		return vm.State, true
-	} else {
-		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VM_EN, lcuuid))
-		return state, false
 	}
 }
 
@@ -1510,5 +1505,22 @@ func (t *ToolDataSet) GetWANIPByLcuuid(lcuuid string) (string, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
 		return ip, false
+	}
+}
+
+func (t *ToolDataSet) GetHostNameByID(id int) (string, bool) {
+	name, exists := t.HostIDToName[id]
+	if exists {
+		return name, true
+	}
+	log.Warning(cacheNameByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
+	var dbItem mysql.Host
+	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
+	if result.RowsAffected == 1 {
+		t.addHost(&dbItem)
+		return dbItem.Name, true
+	} else {
+		log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
+		return name, false
 	}
 }

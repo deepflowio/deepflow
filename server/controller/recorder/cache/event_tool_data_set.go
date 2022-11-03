@@ -34,6 +34,7 @@ type EventToolDataSet struct {
 	VInterfaceIDToLcuuid          map[int]string
 	WANIPLcuuidToVInterfaceID     map[string]int
 	WANIPLcuuidToIP               map[string]string
+	HostIDToName                  map[int]string
 }
 
 func NewEventToolDataSet() EventToolDataSet {
@@ -55,6 +56,7 @@ func NewEventToolDataSet() EventToolDataSet {
 		VInterfaceIDToLcuuid:          make(map[int]string),
 		WANIPLcuuidToVInterfaceID:     make(map[string]int),
 		WANIPLcuuidToIP:               make(map[string]string),
+		HostIDToName:                  make(map[int]string),
 	}
 }
 

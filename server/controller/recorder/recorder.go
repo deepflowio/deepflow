@@ -173,7 +173,7 @@ func (r *Recorder) getDomainUpdatersInOrder(cloudData cloudmodel.Resource) []upd
 		updater.NewAZ(r.cacheMng.DomainCache, cloudData.AZs),
 		updater.NewSubDomain(r.cacheMng.DomainCache, cloudData.SubDomains),
 		updater.NewVPC(r.cacheMng.DomainCache, cloudData.VPCs),
-		updater.NewHost(r.cacheMng.DomainCache, cloudData.Hosts),
+		updater.NewHost(r.cacheMng.DomainCache, cloudData.Hosts, r.eventQueue),
 		updater.NewVM(r.cacheMng.DomainCache, cloudData.VMs, r.eventQueue),
 		updater.NewPodCluster(r.cacheMng.DomainCache, cloudData.PodClusters),
 		updater.NewPodNode(r.cacheMng.DomainCache, cloudData.PodNodes, r.eventQueue),
