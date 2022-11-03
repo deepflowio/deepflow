@@ -270,7 +270,7 @@ func GetMasterControllerHostPort() (masterIP string, httpPort, grpcPort int, err
 		for _, c := range controllers {
 			host = c.IP
 			err = IsTCPActive(host, httpPort)
-			if err == nil {
+			if err != nil {
 				log.Error(err.Error())
 				continue
 			}
