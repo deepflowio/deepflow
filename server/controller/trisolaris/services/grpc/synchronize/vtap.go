@@ -523,7 +523,7 @@ func (e *VTapEvent) noVTapResponse(in *api.SyncRequest) *api.SyncResponse {
 		}
 	}
 
-	tridentTypeForUnkonwVTap := gVTapInfo.GetTridentTypeForUnkonwVTap()
+	tridentTypeForUnkonwVTap := gVTapInfo.GetTridentTypeForUnknowVTap()
 	if tridentTypeForUnkonwVTap != 0 {
 		tridentType := common.TridentType(tridentTypeForUnkonwVTap)
 		if configInfo == nil {
