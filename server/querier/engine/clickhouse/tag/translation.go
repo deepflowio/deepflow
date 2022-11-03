@@ -340,6 +340,34 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		}
 	}
 
+	// IP-event
+	tagResourceMap["ips"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"%s(ips,[%s])",
+			"",
+		),
+	}
+	// SubnetID-event
+	tagResourceMap["subnet_ids"] = map[string]*Tag{
+		"default": NewTag(
+			"",
+			"",
+			"%s(subnet_ids,[%s])",
+			"",
+		),
+	}
+	// Subnet-event
+	tagResourceMap["subnets"] = map[string]*Tag{
+		"default": NewTag(
+			"arrayMap(x -> dictGet(flow_tag.subnet_map, 'name', (toUInt64(x))),subnet_ids)",
+			"",
+			"%s(arrayMap(x -> dictGet(flow_tag.subnet_map, 'name', (toUInt64(x))),subnet_ids),[%s])",
+			"",
+		),
+	}
+
 	// 广域网
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
 	for _, suffix := range []string{"", "_0", "_1"} {

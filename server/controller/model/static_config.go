@@ -71,6 +71,7 @@ type StaticConfig struct {
 	L7ProtocolEnabled                []string                           `yaml:"l7-protocol-enabled,omitempty"`
 	EbpfUprobeProcessNameRegexs      *EbpfUprobeProcessNameRegexsConfig `yaml:"ebpf-uprobe-process-name-regexs,omitempty"`
 	StandaloneDataFileSize           *uint64                            `yaml:"standalone-data-file-size,omitempty"`
+	StandaloneDataFileDir            *string                            `yaml:"standalone-data-file-dir,omitempty"`
 	LogFile                          *string                            `yaml:"log-file,omitempty"`
 	ExternalAgentHttpProxyCompressed *bool                              `yaml:"external-agent-http-proxy-compressed,omitempty"`
 	FeatureFlags                     []string                           `yaml:"feature-flags,omitempty"`

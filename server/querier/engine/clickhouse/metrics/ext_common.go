@@ -68,7 +68,7 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 			metricName := fmt.Sprintf("%s.%s", "metrics", externalTag)
 			lm := NewMetrics(
 				i, dbField, metricName, "", METRICS_TYPE_COUNTER,
-				"指标", []bool{true, true, true}, "", tableName,
+				"metrics", []bool{true, true, true}, "", tableName,
 			)
 			loadMetrics[fmt.Sprintf("%s-%s", metricName, tableName)] = lm
 		}

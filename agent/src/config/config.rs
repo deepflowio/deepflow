@@ -161,6 +161,10 @@ impl Config {
                                 continue;
                             }
                             info!("set kubernetes_cluster_id to {}", id);
+                            // FIXME: The channel in the session will become invalid after success here, so reset the session.
+                            // ==============================================================================================
+                            // FIXME: 这里获取成功后 Session 中的 Channel 会失效，所以在这里重置 Session
+                            session.reset();
                             return id;
                         }
                         None => {
@@ -287,6 +291,7 @@ pub struct YamlConfig {
     pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
     pub external_agent_http_proxy_compressed: bool,
     pub standalone_data_file_size: u32,
+    pub standalone_data_file_dir: String,
     pub log_file: String,
 }
 
@@ -333,14 +338,14 @@ impl YamlConfig {
                 8 << 20
             } else {
                 1 << 16
-            }
+            };
         }
         if c.flow_sender_queue_size == 0 {
             c.flow_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
                 8 << 20
             } else {
                 1 << 16
-            }
+            };
         }
         if c.packet_delay < Duration::from_secs(1) || c.packet_delay > Duration::from_secs(10) {
             c.packet_delay = Duration::from_secs(1);
@@ -391,7 +396,16 @@ impl YamlConfig {
         c.vxlan_flags |= 0x08;
 
         if c.standalone_data_file_size == 0 {
-            c.standalone_data_file_size = 200
+            c.standalone_data_file_size = 200;
+        }
+
+        if c.standalone_data_file_dir.len() == 0 {
+            c.standalone_data_file_dir = Path::new(DEFAULT_LOG_FILE)
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
         }
 
         if let Err(e) = c.validate() {
@@ -434,10 +448,10 @@ impl Default for YamlConfig {
             vxlan_port: 4789,
             vxlan_flags: 0xff,
             // default size changes according to tap_mode
-            collector_sender_queue_size: 0,
+            collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,
             // default size changes according to tap_mode
-            flow_sender_queue_size: 0,
+            flow_sender_queue_size: 1 << 16,
             flow_sender_queue_count: 1,
             second_flow_extra_delay: Duration::from_secs(0),
             packet_delay: Duration::from_secs(1),
@@ -452,11 +466,11 @@ impl Default for YamlConfig {
             cloud_gateway_traffic: false,
             ebpf_log_file: "".into(),
             kubernetes_namespace: "".into(),
-            external_metrics_sender_queue_size: 0,
+            external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
             packet_sequence_block_size: 64, // Enterprise Edition Feature: packet-sequence
-            packet_sequence_queue_size: 0,  // Enterprise Edition Feature: packet-sequence
+            packet_sequence_queue_size: 1 << 16, // Enterprise Edition Feature: packet-sequence
             packet_sequence_queue_count: 1, // Enterprise Edition Feature: packet-sequence
             packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
             feature_flags: vec![],
@@ -471,6 +485,13 @@ impl Default for YamlConfig {
             },
             external_agent_http_proxy_compressed: false,
             standalone_data_file_size: 200,
+            standalone_data_file_dir: Path::new(DEFAULT_LOG_FILE)
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+
             log_file: DEFAULT_LOG_FILE.into(),
         }
     }

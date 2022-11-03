@@ -33,20 +33,23 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/manager/config"
 	"github.com/deepflowys/deepflow/server/controller/recorder"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 var log = logging.MustGetLogger("manager")
 
 type Manager struct {
-	cfg     config.ManagerConfig
-	taskMap map[string]*Task
-	mutex   sync.RWMutex
+	cfg                config.ManagerConfig
+	taskMap            map[string]*Task
+	mutex              sync.RWMutex
+	resourceEventQueue *queue.OverwriteQueue
 }
 
-func NewManager(cfg config.ManagerConfig) *Manager {
+func NewManager(cfg config.ManagerConfig, resourceEventQueue *queue.OverwriteQueue) *Manager {
 	return &Manager{
-		cfg:     cfg,
-		taskMap: make(map[string]*Task),
+		cfg:                cfg,
+		taskMap:            make(map[string]*Task),
+		resourceEventQueue: resourceEventQueue,
 	}
 }
 
@@ -175,7 +178,7 @@ func (m *Manager) run(ctx context.Context) {
 	addDomains = newDomains.Difference(oldDomains)
 	for _, domain := range addDomains.ToSlice() {
 		lcuuid := domain.(string)
-		task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
+		task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
 		if task == nil {
 			log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
 			continue
@@ -198,7 +201,7 @@ func (m *Manager) run(ctx context.Context) {
 			log.Infof("oldDomainConfig: %s", oldDomainConfig)
 			log.Infof("newDomainConfig: %s", newDomainConfig)
 			m.taskMap[lcuuid].Stop()
-			task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
+			task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
 			if task == nil {
 				log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
 				continue
@@ -215,7 +218,7 @@ func (m *Manager) run(ctx context.Context) {
 			if oldDomainName != newDomainName {
 				if m.taskMap[lcuuid].Cloud.GetBasicInfo().Type == common.KUBERNETES {
 					m.taskMap[lcuuid].Stop()
-					task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx)
+					task := NewTask(lcuuidToDomain[lcuuid], m.cfg.TaskCfg, ctx, m.resourceEventQueue)
 					if task == nil {
 						log.Errorf("domain (%s) init failed", lcuuidToDomain[lcuuid].Name)
 						continue

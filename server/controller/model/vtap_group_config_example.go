@@ -380,8 +380,10 @@ vtap_group_id: g-xxxxxx
     #golang: .*
     ## eBPF uprobe 开启应用协议数据采集的使用 openssl 库的进程，默认为 .* 表示对所有使用了 openssl 库的进程开启。
     #openssl: .*
-  ## 写入文件流日志大小，单位MB
+  ## 写入单个数据文件的最大大小，单位MB
   #standalone-data-file-size: 200
+  ## 写入数据文件的路径
+  #standalone-data-file-dir: /var/log/deepflow-agent/
   ## 日志文件路径
   #log-file: /var/log/deepflow-agent/deepflow-agent.log
   ## 开发过程中的功能控制开关，支持多个

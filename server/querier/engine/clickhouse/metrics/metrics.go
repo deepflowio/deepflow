@@ -99,7 +99,7 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 				return NewMetrics(
 					0, fmt.Sprintf("if(indexOf(%s, '%s')=0,null,%s[indexOf(%s, '%s')])", metrics_names_field, fieldName, metrics_values_field, metrics_names_field, fieldName),
 					field, "", METRICS_TYPE_COUNTER,
-					"指标", []bool{true, true, true}, "", table,
+					"metrics", []bool{true, true, true}, "", table,
 				), true
 			}
 		}
@@ -140,7 +140,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 			metrics["metrics"] = NewMetrics(
 				len(metrics), "metrics",
 				"metrics", "", METRICS_TYPE_ARRAY,
-				"指标", []bool{true, true, true}, "", table,
+				"metrics", []bool{true, true, true}, "", table,
 			)
 			return metrics, err
 		}
@@ -156,6 +156,11 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 			return GetVtapAppEdgePortMetrics(), err
 		case "vtap_acl":
 			return GetVtapAclMetrics(), err
+		}
+	case "event":
+		switch table {
+		case "resource_event":
+			return GetResourceEventMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
 		return GetExtMetrics(db, table, where, ctx)
@@ -299,6 +304,12 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		case "vtap_acl":
 			metrics = VTAP_ACL_METRICS
 			replaceMetrics = VTAP_ACL_METRICS_REPLACE
+		}
+	case "event":
+		switch table {
+		case "resource_event":
+			metrics = RESOURCE_EVENT_METRICS
+			replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
 		}
 	case "ext_metrics", "deepflow_system":
 		metrics = EXT_METRICS

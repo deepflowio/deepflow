@@ -43,6 +43,8 @@ import (
 	dropletcfg "github.com/deepflowys/deepflow/server/ingester/droplet/config"
 	"github.com/deepflowys/deepflow/server/ingester/droplet/droplet"
 	"github.com/deepflowys/deepflow/server/ingester/droplet/profiler"
+	eventcfg "github.com/deepflowys/deepflow/server/ingester/event/config"
+	"github.com/deepflowys/deepflow/server/ingester/event/event"
 	extmetricscfg "github.com/deepflowys/deepflow/server/ingester/ext_metrics/config"
 	"github.com/deepflowys/deepflow/server/ingester/ext_metrics/ext_metrics"
 	"github.com/deepflowys/deepflow/server/ingester/ingesterctl"
@@ -124,6 +126,10 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		bytes, _ = yaml.Marshal(extMetricsConfig)
 		log.Infof("ext_metrics config:\n%s", string(bytes))
 
+		eventConfig := eventcfg.Load(cfg, configPath)
+		bytes, _ = yaml.Marshal(eventConfig)
+		log.Infof("event config:\n%s", string(bytes))
+
 		// 创建、修改、删除数据源及其存储时长
 		ds := datasource.NewDatasourceManager(cfg, rozeConfig.CKReadTimeout)
 		ds.Start()
@@ -153,6 +159,12 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		checkError(err)
 		extMetrics.Start()
 		closers = append(closers, extMetrics)
+
+		// write event data
+		event, err := event.NewEvent(eventConfig, shared.ResourceEventQueue)
+		checkError(err)
+		event.Start()
+		closers = append(closers, event)
 
 		// 检查clickhouse的磁盘空间占用，达到阈值时，自动删除老数据
 		cm, err := ckmonitor.NewCKMonitor(cfg)

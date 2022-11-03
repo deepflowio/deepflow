@@ -18,7 +18,7 @@ use std::cmp::{max, min};
 use std::fmt;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 #[cfg(target_os = "linux")]
 use std::process;
 use std::sync::Arc;
@@ -179,8 +179,8 @@ pub struct SenderConfig {
     pub npb_socket_type: trident::SocketType,
     pub compressor_socket_type: trident::SocketType,
     pub collector_socket_type: trident::SocketType,
-    pub log_dir: String,
     pub standalone_data_file_size: u32,
+    pub standalone_data_file_dir: String,
     pub server_tx_bandwidth_threshold: u64,
     pub bandwidth_probe_interval: Duration,
     pub enabled: bool,
@@ -750,13 +750,8 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold,
                 bandwidth_probe_interval: conf.bandwidth_probe_interval,
                 collector_socket_type: conf.collector_socket_type,
-                log_dir: Path::new(&static_config.log_file)
-                    .parent()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
                 standalone_data_file_size: conf.yaml_config.standalone_data_file_size,
+                standalone_data_file_dir: conf.yaml_config.standalone_data_file_dir.clone(),
                 enabled: conf.collector_enabled,
             },
             npb: NpbConfig {
@@ -1362,19 +1357,6 @@ impl ConfigHandler {
         if candidate_config.tap_mode != TapMode::Analyzer
             && static_config.kubernetes_cluster_id.is_empty()
         {
-            if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
-                info!(
-                    "memory limit set to {}",
-                    ByteSize::b(new_config.environment.max_memory).to_string_as(true)
-                );
-                candidate_config.environment.max_memory = new_config.environment.max_memory;
-            }
-
-            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
-                info!("cpu limit set to {}", new_config.environment.max_cpus);
-                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
-            }
             #[cfg(target_os = "linux")]
             {
                 let max_memory_change =
@@ -1454,6 +1436,20 @@ impl ConfigHandler {
                         callbacks.push(cgroup_callback);
                     }
                 }
+            }
+
+            if candidate_config.environment.max_memory != new_config.environment.max_memory {
+                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
+                info!(
+                    "memory limit set to {}",
+                    ByteSize::b(new_config.environment.max_memory).to_string_as(true)
+                );
+                candidate_config.environment.max_memory = new_config.environment.max_memory;
+            }
+
+            if candidate_config.environment.max_cpus != new_config.environment.max_cpus {
+                info!("cpu limit set to {}", new_config.environment.max_cpus);
+                candidate_config.environment.max_cpus = new_config.environment.max_cpus;
             }
         } else if (candidate_config.tap_mode == TapMode::Analyzer
             || !static_config.kubernetes_cluster_id.is_empty())
