@@ -497,6 +497,10 @@ func (c *Cache) AddVRouters(items []*mysql.VRouter) {
 	}
 }
 
+func (c *Cache) UpdateVRouter(cloudItem *cloudmodel.VRouter) {
+	c.ToolDataSet.updateVRouter(cloudItem)
+}
+
 func (c *Cache) DeleteVRouters(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteVRouter(lcuuid)
@@ -552,6 +556,10 @@ func (c *Cache) AddDHCPPorts(items []*mysql.DHCPPort) {
 		c.DiffBaseDataSet.addDHCPPort(item, c.Sequence, &c.ToolDataSet)
 		c.ToolDataSet.addDHCPPort(item)
 	}
+}
+
+func (c *Cache) UpdateDHCPPort(cloudItem *cloudmodel.DHCPPort) {
+	c.ToolDataSet.updateDHCPPort(cloudItem)
 }
 
 func (c *Cache) DeleteDHCPPorts(lcuuids []string) {
@@ -775,6 +783,10 @@ func (c *Cache) AddNATGateways(items []*mysql.NATGateway) {
 	}
 }
 
+func (c *Cache) UpdateNATGateway(cloudItem *cloudmodel.NATGateway) {
+	c.ToolDataSet.updateNATGateway(cloudItem)
+}
+
 func (c *Cache) DeleteNATGateways(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteNATGateway(lcuuid)
@@ -850,6 +862,10 @@ func (c *Cache) AddLBs(items []*mysql.LB) {
 		c.DiffBaseDataSet.addLB(item, c.Sequence)
 		c.ToolDataSet.addLB(item)
 	}
+}
+
+func (c *Cache) UpdateLB(cloudItem *cloudmodel.LB) {
+	c.ToolDataSet.updateLB(cloudItem)
 }
 
 func (c *Cache) DeleteLBs(lcuuids []string) {
@@ -1006,6 +1022,10 @@ func (c *Cache) AddRDSInstances(items []*mysql.RDSInstance) {
 	}
 }
 
+func (c *Cache) UpdateRDSInstance(cloudItem *cloudmodel.RDSInstance) {
+	c.ToolDataSet.updateRDSInstance(cloudItem)
+}
+
 func (c *Cache) DeleteRDSInstances(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteRDSInstance(lcuuid)
@@ -1031,6 +1051,10 @@ func (c *Cache) AddRedisInstances(items []*mysql.RedisInstance) {
 		c.DiffBaseDataSet.addRedisInstance(item, c.Sequence)
 		c.ToolDataSet.addRedisInstance(item)
 	}
+}
+
+func (c *Cache) UpdateRedisInstance(cloudItem *cloudmodel.RedisInstance) {
+	c.ToolDataSet.updateRedisInstance(cloudItem)
 }
 
 func (c *Cache) DeleteRedisInstances(lcuuids []string) {
