@@ -200,6 +200,7 @@ impl From<MysqlInfo> for L7ProtocolSendLog {
 pub struct MysqlLog {
     info: MysqlInfo,
     l7_proto: L7Protocol,
+    command: u8,
 }
 
 impl L7ProtocolParserInterface for MysqlLog {
@@ -288,6 +289,7 @@ impl MysqlLog {
             return Err(Error::MysqlLogParseFailed);
         }
         self.info.command = payload[COMMAND_OFFSET];
+        self.command = payload[COMMAND_OFFSET];
         match self.info.command {
             COM_QUIT | COM_FIELD_LIST | COM_STMT_EXECUTE | COM_STMT_CLOSE | COM_STMT_FETCH => (),
             COM_INIT_DB | COM_QUERY | COM_STMT_PREPARE => {
@@ -358,11 +360,13 @@ impl MysqlLog {
             }
             MYSQL_RESPONSE_CODE_OK => {
                 self.info.status = L7ResponseStatus::Ok;
-                self.info.affected_rows =
-                    MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
+                if self.command == COM_QUERY {
+                    self.info.affected_rows = MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
+                }
             }
             _ => (),
         }
+        self.command = 0;
         Ok(())
     }
 
@@ -546,6 +550,7 @@ mod tests {
     #[test]
     fn check() {
         let files = vec![
+            ("mysql-statement-id.pcap", "mysql-statement-id.result"),
             ("mysql-statement.pcap", "mysql-statement.result"),
             ("mysql.pcap", "mysql.result"),
             ("mysql-error.pcap", "mysql-error.result"),
