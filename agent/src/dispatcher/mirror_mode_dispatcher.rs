@@ -49,9 +49,12 @@ use crate::{
     flow_generator::FlowMap,
     handler::PacketHandlerBuilder,
     handler::{MiniPacket, PacketHandler},
-    proto::trident::IfMacSource,
+    proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
-    utils::stats::{Countable, RefCountable, StatsOption},
+    utils::{
+        environment::is_tt_hyper_v_compute,
+        stats::{Countable, RefCountable, StatsOption},
+    },
 };
 use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
@@ -64,39 +67,21 @@ pub struct MirrorModeDispatcherListener {
     updated: Arc<AtomicBool>,
     #[cfg(target_os = "linux")]
     poller: Option<Arc<GenericPoller>>,
-
+    trident_type: Arc<Mutex<TridentType>>,
     base: BaseDispatcherListener,
 }
 
 impl MirrorModeDispatcherListener {
-    pub fn on_tap_interface_change(&self, _: &Vec<Link>, _: IfMacSource) {
+    pub fn on_tap_interface_change(
+        &self,
+        _: &Vec<Link>,
+        _: IfMacSource,
+        trident_type: TridentType,
+    ) {
+        let mut old_trident_type = self.trident_type.lock().unwrap();
+        *old_trident_type = trident_type;
         self.base
             .on_tap_interface_change(vec![], IfMacSource::IfMac);
-    }
-
-    #[cfg(target_os = "linux")]
-    fn tap_bridge_inner_macs(&self, if_index: usize) -> Vec<MacAddr> {
-        if self.poller.is_none() {
-            debug!("Poller is none.");
-            return vec![];
-        }
-        if if_index == 0 {
-            debug!("Mirror mode tap-bridge src-interface ifindex == 0");
-            return vec![];
-        }
-        let mut macs = vec![];
-        let ifaces = self.poller.as_ref().unwrap().get_interface_info();
-        if ifaces.len() == 0 {
-            debug!("Mirror mode tap-bridge macs is nill.");
-            return macs;
-        }
-        for iface in ifaces {
-            if iface.tap_idx as usize == if_index {
-                macs.push(iface.mac);
-            }
-        }
-        debug!("TapBridge: Src-IfIndex {} MAC {:?}", if_index, macs);
-        return macs;
     }
 
     pub fn on_vm_change_with_bridge_macs(
@@ -154,6 +139,33 @@ impl MirrorModeDispatcherListener {
     }
 }
 
+#[cfg(target_os = "linux")]
+impl MirrorModeDispatcherListener {
+    fn tap_bridge_inner_macs(&self, if_index: usize) -> Vec<MacAddr> {
+        if self.poller.is_none() {
+            debug!("Poller is none.");
+            return vec![];
+        }
+        if if_index == 0 {
+            debug!("Mirror mode tap-bridge src-interface ifindex == 0");
+            return vec![];
+        }
+        let mut macs = vec![];
+        let ifaces = self.poller.as_ref().unwrap().get_interface_info();
+        if ifaces.len() == 0 {
+            debug!("Mirror mode tap-bridge macs is nill.");
+            return macs;
+        }
+        for iface in ifaces {
+            if iface.tap_idx as usize == if_index {
+                macs.push(iface.mac);
+            }
+        }
+        debug!("TapBridge: Src-IfIndex {} MAC {:?}", if_index, macs);
+        return macs;
+    }
+}
+
 pub(super) struct MirrorPipeline {
     handlers: Vec<PacketHandler>,
     timestamp: Duration,
@@ -169,6 +181,8 @@ pub(super) struct MirrorModeDispatcher {
     pub(super) poller: Option<Arc<GenericPoller>>,
     pub(super) pipelines: HashMap<u32, MirrorPipeline>,
     pub(super) updated: Arc<AtomicBool>,
+    pub(super) trident_type: Arc<Mutex<TridentType>>,
+    pub(super) mac: u32,
 }
 
 impl MirrorModeDispatcher {
@@ -181,34 +195,10 @@ impl MirrorModeDispatcher {
             local_vm_mac_set: self.local_vm_mac_set.clone(),
             updated: self.updated.clone(),
             base: self.base.listener(),
+            trident_type: self.trident_type.clone(),
             #[cfg(target_os = "linux")]
             poller: self.poller.clone(),
         }
-    }
-
-    #[cfg(target_os = "windows")]
-    fn decap_tunnel(
-        packet: &mut Packet,
-        tap_type_handler: &TapTypeHandler,
-        tunnel_info: &mut TunnelInfo,
-        tunnel_type_bitmap: &Arc<Mutex<TunnelTypeBitmap>>,
-        counter: &Arc<PacketCounter>,
-    ) -> usize {
-        let (decap_length, _) = match BaseDispatcher::decap_tunnel(
-            &mut packet.data,
-            tap_type_handler,
-            tunnel_info,
-            tunnel_type_bitmap.lock().unwrap().clone(),
-        ) {
-            Ok(d) => d,
-            Err(e) => {
-                counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
-                warn!("decap_tunnel failed: {:?}", e);
-                return 0;
-            }
-        };
-
-        return decap_length;
     }
 
     fn get_key(
@@ -315,6 +305,8 @@ impl MirrorModeDispatcher {
         tunnel_info: &TunnelInfo,
         flow_map: &mut FlowMap,
         counter: &Arc<PacketCounter>,
+        trident_type: TridentType,
+        mac: u32,
     ) -> Result<()> {
         let pipeline = Self::get_pipeline(updated, pipelines, key, id, handler_builder, timestamp);
         if timestamp
@@ -341,7 +333,14 @@ impl MirrorModeDispatcher {
             original_length,
         )?;
 
-        Self::prepare_flow(&mut meta_packet, tunnel_info.tunnel_type, key, id as u8);
+        Self::prepare_flow(
+            &mut meta_packet,
+            tunnel_info.tunnel_type,
+            key,
+            id as u8,
+            trident_type,
+            mac,
+        );
         // flowProcesser
         flow_map.inject_meta_packet(&mut meta_packet);
         let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
@@ -397,7 +396,7 @@ impl MirrorModeDispatcher {
             #[cfg(target_os = "linux")]
             let (packet, timestamp) = recved.unwrap();
             #[cfg(target_os = "windows")]
-            let (mut packet, mut timestamp) = recved.unwrap();
+            let (mut packet, timestamp) = recved.unwrap();
 
             self.base.counter.rx.fetch_add(1, Ordering::Relaxed);
             self.base
@@ -442,6 +441,7 @@ impl MirrorModeDispatcher {
                 overlay_packet,
                 self.base.tunnel_info,
             );
+            let trident_type = self.trident_type.lock().unwrap().clone();
             if !src_local && !dst_local {
                 let _ = Self::handler(
                     self.base.id,
@@ -457,6 +457,8 @@ impl MirrorModeDispatcher {
                     &self.base.tunnel_info,
                     &mut flow_map,
                     &self.base.counter,
+                    trident_type,
+                    self.mac,
                 );
                 continue;
             }
@@ -476,6 +478,8 @@ impl MirrorModeDispatcher {
                     &self.base.tunnel_info,
                     &mut flow_map,
                     &self.base.counter,
+                    trident_type,
+                    self.mac,
                 );
             }
             if dst_local {
@@ -493,6 +497,8 @@ impl MirrorModeDispatcher {
                     &self.base.tunnel_info,
                     &mut flow_map,
                     &self.base.counter,
+                    trident_type,
+                    self.mac,
                 );
             }
         }
@@ -506,9 +512,46 @@ impl MirrorModeDispatcher {
         tunnel_type: TunnelType,
         key: u32,
         queue_hash: u8,
+        trident_type: TridentType,
+        mac: u32,
     ) {
-        meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, key);
+        if is_tt_hyper_v_compute(trident_type) {
+            meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, mac);
+        } else {
+            meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, key);
+        }
 
         BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash)
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl MirrorModeDispatcher {
+    fn decap_tunnel(
+        packet: &mut Packet,
+        tap_type_handler: &TapTypeHandler,
+        tunnel_info: &mut TunnelInfo,
+        tunnel_type_bitmap: &Arc<Mutex<TunnelTypeBitmap>>,
+        counter: &Arc<PacketCounter>,
+    ) -> usize {
+        let (decap_length, _) = match BaseDispatcher::decap_tunnel(
+            &mut packet.data,
+            tap_type_handler,
+            tunnel_info,
+            tunnel_type_bitmap.lock().unwrap().clone(),
+        ) {
+            Ok(d) => d,
+            Err(e) => {
+                counter.invalid_packets.fetch_add(1, Ordering::Relaxed);
+                warn!("decap_tunnel failed: {:?}", e);
+                return 0;
+            }
+        };
+
+        return decap_length;
+    }
+
+    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
+        self.base.switch_recv_engine(pcap_interfaces)
     }
 }

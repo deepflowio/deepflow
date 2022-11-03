@@ -122,6 +122,7 @@ func (m *VM) addCache(dbItems []*mysql.VM) {
 
 func (m *VM) updateCache(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 	diffBase.Update(cloudItem)
+	m.cache.UpdateVM(cloudItem)
 }
 
 func (m *VM) deleteCache(lcuuids []string) {

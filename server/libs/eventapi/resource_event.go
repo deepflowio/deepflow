@@ -34,6 +34,8 @@ type ResourceEvent struct {
 	ResourceType uint32 // the value is the same as l3_device_type
 	ResourceID   uint32
 	ResourceName string
+	SubnetIDs    []uint32
+	IPs          []string
 	Description  string
 }
 

@@ -20,6 +20,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
 )
 
 // ResourceUpdater 实现资源进行新旧数据比对，并根据比对结果增删改资源
@@ -53,11 +54,12 @@ type CacheHandler[CT constraint.CloudModel, MT constraint.MySQLModel, BT constra
 
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
 	cache         *cache.Cache
-	dbOperator    db.Operator[MT]           // 数据库操作对象
-	diffBaseData  map[string]BT             // 用于比对的旧资源数据
-	cloudData     []CT                      // 定时获取的新资源数据
-	dataGenerator DataGenerator[CT, MT, BT] // 提供各类数据生成的方法
-	cacheHandler  CacheHandler[CT, MT, BT]  // 提供处理cache中特定资源的方法
+	dbOperator    db.Operator[MT]                 // 数据库操作对象
+	diffBaseData  map[string]BT                   // 用于比对的旧资源数据
+	cloudData     []CT                            // 定时获取的新资源数据
+	dataGenerator DataGenerator[CT, MT, BT]       // 提供各类数据生成的方法
+	cacheHandler  CacheHandler[CT, MT, BT]        // 提供处理cache中特定资源的方法
+	eventProducer event.EventProducer[CT, MT, BT] // 提供资源变更事件管理接口
 }
 
 func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
@@ -65,7 +67,7 @@ func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 	for _, cloudItem := range u.cloudData {
 		diffBase, exists := u.dataGenerator.getDiffBaseByCloudItem(&cloudItem)
 		if !exists {
-			log.Infof("to add (cloud item: %+v)", cloudItem)
+			log.Infof("to add (cloud item: %#v)", cloudItem)
 			dbItem, ok := u.dataGenerator.generateDBItemToAdd(&cloudItem)
 			if ok {
 				dbItemsToAdd = append(dbItemsToAdd, dbItem)
@@ -74,7 +76,7 @@ func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
 			diffBase.SetSequence(u.cache.GetSequence())
 			updateInfo, ok := u.dataGenerator.generateUpdateInfo(diffBase, &cloudItem)
 			if ok {
-				log.Infof("to update (cloud item: %+v, diff base item: %+v)", cloudItem, diffBase)
+				log.Infof("to update (cloud item: %#v, diff base item: %#v)", cloudItem, diffBase)
 				u.update(&cloudItem, diffBase, updateInfo)
 			}
 		}
@@ -88,7 +90,7 @@ func (u *UpdaterBase[CT, MT, BT]) HandleDelete() {
 	lcuuidsOfBatchToDelete := []string{}
 	for lcuuid, diffBase := range u.diffBaseData {
 		if diffBase.GetSequence() != u.cache.GetSequence() {
-			log.Infof("to delete (diff base item: %+v)", diffBase)
+			log.Infof("to delete (diff base item: %#v)", diffBase)
 			lcuuidsOfBatchToDelete = append(lcuuidsOfBatchToDelete, lcuuid)
 		}
 	}
@@ -119,6 +121,9 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 	addedDBItems, ok := u.dbOperator.AddBatch(dbItemsToAdd)
 	if ok {
 		u.cacheHandler.addCache(addedDBItems)
+		if u.eventProducer != nil {
+			u.eventProducer.ProduceByAdd(addedDBItems)
+		}
 	}
 }
 
@@ -126,6 +131,9 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 func (u *UpdaterBase[CT, MT, BT]) update(cloudItem *CT, diffBase BT, updateInfo map[string]interface{}) {
 	_, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo)
 	if ok {
+		if u.eventProducer != nil {
+			u.eventProducer.ProduceByUpdate(cloudItem, diffBase)
+		}
 		u.cacheHandler.updateCache(cloudItem, diffBase)
 	}
 }
@@ -150,6 +158,9 @@ func (u *UpdaterBase[CT, MT, BT]) delete(lcuuids []string) {
 
 func (u *UpdaterBase[CT, MT, BT]) deletePage(lcuuids []string) {
 	if u.dbOperator.DeleteBatch(lcuuids) {
+		if u.eventProducer != nil {
+			u.eventProducer.ProduceByDelete(lcuuids)
+		}
 		u.cacheHandler.deleteCache(lcuuids)
 	}
 }

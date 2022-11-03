@@ -29,6 +29,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/deepflowys/deepflow/message/trident"
+	. "github.com/deepflowys/deepflow/server/controller/common"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/service"
 	. "github.com/deepflowys/deepflow/server/controller/trisolaris/common"
@@ -224,12 +225,14 @@ func (n *NodeInfo) generateControllerInfo() {
 	controllerToNATIP := make(map[string]string)
 	controllerToPodIP := make(map[string]string)
 	for _, controller := range dbControllers {
-		if _, ok := localIPs[controller.IP]; ok {
-			server := &trident.DeepFlowServerInstanceInfo{
-				PodName:  proto.String(controller.PodName),
-				NodeName: proto.String(controller.NodeName),
+		if controller.State != HOST_STATE_EXCEPTION {
+			if _, ok := localIPs[controller.IP]; ok {
+				server := &trident.DeepFlowServerInstanceInfo{
+					PodName:  proto.String(controller.PodName),
+					NodeName: proto.String(controller.NodeName),
+				}
+				localServers = append(localServers, server)
 			}
-			localServers = append(localServers, server)
 		}
 		controllerToNATIP[controller.IP] = controller.NATIP
 		controllerToPodIP[controller.IP] = controller.PodIP

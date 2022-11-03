@@ -280,6 +280,16 @@ ingester:
   #  l7-flow-log: 3
   #  l4-packet: 3
 
+  ## event data write config
+  #event-ck-writer
+  #  queue-count: 1      # 每个表并行写数量
+  #  queue-size: 50000  # 数据队列长度
+  #  batch-size: 25600   # 多少行数据同时写入
+  #  flush-timeout: 5   # 超时写入时间
+
+  ## event database data retention time(unit: day)
+  #event-ttl: 30
+
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
 

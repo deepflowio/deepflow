@@ -22,7 +22,10 @@ use std::time::Duration;
 
 use log::{error, info, warn};
 use md5::{Digest, Md5};
-use serde::Deserialize;
+use serde::{
+    de::{self, Unexpected},
+    Deserialize, Deserializer,
+};
 use thiserror::Error;
 use tokio::runtime::Builder;
 
@@ -37,9 +40,11 @@ use crate::proto::{
     trident::{self, KubernetesClusterIdRequest, TapMode},
 };
 use crate::rpc::Session;
+use crate::trident::RunningMode;
 
 const K8S_CA_CRT_PATH: &str = "/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 const MINUTE: Duration = Duration::from_secs(60);
+const DEFAULT_STANDALONE_CONFIG: &str = "/etc/deepflow-agent-standalone.yaml";
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -64,6 +69,8 @@ pub struct Config {
     pub kubernetes_cluster_id: String,
     pub vtap_group_id_request: String,
     pub controller_domain_name: Vec<String>,
+    #[serde(skip)]
+    pub agent_mode: RunningMode,
 }
 
 impl Config {
@@ -154,6 +161,10 @@ impl Config {
                                 continue;
                             }
                             info!("set kubernetes_cluster_id to {}", id);
+                            // FIXME: The channel in the session will become invalid after success here, so reset the session.
+                            // ==============================================================================================
+                            // FIXME: 这里获取成功后 Session 中的 Channel 会失效，所以在这里重置 Session
+                            session.reset();
                             return id;
                         }
                         None => {
@@ -192,6 +203,7 @@ impl Default for Config {
             kubernetes_cluster_id: "".into(),
             vtap_group_id_request: "".into(),
             controller_domain_name: vec![],
+            agent_mode: Default::default(),
         }
     }
 }
@@ -279,6 +291,8 @@ pub struct YamlConfig {
     pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
     pub external_agent_http_proxy_compressed: bool,
     pub standalone_data_file_size: u32,
+    pub standalone_data_file_dir: String,
+    pub log_file: String,
 }
 
 impl YamlConfig {
@@ -324,14 +338,14 @@ impl YamlConfig {
                 8 << 20
             } else {
                 1 << 16
-            }
+            };
         }
         if c.flow_sender_queue_size == 0 {
             c.flow_sender_queue_size = if tap_mode == trident::TapMode::Analyzer {
                 8 << 20
             } else {
                 1 << 16
-            }
+            };
         }
         if c.packet_delay < Duration::from_secs(1) || c.packet_delay > Duration::from_secs(10) {
             c.packet_delay = Duration::from_secs(1);
@@ -382,7 +396,16 @@ impl YamlConfig {
         c.vxlan_flags |= 0x08;
 
         if c.standalone_data_file_size == 0 {
-            c.standalone_data_file_size = 200
+            c.standalone_data_file_size = 200;
+        }
+
+        if c.standalone_data_file_dir.len() == 0 {
+            c.standalone_data_file_dir = Path::new(DEFAULT_LOG_FILE)
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string();
         }
 
         if let Err(e) = c.validate() {
@@ -425,10 +448,10 @@ impl Default for YamlConfig {
             vxlan_port: 4789,
             vxlan_flags: 0xff,
             // default size changes according to tap_mode
-            collector_sender_queue_size: 0,
+            collector_sender_queue_size: 1 << 16,
             collector_sender_queue_count: 1,
             // default size changes according to tap_mode
-            flow_sender_queue_size: 0,
+            flow_sender_queue_size: 1 << 16,
             flow_sender_queue_count: 1,
             second_flow_extra_delay: Duration::from_secs(0),
             packet_delay: Duration::from_secs(1),
@@ -443,11 +466,11 @@ impl Default for YamlConfig {
             cloud_gateway_traffic: false,
             ebpf_log_file: "".into(),
             kubernetes_namespace: "".into(),
-            external_metrics_sender_queue_size: 0,
+            external_metrics_sender_queue_size: 1 << 12,
             l7_protocol_inference_max_fail_count: L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT,
             l7_protocol_inference_ttl: L7_PROTOCOL_INFERENCE_TTL,
             packet_sequence_block_size: 64, // Enterprise Edition Feature: packet-sequence
-            packet_sequence_queue_size: 0,  // Enterprise Edition Feature: packet-sequence
+            packet_sequence_queue_size: 1 << 16, // Enterprise Edition Feature: packet-sequence
             packet_sequence_queue_count: 1, // Enterprise Edition Feature: packet-sequence
             packet_sequence_flag: 0,        // Enterprise Edition Feature: packet-sequence
             feature_flags: vec![],
@@ -462,6 +485,14 @@ impl Default for YamlConfig {
             },
             external_agent_http_proxy_compressed: false,
             standalone_data_file_size: 200,
+            standalone_data_file_dir: Path::new(DEFAULT_LOG_FILE)
+                .parent()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+
+            log_file: DEFAULT_LOG_FILE.into(),
         }
     }
 }
@@ -637,96 +668,233 @@ pub enum IngressFlavour {
     Openshift,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(default = "RuntimeConfig::standalone_default")]
 pub struct RuntimeConfig {
+    pub vtap_group_id: String,
+    #[serde(skip)]
     pub enabled: bool,
     pub max_cpus: u32,
     pub max_memory: u64,
-    pub sync_interval: Duration,
-    pub stats_interval: Duration,
+    pub sync_interval: u64,  // unit(second)
+    pub stats_interval: u64, // unit(second)
+    #[serde(rename = "max_collect_pps")]
     pub global_pps_threshold: u64,
     #[cfg(target_os = "linux")]
+    #[serde(skip)]
     pub extra_netns_regex: String,
     pub tap_interface_regex: String,
+    #[serde(skip)]
     pub host: String,
+    #[serde(deserialize_with = "bool_from_int")]
     pub rsyslog_enabled: bool,
+    #[serde(skip)]
     pub output_vlan: u16,
     pub mtu: u32,
+    #[serde(rename = "max_npb_bps")]
     pub npb_bps_threshold: u64,
+    #[serde(deserialize_with = "bool_from_int")]
     pub collector_enabled: bool,
-    pub l4_log_store_tap_types: [bool; 256],
+    pub l4_log_store_tap_types: Vec<u8>,
+    #[serde(skip)]
     pub app_proto_log_enabled: bool,
-    pub l7_log_store_tap_types: [bool; 256],
+    pub l7_log_store_tap_types: Vec<u8>,
+    #[serde(skip)]
     pub packet_header_enabled: bool,
+    #[serde(deserialize_with = "bool_from_int")]
     pub platform_enabled: bool,
+    #[serde(skip)]
     pub server_tx_bandwidth_threshold: u64,
+    #[serde(skip)]
     pub bandwidth_probe_interval: Duration,
+    #[serde(deserialize_with = "to_vlan_mode")]
     pub npb_vlan_mode: trident::VlanMode,
+    #[serde(skip)]
     pub npb_dedup_enabled: bool,
+    #[serde(deserialize_with = "to_if_mac_source")]
     pub if_mac_source: trident::IfMacSource,
+    #[serde(deserialize_with = "bool_from_int")]
     pub vtap_flow_1s_enabled: bool,
+    #[serde(skip)]
     pub debug_enabled: bool,
     pub log_threshold: u32,
+    #[serde(deserialize_with = "to_log_level")]
     pub log_level: log::Level,
+    #[serde(skip)]
     pub analyzer_ip: String,
     pub analyzer_port: u16,
-    pub max_escape: Duration,
+    #[serde(rename = "max_escape_seconds")]
+    pub max_escape: u64,
+    #[serde(skip)]
     pub proxy_controller_ip: String,
     pub proxy_controller_port: u16,
+    #[serde(skip)]
     pub epc_id: u32,
+    #[serde(skip)]
     pub vtap_id: u16,
+    #[serde(deserialize_with = "to_socket_type")]
     pub collector_socket_type: trident::SocketType,
+    #[serde(deserialize_with = "to_socket_type")]
     pub compressor_socket_type: trident::SocketType,
+    #[serde(deserialize_with = "to_socket_type")]
     pub npb_socket_type: trident::SocketType,
+    #[serde(skip)]
     pub trident_type: common::TridentType,
     pub capture_packet_size: u32,
+    #[serde(deserialize_with = "bool_from_int")]
     pub inactive_server_port_enabled: bool,
+    #[serde(deserialize_with = "bool_from_int")]
     pub inactive_ip_enabled: bool,
+    #[serde(rename = "vm_xml_path")]
     pub libvirt_xml_path: String,
     pub l7_log_packet_size: u32,
     pub l4_log_collect_nps_threshold: u64,
     pub l7_log_collect_nps_threshold: u64,
+    #[serde(deserialize_with = "bool_from_int")]
     pub l7_metrics_enabled: bool,
+    #[serde(deserialize_with = "to_tunnel_types")]
     pub decap_types: Vec<TunnelType>,
     pub http_log_proxy_client: String,
     pub http_log_trace_id: String,
     pub http_log_span_id: String,
     pub http_log_x_request_id: String,
+    #[serde(skip)]
     pub region_id: u32,
+    #[serde(skip)]
     pub pod_cluster_id: u32,
     pub log_retention: u32,
+    #[serde(deserialize_with = "to_capture_socket_type")]
     pub capture_socket_type: trident::CaptureSocketType,
     pub process_threshold: u32,
     pub thread_threshold: u32,
     pub capture_bpf: String,
+    #[serde(deserialize_with = "bool_from_int")]
     pub l4_performance_enabled: bool,
+    #[serde(skip)]
     pub kubernetes_api_enabled: bool,
+    #[serde(deserialize_with = "bool_from_int")]
     pub ntp_enabled: bool,
     pub sys_free_memory_limit: u32,
     pub log_file_size: u32,
+    #[serde(deserialize_with = "bool_from_int")]
     pub external_agent_http_proxy_enabled: bool,
     pub external_agent_http_proxy_port: u16,
+    #[serde(skip)]
     pub tap_mode: TapMode,
     // TODO: expand and remove
+    #[serde(rename = "static_config")]
     pub yaml_config: YamlConfig,
 }
 
 impl RuntimeConfig {
+    pub fn load_from_file<T: AsRef<Path>>(path: T) -> Result<Self, io::Error> {
+        let contents = fs::read_to_string(path)?;
+        let mut c = if contents.len() == 0 {
+            // parsing empty string leads to EOF error
+            Self::standalone_default()
+        } else {
+            serde_yaml::from_str(contents.as_str())
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?
+        };
+
+        // reset below switch in standalone mode
+        c.app_proto_log_enabled = !c.l7_log_store_tap_types.is_empty();
+        c.ntp_enabled = false;
+        c.collector_socket_type = trident::SocketType::File;
+        c.max_memory <<= 20;
+        c.server_tx_bandwidth_threshold <<= 20;
+
+        c.validate()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        Ok(c)
+    }
+
+    fn standalone_default() -> Self {
+        Self {
+            vtap_group_id: Default::default(),
+            enabled: true,
+            max_cpus: 1,
+            max_memory: 768,
+            sync_interval: 60,
+            stats_interval: 60,
+            global_pps_threshold: 200,
+            extra_netns_regex: Default::default(),
+            tap_interface_regex: "^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$"
+                .into(),
+            host: Default::default(),
+            rsyslog_enabled: false,
+            output_vlan: 0,
+            mtu: 1500,
+            npb_bps_threshold: 1000,
+            collector_enabled: true,
+            l4_log_store_tap_types: vec![0],
+            packet_header_enabled: false,
+            platform_enabled: false,
+            server_tx_bandwidth_threshold: 1,
+            bandwidth_probe_interval: Duration::from_secs(60),
+            npb_vlan_mode: trident::VlanMode::None,
+            npb_dedup_enabled: false,
+            if_mac_source: trident::IfMacSource::IfMac,
+            vtap_flow_1s_enabled: true,
+            debug_enabled: true,
+            log_threshold: 300,
+            log_level: log::Level::Info,
+            analyzer_ip: "127.0.0.1".into(),
+            analyzer_port: 30033,
+            max_escape: 3600,
+            proxy_controller_ip: "127.0.0.1".into(),
+            proxy_controller_port: 30035,
+            epc_id: 3302,
+            vtap_id: 3302,
+            collector_socket_type: trident::SocketType::File,
+            compressor_socket_type: trident::SocketType::Tcp,
+            npb_socket_type: trident::SocketType::RawUdp,
+            trident_type: common::TridentType::TtProcess,
+            capture_packet_size: 65535,
+            inactive_server_port_enabled: true,
+            inactive_ip_enabled: true,
+            libvirt_xml_path: "/etc/libvirt/qemu/".into(),
+            l7_log_packet_size: 1024,
+            l4_log_collect_nps_threshold: 10000,
+            l7_log_collect_nps_threshold: 10000,
+            l7_metrics_enabled: true,
+            app_proto_log_enabled: true,
+            l7_log_store_tap_types: vec![0],
+            decap_types: Default::default(),
+            http_log_proxy_client: "X-Forwarded-For".into(),
+            http_log_trace_id: "traceparent, sw8".into(),
+            http_log_span_id: "traceparent, sw8".into(),
+            http_log_x_request_id: "X-Request-ID".into(),
+            region_id: 3302,
+            pod_cluster_id: 0,
+            log_retention: 300,
+            capture_socket_type: trident::CaptureSocketType::Auto,
+            process_threshold: 10,
+            thread_threshold: 500,
+            capture_bpf: Default::default(),
+            l4_performance_enabled: true,
+            kubernetes_api_enabled: false,
+            ntp_enabled: false,
+            sys_free_memory_limit: 0,
+            log_file_size: 1000,
+            external_agent_http_proxy_enabled: false,
+            external_agent_http_proxy_port: 38086,
+            tap_mode: TapMode::Local,
+            yaml_config: YamlConfig::load("", TapMode::Local).unwrap(), // Default configuration that needs to be corrected to be available
+        }
+    }
+
     fn validate(&self) -> Result<(), ConfigError> {
-        if self.sync_interval < Duration::from_secs(1)
-            || self.sync_interval > Duration::from_secs(60 * 60)
-        {
+        if self.sync_interval < 1 || self.sync_interval > 60 * 60 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "sync-interval {:?} not in [1s, 1h]",
-                self.sync_interval
+                Duration::from_secs(self.sync_interval)
             )));
         }
-        if self.stats_interval < Duration::from_secs(1)
-            || self.stats_interval > Duration::from_secs(60 * 60)
-        {
+        if self.stats_interval < 1 || self.stats_interval > 60 * 60 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "stats-interval {:?} not in [1s, 1h]",
-                self.stats_interval
+                Duration::from_secs(self.stats_interval)
             )));
         }
 
@@ -767,9 +935,7 @@ impl RuntimeConfig {
             )));
         }
 
-        if self.max_escape < Duration::from_secs(600)
-            || self.max_escape > Duration::from_secs(30 * 24 * 60 * 60)
-        {
+        if self.max_escape < 600 || self.max_escape > 30 * 24 * 60 * 60 {
             return Err(ConfigError::RuntimeConfigInvalid(format!(
                 "max-escape-seconds {:?} not in [600s, 30d]",
                 self.max_escape
@@ -827,13 +993,14 @@ impl Default for RuntimeConfig {
 impl TryFrom<trident::Config> for RuntimeConfig {
     type Error = io::Error;
 
-    fn try_from(mut conf: trident::Config) -> Result<Self, io::Error> {
+    fn try_from(conf: trident::Config) -> Result<Self, io::Error> {
         let rc = Self {
+            vtap_group_id: Default::default(),
             enabled: conf.enabled(),
             max_cpus: conf.max_cpus(),
             max_memory: (conf.max_memory() as u64) << 20,
-            sync_interval: Duration::from_secs(conf.sync_interval() as u64),
-            stats_interval: Duration::from_secs(conf.stats_interval() as u64),
+            sync_interval: conf.sync_interval() as u64,
+            stats_interval: conf.stats_interval() as u64,
             global_pps_threshold: conf.global_pps_threshold(),
             #[cfg(target_os = "linux")]
             extra_netns_regex: conf.extra_netns_regex().to_owned(),
@@ -844,17 +1011,18 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             mtu: conf.mtu(),
             npb_bps_threshold: conf.npb_bps_threshold(),
             collector_enabled: conf.collector_enabled(),
-            l4_log_store_tap_types: {
-                let mut tap_types = [false; 256];
-                for t in conf.l4_log_tap_types.drain(..) {
-                    if t >= u16::from(TapType::Max) as u32 {
-                        warn!("invalid tap type: {}", t);
+            l4_log_store_tap_types: conf
+                .l4_log_tap_types
+                .iter()
+                .filter_map(|&i| {
+                    if i >= u16::from(TapType::Max) as u32 {
+                        warn!("invalid tap type: {}", i);
+                        None
                     } else {
-                        tap_types[t as usize] = true;
+                        Some(i as u8)
                     }
-                }
-                tap_types
-            },
+                })
+                .collect(),
             packet_header_enabled: conf.packet_header_enabled(),
             platform_enabled: conf.platform_enabled(),
             server_tx_bandwidth_threshold: conf.server_tx_bandwidth_threshold(),
@@ -875,7 +1043,7 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             },
             analyzer_ip: conf.analyzer_ip().to_owned(),
             analyzer_port: conf.analyzer_port() as u16,
-            max_escape: Duration::from_secs(conf.max_escape_seconds() as u64),
+            max_escape: conf.max_escape_seconds() as u64,
             proxy_controller_ip: conf.proxy_controller_ip().to_owned(),
             proxy_controller_port: conf.proxy_controller_port() as u16,
             epc_id: conf.epc_id(),
@@ -893,21 +1061,22 @@ impl TryFrom<trident::Config> for RuntimeConfig {
             l7_log_collect_nps_threshold: conf.l7_log_collect_nps_threshold(),
             l7_metrics_enabled: conf.l7_metrics_enabled(),
             app_proto_log_enabled: !conf.l7_log_store_tap_types.is_empty(),
-            l7_log_store_tap_types: {
-                let mut tap_types = [false; 256];
-                for t in conf.l7_log_store_tap_types.drain(..) {
-                    if t >= u16::from(TapType::Max) as u32 {
-                        warn!("invalid tap type: {}", t);
+            l7_log_store_tap_types: conf
+                .l7_log_store_tap_types
+                .iter()
+                .filter_map(|&i| {
+                    if i >= u16::from(TapType::Max) as u32 {
+                        warn!("invalid tap type: {}", i);
+                        None
                     } else {
-                        tap_types[t as usize] = true;
+                        Some(i as u8)
                     }
-                }
-                tap_types
-            },
+                })
+                .collect(),
             decap_types: conf
                 .decap_type
-                .drain(..)
-                .filter_map(|t| match TunnelType::try_from(t as u8) {
+                .iter()
+                .filter_map(|&t| match TunnelType::try_from(t as u8) {
                     Ok(t) => Some(t),
                     Err(_) => {
                         warn!("invalid tunnel type: {}", t);
@@ -939,6 +1108,118 @@ impl TryFrom<trident::Config> for RuntimeConfig {
         rc.validate()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err.to_string()))?;
         Ok(rc)
+    }
+}
+
+fn to_capture_socket_type<'de, D>(deserializer: D) -> Result<trident::CaptureSocketType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(trident::CaptureSocketType::Auto),
+        1 => Ok(trident::CaptureSocketType::AfPacketV1),
+        2 => Ok(trident::CaptureSocketType::AfPacketV2),
+        3 => Ok(trident::CaptureSocketType::AfPacketV3),
+        o => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(o as u64),
+            &"0|1|2|3",
+        )),
+    }
+}
+
+fn to_tunnel_types<'de, D>(deserializer: D) -> Result<Vec<TunnelType>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Vec::<u8>::deserialize(deserializer)?
+        .into_iter()
+        .map(|t| {
+            TunnelType::try_from(t).map_err(|_| {
+                de::Error::invalid_value(
+                    Unexpected::Unsigned(t as u64),
+                    &"None|Vxlan|Ipip|TencentGre|ErspanOrTeb",
+                )
+            })
+        })
+        .collect()
+}
+
+fn to_socket_type<'de, D>(deserializer: D) -> Result<trident::SocketType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.as_str() {
+        "FILE" => Ok(trident::SocketType::File),
+        "TCP" => Ok(trident::SocketType::Tcp),
+        "UDP" => Ok(trident::SocketType::Udp),
+        "RAW_UDP" => Ok(trident::SocketType::RawUdp),
+        "" => Ok(trident::SocketType::File),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"FILE|TCP|UDP|RAW_UDP",
+        )),
+    }
+}
+
+fn to_log_level<'de, D>(deserializer: D) -> Result<log::Level, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match String::deserialize(deserializer)?.to_lowercase().as_str() {
+        "error" => Ok(log::Level::Error),
+        "warn" | "warning" => Ok(log::Level::Warn),
+        "info" => Ok(log::Level::Info),
+        "debug" => Ok(log::Level::Debug),
+        "trace" => Ok(log::Level::Trace),
+        "" => Ok(log::Level::Info),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Str(other),
+            &"trace|debug|info|warn|error",
+        )),
+    }
+}
+
+fn to_if_mac_source<'de, D>(deserializer: D) -> Result<trident::IfMacSource, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(trident::IfMacSource::IfMac),
+        1 => Ok(trident::IfMacSource::IfName),
+        2 => Ok(trident::IfMacSource::IfLibvirtXml),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1|2",
+        )),
+    }
+}
+
+fn to_vlan_mode<'de, D>(deserializer: D) -> Result<trident::VlanMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(trident::VlanMode::None),
+        1 => Ok(trident::VlanMode::Qinq),
+        2 => Ok(trident::VlanMode::Vlan),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1|2",
+        )),
+    }
+}
+
+fn bool_from_int<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match u8::deserialize(deserializer)? {
+        0 => Ok(false),
+        1 => Ok(true),
+        other => Err(de::Error::invalid_value(
+            Unexpected::Unsigned(other as u64),
+            &"0|1",
+        )),
     }
 }
 
