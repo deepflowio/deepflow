@@ -20,7 +20,14 @@ type EventToolDataSet struct {
 	VInterfaceLcuuidToDeviceInfo  map[string]*DeviceInfo
 	VInterfaceLcuuidToNetworkInfo map[string]*NetworkInfo
 	NetworkIDToName               map[int]string
+	HostIDToName                  map[int]string
 	VMIDToName                    map[int]string
+	VRouterIDToName               map[int]string
+	DHCPPortIDToName              map[int]string
+	NATGatewayIDToName            map[int]string
+	LBIDToName                    map[int]string
+	RDSInstanceIDToName           map[int]string
+	RedisInstanceIDToName         map[int]string
 	PodNodeIDToName               map[int]string
 	PodServiceIDToName            map[int]string
 	PodIDToName                   map[int]string
@@ -34,7 +41,14 @@ func NewEventToolDataSet() EventToolDataSet {
 		VInterfaceLcuuidToDeviceInfo:  make(map[string]*DeviceInfo),
 		VInterfaceLcuuidToNetworkInfo: make(map[string]*NetworkInfo),
 		NetworkIDToName:               make(map[int]string),
+		HostIDToName:                  make(map[int]string),
 		VMIDToName:                    make(map[int]string),
+		VRouterIDToName:               make(map[int]string),
+		DHCPPortIDToName:              make(map[int]string),
+		NATGatewayIDToName:            make(map[int]string),
+		LBIDToName:                    make(map[int]string),
+		RDSInstanceIDToName:           make(map[int]string),
+		RedisInstanceIDToName:         make(map[int]string),
 		PodNodeIDToName:               make(map[int]string),
 		PodServiceIDToName:            make(map[int]string),
 		PodIDToName:                   make(map[int]string),
