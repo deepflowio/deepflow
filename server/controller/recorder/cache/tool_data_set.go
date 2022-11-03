@@ -33,7 +33,8 @@ type ToolDataSet struct {
 
 	HostLcuuidToID map[string]int
 
-	VMLcuuidToID map[string]int
+	VMLcuuidToID    map[string]int
+	VMLcuuidToState map[string]int
 
 	VPCLcuuidToID map[string]int
 	VPCIDToLcuuid map[int]string
@@ -297,7 +298,6 @@ func (t *ToolDataSet) deleteDHCPPort(lcuuid string) {
 
 func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 	t.VInterfaceLcuuidToID[item.Lcuuid] = item.ID
-	t.VInterfaceIDToLcuuid[item.ID] = item.Lcuuid
 	t.VInterfaceIDToLcuuid[item.ID] = item.Lcuuid
 	t.VInterfaceLcuuidToNetworkID[item.Lcuuid] = item.NetworkID
 	t.VInterfaceLcuuidToDeviceType[item.Lcuuid] = item.DeviceType
@@ -707,6 +707,23 @@ func (t *ToolDataSet) GetVMIDByLcuuid(lcuuid string) (int, bool) {
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VM_EN, lcuuid))
 		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetVMStateByLcuuid(lcuuid string) (int, bool) {
+	state, exists := t.VMLcuuidToState[lcuuid]
+	if exists {
+		return state, true
+	}
+	log.Warning(cacheIDByLcuuidNotFound(RESOURCE_TYPE_VM_EN, lcuuid))
+	var vm mysql.VM
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.addVM(&vm)
+		return vm.State, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VM_EN, lcuuid))
+		return state, false
 	}
 }
 
