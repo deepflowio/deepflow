@@ -39,8 +39,11 @@ const KAFKA_FETCH: u16 = 1;
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct KafkaInfo {
     msg_type: LogMessageType,
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
+    #[serde(skip)]
     is_tls: bool,
 
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
@@ -59,11 +62,14 @@ pub struct KafkaInfo {
     // reponse
     #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
     pub resp_msg_size: Option<u32>,
+    #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
+    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
 
     // the first 14 byte of resp_data, use to parse error code
     // only fetch and api version > 7 can get the correct err code
+    #[serde(skip)]
     pub resp_data: Option<[u8; 14]>,
 }
 

@@ -45,12 +45,18 @@ use public::utils::net::h2pack;
 pub struct HttpInfo {
     // 流是否结束，用于 http2 ebpf uprobe 处理.
     // 由于ebpf有可能响应会比请求先到，所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
+    #[serde(skip)]
     is_req_end: bool,
+    #[serde(skip)]
     is_resp_end: bool,
 
+    #[serde(skip)]
     proto: L7Protocol,
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
+    #[serde(skip)]
     is_tls: bool,
     msg_type: LogMessageType,
     // 数据原始类型，标准的协议格式或者是ebpf上报的自定义格式
@@ -72,9 +78,9 @@ pub struct HttpInfo {
     pub path: String,
     #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
     pub host: String,
-    #[serde(rename = "user_agent", skip_serializing_if = "value_is_default")]
+    #[serde(rename = "user_agent", skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
-    #[serde(rename = "referer", skip_serializing_if = "value_is_default")]
+    #[serde(rename = "referer", skip_serializing_if = "Option::is_none")]
     pub referer: Option<String>,
     #[serde(rename = "http_proxy_client", skip_serializing_if = "value_is_default")]
     pub client_ip: String,
@@ -86,7 +92,9 @@ pub struct HttpInfo {
     #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
     pub resp_content_length: Option<u32>,
 
+    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     status_code: Option<i32>,
+    #[serde(rename = "response_status")]
     status: L7ResponseStatus,
 }
 

@@ -52,12 +52,17 @@ pub struct DnsInfo {
     #[serde(rename = "response_result", skip_serializing_if = "value_is_default")]
     pub answers: String,
 
+    #[serde(rename = "response_status")]
     pub status: L7ResponseStatus,
+    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
     pub status_code: Option<i32>,
 
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
     msg_type: LogMessageType,
+    #[serde(skip)]
     is_tls: bool,
 }
 
