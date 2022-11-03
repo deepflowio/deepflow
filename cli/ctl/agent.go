@@ -17,11 +17,12 @@
 package ctl
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
@@ -30,6 +31,8 @@ import (
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
 	"github.com/deepflowys/deepflow/cli/ctl/common/jsonparser"
+	"github.com/deepflowys/deepflow/cli/ctl/example"
+	agentpb "github.com/deepflowys/deepflow/message/trident"
 )
 
 type RebalanceType string
@@ -65,6 +68,27 @@ func RegisterAgentCommand() *cobra.Command {
 		},
 	}
 
+	var updateFilename string
+	update := &cobra.Command{
+		Use:     "update -f <filename>",
+		Short:   "update agent",
+		Example: "deepflow-ctl agent update -f agent.yaml",
+		Run: func(cmd *cobra.Command, args []string) {
+			updateAgent(cmd, args, updateFilename)
+		},
+	}
+	update.Flags().StringVarP(&updateFilename, "filename", "f", "", "file to use update agent")
+	update.MarkFlagRequired("filename")
+
+	updateExample := &cobra.Command{
+		Use:     "update-example",
+		Short:   "example agent update yaml",
+		Example: "deepflow-ctl agent update-example",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf(string(example.YamlVtapUpdateConfig))
+		},
+	}
+
 	var typeStr string
 	rebalanceCmd := &cobra.Command{
 		Use:   "rebalance",
@@ -92,6 +116,8 @@ deepflow-ctl agent rebalance --type=analyzer`,
 
 	agent.AddCommand(list)
 	agent.AddCommand(delete)
+	agent.AddCommand(update)
+	agent.AddCommand(updateExample)
 	agent.AddCommand(rebalanceCmd)
 	return agent
 }
@@ -176,43 +202,43 @@ func listAgent(cmd *cobra.Command, args []string, output string) {
 		dataYaml, _ := yaml.JSONToYAML(dataJson)
 		fmt.Printf(string(dataYaml))
 	} else {
-		nameMaxSize := 0
+		nameMaxSize, groupMaxSize := 0, 0
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
-			l := len(vtap.Get("NAME").MustString())
-			if l > nameMaxSize {
-				nameMaxSize = l
+			nameSize := len(vtap.Get("NAME").MustString())
+			if nameSize > nameMaxSize {
+				nameMaxSize = nameSize
+			}
+			groupSize := len(vtap.Get("VTAP_GROUP_NAME").MustString())
+			if groupSize > groupMaxSize {
+				groupMaxSize = groupSize
 			}
 		}
 
-		cmdFormat := "%-*s %-10s %-16s %-18s %-8s %-10s %s\n"
-		fmt.Printf(cmdFormat, nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", "EXCEPTIONS", "GROUP")
+		cmdFormat := "%-*s %-10s %-16s %-18s %-8s %-*s %s\n"
+		fmt.Printf(cmdFormat, nameMaxSize, "NAME", "TYPE", "CTRL_IP", "CTRL_MAC", "STATE", groupMaxSize, "GROUP", "EXCEPTIONS")
 		for i := range response.Get("DATA").MustArray() {
 			vtap := response.Get("DATA").GetIndex(i)
-			stateString := ""
-			switch vtap.Get("STATE").MustInt() {
-			case common.VTAP_STATE_NOT_CONNECTED:
-				stateString = common.VTAP_STATE_NOT_CONNECTED_STR
-			case common.VTAP_STATE_NORMAL:
-				stateString = common.VTAP_STATE_NORMAL_STR
-			case common.VTAP_STATE_DISABLE:
-				stateString = common.VTAP_STATE_DISABLE_STR
-			case common.VTAP_STATE_PENDING:
-				stateString = common.VTAP_STATE_PENDING_STR
-			}
-
-			vtapTypeString, _ := common.VTapTypeName[vtap.Get("TYPE").MustInt()]
 
 			exceptionStrings := []string{}
 			for i := range vtap.Get("EXCEPTIONS").MustArray() {
 				exceptionInt := vtap.Get("EXCEPTIONS").GetIndex(i).MustInt()
-				exceptionStrings = append(exceptionStrings, strconv.Itoa(exceptionInt))
+				exceptionStr, ok := agentpb.Exception_name[int32(exceptionInt)]
+				if ok {
+					exceptionStrings = append(exceptionStrings, exceptionStr)
+				} else {
+					exceptionStrings = append(exceptionStrings, string(common.VtapException(exceptionInt)))
+				}
 			}
 
-			fmt.Printf(
-				cmdFormat, nameMaxSize, vtap.Get("NAME").MustString(), vtapTypeString, vtap.Get("CTRL_IP").MustString(),
-				vtap.Get("CTRL_MAC").MustString(), stateString, strings.Join(exceptionStrings, ","),
-				vtap.Get("VTAP_GROUP_NAME").MustString(),
+			fmt.Printf(cmdFormat,
+				nameMaxSize, vtap.Get("NAME").MustString(),
+				common.VtapType(vtap.Get("TYPE").MustInt()),
+				vtap.Get("CTRL_IP").MustString(),
+				vtap.Get("CTRL_MAC").MustString(),
+				common.VtapState(vtap.Get("STATE").MustInt()),
+				groupMaxSize, vtap.Get("VTAP_GROUP_NAME").MustString(),
+				strings.Join(exceptionStrings, ","),
 			)
 		}
 	}
@@ -242,6 +268,97 @@ func deleteAgent(cmd *cobra.Command, args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
+	}
+}
+
+func updateAgent(cmd *cobra.Command, args []string, updateFilename string) {
+	yamlFile, err := ioutil.ReadFile(updateFilename)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	updateMap := make(map[string]interface{})
+	err = yaml.Unmarshal(yamlFile, &updateMap)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	vtapName, ok := updateMap["name"]
+	if !ok {
+		fmt.Fprintln(os.Stderr, "must specify vtap name")
+		return
+	}
+
+	server := common.GetServerInfo(cmd)
+	url := fmt.Sprintf("http://%s:%d/v1/vtaps/?name=%s", server.IP, server.Port, vtapName)
+	// call vtap api, get lcuuid
+	response, err := common.CURLPerform("GET", url, nil, "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	if len(response.Get("DATA").MustArray()) == 0 {
+		fmt.Fprintln(os.Stderr, "agent (%s) not exist\n")
+	}
+	vtap := response.Get("DATA").GetIndex(0)
+	lcuuid := vtap.Get("LCUUID").MustString()
+
+	// modify tap_mode
+	if tapMode, ok := updateMap["tap_mode"]; ok {
+		url = fmt.Sprintf("http://%s:%d/v1/vtaps-tap-mode/", server.IP, server.Port)
+		updateBody := make(map[string]interface{})
+		updateBody["VTAP_LCUUIDS"] = []string{lcuuid}
+		updateBody["TAP_MODE"] = common.GetVtapTapModeByName(tapMode.(string))
+
+		updateJson, _ := json.Marshal(updateBody)
+		_, err := common.CURLPerform("PATCH", url, nil, string(updateJson))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		delete(updateMap, "tap_mode")
+	}
+
+	// return if only update tap_mode
+	if len(updateMap) == 0 {
+		return
+	}
+
+	// update vtap_group_id
+	if vtapGroupID, ok := updateMap["vtap_group_id"]; ok {
+		url := fmt.Sprintf("http://%s:%d/v1/vtap-group-configuration/?vtap_group_id=%s", server.IP, server.Port, vtapGroupID)
+		// call vtap-group api, get lcuuid
+		response, err := common.CURLPerform("GET", url, nil, "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+
+		if len(response.Get("DATA").MustArray()) == 0 {
+			fmt.Fprintln(os.Stderr, "agent-group (%s) not exist\n")
+		}
+		group := response.Get("DATA").GetIndex(0)
+		groupLcuuid := group.Get("LCUUID").MustString()
+		updateMap["VTAP_GROUP_LCUUID"] = groupLcuuid
+		delete(updateMap, "vtap_group_id")
+	}
+
+	// enable/disable
+	if enable, ok := updateMap["enable"]; ok {
+		updateMap["ENABLE"] = enable
+		delete(updateMap, "enable")
+	}
+
+	// call vtap update api
+	updateJson, _ := json.Marshal(updateMap)
+	url = fmt.Sprintf("http://%s:%d/v1/vtaps/%s/", server.IP, server.Port, lcuuid)
+	_, err = common.CURLPerform("PATCH", url, nil, string(updateJson))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
 	}
 }
 

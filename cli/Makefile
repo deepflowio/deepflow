@@ -29,6 +29,7 @@ vendor:
 
 .PHONY: cli
 cli: vendor
+	go generate ./...
 	go build -mod vendor ${FLAGS} -o bin/deepflow-ctl${BINARY_SUFFIX} cmd/ctl/main.go
 
 .PHONY: clean
@@ -36,4 +37,5 @@ clean:
 	touch vendor
 	chmod -R 777 vendor
 	rm -rf vendor
+	rm -rf ctl/common/*_string.go
 	rm -rf bin

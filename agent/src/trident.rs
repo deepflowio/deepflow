@@ -19,6 +19,7 @@ use std::fmt;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
+use std::path::PathBuf;
 use std::process;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -44,7 +45,7 @@ use crate::handler::{NpbBuilder, PacketHandlerBuilder};
 use crate::integration_collector::MetricServer;
 use crate::pcap::WorkerManager;
 #[cfg(target_os = "linux")]
-use crate::platform::{ApiWatcher, PlatformSynchronizer};
+use crate::platform::ApiWatcher;
 #[cfg(target_os = "linux")]
 use crate::utils::cgroups::Cgroups;
 use crate::{
@@ -69,7 +70,7 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{AppProtoLogsParser, PacketSequenceParser},
     monitor::Monitor,
-    platform::LibvirtXmlExtractor,
+    platform::{LibvirtXmlExtractor, PlatformSynchronizer},
     policy::Policy,
     proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
@@ -97,12 +98,25 @@ use public::{
 const MINUTE: Duration = Duration::from_secs(60);
 const COMMON_DELAY: u32 = 5;
 
+#[derive(Default)]
 pub struct ChangedConfig {
     pub runtime_config: RuntimeConfig,
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
     pub kubernetes_cluster_id: Option<String>,
     pub tap_types: Vec<trident::TapType>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RunningMode {
+    Managed,
+    Standalone,
+}
+
+impl Default for RunningMode {
+    fn default() -> Self {
+        Self::Managed
+    }
 }
 
 pub enum State {
@@ -175,26 +189,37 @@ impl Trident {
     pub fn start<P: AsRef<Path>>(
         config_path: P,
         version_info: &'static VersionInfo,
+        agent_mode: RunningMode,
     ) -> Result<Trident> {
-        let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
-        let state_thread = state.clone();
-
-        let config = match Config::load_from_file(config_path.as_ref()) {
-            Ok(conf) => conf,
-            Err(e) => {
-                if let ConfigError::YamlConfigInvalid(_) = e {
-                    // try to load config file from trident.yaml to support upgrading from trident
-                    if let Ok(conf) = Config::load_from_file(DEFAULT_TRIDENT_CONF_FILE) {
-                        conf
-                    } else {
-                        // return the original error instead of loading trident conf
-                        return Err(e.into());
+        let config = match agent_mode {
+            RunningMode::Managed => {
+                match Config::load_from_file(config_path.as_ref()) {
+                    Ok(conf) => conf,
+                    Err(e) => {
+                        if let ConfigError::YamlConfigInvalid(_) = e {
+                            // try to load config file from trident.yaml to support upgrading from trident
+                            if let Ok(conf) = Config::load_from_file(DEFAULT_TRIDENT_CONF_FILE) {
+                                conf
+                            } else {
+                                // return the original error instead of loading trident conf
+                                return Err(e.into());
+                            }
+                        } else {
+                            return Err(e.into());
+                        }
                     }
-                } else {
-                    return Err(e.into());
                 }
             }
+            RunningMode::Standalone => {
+                let rc = RuntimeConfig::load_from_file(config_path.as_ref())?;
+                let mut conf = Config::default();
+                conf.controller_ips = vec!["127.0.0.1".into()];
+                conf.log_file = rc.yaml_config.log_file;
+                conf.agent_mode = agent_mode;
+                conf
+            }
         };
+
         let base_name = Path::new(&env::args().next().unwrap())
             .file_name()
             .unwrap()
@@ -236,7 +261,10 @@ impl Trident {
         let logger_handle = logger.start()?;
 
         let stats_collector = Arc::new(stats::Collector::new(&config.controller_ips));
-        stats_collector.start();
+        if matches!(config.agent_mode, RunningMode::Managed) {
+            stats_collector.start();
+        }
+
         stats_collector.register_countable(
             "log_counter",
             stats::Countable::Owned(Box::new(log_level_counter)),
@@ -244,6 +272,12 @@ impl Trident {
         );
 
         info!("static_config {:#?}", config);
+        let state = Arc::new((Mutex::new(State::Running), Condvar::new()));
+        let state_thread = state.clone();
+        let config_path = match agent_mode {
+            RunningMode::Managed => None,
+            RunningMode::Standalone => Some(config_path.as_ref().to_path_buf()),
+        };
         let handle = Some(thread::spawn(move || {
             if let Err(e) = Self::run(
                 state_thread,
@@ -252,6 +286,7 @@ impl Trident {
                 logger_handle,
                 remote_log_config,
                 stats_collector,
+                config_path,
             ) {
                 warn!("deepflow-agent exited: {}", e);
                 process::exit(1);
@@ -268,6 +303,7 @@ impl Trident {
         logger_handle: LoggerHandle,
         remote_log_config: RemoteLogConfig,
         stats_collector: Arc<stats::Collector>,
+        config_path: Option<PathBuf>,
     ) -> Result<()> {
         info!("========== DeepFlow Agent start! ==========");
 
@@ -278,7 +314,10 @@ impl Trident {
                 ctrl_ip
             );
         }
-        info!("ctrl_ip {} ctrl_mac {}", ctrl_ip, ctrl_mac);
+        info!(
+            "agent running in {:?} mode, ctrl_ip {} ctrl_mac {}",
+            config.agent_mode, ctrl_ip, ctrl_mac
+        );
 
         let exception_handler = ExceptionHandler::default();
         let session = Arc::new(Session::new(
@@ -290,7 +329,10 @@ impl Trident {
             exception_handler.clone(),
         ));
 
-        if running_in_container() && config.kubernetes_cluster_id.is_empty() {
+        if matches!(config.agent_mode, RunningMode::Managed)
+            && running_in_container()
+            && config.kubernetes_cluster_id.is_empty()
+        {
             config.kubernetes_cluster_id = Config::get_k8s_cluster_id(&session);
             warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
@@ -313,6 +355,8 @@ impl Trident {
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
             exception_handler.clone(),
+            config_handler.static_config.agent_mode,
+            config_path,
         ));
         stats_collector.register_countable(
             "ntp",
@@ -400,6 +444,7 @@ impl Trident {
                         exception_handler.clone(),
                         remote_log_config.clone(),
                         vm_mac_addrs,
+                        config_handler.static_config.agent_mode,
                     )?;
                     comp.start();
                     if config_handler.candidate_config.dispatcher.tap_mode == TapMode::Analyzer {
@@ -693,7 +738,6 @@ pub struct Components {
     pub metrics_uniform_sender: UniformSenderThread,
     pub l7_flow_uniform_sender: UniformSenderThread,
     pub stats_sender: UniformSenderThread,
-    #[cfg(target_os = "linux")]
     pub platform_synchronizer: PlatformSynchronizer,
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
@@ -718,6 +762,7 @@ pub struct Components {
     pub compressed_otel_uniform_sender: UniformSenderThread,
     max_memory: u64,
     tap_mode: TapMode,
+    agent_mode: RunningMode,
 }
 
 impl Components {
@@ -728,10 +773,13 @@ impl Components {
         info!("Staring components.");
         self.libvirt_xml_extractor.start();
         self.pcap_manager.start();
+        if matches!(self.agent_mode, RunningMode::Managed) {
+            self.platform_synchronizer.start();
+            #[cfg(target_os = "linux")]
+            self.api_watcher.start();
+        }
         #[cfg(target_os = "linux")]
-        self.platform_synchronizer.start();
-        #[cfg(target_os = "linux")]
-        self.api_watcher.start();
+        self.platform_synchronizer.start_kubernetes_poller();
         self.debugger.start();
         self.metrics_uniform_sender.start();
         self.l7_flow_uniform_sender.start();
@@ -774,13 +822,14 @@ impl Components {
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
             ebpf_collector.start();
         }
-
-        self.otel_uniform_sender.start();
-        self.compressed_otel_uniform_sender.start();
-        self.prometheus_uniform_sender.start();
-        self.telegraf_uniform_sender.start();
-        if self.config.metric_server.enabled {
-            self.external_metrics_server.start();
+        if matches!(self.agent_mode, RunningMode::Managed) {
+            self.otel_uniform_sender.start();
+            self.compressed_otel_uniform_sender.start();
+            self.prometheus_uniform_sender.start();
+            self.telegraf_uniform_sender.start();
+            if self.config.metric_server.enabled {
+                self.external_metrics_server.start();
+            }
         }
         self.domain_name_listener.start();
         self.handler_builders.iter().for_each(|x| {
@@ -799,6 +848,7 @@ impl Components {
         exception_handler: ExceptionHandler,
         remote_log_config: RemoteLogConfig,
         vm_mac_addrs: Vec<MacAddr>,
+        agent_mode: RunningMode,
     ) -> Result<Self> {
         let static_config = &config_handler.static_config;
         let candidate_config = &config_handler.candidate_config;
@@ -866,6 +916,12 @@ impl Components {
             libvirt_xml_extractor.clone(),
             exception_handler.clone(),
             candidate_config.dispatcher.extra_netns_regex.clone(),
+        );
+        #[cfg(target_os = "windows")]
+        let platform_synchronizer = PlatformSynchronizer::new(
+            config_handler.platform(),
+            session.clone(),
+            exception_handler.clone(),
         );
 
         #[cfg(target_os = "linux")]
@@ -1266,7 +1322,8 @@ impl Components {
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
                 .src_interface(src_interface)
-                .netns(netns);
+                .netns(netns)
+                .trident_type(candidate_config.dispatcher.trident_type);
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder
@@ -1279,7 +1336,6 @@ impl Components {
                 .build()
                 .unwrap();
 
-            // TODO: 创建dispatcher的时候处理这些
             let mut dispatcher_listener = dispatcher.listener();
             dispatcher_listener.on_config_change(&candidate_config.dispatcher);
             dispatcher_listener.on_tap_interface_change(
@@ -1469,7 +1525,6 @@ impl Components {
             metrics_uniform_sender,
             l7_flow_uniform_sender,
             stats_sender,
-            #[cfg(target_os = "linux")]
             platform_synchronizer,
             #[cfg(target_os = "linux")]
             api_watcher,
@@ -1495,6 +1550,7 @@ impl Components {
             npb_bps_limit,
             handler_builders,
             compressed_otel_uniform_sender,
+            agent_mode,
         })
     }
 
@@ -1639,12 +1695,11 @@ impl Components {
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
-        #[cfg(target_os = "linux")]
         self.platform_synchronizer.stop();
+
         #[cfg(target_os = "linux")]
         self.api_watcher.stop();
 
-        // TODO: collector
         for q in self.collectors.iter_mut() {
             q.stop();
         }
@@ -1658,7 +1713,6 @@ impl Components {
         self.l7_flow_uniform_sender.stop();
 
         self.libvirt_xml_extractor.stop();
-        self.pcap_manager.stop();
         self.debugger.stop();
         #[cfg(target_os = "linux")]
         if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
@@ -1686,7 +1740,7 @@ impl Components {
                 y.stop();
             })
         });
-
+        self.pcap_manager.stop();
         info!("Stopped components.")
     }
 }

@@ -1,18 +1,18 @@
 # Value , DisplayName
-c       , 客户端网卡
-c-nd    , 客户端容器节点
-c-hv    , 客户端宿主机
-c-gw-hv , 客户端到网关宿主机
-c-gw    , 客户端到网关
-local   , 本机网卡
-rest    , 其他网卡
-s-gw    , 网关到服务端
-s-gw-hv , 网关宿主机到服务端
-s-hv    , 服务端宿主机
-s-nd    , 服务端容器节点
-s       , 服务端网卡
-c-p     , 客户端进程
-s-p     , 服务端进程
-c-app   , 客户端应用
-s-app   , 服务端应用
-app     , 应用
+c       , Client NIC
+c-nd    , Client K8s Node
+c-hv    , Client VM Hypervisor
+c-gw-hv , Client-side Gateway Hypervisor
+c-gw    , Client-side Gateway
+local   , Local NIC
+rest    , Other NIC
+s-gw    , Server-side Gateway
+s-gw-hv , Server-side Gateway Hypervisor
+s-hv    , Server VM Hypervisor
+s-nd    , Server K8s Node
+s       , Server NIC
+c-p     , Client Process
+s-p     , Server Process
+c-app   , Client Application
+s-app   , Server Application
+app     , Application

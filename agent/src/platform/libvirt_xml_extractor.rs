@@ -24,7 +24,7 @@ use std::{
     time::Duration,
 };
 
-use log::{debug, error};
+use log::{debug, error, info};
 use roxmltree::Document;
 
 use public::utils::net::MacAddr;
@@ -95,6 +95,8 @@ impl LibvirtXmlExtractor {
                 break;
             }
         }));
+
+        info!("libvirt_xml_extractor started");
     }
 
     pub fn stop(&self) {
@@ -107,10 +109,9 @@ impl LibvirtXmlExtractor {
         self.timer.notify_one();
 
         if let Some(handle) = self.thread.lock().unwrap().take() {
-            handle
-                .join()
-                .unwrap_or_else(|_| debug!("exit refresh xml threads failed"));
+            let _ = handle.join();
         }
+        info!("libvirt_xml_extractor stopped");
     }
 
     /// get entries info protect by RWLock
