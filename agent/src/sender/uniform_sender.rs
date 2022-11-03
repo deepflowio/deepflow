@@ -80,7 +80,7 @@ struct Header {
 
     version: u32,  // 用来校验encode和decode是否配套
     sequence: u64, // 依次递增，接收方用来判断是否有丢包(UDP发送时)
-    vtap_id: u16,  // roze用来上报trisolaris活跃的VTAP信息
+    vtap_id: u16,  // roze用来上报server活跃的VTAP信息
 }
 
 impl Header {

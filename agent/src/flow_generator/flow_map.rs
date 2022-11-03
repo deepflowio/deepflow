@@ -1043,7 +1043,7 @@ impl FlowMap {
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
     ) {
-        let lookup_key = &meta_packet.lookup_key; //  trisolaris接口定义: 0(TAP_ANY)表示所有都需要
+        let lookup_key = &meta_packet.lookup_key; //  server接口定义: 0(TAP_ANY)表示所有都需要
         if !self.config.load().l7_log_tap_types[u16::from(TapType::Any) as usize]
             && (lookup_key.tap_type > TapType::Max
                 || !self.config.load().l7_log_tap_types[u16::from(lookup_key.tap_type) as usize])
