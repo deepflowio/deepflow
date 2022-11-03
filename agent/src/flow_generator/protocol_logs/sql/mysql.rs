@@ -361,7 +361,8 @@ impl MysqlLog {
             MYSQL_RESPONSE_CODE_OK => {
                 self.info.status = L7ResponseStatus::Ok;
                 if self.command == COM_QUERY {
-                    self.info.affected_rows = MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
+                    self.info.affected_rows =
+                        MysqlLog::decode_compress_int(&payload[AFFECTED_ROWS_OFFSET..]);
                 }
             }
             _ => (),

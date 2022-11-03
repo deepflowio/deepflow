@@ -586,15 +586,15 @@ impl FirstPath {
             return None;
         }
         if let Some((policy, endpoints)) = self.fast.get_policy(key) {
-            if key.has_feature_flag(FeatureFlags::DEDUP) {
-                let mut policy = PolicyData {
-                    acl_id: policy.acl_id,
-                    action_flags: policy.action_flags,
-                    npb_actions: policy.npb_actions.clone(),
-                };
-                policy.dedup(key);
-                return Some((Arc::new(policy), endpoints));
-            }
+            // if key.has_feature_flag(FeatureFlags::DEDUP) {
+            //     let mut policy = PolicyData {
+            //         acl_id: policy.acl_id,
+            //         action_flags: policy.action_flags,
+            //         npb_actions: policy.npb_actions.clone(),
+            //     };
+            //     policy.dedup(key);
+            //     return Some((Arc::new(policy), endpoints));
+            // }
             return Some((policy, endpoints));
         }
         return None;

@@ -19,7 +19,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use ipnet::{IpNet, Ipv4Net};
-use log::{info, warn};
+use log::{error, info, warn};
 use lru::LruCache;
 
 use super::UnsafeWrapper;
@@ -272,6 +272,10 @@ impl FastPath {
         if self.policy_table[key.fast_index * u16::from(key.tap_type) as usize].is_none() {
             self.policy_table[key.fast_index * u16::from(key.tap_type) as usize] =
                 Some(LruCache::new(self.map_size));
+            error!(
+                "fast index {} tap_type {:?} map size: {}",
+                key.fast_index, key.tap_type, self.map_size
+            );
             return true;
         }
         false

@@ -134,9 +134,9 @@ impl Policy {
         // TODO: 根据TTL添加forward表
     }
 
-    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize) {
-        packet.lookup_key.fast_index = index;
-        self.lookup_l3(packet);
+    pub fn lookup(&mut self, packet: &mut MetaPacket, _index: usize) {
+        //packet.lookup_key.fast_index = index;
+        //self.lookup_l3(packet);
 
         let key = &mut packet.lookup_key;
 
