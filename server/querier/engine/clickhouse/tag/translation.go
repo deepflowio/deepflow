@@ -388,6 +388,15 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
+	// Time-event
+	tagResourceMap["time_str"] = map[string]*Tag{
+		"default": NewTag(
+			"toString(time)",
+			"",
+			"",
+			"",
+		),
+	}
 
 	// 广域网
 	// 以下分别针对单端/双端-0端/双端-1端生成name和ID的Tag定义
