@@ -37,8 +37,11 @@ const SEPARATOR_SIZE: usize = 2;
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct RedisInfo {
     msg_type: LogMessageType,
+    #[serde(skip)]
     start_time: u64,
+    #[serde(skip)]
     end_time: u64,
+    #[serde(skip)]
     is_tls: bool,
 
     #[serde(
@@ -66,6 +69,7 @@ pub struct RedisInfo {
         serialize_with = "vec_u8_to_string"
     )]
     pub error: Vec<u8>, // '-'
+    #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
 }
 
