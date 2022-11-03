@@ -44,8 +44,8 @@ func NewLANIP(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 
 func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	for _, item := range items {
-		var deviceInfo *cache.DeviceInfo
-		var networkInfo *cache.NetworkInfo
+		deviceInfo := &cache.DeviceInfo{}
+		networkInfo := &cache.NetworkInfo{}
 		vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(item.VInterfaceID)
 		if ok {
 			deviceInfo, ok = i.ToolDataSet.GetDeviceInfoByVInterfaceLcuuid(vifLcuuid)
@@ -76,8 +76,8 @@ func (i *LANIP) ProduceByUpdate(items *cloudmodel.IP, diffBase *cache.LANIP) {
 
 func (i *LANIP) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var deviceInfo *cache.DeviceInfo
-		var networkInfo *cache.NetworkInfo
+		deviceInfo := &cache.DeviceInfo{}
+		networkInfo := &cache.NetworkInfo{}
 		vifID, ok := i.ToolDataSet.GetVInterfaceIDByLANIPLcuuid(lcuuid)
 		if ok {
 			vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(vifID)
