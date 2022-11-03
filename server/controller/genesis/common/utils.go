@@ -134,7 +134,7 @@ type XMLVM struct {
 	Interfaces []XMLInterface
 }
 
-var IfaceRegex = regexp.MustCompile("^(\\d+):\\s+([(\u4e00-\u9fa5)?\\w?(\\s)?\\.-]+)(@.*)?\\:") // \u4e00-\u9fa5: support Chinese characters
+var IfaceRegex = regexp.MustCompile("^(\\d+):\\s+([^@:]+)(@.*)?\\:")
 var MACRegex = regexp.MustCompile("^\\s+link/\\S+\\s+(([\\dA-Za-z]{2}:){5}[\\dA-Za-z]{2}) brd.*$")
 var IPRegex = regexp.MustCompile("^\\s+inet6?\\s+([\\d\\.A-Za-z:]+)/(\\d+)\\s+.*scope\\s+(global|link|host)")
 
