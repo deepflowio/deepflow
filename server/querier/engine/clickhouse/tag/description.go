@@ -397,6 +397,9 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	if !ok {
 		return nil, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
 	}
+	if db == "event" {
+		sql = strings.ReplaceAll(sql, "subnets", "subnet")
+	}
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 	if !isEnumOK {
