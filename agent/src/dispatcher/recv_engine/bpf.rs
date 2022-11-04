@@ -185,7 +185,7 @@ impl Builder {
                 cond: JumpTest::JumpNotEqual,
                 val: self.vxlan_port as u32,
                 skip_true: 6,
-                skip_false: 5,
+                ..Default::default()
             }))
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
                 off: VXLAN_FLAGS_OFFSET as u32,
@@ -243,8 +243,8 @@ impl Builder {
             .append(BpfSyntax::JumpIf(JumpIf {
                 cond: JumpTest::JumpNotEqual,
                 val: self.vxlan_port as u32,
-                skip_false: 6,
-                skip_true: 5,
+                skip_true: 6,
+                ..Default::default()
             }))
             .append(BpfSyntax::LoadIndirect(LoadIndirect {
                 off: VXLAN6_FLAGS_OFFSET as u32,
