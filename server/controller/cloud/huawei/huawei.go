@@ -197,11 +197,12 @@ func (h *HuaWei) getRawData(url, token, resultKey string) (jsonList []*simplejso
 	} else {
 		var marker string
 		limit := 50
+		baseURL := url
 		for {
 			if marker == "" {
-				url += fmt.Sprintf("?limit=%d", limit)
+				url = fmt.Sprintf("%s?limit=%d", baseURL, limit)
 			} else {
-				url += fmt.Sprintf("?limit=%d&marker=%s", limit, marker)
+				url = fmt.Sprintf("%s?limit=%d&marker=%s", baseURL, limit, marker)
 			}
 			resp, err := cloudcommon.RequestGet(url, token)
 			if err != nil {
