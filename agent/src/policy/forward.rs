@@ -292,18 +292,19 @@ impl Forward {
             value.last = packet.timestamp;
             value.tap_type = packet.tap_type;
             value.tap_port = tap_port;
-        } else {
-            let value = L3Item {
-                epc_id: 0,
-                tap_type: packet.tap_type,
-                tap_port,
-                last: packet.timestamp,
-                from,
-                ip: key.ip,
-                mac: key.mac,
-            };
-            self.mac_ip_tables.write().unwrap().push(key, value);
+            return
         }
+
+        let value = L3Item {
+            epc_id: 0,
+            tap_type: packet.tap_type,
+            tap_port,
+            last: packet.timestamp,
+            from,
+            ip: key.ip,
+            mac: key.mac,
+        };
+        self.mac_ip_tables.write().unwrap().push(key, value);
     }
 }
 
