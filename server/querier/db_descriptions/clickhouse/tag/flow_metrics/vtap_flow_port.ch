@@ -1,6 +1,6 @@
-# Name                     , DisplayName                , Category     , Discription
-time                       ,                            ,              ,
-               
+# Name                     , DisplayName                , Category       , Discription
+time                       ,                            ,                ,
+
 region                     , 区域                       , 知识图谱       ,
 az                         , 可用区                     , 知识图谱       ,
 host                       , 宿主机                     , 知识图谱       ,
@@ -28,12 +28,12 @@ resource_gl1_type          , 类型-工作负载优先          , 知识图谱  
 resource_gl1               , 资源-工作负载优先          , 知识图谱       ,
 resource_gl2_type          , 类型-服务优先              , 知识图谱       ,
 resource_gl2               , 资源-服务优先              , 知识图谱       ,
-               
+
 protocol                   , 网络协议                   , 网络层         ,
 server_port                , 服务端口                   , 传输层         ,
-               
+
 tap                        , 采集点                     , 流信息         ,
 vtap                       , 采集器                     , 流信息         ,
 ip                         , IP地址                     , 网络层         ,
 is_ipv4                    , IP类型                     , 网络层         ,
-labels                     , K8s Labels                 , K8s Labels    ,
+labels                     , K8s Labels                 , K8s Labels     ,

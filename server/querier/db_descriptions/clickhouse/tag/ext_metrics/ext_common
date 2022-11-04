@@ -1,35 +1,35 @@
-# Name                     , ClientName                , ServerName                , Type           , EnumFile                , Permission 
-time                       ,                           ,                           , time           ,                         , 111                         
-
-region                     , region                    , region                    , resource       ,                         , 110        
-az                         , az                        , az                        , resource       ,                         , 110        
-host                       , host                      , host                      , resource       ,                         , 100        
-chost                      , chost                     , chost                     , resource       ,                         , 111        
-vpc                        , vpc                       , vpc                       , resource       ,                         , 111        
-subnet                     , subnet                    , subnet                    , resource       ,                         , 111        
-router                     , router                    , router                    , resource       ,                         , 110        
-dhcpgw                     , dhcpgw                    , dhcpgw                    , resource       ,                         , 110        
-lb                         , lb                        , lb                        , resource       ,                         , 110        
-lb_listener                , lb_listener               , lb_listener               , resource       ,                         , 110        
-natgw                      , natgw                     , natgw                     , resource       ,                         , 110        
-redis                      , redis                     , redis                     , resource       ,                         , 110        
-rds                        , rds                       , rds                       , resource       ,                         , 110        
-pod_cluster                , pod_cluster               , pod_cluster               , resource       ,                         , 111        
-pod_ns                     , pod_ns                    , pod_ns                    , resource       ,                         , 111        
-pod_node                   , pod_node                  , pod_node                  , resource       ,                         , 111        
-pod_ingress                , pod_ingress               , pod_ingress               , resource       ,                         , 111        
-pod_service                , pod_service               , pod_service               , resource       ,                         , 111        
-pod_group                  , pod_group                 , pod_group                 , resource       ,                         , 111        
-pod                        , pod                       , pod                       , resource       ,                         , 111        
-service                    , service                   , service                   , resource       ,                         , 111        
-resource_gl0_type          , resource_gl0_type         , resource_gl0_type         , int_enum       , resource_gl0_type       , 111        
-resource_gl0               , resource_gl0              , resource_gl0              , resource       ,                         , 111        
-resource_gl1_type          , resource_gl1_type         , resource_gl1_type         , int_enum       , resource_gl1_type       , 111        
-resource_gl1               , resource_gl1              , resource_gl1              , resource       ,                         , 111        
-resource_gl2_type          , resource_gl2_type         , resource_gl2_type         , int_enum       , resource_gl2_type       , 111        
-resource_gl2               , resource_gl2              , resource_gl2              , resource       ,                         , 111        
-                       
-vtap                       , vtap                      , vtap                      , resource       ,                         , 111        
-ip                         , ip                        , ip                        , ip             ,                         , 111        
-is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum       , ip_type                 , 111        
-labels                     , labels                    , labels                    , map            ,                         , 111        
+# Name                     , ClientName                , ServerName                , Type           , EnumFile                , Category       , Permission 
+time                       ,                           ,                           , time           ,                         ,                , 111                         
+                                                                                                                                                
+region                     , region                    , region                    , resource       ,                         , 知识图谱       , 110        
+az                         , az                        , az                        , resource       ,                         , 知识图谱       , 110        
+host                       , host                      , host                      , resource       ,                         , 知识图谱       , 100        
+chost                      , chost                     , chost                     , resource       ,                         , 知识图谱       , 111        
+vpc                        , vpc                       , vpc                       , resource       ,                         , 知识图谱       , 111        
+subnet                     , subnet                    , subnet                    , resource       ,                         , 知识图谱       , 111        
+router                     , router                    , router                    , resource       ,                         , 知识图谱       , 110        
+dhcpgw                     , dhcpgw                    , dhcpgw                    , resource       ,                         , 知识图谱       , 110        
+lb                         , lb                        , lb                        , resource       ,                         , 知识图谱       , 110        
+lb_listener                , lb_listener               , lb_listener               , resource       ,                         , 知识图谱       , 110        
+natgw                      , natgw                     , natgw                     , resource       ,                         , 知识图谱       , 110        
+redis                      , redis                     , redis                     , resource       ,                         , 知识图谱       , 110        
+rds                        , rds                       , rds                       , resource       ,                         , 知识图谱       , 110        
+pod_cluster                , pod_cluster               , pod_cluster               , resource       ,                         , 知识图谱       , 111        
+pod_ns                     , pod_ns                    , pod_ns                    , resource       ,                         , 知识图谱       , 111        
+pod_node                   , pod_node                  , pod_node                  , resource       ,                         , 知识图谱       , 111        
+pod_ingress                , pod_ingress               , pod_ingress               , resource       ,                         , 知识图谱       , 111        
+pod_service                , pod_service               , pod_service               , resource       ,                         , 知识图谱       , 111        
+pod_group                  , pod_group                 , pod_group                 , resource       ,                         , 知识图谱       , 111        
+pod                        , pod                       , pod                       , resource       ,                         , 知识图谱       , 111        
+service                    , service                   , service                   , resource       ,                         , 知识图谱       , 111        
+resource_gl0_type          , resource_gl0_type         , resource_gl0_type         , int_enum       , resource_gl0_type       , 知识图谱       , 111        
+resource_gl0               , resource_gl0              , resource_gl0              , resource       ,                         , 知识图谱       , 111        
+resource_gl1_type          , resource_gl1_type         , resource_gl1_type         , int_enum       , resource_gl1_type       , 知识图谱       , 111        
+resource_gl1               , resource_gl1              , resource_gl1              , resource       ,                         , 知识图谱       , 111        
+resource_gl2_type          , resource_gl2_type         , resource_gl2_type         , int_enum       , resource_gl2_type       , 知识图谱       , 111        
+resource_gl2               , resource_gl2              , resource_gl2              , resource       ,                         , 知识图谱       , 111        
+                                                                                                                                                
+vtap                       , vtap                      , vtap                      , resource       ,                         , 流信息         , 111        
+ip                         , ip                        , ip                        , ip             ,                         , 网络层         , 111        
+is_ipv4                    , is_ipv4                   , is_ipv4                   , int_enum       , ip_type                 , 网络层         , 111        
+labels                     , labels                    , labels                    , map            ,                         , K8s Labels     , 111        
