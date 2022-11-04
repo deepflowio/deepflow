@@ -19,6 +19,7 @@ package genesis
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	tridentcommon "github.com/deepflowys/deepflow/message/common"
@@ -60,7 +61,7 @@ type SynchronizerServer struct {
 	clusterIDToVersion  map[string]uint64
 	vtapIDToLastSeen    map[uint32]time.Time
 	clusterIDToLastSeen map[string]time.Time
-	tridentStatsMap     map[uint32]TridentStats
+	tridentStatsMap     sync.Map
 }
 
 func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8sQueue queue.QueueWriter) *SynchronizerServer {
@@ -72,17 +73,18 @@ func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8
 		clusterIDToVersion:  map[string]uint64{},
 		vtapIDToLastSeen:    map[uint32]time.Time{},
 		clusterIDToLastSeen: map[string]time.Time{},
-		tridentStatsMap:     map[uint32]TridentStats{},
+		tridentStatsMap:     sync.Map{},
 	}
 }
 
 func (g *SynchronizerServer) GetAgentStats(ip string) []TridentStats {
 	result := []TridentStats{}
-	for _, value := range g.tridentStatsMap {
-		if ip == "" || value.IP == ip {
-			result = append(result, value)
+	g.tridentStatsMap.Range(func(_, value interface{}) bool {
+		if ip == "" || value.(TridentStats).IP == ip {
+			result = append(result, value.(TridentStats))
 		}
-	}
+		return true
+	})
 	return result
 }
 
@@ -115,12 +117,12 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 	stats.LastSeen = time.Now()
 	platformData := request.GetPlatformData()
 	if vtapID != 0 {
-		if tStats, ok := g.tridentStatsMap[vtapID]; ok && platformData == nil {
-			stats.GenesisSyncDataOperation = tStats.GenesisSyncDataOperation
+		if tStats, ok := g.tridentStatsMap.Load(vtapID); ok && platformData == nil {
+			stats.GenesisSyncDataOperation = tStats.(TridentStats).GenesisSyncDataOperation
 		} else {
 			stats.GenesisSyncDataOperation = platformData
 		}
-		g.tridentStatsMap[vtapID] = stats
+		g.tridentStatsMap.Store(vtapID, stats)
 	}
 	if !isInterestedHost(tType) {
 		log.Debugf("genesis sync ignore message from %s trident %s vtap_id %v", tType, remote, vtapID)
@@ -206,7 +208,7 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	stats.ClusterID = clusterID
 	stats.LastSeen = time.Now()
 	stats.Version = version
-	g.tridentStatsMap[vtapID] = stats
+	g.tridentStatsMap.Store(vtapID, stats)
 	now := time.Now()
 	if vtapID != 0 {
 		if lastTime, ok := g.clusterIDToLastSeen[clusterID]; ok {
