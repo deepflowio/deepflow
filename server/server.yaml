@@ -126,7 +126,7 @@ controller:
       port: 123
       timeout: 1
 
-    trident-type-for-unknow-vtap: 0
+    trident-type-for-unkonw-vtap: 0
 
     platform-vips:
     #  - 55.11.135.18
