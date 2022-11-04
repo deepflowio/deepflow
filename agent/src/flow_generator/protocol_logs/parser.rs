@@ -322,7 +322,7 @@ impl SessionQueue {
                     if request.base_info.head.proto == item.base_info.head.proto {
                         self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                         self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        request.session_merge(item);
+                        let _ = request.session_merge(item);
                         self.send(request);
                     } else {
                         map.insert(key, request);
