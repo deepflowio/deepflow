@@ -69,7 +69,7 @@ func (t *SuiteTest) TestHandleAddVMSucess() {
 	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.VMs), 0)
 
-	updater := NewVM(cache_, []cloudmodel.VM{cloudItem})
+	updater := NewVM(cache_, []cloudmodel.VM{cloudItem}, nil)
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.VM
@@ -85,7 +85,7 @@ func (t *SuiteTest) TestHandleUpdateVMSucess() {
 	cache, cloudItem := t.getVMMock(true)
 	cloudItem.Name = cloudItem.Name + "-update"
 
-	updater := NewVM(cache, []cloudmodel.VM{cloudItem})
+	updater := NewVM(cache, []cloudmodel.VM{cloudItem}, nil)
 	updater.HandleAddAndUpdate()
 
 	var updatedItem *mysql.VM
@@ -102,7 +102,7 @@ func (t *SuiteTest) TestHandleUpdateVMSucess() {
 func (t *SuiteTest) TestHandleDeleteVMSuccess() {
 	cache, cloudItem := t.getVMMock(true)
 
-	updater := NewVM(cache, []cloudmodel.VM{})
+	updater := NewVM(cache, []cloudmodel.VM{}, nil)
 	updater.HandleAddAndUpdate()
 	updater.HandleDelete()
 
