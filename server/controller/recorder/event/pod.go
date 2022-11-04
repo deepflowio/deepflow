@@ -29,23 +29,25 @@ import (
 )
 
 type Pod struct {
-	EventManager[cloudmodel.IP, mysql.Pod, *cache.Pod]
+	EventManager[cloudmodel.Pod, mysql.Pod, *cache.Pod]
+	deviceType int
 }
 
 func NewPod(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
-		EventManager[cloudmodel.IP, mysql.Pod, *cache.Pod]{
+		EventManager[cloudmodel.Pod, mysql.Pod, *cache.Pod]{
 			resourceType: RESOURCE_TYPE_POD_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
+		common.VIF_DEVICE_TYPE_POD,
 	}
 	return mng
 }
 
 func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, common.VIF_DEVICE_TYPE_POD, item.ID, item.Name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "")
 	}
 }
 
@@ -103,6 +105,6 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, common.VIF_DEVICE_TYPE_POD, id, name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "")
 	}
 }

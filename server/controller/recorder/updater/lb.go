@@ -22,13 +22,15 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type LB struct {
 	UpdaterBase[cloudmodel.LB, mysql.LB, *cache.LB]
 }
 
-func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
+func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB, eventQueue *queue.OverwriteQueue) *LB {
 	updater := &LB{
 		UpdaterBase[cloudmodel.LB, mysql.LB, *cache.LB]{
 			cache:        wholeCache,
@@ -39,6 +41,7 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
+	updater.eventProducer = event.NewLB(wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 
@@ -98,6 +101,7 @@ func (l *LB) addCache(dbItems []*mysql.LB) {
 
 func (l *LB) updateCache(cloudItem *cloudmodel.LB, diffBase *cache.LB) {
 	diffBase.Update(cloudItem)
+	l.cache.UpdateLB(cloudItem)
 }
 
 func (l *LB) deleteCache(lcuuids []string) {

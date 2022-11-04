@@ -27,23 +27,25 @@ import (
 )
 
 type PodNode struct {
-	EventManager[cloudmodel.IP, mysql.PodNode, *cache.PodNode]
+	EventManager[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]
+	deviceType int
 }
 
 func NewPodNode(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
 	mng := &PodNode{
-		EventManager[cloudmodel.IP, mysql.PodNode, *cache.PodNode]{
+		EventManager[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]{
 			resourceType: RESOURCE_TYPE_POD_NODE_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
+		common.VIF_DEVICE_TYPE_POD_NODE,
 	}
 	return mng
 }
 
 func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, common.VIF_DEVICE_TYPE_POD_NODE, item.ID, item.Name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "")
 	}
 }
 
@@ -64,6 +66,6 @@ func (p *PodNode) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, common.VIF_DEVICE_TYPE_POD_NODE, id, name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "")
 	}
 }

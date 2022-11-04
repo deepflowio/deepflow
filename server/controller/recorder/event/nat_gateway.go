@@ -26,46 +26,46 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
-type PodService struct {
-	EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]
+type NATGateway struct {
+	EventManager[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]
 	deviceType int
 }
 
-func NewPodService(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *PodService {
-	mng := &PodService{
-		EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]{
-			resourceType: RESOURCE_TYPE_POD_SERVICE_EN,
+func NewNATGateway(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *NATGateway {
+	mng := &NATGateway{
+		EventManager[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]{
+			resourceType: RESOURCE_TYPE_NAT_GATEWAY_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
-		common.VIF_DEVICE_TYPE_POD_SERVICE,
+		common.VIF_DEVICE_TYPE_NAT_GATEWAY,
 	}
 	return mng
 }
 
-func (p *PodService) ProduceByAdd(items []*mysql.PodService) {
+func (n *NATGateway) ProduceByAdd(items []*mysql.NATGateway) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "")
+		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, n.deviceType, item.ID, item.Name, "")
 	}
 }
 
-func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
+func (n *NATGateway) ProduceByUpdate(cloudItem *cloudmodel.NATGateway, diffBase *cache.NATGateway) {
 }
 
-func (p *PodService) ProduceByDelete(lcuuids []string) {
+func (n *NATGateway) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		var id int
 		var name string
-		id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(lcuuid)
+		id, ok := n.ToolDataSet.GetNATGatewayIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodServiceNameByID(id)
+			name, ok = n.ToolDataSet.GetNATGatewayNameByID(id)
 			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+				log.Error(idByLcuuidNotFound(n.resourceType, lcuuid))
 			}
 		} else {
-			log.Error(nameByIDNotFound(p.resourceType, id))
+			log.Error(nameByIDNotFound(n.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "")
+		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, n.deviceType, id, name, "")
 	}
 }
