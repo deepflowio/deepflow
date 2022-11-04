@@ -188,12 +188,25 @@ func (t *ToolDataSet) deleteRegion(lcuuid string) {
 
 func (t *ToolDataSet) addHost(item *mysql.Host) {
 	t.HostLcuuidToID[item.Lcuuid] = item.ID
+	t.HostIDToName[item.ID] = item.Name
 	log.Info(addToToolMap(RESOURCE_TYPE_HOST_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteHost(lcuuid string) {
 	delete(t.HostLcuuidToID, lcuuid)
+	id, exists := t.GetHostIDByLcuuid(lcuuid)
+	if exists {
+		delete(t.HostIDToName, id)
+	}
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_HOST_EN, lcuuid))
+}
+
+func (t *ToolDataSet) updateHost(cloudItem *cloudmodel.Host) {
+	id, exists := t.GetHostIDByLcuuid(cloudItem.Lcuuid)
+	if exists {
+		t.HostIDToName[id] = cloudItem.Name
+	}
+	log.Info(updateToolMap(RESOURCE_TYPE_HOST_EN, cloudItem.Lcuuid))
 }
 
 func (t *ToolDataSet) addVM(item *mysql.VM) {
