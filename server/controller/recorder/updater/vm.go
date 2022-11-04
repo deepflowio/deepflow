@@ -41,7 +41,7 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM, eventQueue *queue
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewVM(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewVM(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

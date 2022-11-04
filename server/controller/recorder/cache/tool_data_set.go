@@ -193,11 +193,9 @@ func (t *ToolDataSet) addHost(item *mysql.Host) {
 }
 
 func (t *ToolDataSet) deleteHost(lcuuid string) {
+	id, _ := t.GetHostIDByLcuuid(lcuuid)
+	delete(t.HostIDToName, id)
 	delete(t.HostLcuuidToID, lcuuid)
-	id, exists := t.GetHostIDByLcuuid(lcuuid)
-	if exists {
-		delete(t.HostIDToName, id)
-	}
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_HOST_EN, lcuuid))
 }
 
@@ -226,6 +224,7 @@ func (t *ToolDataSet) updateVM(cloudItem *cloudmodel.VM) {
 func (t *ToolDataSet) deleteVM(lcuuid string) {
 	id, _ := t.GetVMIDByLcuuid(lcuuid)
 	delete(t.VMIDToName, id)
+	delete(t.VMIDToIPNetworkIDMap, id)
 	delete(t.VMLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_VM_EN, lcuuid))
 }
@@ -316,73 +315,52 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 	t.VInterfaceLcuuidToDeviceID[item.Lcuuid] = item.DeviceID
 	t.VInterfaceLcuuidToIndex[item.Lcuuid] = item.Index
 	t.VInterfaceLcuuidToType[item.Lcuuid] = item.Type
-	networkName, _ := t.GetNetworkNameByID(item.NetworkID)
-	t.VInterfaceLcuuidToNetworkInfo[item.Lcuuid] = NetworkInfo{
-		ID:   item.NetworkID,
-		Name: networkName,
-	}
 
-	deviceInfo := DeviceInfo{
-		Type: item.DeviceType,
-		ID:   item.DeviceID,
-	}
 	if item.DeviceType == common.VIF_DEVICE_TYPE_HOST {
 		t.HostIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.HostIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetHostNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_VM {
 		t.VMIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.VMIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetVMNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_VROUTER {
 		t.VRouterIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.VRouterIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetVRouterNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_DHCP_PORT {
 		t.DHCPPortIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.DHCPPortIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetDHCPPortNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_NAT_GATEWAY {
 		t.NATGatewayIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.NATGatewayIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetNATGatewayNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_LB {
 		t.LBIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.LBIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetLBNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_RDS_INSTANCE {
 		t.RDSInstanceIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.RDSInstanceIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetRDSInstanceNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_REDIS_INSTANCE {
 		t.RedisInstanceIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.RedisInstanceIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetRedisInstanceNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_POD_NODE {
 		t.PodNodeIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.PodNodeIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetPodNodeNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_POD_SERVICE {
 		t.PodServiceIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.PodServiceIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetPodServiceNameByID(item.DeviceID)
 	} else if item.DeviceType == common.VIF_DEVICE_TYPE_POD {
 		t.PodIDToVinterfaceIndexes[item.DeviceID] = append(
 			t.PodIDToVinterfaceIndexes[item.DeviceID], item.ID,
 		)
-		deviceInfo.Name, _ = t.GetPodNameByID(item.DeviceID)
 	}
-	t.VInterfaceLcuuidToDeviceInfo[item.Lcuuid] = deviceInfo
 	log.Info(addToToolMap(RESOURCE_TYPE_VINTERFACE_EN, item.Lcuuid))
 }
 
@@ -400,18 +378,28 @@ func (t *ToolDataSet) deleteVInterface(lcuuid string) {
 	delete(t.VInterfaceLcuuidToDeviceID, lcuuid)
 	delete(t.VInterfaceLcuuidToIndex, lcuuid)
 	delete(t.VInterfaceLcuuidToType, lcuuid)
-	delete(t.VInterfaceLcuuidToNetworkInfo, lcuuid)
-	delete(t.VInterfaceLcuuidToDeviceInfo, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_VINTERFACE_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addWANIP(item *mysql.WANIP) {
 	t.WANIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
 	t.WANIPLcuuidToIP[item.Lcuuid] = item.IP
+	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID)
+	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, item.IP)
 	log.Info(addToToolMap(RESOURCE_TYPE_WAN_IP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteWANIP(lcuuid string) {
+	vifID, _ := t.GetVInterfaceIDByWANIPLcuuid(lcuuid)
+	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID)
+	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+	ip, _ := t.GetWANIPByLcuuid(lcuuid)
+	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, ip)
 	delete(t.WANIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.WANIPLcuuidToIP, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
@@ -420,10 +408,22 @@ func (t *ToolDataSet) deleteWANIP(lcuuid string) {
 func (t *ToolDataSet) addLANIP(item *mysql.LANIP) {
 	t.LANIPLcuuidToVInterfaceID[item.Lcuuid] = item.VInterfaceID
 	t.LANIPLcuuidToIP[item.Lcuuid] = item.IP
+	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(item.VInterfaceID)
+	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, item.IP)
 	log.Info(addToToolMap(RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteLANIP(lcuuid string) {
+	vifID, _ := t.GetVInterfaceIDByWANIPLcuuid(lcuuid)
+	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID)
+	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
+	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
+	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+	ip, _ := t.GetLANIPByLcuuid(lcuuid)
+	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, ip)
 	delete(t.LANIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.LANIPLcuuidToIP, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
@@ -662,6 +662,7 @@ func (t *ToolDataSet) updatePod(cloudItem *cloudmodel.Pod) {
 func (t *ToolDataSet) deletePod(lcuuid string) {
 	id, _ := t.GetPodIDByLcuuid(lcuuid)
 	delete(t.PodIDToName, id)
+	delete(t.PodIDToIPNetworkIDMap, id)
 	delete(t.PodLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_POD_EN, lcuuid))
 }
@@ -800,7 +801,41 @@ func (t *ToolDataSet) GetNetworkIDByVInterfaceLcuuid(vifLcuuid string) (int, boo
 		t.addVInterface(&vif)
 		return vif.NetworkID, true
 	} else {
-		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_NETWORK_EN, vifLcuuid))
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid))
+		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetDeviceTypeByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
+	id, exists := t.VInterfaceLcuuidToDeviceType[vifLcuuid]
+	if exists {
+		return id, true
+	}
+	log.Warningf("cache device type (%s lcuuid: %d) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+	var vif mysql.VInterface
+	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
+	if result.RowsAffected == 1 {
+		t.addVInterface(&vif)
+		return vif.DeviceType, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid))
+		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetDeviceIDByVInterfaceLcuuid(vifLcuuid string) (int, bool) {
+	id, exists := t.VInterfaceLcuuidToDeviceID[vifLcuuid]
+	if exists {
+		return id, true
+	}
+	log.Warningf("cache device id (%s lcuuid: %d) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+	var vif mysql.VInterface
+	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
+	if result.RowsAffected == 1 {
+		t.addVInterface(&vif)
+		return vif.DeviceID, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid))
 		return id, false
 	}
 }
@@ -919,6 +954,35 @@ func (t *ToolDataSet) GetDeviceIDByDeviceLcuuid(deviceType int, deviceLcuuid str
 	} else {
 		log.Errorf("device type %d not supported", deviceType)
 		return 0, false
+	}
+}
+
+func (t *ToolDataSet) GetDeviceNameByDeviceID(deviceType, deviceID int) (string, bool) {
+	if deviceType == common.VIF_DEVICE_TYPE_HOST {
+		return t.GetHostNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_VM {
+		return t.GetVMNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_VROUTER {
+		return t.GetVRouterNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_DHCP_PORT {
+		return t.GetDHCPPortNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_NAT_GATEWAY {
+		return t.GetNATGatewayNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_LB {
+		return t.GetLBNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_RDS_INSTANCE {
+		return t.GetRDSInstanceNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_REDIS_INSTANCE {
+		return t.GetRedisInstanceNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+		return t.GetPodNodeNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_POD_SERVICE {
+		return t.GetPodServiceNameByID(deviceID)
+	} else if deviceType == common.VIF_DEVICE_TYPE_POD {
+		return t.GetPodNameByID(deviceID)
+	} else {
+		log.Errorf("device type %d not supported", deviceType)
+		return "", false
 	}
 }
 
@@ -1429,42 +1493,6 @@ func (t *ToolDataSet) GetPodNameByID(id int) (string, bool) {
 	} else {
 		log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_POD_EN, id))
 		return name, false
-	}
-}
-
-func (t *ToolDataSet) GetDeviceInfoByVInterfaceLcuuid(lcuuid string) (DeviceInfo, bool) {
-	info, exists := t.VInterfaceLcuuidToDeviceInfo[lcuuid]
-	if exists {
-		return info, true
-	}
-	log.Warningf("cache device info (%s lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
-	var vif mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vif)
-	if result.RowsAffected == 1 {
-		t.addVInterface(&vif)
-		info, exists = t.VInterfaceLcuuidToDeviceInfo[lcuuid]
-		return info, exists
-	} else {
-		log.Errorf("db %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
-		return info, false
-	}
-}
-
-func (t *ToolDataSet) GetNetworkInfoByVInterfaceLcuuid(lcuuid string) (NetworkInfo, bool) {
-	info, exists := t.VInterfaceLcuuidToNetworkInfo[lcuuid]
-	if exists {
-		return info, true
-	}
-	log.Warningf("cache %s info (%s lcuuid: %s) not found", RESOURCE_TYPE_NETWORK_EN, RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
-	var vif mysql.VInterface
-	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&vif)
-	if result.RowsAffected == 1 {
-		t.addVInterface(&vif)
-		info, exists = t.VInterfaceLcuuidToNetworkInfo[lcuuid]
-		return info, exists
-	} else {
-		log.Errorf("db %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
-		return info, false
 	}
 }
 

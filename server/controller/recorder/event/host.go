@@ -30,7 +30,7 @@ type Host struct {
 	EventManager[cloudmodel.Host, mysql.Host, *cache.Host]
 }
 
-func NewHost(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
+func NewHost(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
 	mng := &Host{
 		EventManager[cloudmodel.Host, mysql.Host, *cache.Host]{
 			resourceType: RESOURCE_TYPE_HOST_EN,
@@ -48,7 +48,7 @@ func (h *Host) ProduceByAdd(items []*mysql.Host) {
 			common.VIF_DEVICE_TYPE_HOST,
 			item.ID,
 			item.Name,
-			"",
+			"", []uint32{}, []string{},
 		)
 	}
 }
@@ -74,7 +74,7 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			common.VIF_DEVICE_TYPE_HOST,
 			id,
 			name,
-			"",
+			"", []uint32{}, []string{},
 		)
 	}
 }

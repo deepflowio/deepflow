@@ -31,7 +31,7 @@ type LANIP struct {
 	EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]
 }
 
-func NewLANIP(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
+func NewLANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 	mng := &LANIP{
 		EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
 			resourceType: RESOURCE_TYPE_LAN_IP_EN,
@@ -44,17 +44,32 @@ func NewLANIP(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 
 func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	for _, item := range items {
-		var deviceInfo cache.DeviceInfo
-		var networkInfo cache.NetworkInfo
+		var deviceType int
+		var deviceID int
+		var deviceName string
+		var networkID int
+		var networkName string
 		vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(item.VInterfaceID)
 		if ok {
-			deviceInfo, ok = i.ToolDataSet.GetDeviceInfoByVInterfaceLcuuid(vifLcuuid)
+			deviceType, ok = i.ToolDataSet.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
-				log.Errorf("device info for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				log.Errorf("device type for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
-			networkInfo, ok = i.ToolDataSet.GetNetworkInfoByVInterfaceLcuuid(vifLcuuid)
+			deviceID, ok = i.ToolDataSet.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
-				log.Error("network info for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+			}
+			deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+			if !ok {
+				log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+			}
+			networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+			if !ok {
+				log.Errorf("network id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+			}
+			networkName, ok = i.ToolDataSet.GetNetworkNameByID(networkID)
+			if !ok {
+				log.Errorf("network name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 		} else {
 			log.Errorf("%s lcuuid (id: %d) for %s not found",
@@ -63,10 +78,12 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 
 		i.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
-			deviceInfo.Type,
-			deviceInfo.ID,
-			deviceInfo.Name,
-			fmt.Sprintf("%s-%s", networkInfo.Name, item.IP),
+			deviceType,
+			deviceID,
+			deviceName,
+			fmt.Sprintf("%s-%s", networkName, item.IP),
+			[]uint32{uint32(networkID)},
+			[]string{item.IP},
 		)
 	}
 }
@@ -76,19 +93,34 @@ func (i *LANIP) ProduceByUpdate(items *cloudmodel.IP, diffBase *cache.LANIP) {
 
 func (i *LANIP) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var deviceInfo cache.DeviceInfo
-		var networkInfo cache.NetworkInfo
+		var deviceType int
+		var deviceID int
+		var deviceName string
+		var networkID int
+		var networkName string
 		vifID, ok := i.ToolDataSet.GetVInterfaceIDByLANIPLcuuid(lcuuid)
 		if ok {
 			vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(vifID)
 			if ok {
-				deviceInfo, ok = i.ToolDataSet.GetDeviceInfoByVInterfaceLcuuid(vifLcuuid)
+				deviceType, ok = i.ToolDataSet.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
-					log.Errorf("device info for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+					log.Errorf("device type for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
-				networkInfo, ok = i.ToolDataSet.GetNetworkInfoByVInterfaceLcuuid(vifLcuuid)
+				deviceID, ok = i.ToolDataSet.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
-					log.Error("network info for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+					log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				}
+				deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+				if !ok {
+					log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				}
+				networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
+				if !ok {
+					log.Errorf("network id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				}
+				networkName, ok = i.ToolDataSet.GetNetworkNameByID(networkID)
+				if !ok {
+					log.Errorf("network name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
 			} else {
 				log.Errorf("%s lcuuid (id: %d) for %s not found",
@@ -106,10 +138,12 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 
 		i.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
-			deviceInfo.Type,
-			deviceInfo.ID,
-			deviceInfo.Name,
-			fmt.Sprintf("%s-%s", networkInfo.Name, ip),
+			deviceType,
+			deviceID,
+			deviceName,
+			fmt.Sprintf("%s-%s", networkName, ip),
+			[]uint32{uint32(networkID)},
+			[]string{ip},
 		)
 	}
 }

@@ -41,7 +41,7 @@ type VM struct {
 	EventManager[cloudmodel.VM, mysql.VM, *cache.VM]
 }
 
-func NewVM(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
+func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
 	mng := &VM{
 		EventManager[cloudmodel.VM, mysql.VM, *cache.VM]{
 			resourceType: RESOURCE_TYPE_VM_EN,
@@ -59,47 +59,36 @@ func (v *VM) ProduceByAdd(items []*mysql.VM) {
 			common.VIF_DEVICE_TYPE_VM,
 			item.ID,
 			item.Name,
-			"",
+			"", []uint32{}, []string{},
 		)
 	}
 }
 
 func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
+	id, name, err := v.getVMIDAndNameByLcuuid(cloudItem.Lcuuid)
+	if err != nil {
+		log.Error(err)
+	}
+	var eType string
+	var description string
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
-		v.migrate(cloudItem, diffBase)
+		eType = eventapi.RESOURCE_EVENT_TYPE_MIGRATE
+		description = fmt.Sprintf("%s,%s", diffBase.LaunchServer, cloudItem.LaunchServer)
 	}
 	if diffBase.State != cloudItem.State {
-		v.updateState(cloudItem, diffBase)
-	}
-}
-
-func (v *VM) migrate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
-	id, name, err := v.getVMIDAndNameByLcuuid(cloudItem.Lcuuid)
-	if err != nil {
-		log.Error(err)
+		eType = eventapi.RESOURCE_EVENT_TYPE_UPDATE_STATE
+		description = fmt.Sprintf("%s,%s", VMStateToString[diffBase.State], VMStateToString[cloudItem.State])
 	}
 
+	nIDs, ips := v.getIPNetworksByID(id)
 	v.createAndPutEvent(
-		eventapi.RESOURCE_EVENT_TYPE_MIGRATE,
+		eType,
 		common.VIF_DEVICE_TYPE_VM,
 		id,
 		name,
-		fmt.Sprintf("%s,%s", diffBase.LaunchServer, cloudItem.LaunchServer),
-	)
-}
-
-func (v *VM) updateState(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
-	id, name, err := v.getVMIDAndNameByLcuuid(cloudItem.Lcuuid)
-	if err != nil {
-		log.Error(err)
-	}
-
-	v.createAndPutEvent(
-		eventapi.RESOURCE_EVENT_TYPE_UPDATE_STATE,
-		common.VIF_DEVICE_TYPE_VM,
-		id,
-		name,
-		fmt.Sprintf("%s,%s", VMStateToString[diffBase.State], VMStateToString[cloudItem.State]),
+		description,
+		nIDs,
+		ips,
 	)
 }
 
@@ -115,9 +104,18 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 			common.VIF_DEVICE_TYPE_VM,
 			id,
 			name,
-			"",
+			"", []uint32{}, []string{},
 		)
 	}
+}
+
+func (v *VM) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
+	ipNetworkMap, _ := v.ToolDataSet.EventToolDataSet.GetVMIPNetworkMapByID(id)
+	for ip, nID := range ipNetworkMap {
+		networkIDs = append(networkIDs, nID)
+		ips = append(ips, ip)
+	}
+	return
 }
 
 func (v *VM) getVMIDAndNameByLcuuid(lcuuid string) (int, string, error) {
