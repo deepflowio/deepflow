@@ -27,12 +27,12 @@ import (
 
 type EventManager[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
 	resourceType string
-	ToolDataSet  cache.ToolDataSet
+	ToolDataSet  *cache.ToolDataSet
 	Queue        *queue.OverwriteQueue
 	EventProducer[CT, MT, BT]
 }
 
-func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType string, resourceType, resourceID int, resourceName, description string) {
+func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType string, resourceType, resourceID int, resourceName, description string, netIDs []uint32, ips []string) {
 	event := e.create()
 	event.Time = time.Now().Unix()
 	event.Type = eventType
@@ -40,6 +40,8 @@ func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType string, resourceT
 	event.ResourceID = uint32(resourceID)
 	event.ResourceName = resourceName
 	event.Description = description
+	event.SubnetIDs = netIDs
+	event.IPs = ips
 	e.put(event)
 }
 

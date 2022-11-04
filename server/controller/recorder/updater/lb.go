@@ -41,7 +41,7 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB, eventQueue *queue
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewLB(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewLB(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 
