@@ -40,7 +40,7 @@ type Config struct {
 	Chrony                   Chrony   `yaml:"chrony"`
 	SelfUpdateUrl            string   `default:"grpc" yaml:"self-update-url"`
 	RemoteApiTimeout         uint16   `default:"30" yaml:"remote-api-timeout"`
-	TridentTypeForUnknowVtap uint16   `default:"0" yaml:"trident-type-for-unknow-vtap"`
+	TridentTypeForUnkonwVtap uint16   `default:"0" yaml:"trident-type-for-unkonw-vtap"`
 	PlatformVips             []string `yaml:"platform-vips"`
 	NodeType                 string   `default:"master" yaml:"node-type"`
 	RegionDomainPrefix       string   `yaml:"region-domain-prefix"`
