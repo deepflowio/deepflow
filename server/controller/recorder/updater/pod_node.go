@@ -41,7 +41,7 @@ func NewPodNode(wholeCache *cache.Cache, cloudData []cloudmodel.PodNode, eventQu
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewPodNode(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewPodNode(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

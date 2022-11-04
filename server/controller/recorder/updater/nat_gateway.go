@@ -41,7 +41,7 @@ func NewNATGateway(wholeCache *cache.Cache, cloudData []cloudmodel.NATGateway, e
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewNATGateway(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewNATGateway(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

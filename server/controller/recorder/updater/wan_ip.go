@@ -43,7 +43,7 @@ func NewWANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *qu
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewWANIP(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewWANIP(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

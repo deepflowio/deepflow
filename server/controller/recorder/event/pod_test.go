@@ -37,7 +37,7 @@ func TestAddPod(t *testing.T) {
 	id := RandID()
 	name := RandName()
 	eq := NewEventQueue()
-	em := NewPod(ds, eq)
+	em := NewPod(&ds, eq)
 	em.ProduceByAdd([]*mysql.Pod{{Base: mysql.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
@@ -77,7 +77,7 @@ func TestUpdatePod(t *testing.T) {
 	defer monkey3.Reset()
 
 	eq := NewEventQueue()
-	em := NewPod(ds, eq)
+	em := NewPod(&ds, eq)
 	em.ProduceByUpdate(&cloudmodel.Pod{CreatedAt: time.Now()}, &cache.Pod{})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
@@ -100,7 +100,7 @@ func TestDeletePod(t *testing.T) {
 	defer monkey1.Reset()
 
 	eq := NewEventQueue()
-	em := NewPod(ds, eq)
+	em := NewPod(&ds, eq)
 	em.ProduceByDelete([]string{RandLcuuid()})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)

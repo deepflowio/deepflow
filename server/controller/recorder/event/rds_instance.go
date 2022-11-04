@@ -31,7 +31,7 @@ type RDSInstance struct {
 	deviceType int
 }
 
-func NewRDSInstance(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSInstance {
+func NewRDSInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSInstance {
 	mng := &RDSInstance{
 		EventManager[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]{
 			resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN,
@@ -45,7 +45,7 @@ func NewRDSInstance(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSInst
 
 func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
 	for _, item := range items {
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, r.deviceType, item.ID, item.Name, "")
+		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, r.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
 	}
 }
 
@@ -66,6 +66,6 @@ func (r *RDSInstance) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, r.deviceType, id, name, "")
+		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, r.deviceType, id, name, "", []uint32{}, []string{})
 	}
 }

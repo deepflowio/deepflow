@@ -41,7 +41,7 @@ func NewVRouter(wholeCache *cache.Cache, cloudData []cloudmodel.VRouter, eventQu
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewVRouter(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewVRouter(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

@@ -31,7 +31,7 @@ type VRouter struct {
 	deviceType int
 }
 
-func NewVRouter(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *VRouter {
+func NewVRouter(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VRouter {
 	mng := &VRouter{
 		EventManager[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]{
 			resourceType: RESOURCE_TYPE_VROUTER_EN,
@@ -45,7 +45,7 @@ func NewVRouter(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *VRouter {
 
 func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 	for _, item := range items {
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, r.deviceType, item.ID, item.Name, "")
+		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, r.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
 	}
 }
 
@@ -66,6 +66,6 @@ func (r *VRouter) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, r.deviceType, id, name, "")
+		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, r.deviceType, id, name, "", []uint32{}, []string{})
 	}
 }
