@@ -643,12 +643,14 @@ func (c *Cache) refreshWANIPs() {
 func (c *Cache) AddLANIPs(items []*mysql.LANIP) {
 	for _, item := range items {
 		c.DiffBaseDataSet.addLANIP(item, c.Sequence)
+		c.ToolDataSet.addLANIP(item)
 	}
 }
 
 func (c *Cache) DeleteLANIPs(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		c.DiffBaseDataSet.deleteLANIP(lcuuid)
+		c.ToolDataSet.deleteLANIP(lcuuid)
 	}
 }
 
