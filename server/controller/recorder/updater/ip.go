@@ -43,7 +43,7 @@ func NewIP(cache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *queue.Over
 func (i *IP) HandleAddAndUpdate() {
 	wanCloudData, lanCloudData := i.splitToWANAndLAN(i.cloudData)
 	i.wanIPUpdater = NewWANIP(i.cache, wanCloudData, i.eventQueue)
-	i.lanIPUpdater = NewLANIP(i.cache, lanCloudData)
+	i.lanIPUpdater = NewLANIP(i.cache, lanCloudData, i.eventQueue)
 	i.wanIPUpdater.HandleAddAndUpdate()
 	i.lanIPUpdater.HandleAddAndUpdate()
 }
