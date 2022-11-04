@@ -21,6 +21,7 @@ import (
 
 	logging "github.com/op/go-logging"
 
+	"github.com/deepflowys/deepflow/message/trident"
 	ingestercommon "github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/event/common"
 	"github.com/deepflowys/deepflow/server/ingester/event/config"
@@ -142,6 +143,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		eventStore.PodGroupID = resourceInfo.PodGroupID
 		eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
 		eventStore.L3DeviceID = resourceInfo.L3DeviceID
+	}
+	if event.ResourceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
+		eventStore.ServiceID = event.ResourceID
 	}
 
 	d.eventWriter.Write(eventStore)
