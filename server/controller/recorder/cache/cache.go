@@ -324,6 +324,10 @@ func (c *Cache) DeleteHosts(lcuuids []string) {
 	}
 }
 
+func (c *Cache) UpdateHost(cloudItem *cloudmodel.Host) {
+	c.ToolDataSet.updateHost(cloudItem)
+}
+
 func (c *Cache) refreshHosts() {
 	log.Infof(refreshResource(RESOURCE_TYPE_HOST_EN))
 	var hosts []*mysql.Host
