@@ -22,13 +22,15 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type LANIP struct {
 	UpdaterBase[cloudmodel.IP, mysql.LANIP, *cache.LANIP]
 }
 
-func NewLANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP) *LANIP {
+func NewLANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *queue.OverwriteQueue) *LANIP {
 	updater := &LANIP{
 		UpdaterBase[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
 			cache:        wholeCache,
@@ -39,6 +41,7 @@ func NewLANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP) *LANIP {
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
+	updater.eventProducer = event.NewLANIP(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

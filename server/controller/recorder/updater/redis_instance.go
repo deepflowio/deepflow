@@ -22,13 +22,15 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type RedisInstance struct {
 	UpdaterBase[cloudmodel.RedisInstance, mysql.RedisInstance, *cache.RedisInstance]
 }
 
-func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance) *RedisInstance {
+func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInstance, eventQueue *queue.OverwriteQueue) *RedisInstance {
 	updater := &RedisInstance{
 		UpdaterBase[cloudmodel.RedisInstance, mysql.RedisInstance, *cache.RedisInstance]{
 			cache:        wholeCache,
@@ -39,6 +41,7 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
+	updater.eventProducer = event.NewRedisInstance(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 
@@ -103,6 +106,7 @@ func (r *RedisInstance) addCache(dbItems []*mysql.RedisInstance) {
 
 func (r *RedisInstance) updateCache(cloudItem *cloudmodel.RedisInstance, diffBase *cache.RedisInstance) {
 	diffBase.Update(cloudItem)
+	r.cache.UpdateRedisInstance(cloudItem)
 }
 
 func (r *RedisInstance) deleteCache(lcuuids []string) {

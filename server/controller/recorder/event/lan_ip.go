@@ -27,14 +27,14 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
-type WANIP struct {
-	EventManager[cloudmodel.IP, mysql.WANIP, *cache.WANIP]
+type LANIP struct {
+	EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]
 }
 
-func NewWANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *WANIP {
-	mng := &WANIP{
-		EventManager[cloudmodel.IP, mysql.WANIP, *cache.WANIP]{
-			resourceType: RESOURCE_TYPE_WAN_IP_EN,
+func NewLANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
+	mng := &LANIP{
+		EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
+			resourceType: RESOURCE_TYPE_LAN_IP_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
@@ -42,7 +42,7 @@ func NewWANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *WANIP {
 	return mng
 }
 
-func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
+func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	for _, item := range items {
 		var deviceType int
 		var deviceID int
@@ -72,7 +72,8 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 				log.Errorf("network name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
 		} else {
-			log.Errorf("%s lcuuid (id: %d) for %s not found", RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_WAN_IP_EN)
+			log.Errorf("%s lcuuid (id: %d) for %s not found",
+				RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_LAN_IP_EN)
 		}
 
 		i.createAndPutEvent(
@@ -87,17 +88,17 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 	}
 }
 
-func (i *WANIP) ProduceByUpdate(cloudItem *cloudmodel.IP, diffBase *cache.WANIP) {
+func (i *LANIP) ProduceByUpdate(items *cloudmodel.IP, diffBase *cache.LANIP) {
 }
 
-func (i *WANIP) ProduceByDelete(lcuuids []string) {
+func (i *LANIP) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		var deviceType int
 		var deviceID int
 		var deviceName string
 		var networkID int
 		var networkName string
-		vifID, ok := i.ToolDataSet.GetVInterfaceIDByWANIPLcuuid(lcuuid)
+		vifID, ok := i.ToolDataSet.GetVInterfaceIDByLANIPLcuuid(lcuuid)
 		if ok {
 			vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(vifID)
 			if ok {
@@ -121,21 +122,22 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 				if !ok {
 					log.Errorf("network name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
-
 			} else {
-				log.Errorf("%s lcuuid (id: %d) for %s not found", RESOURCE_TYPE_VINTERFACE_EN, vifID, RESOURCE_TYPE_WAN_IP_EN)
+				log.Errorf("%s lcuuid (id: %d) for %s not found",
+					RESOURCE_TYPE_VINTERFACE_EN, vifID, RESOURCE_TYPE_LAN_IP_EN)
 			}
 		} else {
-			log.Errorf("%s id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, RESOURCE_TYPE_WAN_IP_EN, lcuuid)
+			log.Errorf("%s id for %s (lcuuid: %s) not found",
+				RESOURCE_TYPE_VINTERFACE_EN, RESOURCE_TYPE_LAN_IP_EN, lcuuid)
 		}
 
-		ip, ok := i.ToolDataSet.GetWANIPByLcuuid(lcuuid)
+		ip, ok := i.ToolDataSet.GetLANIPByLcuuid(lcuuid)
 		if !ok {
-			log.Errorf("%s (lcuuid: %s) ip not found", RESOURCE_TYPE_WAN_IP_EN, lcuuid)
+			log.Error("%s (lcuuid: %s) ip not found", RESOURCE_TYPE_LAN_IP_EN, lcuuid)
 		}
 
 		i.createAndPutEvent(
-			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
+			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceType,
 			deviceID,
 			deviceName,

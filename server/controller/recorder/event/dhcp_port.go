@@ -26,39 +26,39 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
-type PodService struct {
-	EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]
+type DHCPPort struct {
+	EventManager[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]
 	deviceType int
 }
 
-func NewPodService(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodService {
-	mng := &PodService{
-		EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]{
-			resourceType: RESOURCE_TYPE_POD_SERVICE_EN,
+func NewDHCPPort(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *DHCPPort {
+	mng := &DHCPPort{
+		EventManager[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]{
+			resourceType: RESOURCE_TYPE_DHCP_PORT_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
-		common.VIF_DEVICE_TYPE_POD_SERVICE,
+		common.VIF_DEVICE_TYPE_DHCP_PORT,
 	}
 	return mng
 }
 
-func (p *PodService) ProduceByAdd(items []*mysql.PodService) {
+func (p *DHCPPort) ProduceByAdd(items []*mysql.DHCPPort) {
 	for _, item := range items {
 		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
 	}
 }
 
-func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
+func (p *DHCPPort) ProduceByUpdate(cloudItem *cloudmodel.DHCPPort, diffBase *cache.DHCPPort) {
 }
 
-func (p *PodService) ProduceByDelete(lcuuids []string) {
+func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		var id int
 		var name string
-		id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(lcuuid)
+		id, ok := p.ToolDataSet.GetDHCPPortIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodServiceNameByID(id)
+			name, ok = p.ToolDataSet.GetDHCPPortNameByID(id)
 			if !ok {
 				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
 			}

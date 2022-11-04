@@ -260,7 +260,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 	for _, _key := range rst["values"] {
 		key := _key.([]interface{})[0]
 		labelKey := "label." + key.(string)
-		if db == "ext_metrics" || table == "vtap_flow_port" || table == "vtap_app_port" {
+		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
 			response["values"] = append(response["values"], []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "label",
 				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
@@ -396,6 +396,9 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	}]
 	if !ok {
 		return nil, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+	}
+	if db == "event" {
+		sql = strings.ReplaceAll(sql, "subnets", "subnet")
 	}
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]

@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::net::IpAddr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ipnetwork::IpNetwork;
@@ -109,26 +109,21 @@ impl fmt::Display for L3Item {
 }
 
 type TableLruCache = LruCache<L3Key, L3Item>;
-
-type MacIpTables = UnsafeWrapper<Vec<Option<Box<TableLruCache>>>>;
 type VipDeviceTables = UnsafeWrapper<HashMap<u64, bool>>;
 
 pub struct Forward {
-    mac_ip_tables: MacIpTables,
+    mac_ip_tables: RwLock<TableLruCache>,
     vip_device_tables: VipDeviceTables,
 
     queue_count: usize,
 }
 
 impl Forward {
+    const TABLE_SIZE: usize = 1 << 14;
     pub fn new(queue_count: usize) -> Self {
         assert!(queue_count < super::MAX_QUEUE_COUNT && queue_count > 0);
-        let mut list = Vec::new();
-        for _ in 0..super::MAX_QUEUE_COUNT {
-            list.push(None);
-        }
         Self {
-            mac_ip_tables: MacIpTables::from(list),
+            mac_ip_tables: RwLock::new(TableLruCache::new(Self::TABLE_SIZE)),
             vip_device_tables: VipDeviceTables::from(HashMap::new()),
             queue_count,
         }
@@ -263,23 +258,13 @@ impl Forward {
         platforms: &Vec<Arc<PlatformData>>,
         interfaces: &Vec<NetworkInterface>,
     ) {
-        let mut mac_ip_tables = vec![];
-        // FIXME: Use MAX_QUEUE_COUNT is a temporary scheme, which will be modified later
-        // =======================================================-----===================
-        // FIXME: 这里使用 MAX_QUEUE_COUNT 是临时方案，后面修改使用 self.queue_count
-        for _ in 0..super::MAX_QUEUE_COUNT {
-            let mut mac_ip_table = TableLruCache::new(1 << 14);
-            self.update_l3_from_platforms(&mut mac_ip_table, platforms);
-            self.update_l3_from_interfaces(trident_type, &mut mac_ip_table, interfaces);
-
-            mac_ip_tables.push(Some(Box::new(mac_ip_table)));
-        }
-        self.mac_ip_tables.set(mac_ip_tables);
+        let mut mac_ip_table = self.mac_ip_tables.write().unwrap();
+        mac_ip_table.clear();
+        self.update_l3_from_platforms(&mut mac_ip_table, platforms);
+        self.update_l3_from_interfaces(trident_type, &mut mac_ip_table, interfaces);
 
         let mut vip_device_table = HashMap::new();
-
         self.update_vip_from_platforms(&mut vip_device_table, platforms);
-
         self.vip_device_tables.set(vip_device_table);
     }
 
@@ -288,34 +273,21 @@ impl Forward {
         return self.vip_device_tables.get().get(&mac).is_some();
     }
 
-    pub fn query(&mut self, index: usize, mac: MacAddr, ip: IpAddr, l2_end: bool) -> bool {
+    pub fn query(&mut self, _index: usize, mac: MacAddr, ip: IpAddr, l2_end: bool) -> bool {
         let key = L3Key { mac, ip };
-        if self.mac_ip_tables.get()[index].is_none() {
+        if self.mac_ip_tables.read().unwrap().peek(&key).is_none() {
             return l2_end && self.query_vip(mac);
         }
 
-        return self.mac_ip_tables.get()[index]
-            .as_ref()
-            .unwrap()
-            .peek(&key)
-            .is_some()
-            || (l2_end && self.query_vip(mac));
+        return true;
     }
 
-    pub fn add(&mut self, index: usize, packet: &LookupKey, tap_port: TapPort, from: u16) {
-        if self.mac_ip_tables.get()[index].is_none() {
-            self.mac_ip_tables.get_mut()[index] = Some(Box::new(TableLruCache::new(1 << 14)));
-        }
-
+    pub fn add(&mut self, _index: usize, packet: &LookupKey, tap_port: TapPort, from: u16) {
         let key = L3Key {
             mac: packet.src_mac,
             ip: packet.src_ip,
         };
-        if let Some(value) = self.mac_ip_tables.get_mut()[index]
-            .as_mut()
-            .unwrap()
-            .get_mut(&key)
-        {
+        if let Some(value) = self.mac_ip_tables.write().unwrap().get_mut(&key) {
             value.from |= from;
             value.last = packet.timestamp;
             value.tap_type = packet.tap_type;
@@ -330,10 +302,7 @@ impl Forward {
                 ip: key.ip,
                 mac: key.mac,
             };
-            self.mac_ip_tables.get_mut()[index]
-                .as_mut()
-                .unwrap()
-                .push(key, value);
+            self.mac_ip_tables.write().unwrap().push(key, value);
         }
     }
 }

@@ -1,5 +1,5 @@
 # Name                     , DisplayName                , Category     , Discription
-time                       ,                            ,              ,
+time_str                   , 时间                       ,              ,
                
 region                     , 区域                       , 知识图谱       ,
 az                         , 可用区                     , 知识图谱       ,

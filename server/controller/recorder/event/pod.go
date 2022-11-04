@@ -29,23 +29,25 @@ import (
 )
 
 type Pod struct {
-	EventManager[cloudmodel.IP, mysql.Pod, *cache.Pod]
+	EventManager[cloudmodel.Pod, mysql.Pod, *cache.Pod]
+	deviceType int
 }
 
-func NewPod(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
+func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
-		EventManager[cloudmodel.IP, mysql.Pod, *cache.Pod]{
+		EventManager[cloudmodel.Pod, mysql.Pod, *cache.Pod]{
 			resourceType: RESOURCE_TYPE_POD_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
+		common.VIF_DEVICE_TYPE_POD,
 	}
 	return mng
 }
 
 func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, common.VIF_DEVICE_TYPE_POD, item.ID, item.Name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
 	}
 }
 
@@ -85,7 +87,8 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 			log.Error(idByLcuuidNotFound(RESOURCE_TYPE_POD_NODE_EN, diffBase.PodNodeLcuuid))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_RECREATE, common.VIF_DEVICE_TYPE_POD, id, name, fmt.Sprintf("%s,%s", oldPodNodeName, newPodNodeName))
+		nIDs, ips := p.getIPNetworksByID(id)
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_RECREATE, common.VIF_DEVICE_TYPE_POD, id, name, fmt.Sprintf("%s,%s", oldPodNodeName, newPodNodeName), nIDs, ips)
 	}
 }
 
@@ -103,6 +106,15 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, common.VIF_DEVICE_TYPE_POD, id, name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "", []uint32{}, []string{})
 	}
+}
+
+func (p *Pod) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
+	ipNetworkMap, _ := p.ToolDataSet.EventToolDataSet.GetPodIPNetworkMapByID(id)
+	for ip, nID := range ipNetworkMap {
+		networkIDs = append(networkIDs, nID)
+		ips = append(ips, ip)
+	}
+	return
 }

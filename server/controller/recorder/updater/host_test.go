@@ -57,7 +57,7 @@ func (t *SuiteTest) TestHandleAddHostSucess() {
 	cache, cloudItem := t.getHostMock(false)
 	assert.Equal(t.T(), len(cache.Hosts), 0)
 
-	updater := NewHost(cache, []cloudmodel.Host{cloudItem})
+	updater := NewHost(cache, []cloudmodel.Host{cloudItem}, nil)
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.Host
@@ -74,7 +74,7 @@ func (t *SuiteTest) TestHandleUpdateHostSucess() {
 	cloudItem.VCPUNum = cloudItem.VCPUNum + 1
 	cloudItem.AZLcuuid = uuid.New().String()
 
-	updater := NewHost(cache, []cloudmodel.Host{cloudItem})
+	updater := NewHost(cache, []cloudmodel.Host{cloudItem}, nil)
 	updater.HandleAddAndUpdate()
 
 	var updatedItem *mysql.Host
@@ -92,7 +92,7 @@ func (t *SuiteTest) TestHandleDeleteHostSucess() {
 	cache, cloudItem := t.getHostMock(true)
 	assert.Equal(t.T(), len(cache.Hosts), 1)
 
-	updater := NewHost(cache, []cloudmodel.Host{cloudItem})
+	updater := NewHost(cache, []cloudmodel.Host{cloudItem}, nil)
 	updater.HandleDelete()
 
 	var addedItem *mysql.Host

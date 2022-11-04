@@ -22,7 +22,6 @@ import (
 
 	"github.com/bxcodec/faker/v3"
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -103,35 +102,6 @@ func (t *SuiteTest) TestDeleteNetworkInTDS() {
 	ds.NetworkLcuuidToID[lcuuid] = id
 	ds.deleteNetwork(lcuuid)
 	_, ok := ds.NetworkIDToName[id]
-	assert.Equal(t.T(), false, ok)
-}
-
-func (t *SuiteTest) TestAddVInterfaceInTDS() {
-	id := RandID()
-	lcuuid := RandLcuuid()
-	networkID := RandID()
-	vmID := RandID()
-	dbItem := &mysql.VInterface{Base: mysql.Base{ID: id, Lcuuid: lcuuid}, DeviceType: common.VIF_DEVICE_TYPE_VM, DeviceID: vmID, NetworkID: networkID}
-	ds := NewToolDataSet()
-	ds.NetworkIDToName[networkID] = RandName()
-	ds.VMIDToName[vmID] = RandName()
-	ds.addVInterface(dbItem)
-	assert.Equal(t.T(), networkID, ds.VInterfaceLcuuidToNetworkInfo[lcuuid].ID)
-	assert.Equal(t.T(), vmID, ds.VInterfaceLcuuidToDeviceInfo[lcuuid].ID)
-	assert.Equal(t.T(), common.VIF_DEVICE_TYPE_VM, ds.VInterfaceLcuuidToDeviceInfo[lcuuid].Type)
-}
-
-func (t *SuiteTest) TestDeleteVInterfaceInTDS() {
-	id := RandID()
-	lcuuid := RandLcuuid()
-	ds := NewToolDataSet()
-	ds.VInterfaceLcuuidToID[lcuuid] = id
-	ds.VInterfaceLcuuidToDeviceInfo[lcuuid] = &DeviceInfo{ID: RandID()}
-	ds.VInterfaceLcuuidToNetworkInfo[lcuuid] = &NetworkInfo{ID: RandID()}
-	ds.deleteVInterface(lcuuid)
-	_, ok := ds.VInterfaceLcuuidToNetworkInfo[lcuuid]
-	assert.Equal(t.T(), false, ok)
-	_, ok = ds.VInterfaceLcuuidToDeviceInfo[lcuuid]
 	assert.Equal(t.T(), false, ok)
 }
 
@@ -236,44 +206,6 @@ func (t *SuiteTest) TestGetPodNameByID() {
 	mysql.Db.Create(&dbItem)
 	rname2, _ := ds.GetPodNameByID(id2)
 	assert.Equal(t.T(), name2, rname2)
-}
-
-func (t *SuiteTest) TestGetDeviceInfoByVInterfaceLcuuid() {
-	lcuuid := RandLcuuid()
-	vmID := RandID()
-	info := &DeviceInfo{Type: common.VIF_DEVICE_TYPE_VM, ID: vmID}
-	ds := NewToolDataSet()
-	ds.VInterfaceLcuuidToDeviceInfo[lcuuid] = info
-	rinfo, _ := ds.GetDeviceInfoByVInterfaceLcuuid(lcuuid)
-	assert.Equal(t.T(), vmID, rinfo.ID)
-
-	lcuuid2 := RandLcuuid()
-	vmID2 := RandID()
-	vmName2 := RandName()
-	ds.VMIDToName[vmID2] = vmName2
-	dbItem := &mysql.VInterface{Base: mysql.Base{Lcuuid: lcuuid2}, DeviceType: common.VIF_DEVICE_TYPE_VM, DeviceID: vmID2}
-	mysql.Db.Create(&dbItem)
-	rinfo2, _ := ds.GetDeviceInfoByVInterfaceLcuuid(lcuuid2)
-	assert.Equal(t.T(), vmName2, rinfo2.Name)
-}
-
-func (t *SuiteTest) TestGetNetworkInfoByVInterfaceLcuuid() {
-	lcuuid := RandLcuuid()
-	netID := RandID()
-	info := &NetworkInfo{ID: netID}
-	ds := NewToolDataSet()
-	ds.VInterfaceLcuuidToNetworkInfo[lcuuid] = info
-	rinfo, _ := ds.GetNetworkInfoByVInterfaceLcuuid(lcuuid)
-	assert.Equal(t.T(), netID, rinfo.ID)
-
-	lcuuid2 := RandLcuuid()
-	netID2 := RandID()
-	netName2 := RandName()
-	ds.NetworkIDToName[netID2] = netName2
-	dbItem := &mysql.VInterface{Base: mysql.Base{Lcuuid: lcuuid2}, NetworkID: netID2}
-	mysql.Db.Create(&dbItem)
-	rinfo2, _ := ds.GetNetworkInfoByVInterfaceLcuuid(lcuuid2)
-	assert.Equal(t.T(), netName2, rinfo2.Name)
 }
 
 func (t *SuiteTest) TestGetVInterfaceLcuuidByID() {

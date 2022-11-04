@@ -26,46 +26,55 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
-type PodService struct {
-	EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]
-	deviceType int
+type Host struct {
+	EventManager[cloudmodel.Host, mysql.Host, *cache.Host]
 }
 
-func NewPodService(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodService {
-	mng := &PodService{
-		EventManager[cloudmodel.PodService, mysql.PodService, *cache.PodService]{
-			resourceType: RESOURCE_TYPE_POD_SERVICE_EN,
+func NewHost(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
+	mng := &Host{
+		EventManager[cloudmodel.Host, mysql.Host, *cache.Host]{
+			resourceType: RESOURCE_TYPE_HOST_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
-		common.VIF_DEVICE_TYPE_POD_SERVICE,
 	}
 	return mng
 }
 
-func (p *PodService) ProduceByAdd(items []*mysql.PodService) {
+func (h *Host) ProduceByAdd(items []*mysql.Host) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
+		h.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			common.VIF_DEVICE_TYPE_HOST,
+			item.ID,
+			item.Name,
+			"", []uint32{}, []string{},
+		)
 	}
 }
 
-func (p *PodService) ProduceByUpdate(cloudItem *cloudmodel.PodService, diffBase *cache.PodService) {
+func (h *Host) ProduceByUpdate(cloudItem *cloudmodel.Host, diffBase *cache.Host) {
 }
 
-func (p *PodService) ProduceByDelete(lcuuids []string) {
+func (h *Host) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var id int
 		var name string
-		id, ok := p.ToolDataSet.GetPodServiceIDByLcuuid(lcuuid)
-		if ok {
-			name, ok = p.ToolDataSet.GetPodServiceNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
-			}
+		id, ok := h.ToolDataSet.GetHostIDByLcuuid(lcuuid)
+		if !ok {
+			log.Error(nameByIDNotFound(h.resourceType, id))
 		} else {
-			log.Error(nameByIDNotFound(p.resourceType, id))
+			name, ok = h.ToolDataSet.GetHostNameByID(id)
+			if !ok {
+				log.Error(idByLcuuidNotFound(h.resourceType, lcuuid))
+			}
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "", []uint32{}, []string{})
+		h.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_DELETE,
+			common.VIF_DEVICE_TYPE_HOST,
+			id,
+			name,
+			"", []uint32{}, []string{},
+		)
 	}
 }

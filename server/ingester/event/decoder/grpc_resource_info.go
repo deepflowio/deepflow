@@ -28,8 +28,18 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/grpc"
 )
 
-func (p *ResourceInfoTable) QueryResourceInfo(l3DeviceType uint32, l3DeviceID uint32) *ResourceInfo {
-	return p.resourceInfos[uint64(l3DeviceType)<<32|uint64(l3DeviceID)]
+func (p *ResourceInfoTable) QueryResourceInfo(resourceType uint32, resourceID uint32) *ResourceInfo {
+	switch trident.DeviceType(resourceType) {
+	case trident.DeviceType_DEVICE_TYPE_POD:
+		return p.podInfos[resourceID]
+	case trident.DeviceType_DEVICE_TYPE_POD_NODE:
+		return p.podNodeInfos[resourceID]
+	case trident.DeviceType_DEVICE_TYPE_HOST_DEVICE:
+		return p.hostInfos[resourceID]
+	default:
+		return p.resourceInfos[uint64(resourceType)<<32|uint64(resourceID)]
+	}
+
 }
 
 func (p *ResourceInfoTable) Close() {
@@ -60,12 +70,18 @@ type ResourceInfoTable struct {
 	versionPlatformData uint64
 
 	resourceInfos map[uint64]*ResourceInfo
+	podInfos      map[uint32]*ResourceInfo
+	podNodeInfos  map[uint32]*ResourceInfo
+	hostInfos     map[uint32]*ResourceInfo
 }
 
 func NewResourceInfoTable(ips []net.IP, port, rpcMaxMsgSize int) *ResourceInfoTable {
 	info := &ResourceInfoTable{
 		GrpcSession:   &grpc.GrpcSession{},
 		resourceInfos: make(map[uint64]*ResourceInfo),
+		podInfos:      make(map[uint32]*ResourceInfo),
+		podNodeInfos:  make(map[uint32]*ResourceInfo),
+		hostInfos:     make(map[uint32]*ResourceInfo),
 	}
 	runOnce := func() {
 		if err := info.Reload(); err != nil {
@@ -123,17 +139,23 @@ func (p *ResourceInfoTable) Reload() error {
 	}
 
 	resourceInfos := make(map[uint64]*ResourceInfo)
+	podInfos := make(map[uint32]*ResourceInfo)
+	podNodeInfos := make(map[uint32]*ResourceInfo)
+	hostInfos := make(map[uint32]*ResourceInfo)
 	for _, intf := range platformData.GetInterfaces() {
-		updateResourceInfos(resourceInfos, intf)
+		updateResourceInfos(resourceInfos, podInfos, podNodeInfos, hostInfos, intf)
 	}
 	p.resourceInfos = resourceInfos
+	p.podInfos = podInfos
+	p.podNodeInfos = podNodeInfos
+	p.hostInfos = hostInfos
 
 	log.Infof("Event update rpc platformdata version %d -> %d", p.versionPlatformData, newVersion)
 
 	return nil
 }
 
-func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, intf *trident.Interface) {
+func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNodeInfos, hostInfos map[uint32]*ResourceInfo, intf *trident.Interface) {
 	epcID := intf.GetEpcId()
 	if epcID == 0 {
 		tmp := datatype.EPC_FROM_DEEPFLOW
@@ -141,17 +163,25 @@ func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, intf *trident.In
 	}
 	deviceType := intf.GetDeviceType()
 	deviceID := intf.GetDeviceId()
-	reourceInfos[uint64(deviceType)<<32|uint64(deviceID)] = &ResourceInfo{
+	podID := intf.GetPodId()
+	podNodeID := intf.GetPodNodeId()
+	hostID := intf.GetLaunchServerId()
+
+	info := &ResourceInfo{
 		L3EpcID:      int32(epcID),
-		HostID:       intf.GetLaunchServerId(),
+		HostID:       hostID,
 		RegionID:     intf.GetRegionId(),
 		L3DeviceType: deviceType,
 		L3DeviceID:   deviceID,
-		PodNodeID:    intf.GetPodNodeId(),
+		PodNodeID:    podNodeID,
 		PodNSID:      intf.GetPodNsId(),
 		PodGroupID:   intf.GetPodGroupId(),
-		PodID:        intf.GetPodId(),
+		PodID:        podID,
 		PodClusterID: intf.GetPodClusterId(),
 		AZID:         intf.GetAzId(),
 	}
+	reourceInfos[uint64(deviceType)<<32|uint64(deviceID)] = info
+	podInfos[podID] = info
+	podNodeInfos[podNodeID] = info
+	hostInfos[hostID] = info
 }

@@ -34,7 +34,7 @@ func TestAddPodService(t *testing.T) {
 	id := RandID()
 	name := RandName()
 	eq := NewEventQueue()
-	dbItem := NewPodService(ds, eq)
+	dbItem := NewPodService(&ds, eq)
 	dbItem.ProduceByAdd([]*mysql.PodService{{Base: mysql.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
@@ -62,7 +62,7 @@ func TestDeletePodService(t *testing.T) {
 	defer monkey1.Reset()
 
 	eq := NewEventQueue()
-	wanIP := NewPodService(ds, eq)
+	wanIP := NewPodService(&ds, eq)
 	wanIP.ProduceByDelete([]string{RandLcuuid()})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)

@@ -319,6 +319,23 @@ pub struct EbpfParam {
     // now only http2 uprobe uses
     pub is_req_end: bool,
     pub is_resp_end: bool,
+
+    /*
+        eBPF 程序为每一个 socket 维护一个 cap_seq 序列号，每次 read/write syscall 调用会自增 1。
+        目前仅用于处理ebpf乱序问题，并且仅能用于没有 request_id 并且是请求响应串行的模型。
+        当响应的 cap_seq 减去请求的 cap_seq 不等于1，就认为乱序无法聚合，直接发送请求和响应。
+        其中，mysql 和 postgresql 由于 预编译请求 和 执行结果之间有数个报文的间隔，所以不能通过序号差判断是否乱序。
+        所以现在只有 http1，redis 能使用这个方法处理乱序。
+        FIXME: http1 在 pipeline 模型下依然会有乱序的情况，目前不解决。
+        ====================================================================
+        The eBPF program maintains a cap_seq sequence number for each socket, which is incremented by 1 for each read/write syscall call.
+        Currently only used to deal with ebpf out-of-order problems, and can only be used for protocol without request_id and request-response serialization.
+        When the cap_seq of the response subtract the cap_seq of the request is not equal to 1, it is considered that the out-of-order cannot be aggregated, and the request and response are sent directly without merge.
+        MySQL and postgreSQL cannot judge whether the order is out of order due to the interval of several messages between the precompiled request and the execution result.
+        So now only http1, redis can use this method to deal with out-of-order.
+        FIXME: http1 will still be out of order under the pipeline model, which is not resolved at present.
+    */
+    pub cap_seq: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -365,6 +382,7 @@ impl From<&MetaPacket<'_>> for ParseParam {
                 is_tls,
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
+                cap_seq: packet.cap_seq,
             });
         }
 

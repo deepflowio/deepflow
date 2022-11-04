@@ -22,13 +22,15 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type DHCPPort struct {
 	UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]
 }
 
-func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCPPort {
+func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort, eventQueue *queue.OverwriteQueue) *DHCPPort {
 	updater := &DHCPPort{
 		UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]{
 			cache:        wholeCache,
@@ -39,6 +41,7 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCP
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
+	updater.eventProducer = event.NewDHCPPort(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 
@@ -102,6 +105,7 @@ func (p *DHCPPort) addCache(dbItems []*mysql.DHCPPort) {
 
 func (p *DHCPPort) updateCache(cloudItem *cloudmodel.DHCPPort, diffBase *cache.DHCPPort) {
 	diffBase.Update(cloudItem)
+	p.cache.UpdateDHCPPort(cloudItem)
 }
 
 func (p *DHCPPort) deleteCache(lcuuids []string) {

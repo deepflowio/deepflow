@@ -22,13 +22,15 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
+	"github.com/deepflowys/deepflow/server/controller/recorder/event"
+	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type VM struct {
 	UpdaterBase[cloudmodel.VM, mysql.VM, *cache.VM]
 }
 
-func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
+func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM, eventQueue *queue.OverwriteQueue) *VM {
 	updater := &VM{
 		UpdaterBase[cloudmodel.VM, mysql.VM, *cache.VM]{
 			cache:        wholeCache,
@@ -39,6 +41,7 @@ func NewVM(wholeCache *cache.Cache, cloudData []cloudmodel.VM) *VM {
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
+	updater.eventProducer = event.NewVM(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

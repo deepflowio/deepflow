@@ -41,6 +41,8 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
+	"github.com/deepflowys/deepflow/server/controller/genesis"
+	controllermodel "github.com/deepflowys/deepflow/server/controller/model"
 )
 
 var log = logging.MustGetLogger("cloud.common")
@@ -333,7 +335,6 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 	var retVInterfaces []model.VInterface
 	var retIPs []model.IP
 
-	// TODO delete? not used 查询数据库获取采集器，生成采集器ctrl_ip到launch_server的对应关系
 	vtaps := []mysql.VTap{}
 	mysql.Db.Find(&vtaps)
 
@@ -342,35 +343,35 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 		vtapLaunchServerToCtrlIP[vtap.LaunchServer] = vtap.CtrlIP
 	}
 
-	// 调用genesis API获取vinterfaces
-	// TODO: genesis重构后，修改为内部函数调用
-	response, err := common.CURLPerform(
-		"GET", "http://genesis:20015/v1/vinterfaces", map[string]interface{}{},
-	)
-	if err != nil {
-		log.Errorf("call genesis vinterfaces api failed: (%s)", err.Error())
-		return nil, nil, nil, nil, err
+	if genesis.GenesisService == nil {
+		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, errors.New("genesis service is nil")
 	}
-	// 获取hostIP与vinterfaces的对应关系
-	hostIPToVInterfaces := make(map[string][]*simplejson.Json)
-	for i := range response.Get("DATA").MustArray() {
-		r := response.Get("DATA").GetIndex(i)
-		if r.Get("DEVICE_TYPE").MustString() != "kvm-host" {
+	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	if err != nil {
+		return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, err
+	}
+	vDatas := genesisData.Vinterfaces
+	hostIPToVInterfaces := map[string][]controllermodel.GenesisVinterface{}
+	for _, vData := range vDatas {
+		if vData.DeviceType != "kvm-host" {
 			continue
 		}
-		hostIP := r.Get("HOST_IP").MustString()
-		hostIPToVInterfaces[hostIP] = append(hostIPToVInterfaces[hostIP], r)
+		hostIPToVInterfaces[vData.HostIP] = append(hostIPToVInterfaces[vData.HostIP], vData)
 	}
 
 	var reg *regexp.Regexp
 	if portNameRegex != "" {
-		reg, _ = regexp.Compile(portNameRegex)
+		reg, err = regexp.Compile(portNameRegex)
+		if err != nil {
+			return []model.Subnet{}, []model.VInterface{}, []model.IP{}, map[string][]model.Subnet{}, err
+		}
 	}
 	// 遍历宿主机生成网段、接口和IP信息
 	vpcLcuuidToSubnets := make(map[string][]model.Subnet)
 	for _, host := range hosts {
 		vinterfaces, ok := hostIPToVInterfaces[host.IP]
 		if !ok {
+			log.Debugf("no ip in host (%s) response", host.Name)
 			continue
 		}
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, host.RegionLcuuid)
@@ -384,15 +385,15 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 		// 额外对接路由接口为空 或者 不匹配额外对接路由接口时，跳过该接口
 		includeHostIP := false
 		for _, vinterface := range vinterfaces {
-			vinterfaceName := vinterface.Get("NAME").MustString()
+			vinterfaceName := vinterface.Name
 			if reg == nil || reg.MatchString(vinterfaceName) {
 				continue
 			}
-			mac := vinterface.Get("MAC").MustString()
+			mac := vinterface.Mac
 			vinterfaceLcuuid := common.GenerateUUID(host.Lcuuid + mac)
 
-			for i := range vinterface.Get("IPS").MustArray() {
-				ip := vinterface.Get("IPS").GetIndex(i).MustString()
+			ips := strings.Split(vinterface.IPs, ",")
+			for _, ip := range ips {
 				if ip == host.IP {
 					includeHostIP = true
 				}
