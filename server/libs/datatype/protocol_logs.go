@@ -355,6 +355,7 @@ func (h *HTTPInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 		SpanId:  h.SpanID,
 	}
 
+	p.ReqLen, p.RespLen = -1, -1
 	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
 		p.Req = &pb.L7Request{
 			ReqType:  h.Method,
@@ -430,6 +431,7 @@ func (h *DNSInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 			RequestId: uint32(h.TransID),
 		}
 	}
+	p.ReqLen, p.RespLen = -1, -1
 	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
 		p.Req = &pb.L7Request{
 			ReqType:  GetDNSQueryType(uint8(h.QueryType)),
@@ -439,6 +441,9 @@ func (h *DNSInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 
 	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
 		p.Resp.Result = h.Answers
+		if p.Resp.Code == 0 {
+			p.Resp.Code = L7PROTOCOL_LOG_RESP_CODE_NONE
+		}
 	}
 }
 

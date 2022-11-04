@@ -31,7 +31,7 @@ type PodNode struct {
 	deviceType int
 }
 
-func NewPodNode(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
+func NewPodNode(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
 	mng := &PodNode{
 		EventManager[cloudmodel.PodNode, mysql.PodNode, *cache.PodNode]{
 			resourceType: RESOURCE_TYPE_POD_NODE_EN,
@@ -45,7 +45,7 @@ func NewPodNode(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
 
 func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
 	}
 }
 
@@ -66,6 +66,6 @@ func (p *PodNode) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "", []uint32{}, []string{})
 	}
 }

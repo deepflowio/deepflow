@@ -34,7 +34,7 @@ func TestAddPodNode(t *testing.T) {
 	id := RandID()
 	name := RandName()
 	eq := NewEventQueue()
-	dbItem := NewPodNode(ds, eq)
+	dbItem := NewPodNode(&ds, eq)
 	dbItem.ProduceByAdd([]*mysql.PodNode{{Base: mysql.Base{ID: id}, Name: name}})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
@@ -59,7 +59,7 @@ func TestDeletePodNode(t *testing.T) {
 	defer monkey1.Reset()
 
 	eq := NewEventQueue()
-	wanIP := NewPodNode(ds, eq)
+	wanIP := NewPodNode(&ds, eq)
 	wanIP.ProduceByDelete([]string{RandLcuuid()})
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)

@@ -31,7 +31,7 @@ type DHCPPort struct {
 	deviceType int
 }
 
-func NewDHCPPort(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *DHCPPort {
+func NewDHCPPort(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *DHCPPort {
 	mng := &DHCPPort{
 		EventManager[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]{
 			resourceType: RESOURCE_TYPE_DHCP_PORT_EN,
@@ -45,7 +45,7 @@ func NewDHCPPort(toolDS cache.ToolDataSet, eq *queue.OverwriteQueue) *DHCPPort {
 
 func (p *DHCPPort) ProduceByAdd(items []*mysql.DHCPPort) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
 	}
 }
 
@@ -66,6 +66,6 @@ func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "")
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "", []uint32{}, []string{})
 	}
 }
