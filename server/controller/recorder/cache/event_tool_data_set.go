@@ -17,8 +17,8 @@
 package cache
 
 type EventToolDataSet struct {
-	VInterfaceLcuuidToDeviceInfo  map[string]*DeviceInfo
-	VInterfaceLcuuidToNetworkInfo map[string]*NetworkInfo
+	VInterfaceLcuuidToDeviceInfo  map[string]DeviceInfo
+	VInterfaceLcuuidToNetworkInfo map[string]NetworkInfo
 	NetworkIDToName               map[int]string
 	HostIDToName                  map[int]string
 	VMIDToName                    map[int]string
@@ -38,8 +38,8 @@ type EventToolDataSet struct {
 
 func NewEventToolDataSet() EventToolDataSet {
 	return EventToolDataSet{
-		VInterfaceLcuuidToDeviceInfo:  make(map[string]*DeviceInfo),
-		VInterfaceLcuuidToNetworkInfo: make(map[string]*NetworkInfo),
+		VInterfaceLcuuidToDeviceInfo:  make(map[string]DeviceInfo),
+		VInterfaceLcuuidToNetworkInfo: make(map[string]NetworkInfo),
 		NetworkIDToName:               make(map[int]string),
 		HostIDToName:                  make(map[int]string),
 		VMIDToName:                    make(map[int]string),

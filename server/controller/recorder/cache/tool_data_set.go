@@ -304,12 +304,12 @@ func (t *ToolDataSet) addVInterface(item *mysql.VInterface) {
 	t.VInterfaceLcuuidToIndex[item.Lcuuid] = item.Index
 	t.VInterfaceLcuuidToType[item.Lcuuid] = item.Type
 	networkName, _ := t.GetNetworkNameByID(item.NetworkID)
-	t.VInterfaceLcuuidToNetworkInfo[item.Lcuuid] = &NetworkInfo{
+	t.VInterfaceLcuuidToNetworkInfo[item.Lcuuid] = NetworkInfo{
 		ID:   item.NetworkID,
 		Name: networkName,
 	}
 
-	deviceInfo := &DeviceInfo{
+	deviceInfo := DeviceInfo{
 		Type: item.DeviceType,
 		ID:   item.DeviceID,
 	}
@@ -1407,7 +1407,7 @@ func (t *ToolDataSet) GetPodNameByID(id int) (string, bool) {
 	}
 }
 
-func (t *ToolDataSet) GetDeviceInfoByVInterfaceLcuuid(lcuuid string) (*DeviceInfo, bool) {
+func (t *ToolDataSet) GetDeviceInfoByVInterfaceLcuuid(lcuuid string) (DeviceInfo, bool) {
 	info, exists := t.VInterfaceLcuuidToDeviceInfo[lcuuid]
 	if exists {
 		return info, true
@@ -1425,7 +1425,7 @@ func (t *ToolDataSet) GetDeviceInfoByVInterfaceLcuuid(lcuuid string) (*DeviceInf
 	}
 }
 
-func (t *ToolDataSet) GetNetworkInfoByVInterfaceLcuuid(lcuuid string) (*NetworkInfo, bool) {
+func (t *ToolDataSet) GetNetworkInfoByVInterfaceLcuuid(lcuuid string) (NetworkInfo, bool) {
 	info, exists := t.VInterfaceLcuuidToNetworkInfo[lcuuid]
 	if exists {
 		return info, true

@@ -126,8 +126,8 @@ func (t *SuiteTest) TestDeleteVInterfaceInTDS() {
 	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
 	ds.VInterfaceLcuuidToID[lcuuid] = id
-	ds.VInterfaceLcuuidToDeviceInfo[lcuuid] = &DeviceInfo{ID: RandID()}
-	ds.VInterfaceLcuuidToNetworkInfo[lcuuid] = &NetworkInfo{ID: RandID()}
+	ds.VInterfaceLcuuidToDeviceInfo[lcuuid] = DeviceInfo{ID: RandID()}
+	ds.VInterfaceLcuuidToNetworkInfo[lcuuid] = NetworkInfo{ID: RandID()}
 	ds.deleteVInterface(lcuuid)
 	_, ok := ds.VInterfaceLcuuidToNetworkInfo[lcuuid]
 	assert.Equal(t.T(), false, ok)
@@ -241,7 +241,7 @@ func (t *SuiteTest) TestGetPodNameByID() {
 func (t *SuiteTest) TestGetDeviceInfoByVInterfaceLcuuid() {
 	lcuuid := RandLcuuid()
 	vmID := RandID()
-	info := &DeviceInfo{Type: common.VIF_DEVICE_TYPE_VM, ID: vmID}
+	info := DeviceInfo{Type: common.VIF_DEVICE_TYPE_VM, ID: vmID}
 	ds := NewToolDataSet()
 	ds.VInterfaceLcuuidToDeviceInfo[lcuuid] = info
 	rinfo, _ := ds.GetDeviceInfoByVInterfaceLcuuid(lcuuid)
@@ -260,7 +260,7 @@ func (t *SuiteTest) TestGetDeviceInfoByVInterfaceLcuuid() {
 func (t *SuiteTest) TestGetNetworkInfoByVInterfaceLcuuid() {
 	lcuuid := RandLcuuid()
 	netID := RandID()
-	info := &NetworkInfo{ID: netID}
+	info := NetworkInfo{ID: netID}
 	ds := NewToolDataSet()
 	ds.VInterfaceLcuuidToNetworkInfo[lcuuid] = info
 	rinfo, _ := ds.GetNetworkInfoByVInterfaceLcuuid(lcuuid)
