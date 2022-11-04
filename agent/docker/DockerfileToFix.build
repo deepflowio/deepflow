@@ -1,5 +1,5 @@
 # 编译阶段
-# dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:1.2
+# dfcloud-image-registry.cn-beijing.cr.aliyuncs.com/deepflowcloud/rust-build:latest
 # 使用 Centos 为基础镜像，安装所需依赖
 #FIXME: 暂时锁定x86_64架构，以后支持优化构建速度
 FROM centos:centos7.9.2009

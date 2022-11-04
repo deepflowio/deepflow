@@ -133,27 +133,23 @@ impl PlatformSynchronizer {
             None
         };
 
-        let config_guard = config.load();
-        let poller = match config_guard.kubernetes_poller_type {
+        let sync_interval = config.load().sync_interval;
+        let kubernetes_poller_type = config.load().kubernetes_poller_type;
+        let poller = match kubernetes_poller_type {
             KubernetesPollerType::Adaptive => {
                 if can_set_ns && can_read_link_ns {
-                    GenericPoller::from(ActivePoller::new(
-                        config_guard.sync_interval,
-                        extra_netns_regex.clone(),
-                    ))
+                    GenericPoller::from(ActivePoller::new(sync_interval, extra_netns_regex.clone()))
                 } else {
-                    GenericPoller::from(PassivePoller::new(config_guard.sync_interval))
+                    GenericPoller::from(PassivePoller::new(sync_interval, config.clone()))
                 }
             }
-            KubernetesPollerType::Active => GenericPoller::from(ActivePoller::new(
-                config_guard.sync_interval,
-                extra_netns_regex.clone(),
-            )),
+            KubernetesPollerType::Active => {
+                GenericPoller::from(ActivePoller::new(sync_interval, extra_netns_regex.clone()))
+            }
             KubernetesPollerType::Passive => {
-                GenericPoller::from(PassivePoller::new(config_guard.sync_interval))
+                GenericPoller::from(PassivePoller::new(sync_interval, config.clone()))
             }
         };
-        drop(config_guard);
 
         let kubernetes_poller = Arc::new(poller);
         let mappings = mappings::Mappings;
