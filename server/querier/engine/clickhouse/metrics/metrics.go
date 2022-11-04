@@ -243,24 +243,23 @@ func LoadMetrics(db string, table string, dbDescription map[string]interface{}) 
 		if ok {
 			loadMetrics = make(map[string]*Metrics)
 			for i, metrics := range metricsData.([][]interface{}) {
-				if len(metrics) < 4 {
+				if len(metrics) < 5 {
 					return nil, errors.New(fmt.Sprintf("get metrics failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
 				metricType, ok := METRICS_TYPE_NAME_MAP[metrics[2].(string)]
 				if !ok {
 					return nil, errors.New(fmt.Sprintf("get metrics type failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
-				permissions, err := ckcommon.ParsePermission(metrics[3])
+				permissions, err := ckcommon.ParsePermission(metrics[4])
 				if err != nil {
 					return nil, errors.New(fmt.Sprintf("parse metrics permission failed! db:%s table:%s metrics:%v", db, table, metrics))
 				}
 				metricsLanguage := metricsDataLanguage.([][]interface{})[i]
 				displayName := metricsLanguage[1].(string)
 				unit := metricsLanguage[2].(string)
-				category := metricsLanguage[3].(string)
 				lm := NewMetrics(
 					i, metrics[1].(string), displayName, unit, metricType,
-					category, permissions, "", table,
+					metrics[3].(string), permissions, "", table,
 				)
 				loadMetrics[metrics[0].(string)] = lm
 			}
