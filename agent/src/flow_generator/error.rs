@@ -18,6 +18,10 @@ use std::str::Utf8Error;
 
 use thiserror::Error;
 
+use super::AppProtoLogsData;
+
+use crate::common::l7_protocol_info::L7ProtocolInfo;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("invalid packet timestamp")]
@@ -61,6 +65,10 @@ pub enum Error {
     L7ProtocolCheckLimit,
     #[error("l7 protocol parse limit")]
     L7ProtocolParseLimit,
+    #[error("l7 protocol can not merge")]
+    L7ProtocolCanNotMerge(L7ProtocolInfo),
+    #[error("l7 log can not merge")]
+    L7LogCanNotMerge(AppProtoLogsData),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
