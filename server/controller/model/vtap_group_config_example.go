@@ -375,11 +375,11 @@ vtap_group_id: g-xxxxxx
     ## 当关闭此开关时，无法采集此类进程的 uprobe 数据。
     ## 当开启此开关时，对于 Golang >= 1.13 且 < 1.18 的 Golang 进程，
     ## 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
-    #golang-symbol:
+    #golang-symbol: ""
     ## eBPF uprobe 开启应用协议数据采集的 Golang 进程，默认为 .* 表示对所有 Golang 进程开启。
-    #golang: .*
+    #golang: ".*"
     ## eBPF uprobe 开启应用协议数据采集的使用 openssl 库的进程，默认为 .* 表示对所有使用了 openssl 库的进程开启。
-    #openssl: .*
+    #openssl: ".*"
   ## 写入单个数据文件的最大大小，单位MB
   #standalone-data-file-size: 200
   ## 写入数据文件的路径
