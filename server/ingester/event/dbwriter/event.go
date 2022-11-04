@@ -49,6 +49,7 @@ type ResourceEventStore struct {
 	PodGroupID   uint32
 	L3DeviceType uint8
 	L3DeviceID   uint32
+	ServiceID    uint32
 }
 
 func (e *ResourceEventStore) WriteBlock(block *ckdb.Block) error {
@@ -112,6 +113,9 @@ func (e *ResourceEventStore) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt32(e.L3DeviceID); err != nil {
 		return err
 	}
+	if err := block.WriteUInt32(e.ServiceID); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -143,6 +147,7 @@ func ResourceEventColumns() []*ckdb.Column {
 
 		ckdb.NewColumn("l3_device_type", ckdb.UInt8).SetComment("资源类型"),
 		ckdb.NewColumn("l3_device_id", ckdb.UInt32).SetComment("资源ID"),
+		ckdb.NewColumn("service_id", ckdb.UInt32).SetComment("服务ID"),
 	}
 }
 
