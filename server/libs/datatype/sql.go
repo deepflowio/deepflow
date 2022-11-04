@@ -18,7 +18,6 @@ package datatype
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/deepflowys/deepflow/server/libs/datatype/pb"
 	"github.com/deepflowys/deepflow/server/libs/pool"
@@ -71,7 +70,6 @@ type MysqlInfo struct {
 }
 
 func (i *MysqlInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
-	p.Version = strconv.Itoa(int(i.ProtocolVersion))
 	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
 		p.Req = &pb.L7Request{
 			ReqType:  MysqlCommand(i.Command).String(),
@@ -79,9 +77,13 @@ func (i *MysqlInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 		}
 	}
 
+	p.ReqLen, p.RespLen = -1, -1
 	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
 		p.Resp.Code = int32(i.ErrorCode)
 		p.Resp.Exception = i.ErrorMessage
+		if p.Resp.Code == 0 {
+			p.Resp.Code = L7PROTOCOL_LOG_RESP_CODE_NONE
+		}
 	}
 	p.RowEffect = uint32(i.AffectedRows)
 }
@@ -129,9 +131,13 @@ func (i *RedisInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 		}
 	}
 
+	p.ReqLen, p.RespLen = -1, -1
 	if msgType == MSG_T_RESPONSE || msgType == MSG_T_SESSION {
 		p.Resp.Result = i.Response
 		p.Resp.Exception = i.Error
+		if p.Resp.Code == 0 {
+			p.Resp.Code = L7PROTOCOL_LOG_RESP_CODE_NONE
+		}
 	}
 }
 

@@ -62,6 +62,7 @@ func (i *DubboInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 		}
 	}
 
+	p.ReqLen, p.RespLen = -1, -1
 	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
 		p.Req = &pb.L7Request{
 			Domain:   i.ServiceName,

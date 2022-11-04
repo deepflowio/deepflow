@@ -57,6 +57,7 @@ func (i *KafkaInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 		}
 	}
 
+	p.ReqLen, p.RespLen = -1, -1
 	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
 		p.Req = &pb.L7Request{
 			ReqType: KafkaCommand(i.ApiKey).String(),
@@ -116,6 +117,7 @@ func (i *MqttInfo) WriteToPB(p *pb.AppProtoLogsData, msgType LogMessageType) {
 		p.Version = strconv.Itoa(int(i.ProtoVersion))
 	}
 
+	p.ReqLen, p.RespLen = -1, -1
 	if msgType == MSG_T_REQUEST || msgType == MSG_T_SESSION {
 		p.Req = &pb.L7Request{
 			ReqType: i.MqttType,
