@@ -74,7 +74,7 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 }
 
 func (v *VM) migrate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
-	id, name, err := getVMIDAndNameByLcuuid(v, cloudItem.Lcuuid)
+	id, name, err := v.getVMIDAndNameByLcuuid(cloudItem.Lcuuid)
 	if err != nil {
 		log.Error(err)
 	}
@@ -89,7 +89,7 @@ func (v *VM) migrate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 }
 
 func (v *VM) updateState(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
-	id, name, err := getVMIDAndNameByLcuuid(v, cloudItem.Lcuuid)
+	id, name, err := v.getVMIDAndNameByLcuuid(cloudItem.Lcuuid)
 	if err != nil {
 		log.Error(err)
 	}
@@ -105,7 +105,7 @@ func (v *VM) updateState(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 
 func (v *VM) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		id, name, err := getVMIDAndNameByLcuuid(v, lcuuid)
+		id, name, err := v.getVMIDAndNameByLcuuid(lcuuid)
 		if err != nil {
 			log.Error(err)
 		}
@@ -120,7 +120,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 	}
 }
 
-func getVMIDAndNameByLcuuid(v *VM, lcuuid string) (int, string, error) {
+func (v *VM) getVMIDAndNameByLcuuid(lcuuid string) (int, string, error) {
 	id, ok := v.ToolDataSet.GetVMIDByLcuuid(lcuuid)
 	if !ok {
 		return 0, "", errors.New(nameByIDNotFound(v.resourceType, id))

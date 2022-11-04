@@ -1507,20 +1507,3 @@ func (t *ToolDataSet) GetWANIPByLcuuid(lcuuid string) (string, bool) {
 		return ip, false
 	}
 }
-
-func (t *ToolDataSet) GetHostNameByID(id int) (string, bool) {
-	name, exists := t.HostIDToName[id]
-	if exists {
-		return name, true
-	}
-	log.Warning(cacheNameByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
-	var dbItem mysql.Host
-	result := mysql.Db.Where("id = ?", id).Find(&dbItem)
-	if result.RowsAffected == 1 {
-		t.addHost(&dbItem)
-		return dbItem.Name, true
-	} else {
-		log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
-		return name, false
-	}
-}

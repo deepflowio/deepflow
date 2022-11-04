@@ -45,7 +45,7 @@ func (h *Host) ProduceByAdd(items []*mysql.Host) {
 	for _, item := range items {
 		h.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
-			common.VIF_DEVICE_TYPE_VM,
+			common.VIF_DEVICE_TYPE_HOST,
 			item.ID,
 			item.Name,
 			"",
@@ -71,7 +71,7 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 
 		h.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_DELETE,
-			common.VIF_DEVICE_TYPE_VM,
+			common.VIF_DEVICE_TYPE_HOST,
 			id,
 			name,
 			"",
