@@ -41,7 +41,7 @@ func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance,
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewRDSInstance(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewRDSInstance(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

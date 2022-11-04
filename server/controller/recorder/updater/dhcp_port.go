@@ -41,7 +41,7 @@ func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort, event
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewDHCPPort(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewDHCPPort(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

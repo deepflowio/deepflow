@@ -41,7 +41,7 @@ func NewRedisInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RedisInsta
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewRedisInstance(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewRedisInstance(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

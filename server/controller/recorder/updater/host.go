@@ -41,7 +41,7 @@ func NewHost(wholeCache *cache.Cache, cloudData []cloudmodel.Host, eventQueue *q
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewHost(wholeCache.ToolDataSet, eventQueue)
+	updater.eventProducer = event.NewHost(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 
