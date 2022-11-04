@@ -1182,36 +1182,24 @@ pub fn get_direction(
                 } else {
                     if is_local_mac {
                         if is_local_ip {
-                            // 容器节点作为路由器时，路由流量在宿主机出接口上直接做交换转发
-                            // 举例：青云环境中，如果网卡做VXLAN Offload，流量会从vfXXX口经过，此时没有做隧道封装
-                            //       POD与外部通信时在vfXXX口看到的MAC是容器节点的，因此l2End和l3End同时为假
-                            //       此时只能通过isLocalIp来判断统计数据的direction
                             return (
-                                Direction::ClientHypervisorToServer,
-                                Direction::ServerHypervisorToClient,
+                                Direction::ClientNodeToServer,
+                                Direction::ServerNodeToClient,
                                 add_tracing_doc,
                             );
                         } else if tunnel_tier > 0 {
-                            // 腾讯TCE的Underlay母机使用IPIP封装，外层IP为本机Underlay CVM的IP和MAC，内层IP为CLB的VIP
-                            // 宽泛来讲，如果隧道内层是本机MAC、且L2End=false（即隧道外层不是本机MAC），也认为是到达了端点
                             return (
-                                Direction::ClientHypervisorToServer,
-                                Direction::ServerHypervisorToClient,
+                                Direction::ClientNodeToServer,
+                                Direction::ServerNodeToClient,
                                 add_tracing_doc,
                             );
                         } else {
-                            // 虚拟机作为路由器时，路由流量在宿主机出接口上直接做交换转发
-                            return (
-                                Direction::ServerGatewayHypervisorToClient,
-                                Direction::ClientGatewayHypervisorToServer,
-                                add_tracing_doc,
-                            );
+                            //其他情况: BUM流量
                         }
                     } else {
                         //其他情况: BUM流量
                     }
                 }
-                //其他情况: BUM流量
             }
             TridentType::TtProcess => {
                 if is_ep {
