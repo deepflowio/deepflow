@@ -534,6 +534,7 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 				h.ResponseStatus = datatype.STATUS_NOT_EXIST
 				h.ResponseCode = nil
 			}
+			h.RequestId = &h.requestId
 		}
 	}
 }
