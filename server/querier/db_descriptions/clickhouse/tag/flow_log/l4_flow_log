@@ -73,7 +73,7 @@ tap_port            , tap_port             , tap_port              , mac        
 tap_port_name       , tap_port_name        , tap_port_name         , string       ,                      , Flow                 , 111        
 tap_port_type       , tap_port_type        , tap_port_type         , int_enum     , tap_port_type        , Flow                 , 111        
 vtap                , vtap                 , vtap                  , resource     ,                      , Flow                 , 111        
-                                                                                                           Flow                 ,
+
 tap_side            , tap_side             , tap_side              , string_enum  , tap_side             , Flow                 , 111        
 l2_end              , l2_end_0             , l2_end_1              , bool         ,                      , Flow                 , 111        
 l3_end              , l3_end_0             , l3_end_1              , bool         ,                      , Flow                 , 111        
@@ -81,5 +81,5 @@ is_new_flow         , is_new_flow          , is_new_flow           , bool       
 start_time          , start_time           , start_time            , int          ,                      , Flow                 , 111        
 end_time            , end_time             , end_time              , int          ,                      , Flow                 , 111        
 duration            , duration             , duration              , int          ,                      , Flow                 , 111        
-status              , status               , status                , int_enum     , status               ,                        111
+status              , status               , status                , int_enum     , status               ,                      , 111
 labels              , labels_0             , labels_1              , map          ,                      , K8s Labels           , 111        
