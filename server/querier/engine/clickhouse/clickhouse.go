@@ -58,6 +58,9 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interf
 	sql := args.Sql
 	query_uuid := args.QueryUUID
 	log.Debugf("query_uuid: %s | raw sql: %s", query_uuid, sql)
+	if args.DB == "event" && (strings.HasPrefix(sql, "show") || strings.HasPrefix(sql, "SHOW")) {
+		sql = strings.ReplaceAll(sql, "subnets", "subnet")
+	}
 	// Parse showSql
 	result, sqlList, isShow, err := e.ParseShowSql(sql)
 	if isShow {

@@ -1,5 +1,5 @@
 # Name                , DisplayName                  , Category               , Description
-time                  ,                              ,                        ,
+time_str              ,                              ,                        ,
 
 region                , Region                       , Resource               ,
 az                    , Availability Zone            , Resource               ,
