@@ -37,4 +37,4 @@ tap                        , 采集点                     ,
 vtap                       , 采集器                     ,
 ip                         , IP地址                     ,
 is_ipv4                    , IP类型                     ,
-labels                     , K8s Labels                 
+labels                     , K8s Labels                 ,
