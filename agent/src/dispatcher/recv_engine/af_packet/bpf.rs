@@ -31,6 +31,7 @@ pub enum BpfSyntax {
     JumpIf(JumpIf),
     ALUOpConstant(ALUOpConstant),
     RetConstant(RetConstant),
+    Txa(Txa),
 }
 
 impl fmt::Display for BpfSyntax {
@@ -43,6 +44,7 @@ impl fmt::Display for BpfSyntax {
             Self::JumpIf(e) => write!(f, "{}", e),
             Self::ALUOpConstant(e) => write!(f, "{}", e),
             Self::RetConstant(e) => write!(f, "{}", e),
+            Self::Txa(t) => write!(f, "{t}"),
         }
     }
 }
@@ -57,6 +59,7 @@ impl BpfSyntax {
             Self::JumpIf(e) => e.to_instruction(),
             Self::ALUOpConstant(e) => e.to_instruction(),
             Self::RetConstant(e) => e.to_instruction(),
+            Self::Txa(t) => t.to_instruction(),
         }
     }
 }
@@ -142,6 +145,7 @@ const OP_CLS_ALU: u16 = 4;
 pub const OP_CLS_JUMP: u16 = 5;
 pub const OP_CLS_RETURN: u16 = 6;
 const OP_CLS_MISC: u16 = 7;
+const OP_MISC_TXA: u16 = 128;
 
 const OP_LOAD_WIDTH_4: u16 = 0;
 const OP_LOAD_WIDTH_2: u16 = 1 << 3;
@@ -524,6 +528,24 @@ impl Instruction for ALUOpConstant {
         RawInstruction {
             op: OP_CLS_ALU | self.op | OP_OPERAND_CONSTANT,
             k: self.val,
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Txa;
+
+impl fmt::Display for Txa {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "txa")
+    }
+}
+
+impl Instruction for Txa {
+    fn to_instruction(&self) -> RawInstruction {
+        RawInstruction {
+            op: OP_CLS_MISC | OP_MISC_TXA,
             ..Default::default()
         }
     }
