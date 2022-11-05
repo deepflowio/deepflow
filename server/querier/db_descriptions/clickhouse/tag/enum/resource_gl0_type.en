@@ -1,14 +1,14 @@
 # Value , DisplayName
-0       , InternetIP
-1       , 云服务器
-5       , 路由器
-6       , 宿主机
-9       , DHCP网关
-10      , 容器POD
-11      , 容器服务
+0       , Internet IP
+1       , Cloud Host
+5       , Router
+6       , VM Hypervisor
+9       , DHCP Gateway
+10      , K8s POD
+11      , K8s Service
 12      , RDS
 13      , Redis
-14      , 容器节点
-15      , 负载均衡器
-16      , NAT网关
+14      , K8s Node
+15      , Load Balancer
+16      , NAT Gateway
 255     , IP
