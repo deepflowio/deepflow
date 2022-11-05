@@ -1,6 +1,6 @@
 # Value , DisplayName
-0       , 未知
-1       , 其他
+0       , N/A
+1       , Others
 20      , HTTP
 21      , HTTP2
 22      , HTTP1_TLS
