@@ -1,18 +1,18 @@
 # Name                , DisplayName                       , Description
-_id                   ,                                   ,
-time                  ,                                   ,
+_id                   , UID                               ,
+time                  , Time                              , Round end_time to seconds.
 
 region                , Region                            ,
 az                    , Availability Zone                 ,
-host                  , VM Hypervisor                     ,
-chost                 , Cloud Host                        ,
+host                  , VM Hypervisor                     , Host running virtual machine.
+chost                 , Cloud Host                        , Including virtual machines, bare metal servers.
 vpc                   , VPC                               ,
-l2_vpc                , VPC of MAC Address                ,
+l2_vpc                , Forwarding VPC                    , VPC where the MAC address is located.
 subnet                , Subnet                            ,
 router                , Router                            ,
 dhcpgw                , DHCP Gateway                      ,
 lb                    , Load Balancer                     ,
-lb_listener           , Listener for ALB                  ,
+lb_listener           , Load Balancer Listener            ,
 natgw                 , NAT Gateway                       ,
 redis                 , Redis                             ,
 rds                   , RDS                               ,
@@ -21,65 +21,65 @@ pod_ns                , K8s Namespace                     ,
 pod_node              , K8s Node                          ,
 pod_ingress           , K8s Ingress                       ,
 pod_service           , K8s Service                       ,
-pod_group             , K8s Workload                      ,
+pod_group             , K8s Workload                      , Such as Deployment, StatefulSet, Daemonset, etc.
 pod                   , K8s POD                           ,
-service               , Service                           ,
+# service             , Service                           , # temporarily disabled
 resource_gl0_type     , Type - K8s POD First              ,
 resource_gl0          , Instance - K8s POD First          ,
 resource_gl1_type     , Type - K8s Workload First         ,
 resource_gl1          , Instance - K8s Workload First     ,
 resource_gl2_type     , Type - K8s Service First          ,
 resource_gl2          , Instance - K8s Service First      ,
-is_internet           , Internet IP Flag                  ,
 
-mac                   , MAC Address                       ,
+labels                , K8s Labels                        ,
+
 eth_type              , Ether Type                        ,
-vlan                  , VLAN                              ,
+vlan                  , VLAN TAG                          ,
+mac                   , MAC Address                       ,
 
 ip                    , IP Address                        ,
 is_ipv4               , IPv4 Flag                         ,
+is_internet           , Internet IP Flag                  , Whether the IP address is an external Internet address.
+province              , Province                          , The province to which the Internet IP address belongs.
 protocol              , Network Protocol                  ,
+
 tunnel_tier           , Tunnel Tiers                      ,
 tunnel_type           , Tunnel Type                       ,
 tunnel_tx_id          , TX Tunnel ID                      ,
 tunnel_rx_id          , RX Tunnel ID                      ,
-tunnel_tx_ip_0        , TX Tunnel Source IP Address       ,
-tunnel_tx_ip_1        , TX Tunnel Destination IP Address  ,
-tunnel_rx_ip_0        , RX Tunnel Source IP Address       ,
-tunnel_rx_ip_1        , RX Tunnel Destination IP Address  ,
-tunnel_tx_mac_0       , TX Tunnel Source MAC Address      ,
-tunnel_tx_mac_1       , RX Tunnel Destination MAC Address ,
-tunnel_rx_mac_0       , TX Tunnel Source MAC Address      ,
-tunnel_rx_mac_1       , RX Tunnel Destination MAC Address ,
-
+tunnel_tx_ip_0        , TX Tunnel src IP Address          ,
+tunnel_tx_ip_1        , TX Tunnel dst IP Address          ,
+tunnel_rx_ip_0        , RX Tunnel src IP Address          ,
+tunnel_rx_ip_1        , RX Tunnel dst IP Address          ,
+tunnel_tx_mac_0       , TX Tunnel src MAC Address         ,
+tunnel_tx_mac_1       , TX Tunnel dst MAC Address         ,
+tunnel_rx_mac_0       , RX Tunnel src MAC Address         ,
+tunnel_rx_mac_1       , RX Tunnel dst MAC Address         ,
 
 client_port           , Client Port                       ,
 server_port           , Server Port                       ,
-tcp_flags_bit         , TCP Flags                         ,
-syn_seq               , SEQ of SYN Packet                 ,
-syn_ack_seq           , SEQ of SYN-ACK Packet             ,
-last_keepalive_seq    , SEQ of Heartbeat Packet           ,
-last_keepalive_ack    , ACK of Heartbeat Packet           ,
+tcp_flags_bit         , TCP Flag Set                      , The set of TCP flags in all packets in the current natural minute.
+syn_seq               , Seq no. of SYN Packet             ,
+syn_ack_seq           , Seq no. of SYN-ACK Packet         ,
+last_keepalive_seq    , Seq no. of Heartbeat Packet       , Seq number in the most recent heartbeat packet.
+last_keepalive_ack    , Ack no. of Heartbeat Packet       , Ack number in the most recent heartbeat packet.
 
 l7_protocol           , Application Protocol              ,
 
-province              , Province                          ,
-
-close_type            , Flow Close Type                   ,
-flow_source           , Flow Source                       ,
 flow_id               , Flow ID                           ,
-tap                   , Traffic Access Point              ,
-tap_port              , TAP Port Identifier               ,
-tap_port_name         , TAP Port Name                     ,
-tap_port_type         , TAP Port Type                     ,
-vtap                  , Alias of deepflow-agent           ,
-tap_side              , TAP Side                          ,
-l2_end                , Boundary of L2 Network            ,
-l3_end                , Boundary of L3 Network            ,
+start_time            , Start Time                        , Unit: microseconds. Indicates the start time of the flow within the current natural minute, and indicates the first packet time for a newly created flow.
+end_time              , End Time                          , Unit: microseconds. Indicates the end time of the flow within the current natural minute. If the flow is closed within this minute, it is the end packet time or the timeout time of the flow state machine.
+duration              , Duration                          , Unit: microseconds.
+close_type            , Flow Close Type                   ,
+status                , Status                            , Determined by the close_type: Normal/ForceReport = Normal, Client* = Client Error, Server*/Timeout = Server Error, others = Unknown.
 is_new_flow           , New Flow Flag                     ,
-start_time            , Start Time                        ,
-end_time              , End Time                          ,
-duration              , Duration                          , Unit: us
-status                , Status                            , Determined by the close_type. 正常：正常结束、周期性上报。客户端异常：客户端SYN结束、客户端重置、客户端半关、客户端端口复用、客户端其他重置。服务端异常：服务端重置、连接超时、服务端半关、服务端SYN结束、服务端直接重置、服务端队列溢出、服务端其他重置。未知：其他结束方式。
+flow_source           , Flow Source                       ,
 
-labels                , K8s Labels                        ,
+tap                   , Traffic Access Point              , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
+vtap                  , DeepFlow Agent                    ,
+tap_port              , TAP Port Identifier               , When the value of tap_port_type is 'Local NIC', tap_port indicates the MAC address suffix (the last four bytes) of the tap interface.
+tap_port_name         , TAP Port Name                     , When the value of tap_port_type is 'Local NIC', tap_port_name indicates the name of the tap interface.
+tap_port_type         , TAP Port Type                     , Indicates the type of traffic collection location, including Local NIC (cloud traffic), NFV Gateway NIC (NFV Gateway traffic), Traffic Mirror (traditional IDC traffic), etc.
+tap_side              , TAP Side                          , The logical location of the collection location in the traffic path, such as Cient NIC, Client Node, Server Node, Server NIC, etc.
+l2_end                , Boundary of L2 Network            , Indicates whether the traffic is collected on the client NIC or the server NIC.
+l3_end                , Boundary of L3 Network            , Indicates whether the traffic is collected in the Layer 2 network where the client or server is located.

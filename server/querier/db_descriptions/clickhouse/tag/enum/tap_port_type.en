@@ -1,6 +1,6 @@
 # Value , DisplayName
 0       , Local NIC
-1       , NIC of NFV Gateway
+1       , NFV Gateway NIC
 2       , ERSPAN
 3       , ERSPAN (IPv6)
 4       , Traffic Mirror

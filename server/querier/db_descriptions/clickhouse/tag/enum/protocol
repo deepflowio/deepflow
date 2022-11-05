@@ -1,5 +1,5 @@
 # Value  DisplayName
-0     , 非IP
+0     , None IP
 1     , ICMP
 2     , IGMP
 3     , GGP
