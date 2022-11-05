@@ -43,7 +43,7 @@ use super::{
     protocol_logs::MetaAppProto,
     service_table::{ServiceKey, ServiceTable},
     FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
-    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
+    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, //QUEUE_BATCH_SIZE,
     SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
     THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
 };
@@ -939,17 +939,17 @@ impl FlowMap {
                 stats.l7_protocol = L7Protocol::Other;
             }
         }
-        self.output_buffer.push(tagged_flow);
-        if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
-            let flows = self
-                .output_buffer
-                .drain(..)
-                .map(Box::new)
-                .collect::<Vec<_>>();
-            if let Err(_) = self.output_queue.send_all(flows) {
-                warn!("flow-map push tagged flows to queue failed because queue have terminated");
-            }
-        }
+        //self.output_buffer.push(tagged_flow);
+        //if self.output_buffer.len() >= QUEUE_BATCH_SIZE {
+        //    let flows = self
+        //        .output_buffer
+        //        .drain(..)
+        //        .map(Box::new)
+        //        .collect::<Vec<_>>();
+        //    if let Err(_) = self.output_queue.send_all(flows) {
+        //        warn!("flow-map push tagged flows to queue failed because queue have terminated");
+        //    }
+        //}
     }
 
     // go 版本的removeAndOutput
@@ -1061,14 +1061,14 @@ impl FlowMap {
                 self.config.load().cloud_gateway_traffic,
             );
 
-            if let Some(app_proto) =
+            if let Some(_app_proto) =
                 MetaAppProto::new(&node.tagged_flow, meta_packet, l7_info, head)
             {
-                if let Err(_) = self.out_log_queue.send(Box::new(app_proto)) {
-                    warn!(
-                        "flow-map push MetaAppProto to queue failed because queue have terminated"
-                    );
-                }
+                //if let Err(_) = self.out_log_queue.send(Box::new(app_proto)) {
+                //    warn!(
+                //        "flow-map push MetaAppProto to queue failed because queue have terminated"
+                //    );
+                //}
             }
         }
     }

@@ -818,10 +818,10 @@ impl Components {
             collector.start();
         }
 
-        #[cfg(target_os = "linux")]
-        if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
-            ebpf_collector.start();
-        }
+        //#[cfg(target_os = "linux")]
+        //if let Some(ebpf_collector) = self.ebpf_collector.as_mut() {
+        //    ebpf_collector.start();
+        //}
         if matches!(self.agent_mode, RunningMode::Managed) {
             self.otel_uniform_sender.start();
             self.compressed_otel_uniform_sender.start();
@@ -1364,25 +1364,25 @@ impl Components {
             collectors.push(collector);
         }
 
-        #[cfg(target_os = "linux")]
-        let ebpf_collector = EbpfCollector::new(
-            synchronizer.ntp_diff(),
-            &config_handler.candidate_config.ebpf,
-            config_handler.log_parser(),
-            policy_getter,
-            l7_log_rate.clone(),
-            proto_log_sender,
-            &queue_debugger,
-        )
-        .ok();
-        #[cfg(target_os = "linux")]
-        if let Some(collector) = &ebpf_collector {
-            stats_collector.register_countable(
-                "ebpf-collector",
-                Countable::Owned(Box::new(collector.get_sync_counter())),
-                vec![],
-            );
-        }
+        //#[cfg(target_os = "linux")]
+        //let ebpf_collector = EbpfCollector::new(
+        //    synchronizer.ntp_diff(),
+        //    &config_handler.candidate_config.ebpf,
+        //    config_handler.log_parser(),
+        //    policy_getter,
+        //    l7_log_rate.clone(),
+        //    proto_log_sender,
+        //    &queue_debugger,
+        //)
+        //.ok();
+        //#[cfg(target_os = "linux")]
+        //if let Some(collector) = &ebpf_collector {
+        //    stats_collector.register_countable(
+        //        "ebpf-collector",
+        //        Countable::Owned(Box::new(collector.get_sync_counter())),
+        //        vec![],
+        //    );
+        //}
         #[cfg(target_os = "linux")]
         let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
 
@@ -1532,7 +1532,7 @@ impl Components {
             pcap_manager,
             log_parsers,
             #[cfg(target_os = "linux")]
-            ebpf_collector,
+            ebpf_collector: None,
             stats_collector,
             running: AtomicBool::new(false),
             #[cfg(target_os = "linux")]

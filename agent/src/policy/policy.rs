@@ -134,9 +134,9 @@ impl Policy {
         // TODO: 根据TTL添加forward表
     }
 
-    pub fn lookup(&mut self, packet: &mut MetaPacket, index: usize) {
-        packet.lookup_key.fast_index = index;
-        self.lookup_l3(packet);
+    pub fn lookup(&mut self, packet: &mut MetaPacket, _index: usize) {
+        //packet.lookup_key.fast_index = index;
+        //self.lookup_l3(packet);
 
         let key = &mut packet.lookup_key;
 
@@ -172,18 +172,29 @@ impl Policy {
 
     pub fn lookup_all_by_key(
         &mut self,
-        key: &mut LookupKey,
+        _key: &mut LookupKey,
     ) -> Option<(Arc<PolicyData>, Arc<EndpointData>)> {
-        if let Some(x) = self.table.fast_get(key) {
-            self.fast_hit += 1;
-            self.send(key, &x.0, &x.1);
-            return Some(x);
-        }
-        self.first_hit += 1;
-        let endpoints = self.labeler.get_endpoint_data(key);
-        let x = self.table.first_get(key, endpoints).unwrap();
-        self.send(key, &x.0, &x.1);
-        return Some(x);
+        let policy = PolicyData::default();
+        let mut endpoints = EndpointData::default();
+
+        endpoints.src_info.l2_end = true;
+        endpoints.src_info.l3_end = true;
+        endpoints.src_info.l3_epc_id = 10;
+        endpoints.dst_info.l2_end = true;
+        endpoints.dst_info.l3_end = true;
+        endpoints.dst_info.l3_epc_id = 10;
+        Some((Arc::new(policy), Arc::new(endpoints)))
+
+        //if let Some(x) = self.table.fast_get(key) {
+        //    self.fast_hit += 1;
+        //    self.send(key, &x.0, &x.1);
+        //    return Some(x);
+        //}
+        //self.first_hit += 1;
+        //let endpoints = self.labeler.get_endpoint_data(key);
+        //let x = self.table.first_get(key, endpoints).unwrap();
+        //self.send(key, &x.0, &x.1);
+        //return Some(x);
     }
 
     pub fn lookup_all_by_epc(
@@ -335,20 +346,20 @@ impl From<*mut Policy> for PolicySetter {
 impl FlowAclListener for PolicySetter {
     fn flow_acl_change(
         &mut self,
-        trident_type: TridentType,
-        ip_groups: &Vec<Arc<IpGroupData>>,
-        platform_data: &Vec<Arc<PlatformData>>,
-        peers: &Vec<Arc<PeerConnection>>,
-        cidrs: &Vec<Arc<Cidr>>,
-        acls: &Vec<Arc<Acl>>,
+        _trident_type: TridentType,
+        _ip_groups: &Vec<Arc<IpGroupData>>,
+        _platform_data: &Vec<Arc<PlatformData>>,
+        _peers: &Vec<Arc<PeerConnection>>,
+        _cidrs: &Vec<Arc<Cidr>>,
+        _acls: &Vec<Arc<Acl>>,
     ) {
-        self.update_interfaces(trident_type, platform_data);
-        self.update_ip_group(ip_groups);
-        self.update_peer_connections(peers);
-        self.update_cidr(cidrs);
-        let _ = self.update_acl(acls, true);
+        //self.update_interfaces(trident_type, platform_data);
+        //self.update_ip_group(ip_groups);
+        //self.update_peer_connections(peers);
+        //self.update_cidr(cidrs);
+        //let _ = self.update_acl(acls, true);
 
-        self.flush();
+        //self.flush();
     }
 
     // TODO: 用于区别于不同的FlowAclListener
