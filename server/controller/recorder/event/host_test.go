@@ -57,8 +57,8 @@ func TestHost_ProduceByAdd(t *testing.T) {
 			tt.h.ProduceByAdd(tt.args.items)
 
 			e := tt.h.EventManager.Queue.Get().(*eventapi.ResourceEvent)
-			assert.Equal(t, tt.wantID, e.ResourceID)
-			assert.Equal(t, tt.wantName, e.ResourceName)
+			assert.Equal(t, tt.wantID, e.InstanceID)
+			assert.Equal(t, tt.wantName, e.InstanceName)
 		})
 	}
 }
@@ -100,8 +100,8 @@ func TestHost_ProduceByDelete(t *testing.T) {
 			tt.h.ProduceByDelete(tt.args.lcuuids)
 
 			e := tt.h.EventManager.Queue.Get().(*eventapi.ResourceEvent)
-			assert.Equal(t, tt.wantID, e.ResourceID)
-			assert.Equal(t, tt.wantName, e.ResourceName)
+			assert.Equal(t, tt.wantID, e.InstanceID)
+			assert.Equal(t, tt.wantName, e.InstanceName)
 		})
 	}
 }
