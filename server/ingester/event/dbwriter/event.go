@@ -26,12 +26,14 @@ const (
 	DefaultPartition = ckdb.TimeFuncTwelveHour
 )
 
-type ResourceEventStore struct {
-	Time uint32 // s
+type EventStore struct {
+	Time   uint32 // s
+	Source string
+	Tagged uint8
 
-	ResourceType uint32 // l3_device_type
-	ResourceID   uint32
-	ResourceName string
+	InstanceType uint32 // l3_device_type
+	InstanceID   uint32
+	InstanceName string
 
 	EventType        string
 	EventDescription string
@@ -52,17 +54,23 @@ type ResourceEventStore struct {
 	ServiceID    uint32
 }
 
-func (e *ResourceEventStore) WriteBlock(block *ckdb.Block) error {
+func (e *EventStore) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteDateTime(e.Time); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(e.ResourceType); err != nil {
+	if err := block.WriteString(e.Source); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(e.ResourceID); err != nil {
+	if err := block.WriteUInt8(e.Tagged); err != nil {
 		return err
 	}
-	if err := block.WriteString(e.ResourceName); err != nil {
+	if err := block.WriteUInt32(e.InstanceType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt32(e.InstanceID); err != nil {
+		return err
+	}
+	if err := block.WriteString(e.InstanceName); err != nil {
 		return err
 	}
 	if err := block.WriteString(e.EventType); err != nil {
@@ -120,16 +128,18 @@ func (e *ResourceEventStore) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (e *ResourceEventStore) Release() {
-	ReleaseResourceEventStore(e)
+func (e *EventStore) Release() {
+	ReleaseEventStore(e)
 }
 
-func ResourceEventColumns() []*ckdb.Column {
+func EventColumns() []*ckdb.Column {
 	return []*ckdb.Column{
 		ckdb.NewColumn("time", ckdb.DateTime),
-		ckdb.NewColumn("resource_type", ckdb.UInt32).SetComment("资源类型"),
-		ckdb.NewColumn("resource_id", ckdb.UInt32).SetComment("资源ID"),
-		ckdb.NewColumn("resource_name", ckdb.LowCardinalityString).SetComment("资源名称"),
+		ckdb.NewColumn("source", ckdb.LowCardinalityString).SetComment("事件来源"),
+		ckdb.NewColumn("tagged", ckdb.UInt8).SetComment("标签是否为填充"),
+		ckdb.NewColumn("instance_type", ckdb.UInt32).SetComment("资源类型"),
+		ckdb.NewColumn("instance_id", ckdb.UInt32).SetComment("资源ID"),
+		ckdb.NewColumn("instance_name", ckdb.LowCardinalityString).SetComment("资源名称"),
 		ckdb.NewColumn("event_type", ckdb.LowCardinalityString).SetComment("事件类型"),
 		ckdb.NewColumn("event_desc", ckdb.String).SetComment("事件信息"),
 		ckdb.NewColumn("subnet_ids", ckdb.ArrayUInt32).SetComment("子网IDs"),
@@ -159,7 +169,7 @@ func GenEventCKTable(eventType common.EventType, cluster, storagePolicy string, 
 	var columns []*ckdb.Column
 	switch eventType {
 	case common.RESOURCE_EVENT:
-		columns = ResourceEventColumns()
+		columns = EventColumns()
 	default:
 		return nil
 	}
@@ -181,25 +191,25 @@ func GenEventCKTable(eventType common.EventType, cluster, storagePolicy string, 
 	}
 }
 
-var resourceEventPool = pool.NewLockFreePool(func() interface{} {
-	return &ResourceEventStore{
+var eventPool = pool.NewLockFreePool(func() interface{} {
+	return &EventStore{
 		SubnetIDs: []uint32{},
 		IPs:       []string{},
 	}
 })
 
-func AcquireResourceEventStore() *ResourceEventStore {
-	return resourceEventPool.Get().(*ResourceEventStore)
+func AcquireEventStore() *EventStore {
+	return eventPool.Get().(*EventStore)
 }
 
-func ReleaseResourceEventStore(e *ResourceEventStore) {
+func ReleaseEventStore(e *EventStore) {
 	if e == nil {
 		return
 	}
 	subnetIDs := e.SubnetIDs[:0]
 	ips := e.IPs[:0]
-	*e = ResourceEventStore{}
+	*e = EventStore{}
 	e.SubnetIDs = subnetIDs
 	e.IPs = ips
-	resourceEventPool.Put(e)
+	eventPool.Put(e)
 }
