@@ -272,11 +272,6 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
 	send_buffer->tuple.num = inet_sport;
 
-	// Display ipv4 when both ipv4 and ipv6 are supported
-	if (skc_family == PF_INET6 && skc_flags.skc_ipv6only == 0) {
-		skc_family = PF_INET;
-	}
-
 	switch (skc_family) {
 	case PF_INET:
 		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
