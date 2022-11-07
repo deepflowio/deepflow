@@ -1,13 +1,13 @@
-# Field                     , DBField              , Type       , Permission 
-byte                        , byte                 , counter    , 111        
-byte_tx                     , byte_tx              , counter    , 111        
-byte_rx                     , byte_rx              , counter    , 111        
-packet                      , packet               , counter    , 111        
-packet_tx                   , packet_tx            , counter    , 111        
-packet_rx                   , packet_rx            , counter    , 111        
-l3_byte                     ,                      , counter    , 111        
-l3_byte_tx                  , l3_byte_tx           , counter    , 111        
-l3_byte_rx                  , l3_byte_rx           , counter    , 111        
-l4_byte                     ,                      , counter    , 111        
-l4_byte_tx                  , l4_byte_tx           , counter    , 111        
-l4_byte_rx                  , l4_byte_rx           , counter    , 111        
+# Field                     , DBField              , Type       , Category     , Permission 
+byte                        , byte                 , counter    , 网络层吞吐   , 111        
+byte_tx                     , byte_tx              , counter    , 网络层吞吐   , 111        
+byte_rx                     , byte_rx              , counter    , 网络层吞吐   , 111        
+packet                      , packet               , counter    , 网络层吞吐   , 111        
+packet_tx                   , packet_tx            , counter    , 网络层吞吐   , 111        
+packet_rx                   , packet_rx            , counter    , 网络层吞吐   , 111        
+l3_byte                     ,                      , counter    , 网络层吞吐   , 111        
+l3_byte_tx                  , l3_byte_tx           , counter    , 网络层吞吐   , 111        
+l3_byte_rx                  , l3_byte_rx           , counter    , 网络层吞吐   , 111        
+l4_byte                     ,                      , counter    , 网络层吞吐   , 111        
+l4_byte_tx                  , l4_byte_tx           , counter    , 网络层吞吐   , 111        
+l4_byte_rx                  , l4_byte_rx           , counter    , 网络层吞吐   , 111        

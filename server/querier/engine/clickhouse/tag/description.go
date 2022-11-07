@@ -135,7 +135,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				if strings.Contains(table, ".") {
 					continue
 				}
-				if len(tag) < 6 {
+				if len(tag) < 7 {
 					return errors.New(
 						fmt.Sprintf("get tag failed! db:%s table:%s, tag:%v", db, table, tag),
 					)
@@ -150,7 +150,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 				// 7 - Permissions
 				// 8 - Description
 				// 9 - RelatedTag
-				permissions, err := ckcommon.ParsePermission(tag[5])
+				permissions, err := ckcommon.ParsePermission(tag[6])
 				if err != nil {
 					return errors.New(
 						fmt.Sprintf(
@@ -171,11 +171,10 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 					enumFile = tag[4].(string) + "." + config.Cfg.Language
 				}
 				displayName := tagLanguage[1].(string)
-				category := tagLanguage[2].(string)
-				des := tagLanguage[3].(string)
+				des := tagLanguage[2].(string)
 				description := NewTagDescription(
 					tag[0].(string), tag[1].(string), tag[2].(string), displayName,
-					tag[3].(string), enumFile, category, permissions, des, relatedTag,
+					tag[3].(string), enumFile, tag[5].(string), permissions, des, relatedTag,
 				)
 				TAG_DESCRIPTIONS[key] = description
 				enumFileToTagType[enumFile] = tag[3].(string)

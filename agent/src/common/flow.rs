@@ -1179,8 +1179,27 @@ pub fn get_direction(
                             add_tracing_doc,
                         );
                     }
+                } else {
+                    if is_local_mac {
+                        if is_local_ip {
+                            return (
+                                Direction::ClientNodeToServer,
+                                Direction::ServerNodeToClient,
+                                add_tracing_doc,
+                            );
+                        } else if tunnel_tier > 0 {
+                            return (
+                                Direction::ClientNodeToServer,
+                                Direction::ServerNodeToClient,
+                                add_tracing_doc,
+                            );
+                        } else {
+                            //其他情况: BUM流量
+                        }
+                    } else {
+                        //其他情况: BUM流量
+                    }
                 }
-                //其他情况: BUM流量
             }
             TridentType::TtProcess => {
                 if is_ep {

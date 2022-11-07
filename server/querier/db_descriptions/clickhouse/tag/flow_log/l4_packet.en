@@ -1,8 +1,8 @@
-# Name                    , DisplayName           , Category      , Discription
-time                      ,                       ,               ,
+# Name                    , DisplayName           , Discription
+time                      ,                       ,
 
-flow_id                   , 流日志ID              , 流信息        ,
-vtap                      , 采集器                , 流信息        ,
-start_time                , 开始时间              , 流信息        ,
-end_time                  , 结束时间              , 流信息        ,
-packet_batch              , packet_batch          , 流信息        ,
+flow_id                   , 流日志ID              ,
+vtap                      , 采集器                ,
+start_time                , 开始时间              ,
+end_time                  , 结束时间              ,
+packet_batch              , packet_batch          ,
