@@ -17,19 +17,19 @@
 package kubernetes_gather
 
 import (
+	"errors"
+	"inet.af/netaddr"
 	"regexp"
 	"sort"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/mikioh/ipaddr"
-	uuid "github.com/satori/go.uuid"
-	"inet.af/netaddr"
-
 	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
 	"github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/genesis"
+	"github.com/mikioh/ipaddr"
+	uuid "github.com/satori/go.uuid"
 )
 
 func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []model.Subnet, nodeVInterfaces, podVInterfaces []model.VInterface, nodeIPs, podIPs []model.IP, err error) {
@@ -49,10 +49,22 @@ func (k *KubernetesGather) getVInterfacesAndIPs() (nodeSubnets, podSubnets []mod
 		k8sNodeIPs.Add(key)
 	}
 
-	portNameRegex, _ := regexp.Compile(k.PortNameRegex)
+	portNameRegex, err := regexp.Compile(k.PortNameRegex)
+	if err != nil {
+		log.Errorf("config port name regex (%s) complie failed", k.PortNameRegex)
+		return
+	}
 
 	// 获取vinterface API返回中host ip与其上所有node ip的对应关系
-	genesisData, _ := genesis.GenesisService.GetGenesisSyncResponse()
+	if genesis.GenesisService == nil {
+		err = errors.New("genesis service is nil")
+		return
+	}
+	genesisData, err := genesis.GenesisService.GetGenesisSyncResponse()
+	if err != nil {
+		log.Error("get genesis vinterface failed")
+		return
+	}
 	vData := genesisData.Vinterfaces
 	for _, vItem := range vData {
 		if vItem.KubernetesClusterID != k.ClusterID {

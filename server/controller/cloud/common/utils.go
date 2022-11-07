@@ -385,13 +385,12 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 		// 额外对接路由接口为空 或者 不匹配额外对接路由接口时，跳过该接口
 		includeHostIP := false
 		for _, vinterface := range vinterfaces {
-			vinterfaceName := vinterface.Name
-			if reg == nil || reg.MatchString(vinterfaceName) {
+			if reg == nil || !reg.MatchString(vinterface.Name) {
+				log.Debugf("vinterface name (%s) reg (%s) not match", vinterface.Name, portNameRegex)
 				continue
 			}
-			mac := vinterface.Mac
-			vinterfaceLcuuid := common.GenerateUUID(host.Lcuuid + mac)
 
+			vinterfaceLcuuid := common.GenerateUUID(host.Lcuuid + vinterface.Mac)
 			ips := strings.Split(vinterface.IPs, ",")
 			for _, ip := range ips {
 				if ip == host.IP {
@@ -459,7 +458,7 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 			retVInterfaces = append(retVInterfaces, model.VInterface{
 				Lcuuid:        vinterfaceLcuuid,
 				Type:          common.VIF_TYPE_LAN,
-				Mac:           mac,
+				Mac:           vinterface.Mac,
 				DeviceType:    common.VIF_DEVICE_TYPE_HOST,
 				DeviceLcuuid:  host.Lcuuid,
 				NetworkLcuuid: networkLcuuid,
