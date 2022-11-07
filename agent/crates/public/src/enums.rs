@@ -308,8 +308,8 @@ impl HeaderType {
             Self::Ipv6 => 14 + 20, // 不包括DOT1Q + IPv6 option，IPv6大于IPv4的20个字节计算在m.l2L3OptSize里面0,
             Self::Ipv4Tcp => 14 + 20 + 20, // 不包括DOT1Q + IPv4 option0x80,
             Self::Ipv4Udp => 14 + 20 + 8, // 不包括DOT1Q + IPv4 option0x81,
-            Self::Ipv6Tcp => 14 + 20 + 20, // 不包括DOT1Q + IPv6 option，IPv6大于IPv4的20个字节计算在m.l2L3OptSize里面0xb0,
-            Self::Ipv6Udp => 14 + 20 + 8, // 不包括DOT1Q + IPv6 option，IPv6大于IPv4的20个字节计算在m.l2L3OptSize里面0xb1,
+            Self::Ipv6Tcp => 14 + 40 + 20, // 不包括DOT1Q + IPv6 option，IPv6大于40字节的option计算在m.l2L3OptSize里面0xb0,
+            Self::Ipv6Udp => 14 + 40 + 8, // 不包括DOT1Q + IPv6 option，IPv6大于40字节的option计算在m.l2L3OptSize里面0xb1,
             Self::Invalid => unreachable!(),
         }
     }

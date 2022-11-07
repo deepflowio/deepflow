@@ -86,9 +86,9 @@ var L4_FLOW_LOG_METRICS_REPLACE = map[string]*Metrics{
 	"packet":    NewReplaceMetrics("packet_tx+packet_rx", ""),
 	"l3_byte":   NewReplaceMetrics("l3_byte_tx+l3_byte_rx", ""),
 	"l4_byte":   NewReplaceMetrics("l4_byte_tx+l4_byte_rx", ""),
-	"bbp":       NewReplaceMetrics("(byte_tx+byte_rx)/(packet_tx+packet_rx)", "(packet_tx+packet_rx)>0"),
-	"bbp_tx":    NewReplaceMetrics("byte_tx/packet_tx", "packet_tx>0"),
-	"bbp_rx":    NewReplaceMetrics("byte_rx/packet_rx", "packet_rx>0"),
+	"bpp":       NewReplaceMetrics("(byte_tx+byte_rx)/(packet_tx+packet_rx)", "(packet_tx+packet_rx)>0"),
+	"bpp_tx":    NewReplaceMetrics("byte_tx/packet_tx", "packet_tx>0"),
+	"bpp_rx":    NewReplaceMetrics("byte_rx/packet_rx", "packet_rx>0"),
 
 	"retrans":              NewReplaceMetrics("retrans_tx+retrans_rx", ""),
 	"zero_win":             NewReplaceMetrics("zero_win_tx+zero_win_rx", ""),

@@ -117,12 +117,12 @@ func (d *Decoder) Run() {
 }
 
 func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
-	eventStore := dbwriter.AcquireResourceEventStore()
+	eventStore := dbwriter.AcquireEventStore()
 	eventStore.Time = uint32(event.Time)
 
-	eventStore.ResourceType = event.ResourceType
-	eventStore.ResourceID = event.ResourceID
-	eventStore.ResourceName = event.ResourceName
+	eventStore.InstanceType = event.InstanceType
+	eventStore.InstanceID = event.InstanceID
+	eventStore.InstanceName = event.InstanceName
 
 	eventStore.EventType = event.Type
 	eventStore.EventDescription = event.Description
@@ -130,22 +130,43 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.SubnetIDs...)
 	eventStore.IPs = append(eventStore.IPs, event.IPs...)
 
-	resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.ResourceType, event.ResourceID)
-	if resourceInfo != nil {
-		eventStore.RegionID = uint16(resourceInfo.RegionID)
-		eventStore.AZID = uint16(resourceInfo.AZID)
-		eventStore.L3EpcID = resourceInfo.L3EpcID
-		eventStore.HostID = uint16(resourceInfo.HostID)
-		eventStore.PodID = resourceInfo.PodID
-		eventStore.PodNodeID = resourceInfo.PodNodeID
-		eventStore.PodNSID = uint16(resourceInfo.PodNSID)
-		eventStore.PodClusterID = uint16(resourceInfo.PodClusterID)
-		eventStore.PodGroupID = resourceInfo.PodGroupID
-		eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
-		eventStore.L3DeviceID = resourceInfo.L3DeviceID
+	if event.IfNeedTagged {
+		eventStore.Tagged = 1
+		resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.InstanceType, event.InstanceID)
+		if resourceInfo != nil {
+			eventStore.RegionID = uint16(resourceInfo.RegionID)
+			eventStore.AZID = uint16(resourceInfo.AZID)
+			eventStore.L3EpcID = resourceInfo.L3EpcID
+			eventStore.HostID = uint16(resourceInfo.HostID)
+			eventStore.PodID = resourceInfo.PodID
+			eventStore.PodNodeID = resourceInfo.PodNodeID
+			eventStore.PodNSID = uint16(resourceInfo.PodNSID)
+			eventStore.PodClusterID = uint16(resourceInfo.PodClusterID)
+			eventStore.PodGroupID = resourceInfo.PodGroupID
+			eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
+			eventStore.L3DeviceID = resourceInfo.L3DeviceID
+		}
+	} else {
+		eventStore.Tagged = 0
+		eventStore.RegionID = uint16(event.RegionID)
+		eventStore.AZID = uint16(event.AZID)
+		if event.VPCID == 0 {
+			eventStore.L3EpcID = -2
+		} else {
+			eventStore.L3EpcID = int32(event.VPCID)
+		}
+		eventStore.HostID = uint16(event.HostID)
+		eventStore.PodID = event.PodID
+		eventStore.PodNodeID = event.PodNodeID
+		eventStore.PodNSID = uint16(event.PodNSID)
+		eventStore.PodClusterID = uint16(event.PodClusterID)
+		eventStore.PodGroupID = event.PodGroupID
+		eventStore.L3DeviceType = uint8(event.L3DeviceType)
+		eventStore.L3DeviceID = event.L3DeviceID
+
 	}
-	if event.ResourceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
-		eventStore.ServiceID = event.ResourceID
+	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
+		eventStore.ServiceID = event.InstanceID
 	}
 
 	d.eventWriter.Write(eventStore)

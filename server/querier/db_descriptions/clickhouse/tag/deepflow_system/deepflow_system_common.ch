@@ -1,2 +1,2 @@
-# Name                     , DisplayName                , Discription
-time                       ,                            ,
+# Name                     , DisplayName                , Description
+time                       , 时间                       ,
