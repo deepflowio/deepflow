@@ -89,8 +89,8 @@ func NewReplaceMetrics(dbField string, condition string) *Metrics {
 }
 
 func GetMetrics(field string, db string, table string, ctx context.Context) (*Metrics, bool) {
+	field = strings.Trim(field, "`")
 	if db == "ext_metrics" || db == "deepflow_system" || table == "l7_flow_log" {
-		field = strings.Trim(field, "`")
 		fieldSplit := strings.Split(field, ".")
 		if len(fieldSplit) > 1 {
 			if fieldSplit[0] == "metrics" {
@@ -104,12 +104,46 @@ func GetMetrics(field string, db string, table string, ctx context.Context) (*Me
 			}
 		}
 	}
-	allMetrics, err := GetMetricsByDBTable(db, table, "", ctx)
+	allMetrics, err := GetMetricsByDBTableStatic(db, table, "")
 	if err != nil {
 		return nil, false
 	}
 	metric, ok := allMetrics[field]
 	return metric, ok
+}
+
+func GetMetricsByDBTableStatic(db string, table string, where string) (map[string]*Metrics, error) {
+	var err error
+	switch db {
+	case "flow_log":
+		switch table {
+		case "l4_flow_log":
+			return GetL4FlowLogMetrics(), err
+		case "l4_packet":
+			return GetL4PacketMetrics(), err
+		case "l7_flow_log":
+			return GetL7FlowLogMetrics(), err
+		}
+	case "flow_metrics":
+		switch table {
+		case "vtap_flow_port":
+			return GetVtapFlowPortMetrics(), err
+		case "vtap_flow_edge_port":
+			return GetVtapFlowEdgePortMetrics(), err
+		case "vtap_app_port":
+			return GetVtapAppPortMetrics(), err
+		case "vtap_app_edge_port":
+			return GetVtapAppEdgePortMetrics(), err
+		case "vtap_acl":
+			return GetVtapAclMetrics(), err
+		}
+	case "event":
+		switch table {
+		case "event":
+			return GetResourceEventMetrics(), err
+		}
+	}
+	return nil, err
 }
 
 func GetMetricsByDBTable(db string, table string, where string, ctx context.Context) (map[string]*Metrics, error) {
