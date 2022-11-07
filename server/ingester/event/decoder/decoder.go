@@ -120,9 +120,9 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore := dbwriter.AcquireResourceEventStore()
 	eventStore.Time = uint32(event.Time)
 
-	eventStore.ResourceType = event.ResourceType
-	eventStore.ResourceID = event.ResourceID
-	eventStore.ResourceName = event.ResourceName
+	eventStore.ResourceType = event.InstanceType
+	eventStore.ResourceID = event.InstanceID
+	eventStore.ResourceName = event.InstanceName
 
 	eventStore.EventType = event.Type
 	eventStore.EventDescription = event.Description
@@ -130,7 +130,7 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 	eventStore.SubnetIDs = append(eventStore.SubnetIDs, event.SubnetIDs...)
 	eventStore.IPs = append(eventStore.IPs, event.IPs...)
 
-	resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.ResourceType, event.ResourceID)
+	resourceInfo := d.resourceInfoTable.QueryResourceInfo(event.InstanceType, event.InstanceID)
 	if resourceInfo != nil {
 		eventStore.RegionID = uint16(resourceInfo.RegionID)
 		eventStore.AZID = uint16(resourceInfo.AZID)
@@ -144,8 +144,8 @@ func (d *Decoder) handleResourceEvent(event *eventapi.ResourceEvent) {
 		eventStore.L3DeviceType = uint8(resourceInfo.L3DeviceType)
 		eventStore.L3DeviceID = resourceInfo.L3DeviceID
 	}
-	if event.ResourceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
-		eventStore.ServiceID = event.ResourceID
+	if event.InstanceType == uint32(trident.DeviceType_DEVICE_TYPE_POD_SERVICE) {
+		eventStore.ServiceID = event.InstanceID
 	}
 
 	d.eventWriter.Write(eventStore)

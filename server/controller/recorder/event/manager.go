@@ -36,9 +36,9 @@ func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType string, resourceT
 	event := e.create()
 	event.Time = time.Now().Unix()
 	event.Type = eventType
-	event.ResourceType = uint32(resourceType)
-	event.ResourceID = uint32(resourceID)
-	event.ResourceName = resourceName
+	event.InstanceType = uint32(resourceType)
+	event.InstanceID = uint32(resourceID)
+	event.InstanceName = resourceName
 	event.Description = description
 	event.SubnetIDs = netIDs
 	event.IPs = ips
