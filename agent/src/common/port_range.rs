@@ -218,6 +218,17 @@ impl TryFrom<String> for PortRangeList {
     }
 }
 
+impl fmt::Display for PortRangeList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ports = self
+            .0
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>();
+        write!(f, "[{}]", ports.join(", "))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

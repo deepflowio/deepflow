@@ -294,7 +294,7 @@ impl Status {
     }
 
     pub fn get_flow_acls(&mut self, resp: &tp::SyncResponse) -> bool {
-        let version = resp.version_platform_data.unwrap_or(0);
+        let version = resp.version_acls.unwrap_or(0);
         debug!(
             "get grpc FlowAcls version: {} vs current version: {}.",
             version, self.version_acls

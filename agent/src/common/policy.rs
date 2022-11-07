@@ -717,8 +717,11 @@ impl TryFrom<trident::FlowAcl> for Acl {
 
 impl fmt::Display for Acl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Id:{} TapType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:{:?} DstPortRange:{:?} Proto:{} NpbActions:{}",
-            self.id, self.tap_type, self.src_groups, self.dst_groups, self.src_port_ranges, self.dst_port_ranges, self.proto, self.npb_actions.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","))
+        write!(f, "Id:{} TapType:{} SrcGroups:{:?} DstGroups:{:?} SrcPortRange:[{}] DstPortRange:[{}] Proto:{} NpbActions:{}",
+            self.id, self.tap_type, self.src_groups, self.dst_groups,
+            self.src_port_ranges.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", "),
+            self.dst_port_ranges.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", "),
+            self.proto, self.npb_actions.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","))
     }
 }
 
