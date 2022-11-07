@@ -42,7 +42,7 @@ use crate::{
         },
         InterfaceEntry, LibvirtXmlExtractor,
     },
-    proto::trident::{self, Exception, GenesisSyncRequest, GenesisSyncResponse},
+    proto::trident::{self, Exception},
     rpc::Session,
     utils::{command::*, environment::is_tt_pod},
 };
@@ -615,7 +615,7 @@ impl PlatformSynchronizer {
             nat_ip: None,
         };
 
-        rt.block_on(Self::genesis_sync(&process_args.session, msg))
+        rt.block_on(process_args.session.call_with_statsd(msg))
             .map(|r| r.into_inner().version())
     }
 
@@ -692,7 +692,7 @@ impl PlatformSynchronizer {
                     nat_ip: None,
                 };
 
-                match rt.block_on(Self::genesis_sync(&args.session, msg)) {
+                match rt.block_on(args.session.call_with_statsd(msg)) {
                     Ok(res) => {
                         let res = res.into_inner();
                         let remote_version = res.version();
@@ -709,7 +709,10 @@ impl PlatformSynchronizer {
                     }
                     Err(e) => {
                         args.exception_handler.set(Exception::ControllerSocketError);
-                        error!("send platform heartbeat failed: {}", e);
+                        error!(
+                            "send platform heartbeat with genesis_sync grpc call failed: {}",
+                            e
+                        );
                         if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                             break;
                         }
@@ -732,7 +735,10 @@ impl PlatformSynchronizer {
                 Ok(version) => last_version = version,
                 Err(e) => {
                     args.exception_handler.set(Exception::ControllerSocketError);
-                    error!("send platform information failed: {}", e);
+                    error!(
+                        "send platform information with genesis_sync grpc call failed: {}",
+                        e
+                    );
                     if Self::wait_timeout(&args.running, &args.timer, poll_interval) {
                         break;
                     }
@@ -756,19 +762,6 @@ impl PlatformSynchronizer {
             return true;
         }
         false
-    }
-
-    async fn genesis_sync(
-        session: &Arc<Session>,
-        req: GenesisSyncRequest,
-    ) -> Result<tonic::Response<GenesisSyncResponse>, tonic::Status> {
-        session.update_current_server().await;
-        let client = session
-            .get_client()
-            .ok_or(tonic::Status::not_found("rpc client not connected"))?;
-
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-        client.genesis_sync(req).await
     }
 }
 

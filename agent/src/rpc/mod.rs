@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
+mod grpc_call;
 mod ntp;
 mod session;
 mod synchronizer;
 
+use grpc_call::{GrpcCallCounter, GrpcWrapper};
 pub(crate) use session::{Session, DEFAULT_TIMEOUT};
 pub(crate) use synchronizer::{RunningConfig, StaticConfig, Status, Synchronizer};
 
