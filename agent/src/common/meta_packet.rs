@@ -489,6 +489,8 @@ impl<'a> MetaPacket<'a> {
                 self.header_type = HeaderType::Ipv6;
                 self.offset_ip_0 = FIELD_OFFSET_IPV6_SRC + vlan_tag_size;
                 self.offset_ip_1 = FIELD_OFFSET_IPV6_DST + vlan_tag_size;
+                self.offset_port_0 = FIELD_OFFSET_IPV6_SPORT + vlan_tag_size;
+                self.offset_port_1 = FIELD_OFFSET_IPV6_DPORT + vlan_tag_size;
                 self.lookup_key.src_ip = IpAddr::from(
                     *<&[u8; 16]>::try_from(
                         &packet[self.offset_ip_0..self.offset_ip_0 + IPV6_ADDR_LEN],
