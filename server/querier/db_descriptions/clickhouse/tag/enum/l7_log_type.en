@@ -1,4 +1,4 @@
 # Value , DisplayName
-0       , 请求
-1       , 回复
-2       , 会话
+0       , Request
+1       , Response
+2       , Session

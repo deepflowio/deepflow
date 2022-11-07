@@ -3,8 +3,8 @@ time_str              , Time                         ,
 
 region                , Region                       ,
 az                    , Availability Zone            ,
-host                  , VM Hypervisor                ,
-chost                 , Cloud Host                   ,
+host                  , VM Hypervisor                 , Host running virtual machine.
+chost                 , Cloud Host                    , Including virtual machines, bare metal servers.
 vpc                   , VPC                          ,
 router                , Router                       ,
 dhcpgw                , DHCP Gateway                 ,
@@ -19,11 +19,13 @@ pod_service           , K8s Service                  ,
 pod_group             , K8s Workload                 ,
 pod                   , K8s POD                      ,
 
+labels                , K8s Labels                   ,
+
+instance              , Instance                     ,
+instance_type         , Instance Type                ,
+instance_id           , Instance ID                  ,
 ips                   , IP Address                   ,
 subnets               , Subnet                       ,
-resource_type         , Type                         ,
-resource_id           , Instance ID                  ,
-resource              , Instance                     ,
-event_desc            , 信息                         ,
-event_type            , 类型                         ,
-labels                , K8s Labels                   ,
+
+event_type            , Event Type                   ,
+event_desc            , Event Message                ,

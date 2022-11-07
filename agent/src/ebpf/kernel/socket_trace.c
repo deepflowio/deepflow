@@ -221,10 +221,7 @@ static __inline int is_tcp_udp_data(void *sk,
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
-		break;
 	case PF_INET6:
-		if (conn_info->skc_ipv6only == 0)
-			conn_info->skc_family = PF_INET;
 		break;
 	default:
 		return SOCK_CHECK_TYPE_ERROR;

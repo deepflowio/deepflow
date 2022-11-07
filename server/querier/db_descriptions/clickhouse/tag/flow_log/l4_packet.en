@@ -1,8 +1,10 @@
-# Name                    , DisplayName           , Discription
-time                      ,                       ,
+# Name                    , DisplayName              , Description
+time                      , Time                     , Round end_time to seconds.
 
-flow_id                   , 流日志ID              ,
-vtap                      , 采集器                ,
-start_time                , 开始时间              ,
-end_time                  , 结束时间              ,
-packet_batch              , packet_batch          ,
+flow_id                   , Flow ID                  ,
+start_time                , Start Time               , Unit: microseconds. Minimal time in packet_batch.
+end_time                  , End Time                 , Unit: microseconds. Maximal time in packet_batch.
+
+packet_batch              , Compressed Packet Header ,
+
+vtap                      , Agent Name               ,

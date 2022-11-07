@@ -79,6 +79,10 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	var levelFlag int
 	field := args[0]
 	field = strings.Trim(field, "`")
+	function, ok := metrics.METRICS_FUNCTIONS_MAP[name]
+	if !ok {
+		return nil, 0, "", nil
+	}
 	metricStruct, ok := metrics.GetMetrics(field, db, table, ctx)
 	if !ok {
 		return nil, 0, "", nil
@@ -86,12 +90,7 @@ func GetAggFunc(name string, args []string, alias string, db string, table strin
 	if metricStruct.Type == metrics.METRICS_TYPE_ARRAY {
 		return nil, 0, "", nil
 	}
-	var unit string
-	if function, ok := metrics.METRICS_FUNCTIONS_MAP[name]; !ok {
-		return nil, 0, "", nil
-	} else {
-		unit = strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
-	}
+	unit := strings.ReplaceAll(function.UnitOverwrite, "$unit", metricStruct.Unit)
 	// 判断算子是否支持单层
 	if db == "flow_metrics" {
 		unlayFuns := metrics.METRICS_TYPE_UNLAY_FUNCTIONS[metricStruct.Type]

@@ -20,9 +20,11 @@ import (
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/parse"
+
 	//"github.com/deepflowys/deepflow/server/querier/querier"
-	"github.com/deepflowys/deepflow/server/querier/config"
 	"testing"
+
+	"github.com/deepflowys/deepflow/server/querier/config"
 )
 
 /* var (
@@ -176,17 +178,17 @@ var (
 		output: "SELECT `xx`, region_0, AVG(`_sum_byte_tx`) AS `Avg(byte_tx)` FROM (WITH dictGet(flow_tag.device_map, 'icon_id', (toUInt64(1),toUInt64(l3_device_id_0))) AS `xx`, toStartOfInterval(time, toIntervalSecond(1)) AS `_time` SELECT `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, SUM(byte_tx) AS `_sum_byte_tx`, _time FROM flow_metrics.`vtap_flow_edge_port` WHERE (region_id_0!=0) GROUP BY `xx`, dictGet(flow_tag.region_map, 'name', (toUInt64(region_id_0))) AS `region_0`, `_time`) GROUP BY `xx`, `region_0` LIMIT 1",
 		db:     "flow_metrics",
 	}, {
-		// 	input:  "select request from l7_flow_log where Enum(tap_side)='xxx' limit 0, 50",
-		// 	output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (tap_side IN (SELECT value FROM flow_tag.string_enum_map WHERE name = 'xxx' and tag_name='tap_side') OR tap_side = 'xxx') LIMIT 0, 50",
-		// }, {
-		// 	input:  "select request from l7_flow_log where Enum(tap_side) like 'xxx' limit 0, 50",
-		// 	output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (tap_side IN (SELECT value FROM flow_tag.string_enum_map WHERE name ilike 'xxx' and tag_name='tap_side')) LIMIT 0, 50",
+		input:  "select request from l7_flow_log where Enum(tap_side)='xxx' limit 0, 50",
+		output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (tap_side IN (SELECT value FROM flow_tag.string_enum_map WHERE name = 'xxx' and tag_name='tap_side') OR tap_side = 'xxx') LIMIT 0, 50",
+	}, {
+		input:  "select request from l7_flow_log where Enum(tap_side) like 'xxx' limit 0, 50",
+		output: "SELECT if(type IN [0, 2],1,0) AS `request` FROM flow_log.`l7_flow_log` PREWHERE (tap_side IN (SELECT value FROM flow_tag.string_enum_map WHERE name ilike 'xxx' and tag_name='tap_side')) LIMIT 0, 50",
 	}, {
 		input:  "select Histogram(Sum(byte),10) AS histo from l4_flow_log",
 		output: "SELECT histogram(10)(`_sum_byte_tx+byte_rx`) AS `histo` FROM (SELECT SUM(byte_tx+byte_rx) AS `_sum_byte_tx+byte_rx` FROM flow_log.`l4_flow_log`)",
 	}, {
-		input:  "select Sum(log_count) from resource_event",
-		output: "SELECT SUM(1) FROM event.`resource_event`",
+		input:  "select Sum(log_count) from event",
+		output: "SELECT SUM(1) FROM event.`event`",
 		db:     "event",
 	},
 	}
