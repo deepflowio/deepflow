@@ -41,7 +41,7 @@ func TestVM_ProduceByAdd(t *testing.T) {
 	}{
 		{
 			name: "add success",
-			v:    NewVM(cache.NewToolDataSet(), NewEventQueue()),
+			v:    NewVM(&cache.ToolDataSet{}, NewEventQueue()),
 			args: args{
 				items: []*mysql.VM{
 					{
@@ -59,8 +59,8 @@ func TestVM_ProduceByAdd(t *testing.T) {
 			tt.v.ProduceByAdd(tt.args.items)
 
 			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
-			assert.Equal(t, tt.wantID, e.ResourceID)
-			assert.Equal(t, tt.wantName, e.ResourceName)
+			assert.Equal(t, tt.wantID, e.InstanceID)
+			assert.Equal(t, tt.wantName, e.InstanceName)
 		})
 
 	}
@@ -72,7 +72,7 @@ func TestVM_ProduceByDelete(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		dataSet  cache.ToolDataSet
+		dataSet  *cache.ToolDataSet
 		v        *VM
 		args     args
 		wantID   uint32
@@ -80,7 +80,7 @@ func TestVM_ProduceByDelete(t *testing.T) {
 	}{
 		{
 			name: "delete success",
-			dataSet: cache.ToolDataSet{
+			dataSet: &cache.ToolDataSet{
 				VMLcuuidToID: map[string]int{
 					"ff6f9b99-82ef-5507-b6b6-cbab28bda9cb": 1,
 				},
@@ -103,8 +103,8 @@ func TestVM_ProduceByDelete(t *testing.T) {
 			tt.v.ProduceByDelete(tt.args.lcuuids)
 
 			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
-			assert.Equal(t, tt.wantID, e.ResourceID)
-			assert.Equal(t, tt.wantName, e.ResourceName)
+			assert.Equal(t, tt.wantID, e.InstanceID)
+			assert.Equal(t, tt.wantName, e.InstanceName)
 		})
 	}
 }
@@ -180,8 +180,8 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 			tt.v.ProduceByUpdate(tt.args.cloudItem, tt.args.diffBase)
 
 			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
-			assert.Equal(t, tt.wantID, e.ResourceID)
-			assert.Equal(t, tt.wantName, e.ResourceName)
+			assert.Equal(t, tt.wantID, e.InstanceID)
+			assert.Equal(t, tt.wantName, e.InstanceName)
 			assert.Equal(t, tt.wantDescription, e.Description)
 		})
 	}
