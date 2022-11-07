@@ -1,4 +1,4 @@
-# Name                    , DisplayName            , Discription
+# Name                    , DisplayName            , Description
 time                      , 时间                   , 将 end_time 取整到秒。
 
 flow_id                   , 流日志ID               ,
