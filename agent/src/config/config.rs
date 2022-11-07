@@ -129,27 +129,16 @@ impl Config {
         };
 
         loop {
-            session.update_current_server().await;
-            let client = match session.get_client() {
-                Some(c) => c,
-                None => {
-                    session.set_request_failed(true);
-                    warn!("rpc client not connected");
-                    tokio::time::sleep(MINUTE).await;
-                    continue;
-                }
-            };
-            let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
             let request = KubernetesClusterIdRequest {
                 ca_md5: ca_md5.clone(),
             };
 
-            match client.get_kubernetes_cluster_id(request).await {
+            match session.call_with_statsd(request).await {
                 Ok(response) => {
                     let cluster_id_response = response.into_inner();
                     if !cluster_id_response.error_msg().is_empty() {
                         error!(
-                            "failed to get kubernetes_cluster_id from server error: {}",
+                            "get_kubernetes_cluster_id grpc call from server error: {}",
                             cluster_id_response.error_msg()
                         );
                         tokio::time::sleep(MINUTE).await;
@@ -174,7 +163,7 @@ impl Config {
                         }
                     }
                 }
-                Err(e) => error!("failed to call get_kubernetes_cluster_id error: {}", e),
+                Err(e) => error!("get_kubernetes_cluster_id grpc call error: {}", e),
             }
             tokio::time::sleep(MINUTE).await;
         }
