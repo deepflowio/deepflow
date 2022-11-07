@@ -15,18 +15,25 @@
  */
 
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64, Ordering},
+    Arc, Weak,
+};
 use std::time::Duration;
 
-use parking_lot::RwLock;
-
 use log::{error, info};
+use parking_lot::RwLock;
 use rand::Rng;
 use tonic::transport::{Channel, Endpoint};
 
+use super::{GrpcCallCounter, GrpcWrapper};
+
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::Exception;
+use crate::proto::trident::{self, Exception};
+use crate::utils::stats::{self, StatsOption};
+
+use public::counter::{Countable, RefCountable};
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 // Sessions in use occasionally timeout for 60 seconds, The
@@ -34,6 +41,16 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 // ==========================================================
 // 使用中会话偶尔会超时60秒，这里调整超时时间需要大于60秒
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
+
+const GRPC_CALL_NAMES: [&str; 7] = [
+    "push",
+    "query",
+    "upgrade",
+    "sync",
+    "genesis_sync",
+    "kubernetes_api_sync",
+    "get_kubernetes_cluster_id",
+];
 
 struct Config {
     port: u16,
@@ -80,11 +97,11 @@ pub struct Session {
 
     server_ip: RwLock<ServerIp>,
 
-    reset_triggered_session: AtomicBool,
     reset_session: AtomicBool,
     version: AtomicU64,
     client: RwLock<Option<Channel>>,
     exception_handler: ExceptionHandler,
+    counters: Vec<(&'static str, Arc<GrpcCallCounter>)>,
 }
 
 impl Session {
@@ -95,7 +112,21 @@ impl Session {
         controller_cert_file_prefix: String,
         controller_ips: Vec<String>,
         exception_handler: ExceptionHandler,
+        stats_collector: &stats::Collector,
     ) -> Session {
+        let counters = GRPC_CALL_NAMES
+            .iter()
+            .map(|&grpc| (grpc, Arc::new(GrpcCallCounter::default())))
+            .collect::<Vec<_>>();
+
+        for (name, counter) in counters.iter() {
+            stats_collector.register_countable(
+                "grpc_call",
+                Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("name", name.to_string())],
+            );
+        }
+
         Session {
             config: RwLock::new(Config {
                 port,
@@ -111,10 +142,10 @@ impl Session {
                     .collect(),
             )),
             version: AtomicU64::new(0),
-            reset_session: AtomicBool::new(false),
-            reset_triggered_session: AtomicBool::new(false),
+            reset_session: Default::default(),
             client: RwLock::new(None),
             exception_handler,
+            counters,
         }
     }
 
@@ -127,7 +158,6 @@ impl Session {
         );
 
         self.reset_session.store(true, Ordering::Relaxed);
-        self.reset_triggered_session.store(true, Ordering::Relaxed);
     }
 
     pub fn reset(&self) {
@@ -163,31 +193,14 @@ impl Session {
         self.server_ip.read().get_current_ip()
     }
 
-    pub async fn update_current_server(&self) -> bool {
-        let changed = self.server_ip.write().update_current_ip()
-            || self.reset_session.swap(false, Ordering::Relaxed);
-        if changed {
-            let ip = self.server_ip.read().get_current_ip();
-            self.dial(&ip).await;
-            self.version.fetch_add(1, Ordering::SeqCst);
-
-            self.reset_triggered_session.store(true, Ordering::Relaxed);
-        }
-        changed
-    }
-
-    pub async fn update_triggered_current_server(&self) -> bool {
-        let changed = self.reset_triggered_session.swap(false, Ordering::Relaxed);
+    async fn update_current_server(&self) -> bool {
+        let changed = self.server_ip.write().update_current_ip();
         if changed {
             let ip = self.server_ip.read().get_current_ip();
             self.dial(&ip).await;
             self.version.fetch_add(1, Ordering::SeqCst);
         }
         changed
-    }
-
-    pub fn reset_triggered(&self) -> bool {
-        self.reset_triggered_session.load(Ordering::Relaxed)
     }
 
     pub fn get_version(&self) -> u64 {
@@ -218,7 +231,38 @@ impl Session {
         self.config.write().set_proxy_port(port);
 
         self.reset_session.store(true, Ordering::Relaxed);
-        self.reset_triggered_session.store(true, Ordering::Relaxed);
+    }
+
+    pub async fn call_with_statsd<Response, Request: GrpcWrapper<Response>>(
+        &self,
+        request: Request,
+    ) -> Result<tonic::Response<Response>, tonic::Status> {
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let client = trident::synchronizer_client::SynchronizerClient::new(client);
+        request.call_with_statsd(client, &self.counters).await
+    }
+
+    pub async fn call<Response, Request: GrpcWrapper<Response>>(
+        &self,
+        request: Request,
+    ) -> Result<tonic::Response<Response>, tonic::Status> {
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let client = trident::synchronizer_client::SynchronizerClient::new(client);
+        request.call(client).await
     }
 }
 
@@ -345,6 +389,14 @@ impl ServerIp {
         if !self.proxied {
             // 请求controller成功，改为请求proxy
             if let Some(new_ip) = self.get_proxy_ip() {
+                if new_ip == self.current_ip {
+                    info!(
+                        "proxy {} same as controller {}, nothing to do",
+                        new_ip, self.current_ip
+                    );
+                    self.proxied = true;
+                    return false;
+                }
                 info!(
                     "rpc IP changed to proxy {} from controller {}",
                     new_ip, self.current_ip

@@ -107,16 +107,11 @@ pub struct ChangedConfig {
     pub tap_types: Vec<trident::TapType>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
 pub enum RunningMode {
+    #[default]
     Managed,
     Standalone,
-}
-
-impl Default for RunningMode {
-    fn default() -> Self {
-        Self::Managed
-    }
 }
 
 pub enum State {
@@ -327,6 +322,7 @@ impl Trident {
             config.controller_cert_file_prefix.clone(),
             config.controller_ips.clone(),
             exception_handler.clone(),
+            &stats_collector,
         ));
 
         if matches!(config.agent_mode, RunningMode::Managed)

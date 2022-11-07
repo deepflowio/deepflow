@@ -27,7 +27,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     Arc, Weak,
 };
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
 use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
@@ -43,6 +43,7 @@ use tokio::task::JoinHandle;
 use tokio::time;
 
 use super::ntp::{NtpMode, NtpPacket, NtpTime};
+
 use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
@@ -752,25 +753,19 @@ impl Synchronizer {
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
-                session.update_triggered_current_server().await;
-                let client = session.get_client();
-                if client.is_none() {
-                    info!("rpc trigger not running, client not connected");
-                    time::sleep(RPC_RETRY_INTERVAL).await;
-                    continue;
-                }
-                let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
                 let version = session.get_version();
-
-                let response = client
-                    .push(Synchronizer::generate_sync_request(
-                        &running_config,
-                        &static_config,
-                        &status,
-                        ntp_diff.load(Ordering::Relaxed),
-                        &exception_handler,
-                    ))
+                let response = session
+                    .call_with_statsd::<tonic::codec::Streaming<tp::SyncResponse>, _>(
+                        Synchronizer::generate_sync_request(
+                            &running_config,
+                            &static_config,
+                            &status,
+                            ntp_diff.load(Ordering::Relaxed),
+                            &exception_handler,
+                        ),
+                    )
                     .await;
+
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
                     error!("rpc error {:?}", m);
@@ -782,7 +777,7 @@ impl Synchronizer {
                 let mut stream = response.unwrap().into_inner();
                 while running.load(Ordering::SeqCst) {
                     let message = stream.message().await;
-                    if session.get_version() != version || session.reset_triggered() {
+                    if session.get_version() != version {
                         info!("grpc server changed");
                         break;
                     }
@@ -902,15 +897,6 @@ impl Synchronizer {
                     continue;
                 }
 
-                let inner_client = session.get_client();
-                if inner_client.is_none() {
-                    info!("grpc sync client not connected");
-                    time::sleep(RPC_RETRY_INTERVAL).await;
-                    continue;
-                }
-                let mut client =
-                    tp::synchronizer_client::SynchronizerClient::new(inner_client.unwrap());
-
                 let mut ntp_msg = NtpPacket::new();
                 // To ensure privacy and prevent spoofing, try to use a random 64-bit
                 // value for the TransmitTime. Keep track of when the messsage was
@@ -919,12 +905,13 @@ impl Synchronizer {
                 let send_time = SystemTime::now();
 
                 let ctrl_ip = running_config.read().ctrl_ip.clone();
-                let response = client
-                    .query(tp::NtpRequest {
+                let response = session
+                    .call_with_statsd(tp::NtpRequest {
                         ctrl_ip: Some(ctrl_ip),
                         request: Some(ntp_msg.to_vec()),
                     })
                     .await;
+
                 if let Err(e) = response {
                     warn!("ntp request failed with: {:?}", e);
                     time::sleep(sync_interval).await;
@@ -998,15 +985,8 @@ impl Synchronizer {
             return Ok(());
         }
 
-        session.update_current_server().await;
-        let client = session.get_client();
-        if client.is_none() {
-            return Err("client not connected".to_owned());
-        }
-        let mut client = tp::synchronizer_client::SynchronizerClient::new(client.unwrap());
-
-        let response = client
-            .upgrade(tp::UpgradeRequest {
+        let response = session
+            .call_with_statsd(tp::UpgradeRequest {
                 ctrl_ip: Some(ctrl_ip.to_owned()),
                 ctrl_mac: Some(ctrl_mac.to_owned()),
             })
@@ -1213,23 +1193,6 @@ impl Synchronizer {
                     )
                 }
 
-                let changed = session.update_current_server().await;
-                if changed {
-                    debug!(
-                        "grpc sync new rpc server {} available",
-                        session.get_current_server()
-                    );
-                }
-
-                let inner_client = session.get_client();
-                if inner_client.is_none() {
-                    session.set_request_failed(true);
-                    error!("grpc sync client not connected");
-                    time::sleep(RPC_RETRY_INTERVAL).await;
-                    continue;
-                }
-                let mut client = tp::synchronizer_client::SynchronizerClient::new(inner_client.unwrap());
-
                 let request = Synchronizer::generate_sync_request(
                     &running_config,
                     &static_config,
@@ -1239,8 +1202,7 @@ impl Synchronizer {
                 );
                 debug!("grpc sync request: {:?}", request);
 
-                let now = Instant::now();
-                let response = client.sync(request).await;
+                let response = session.call_with_statsd::<tp::SyncResponse, _>(request).await;
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
                     error!(
@@ -1253,8 +1215,6 @@ impl Synchronizer {
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }
-
-                debug!("grpc sync took {:?}", now.elapsed());
                 session.set_request_failed(false);
 
                 Self::on_response(

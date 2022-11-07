@@ -46,7 +46,7 @@ use crate::{
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
     proto::{
         common::KubernetesApiInfo,
-        trident::{self, Exception, KubernetesApiSyncRequest, KubernetesApiSyncResponse},
+        trident::{Exception, KubernetesApiSyncRequest},
     },
     rpc::Session,
 };
@@ -546,7 +546,7 @@ impl ApiWatcher {
 
         match context
             .runtime
-            .block_on(Self::kubernetes_api_sync(session, msg.clone()))
+            .block_on(session.call_with_statsd(msg.clone()))
         {
             Ok(resp) => {
                 if has_update {
@@ -561,7 +561,7 @@ impl ApiWatcher {
                 }
             }
             Err(e) => {
-                let err = format!("KubernetesAPISync failed: {}", e);
+                let err = format!("kubernetes_api_sync grpc call failed: {}", e);
                 exception_handler.set(Exception::ControllerSocketError);
                 error!("{}", err);
                 err_msgs.lock().unwrap().push(err);
@@ -594,29 +594,12 @@ impl ApiWatcher {
             Self::debug_k8s_request(&msg, true);
         }
 
-        if let Err(e) = context
-            .runtime
-            .block_on(Self::kubernetes_api_sync(session, msg))
-        {
-            let err = format!("KubernetesAPISync failed: {}", e);
+        if let Err(e) = context.runtime.block_on(session.call_with_statsd(msg)) {
+            let err = format!("kubernetes_api_sync grpc call failed: {}", e);
             exception_handler.set(Exception::ControllerSocketError);
             error!("{}", err);
             err_msgs.lock().unwrap().push(err);
         }
-    }
-
-    async fn kubernetes_api_sync(
-        session: &Arc<Session>,
-        req: KubernetesApiSyncRequest,
-    ) -> Result<tonic::Response<KubernetesApiSyncResponse>, tonic::Status> {
-        session.update_current_server().await;
-        let client = session
-            .get_client()
-            .ok_or(tonic::Status::not_found("rpc client not connected"))?;
-
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-
-        client.kubernetes_api_sync(req).await
     }
 
     fn parse_apiserver_version(info: &Info) -> Option<KubernetesApiInfo> {
@@ -667,11 +650,8 @@ impl ApiWatcher {
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
-                    if let Err(e) = context
-                        .runtime
-                        .block_on(Self::kubernetes_api_sync(&session, msg))
-                    {
-                        debug!("report error: {}", e);
+                    if let Err(e) = context.runtime.block_on(session.call_with_statsd(msg)) {
+                        debug!("kubernetes_api_sync grpc call failed: {}", e);
                     }
                 }
             }
