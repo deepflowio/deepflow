@@ -93,10 +93,15 @@ pub const FIELD_OFFSET_DPORT: usize = 36;
 pub const FIELD_OFFSET_IPV6_SPORT: usize = 54;
 pub const FIELD_OFFSET_IPV6_DPORT: usize = 56;
 pub const FIELD_OFFSET_TCP_SEQ: usize = 38;
+pub const FIELD_OFFSET_TCPV6_SEQ: usize = 58;
 pub const FIELD_OFFSET_TCP_ACK: usize = 42;
+pub const FIELD_OFFSET_TCPV6_ACK: usize = 62;
 pub const FIELD_OFFSET_TCP_DATAOFF: usize = 46;
+pub const FIELD_OFFSET_TCPV6_DATAOFF: usize = 66;
 pub const FIELD_OFFSET_TCP_FLAG: usize = 47;
+pub const FIELD_OFFSET_TCPV6_FLAG: usize = 67;
 pub const FIELD_OFFSET_TCP_WIN: usize = 48;
+pub const FIELD_OFFSET_TCPV6_WIN: usize = 68;
 pub const FIELD_OFFSET_VXLAN_FLAGS: usize = 42;
 pub const FIELD_OFFSET_VXLAN_VNI: usize = 46;
 

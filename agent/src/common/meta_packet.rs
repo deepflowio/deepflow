@@ -454,6 +454,7 @@ impl<'a> MetaPacket<'a> {
             // inbound
             mem::swap(&mut self.offset_mac_0, &mut self.offset_mac_1);
         }
+        let mut is_ipv6 = false;
         let ip_protocol;
         match eth_type {
             EthernetType::Arp => {
@@ -482,6 +483,7 @@ impl<'a> MetaPacket<'a> {
                 return Ok(());
             }
             EthernetType::Ipv6 => {
+                is_ipv6 = true;
                 size_checker -= HeaderType::Ipv6.min_header_size() as isize;
                 if size_checker < 0 {
                     return Ok(());
@@ -664,6 +666,24 @@ impl<'a> MetaPacket<'a> {
                 self.header_type = header_type;
             }
             IpProtocol::Tcp => {
+                let (data_off, seq_off, ack_off, win_off, flag_off) = if is_ipv6 {
+                    (
+                        FIELD_OFFSET_TCPV6_DATAOFF,
+                        FIELD_OFFSET_TCPV6_SEQ,
+                        FIELD_OFFSET_TCPV6_ACK,
+                        FIELD_OFFSET_TCPV6_WIN,
+                        FIELD_OFFSET_TCPV6_FLAG,
+                    )
+                } else {
+                    (
+                        FIELD_OFFSET_TCP_DATAOFF,
+                        FIELD_OFFSET_TCP_SEQ,
+                        FIELD_OFFSET_TCP_ACK,
+                        FIELD_OFFSET_TCP_WIN,
+                        FIELD_OFFSET_TCP_FLAG,
+                    )
+                };
+
                 match eth_type {
                     EthernetType::Ipv4 => {
                         self.packet_len = self
@@ -687,7 +707,9 @@ impl<'a> MetaPacket<'a> {
                     self.npb_ignore_l4 = true;
                     return Ok(());
                 }
-                let data_offset = packet[FIELD_OFFSET_TCP_DATAOFF + self.l2_l3_opt_size] >> 4;
+
+                let data_offset = packet[data_off + self.l2_l3_opt_size] >> 4;
+
                 self.data_offset_ihl_or_fl4b |= data_offset << 4;
                 let mut l4_opt_size = data_offset as isize * 4 - 20;
                 if l4_opt_size < 0 {
@@ -704,15 +726,11 @@ impl<'a> MetaPacket<'a> {
                 self.payload_len = self.l4_payload_len as u16;
                 self.header_type = header_type;
                 self.tcp_data.data_offset = data_offset;
-                self.tcp_data.win_size =
-                    read_u16_be(&packet[FIELD_OFFSET_TCP_WIN + self.l2_l3_opt_size..]);
-                self.tcp_data.flags = TcpFlags::from_bits_truncate(
-                    packet[FIELD_OFFSET_TCP_FLAG + self.l2_l3_opt_size],
-                );
-                self.tcp_data.seq =
-                    read_u32_be(&packet[FIELD_OFFSET_TCP_SEQ + self.l2_l3_opt_size..]);
-                self.tcp_data.ack =
-                    read_u32_be(&packet[FIELD_OFFSET_TCP_ACK + self.l2_l3_opt_size..]);
+                self.tcp_data.win_size = read_u16_be(&packet[win_off + self.l2_l3_opt_size..]);
+                self.tcp_data.flags =
+                    TcpFlags::from_bits_truncate(packet[flag_off + self.l2_l3_opt_size]);
+                self.tcp_data.seq = read_u32_be(&packet[seq_off + self.l2_l3_opt_size..]);
+                self.tcp_data.ack = read_u32_be(&packet[ack_off + self.l2_l3_opt_size..]);
                 if data_offset > 5 {
                     self.update_tcp_opt();
                 }
