@@ -292,7 +292,7 @@ impl Forward {
             value.last = packet.timestamp;
             value.tap_type = packet.tap_type;
             value.tap_port = tap_port;
-            return
+            return;
         }
 
         let value = L3Item {
