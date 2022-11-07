@@ -138,7 +138,7 @@ func (g *GroupTag) Format(m *view.Model) {
 			resourceIDSuffix := resourceName + "_id" + suffix
 			resourceTypeSuffix := resourceName + "_type" + suffix
 			if g.Alias == resourceName+suffix {
-				ipTag := fmt.Sprintf("multiIf(%s=0 and is_ipv4=1,IPv4NumToString(%s), %s=0 and is_ipv4=0,IPv6NumToString(%s),%s!=0 and is_ipv4=1,'0.0.0.0','::')", resourceIDSuffix, ip4Suffix, resourceIDSuffix, ip6Suffix, resourceIDSuffix)
+				ipTag := fmt.Sprintf("multiIf(%s=0 and is_ipv4=1,IPv4NumToString(%s), %s=0 and is_ipv4=0,IPv6NumToString(%s),%s!=0,'0.0.0.0')", resourceIDSuffix, ip4Suffix, resourceIDSuffix, ip6Suffix, resourceIDSuffix)
 				subnetIDSuffix := "subnet_id" + suffix
 				subnetTag := fmt.Sprintf("if(%s=0,%s,0)", resourceIDSuffix, subnetIDSuffix)
 				m.AddTag(&view.Tag{Value: ipTag, Alias: "ip" + suffix})
