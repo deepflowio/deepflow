@@ -17,9 +17,10 @@
 package metrics
 
 import (
+	"testing"
+
 	"github.com/deepflowys/deepflow/server/querier/common"
 	chCommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
-	"testing"
 )
 
 func TestCheckDBField(t *testing.T) {
@@ -78,7 +79,7 @@ func TestCheckDBField(t *testing.T) {
 					}
 				case "event":
 					switch table {
-					case "resource_event":
+					case "event":
 						metrics = RESOURCE_EVENT_METRICS
 						replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
 					}

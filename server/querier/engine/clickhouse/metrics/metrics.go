@@ -159,7 +159,7 @@ func GetMetricsByDBTable(db string, table string, where string, ctx context.Cont
 		}
 	case "event":
 		switch table {
-		case "resource_event":
+		case "event":
 			return GetResourceEventMetrics(), err
 		}
 	case "ext_metrics", "deepflow_system":
@@ -306,7 +306,7 @@ func MergeMetrics(db string, table string, loadMetrics map[string]*Metrics) erro
 		}
 	case "event":
 		switch table {
-		case "resource_event":
+		case "event":
 			metrics = RESOURCE_EVENT_METRICS
 			replaceMetrics = RESOURCE_EVENT_METRICS_REPLACE
 		}

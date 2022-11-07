@@ -1,4 +1,4 @@
-# Name                    , DisplayName              , Discription
+# Name                    , DisplayName              , Description
 _id                       , UID                      ,
 time                      , 时间                     , 将 end_time 取整到秒。
 
@@ -35,6 +35,7 @@ labels                    , K8s Labels               ,
 attributes                , Attributes               ,
 
 ip                        , IP 地址                  ,
+is_ipv4                   , IPv4 标志                ,
 is_internet               , Internet IP 标志         ,
 protocol                  , 网络协议                 ,
 

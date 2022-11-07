@@ -1,4 +1,4 @@
-# Name                     , DisplayName                , Discription
+# Name                     , DisplayName                , Description
 time                       , 时间                       ,
 
 acl_gid                    , acl_gid                    ,

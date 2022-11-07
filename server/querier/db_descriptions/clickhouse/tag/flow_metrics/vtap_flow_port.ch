@@ -1,4 +1,4 @@
-# Name                     , DisplayName                , Discription
+# Name                     , DisplayName                , Description
 time                       , 时间                       ,
 
 region                     , 区域                       ,

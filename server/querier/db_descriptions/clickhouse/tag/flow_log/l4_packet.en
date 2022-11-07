@@ -1,4 +1,4 @@
-# Name                    , DisplayName              , Discription
+# Name                    , DisplayName              , Description
 time                      , Time                     , Round end_time to seconds.
 
 flow_id                   , Flow ID                  ,

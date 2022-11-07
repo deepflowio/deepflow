@@ -1,4 +1,4 @@
-# Name                    , DisplayName                   , Discription
+# Name                    , DisplayName                   , Description
 _id                       , UID                            ,
 time                      , Time                          , Round end_time to seconds.
 
@@ -35,6 +35,7 @@ labels                    , K8s Labels                    ,
 attributes                , Attributes                    ,
 
 ip                        , IP Address                    ,
+is_ipv4                   , IPv4 Flag                     ,
 is_internet               , Internet IP Flag              , Whether the IP address is an external Internet address.
 protocol                  , Network Protocol              ,
 
