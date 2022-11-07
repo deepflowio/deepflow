@@ -31,12 +31,26 @@ const (
 type ResourceEvent struct {
 	Time         int64
 	Type         string
-	ResourceType uint32 // the value is the same as l3_device_type
-	ResourceID   uint32
-	ResourceName string
+	InstanceType uint32 // the value is the same as l3_device_type
+	InstanceID   uint32
+	InstanceName string
 	SubnetIDs    []uint32
 	IPs          []string
 	Description  string
+
+	IfNeedTagged bool // if need ingester set tag
+	RegionID     uint32
+	AZID         uint32
+	VPCID        uint32
+	L3DeviceType uint32
+	L3DeviceID   uint32
+	HostID       uint32
+	PodClusterID uint32
+	PodNSID      uint32
+	PodNodeID    uint32
+	PodServiceID uint32
+	PodGroupID   uint32
+	PodID        uint32
 }
 
 func (r *ResourceEvent) Release() {
