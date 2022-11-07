@@ -37,6 +37,7 @@ jobs:
         run: |
           docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.14 "-c" "\
           source /opt/rh/devtoolset-8/enable && \
+          cp agent/docker/rust-proxy-config /usr/local/cargo/config && \
           cd  agent/src/ebpf && \
           make clean && \
           make rust-sample && \
