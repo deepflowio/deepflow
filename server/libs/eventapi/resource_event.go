@@ -53,6 +53,98 @@ type ResourceEvent struct {
 	PodID        uint32
 }
 
+type ResourceOption func(opts *ResourceEvent)
+
+func SubnetIDs(netIDs []uint32) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.SubnetIDs = netIDs
+	}
+}
+
+func IPs(ips []string) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.IPs = ips
+	}
+}
+
+func Description(description string) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.Description = description
+	}
+}
+
+func RegionID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.RegionID = uint32(id)
+	}
+}
+
+func AZID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.AZID = uint32(id)
+	}
+}
+
+func VPCID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.VPCID = uint32(id)
+	}
+}
+
+func L3DeviceType(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.L3DeviceType = uint32(id)
+	}
+}
+
+func L3DeviceID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.L3DeviceID = uint32(id)
+	}
+}
+
+func HostID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.HostID = uint32(id)
+	}
+}
+
+func PodClusterID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.PodClusterID = uint32(id)
+	}
+}
+
+func PodNSID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.PodNSID = uint32(id)
+	}
+}
+
+func PodNodeID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.PodNodeID = uint32(id)
+	}
+}
+
+func PodServiceID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.PodServiceID = uint32(id)
+	}
+}
+
+func PodGroupID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.PodGroupID = uint32(id)
+	}
+}
+
+func PodID(id int) ResourceOption {
+	return func(r *ResourceEvent) {
+		r.PodID = uint32(id)
+	}
+}
+
 func (r *ResourceEvent) Release() {
 	ReleaseResourceEvent(r)
 }

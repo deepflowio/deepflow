@@ -77,12 +77,12 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 
 		i.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+			deviceName,
 			deviceType,
 			deviceID,
-			deviceName,
-			fmt.Sprintf("%s-%s", networkName, item.IP),
-			[]uint32{uint32(networkID)},
-			[]string{item.IP},
+			eventapi.Description(fmt.Sprintf("%s-%s", networkName, item.IP)),
+			eventapi.SubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.IPs([]string{item.IP}),
 		)
 	}
 }
@@ -136,12 +136,12 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 
 		i.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
+			deviceName,
 			deviceType,
 			deviceID,
-			deviceName,
-			fmt.Sprintf("%s-%s", networkName, ip),
-			[]uint32{uint32(networkID)},
-			[]string{ip},
+			eventapi.Description(fmt.Sprintf("%s-%s", networkName, ip)),
+			eventapi.SubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.IPs([]string{ip}),
 		)
 	}
 }

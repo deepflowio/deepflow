@@ -39,6 +39,7 @@ var (
 
 type VM struct {
 	EventManager[cloudmodel.VM, mysql.VM, *cache.VM]
+	deviceType int
 }
 
 func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
@@ -48,6 +49,7 @@ func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
+		common.VIF_DEVICE_TYPE_VM,
 	}
 	return mng
 }
@@ -56,10 +58,14 @@ func (v *VM) ProduceByAdd(items []*mysql.VM) {
 	for _, item := range items {
 		v.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
-			common.VIF_DEVICE_TYPE_VM,
-			item.ID,
 			item.Name,
-			"", []uint32{}, []string{},
+			v.deviceType,
+			item.ID,
+			eventapi.L3DeviceType(v.deviceType),
+			eventapi.L3DeviceID(item.ID),
+			eventapi.VPCID(item.VPCID),
+			eventapi.AZID(v.ToolDataSet.AZLcuuidToID[item.AZ]),
+			eventapi.RegionID(v.ToolDataSet.RegionLcuuidToID[item.Region]),
 		)
 	}
 }
@@ -83,12 +89,12 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 	nIDs, ips := v.getIPNetworksByID(id)
 	v.createAndPutEvent(
 		eType,
+		name,
 		common.VIF_DEVICE_TYPE_VM,
 		id,
-		name,
-		description,
-		nIDs,
-		ips,
+		eventapi.Description(description),
+		eventapi.SubnetIDs(nIDs),
+		eventapi.IPs(ips),
 	)
 }
 
@@ -99,13 +105,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 			log.Error(err)
 		}
 
-		v.createAndPutEvent(
-			eventapi.RESOURCE_EVENT_TYPE_DELETE,
-			common.VIF_DEVICE_TYPE_VM,
-			id,
-			name,
-			"", []uint32{}, []string{},
-		)
+		v.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
 	}
 }
 

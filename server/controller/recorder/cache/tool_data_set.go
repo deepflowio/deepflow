@@ -28,6 +28,8 @@ type ToolDataSet struct {
 	// 仅资源变更事件所需的数据
 	EventToolDataSet
 
+	AZLcuuidToID map[string]int
+
 	RegionLcuuidToID map[string]int
 	RegionIDToLcuuid map[int]string
 
@@ -101,6 +103,8 @@ func NewToolDataSet() ToolDataSet {
 	return ToolDataSet{
 		EventToolDataSet: NewEventToolDataSet(),
 
+		AZLcuuidToID: make(map[string]int),
+
 		RegionLcuuidToID: make(map[string]int),
 		RegionIDToLcuuid: make(map[int]string),
 
@@ -171,6 +175,16 @@ func NewToolDataSet() ToolDataSet {
 
 		PodLcuuidToID: make(map[string]int),
 	}
+}
+
+func (t *ToolDataSet) addAZ(item *mysql.AZ) {
+	t.AZLcuuidToID[item.Lcuuid] = item.ID
+	log.Info(addToToolMap(RESOURCE_TYPE_AZ_EN, item.Lcuuid))
+}
+
+func (t *ToolDataSet) deleteAZ(lcuuid string) {
+	delete(t.AZLcuuidToID, lcuuid)
+	log.Info(deleteFromToolMap(RESOURCE_TYPE_AZ_EN, lcuuid))
 }
 
 func (t *ToolDataSet) addRegion(item *mysql.Region) {
