@@ -35,6 +35,7 @@ labels                    , labels_0                  , labels_1                
 attributes                , attributes                , attributes                 , map            ,                       , Attributes        , 111
 
 ip                        , ip_0                      , ip_1                       , ip             ,                       , Network Layer     , 111
+is_ipv4                   , is_ipv4                   , is_ipv4                    , int_enum       , ip_type               , Network Layer     , 111
 is_internet               , is_internet_0             , is_internet_1              , bool           ,                       , Network Layer     , 111
 protocol                  , protocol                  , protocol                   , int_enum       , l7_ip_protocol        , Network Layer     , 111
 

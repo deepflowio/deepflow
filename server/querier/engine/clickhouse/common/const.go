@@ -23,5 +23,5 @@ var DB_TABLE_MAP = map[string][]string{
 	"flow_metrics":    []string{"vtap_flow_port", "vtap_flow_edge_port", "vtap_app_port", "vtap_app_edge_port", "vtap_acl"},
 	"ext_metrics":     []string{"ext_common"},
 	"deepflow_system": []string{"deepflow_system_common"},
-	"event":           []string{"resource_event"},
+	"event":           []string{"event"},
 }
