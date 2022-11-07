@@ -39,9 +39,9 @@ func TestAddPodNode(t *testing.T) {
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
 	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_CREATE, e.Type)
-	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_NODE), e.ResourceType)
-	assert.Equal(t, uint32(id), e.ResourceID)
-	assert.Equal(t, name, e.ResourceName)
+	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_NODE), e.InstanceType)
+	assert.Equal(t, uint32(id), e.InstanceID)
+	assert.Equal(t, name, e.InstanceName)
 }
 
 func TestDeletePodNode(t *testing.T) {
@@ -64,7 +64,7 @@ func TestDeletePodNode(t *testing.T) {
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
 	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_DELETE, e.Type)
-	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_NODE), e.ResourceType)
-	assert.Equal(t, uint32(id), e.ResourceID)
-	assert.Equal(t, name, e.ResourceName)
+	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_NODE), e.InstanceType)
+	assert.Equal(t, uint32(id), e.InstanceID)
+	assert.Equal(t, name, e.InstanceName)
 }

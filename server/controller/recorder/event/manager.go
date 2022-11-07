@@ -42,6 +42,10 @@ func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType string, resourceT
 	event.Description = description
 	event.SubnetIDs = netIDs
 	event.IPs = ips
+	event.IfNeedTagged = true
+	if eventType == eventapi.RESOURCE_EVENT_TYPE_CREATE || eventType == eventapi.RESOURCE_EVENT_TYPE_ADD_IP {
+		event.IfNeedTagged = false
+	}
 	e.put(event)
 }
 

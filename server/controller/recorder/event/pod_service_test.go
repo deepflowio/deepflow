@@ -39,9 +39,9 @@ func TestAddPodService(t *testing.T) {
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
 	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_CREATE, e.Type)
-	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_SERVICE), e.ResourceType)
-	assert.Equal(t, uint32(id), e.ResourceID)
-	assert.Equal(t, name, e.ResourceName)
+	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_SERVICE), e.InstanceType)
+	assert.Equal(t, uint32(id), e.InstanceID)
+	assert.Equal(t, name, e.InstanceName)
 
 	dbItem.ProduceByAdd([]*mysql.PodService{{Name: RandName()}, {Name: RandName()}})
 	assert.Equal(t, 2, eq.Len())
@@ -67,7 +67,7 @@ func TestDeletePodService(t *testing.T) {
 	assert.Equal(t, 1, eq.Len())
 	e := eq.Get().(*eventapi.ResourceEvent)
 	assert.Equal(t, eventapi.RESOURCE_EVENT_TYPE_DELETE, e.Type)
-	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_SERVICE), e.ResourceType)
-	assert.Equal(t, uint32(id), e.ResourceID)
-	assert.Equal(t, name, e.ResourceName)
+	assert.Equal(t, uint32(common.VIF_DEVICE_TYPE_POD_SERVICE), e.InstanceType)
+	assert.Equal(t, uint32(id), e.InstanceID)
+	assert.Equal(t, name, e.InstanceName)
 }
