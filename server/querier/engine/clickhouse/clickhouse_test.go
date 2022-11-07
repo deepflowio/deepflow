@@ -20,9 +20,11 @@ import (
 	//"github.com/k0kubun/pp"
 	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/parse"
+
 	//"github.com/deepflowys/deepflow/server/querier/querier"
-	"github.com/deepflowys/deepflow/server/querier/config"
 	"testing"
+
+	"github.com/deepflowys/deepflow/server/querier/config"
 )
 
 /* var (
@@ -185,8 +187,8 @@ var (
 		input:  "select Histogram(Sum(byte),10) AS histo from l4_flow_log",
 		output: "SELECT histogram(10)(`_sum_byte_tx+byte_rx`) AS `histo` FROM (SELECT SUM(byte_tx+byte_rx) AS `_sum_byte_tx+byte_rx` FROM flow_log.`l4_flow_log`)",
 	}, {
-		input:  "select Sum(log_count) from resource_event",
-		output: "SELECT SUM(1) FROM event.`resource_event`",
+		input:  "select Sum(log_count) from event",
+		output: "SELECT SUM(1) FROM event.`event`",
 		db:     "event",
 	},
 	}
