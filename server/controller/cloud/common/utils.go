@@ -405,7 +405,11 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 					ipMask = strconv.Itoa(common.IPV6_MAX_MASK)
 				}
 				if len(ipMasks) > 1 {
-					ipAddr, _ = netaddr.ParseIP(ipMasks[0])
+					ipAddr, err = netaddr.ParseIP(ipMasks[0])
+					if err != nil {
+						log.Debugf("parse ip (%s) failed", ipMasks[0])
+						continue
+					}
 					ipMask = ipMasks[1]
 				}
 				// 判断是否在excludeIPs；如果是，则跳过
@@ -422,14 +426,22 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 
 				// 判断IP + 掩码信息是否已经在当前网段中；如果不在，则生成新的网段信息
 				for _, subnet := range subnets {
-					subnetCidr, _ := netaddr.ParseIPPrefix(subnet.CIDR)
+					subnetCidr, err := netaddr.ParseIPPrefix(subnet.CIDR)
+					if err != nil {
+						log.Debugf("parse ip prefix (%s) failed", subnet.CIDR)
+						continue
+					}
 					if subnetCidr.Contains(ipAddr) {
 						subnetLcuuid = subnet.Lcuuid
 						break
 					}
 				}
 				if subnetLcuuid == "" {
-					cidrParse, _ := ipaddr.Parse(ip)
+					cidrParse, err := ipaddr.Parse(ip)
+					if err != nil {
+						log.Debugf("parse ip (%s) failed", ip)
+						continue
+					}
 					subnetCidr := cidrParse.First().IP.String() + "/" + ipMask
 					subnetLcuuid = common.GenerateUUID(networkLcuuid + subnetCidr)
 					retSubnet := model.Subnet{
@@ -472,10 +484,18 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 			continue
 		}
 		// 判断IP是否已经在当前网段中；如果不在，则生成新的网段信息
-		ipAddr, _ := netaddr.ParseIP(host.IP)
+		ipAddr, err := netaddr.ParseIP(host.IP)
+		if err != nil {
+			log.Debugf("parse ip (%s) failed", host.IP)
+			continue
+		}
 		subnetLcuuid := ""
 		for _, subnet := range subnets {
-			subnetCidr, _ := netaddr.ParseIPPrefix(subnet.CIDR)
+			subnetCidr, err := netaddr.ParseIPPrefix(subnet.CIDR)
+			if err != nil {
+				log.Debugf("parse ip prefix (%s) failed", subnet.CIDR)
+				continue
+			}
 			if subnetCidr.Contains(ipAddr) {
 				subnetLcuuid = subnet.Lcuuid
 				break
@@ -486,7 +506,11 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 			if strings.Contains(host.IP, ":") {
 				ipMask = strconv.Itoa(common.IPV6_DEFAULT_NETMASK)
 			}
-			cidrParse, _ := ipaddr.Parse(host.IP + "/" + ipMask)
+			cidrParse, err := ipaddr.Parse(host.IP + "/" + ipMask)
+			if err != nil {
+				log.Debugf("parse ip (%s) failed", host.IP+"/"+ipMask)
+				continue
+			}
 			subnetCidr := cidrParse.First().IP.String() + "/" + ipMask
 			subnetLcuuid = common.GenerateUUID(networkLcuuid + subnetCidr)
 			retSubnet := model.Subnet{
