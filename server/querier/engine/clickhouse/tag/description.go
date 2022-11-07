@@ -454,7 +454,6 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 	tag = strings.Trim(tag, "'")
 	var sqlList []string
 	var sql string
-	var dictTag = "''"
 	var whereSql string
 	var limitSql string
 	var isAdminFlag bool
@@ -497,15 +496,13 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 			// results := map[string][]interface{}{}
 			for resourceKey, resourceType := range AutoMap {
 				// 增加资源ID
-				switch resourceKey {
-				case "chost", "rds", "redis", "lb", "natgw":
-					dictTag = fmt.Sprintf("dictGet(flow_tag.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(resourceType))
-				case "vpc":
-					dictTag = fmt.Sprintf("dictGet(flow_tag.l3_epc_map, ('uid'), toUInt64(value)))")
-				}
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
+				if resourceKey == "vpc" {
+					resourceId = "l3_epc_id"
+					resourceName = "l3_epc_name"
+				}
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
@@ -521,7 +518,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 					resourceId = "pod_service_id"
 					resourceName = "pod_service_name"
 				}
-				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), dictTag, whereSql, orderBy, limitSql)
+				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
 				log.Debug(sql)
 				sqlList = append(sqlList, sql)
 			}
@@ -532,11 +529,10 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 		case "chost", "rds", "redis", "lb", "natgw":
 			resourceId := tag + "_id"
 			resourceName := tag + "_name"
-			dictTag = fmt.Sprintf("dictGet(flow_tag.device_map, ('uid'), (toUInt64(%s), toUInt64(value)))", strconv.Itoa(AutoMap[tag]))
-			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, dictTag, whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
 
 		case "vpc", "l2_vpc":
-			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, dictGet(flow_tag.l3_epc_map, 'uid', toUInt64(value)) AS uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT l3_epc_id AS value, l3_epc_name AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
 		case "service", "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
