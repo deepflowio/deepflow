@@ -72,4 +72,7 @@ var AutoServiceMap = map[string]int{
 	"service":   VIF_DEVICE_TYPE_SERVICE,
 }
 
-var NoLanguageTag = []string{"ip_type", "l7_ip_protocol", "server_port", "span_kind", "tcp_flags_bit", "tunnel_tier"}
+var NoLanguageTag = []string{
+	"ip_type", "l7_ip_protocol", "server_port", "span_kind", "tcp_flags_bit",
+	"tunnel_tier", "l7_protocol", "eth_type", "flow_source", "protocol", "tunnel_type",
+}
