@@ -8,9 +8,9 @@ packet_rx                   , packet_rx                 , counter    , L3 Throug
 l3_byte                     ,                           , counter    , L3 Throughput   , 111
 l3_byte_tx                  , l3_byte_tx                , counter    , L3 Throughput   , 111
 l3_byte_rx                  , l3_byte_rx                , counter    , L3 Throughput   , 111
-bbp                         ,                           , quotient   , L3 Throughput   , 111
-bbp_tx                      ,                           , quotient   , L3 Throughput   , 111
-bbp_rx                      ,                           , quotient   , L3 Throughput   , 111
+bpp                         ,                           , quotient   , L3 Throughput   , 111
+bpp_tx                      ,                           , quotient   , L3 Throughput   , 111
+bpp_rx                      ,                           , quotient   , L3 Throughput   , 111
 
 new_flow                    , new_flow                  , counter    , L4 Throughput   , 111
 closed_flow                 , closed_flow               , counter    , L4 Throughput   , 111
