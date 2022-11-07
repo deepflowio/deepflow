@@ -21,9 +21,9 @@ var VTAP_FLOW_EDGE_PORT_METRICS = map[string]*Metrics{}
 var VTAP_FLOW_EDGE_PORT_METRICS_REPLACE = map[string]*Metrics{
 	"l3_byte": NewReplaceMetrics("l3_byte_tx+l3_byte_rx", ""),
 	"l4_byte": NewReplaceMetrics("l4_byte_tx+l4_byte_rx", ""),
-	"bbp":     NewReplaceMetrics("byte/packet", ""),
-	"bbp_tx":  NewReplaceMetrics("byte_tx/packet_tx", ""),
-	"bbp_rx":  NewReplaceMetrics("byte_rx/packet_rx", ""),
+	"bpp":     NewReplaceMetrics("byte/packet", ""),
+	"bpp_tx":  NewReplaceMetrics("byte_tx/packet_tx", ""),
+	"bpp_rx":  NewReplaceMetrics("byte_rx/packet_rx", ""),
 
 	"rtt":        NewReplaceMetrics("rtt_sum/rtt_count", ""),
 	"rtt_client": NewReplaceMetrics("rtt_client_sum/rtt_client_count", ""),
