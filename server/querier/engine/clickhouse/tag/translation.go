@@ -367,22 +367,22 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 		),
 	}
-	// Resource-event
-	tagResourceMap["resource"] = map[string]*Tag{
+	// Instance-event
+	tagResourceMap["instance"] = map[string]*Tag{
 		"default": NewTag(
-			"resource_name",
+			"instance_name",
 			"",
 			"",
 			"",
 		),
 		"node_type": NewTag(
-			"dictGet(flow_tag.node_type_map, 'node_type', toUInt64(resource_type))",
+			"dictGet(flow_tag.node_type_map, 'node_type', toUInt64(instance_type))",
 			"",
 			"",
 			"",
 		),
 		"icon_id": NewTag(
-			"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(resource_type),toUInt64(resource_id)))",
+			"dictGet(flow_tag.device_map, 'icon_id', (toUInt64(instance_type),toUInt64(instance_id)))",
 			"",
 			"",
 			"",
