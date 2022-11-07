@@ -39,9 +39,98 @@ func NewChIPResource() *ChIPResource {
 	return updater
 }
 
+func getVMIdToUidMap() map[int]string {
+	idToUidMap := map[int]string{}
+	var vms []mysql.VM
+	err := mysql.Db.Find(&vms).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VM, err))
+		return idToUidMap
+	}
+	for _, vm := range vms {
+		idToUidMap[vm.ID] = vm.UID
+	}
+	return idToUidMap
+}
+
+func getRDSIdToUidMap() map[int]string {
+	idToUidMap := map[int]string{}
+	var rdsInstances []mysql.RDSInstance
+	err := mysql.Db.Find(&rdsInstances).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_RDS, err))
+		return idToUidMap
+	}
+	for _, rdsInstance := range rdsInstances {
+		idToUidMap[rdsInstance.ID] = rdsInstance.UID
+	}
+	return idToUidMap
+}
+
+func getRedisIdToUidMap() map[int]string {
+	idToUidMap := map[int]string{}
+	var redisInstances []mysql.RedisInstance
+	err := mysql.Db.Find(&redisInstances).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_REDIS, err))
+		return idToUidMap
+	}
+	for _, redisInstance := range redisInstances {
+		idToUidMap[redisInstance.ID] = redisInstance.UID
+	}
+	return idToUidMap
+}
+
+func getLBIdToUidMap() map[int]string {
+	idToUidMap := map[int]string{}
+	var lbs []mysql.LB
+	err := mysql.Db.Find(&lbs).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_LB, err))
+		return idToUidMap
+	}
+	for _, lb := range lbs {
+		idToUidMap[lb.ID] = lb.UID
+	}
+	return idToUidMap
+}
+
+func getNatgwIdToUidMap() map[int]string {
+	idToUidMap := map[int]string{}
+	var natGateways []mysql.NATGateway
+	err := mysql.Db.Find(&natGateways).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err))
+		return idToUidMap
+	}
+	for _, natGateway := range natGateways {
+		idToUidMap[natGateway.ID] = natGateway.UID
+	}
+	return idToUidMap
+}
+
+func getVPCIdToUidMap() map[int]string {
+	idToUidMap := map[int]string{}
+	var vpcs []mysql.VPC
+	err := mysql.Db.Find(&vpcs).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VPC, err))
+		return idToUidMap
+	}
+	for _, vpc := range vpcs {
+		idToUidMap[vpc.ID] = vpc.UID
+	}
+	return idToUidMap
+}
+
 func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, bool) {
 	keyToItem := make(map[IPResourceKey]mysql.ChIPResource)
-
+	vmIdToUidMap := getVMIdToUidMap()
+	rdsIdToUidMap := getRDSIdToUidMap()
+	redisIdToUidMap := getRedisIdToUidMap()
+	lbIdToUidMap := getLBIdToUidMap()
+	natgwIdToUidMap := getNatgwIdToUidMap()
+	vpcIdToUidMap := getVPCIdToUidMap()
 	if redis.Redisdb == nil {
 		return keyToItem, false
 	}
@@ -84,6 +173,7 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 			multiIDTag = strings.ReplaceAll(multiIDTag, "subnet", "vl2")
 			multiIDTag = strings.ReplaceAll(multiIDTag, "pod_ns", "pod_namespace")
 			multiIDTag = multiIDTag + "s"
+			tag = strings.ReplaceAll(tag, "vpc", "l3_epc")
 			switch MultiResourceMap[multiIDTag].(type) {
 			case []interface{}:
 				if len(MultiResourceMap[multiIDTag].([]interface{})) > 0 {
@@ -93,6 +183,22 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 						itemMap[strings.ToUpper(tag)] = resource_value.(string)
 					case float64:
 						itemMap[strings.ToUpper(tag)] = int(resource_value.(float64))
+						// 当tag为_id的时候,添加uid信息
+						switch strings.TrimSuffix(multiIDTag, "_ids") {
+						case "vm":
+							itemMap["uid"] = vmIdToUidMap[int(resource_value.(float64))]
+						case "rds_instance":
+							itemMap["uid"] = rdsIdToUidMap[int(resource_value.(float64))]
+						case "redis_instance":
+							itemMap["uid"] = redisIdToUidMap[int(resource_value.(float64))]
+						case "lb":
+							itemMap["uid"] = lbIdToUidMap[int(resource_value.(float64))]
+						case "nat_gateway":
+							itemMap["uid"] = natgwIdToUidMap[int(resource_value.(float64))]
+						case "epc":
+							itemMap["uid"] = vpcIdToUidMap[int(resource_value.(float64))]
+						}
+
 					}
 				}
 			}

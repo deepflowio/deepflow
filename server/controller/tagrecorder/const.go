@@ -336,8 +336,8 @@ const (
 		"    `host_name` String,\n" +
 		"    `chost_id` UInt64,\n" +
 		"    `chost_name` String,\n" +
-		"    `vpc_id` UInt64,\n" +
-		"    `vpc_name` String,\n" +
+		"    `l3_epc_id` UInt64,\n" +
+		"    `l3_epc_name` String,\n" +
 		"    `router_id` UInt64,\n" +
 		"    `router_name` String,\n" +
 		"    `dhcpgw_id` UInt64,\n" +
@@ -365,7 +365,8 @@ const (
 		"    `pod_group_id` UInt64,\n" +
 		"    `pod_group_name` String,\n" +
 		"    `pod_id` UInt64,\n" +
-		"    `pod_name` String\n" +
+		"    `pod_name` String,\n" +
+		"    `uid` String\n" +
 		")\n" +
 		"PRIMARY KEY ip, subnet_id\n" +
 		"SOURCE(MYSQL(PORT %s USER '%s' PASSWORD '%s' %s DB %s TABLE %s INVALIDATE_QUERY 'select updated_at from %s order by updated_at desc limit 1'))\n" +
