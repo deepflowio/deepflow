@@ -100,9 +100,10 @@ func TestCheckDomainSubDomainByClusterID(t *testing.T) {
 		fmt.Printf("check cluster id: %s should be ok\n", "b")
 	}
 	k8sInfo.clusterIDToDomain = make(map[string]string)
-	domain := mysql.Domain{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Type: 11, ClusterID: "a"}
+	k8sInfo.clusterIDToSubDomain = make(map[string]string)
+	domain := mysql.Domain{Base: mysql.Base{Lcuuid: uuid.New().String()}, Name: uuid.New().String(), Type: 11, ClusterID: "d"}
 	mysql.Db.Create(&domain)
-	if !k8sInfo.CheckDomainSubDomainByClusterID("a") {
+	if !k8sInfo.CheckDomainSubDomainByClusterID("d") {
 		fmt.Printf("check cluster id: %s should be ok\n", "a")
 	}
 	if k8sInfo.CheckDomainSubDomainByClusterID("C") {

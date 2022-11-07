@@ -87,11 +87,19 @@ func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool 
 	if !ok {
 		log.Warningf("cluster_id: %s not found in cache, domain map: %v, sub_domain map: %v", clusterID, k.clusterIDToDomain, k.clusterIDToSubDomain)
 		var count int64
-		k.db.Model(&models.Domain{}).Where("cluster_id = ?", clusterID).Count(&count)
+		dResult := k.db.Model(&models.Domain{}).Where("cluster_id = ?", clusterID).Count(&count)
+		if dResult.Error != nil {
+			log.Errorf("query domain from db failed: %s", dResult.Error.Error())
+			return true
+		}
 		if count > 0 {
 			return true
 		}
-		k.db.Model(&models.SubDomain{}).Where("cluster_id = ?", clusterID).Count(&count)
+		sdResult := k.db.Model(&models.SubDomain{}).Where("cluster_id = ?", clusterID).Count(&count)
+		if sdResult.Error != nil {
+			log.Errorf("query sub_domain from db failed: %s", sdResult.Error.Error())
+			return true
+		}
 		if count > 0 {
 			return true
 		}
