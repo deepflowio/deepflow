@@ -40,7 +40,7 @@ func (e EventType) String() string {
 func (e EventType) TableName() string {
 	switch e {
 	case RESOURCE_EVENT:
-		return "resource_event"
+		return "event"
 	default:
 		return "unknown_event"
 	}
