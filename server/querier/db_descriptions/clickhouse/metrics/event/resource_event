@@ -1,2 +1,2 @@
-# Field              , DBField              , Type       , Permission 
-log_count            ,                      , counter    , 111    
+# Field              , DBField              , Type       , Category   , Permission 
+log_count            ,                      , counter    , Throughput , 111    
