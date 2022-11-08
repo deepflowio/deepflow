@@ -161,6 +161,34 @@ impl NpbBuilder {
         return l2;
     }
 
+    pub fn on_config_change(&mut self, config: &NpbConfig, queue_debugger: &QueueDebugger) {
+        let is_running = self.npb_packet_sender.is_running();
+        self.stop();
+
+        let (sender, receiver, _) =
+            bounded_with_debug(4096, "2-packet-to-npb-sender", queue_debugger);
+
+        self.mtu = config.mtu as usize;
+        self.underlay_is_ipv6 = config.underlay_is_ipv6;
+        self.underlay_has_vlan = config.output_vlan > 0;
+        self.overlay_vlan_mode = config.vlan_mode;
+        self.npb_packet_sender = Arc::new(NpbPacketSender::new(
+            self.id,
+            receiver,
+            config,
+            self.stats_collector.clone(),
+        ));
+        self.sender = sender;
+        self.pseudo_tunnel_header = [
+            Self::create_pseudo_vxlan_packet(config),
+            Self::create_pseudo_erspan_packet(config),
+        ];
+
+        if is_running {
+            self.start();
+        }
+    }
+
     pub fn new(
         id: usize,
         config: &NpbConfig,
@@ -174,7 +202,7 @@ impl NpbBuilder {
         let builder = Box::new(Self {
             id,
             mtu: config.mtu as usize,
-            enable_qos_bypass: false, // TODO
+            enable_qos_bypass: config.enable_qos_bypass, // TODO
             underlay_is_ipv6: config.underlay_is_ipv6,
             underlay_has_vlan: config.output_vlan > 0,
             overlay_vlan_mode: config.vlan_mode,

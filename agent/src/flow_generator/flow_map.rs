@@ -1507,7 +1507,7 @@ mod tests {
             123,
         );
         let mut policy_data0 = PolicyData::default();
-        policy_data0.merge_npb_action(&vec![npb_action], 10, vec![]);
+        policy_data0.merge_npb_action(&vec![npb_action], 10, None);
         let mut packet0 = _new_meta_packet();
         packet0.policy_data.replace(Arc::new(policy_data0));
 
@@ -1520,7 +1520,7 @@ mod tests {
             123,
         );
         let mut policy_data1 = PolicyData::default();
-        policy_data1.merge_npb_action(&vec![npb_action], 11, vec![]);
+        policy_data1.merge_npb_action(&vec![npb_action], 11, None);
         let mut packet1 = _new_meta_packet();
         packet1.tcp_data.flags = TcpFlags::SYN_ACK;
         _reverse_meta_packet(&mut packet1);
