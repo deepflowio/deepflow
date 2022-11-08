@@ -20,6 +20,7 @@ import "github.com/deepflowys/deepflow/server/controller/common"
 
 type EventToolDataSet struct {
 	HostIDToName map[int]string
+	HostIPToID   map[string]int
 
 	VMIDToName           map[int]string
 	VMIDToIPNetworkIDMap map[int]map[string]uint32

@@ -45,7 +45,7 @@ func NewNATGateway(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *NATGate
 
 func (n *NATGateway) ProduceByAdd(items []*mysql.NATGateway) {
 	for _, item := range items {
-		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, n.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
+		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, n.deviceType, item.ID)
 	}
 }
 
@@ -66,6 +66,6 @@ func (n *NATGateway) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(n.resourceType, id))
 		}
 
-		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, n.deviceType, id, name, "", []uint32{}, []string{})
+		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
 	}
 }

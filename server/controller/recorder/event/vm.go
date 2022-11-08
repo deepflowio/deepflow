@@ -39,6 +39,7 @@ var (
 
 type VM struct {
 	EventManager[cloudmodel.VM, mysql.VM, *cache.VM]
+	deviceType int
 }
 
 func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
@@ -48,18 +49,33 @@ func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
+		common.VIF_DEVICE_TYPE_VM,
 	}
 	return mng
 }
 
 func (v *VM) ProduceByAdd(items []*mysql.VM) {
 	for _, item := range items {
+		hostID, ok := v.ToolDataSet.GetHostIDByIP(item.LaunchServer)
+		if !ok {
+			log.Errorf("host id for %s (ip: %s) not found", RESOURCE_TYPE_HOST_EN, item.LaunchServer)
+		}
+		regionID, azID, err := v.ToolDataSet.GetRegionIDAndAZIDByLcuuid(item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
 		v.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
-			common.VIF_DEVICE_TYPE_VM,
-			item.ID,
 			item.Name,
-			"", []uint32{}, []string{},
+			v.deviceType,
+			item.ID,
+			eventapi.TagHostID(hostID),
+			eventapi.TagL3DeviceType(v.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagAZID(azID),
+			eventapi.TagRegionID(regionID),
 		)
 	}
 }
@@ -83,12 +99,12 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 	nIDs, ips := v.getIPNetworksByID(id)
 	v.createAndPutEvent(
 		eType,
+		name,
 		common.VIF_DEVICE_TYPE_VM,
 		id,
-		name,
-		description,
-		nIDs,
-		ips,
+		eventapi.TagDescription(description),
+		eventapi.TagSubnetIDs(nIDs),
+		eventapi.TagIPs(ips),
 	)
 }
 
@@ -99,13 +115,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 			log.Error(err)
 		}
 
-		v.createAndPutEvent(
-			eventapi.RESOURCE_EVENT_TYPE_DELETE,
-			common.VIF_DEVICE_TYPE_VM,
-			id,
-			name,
-			"", []uint32{}, []string{},
-		)
+		v.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
 	}
 }
 

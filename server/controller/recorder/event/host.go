@@ -28,6 +28,7 @@ import (
 
 type Host struct {
 	EventManager[cloudmodel.Host, mysql.Host, *cache.Host]
+	deviceType int
 }
 
 func NewHost(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
@@ -37,19 +38,14 @@ func NewHost(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
+		common.VIF_DEVICE_TYPE_HOST,
 	}
 	return mng
 }
 
 func (h *Host) ProduceByAdd(items []*mysql.Host) {
 	for _, item := range items {
-		h.createAndPutEvent(
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
-			common.VIF_DEVICE_TYPE_HOST,
-			item.ID,
-			item.Name,
-			"", []uint32{}, []string{},
-		)
+		h.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, h.deviceType, item.ID)
 	}
 }
 
@@ -69,12 +65,6 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		h.createAndPutEvent(
-			eventapi.RESOURCE_EVENT_TYPE_DELETE,
-			common.VIF_DEVICE_TYPE_HOST,
-			id,
-			name,
-			"", []uint32{}, []string{},
-		)
+		h.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, h.deviceType, id)
 	}
 }

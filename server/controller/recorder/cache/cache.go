@@ -238,6 +238,7 @@ func (c *Cache) refreshRegions() {
 
 func (c *Cache) AddAZ(item *mysql.AZ) {
 	c.DiffBaseDataSet.addAZ(item, c.Sequence)
+	c.ToolDataSet.addAZ(item)
 }
 
 func (c *Cache) AddAZs(items []*mysql.AZ) {
@@ -248,6 +249,7 @@ func (c *Cache) AddAZs(items []*mysql.AZ) {
 
 func (c *Cache) DeleteAZ(lcuuid string) {
 	c.DiffBaseDataSet.deleteAZ(lcuuid)
+	c.ToolDataSet.deleteAZ(lcuuid)
 }
 
 func (c *Cache) DeleteAZs(lcuuids []string) {

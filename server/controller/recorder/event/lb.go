@@ -45,7 +45,7 @@ func NewLB(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LB {
 
 func (l *LB) ProduceByAdd(items []*mysql.LB) {
 	for _, item := range items {
-		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, l.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
+		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, l.deviceType, item.ID)
 	}
 }
 
@@ -66,6 +66,6 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(l.resourceType, id))
 		}
 
-		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, l.deviceType, id, name, "", []uint32{}, []string{})
+		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
 	}
 }
