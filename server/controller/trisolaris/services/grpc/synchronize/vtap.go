@@ -488,6 +488,11 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		L7LogStoreTapTypes: vtapConfig.ConvertedL7LogStoreTapTypes,
 		L4LogTapTypes:      vtapConfig.ConvertedL4LogTapTypes,
 	}
+	if vtapConfig.TapInterfaceRegex != "" {
+		configure.TapInterfaceRegex = proto.String(vtapConfig.TapInterfaceRegex)
+	}
+	configure.LocalConfig = proto.String(
+		trisolaris.GetGVTapInfo().GetVTapLocalConfigByShortID(groupID))
 
 	return configure
 }

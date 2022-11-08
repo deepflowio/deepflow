@@ -511,6 +511,15 @@ func (v *VTapInfo) GetVTapLocalConfig(vtapGroupLcuuid string) string {
 	return v.vtapGroupLcuuidToLocalConfig[vtapGroupLcuuid]
 }
 
+func (v *VTapInfo) GetVTapLocalConfigByShortID(shortID string) string {
+	lcuuid, ok := v.vtapGroupShortIDToLcuuid[shortID]
+	if ok == false {
+		return ""
+	}
+
+	return v.vtapGroupLcuuidToLocalConfig[lcuuid]
+}
+
 func (v *VTapInfo) GetDefaultMaxEscapeSeconds() int {
 	return MaxEscapeSeconds
 }
