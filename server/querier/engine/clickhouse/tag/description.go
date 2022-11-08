@@ -353,7 +353,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
-func GetTagValues(db, table, sql string) ([]string, error) {
+func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	// 获取tagEnumFile
@@ -361,10 +361,11 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
 	var sqlList []string
+	response := map[string][]interface{}{}
 	var rgx = regexp.MustCompile(`(?i)show|SHOW +tag +\S+ +values +from|FROM +\S+( +(where|WHERE \S+ like|LIKE \S+))?`)
 	sqlOk := rgx.MatchString(sql)
 	if !sqlOk {
-		return nil, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
+		return response, sqlList, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
 	}
 	showSqlList := strings.Split(sql, "WHERE")
 	if len(showSqlList) == 1 {
@@ -373,8 +374,8 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	//Enum($tag_name) replace in with column 'display_name'
 	//$tag_name replace in with column 'value'
 	if len(showSqlList) > 1 {
-		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "Enum("+tag+")", "display_name")
-		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag, "value")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], " Enum("+tag+") ", " display_name ")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], " "+tag+" ", " value ")
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
 	// K8s Labels是动态的,不需要去tag_description里确认
@@ -394,7 +395,7 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 		DB: db, Table: table, TagName: tag,
 	}]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+		return response, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
 	}
 	if db == "event" {
 		sql = strings.ReplaceAll(sql, "subnets", "subnet")
@@ -443,12 +444,18 @@ func GetTagValues(db, table, sql string) ([]string, error) {
 	sql = fmt.Sprintf("SELECT value,name AS display_name FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
-	return sqlList, nil
+	return response, sqlList, nil
 
 }
 
-func GetTagResourceValues(rawSql string) ([]string, error) {
-
+func GetTagResourceValues(rawSql string) (map[string][]interface{}, []string, error) {
+	chClient := client.Client{
+		Host:     config.Cfg.Clickhouse.Host,
+		Port:     config.Cfg.Clickhouse.Port,
+		UserName: config.Cfg.Clickhouse.User,
+		Password: config.Cfg.Clickhouse.Password,
+		DB:       "flow_tag",
+	}
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
@@ -493,18 +500,23 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 	if !isAdminFlag {
 		switch tag {
 		case "resource_gl0", "resource_gl1", "resource_gl2":
-			// results := map[string][]interface{}{}
+			results := map[string][]interface{}{}
 			for resourceKey, resourceType := range AutoMap {
 				// 增加资源ID
 				resourceId := resourceKey + "_id"
 				resourceName := resourceKey + "_name"
-				if resourceKey == "vpc" {
-					resourceId = "l3_epc_id"
-					resourceName = "l3_epc_name"
-				}
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+				sql = strings.ReplaceAll(sql, " like ", " ilike ")
+				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
-				sqlList = append(sqlList, sql)
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return map[string][]interface{}{}, sqlList, err
+				}
+
+				for _, value := range rst["values"] {
+					results["values"] = append(results["values"], value)
+				}
 			}
 			autoMap := map[string]map[string]int{
 				"resource_gl0": AutoPodMap,
@@ -519,10 +531,19 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 					resourceName = "pod_service_name"
 				}
 				sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, %s AS device_type, uid FROM ip_resource_map %s GROUP BY value, display_name, device_type, uid ORDER BY %s ASC %s", resourceId, resourceName, strconv.Itoa(resourceType), whereSql, orderBy, limitSql)
+				sql = strings.ReplaceAll(sql, " like ", " ilike ")
+				sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 				log.Debug(sql)
-				sqlList = append(sqlList, sql)
+				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+				if err != nil {
+					return map[string][]interface{}{}, sqlList, err
+				}
+				for _, value := range rst["values"] {
+					results["values"] = append(results["values"], value)
+				}
+				results["columns"] = rst["columns"]
 			}
-			return sqlList, nil
+			return results, sqlList, nil
 		}
 
 		switch tag {
@@ -532,7 +553,7 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 			sql = fmt.Sprintf("SELECT %s AS value,%s AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", resourceId, resourceName, whereSql, orderBy, limitSql)
 
 		case "vpc", "l2_vpc":
-			sql = fmt.Sprintf("SELECT l3_epc_id AS value, l3_epc_name AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
+			sql = fmt.Sprintf("SELECT vpc_id AS value, vpc_name AS display_name, uid FROM ip_resource_map %s GROUP BY value, display_name, uid ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 
 		case "service", "router", "host", "dhcpgw", "pod_service", "ip", "lb_listener", "pod_ingress", "az", "region", "pod_cluster", "pod_ns", "pod_node", "pod_group", "pod", "subnet":
 			resourceId := tag + "_id"
@@ -562,12 +583,17 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 				}
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 			} else {
-				return sqlList, nil
+				return map[string][]interface{}{}, sqlList, nil
 			}
 		}
+		sql = strings.ReplaceAll(sql, " like ", " ilike ")
+		sql = strings.ReplaceAll(sql, " LIKE ", " ILIKE ")
 		log.Debug(sql)
-		sqlList = append(sqlList, sql)
-		return sqlList, nil
+		rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
+		if err != nil {
+			return nil, nil, err
+		}
+		return rst, sqlList, nil
 	} else {
 		deviceType, ok := TAG_RESOURCE_TYPE_DEVICE_MAP[tag]
 		if ok {
@@ -623,15 +649,15 @@ func GetTagResourceValues(rawSql string) ([]string, error) {
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		}
 		if sql == "" {
-			return sqlList, nil
+			return map[string][]interface{}{}, sqlList, nil
 		}
 		log.Debug(sql)
 		sqlList = append(sqlList, sql)
-		return sqlList, nil
+		return map[string][]interface{}{}, sqlList, nil
 	}
 }
 
-func GetExternalTagValues(db, table, rawSql string) ([]string, error) {
+func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, []string, error) {
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
@@ -674,5 +700,5 @@ func GetExternalTagValues(db, table, rawSql string) ([]string, error) {
 	}
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
-	return sqlList, nil
+	return map[string][]interface{}{}, sqlList, nil
 }

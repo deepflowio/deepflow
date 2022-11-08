@@ -173,7 +173,6 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 			multiIDTag = strings.ReplaceAll(multiIDTag, "subnet", "vl2")
 			multiIDTag = strings.ReplaceAll(multiIDTag, "pod_ns", "pod_namespace")
 			multiIDTag = multiIDTag + "s"
-			tag = strings.ReplaceAll(tag, "vpc", "l3_epc")
 			switch MultiResourceMap[multiIDTag].(type) {
 			case []interface{}:
 				if len(MultiResourceMap[multiIDTag].([]interface{})) > 0 {
