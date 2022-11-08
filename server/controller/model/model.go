@@ -395,6 +395,8 @@ type VTapGroupConfiguration struct {
 	ExternalAgentHTTPProxyPort    *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT" yaml:"external_agent_http_proxy_port,omitempty"`
 	AnalyzerPort                  *int          `json:"ANALYZER_PORT" yaml:"analyzer_port,omitempty"`
 	ProxyControllerPort           *int          `json:"PROXY_CONTROLLER_PORT" yaml:"proxy_controller_port,omitempty"`
+	ProxyControllerIP             *string       `json:"PROXY_CONTROLLER_IP" yaml:"proxy_controller_ip,omitempty"`
+	AnalyzerIP                    *string       `json:"ANALYZER_IP" yaml:"analyzer_ip,omitempty"`
 	YamlConfig                    *StaticConfig `yaml:"static_config,omitempty"`
 }
 
@@ -469,6 +471,8 @@ type VTapGroupConfigurationResponse struct {
 	ExternalAgentHTTPProxyPort    *int          `json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
 	AnalyzerPort                  *int          `json:"ANALYZER_PORT"`
 	ProxyControllerPort           *int          `json:"PROXY_CONTROLLER_PORT"`
+	ProxyControllerIP             *string       `json:"PROXY_CONTROLLER_IP"`
+	AnalyzerIP                    *string       `json:"ANALYZER_IP"`
 }
 
 type DetailedConfig struct {

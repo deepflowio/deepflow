@@ -76,6 +76,8 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	ExternalAgentHTTPProxyPort:    &ExternalAgentHTTPProxyPort,
 	AnalyzerPort:                  &AnalyzerPort,
 	ProxyControllerPort:           &ProxyControllerPort,
+	ProxyControllerIP:             &ProxyControllerIP,
+	AnalyzerIP:                    &AnalyzerIP,
 }
 
 var (
@@ -135,4 +137,6 @@ var (
 	ExternalAgentHTTPProxyPort    = 38086
 	AnalyzerPort                  = 30033
 	ProxyControllerPort           = 30035
+	ProxyControllerIP             = ""
+	AnalyzerIP                    = ""
 )
