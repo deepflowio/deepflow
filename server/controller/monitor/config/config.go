@@ -29,5 +29,7 @@ type MonitorConfig struct {
 	LicenseCheckInterval        int     `default:"60" yaml:"license_check_interval"`
 	VTapCheckInterval           int     `default:"60" yaml:"vtap_check_interval"`
 	ExceptionTimeFrame          int     `default:"3600" yaml:"exception_time_frame"`
+	AutoRebalanceVTap           bool    `default:"true" yaml:"auto_rebalance_vtap"`
+	RebalanceCheckInterval      int     `default:"300" yaml:"rebalance_check_interval"` // unit: second
 	Warrant                     Warrant `yaml:"warrant"`
 }
