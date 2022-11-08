@@ -56,16 +56,26 @@ func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
 
 func (v *VM) ProduceByAdd(items []*mysql.VM) {
 	for _, item := range items {
+		hostID, ok := v.ToolDataSet.GetHostIDByIP(item.LaunchServer)
+		if !ok {
+			log.Errorf("host id for %s (ip: %s) not found", RESOURCE_TYPE_HOST_EN, item.LaunchServer)
+		}
+		regionID, azID, err := v.ToolDataSet.GetRegionIDAndAZIDByLcuuid(item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
 		v.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			v.deviceType,
 			item.ID,
-			eventapi.L3DeviceType(v.deviceType),
-			eventapi.L3DeviceID(item.ID),
-			eventapi.VPCID(item.VPCID),
-			eventapi.AZID(v.ToolDataSet.AZLcuuidToID[item.AZ]),
-			eventapi.RegionID(v.ToolDataSet.RegionLcuuidToID[item.Region]),
+			eventapi.TagHostID(hostID),
+			eventapi.TagL3DeviceType(v.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagAZID(azID),
+			eventapi.TagRegionID(regionID),
 		)
 	}
 }
@@ -92,9 +102,9 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 		name,
 		common.VIF_DEVICE_TYPE_VM,
 		id,
-		eventapi.Description(description),
-		eventapi.SubnetIDs(nIDs),
-		eventapi.IPs(ips),
+		eventapi.TagDescription(description),
+		eventapi.TagSubnetIDs(nIDs),
+		eventapi.TagIPs(ips),
 	)
 }
 

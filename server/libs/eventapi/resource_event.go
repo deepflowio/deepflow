@@ -53,93 +53,93 @@ type ResourceEvent struct {
 	PodID        uint32
 }
 
-type ResourceOption func(opts *ResourceEvent)
+type TagFieldOption func(opts *ResourceEvent)
 
-func SubnetIDs(netIDs []uint32) ResourceOption {
+func TagSubnetIDs(netIDs []uint32) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.SubnetIDs = netIDs
 	}
 }
 
-func IPs(ips []string) ResourceOption {
+func TagIPs(ips []string) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.IPs = ips
 	}
 }
 
-func Description(description string) ResourceOption {
+func TagDescription(description string) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.Description = description
 	}
 }
 
-func RegionID(id int) ResourceOption {
+func TagRegionID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.RegionID = uint32(id)
 	}
 }
 
-func AZID(id int) ResourceOption {
+func TagAZID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.AZID = uint32(id)
 	}
 }
 
-func VPCID(id int) ResourceOption {
+func TagVPCID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.VPCID = uint32(id)
 	}
 }
 
-func L3DeviceType(id int) ResourceOption {
+func TagL3DeviceType(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.L3DeviceType = uint32(id)
 	}
 }
 
-func L3DeviceID(id int) ResourceOption {
+func TagL3DeviceID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.L3DeviceID = uint32(id)
 	}
 }
 
-func HostID(id int) ResourceOption {
+func TagHostID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.HostID = uint32(id)
 	}
 }
 
-func PodClusterID(id int) ResourceOption {
+func TagPodClusterID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodClusterID = uint32(id)
 	}
 }
 
-func PodNSID(id int) ResourceOption {
+func TagPodNSID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodNSID = uint32(id)
 	}
 }
 
-func PodNodeID(id int) ResourceOption {
+func TagPodNodeID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodNodeID = uint32(id)
 	}
 }
 
-func PodServiceID(id int) ResourceOption {
+func TagPodServiceID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodServiceID = uint32(id)
 	}
 }
 
-func PodGroupID(id int) ResourceOption {
+func TagPodGroupID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodGroupID = uint32(id)
 	}
 }
 
-func PodID(id int) ResourceOption {
+func TagPodID(id int) TagFieldOption {
 	return func(r *ResourceEvent) {
 		r.PodID = uint32(id)
 	}

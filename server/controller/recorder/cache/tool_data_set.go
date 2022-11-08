@@ -17,6 +17,8 @@
 package cache
 
 import (
+	"fmt"
+
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -187,6 +189,23 @@ func (t *ToolDataSet) deleteAZ(lcuuid string) {
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_AZ_EN, lcuuid))
 }
 
+func (t *ToolDataSet) GetAZIDByLcuuid(lcuuid string) (int, bool) {
+	id, exists := t.AZLcuuidToID[lcuuid]
+	if exists {
+		return id, true
+	}
+	log.Warning(cacheIDByLcuuidNotFound(RESOURCE_TYPE_AZ_EN, lcuuid))
+	var az mysql.AZ
+	result := mysql.Db.Where("lcuuid = ?", lcuuid).Find(&az)
+	if result.RowsAffected == 1 {
+		t.addAZ(&az)
+		return az.ID, true
+	} else {
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_AZ_EN, lcuuid))
+		return id, false
+	}
+}
+
 func (t *ToolDataSet) addRegion(item *mysql.Region) {
 	t.RegionLcuuidToID[item.Lcuuid] = item.ID
 	t.RegionIDToLcuuid[item.ID] = item.Lcuuid
@@ -203,6 +222,7 @@ func (t *ToolDataSet) deleteRegion(lcuuid string) {
 func (t *ToolDataSet) addHost(item *mysql.Host) {
 	t.HostLcuuidToID[item.Lcuuid] = item.ID
 	t.HostIDToName[item.ID] = item.Name
+	t.HostIPToID[item.IP] = item.ID
 	log.Info(addToToolMap(RESOURCE_TYPE_HOST_EN, item.Lcuuid))
 }
 
@@ -728,6 +748,23 @@ func (t *ToolDataSet) GetHostIDByLcuuid(lcuuid string) (int, bool) {
 		return host.ID, true
 	} else {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_HOST_EN, lcuuid))
+		return id, false
+	}
+}
+
+func (t *ToolDataSet) GetHostIDByIP(ip string) (int, bool) {
+	id, exists := t.HostIPToID[ip]
+	if exists {
+		return id, true
+	}
+	log.Warningf("cache %s id (ip: %s) not found", RESOURCE_TYPE_HOST_EN, ip)
+	var host mysql.Host
+	result := mysql.Db.Where("ip = ?", ip).Find(&host)
+	if result.RowsAffected == 1 {
+		t.addHost(&host)
+		return host.ID, true
+	} else {
+		log.Error("db %s (ip: %s) not found", RESOURCE_TYPE_HOST_EN, ip)
 		return id, false
 	}
 }
@@ -1595,4 +1632,16 @@ func (t *ToolDataSet) GetLANIPByLcuuid(lcuuid string) (string, bool) {
 		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 		return ip, false
 	}
+}
+
+func (t *ToolDataSet) GetRegionIDAndAZIDByLcuuid(regionLcuuid, azLcuuid string) (regionID, azID int, err error) {
+	regionID, ok := t.GetRegionIDByLcuuid(regionLcuuid)
+	if !ok {
+		return 0, 0, fmt.Errorf("%s (lcuuid: %s) id not found", RESOURCE_TYPE_REGION_EN, regionLcuuid)
+	}
+	azID, ok = t.GetAZIDByLcuuid(azLcuuid)
+	if !ok {
+		return 0, 0, fmt.Errorf("%s (lcuuid: %s) id not found", RESOURCE_TYPE_AZ_EN, azLcuuid)
+	}
+	return
 }

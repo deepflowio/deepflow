@@ -33,7 +33,7 @@ type EventManager[CT constraint.CloudModel, MT constraint.MySQLModel, BT constra
 }
 
 func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType, resourceName string, resourceType, resourceID int,
-	options ...eventapi.ResourceOption) {
+	options ...eventapi.TagFieldOption) {
 	// create
 	event := eventapi.AcquireResourceEvent()
 	event.Time = time.Now().Unix()
@@ -50,10 +50,6 @@ func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType, resourceName str
 	}
 
 	// put
-	e.put(event)
-}
-
-func (e *EventManager[CT, MT, BT]) put(event *eventapi.ResourceEvent) {
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(e.resourceType, err))
