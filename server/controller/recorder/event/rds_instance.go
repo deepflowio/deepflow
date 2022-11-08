@@ -45,7 +45,7 @@ func NewRDSInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSIns
 
 func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
 	for _, item := range items {
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, r.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
+		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, r.deviceType, item.ID)
 	}
 }
 
@@ -66,6 +66,6 @@ func (r *RDSInstance) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, r.deviceType, id, name, "", []uint32{}, []string{})
+		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
 	}
 }
