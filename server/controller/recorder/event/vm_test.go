@@ -33,11 +33,12 @@ func TestVM_ProduceByAdd(t *testing.T) {
 		items []*mysql.VM
 	}
 	tests := []struct {
-		name     string
-		v        *VM
-		args     args
-		wantID   uint32
-		wantName string
+		name      string
+		v         *VM
+		args      args
+		wantID    uint32
+		wantName  string
+		wantVPCID uint32
 	}{
 		{
 			name: "add success",
@@ -45,13 +46,15 @@ func TestVM_ProduceByAdd(t *testing.T) {
 			args: args{
 				items: []*mysql.VM{
 					{
-						Base: mysql.Base{ID: 1},
-						Name: "vm",
+						Base:  mysql.Base{ID: 1},
+						Name:  "vm",
+						VPCID: 2,
 					},
 				},
 			},
-			wantID:   1,
-			wantName: "vm",
+			wantID:    1,
+			wantName:  "vm",
+			wantVPCID: 2,
 		},
 	}
 	for _, tt := range tests {
@@ -61,6 +64,7 @@ func TestVM_ProduceByAdd(t *testing.T) {
 			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
 			assert.Equal(t, tt.wantID, e.InstanceID)
 			assert.Equal(t, tt.wantName, e.InstanceName)
+			assert.Equal(t, tt.wantVPCID, e.VPCID)
 		})
 
 	}
