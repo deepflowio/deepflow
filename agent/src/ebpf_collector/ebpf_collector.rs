@@ -23,6 +23,7 @@ use std::time::Duration;
 
 use log::{debug, error, info, warn};
 use lru::LruCache;
+use public::bitmap::Bitmap;
 
 use super::{Error, Result};
 
@@ -380,6 +381,9 @@ struct FlowItem {
     parser: Option<L7ProtocolParser>,
     // from yaml static config, use for skip some protocol check
     l7_enable_from_config: L7ProtocolBitmap,
+    // Vec<L7ProtocolString,PortBitmap>
+    // port bitmap max = 65535, indicate the l7 protocol in this port whether to parse
+    l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
 }
 
 impl FlowItem {
@@ -405,6 +409,7 @@ impl FlowItem {
         remote_epc: i32,
         log_parser_config: &LogParserAccess,
         l7_enable_from_config: L7ProtocolBitmap,
+        l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     ) -> Self {
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
         let l4_protocol = packet.lookup_key.proto;
@@ -412,7 +417,6 @@ impl FlowItem {
         let is_from_app = l7_protocol.is_some();
         let (l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
         let protocol_bitmap = get_parse_bitmap(l4_protocol, l7_enable_from_config);
-
         FlowItem {
             last_policy: time_in_sec,
             last_packet: time_in_sec,
@@ -427,7 +431,15 @@ impl FlowItem {
             protocol_bitmap_image: protocol_bitmap,
             parser: Self::get_parser(l7_protocol, log_parser_config),
             l7_enable_from_config,
+            l7_protocol_parse_port_bitmap,
         }
+    }
+
+    fn is_skip_l7_protocol_parse(&self, proto: &L7ProtocolParser, port: u16) -> bool {
+        if self.protocol_bitmap.is_disabled(proto.protocol()) {
+            return true;
+        }
+        proto.is_skip_parse_by_port_bitmap(&self.l7_protocol_parse_port_bitmap, port)
     }
 
     fn check(
@@ -443,9 +455,16 @@ impl FlowItem {
 
         let param = ParseParam::from(packet as &MetaPacket);
         for mut protocol_log in get_all_protocol().into_iter() {
-            if self.protocol_bitmap.is_disabled(protocol_log.protocol()) {
+            if self.is_skip_l7_protocol_parse(
+                &protocol_log,
+                match packet.direction {
+                    PacketDirection::ClientToServer => packet.lookup_key.dst_port,
+                    PacketDirection::ServerToClient => packet.lookup_key.src_port,
+                },
+            ) {
                 continue;
             }
+
             protocol_log.set_parse_config(log_parser_config);
             if protocol_log.check_payload(&packet.raw_from_ebpf.as_ref(), &param) {
                 self.l7_protocol = protocol_log.protocol();
@@ -844,6 +863,7 @@ impl EbpfRunner {
                         remote_epc,
                         &self.log_parser_config,
                         self.config.l7_protocol_enabled_bitmap,
+                        self.config.l7_protocol_parse_port_bitmap.clone(),
                     ),
                 );
                 flow_item = flow_map.get_mut(&key);

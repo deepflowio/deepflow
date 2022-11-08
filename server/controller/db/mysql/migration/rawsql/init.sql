@@ -1603,6 +1603,7 @@ CREATE TABLE IF NOT EXISTS controller (
     node_name           CHAR(64),
     pod_ip              CHAR(64),
     pod_name            CHAR(64),
+    ca_md5              CHAR(64),
     lcuuid              CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE controller;
@@ -1630,6 +1631,7 @@ CREATE TABLE IF NOT EXISTS analyzer (
     nat_ip_enabled          TINYINT(1) DEFAULT 0 COMMENT '0: disabled 1:enabled',
     pod_ip                  CHAR(64),
     pod_name                CHAR(64),
+    ca_md5                  CHAR(64),
     lcuuid                  CHAR(64)
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 TRUNCATE TABLE analyzer;
@@ -1910,8 +1912,8 @@ CREATE TABLE IF NOT EXISTS ch_ip_resource (
     host_name           VARCHAR(256),
     chost_id            INTEGER,
     chost_name          VARCHAR(256),
-    vpc_id              INTEGER,
-    vpc_name            VARCHAR(256),
+    l3_epc_id           INTEGER,
+    l3_epc_name         VARCHAR(256),
     router_id           INTEGER,
     router_name         VARCHAR(256),
     dhcpgw_id           INTEGER,
@@ -1940,6 +1942,7 @@ CREATE TABLE IF NOT EXISTS ch_ip_resource (
     pod_group_name      VARCHAR(256),
     pod_id              INTEGER,
     pod_name            VARCHAR(256),
+    uid                 CHAR(64),
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (ip, subnet_id)
 )ENGINE=innodb DEFAULT CHARSET=utf8;

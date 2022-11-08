@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::net::{IpAddr, ToSocketAddrs};
@@ -22,6 +23,7 @@ use std::time::Duration;
 
 use log::{error, info, warn};
 use md5::{Digest, Md5};
+use public::bitmap::Bitmap;
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer,
@@ -293,6 +295,9 @@ pub struct YamlConfig {
     pub standalone_data_file_size: u32,
     pub standalone_data_file_dir: String,
     pub log_file: String,
+    #[serde(rename = "l7-protocol-ports")]
+    // hashmap<protocolName, portRange>
+    pub l7_protocol_ports: HashMap<String, String>,
 }
 
 impl YamlConfig {
@@ -417,6 +422,44 @@ impl YamlConfig {
     fn validate(&self) -> Result<(), ConfigError> {
         Ok(())
     }
+
+    pub fn get_protocol_port_parse_bitmap(&self) -> Vec<(String, Bitmap)> {
+        /*
+            parse all protocol port range
+            format example:
+
+                l7-protocol-ports:
+                    "HTTP": "80,8080,1000-2000"
+                ...
+        */
+        let mut port_bitmap = Vec::new();
+        for (protocol_name, port_range) in self.l7_protocol_ports.iter() {
+            let mut bitmap = Bitmap::new(u16::MAX as usize, false);
+            let mut ports = port_range.split(",");
+
+            while let Some(mut p) = ports.next() {
+                p = p.trim();
+                if let Ok(port) = p.parse::<u16>() {
+                    let _ = bitmap.set(port as usize, true);
+                } else {
+                    let range = p.split("-").collect::<Vec<&str>>();
+                    if range.len() != 2 {
+                        continue;
+                    }
+
+                    if let (Some(start_str), Some(end_str)) = (range.get(0), range.get(1)) {
+                        if let (Ok(start), Ok(end)) =
+                            (start_str.parse::<u16>(), end_str.parse::<u16>())
+                        {
+                            let _ = bitmap.set_range(start as usize..=end as usize, true);
+                        }
+                    }
+                }
+            }
+            port_bitmap.push((protocol_name.clone(), bitmap));
+        }
+        port_bitmap
+    }
 }
 
 impl Default for YamlConfig {
@@ -493,6 +536,7 @@ impl Default for YamlConfig {
                 .to_string(),
 
             log_file: DEFAULT_LOG_FILE.into(),
+            l7_protocol_ports: HashMap::new(),
         }
     }
 }
