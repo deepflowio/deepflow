@@ -49,7 +49,7 @@ bitflags! {
     }
 }
 
-#[derive(TryFromPrimitive, IntoPrimitive, Clone, Copy, Debug)]
+#[derive(TryFromPrimitive, IntoPrimitive, Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum DirectionType {
     NoDirection = 0,
@@ -136,6 +136,8 @@ impl NpbAction {
         IpAddr::from(Ipv4Addr::UNSPECIFIED)
     }
 
+    pub fn reverse_tap_side(&mut self) {}
+
     pub fn set_payload_slice(&mut self, _payload_slice: u16) {}
 
     pub fn add_tap_side(&mut self, _tap_side: TapSide) {}
@@ -181,12 +183,35 @@ impl PolicyData {
         &mut self,
         actions: &Vec<NpbAction>,
         acl_id: u32,
-        _directions: Vec<DirectionType>,
+        direction: Option<DirectionType>,
     ) {
         self.acl_id = acl_id;
-        actions
-            .into_iter()
-            .for_each(|x| self.npb_actions.push(x.clone()))
+        if direction.is_none() {
+            actions
+                .into_iter()
+                .for_each(|x| self.npb_actions.push(x.clone()));
+            return;
+        }
+
+        let tap_side = if direction.unwrap() == DirectionType::Forward {
+            TapSide::SRC
+        } else {
+            TapSide::DST
+        };
+        actions.into_iter().for_each(|x| {
+            let mut action = x.clone();
+            action.set_tap_side(tap_side);
+            self.npb_actions.push(action)
+        })
+    }
+
+    pub fn merge_reverse_npb_action(&mut self, actions: &Vec<NpbAction>, acl_id: u32) {
+        self.acl_id = acl_id;
+        actions.into_iter().for_each(|x| {
+            let mut action = x.clone();
+            action.reverse_tap_side();
+            self.npb_actions.push(action)
+        })
     }
 
     fn dedup_npb_actions(&self, _packet: &dyn DedupOperator) -> Vec<NpbAction> {

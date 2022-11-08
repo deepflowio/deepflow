@@ -502,7 +502,7 @@ impl FirstPath {
                 policy.merge_npb_action(
                     &item.policy.npb_actions,
                     item.policy.acl_id,
-                    vec![direction],
+                    Some(direction),
                 );
             }
         }
@@ -524,7 +524,7 @@ impl FirstPath {
                 policy.merge_npb_action(
                     &item.policy.npb_actions,
                     item.policy.acl_id,
-                    vec![direction],
+                    Some(direction),
                 );
             }
         }
@@ -568,7 +568,7 @@ impl FirstPath {
             self.get_policy_from_table(key, &endpoints, &mut policy);
         }
 
-        self.fast.add_policy(key, &policy, &policy, endpoints);
+        self.fast.add_policy(key, &policy, endpoints);
 
         policy.format_npb_action();
         if key.has_feature_flag(FeatureFlags::DEDUP) {
