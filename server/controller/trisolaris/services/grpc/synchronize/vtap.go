@@ -179,11 +179,19 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 		}
 	}
 
-	if vtapConfig.NatIPEnabled == 1 {
-		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
-	} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
-		configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
-		configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
+	if vtapConfig.ProxyControllerIP != "" {
+		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
+	} else {
+		if vtapConfig.NatIPEnabled == 1 {
+			configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerNatIP(c.GetControllerIP()))
+		} else if isPodVTap(c.GetVTapType()) && gVTapInfo.IsTheSameCluster(clusterID) {
+			configure.ProxyControllerIp = proto.String(trisolaris.GetGNodeInfo().GetControllerPodIP(c.GetControllerIP()))
+			configure.ProxyControllerPort = proto.Uint32(uint32(trisolaris.GetGrpcPort()))
+		}
+	}
+
+	if vtapConfig.AnalyzerIP != "" {
+		configure.AnalyzerIp = proto.String(vtapConfig.AnalyzerIP)
 	}
 
 	if configure.GetProxyControllerIp() == "" {
@@ -493,6 +501,13 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	}
 	configure.LocalConfig = proto.String(
 		trisolaris.GetGVTapInfo().GetVTapLocalConfigByShortID(groupID))
+
+	if vtapConfig.ProxyControllerIP != "" {
+		configure.ProxyControllerIp = proto.String(vtapConfig.ProxyControllerIP)
+	}
+	if vtapConfig.AnalyzerIP != "" {
+		configure.AnalyzerIp = proto.String(vtapConfig.AnalyzerIP)
+	}
 
 	return configure
 }

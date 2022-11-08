@@ -1347,6 +1347,8 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     external_agent_http_proxy_port     INTEGER DEFAULT NULL,
     proxy_controller_port     INTEGER DEFAULT NULL,
     analyzer_port             INTEGER DEFAULT NULL,
+    proxy_controller_ip       VARCHAR(128),
+    analyzer_ip               VARCHAR(128),
     yaml_config               TEXT,
     lcuuid                    CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;

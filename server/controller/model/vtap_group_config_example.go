@@ -92,6 +92,10 @@ vtap_group_id: g-xxxxxx
 #proxy_controller_port: 30035
 ## 数据节点通信端口，默认值：30033，可选值：1-65535
 #analyzer_port: 30033
+##控制器IP：默认为空，固定使用此控制器IP
+#proxy_controller_ip:
+##数据节点IP：默认为空，固定使用此数据节点IP
+#analyzer_ip:
 #
 ## 全景图配置参数
 ## 数据套接字，默认值: TCP，可选值：TCP/UDP/FILE
