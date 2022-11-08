@@ -349,6 +349,7 @@ func (i *ChIPPort) generatePortPodServiceData(keyToItem map[PortIPKey]mysql.ChIP
 func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bool {
 	var vInterfaceIPs []mysql.LANIP
 	var lbVInterfaces []mysql.VInterface
+	var vmVInterfaces []mysql.VInterface
 	var ipResources []mysql.WANIP
 	var lbs []mysql.LB
 	var lbListeners []mysql.LBListener
@@ -365,6 +366,11 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 		return false
 	}
 	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_LB).Find(&lbVInterfaces).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
+		return false
+	}
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_VM).Find(&vmVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
@@ -398,11 +404,13 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 	ipResourceIPToSubnetIDs := make(map[string][]int)
 	for _, vInterfaceIP := range vInterfaceIPs {
 		vInterfaceIPToSubnetIDs[vInterfaceIP.IP] = append(vInterfaceIPToSubnetIDs[vInterfaceIP.IP], vInterfaceIP.NetworkID)
+	}
+	for _, vmVInterface := range vmVInterfaces {
 		for _, ipResource := range ipResources {
-			if vInterfaceIP.ID != ipResource.VInterfaceID {
+			if vmVInterface.ID != ipResource.VInterfaceID {
 				continue
 			}
-			ipResourceIPToSubnetIDs[ipResource.IP] = append(ipResourceIPToSubnetIDs[ipResource.IP], vInterfaceIP.NetworkID)
+			ipResourceIPToSubnetIDs[ipResource.IP] = append(ipResourceIPToSubnetIDs[ipResource.IP], vmVInterface.NetworkID)
 		}
 	}
 	for _, lbVInterface := range lbVInterfaces {
