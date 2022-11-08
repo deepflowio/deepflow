@@ -167,6 +167,12 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, []string,
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
 	}
+	if strings.ToLower(sqlSplit[1]) == "language" {
+		result := make(map[string][]interface{})
+		result["columns"] = []interface{}{"language"}
+		result["values"] = []interface{}{[]string{config.Cfg.Language}}
+		return result, []string{}, true, nil
+	}
 	var table string
 	var where string
 	for i, item := range sqlSplit {
