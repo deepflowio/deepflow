@@ -336,8 +336,8 @@ const (
 		"    `host_name` String,\n" +
 		"    `chost_id` UInt64,\n" +
 		"    `chost_name` String,\n" +
-		"    `l3_epc_id` UInt64,\n" +
-		"    `l3_epc_name` String,\n" +
+		"    `vpc_id` UInt64,\n" +
+		"    `vpc_name` String,\n" +
 		"    `router_id` UInt64,\n" +
 		"    `router_name` String,\n" +
 		"    `dhcpgw_id` UInt64,\n" +
