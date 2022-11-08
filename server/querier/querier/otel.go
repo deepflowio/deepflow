@@ -4,7 +4,7 @@ import (
 	"context"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	otelTrace "go.opentelemetry.io/otel/sdk/trace"
@@ -36,10 +36,9 @@ func initTraceProvider(endpoint string) *otelTrace.TracerProvider {
 
 	//创建OtlpExporter，并通过默认的Exporter做数据导出
 	oltpExporter, err := otlptrace.New(ctx,
-		otlptracegrpc.NewClient(
-			otlptracegrpc.WithEndpoint(endpoint),
-			otlptracegrpc.WithInsecure(),
-			otlptracegrpc.WithDialOption(grpc.WithBlock()),
+		otlptracehttp.NewClient(
+			otlptracehttp.WithEndpoint(endpoint),
+			otlptracehttp.WithInsecure(),
 		))
 
 	if err != nil {
