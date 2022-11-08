@@ -442,8 +442,49 @@ func (v *ChVTapPort) generateUpdateInfo(oldItem, newItem mysql.ChVTapPort) (map[
 	return nil, false
 }
 
-func getGenesisInterface() *simplejson.Json {
-	url := fmt.Sprintf("http://%s/v1/sync/vinterface/", net.JoinHostPort(common.LOCALHOST, fmt.Sprintf("%d", common.GConfig.HTTPPort)))
+func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, error) {
+	var vtapVIFs []model.VTapInterface
+	toolDS, err := newToolDataSet()
+	if err != nil {
+		return nil, err
+	}
+
+	controllerIPToRegionLcuuid := make(map[string]string)
+	var azCConns []*mysql.AZControllerConnection
+	mysql.Db.Find(&azCConns)
+	for _, c := range azCConns {
+		controllerIPToRegionLcuuid[c.ControllerIP] = c.Region
+	}
+	var controllers []*mysql.Controller
+	mysql.Db.Find(&controllers)
+	slaveRegionLcuuidToHealthyControllerIPs := make(map[string][]string)
+	for _, c := range controllers {
+		if c.State == common.CONTROLLER_STATE_NORMAL && c.NodeType == common.CONTROLLER_NODE_TYPE_SLAVE {
+			slaveRegionLcuuidToHealthyControllerIPs[controllerIPToRegionLcuuid[c.IP]] = append(
+				slaveRegionLcuuidToHealthyControllerIPs[controllerIPToRegionLcuuid[c.IP]], c.IP,
+			)
+		}
+	}
+
+	masterRegionVVIFs := getRawVTapVinterfacesByRegion(common.LOCALHOST, common.GConfig.HTTPPort)
+	vtapVIFs = append(vtapVIFs, formatVTapVInterfaces(masterRegionVVIFs, filter, toolDS)...)
+	for slaveRegion, regionControllerIPs := range slaveRegionLcuuidToHealthyControllerIPs {
+		log.Infof("get region (lcuuid: %s) vtap interfaces", slaveRegion)
+		for _, ip := range regionControllerIPs {
+			err := common.IsTCPActive(ip, common.GConfig.HTTPNodePort)
+			if err != nil {
+				log.Error(err.Error())
+			} else {
+				vtapVIFs = append(vtapVIFs, formatVTapVInterfaces(getRawVTapVinterfacesByRegion(ip, common.GConfig.HTTPNodePort), filter, toolDS)...)
+				break
+			}
+		}
+	}
+	return vtapVIFs, nil
+}
+
+func getRawVTapVinterfacesByRegion(host string, port int) *simplejson.Json {
+	url := fmt.Sprintf("http://%s/v1/sync/vinterface/", net.JoinHostPort(host, fmt.Sprintf("%d", port)))
 	resp, err := common.CURLPerform("GET", url, nil)
 	if err != nil {
 		log.Errorf("get genesis vinterface failed: %s, %s", err.Error(), url)
@@ -453,24 +494,20 @@ func getGenesisInterface() *simplejson.Json {
 		log.Warningf("no data in curl response: %s", url)
 		return simplejson.New()
 	}
+	log.Debug(url)
 	return resp.Get("DATA")
 }
 
-func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, error) {
+func formatVTapVInterfaces(vifs *simplejson.Json, filter map[string]interface{}, toolDS *vpToolDataSet) []model.VTapInterface {
 	var vtapVIFs []model.VTapInterface
-	db := mysql.Db
-	if _, ok := filter["name"]; ok {
-		db = db.Where("name = ?", filter["name"])
-	}
-
-	vifs := getGenesisInterface()
-	toolDS, err := newToolDataSet()
-	if err != nil {
-		return nil, err
-	}
-
 	for i := range vifs.MustArray() {
 		jVIF := vifs.GetIndex(i)
+		name := jVIF.Get("NAME").MustString()
+		if n, ok := filter["name"]; ok {
+			if n != name {
+				continue
+			}
+		}
 		vtapID := jVIF.Get("VTAP_ID").MustInt()
 		lastSeen, err := time.Parse(time.RFC3339, jVIF.Get("LAST_SEEN").MustString())
 		if err != nil {
@@ -478,7 +515,7 @@ func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, er
 		}
 		vtapVIF := model.VTapInterface{
 			ID:       jVIF.Get("ID").MustInt(),
-			Name:     jVIF.Get("NAME").MustString(),
+			Name:     name,
 			MAC:      jVIF.Get("MAC").MustString(),
 			TapName:  jVIF.Get("TAP_NAME").MustString(),
 			TapMAC:   jVIF.Get("TAP_MAC").MustString(),
@@ -556,7 +593,7 @@ func GetVTapInterfaces(filter map[string]interface{}) ([]model.VTapInterface, er
 		}
 		vtapVIFs = append(vtapVIFs, vtapVIF)
 	}
-	return vtapVIFs, nil
+	return vtapVIFs
 }
 
 type vpToolDataSet struct {
@@ -600,7 +637,6 @@ func newToolDataSet() (toolDS *vpToolDataSet, err error) {
 		podIDToName:           make(map[int]string),
 	}
 
-	// generate tool dataset
 	var vtaps []*mysql.VTap
 	if err = mysql.Db.Find(&vtaps).Error; err != nil {
 		log.Error(dbQueryResourceFailed("vtap", err))
