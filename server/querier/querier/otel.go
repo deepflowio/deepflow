@@ -9,7 +9,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
-	"google.golang.org/grpc"
 )
 
 func initTraceProvider(endpoint string) *otelTrace.TracerProvider {
