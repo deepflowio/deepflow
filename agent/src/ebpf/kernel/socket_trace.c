@@ -199,6 +199,35 @@ static __inline void get_sock_flags(void *sk,
 	conn_info->sk_type = sk_flags->sk_type;
 }
 
+/*
+ * IPv4 connections can be handled with the v6 API by using the
+ * v4-mapped-on-v6 address type;thus a program needs to
+ * support only this API type to support both protocols.This
+ * is handled transparently by the address handling functions
+ * in the C library . IPv4 and IPv6 share the local port space.
+ * When you get an IPv4 connection or packet to a IPv6 socket,
+ * its source address will be mapped to v6 and it will be mapped
+ * to v6. The address notation for IPv6 is a group of 8 4 -digit
+ * hexadecimal numbers, separated with a ':'."::" stands for a
+ * string of 0 bits.
+ * Special addresses are
+ *   ::1 for loopback and ::FFFF:<IPv4 address> for IPv4-mapped-on-IPv6.
+ */
+/*
+ * Confirm whether you want to obtain IP through socket IPv4 address
+ *
+ * @s sock address
+ * @f skc_family
+ */
+#define ipv4_mapped_on_ipv6_confirm(s, f)				\
+do {									\
+	char __addr[16];						\
+	bpf_probe_read(__addr, 16, (s) + STRUCT_SOCK_IP6SADDR_OFFSET);	\
+	__u32 __feature = *(__u32 *)&__addr[8];				\
+	if (__feature == 0xffff0000)					\
+		f = PF_INET;						\
+} while(0)
+
 static __inline int is_tcp_udp_data(void *sk,
 				    struct member_fields_offset *offset,
 				    struct conn_info_t *conn_info)
@@ -221,7 +250,11 @@ static __inline int is_tcp_udp_data(void *sk,
 	 */
 	switch (conn_info->skc_family) {
 	case PF_INET:
+		break;
 	case PF_INET6:
+		if (conn_info->skc_ipv6only == 0) {
+			ipv4_mapped_on_ipv6_confirm(sk, conn_info->skc_family);
+		}
 		break;
 	default:
 		return SOCK_CHECK_TYPE_ERROR;
@@ -300,7 +333,7 @@ static __inline bool get_socket_info(struct __socket_data *v,
 		break;
 	case PF_INET6:
 		bpf_probe_read(v->tuple.rcv_saddr, 16, sk + STRUCT_SOCK_IP6SADDR_OFFSET);
-		bpf_probe_read(v->tuple.daddr, 16, sk + STRUCT_SOCK_IP6SADDR_OFFSET);
+		bpf_probe_read(v->tuple.daddr, 16, sk + STRUCT_SOCK_IP6DADDR_OFFSET);
 		v->tuple.addr_len = 16;
 		break;
 	default:

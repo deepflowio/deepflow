@@ -272,6 +272,10 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	send_buffer->tuple.dport = __bpf_ntohs(inet_dport);
 	send_buffer->tuple.num = inet_sport;
 
+	if (skc_family == PF_INET6 && skc_flags.skc_ipv6only == 0) {
+		ipv4_mapped_on_ipv6_confirm(sk, skc_family);
+	}
+
 	switch (skc_family) {
 	case PF_INET:
 		bpf_probe_read(send_buffer->tuple.rcv_saddr, 4,
@@ -284,7 +288,7 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 		bpf_probe_read(send_buffer->tuple.rcv_saddr, 16,
 			       sk + STRUCT_SOCK_IP6SADDR_OFFSET);
 		bpf_probe_read(send_buffer->tuple.daddr, 16,
-			       sk + STRUCT_SOCK_IP6SADDR_OFFSET);
+			       sk + STRUCT_SOCK_IP6DADDR_OFFSET);
 		send_buffer->tuple.addr_len = 16;
 		break;
 	default:
