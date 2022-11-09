@@ -45,7 +45,22 @@ func NewNATGateway(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *NATGate
 
 func (n *NATGateway) ProduceByAdd(items []*mysql.NATGateway) {
 	for _, item := range items {
-		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, n.deviceType, item.ID)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(n.ToolDataSet, item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		n.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			n.deviceType,
+			item.ID,
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(n.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		)
 	}
 }
 

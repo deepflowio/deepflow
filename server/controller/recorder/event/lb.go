@@ -45,7 +45,22 @@ func NewLB(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LB {
 
 func (l *LB) ProduceByAdd(items []*mysql.LB) {
 	for _, item := range items {
-		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, l.deviceType, item.ID)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(l.ToolDataSet, item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		l.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			l.deviceType,
+			item.ID,
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(l.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		)
 	}
 }
 

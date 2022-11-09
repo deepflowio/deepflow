@@ -44,11 +44,16 @@ func NewLANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 
 func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	for _, item := range items {
-		var deviceType int
-		var deviceID int
-		var deviceName string
-		var networkID int
-		var networkName string
+		var (
+			deviceType  int
+			deviceID    int
+			deviceName  string
+			networkID   int
+			networkName string
+			opts        []eventapi.TagFieldOption
+			tempOpts    []eventapi.TagFieldOption
+		)
+
 		vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(item.VInterfaceID)
 		if ok {
 			deviceType, ok = i.ToolDataSet.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
@@ -63,6 +68,11 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			if !ok {
 				log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
+			var err error
+			tempOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
+			if err != nil {
+				log.Error(err)
+			}
 			networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
 				log.Errorf("network id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
@@ -76,14 +86,19 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 				RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_LAN_IP_EN)
 		}
 
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, item.IP)),
+			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.TagIPs([]string{item.IP}),
+		}...)
+		opts = append(opts, tempOpts...)
+
 		i.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
 			deviceType,
 			deviceID,
-			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, item.IP)),
-			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
-			eventapi.TagIPs([]string{item.IP}),
+			opts...,
 		)
 	}
 }

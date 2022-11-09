@@ -47,7 +47,7 @@ func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 
 func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	for _, item := range items {
-		regionID, azID, err := p.ToolDataSet.GetRegionIDAndAZIDByLcuuid(item.Region, item.AZ)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(p.ToolDataSet, item.Region, item.AZ)
 		if err != nil {
 			log.Error(err)
 		}

@@ -45,7 +45,20 @@ func NewHost(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
 
 func (h *Host) ProduceByAdd(items []*mysql.Host) {
 	for _, item := range items {
-		h.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, h.deviceType, item.ID)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(h.ToolDataSet, item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		h.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			h.deviceType,
+			item.ID,
+			eventapi.TagHostID(item.ID),
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+		)
 	}
 }
 

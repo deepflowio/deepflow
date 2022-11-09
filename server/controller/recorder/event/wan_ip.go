@@ -92,11 +92,15 @@ func (i *WANIP) ProduceByUpdate(cloudItem *cloudmodel.IP, diffBase *cache.WANIP)
 
 func (i *WANIP) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var deviceType int
-		var deviceID int
-		var deviceName string
-		var networkID int
-		var networkName string
+		var (
+			deviceType  int
+			deviceID    int
+			deviceName  string
+			networkID   int
+			networkName string
+			opts        []eventapi.TagFieldOption
+			tempOpts    []eventapi.TagFieldOption
+		)
 		vifID, ok := i.ToolDataSet.GetVInterfaceIDByWANIPLcuuid(lcuuid)
 		if ok {
 			vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(vifID)
@@ -112,6 +116,11 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 				deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 				if !ok {
 					log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				}
+				var err error
+				tempOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
+				if err != nil {
+					log.Error(err)
 				}
 				networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
@@ -134,14 +143,19 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 			log.Errorf("%s (lcuuid: %s) ip not found", RESOURCE_TYPE_WAN_IP_EN, lcuuid)
 		}
 
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, ip)),
+			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.TagIPs([]string{ip}),
+		}...)
+		opts = append(opts, tempOpts...)
+
 		i.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,
 			deviceType,
 			deviceID,
-			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, ip)),
-			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
-			eventapi.TagIPs([]string{ip}),
+			opts...,
 		)
 	}
 }

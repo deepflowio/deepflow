@@ -45,7 +45,22 @@ func NewRDSInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSIns
 
 func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
 	for _, item := range items {
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, r.deviceType, item.ID)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(r.ToolDataSet, item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		r.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			r.deviceType,
+			item.ID,
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(r.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		)
 	}
 }
 

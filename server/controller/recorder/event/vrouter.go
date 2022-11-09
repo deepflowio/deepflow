@@ -45,7 +45,22 @@ func NewVRouter(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VRouter {
 
 func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 	for _, item := range items {
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, r.deviceType, item.ID)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(r.ToolDataSet, item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		r.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			r.deviceType,
+			item.ID,
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(r.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		)
 	}
 }
 

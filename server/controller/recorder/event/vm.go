@@ -60,7 +60,7 @@ func (v *VM) ProduceByAdd(items []*mysql.VM) {
 		if !ok {
 			log.Errorf("host id for %s (ip: %s) not found", RESOURCE_TYPE_HOST_EN, item.LaunchServer)
 		}
-		regionID, azID, err := v.ToolDataSet.GetRegionIDAndAZIDByLcuuid(item.Region, item.AZ)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(v.ToolDataSet, item.Region, item.AZ)
 		if err != nil {
 			log.Error(err)
 		}

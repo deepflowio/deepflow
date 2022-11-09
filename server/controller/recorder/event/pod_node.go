@@ -45,7 +45,23 @@ func NewPodNode(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
 
 func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, p.deviceType, item.ID)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(p.ToolDataSet, item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		p.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			p.deviceType,
+			item.ID,
+			eventapi.TagPodNodeID(item.ID),
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagPodNodeID(item.ID),
+			eventapi.TagPodClusterID(item.PodClusterID),
+		)
 	}
 }
 

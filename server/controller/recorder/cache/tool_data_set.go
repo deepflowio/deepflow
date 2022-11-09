@@ -17,8 +17,6 @@
 package cache
 
 import (
-	"fmt"
-
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -222,6 +220,8 @@ func (t *ToolDataSet) deleteRegion(lcuuid string) {
 func (t *ToolDataSet) addHost(item *mysql.Host) {
 	t.HostLcuuidToID[item.Lcuuid] = item.ID
 	t.HostIDToName[item.ID] = item.Name
+	t.HostIDToRegionLcuuid[item.ID] = item.Region
+	t.HostIDToAZLcuuid[item.ID] = item.AZ
 	t.HostIPToID[item.IP] = item.ID
 	log.Info(addToToolMap(RESOURCE_TYPE_HOST_EN, item.Lcuuid))
 }
@@ -229,28 +229,45 @@ func (t *ToolDataSet) addHost(item *mysql.Host) {
 func (t *ToolDataSet) deleteHost(lcuuid string) {
 	id, _ := t.GetHostIDByLcuuid(lcuuid)
 	delete(t.HostIDToName, id)
+	delete(t.HostIDToRegionLcuuid, id)
+	delete(t.HostIDToAZLcuuid, id)
 	delete(t.HostLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_HOST_EN, lcuuid))
 }
 
 func (t *ToolDataSet) updateHost(cloudItem *cloudmodel.Host) {
 	id, exists := t.GetHostIDByLcuuid(cloudItem.Lcuuid)
-	if exists {
-		t.HostIDToName[id] = cloudItem.Name
+	if !exists {
+		return
 	}
+	t.HostIDToName[id] = cloudItem.Name
+	t.HostIDToRegionLcuuid[id] = cloudItem.RegionLcuuid
+	t.HostIDToAZLcuuid[id] = cloudItem.AZLcuuid
 	log.Info(updateToolMap(RESOURCE_TYPE_HOST_EN, cloudItem.Lcuuid))
 }
 
 func (t *ToolDataSet) addVM(item *mysql.VM) {
 	t.VMLcuuidToID[item.Lcuuid] = item.ID
 	t.VMIDToName[item.ID] = item.Name
+	t.VMIDToRegionLcuuid[item.ID] = item.Region
+	t.VMIDToAZLcuuid[item.ID] = item.AZ
+	t.VMIDToVPCID[item.ID] = item.VPCID
+	t.VMIDToLaunchServer[item.ID] = item.LaunchServer
 	log.Info(addToToolMap(RESOURCE_TYPE_VM_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) updateVM(cloudItem *cloudmodel.VM) {
 	id, exists := t.GetVMIDByLcuuid(cloudItem.Lcuuid)
+	if !exists {
+		return
+	}
+	t.VMIDToName[id] = cloudItem.Name
+	t.VMIDToRegionLcuuid[id] = cloudItem.RegionLcuuid
+	t.VMIDToAZLcuuid[id] = cloudItem.AZLcuuid
+	t.VMIDToLaunchServer[id] = cloudItem.LaunchServer
+	vpcID, exists := t.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if exists {
-		t.VMIDToName[id] = cloudItem.Name
+		t.VMIDToVPCID[id] = vpcID
 	}
 	log.Info(updateToolMap(RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid))
 }
@@ -260,6 +277,10 @@ func (t *ToolDataSet) deleteVM(lcuuid string) {
 	delete(t.VMIDToName, id)
 	delete(t.VMIDToIPNetworkIDMap, id)
 	delete(t.VMLcuuidToID, lcuuid)
+	delete(t.VMIDToRegionLcuuid, id)
+	delete(t.VMIDToAZLcuuid, id)
+	delete(t.VMIDToVPCID, id)
+	delete(t.VMIDToLaunchServer, id)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_VM_EN, lcuuid))
 }
 
@@ -1634,14 +1655,110 @@ func (t *ToolDataSet) GetLANIPByLcuuid(lcuuid string) (string, bool) {
 	}
 }
 
-func (t *ToolDataSet) GetRegionIDAndAZIDByLcuuid(regionLcuuid, azLcuuid string) (regionID, azID int, err error) {
-	regionID, ok := t.GetRegionIDByLcuuid(regionLcuuid)
-	if !ok {
-		return 0, 0, fmt.Errorf("%s (lcuuid: %s) id not found", RESOURCE_TYPE_REGION_EN, regionLcuuid)
+func (t *ToolDataSet) GetHostRegionLcuuidByID(id int) (string, bool) {
+	regionLcuuid, exists := t.HostIDToRegionLcuuid[id]
+	if exists {
+		return regionLcuuid, true
 	}
-	azID, ok = t.GetAZIDByLcuuid(azLcuuid)
-	if !ok {
-		return 0, 0, fmt.Errorf("%s (lcuuid: %s) id not found", RESOURCE_TYPE_AZ_EN, azLcuuid)
+
+	log.Warning(cacheRegionLcuuidByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
+	var host mysql.Host
+	result := mysql.Db.Where("id = ?", id).Find(&host)
+	if result.RowsAffected == 1 {
+		t.addHost(&host)
+		return host.Region, true
 	}
-	return
+
+	log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
+	return "", false
+}
+
+func (t *ToolDataSet) GetHostAZLcuuidByID(id int) (string, bool) {
+	regionLcuuid, exists := t.HostIDToAZLcuuid[id]
+	if exists {
+		return regionLcuuid, true
+	}
+
+	log.Warning(cacheRegionLcuuidByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
+	var host mysql.Host
+	result := mysql.Db.Where("id = ?", id).Find(&host)
+	if result.RowsAffected == 1 {
+		t.addHost(&host)
+		return host.Region, true
+	}
+
+	log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_HOST_EN, id))
+	return "", false
+}
+
+func (t *ToolDataSet) GetVMRegionLcuuidByID(id int) (string, bool) {
+	vmLcuuid, exists := t.VMIDToRegionLcuuid[id]
+	if exists {
+		return vmLcuuid, false
+	}
+
+	log.Warning(cacheAZLcuuidByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	var vm mysql.VM
+	result := mysql.Db.Where("id = ?", id).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.addVM(&vm)
+		return vm.Region, true
+	}
+
+	log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	return "", false
+}
+
+func (t *ToolDataSet) GetVMAZLcuuidByID(id int) (string, bool) {
+	azLcuuid, exists := t.VMIDToAZLcuuid[id]
+	if exists {
+		return azLcuuid, true
+	}
+
+	log.Warning(cacheAZLcuuidByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	var vm mysql.VM
+	result := mysql.Db.Where("id = ?", id).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.addVM(&vm)
+		return vm.Region, true
+	}
+
+	log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	return "", false
+}
+
+func (t *ToolDataSet) GetVMVPCIDByID(id int) (int, bool) {
+	vpcID, exists := t.VMIDToVPCID[id]
+	if exists {
+		return vpcID, true
+	}
+
+	log.Warning(cacheVPCIDByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	var vm mysql.VM
+	result := mysql.Db.Where("id = ?", id).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.addVM(&vm)
+		return vm.VPCID, true
+	}
+
+	log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	return 0, false
+}
+
+func (t *ToolDataSet) GetVMLaunchServerByID(id int) (string, bool) {
+	launchServer, exists := t.VMIDToLaunchServer[id]
+	if exists {
+		return launchServer, true
+	}
+
+	log.Warning(cacheLaunchServerByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	var vm mysql.VM
+	result := mysql.Db.Where("id = ?", id).Find(&vm)
+	if result.RowsAffected == 1 {
+		t.addVM(&vm)
+		return vm.LaunchServer, true
+	}
+
+	log.Error(dbResourceByIDNotFound(RESOURCE_TYPE_VM_EN, id))
+	return "", false
 }

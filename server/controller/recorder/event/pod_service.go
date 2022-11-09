@@ -45,7 +45,25 @@ func NewPodService(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodServ
 
 func (p *PodService) ProduceByAdd(items []*mysql.PodService) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, p.deviceType, item.ID)
+		regionID, azID, err := getRegionIDAndAZIDByLcuuid(p.ToolDataSet, item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		p.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			p.deviceType,
+			item.ID,
+			eventapi.TagPodServiceID(item.ID),
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(p.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+			eventapi.TagPodClusterID(item.PodClusterID),
+			eventapi.TagPodNSID(item.PodNamespaceID),
+		)
 	}
 }
 

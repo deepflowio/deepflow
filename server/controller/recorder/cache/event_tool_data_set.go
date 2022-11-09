@@ -16,14 +16,22 @@
 
 package cache
 
-import "github.com/deepflowys/deepflow/server/controller/common"
+import (
+	"github.com/deepflowys/deepflow/server/controller/common"
+)
 
 type EventToolDataSet struct {
-	HostIDToName map[int]string
-	HostIPToID   map[string]int
+	HostIDToName         map[int]string
+	HostIPToID           map[string]int
+	HostIDToRegionLcuuid map[int]string
+	HostIDToAZLcuuid     map[int]string
 
 	VMIDToName           map[int]string
 	VMIDToIPNetworkIDMap map[int]map[string]uint32
+	VMIDToRegionLcuuid   map[int]string
+	VMIDToAZLcuuid       map[int]string
+	VMIDToVPCID          map[int]int
+	VMIDToLaunchServer   map[int]string
 
 	VRouterIDToName map[int]string
 
@@ -54,11 +62,17 @@ type EventToolDataSet struct {
 
 func NewEventToolDataSet() EventToolDataSet {
 	return EventToolDataSet{
-		HostIDToName: make(map[int]string),
-		HostIPToID:   make(map[string]int),
+		HostIDToName:         make(map[int]string),
+		HostIPToID:           make(map[string]int),
+		HostIDToRegionLcuuid: make(map[int]string),
+		HostIDToAZLcuuid:     make(map[int]string),
 
 		VMIDToName:           make(map[int]string),
 		VMIDToIPNetworkIDMap: make(map[int]map[string]uint32),
+		VMIDToRegionLcuuid:   make(map[int]string),
+		VMIDToAZLcuuid:       make(map[int]string),
+		VMIDToVPCID:          make(map[int]int),
+		VMIDToLaunchServer:   make(map[int]string),
 
 		VRouterIDToName: make(map[int]string),
 
