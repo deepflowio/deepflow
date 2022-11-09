@@ -1073,7 +1073,7 @@ func (r *PlatformRawData) vInterfaceToProto(
 		if vl2, ok := r.idToNetwork[vif.NetworkID]; ok {
 			vpcID = vl2.VPCID
 		} else {
-			errorInfo := fmt.Sprintf("VIF(id:%d) not found vl2(id:%d)", vif.ID, vif.NetworkID)
+			errorInfo := fmt.Sprintf("VIF(id:%d, mac:%s) not found vl2(id:%d)", vif.ID, vif.Mac, vif.NetworkID)
 			return nil, errors.New(errorInfo)
 		}
 	}
@@ -1132,7 +1132,7 @@ func (r *PlatformRawData) modifyInterfaceProto(
 			}
 			vmDevice, ok := r.typeIDToDevice[typeIDKey]
 			if ok == false {
-				errorInfo := fmt.Sprintf("VIF (%s) not found vm", vif.Lcuuid)
+				errorInfo := fmt.Sprintf("VIF(%s %s) not found vm", vif.Lcuuid, vif.Mac)
 				return errors.New(errorInfo)
 			}
 			aInterface.LaunchServer = proto.String(vmDevice.LaunchServer)
@@ -1151,7 +1151,7 @@ func (r *PlatformRawData) modifyInterfaceProto(
 			}
 			podNodeDeivce, ok := r.typeIDToDevice[typeIDKey]
 			if ok == false {
-				errorInfo := fmt.Sprintf("VIF (%s) not found pod_node", vif.Lcuuid)
+				errorInfo := fmt.Sprintf("VIF (%s %s) not found pod_node", vif.Lcuuid, vif.Mac)
 				return errors.New(errorInfo)
 			}
 			sInterface.PodNodeId = proto.Uint32(uint32(PodNodeID))
