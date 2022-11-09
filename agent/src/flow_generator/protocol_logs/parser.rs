@@ -17,13 +17,14 @@
 use std::{
     cmp::min,
     collections::HashMap,
+    mem::swap,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     thread,
     thread::JoinHandle,
-    time::{Duration, SystemTime}, mem::swap,
+    time::{Duration, SystemTime},
 };
 
 use arc_swap::access::Access;

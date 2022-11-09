@@ -53,10 +53,11 @@ use base_dispatcher::{BaseDispatcher, TapTypeHandler};
 use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
+pub use recv_engine::RecvEngine;
 #[cfg(target_os = "linux")]
 pub use recv_engine::{
     af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
-    RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
+    DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 
 #[cfg(target_os = "linux")]

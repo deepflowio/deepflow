@@ -247,7 +247,8 @@ impl DubboLog {
         let bytes = payload.as_bytes();
         match bytes[start] {
             BC_STRING_SHORT..=BC_STRING_SHORT_MAX => {
-                let field_len = (((bytes[start]-BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
+                let field_len =
+                    (((bytes[start] - BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
                 start += 2;
                 if start + field_len < end {
                     return Some(payload[start..start + field_len].to_string());
@@ -261,7 +262,7 @@ impl DubboLog {
                 }
             }
             b'S' => {
-                let field_len = ((bytes[start+1] as usize) << 8) + bytes[start+2] as usize;
+                let field_len = ((bytes[start + 1] as usize) << 8) + bytes[start + 2] as usize;
                 start += 3;
                 if start + field_len < end {
                     return Some(payload[start..start + field_len].to_string());
@@ -359,11 +360,11 @@ impl DubboLog {
 
         match trace_type {
             TraceType::Sw8 => {
-                // Format: 
+                // Format:
                 // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
                 if info.span_id.len() > 2 {
                     if let Some(start) = info.span_id[2..].find("-") {
-                        let start = 2+start+1;
+                        let start = 2 + start + 1;
                         if info.span_id.len() <= start {
                             return;
                         }
@@ -376,7 +377,7 @@ impl DubboLog {
                             return;
                         }
                         if let Some(end) = info.span_id[segment_id_offset..].find("-") {
-                            info.span_id = info.span_id[start..segment_id_offset+end].to_string();
+                            info.span_id = info.span_id[start..segment_id_offset + end].to_string();
                         }
                     }
                 }
