@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package monitor
+package vtap
 
 import (
 	"context"
@@ -22,10 +22,14 @@ import (
 	"regexp"
 	"time"
 
+	logging "github.com/op/go-logging"
+
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/monitor/config"
 )
+
+var log = logging.MustGetLogger("monitor/vtap")
 
 type VTapCheck struct {
 	vCtx    context.Context

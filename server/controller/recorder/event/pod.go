@@ -47,7 +47,25 @@ func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 
 func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, p.deviceType, item.ID, item.Name, "", []uint32{}, []string{})
+		regionID, azID, err := p.ToolDataSet.GetRegionIDAndAZIDByLcuuid(item.Region, item.AZ)
+		if err != nil {
+			log.Error(err)
+		}
+
+		p.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			p.deviceType,
+			item.ID,
+			eventapi.TagPodID(item.ID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagRegionID(regionID),
+			eventapi.TagAZID(azID),
+			eventapi.TagPodClusterID(item.PodClusterID),
+			eventapi.TagPodGroupID(item.PodGroupID),
+			eventapi.TagPodNodeID(item.PodNodeID),
+			eventapi.TagPodNSID(item.PodNamespaceID),
+		)
 	}
 }
 
@@ -88,7 +106,15 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		}
 
 		nIDs, ips := p.getIPNetworksByID(id)
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_RECREATE, common.VIF_DEVICE_TYPE_POD, id, name, fmt.Sprintf("%s,%s", oldPodNodeName, newPodNodeName), nIDs, ips)
+		p.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_RECREATE,
+			name,
+			p.deviceType,
+			id,
+			eventapi.TagDescription(fmt.Sprintf("%s,%s", oldPodNodeName, newPodNodeName)),
+			eventapi.TagSubnetIDs(nIDs),
+			eventapi.TagIPs(ips),
+		)
 	}
 }
 
@@ -106,7 +132,7 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, p.deviceType, id, name, "", []uint32{}, []string{})
+		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }
 

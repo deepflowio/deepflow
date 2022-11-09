@@ -53,6 +53,7 @@ use crate::{
     dispatcher::recv_engine,
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
+    handler::PacketHandlerBuilder,
     proto::trident::{self, CaptureSocketType},
     proto::{
         common::TridentType,
@@ -1816,6 +1817,21 @@ impl ConfigHandler {
                     components
                         .npb_bps_limit
                         .set_rate(Some(handler.candidate_config.npb.bps_threshold));
+                    let dispatcher_builders = &components.handler_builders;
+                    for e in dispatcher_builders {
+                        let mut builders = e.lock().unwrap();
+                        for e in builders.iter_mut() {
+                            match e {
+                                PacketHandlerBuilder::Npb(n) => {
+                                    n.on_config_change(
+                                        &handler.candidate_config.npb,
+                                        &components.debugger.clone_queue(),
+                                    );
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                 }
                 callbacks.push(dispatcher_callback);
             }

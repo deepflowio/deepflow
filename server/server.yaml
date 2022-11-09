@@ -81,6 +81,9 @@ controller:
     vtap_check_interval: 60
     # exception_time_frame, unit:s
     exception_time_frame: 3600
+    # vtap rebalance config, interval uint:s
+    auto_rebalance_vtap: true
+    rebalance_check_interval: 300
     # warrant
     warrant:
       host: warrant
