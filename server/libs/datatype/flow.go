@@ -151,6 +151,7 @@ const (
 	L7_PROTOCOL_HTTP_1_TLS L7Protocol = 22
 	L7_PROTOCOL_HTTP_2_TLS L7Protocol = 23
 	L7_PROTOCOL_DUBBO      L7Protocol = 40
+	L7_PROTOCOL_GRPC       L7Protocol = 41
 	L7_PROTOCOL_MYSQL      L7Protocol = 60
 	L7_PROTOCOL_POSTGRE    L7Protocol = 61
 	L7_PROTOCOL_REDIS      L7Protocol = 80
@@ -605,6 +606,8 @@ func (p L7Protocol) String() string {
 		formatted = "redis"
 	case L7_PROTOCOL_DUBBO:
 		formatted = "dubbo"
+	case L7_PROTOCOL_GRPC:
+		formatted = "grpc"
 	case L7_PROTOCOL_KAFKA:
 		formatted = "kafka"
 	case L7_PROTOCOL_MQTT:
@@ -626,6 +629,7 @@ var L7ProtocolStringMap = map[string]L7Protocol{
 	L7_PROTOCOL_MYSQL.String():      L7_PROTOCOL_MYSQL,
 	L7_PROTOCOL_REDIS.String():      L7_PROTOCOL_REDIS,
 	L7_PROTOCOL_DUBBO.String():      L7_PROTOCOL_DUBBO,
+	L7_PROTOCOL_GRPC.String():       L7_PROTOCOL_GRPC,
 	L7_PROTOCOL_KAFKA.String():      L7_PROTOCOL_KAFKA,
 	L7_PROTOCOL_MQTT.String():       L7_PROTOCOL_MQTT,
 	L7_PROTOCOL_OTHER.String():      L7_PROTOCOL_OTHER,
