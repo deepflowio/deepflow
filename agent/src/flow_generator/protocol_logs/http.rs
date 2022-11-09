@@ -351,7 +351,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 client_ip: Some(f.client_ip),
                 user_agent: f.user_agent,
                 referer: f.referer,
-                service_name,
+                rpc_service: service_name,
                 ..Default::default()
             }),
             ..Default::default()
