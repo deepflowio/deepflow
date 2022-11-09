@@ -360,7 +360,6 @@ impl Collector {
                                     Ok(client) => statsd_clients.push(Some(client)),
                                     Err(e) => {
                                         warn!("create client to remote {} failed: {}", remote, e);
-                                        statsd_clients.push(None);
                                     }
                                 }
                             }
@@ -387,26 +386,21 @@ impl Collector {
                         }
                     }
 
-                    if statsd_clients.iter().all(|s| s.is_none()) {
+                    if statsd_clients.len() == 0 {
                         info!("no statsd remote available");
                         break;
                     }
 
                     debug!("collected: {:?}", batches);
-                    for batch in batches.into_iter() {
-                        for client in statsd_clients.iter() {
-                            if client.is_none() {
-                                continue;
-                            }
-                            let client = client.as_ref().unwrap();
-                            for point in batch.points.iter() {
-                                let metric_name =
-                                    format!("{}_{}", batch.module, point.0).replace("-", "_");
-                                // use counted for gauged fields for compatibility
-                                // will cause problem if counted fields in buffer not reset before next point
-                                let b = client.count_with_tags(&metric_name, point.2);
-                                Self::send_metrics(b, &host, &batch.tags);
-                            }
+                    for (i, batch) in batches.into_iter().enumerate() {
+                        let client = statsd_clients[i % statsd_clients.len()].as_ref().unwrap();
+                        for point in batch.points.iter() {
+                            let metric_name =
+                                format!("{}_{}", batch.module, point.0).replace("-", "_");
+                            // use counted for gauged fields for compatibility
+                            // will cause problem if counted fields in buffer not reset before next point
+                            let b = client.count_with_tags(&metric_name, point.2);
+                            Self::send_metrics(b, &host, &batch.tags);
                         }
                     }
 
