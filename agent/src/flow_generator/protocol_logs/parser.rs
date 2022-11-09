@@ -23,7 +23,7 @@ use std::{
     },
     thread,
     thread::JoinHandle,
-    time::{Duration, SystemTime},
+    time::{Duration, SystemTime}, mem::swap,
 };
 
 use arc_swap::access::Access;
@@ -134,6 +134,9 @@ impl MetaAppProto {
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.req_tcp_seq = meta_packet.tcp_data.seq;
         } else {
+            swap(&mut base_info.ip_src, &mut base_info.ip_dst);
+            swap(&mut base_info.port_src, &mut base_info.port_dst);
+
             base_info.l3_epc_id_src = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_DST].l3_epc_id;
             base_info.l3_epc_id_dst = flow.flow.flow_metrics_peers[FLOW_METRICS_PEER_SRC].l3_epc_id;
             base_info.resp_tcp_seq = meta_packet.tcp_data.seq;
