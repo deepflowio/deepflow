@@ -75,6 +75,7 @@ type StaticConfig struct {
 	LogFile                          *string                            `yaml:"log-file,omitempty"`
 	ExternalAgentHttpProxyCompressed *bool                              `yaml:"external-agent-http-proxy-compressed,omitempty"`
 	FeatureFlags                     []string                           `yaml:"feature-flags,omitempty"`
+	L7ProtocolPorts                  map[string]string                  `yaml:"l7-protocol-ports,omitempty"`
 }
 
 type XflowCollectorConfig struct {

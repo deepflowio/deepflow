@@ -392,4 +392,16 @@ vtap_group_id: g-xxxxxx
   #log-file: /var/log/deepflow-agent/deepflow-agent.log
   ## 开发过程中的功能控制开关，支持多个
   #feature-flags:
+  ## 协议解析的端口范围，类型map<string, string>，不配置默认全端口
+  #l7-protocol-ports:
+    ##协议名称: 端口范围，端口范围可以是数字或范围
+    #"HTTP": "80,8080,10000-15000" # for both HTTP and HTTP_TLS
+    #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
+    #"Dubbo": "1-65535"
+    #"MySQL": "1-65535"
+    #"PostgreSQL": "1-65535"
+    #"Redis": "1-65535"
+    #"Kafka": "1-65535"
+    #"MQTT": "1-65535"
+    #"DNS": "53"
 `)
