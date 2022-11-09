@@ -300,13 +300,6 @@ impl From<AppProtoLogsBaseInfo> for flow_log::AppProtoLogsBaseInfo {
 }
 
 impl AppProtoLogsBaseInfo {
-    pub fn l3l4_adjust_by_direction(&mut self){
-        if self.head.msg_type==LogMessageType::Response{
-            (self.ip_src,self.ip_dst) = (self.ip_dst,self.ip_src);
-            (self.port_src,self.port_dst) = (self.port_dst,self.port_src);
-        }
-    }
-
     pub fn from_ebpf(
         packet: &MetaPacket,
         head: AppProtoHead,
