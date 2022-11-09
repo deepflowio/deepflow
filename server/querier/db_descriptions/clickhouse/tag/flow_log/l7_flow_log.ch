@@ -23,7 +23,7 @@ pod_ingress               , K8s Ingress              ,
 pod_service               , K8s 容器服务             ,
 pod_group                 , K8s 工作负载             , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                       , K8s 容器 POD             ,
-# service                 , 服务                     , # temporarily disabled
+service                   , 服务                     ,
 resource_gl0_type         , 类型-容器 POD 优先       ,
 resource_gl0              , 资源-容器 POD 优先       ,
 resource_gl1_type         , 类型-工作负载优先        ,

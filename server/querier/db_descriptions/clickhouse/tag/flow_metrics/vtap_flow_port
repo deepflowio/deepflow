@@ -21,7 +21,7 @@ pod_ingress                , pod_ingress               , pod_ingress            
 pod_service                , pod_service               , pod_service               , resource      ,                       , Universal Tag   , 111
 pod_group                  , pod_group                 , pod_group                 , resource      ,                       , Universal Tag   , 111
 pod                        , pod                       , pod                       , resource      ,                       , Universal Tag   , 111
-# service                  , service                   , service                   , resource      ,                       , Universal Tag   , 111 # temporarily disabled
+service                    , service                   , service                   , resource      ,                       , Universal Tag   , 111
 resource_gl0_type          , resource_gl0_type         , resource_gl0_type         , int_enum      , resource_gl0_type     , Universal Tag   , 111
 resource_gl0               , resource_gl0              , resource_gl0              , resource      ,                       , Universal Tag   , 111
 resource_gl1_type          , resource_gl1_type         , resource_gl1_type         , int_enum      , resource_gl1_type     , Universal Tag   , 111
