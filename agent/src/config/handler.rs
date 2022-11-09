@@ -232,6 +232,7 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
+    pub tap_mode: TapMode,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -824,6 +825,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     Some(conf.yaml_config.kubernetes_namespace.clone())
                 },
                 thread_threshold: conf.thread_threshold,
+                tap_mode: conf.tap_mode,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
