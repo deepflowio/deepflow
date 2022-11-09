@@ -55,7 +55,7 @@ OBJS := user/elf.o \
 	user/offset.o
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
-CFLAGS ?= -std=gnu99 -g -O0 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
+CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
 # -DBPF_DEBUG for parse and load ebpf probes.
 CFLAGS += $(MACHINE_CFLAGS) -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -I.
 all: build
