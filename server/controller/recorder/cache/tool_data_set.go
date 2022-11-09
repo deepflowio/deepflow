@@ -220,17 +220,17 @@ func (t *ToolDataSet) deleteRegion(lcuuid string) {
 func (t *ToolDataSet) addHost(item *mysql.Host) {
 	t.HostLcuuidToID[item.Lcuuid] = item.ID
 	t.HostIDToName[item.ID] = item.Name
-	t.HostIDToRegionLcuuid[item.ID] = item.Region
-	t.HostIDToAZLcuuid[item.ID] = item.AZ
-	t.HostIPToID[item.IP] = item.ID
+	t.hostIDToRegionLcuuid[item.ID] = item.Region
+	t.hostIDToAZLcuuid[item.ID] = item.AZ
+	t.hostIPToID[item.IP] = item.ID
 	log.Info(addToToolMap(RESOURCE_TYPE_HOST_EN, item.Lcuuid))
 }
 
 func (t *ToolDataSet) deleteHost(lcuuid string) {
 	id, _ := t.GetHostIDByLcuuid(lcuuid)
 	delete(t.HostIDToName, id)
-	delete(t.HostIDToRegionLcuuid, id)
-	delete(t.HostIDToAZLcuuid, id)
+	delete(t.hostIDToRegionLcuuid, id)
+	delete(t.hostIDToAZLcuuid, id)
 	delete(t.HostLcuuidToID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_HOST_EN, lcuuid))
 }
@@ -241,18 +241,18 @@ func (t *ToolDataSet) updateHost(cloudItem *cloudmodel.Host) {
 		return
 	}
 	t.HostIDToName[id] = cloudItem.Name
-	t.HostIDToRegionLcuuid[id] = cloudItem.RegionLcuuid
-	t.HostIDToAZLcuuid[id] = cloudItem.AZLcuuid
+	t.hostIDToRegionLcuuid[id] = cloudItem.RegionLcuuid
+	t.hostIDToAZLcuuid[id] = cloudItem.AZLcuuid
 	log.Info(updateToolMap(RESOURCE_TYPE_HOST_EN, cloudItem.Lcuuid))
 }
 
 func (t *ToolDataSet) addVM(item *mysql.VM) {
 	t.VMLcuuidToID[item.Lcuuid] = item.ID
 	t.VMIDToName[item.ID] = item.Name
-	t.VMIDToRegionLcuuid[item.ID] = item.Region
-	t.VMIDToAZLcuuid[item.ID] = item.AZ
-	t.VMIDToVPCID[item.ID] = item.VPCID
-	t.VMIDToLaunchServer[item.ID] = item.LaunchServer
+	t.vmIDToRegionLcuuid[item.ID] = item.Region
+	t.vmIDToAZLcuuid[item.ID] = item.AZ
+	t.vmIDToVPCID[item.ID] = item.VPCID
+	t.vmIDToLaunchServer[item.ID] = item.LaunchServer
 	log.Info(addToToolMap(RESOURCE_TYPE_VM_EN, item.Lcuuid))
 }
 
@@ -262,12 +262,12 @@ func (t *ToolDataSet) updateVM(cloudItem *cloudmodel.VM) {
 		return
 	}
 	t.VMIDToName[id] = cloudItem.Name
-	t.VMIDToRegionLcuuid[id] = cloudItem.RegionLcuuid
-	t.VMIDToAZLcuuid[id] = cloudItem.AZLcuuid
-	t.VMIDToLaunchServer[id] = cloudItem.LaunchServer
+	t.vmIDToRegionLcuuid[id] = cloudItem.RegionLcuuid
+	t.vmIDToAZLcuuid[id] = cloudItem.AZLcuuid
+	t.vmIDToLaunchServer[id] = cloudItem.LaunchServer
 	vpcID, exists := t.GetVPCIDByLcuuid(cloudItem.VPCLcuuid)
 	if exists {
-		t.VMIDToVPCID[id] = vpcID
+		t.vmIDToVPCID[id] = vpcID
 	}
 	log.Info(updateToolMap(RESOURCE_TYPE_VM_EN, cloudItem.Lcuuid))
 }
@@ -277,10 +277,10 @@ func (t *ToolDataSet) deleteVM(lcuuid string) {
 	delete(t.VMIDToName, id)
 	delete(t.VMIDToIPNetworkIDMap, id)
 	delete(t.VMLcuuidToID, lcuuid)
-	delete(t.VMIDToRegionLcuuid, id)
-	delete(t.VMIDToAZLcuuid, id)
-	delete(t.VMIDToVPCID, id)
-	delete(t.VMIDToLaunchServer, id)
+	delete(t.vmIDToRegionLcuuid, id)
+	delete(t.vmIDToAZLcuuid, id)
+	delete(t.vmIDToVPCID, id)
+	delete(t.vmIDToLaunchServer, id)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_VM_EN, lcuuid))
 }
 
@@ -774,7 +774,7 @@ func (t *ToolDataSet) GetHostIDByLcuuid(lcuuid string) (int, bool) {
 }
 
 func (t *ToolDataSet) GetHostIDByIP(ip string) (int, bool) {
-	id, exists := t.HostIPToID[ip]
+	id, exists := t.hostIPToID[ip]
 	if exists {
 		return id, true
 	}
@@ -1656,7 +1656,7 @@ func (t *ToolDataSet) GetLANIPByLcuuid(lcuuid string) (string, bool) {
 }
 
 func (t *ToolDataSet) GetHostRegionLcuuidByID(id int) (string, bool) {
-	regionLcuuid, exists := t.HostIDToRegionLcuuid[id]
+	regionLcuuid, exists := t.hostIDToRegionLcuuid[id]
 	if exists {
 		return regionLcuuid, true
 	}
@@ -1674,7 +1674,7 @@ func (t *ToolDataSet) GetHostRegionLcuuidByID(id int) (string, bool) {
 }
 
 func (t *ToolDataSet) GetHostAZLcuuidByID(id int) (string, bool) {
-	regionLcuuid, exists := t.HostIDToAZLcuuid[id]
+	regionLcuuid, exists := t.hostIDToAZLcuuid[id]
 	if exists {
 		return regionLcuuid, true
 	}
@@ -1692,7 +1692,7 @@ func (t *ToolDataSet) GetHostAZLcuuidByID(id int) (string, bool) {
 }
 
 func (t *ToolDataSet) GetVMRegionLcuuidByID(id int) (string, bool) {
-	vmLcuuid, exists := t.VMIDToRegionLcuuid[id]
+	vmLcuuid, exists := t.vmIDToRegionLcuuid[id]
 	if exists {
 		return vmLcuuid, false
 	}
@@ -1710,7 +1710,7 @@ func (t *ToolDataSet) GetVMRegionLcuuidByID(id int) (string, bool) {
 }
 
 func (t *ToolDataSet) GetVMAZLcuuidByID(id int) (string, bool) {
-	azLcuuid, exists := t.VMIDToAZLcuuid[id]
+	azLcuuid, exists := t.vmIDToAZLcuuid[id]
 	if exists {
 		return azLcuuid, true
 	}
@@ -1728,7 +1728,7 @@ func (t *ToolDataSet) GetVMAZLcuuidByID(id int) (string, bool) {
 }
 
 func (t *ToolDataSet) GetVMVPCIDByID(id int) (int, bool) {
-	vpcID, exists := t.VMIDToVPCID[id]
+	vpcID, exists := t.vmIDToVPCID[id]
 	if exists {
 		return vpcID, true
 	}
@@ -1746,7 +1746,7 @@ func (t *ToolDataSet) GetVMVPCIDByID(id int) (int, bool) {
 }
 
 func (t *ToolDataSet) GetVMLaunchServerByID(id int) (string, bool) {
-	launchServer, exists := t.VMIDToLaunchServer[id]
+	launchServer, exists := t.vmIDToLaunchServer[id]
 	if exists {
 		return launchServer, true
 	}

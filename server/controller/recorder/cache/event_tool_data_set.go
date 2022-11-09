@@ -22,16 +22,16 @@ import (
 
 type EventToolDataSet struct {
 	HostIDToName         map[int]string
-	HostIPToID           map[string]int
-	HostIDToRegionLcuuid map[int]string
-	HostIDToAZLcuuid     map[int]string
+	hostIPToID           map[string]int
+	hostIDToRegionLcuuid map[int]string
+	hostIDToAZLcuuid     map[int]string
 
 	VMIDToName           map[int]string
 	VMIDToIPNetworkIDMap map[int]map[string]uint32
-	VMIDToRegionLcuuid   map[int]string
-	VMIDToAZLcuuid       map[int]string
-	VMIDToVPCID          map[int]int
-	VMIDToLaunchServer   map[int]string
+	vmIDToRegionLcuuid   map[int]string
+	vmIDToAZLcuuid       map[int]string
+	vmIDToVPCID          map[int]int
+	vmIDToLaunchServer   map[int]string
 
 	VRouterIDToName map[int]string
 
@@ -63,16 +63,16 @@ type EventToolDataSet struct {
 func NewEventToolDataSet() EventToolDataSet {
 	return EventToolDataSet{
 		HostIDToName:         make(map[int]string),
-		HostIPToID:           make(map[string]int),
-		HostIDToRegionLcuuid: make(map[int]string),
-		HostIDToAZLcuuid:     make(map[int]string),
+		hostIPToID:           make(map[string]int),
+		hostIDToRegionLcuuid: make(map[int]string),
+		hostIDToAZLcuuid:     make(map[int]string),
 
 		VMIDToName:           make(map[int]string),
 		VMIDToIPNetworkIDMap: make(map[int]map[string]uint32),
-		VMIDToRegionLcuuid:   make(map[int]string),
-		VMIDToAZLcuuid:       make(map[int]string),
-		VMIDToVPCID:          make(map[int]int),
-		VMIDToLaunchServer:   make(map[int]string),
+		vmIDToRegionLcuuid:   make(map[int]string),
+		vmIDToAZLcuuid:       make(map[int]string),
+		vmIDToVPCID:          make(map[int]int),
+		vmIDToLaunchServer:   make(map[int]string),
 
 		VRouterIDToName: make(map[int]string),
 
