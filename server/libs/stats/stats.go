@@ -71,8 +71,8 @@ var (
 	remoteIndex       = -1
 	connection        client.Client
 
-	statsdClients  = make([]*statsd.Client, 2) // could be nil
-	dfstatsdClient *UDPClient                  // could be nil
+	statsdClients  = make([]*statsd.Client, 0, 2)
+	dfstatsdClient *UDPClient // could be nil
 )
 
 type StatItem struct {
@@ -205,7 +205,7 @@ func sendStatsd(bp client.BatchPoints) {
 		dfstatsdClient, _ = NewUDPClient(UDPConfig{dfRemote, 1400})
 	}
 
-	for _, point := range bp.Points() {
+	for i, point := range bp.Points() {
 		module := point.Name()
 		tags := point.Tags()
 		tagsOption := make([]string, 0, len(tags)*2)
@@ -217,17 +217,17 @@ func sendStatsd(bp client.BatchPoints) {
 		}
 		fields, _ := point.Fields()
 		if remoteType&REMOTE_TYPE_STATSD != 0 {
-			for _, statsdClient := range statsdClients {
-				if statsdClient == nil {
-					continue
-				}
-				statsdClient = statsdClient.Clone(
-					statsd.Prefix(strings.Replace(module, "-", "_", -1)),
-					statsd.Tags(tagsOption...),
-				)
-				for key, value := range fields {
-					name := strings.Replace(key, "-", "_", -1)
-					statsdClient.Count(name, value)
+			if len(statsdClients) > 0 {
+				statsdClient := statsdClients[i%len(statsdClients)]
+				if statsdClient != nil {
+					statsdClient = statsdClient.Clone(
+						statsd.Prefix(strings.Replace(module, "-", "_", -1)),
+						statsd.Tags(tagsOption...),
+					)
+					for key, value := range fields {
+						name := strings.Replace(key, "-", "_", -1)
+						statsdClient.Count(name, value)
+					}
 				}
 			}
 		}
