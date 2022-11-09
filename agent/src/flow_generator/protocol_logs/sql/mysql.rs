@@ -95,7 +95,9 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     // use for filter the mysql protocol miscalculate.
     fn skip_send(&self) -> bool {
         // if sql check fail and have no error response, very likely is protocol miscalculate.
-        self.status == L7ResponseStatus::default() && !is_mysql(&self.context)
+        // skip 0 command
+        (self.status == L7ResponseStatus::default() && !is_mysql(&self.context))
+            || self.command == 0
     }
 }
 
