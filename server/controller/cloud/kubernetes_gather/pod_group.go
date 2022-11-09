@@ -17,14 +17,13 @@
 package kubernetes_gather
 
 import (
-	"fmt"
+	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
+	"github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"strings"
 
 	"github.com/bitly/go-simplejson"
 	mapset "github.com/deckarep/golang-set"
-	cloudcommon "github.com/deepflowys/deepflow/server/controller/cloud/common"
-	"github.com/deepflowys/deepflow/server/controller/cloud/model"
-	"github.com/deepflowys/deepflow/server/controller/common"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -89,45 +88,29 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				label = "daemonset" + namespace + ":" + name
 			case 3:
 				replicas = 0
-				oReferences := metaData.Get("ownerReferences")
-				if len(oReferences.MustArray()) == 0 {
-					podType := "Deployment"
-					key := metaData.Get("generateName").MustString()
-					if pTempHash, ok := metaData.Get("labels").CheckGet("pod-template-hash"); ok {
-						if key == "" {
-							key = pTempHash.MustString() + "-"
-						}
-						podType = "Deployment"
-					} else if cReHash, ok := metaData.Get("labels").CheckGet("controller-revision-hash"); ok {
-						if key == "" {
-							targetIndex := strings.LastIndex(cReHash.MustString(), "-")
-							key = cReHash.MustString()[:targetIndex+1]
-						}
-						podType = "StatefulSet"
-					} else {
-						if key == "" {
-							log.Debugf("pod (%s) abstract workload target hash and generate name not found", name)
-							continue
-						}
-					}
-					pNameSlice := strings.Split(name, "-"+key)
+				generateName := metaData.Get("generateName").MustString()
+				pTempHash := metaData.Get("labels").Get("pod-template-hash").MustString()
+				if generateName == "" && pTempHash == "" {
+					log.Debugf("podgroup (%s) generatename or pod template hash not found", name)
+					continue
+				}
+				if generateName == "" {
+					pNameSlice := strings.Split(name, "-"+pTempHash+"-")
 					if len(pNameSlice) != 2 {
-						log.Debugf("pod name (%s) not split by (%s)", name, key)
-						continue
-					}
-					uid := common.GetUUID(namespace+pNameSlice[0], uuid.Nil)
-					oReferences, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s"}]`, uid, podType)))
-					if k.podGroupLcuuids.Contains(uid) {
-						log.Debugf("podgroup (%s) abstract workload already existed", name)
+						log.Debugf("podgroup (%s) not split by hash (%s)", name, pTempHash)
 						continue
 					}
 					name = pNameSlice[0]
+					uID = common.GetUUID(namespace+name, uuid.Nil)
+				} else {
+					name = generateName[:strings.LastIndex(generateName, "-")]
+					uID = common.GetUUID(namespace+generateName, uuid.Nil)
 				}
-				uID = oReferences.GetIndex(0).Get("uid").MustString()
-				if uID == "" {
-					log.Info("abstract workload podgroup uid not found")
+				if k.podGroupLcuuids.Contains(uID) {
+					log.Debugf("podgroup (%s) abstract workload already existed", name)
 					continue
 				}
+				oReferences := metaData.Get("ownerReferences")
 				typeName := strings.ToLower(oReferences.GetIndex(0).Get("kind").MustString())
 				serviceType, ok = pgNameToTypeID[typeName]
 				if !ok {
