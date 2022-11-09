@@ -196,10 +196,10 @@ _Pragma("GCC error \"PT_GO_REGS_PARM\"");
 
 #define NAME(N)  __##N
 
+#define PROG(F) SEC("prog/"__stringify(F)) int bpf_prog__##F
 #define KRETPROG(F) SEC("kretprobe/"__stringify(F)) int kretprobe__##F
 #define KPROG(F) SEC("kprobe/"__stringify(F)) int kprobe__##F
-
-#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+#define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F
 
 #ifndef CUR_CPU_IDENTIFIER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
@@ -278,6 +278,13 @@ static __always_inline __attribute__((unused)) int name ## __delete(key_type *ke
 struct bpf_map_def SEC("maps") __ ## name = \
 {   \
     .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY, \
+    __BPF_MAP_DEF(key_type, value_type, max_entries), \
+};
+
+#define MAP_PROG_ARRAY(name, key_type, value_type, max_entries) \
+struct bpf_map_def SEC("maps") __ ## name = \
+{   \
+    .type = BPF_MAP_TYPE_PROG_ARRAY, \
     __BPF_MAP_DEF(key_type, value_type, max_entries), \
 };
 

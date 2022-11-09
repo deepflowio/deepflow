@@ -95,6 +95,8 @@ static inline char *get_proto_name(uint16_t proto_id)
 		return "MQTT";
 	case PROTO_DUBBO:
 		return "Dubbo";
+	case PROTO_POSTGRESQL:
+		return "PgSQL";
 	default:
 		return "Unknown";
 	}
@@ -115,6 +117,7 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("%-18s %d [ 0 (TRACER_INIT), 1 (TRACER_RUNNING), "
 	       "2 (TRACER_STOP) ]\n", "State", btp->state);
 	printf("%-18s %d\n", "Adapt", btp->adapt_success);
+	printf("%-18s %d\n", "data_limit_max", btp->data_limit_max);
 	printf("\n-------------------- Queue ---------------------------\n");
 	int j;
 	uint64_t enqueue_nr, enqueue_lost, burst_count, heap_get_failed,
@@ -146,8 +149,9 @@ static void tracer_dump(struct bpf_tracer_param *param)
 	printf("\n-------------------- Protocol ------------------------\n");
 	for (j = 0; j < PROTO_NUM; j++) {
 		if (btp->proto_status[j] > 0) {
-			printf("- %-10s %" PRIu64 "\n",
+			printf("- %-10s(%d) %" PRIu64 "\n",
 			       get_proto_name((uint16_t) j),
+			       j,
 			       btp->proto_status[j]);
 		}
 	}

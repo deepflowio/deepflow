@@ -224,8 +224,8 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 
 	ret = ebpf_obj_load(obj);
 	if (ret != 0) {
-		ebpf_info("bpf load \"%s\" failed, error:%s\n",
-			  tracer->bpf_load_name, strerror(errno));
+		ebpf_info("bpf load \"%s\" failed, error:%s (%d)\n",
+			  tracer->bpf_load_name, strerror(errno), errno);
 		return ret;
 	}
 
@@ -1109,6 +1109,7 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		btp->probes_count = t->probes_count;
 		btp->state = t->state;
 		btp->adapt_success = t->adapt_success;
+		btp->data_limit_max = t->data_limit_max;
 
 		for (j = 0; j < PROTO_NUM; j++) {
 			btp->proto_status[j] =

@@ -83,8 +83,8 @@ static char *dispatch_message(char *msg, uint16_t len)
 	return msg;
 }
 
-void _ebpf_error(int how_to_die,
-		 char *function_name, uint32_t line_number, char *fmt, ...)
+void _ebpf_error(int how_to_die, char *function_name, char *file_path,
+		 uint32_t line_number, char *fmt, ...)
 {
 	char msg[MSG_SZ];
 	uint16_t len = 0;
@@ -94,19 +94,23 @@ void _ebpf_error(int how_to_die,
 	struct tm *p;
 	time(&timep);
 	p = localtime(&timep);
-	len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d \033[0;33;m [eBPF] ",
-			(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
-			p->tm_hour, p->tm_min, p->tm_sec);
 
 	if (function_name) {
-		if (how_to_die & ERROR_WARNING)
-			len += snprintf(msg + len, max - len, "WARNING: %s:", function_name);
-		else
-			len += snprintf(msg + len, max - len, "ERROR: %s:", function_name);
+		if (how_to_die & ERROR_WARNING) {
+			len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d \033[0;35m[eBPF] ",
+					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
+					p->tm_hour, p->tm_min, p->tm_sec);
+			len += snprintf(msg + len, max - len, "WARNING: func %s()", function_name);
+		} else {
+			len += snprintf(msg + len, max - len, "%d-%02d-%02d %d:%d:%d \033[0;31m[eBPF] ",
+					(1900 + p->tm_year), (1 + p->tm_mon), p->tm_mday,
+					p->tm_hour, p->tm_min, p->tm_sec);
+			len += snprintf(msg + len, max - len, "ERROR: func %s()", function_name);
+		}
 		if (line_number > 0)
 			len +=
-			    snprintf(msg + len, max - len, "%u:",
-				     line_number);
+			    snprintf(msg + len, max - len, " [%s:%u] ",
+				     file_path, line_number);
 	}
 #ifdef HAVE_ERRNO
 	if (how_to_die & ERROR_ERRNO_VALID)

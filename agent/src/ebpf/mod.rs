@@ -18,14 +18,14 @@ extern crate libc;
 
 pub use libc::c_char;
 pub use libc::c_int;
-pub use libc::c_uchar; //u8
-pub use libc::c_uint;
-pub use std::ffi::{CStr, CString}; //u32
+pub use libc::c_uchar; // u8
+pub use libc::c_uint; // u32
+pub use std::ffi::{CStr, CString};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 // 最大长度
-pub const CAP_LEN_MAX: usize = 1024;
+pub const CAP_LEN_MAX: usize = 8192;
 
 //方向
 #[allow(dead_code)]
@@ -304,9 +304,20 @@ pub struct SK_TRACE_STATS {
     pub boot_time_update_diff: i64,
     // How many probes now
     pub probes_count: u32,
+    // Maximum length limit of eBPF data transmission
+    pub data_limit_max: u32,
 }
 
 extern "C" {
+    /*
+     * Set maximum amount of data passed to the agent by eBPF programe.
+     * @limit_size : The maximum length of data. If @limit_size exceeds 8192,
+     *               it will automatically adjust to 8192 bytes.
+     *               If limit_size is 0, Use the default values 4096.
+     *
+     * @return the set maximum buffer size value on success, < 0 on failure.
+     */
+    pub fn set_data_limit_max(limit_size: c_int) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
 

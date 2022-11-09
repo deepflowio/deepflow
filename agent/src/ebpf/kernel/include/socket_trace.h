@@ -167,6 +167,15 @@ enum syscall_src_func {
 	SYSCALL_FUNC_SENDFILE
 };
 
+/*
+ * BPF Tail Calls context
+ */
+struct tail_calls_context {
+	int max_size_limit;             // The maximum size of the socket data that can be transferred.
+	enum traffic_direction dir;     // Data flow direction.
+	bool vecs;                      // Whether a memory vector is used ? (for specific syscall)
+};
+
 struct data_args_t {
 	// Represents the function from which this argument group originates.
 	enum syscall_src_func source_fn;
@@ -185,8 +194,6 @@ struct data_args_t {
 	// Timestamp for enter syscall function.
 	__u64 enter_ts;
 };
-
-#define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F
 
 struct syscall_comm_enter_ctx {
 	__u64 __pad_0;		/*     0     8 */
