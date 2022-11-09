@@ -30,7 +30,7 @@ import (
 
 func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, err error) {
 	log.Debug("get pods starting")
-	podTypes := [4]string{"StatefulSet", "ReplicaSet", "ReplicationController", "Deployment"}
+	podTypes := [5]string{"StatefulSet", "ReplicaSet", "ReplicationController", "DaemonSet", "Deployment"}
 	abstractNodes := map[string]int{}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
 		pData, pErr := simplejson.NewJson([]byte(p))
@@ -62,40 +62,27 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 		}
 
 		podGroups := metaData.Get("ownerReferences")
+		generateName := metaData.Get("generateName").MustString()
 		if len(podGroups.MustArray()) == 0 {
-			// metadata:labels:pod-template-hash 存在的 pod 抽象为 Deployment
-			// metadata:labels:controller-revision-hash 存在的 pod 抽象为 StatefulSet
-			// 从 pod name 截取 pod group name 时标志位优先使用 generateName, 其次使用取到的对应 hash
-			// 没有 generateName 和 对应的 hash 值时 不做处理
-			podType := "Deployment"
-			key := metaData.Get("generateName").MustString()
-			if pTempHash, ok := metaData.Get("labels").CheckGet("pod-template-hash"); ok {
-				if key == "" {
-					key = pTempHash.MustString() + "-"
-				}
-				podType = "Deployment"
-			} else if cReHash, ok := metaData.Get("labels").CheckGet("controller-revision-hash"); ok {
-				if key == "" {
-					targetIndex := strings.LastIndex(cReHash.MustString(), "-")
-					key = cReHash.MustString()[:targetIndex+1]
-				}
-				podType = "StatefulSet"
-			} else {
-				if key == "" {
-					log.Debugf("pod (%s) target hash and generate name not found", name)
+			if generateName == "" {
+				pTempHash := metaData.Get("labels").Get("pod-template-hash").MustString()
+				if pTempHash == "" {
+					log.Debugf("pod (%s) pod template hash not found", name)
 					continue
 				}
+				pNameSlice := strings.Split(name, "-"+pTempHash+"-")
+				if len(pNameSlice) != 2 {
+					log.Debugf("pod (%s) not split by hash (%s)", name, pTempHash)
+					continue
+				}
+				uid := common.GetUUID(namespace+pNameSlice[0], uuid.Nil)
+				// 适配平安 serverless pod, 需要抽象出一个对应的 node , 在这里添加一个参考值 abstract 作为判断标志
+				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "Deployment","abstract":true}]`, uid)))
+			} else {
+				uid := common.GetUUID(namespace+generateName, uuid.Nil)
+				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "DaemonSet","abstract":true}]`, uid)))
 			}
-			pNameSlice := strings.Split(name, "-"+key)
-			if len(pNameSlice) != 2 {
-				log.Debugf("pod (%s) not split by (%s)", name, key)
-				continue
-			}
-			uid := common.GetUUID(namespace+pNameSlice[0], uuid.Nil)
-			// 适配平安 serverless pod, 需要抽象出一个对应的 node , 在这里添加一个参考值 abstract 作为判断标志
-			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s","abstract": true}]`, uid, podType)))
 		}
-
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
 		if len(podGroups.MustArray()) == 0 || ID == "" {
 			log.Infof("pod (%s) pod group not found", name)
