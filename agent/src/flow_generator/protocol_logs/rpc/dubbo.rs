@@ -240,13 +240,16 @@ impl DubboLog {
     }
 
     fn decode_field(payload: &Cow<'_, str>, mut start: usize, end: usize) -> Option<String> {
-        if start + 3 >= payload.len() {
+        if start >= payload.len() {
             return None;
         }
 
         let bytes = payload.as_bytes();
         match bytes[start] {
             BC_STRING_SHORT..=BC_STRING_SHORT_MAX => {
+                if start + 2 >= payload.len() {
+                    return None;
+                }
                 let field_len =
                     (((bytes[start] - BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
                 start += 2;
@@ -262,6 +265,9 @@ impl DubboLog {
                 }
             }
             b'S' => {
+                if start + 3 >= payload.len() {
+                    return None;
+                }
                 let field_len = ((bytes[start + 1] as usize) << 8) + bytes[start + 2] as usize;
                 start += 3;
                 if start + field_len < end {

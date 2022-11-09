@@ -409,6 +409,10 @@ impl AppProtoLogsBaseInfo {
     }
     // 请求调用回应来合并
     fn merge(&mut self, log: AppProtoLogsBaseInfo) {
+        // adjust protocol when change, now only use for http2 change to grpc.
+        if self.head.proto != log.head.proto {
+            self.head.proto = log.head.proto;
+        }
         if log.process_id_0 > 0 {
             self.process_id_0 = log.process_id_0;
             self.process_kname_0 = log.process_kname_0;
