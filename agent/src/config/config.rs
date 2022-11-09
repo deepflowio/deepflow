@@ -536,7 +536,7 @@ impl Default for YamlConfig {
                 .to_string(),
 
             log_file: DEFAULT_LOG_FILE.into(),
-            l7_protocol_ports: HashMap::new(),
+            l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
         }
     }
 }
