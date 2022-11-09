@@ -232,6 +232,7 @@ pub struct PlatformConfig {
     pub kubernetes_api_enabled: bool,
     pub namespace: Option<String>,
     pub thread_threshold: u32,
+    pub tap_mode: TapMode,
 }
 
 #[derive(Clone, PartialEq, Debug, Eq)]
@@ -824,6 +825,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     Some(conf.yaml_config.kubernetes_namespace.clone())
                 },
                 thread_threshold: conf.thread_threshold,
+                tap_mode: conf.tap_mode,
             },
             flow: (&conf).into(),
             log_parser: LogParserConfig {
@@ -1810,29 +1812,27 @@ impl ConfigHandler {
         }
 
         if candidate_config.npb != new_config.npb {
-            if candidate_config.npb.bps_threshold != new_config.npb.bps_threshold {
-                fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
-                    components
-                        .npb_bps_limit
-                        .set_rate(Some(handler.candidate_config.npb.bps_threshold));
-                    let dispatcher_builders = &components.handler_builders;
-                    for e in dispatcher_builders {
-                        let mut builders = e.lock().unwrap();
-                        for e in builders.iter_mut() {
-                            match e {
-                                PacketHandlerBuilder::Npb(n) => {
-                                    n.on_config_change(
-                                        &handler.candidate_config.npb,
-                                        &components.debugger.clone_queue(),
-                                    );
-                                }
-                                _ => {}
+            fn dispatcher_callback(handler: &ConfigHandler, components: &mut Components) {
+                components
+                    .npb_bps_limit
+                    .set_rate(Some(handler.candidate_config.npb.bps_threshold));
+                let dispatcher_builders = &components.handler_builders;
+                for e in dispatcher_builders {
+                    let mut builders = e.lock().unwrap();
+                    for e in builders.iter_mut() {
+                        match e {
+                            PacketHandlerBuilder::Npb(n) => {
+                                n.on_config_change(
+                                    &handler.candidate_config.npb,
+                                    &components.debugger.clone_queue(),
+                                );
                             }
+                            _ => {}
                         }
                     }
                 }
-                callbacks.push(dispatcher_callback);
             }
+            callbacks.push(dispatcher_callback);
 
             info!(
                 "npb config change from {:#?} to {:#?}",

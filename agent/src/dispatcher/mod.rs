@@ -53,7 +53,7 @@ use base_dispatcher::{BaseDispatcher, TapTypeHandler};
 use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
-use recv_engine::RecvEngine;
+pub use recv_engine::RecvEngine;
 #[cfg(target_os = "linux")]
 pub use recv_engine::{
     af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
@@ -940,7 +940,7 @@ impl DispatcherBuilder {
     fn get_engine(
         src_interface: &mut Option<String>,
         tap_mode: TapMode,
-        options: &Arc<Options>,
+        options: &Options,
     ) -> Result<RecvEngine> {
         match tap_mode {
             TapMode::Mirror if options.dpdk_conf.enabled => {

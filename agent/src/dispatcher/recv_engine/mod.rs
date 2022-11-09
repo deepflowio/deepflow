@@ -37,7 +37,7 @@ pub const FRAME_SIZE_MAX: usize = 1 << 16; // local and mirror
 pub const FRAME_SIZE_MIN: usize = 1 << 11; // analyzer
 pub const POLL_TIMEOUT: Duration = Duration::from_millis(100);
 
-pub(super) enum RecvEngine {
+pub enum RecvEngine {
     #[cfg(target_os = "linux")]
     AfPacket(Tpacket),
     Dpdk(),
