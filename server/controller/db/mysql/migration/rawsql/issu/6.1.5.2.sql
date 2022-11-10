@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 UPDATE controller SET name = node_name;

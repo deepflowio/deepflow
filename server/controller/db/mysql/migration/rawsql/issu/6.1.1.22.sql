@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 -- modify start, add upgrade sql

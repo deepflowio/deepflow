@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 ALTER TABLE alarm_policy MODIFY column deleted_at DATETIME DEFAULT NULL;

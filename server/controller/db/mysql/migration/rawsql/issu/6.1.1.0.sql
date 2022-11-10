@@ -1,5 +1,3 @@
-USE deepflow;
-
 /*RENAME TABLE*/
 RENAME TABLE ch_epc TO ch_l3_epc;
 RENAME TABLE ch_vl2 TO ch_subnet;

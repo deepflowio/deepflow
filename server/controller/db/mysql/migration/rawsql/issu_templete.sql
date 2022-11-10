@@ -1,6 +1,4 @@
 -- This templete is for upgrade using CREATE/DROP/ALTER
-USE deepflow;
-
 -- modify start, add upgrade sql
 -- example
 INSERT INTO epc (name) VALUE ("example");

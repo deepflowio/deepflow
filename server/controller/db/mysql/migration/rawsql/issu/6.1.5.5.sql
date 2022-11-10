@@ -1,5 +1,3 @@
-USE deepflow;
-
 CREATE TABLE IF NOT EXISTS ch_node_type (
     resource_type           INTEGER NOT NULL DEFAULT 0 PRIMARY KEY,
     node_type               VARCHAR(256),

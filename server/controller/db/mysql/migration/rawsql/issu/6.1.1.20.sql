@@ -1,5 +1,3 @@
-USE deepflow;
-
 CREATE TABLE IF NOT EXISTS go_genesis_storage (
     id          INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     vtap_id     INTEGER,

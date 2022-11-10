@@ -1,6 +1,4 @@
 -- This templete is for upgrade using INSERT/UPDATE/DELETE
-USE deepflow;
-
 START TRANSACTION;
 
 -- modify start, add upgrade sql

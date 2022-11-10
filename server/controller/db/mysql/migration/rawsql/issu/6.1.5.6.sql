@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 UPDATE vtap SET license_type=1 where license_type=3;
