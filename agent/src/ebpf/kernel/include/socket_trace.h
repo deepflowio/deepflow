@@ -280,8 +280,8 @@ struct tls_conn {
 
 struct tls_conn_key
 {
-	unsigned int tgid;
-	long long int goid;
+	__u32 tgid;
+	__u64 goid;
 };
 
 #endif /* DF_BPF_SOCKET_TRACE_H */

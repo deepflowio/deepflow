@@ -35,7 +35,7 @@ struct bpf_map_def SEC("maps") http2_tcp_seq_map = {
 	.type = BPF_MAP_TYPE_LRU_HASH,
 	.key_size = sizeof(struct http2_tcp_seq_key),
 	.value_size = sizeof(__u32),
-	.max_entries = 10240,
+	.max_entries = HASH_ENTRIES_MAX,
 };
 
 /*
@@ -50,6 +50,47 @@ struct bpf_map_def SEC("maps") proc_info_map = {
 	.max_entries = HASH_ENTRIES_MAX,
 };
 
+// Process ID and coroutine ID, marking the coroutine in the system
+struct go_key {
+	__u32 tgid;
+	__u64 goid;
+} __attribute__((packed));
+
+// The mapping of coroutines to ancestors, the map is updated when a new
+// coroutine is created
+// key : current gorouting (struct go_key)
+// value : ancerstor goid
+struct bpf_map_def SEC("maps") go_ancerstor_map = {
+	.type = BPF_MAP_TYPE_LRU_HASH,
+	.key_size = sizeof(struct go_key),
+	.value_size = sizeof(__u64),
+	.max_entries = HASH_ENTRIES_MAX,
+};
+
+// Used to determine the timeout, as a termination condition for finding
+// ancestors.
+// key : current gorouting (struct go_key)
+// value: timestamp when the data was inserted into the map
+struct bpf_map_def SEC("maps") go_rw_ts_map = {
+	.type = BPF_MAP_TYPE_LRU_HASH,
+	.key_size = sizeof(struct go_key),
+	.value_size = sizeof(__u64),
+	.max_entries = HASH_ENTRIES_MAX,
+};
+
+// Pass data between coroutine entry and exit functions
+struct go_newproc_caller {
+	__u64 goid;
+	void *sp; // stack pointer
+} __attribute__((packed));
+
+struct bpf_map_def SEC("maps") pid_tgid_callerid_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(__u64),
+	.value_size = sizeof(struct go_newproc_caller),
+	.max_entries = HASH_ENTRIES_MAX,
+};
+
 /*
  * Goroutines Map
  * key: {tgid, pid}
@@ -58,7 +99,7 @@ struct bpf_map_def SEC("maps") proc_info_map = {
 struct bpf_map_def SEC("maps") goroutines_map = {
 	.type = BPF_MAP_TYPE_HASH,
 	.key_size = sizeof(__u64),
-	.value_size = sizeof(__s64),
+	.value_size = sizeof(__u64),
 	.max_entries = MAX_SYSTEM_THREADS,
 };
 
@@ -133,32 +174,11 @@ static __inline bool is_http2_tls()
 	return false;
 }
 
-static __inline __u32 get_go_version(void)
-{
-	__u64 id;
-	pid_t pid;
-
-	id = bpf_get_current_pid_tgid();
-	pid = id >> 32;
-	struct ebpf_proc_info *info;
-	info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (info) {
-		return info->version;
-	}
-
-	return 0;
-}
-
 // The function address is used to set the hook point. itab is used for http2
 // to obtain fd. After directly parsing the Go ELF file, the address of the
-// function must be obtained, but the itab may not be obtained. Continuing to
-// use the previous get_go_version judgment will cause kprobe to skip the 
-// judgment, and the uprobe cannot take the correct value, resulting in packet
-// loss. Therefore, the more stringent limit judgment conditions
+// function must be obtained, but the itab may not be obtained.
 // 函数地址用于设置 hook 点. itab 用于 http2 获取 fd. 在直接解析 Go ELF 文件后,
-// 一定能获取到函数的地址,但是不一定能获取 itab. 如果继续使用先前 get_go_version
-// 判断将导致 kprobe 跳过判断, 而 uprobe 又无法正确取值的情况导致报文丢失.因此更
-// 严格的限制判断条件
+// 一定能获取到函数的地址,但是不一定能获取 itab.
 static __inline bool skip_http2_kprobe(void)
 {
 	__u64 id;
@@ -186,15 +206,65 @@ static __inline bool skip_http2_kprobe(void)
 	return false;
 }
 
-static __inline __s64 get_current_goroutine(void)
+static __inline __u64 get_current_goroutine(void)
 {
 	__u64 current_thread = bpf_get_current_pid_tgid();
-	__s64 *goid_ptr = bpf_map_lookup_elem(&goroutines_map, &current_thread);
+	__u64 *goid_ptr = bpf_map_lookup_elem(&goroutines_map, &current_thread);
 	if (goid_ptr) {
 		return *goid_ptr;
 	}
 
 	return 0;
+}
+
+static __inline bool is_final_ancestor(__u32 tgid, __u64 goid, __u64 now)
+{
+	// 30s
+	static const __u64 TIMEOUT = 30000000000;
+
+	struct go_key key = { .tgid = tgid, .goid = goid };
+
+	__u64 *ts = bpf_map_lookup_elem(&go_rw_ts_map, &key);
+	if (!ts) {
+		return false;
+	}
+
+	return now < *ts + TIMEOUT;
+}
+
+// Try to find an ancestor coroutine that can represent this request.
+// The ancestor coroutine needs to meet two conditions:
+//  1. There have been socket read or write operations in the recent period of time
+//  2. All of its ancestor coroutines do not satisfy condition 1
+// If no such coroutine exists, mark itself as a coroutine that can represent the request and return.
+static __inline __u64 get_rw_goid(void)
+{
+	__u32 tgid = (__u32)(bpf_get_current_pid_tgid() >> 32);
+	__u64 ts = bpf_ktime_get_ns();
+	__u64 goid = get_current_goroutine();
+	if (goid == 0) {
+		return 0;
+	}
+
+	__u64 ancestor = goid;
+
+	int idx = 0;
+#pragma unroll
+	for (idx = 0; idx < 8; ++idx) {
+		if (is_final_ancestor(tgid, ancestor, ts)) {
+			return ancestor;
+		}
+		struct go_key key = { .tgid = tgid, .goid = ancestor };
+		__u64 *newancestor =
+			bpf_map_lookup_elem(&go_ancerstor_map, &key);
+		if (!newancestor) {
+			break;
+		}
+		ancestor = *newancestor;
+	}
+	struct go_key key = { .tgid = tgid, .goid = goid };
+	bpf_map_update_elem(&go_rw_ts_map, &key, &ts, BPF_ANY);
+	return goid;
 }
 
 static __inline bool is_tcp_conn_interface(void *conn,
@@ -292,9 +362,9 @@ SEC("uprobe/runtime.casgstatus")
 int runtime_casgstatus(struct pt_regs *ctx)
 {
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
-	__u32 pid = pid_tgid >> 32;
+	__u32 tgid = pid_tgid >> 32;
 
-	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
+	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &tgid);
 	if (!info) {
 		return 0;
 	}
@@ -323,6 +393,98 @@ int runtime_casgstatus(struct pt_regs *ctx)
 	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
 	bpf_map_update_elem(&goroutines_map, &pid_tgid, &goid, BPF_ANY);
 
+	return 0;
+}
+
+// This function creates a new go coroutine, and the parent and child 
+// coroutine numbers are in the parameters and return values ​​respectively.
+// Pass the function parameters through pid_tgid_callerid_map
+//
+// func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
+SEC("uprobe/enter_runtime.newproc1")
+int enter_runtime_newproc1(struct pt_regs *ctx)
+{
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 tgid = pid_tgid >> 32;
+
+	struct ebpf_proc_info *info =
+		bpf_map_lookup_elem(&proc_info_map, &tgid);
+	if (!info) {
+		return 0;
+	}
+
+	int offset_g_goid = info->offsets[OFFSET_IDX_GOID_RUNTIME_G];
+	if (offset_g_goid < 0) {
+		return 0;
+	}
+
+	void *g_ptr;
+	if (is_register_based_call(info)) {
+		g_ptr = (void *)PT_GO_REGS_PARM2(ctx);
+	} else {
+		bpf_probe_read(&g_ptr, sizeof(g_ptr),
+			       (void *)(PT_REGS_SP(ctx) + 16));
+	}
+
+	__s64 goid = 0;
+	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	if (!goid) {
+		return 0;
+	}
+
+	struct go_newproc_caller caller = {
+		.goid = goid,
+		.sp = (void *)PT_REGS_SP(ctx),
+	};
+	bpf_map_update_elem(&pid_tgid_callerid_map, &pid_tgid, &caller,
+			    BPF_ANY);
+	return 0;
+}
+
+// The mapping relationship between parent and child coroutines is stored in go_ancerstor_map
+//
+// func newproc1(fn *funcval, callergp *g, callerpc uintptr) *g
+SEC("uprobe/exit_runtime.newproc1")
+int exit_runtime_newproc1(struct pt_regs *ctx)
+{
+	__u64 pid_tgid = bpf_get_current_pid_tgid();
+	__u32 tgid = pid_tgid >> 32;
+
+	struct ebpf_proc_info *info =
+		bpf_map_lookup_elem(&proc_info_map, &tgid);
+	if (!info) {
+		return 0;
+	}
+
+	int offset_g_goid = info->offsets[OFFSET_IDX_GOID_RUNTIME_G];
+	if (offset_g_goid < 0) {
+		return 0;
+	}
+
+	struct go_newproc_caller *caller =
+		bpf_map_lookup_elem(&pid_tgid_callerid_map, &pid_tgid);
+	if (!caller) {
+		return 0;
+	}
+
+	void *g_ptr;
+	if (is_register_based_call(info)) {
+		g_ptr = (void *)PT_GO_REGS_PARM1(ctx);
+	} else {
+		bpf_probe_read(&g_ptr, sizeof(g_ptr), caller->sp + 32);
+	}
+
+	__s64 goid = 0;
+	bpf_probe_read(&goid, sizeof(goid), g_ptr + offset_g_goid);
+	if (!goid) {
+		bpf_map_delete_elem(&pid_tgid_callerid_map, &pid_tgid);
+		return 0;
+	}
+
+	struct go_key key = { .tgid = tgid, .goid = goid };
+	bpf_map_update_elem(&go_ancerstor_map, &key, &caller->goid, BPF_ANY);
+
+	bpf_map_delete_elem(&pid_tgid_callerid_map, &pid_tgid);
 	return 0;
 }
 

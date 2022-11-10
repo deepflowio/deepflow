@@ -71,4 +71,10 @@ struct protocol_message_t {
 	enum message_type type;
 };
 
+struct trace_key_t {
+	__u32 tgid;
+	__u32 pid;
+	__u64 goid;
+} __attribute__((packed));
+
 #endif /* DF_BPF_COMMON_H */
