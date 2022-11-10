@@ -613,7 +613,7 @@ static void reclaim_trace_map(struct bpf_tracer *tracer, uint32_t timeout)
 	}
 	int map_fd = map->fd;
 
-	uint64_t trace_key = 0, next_trace_key;
+	struct trace_key_t trace_key = {}, next_trace_key;
 	uint32_t reclaim_count = 0;
 	struct trace_info_t value;
 	uint32_t uptime = get_sys_uptime();
