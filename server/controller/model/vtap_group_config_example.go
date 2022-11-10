@@ -212,9 +212,6 @@ vtap_group_id: g-xxxxxx
   #src-interfaces:
   # - dummy0
   # - dummy1
-  ## Tap mode
-  ## LOCAL:0, MIRROR/OVS-DPDK:1, ANALYZER:2
-  #tap-mode: 0
   ## 是否为云网关镜像流量
   #cloud-gateway-traffic: false
   ## mirror-traffic-pcp will only be used with analyzer-mode
