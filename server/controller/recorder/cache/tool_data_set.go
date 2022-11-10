@@ -451,7 +451,7 @@ func (t *ToolDataSet) addLANIP(item *mysql.LANIP) {
 }
 
 func (t *ToolDataSet) deleteLANIP(lcuuid string) {
-	vifID, _ := t.GetVInterfaceIDByWANIPLcuuid(lcuuid)
+	vifID, _ := t.GetVInterfaceIDByLANIPLcuuid(lcuuid)
 	vifLcuuid, _ := t.GetVInterfaceLcuuidByID(vifID)
 	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
@@ -845,7 +845,7 @@ func (t *ToolDataSet) GetNetworkIDByVInterfaceLcuuid(vifLcuuid string) (int, boo
 	if exists {
 		return id, true
 	}
-	log.Warningf("cache %s id (%s lcuuid: %d) not found", RESOURCE_TYPE_NETWORK_EN, RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+	log.Warningf("cache %s id (%s lcuuid: %s) not found", RESOURCE_TYPE_NETWORK_EN, RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 	var vif mysql.VInterface
 	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
@@ -862,7 +862,7 @@ func (t *ToolDataSet) GetDeviceTypeByVInterfaceLcuuid(vifLcuuid string) (int, bo
 	if exists {
 		return id, true
 	}
-	log.Warningf("cache device type (%s lcuuid: %d) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+	log.Warningf("cache device type (%s lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 	var vif mysql.VInterface
 	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
@@ -879,7 +879,7 @@ func (t *ToolDataSet) GetDeviceIDByVInterfaceLcuuid(vifLcuuid string) (int, bool
 	if exists {
 		return id, true
 	}
-	log.Warningf("cache device id (%s lcuuid: %d) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+	log.Warningf("cache device id (%s lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 	var vif mysql.VInterface
 	result := mysql.Db.Where("lcuuid = ?", vifLcuuid).Find(&vif)
 	if result.RowsAffected == 1 {
@@ -1577,7 +1577,7 @@ func (t *ToolDataSet) GetVInterfaceIDByWANIPLcuuid(lcuuid string) (int, bool) {
 		vifID, exists = t.WANIPLcuuidToVInterfaceID[lcuuid]
 		return vifID, exists
 	} else {
-		log.Errorf("db %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
 		return vifID, false
 	}
 }
@@ -1612,7 +1612,7 @@ func (t *ToolDataSet) GetVInterfaceIDByLANIPLcuuid(lcuuid string) (int, bool) {
 		vifID, exists = t.LANIPLcuuidToVInterfaceID[lcuuid]
 		return vifID, exists
 	} else {
-		log.Errorf("db %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, lcuuid)
+		log.Error(dbResourceByLcuuidNotFound(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
 		return vifID, false
 	}
 }
