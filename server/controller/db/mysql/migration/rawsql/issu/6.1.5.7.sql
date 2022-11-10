@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 ALTER TABLE controller ADD COLUMN ca_md5 CHAR(64);

@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 DELETE FROM vtap_group_configuration WHERE vtap_group_lcuuid IS NULL;
