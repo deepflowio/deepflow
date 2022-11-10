@@ -134,7 +134,7 @@ impl FlowPerf {
             L7Protocol::MySQL => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
             L7Protocol::PostgreSQL => Some(L7FlowPerfTable::from(PostgresqlLog::new())),
             L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Http1 | L7Protocol::Http2 => {
+            L7Protocol::Http1 | L7Protocol::Http2 | L7Protocol::Grpc => {
                 Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
             }
             _ => None,
