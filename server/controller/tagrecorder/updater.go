@@ -69,7 +69,7 @@ func (b *UpdaterBase[MT, KT]) Refresh() {
 
 func (b *UpdaterBase[MT, KT]) generateOldData() (map[KT]MT, bool) {
 	var items []MT
-	err := mysql.Db.Find(&items).Error
+	err := mysql.Db.Unscoped().Find(&items).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(b.resourceTypeName, err))
 		return nil, false

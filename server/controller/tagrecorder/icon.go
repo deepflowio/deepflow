@@ -81,7 +81,7 @@ func (c *TagRecorder) UpdateIconInfo() (map[string]int, map[IconKey]int, error) 
 		}
 	}
 	var domains []mysql.Domain
-	mysql.Db.Find(&domains)
+	mysql.Db.Unscoped().Find(&domains)
 	for _, domain := range domains {
 		if domain.IconID != 0 {
 			domainToIconID[domain.Lcuuid] = domain.IconID

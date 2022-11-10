@@ -39,7 +39,7 @@ func NewChNetwork(resourceTypeToIconID map[IconKey]int) *ChNetwork {
 
 func (n *ChNetwork) generateNewData() (map[IDKey]mysql.ChNetwork, bool) {
 	var networks []mysql.Network
-	err := mysql.Db.Find(&networks).Error
+	err := mysql.Db.Unscoped().Find(&networks).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(n.resourceTypeName, err))
 		return nil, false

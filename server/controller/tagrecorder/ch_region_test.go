@@ -39,20 +39,20 @@ func (t *SuiteTest) TestRefreshChRegion() {
 	t.db.Create(&region)
 	updater.Refresh()
 	var addedItem mysql.ChRegion
-	t.db.Where("id = ?", region.ID).Find(&addedItem)
+	t.db.Where("id = ?", region.ID).Unscoped().Find(&addedItem)
 	assert.Equal(t.T(), addedItem.Name, region.Name)
 
 	region.Name = uuid.NewString()
 	t.db.Save(&region)
 	updater.Refresh()
 	var updatedItem mysql.ChRegion
-	t.db.Where("id = ?", region.ID).Find(&updatedItem)
+	t.db.Where("id = ?", region.ID).Unscoped().Find(&updatedItem)
 	assert.Equal(t.T(), updatedItem.Name, region.Name)
 
 	t.db.Where("id = ?", region.ID).Delete(&mysql.Region{})
 	updater.Refresh()
 	var deletedItem mysql.ChRegion
-	result := t.db.Find(&deletedItem)
+	result := t.db.Unscoped().Find(&deletedItem)
 	assert.Equal(t.T(), result.RowsAffected, int64(0))
 
 	t.db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&mysql.Region{})

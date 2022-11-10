@@ -39,17 +39,17 @@ func (p *ChPodPort) generateNewData() (map[PortIDKey]mysql.ChPodPort, bool) {
 	var podServices []mysql.PodService
 	var pods []mysql.Pod
 	var podGroupPorts []mysql.PodGroupPort
-	err := mysql.Db.Find(&podServices).Error
+	err := mysql.Db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Find(&pods).Error
+	err = mysql.Db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Find(&podGroupPorts).Error
+	err = mysql.Db.Unscoped().Find(&podGroupPorts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

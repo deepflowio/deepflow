@@ -187,7 +187,7 @@ func (d *ChDevice) generateVMData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 
 func (d *ChDevice) generateVRouterData(keyToItem map[DeviceKey]mysql.ChDevice) bool {
 	var vrouters []mysql.VRouter
-	err := mysql.Db.Find(&vrouters).Error
+	err := mysql.Db.Unscoped().Find(&vrouters).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return false
