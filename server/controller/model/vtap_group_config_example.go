@@ -16,161 +16,387 @@
 
 package model
 
-var YamlVTapGroupConfig = []byte(`## 采集器组ID
+var YamlVTapGroupConfig = []byte(`## Agent Group ID
 vtap_group_id: g-xxxxxx
-## 资源限制
-## CPU限制，单位：逻辑核，默认值: 1，值域[1, 100000]
+
+####################
+## Resource Limit ##
+####################
+## CPU Limit
+## Unit: number of logical cores. Default: 1. Range: [1, 100000]
+## Note: deepflow-agent uses cgroups to limit CPU usage.
+##   But please note that deepflow-agent running in K8s Pod
+##   cannot be limited by this value, please configure it
+##   through K8s Limit.
 #max_cpus: 1
-## 内存限制，单位：M字节，默认值: 768，值域[128, 100000]
+
+## Memory Limit
+## Unit: M bytes. Default: 768. Range: [128, 100000]
+## Note: deepflow-agent uses cgroups to limit memory usage.
+##   But please note that deepflow-agent running in K8s Pod
+##   cannot be limited by this value, please configure it
+##   through K8s Limit.
 #max_memory: 768
-## 系统空闲内存限制，单位：%，默认值: 10，值域[0, 100]
-## 说明：系统空闲内存的最低百分比，当比例低于该值的90%时采集器将重启
+
+## System Free Memory Limit
+## Unit: %. Default: 0. Range: [0, 100]
+## Note: The limit of the percentage of system free memory.
+##   When the free percentage is lower than 90% of this value,
+##   the agent will will automatically restart.
 #sys_free_memory_limit: 0
-## 采集包限速，单位：Kpps，默认值: 200，值域[1, 1000000]
+
+## Packet Capture Rate Limit
+## Unit: Kpps. Default: 200. Range: [1, 1000000]
 #max_collect_pps: 200
-## 分发流限速，单位：Mbps，默认值: 1000，值域[1, 10000]
+
+## NPB (Packet Broker) Traffic Limit
+## Unit: Mbps. Default: 1000. Range: [1, 10000]
 #max_npb_bps: 1000
-## 分发熔断阈值，单位：Mbps，默认值: 0，值域[0, 10000]
-## 说明：当分发接口出方向达到或超过阈值时将停止分发，当连续5个监控间隔低于(阈值-分发流量限制)*90%时恢复分发。注意：配置此值必须大于分发流限速，输入0表示关闭此功能。
+
+## NPB (Packet Broker) Circuit Breaker Threshold
+## Unit: Mbps. Default: 0. Range: [0, 10000]
+## Note: When the outbound direction of the NPB interface
+##   reaches or exceeds the threshold, the distribution will be
+##   stopped, and then the distribution will be resumed if the
+##   value is lower than (max_tx_bandwidth - max_npb_bps)*90%
+##   within 5 consecutive monitoring intervals.
+## Attention: When configuring this value, it must be greater
+##   than max_npb_bps. 0 means disable this feature.
 #max_tx_bandwidth: 0
-## 分发熔断监控间隔，单位：秒，默认值: 10，值域[1, 60]
-## 说明：分发接口出方向流量速率的监控间隔
+
+## NPB Circuit Breaker Monitoring Interval
+## Unit: second. Default: 10. Range: [1, 60]
+## Note: monitoring interval for outbound traffic rate of NPB interface
 #bandwidth_probe_interval: 10
-## 日志发送速率，单位：条/小时，默认值: 300，值域[0, 10000]
-## 说明：设置为0表示不限速
+
+## Remote Log Rate
+## Unit: lines/hour. Default: 300. Range: [0, 10000]
+## Note: deepflow-agent will send logs to deepflow-server, 0 means no limit.
 #log_threshold: 300
-## 日志打印等级，默认值: INFO，可选值有：DEBUG/INFO/WARNING/ERROR
+
+## Log Level
+## Default: INFO. options: DEBUG, INFO, WARNING, ERROR
 #log_level: INFO
-## 日志文件大小，单位：M字节，默认值：1000，值域[10, 10000]
+
+## Log File Size
+## Unit: M bytes. Default: 1000. Range: [10, 10000]
 #log_file_size: 1000
-## 线程数限制，单位：个，默认值：500，值域[1， 1000]
+
+## Thread Limit
+## Default: 500. Range: [1, 1000]
+## Note: Maximum number of threads that deepflow-agent is allowed to launch.
 #thread_threshold: 500
-## 进程数限制，单位：个，默认值：10，值域[1， 100]
+
+## Process Limit
+## Default: 10. Range: [1, 100]
+## Note: Maximum number of processes that deepflow-agent is allowed to launch.
 #process_threshold: 10
-#
-## 基础配置参数
-## 采集网口，默认值：^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$，长度范围[0, 65535]
-## qemu: tap.*
-## localhost: lo
-## common nic: eth|en[ospx].*
-## flannel: veth.*
-## calico: cali.*
-## cilium: lxc.*
-## kube-ovn: [0-9a-f]+_h$#
+
+#########################
+## Basic Configuration ##
+#########################
+## Regular Expression for TAP (Traffic Access Point)
+## Length: [0, 65535]
+## Default:
+##   Localhost:   lo
+##   Common NIC:  eth.*|en[ospx].*
+##   QEMU VM NIC: tap.*
+##   Flannel:     veth.*
+##   Calico:      cali.*
+##   Cilium:      lxc.*
+##   Kube-OVN:    [0-9a-f]+_h$
+## Note: Regular expression of NIC name for collecting traffic
 #tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$
-## 流量过滤，默认值：空，表示全采集，长度范围[1, 512]
-## 请参考BPF语法：https://biot.com/capstats/bpf.html
+
+## Traffic Capture Filter
+## Length: [1, 512]
+## Note: If not configured, all traffic will be collected. Please
+##   refer to BPF syntax: https://biot.com/capstats/bpf.html
 #capture_bpf:
-## 采集包长，单位：字节，默认值：65535，值域[128, 65535]
-## 说明：DPDK环境目前不支持此参数
+
+## Maximum Packet Capture Length
+## Unit: bytes. Default: 65535. Range: [128, 65535]
+## Note: DPDK environment does not support this configuration.
 #capture_packet_size: 65535
-## 流量采集方式，默认值：0，表示自适应，可选值：0表示自适应/2表示AF_PACKET V2/3表示AF_PACKET V3
-## 说明：Linux环境中的流量采集方式
+
+## Traffic Capture API
+## Default: 0, means adaptive. Options: 0, 2 (AF_PACKET V2), 3 (AF_PACKET V3)
+## Description: Traffic capture API in Linux environment
 #capture_socket_type: 0
-## 解封装隧道类型，默认值：[1,3]，表示VXLAN+IPIP，可选值：0表示无/1表示VXLAN/2表示GRE/3表示IPIP
+
+## Decapsulation Tunnel Protocols
+## Default: [1, 3], means VXLAN and IPIP. Options: 1 (VXLAN), 2 (GRE), 3 (IPIP)
 #decap_type:
 #- 1
 #- 3
-## 虚拟机MAC解析，默认值: 0，表示接口MAC，可选值：0表示接口MAC/1表示接口名称/2表示虚拟机XML
-## 说明：KVM类型采集器获取虚拟机真实MAC地址的方式
+
+## VM MAC Address Extraction
+## Default: 0
+## Options:
+##   0: extracted from tap interface MAC address
+##   1: extracted from tap interface name
+##   2: extracted from the XML file of the virtual machine
+## Note: How to extract the real MAC address of the virtual machine when the
+##   agent runs on the KVM host
 #if_mac_source: 0
-## 虚拟机XML文件夹，默认值: /etc/libvirt/qemu/，长度范围[0, 100]
+
+## VM XML File Directory
+## Default: /etc/libvirt/qemu/
+## Length: [0, 100]
 #vm_xml_path: /etc/libvirt/qemu/
-## 最长同步间隔，单位：秒，默认值：60，值域[10， 3600]
+
+## Configuration Synchronization Interval
+## Unit: second. Default: 60. Range: [10, 3600]
 #sync_interval: 60
-## 最长逃逸时间，单位：秒，默认值：3600，值域[600, 2592000]
+
+## Maximum Escape Time
+## Unit: seconds. Default: 3600. Range: [600, 2592000]
+## Note: The maximum time that the agent is allowed to work normally when it
+##   cannot connect to the server. After the timeout, the agent automatically
+##   enters the disabled state.
 #max_escape_seconds: 3600
-## UDP最大MTU，单位：字节，默认值: 1500，值域[500, 10000]
+
+## UDP maximum MTU, unit: bytes, default value: 1500, value range [500, 10000]
+## Note: Maximum MTU allowed when using UDP to transfer data.
+## Attention: Public cloud service providers may modify the content of the
+##   tail of the UDP packet whose packet length is close to 1500 bytes. When
+##   using UDP transmission, it is recommended to set a slightly smaller value.
 #mtu: 1500
-## 裸UDP外层VLAN，默认值: 0，表示不带任何VLAN标签，值域[0, 4095]
+
+## Raw UDP VLAN Tag
+## Default: 0, means no VLAN tag. Range: [0, 4095]
+## Note: When using Raw Socket to transmit UDP data, this value can be used to
+##   set the VLAN tag
 #output_vlan: 0
-## 是否请求NAT IP，默认值：0，表示否，可选值：0表示否/1表示是
+
+## Request NAT IP
+## Default: 0. Options: 0, 1
+## Note: Used when deepflow-agent uses an external IP address to access
+##   deepflow-server. For example, when deepflow-server is behind a NAT gateway,
+##   or the host where deepflow-server is located has multiple node IP addresses
+##   and different deepflow-agents need to access different node IPs, you can
+##   set an additional NAT IP for each deepflow-server address, and modify this
+##   value to 1.
 #nat_ip_enabled: 0
-## 日志存储时长，单位：天，默认值：30，值域[7, 365]
+
+## Log Retention Time
+## Unit: days. Default: 30. Range: [7, 365]
 #log_retention: 300
-## 控制器通信端口，默认值：30035，可选值：1-65535
+
+## Control Plane Server Port
+## Default: 30035. Range: 1-65535
+## Note: The control plane port used by deepflow-agent to access deepflow-server.
+##   The default port within the same K8s cluster is 20035, and the default port
+##   of deepflow-agent outside the cluster is 30035.
 #proxy_controller_port: 30035
-## 数据节点通信端口，默认值：30033，可选值：1-65535
+
+## Data Plane Server Port
+## Default: 30033. Range: 1-65535
+## Note: The data plane port used by deepflow-agent to access deepflow-server.
+##   The default port within the same K8s cluster is 20033, and the default port
+##   of deepflow-agent outside the cluster is 30033.
 #analyzer_port: 30033
-##控制器IP：默认为空，固定使用此控制器IP
+
+## Fixed Control Plane Server IP
+## Note: When this value is set, deepflow-agent will use this IP to access the
+##   control plane port of deepflow-server, which is usually used when
+##   deepflow-server uses an external load balancer.
 #proxy_controller_ip:
-##数据节点IP：默认为空，固定使用此数据节点IP
+
+## Fixed Data Plane Server IP
+## Note: When this value is set, deepflow-agent will use this IP to access the
+##   data plane port of deepflow-server, which is usually used when
+##   deepflow-server uses an external load balancer.
 #analyzer_ip:
-#
-## 全景图配置参数
-## 数据套接字，默认值: TCP，可选值：TCP/UDP/FILE
+
+#############################
+## Collector Configuration ##
+#############################
+## Data Socket Type
+## Default: TCP. Options: TCP, UDP, FILE
+## Note: It can only be set to FILE in standalone mode, in which case
+##   l4_flow_log and l7_flow_log will be written to local files.
 #collector_socket_type: TCP
-## PCAP套接字，默认值: TCP，可选值：TCP/UDP/RAW_UDP
+
+## PCAP Socket Type
+## Default: TCP. Options: TCP, UDP, RAW_UDP
+## Note: RAW_UDP uses RawSocket to send UDP packets, which has the highest
+##   performance, but there may be compatibility issues in some environments.
 #compressor_socket_type: TCP
-## HTTP日志代理客户端，默认值: X-Forwarded-For，可选值：关闭/X-Forwarded-For
+
+## HTTP Real Client Key
+## Default: X-Forwarded-For.
+## Note: It is used to extract the real client IP field in the HTTP header,
+##   such as X-Forwarded-For, etc. Leave it empty to disable this feature.
 #http_log_proxy_client: X-Forwarded-For
-## HTTP日志XRequestID，默认值: 关闭，可选值：关闭/X-Request-ID
+
+## HTTP X-Request-ID Key
+## Default: X-Request-ID
+## Note: It is used to extract the fields in the HTTP header that are used
+##   to uniquely identify the same request before and after the gateway,
+##   such as X-Request-ID, etc. This feature can be turned off by setting
+##   it to empty.
 #http_log_x_request_id: X-Request-ID
-## 应用流日志TraceID，默认值: traceparent,sw8，可选值：关闭/traceparent/X-B3-TraceId/uber-trace-id/sw6/sw8
-## 支持输入自定义值，支持输入逗号分隔的多个值（除关闭外）
+
+## TraceID Keys
+## Default: traceparent, sw8.
+## Note: Used to extract the TraceID field in HTTP and RPC headers, supports filling
+##   in multiple values separated by commas. This feature can be turned off by
+##   setting it to empty.
 #http_log_trace_id: traceparent, sw8
-## 应用流日志SpanID，默认值：traceparent,sw8，可选值：关闭/traceparent/X-B3-SpanId/uber-trace-id/sw6/sw8
-## 支持输入自定义值，支持输入逗号分隔的多个值（除关闭外）
+
+## SpanID Keys
+## Default: traceparent, sw8.
+## Note: Used to extract the SpanID field in HTTP and RPC headers, supports filling
+##   in multiple values separated by commas. This feature can be turned off by
+##   setting it to empty.
 #http_log_span_id: traceparent, sw8
-## 应用日志解析包长，默认值: 1024，值域[256, 1500]
-## 说明：采集HTTP、DNS日志时的解析的包长，注意不要超过采集包长参数
+
+## Protocol Identification Maximun Packet Length
+## Default: 1024. Range: [256, 1500]
+## Note: The maximum data length used for application protocol identification,
+##   note that the effective value is less than or equal to the value of
+##   capture_packet_size.
 #l7_log_packet_size: 1024
-## 流日志采集速率，默认值: 10000，值域[100, 1000000]
-## 说明：每秒采集的流日志条数，超过以后采样
+
+## Maximum Sending Rate for l4_flow_log
+## Default: 10000. Range: [100, [1000000]
+## Note: The maximum number of rows of l4_flow_log sent per second, when the actual
+##   number of rows exceeds this value, sampling is triggered.
 #l4_log_collect_nps_threshold: 10000
-## 应用日志采集速率，默认值: 10000，值域[100, 1000000]
-## 每秒采集的HTTP和DNS日志条数，超过时采样
+
+## Maximum Sending Rate for l7_flow_log
+## Default: 10000. Range: [100, [1000000]
+## Note: The maximum number of rows of l7_flow_log sent per second, when the actual
+##   number of rows exceeds this value, sampling is triggered.
 #l7_log_collect_nps_threshold: 10000
-#
-## 包分发配置参数
-## 分发套接字，默认值: RAW_UDP，可选值：UDP/RAW_UDP
+
+#######################
+## NPB Configuration ##
+#######################
+## NPB Socket Type
+## Default: RAW_UDP. Options: UDP, RAW_UDP
+## Note: RAW_UDP uses RawSocket to send UDP packets, which has the highest
+##   performance, but there may be compatibility issues in some environments.
 #npb_socket_type: RAW_UDP
-## 内层附加头，默认值: 0，表示无，可选值：0表示无/1表示802.1Q
+
+## Inner Additional Header
+## Default: 0, means none. Options: 0, 1 (Additional 802.1Q Header)
+## Note: Whether to add an extra 802.1Q header to NPB traffic, when this value is
+##   set, deepflow-agent will insert a VLAN Tag into the NPB traffic header, and
+##   the value is the lower 12 bits of TunnelID in the VXLAN header.
 #npb_vlan_mode: 0
-#
-## 基础功能开关
-## 同步资源信息，默认值: 0，表示关闭，可选值：0表示关闭/1表示开启
+
+##############################
+## Management Configuration ##
+##############################
+## KVM/Host Metadata Synchronization
+## Default: 0, means disabled. Options: 0 (disabled), 1 (enabled).
+## Node: When enabled, deepflow-agent will automatically synchronize virtual
+##   machine and network information on the KVM (or Host) to deepflow-server.
 #platform_enabled: 0
-## 日志发送，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+
+## Self Log Sending
+## Default: 1, means enabled. Options: 0 (disabled), 1 (enabled).
+## Note: When enabled, deepflow-agent will send its own logs to deepflow-server.
 #rsyslog_enabled: 1
-## 时钟同步，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+
+## NTP Synchronization
+## Default: 1, means enabled. Options: 0 (disabled), 1 (enabled).
+## Note: Whether to synchronize the clock to the deepflow-server, this behavior
+##   will not change the time of the deepflow-agent running environment.
 #ntp_enabled: 1
-## 云平台资源信息下发，默认值：0，表示全部，可选值（多选）：0表示全部/全部云平台的lcuuid（可通过命令deepflow-ctl get domain获取）
+
+## Resource Tag Synchronization Scope
+## Default: 0, which means all domains, or can be set to a list of lcuuid of a
+##   series of domains, you can get lcuuid through 'deepflow-ctl domain list'.
+## Note: Usually used in multi-cluster environments to reduce the number and
+##   frequency of resource tags synchronized to deepflow-agent.
 #domains:
-#  - 0
-## 容器集群内部IP下发，默认值：0，表示所有集群，可选值：0表示所有集群/1表示采集器所在集群
-#pod_cluster_internal_ip: 1
-#
-## 全景图功能开关
-## 指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+#- 0
+
+## Pod IP Synchronization Scope
+## Default: 0, which means all K8s cluster. Options: 0 (all cluster), 1 (self cluster).
+## Note: Pod IP is generally not directly used for cross-K8s cluster communication.
+##   Setting it to 1 can reduce the number and frequency of synchronizing resource
+##   tags to deepflow-agent.
+#pod_cluster_internal_ip: 0
+
+########################
+## Collector Switches ##
+########################
+## AutoMetrics & AutoLogging
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When disabled, deepflow-agent will not send metrics and logging data
+##   collected using eBPF and cBPF.
 #collector_enabled: 1
-## 非活跃端口指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+
+## Detailed Metrics for Inactive Port
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent will not generate detailed metrics for each
+##   inactive port (ports that only receive data, not send data), and the data of
+##   all inactive ports will be aggregated into the metrics with a tag
+##   'server_port = 0'.
 #inactive_server_port_enabled: 1
-## 非活跃IP指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+
+## Detailed Metrics for Inactive IP Address
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent will not generate detailed metrics for each
+##   inactive IP address (IP addresses that only receive data, not send data), and
+##   the data of all inactive IP addresses will be aggregated into the metrics with
+##   a tag 'ip = 0'.
 #inactive_ip_enabled: 1
-## 网络性能指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-## 说明：关闭时，采集器仅计算最基本的网络层吞吐指标量
+
+## NPM Metrics
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent only collects some basic throughput metrics.
 #l4_performance_enabled: 1
-## 应用性能指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+
+## APM Metrics
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent will not collect RED (request/error/delay) metrics.
 #l7_metrics_enabled: 1
-## 秒粒度指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+
+## Second Granularity Metrics
+## Default: 1. Options: 0 (disabled), 1 (enabled).
 #vtap_flow_1s_enabled: 1
-## 流日志开启采集点，默认值：0，表示全部，可选值：-1表示无/0表示全部/所有采集器点的数据标记值
+
+## TAPs Collect l4_flow_log
+## Default: 0, which means all TAPs. Options: -1 (disabled), 0 (all TAPs)
+## Note: The list of TAPs to collect l4_flow_log, you can also set a list of TAPs to
+##   be collected.
 #l4_log_tap_types:
-#  - 0
-## 应用日志开启采集点，默认值：0，表示全部，可选值：-1表示无/0表示全部/所有采集器点的数据标记值
+#- 0
+
+## TAPs Collect l7_flow_log
+## Default: 0, which means all TAPs. Options: -1 (disabled), 0 (all TAPs)
+## Note: The list of TAPs to collect l7_flow_log, you can also set a list of TAPs to
+##   be collected.
 #l7_log_store_tap_types:
-#  - 0
-## 数据集成HTTP代理，默认值：0，表示关闭，可选址：0表示关闭/1表示开启
+#- 0
+
+## Data Integration Socket
+## Default: 0. Options: 0 (disabled), 1 (enabled).
+## Note: Whether to enable receiving external data sources such as Prometheus,
+##   Telegraf, OpenTelemetry, and SkyWalking.
 #external_agent_http_proxy_enabled: 0
-## 数据集成HTTP代理端口，默认值：38086，可选值：1-65535
+
+## Listen Port of the Data Integration Socket
+## Default: 38086. Options: [1, 65535]
 #external_agent_http_proxy_port: 38086
-#
-## 包分发功能开关
-## 全局去重，默认值：1，表示开启，可选值：0表示关闭/1表示开启
+
+##################
+## NPB Switches ##
+##################
+## Global Deduplication
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: Whether to enable global (distributed) traffic deduplication for the
+##   NPB feature.
 #npb_dedup_enabled: 1
-#
-## 采集器静态配置
+
+############################
+## Advanced Configuration ##
+############################
 #static_config:
   ## kubernetes-namespace，当只有一个K8s命名空间权限时，填写此值
   #kubernetes-namespace:
