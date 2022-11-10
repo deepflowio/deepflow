@@ -279,6 +279,8 @@ static __inline int is_tcp_udp_data(void *sk,
 		return SOCK_CHECK_TYPE_ERROR;
 	}
 
+	conn_info->skc_state = skc_state;
+
 	conn_info->tuple.l4_protocol = IPPROTO_TCP;
 	return SOCK_CHECK_TYPE_TCP_ES;
 }
@@ -730,6 +732,13 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 		tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
+		/*
+		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received.
+		 * Since tcp_sock->copied_seq has done such an operation +1, need to fix the value of tcp_seq.
+		 */ 
+		if ((1 << conn_info->skc_state) & TCPF_CLOSE_WAIT) {
+			tcp_seq--;
+		}
 	} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 		tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
 	}
