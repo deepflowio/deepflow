@@ -873,6 +873,26 @@ int set_data_limit_max(int limit_size)
 	return set_val;
 }
 
+static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
+					const char *map_name,
+					const char *prog_name,
+					int key)
+{
+	struct ebpf_prog *prog;
+	prog = ebpf_obj__get_prog_by_name(tracer->obj, prog_name);
+	if (prog == NULL) {
+		ebpf_error("bpf_obj__get_prog_by_name() not find \"%s\"\n",
+			   prog_name);
+	}
+
+	if (!bpf_table_set_value(tracer, map_name, key, &prog->prog_fd)) {
+		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n", prog->prog_fd);
+	}
+
+	ebpf_info("Insert into map('%s'), key %d, program name %s\n",
+		  map_name, key, prog_name);
+}
+
 /*
  * Using an eBPF program specifically designed to send data, the goal is to solve the
  * problem of instructions exceeding the maximum limit.
@@ -881,18 +901,14 @@ int set_data_limit_max(int limit_size)
  */
 static void insert_output_prog_to_map(struct bpf_tracer *tracer)
 {
-	struct ebpf_prog *prog;
-	prog = ebpf_obj__get_prog_by_name(tracer->obj, PROG_OUTPUT_DATA_NAME);
-	if (prog == NULL) {
-		ebpf_error("bpf_obj__get_prog_by_name() not find \"%s\"\n",
-			   PROG_OUTPUT_DATA_NAME);
-	}
-
-	if (!bpf_table_set_value
-	    (tracer, MAP_PROGS_JMP_NAME, PROG_OUTPUT_DATA_MAP_KEY,
-	    (void *)&prog->prog_fd)) {
-		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n", prog->prog_fd);
-	}
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_TP_NAME,
+				    PROG_OUTPUT_DATA_NAME_FOR_TP,
+				    0);
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_KP_NAME,
+				    PROG_OUTPUT_DATA_NAME_FOR_KP,
+				    0);
 }
 
 /**

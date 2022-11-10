@@ -24,11 +24,14 @@
 #define MAP_PERF_SOCKET_DATA_NAME       "__socket_data"
 #define MAP_TRACE_CONF_NAME             "__trace_conf_map"
 #define MAP_TRACE_STATS_NAME            "__trace_stats_map"
-#define MAP_PROGS_JMP_NAME              "__progs_jmp_map"
+
+//Program jmp tables
+#define MAP_PROGS_JMP_KP_NAME		"__progs_jmp_kp_map"
+#define MAP_PROGS_JMP_TP_NAME		"__progs_jmp_tp_map"
 
 // This prog is designed to handle data transfer
-#define PROG_OUTPUT_DATA_NAME           "bpf_prog__output_data"
-#define PROG_OUTPUT_DATA_MAP_KEY        0
+#define PROG_OUTPUT_DATA_NAME_FOR_KP	"bpf_prog__output_data_kp"
+#define PROG_OUTPUT_DATA_NAME_FOR_TP	"bpf_prog__output_data_tp"
 
 /*
  * When the socket map is recycled, each socket message is recycled without sending

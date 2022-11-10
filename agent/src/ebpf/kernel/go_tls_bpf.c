@@ -51,7 +51,8 @@ int uprobe_go_tls_write_enter(struct pt_regs *ctx)
 	c.sp = (void *)PT_REGS_SP(ctx);
 
 	if (is_register_based_call(info)) {
-		c.fd = get_fd_from_tls_conn_struct((void *)PT_GO_REGS_PARM1(ctx), info);
+		c.fd = get_fd_from_tls_conn_struct(
+			(void *)PT_GO_REGS_PARM1(ctx), info);
 		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
@@ -101,8 +102,10 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 		bpf_probe_read(&bytes_count, sizeof(bytes_count),
 			       (void *)(c->sp + 40));
 	}
-	if (bytes_count == 0)
-		goto out;
+	if (bytes_count == 0) {
+		bpf_map_delete_elem(&tls_conn_map, &key);
+		return 0;
+	}
 
 	struct data_args_t write_args = {
 		.buf = c->buffer,
@@ -116,10 +119,14 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 		.tcp_seq = c->tcp_seq,
 		.coroutine_id = key.goid,
 	};
-	process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
-		     bytes_count, &extra);
-out:
+
 	bpf_map_delete_elem(&tls_conn_map, &key);
+	active_write_args_map__update(&id, &write_args);
+	if (!process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
+			  bytes_count, &extra)) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), 0);
+	}
+	active_write_args_map__delete(&id);
 	return 0;
 }
 
@@ -148,7 +155,8 @@ int uprobe_go_tls_read_enter(struct pt_regs *ctx)
 	c.sp = (void *)PT_REGS_SP(ctx);
 
 	if (is_register_based_call(info)) {
-		c.fd = get_fd_from_tls_conn_struct((void *)PT_GO_REGS_PARM1(ctx), info);
+		c.fd = get_fd_from_tls_conn_struct(
+			(void *)PT_GO_REGS_PARM1(ctx), info);
 		c.buffer = (char *)PT_GO_REGS_PARM2(ctx);
 	} else {
 		void *conn;
@@ -209,8 +217,10 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 			       (void *)(c->sp + 40));
 	}
 
-	if (bytes_count == 0)
-		goto out;
+	if (bytes_count == 0) {
+		bpf_map_delete_elem(&tls_conn_map, &key);
+		return 0;
+	}
 
 	struct data_args_t read_args = {
 		.buf = c->buffer,
@@ -225,9 +235,12 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 		.coroutine_id = key.goid,
 	};
 
-	process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args,
-		     bytes_count, &extra);
-out:
 	bpf_map_delete_elem(&tls_conn_map, &key);
+	active_read_args_map__update(&id, &read_args);
+	if (!process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args,
+			  bytes_count, &extra)) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), 0);
+	}
+	active_read_args_map__delete(&id);
 	return 0;
 }

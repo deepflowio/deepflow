@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
 
@@ -31,12 +32,24 @@
 MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU)
 
 /*
+ * Why use two Tail Calls jmp tables ?
+ *
+ * struct bpf_array { ...  enum bpf_prog_type owner_prog_type}
+ * 'ownership' of prog_array is claimed by the first program that
+ * is going to use this map or by the first program which FD is stored
+ * in the map to make sure that all callers and callees have the same
+ * prog_type and JITed flag.
+ *
  * Tail Calls jmp table
  * We divide the data processing and data output into two parts, and each has a -
  * different eBPF program for processing.
  * The purpose of this is to prevent the problem of the number of instructions exceeding max limit.
+ *
+ * 'progs_jmp_kp_map' for kprobe/uprobe (`A -> B`, both A and B are [k/u]probe program)
+ * 'progs_jmp_tp_map' for tracepoint (`A -> B`, both A and B are tracepoint program)
  */
-MAP_PROG_ARRAY(progs_jmp_map, __u32, __u32, 1)
+MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, 1)
+MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, 1)
 
 /*
  * 因为ebpf栈只有512字节无法存放http数据，这里使用map做为buffer。
@@ -1000,7 +1013,7 @@ static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra))
-		bpf_tail_call(ctx, &NAME(progs_jmp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
 }
 
 static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
@@ -1013,7 +1026,7 @@ static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 	};
 
 	if (!process_data(ctx, id, direction, args, bytes_count, &extra))
-		bpf_tail_call(ctx, &NAME(progs_jmp_map), 0);
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
 }
 
 /***********************************************************

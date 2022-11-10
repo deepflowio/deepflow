@@ -61,8 +61,10 @@ int uprobe_openssl_write_exit(struct pt_regs *ctx)
 		return 0;
 
 	int size = (int)PT_REGS_RC(ctx);
-	if (size <= 0)
-		goto out;
+	if (size <= 0) {
+		ssl_ctx_map__delete(&id);
+		return 0;
+	}
 
 	struct data_args_t write_args = {
 		.buf = ssl_ctx->buf,
@@ -76,11 +78,13 @@ int uprobe_openssl_write_exit(struct pt_regs *ctx)
 		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
-	process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args, size,
-		     &extra);
-
-out:
 	ssl_ctx_map__delete(&id);
+        active_write_args_map__update(&id, &write_args);
+	if (!process_data((struct pt_regs *)ctx, id, T_EGRESS, &write_args,
+			  size, &extra)) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), 0);
+	}
+	active_write_args_map__delete(&id);
 	return 0;
 }
 
@@ -111,8 +115,10 @@ int uprobe_openssl_read_exit(struct pt_regs *ctx)
 		return 0;
 
 	int size = (int)PT_REGS_RC(ctx);
-	if (size <= 0)
-		goto out;
+	if (size <= 0) {
+		ssl_ctx_map__delete(&id);
+		return 0;
+	}
 
 	struct data_args_t read_args = {
 		.buf = ssl_ctx->buf,
@@ -126,10 +132,12 @@ int uprobe_openssl_read_exit(struct pt_regs *ctx)
 		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
-	process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args, size,
-		     &extra);
-
-out:
 	ssl_ctx_map__delete(&id);
+        active_read_args_map__update(&id, &read_args);
+	if (!process_data((struct pt_regs *)ctx, id, T_INGRESS, &read_args,
+			  size, &extra)) {
+		bpf_tail_call(ctx, &NAME(progs_jmp_kp_map), 0);
+	}
+	active_read_args_map__delete(&id);
 	return 0;
 }

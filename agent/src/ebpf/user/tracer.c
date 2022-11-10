@@ -211,8 +211,8 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 	obj = ebpf_open_buffer(tracer->buffer_ptr,
 			       tracer->buffer_sz, tracer->bpf_load_name);
 	if (IS_NULL(obj)) {
-		ebpf_info("ebpf_open_buffer() \"%s\" failed, error:%s\n",
-			  tracer->bpf_load_name, strerror(errno));
+		ebpf_warning("ebpf_open_buffer() \"%s\" failed, error:%s\n",
+			     tracer->bpf_load_name, strerror(errno));
 		return ETR_INVAL;
 	}
 
@@ -224,8 +224,8 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 
 	ret = ebpf_obj_load(obj);
 	if (ret != 0) {
-		ebpf_info("bpf load \"%s\" failed, error:%s (%d)\n",
-			  tracer->bpf_load_name, strerror(errno), errno);
+		ebpf_warning("bpf load \"%s\" failed, error:%s (%d)\n",
+			     tracer->bpf_load_name, strerror(errno), errno);
 		return ret;
 	}
 
