@@ -46,6 +46,7 @@
 ## Uprobes
 - base
   - runtime.casgstatus (for golang)
+  - runtime.newproc1 (for golang)
 - http2
   - net/http.(*http2serverConn).writeHeaders
   - golang.org/x/net/http2.(*serverConn).writeHeaders
@@ -61,7 +62,7 @@
   - google.golang.org/grpc/internal/transport.(*loopyWriter).writeHeader
   - google.golang.org/grpc/internal/transport.(*http2Client).operateHeaders
   - google.golang.org/grpc/internal/transport.(*http2Server).operateHeaders
-- tls (fo golang)
+- tls (for golang)
   - crypto/tls.(*Conn).Write
   - crypto/tls.(*Conn).Read
 - ssl (libopenssl.so)
@@ -90,3 +91,6 @@
 |goroutines_map|BPF_MAP_TYPE_HASH|线程号|协程号|保存线程号到协程号的映射,在需要协程号时可以直接根据线程号获取|
 |http2_tcp_seq_map|BPF_MAP_TYPE_LRU_HASH|进程号,文件描述符,读操作结束时的序列号|读操作开始前的序列号|在 Go http2 的读操作 hook 点命中时,已经读完 buffer, 导致此时获取的 tcp 序列号相比于此时正在处理的报文更靠后.在比 http2 读操作更下层的 hook 点获读前后的序列号的映射并保存,可以修正成正确的序列号.由于不存在明确的用于回收这个 map 中元素的方法,所以选用 LRU|
 |proc_info_map|BPF_MAP_TYPE_HASH|进程号|与该进程相关的偏移量|与 __members_offset 作用类似,__members_offset 保存的是内核中的偏移量,仅需要保存一份.proc_info_map 中保存的是与进程相关的结构体的偏移量,因此需要以进程号为 key 保存在 map 中 >这些值由用户态程序获取并设置到 map 中,由内核态程序使用|
+|pid_tgid_callerid_map|BPF_MAP_TYPE_HASH|进程号,线程号|struct go_newproc_caller|在 runtime.newproc1 函数进出时传递参数,用于生成父子协程的映射关系|
+|go_rw_ts_map|BPF_MAP_TYPE_LRU_HASH|struct go_key|timestamp when the data was inserted into the map|保存 (线程号,协程号) 到 最近一次读写时间戳 的映射关系,时间戳用于实现读写超时|
+|go_ancerstor_map|BPF_MAP_TYPE_LRU_HASH|struct go_key|ancerstor goid|保存父子协程的映射关系|
