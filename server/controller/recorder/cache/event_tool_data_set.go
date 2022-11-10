@@ -31,7 +31,7 @@ type EventToolDataSet struct {
 
 	dhcpPortIDToInfo map[int]*dhcpPortInfo
 
-	nateGatewayIDToInfo map[int]*nateGatewayInfo
+	natGatewayIDToInfo map[int]*natGatewayInfo
 
 	lbIDToInfo map[int]*lbInfo
 
@@ -54,69 +54,82 @@ type EventToolDataSet struct {
 	LANIPLcuuidToIP           map[string]string
 }
 
-type BaseInfo struct {
-	RegionLcuuid string
-	AZLcuuid     string
-	VPCID        int
-}
-
 type hostInfo struct {
-	BaseInfo
-	Name string
+	Name     string
+	RegionID int
+	AZID     int
 }
 
 type vmInfo struct {
-	BaseInfo
-	Name         string
-	LaunchServer string
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+	HostID   int
 }
 
 type vrouterInfo struct {
-	BaseInfo
-	Name string
+	Name     string
+	RegionID int
+	VPCID    int
 }
 
 type dhcpPortInfo struct {
-	BaseInfo
-	Name string
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
 }
 
-type nateGatewayInfo struct {
-	BaseInfo
-	Name string
+type natGatewayInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
 }
 
 type lbInfo struct {
-	BaseInfo
-	Name string
+	Name     string
+	RegionID int
+	VPCID    int
 }
 
 type rdsInstanceInfo struct {
-	BaseInfo
-	Name string
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
 }
 
 type redisInstanceInfo struct {
-	BaseInfo
-	Name string
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
 }
 
 type podNodeInfo struct {
-	BaseInfo
 	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
 	PodClusterID int
 }
 
 type podServiceInfo struct {
-	BaseInfo
 	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
 	PodClusterID int
 	PodNSID      int
 }
 
 type podInfo struct {
-	BaseInfo
 	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
 	PodClusterID int
 	PodNSID      int
 	PodGroupID   int
@@ -135,7 +148,7 @@ func NewEventToolDataSet() EventToolDataSet {
 
 		dhcpPortIDToInfo: make(map[int]*dhcpPortInfo),
 
-		nateGatewayIDToInfo: make(map[int]*nateGatewayInfo),
+		natGatewayIDToInfo: make(map[int]*natGatewayInfo),
 
 		lbIDToInfo: make(map[int]*lbInfo),
 

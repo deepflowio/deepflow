@@ -45,19 +45,24 @@ func NewHost(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
 
 func (h *Host) ProduceByAdd(items []*mysql.Host) {
 	for _, item := range items {
-		regionID, azID, err := getRegionIDAndAZIDByLcuuid(h.ToolDataSet, item.Region, item.AZ)
+		var opts []eventapi.TagFieldOption
+		info, err := h.ToolDataSet.GetHostInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagAZID(info.AZID),
+				eventapi.TagRegionID(info.RegionID),
+			}...)
 		}
+		opts = append(opts, eventapi.TagHostID(item.ID))
 
 		h.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			h.deviceType,
 			item.ID,
-			eventapi.TagHostID(item.ID),
-			eventapi.TagRegionID(regionID),
-			eventapi.TagAZID(azID),
+			opts...,
 		)
 	}
 }
@@ -75,7 +80,7 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = h.ToolDataSet.GetHostNameByID(id)
 			if err != nil {
-				log.Error(err)
+				log.Errorf("%v, %v", idByLcuuidNotFound(h.resourceType, lcuuid), err)
 			}
 		}
 

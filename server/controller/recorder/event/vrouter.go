@@ -45,21 +45,27 @@ func NewVRouter(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VRouter {
 
 func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 	for _, item := range items {
-		regionID, azID, err := getRegionIDAndAZIDByLcuuid(r.ToolDataSet, item.Region, item.AZ)
+		var opts []eventapi.TagFieldOption
+		info, err := r.ToolDataSet.GetVRouterInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagRegionID(info.RegionID),
+			}...)
 		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(r.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		}...)
 
 		r.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			r.deviceType,
 			item.ID,
-			eventapi.TagRegionID(regionID),
-			eventapi.TagAZID(azID),
-			eventapi.TagVPCID(item.VPCID),
-			eventapi.TagL3DeviceType(r.deviceType),
-			eventapi.TagL3DeviceID(item.ID),
+			opts...,
 		)
 	}
 }
@@ -78,7 +84,7 @@ func (r *VRouter) ProduceByDelete(lcuuids []string) {
 			var err error
 			name, err = r.ToolDataSet.GetVRouterNameByID(id)
 			if err != nil {
-				log.Error(err)
+				log.Errorf("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err)
 			}
 		}
 

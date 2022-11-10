@@ -45,13 +45,13 @@ func NewLANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	for _, item := range items {
 		var (
-			deviceType  int
-			deviceID    int
-			deviceName  string
-			networkID   int
-			networkName string
-			opts        []eventapi.TagFieldOption
-			tempOpts    []eventapi.TagFieldOption
+			deviceType        int
+			deviceID          int
+			deviceName        string
+			networkID         int
+			networkName       string
+			opts              []eventapi.TagFieldOption
+			deviceRelatedOpts []eventapi.TagFieldOption
 		)
 
 		vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(item.VInterfaceID)
@@ -69,7 +69,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			if err != nil {
 				log.Error(err)
 			}
-			tempOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
+			deviceRelatedOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
 			if err != nil {
 				log.Error(err)
 			}
@@ -91,7 +91,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
 			eventapi.TagIPs([]string{item.IP}),
 		}...)
-		opts = append(opts, tempOpts...)
+		opts = append(opts, deviceRelatedOpts...)
 
 		i.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
@@ -128,7 +128,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 				}
 				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 				if err != nil {
-					log.Error(err)
+					log.Errorf("device name for %s (lcuuid: %s) not found, %v", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 				}
 				networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {

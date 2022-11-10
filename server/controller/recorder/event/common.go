@@ -22,7 +22,6 @@ import (
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
-	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/libs/eventapi"
 )
 
@@ -70,17 +69,13 @@ func getHostOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
+
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getVMOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -88,26 +83,17 @@ func getVMOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, 
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
-	hostID, exists := t.GetHostIDByIP(info.LaunchServer)
-	if !exists {
-		resultErr = addErrMessage(resultErr, fmt.Sprintf("host id for %s (ip: %d) not found", RESOURCE_TYPE_HOST_EN, id))
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
-		eventapi.TagHostID(hostID),
+		eventapi.TagHostID(info.HostID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_VM),
 		eventapi.TagL3DeviceID(id),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getVRouterOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -115,16 +101,10 @@ func getVRouterOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOpt
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_VROUTER),
 		eventapi.TagL3DeviceID(id),
@@ -133,25 +113,20 @@ func getVRouterOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOpt
 }
 
 func getDHCPPortOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := t.GetVRouterInfoByID(id)
+	info, err := t.GetDHCPPortInfoByID(id)
 	if err != nil {
 		return nil, err
-	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
 	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_DHCP_PORT),
 		eventapi.TagL3DeviceID(id),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getNatGateWayOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -159,21 +134,16 @@ func getNatGateWayOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagField
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_NAT_GATEWAY),
 		eventapi.TagL3DeviceID(id),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getLBOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -181,21 +151,15 @@ func getLBOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, 
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_LB),
 		eventapi.TagL3DeviceID(id),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getRDSInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -203,21 +167,16 @@ func getRDSInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFiel
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_RDS_INSTANCE),
 		eventapi.TagL3DeviceID(id),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getRedisInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -225,21 +184,16 @@ func getRedisInstanceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFi
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_REDIS_INSTANCE),
 		eventapi.TagL3DeviceID(id),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getPodNodeOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -247,20 +201,15 @@ func getPodNodeOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOpt
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagPodClusterID(info.PodClusterID),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getPodServiceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -268,23 +217,18 @@ func getPodServiceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagField
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_POD_SERVICE),
 		eventapi.TagL3DeviceID(id),
 		eventapi.TagPodClusterID(info.PodClusterID),
 		eventapi.TagPodNSID(info.PodNSID),
 	}...)
-	return opts, resultErr
+	return opts, nil
 }
 
 func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -292,33 +236,16 @@ func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption,
 	if err != nil {
 		return nil, err
 	}
-	var resultErr error
-	regionID, azID, err := getRegionIDAndAZIDByLcuuid(t, info.RegionLcuuid, info.AZLcuuid)
-	if err != nil {
-		resultErr = addErrMessage(resultErr, err.Error())
-	}
 
 	var opts []eventapi.TagFieldOption
 	opts = append(opts, []eventapi.TagFieldOption{
-		eventapi.TagRegionID(regionID),
-		eventapi.TagAZID(azID),
+		eventapi.TagRegionID(info.RegionID),
+		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagPodClusterID(info.PodClusterID),
 		eventapi.TagPodNSID(info.PodNSID),
 		eventapi.TagPodGroupID(info.PodGroupID),
 		eventapi.TagPodNodeID(info.PodNodeID),
 	}...)
-	return opts, resultErr
-}
-
-func getRegionIDAndAZIDByLcuuid(t *cache.ToolDataSet, regionLcuuid, azLcuuid string) (regionID, azID int, err error) {
-	regionID, ok := t.GetRegionIDByLcuuid(regionLcuuid)
-	if !ok {
-		return 0, 0, fmt.Errorf("%s (lcuuid: %s) id not found", RESOURCE_TYPE_REGION_EN, regionLcuuid)
-	}
-	azID, ok = t.GetAZIDByLcuuid(azLcuuid)
-	if !ok {
-		return 0, 0, fmt.Errorf("%s (lcuuid: %s) id not found", RESOURCE_TYPE_AZ_EN, azLcuuid)
-	}
-	return
+	return opts, nil
 }
