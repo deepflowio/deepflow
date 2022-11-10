@@ -73,9 +73,10 @@ func (r *RedisInstance) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := r.ToolDataSet.GetRedisInstanceIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = r.ToolDataSet.GetRedisInstanceNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(r.resourceType, lcuuid))
+			var err error
+			name, err = r.ToolDataSet.GetRedisInstanceNameByID(id)
+			if err != nil {
+				log.Error(err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(r.resourceType, id))

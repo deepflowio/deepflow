@@ -73,10 +73,9 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := l.ToolDataSet.GetLBIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = l.ToolDataSet.GetLBNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(l.resourceType, lcuuid))
-			}
+			var err error
+			name, err = l.ToolDataSet.GetLBNameByID(id)
+			log.Error(err)
 		} else {
 			log.Error(nameByIDNotFound(l.resourceType, id))
 		}

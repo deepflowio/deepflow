@@ -21,35 +21,29 @@ import (
 )
 
 type EventToolDataSet struct {
-	HostIDToName         map[int]string
-	hostIPToID           map[string]int
-	hostIDToRegionLcuuid map[int]string
-	hostIDToAZLcuuid     map[int]string
+	hostIPToID   map[string]int
+	hostIDtoInfo map[int]*hostInfo
 
-	VMIDToName           map[int]string
+	vmIDToInfo           map[int]*vmInfo
 	VMIDToIPNetworkIDMap map[int]map[string]uint32
-	vmIDToRegionLcuuid   map[int]string
-	vmIDToAZLcuuid       map[int]string
-	vmIDToVPCID          map[int]int
-	vmIDToLaunchServer   map[int]string
 
-	VRouterIDToName map[int]string
+	vrouterIDToInfo map[int]*vrouterInfo
 
-	DHCPPortIDToName map[int]string
+	dhcpPortIDToInfo map[int]*dhcpPortInfo
 
-	NATGatewayIDToName map[int]string
+	nateGatewayIDToInfo map[int]*nateGatewayInfo
 
-	LBIDToName map[int]string
+	lbIDToInfo map[int]*lbInfo
 
-	RDSInstanceIDToName map[int]string
+	rdsInstanceIDToInfo map[int]*rdsInstanceInfo
 
-	RedisInstanceIDToName map[int]string
+	redisInstanceIDToInfo map[int]*redisInstanceInfo
 
-	PodNodeIDToName map[int]string
+	podNodeIDToInfo map[int]*podNodeInfo
 
-	PodServiceIDToName map[int]string
+	podServiceIDToInfo map[int]*podServiceInfo
 
-	PodIDToName           map[int]string
+	podIDToInfo           map[int]*podInfo
 	PodIDToIPNetworkIDMap map[int]map[string]uint32
 
 	NetworkIDToName           map[int]string
@@ -60,37 +54,100 @@ type EventToolDataSet struct {
 	LANIPLcuuidToIP           map[string]string
 }
 
+type BaseInfo struct {
+	RegionLcuuid string
+	AZLcuuid     string
+	VPCID        int
+}
+
+type hostInfo struct {
+	BaseInfo
+	Name string
+}
+
+type vmInfo struct {
+	BaseInfo
+	Name         string
+	LaunchServer string
+}
+
+type vrouterInfo struct {
+	BaseInfo
+	Name string
+}
+
+type dhcpPortInfo struct {
+	BaseInfo
+	Name string
+}
+
+type nateGatewayInfo struct {
+	BaseInfo
+	Name string
+}
+
+type lbInfo struct {
+	BaseInfo
+	Name string
+}
+
+type rdsInstanceInfo struct {
+	BaseInfo
+	Name string
+}
+
+type redisInstanceInfo struct {
+	BaseInfo
+	Name string
+}
+
+type podNodeInfo struct {
+	BaseInfo
+	Name         string
+	PodClusterID int
+}
+
+type podServiceInfo struct {
+	BaseInfo
+	Name         string
+	PodClusterID int
+	PodNSID      int
+}
+
+type podInfo struct {
+	BaseInfo
+	Name         string
+	PodClusterID int
+	PodNSID      int
+	PodGroupID   int
+	PodNodeID    int
+}
+
 func NewEventToolDataSet() EventToolDataSet {
 	return EventToolDataSet{
-		HostIDToName:         make(map[int]string),
-		hostIPToID:           make(map[string]int),
-		hostIDToRegionLcuuid: make(map[int]string),
-		hostIDToAZLcuuid:     make(map[int]string),
+		hostIPToID:   make(map[string]int),
+		hostIDtoInfo: make(map[int]*hostInfo),
 
-		VMIDToName:           make(map[int]string),
+		vmIDToInfo:           make(map[int]*vmInfo),
 		VMIDToIPNetworkIDMap: make(map[int]map[string]uint32),
-		vmIDToRegionLcuuid:   make(map[int]string),
-		vmIDToAZLcuuid:       make(map[int]string),
-		vmIDToVPCID:          make(map[int]int),
-		vmIDToLaunchServer:   make(map[int]string),
 
-		VRouterIDToName: make(map[int]string),
+		vrouterIDToInfo: make(map[int]*vrouterInfo),
 
-		DHCPPortIDToName: make(map[int]string),
+		dhcpPortIDToInfo: make(map[int]*dhcpPortInfo),
 
-		NATGatewayIDToName: make(map[int]string),
+		nateGatewayIDToInfo: make(map[int]*nateGatewayInfo),
 
-		LBIDToName: make(map[int]string),
+		lbIDToInfo: make(map[int]*lbInfo),
 
-		RDSInstanceIDToName: make(map[int]string),
+		rdsInstanceIDToInfo: make(map[int]*rdsInstanceInfo),
 
-		RedisInstanceIDToName: make(map[int]string),
+		redisInstanceIDToInfo: make(map[int]*redisInstanceInfo),
 
-		PodNodeIDToName: make(map[int]string),
+		podNodeIDToInfo: make(map[int]*podNodeInfo),
 
-		PodServiceIDToName: make(map[int]string),
+		podServiceIDToInfo: make(map[int]*podServiceInfo),
 
-		PodIDToName:           make(map[int]string),
+		podIDToInfo:           make(map[int]*podInfo),
 		PodIDToIPNetworkIDMap: make(map[int]map[string]uint32),
 
 		NetworkIDToName:           make(map[int]string),

@@ -52,6 +52,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 			networkName string
 			opts        []eventapi.TagFieldOption
 			tempOpts    []eventapi.TagFieldOption
+			err         error
 		)
 
 		vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(item.VInterfaceID)
@@ -64,11 +65,10 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 			if !ok {
 				log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
-			deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
-			if !ok {
-				log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+			deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+			if err != nil {
+				log.Error(err)
 			}
-			var err error
 			tempOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
 			if err != nil {
 				log.Error(err)
@@ -114,6 +114,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 			networkName string
 			opts        []eventapi.TagFieldOption
 			tempOpts    []eventapi.TagFieldOption
+			err         error
 		)
 		vifID, ok := i.ToolDataSet.GetVInterfaceIDByWANIPLcuuid(lcuuid)
 		if ok {
@@ -127,9 +128,9 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 				if !ok {
 					log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
-				deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
-				if !ok {
-					log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+				if err != nil {
+					log.Error(err)
 				}
 				var err error
 				tempOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)

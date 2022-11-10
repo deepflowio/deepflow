@@ -64,11 +64,11 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			if !ok {
 				log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
-			deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
-			if !ok {
-				log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
-			}
 			var err error
+			deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+			if err != nil {
+				log.Error(err)
+			}
 			tempOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
 			if err != nil {
 				log.Error(err)
@@ -113,6 +113,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 		var deviceName string
 		var networkID int
 		var networkName string
+		var err error
 		vifID, ok := i.ToolDataSet.GetVInterfaceIDByLANIPLcuuid(lcuuid)
 		if ok {
 			vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(vifID)
@@ -125,9 +126,9 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 				if !ok {
 					log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
-				deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
-				if !ok {
-					log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+				if err != nil {
+					log.Error(err)
 				}
 				networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {

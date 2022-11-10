@@ -72,13 +72,14 @@ func (r *VRouter) ProduceByDelete(lcuuids []string) {
 		var id int
 		var name string
 		id, ok := r.ToolDataSet.GetVRouterIDByLcuuid(lcuuid)
-		if ok {
-			name, ok = r.ToolDataSet.GetVRouterNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(r.resourceType, lcuuid))
-			}
-		} else {
+		if !ok {
 			log.Error(nameByIDNotFound(r.resourceType, id))
+		} else {
+			var err error
+			name, err = r.ToolDataSet.GetVRouterNameByID(id)
+			if err != nil {
+				log.Error(err)
+			}
 		}
 
 		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)

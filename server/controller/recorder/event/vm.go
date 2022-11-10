@@ -133,9 +133,9 @@ func (v *VM) getVMIDAndNameByLcuuid(lcuuid string) (int, string, error) {
 	if !ok {
 		return 0, "", errors.New(nameByIDNotFound(v.resourceType, id))
 	}
-	name, ok := v.ToolDataSet.GetVMNameByID(id)
+	name, err := v.ToolDataSet.GetVMNameByID(id)
 	if !ok {
-		return 0, "", errors.New(idByLcuuidNotFound(v.resourceType, lcuuid))
+		return 0, "", err
 	}
 
 	return id, name, nil

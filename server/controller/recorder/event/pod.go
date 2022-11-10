@@ -71,13 +71,17 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 
 func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 	if diffBase.CreatedAt != cloudItem.CreatedAt {
-		var id int
-		var name string
+		var (
+			id   int
+			name string
+			err  error
+		)
 		id, ok := p.ToolDataSet.GetPodIDByLcuuid(diffBase.Lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, diffBase.Lcuuid))
+
+			name, err = p.ToolDataSet.GetPodNameByID(id)
+			if err != nil {
+				log.Error(err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))
@@ -86,9 +90,9 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		var oldPodNodeName string
 		oldPodNodeID, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(diffBase.PodNodeLcuuid)
 		if ok {
-			oldPodNodeName, ok = p.ToolDataSet.GetPodNodeNameByID(oldPodNodeID)
-			if !ok {
-				log.Error(nameByIDNotFound(RESOURCE_TYPE_POD_NODE_EN, id))
+			oldPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(oldPodNodeID)
+			if err != nil {
+				log.Error(err)
 			}
 		} else {
 			log.Error(idByLcuuidNotFound(RESOURCE_TYPE_POD_NODE_EN, diffBase.PodNodeLcuuid))
@@ -97,9 +101,9 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		var newPodNodeName string
 		newPodNodeID, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
 		if ok {
-			newPodNodeName, ok = p.ToolDataSet.GetPodNodeNameByID(newPodNodeID)
-			if !ok {
-				log.Error(nameByIDNotFound(RESOURCE_TYPE_POD_NODE_EN, id))
+			newPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(newPodNodeID)
+			if err != nil {
+				log.Error(err)
 			}
 		} else {
 			log.Error(idByLcuuidNotFound(RESOURCE_TYPE_POD_NODE_EN, diffBase.PodNodeLcuuid))
@@ -120,13 +124,16 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 
 func (p *Pod) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var id int
-		var name string
+		var (
+			id   int
+			name string
+			err  error
+		)
 		id, ok := p.ToolDataSet.GetPodIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+			name, err = p.ToolDataSet.GetPodNameByID(id)
+			if err != nil {
+				log.Error(err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

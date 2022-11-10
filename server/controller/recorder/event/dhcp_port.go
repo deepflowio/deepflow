@@ -72,9 +72,10 @@ func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := p.ToolDataSet.GetDHCPPortIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetDHCPPortNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+			var err error
+			name, err = p.ToolDataSet.GetDHCPPortNameByID(id)
+			if err != nil {
+				log.Error(err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

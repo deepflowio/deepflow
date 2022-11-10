@@ -59,7 +59,6 @@ func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 			eventapi.TagRegionID(regionID),
 			eventapi.TagAZID(azID),
 			eventapi.TagVPCID(item.VPCID),
-			eventapi.TagPodNodeID(item.ID),
 			eventapi.TagPodClusterID(item.PodClusterID),
 		)
 	}
@@ -74,9 +73,10 @@ func (p *PodNode) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodNodeNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+			var err error
+			name, err = p.ToolDataSet.GetPodNodeNameByID(id)
+			if err != nil {
+				log.Error(err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))
