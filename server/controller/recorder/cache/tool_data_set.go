@@ -676,8 +676,8 @@ func (t *ToolDataSet) deletePodCluster(lcuuid string) {
 func (t *ToolDataSet) addPodNode(item *mysql.PodNode) {
 	t.PodNodeLcuuidToID[item.Lcuuid] = item.ID
 	t.PodNodeIDToLcuuid[item.ID] = item.Lcuuid
-	if _, ok := t.redisInstanceIDToInfo[item.ID]; !ok {
-		t.redisInstanceIDToInfo[item.ID] = &redisInstanceInfo{}
+	if _, ok := t.podNodeIDToInfo[item.ID]; !ok {
+		t.podNodeIDToInfo[item.ID] = &podNodeInfo{}
 	}
 	t.podNodeIDToInfo[item.ID].Name = item.Name
 	t.podNodeIDToInfo[item.ID].RegionLcuuid = item.Region
