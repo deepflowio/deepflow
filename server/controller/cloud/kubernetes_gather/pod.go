@@ -30,7 +30,7 @@ import (
 
 func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, err error) {
 	log.Debug("get pods starting")
-	podTypes := [5]string{"StatefulSet", "ReplicaSet", "ReplicationController", "DaemonSet", "Deployment"}
+	podTypes := [4]string{"StatefulSet", "ReplicaSet", "ReplicationController", "Deployment"}
 	abstractNodes := map[string]int{}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
 		pData, pErr := simplejson.NewJson([]byte(p))
@@ -62,29 +62,32 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 		}
 
 		podGroups := metaData.Get("ownerReferences")
-		generateName := metaData.Get("generateName").MustString()
 		if len(podGroups.MustArray()) == 0 {
-			if generateName == "" {
-				pTempHash := metaData.Get("labels").Get("pod-template-hash").MustString()
-				if pTempHash == "" {
-					log.Debugf("pod (%s) pod template hash not found", name)
-					continue
-				}
-				pNameSlice := strings.Split(name, "-"+pTempHash+"-")
-				if len(pNameSlice) != 2 {
-					log.Debugf("pod (%s) not split by hash (%s)", name, pTempHash)
-					continue
-				}
-				uid := common.GetUUID(namespace+pNameSlice[0], uuid.Nil)
-				// 适配平安 serverless pod, 需要抽象出一个对应的 node , 在这里添加一个参考值 abstract 作为判断标志
-				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "Deployment","abstract":true}]`, uid)))
-			} else {
-				uid := common.GetUUID(namespace+generateName, uuid.Nil)
-				podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "DaemonSet","abstract":true}]`, uid)))
+			if metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString() != "serverless" {
+				log.Debugf("pod (%s) ownerReferences not found or sci cluster type not is serverless", name)
+				continue
 			}
+			abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
+			if abstractPGType == "" {
+				if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
+					abstractPGType = "StatefulSet"
+				} else {
+					abstractPGType = "Deployment"
+				}
+			}
+			resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
+			if resourceName == "" {
+				log.Debugf("sci pod (%s) not found provider resource name", name)
+				continue
+			}
+			targetIndex := strings.LastIndex(resourceName, "-")
+			abstractPGName := resourceName[:targetIndex]
+			uid := common.GetUUID(namespace+abstractPGName, uuid.Nil)
+			// 适配平安 serverless pod, 需要抽象出一个对应的 node , 在这里添加一个参考值 abstract 作为判断标志
+			podGroups, _ = simplejson.NewJson([]byte(fmt.Sprintf(`[{"uid": "%s","kind": "%s","abstract": true}]`, uid, abstractPGType)))
 		}
 		ID := podGroups.GetIndex(0).Get("uid").MustString()
-		if len(podGroups.MustArray()) == 0 || ID == "" {
+		if ID == "" {
 			log.Infof("pod (%s) pod group not found", name)
 			continue
 		}

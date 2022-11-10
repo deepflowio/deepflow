@@ -88,35 +88,33 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				label = "daemonset" + namespace + ":" + name
 			case 3:
 				replicas = 0
-				generateName := metaData.Get("generateName").MustString()
-				pTempHash := metaData.Get("labels").Get("pod-template-hash").MustString()
-				if generateName == "" && pTempHash == "" {
-					log.Debugf("podgroup (%s) generatename or pod template hash not found", name)
+				if metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString() != "serverless" {
+					log.Debugf("sci pod (%s) abstract pod group not found provicer cluster type,", name)
 					continue
 				}
-				if generateName == "" {
-					pNameSlice := strings.Split(name, "-"+pTempHash+"-")
-					if len(pNameSlice) != 2 {
-						log.Debugf("podgroup (%s) not split by hash (%s)", name, pTempHash)
-						continue
+				abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
+				if abstractPGType == "" {
+					if _, ok := metaData.Get("labels").CheckGet("statefulset.kubernetes.io/pod-name"); ok {
+						abstractPGType = "StatefulSet"
+					} else {
+						abstractPGType = "Deployment"
 					}
-					name = pNameSlice[0]
-					uID = common.GetUUID(namespace+name, uuid.Nil)
-				} else {
-					name = generateName[:strings.LastIndex(generateName, "-")]
-					uID = common.GetUUID(namespace+generateName, uuid.Nil)
 				}
-				if k.podGroupLcuuids.Contains(uID) {
-					log.Debugf("podgroup (%s) abstract workload already existed", name)
+				resourceName := metaData.Get("labels").Get("virtual-kubelet.io/provider-resource-name").MustString()
+				if resourceName == "" {
+					log.Debugf("sci pod (%s) abstract pod group not found provider resource name", name)
 					continue
 				}
-				oReferences := metaData.Get("ownerReferences")
-				typeName := strings.ToLower(oReferences.GetIndex(0).Get("kind").MustString())
-				serviceType, ok = pgNameToTypeID[typeName]
-				if !ok {
-					serviceType = 1
+				targetIndex := strings.LastIndex(resourceName, "-")
+				abstractPGName := resourceName[:targetIndex]
+				uID := common.GetUUID(namespace+abstractPGName, uuid.Nil)
+				if k.podGroupLcuuids.Contains(uID) {
+					log.Debugf("sci pod (%s) abstract workload already existed", name)
+					continue
 				}
-				label = typeName + ":" + namespace + ":" + name
+				typeName := strings.ToLower(abstractPGType)
+				serviceType = pgNameToTypeID[typeName]
+				label = typeName + ":" + namespace + ":" + abstractPGName
 			}
 
 			_, ok = k.nsLabelToGroupLcuuids[namespace+label]
