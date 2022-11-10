@@ -37,6 +37,8 @@ import (
 
 var log = logging.MustGetLogger("db.mysql.common")
 
+var SQL_FILE_DIR = "/etc/mysql"
+
 func GetConnectionWithoudDatabase(cfg MySqlConfig) *gorm.DB {
 	dsn := GetDSN(cfg, "", cfg.TimeOut, false)
 	return GetGormDB(dsn)
@@ -110,7 +112,8 @@ func CreateDatabaseIfNotExists(db *gorm.DB, database string) (bool, error) {
 }
 
 func RollbackIfInitTablesFailed(db *gorm.DB, database string) bool {
-	err := initTables(db)
+	log.Info("init db tables with rollback")
+	err := InitTables(db)
 	if err != nil {
 		DropDatabase(db, database)
 		return false
@@ -118,9 +121,9 @@ func RollbackIfInitTablesFailed(db *gorm.DB, database string) bool {
 	return true
 }
 
-func initTables(db *gorm.DB) error {
+func InitTables(db *gorm.DB) error {
 	log.Info("init db tables start")
-	initSQL, err := ioutil.ReadFile("/etc/mysql/init.sql")
+	initSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/init.sql", SQL_FILE_DIR))
 	if err != nil {
 		log.Errorf("read sql file failed: %v", err)
 		return err
@@ -150,7 +153,7 @@ func initTables(db *gorm.DB) error {
 }
 
 func ExecuteIssus(db *gorm.DB, curVersion string) error {
-	issus, err := ioutil.ReadDir("/etc/mysql/issu")
+	issus, err := ioutil.ReadDir(fmt.Sprintf("%s/issu", SQL_FILE_DIR))
 	if err != nil {
 		log.Errorf("read sql dir faild: %v", err)
 		return err
@@ -167,7 +170,7 @@ func ExecuteIssus(db *gorm.DB, curVersion string) error {
 }
 
 func executeIssu(db *gorm.DB, nextVersion string) error {
-	issuSQL, err := ioutil.ReadFile(fmt.Sprintf("/etc/mysql/issu/%s.sql", nextVersion))
+	issuSQL, err := ioutil.ReadFile(fmt.Sprintf("%s/issu/%s.sql", SQL_FILE_DIR, nextVersion))
 	if err != nil {
 		log.Errorf("read sql file (version: %s) failed: %v", nextVersion, err)
 		return err

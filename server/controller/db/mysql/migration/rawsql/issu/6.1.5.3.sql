@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 ALTER TABLE vtap_group_configuration ADD COLUMN extra_netns_regex TEXT;

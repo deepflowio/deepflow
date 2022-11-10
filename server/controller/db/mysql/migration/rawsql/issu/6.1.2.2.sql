@@ -1,5 +1,3 @@
-USE deepflow;
-
 CREATE TABLE IF NOT EXISTS ch_k8s_labels (
     `pod_id`        INTEGER NOT NULL PRIMARY KEY,
     `labels`        TEXT,

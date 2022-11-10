@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/op/go-logging"
+	"gorm.io/gorm"
 
 	. "github.com/deepflowys/deepflow/server/controller/db/mysql/common"
 	. "github.com/deepflowys/deepflow/server/controller/db/mysql/config"
@@ -28,14 +29,17 @@ import (
 
 var log = logging.MustGetLogger("db.migrator.mysql")
 
-// if database or version info not exist, create database and tables;
-// if database exsits, execute issue if db version not equal lastest version
+// if configured database does not exist, it is considered a new dployment, will create database and init tables;
+// if configured database exsits, but db_version table does not exist, it is also considered a new deployment,
+// 		maybe we do not have permission to create database or other reasons, then will init all tables.
+// if configured database exsits, and db_version table exists, check wheather db_version is the latest version
+// 		and upgrade based the result.
 func MigrateMySQL(cfg MySqlConfig) bool {
 	db := GetConnectionWithoudDatabase(cfg)
 	if db == nil {
 		return false
 	}
-	existed, err := CreateDatabaseIfNotExists(db, cfg.Database)
+	databaseExisted, err := CreateDatabaseIfNotExists(db, cfg.Database)
 	if err != nil {
 		log.Errorf("database: %s is not ready: %v", cfg.Database, err)
 		return false
@@ -45,40 +49,65 @@ func MigrateMySQL(cfg MySqlConfig) bool {
 	if db == nil {
 		return false
 	}
-	if !existed {
+	if !databaseExisted {
 		return RollbackIfInitTablesFailed(db, cfg.Database)
 	} else {
-		var version string
-		err = db.Raw(fmt.Sprintf("SELECT version FROM db_version")).Scan(&version).Error
+		var dbVersionTable string
+		err = db.Raw(fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='%s' AND TABLE_NAME='%s'", cfg.Database, migration.DB_VERSION_TABLE)).Scan(&dbVersionTable).Error
 		if err != nil {
-			log.Errorf("check db version failed: %v", err)
+			log.Errorf("check db_version table failed: %v", err)
 			return false
 		}
-		log.Infof("current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED)
-		if version == "" {
-			// TODO drop database is a dangerous operation
-			DropDatabase(db, cfg.Database)
-			db = GetConnectionWithoudDatabase(cfg)
-			if db == nil {
-				return false
-			}
-			err = CreateDatabase(db, cfg.Database)
-			if err != nil {
-				log.Errorf("created database %s failed: %v", cfg.Database, err)
-				return false
-			}
-
-			db = GetConnectionWithDatabase(cfg)
-			if db == nil {
-				return false
-			}
-			return RollbackIfInitTablesFailed(db, cfg.Database)
-		} else if version != migration.DB_VERSION_EXPECTED {
-			err = ExecuteIssus(db, version)
-			if err != nil {
-				return false
-			}
+		if dbVersionTable == "" {
+			return InitTablesWithoutRollBack(db, cfg.Database)
+		} else {
+			return UpgradeIfDBVersionNotLatest(db, cfg)
 		}
+	}
+}
+
+func InitTablesWithoutRollBack(db *gorm.DB, database string) bool {
+	log.Info("init db tables without rollback")
+	err := InitTables(db)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func UpgradeIfDBVersionNotLatest(db *gorm.DB, cfg MySqlConfig) bool {
+	log.Info("upgrade if db version is not the latest")
+	var version string
+	err := db.Raw(fmt.Sprintf("SELECT version FROM %s", migration.DB_VERSION_TABLE)).Scan(&version).Error
+	if err != nil {
+		log.Errorf("check db version failed: %v", err)
+		return false
+	}
+	log.Infof("current db version: %s, expected db version: %s", version, migration.DB_VERSION_EXPECTED)
+	if version == "" {
+		// TODO delete this block
+		DropDatabase(db, cfg.Database)
+		db = GetConnectionWithoudDatabase(cfg)
+		if db == nil {
+			return false
+		}
+		err = CreateDatabase(db, cfg.Database)
+		if err != nil {
+			log.Errorf("created database %s failed: %v", cfg.Database, err)
+			return false
+		}
+
+		db = GetConnectionWithDatabase(cfg)
+		if db == nil {
+			return false
+		}
+		return RollbackIfInitTablesFailed(db, cfg.Database)
+	} else if version != migration.DB_VERSION_EXPECTED {
+		err = ExecuteIssus(db, version)
+		if err != nil {
+			return false
+		}
+		return true
 	}
 	return true
 }
