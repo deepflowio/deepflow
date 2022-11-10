@@ -1645,12 +1645,18 @@ impl Components {
             stats_collector.clone(),
         );
 
-        let l4_flow_aggr = FlowAggrThread::new(
+        let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
             id,                          // id
             l4_log_receiver,             // input
             l4_flow_aggr_sender.clone(), // output
             config_handler.collector(),
             synchronizer.ntp_diff(),
+        );
+
+        stats_collector.register_countable(
+            "flow_aggr",
+            Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
+            Default::default(),
         );
 
         let (mut second_collector, mut minute_collector) = (None, None);
