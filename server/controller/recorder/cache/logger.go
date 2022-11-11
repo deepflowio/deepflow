@@ -79,3 +79,19 @@ func cacheNameByIDNotFound(resource string, id int) string {
 func cacheIPByLcuuidNotFound(resource, lcuuid string) string {
 	return fmt.Sprintf("cache %s ip (lcuuid: %s) not found", resource, lcuuid)
 }
+
+func cacheRegionLcuuidByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s region (id: %d) not found", resource, id)
+}
+
+func cacheAZLcuuidByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s az (id: %d) not found", resource, id)
+}
+
+func cacheVPCIDByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s vpc id (id: %d) not found", resource, id)
+}
+
+func cacheLaunchServerByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s launch server (id: %d) not found", resource, id)
+}
