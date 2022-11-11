@@ -120,6 +120,9 @@ static __u32 __inline get_tcp_read_seq_from_fd(int fd)
 		return 0;
 
 	void *sock = get_socket_from_fd(fd, offset);
+	if (sock == NULL)
+		return 0;
+
 	__u32 tcp_seq = 0;
 	bpf_probe_read(&tcp_seq, sizeof(tcp_seq),
 		       sock + offset->tcp_sock__copied_seq_offset);
@@ -278,8 +281,6 @@ static __inline int is_tcp_udp_data(void *sk,
 	if ((1 << skc_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
 		return SOCK_CHECK_TYPE_ERROR;
 	}
-
-	conn_info->skc_state = skc_state;
 
 	conn_info->tuple.l4_protocol = IPPROTO_TCP;
 	return SOCK_CHECK_TYPE_TCP_ES;
@@ -731,14 +732,12 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	__u64 thread_trace_id = 0;
 
 	if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-		tcp_seq = get_tcp_read_seq_from_fd(conn_info->fd);
 		/*
 		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received.
-		 * Since tcp_sock->copied_seq has done such an operation +1, need to fix the value of tcp_seq.
-		 */ 
-		if ((1 << conn_info->skc_state) & TCPF_CLOSE_WAIT) {
-			tcp_seq--;
-		}
+		 * However, it cannot be confirmed that it has been processed by the syscall,
+		 * so use the tcp_seq value that entering the syscalls.
+		 */
+		tcp_seq = args->tcp_seq + syscall_len; 
 	} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
 		tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
 	}
@@ -1092,6 +1091,7 @@ TPPROG(sys_enter_read) (struct syscall_comm_enter_ctx *ctx) {
 	read_args.source_fn = SYSCALL_FUNC_READ;
 	read_args.fd = fd;
 	read_args.buf = buf;
+	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1165,6 +1165,7 @@ TPPROG(sys_enter_recvfrom) (struct syscall_comm_enter_ctx *ctx) {
 	read_args.source_fn = SYSCALL_FUNC_RECVFROM;
 	read_args.fd = sockfd;
 	read_args.buf = buf;
+	read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
@@ -1282,6 +1283,7 @@ KPROG(__sys_recvmsg) (struct pt_regs* ctx) {
 		read_args.fd = sockfd;
 		read_args.iov = msghdr->msg_iov;
 		read_args.iovlen = msghdr->msg_iovlen;
+		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
 		active_read_args_map__update(&id, &read_args);
 	}
 
@@ -1328,6 +1330,7 @@ KPROG(__sys_recvmmsg) (struct pt_regs* ctx) {
 		bpf_probe_read(&read_args.iovlen, sizeof(read_args.iovlen), (void *)msgvec + offset);
 
 		read_args.msg_len = (void *)msgvec + offsetof(typeof(struct mmsghdr), msg_len);
+		read_args.tcp_seq = get_tcp_read_seq_from_fd(sockfd);
 		active_read_args_map__update(&id, &read_args);
 	}
 	
@@ -1398,6 +1401,7 @@ KPROG(do_readv) (struct pt_regs* ctx) {
 	read_args.fd = fd;
 	read_args.iov = iov;
 	read_args.iovlen = iovlen;
+	read_args.tcp_seq = get_tcp_read_seq_from_fd(fd);
 	active_read_args_map__update(&id, &read_args);
 
 	return 0;
