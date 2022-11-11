@@ -152,7 +152,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 		}
 
 		i.createAndPutEvent(
-			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,
 			deviceType,
 			deviceID,
