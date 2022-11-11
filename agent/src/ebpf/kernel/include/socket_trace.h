@@ -131,7 +131,6 @@ struct conn_info_t {
 	__s32 correlation_id; // 目前用于kafka判断
 	enum traffic_direction prev_direction;
 	struct socket_info_t *socket_info_ptr; /* lookup __socket_info_map */
-	unsigned char skc_state; // State of the current socket
 };
 
 enum process_data_extra_source {
@@ -185,6 +184,7 @@ struct data_args_t {
 	};
 	// Timestamp for enter syscall function.
 	__u64 enter_ts;
+	__u32 tcp_seq; // Used to record the entry of syscalls
 };
 
 #define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F
