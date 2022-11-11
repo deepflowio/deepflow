@@ -40,7 +40,7 @@ type QuerierConfig struct {
 	ListenPort   int        `default:"20416" yaml:"listen-port"`
 	Clickhouse   Clickhouse `yaml:clickhouse`
 	Language     string     `default:"en" yaml:"language"`
-	OtelEndpoint string     `yaml:"otel-endpoint"`
+	OtelEndpoint string     `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
 }
 
 type Clickhouse struct {
