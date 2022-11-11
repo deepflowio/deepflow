@@ -85,7 +85,6 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			log.Errorf("%s lcuuid (id: %d) for %s not found",
 				RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_LAN_IP_EN)
 		}
-
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, item.IP)),
 			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
