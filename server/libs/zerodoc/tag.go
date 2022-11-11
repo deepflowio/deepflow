@@ -499,7 +499,7 @@ func unmarshalUint16WithSpecialID(s string) (int16, error) {
 	return int16(i), nil
 }
 
-func marshalInt32WithSpecialID(v int16) int32 {
+func MarshalInt32WithSpecialID(v int16) int32 {
 	switch v {
 	case ID_OTHER:
 		fallthrough
@@ -1195,16 +1195,16 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 	}
 
 	if code&L3EpcID != 0 {
-		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID)); err != nil {
+		if err := block.WriteInt32(MarshalInt32WithSpecialID(t.L3EpcID)); err != nil {
 			return err
 		}
 	}
 	if code&L3EpcIDPath != 0 {
-		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID)); err != nil {
+		if err := block.WriteInt32(MarshalInt32WithSpecialID(t.L3EpcID)); err != nil {
 			return err
 		}
 
-		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID1)); err != nil {
+		if err := block.WriteInt32(MarshalInt32WithSpecialID(t.L3EpcID1)); err != nil {
 			return err
 		}
 	}
