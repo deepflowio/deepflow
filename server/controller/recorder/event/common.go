@@ -17,7 +17,6 @@
 package event
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
@@ -52,16 +51,6 @@ func GetDeviceOptionsByDeviceID(t *cache.ToolDataSet, deviceType, deviceID int) 
 	default:
 		return nil, fmt.Errorf("device type %d not supported", deviceType)
 	}
-}
-
-func addErrMessage(err error, message string) error {
-	if err == nil {
-		return errors.New(message)
-	}
-	if message == "" {
-		return err
-	}
-	return fmt.Errorf("%w, %s", err, message)
 }
 
 func getHostOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
@@ -208,6 +197,7 @@ func getPodNodeOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOpt
 		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagPodClusterID(info.PodClusterID),
+		eventapi.TagPodNodeID(id),
 	}...)
 	return opts, nil
 }
@@ -227,6 +217,7 @@ func getPodServiceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagField
 		eventapi.TagL3DeviceID(id),
 		eventapi.TagPodClusterID(info.PodClusterID),
 		eventapi.TagPodNSID(info.PodNSID),
+		eventapi.TagPodServiceID(id),
 	}...)
 	return opts, nil
 }
@@ -246,6 +237,7 @@ func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption,
 		eventapi.TagPodNSID(info.PodNSID),
 		eventapi.TagPodGroupID(info.PodGroupID),
 		eventapi.TagPodNodeID(info.PodNodeID),
+		eventapi.TagPodID(id),
 	}...)
 	return opts, nil
 }
