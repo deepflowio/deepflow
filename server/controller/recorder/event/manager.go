@@ -51,7 +51,7 @@ func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType, resourceName str
 
 	// put
 	err := e.Queue.Put(event)
-	log.Infof("put %s event: %s into shared queue", e.resourceType, event)
+	log.Infof("put %s event: %+v into shared queue", e.resourceType, event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(e.resourceType, err))
 	}
