@@ -16,32 +16,34 @@
 
 package cache
 
-import "github.com/deepflowys/deepflow/server/controller/common"
+import (
+	"github.com/deepflowys/deepflow/server/controller/common"
+)
 
 type EventToolDataSet struct {
-	HostIDToName map[int]string
-	HostIPToID   map[string]int
+	hostIPToID   map[string]int
+	hostIDtoInfo map[int]*hostInfo
 
-	VMIDToName           map[int]string
+	vmIDToInfo           map[int]*vmInfo
 	VMIDToIPNetworkIDMap map[int]map[string]uint32
 
-	VRouterIDToName map[int]string
+	vrouterIDToInfo map[int]*vrouterInfo
 
-	DHCPPortIDToName map[int]string
+	dhcpPortIDToInfo map[int]*dhcpPortInfo
 
-	NATGatewayIDToName map[int]string
+	natGatewayIDToInfo map[int]*natGatewayInfo
 
-	LBIDToName map[int]string
+	lbIDToInfo map[int]*lbInfo
 
-	RDSInstanceIDToName map[int]string
+	rdsInstanceIDToInfo map[int]*rdsInstanceInfo
 
-	RedisInstanceIDToName map[int]string
+	redisInstanceIDToInfo map[int]*redisInstanceInfo
 
-	PodNodeIDToName map[int]string
+	podNodeIDToInfo map[int]*podNodeInfo
 
-	PodServiceIDToName map[int]string
+	podServiceIDToInfo map[int]*podServiceInfo
 
-	PodIDToName           map[int]string
+	podIDToInfo           map[int]*podInfo
 	PodIDToIPNetworkIDMap map[int]map[string]uint32
 
 	NetworkIDToName           map[int]string
@@ -52,31 +54,113 @@ type EventToolDataSet struct {
 	LANIPLcuuidToIP           map[string]string
 }
 
+type hostInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+}
+
+type vmInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+	HostID   int
+}
+
+type vrouterInfo struct {
+	Name     string
+	RegionID int
+	VPCID    int
+}
+
+type dhcpPortInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type natGatewayInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type lbInfo struct {
+	Name     string
+	RegionID int
+	VPCID    int
+}
+
+type rdsInstanceInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type redisInstanceInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type podNodeInfo struct {
+	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
+	PodClusterID int
+}
+
+type podServiceInfo struct {
+	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
+	PodClusterID int
+	PodNSID      int
+}
+
+type podInfo struct {
+	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
+	PodClusterID int
+	PodNSID      int
+	PodGroupID   int
+	PodNodeID    int
+}
+
 func NewEventToolDataSet() EventToolDataSet {
 	return EventToolDataSet{
-		HostIDToName: make(map[int]string),
-		HostIPToID:   make(map[string]int),
+		hostIPToID:   make(map[string]int),
+		hostIDtoInfo: make(map[int]*hostInfo),
 
-		VMIDToName:           make(map[int]string),
+		vmIDToInfo:           make(map[int]*vmInfo),
 		VMIDToIPNetworkIDMap: make(map[int]map[string]uint32),
 
-		VRouterIDToName: make(map[int]string),
+		vrouterIDToInfo: make(map[int]*vrouterInfo),
 
-		DHCPPortIDToName: make(map[int]string),
+		dhcpPortIDToInfo: make(map[int]*dhcpPortInfo),
 
-		NATGatewayIDToName: make(map[int]string),
+		natGatewayIDToInfo: make(map[int]*natGatewayInfo),
 
-		LBIDToName: make(map[int]string),
+		lbIDToInfo: make(map[int]*lbInfo),
 
-		RDSInstanceIDToName: make(map[int]string),
+		rdsInstanceIDToInfo: make(map[int]*rdsInstanceInfo),
 
-		RedisInstanceIDToName: make(map[int]string),
+		redisInstanceIDToInfo: make(map[int]*redisInstanceInfo),
 
-		PodNodeIDToName: make(map[int]string),
+		podNodeIDToInfo: make(map[int]*podNodeInfo),
 
-		PodServiceIDToName: make(map[int]string),
+		podServiceIDToInfo: make(map[int]*podServiceInfo),
 
-		PodIDToName:           make(map[int]string),
+		podIDToInfo:           make(map[int]*podInfo),
 		PodIDToIPNetworkIDMap: make(map[int]map[string]uint32),
 
 		NetworkIDToName:           make(map[int]string),

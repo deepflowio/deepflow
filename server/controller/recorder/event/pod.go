@@ -47,37 +47,47 @@ func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 
 func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	for _, item := range items {
-		regionID, azID, err := p.ToolDataSet.GetRegionIDAndAZIDByLcuuid(item.Region, item.AZ)
+		var opts []eventapi.TagFieldOption
+		info, err := p.ToolDataSet.GetPodInfoeByID(item.ID)
 		if err != nil {
 			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagAZID(info.AZID),
+				eventapi.TagRegionID(info.RegionID),
+			}...)
 		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagPodID(item.ID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagPodClusterID(item.PodClusterID),
+			eventapi.TagPodGroupID(item.PodGroupID),
+			eventapi.TagPodNodeID(item.PodNodeID),
+			eventapi.TagPodNSID(item.PodNamespaceID),
+		}...)
 
 		p.createAndPutEvent(
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			p.deviceType,
 			item.ID,
-			eventapi.TagPodID(item.ID),
-			eventapi.TagVPCID(item.VPCID),
-			eventapi.TagRegionID(regionID),
-			eventapi.TagAZID(azID),
-			eventapi.TagPodClusterID(item.PodClusterID),
-			eventapi.TagPodGroupID(item.PodGroupID),
-			eventapi.TagPodNodeID(item.PodNodeID),
-			eventapi.TagPodNSID(item.PodNamespaceID),
+			opts...,
 		)
 	}
 }
 
 func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 	if diffBase.CreatedAt != cloudItem.CreatedAt {
-		var id int
-		var name string
+		var (
+			id   int
+			name string
+			err  error
+		)
 		id, ok := p.ToolDataSet.GetPodIDByLcuuid(diffBase.Lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, diffBase.Lcuuid))
+			name, err = p.ToolDataSet.GetPodNameByID(id)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.Lcuuid), err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))
@@ -86,9 +96,9 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		var oldPodNodeName string
 		oldPodNodeID, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(diffBase.PodNodeLcuuid)
 		if ok {
-			oldPodNodeName, ok = p.ToolDataSet.GetPodNodeNameByID(oldPodNodeID)
-			if !ok {
-				log.Error(nameByIDNotFound(RESOURCE_TYPE_POD_NODE_EN, id))
+			oldPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(oldPodNodeID)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, diffBase.PodNodeLcuuid), err)
 			}
 		} else {
 			log.Error(idByLcuuidNotFound(RESOURCE_TYPE_POD_NODE_EN, diffBase.PodNodeLcuuid))
@@ -97,9 +107,9 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		var newPodNodeName string
 		newPodNodeID, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(cloudItem.PodNodeLcuuid)
 		if ok {
-			newPodNodeName, ok = p.ToolDataSet.GetPodNodeNameByID(newPodNodeID)
-			if !ok {
-				log.Error(nameByIDNotFound(RESOURCE_TYPE_POD_NODE_EN, id))
+			newPodNodeName, err = p.ToolDataSet.GetPodNodeNameByID(newPodNodeID)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, cloudItem.PodNodeLcuuid), err)
 			}
 		} else {
 			log.Error(idByLcuuidNotFound(RESOURCE_TYPE_POD_NODE_EN, diffBase.PodNodeLcuuid))
@@ -120,13 +130,16 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 
 func (p *Pod) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
-		var id int
-		var name string
+		var (
+			id   int
+			name string
+			err  error
+		)
 		id, ok := p.ToolDataSet.GetPodIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+			name, err = p.ToolDataSet.GetPodNameByID(id)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))

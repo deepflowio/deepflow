@@ -45,7 +45,29 @@ func NewDHCPPort(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *DHCPPort 
 
 func (p *DHCPPort) ProduceByAdd(items []*mysql.DHCPPort) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, p.deviceType, item.ID)
+		var opts []eventapi.TagFieldOption
+		info, err := p.ToolDataSet.GetDHCPPortInfoByID(item.ID)
+		if err != nil {
+			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagAZID(info.AZID),
+				eventapi.TagVPCID(item.VPCID),
+				eventapi.TagRegionID(info.RegionID),
+			}...)
+		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagL3DeviceType(p.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		}...)
+
+		p.createAndPutEvent(
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			p.deviceType,
+			item.ID,
+			opts...,
+		)
 	}
 }
 
@@ -58,9 +80,10 @@ func (p *DHCPPort) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := p.ToolDataSet.GetDHCPPortIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetDHCPPortNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+			var err error
+			name, err = p.ToolDataSet.GetDHCPPortNameByID(id)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))
