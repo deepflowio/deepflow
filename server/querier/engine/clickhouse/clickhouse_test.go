@@ -190,6 +190,9 @@ var (
 		input:  "select Sum(log_count) from event",
 		output: "SELECT SUM(1) FROM event.`event`",
 		db:     "event",
+	}, {
+		input:  "select Sum(session_length) from l7_flow_log",
+		output: "SELECT SUM(if(request_length>0,request_length,0)+if(response_length>0,response_length,0)) FROM flow_log.`l7_flow_log`",
 	},
 	}
 )
