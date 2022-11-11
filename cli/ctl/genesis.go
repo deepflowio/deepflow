@@ -47,7 +47,7 @@ func RegisterGenesisCommand() *cobra.Command {
 			syncInfo(cmd, syncType)
 		},
 	}
-	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type")
+	syncInfo.Flags().StringVarP(&syncType, "type", "t", "vinterface", "genesis sync type: 'vm | vpc | host | port | lldp | ip | network | vinterface'\ndefault: vinterface")
 
 	var k8sType string
 	k8sInfo := &cobra.Command{
