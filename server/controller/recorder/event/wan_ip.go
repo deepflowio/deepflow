@@ -67,11 +67,11 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 			}
 			deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 			if err != nil {
-				log.Error(err)
+				log.Errorf("device name for %s (lcuuid: %s) not found, %v", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 			}
 			deviceRelatedOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
 			if err != nil {
-				log.Error(err)
+				log.Errorf("releated options for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 			}
 			networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
