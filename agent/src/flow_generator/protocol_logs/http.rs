@@ -66,7 +66,7 @@ pub struct HttpInfo {
     raw_data_type: L7ProtoRawDataType,
 
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
-    pub stream_id: u32,
+    pub stream_id: Option<u32>,
     #[serde(skip_serializing_if = "value_is_default")]
     pub version: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -102,7 +102,7 @@ pub struct HttpInfo {
 
 impl L7ProtocolInfoInterface for HttpInfo {
     fn session_id(&self) -> Option<u32> {
-        Some(self.stream_id)
+        self.stream_id
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
@@ -317,7 +317,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             // server endpoint = req_type
             (
                 String::from("POST"), // grpc method always post, reference https://chromium.googlesource.com/external/github.com/grpc/grpc/+/HEAD/doc/PROTOCOL-HTTP2.md
-                service_name.unwrap_or_default(),
+                service_name.clone().unwrap_or_default(),
                 f.host,
                 f.path,
             )
@@ -346,11 +346,12 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
-                request_id: Some(f.stream_id),
+                request_id: f.stream_id,
                 x_request_id: Some(f.x_request_id),
                 client_ip: Some(f.client_ip),
                 user_agent: f.user_agent,
                 referer: f.referer,
+                rpc_service: service_name,
                 ..Default::default()
             }),
             ..Default::default()
@@ -653,7 +654,7 @@ impl HttpLog {
         self.info.is_req_end = is_req_end.unwrap_or_default();
         self.info.is_resp_end = is_resp_end.unwrap_or_default();
         self.info.version = String::from("2");
-        self.info.stream_id = stream_id;
+        self.info.stream_id = Some(stream_id);
         return Ok(());
     }
 
@@ -747,7 +748,7 @@ impl HttpLog {
             if httpv2_header.parse_headers_frame(frame_payload).is_err() {
                 // 当已经解析了Headers帧(该Headers帧未携带“Content-Length”)且发现该报文被截断时，无法进行后续解析，ContentLength为None
                 if header_frame_parsed {
-                    self.info.stream_id = httpv2_header.stream_id;
+                    self.info.stream_id = Some(httpv2_header.stream_id);
                     is_httpv2 = true
                 }
                 break;
@@ -858,7 +859,7 @@ impl HttpLog {
                 self.info.resp_content_length = content_length;
             }
             self.info.version = String::from("2");
-            self.info.stream_id = httpv2_header.stream_id;
+            self.info.stream_id = Some(httpv2_header.stream_id);
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)

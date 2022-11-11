@@ -44,7 +44,7 @@ const QUEUE_READ_TIMEOUT: Duration = Duration::from_secs(2);
 const TAPTYPE_MAX: usize = 256; // TapType::Max
 
 #[derive(Debug, Default)]
-struct FlowAggrCounter {
+pub struct FlowAggrCounter {
     drop_before_window: AtomicU64,
     out: AtomicU64,
     drop_in_throttle: AtomicU64,
@@ -60,6 +60,8 @@ pub struct FlowAggrThread {
 
     running: Arc<AtomicBool>,
     ntp_diff: Arc<AtomicI64>,
+
+    metrics: Arc<FlowAggrCounter>,
 }
 
 impl FlowAggrThread {
@@ -69,17 +71,22 @@ impl FlowAggrThread {
         output: DebugSender<SendItem>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
-    ) -> Self {
+    ) -> (Self, Arc<FlowAggrCounter>) {
         let running = Arc::new(AtomicBool::new(false));
-        Self {
-            id,
-            input: Arc::new(input),
-            output: output.clone(),
-            thread_handle: None,
-            config,
-            running,
-            ntp_diff,
-        }
+        let metrics = Arc::new(FlowAggrCounter::default());
+        (
+            Self {
+                id,
+                input: Arc::new(input),
+                output: output.clone(),
+                thread_handle: None,
+                config,
+                running,
+                ntp_diff,
+                metrics: metrics.clone(),
+            },
+            metrics,
+        )
     }
 
     pub fn start(&mut self) {
@@ -94,6 +101,7 @@ impl FlowAggrThread {
             self.running.clone(),
             self.config.clone(),
             self.ntp_diff.clone(),
+            self.metrics.clone(),
         );
         self.thread_handle = Some(thread::spawn(move || flow_aggr.run()));
         info!("l4 flow aggr id: {} started", self.id);
@@ -121,8 +129,8 @@ pub struct FlowAggr {
 
     running: Arc<AtomicBool>,
 
-    counter: FlowAggrCounter,
     ntp_diff: Arc<AtomicI64>,
+    metrics: Arc<FlowAggrCounter>,
 }
 
 impl FlowAggr {
@@ -132,6 +140,7 @@ impl FlowAggr {
         running: Arc<AtomicBool>,
         config: CollectorAccess,
         ntp_diff: Arc<AtomicI64>,
+        metrics: Arc<FlowAggrCounter>,
     ) -> Self {
         let mut stashs = VecDeque::new();
         for _ in 0..MINUTE_SLOTS {
@@ -145,7 +154,7 @@ impl FlowAggr {
             last_flush_time: Duration::ZERO,
             config,
             running,
-            counter: FlowAggrCounter::default(),
+            metrics,
             ntp_diff,
         }
     }
@@ -154,7 +163,7 @@ impl FlowAggr {
         let flow_time = f.flow.flow_stat_time;
         if flow_time < self.slot_start_time {
             debug!("flow drop before slot start time. flow stat time: {:?}, slot start time is {:?}, delay is {:?}", flow_time, self.slot_start_time, self.slot_start_time - flow_time);
-            self.counter
+            self.metrics
                 .drop_before_window
                 .fetch_add(1, Ordering::Relaxed);
             return;
@@ -215,9 +224,9 @@ impl FlowAggr {
             f.flow.end_time =
                 round_to_minute(f.flow.flow_stat_time + Duration::from_secs(SECONDS_IN_MINUTE));
         }
-        self.counter.out.fetch_add(1, Ordering::Relaxed);
+        self.metrics.out.fetch_add(1, Ordering::Relaxed);
         if !self.output.send(f) {
-            self.counter
+            self.metrics
                 .drop_in_throttle
                 .fetch_add(1, Ordering::Relaxed);
         }
@@ -274,31 +283,26 @@ impl FlowAggr {
     }
 }
 
-// FIXME: counter not registered
-impl RefCountable for FlowAggr {
+impl RefCountable for FlowAggrCounter {
     fn get_counters(&self) -> Vec<Counter> {
         vec![
             (
                 "drop-before-window",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.drop_before_window.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.drop_before_window.swap(0, Ordering::Relaxed)),
             ),
             (
                 "out",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.out.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.out.swap(0, Ordering::Relaxed)),
             ),
             (
                 "drop-in-throttle",
                 CounterType::Counted,
-                CounterValue::Unsigned(self.counter.drop_in_throttle.swap(0, Ordering::Relaxed)),
+                CounterValue::Unsigned(self.drop_in_throttle.swap(0, Ordering::Relaxed)),
             ),
         ]
     }
-
-    // fn closed(&self) -> bool {
-    //     !self.running.load(Ordering::Relaxed)
-    // }
 }
 
 struct ThrottlingQueue {

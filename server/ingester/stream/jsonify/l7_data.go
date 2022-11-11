@@ -584,8 +584,14 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	// 网络层
 	if l.IsIpv6 == 1 {
 		b.IsIPv4 = false
-		b.IP60 = l.Ip6Src[:]
-		b.IP61 = l.Ip6Dst[:]
+		if len(b.IP60) > 0 {
+			b.IP60 = b.IP60[:0]
+		}
+		b.IP60 = append(b.IP60, l.Ip6Src...)
+		if len(b.IP61) > 0 {
+			b.IP61 = b.IP61[:0]
+		}
+		b.IP61 = append(b.IP61, l.Ip6Dst...)
 	} else {
 		b.IsIPv4 = true
 		b.IP40 = l.IpSrc
