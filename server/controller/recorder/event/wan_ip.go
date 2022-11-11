@@ -130,7 +130,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 				}
 				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
 				if err != nil {
-					log.Error(err)
+					log.Errorf("device name for %s (lcuuid: %s) not found, %v", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 				}
 				var err error
 				tempOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
