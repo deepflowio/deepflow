@@ -144,11 +144,10 @@ struct process_data_extra {
 	bool vecs : 1;
 	enum process_data_extra_source source;
 	enum traffic_protocol protocol;
-	__u32 tcp_seq;
 	__u64 coroutine_id;
 	enum traffic_direction direction;
 	enum message_type message_type;
-};
+} __attribute__ ((packed));
 
 enum syscall_src_func {
 	SYSCALL_FUNC_UNKNOWN,
@@ -194,7 +193,7 @@ struct data_args_t {
 	// Timestamp for enter syscall function.
 	__u64 enter_ts;
 	__u32 tcp_seq; // Used to record the entry of syscalls
-};
+} __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {
 	__u64 __pad_0;		/*     0     8 */

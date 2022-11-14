@@ -749,20 +749,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		return -1;
 	}
 
-	__u32 tcp_seq = 0;
+	__u32 tcp_seq = args->tcp_seq;
 	__u64 thread_trace_id = 0;
-
-	if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-		/*
-		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received.
-		 * However, it cannot be confirmed that it has been processed by the syscall,
-		 * so use the tcp_seq value that entering the syscalls.
-		 */
-		tcp_seq = args->tcp_seq + syscall_len; 
-	} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-		tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
-	}
-
 	__u32 k0 = 0;
 	struct socket_info_t sk_info = { 0 };
 	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
@@ -903,8 +891,24 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;
 	v->tcp_seq = 0;
-	if (conn_info->tuple.l4_protocol == IPPROTO_TCP)
-		v->tcp_seq = tcp_seq - syscall_len;
+
+	if ((extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
+	     extra->source == DATA_SOURCE_OPENSSL_UPROBE) ||
+	    (conn_info->direction == T_INGRESS &&
+	     conn_info->tuple.l4_protocol == IPPROTO_TCP)) {
+		/*
+		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received.
+		 * However, it cannot be confirmed that it has been processed by the syscall,
+		 * so use the tcp_seq value that entering the syscalls.
+		 *
+		 * Why not use "v->tcp_seq = args->tcp_seq;" ?
+		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
+		 */
+		v->tcp_seq = tcp_seq;
+	} else if (conn_info->direction == T_EGRESS &&
+		   conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		v->tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd) - syscall_len;
+	}
 
 	v->thread_trace_id = thread_trace_id;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
@@ -916,10 +920,6 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 		v->tcp_seq -= conn_info->prev_count; // 客户端和服务端的tcp_seq匹配
 	} else
 		v->extra_data_count = 0;
-
-	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
-	    extra->source == DATA_SOURCE_OPENSSL_UPROBE)
-		v->tcp_seq = extra->tcp_seq;
 
 	v->coroutine_id = extra->coroutine_id;
 	v->source = extra->source;
@@ -1094,12 +1094,7 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* read_args = active_read_args_map__lookup(&id);
 	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
 	if (read_args != NULL && read_args->fd > 2) {
-		struct process_data_extra extra = {
-			.vecs = false,
-			.source = DATA_SOURCE_SYSCALL,
-		};
-		process_data((struct pt_regs *)ctx, id, T_INGRESS, read_args,
-			     bytes_count, &extra);
+		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
 	}
 
 	active_read_args_map__delete(&id);

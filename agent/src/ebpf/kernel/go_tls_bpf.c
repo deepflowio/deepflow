@@ -111,12 +111,12 @@ int uprobe_go_tls_write_exit(struct pt_regs *ctx)
 		.buf = c->buffer,
 		.fd = c->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.tcp_seq = c->tcp_seq,
 	};
 
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_GO_TLS_UPROBE,
-		.tcp_seq = c->tcp_seq,
 		.coroutine_id = key.goid,
 	};
 
@@ -226,12 +226,12 @@ int uprobe_go_tls_read_exit(struct pt_regs *ctx)
 		.buf = c->buffer,
 		.fd = c->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.tcp_seq = c->tcp_seq,
 	};
 
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_GO_TLS_UPROBE,
-		.tcp_seq = c->tcp_seq,
 		.coroutine_id = key.goid,
 	};
 

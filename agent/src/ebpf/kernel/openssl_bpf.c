@@ -70,12 +70,12 @@ int uprobe_openssl_write_exit(struct pt_regs *ctx)
 		.buf = ssl_ctx->buf,
 		.fd = ssl_ctx->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_OPENSSL_UPROBE,
-		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
 	ssl_ctx_map__delete(&id);
@@ -124,12 +124,12 @@ int uprobe_openssl_read_exit(struct pt_regs *ctx)
 		.buf = ssl_ctx->buf,
 		.fd = ssl_ctx->fd,
 		.enter_ts = bpf_ktime_get_ns(),
+		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
 	struct process_data_extra extra = {
 		.vecs = false,
 		.source = DATA_SOURCE_OPENSSL_UPROBE,
-		.tcp_seq = ssl_ctx->tcp_seq,
 	};
 
 	ssl_ctx_map__delete(&id);
