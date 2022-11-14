@@ -183,6 +183,7 @@ var configFuns = []*ConfigBase{
 	CaptureBpfFun(),
 	CapturePacketSizeFun(),
 	CaptureSocketTypeFun(),
+	TapModeFun(),
 	DecapTypeFun(),
 	IfMacSourceFun(),
 	VmXmlPathFun(),
@@ -518,11 +519,28 @@ func CaptureSocketTypeFun() *ConfigBase {
 	}
 	return &ConfigBase{
 		Type:        "select",
-		Label:       "流量采集方式",
+		Label:       "流量采集API",
 		Data:        data,
 		Placeholder: "默认配置: 自适应",
 		Help:        "Linux环境中的流量采集方式",
 		jsonTag:     "CAPTURE_SOCKET_TYPE",
+		labelName:   basic_configuration_params_label,
+	}
+}
+
+func TapModeFun() *ConfigBase {
+	data := []Data{
+		Data{Value: 0, Label: "本地 (0)"},
+		Data{Value: 1, Label: "虚拟镜像 (1)"},
+		Data{Value: 2, Label: "物理物理 (2)"},
+	}
+	return &ConfigBase{
+		Type:        "select",
+		Label:       "流量采集方式",
+		Data:        data,
+		Placeholder: "默认配置: 本地 (0)",
+		Help:        "ESXi 采集器选择虚拟镜像，专属采集器选择物理镜像",
+		jsonTag:     "TAP_MODE",
 		labelName:   basic_configuration_params_label,
 	}
 }

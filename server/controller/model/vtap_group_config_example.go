@@ -124,6 +124,11 @@ vtap_group_id: g-xxxxxx
 ## Description: Traffic capture API in Linux environment
 #capture_socket_type: 0
 
+## Traffic Tap Mode
+## Default: 0, means local, Options: 0, 1 (mirror), 2 (physical)
+## Note: EXSi vtap choose mirror tap mode, dedicated vtap choose physical tap mode
+#tap_mode: 0
+
 ## Decapsulation Tunnel Protocols
 ## Default: [1, 3], means VXLAN and IPIP. Options: 1 (VXLAN), 2 (GRE), 3 (IPIP)
 #decap_type:
