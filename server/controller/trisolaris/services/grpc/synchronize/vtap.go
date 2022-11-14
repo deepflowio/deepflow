@@ -91,7 +91,7 @@ func (e *VTapEvent) generateConfigInfo(c *vtap.VTapCache, clusterID string) *api
 	tridentType := common.TridentType(c.GetVTapType())
 	podClusterId := uint32(c.GetPodClusterID())
 	vpcID := uint32(c.GetVPCID())
-	tapMode := api.TapMode(c.GetTapMode())
+	tapMode := api.TapMode(vtapConfig.TapMode)
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -440,6 +440,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 	npbVlanMode := api.VlanMode(vtapConfig.NpbVlanMode)
 	ifMacSource := api.IfMacSource(vtapConfig.IfMacSource)
 	captureSocketType := api.CaptureSocketType(vtapConfig.CaptureSocketType)
+	tapMode := api.TapMode(vtapConfig.TapMode)
 	configure := &api.Config{
 		CollectorEnabled:              proto.Bool(Int2Bool(vtapConfig.CollectorEnabled)),
 		CollectorSocketType:           &collectorSocketType,
@@ -492,6 +493,7 @@ func (e *VTapEvent) generateNoVTapCacheConfig(groupID string) *api.Config {
 		ExternalAgentHttpProxyPort:    proto.Uint32(uint32(vtapConfig.ExternalAgentHTTPProxyPort)),
 		AnalyzerPort:                  proto.Uint32(uint32(vtapConfig.AnalyzerPort)),
 		ProxyControllerPort:           proto.Uint32(uint32(vtapConfig.ProxyControllerPort)),
+		TapMode:                       &tapMode,
 		// 调整后采集器配置信息
 		L7LogStoreTapTypes: vtapConfig.ConvertedL7LogStoreTapTypes,
 		L4LogTapTypes:      vtapConfig.ConvertedL4LogTapTypes,

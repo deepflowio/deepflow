@@ -121,9 +121,9 @@ func (r *VTapRegister) getVTapGroupLcuuid(db *gorm.DB) string {
 
 func finishLog(dbVTap *models.VTap) {
 	log.Infof(
-		"finish register vtap (type: %d name:%s ctrl_ip: %s ctrl_mac: %s "+
+		"finish register vtap (type: %d tap_mode:%d, name:%s ctrl_ip: %s ctrl_mac: %s "+
 			"launch_server: %s launch_server_id: %d vtap_group_lcuuid: %s az: %s lcuuid: %s)",
-		dbVTap.Type, dbVTap.Name, dbVTap.CtrlIP, dbVTap.CtrlMac, dbVTap.LaunchServer,
+		dbVTap.Type, dbVTap.TapMode, dbVTap.Name, dbVTap.CtrlIP, dbVTap.CtrlMac, dbVTap.LaunchServer,
 		dbVTap.LaunchServerID, dbVTap.VtapGroupLcuuid, dbVTap.AZ, dbVTap.Lcuuid)
 }
 
@@ -223,7 +223,7 @@ func (r *VTapRegister) registerVTapByHost(db *gorm.DB) (*models.VTap, bool) {
 		Region:          vtapLKData.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
-		TapMode:         TAPMODE_LOCAL,
+		TapMode:         r.tapMode,
 		Lcuuid:          vtapLKData.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -354,7 +354,7 @@ func (r *VTapRegister) registerVTapByPodNode(db *gorm.DB) (*models.VTap, bool) {
 		Region:          vtapLKResult.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
-		TapMode:         TAPMODE_LOCAL,
+		TapMode:         r.tapMode,
 		Lcuuid:          vtapLKResult.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -479,7 +479,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 		Region:          vtapLKResult.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
-		TapMode:         TAPMODE_MIRROR,
+		TapMode:         r.tapMode,
 		Lcuuid:          vtapLKResult.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -558,7 +558,7 @@ func (r *VTapRegister) registerLocalVTapByIP(db *gorm.DB) (*models.VTap, bool) {
 		Region:          vtapLKResult.Region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
-		TapMode:         TAPMODE_LOCAL,
+		TapMode:         r.tapMode,
 		Lcuuid:          vtapLKResult.Lcuuid,
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -582,7 +582,7 @@ func (r *VTapRegister) registerVTapAnalyzerTapMode(db *gorm.DB) *models.VTap {
 		Region:          r.region,
 		VtapGroupLcuuid: r.getVTapGroupLcuuid(db),
 		State:           VTAP_STATE_PENDING,
-		TapMode:         TAPMODE_ANALYZER,
+		TapMode:         r.tapMode,
 		Lcuuid:          uuid.NewString(),
 	}
 	result := r.insertToDB(dbVTap, db)
@@ -607,6 +607,12 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 		log.Error(err)
 		return
 	}
+	vtapConfig := v.GetVTapConfigFromShortID(r.vTapGroupID)
+	if vtapConfig != nil {
+		r.tapMode = vtapConfig.TapMode
+	} else {
+		r.tapMode = DefaultTapMode
+	}
 	r.region = v.getRegion()
 	r.defaultVTapGroup = v.getDefaultVTapGroup()
 	r.vTapAutoRegister = v.getVTapAutoRegister()
@@ -614,21 +620,32 @@ func (r *VTapRegister) registerVTap(v *VTapInfo, done func()) {
 	var vtap *models.VTap
 	ok := false
 	for {
-		vtap, ok = r.registerVTapByHost(v.db)
-		if ok == true {
-			break
-		}
-		vtap, ok = r.registerVTapByPodNode(v.db)
-		if ok == true {
-			break
-		}
-		vtap, ok = r.registerLocalVTapByIP(v.db)
-		if ok == true {
-			break
-		}
-		vtap, ok = r.registerMirrorVTapByIP(v.db)
-		if ok == true {
-			break
+		switch r.tapMode {
+		case TAPMODE_LOCAL:
+			vtap, ok = r.registerVTapByHost(v.db)
+			if ok == true {
+				break
+			}
+			vtap, ok = r.registerVTapByPodNode(v.db)
+			if ok == true {
+				break
+			}
+			vtap, ok = r.registerLocalVTapByIP(v.db)
+		case TAPMODE_MIRROR:
+			vtap, ok = r.registerVTapByHost(v.db)
+			if ok == true {
+				break
+			}
+			vtap, ok = r.registerVTapByPodNode(v.db)
+			if ok == true {
+				break
+			}
+			vtap, ok = r.registerMirrorVTapByIP(v.db)
+		case TAPMODE_ANALYZER:
+			vtap = r.registerVTapAnalyzerTapMode(v.db)
+
+		default:
+			log.Errorf("unkown tap_mode(%d) from vtap(%s)", r.tapMode, r.getKey())
 		}
 		break
 	}
