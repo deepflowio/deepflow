@@ -442,6 +442,10 @@ func (c *VTapCache) GetLaunchServer() string {
 	return ""
 }
 
+func (c *VTapCache) UpdateLaunchServer(launcherServer string) {
+	c.launchServer = &launcherServer
+}
+
 func (c *VTapCache) GetLaunchServerID() int {
 	return c.launchServerID
 }
@@ -800,6 +804,9 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 			maxTime := MaxTime(vtap.SyncedAnalyzerAt, *c.GetSyncedTSDBAt())
 			c.UpdateSyncedTSDBAt(maxTime)
 		}
+	}
+	if c.GetLaunchServer() != vtap.LaunchServer {
+		c.UpdateLaunchServer(vtap.LaunchServer)
 	}
 	c.UpdateLaunchServerID(vtap.LaunchServerID)
 	if c.GetAZ() != vtap.AZ {
