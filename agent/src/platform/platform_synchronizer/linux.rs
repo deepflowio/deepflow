@@ -615,7 +615,7 @@ impl PlatformSynchronizer {
             nat_ip: None,
         };
 
-        rt.block_on(process_args.session.call_with_statsd(msg))
+        rt.block_on(process_args.session.grpc_genesis_sync_with_statsd(msg))
             .map(|r| r.into_inner().version())
     }
 
@@ -692,7 +692,7 @@ impl PlatformSynchronizer {
                     nat_ip: None,
                 };
 
-                match rt.block_on(args.session.call_with_statsd(msg)) {
+                match rt.block_on(args.session.grpc_genesis_sync_with_statsd(msg)) {
                     Ok(res) => {
                         let res = res.into_inner();
                         let remote_version = res.version();

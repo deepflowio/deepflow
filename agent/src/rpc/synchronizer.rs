@@ -755,15 +755,13 @@ impl Synchronizer {
             while running.load(Ordering::SeqCst) {
                 let version = session.get_version();
                 let response = session
-                    .call_with_statsd::<tonic::codec::Streaming<tp::SyncResponse>, _>(
-                        Synchronizer::generate_sync_request(
-                            &running_config,
-                            &static_config,
-                            &status,
-                            ntp_diff.load(Ordering::Relaxed),
-                            &exception_handler,
-                        ),
-                    )
+                    .grpc_push_with_statsd(Synchronizer::generate_sync_request(
+                        &running_config,
+                        &static_config,
+                        &status,
+                        ntp_diff.load(Ordering::Relaxed),
+                        &exception_handler,
+                    ))
                     .await;
 
                 if let Err(m) = response {
@@ -906,7 +904,7 @@ impl Synchronizer {
 
                 let ctrl_ip = running_config.read().ctrl_ip.clone();
                 let response = session
-                    .call_with_statsd(tp::NtpRequest {
+                    .grpc_query_with_statsd(tp::NtpRequest {
                         ctrl_ip: Some(ctrl_ip),
                         request: Some(ntp_msg.to_vec()),
                     })
@@ -986,7 +984,7 @@ impl Synchronizer {
         }
 
         let response = session
-            .call_with_statsd(tp::UpgradeRequest {
+            .grpc_upgrade_with_statsd(tp::UpgradeRequest {
                 ctrl_ip: Some(ctrl_ip.to_owned()),
                 ctrl_mac: Some(ctrl_mac.to_owned()),
             })
@@ -1202,7 +1200,7 @@ impl Synchronizer {
                 );
                 debug!("grpc sync request: {:?}", request);
 
-                let response = session.call_with_statsd::<tp::SyncResponse, _>(request).await;
+                let response = session.grpc_sync_with_statsd(request).await;
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
                     error!(
