@@ -302,9 +302,17 @@ func GetBasicNetworkLcuuid(vpcLcuuid string) string {
 	return common.GenerateUUID(vpcLcuuid)
 }
 
-func GetBasicVPCAndNetworks(regions []model.Region, domainName, uuidGenerate string) ([]model.VPC, []model.Network) {
+func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uuidGenerate string) ([]model.VPC, []model.Network) {
 	var retVPCs []model.VPC
 	var retNetworks []model.Network
+
+	// 没有有效区域时, 根据 regionLcuuid 生成一个参考区域
+	if len(regions) == 0 && regionLcuuid != "" {
+		regions = append(regions, model.Region{
+			Name:   "",
+			Lcuuid: regionLcuuid,
+		})
+	}
 
 	for _, region := range regions {
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, region.Lcuuid)
