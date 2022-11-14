@@ -349,7 +349,7 @@ func (k *KnowledgeGraph) FillOTel(l *L7Logger, platformData *grpc.PlatformInfoTa
 	k.fill(
 		platformData,
 		!l.IsIPv4, false, false,
-		int16(k.L3EpcID0), int16(k.L3EpcID1),
+		k.L3EpcID0, k.L3EpcID1,
 		l.IP40, l.IP41,
 		l.IP60, l.IP61,
 		0, 0,

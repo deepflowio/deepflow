@@ -636,7 +636,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 	k.fill(
 		platformData,
 		l.IsIpv6 == 1, l.IsVipInterfaceSrc == 1, l.IsVipInterfaceDst == 1,
-		int16(l.L3EpcIdSrc), int16(l.L3EpcIdDst),
+		l.L3EpcIdSrc, l.L3EpcIdDst,
 		l.IpSrc, l.IpDst,
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,

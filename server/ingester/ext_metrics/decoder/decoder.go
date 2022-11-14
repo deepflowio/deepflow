@@ -318,14 +318,14 @@ func (d *Decoder) fillExtMetricsBase(m *dbwriter.ExtMetrics, vtapID uint16, podN
 		if podInfo != nil {
 			t.PodClusterID = uint16(podInfo.PodClusterId)
 			t.PodID = podInfo.PodId
-			t.L3EpcID = int16(podInfo.EpcId)
+			t.L3EpcID = podInfo.EpcId
 			ip = net.ParseIP(podInfo.Ip)
 		}
 	} else if instance != "" {
-		t.L3EpcID = int16(d.platformData.QueryVtapEpc0(uint32(vtapID)))
+		t.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapID))
 		ip = parseIPFromInstance(instance)
 	} else if fillWithVtapId {
-		t.L3EpcID = int16(d.platformData.QueryVtapEpc0(uint32(vtapID)))
+		t.L3EpcID = d.platformData.QueryVtapEpc0(uint32(vtapID))
 		vtapInfo := d.platformData.QueryVtapInfo(uint32(vtapID))
 		if vtapInfo != nil {
 			ip = net.ParseIP(vtapInfo.Ip)
