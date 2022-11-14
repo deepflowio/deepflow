@@ -323,7 +323,12 @@ impl AnalyzerModeDispatcher {
                 }
             }
 
-            Self::prepare_flow(&mut meta_packet, tap_type, base.id as u8);
+            Self::prepare_flow(
+                &mut meta_packet,
+                tap_type,
+                base.id as u8,
+                base.npb_dedup_enabled.load(Ordering::Relaxed),
+            );
             // flowProcesser
             flow_map.inject_meta_packet(&mut meta_packet);
             let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
@@ -359,11 +364,16 @@ impl AnalyzerModeDispatcher {
         BaseDispatcher::decap_tunnel(&mut packet.to_vec(), tap_type_handler, tunnel_info, bitmap)
     }
 
-    pub(super) fn prepare_flow(meta_packet: &mut MetaPacket, tap_type: TapType, queue_hash: u8) {
+    pub(super) fn prepare_flow(
+        meta_packet: &mut MetaPacket,
+        tap_type: TapType,
+        queue_hash: u8,
+        npb_dedup: bool,
+    ) {
         let mut reset_ttl = false;
         if tap_type == TapType::Cloud {
             reset_ttl = true;
         }
-        BaseDispatcher::prepare_flow(meta_packet, tap_type, reset_ttl, queue_hash)
+        BaseDispatcher::prepare_flow(meta_packet, tap_type, reset_ttl, queue_hash, npb_dedup)
     }
 }
