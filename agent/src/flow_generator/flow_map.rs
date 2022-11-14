@@ -207,6 +207,9 @@ impl FlowMap {
                 // 超时Flow将被删除然后把统计信息发送队列下游
                 time_set.remove(&time_key);
                 self.node_removed_aftercare(node, timeout, None);
+                if nodes.is_empty() {
+                    node_map.remove(&time_key.map_key);
+                }
                 continue;
             }
             // 未超时Flow的统计信息发送到队列下游
