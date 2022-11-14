@@ -242,7 +242,7 @@ type Field struct {
 	IP6             net.IP // FIXME: 合并IP6和IP
 	MAC             uint64
 	IP              uint32
-	L3EpcID         int16 // (8B)
+	L3EpcID         int32 // (8B)
 	L3DeviceID      uint32
 	L3DeviceType    DeviceType
 	RegionID        uint16
@@ -265,7 +265,7 @@ type Field struct {
 	MAC1             uint64
 	IP61             net.IP // FIXME: 合并IP61和IP1
 	IP1              uint32
-	L3EpcID1         int16 // (8B)
+	L3EpcID1         int32 // (8B)
 	L3DeviceID1      uint32
 	L3DeviceType1    DeviceType // (+1B=8B)
 	RegionID1        uint16
@@ -499,12 +499,9 @@ func unmarshalUint16WithSpecialID(s string) (int16, error) {
 	return int16(i), nil
 }
 
-func marshalInt32WithSpecialID(v int16) int32 {
-	switch v {
-	case ID_OTHER:
-		fallthrough
-	case ID_INTERNET:
-		return int32(v)
+func MarshalInt32WithSpecialID(v int32) int32 {
+	if v > 0 || v == ID_OTHER || v == ID_INTERNET {
+		return v
 	}
 	return int32(uint64(v) & math.MaxUint16)
 }
@@ -632,13 +629,13 @@ func (t *Tag) MarshalTo(b []byte) int {
 	}
 	if t.Code&L3EpcID != 0 {
 		offset += copy(b[offset:], ",l3_epc_id=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
+		offset += copy(b[offset:], strconv.FormatInt(int64(t.L3EpcID), 10))
 	}
 	if t.Code&L3EpcIDPath != 0 {
 		offset += copy(b[offset:], ",l3_epc_id_0=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID))
+		offset += copy(b[offset:], strconv.FormatInt(int64(t.L3EpcID), 10))
 		offset += copy(b[offset:], ",l3_epc_id_1=")
-		offset += copy(b[offset:], marshalUint16WithSpecialID(t.L3EpcID1))
+		offset += copy(b[offset:], strconv.FormatInt(int64(t.L3EpcID1), 10))
 	}
 	if t.Code&L7Protocol != 0 {
 		offset += copy(b[offset:], ",l7_protocol=")
@@ -1195,16 +1192,16 @@ func (t *Tag) WriteBlock(block *ckdb.Block, time uint32) error {
 	}
 
 	if code&L3EpcID != 0 {
-		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID)); err != nil {
+		if err := block.WriteInt32(t.L3EpcID); err != nil {
 			return err
 		}
 	}
 	if code&L3EpcIDPath != 0 {
-		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID)); err != nil {
+		if err := block.WriteInt32(t.L3EpcID); err != nil {
 			return err
 		}
 
-		if err := block.WriteInt32(marshalInt32WithSpecialID(t.L3EpcID1)); err != nil {
+		if err := block.WriteInt32(t.L3EpcID1); err != nil {
 			return err
 		}
 	}
@@ -1507,8 +1504,9 @@ func (t *Tag) ReadFromPB(p *pb.MiniTag) {
 	}
 	t.MAC = p.Field.Mac
 	t.MAC1 = p.Field.Mac1
-	t.L3EpcID = int16(p.Field.L3EpcId)
-	t.L3EpcID1 = int16(p.Field.L3EpcId1)
+	// The range of EPC ID is [-2,65533], if EPC ID < -2 needs to be transformed into the range.
+	t.L3EpcID = MarshalInt32WithSpecialID(p.Field.L3EpcId)
+	t.L3EpcID1 = MarshalInt32WithSpecialID(p.Field.L3EpcId1)
 	t.Direction = DirectionEnum(p.Field.Direction)
 	t.TAPSide = TAPSideEnum(p.Field.TapSide)
 	t.Protocol = layers.IPProtocol(p.Field.Protocol)

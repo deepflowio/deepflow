@@ -56,7 +56,7 @@ func RegisterCountableForIngester(name string, countable stats.Countable, opts .
 }
 
 // 如果通过MAC匹配平台信息失败，则需要通过IP再获取, 解决工单122/126问题
-func RegetInfoFromIP(isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int16, platformData *grpc.PlatformInfoTable) *grpc.Info {
+func RegetInfoFromIP(isIPv6 bool, ip6 net.IP, ip4 uint32, epcID int32, platformData *grpc.PlatformInfoTable) *grpc.Info {
 	if isIPv6 {
 		return platformData.QueryIPV6Infos(epcID, ip6)
 	} else {
@@ -75,7 +75,7 @@ const (
 	ServiceType  = 102
 )
 
-func GetResourceGl0(podID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int16) (uint32, uint8) {
+func GetResourceGl0(podID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
 	if podID > 0 {
 		return podID, PodType
 	} else if podNodeID > 0 {
@@ -89,7 +89,7 @@ func GetResourceGl0(podID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3E
 	return 0, IpType
 }
 
-func GetResourceGl1(podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int16) (uint32, uint8) {
+func GetResourceGl1(podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
 	if podGroupID > 0 {
 		return podGroupID, PodGroupType
 	} else if podNodeID > 0 {
@@ -102,7 +102,7 @@ func GetResourceGl1(podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8
 	return 0, IpType
 }
 
-func GetResourceGl2(serviceID, podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int16) (uint32, uint8) {
+func GetResourceGl2(serviceID, podGroupID, podNodeID, l3DeviceID uint32, l3DeviceType uint8, l3EpcID int32) (uint32, uint8) {
 	if serviceID > 0 {
 		return serviceID, ServiceType
 	}
