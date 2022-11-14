@@ -20,7 +20,6 @@ import (
 	"github.com/deepflowys/deepflow/server/ingester/event/common"
 	"github.com/deepflowys/deepflow/server/libs/ckdb"
 	"github.com/deepflowys/deepflow/server/libs/pool"
-	"github.com/deepflowys/deepflow/server/libs/zerodoc"
 )
 
 const (
@@ -93,7 +92,7 @@ func (e *EventStore) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(e.AZID); err != nil {
 		return err
 	}
-	if err := block.WriteInt32(zerodoc.MarshalInt32WithSpecialID(int16(e.L3EpcID))); err != nil {
+	if err := block.WriteInt32(e.L3EpcID); err != nil {
 		return err
 	}
 	if err := block.WriteUInt16(e.HostID); err != nil {
