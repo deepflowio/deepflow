@@ -371,7 +371,7 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 	for _, host := range hosts {
 		vinterfaces, ok := hostIPToVInterfaces[host.IP]
 		if !ok {
-			log.Debugf("no ip in host (%s) response", host.Name)
+			log.Debugf("no ip in host (%s) response", host.IP)
 			continue
 		}
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, host.RegionLcuuid)
@@ -390,15 +390,19 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 				continue
 			}
 
+			if vinterface.IPs == "" {
+				log.Debugf("vinterface name (%s) not found ips", vinterface.Name)
+				continue
+			}
+
 			vinterfaceLcuuid := common.GenerateUUID(host.Lcuuid + vinterface.Mac)
 			ips := strings.Split(vinterface.IPs, ",")
 			for _, ip := range ips {
-				if ip == host.IP {
-					includeHostIP = true
-				}
-
 				subnetLcuuid := ""
 				ipMasks := strings.Split(ip, "/")
+				if ipMasks[0] == host.IP {
+					includeHostIP = true
+				}
 				ipAddr := netaddr.IP{}
 				ipMask := strconv.Itoa(common.IPV4_MAX_MASK)
 				if strings.Contains(ip, ":") {
