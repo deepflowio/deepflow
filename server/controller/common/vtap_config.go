@@ -61,6 +61,7 @@ var DefaultVTapGroupConfig = &mysql.VTapGroupConfiguration{
 	L7LogStoreTapTypes:            &L7LogStoreTapTypes,
 	CaptureSocketType:             &CaptureSocketType,
 	CaptureBpf:                    &CaptureBpf,
+	TapMode:                       &TapMode,
 	ThreadThreshold:               &ThreadThreshold,
 	ProcessThreshold:              &ProcessThreshold,
 	NtpEnabled:                    &NtpEnabled,
@@ -122,6 +123,7 @@ var (
 	L7LogStoreTapTypes            = "0"
 	CaptureSocketType             = 0
 	CaptureBpf                    = ""
+	TapMode                       = 0
 	ThreadThreshold               = 500
 	ProcessThreshold              = 10
 	NtpEnabled                    = 1
