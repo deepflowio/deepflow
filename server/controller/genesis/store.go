@@ -120,6 +120,9 @@ func (s *SyncStorage) Update(data GenesisSyncDataOperation, vtapID uint32) {
 		s.genesisSyncInfo.Vinterfaces.Update(data.Vinterfaces.Fetch(), now)
 	}
 	if updateFlag && vtapID != 0 {
+		// push immediately after update
+		s.fetch()
+
 		var storages []model.GenesisStorage
 		mysql.Db.Where("vtap_id = ?", vtapID).Find(&storages)
 		if len(storages) > 0 {
