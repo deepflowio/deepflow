@@ -30,6 +30,7 @@ var log = logging.MustGetLogger("pool")
 type Option = interface{}
 type OptionPoolSizePerCPU int
 type OptionInitFullPoolSize int // 太大会导致Get操作卡顿，太小会导致创建过多的slice
+type OptionCounterNameSuffix string
 
 const OPTIMAL_BLOCK_SIZE = 1 << 16
 const POOL_SIZE_PER_CPU = OptionPoolSizePerCPU(256)
@@ -118,11 +119,14 @@ func NewLockFreePool(alloc func() interface{}, options ...Option) *LockFreePool 
 	// options
 	poolSizePerCPU := POOL_SIZE_PER_CPU
 	initFullPoolSize := INIT_FULL_POOL_SIZE
+	counterNameSuffix := ""
 	for _, opt := range options {
 		if size, ok := opt.(OptionPoolSizePerCPU); ok {
 			poolSizePerCPU = size
 		} else if size, ok := opt.(OptionInitFullPoolSize); ok {
 			initFullPoolSize = size
+		} else if suffixName, ok := opt.(OptionCounterNameSuffix); ok {
+			counterNameSuffix = string(suffixName)
 		}
 	}
 	if poolSizePerCPU < OptionPoolSizePerCPU(initFullPoolSize) || initFullPoolSize <= 0 {
@@ -154,7 +158,7 @@ func NewLockFreePool(alloc func() interface{}, options ...Option) *LockFreePool 
 
 	// counter
 	counter := &Counter{
-		Name:             objectType.String(),
+		Name:             objectType.String() + counterNameSuffix,
 		ObjectSize:       objectSize,
 		PoolSizePerCPU:   uint32(poolSizePerCPU),
 		InitFullPoolSize: uint32(initFullPoolSize),
