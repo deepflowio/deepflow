@@ -25,7 +25,6 @@ pub(crate) mod lru;
 pub(crate) mod possible_host;
 pub(crate) mod process;
 pub(crate) mod stats;
-pub(crate) mod time;
 
 pub use public::bytes;
 

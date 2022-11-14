@@ -546,7 +546,7 @@ impl ApiWatcher {
 
         match context
             .runtime
-            .block_on(session.call_with_statsd(msg.clone()))
+            .block_on(session.grpc_kubernetes_api_sync_with_statsd(msg.clone()))
         {
             Ok(resp) => {
                 if has_update {
@@ -594,7 +594,10 @@ impl ApiWatcher {
             Self::debug_k8s_request(&msg, true);
         }
 
-        if let Err(e) = context.runtime.block_on(session.call_with_statsd(msg)) {
+        if let Err(e) = context
+            .runtime
+            .block_on(session.grpc_kubernetes_api_sync_with_statsd(msg))
+        {
             let err = format!("kubernetes_api_sync grpc call failed: {}", e);
             exception_handler.set(Exception::ControllerSocketError);
             error!("{}", err);
@@ -650,7 +653,10 @@ impl ApiWatcher {
                         error_msg: Some(e.to_string()),
                         entries: vec![],
                     };
-                    if let Err(e) = context.runtime.block_on(session.call_with_statsd(msg)) {
+                    if let Err(e) = context
+                        .runtime
+                        .block_on(session.grpc_kubernetes_api_sync_with_statsd(msg))
+                    {
                         debug!("kubernetes_api_sync grpc call failed: {}", e);
                     }
                 }

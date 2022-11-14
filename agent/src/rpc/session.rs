@@ -19,21 +19,19 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Weak,
 };
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use log::{error, info};
 use parking_lot::RwLock;
 use rand::Rng;
 use tonic::transport::{Channel, Endpoint};
 
-use super::{GrpcCallCounter, GrpcWrapper};
-
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
 use crate::exception::ExceptionHandler;
 use crate::proto::trident::{self, Exception};
-use crate::utils::stats::{self, StatsOption};
+use crate::utils::stats::{self, AtomicTimeStats, StatsOption};
 
-use public::counter::{Countable, RefCountable};
+use public::counter::{Countable, Counter, CounterType, CounterValue, RefCountable};
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 // Sessions in use occasionally timeout for 60 seconds, The
@@ -42,7 +40,7 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 // 使用中会话偶尔会超时60秒，这里调整超时时间需要大于60秒
 pub const SESSION_TIMEOUT: Duration = Duration::from_secs(120);
 
-const GRPC_CALL_NAMES: [&str; 7] = [
+const GRPC_CALL_ENDPOINTS: [&str; 7] = [
     "push",
     "query",
     "upgrade",
@@ -51,6 +49,14 @@ const GRPC_CALL_NAMES: [&str; 7] = [
     "kubernetes_api_sync",
     "get_kubernetes_cluster_id",
 ];
+
+const PUSH_ENDPOINT: usize = 0;
+const QUERY_ENDPOINT: usize = 1;
+const UPGRADE_ENDPOINT: usize = 2;
+const SYNC_ENDPOINT: usize = 3;
+const GENESIS_SYNC_ENDPOINT: usize = 4;
+const KUBERNETES_API_SYNC_ENDPOINT: usize = 5;
+const GET_KUBERNETES_CLUSTER_ID_ENDPOINT: usize = 6;
 
 struct Config {
     port: u16,
@@ -101,7 +107,7 @@ pub struct Session {
     version: AtomicU64,
     client: RwLock<Option<Channel>>,
     exception_handler: ExceptionHandler,
-    counters: Vec<(&'static str, Arc<GrpcCallCounter>)>,
+    counters: Vec<Arc<GrpcCallCounter>>,
 }
 
 impl Session {
@@ -114,16 +120,19 @@ impl Session {
         exception_handler: ExceptionHandler,
         stats_collector: &stats::Collector,
     ) -> Session {
-        let counters = GRPC_CALL_NAMES
-            .iter()
-            .map(|&grpc| (grpc, Arc::new(GrpcCallCounter::default())))
+        let counters = (0..GRPC_CALL_ENDPOINTS.len())
+            .into_iter()
+            .map(|_| Arc::new(GrpcCallCounter::default()))
             .collect::<Vec<_>>();
 
-        for (name, counter) in counters.iter() {
+        for (endpoint, counter) in counters.iter().enumerate() {
             stats_collector.register_countable(
                 "grpc_call",
                 Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
-                vec![StatsOption::Tag("name", name.to_string())],
+                vec![StatsOption::Tag(
+                    "endpoint",
+                    GRPC_CALL_ENDPOINTS[endpoint].to_string(),
+                )],
             );
         }
 
@@ -233,10 +242,11 @@ impl Session {
         self.reset_session.store(true, Ordering::Relaxed);
     }
 
-    pub async fn call_with_statsd<Response, Request: GrpcWrapper<Response>>(
+    pub async fn grpc_push_with_statsd(
         &self,
-        request: Request,
-    ) -> Result<tonic::Response<Response>, tonic::Status> {
+        request: trident::SyncRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<trident::SyncResponse>>, tonic::Status>
+    {
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -245,14 +255,20 @@ impl Session {
                 return Err(tonic::Status::cancelled("grpc client not connected"));
             }
         };
-        let client = trident::synchronizer_client::SynchronizerClient::new(client);
-        request.call_with_statsd(client, &self.counters).await
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        let now = Instant::now();
+        let response = client.push(request).await;
+        let now_elapsed = now.elapsed();
+        self.counters[PUSH_ENDPOINT].delay.update(now_elapsed);
+        response
     }
 
-    pub async fn call<Response, Request: GrpcWrapper<Response>>(
+    async fn grpc_sync_inner(
         &self,
-        request: Request,
-    ) -> Result<tonic::Response<Response>, tonic::Status> {
+        request: trident::SyncRequest,
+        with_statsd: bool,
+    ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
         self.update_current_server().await;
         let client = match self.get_client() {
             Some(c) => c,
@@ -261,8 +277,144 @@ impl Session {
                 return Err(tonic::Status::cancelled("grpc client not connected"));
             }
         };
-        let client = trident::synchronizer_client::SynchronizerClient::new(client);
-        request.call(client).await
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        if with_statsd {
+            client.sync(request).await
+        } else {
+            let now = Instant::now();
+            let response = client.sync(request).await;
+            let now_elapsed = now.elapsed();
+            self.counters[SYNC_ENDPOINT].delay.update(now_elapsed);
+            response
+        }
+    }
+
+    // Not recommended, only used by debugger
+    pub async fn grpc_sync(
+        &self,
+        request: trident::SyncRequest,
+    ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
+        self.grpc_sync_inner(request, false).await
+    }
+
+    pub async fn grpc_sync_with_statsd(
+        &self,
+        request: trident::SyncRequest,
+    ) -> Result<tonic::Response<trident::SyncResponse>, tonic::Status> {
+        self.grpc_sync_inner(request, true).await
+    }
+
+    pub async fn grpc_upgrade_with_statsd(
+        &self,
+        request: trident::UpgradeRequest,
+    ) -> Result<tonic::Response<tonic::codec::Streaming<trident::UpgradeResponse>>, tonic::Status>
+    {
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        let now = Instant::now();
+        let response = client.upgrade(request).await;
+        let now_elapsed = now.elapsed();
+        self.counters[UPGRADE_ENDPOINT].delay.update(now_elapsed);
+        response
+    }
+
+    pub async fn grpc_query_with_statsd(
+        &self,
+        request: trident::NtpRequest,
+    ) -> Result<tonic::Response<trident::NtpResponse>, tonic::Status> {
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        let now = Instant::now();
+        let response = client.query(request).await;
+        let now_elapsed = now.elapsed();
+        self.counters[QUERY_ENDPOINT].delay.update(now_elapsed);
+        response
+    }
+
+    pub async fn grpc_genesis_sync_with_statsd(
+        &self,
+        request: trident::GenesisSyncRequest,
+    ) -> Result<tonic::Response<trident::GenesisSyncResponse>, tonic::Status> {
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        let now = Instant::now();
+        let response = client.genesis_sync(request).await;
+        let now_elapsed = now.elapsed();
+        self.counters[GENESIS_SYNC_ENDPOINT]
+            .delay
+            .update(now_elapsed);
+        response
+    }
+
+    pub async fn grpc_kubernetes_api_sync_with_statsd(
+        &self,
+        request: trident::KubernetesApiSyncRequest,
+    ) -> Result<tonic::Response<trident::KubernetesApiSyncResponse>, tonic::Status> {
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        let now = Instant::now();
+        let response = client.kubernetes_api_sync(request).await;
+        let now_elapsed = now.elapsed();
+        self.counters[KUBERNETES_API_SYNC_ENDPOINT]
+            .delay
+            .update(now_elapsed);
+        response
+    }
+
+    pub async fn grpc_get_kubernetes_cluster_id_with_statsd(
+        &self,
+        request: trident::KubernetesClusterIdRequest,
+    ) -> Result<tonic::Response<trident::KubernetesClusterIdResponse>, tonic::Status> {
+        self.update_current_server().await;
+        let client = match self.get_client() {
+            Some(c) => c,
+            None => {
+                self.set_request_failed(true);
+                return Err(tonic::Status::cancelled("grpc client not connected"));
+            }
+        };
+        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
+
+        let now = Instant::now();
+        let response = client.get_kubernetes_cluster_id(request).await;
+        let now_elapsed = now.elapsed();
+        self.counters[GET_KUBERNETES_CLUSTER_ID_ENDPOINT]
+            .delay
+            .update(now_elapsed);
+        response
     }
 }
 
@@ -423,5 +575,36 @@ impl ServerIp {
                 false
             }
         }
+    }
+}
+
+#[derive(Default)]
+pub struct GrpcCallCounter {
+    pub delay: AtomicTimeStats,
+}
+
+impl RefCountable for GrpcCallCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        vec![
+            (
+                "max_delay",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.delay.max_nanos.swap(0, Ordering::Relaxed) / 1000),
+            ),
+            (
+                "avg_delay",
+                CounterType::Gauged,
+                CounterValue::Unsigned(
+                    (self.delay.sum_nanos.swap(0, Ordering::Relaxed)
+                        / self.delay.count.load(Ordering::Relaxed) as u64)
+                        as u64,
+                ),
+            ),
+            (
+                "delay_count",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.delay.count.swap(0, Ordering::Relaxed) as u64),
+            ),
+        ]
     }
 }

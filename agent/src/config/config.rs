@@ -133,7 +133,10 @@ impl Config {
                 ca_md5: ca_md5.clone(),
             };
 
-            match session.call_with_statsd(request).await {
+            match session
+                .grpc_get_kubernetes_cluster_id_with_statsd(request)
+                .await
+            {
                 Ok(response) => {
                     let cluster_id_response = response.into_inner();
                     if !cluster_id_response.error_msg().is_empty() {
