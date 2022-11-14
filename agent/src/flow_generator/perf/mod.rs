@@ -141,6 +141,15 @@ impl FlowPerf {
         }
     }
 
+    fn get_rrt(&mut self) -> u64 {
+        if let Some(perf) = self.l7.as_mut() {
+            if let Some((head, _)) = perf.app_proto_head() {
+                return head.rrt;
+            }
+        }
+        0
+    }
+
     fn is_skip_l7_protocol_parse(&self, proto: &L7ProtocolParser, port: u16) -> bool {
         if self.protocol_bitmap.is_disabled(proto.protocol()) {
             return true;
@@ -242,18 +251,25 @@ impl FlowPerf {
         return Err(Error::L7ProtocolUnknown);
     }
 
+    // TODO 目前rrt由perf计算， 用于聚合时计算slot，后面perf 抽象出来后，将去掉perf，rrt由log parser计算
+    // =======================================================================================
+    // TODO now rrt is calculate by perf parse, use for calculate slot index on session merge.
+    // when log parse implement perf parse, rrt will calculate from log parse.
     fn l7_parse(
         &mut self,
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if self.l7.is_some() {
             self.l7_parse_perf(packet, flow_id, app_table)?;
         }
 
         if self.l7_protocol_log_parser.is_some() {
-            return self.l7_parse_log(packet, app_table, &ParseParam::from(packet));
+            return Ok((
+                self.l7_parse_log(packet, app_table, &ParseParam::from(packet))?,
+                self.get_rrt(),
+            ));
         }
 
         if self.is_from_app {
@@ -264,7 +280,7 @@ impl FlowPerf {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        return self.l7_check(packet, flow_id, app_table);
+        return Ok((self.l7_check(packet, flow_id, app_table)?, self.get_rrt()));
     }
 
     pub fn new(
@@ -323,7 +339,7 @@ impl FlowPerf {
         l4_performance_enabled: bool,
         l7_performance_enabled: bool,
         app_table: &mut AppTable,
-    ) -> Result<Vec<L7ProtocolInfo>> {
+    ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if l4_performance_enabled {
             self.l4.parse(packet, is_first_packet_direction)?;
         }
@@ -331,7 +347,7 @@ impl FlowPerf {
             // 抛出错误由flowMap.FlowPerfCounter处理
             return self.l7_parse(packet, flow_id, app_table);
         }
-        Ok(vec![])
+        Ok((vec![], 0))
     }
 
     pub fn copy_and_reset_perf_data(
