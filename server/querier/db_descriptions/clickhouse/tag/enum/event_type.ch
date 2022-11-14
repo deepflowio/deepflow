@@ -1,5 +1,5 @@
 # Value         , DisplayName
-create          , 增加
+create          , 创建/同步
 delete          , 删除
 update-state    , 状态改变
 migrate         , 迁移
