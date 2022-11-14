@@ -307,6 +307,7 @@ impl MirrorModeDispatcher {
         counter: &Arc<PacketCounter>,
         trident_type: TridentType,
         mac: u32,
+        npb_dedup: bool,
     ) -> Result<()> {
         let pipeline = Self::get_pipeline(updated, pipelines, key, id, handler_builder, timestamp);
         if timestamp
@@ -340,6 +341,7 @@ impl MirrorModeDispatcher {
             id as u8,
             trident_type,
             mac,
+            npb_dedup,
         );
         // flowProcesser
         flow_map.inject_meta_packet(&mut meta_packet);
@@ -459,6 +461,7 @@ impl MirrorModeDispatcher {
                     &self.base.counter,
                     trident_type,
                     self.mac,
+                    self.base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
                 continue;
             }
@@ -480,6 +483,7 @@ impl MirrorModeDispatcher {
                     &self.base.counter,
                     trident_type,
                     self.mac,
+                    self.base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
             }
             if dst_local {
@@ -499,6 +503,7 @@ impl MirrorModeDispatcher {
                     &self.base.counter,
                     trident_type,
                     self.mac,
+                    self.base.npb_dedup_enabled.load(Ordering::Relaxed),
                 );
             }
         }
@@ -514,6 +519,7 @@ impl MirrorModeDispatcher {
         queue_hash: u8,
         trident_type: TridentType,
         mac: u32,
+        npb_dedup: bool,
     ) {
         if is_tt_hyper_v_compute(trident_type) {
             meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, mac);
@@ -521,7 +527,7 @@ impl MirrorModeDispatcher {
             meta_packet.tap_port = TapPort::from_local_mac(tunnel_type, key);
         }
 
-        BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash)
+        BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash, npb_dedup)
     }
 }
 

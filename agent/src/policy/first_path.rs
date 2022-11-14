@@ -571,7 +571,7 @@ impl FirstPath {
         self.fast.add_policy(key, &policy, endpoints);
 
         policy.format_npb_action();
-        if key.has_feature_flag(FeatureFlags::DEDUP) {
+        if key.feature_flag.contains(FeatureFlags::DEDUP) {
             policy.dedup(key);
         }
 
@@ -586,7 +586,7 @@ impl FirstPath {
             return None;
         }
         if let Some((policy, endpoints)) = self.fast.get_policy(key) {
-            if key.has_feature_flag(FeatureFlags::DEDUP) {
+            if key.feature_flag.contains(FeatureFlags::DEDUP) {
                 let mut policy = PolicyData {
                     acl_id: policy.acl_id,
                     action_flags: policy.action_flags,

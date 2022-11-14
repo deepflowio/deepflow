@@ -248,7 +248,13 @@ impl LocalModeDispatcher {
                 base.tunnel_info.tunnel_type,
                 u64::from(pipeline.vm_mac) as u32,
             );
-            BaseDispatcher::prepare_flow(&mut meta_packet, TapType::Cloud, false, base.id as u8);
+            BaseDispatcher::prepare_flow(
+                &mut meta_packet,
+                TapType::Cloud,
+                false,
+                base.id as u8,
+                base.npb_dedup_enabled.load(Ordering::Relaxed),
+            );
             flow_map.inject_meta_packet(&mut meta_packet);
             let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
             for h in pipeline.handlers.iter_mut() {

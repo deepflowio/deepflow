@@ -803,6 +803,7 @@ impl DispatcherBuilder {
                 .take()
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
             netns,
+            npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
         };
         collector.register_countable(
             "dispatcher",

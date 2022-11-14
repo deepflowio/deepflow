@@ -46,6 +46,7 @@ use crate::platform::GenericPoller;
 use crate::{
     common::{
         decapsulate::{TunnelInfo, TunnelType, TunnelTypeBitmap},
+        endpoint::FeatureFlags,
         enums::{EthernetType, TapType},
         MetaPacket, TaggedFlow, TapTyper, DEFAULT_CONTROLLER_PORT, DEFAULT_INGESTER_PORT,
         ETH_HEADER_SIZE, FIELD_OFFSET_ETH_TYPE, VLAN_HEADER_SIZE, VLAN_ID_MASK,
@@ -111,6 +112,8 @@ pub(super) struct BaseDispatcher {
     pub(super) exception_handler: ExceptionHandler,
     pub(super) ntp_diff: Arc<AtomicI64>,
 
+    pub(super) npb_dedup_enabled: Arc<AtomicBool>,
+
     // Enterprise Edition Feature: packet-sequence
     pub(super) packet_sequence_output_queue:
         DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>,
@@ -124,7 +127,12 @@ impl BaseDispatcher {
         tap_type: TapType,
         reset_ttl: bool,
         queue_hash: u8,
+        npb_dedup_enabled: bool,
     ) {
+        meta_packet
+            .lookup_key
+            .feature_flag
+            .set(FeatureFlags::DEDUP, npb_dedup_enabled);
         meta_packet.lookup_key.tap_type = tap_type;
         meta_packet.reset_ttl = reset_ttl;
         meta_packet.queue_hash = queue_hash;
@@ -150,6 +158,7 @@ impl BaseDispatcher {
             tunnel_type_bitmap: self.tunnel_type_bitmap.clone(),
             handler_builders: self.handler_builder.clone(),
             netns: self.netns.clone(),
+            npb_dedup_enabled: self.npb_dedup_enabled.clone(),
         }
     }
 
@@ -608,6 +617,7 @@ pub(super) struct BaseDispatcherListener {
     #[cfg(target_os = "linux")]
     pub platform_poller: Arc<GenericPoller>,
     pub tunnel_type_bitmap: Arc<Mutex<TunnelTypeBitmap>>,
+    pub npb_dedup_enabled: Arc<AtomicBool>,
     capture_bpf: String,
     proxy_controller_ip: IpAddr,
     analyzer_ip: IpAddr,
@@ -672,11 +682,19 @@ impl BaseDispatcherListener {
         mem::drop(bpf_options);
     }
 
+    fn on_npb_dedup_change(&mut self, config: &DispatcherConfig) {
+        if config.npb_dedup_enabled != self.npb_dedup_enabled.load(Ordering::Relaxed) {
+            info!("Npb dedup change to {}", config.npb_dedup_enabled);
+            self.npb_dedup_enabled.store(config.npb_dedup_enabled, Ordering::Relaxed)
+        }
+    }
+
     pub(super) fn on_config_change(&mut self, config: &DispatcherConfig) {
         #[cfg(target_os = "linux")]
         self.on_afpacket_change(config);
         self.on_decap_type_change(config);
         self.on_bpf_change(config);
+        self.on_npb_dedup_change(config);
     }
 
     pub(super) fn on_vm_change(&self, keys: &[u32], vm_macs: &[MacAddr]) {
