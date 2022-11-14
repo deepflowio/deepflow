@@ -51,10 +51,10 @@ func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType, resourceName str
 
 	// put
 	err := e.Queue.Put(event)
+	log.Infof("put %s event: %+v into shared queue", e.resourceType, event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(e.resourceType, err))
 	}
-	log.Infof("put %s event: %+v into shared queue", e.resourceType, event)
 }
 
 type EventProducer[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] interface {

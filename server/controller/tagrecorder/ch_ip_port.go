@@ -107,67 +107,67 @@ func (i *ChIPPort) generatePortPodServiceData(keyToItem map[PortIPKey]mysql.ChIP
 	var podGroupPorts []mysql.PodGroupPort
 	var ipResources []mysql.WANIP
 	var networks []mysql.Network
-	err := mysql.Db.Find(&podServices).Error
+	err := mysql.Db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&vInterfaceIPs).Error
+	err = mysql.Db.Unscoped().Find(&vInterfaceIPs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD_SERVICE).Find(&podServiceVInterfaces).Error
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD_SERVICE).Unscoped().Find(&podServiceVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD_NODE).Find(&podNodeVInterfaces).Error
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD_NODE).Unscoped().Find(&podNodeVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_VM).Find(&vmVInterfaces).Error
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_VM).Unscoped().Find(&vmVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD).Find(&podVInterfaces).Error
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_POD).Unscoped().Find(&podVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&vmPodNodeConnections).Error
+	err = mysql.Db.Unscoped().Find(&vmPodNodeConnections).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&podServicePorts).Error
+	err = mysql.Db.Unscoped().Find(&podServicePorts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&podNodes).Error
+	err = mysql.Db.Unscoped().Find(&podNodes).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&pods).Error
+	err = mysql.Db.Unscoped().Find(&pods).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&podGroupPorts).Error
+	err = mysql.Db.Unscoped().Find(&podGroupPorts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&ipResources).Error
+	err = mysql.Db.Unscoped().Find(&ipResources).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&networks).Error
+	err = mysql.Db.Unscoped().Find(&networks).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
@@ -349,42 +349,48 @@ func (i *ChIPPort) generatePortPodServiceData(keyToItem map[PortIPKey]mysql.ChIP
 func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bool {
 	var vInterfaceIPs []mysql.LANIP
 	var lbVInterfaces []mysql.VInterface
+	var vmVInterfaces []mysql.VInterface
 	var ipResources []mysql.WANIP
 	var lbs []mysql.LB
 	var lbListeners []mysql.LBListener
 	var networks []mysql.Network
 	var lbTargetServers []mysql.LBTargetServer
-	err := mysql.Db.Find(&vInterfaceIPs).Error
+	err := mysql.Db.Unscoped().Find(&vInterfaceIPs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&ipResources).Error
+	err = mysql.Db.Unscoped().Find(&ipResources).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_LB).Find(&lbVInterfaces).Error
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_LB).Unscoped().Find(&lbVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&lbs).Error
+	err = mysql.Db.Where("devicetype = ?", common.VIF_DEVICE_TYPE_VM).Unscoped().Find(&vmVInterfaces).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&lbListeners).Error
+	err = mysql.Db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&networks).Error
+	err = mysql.Db.Unscoped().Find(&lbListeners).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
 	}
-	err = mysql.Db.Find(&lbTargetServers).Error
+	err = mysql.Db.Unscoped().Find(&networks).Error
+	if err != nil {
+		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
+		return false
+	}
+	err = mysql.Db.Unscoped().Find(&lbTargetServers).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(i.resourceTypeName, err))
 		return false
@@ -398,11 +404,13 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 	ipResourceIPToSubnetIDs := make(map[string][]int)
 	for _, vInterfaceIP := range vInterfaceIPs {
 		vInterfaceIPToSubnetIDs[vInterfaceIP.IP] = append(vInterfaceIPToSubnetIDs[vInterfaceIP.IP], vInterfaceIP.NetworkID)
+	}
+	for _, vmVInterface := range vmVInterfaces {
 		for _, ipResource := range ipResources {
-			if vInterfaceIP.ID != ipResource.VInterfaceID {
+			if vmVInterface.ID != ipResource.VInterfaceID {
 				continue
 			}
-			ipResourceIPToSubnetIDs[ipResource.IP] = append(ipResourceIPToSubnetIDs[ipResource.IP], vInterfaceIP.NetworkID)
+			ipResourceIPToSubnetIDs[ipResource.IP] = append(ipResourceIPToSubnetIDs[ipResource.IP], vmVInterface.NetworkID)
 		}
 	}
 	for _, lbVInterface := range lbVInterfaces {
@@ -472,7 +480,6 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 			lanSubnetIDs := vInterfaceIPToSubnetIDs[lbTargetServer.IP]
 			for _, lanSubnetID := range lanSubnetIDs {
 				if lanSubnetID == network.ID {
-					log.Infof("lan %s:%d", lbTargetServer.IP, lanSubnetID)
 					isData = true
 					break
 				}
@@ -481,7 +488,6 @@ func (i *ChIPPort) generatePortLBData(keyToItem map[PortIPKey]mysql.ChIPPort) bo
 				wanSubnetIDs := ipResourceIPToSubnetIDs[lbTargetServer.IP]
 				for _, wanSubnetID := range wanSubnetIDs {
 					if wanSubnetID == network.ID {
-						log.Infof("wan %s:%d", lbTargetServer.IP, wanSubnetID)
 						isData = true
 						break
 					}

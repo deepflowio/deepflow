@@ -56,7 +56,6 @@ OBJS := user/elf.o \
 
 STATIC_OBJS := $(addprefix $(STATIC_OBJDIR)/,$(OBJS))
 CFLAGS ?= -std=gnu99 -g -O2 -ffunction-sections -fdata-sections -fPIC -fno-omit-frame-pointer -Wall -Wno-sign-compare -Wno-unused-parameter -Wno-missing-field-initializers
-
 # '-Wformat-truncation' : The warning was added in gcc7.1
 GCC_VER_GTE71 := $(shell echo `gcc --version | grep ^gcc | cut -f3 -d' '|cut -f1-2 -d.` \>= 7.1 | sed -e 's/\./*100+/g' | bc )
 ifeq ($(GCC_VER_GTE71),1)

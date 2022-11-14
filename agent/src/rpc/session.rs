@@ -21,6 +21,7 @@ use std::time::Duration;
 use parking_lot::RwLock;
 
 use log::{error, info};
+use rand::Rng;
 use tonic::transport::{Channel, Endpoint};
 
 use crate::common::{DEFAULT_CONTROLLER_PORT, DEFAULT_CONTROLLER_TLS_PORT};
@@ -238,11 +239,15 @@ impl ServerIp {
         if controller_ips.is_empty() {
             panic!("no controller IP set");
         }
+
+        // Prevent multiple agents from reporting data to the same server and cause avalanches
+        let mut rng = rand::thread_rng();
+        let this_controller = rng.gen_range(0..controller_ips.len());
         ServerIp {
-            current_ip: controller_ips[0],
+            current_ip: controller_ips[this_controller],
 
             controller_ips,
-            this_controller: 0,
+            this_controller,
 
             proxy_ip: None,
             proxied: false,
@@ -253,8 +258,8 @@ impl ServerIp {
     }
 
     fn reset(&mut self) {
-        self.current_ip = self.controller_ips[0];
         self.this_controller = 0;
+        self.current_ip = self.controller_ips[self.this_controller];
         self.proxied = false;
         self.initialized = false;
         self.proxy_ip = None;
@@ -263,10 +268,10 @@ impl ServerIp {
 
     fn update_controller_ips(&mut self, controller_ips: Vec<IpAddr>) {
         self.proxied = false;
-        self.current_ip = controller_ips[0];
-        self.controller_ips = controller_ips;
-        self.initialized = false;
         self.this_controller = 0;
+        self.controller_ips = controller_ips;
+        self.current_ip = self.controller_ips[self.this_controller];
+        self.initialized = false;
         self.request_failed = false;
     }
 

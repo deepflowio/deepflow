@@ -49,12 +49,12 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Find(&azs).Error
+	err = mysql.Db.Unscoped().Find(&azs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Find(&vpcs).Error
+	err = mysql.Db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(r.resourceTypeName, err))
 		return nil, false

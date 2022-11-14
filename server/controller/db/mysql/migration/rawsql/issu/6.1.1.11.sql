@@ -1,5 +1,3 @@
-USE deepflow;
-
 START TRANSACTION;
 
 TRUNCATE go_genesis_host;

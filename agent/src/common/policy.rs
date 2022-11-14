@@ -468,7 +468,7 @@ impl Acl {
 
     pub fn init_policy(&mut self) {
         self.policy
-            .merge_npb_action(&self.npb_actions, self.id, vec![]);
+            .merge_npb_action(&self.npb_actions, self.id, None);
     }
 
     pub fn reset(&mut self) {

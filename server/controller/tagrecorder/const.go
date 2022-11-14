@@ -336,8 +336,8 @@ const (
 		"    `host_name` String,\n" +
 		"    `chost_id` UInt64,\n" +
 		"    `chost_name` String,\n" +
-		"    `l3_epc_id` UInt64,\n" +
-		"    `l3_epc_name` String,\n" +
+		"    `vpc_id` UInt64,\n" +
+		"    `vpc_name` String,\n" +
 		"    `router_id` UInt64,\n" +
 		"    `router_name` String,\n" +
 		"    `dhcpgw_id` UInt64,\n" +
@@ -486,17 +486,17 @@ var VTAP_TYPE_TO_DEVICE_TYPE = map[int]int{
 }
 
 var RESOURCE_TYPE_TO_NODE_TYPE = map[int]string{
-	common.VIF_DEVICE_TYPE_VM:             RESOURCE_TYPE_VM,
-	common.VIF_DEVICE_TYPE_VROUTER:        RESOURCE_TYPE_VGW,
+	common.VIF_DEVICE_TYPE_VM:             "chost",
+	common.VIF_DEVICE_TYPE_VROUTER:        "router",
 	common.VIF_DEVICE_TYPE_HOST:           RESOURCE_TYPE_HOST,
-	common.VIF_DEVICE_TYPE_DHCP_PORT:      RESOURCE_TYPE_DHCP_PORT,
+	common.VIF_DEVICE_TYPE_DHCP_PORT:      "dhcpgw",
 	common.VIF_DEVICE_TYPE_POD:            RESOURCE_TYPE_POD,
 	common.VIF_DEVICE_TYPE_POD_SERVICE:    RESOURCE_TYPE_POD_SERVICE,
-	common.VIF_DEVICE_TYPE_REDIS_INSTANCE: RESOURCE_TYPE_REDIS,
-	common.VIF_DEVICE_TYPE_RDS_INSTANCE:   RESOURCE_TYPE_RDS,
+	common.VIF_DEVICE_TYPE_REDIS_INSTANCE: "redis",
+	common.VIF_DEVICE_TYPE_RDS_INSTANCE:   "rds",
 	common.VIF_DEVICE_TYPE_POD_NODE:       RESOURCE_TYPE_POD_NODE,
 	common.VIF_DEVICE_TYPE_LB:             RESOURCE_TYPE_LB,
-	common.VIF_DEVICE_TYPE_NAT_GATEWAY:    RESOURCE_TYPE_NAT_GATEWAY,
+	common.VIF_DEVICE_TYPE_NAT_GATEWAY:    "natgw",
 	common.VIF_DEVICE_TYPE_INTERNET:       RESOURCE_TYPE_INTERNET_IP,
 	common.VIF_DEVICE_TYPE_POD_GROUP:      RESOURCE_TYPE_POD_GROUP,
 	common.VIF_DEVICE_TYPE_SERVICE:        RESOURCE_TYPE_SERVICE,

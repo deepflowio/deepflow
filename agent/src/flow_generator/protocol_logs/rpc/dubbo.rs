@@ -40,7 +40,7 @@ use crate::log_info_merge;
 use crate::parse_common;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
 
-const TRACE_ID_MAX_LEN: usize = 51;
+const TRACE_ID_MAX_LEN: usize = 1024;
 
 #[derive(Serialize, Debug, Default, Clone)]
 pub struct DubboInfo {
@@ -240,14 +240,18 @@ impl DubboLog {
     }
 
     fn decode_field(payload: &Cow<'_, str>, mut start: usize, end: usize) -> Option<String> {
-        if start + 2 >= payload.len() {
+        if start >= payload.len() {
             return None;
         }
 
         let bytes = payload.as_bytes();
         match bytes[start] {
-            BC_STRING_SHORT => {
-                let field_len = bytes[start + 1] as usize;
+            BC_STRING_SHORT..=BC_STRING_SHORT_MAX => {
+                if start + 2 >= payload.len() {
+                    return None;
+                }
+                let field_len =
+                    (((bytes[start] - BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
                 start += 2;
                 if start + field_len < end {
                     return Some(payload[start..start + field_len].to_string());
@@ -256,6 +260,16 @@ impl DubboLog {
             0..=STRING_DIRECT_MAX => {
                 let field_len = bytes[start] as usize;
                 start += 1;
+                if start + field_len < end {
+                    return Some(payload[start..start + field_len].to_string());
+                }
+            }
+            b'S' => {
+                if start + 3 >= payload.len() {
+                    return None;
+                }
+                let field_len = ((bytes[start + 1] as usize) << 8) + bytes[start + 2] as usize;
+                start += 3;
                 if start + field_len < end {
                     return Some(payload[start..start + field_len].to_string());
                 }
@@ -305,7 +319,7 @@ impl DubboLog {
         match trace_type {
             TraceType::Sw8 => {
                 if info.trace_id.len() > 2 {
-                    if let Some(index) = payload[2..].find("-") {
+                    if let Some(index) = info.trace_id[2..].find("-") {
                         info.trace_id = info.trace_id[2..2 + index].to_string();
                     }
                 }
@@ -316,7 +330,8 @@ impl DubboLog {
 
     fn decode_span_id(payload: &Cow<'_, str>, trace_type: &TraceType, info: &mut DubboInfo) {
         let tag = match trace_type {
-            TraceType::Customize(tag) => tag,
+            TraceType::Customize(tag) => tag.to_string(),
+            TraceType::Sw8 => TraceType::Sw8.to_string(),
             _ => return,
         };
 
@@ -348,6 +363,33 @@ impl DubboLog {
             }
             start += index + tag.len();
         }
+
+        match trace_type {
+            TraceType::Sw8 => {
+                // Format:
+                // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+                if info.span_id.len() > 2 {
+                    if let Some(start) = info.span_id[2..].find("-") {
+                        let start = 2 + start + 1;
+                        if info.span_id.len() <= start {
+                            return;
+                        }
+                        let segment_id_offset = info.span_id[start..].find("-");
+                        if segment_id_offset.is_none() {
+                            return;
+                        }
+                        let segment_id_offset = start + segment_id_offset.unwrap() + 1;
+                        if info.span_id.len() <= segment_id_offset {
+                            return;
+                        }
+                        if let Some(end) = info.span_id[segment_id_offset..].find("-") {
+                            info.span_id = info.span_id[start..segment_id_offset + end].to_string();
+                        }
+                    }
+                }
+            }
+            _ => return,
+        };
     }
 
     // 尽力而为的去解析Dubbo请求中Body各参数
@@ -405,6 +447,9 @@ impl DubboLog {
             }
 
             Self::decode_trace_id(&payload_str, &trace_type, &mut self.info);
+            if self.info.trace_id.len() != 0 {
+                break;
+            }
         }
         for span_type in self.l7_log_dynamic_config.span_types.iter() {
             if span_type.to_string().len() > u8::MAX as usize {
@@ -412,6 +457,9 @@ impl DubboLog {
             }
 
             Self::decode_span_id(&payload_str, &span_type, &mut self.info);
+            if self.info.span_id.len() != 0 {
+                break;
+            }
         }
     }
 
@@ -596,10 +644,14 @@ mod tests {
             };
 
             let mut dubbo = DubboLog::default();
-            dubbo.l7_log_dynamic_config.trace_types =
-                vec![TraceType::Customize("EagleEye-TraceID".to_string())];
-            dubbo.l7_log_dynamic_config.span_types =
-                vec![TraceType::Customize("EagleEye-SpanID".to_string())];
+            dubbo.l7_log_dynamic_config.trace_types = vec![
+                TraceType::Customize("EagleEye-TraceID".to_string()),
+                TraceType::Sw8,
+            ];
+            dubbo.l7_log_dynamic_config.span_types = vec![
+                TraceType::Customize("EagleEye-SpanID".to_string()),
+                TraceType::Sw8,
+            ];
             let _ = dubbo.parse(
                 payload,
                 packet.lookup_key.proto,
@@ -619,6 +671,7 @@ mod tests {
         let files = vec![
             ("dubbo_hessian2.pcap", "dubbo_hessian.result"),
             ("dubbo-eys.pcap", "dubbo-eys.result"),
+            ("dubbo-sw8.pcap", "dubbo-sw8.result"),
         ];
 
         for item in files.iter() {

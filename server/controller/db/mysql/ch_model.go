@@ -162,8 +162,8 @@ type ChIPResource struct {
 	HostName       string `gorm:"column:host_name;type:varchar(256);default:null" json:"HOST_NAME"`
 	CHostID        int    `gorm:"column:chost_id;type:int;not null" json:"CHOST_ID"`
 	CHostName      string `gorm:"column:chost_name;type:varchar(256);default:null" json:"CHOST_NAME"`
-	L3EPCID        int    `gorm:"column:l3_epc_id;type:int;not null" json:"L3_EPC_ID"`
-	L3EPCName      string `gorm:"column:l3_epc_name;type:varchar(256);default:null" json:"L3_EPC_NAME"`
+	VPCID          int    `gorm:"column:vpc_id;type:int;not null" json:"VPC_ID"`
+	VPCName        string `gorm:"column:vpc_name;type:varchar(256);default:null" json:"VPC_NAME"`
 	RouterID       int    `gorm:"column:router_id;type:int;not null" json:"ROUTER_ID"`
 	RouterName     string `gorm:"column:router_name;type:varchar(256);default:null" json:"ROUTER_NAME"`
 	DHCPGWID       int    `gorm:"column:dhcpgw_id;type:int;not null" json:"DHCPGW_ID"`

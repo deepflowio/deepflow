@@ -472,16 +472,16 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(k.PodClusterID1); err != nil {
 		return err
 	}
-	if err := block.WriteInt32(k.L3EpcID0); err != nil {
+	if err := block.WriteInt32(zerodoc.MarshalInt32WithSpecialID(int16(k.L3EpcID0))); err != nil {
 		return err
 	}
-	if err := block.WriteInt32(k.L3EpcID1); err != nil {
+	if err := block.WriteInt32(zerodoc.MarshalInt32WithSpecialID(int16(k.L3EpcID1))); err != nil {
 		return err
 	}
-	if err := block.WriteInt32(k.EpcID0); err != nil {
+	if err := block.WriteInt32(zerodoc.MarshalInt32WithSpecialID(int16(k.EpcID0))); err != nil {
 		return err
 	}
-	if err := block.WriteInt32(k.EpcID1); err != nil {
+	if err := block.WriteInt32(zerodoc.MarshalInt32WithSpecialID(int16(k.EpcID1))); err != nil {
 		return err
 	}
 	if err := block.WriteUInt16(k.SubnetID0); err != nil {

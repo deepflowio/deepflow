@@ -26,6 +26,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/election"
 	"github.com/deepflowys/deepflow/server/controller/monitor"
 	"github.com/deepflowys/deepflow/server/controller/monitor/license"
+	"github.com/deepflowys/deepflow/server/controller/monitor/vtap"
 	"github.com/deepflowys/deepflow/server/controller/recorder"
 	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
 	"github.com/deepflowys/deepflow/server/controller/service"
@@ -86,7 +87,8 @@ func checkAndStartMasterFunctions(
 		return
 	}
 
-	vtapCheck := monitor.NewVTapCheck(cfg.MonitorCfg, ctx)
+	vtapCheck := vtap.NewVTapCheck(cfg.MonitorCfg, ctx)
+	vtapRebalanceCheck := vtap.NewRebalanceCheck(cfg.MonitorCfg, ctx)
 	vtapLicenseAllocation := license.NewVTapLicenseAllocation(cfg.MonitorCfg, ctx)
 	resourceCleaner := recorder.NewResourceCleaner(&cfg.ManagerCfg.TaskCfg.RecorderCfg, ctx)
 	domainChecker := service.NewDomainCheck(ctx)
@@ -124,6 +126,9 @@ func checkAndStartMasterFunctions(
 
 				// vtap check
 				vtapCheck.Start()
+
+				// rebalance vtap check
+				vtapRebalanceCheck.Start()
 
 				// license分配和检查
 				vtapLicenseAllocation.Start()

@@ -193,6 +193,7 @@ struct data_args_t {
 	};
 	// Timestamp for enter syscall function.
 	__u64 enter_ts;
+	__u32 tcp_seq; // Used to record the entry of syscalls
 };
 
 struct syscall_comm_enter_ctx {

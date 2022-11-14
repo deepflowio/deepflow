@@ -28,7 +28,7 @@ use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData as Interface;
 use crate::common::policy::{Acl, Cidr, IpGroupData};
 use crate::common::port_range::{PortRange, PortRangeList};
-use npb_pcap_policy::{NpbAction, PolicyData};
+use npb_pcap_policy::PolicyData;
 
 const MAX_ACL_PROTOCOL: usize = 255;
 const MAX_TAP_TYPE: usize = 256;
@@ -280,41 +280,33 @@ impl FastPath {
     pub fn add_policy(
         &mut self,
         packet: &mut LookupKey,
-        forward: &PolicyData,
-        backward: &PolicyData,
+        policy: &PolicyData,
         endpoints: EndpointData,
     ) {
         self.table_flush_check(packet);
         self.interest_table_map(packet);
 
-        let acl_id = max(forward.acl_id, backward.acl_id);
+        let acl_id = policy.acl_id;
         let (key_0, key_1) = self.generate_map_key(packet);
         let key = (key_0 as u128) << 64 | key_1 as u128;
         let table = self.policy_table[packet.fast_index * u16::from(packet.tap_type) as usize]
             .as_mut()
             .unwrap();
 
-        let mut policy = PolicyData::default();
-        let mut list: Vec<NpbAction> = vec![];
+        let mut forward = PolicyData::default();
         if acl_id > 0 {
-            for item in &forward.npb_actions {
-                list.push(item.clone());
-            }
-            for item in &backward.npb_actions {
-                list.push(item.clone());
-            }
-            policy.merge_npb_action(&list, acl_id, vec![]);
-            policy.format_npb_action();
+            forward.merge_npb_action(&policy.npb_actions, acl_id, None);
+            forward.format_npb_action();
         }
 
         if let Some(item) = table.get_mut(&key) {
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(policy.clone()));
+            item.protocol_table[packet.proto as usize] = Some(Arc::new(forward.clone()));
         } else {
             let mut item = PolicyTableItem {
                 store: EndpointStore::from(endpoints),
                 protocol_table: unsafe { std::mem::zeroed() },
             };
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(policy.clone()));
+            item.protocol_table[packet.proto as usize] = Some(Arc::new(forward.clone()));
             table.put(key, item);
 
             self.policy_count += 1;
@@ -324,10 +316,16 @@ impl FastPath {
             return;
         }
 
+        let mut backward = PolicyData::default();
+        if acl_id > 0 {
+            backward.merge_reverse_npb_action(&policy.npb_actions, acl_id);
+            backward.format_npb_action();
+        }
+
         let (key_0, key_1) = (key_1, key_0);
         let key = (key_0 as u128) << 64 | key_1 as u128;
         if let Some(item) = table.get_mut(&key) {
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(policy.clone()));
+            item.protocol_table[packet.proto as usize] = Some(Arc::new(backward.clone()));
         } else {
             let endpoints = EndpointData {
                 src_info: endpoints.dst_info,
@@ -338,7 +336,7 @@ impl FastPath {
                 protocol_table: unsafe { std::mem::zeroed() },
             };
 
-            item.protocol_table[packet.proto as usize] = Some(Arc::new(policy.clone()));
+            item.protocol_table[packet.proto as usize] = Some(Arc::new(backward.clone()));
             table.put(key, item);
 
             self.policy_count += 1;
@@ -554,7 +552,7 @@ mod test {
         endpoints.src_info.l3_epc_id = 10;
         endpoints.dst_info.l3_epc_id = 20;
         let policy: PolicyData = Default::default();
-        table.add_policy(&mut key, &policy, &policy, endpoints);
+        table.add_policy(&mut key, &policy, endpoints);
 
         let result = table.get_policy(&mut key);
         assert_eq!(result.is_some(), true);

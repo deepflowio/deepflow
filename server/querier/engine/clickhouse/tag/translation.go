@@ -372,8 +372,8 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		"default": NewTag(
 			"instance_name",
 			"",
-			"",
-			"",
+			"instance_name %s %s",
+			"%s(instance_name,%s)",
 		),
 		"node_type": NewTag(
 			"dictGet(flow_tag.node_type_map, 'node_type', toUInt64(instance_type))",

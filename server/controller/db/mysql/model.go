@@ -1009,6 +1009,8 @@ type VTapGroupConfiguration struct {
 	ExternalAgentHTTPProxyPort    *int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
 	AnalyzerPort                  *int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
 	ProxyControllerPort           *int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
+	ProxyControllerIP             *string `gorm:"column:proxy_controller_ip;type:varchar(512);default:null" json:"PROXY_CONTROLLER_IP"`
+	AnalyzerIP                    *string `gorm:"column:analyzer_ip;type:varchar(512);default:null" json:"ANALYZER_IP"`
 	YamlConfig                    *string `gorm:"column:yaml_config;type:text;default:null" json:"YAML_CONFIG"`
 }
 
@@ -1077,6 +1079,8 @@ type RVTapGroupConfiguration struct {
 	ExternalAgentHTTPProxyPort    int    `gorm:"column:external_agent_http_proxy_port;type:int;default:null" json:"EXTERNAL_AGENT_HTTP_PROXY_PORT"`
 	AnalyzerPort                  int    `gorm:"column:analyzer_port;type:int;default:null" json:"ANALYZER_PORT"`
 	ProxyControllerPort           int    `gorm:"column:proxy_controller_port;type:int;default:null" json:"PROXY_CONTROLLER_PORT"`
+	ProxyControllerIP             string `gorm:"column:proxy_controller_ip;type:varchar(512);default:null" json:"PROXY_CONTROLLER_IP"`
+	AnalyzerIP                    string `gorm:"column:analyzer_ip;type:varchar(512);default:null" json:"ANALYZER_IP"`
 	YamlConfig                    string `gorm:"column:yaml_config;type:text;default:null" json:"yaml_config"`
 }
 

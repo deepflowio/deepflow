@@ -38,12 +38,12 @@ func NewChPodGroupPort() *ChPodGroupPort {
 func (p *ChPodGroupPort) generateNewData() (map[PortIDKey]mysql.ChPodGroupPort, bool) {
 	var podServices []mysql.PodService
 	var podGroupPorts []mysql.PodGroupPort
-	err := mysql.Db.Find(&podServices).Error
+	err := mysql.Db.Unscoped().Find(&podServices).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Find(&podGroupPorts).Error
+	err = mysql.Db.Unscoped().Find(&podGroupPorts).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(p.resourceTypeName, err))
 		return nil, false

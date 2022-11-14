@@ -167,6 +167,12 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, []string,
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
 	}
+	if strings.ToLower(sqlSplit[1]) == "language" {
+		result := make(map[string][]interface{})
+		result["columns"] = []interface{}{"language"}
+		result["values"] = []interface{}{[]string{config.Cfg.Language}}
+		return result, []string{}, true, nil
+	}
 	var table string
 	var where string
 	for i, item := range sqlSplit {
@@ -193,8 +199,8 @@ func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, []string,
 			return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 		}
 		if strings.ToLower(sqlSplit[3]) == "values" {
-			sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
-			return nil, sqlList, true, err
+			result, sqlList, err := tagdescription.GetTagValues(e.DB, table, sql)
+			return result, sqlList, true, err
 		}
 		return nil, []string{}, true, errors.New(fmt.Sprintf("parse show sql error, sql: '%s' not support", sql))
 	case "tags":

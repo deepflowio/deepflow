@@ -42,7 +42,7 @@ func NewChIPResource() *ChIPResource {
 func getVMIdToUidMap() map[int]string {
 	idToUidMap := map[int]string{}
 	var vms []mysql.VM
-	err := mysql.Db.Find(&vms).Error
+	err := mysql.Db.Unscoped().Find(&vms).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VM, err))
 		return idToUidMap
@@ -56,7 +56,7 @@ func getVMIdToUidMap() map[int]string {
 func getRDSIdToUidMap() map[int]string {
 	idToUidMap := map[int]string{}
 	var rdsInstances []mysql.RDSInstance
-	err := mysql.Db.Find(&rdsInstances).Error
+	err := mysql.Db.Unscoped().Find(&rdsInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_RDS, err))
 		return idToUidMap
@@ -70,7 +70,7 @@ func getRDSIdToUidMap() map[int]string {
 func getRedisIdToUidMap() map[int]string {
 	idToUidMap := map[int]string{}
 	var redisInstances []mysql.RedisInstance
-	err := mysql.Db.Find(&redisInstances).Error
+	err := mysql.Db.Unscoped().Find(&redisInstances).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_REDIS, err))
 		return idToUidMap
@@ -84,7 +84,7 @@ func getRedisIdToUidMap() map[int]string {
 func getLBIdToUidMap() map[int]string {
 	idToUidMap := map[int]string{}
 	var lbs []mysql.LB
-	err := mysql.Db.Find(&lbs).Error
+	err := mysql.Db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_LB, err))
 		return idToUidMap
@@ -98,7 +98,7 @@ func getLBIdToUidMap() map[int]string {
 func getNatgwIdToUidMap() map[int]string {
 	idToUidMap := map[int]string{}
 	var natGateways []mysql.NATGateway
-	err := mysql.Db.Find(&natGateways).Error
+	err := mysql.Db.Unscoped().Find(&natGateways).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_NAT_GATEWAY, err))
 		return idToUidMap
@@ -112,7 +112,7 @@ func getNatgwIdToUidMap() map[int]string {
 func getVPCIdToUidMap() map[int]string {
 	idToUidMap := map[int]string{}
 	var vpcs []mysql.VPC
-	err := mysql.Db.Find(&vpcs).Error
+	err := mysql.Db.Unscoped().Find(&vpcs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(RESOURCE_TYPE_VPC, err))
 		return idToUidMap
@@ -173,7 +173,6 @@ func (i *ChIPResource) generateNewData() (map[IPResourceKey]mysql.ChIPResource, 
 			multiIDTag = strings.ReplaceAll(multiIDTag, "subnet", "vl2")
 			multiIDTag = strings.ReplaceAll(multiIDTag, "pod_ns", "pod_namespace")
 			multiIDTag = multiIDTag + "s"
-			tag = strings.ReplaceAll(tag, "vpc", "l3_epc")
 			switch MultiResourceMap[multiIDTag].(type) {
 			case []interface{}:
 				if len(MultiResourceMap[multiIDTag].([]interface{})) > 0 {

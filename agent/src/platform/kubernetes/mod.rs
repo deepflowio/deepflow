@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{fs, os::unix::io::AsRawFd, time::Duration};
+use std::{fs, os::unix::io::AsRawFd};
 
 use enum_dispatch::enum_dispatch;
 use nix::sched::{setns, CloneFlags};
@@ -22,9 +22,11 @@ use regex::Regex;
 
 mod active_poller;
 mod api_watcher;
+mod passive_poller;
 mod resource_watcher;
 pub use active_poller::ActivePoller;
 pub use api_watcher::ApiWatcher;
+pub use passive_poller::PassivePoller;
 
 use public::netns::{InterfaceInfo, NsFile};
 
@@ -43,31 +45,6 @@ pub trait Poller {
     fn start(&self);
     fn stop(&self);
 }
-
-//TODO
-pub struct PassivePoller;
-
-impl PassivePoller {
-    pub fn new(_interval: Duration) -> Self {
-        Self
-    }
-}
-
-impl Poller for PassivePoller {
-    fn get_version(&self) -> u64 {
-        0
-    }
-    fn get_interface_info_in(&self, _: &NsFile) -> Option<Vec<InterfaceInfo>> {
-        None
-    }
-    fn get_interface_info(&self) -> Vec<InterfaceInfo> {
-        vec![]
-    }
-    fn set_netns_regex(&self, _: Option<Regex>) {}
-    fn start(&self) {}
-    fn stop(&self) {}
-}
-//END
 
 pub fn check_set_ns() -> bool {
     match fs::File::open("/proc/self/ns/net") {

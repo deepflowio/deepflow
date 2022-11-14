@@ -1347,6 +1347,8 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     external_agent_http_proxy_port     INTEGER DEFAULT NULL,
     proxy_controller_port     INTEGER DEFAULT NULL,
     analyzer_port             INTEGER DEFAULT NULL,
+    proxy_controller_ip       VARCHAR(128),
+    analyzer_ip               VARCHAR(128),
     yaml_config               TEXT,
     lcuuid                    CHAR(64)
 ) ENGINE=innodb DEFAULT CHARSET=utf8 AUTO_INCREMENT=1;
@@ -1912,8 +1914,8 @@ CREATE TABLE IF NOT EXISTS ch_ip_resource (
     host_name           VARCHAR(256),
     chost_id            INTEGER,
     chost_name          VARCHAR(256),
-    l3_epc_id           INTEGER,
-    l3_epc_name         VARCHAR(256),
+    vpc_id              INTEGER,
+    vpc_name            VARCHAR(256),
     router_id           INTEGER,
     router_name         VARCHAR(256),
     dhcpgw_id           INTEGER,

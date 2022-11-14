@@ -445,6 +445,26 @@ get_fields_from_http2MetaHeadersFrame(void *ptr, struct ebpf_proc_info *info)
 	return ptr;
 }
 
+// When the type information is missing, the TCP connection information cannot
+// be obtained, and kprobe reports the message when it determines that the
+// uprobe cannot work properly. If it is not skipped here, the data will be
+// duplicated.
+static __inline bool skip_http2_uprobe(struct ebpf_proc_info *info)
+{
+	if (!info) {
+		return true;
+	}
+
+	if (info->crypto_tls_Conn_itab != 0) {
+		return false;
+	}
+
+	if (info->credentials_syscallConn_itab != 0) {
+		return false;
+	}
+	return true;
+}
+
 // func (cc *http2ClientConn) writeHeader(name, value string)
 SEC("uprobe/go_http2ClientConn_writeHeader")
 int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
@@ -453,7 +473,7 @@ int uprobe_go_http2ClientConn_writeHeader(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
@@ -509,7 +529,7 @@ int uprobe_go_http2ClientConn_writeHeaders(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
@@ -552,9 +572,10 @@ int uprobe_go_http2serverConn_processHeaders(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
+
 	if (is_register_based_call(info)) {
 		frame = (void *)PT_GO_REGS_PARM2(ctx);
 	} else {
@@ -584,7 +605,7 @@ int uprobe_go_http2serverConn_writeHeaders(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
@@ -673,7 +694,7 @@ int uprobe_go_http2clientConnReadLoop_handleResponse(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
@@ -705,7 +726,7 @@ int uprobe_go_loopyWriter_writeHeader(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
@@ -749,7 +770,7 @@ int uprobe_go_http2Server_operateHeaders(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
@@ -785,7 +806,7 @@ int uprobe_go_http2Client_operateHeaders(struct pt_regs *ctx)
 	pid_t pid = id >> 32;
 
 	struct ebpf_proc_info *info = bpf_map_lookup_elem(&proc_info_map, &pid);
-	if (!info) {
+	if (skip_http2_uprobe(info)) {
 		return 0;
 	}
 
