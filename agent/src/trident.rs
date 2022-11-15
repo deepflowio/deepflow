@@ -224,7 +224,7 @@ impl Trident {
         );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
-        let logger = Logger::try_with_str("info")
+        let logger = Logger::try_with_env_or_str("info")
             .unwrap()
             .format(colored_opt_format)
             .log_to_file_and_writer(
