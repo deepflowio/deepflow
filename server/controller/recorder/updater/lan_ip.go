@@ -85,17 +85,20 @@ func (l *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 	return dbItem, true
 }
 
-// 保留接口
 func (l *LANIP) generateUpdateInfo(diffBase *cache.LANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
-	return nil, false
+	updateInfo := make(map[string]interface{})
+	if diffBase.RegionLcuuid != cloudItem.RegionLcuuid {
+		updateInfo["region"] = cloudItem.RegionLcuuid
+	}
+	return updateInfo, len(updateInfo) > 0
 }
 
 func (l *LANIP) addCache(dbItems []*mysql.LANIP) {
 	l.cache.AddLANIPs(dbItems)
 }
 
-// 保留接口
 func (l *LANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
+	diffBase.Update(cloudItem)
 }
 
 func (l *LANIP) deleteCache(lcuuids []string) {

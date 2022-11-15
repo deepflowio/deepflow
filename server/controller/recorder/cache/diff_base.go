@@ -1155,10 +1155,12 @@ func (w *WANIP) Update(cloudItem *cloudmodel.IP) {
 
 type LANIP struct {
 	DiffBase
+	RegionLcuuid    string `json:"region_lcuuid"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
 func (l *LANIP) Update(cloudItem *cloudmodel.IP) {
+	l.RegionLcuuid = cloudItem.RegionLcuuid
 	l.SubDomainLcuuid = cloudItem.SubDomainLcuuid
 	log.Info(updateDiffBase(RESOURCE_TYPE_LAN_IP_EN, l))
 }
