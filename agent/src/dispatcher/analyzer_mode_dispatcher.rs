@@ -337,6 +337,7 @@ impl AnalyzerModeDispatcher {
             }
         }
 
+        self.tap_pipelines.clear();
         base.terminate_handler();
         info!("Stopped dispatcher {}", base.id);
     }
