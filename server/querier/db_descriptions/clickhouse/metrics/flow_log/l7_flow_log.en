@@ -1,20 +1,20 @@
 # Field              , DisplayName             , Unit , Description
 request              , Request                 ,      ,
 response             , Response                ,      ,
-session_length       , Session Total Bytes     , Byte , Sum of request_length and response_length.
+session_length       , Session Total Bytes     , Byte , request_length + response_length.
 request_length       , Request Total Bytes     , Byte ,
 response_length      , Response Total Bytes    , Byte ,
 sql_affected_rows    , SQL Affected Rows       , Row  ,
 log_count            , Log Count               ,      ,
 
-error                , Error                   ,      ,
+error                , Error                   ,      , Client Error + Server Error.
 client_error         , Client Error            ,      ,
 server_error         , Server Error            ,      ,
-error_ratio          , Error %                 , %    ,
-client_error_ratio   , Client Error %          , %    ,
-server_error_ratio   , Server Error %          , %    ,
+error_ratio          , Error %                 , %    , Error / Response.
+client_error_ratio   , Client Error %          , %    , Client Error / Response.
+server_error_ratio   , Server Error %          , %    , Server Error / Response.
 
-response_duration    , Response Delay          , us   ,
+response_duration    , Response Delay          , us   , If the log type is Session, response_duration = end_time - start_time.
 
 ip_version           , IP Version              ,      ,
 server_port          , Server Port             ,      ,
