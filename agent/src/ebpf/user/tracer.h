@@ -108,6 +108,7 @@ struct cfg_feature_regex {
 
 extern struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 extern int ebpf_config_protocol_filter[PROTO_NUM];
+extern struct allow_port_bitmap allow_port_bitmap;
 
 // use for inference struct offset.
 #define OFFSET_INFER_SERVER_PORT 54583
@@ -452,6 +453,7 @@ prefetch_and_process_datas(struct bpf_tracer *t, int nb_rx, void **datas_burst)
 	}
 }
 
+int set_allow_port_bitmap(void *bitmap);
 int enable_ebpf_protocol(int protocol);
 int set_feature_regex(int feature, const char *pattern);
 bool is_feature_enabled(int feature);

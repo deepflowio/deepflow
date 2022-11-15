@@ -805,6 +805,12 @@ static void update_protocol_filter_array(struct bpf_tracer *tracer)
 	}
 }
 
+static void update_allow_port_bitmap(struct bpf_tracer *tracer)
+{
+	bpf_table_set_value(tracer, "__allow_port_bitmap", 0,
+			    &allow_port_bitmap);
+}
+
 static inline int __set_data_limit_max(int limit_size)
 {
 	if (limit_size < 0) {
@@ -1067,6 +1073,8 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	// Update protocol filter array
 	update_protocol_filter_array(tracer);
+
+	update_allow_port_bitmap(tracer);
 
 	if (tracer_hooks_attach(tracer))
 		return -EINVAL;
