@@ -701,15 +701,19 @@ impl HttpLog {
             if col_index + 1 >= body_line.len() {
                 continue;
             }
-            let key = str::from_utf8(&body_line[..col_index])?.to_lowercase();
-            let value = str::from_utf8(&body_line[col_index + 1..])?.trim();
-            self.on_header(
-                &(((&key).to_lowercase()).as_bytes().to_vec()),
-                &String::from(value).as_bytes().to_vec(),
-                direction,
-            );
-            if &key == "content-length" {
-                content_length = Some(value.parse::<u32>().unwrap_or_default());
+
+            if let (Ok(key), Ok(value)) = (
+                str::from_utf8(&body_line[..col_index]),
+                str::from_utf8(&body_line[col_index + 1..]),
+            ) {
+                self.on_header(
+                    &((&key).to_lowercase()).as_bytes().to_vec(),
+                    &String::from(value).trim().as_bytes().to_vec(),
+                    direction,
+                );
+                if key == "content-length" {
+                    content_length = Some(value.parse::<u32>().unwrap_or_default());
+                }
             }
         }
 
