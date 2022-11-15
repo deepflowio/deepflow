@@ -40,8 +40,12 @@ import (
 )
 
 const (
+	RECV_BUFSIZE_2K           = 1 << 11 // 2k for UDP
+	RECV_BUFSIZE_8K           = 1 << 13 // 8k
+	RECV_BUFSIZE_64K          = 1 << 16 // 64k
+	RECV_BUFSIZE_256K         = 1 << 18 // 256k
+	RECV_BUFSIZE_512K         = 1 << 19 // 512k
 	RECV_BUFSIZE_MAX          = datatype.MESSAGE_FRAME_SIZE_MAX * 2
-	RECV_BUFSIZE              = 10 << 10
 	RECV_TIMEOUT              = 30 * time.Second
 	QUEUE_CACHE_FLUSH_TIMEOUT = 3
 	DROP_DETECT_WINDOW_SIZE   = 1024
@@ -74,21 +78,55 @@ func (r *RecvBuffer) String() string {
 	return fmt.Sprintf("IP:%s %s\n", r.IP, string(r.Buffer))
 }
 
-var recvBufferPool = pool.NewLockFreePool(
-	func() interface{} {
-		return &RecvBuffer{
-			Buffer: make([]byte, RECV_BUFSIZE),
+func newBufferPool(bufferSize, poolSizePerCPU int) *pool.LockFreePool {
+	return pool.NewLockFreePool(
+		func() interface{} {
+			return &RecvBuffer{
+				Buffer: make([]byte, bufferSize),
+			}
+		},
+		pool.OptionPoolSizePerCPU(poolSizePerCPU),
+		pool.OptionInitFullPoolSize(poolSizePerCPU),
+		pool.OptionCounterNameSuffix(fmt.Sprintf("_%dK", bufferSize>>10)),
+	)
+}
+
+var recvBufferPools = []*pool.LockFreePool{
+	newBufferPool(RECV_BUFSIZE_2K, 16),
+	newBufferPool(RECV_BUFSIZE_8K, 32),
+	newBufferPool(RECV_BUFSIZE_64K, 8),
+	newBufferPool(RECV_BUFSIZE_256K, 8),
+	newBufferPool(RECV_BUFSIZE_512K, 8),
+	// if the required buffer > 512k, the memory will not be pre-allocated, and the memory will be allocated when it is used
+	newBufferPool(0, 8),
+}
+
+func getBufferPoolIndex(length int) int {
+	for i, v := range []int{RECV_BUFSIZE_2K, RECV_BUFSIZE_8K, RECV_BUFSIZE_64K, RECV_BUFSIZE_256K, RECV_BUFSIZE_512K} {
+		if length <= v {
+			return i
 		}
-	},
-	pool.OptionPoolSizePerCPU(8),
-	pool.OptionInitFullPoolSize(8),
-)
+	}
+	return len(recvBufferPools) - 1
+}
+
+func minPowerOfTwo(v int) int {
+	for i := 0; i < 30; i++ {
+		if v <= 1<<uint64(i) {
+			return 1 << uint64(i)
+		}
+	}
+	return v
+}
 
 func AcquireRecvBuffer(length int) *RecvBuffer {
-	buf := recvBufferPool.Get().(*RecvBuffer)
+	index := getBufferPoolIndex(length)
+	buf := recvBufferPools[index].Get().(*RecvBuffer)
 	if len(buf.Buffer) < length {
+		length = minPowerOfTwo(length)
 		buf.Buffer = make([]byte, length)
 	}
+
 	return buf
 }
 
@@ -97,7 +135,7 @@ func ReleaseRecvBuffer(b *RecvBuffer) {
 	b.End = 0
 	b.IP = nil
 	b.VtapID = 0
-	recvBufferPool.Put(b)
+	recvBufferPools[getBufferPoolIndex(len(b.Buffer))].Put(b)
 }
 
 type QueueCache struct {
@@ -624,7 +662,7 @@ func (r *Receiver) ProcessUDPServer() {
 	flowHeader := &datatype.FlowHeader{}
 	r.setUDPTimeout()
 	for !r.exit {
-		recvBuffer := AcquireRecvBuffer(RECV_BUFSIZE)
+		recvBuffer := AcquireRecvBuffer(RECV_BUFSIZE_2K)
 		size, remoteAddr, err := r.UDPConn.ReadFromUDP(recvBuffer.Buffer)
 		if err != nil || size < datatype.MESSAGE_HEADER_LEN {
 			ReleaseRecvBuffer(recvBuffer)
