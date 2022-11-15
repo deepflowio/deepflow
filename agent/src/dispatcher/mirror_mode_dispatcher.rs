@@ -19,7 +19,7 @@ use std::{
     ops::Add,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex, Weak,
+        Arc, Mutex,
     },
     time::Duration,
 };
@@ -51,10 +51,7 @@ use crate::{
     handler::{MiniPacket, PacketHandler},
     proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
-    utils::{
-        environment::is_tt_hyper_v_compute,
-        stats::{Countable, RefCountable, StatsOption},
-    },
+    utils::environment::is_tt_hyper_v_compute,
 };
 use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
@@ -370,7 +367,7 @@ impl MirrorModeDispatcher {
         let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
-        let (mut flow_map, flow_counter) = FlowMap::new(
+        let mut flow_map = FlowMap::new(
             self.base.id as u32,
             self.base.flow_output_queue.clone(),
             self.base.policy_getter,
@@ -379,12 +376,7 @@ impl MirrorModeDispatcher {
             self.base.flow_map_config.clone(),
             self.base.log_parse_config.clone(),
             self.base.packet_sequence_output_queue.clone(), // Enterprise Edition Feature: packet-sequence
-        );
-
-        self.base.stats.register_countable(
-            "flow-perf",
-            Countable::Ref(Arc::downgrade(&flow_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("id", format!("{}", self.base.id))],
+            &self.base.stats,
         );
 
         while !self.base.terminated.load(Ordering::Relaxed) {

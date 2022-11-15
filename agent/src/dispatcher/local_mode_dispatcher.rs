@@ -17,7 +17,7 @@
 use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::str;
-use std::sync::{atomic::Ordering, Arc, Weak};
+use std::sync::{atomic::Ordering, Arc};
 use std::time::Duration;
 
 use log::{debug, info, log_enabled, warn};
@@ -41,10 +41,7 @@ use crate::{
     platform::LibvirtXmlExtractor,
     proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
-    utils::{
-        bytes::read_u16_be,
-        stats::{Countable, RefCountable, StatsOption},
-    },
+    utils::bytes::read_u16_be,
 };
 #[cfg(target_os = "linux")]
 use public::netns::link_list_in_netns;
@@ -65,7 +62,7 @@ impl LocalModeDispatcher {
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
-        let (mut flow_map, flow_counter) = FlowMap::new(
+        let mut flow_map = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),
             base.policy_getter,
@@ -74,12 +71,7 @@ impl LocalModeDispatcher {
             base.flow_map_config.clone(),
             base.log_parse_config.clone(),
             base.packet_sequence_output_queue.clone(), // Enterprise Edition Feature: packet-sequence
-        );
-
-        base.stats.register_countable(
-            "flow-perf",
-            Countable::Ref(Arc::downgrade(&flow_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("id", format!("{}", base.id))],
+            &base.stats,
         );
 
         while !base.terminated.load(Ordering::Relaxed) {

@@ -17,7 +17,7 @@
 use std::{
     collections::HashMap,
     ops::Add,
-    sync::{atomic::Ordering, Arc, Mutex, Weak},
+    sync::{atomic::Ordering, Arc, Mutex},
     time::Duration,
 };
 
@@ -41,7 +41,6 @@ use crate::{
     handler::{MiniPacket, PacketHandler},
     proto::trident::IfMacSource,
     rpc::get_timestamp,
-    utils::stats::{Countable, RefCountable, StatsOption},
 };
 use public::utils::net::{Link, MacAddr};
 
@@ -112,7 +111,7 @@ impl AnalyzerModeDispatcher {
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
-        let (mut flow_map, flow_counter) = FlowMap::new(
+        let mut flow_map = FlowMap::new(
             base.id as u32,
             base.flow_output_queue.clone(),
             base.policy_getter,
@@ -121,12 +120,7 @@ impl AnalyzerModeDispatcher {
             base.flow_map_config.clone(),
             base.log_parse_config.clone(),
             base.packet_sequence_output_queue.clone(), // Enterprise Edition Feature: packet-sequence
-        );
-
-        base.stats.register_countable(
-            "flow-perf",
-            Countable::Ref(Arc::downgrade(&flow_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("id", format!("{}", base.id))],
+            &base.stats,
         );
 
         while !base.terminated.load(Ordering::Relaxed) {

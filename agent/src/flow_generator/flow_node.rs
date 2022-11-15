@@ -188,7 +188,8 @@ impl FlowNode {
     pub fn match_node(
         &self,
         meta_packet: &mut MetaPacket,
-        config_ignore: (bool, bool),
+        ignore_l2_end: bool,
+        ignore_tor_mac: bool,
         trident_type: TridentType,
     ) -> bool {
         let flow = &self.tagged_flow.flow;
@@ -245,7 +246,7 @@ impl FlowNode {
         }
 
         // Ipv4/Ipv6 solve
-        let mac_match = Self::mac_match(meta_packet, config_ignore, trident_type);
+        let mac_match = Self::mac_match(meta_packet, ignore_l2_end, ignore_tor_mac, trident_type);
         if flow_key.ip_src == meta_lookup_key.src_ip
             && flow_key.ip_dst == meta_lookup_key.dst_ip
             && flow_key.port_src == meta_lookup_key.src_port
@@ -300,7 +301,8 @@ impl FlowNode {
     //   实际上IPIP没有隧道ID，因此可以肯定不存在IP冲突，忽略MAC也是合理的
     fn mac_match(
         meta_packet: &MetaPacket,
-        config_ignore: (bool, bool),
+        ignore_l2_end: bool,
+        ignore_tor_mac: bool,
         trident_type: TridentType,
     ) -> MatchMac {
         let ignore_mac = meta_packet.tunnel.is_some()
@@ -311,14 +313,14 @@ impl FlowNode {
         // return value stands different match type, defined by MAC_MATCH_*
         // TODO: maybe should consider L2End0 and L2End1 when InPort == 0x30000
         let is_from_isp = meta_packet.lookup_key.tap_type != TapType::Cloud;
-        if is_from_isp || ignore_mac || config_ignore.1 {
+        if is_from_isp || ignore_mac || ignore_tor_mac {
             return MatchMac::None;
         }
 
         let is_from_trident = meta_packet.lookup_key.tap_type == TapType::Cloud
             && meta_packet.tap_port.split_fields().0 > 0;
 
-        if !config_ignore.0 && is_from_trident {
+        if !ignore_l2_end && is_from_trident {
             if !meta_packet.lookup_key.l2_end_0 && !meta_packet.lookup_key.l2_end_1 {
                 return MatchMac::None;
             } else if !meta_packet.lookup_key.l2_end_0 {
