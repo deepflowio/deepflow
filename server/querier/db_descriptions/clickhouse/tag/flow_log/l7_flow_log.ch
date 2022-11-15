@@ -24,19 +24,19 @@ pod_service               , K8s 容器服务             ,
 pod_group                 , K8s 工作负载             , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                       , K8s 容器 POD             ,
 service                   , 服务                     ,
-resource_gl0_type         , 类型-容器 POD 优先       ,
-resource_gl0              , 资源-容器 POD 优先       ,
-resource_gl1_type         , 类型-工作负载优先        ,
-resource_gl1              , 资源-工作负载优先        ,
-resource_gl2_type         , 类型-服务优先            ,
-resource_gl2              , 资源-服务优先            ,
+resource_gl0_type         , 类型-容器 POD 优先       , `resource_gl0`实例对应的类型。
+resource_gl0              , 资源-容器 POD 优先       , IP 对应的实例。
+resource_gl1_type         , 类型-工作负载优先        , `resource_gl1`实例对应的类型。
+resource_gl1              , 资源-工作负载优先        , 在`resource_gl0`基础上，将 POD 聚合为工作负载。
+resource_gl2_type         , 类型-服务优先            , `resource_gl2`实例对应的类型。
+resource_gl2              , 资源-服务优先            , 在`resource_gl1`基础上，将容器服务的 ClusterIP 与工作负载聚合为服务。
 
-labels                    , K8s Labels               ,
-attributes                , Attributes               ,
+labels                    , K8s Labels               , K8s 自定义 Label。
+attributes                , Attributes               , OpenTelemetry Span 属性，以及应用协议特有属性。
 
 ip                        , IP 地址                  ,
 is_ipv4                   , IPv4 标志                ,
-is_internet               , Internet IP 标志         ,
+is_internet               , Internet IP 标志         , Internet IP 无法关联到实例或子网 CIDR 的 IP。
 protocol                  , 网络协议                 ,
 
 tunnel_type               , 隧道类型                 ,
@@ -46,7 +46,7 @@ server_port               , 服务端口                 ,
 req_tcp_seq               , 请求 TCP Seq 号          ,
 resp_tcp_seq              , 响应 TCP Seq 号          ,
 
-l7_protocol               , 应用协议                 ,
+l7_protocol               , 应用协议                 , 
 l7_protocol_str           , 应用协议                 , 字符串形式。
 version                   , 协议版本                 ,
 type                      , 日志类型                 ,
@@ -79,8 +79,8 @@ syscall_cap_seq_0         , 请求 Syscall 序号        ,
 syscall_cap_seq_1         , 响应 Syscall 序号        ,
 
 flow_id                   , 流日志 ID                ,
-start_time                , 开始时间                 , 单位: 微秒。表示当前自然分钟内流的开始时间，对于新建流表示首包时间。
-end_time                  , 结束时间                 , 单位: 微秒。表示当前自然分钟内流的结束时间，若流在该分钟内 close，则为尾包时间或流状态机超时的时间。
+start_time                , 开始时间                 , 单位: 微秒。表示当前请求开始的时间。
+end_time                  , 结束时间                 , 单位: 微秒。表示当前响应开始的时间，但对 OTel 是响应结束时间。
 
 tap                       , 采集点                   , Traffic Access Point，流量采集点，使用固定值（虚拟网络）表示云内流量，其他值表示传统 IDC 流量（支持最多 254 个自定义值表示镜像分光的位置）。
 vtap                      , 采集器                   ,
