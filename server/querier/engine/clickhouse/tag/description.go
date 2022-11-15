@@ -374,8 +374,9 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, er
 	//Enum($tag_name) replace in with column 'display_name'
 	//$tag_name replace in with column 'value'
 	if len(showSqlList) > 1 {
-		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "Enum("+tag+") ", "display_name ")
-		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag+" ", "value ")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "Enum("+tag+")", "display_name")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], tag, "value")
+		showSqlList[1] = strings.ReplaceAll(showSqlList[1], "value_id", tag+"_id")
 		sql = showSqlList[0] + " WHERE " + showSqlList[1]
 	}
 	// K8s Labels是动态的,不需要去tag_description里确认
