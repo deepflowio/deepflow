@@ -126,6 +126,12 @@ struct trace_info_t {
 	__u64 socket_id; // Records the socket associated when tracing was created (记录创建追踪时关联的socket)
 };
 
+struct allow_port_bitmap {
+	__u8 bitmap[65536 / 8];
+} __attribute__((packed));
+
+#define is_set_bitmap(bitmap, idx) (bitmap[(idx) / 8] & (1 << ((idx) % 8)))
+
 // struct ebpf_proc_info -> offsets[]  arrays index.
 enum offsets_index {
 	OFFSET_IDX_GOID_RUNTIME_G,
