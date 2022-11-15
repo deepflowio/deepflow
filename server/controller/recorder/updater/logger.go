@@ -27,3 +27,7 @@ var log = logging.MustGetLogger("recorder.updater")
 func resourceAForResourceBNotFound(resourceA, lcuuidA, resourceB, lcuuidB string) string {
 	return fmt.Sprintf("%s (lcuuid: %s) for %s (lcuuid: %s) not found", resourceA, lcuuidA, resourceB, lcuuidB)
 }
+
+func ipIsInvalid(resource, lcuuid, ip string) string {
+	return fmt.Sprintf("%s (lcuuid: %s) ip: %s is invalid", resource, lcuuid, ip)
+}
