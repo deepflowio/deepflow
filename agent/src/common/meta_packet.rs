@@ -793,10 +793,7 @@ impl<'a> MetaPacket<'a> {
     }
 
     #[cfg(target_os = "linux")]
-    pub unsafe fn from_ebpf(
-        data: *mut SK_BPF_DATA,
-        capture_size: usize,
-    ) -> Result<MetaPacket<'a>, Box<dyn Error>> {
+    pub unsafe fn from_ebpf(data: *mut SK_BPF_DATA) -> Result<MetaPacket<'a>, Box<dyn Error>> {
         let data = &mut (*data);
         let (local_ip, remote_ip) = if data.tuple.addr_len == 4 {
             (
@@ -842,7 +839,7 @@ impl<'a> MetaPacket<'a> {
             ..Default::default()
         };
 
-        let cap_len = capture_size.min(data.cap_len as usize);
+        let cap_len = data.cap_len as usize;
 
         packet.raw_from_ebpf = vec![0u8; cap_len as usize];
         #[cfg(target_arch = "aarch64")]

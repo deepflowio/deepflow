@@ -269,6 +269,7 @@ pub struct DispatcherConfig {
     pub region_id: u32,
     pub pod_cluster_id: u32,
     pub enabled: bool,
+    pub npb_dedup_enabled: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -745,6 +746,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                 region_id: conf.region_id,
                 pod_cluster_id: conf.pod_cluster_id,
                 enabled: conf.enabled,
+                npb_dedup_enabled: conf.npb_dedup_enabled,
             },
             sender: SenderConfig {
                 mtu: conf.mtu,

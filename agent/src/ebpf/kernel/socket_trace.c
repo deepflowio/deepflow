@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "include/socket_trace.h"
 #include "include/task_struct_utils.h"
 
@@ -29,6 +30,26 @@
  * 向用户态传递数据的专用map
  */
 MAP_PERF_EVENT(socket_data, int, __u32, MAX_CPU)
+
+/*
+ * Why use two Tail Calls jmp tables ?
+ *
+ * struct bpf_array { ...  enum bpf_prog_type owner_prog_type}
+ * 'ownership' of prog_array is claimed by the first program that
+ * is going to use this map or by the first program which FD is stored
+ * in the map to make sure that all callers and callees have the same
+ * prog_type and JITed flag.
+ *
+ * Tail Calls jmp table
+ * We divide the data processing and data output into two parts, and each has a -
+ * different eBPF program for processing.
+ * The purpose of this is to prevent the problem of the number of instructions exceeding max limit.
+ *
+ * 'progs_jmp_kp_map' for kprobe/uprobe (`A -> B`, both A and B are [k/u]probe program)
+ * 'progs_jmp_tp_map' for tracepoint (`A -> B`, both A and B are tracepoint program)
+ */
+MAP_PROG_ARRAY(progs_jmp_kp_map, __u32, __u32, 1)
+MAP_PROG_ARRAY(progs_jmp_tp_map, __u32, __u32, 1)
 
 /*
  * 因为ebpf栈只有512字节无法存放http数据，这里使用map做为buffer。
@@ -52,7 +73,7 @@ MAP_PERARRAY(members_offset, __u32, struct member_fields_offset, 1)
  * 可以存储176年(如果从2022年开始)的数据而UID不会出现重复。
  * ((2^56 - 1) - sys_boot_time)/10/1000/1000/60/60/24/365 = 176 years
  */
-MAP_PERARRAY(trace_uid_map, __u32, struct trace_uid_t, 1)
+MAP_PERARRAY(trace_conf_map, __u32, struct trace_conf_t, 1)
 
 /*
  * 对各类map进行统计
@@ -550,7 +571,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 				   struct conn_info_t* conn_info,
 				   __u64 socket_id, __u64 pid_tgid,
 				   struct trace_info_t *trace_info_ptr,
-				   struct trace_uid_t *trace_uid,
+				   struct trace_conf_t *trace_conf,
 				   struct trace_stats *trace_stats,
 				   __u64 *thread_trace_id,
 				   __u64 time_stamp) {
@@ -609,7 +630,7 @@ static __inline void trace_process(struct socket_info_t *socket_info_ptr,
 	if (conn_info->direction == T_INGRESS) {
 		struct trace_info_t trace_info = { 0 };
 		*thread_trace_id = trace_info.thread_trace_id =
-				(pre_trace_id == 0 ? ++trace_uid->thread_trace_id : pre_trace_id);
+				(pre_trace_id == 0 ? ++trace_conf->thread_trace_id : pre_trace_id);
 		if (conn_info->message_type == MSG_REQUEST)
 			trace_info.peer_fd = conn_info->fd;
 		else if (conn_info->message_type == MSG_RESPONSE) {
@@ -691,30 +712,30 @@ static __inline int iovecs_copy(struct __socket_data *v,
 	return bytes_sent;
 }
 
-static __inline void
+static __inline int
 data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	    const struct data_args_t *args, const bool vecs, __u32 syscall_len,
 	    struct member_fields_offset *offset, __u64 time_stamp,
 	    const struct process_data_extra *extra)
 {
 	if (conn_info == NULL) {
-		return;
+		return -1;
 	}
 
 	// ignore non-http protocols that are go tls
 	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE) {
 		if (conn_info->protocol != PROTO_HTTP1)
-			return;
+			return -1;
 	}
 
 	if (extra->source == DATA_SOURCE_OPENSSL_UPROBE) {
 		if (conn_info->protocol != PROTO_HTTP1 &&
 		    conn_info->protocol != PROTO_HTTP2)
-			return;
+			return -1;
 	}
 
 	if (conn_info->sk == NULL || conn_info->message_type == MSG_UNKNOWN) {
-		return;
+		return -1;
 	}
 
 	__u64 pid_tgid = bpf_get_current_pid_tgid();
@@ -725,32 +746,26 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	if (conn_info->message_type == MSG_CLEAR) {
 		delete_socket_info(conn_key, conn_info->socket_info_ptr);
-		return;
+		return -1;
 	}
 
-	__u32 tcp_seq = 0;
+	__u32 tcp_seq = args->tcp_seq;
 	__u64 thread_trace_id = 0;
-
-	if (conn_info->direction == T_INGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-		/*
-		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received.
-		 * However, it cannot be confirmed that it has been processed by the syscall,
-		 * so use the tcp_seq value that entering the syscalls.
-		 */
-		tcp_seq = args->tcp_seq + syscall_len; 
-	} else if (conn_info->direction == T_EGRESS && conn_info->tuple.l4_protocol == IPPROTO_TCP) {
-		tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd);
-	}
-
 	__u32 k0 = 0;
 	struct socket_info_t sk_info = { 0 };
-	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
-	if (trace_uid == NULL)
-		return;
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	if (trace_conf == NULL)
+		return -1;
+
+	/*
+	 * It is possible that these values were modified during ebpf running,
+	 * so they are saved here.
+	 */
+	int data_max_sz = trace_conf->data_limit_max;
 
 	struct trace_stats *trace_stats = trace_stats_map__lookup(&k0);
 	if (trace_stats == NULL)
-		return;
+		return -1;
 
 	struct trace_info_t *trace_info_ptr =
 				trace_map__lookup(&pid_tgid);
@@ -759,9 +774,9 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	// 'socket_id' used to resolve non-tracing between the same socket
 	__u64 socket_id = 0;
 	if (!is_socket_info_valid(socket_info_ptr)) {
-		// Not use "++trace_uid->socket_id" here,
+		// Not use "++trace_conf->socket_id" here,
 		// because it did not pass the verification of linux 4.14.x, 4.15.x
-		socket_id = trace_uid->socket_id + 1;
+		socket_id = trace_conf->socket_id + 1;
 	} else {
 		socket_id = socket_info_ptr->uid;
 	}
@@ -770,7 +785,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	if (conn_info->message_type != MSG_PRESTORE &&
 	    conn_info->message_type != MSG_RECONFIRM && !get_go_version())
 		trace_process(socket_info_ptr, conn_info, socket_id, pid_tgid, trace_info_ptr,
-			      trace_uid, trace_stats, &thread_trace_id, time_stamp);
+			      trace_conf, trace_stats, &thread_trace_id, time_stamp);
 
 	if (!is_socket_info_valid(socket_info_ptr)) {
 		if (socket_info_ptr && conn_info->direction == T_EGRESS) {
@@ -778,8 +793,8 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 			thread_trace_id = socket_info_ptr->trace_id;
 		}
 
-		sk_info.uid = trace_uid->socket_id + 1;
-		trace_uid->socket_id++; // Ensure that socket_id is incremented.
+		sk_info.uid = trace_conf->socket_id + 1;
+		trace_conf->socket_id++; // Ensure that socket_id is incremented.
 		sk_info.l7_proto = conn_info->protocol;
 		sk_info.direction = conn_info->direction;
 		sk_info.role = conn_info->role;
@@ -808,7 +823,7 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	 */
 	if (conn_info->message_type == MSG_PRESTORE ||
 	    conn_info->message_type == MSG_RECONFIRM)
-		return;
+		return -1;
 
 	if (is_socket_info_valid(socket_info_ptr)) {
 		sk_info.uid = socket_info_ptr->uid;
@@ -842,16 +857,16 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 
 	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
 	if (!v_buff)
-		return;
+		return -1;
 
 	struct __socket_data *v = (struct __socket_data *)&v_buff->data[0];
 
 	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
-		return;
+		return -1;
 
 	v = (struct __socket_data *)(v_buff->data + v_buff->len);
 	if (get_socket_info(v, conn_info->sk, conn_info) == false)
-		return;
+		return -1;
 
 	v->tuple.l4_protocol = conn_info->tuple.l4_protocol;
 	v->tuple.dport = conn_info->tuple.dport;
@@ -876,8 +891,24 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	v->syscall_len = syscall_len;
 	v->msg_type = conn_info->message_type;
 	v->tcp_seq = 0;
-	if (conn_info->tuple.l4_protocol == IPPROTO_TCP)
-		v->tcp_seq = tcp_seq - syscall_len;
+
+	if ((extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
+	     extra->source == DATA_SOURCE_OPENSSL_UPROBE) ||
+	    (conn_info->direction == T_INGRESS &&
+	     conn_info->tuple.l4_protocol == IPPROTO_TCP)) {
+		/*
+		 * If the current state is TCPF_CLOSE_WAIT, the FIN frame already has been received.
+		 * However, it cannot be confirmed that it has been processed by the syscall,
+		 * so use the tcp_seq value that entering the syscalls.
+		 *
+		 * Why not use "v->tcp_seq = args->tcp_seq;" ?
+		 * This is because kernel 4.14 verify reports errors("R0 invalid mem access 'inv'").
+		 */
+		v->tcp_seq = tcp_seq;
+	} else if (conn_info->direction == T_EGRESS &&
+		   conn_info->tuple.l4_protocol == IPPROTO_TCP) {
+		v->tcp_seq = get_tcp_write_seq_from_fd(conn_info->fd) - syscall_len;
+	}
 
 	v->thread_trace_id = thread_trace_id;
 	bpf_get_current_comm(v->comm, sizeof(v->comm));
@@ -890,93 +921,46 @@ data_submit(struct pt_regs *ctx, struct conn_info_t *conn_info,
 	} else
 		v->extra_data_count = 0;
 
-	if (extra->source == DATA_SOURCE_GO_TLS_UPROBE ||
-	    extra->source == DATA_SOURCE_OPENSSL_UPROBE)
-		v->tcp_seq = extra->tcp_seq;
-
 	v->coroutine_id = extra->coroutine_id;
 	v->source = extra->source;
-	/*
-	 * the bitwise AND operation will set the range of possible values for
-	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
-	 */
-	__u32 len = syscall_len & (sizeof(v->data) - 1);
 
-	if (vecs) {
-		len = iovecs_copy(v, v_buff, args, syscall_len, len);
-	} else {
-		if (syscall_len >= sizeof(v->data)) {
-			if (unlikely(bpf_probe_read(v->data, sizeof(v->data), args->buf) != 0))
-				return;
-			len = sizeof(v->data);
-		} else {
-			/*
-			 * https://elixir.bootlin.com/linux/v4.14/source/kernel/bpf/verifier.c#812
-			 * __check_map_access() 触发条件检查（size <= 0）
-			 * ```
-			 *     if (off < 0 || size <= 0 || off + size > map->value_size)
-			 * ```
-			 * "invalid access to map value, value_size=10888 off=135 size=0"
-			 * 使用'len + 1'代替'len'，来规避（Linux 4.14.x）这个检查。
-			 */
-			if (unlikely(bpf_probe_read(v->data,
-						    len + 1,
-						    args->buf) != 0))
-				return;
-		}
-	}
+	struct tail_calls_context *context = (struct tail_calls_context *)v->data;
+	context->max_size_limit = data_max_sz;
+	context->vecs = (bool) vecs;
+	context->dir = conn_info->direction;
 
-	v->data_len = len;
-	v_buff->len += offsetof(typeof(struct __socket_data), data) + v->data_len;
-	v_buff->events_num++;
-
-	if (v_buff->events_num == EVENT_BURST_NUM) {
-		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
-				 & (sizeof(*v_buff) - 1);
-		if (buf_size >= sizeof(*v_buff))
-			bpf_perf_event_output(ctx, &NAME(socket_data),
-					      BPF_F_CURRENT_CPU, v_buff,
-					      sizeof(*v_buff));
-		else
-			/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
-			bpf_perf_event_output(ctx, &NAME(socket_data),
-					      BPF_F_CURRENT_CPU, v_buff,
-					      buf_size + 1);
-
-		v_buff->events_num = 0;
-		v_buff->len = 0;
-	}
+	return 0;
 }
 
-static __inline void process_data(struct pt_regs *ctx, __u64 id,
-				  const enum traffic_direction direction,
-				  const struct data_args_t *args,
-				  ssize_t bytes_count,
-				  const struct process_data_extra *extra)
+static __inline int process_data(struct pt_regs *ctx, __u64 id,
+				 const enum traffic_direction direction,
+				 const struct data_args_t *args,
+				 ssize_t bytes_count,
+				 const struct process_data_extra *extra)
 {
 	__u32 tgid = id >> 32;
 
 	if (!extra)
-		return;
+		return -1;
 
 	if (!extra->vecs && args->buf == NULL)
-		return;
+		return -1;
 
 	if (extra->vecs && (args->iov == NULL || args->iovlen <= 0))
-		return;
+		return -1;
 
 	if (unlikely(args->fd < 0 || (int)bytes_count <= 0))
-		return;
+		return -1;
 
 	// TODO : 此处可以根据配置对进程号进行过滤
 
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
-		return;
+		return -1;
 
 	if (unlikely(!offset->ready))
-		return;
+		return -1;
 	
 	void *sk = get_socket_from_fd(args->fd, offset);
 	struct conn_info_t *conn_info, __conn_info = {};
@@ -985,7 +969,7 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 	if (!(sk != NULL &&
 	      ((sock_state = is_tcp_udp_data(sk, offset, conn_info))
 	       != SOCK_CHECK_TYPE_ERROR))) {
-		return;
+		return -1;
 	}
 
 	init_conn_info(tgid, args->fd, &__conn_info, sk);
@@ -1021,9 +1005,11 @@ static __inline void process_data(struct pt_regs *ctx, __u64 id,
 	// data_submit can be performed, otherwise MySQL data may be lost
 	if (conn_info->protocol != PROTO_UNKNOWN ||
 	    conn_info->message_type != MSG_UNKNOWN) {
-		data_submit(ctx, conn_info, args, extra->vecs,
-			    (__u32)bytes_count, offset, args->enter_ts, extra);
+		return data_submit(ctx, conn_info, args, extra->vecs,
+				   (__u32)bytes_count, offset, args->enter_ts, extra);
 	}
+
+	return -1;
 }
 
 static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
@@ -1033,8 +1019,9 @@ static __inline void process_syscall_data(struct pt_regs* ctx, __u64 id,
 		.vecs = false,
 		.source = DATA_SOURCE_SYSCALL,
 	};
-	process_data(ctx, id, direction, args, bytes_count, &extra);
 
+	if (!process_data(ctx, id, direction, args, bytes_count, &extra))
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
 }
 
 static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
@@ -1045,7 +1032,9 @@ static __inline void process_syscall_data_vecs(struct pt_regs* ctx, __u64 id,
 		.vecs = true,
 		.source = DATA_SOURCE_SYSCALL,
 	};
-	process_data(ctx, id, direction, args, bytes_count, &extra);
+
+	if (!process_data(ctx, id, direction, args, bytes_count, &extra))
+		bpf_tail_call(ctx, &NAME(progs_jmp_tp_map), 0);
 }
 
 /***********************************************************
@@ -1105,12 +1094,7 @@ TPPROG(sys_exit_read) (struct syscall_comm_exit_ctx *ctx) {
 	struct data_args_t* read_args = active_read_args_map__lookup(&id);
 	// Don't process FD 0-2 to avoid STDIN, STDOUT, STDERR.
 	if (read_args != NULL && read_args->fd > 2) {
-		struct process_data_extra extra = {
-			.vecs = false,
-			.source = DATA_SOURCE_SYSCALL,
-		};
-		process_data((struct pt_regs *)ctx, id, T_INGRESS, read_args,
-			     bytes_count, &extra);
+		process_syscall_data((struct pt_regs *)ctx, id, T_INGRESS, read_args, bytes_count);
 	}
 
 	active_read_args_map__delete(&id);
@@ -1499,6 +1483,117 @@ TPPROG(sys_exit_socket) (struct syscall_comm_exit_ctx *ctx) {
 		trace_stats->socket_map_count++;
 	}
 
+	return 0;
+}
+
+/*
+ * This eBPF program is specially used to transmit data to the agent. The purpose
+ * of this is to solve the problem that the number of instructions exceeds the limit.
+ */
+PROG(output_data) (void *ctx) {
+	__u64 id = bpf_get_current_pid_tgid();
+	enum traffic_direction dir;
+	bool vecs = false;
+	int max_size = 0;
+	int k0 = 0;
+
+	struct __socket_data_buffer *v_buff = bpf_map_lookup_elem(&NAME(data_buf), &k0);
+	if (!v_buff)
+		goto clear_args_map_2;
+
+	struct tail_calls_context *context =
+	    (struct tail_calls_context *)(v_buff->data + v_buff->len +
+					  offsetof(typeof(struct __socket_data),
+						   data));
+
+	if ((v_buff->len + offsetof(typeof(struct __socket_data), data) +
+	     sizeof(struct tail_calls_context)) > sizeof(v_buff->data)) {
+		goto clear_args_map_2;
+	}
+
+	dir = context->dir;
+	vecs = context->vecs;
+	max_size = context->max_size_limit;
+
+	struct data_args_t *args;
+	if (dir == T_INGRESS)
+		args = active_read_args_map__lookup(&id);
+	else
+		args = active_write_args_map__lookup(&id);
+
+	if (args == NULL)
+		goto clear_args_map_1;
+
+	struct __socket_data *v =
+	    (struct __socket_data *)(v_buff->data + v_buff->len);
+	if (v_buff->len > (sizeof(v_buff->data) - sizeof(*v)))
+		goto clear_args_map_1;
+
+	__u32 __len = v->syscall_len > max_size ? max_size : v->syscall_len;
+
+	/*
+	 * the bitwise AND operation will set the range of possible values for
+	 * the UNKNOWN_VALUE register to [0, BUFSIZE)
+	 */
+	__u32 len = __len & (sizeof(v->data) - 1);
+
+	if (vecs) {
+		len = iovecs_copy(v, v_buff, args, v->syscall_len, len);
+	} else {
+		if (__len >= sizeof(v->data)) {
+			if (unlikely(bpf_probe_read(v->data, sizeof(v->data), args->buf) != 0))
+				goto clear_args_map_1;
+			len = sizeof(v->data);
+		} else {
+			/*
+			 * https://elixir.bootlin.com/linux/v4.14/source/kernel/bpf/verifier.c#812
+			 * __check_map_access() 触发条件检查（size <= 0）
+			 * ```
+			 *     if (off < 0 || size <= 0 || off + size > map->value_size)
+			 * ```
+			 * "invalid access to map value, value_size=10888 off=135 size=0"
+			 * 使用'len + 1'代替'len'，来规避（Linux 4.14.x）这个检查。
+			 */
+			if (unlikely(bpf_probe_read(v->data,
+						    len + 1,
+						    args->buf) != 0))
+				goto clear_args_map_1;
+		}
+	}
+
+	v->data_len = len;
+	v_buff->len += offsetof(typeof(struct __socket_data), data) + v->data_len;
+	v_buff->events_num++;
+
+	if (v_buff->events_num >= EVENT_BURST_NUM ||
+	    ((sizeof(v_buff->data) - v_buff->len) < sizeof(*v))) {
+		__u32 buf_size = (v_buff->len + offsetof(typeof(struct __socket_data_buffer), data))
+				 & (sizeof(*v_buff) - 1);
+		if (buf_size >= sizeof(*v_buff))
+			bpf_perf_event_output(ctx, &NAME(socket_data),
+					      BPF_F_CURRENT_CPU, v_buff,
+					      sizeof(*v_buff));
+		else
+			/* 使用'buf_size + 1'代替'buf_size'，来规避（Linux 4.14.x）长度检查 */
+			bpf_perf_event_output(ctx, &NAME(socket_data),
+					      BPF_F_CURRENT_CPU, v_buff,
+					      buf_size + 1);
+
+		v_buff->events_num = 0;
+		v_buff->len = 0;
+	}
+
+clear_args_map_1:
+	if (dir == T_INGRESS)
+		active_read_args_map__delete(&id);
+	else
+		active_write_args_map__delete(&id);
+
+	return 0;
+
+clear_args_map_2:
+	active_read_args_map__delete(&id);
+	active_write_args_map__delete(&id);
 	return 0;
 }
 
