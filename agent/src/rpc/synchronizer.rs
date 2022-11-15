@@ -753,7 +753,6 @@ impl Synchronizer {
         let ntp_diff = self.ntp_diff.clone();
         self.threads.lock().push(self.rt.spawn(async move {
             while running.load(Ordering::SeqCst) {
-                let version = session.get_version();
                 let response = session
                     .grpc_push_with_statsd(Synchronizer::generate_sync_request(
                         &running_config,
@@ -763,11 +762,11 @@ impl Synchronizer {
                         &exception_handler,
                     ))
                     .await;
+                let version = session.get_version();
 
                 if let Err(m) = response {
                     exception_handler.set(Exception::ControllerSocketError);
                     error!("rpc error {:?}", m);
-
                     time::sleep(RPC_RETRY_INTERVAL).await;
                     continue;
                 }

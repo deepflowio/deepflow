@@ -461,17 +461,17 @@ impl MetricSink for DropletSink {
 #[derive(Default)]
 pub struct AtomicTimeStats {
     pub count: AtomicU32,
-    pub sum_nanos: AtomicU64,
-    pub max_nanos: AtomicU64,
+    pub sum_ns: AtomicU64,
+    pub max_ns: AtomicU64,
 }
 
 impl AtomicTimeStats {
     pub fn update(&self, duration: Duration) {
-        self.sum_nanos
+        self.sum_ns
             .fetch_add(duration.as_nanos() as u64, Ordering::Relaxed);
         self.count.fetch_add(1, Ordering::Relaxed);
         let _ = self
-            .max_nanos
+            .max_ns
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
                 let nanos = duration.as_nanos() as u64;
                 if x < nanos {

@@ -685,7 +685,8 @@ impl BaseDispatcherListener {
     fn on_npb_dedup_change(&mut self, config: &DispatcherConfig) {
         if config.npb_dedup_enabled != self.npb_dedup_enabled.load(Ordering::Relaxed) {
             info!("Npb dedup change to {}", config.npb_dedup_enabled);
-            self.npb_dedup_enabled.store(config.npb_dedup_enabled, Ordering::Relaxed)
+            self.npb_dedup_enabled
+                .store(config.npb_dedup_enabled, Ordering::Relaxed)
         }
     }
 
