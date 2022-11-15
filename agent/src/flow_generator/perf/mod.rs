@@ -214,6 +214,8 @@ impl FlowPerf {
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
+        is_parse_perf: bool,
+        is_parse_log: bool,
     ) -> Result<Vec<L7ProtocolInfo>> {
         if self.is_skip {
             return Err(Error::L7ProtocolCheckLimit);
@@ -234,14 +236,20 @@ impl FlowPerf {
                 i.set_parse_config(&self.parse_config);
                 if i.check_payload(payload, &param) {
                     self.l7_protocol = i.protocol();
-                    // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
-                    self.l7 = Self::l7_new(i.protocol(), self.rrt_cache.clone());
-                    if self.l7.is_some() {
-                        self.l7_parse_perf(packet, flow_id, app_table)?;
+
+                    if is_parse_perf {
+                        // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
+                        self.l7 = Self::l7_new(i.protocol(), self.rrt_cache.clone());
+                        if self.l7.is_some() {
+                            self.l7_parse_perf(packet, flow_id, app_table)?;
+                        }
                     }
 
-                    self.l7_protocol_log_parser = Some(i);
-                    return self.l7_parse_log(packet, app_table, &param);
+                    if is_parse_log {
+                        self.l7_protocol_log_parser = Some(i);
+                        return self.l7_parse_log(packet, app_table, &param);
+                    }
+                    return Ok(vec![]);
                 }
             }
 
@@ -260,6 +268,8 @@ impl FlowPerf {
         packet: &MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
+        is_parse_perf: bool,
+        is_parse_log: bool,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if self.l7.is_some() {
             self.l7_parse_perf(packet, flow_id, app_table)?;
@@ -280,7 +290,10 @@ impl FlowPerf {
             return Err(Error::L7ProtocolUnknown);
         }
 
-        return Ok((self.l7_check(packet, flow_id, app_table)?, self.get_rrt()));
+        return Ok((
+            self.l7_check(packet, flow_id, app_table, is_parse_perf, is_parse_log)?,
+            self.get_rrt(),
+        ));
     }
 
     pub fn new(
@@ -338,14 +351,22 @@ impl FlowPerf {
         flow_id: u64,
         l4_performance_enabled: bool,
         l7_performance_enabled: bool,
+        l7_log_parse_enabled: bool,
         app_table: &mut AppTable,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if l4_performance_enabled {
             self.l4.parse(packet, is_first_packet_direction)?;
         }
-        if l7_performance_enabled {
+
+        if l7_performance_enabled || l7_log_parse_enabled {
             // 抛出错误由flowMap.FlowPerfCounter处理
-            return self.l7_parse(packet, flow_id, app_table);
+            return self.l7_parse(
+                packet,
+                flow_id,
+                app_table,
+                l7_performance_enabled,
+                l7_log_parse_enabled,
+            );
         }
         Ok((vec![], 0))
     }

@@ -317,21 +317,4 @@ impl AppTable {
             IpAddr::V6(i) => self.set_ipv6_protocol(time_in_sec, i, epc, port, protocol),
         }
     }
-
-    fn delete_ipv4(&mut self, ip: Ipv4Addr, epc: i32, port: u16) {
-        let key = AppTable4Key { ip, epc, port };
-        self.ipv4.pop(&key);
-    }
-
-    fn delete_ipv6(&mut self, ip: Ipv6Addr, epc: i32, port: u16) {
-        let key = AppTable6Key { ip, epc, port };
-        self.ipv6.pop(&key);
-    }
-
-    pub fn delete(&mut self, ip: IpAddr, epc: i32, port: u16) {
-        match ip {
-            IpAddr::V4(i) => self.delete_ipv4(i, epc, port),
-            IpAddr::V6(i) => self.delete_ipv6(i, epc, port),
-        }
-    }
 }

@@ -47,6 +47,21 @@ struct HttpSessionData {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 }
 
+impl HttpSessionData {
+    fn set_http_protocol(&mut self, proto: L7Protocol) {
+        match proto {
+            L7Protocol::Http1 => self.l7_proto = L7Protocol::Http1,
+            L7Protocol::Http2 => {
+                if self.l7_proto != L7Protocol::Grpc {
+                    self.l7_proto = L7Protocol::Http2
+                }
+            }
+            L7Protocol::Grpc => self.l7_proto = L7Protocol::Grpc,
+            _ => {}
+        }
+    }
+}
+
 pub struct HttpPerfData {
     perf_stats: Option<PerfStats>,
     session_data: HttpSessionData,
@@ -91,7 +106,7 @@ impl L7FlowPerf for HttpPerfData {
             .is_ok()
         {
             self.session_data.has_log_data = true;
-            self.session_data.l7_proto = L7Protocol::Http1;
+            self.session_data.set_http_protocol(L7Protocol::Http1);
             return Ok(());
         }
         if self
@@ -99,7 +114,7 @@ impl L7FlowPerf for HttpPerfData {
             .is_ok()
         {
             self.session_data.has_log_data = true;
-            self.session_data.l7_proto = L7Protocol::Http2;
+            self.session_data.set_http_protocol(L7Protocol::Http2);
             return Ok(());
         }
 
@@ -140,7 +155,8 @@ impl L7FlowPerf for HttpPerfData {
 
     fn app_proto_head(&mut self) -> Option<(AppProtoHead, u16)> {
         if (self.session_data.l7_proto != L7Protocol::Http1
-            && self.session_data.l7_proto != L7Protocol::Http2)
+            && self.session_data.l7_proto != L7Protocol::Http2
+            && self.session_data.l7_proto != L7Protocol::Grpc)
             || !self.session_data.has_log_data
         {
             return None;
@@ -331,22 +347,28 @@ impl HttpPerfData {
         }
 
         let header_list = parse_rst.unwrap();
-
+        let mut ret = Err(Error::HttpHeaderParseFailed);
         for header in header_list.iter() {
             match header.0.as_slice() {
                 b":method" => {
-                    return Ok(0);
+                    ret = Ok(0);
                 }
                 b":status" => {
-                    return Ok(std::str::from_utf8(header.1.as_slice())
+                    ret = Ok(std::str::from_utf8(header.1.as_slice())
                         .unwrap_or_default()
                         .parse::<u16>()
                         .unwrap_or_default())
                 }
+                b"content-type" => {
+                    if header.1.starts_with(b"application/grpc") {
+                        // change to grpc protocol
+                        self.session_data.set_http_protocol(L7Protocol::Grpc);
+                    }
+                }
                 _ => {}
             }
         }
-        Err(Error::HttpHeaderParseFailed)
+        ret
     }
 
     fn has_magic(payload: &[u8]) -> bool {
