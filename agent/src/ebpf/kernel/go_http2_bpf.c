@@ -295,9 +295,9 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 		return;
 	}
 
-	// trace_uid, generator for socket_id
-	struct trace_uid_t *trace_uid = trace_uid_map__lookup(&k0);
-	if (trace_uid == NULL)
+	// trace_conf, generator for socket_id
+	struct trace_conf_t *trace_conf = trace_conf_map__lookup(&k0);
+	if (trace_conf == NULL)
 		return;
 
 	// Update and get socket_id
@@ -308,8 +308,8 @@ static __inline void http2_fill_common_socket(struct http2_header_data *data,
 	if (is_socket_info_valid(socket_info_ptr)) {
 		send_buffer->socket_id = socket_info_ptr->uid;
 	} else {
-		send_buffer->socket_id = trace_uid->socket_id + 1;
-		trace_uid->socket_id++;
+		send_buffer->socket_id = trace_conf->socket_id + 1;
+		trace_conf->socket_id++;
 
 		struct socket_info_t sk_info = {
 			.uid = send_buffer->socket_id,

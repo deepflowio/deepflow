@@ -88,6 +88,7 @@ struct socket_bpf_data {
  *
  * @boot_time_update_diff 这里用于记录相邻两次更新后，系统启动时间之间的差异（单位为纳秒）。
  * @probes_count How many probes now 
+ * @data_limit_max Maximum data length limit
  */
 struct socket_trace_stats {
 
@@ -124,6 +125,7 @@ struct socket_trace_stats {
 
 	int64_t boot_time_update_diff;
 	uint32_t probes_count;
+	uint32_t data_limit_max;
 };
 
 struct bpf_offset_param {
@@ -158,6 +160,7 @@ struct extra_event {
 	void (*h)(void *);
 };
 
+int set_data_limit_max(int limit_size);
 struct socket_trace_stats socket_tracer_stats(void);
 int running_socket_tracer(l7_handle_fn handle,
 			  int thread_nr,

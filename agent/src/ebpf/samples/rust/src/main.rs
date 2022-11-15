@@ -301,6 +301,9 @@ fn main() {
             ::std::process::exit(1);
         }
 
+	// test data limit max
+	set_data_limit_max(10000);
+
         bpf_tracer_finish();
 
         let stats = socket_tracer_stats();

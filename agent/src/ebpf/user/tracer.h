@@ -332,6 +332,7 @@ struct bpf_tracer {
 	tracer_ctl_fun_t start_handle;
 	enum tracer_state state;	// 追踪器状态
 	bool adapt_success;	// 是否成功适配内核, true 成功适配，false 适配失败
+	uint32_t data_limit_max;     // The maximum amount of data returned to the user-reader
 };
 
 #define EXTRA_TYPE_SERVER 0
@@ -379,6 +380,7 @@ struct bpf_tracer_param {
 	int probes_count;
 	int state;
 	bool adapt_success;
+	uint32_t data_limit_max;
 	uint64_t proto_status[PROTO_NUM];
 } __attribute__ ((__packed__));
 

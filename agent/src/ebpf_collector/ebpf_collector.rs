@@ -21,12 +21,12 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use libc::c_int;
 use log::{debug, error, info, warn};
 use lru::LruCache;
 use public::bitmap::Bitmap;
 
 use super::{Error, Result};
-
 use crate::common::enums::IpProtocol;
 use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::l7_protocol_info::L7ProtocolInfo;
@@ -813,7 +813,6 @@ impl EbpfRunner {
             self.config, config
         );
         self.config = config.clone();
-        unsafe { CAPTURE_SIZE = config.l7_log_packet_size }
     }
 
     fn l7_log_dynamic_config_updated(&mut self) {
@@ -916,7 +915,6 @@ pub struct EbpfCollector {
 
 static mut SWITCH: bool = false;
 static mut SENDER: Option<DebugSender<Box<MetaPacket>>> = None;
-static mut CAPTURE_SIZE: usize = ebpf::CAP_LEN_MAX as usize;
 
 impl EbpfCollector {
     extern "C" fn ebpf_callback(sd: *mut ebpf::SK_BPF_DATA) {
@@ -924,7 +922,7 @@ impl EbpfCollector {
             if !SWITCH || SENDER.is_none() {
                 return;
             }
-            let packet = MetaPacket::from_ebpf(sd, CAPTURE_SIZE);
+            let packet = MetaPacket::from_ebpf(sd);
             if packet.is_err() {
                 warn!("meta packet parse from ebpf error: {}", packet.unwrap_err());
                 return;
@@ -1031,10 +1029,26 @@ impl EbpfCollector {
         unsafe {
             SWITCH = false;
             SENDER = Some(sender);
-            CAPTURE_SIZE = config.l7_log_packet_size;
         }
 
         Ok(())
+    }
+
+    fn ebpf_on_config_change(l7_log_packet_size: usize) {
+        unsafe {
+            let n = ebpf::set_data_limit_max(l7_log_packet_size as c_int);
+            if n < 0 {
+                warn!(
+                    "ebpf set l7_log_packet_size({}) failed.",
+                    l7_log_packet_size
+                );
+            } else if n != l7_log_packet_size as c_int {
+                info!(
+                    "ebpf set l7_log_packet_size to {}, actual effective configuration is {}.",
+                    l7_log_packet_size, n
+                );
+            }
+        }
     }
 
     fn ebpf_start() {
@@ -1087,6 +1101,8 @@ impl EbpfCollector {
             &config.ebpf_uprobe_proc_regexp,
             config.l7_protocol_enabled_bitmap,
         )?;
+        Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
+
         info!("ebpf collector initialized.");
         return Ok(Box::new(EbpfCollector {
             thread_runner: EbpfRunner {
@@ -1136,6 +1152,7 @@ impl EbpfCollector {
             self.stop();
         }
 
+        Self::ebpf_on_config_change(config.l7_log_packet_size);
         self.thread_runner.on_config_change(config);
     }
 

@@ -16,7 +16,8 @@
 
 #ifndef DF_BPF_SOCKET_TRACE_COMMON_H
 #define DF_BPF_SOCKET_TRACE_COMMON_H
-#define CAP_DATA_SIZE 1024
+#define CAP_DATA_SIZE 1024		// For no-brust send buffer
+#define BURST_DATA_BUF_SIZE 8192	// For brust send buffer
 
 enum endpoint_role {
 	ROLE_UNKNOWN,
@@ -65,7 +66,7 @@ struct __socket_data {
 	__u64 data_seq;      // cap_data在Socket中的相对顺序号
 	__u16 data_type;     // HTTP, DNS, MySQL
 	__u16 data_len;      // 数据长度
-	char data[CAP_DATA_SIZE];
+	char data[BURST_DATA_BUF_SIZE];
 } __attribute__((packed));
 
 /*
@@ -78,10 +79,11 @@ struct __socket_data_buffer {
 	char data[32760]; // 32760 + len(4bytes) + events_num(4bytes) = 2^15 = 32768
 };
 
-struct trace_uid_t {
+struct trace_conf_t {
 	__u64 socket_id;       // 会话标识
 	__u64 coroutine_trace_id;  // 同一协程的数据转发关联
 	__u64 thread_trace_id; // 同一进程/线程的数据转发关联，用于多事务流转场景
+	__u32 data_limit_max;  // Maximum number of data transfers
 };
 
 struct trace_stats {
