@@ -109,6 +109,8 @@ func main() {
 	go querier.Start(*configPath)
 	closers := ingester.Start(*configPath, shared)
 
+	common.NewMonitor()
+
 	// TODO: loghandle提取出来，并增加log
 	// setup system signal
 	signalChannel := make(chan os.Signal, 1)

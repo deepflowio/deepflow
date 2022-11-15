@@ -142,7 +142,7 @@ func (m *Metricsor) Start() {
 func (m *Metricsor) Close() {
 	for _, platformData := range m.PlatformDatas {
 		if m.PlatformDataEnabled {
-			platformData.Close()
+			platformData.ClosePlatformInfoTable()
 		}
 	}
 }

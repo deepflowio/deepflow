@@ -31,6 +31,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/spf13/cobra"
 	"github.com/vishvananda/netlink"
+
 	"golang.org/x/net/context"
 
 	"github.com/deepflowys/deepflow/message/trident"
@@ -39,6 +40,7 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/receiver"
 	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
+	"github.com/deepflowys/deepflow/server/libs/stats"
 	"github.com/deepflowys/deepflow/server/libs/utils"
 )
 
@@ -102,6 +104,18 @@ type VtapInfo struct {
 	PodClusterId uint32
 }
 
+type Counter struct {
+	GrpcRequestTime    int64 `statsd:"grpc-request-time"`
+	UpdateServiceTime  int64 `statsd:"update-service-time"`
+	UpdatePlatformTime int64 `statsd:"update-platform-time"`
+	UpdateCount        int64 `statsd:"update-count"`
+
+	IP4TotalCount int64 `statsd:"ip4-total-count"`
+	IP4HitCount   int64 `statsd:"ip4-hit-count"`
+	IP6TotalCount int64 `statsd:"ip6-total-count"`
+	IP6HitCount   int64 `statsd:"ip6-hit-count"`
+}
+
 type PlatformInfoTable struct {
 	receiver         *receiver.Receiver
 	regionID         uint32
@@ -140,10 +154,20 @@ type PlatformInfoTable struct {
 	peerConnections map[int32][]int32
 
 	*GrpcSession
+
+	counter *Counter
+	utils.Closable
+}
+
+func (t *PlatformInfoTable) GetCounter() interface{} {
+	var counter *Counter
+	counter, t.counter = t.counter, &Counter{}
+	return counter
 }
 
 func (t *PlatformInfoTable) ClosePlatformInfoTable() {
-	t.Close()
+	t.GrpcSession.Close()
+	t.Closable.Close()
 }
 
 func (t *PlatformInfoTable) QueryRegionID() uint32 {
@@ -279,6 +303,7 @@ func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize int, moduleName, pca
 		vtapIdInfos:     make(map[uint32]*VtapInfo),
 		peerConnections: make(map[int32][]int32),
 		ctlIP:           nodeIP,
+		counter:         &Counter{},
 	}
 	runOnce := func() {
 		if err := table.Reload(); err != nil {
@@ -286,6 +311,7 @@ func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize int, moduleName, pca
 		}
 	}
 	table.Init(ips, uint16(port), DEFAULT_SYNC_INTERVAL, rpcMaxMsgSize, runOnce)
+	stats.RegisterCountable("platformdata", table, stats.OptionStatTags{"module": moduleName})
 	return table
 }
 
@@ -314,6 +340,7 @@ func (t *PlatformInfoTable) IPV4InfoStat(lruItem interface{}) {
 func (t *PlatformInfoTable) queryIPV4Infos(epcID int32, ipv4 uint32) (info *Info) {
 	var ok bool
 	var lruValue interface{}
+	t.counter.IP4TotalCount++
 	key := uint64(epcID)<<32 | uint64(ipv4)
 	if lruValue, ok = t.epcIDIPV4Lru.Get(key, false); !ok {
 		if info, ok = t.epcIDIPV4Infos[key]; !ok {
@@ -321,6 +348,7 @@ func (t *PlatformInfoTable) queryIPV4Infos(epcID int32, ipv4 uint32) (info *Info
 		}
 		t.IPV4InfoAddLru(info, key)
 	} else {
+		t.counter.IP4HitCount++
 		t.IPV4InfoStat(lruValue)
 		info, _ = lruValue.(*Info)
 	}
@@ -414,11 +442,13 @@ func (t *PlatformInfoTable) queryIPV4InfosPair(epcID0 int32, ipv40 uint32, epcID
 	var lruValue0, lruValue1 interface{}
 	key0 := uint64(epcID0)<<32 | uint64(ipv40)
 	key1 := uint64(epcID1)<<32 | uint64(ipv41)
+	t.counter.IP4TotalCount += 2
 	if lruValue0, ok0 = t.epcIDIPV4Lru.Get(key0, false); !ok0 {
 		if info0, ok0 = t.epcIDIPV4Infos[key0]; !ok0 {
 			info0 = t.queryIPV4Cidr(epcID0, ipv40)
 		}
 	} else {
+		t.counter.IP4HitCount++
 		t.IPV4InfoStat(lruValue0)
 		info0, _ = lruValue0.(*Info)
 	}
@@ -427,6 +457,7 @@ func (t *PlatformInfoTable) queryIPV4InfosPair(epcID0 int32, ipv40 uint32, epcID
 			info1 = t.queryIPV4Cidr(epcID1, ipv41)
 		}
 	} else {
+		t.counter.IP4HitCount++
 		t.IPV4InfoStat(lruValue1)
 		info1, _ = lruValue1.(*Info)
 	}
@@ -470,12 +501,14 @@ func (t *PlatformInfoTable) queryIPV6Infos(epcID int32, ipv6 net.IP) (info *Info
 	binary.LittleEndian.PutUint32(key[:], uint32(epcID))
 	copy(key[4:], ipv6)
 
+	t.counter.IP6TotalCount++
 	if lruValue, ok = t.epcIDIPV6Lru.Get(key[:], false); !ok {
 		if info, ok = t.epcIDIPV6Infos[key]; !ok {
 			info = t.queryIPV6Cidr(epcID, ipv6)
 		}
 		t.IPV6InfoAddLru(info, key[:])
 	} else {
+		t.counter.IP6HitCount++
 		t.IPV6InfoStat(lruValue)
 		info, _ = lruValue.(*Info)
 	}
@@ -489,6 +522,7 @@ func (t *PlatformInfoTable) queryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 	binary.LittleEndian.PutUint32(key1[:], uint32(epcID1))
 	copy(key1[4:], ipv61)
 
+	t.counter.IP6TotalCount += 2
 	var ok0, ok1 bool
 	var lruValue0, lruValue1 interface{}
 	if lruValue0, ok0 = t.epcIDIPV6Lru.Get(key0[:], false); !ok0 {
@@ -496,6 +530,7 @@ func (t *PlatformInfoTable) queryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 			info0 = t.queryIPV6Cidr(epcID0, ipv60)
 		}
 	} else {
+		t.counter.IP6HitCount++
 		t.IPV6InfoStat(lruValue0)
 		info0, _ = lruValue0.(*Info)
 	}
@@ -505,6 +540,7 @@ func (t *PlatformInfoTable) queryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 			info1 = t.queryIPV6Cidr(epcID1, ipv61)
 		}
 	} else {
+		t.counter.IP6HitCount++
 		t.IPV6InfoStat(lruValue1)
 		info1, _ = lruValue1.(*Info)
 	}
@@ -883,7 +919,9 @@ func servicesHasGroupIDMap(services []api.GroupIDMap, g api.GroupIDMap) bool {
 }
 
 func (t *PlatformInfoTable) Reload() error {
+	t.counter.UpdateCount++
 	var response *trident.SyncResponse
+	start := time.Now()
 	err := t.Request(func(ctx context.Context, remote net.IP) error {
 		var err error
 		if t.ctlIP == "" {
@@ -927,6 +965,8 @@ func (t *PlatformInfoTable) Reload() error {
 		return err
 	}
 
+	grpcRequestTime := int64(time.Since(start))
+	t.counter.GrpcRequestTime += grpcRequestTime
 	if status := response.GetStatus(); status != trident.Status_SUCCESS {
 		return fmt.Errorf("grpc response failed. responseStatus is %v", status)
 	}
@@ -938,6 +978,8 @@ func (t *PlatformInfoTable) Reload() error {
 			t.versionGroups = newGroupsVersion
 		}
 	}
+	updateServiceTime := int64(time.Since(start)) - grpcRequestTime
+	t.counter.UpdateServiceTime += updateServiceTime
 
 	vtapIps := response.GetVtapIps()
 	if vtapIps != nil {
@@ -950,6 +992,7 @@ func (t *PlatformInfoTable) Reload() error {
 
 	newVersion := response.GetVersionPlatformData()
 	if newVersion == t.versionPlatformData {
+		t.counter.UpdatePlatformTime += int64(time.Since(start)) - grpcRequestTime - updateServiceTime
 		return nil
 	}
 
@@ -1001,6 +1044,7 @@ func (t *PlatformInfoTable) Reload() error {
 	t.epcIDBaseInfos = newEpcIDBaseInfos
 	t.epcIDBaseMissCount = make(map[int32]*uint64)
 
+	t.counter.UpdatePlatformTime += int64(time.Since(start)) - grpcRequestTime - updateServiceTime
 	return nil
 }
 

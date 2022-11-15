@@ -255,7 +255,7 @@ func (l *Logger) Start() {
 func (l *Logger) Close() {
 	for _, platformData := range l.PlatformDatas {
 		if platformData != nil {
-			platformData.Close()
+			platformData.ClosePlatformInfoTable()
 		}
 	}
 }

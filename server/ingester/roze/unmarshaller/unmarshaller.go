@@ -60,6 +60,8 @@ type Counter struct {
 	ExpiredDocCount int64 `statsd:"expired-doc-count"`
 	FutureDocCount  int64 `statsd:"future-doc-count"`
 	DropDocCount    int64 `statsd:"drop-doc-count"`
+	TotalTime       int64 `statsd:"total-time"`
+	AvgTime         int64 `statsd:"avg-time"`
 
 	FlowPortCount       int64 `statsd:"vtap-flow-port"`
 	FlowPort1sCount     int64 `statsd:"vtap-flow-port-1s"`
@@ -129,6 +131,7 @@ func (u *Unmarshaller) GetCounter() interface{} {
 
 	if counter.DocCount != 0 {
 		counter.AverageDelay /= counter.DocCount
+		counter.AvgTime = counter.TotalTime / counter.DocCount
 	} else {
 		counter.MaxDelay = 0
 		counter.MinDelay = 0
@@ -210,6 +213,7 @@ func (u *Unmarshaller) QueueProcess() {
 	pbDoc := pb.NewDocument()
 	for {
 		n := u.unmarshallQueue.Gets(rawDocs)
+		start := time.Now()
 		for i := 0; i < n; i++ {
 			value := rawDocs[i]
 			if recvBytes, ok := value.(*receiver.RecvBuffer); ok {
@@ -258,5 +262,6 @@ func (u *Unmarshaller) QueueProcess() {
 				log.Warning("get unmarshall queue data type wrong")
 			}
 		}
+		u.counter.TotalTime += int64(time.Since(start))
 	}
 }
