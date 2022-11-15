@@ -587,7 +587,7 @@ impl RefCountable for GrpcCallCounter {
     fn get_counters(&self) -> Vec<Counter> {
         let max_delay = self.delay.max_ns.swap(0, Ordering::Relaxed) / 1000;
         let delay_count = self.delay.count.swap(0, Ordering::Relaxed) as u64;
-        let sum = self.delay.sum_ns.swap(0, Ordering::Relaxed) / delay_count / 1000;
+        let sum = self.delay.sum_ns.swap(0, Ordering::Relaxed) / 1000;
         let avg_delay = if delay_count == 0 {
             0
         } else {
