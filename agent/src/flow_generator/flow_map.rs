@@ -860,9 +860,9 @@ impl FlowMap {
             }
         }
         if self.config.load().app_proto_log_enabled && meta_packet.packet_len > 0 {
-            if let Some(info) = info {
+            if let Some((info, rrt)) = info {
                 for i in info.into_iter() {
-                    self.write_to_app_proto_log(node, &meta_packet, i);
+                    self.write_to_app_proto_log(node, &meta_packet, i, rrt);
                 }
             }
         }
@@ -1049,6 +1049,7 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
+        rrt: u64,
     ) {
         let lookup_key = &meta_packet.lookup_key; //  server接口定义: 0(TAP_ANY)表示所有都需要
         if !self.config.load().l7_log_tap_types[u16::from(TapType::Any) as usize]
@@ -1062,7 +1063,8 @@ impl FlowMap {
             return;
         }
         // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
-        if let Some(head) = l7_info.app_proto_head() {
+        if let Some(mut head) = l7_info.app_proto_head() {
+            head.rrt = rrt;
             node.tagged_flow.flow.set_tap_side(
                 self.config.load().trident_type,
                 self.config.load().cloud_gateway_traffic,
