@@ -585,25 +585,29 @@ pub struct GrpcCallCounter {
 
 impl RefCountable for GrpcCallCounter {
     fn get_counters(&self) -> Vec<Counter> {
+        let max_delay = self.delay.max_ns.swap(0, Ordering::Relaxed) / 1000;
+        let delay_count = self.delay.count.swap(0, Ordering::Relaxed) as u64;
+        let sum = self.delay.sum_ns.swap(0, Ordering::Relaxed) / delay_count / 1000;
+        let avg_delay = if delay_count == 0 {
+            0
+        } else {
+            sum / delay_count
+        };
         vec![
             (
                 "max_delay",
                 CounterType::Gauged,
-                CounterValue::Unsigned(self.delay.max_nanos.swap(0, Ordering::Relaxed) / 1000),
+                CounterValue::Unsigned(max_delay),
             ),
             (
                 "avg_delay",
                 CounterType::Gauged,
-                CounterValue::Unsigned(
-                    (self.delay.sum_nanos.swap(0, Ordering::Relaxed)
-                        / self.delay.count.load(Ordering::Relaxed) as u64)
-                        as u64,
-                ),
+                CounterValue::Unsigned(avg_delay),
             ),
             (
                 "delay_count",
                 CounterType::Gauged,
-                CounterValue::Unsigned(self.delay.count.swap(0, Ordering::Relaxed) as u64),
+                CounterValue::Unsigned(delay_count),
             ),
         ]
     }
