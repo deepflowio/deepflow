@@ -61,9 +61,15 @@ func (i *WANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.WANIP, boo
 		))
 		return nil, false
 	}
-
+	ip := common.FormatIP(cloudItem.IP)
+	if ip == "" {
+		log.Error(ipIsInvalid(
+			common.RESOURCE_TYPE_WAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
+		))
+		return nil, false
+	}
 	dbItem := &mysql.WANIP{
-		IP:           common.FormatIP(cloudItem.IP),
+		IP:           ip,
 		Domain:       i.cache.DomainLcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		VInterfaceID: vinterfaceID,

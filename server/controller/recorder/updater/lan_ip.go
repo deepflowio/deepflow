@@ -67,22 +67,19 @@ func (l *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 		))
 		return nil, false
 	}
-	// netIndex, exists := l.cache.GetSubnetIndexByLcuuid(cloudItem.SubnetLcuuid)
-	// if !exists {
-	// 	log.Error(resourceAForResourceBNotFound(
-	// 		common.RESOURCE_TYPE_SUBNET_EN, cloudItem.SubnetLcuuid,
-	// 		common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
-	// 	))
-	// 	return nil, false
-	// }
-
+	ip := common.FormatIP(cloudItem.IP)
+	if ip == "" {
+		log.Error(ipIsInvalid(
+			common.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
+		))
+		return nil, false
+	}
 	dbItem := &mysql.LANIP{
-		IP:           common.FormatIP(cloudItem.IP),
+		IP:           ip,
 		Domain:       l.cache.DomainLcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		NetworkID:    networkID,
 		VInterfaceID: vinterfaceID,
-		// NetIndex:     netIndex,
 	}
 	dbItem.Lcuuid = cloudItem.Lcuuid
 	return dbItem, true

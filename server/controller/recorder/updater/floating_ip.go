@@ -72,10 +72,17 @@ func (f *FloatingIP) generateDBItemToAdd(cloudItem *cloudmodel.FloatingIP) (*mys
 		))
 		return nil, false
 	}
+	ip := common.FormatIP(cloudItem.IP)
+	if ip == "" {
+		log.Error(ipIsInvalid(
+			common.RESOURCE_TYPE_FLOATING_IP_EN, cloudItem.Lcuuid, cloudItem.IP,
+		))
+		return nil, false
+	}
 	dbItem := &mysql.FloatingIP{
 		Domain:    f.cache.DomainLcuuid,
 		Region:    cloudItem.RegionLcuuid,
-		IP:        common.FormatIP(cloudItem.IP),
+		IP:        ip,
 		NetworkID: networkID,
 		VPCID:     vpcID,
 		VMID:      vmID,
