@@ -56,8 +56,8 @@ use crate::{
     },
     common::{
         enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
-        FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
-        NORMAL_EXIT_WITH_RESTART,
+        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
+        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -175,11 +175,6 @@ pub struct Trident {
     handle: Option<JoinHandle<()>>,
 }
 
-#[cfg(unix)]
-pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
-#[cfg(windows)]
-pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "C:\\DeepFlow\\trident\\trident-windows.yaml";
-
 impl Trident {
     pub fn start<P: AsRef<Path>>(
         config_path: P,
@@ -193,7 +188,7 @@ impl Trident {
                     Err(e) => {
                         if let ConfigError::YamlConfigInvalid(_) = e {
                             // try to load config file from trident.yaml to support upgrading from trident
-                            if let Ok(conf) = Config::load_from_file(DEFAULT_TRIDENT_CONF_FILE) {
+                            if let Ok(conf) = Config::load_from_file(DEFAULT_CONF_FILE) {
                                 conf
                             } else {
                                 // return the original error instead of loading trident conf
