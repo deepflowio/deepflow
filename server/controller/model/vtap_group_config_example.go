@@ -125,7 +125,7 @@ vtap_group_id: g-xxxxxx
 #capture_socket_type: 0
 
 ## Traffic Tap Mode
-## Default: 0, means local, Options: 0, 1 (mirror), 2 (physical)
+## Default: 0, means local, Options: 0, 1 (virtual mirror), 2 (physical mirror)
 ## Note: EXSi vtap choose mirror tap mode, dedicated vtap choose physical tap mode
 #tap_mode: 0
 
