@@ -508,6 +508,7 @@ impl MirrorModeDispatcher {
             }
         }
 
+        self.pipelines.clear();
         self.base.terminate_handler();
         info!("Stopped dispatcher {}", self.base.id);
     }
