@@ -83,6 +83,8 @@ MAP_PERARRAY(trace_stats_map, __u32, struct trace_stats, 1)
 // key: protocol id, value: is protocol enabled, size: PROTO_NUM
 MAP_ARRAY(protocol_filter, int, int, PROTO_NUM)
 
+MAP_ARRAY(allow_port_bitmap, __u32, struct allow_port_bitmap, 1)
+
 // write() syscall's input argument.
 // Key is {tgid, pid}.
 BPF_HASH(active_write_args_map, __u64, struct data_args_t)
@@ -975,7 +977,19 @@ static __inline int process_data(struct pt_regs *ctx, __u64 id,
 	init_conn_info(tgid, args->fd, &__conn_info, sk);
 
 	conn_info->direction = direction;
-	if (!extra->vecs) {
+
+	bool data_submit_dircet = false;
+	struct allow_port_bitmap *bp = allow_port_bitmap__lookup(&k0);
+	if (bp) {
+		if (is_set_bitmap(bp->bitmap, conn_info->tuple.dport) ||
+		    is_set_bitmap(bp->bitmap, conn_info->tuple.num)) {
+			data_submit_dircet = true;
+		}
+	}
+	if (data_submit_dircet) {
+		conn_info->protocol = PROTO_ORTHER;
+		conn_info->message_type = MSG_REQUEST;
+	} else if (!extra->vecs) {
 		infer_l7_class(conn_info, direction, args->buf, bytes_count, sock_state, extra);
 	} else {
 		struct iovec iov_cpy = {};
