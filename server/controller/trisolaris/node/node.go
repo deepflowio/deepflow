@@ -507,10 +507,6 @@ func (n *NodeInfo) isRegisterController() {
 			dbController.Os = data.Os
 			changed = true
 		}
-		if dbController.Os != data.Os {
-			dbController.Os = data.Os
-			changed = true
-		}
 		if dbController.KernelVersion != data.KernelVersion {
 			dbController.KernelVersion = data.KernelVersion
 			changed = true
