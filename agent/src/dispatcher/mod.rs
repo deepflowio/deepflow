@@ -709,6 +709,11 @@ impl DispatcherBuilder {
         let collector = self
             .stats_collector
             .ok_or(Error::StatsCollector("no stats collector"))?;
+        let src_interface = if tap_mode == TapMode::Local {
+            "".to_string()
+        } else {
+            self.src_interface.unwrap_or("".to_string())
+        };
 
         #[cfg(target_os = "linux")]
         let platform_poller = self
@@ -716,16 +721,20 @@ impl DispatcherBuilder {
             .take()
             .ok_or(Error::ConfigIncomplete("no platform poller".into()))?;
 
-        let src_interface = self.src_interface.unwrap_or("".to_string());
         let base = BaseDispatcher {
+            log_id: {
+                let mut lid = vec![id.to_string()];
+                if &src_interface != "" {
+                    lid.push(src_interface.clone());
+                } else if netns != NsFile::Root {
+                    lid.push(netns.to_string());
+                }
+                format!("({})", lid.join(", "))
+            },
             engine,
 
             id,
-            src_interface: if tap_mode == TapMode::Local {
-                "".to_string()
-            } else {
-                src_interface.clone()
-            },
+            src_interface: src_interface.clone(),
             src_interface_index: 0,
             ctrl_mac: self
                 .ctrl_mac

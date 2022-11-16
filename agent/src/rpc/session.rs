@@ -410,7 +410,10 @@ impl Session {
         self.counters[KUBERNETES_API_SYNC_ENDPOINT]
             .delay
             .update(now_elapsed);
-        debug!("grpc kubernetes_api_sync latency {:?}ms", now_elapsed.as_millis());
+        debug!(
+            "grpc kubernetes_api_sync latency {:?}ms",
+            now_elapsed.as_millis()
+        );
         response
     }
 
@@ -435,7 +438,10 @@ impl Session {
         self.counters[GET_KUBERNETES_CLUSTER_ID_ENDPOINT]
             .delay
             .update(now_elapsed);
-        debug!("grpc get_kubernetes_cluster_id latency {:?}ms", now_elapsed.as_millis());
+        debug!(
+            "grpc get_kubernetes_cluster_id latency {:?}ms",
+            now_elapsed.as_millis()
+        );
         response
     }
 }
