@@ -69,7 +69,6 @@ l7_protocol         , l7_protocol          , l7_protocol           , int_enum   
 flow_id             , flow_id              , flow_id               , int          ,                      , Flow Info            , 111
 start_time          , start_time           , start_time            , int          ,                      , Flow Info            , 111
 end_time            , end_time             , end_time              , int          ,                      , Flow Info            , 111
-duration            , duration             , duration              , int          ,                      , Flow Info            , 111
 close_type          , close_type           , close_type            , int_enum     , close_type           , Flow Info            , 111
 status              , status               , status                , int_enum     , status               , Flow Info            , 111
 is_new_flow         , is_new_flow          , is_new_flow           , bool         ,                      , Flow Info            , 111

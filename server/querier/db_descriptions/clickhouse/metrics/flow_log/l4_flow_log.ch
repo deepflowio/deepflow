@@ -83,6 +83,7 @@ art_sum                     , 累计数据时延            , 微秒 ,
 art_count                   , 数据时延次数            , 次   ,
 cit_sum                     , 累计客户端等待时延      , 微秒 ,
 cit_count                   , 客户端等待时延次数      , 次   ,
+duration                    , 流持续时间              , 微秒 , 表示流的首包到尾包（注意不是 end_time）的时长。
 
 l7_request                  , 应用请求                , 个   ,
 l7_response                 , 应用响应                , 个   ,
