@@ -74,6 +74,7 @@ func (v *VM) ProduceByAdd(items []*mysql.VM) {
 		}...)
 
 		v.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			v.deviceType,
@@ -101,6 +102,7 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 
 	nIDs, ips := v.getIPNetworksByID(id)
 	v.createAndPutEvent(
+		cloudItem.Lcuuid,
 		eType,
 		name,
 		common.VIF_DEVICE_TYPE_VM,
@@ -118,14 +120,14 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 			log.Errorf("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err)
 		}
 
-		v.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
+		v.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
 	}
 }
 
 func (v *VM) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
 	ipNetworkMap, _ := v.ToolDataSet.EventToolDataSet.GetVMIPNetworkMapByID(id)
 	for ip, nID := range ipNetworkMap {
-		networkIDs = append(networkIDs, nID)
+		networkIDs = append(networkIDs, uint32(nID))
 		ips = append(ips, ip)
 	}
 	return

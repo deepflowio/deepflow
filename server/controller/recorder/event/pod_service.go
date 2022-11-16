@@ -65,6 +65,7 @@ func (p *PodService) ProduceByAdd(items []*mysql.PodService) {
 		}...)
 
 		p.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			p.deviceType,
@@ -92,6 +93,6 @@ func (p *PodService) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }

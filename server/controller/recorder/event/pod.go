@@ -67,6 +67,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 		}...)
 
 		p.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			p.deviceType,
@@ -117,6 +118,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 
 		nIDs, ips := p.getIPNetworksByID(id)
 		p.createAndPutEvent(
+			cloudItem.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_RECREATE,
 			name,
 			p.deviceType,
@@ -145,14 +147,14 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }
 
 func (p *Pod) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
 	ipNetworkMap, _ := p.ToolDataSet.EventToolDataSet.GetPodIPNetworkMapByID(id)
 	for ip, nID := range ipNetworkMap {
-		networkIDs = append(networkIDs, nID)
+		networkIDs = append(networkIDs, uint32(nID))
 		ips = append(ips, ip)
 	}
 	return

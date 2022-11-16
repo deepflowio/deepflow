@@ -62,6 +62,7 @@ func (n *NATGateway) ProduceByAdd(items []*mysql.NATGateway) {
 		}...)
 
 		n.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			n.deviceType,
@@ -89,6 +90,6 @@ func (n *NATGateway) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(n.resourceType, id))
 		}
 
-		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
+		n.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
 	}
 }

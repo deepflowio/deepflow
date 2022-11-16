@@ -61,6 +61,7 @@ func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 		}...)
 
 		r.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			r.deviceType,
@@ -88,6 +89,6 @@ func (r *VRouter) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
 	}
 }
