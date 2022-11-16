@@ -1,0 +1,183 @@
+#
+# Copyright (c) 2022 Yunshan Networks
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+name: DeepFlow bug report
+description: Suggest an idea for this project
+title: "[BUG] "
+labels: [ "bug" ]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <img src="https://github.com/deepflowys/deepflow/blob/main/docs/deepflow-logo.png?raw=true" alt="DeepFlow logo" height="90px" align="right" />
+
+        Thank you for finding the time to propose new feature!
+
+        We really appreciate the community efforts to improve DeepFlow.
+
+  - type: checkboxes
+    attributes:
+      label: Search before asking
+      description: >
+        Please make sure to search in the [issues](https://github.com/deepflowys/deepflow/issues?q=is%3Aissue) first to see
+        whether the same feature was requested already.
+      options:
+        - label: >
+            I had searched in the [issues](https://github.com/deepflowys/deepflow/issues?q=is%3Aissue) and found no similar
+            feature requirement.
+          required: true
+
+
+  - type: dropdown
+    attributes:
+      label: DeepFlow Component
+      description: |
+        What DeepFlow component are you using? DeepFlow  has many component, please make sure to choose the component that you found the bug. 
+      multiple: false
+      options:
+        - "Agent"
+        - "Server"
+        - "CLI"
+        - "Grafana Plugin"
+        - "Grafana Dashbaord"
+        - "Helm Chart"
+        - "Docs"
+    validations:
+      required: true
+
+
+  - type: textarea
+    attributes:
+      label: What you expected to happen
+      description: What do you think went wrong?
+      placeholder: >
+        Please explain why you think the behaviour is erroneous. It is extremely helpful if you copy and paste
+        the fragment of logs showing the exact error messages or wrong behaviour and screenshots for
+        UI problems. You can include files by dragging and dropping them here.
+
+        **NOTE**: please copy and paste texts instead of taking screenshots of them for easy future search.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: How to reproduce
+      description: >
+        What should we do to reproduce the problem?
+      placeholder: >
+        Please make sure you provide a reproducible step-by-step case of how to reproduce the problem
+        as minimally and precisely as possible. Keep in mind we do not have access to your deployment.
+        Remember that non-reproducible issues will be closed! Opening a discussion is recommended as a
+        first step.
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: DeepFlow version
+      description: >
+        Please provide the version information to facilitate inspection.
+        
+        **Output of `kubectl exec -it -n deepflow deploy/deepflow-server -- deepflow-server -v`:**
+
+        **Output of `kubectl exec -it -n deepflow ds/deepflow-agent -- deepflow-agent -v`:**
+
+      placeholder: >
+        ```bash
+
+        paste your output here
+
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: DeepFlow agent list
+      description: >
+        Please provide the Kubernetes CNI information to facilitate inspection.
+
+        **Output of `deepflow-ctl agent list`:**
+      placeholder: >
+        ```bash
+
+        paste your output here
+        
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Kubernetes CNI
+      description: >
+        Please provide the Kubernetes CNI information to facilitate inspection.
+      placeholder: >
+        Your Kubernetes CNI
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Operation-System/Kernel version
+      description: >
+        Please provide the lperation-system/kernel version information to facilitate inspection.
+
+        **Output of `awk -F '=' '/PRETTY_NAME/ { print $2 }' /etc/os-release`:**
+
+        **Output of `uname -r`:**
+      placeholder: >
+        ```bash
+
+        paste your output here
+        
+        ```
+    validations:
+      required: false
+        
+  - type: textarea
+    attributes:
+      label: Anything else
+      description: Anything else we need to know?
+      placeholder: >
+        How often does this problem occur? (Once? Every time? Only when certain conditions are met?)
+        Any relevant logs to include? Put them here inside fenced
+        ``` ``` blocks or inside a collapsable details tag if it's too long:
+        <details><summary>x.log</summary> lots of stuff </details>
+
+  - type: checkboxes
+    attributes:
+      label: Are you willing to submit a PR?
+      description: >
+        This is absolutely not required, but we are happy to guide you in the contribution process
+        especially if you already have a good understanding of how to implement the feature.
+        DeepFlow is a totally community-driven project and we love to bring new contributors in.
+      options:
+        - label: Yes I am willing to submit a PR!
+
+  - type: checkboxes
+    attributes:
+      label: Code of Conduct
+      description: The Code of Conduct helps create a safe space for everyone. We require
+        that everyone agrees to it.
+      options:
+        - label: |
+            I agree to follow this project's [Code of Conduct](https://github.com/deepflowys/deepflow/blob/main/CODE_OF_CONDUCT.md)
+          required: true
+
+  - type: markdown
+    attributes:
+      value: "Thanks for completing our form!"
+

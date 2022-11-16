@@ -521,11 +521,11 @@ func (v *VTapInfo) GetVTapLocalConfigByShortID(shortID string) string {
 }
 
 func (v *VTapInfo) GetDefaultMaxEscapeSeconds() int {
-	return MaxEscapeSeconds
+	return DefaultMaxEscapeSeconds
 }
 
 func (v *VTapInfo) GetDefaultMaxMemory() int {
-	return MaxMemory
+	return DefaultMaxMemory
 }
 
 func (v *VTapInfo) GetVTapCacheIsReady() bool {

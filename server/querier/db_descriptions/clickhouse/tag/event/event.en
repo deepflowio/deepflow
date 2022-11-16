@@ -1,5 +1,6 @@
 # Name                , DisplayName                  , Description
 time_str              , Time                         ,
+time                  , Time                         , Round end_time to seconds.
 
 region                , Region                       ,
 az                    , Availability Zone            ,

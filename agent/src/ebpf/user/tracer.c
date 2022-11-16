@@ -45,6 +45,8 @@ struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 // eBPF protocol filter.
 int ebpf_config_protocol_filter[PROTO_NUM];
 
+struct allow_port_bitmap allow_port_bitmap;
+
 /*
  * tracers
  */
@@ -1153,6 +1155,12 @@ int enable_ebpf_protocol(int protocol)
 		return 0;
 	}
 	return ETR_INVAL;
+}
+
+int set_allow_port_bitmap(void *bitmap)
+{
+	memcpy(&allow_port_bitmap, bitmap, sizeof(allow_port_bitmap));
+	return 0;
 }
 
 int set_feature_regex(int feature, const char *pattern)

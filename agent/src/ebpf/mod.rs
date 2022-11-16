@@ -37,6 +37,8 @@ pub const SOCK_DIR_RCV: u8 = 1;
 #[allow(dead_code)]
 pub const SOCK_DATA_UNKNOWN: u16 = 0;
 #[allow(dead_code)]
+pub const SOCK_DATA_OTHER: u16 = 1;
+#[allow(dead_code)]
 pub const SOCK_DATA_HTTP1: u16 = 20;
 #[allow(dead_code)]
 pub const SOCK_DATA_HTTP2: u16 = 21;
@@ -318,6 +320,7 @@ extern "C" {
      * @return the set maximum buffer size value on success, < 0 on failure.
      */
     pub fn set_data_limit_max(limit_size: c_int) -> c_int;
+    pub fn set_allow_port_bitmap(bitmap: *const c_uchar) -> c_int;
     pub fn enable_ebpf_protocol(protocol: c_int) -> c_int;
     pub fn set_feature_regex(idx: c_int, pattern: *const c_char) -> c_int;
 
