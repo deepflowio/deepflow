@@ -53,11 +53,16 @@ func (a *TSDBDiscovery) register(request *trident.SyncRequest) {
 		log.Errorf("get env(%s) data failed", POD_NAME_KEY)
 		return
 	}
+	nodeName := GetNodeName()
+	if nodeName == "" {
+		log.Errorf("get env(%s) data failed", NODE_NAME_KEY)
+		return
+	}
 	tsdb := &models.Analyzer{
 		IP:                request.GetCtrlIp(),
 		NATIPEnabled:      0,
 		NATIP:             "",
-		Name:              request.GetHost(),
+		Name:              nodeName,
 		CPUNum:            int(request.GetCpuNum()),
 		MemorySize:        int64(request.GetMemorySize()),
 		Arch:              request.GetArch(),
