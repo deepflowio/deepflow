@@ -153,13 +153,19 @@ func (c *TSDBCache) UpdateSystemInfo(cpuNum int, memorySize int64, arch string, 
 	c.os = &tsdbOS
 	c.kernelVersion = &kernelVersion
 	c.pcapDataMountPath = &pcapDataMountPath
-	c.name = &name
 
 	podIP := common.GetPodIP()
 	if podIP == "" {
 		log.Errorf("get env(%s) data failed", common.POD_IP_KEY)
 	} else if podIP != *c.podIP {
 		c.podIP = &podIP
+	}
+
+	nodeName := common.GetNodeName()
+	if nodeName == "" {
+		log.Errorf("get env(%s) data failed", common.NODE_NAME_KEY)
+	} else if nodeName != *c.name {
+		c.name = &nodeName
 	}
 }
 
