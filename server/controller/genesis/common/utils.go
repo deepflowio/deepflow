@@ -171,16 +171,13 @@ func ParseIPOutput(s string) ([]Iface, error) {
 				}
 				iface.PeerIndex = peerIndex
 			}
-			continue
 		}
 
 		macMatched := MACRegex.FindStringSubmatch(line)
 		if macMatched != nil {
 			iface.MAC = macMatched[1]
-			continue
 		} else if strings.HasPrefix(iface.Name, "tunl0") {
 			iface.MAC = "00:00:00:00:00:00"
-			continue
 		}
 		ipMatched := IPRegex.FindStringSubmatch(line)
 		if ipMatched != nil {
