@@ -92,6 +92,7 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 		opts = append(opts, deviceRelatedOpts...)
 
 		i.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
 			deviceType,
@@ -158,6 +159,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 		}...)
 
 		i.createAndPutEvent(
+			lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,
 			deviceType,

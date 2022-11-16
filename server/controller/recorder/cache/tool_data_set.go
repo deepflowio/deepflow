@@ -1008,7 +1008,7 @@ func (t *ToolDataSet) GetHostIDByIP(ip string) (int, bool) {
 		t.addHost(&host)
 		return host.ID, true
 	} else {
-		log.Error("db %s (ip: %s) not found", RESOURCE_TYPE_HOST_EN, ip)
+		log.Errorf("db %s (ip: %s) not found", RESOURCE_TYPE_HOST_EN, ip)
 		return id, false
 	}
 }

@@ -58,6 +58,7 @@ func (h *Host) ProduceByAdd(items []*mysql.Host) {
 		opts = append(opts, eventapi.TagHostID(item.ID))
 
 		h.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			h.deviceType,
@@ -84,6 +85,6 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		h.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, h.deviceType, id)
+		h.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, h.deviceType, id)
 	}
 }
