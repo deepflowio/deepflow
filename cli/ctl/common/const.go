@@ -44,7 +44,7 @@ const (
 	DOMAIN_TYPE_KUBERNETES DomainType = 11 // kubernetes
 	DOMAIN_TYPE_HUAWEI     DomainType = 13 // huawei
 	DOMAIN_TYPE_QINGCLOUD  DomainType = 14 // qingcloud
-	DOMAIN_TYPE_AGENT_SYNC DomainType = 23 // agent-sync
+	DOMAIN_TYPE_AGENT_SYNC DomainType = 23 // agent_sync
 	DOMAIN_TYPE_BAIDU_BCE  DomainType = 25 // baidu_bce
 )
 
