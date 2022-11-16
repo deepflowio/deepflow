@@ -182,6 +182,19 @@ func updateResourceInfos(reourceInfos map[uint64]*ResourceInfo, podInfos, podNod
 	}
 	reourceInfos[uint64(deviceType)<<32|uint64(deviceID)] = info
 	podInfos[podID] = info
-	podNodeInfos[podNodeID] = info
-	hostInfos[hostID] = info
+
+	nodeInfo := *info
+	nodeInfo.PodID = 0
+	nodeInfo.PodNSID = 0
+	nodeInfo.PodGroupID = 0
+	nodeInfo.PodClusterID = 0
+	podNodeInfos[podNodeID] = &nodeInfo
+
+	hostInfo := *info
+	hostInfo.PodNodeID = 0
+	hostInfo.PodID = 0
+	hostInfo.PodNSID = 0
+	hostInfo.PodGroupID = 0
+	hostInfo.PodClusterID = 0
+	hostInfos[hostID] = &hostInfo
 }
