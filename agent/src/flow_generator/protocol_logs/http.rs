@@ -36,7 +36,7 @@ use crate::{
     },
     config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType},
     flow_generator::error::{Error, Result},
-    flow_generator::protocol_logs::L7ProtoRawDataType,
+    flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
     parse_common,
     utils::bytes::{read_u32_be, read_u32_le},
 };
@@ -956,17 +956,6 @@ impl HttpLog {
         None
     }
 
-    fn decode_base64_to_string(value: &str) -> String {
-        let bytes = match base64::decode(value) {
-            Ok(v) => v,
-            Err(_) => return value.to_string(),
-        };
-        match str::from_utf8(&bytes) {
-            Ok(s) => s.to_string(),
-            Err(_) => value.to_string(),
-        }
-    }
-
     // sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
     // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
     // sw6和sw8的value全部使用'-'分隔，TRACEID前为SAMPLE字段取值范围仅有0或1
@@ -976,14 +965,10 @@ impl HttpLog {
         let segs: Vec<&str> = value.split("-").collect();
 
         if id_type == Self::TRACE_ID && segs.len() > 2 {
-            return Some(Self::decode_base64_to_string(segs[1]));
+            return Some(decode_base64_to_string(segs[1]));
         }
         if id_type == Self::SPAN_ID && segs.len() > 4 {
-            return Some(format!(
-                "{}-{}",
-                Self::decode_base64_to_string(segs[2]),
-                segs[3]
-            ));
+            return Some(format!("{}-{}", decode_base64_to_string(segs[2]), segs[3]));
         }
 
         None

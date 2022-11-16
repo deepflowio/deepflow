@@ -33,8 +33,9 @@ use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::{
-    ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+use crate::flow_generator::protocol_logs::{
+    decode_base64_to_string,
+    pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
 };
 use crate::log_info_merge;
 use crate::parse_common;
@@ -320,7 +321,7 @@ impl DubboLog {
             TraceType::Sw8 => {
                 if info.trace_id.len() > 2 {
                     if let Some(index) = info.trace_id[2..].find("-") {
-                        info.trace_id = info.trace_id[2..2 + index].to_string();
+                        info.trace_id = decode_base64_to_string(&info.trace_id[2..2 + index]);
                     }
                 }
             }
@@ -383,7 +384,9 @@ impl DubboLog {
                             return;
                         }
                         if let Some(end) = info.span_id[segment_id_offset..].find("-") {
-                            info.span_id = info.span_id[start..segment_id_offset + end].to_string();
+                            info.span_id = decode_base64_to_string(
+                                &info.span_id[start..segment_id_offset + end],
+                            );
                         }
                     }
                 }
