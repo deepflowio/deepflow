@@ -213,7 +213,7 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	} */
 	values := make([]interface{}, len(allMetrics))
 	for field, metrics := range allMetrics {
-		if db == "ext_metrics" || db == "deepflow_system" {
+		if db == "ext_metrics" || db == "deepflow_system" || (table == "l7_flow_log" && strings.Contains(field, "metrics.")) {
 			field = metrics.DisplayName
 		}
 		values[metrics.Index] = []interface{}{
