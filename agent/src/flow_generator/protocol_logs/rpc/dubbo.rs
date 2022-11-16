@@ -321,9 +321,10 @@ impl DubboLog {
             TraceType::Sw8 => {
                 if info.trace_id.len() > 2 {
                     if let Some(index) = info.trace_id[2..].find("-") {
-                        info.trace_id = decode_base64_to_string(&info.trace_id[2..2 + index]);
+                        info.trace_id = info.trace_id[2..2 + index].to_string();
                     }
                 }
+                info.trace_id = decode_base64_to_string(&info.trace_id);
             }
             _ => return,
         };
@@ -369,26 +370,16 @@ impl DubboLog {
             TraceType::Sw8 => {
                 // Format:
                 // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+                let mut skip = false;
                 if info.span_id.len() > 2 {
-                    if let Some(start) = info.span_id[2..].find("-") {
-                        let start = 2 + start + 1;
-                        if info.span_id.len() <= start {
-                            return;
-                        }
-                        let segment_id_offset = info.span_id[start..].find("-");
-                        if segment_id_offset.is_none() {
-                            return;
-                        }
-                        let segment_id_offset = start + segment_id_offset.unwrap() + 1;
-                        if info.span_id.len() <= segment_id_offset {
-                            return;
-                        }
-                        if let Some(end) = info.span_id[segment_id_offset..].find("-") {
-                            info.span_id = decode_base64_to_string(
-                                &info.span_id[start..segment_id_offset + end],
-                            );
-                        }
+                    let segs: Vec<&str> = info.span_id.split("-").collect();
+                    if segs.len() > 4 {
+                        info.span_id = format!("{}-{}", decode_base64_to_string(segs[2]), segs[3]);
+                        skip = true;
                     }
+                }
+                if !skip {
+                    info.span_id = decode_base64_to_string(&info.span_id);
                 }
             }
             _ => return,
