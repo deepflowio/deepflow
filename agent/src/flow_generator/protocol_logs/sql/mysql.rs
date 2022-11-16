@@ -360,8 +360,10 @@ impl MysqlLog {
                     } else {
                         SQL_STATE_OFFSET
                     };
-                self.info.error_message =
-                    String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
+                if error_message_offset < payload.len() {
+                    self.info.error_message =
+                        String::from_utf8_lossy(&payload[error_message_offset..]).into_owned();
+                }
             }
             MYSQL_RESPONSE_CODE_OK => {
                 self.info.status = L7ResponseStatus::Ok;
