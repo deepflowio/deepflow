@@ -1,5 +1,6 @@
 # Name                     , DisplayName                , Description
 time_str                   , 时间                       ,
+time                       , 时间                       , 将 end_time 取整到秒。
 
 region                     , 区域                       ,
 az                         , 可用区                     ,
