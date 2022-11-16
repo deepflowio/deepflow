@@ -72,7 +72,7 @@ rtt_client_max              , rtt_client_max       , delay      , Delay         
 rtt_server_max              , rtt_server_max       , delay      , Delay          , 111
 srt_max                     , srt_max              , delay      , Delay          , 111
 art_max                     , art_max              , delay      , Delay          , 111
-cit_max                     , cit_max               , delay     , Delay          , 111
+cit_max                     , cit_max              , delay      , Delay          , 111
 rtt_client_sum              , rtt_client_sum       , counter    , Delay          , 111
 rtt_client_count            , rtt_client_count     , counter    , Delay          , 111
 rtt_server_sum              , rtt_server_sum       , counter    , Delay          , 111
@@ -81,8 +81,9 @@ srt_sum                     , srt_sum              , counter    , Delay         
 srt_count                   , srt_count            , counter    , Delay          , 111
 art_sum                     , art_sum              , counter    , Delay          , 111
 art_count                   , art_count            , counter    , Delay          , 111
-cit_sum                     , cit_sum               , delay     , Delay          , 111
-cit_count                   , cit_count             , counter   , Delay          , 111
+cit_sum                     , cit_sum              , delay      , Delay          , 111
+cit_count                   , cit_count            , counter    , Delay          , 111
+duration                    , duration             , delay      , Delay          , 111
 
 l7_request                  , l7_request           , counter    , Application    , 111
 l7_response                 , l7_response          , counter    , Application    , 111

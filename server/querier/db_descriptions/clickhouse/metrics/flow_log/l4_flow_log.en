@@ -83,6 +83,7 @@ art_sum                     , Total Data Delay            , us ,
 art_count                   , Data Delay Count            ,    ,
 cit_sum                     , Total Client Idle Delay     , us ,
 cit_count                   , Client Idele Delay Count    ,    ,
+duration                    , Duration                    , us , The duration from start_time to the last packet (not end_time).
 
 l7_request                  , Request                     ,    ,
 l7_response                 , Response                    ,    ,
