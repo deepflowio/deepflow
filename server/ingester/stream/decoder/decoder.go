@@ -238,10 +238,10 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 
 func (d *Decoder) handleL4Packet(vtapID uint16, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
-		l4Packet := jsonify.DecodePacketSequence(decoder, vtapID)
-		if decoder.Failed() {
+		l4Packet, err := jsonify.DecodePacketSequence(decoder, vtapID)
+		if decoder.Failed() || err != nil {
 			if d.counter.ErrorCount == 0 {
-				log.Errorf("packet sequence decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+				log.Errorf("packet sequence decode failed, offset=%d len=%d, err: %s", decoder.Offset(), len(decoder.Bytes()), err)
 			}
 			l4Packet.Release()
 			d.counter.ErrorCount++

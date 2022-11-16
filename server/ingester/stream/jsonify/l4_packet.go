@@ -24,6 +24,8 @@ import (
 	"github.com/deepflowys/deepflow/server/libs/pool"
 )
 
+const BLOCK_HEAD_SIZE = 16
+
 type L4Packet struct {
 	EndTime     int64
 	FlowID      uint64
@@ -93,15 +95,18 @@ func ReleaseL4Packet(l *L4Packet) {
 	poolL4Packet.Put(l)
 }
 
-func DecodePacketSequence(decoder *codec.SimpleDecoder, vtapID uint16) *L4Packet {
+func DecodePacketSequence(decoder *codec.SimpleDecoder, vtapID uint16) (*L4Packet, error) {
 	l4Packet := AcquireL4Packet()
 	l4Packet.VtapID = vtapID
 	blockSize := decoder.ReadU32()
+	if blockSize <= BLOCK_HEAD_SIZE {
+		return l4Packet, fmt.Errorf("vtap id(%d) packet block size(%d) < BLOCK_HEAD_SIZE(%d)", vtapID, blockSize, BLOCK_HEAD_SIZE)
+	}
 	l4Packet.FlowID = decoder.ReadU64()
 	endTimePacketCount := decoder.ReadU64()
 	l4Packet.EndTime = int64(endTimePacketCount << 8 >> 8)
 	l4Packet.PacketCount = uint32(endTimePacketCount >> 56)
-	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-16)...)
+	l4Packet.PacketBatch = append(l4Packet.PacketBatch, decoder.ReadBytesN(int(blockSize)-BLOCK_HEAD_SIZE)...)
 
-	return l4Packet
+	return l4Packet, nil
 }
