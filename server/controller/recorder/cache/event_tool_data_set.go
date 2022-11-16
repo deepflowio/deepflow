@@ -25,7 +25,7 @@ type EventToolDataSet struct {
 	hostIDtoInfo map[int]*hostInfo
 
 	vmIDToInfo           map[int]*vmInfo
-	VMIDToIPNetworkIDMap map[int]map[string]uint32
+	VMIDToIPNetworkIDMap map[int]map[string]int
 
 	vrouterIDToInfo map[int]*vrouterInfo
 
@@ -44,7 +44,7 @@ type EventToolDataSet struct {
 	podServiceIDToInfo map[int]*podServiceInfo
 
 	podIDToInfo           map[int]*podInfo
-	PodIDToIPNetworkIDMap map[int]map[string]uint32
+	PodIDToIPNetworkIDMap map[int]map[string]int
 
 	NetworkIDToName           map[int]string
 	VInterfaceIDToLcuuid      map[int]string
@@ -142,7 +142,7 @@ func NewEventToolDataSet() EventToolDataSet {
 		hostIDtoInfo: make(map[int]*hostInfo),
 
 		vmIDToInfo:           make(map[int]*vmInfo),
-		VMIDToIPNetworkIDMap: make(map[int]map[string]uint32),
+		VMIDToIPNetworkIDMap: make(map[int]map[string]int),
 
 		vrouterIDToInfo: make(map[int]*vrouterInfo),
 
@@ -161,7 +161,7 @@ func NewEventToolDataSet() EventToolDataSet {
 		podServiceIDToInfo: make(map[int]*podServiceInfo),
 
 		podIDToInfo:           make(map[int]*podInfo),
-		PodIDToIPNetworkIDMap: make(map[int]map[string]uint32),
+		PodIDToIPNetworkIDMap: make(map[int]map[string]int),
 
 		NetworkIDToName:           make(map[int]string),
 		VInterfaceIDToLcuuid:      make(map[int]string),
@@ -175,14 +175,14 @@ func NewEventToolDataSet() EventToolDataSet {
 func (t *EventToolDataSet) setDeviceToIPNetworkMap(deviceType, deviceID, networkID int, ip string) {
 	if deviceType == common.VIF_DEVICE_TYPE_VM {
 		if t.VMIDToIPNetworkIDMap[deviceID] == nil {
-			t.VMIDToIPNetworkIDMap[deviceID] = make(map[string]uint32)
+			t.VMIDToIPNetworkIDMap[deviceID] = make(map[string]int)
 		}
-		t.VMIDToIPNetworkIDMap[deviceID][ip] = uint32(networkID)
+		t.VMIDToIPNetworkIDMap[deviceID][ip] = networkID
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD {
 		if t.PodIDToIPNetworkIDMap[deviceID] == nil {
-			t.PodIDToIPNetworkIDMap[deviceID] = make(map[string]uint32)
+			t.PodIDToIPNetworkIDMap[deviceID] = make(map[string]int)
 		}
-		t.PodIDToIPNetworkIDMap[deviceID][ip] = uint32(networkID)
+		t.PodIDToIPNetworkIDMap[deviceID][ip] = networkID
 	}
 }
 
@@ -200,18 +200,18 @@ func (t *EventToolDataSet) deleteDeviceToIPNetworkMapIP(deviceType, deviceID, ne
 	}
 }
 
-func (t *EventToolDataSet) GetVMIPNetworkMapByID(id int) (map[string]uint32, bool) {
+func (t *EventToolDataSet) GetVMIPNetworkMapByID(id int) (map[string]int, bool) {
 	m, exists := t.VMIDToIPNetworkIDMap[id]
 	if !exists {
-		return make(map[string]uint32), false
+		return make(map[string]int), false
 	}
 	return m, true
 }
 
-func (t *EventToolDataSet) GetPodIPNetworkMapByID(id int) (map[string]uint32, bool) {
+func (t *EventToolDataSet) GetPodIPNetworkMapByID(id int) (map[string]int, bool) {
 	m, exists := t.PodIDToIPNetworkIDMap[id]
 	if !exists {
-		return make(map[string]uint32), false
+		return make(map[string]int), false
 	}
 	return m, true
 }
