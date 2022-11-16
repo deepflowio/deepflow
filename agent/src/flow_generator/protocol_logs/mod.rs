@@ -39,6 +39,7 @@ use std::{
     fmt,
     mem::swap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    str,
     time::Duration,
 };
 
@@ -603,5 +604,16 @@ impl fmt::Display for AppProtoLogsBaseInfo {
             self.head.msg_type,
             self.head.rrt
         )
+    }
+}
+
+fn decode_base64_to_string(value: &str) -> String {
+    let bytes = match base64::decode(value) {
+        Ok(v) => v,
+        Err(_) => return value.to_string(),
+    };
+    match str::from_utf8(&bytes) {
+        Ok(s) => s.to_string(),
+        Err(_) => value.to_string(),
     }
 }

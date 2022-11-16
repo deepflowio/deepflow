@@ -247,7 +247,7 @@ impl PortSegment {
         return (u16::MAX, 0);
     }
 
-    fn new(port: PortRange) -> Vec<PortSegment> {
+    fn new(port: &PortRange) -> Vec<PortSegment> {
         let mut port_segments = Vec::new();
 
         let mut i = port.min() as usize;
@@ -430,8 +430,6 @@ pub struct Acl {
     pub dst_groups: Vec<u32>,
     pub src_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
     pub dst_port_ranges: Vec<PortRange>, // 0仅表示采集端口0
-    pub src_ports: Vec<u16>,             // 0仅表示采集端口0
-    pub dst_ports: Vec<u16>,             // 0仅表示采集端口0
 
     pub proto: u16, // 256表示全采集, 0表示采集采集协议0
 
@@ -509,10 +507,10 @@ impl Acl {
         let mut src_segments = Vec::new();
         let mut dst_segments = Vec::new();
 
-        for ports in Self::get_port_range(&self.src_ports) {
+        for ports in &self.src_port_ranges {
             src_segments.append(&mut PortSegment::new(ports));
         }
-        for ports in Self::get_port_range(&self.dst_ports) {
+        for ports in &self.dst_port_ranges {
             dst_segments.append(&mut PortSegment::new(ports));
         }
 
@@ -830,12 +828,12 @@ mod tests {
         assert_eq!(PortSegment::calc_right_zero(0), 16);
 
         assert_eq!(
-            PortSegment::new(PortRange::new(0, 65535)),
+            PortSegment::new(&PortRange::new(0, 65535)),
             vec![PortSegment { port: 0, mask: 0 }]
         );
 
         assert_eq!(
-            PortSegment::new(PortRange::new(100, 10000)),
+            PortSegment::new(&PortRange::new(100, 10000)),
             vec![
                 PortSegment {
                     port: 100,
