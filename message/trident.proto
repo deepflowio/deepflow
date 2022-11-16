@@ -576,3 +576,12 @@ message KubernetesClusterIDResponse {
     optional string error_msg = 1;
     optional string cluster_id = 2;
 }
+
+message Pcap {
+    optional uint64 flow_id = 1;
+    optional bytes  packet_records = 2;
+}
+
+message PcapBatch {
+    repeated Pcap batches = 1;
+}
