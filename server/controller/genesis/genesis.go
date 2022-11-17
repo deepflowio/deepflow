@@ -45,12 +45,13 @@ var GenesisService *Genesis
 var Synchronizer *SynchronizerServer
 
 type Genesis struct {
-	mutex           sync.RWMutex
-	grpcPort        string
-	cfg             gconfig.GenesisConfig
-	genesisSyncData atomic.Value
-	kubernetesData  atomic.Value
-	genesisStatsd   statsd.GenesisStatsd
+	mutex            sync.RWMutex
+	grpcPort         string
+	grpcMaxMSGLength int
+	cfg              gconfig.GenesisConfig
+	genesisSyncData  atomic.Value
+	kubernetesData   atomic.Value
+	genesisStatsd    statsd.GenesisStatsd
 }
 
 func NewGenesis(cfg *config.ControllerConfig) *Genesis {
@@ -59,11 +60,12 @@ func NewGenesis(cfg *config.ControllerConfig) *Genesis {
 	var kData atomic.Value
 	kData.Store(map[string]KubernetesInfo{})
 	GenesisService = &Genesis{
-		mutex:           sync.RWMutex{},
-		grpcPort:        cfg.GrpcPort,
-		cfg:             cfg.GenesisCfg,
-		genesisSyncData: sData,
-		kubernetesData:  kData,
+		mutex:            sync.RWMutex{},
+		grpcPort:         cfg.GrpcPort,
+		grpcMaxMSGLength: cfg.GrpcMaxMessageLength,
+		cfg:              cfg.GenesisCfg,
+		genesisSyncData:  sData,
+		kubernetesData:   kData,
 		genesisStatsd: statsd.GenesisStatsd{
 			K8SInfoDelay: make(map[string][]int),
 		},
@@ -154,7 +156,7 @@ func (g *Genesis) GetGenesisSyncResponse() (GenesisSyncData, error) {
 			serverIP = controller.IP
 		}
 		grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
-		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
+		conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 		if err != nil {
 			log.Error("create grpc connection faild:" + err.Error())
 			continue
@@ -349,7 +351,7 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 				serverIP = controller.IP
 			}
 			grpcServer := net.JoinHostPort(serverIP, g.grpcPort)
-			conn, err := grpc.Dial(grpcServer, grpc.WithInsecure())
+			conn, err := grpc.Dial(grpcServer, grpc.WithInsecure(), grpc.WithMaxMsgSize(g.grpcMaxMSGLength))
 			if err != nil {
 				log.Error("create grpc connection faild:" + err.Error())
 				continue
