@@ -58,7 +58,7 @@ func Start(configPath string) {
 
 	// init opentelemetry
 	if cfg.OtelEndpoint != "" {
-		log.Info("init opentelemetry")
+		log.Infof("init opentelemetry: otel-endpoint(%s)", cfg.OtelEndpoint)
 		initTraceProvider(cfg.OtelEndpoint)
 	}
 

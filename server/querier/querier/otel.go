@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	"strings"
 )
 
 func initTraceProvider(endpoint string) *otelTrace.TracerProvider {
@@ -32,12 +33,20 @@ func initTraceProvider(endpoint string) *otelTrace.TracerProvider {
 		log.Error(err)
 		return nil
 	}
-
+	urlPath := ""
+	if strings.Contains(endpoint, "http://") {
+		endpointSplit := strings.Split(endpoint, "/")
+		endpoint = endpointSplit[2]
+		if len(endpointSplit) > 2 {
+			urlPath = "/" + strings.Join(endpointSplit[3:], "/")
+		}
+	}
 	//创建OtlpExporter，并通过默认的Exporter做数据导出
 	oltpExporter, err := otlptrace.New(ctx,
 		otlptracehttp.NewClient(
 			otlptracehttp.WithEndpoint(endpoint),
 			otlptracehttp.WithInsecure(),
+			otlptracehttp.WithURLPath(urlPath),
 		))
 
 	if err != nil {
