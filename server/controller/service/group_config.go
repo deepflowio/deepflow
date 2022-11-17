@@ -83,14 +83,25 @@ func getDomains() []Data {
 	return values
 }
 
-var switchData = []Data{
+type DataList []Data
+
+var switchData = DataList{
 	Data{Value: 0, Label: "关闭"},
 	Data{Value: 1, Label: "开启"},
 }
 
-var whetherData = []Data{
+var whetherData = DataList{
 	Data{Value: 0, Label: "否"},
 	Data{Value: 1, Label: "是"},
+}
+
+func (d DataList) getLabelByValue(value interface{}) string {
+	for _, data := range d {
+		if data.Value == value {
+			return data.Label
+		}
+	}
+	return ""
 }
 
 type ConfigLabel struct {
@@ -193,6 +204,11 @@ var configFuns = []*ConfigBase{
 	OutputVlanFun(),
 	NatIpEnabledFun(),
 	LogRetentionFun(),
+	ExtraNetnsRegexFun(),
+	ProxyControllerPortFun(),
+	ProxyControllerIPFun(),
+	AnalyzerPortFun(),
+	AnalyzerIPFun(),
 	//statistics_configuration_params_label
 	CollectorSocketTypeFun(),
 	CompressorSocketTypeFun(),
@@ -217,7 +233,7 @@ var configFuns = []*ConfigBase{
 	InactiveServerPortEnabledFun(),
 	InactiveIPEnabledFun(),
 	L4PerformanceEnabledFun(),
-	L7MetricsenabledFun(),
+	L7MetricsEnabledFun(),
 	VtapFlow1SEnabledFun(),
 	L4LogTapTypesFun(),
 	L7LogStoreTapTypesFun(),
@@ -288,6 +304,7 @@ func MaxMemoryFun() *ConfigBase {
 		Placeholder: fmt.Sprintf("默认配置: %d，值域[128, 100000]", DefaultMaxMemory),
 		jsonTag:     "MAX_MEMORY",
 		labelName:   resource_limit_label,
+		Help:        "对于专属服务器采集器无效，对于容器类型的 deepflow-agent 也无效",
 	}
 }
 
@@ -320,6 +337,8 @@ func MaxCpusFun() *ConfigBase {
 		Placeholder: fmt.Sprintf("默认配置: %d，值域[1, 100000]", DefaultMaxCPUs),
 		jsonTag:     "MAX_CPUS",
 		labelName:   resource_limit_label,
+		Help:        "对于专属服务器采集器无效，对于容器类型的 deepflow-agent 也无效",
+		Unit:        "逻辑核",
 	}
 }
 
@@ -352,6 +371,7 @@ func MaxCollectPpsFun() *ConfigBase {
 		Unit:        "Kpps",
 		jsonTag:     "MAX_COLLECT_PPS",
 		labelName:   resource_limit_label,
+		Help:        "对于专属服务器采集器无效",
 	}
 }
 
@@ -490,6 +510,77 @@ func CaptureBpfFun() *ConfigBase {
 		Placeholder: "默认配置: 全采集，长度范围[1, 512]",
 		Help:        "参考BPF语法：https://biot.com/capstats/bpf.html",
 		jsonTag:     "CAPTURE_BPF",
+		labelName:   basic_configuration_params_label,
+	}
+}
+
+func ExtraNetnsRegexFun() *ConfigBase {
+	return &ConfigBase{
+		Type:        "text",
+		Label:       "采集NETNS",
+		Placeholder: "默认配置: ，长度范围[0, 65535]",
+		Help:        "正则表达式，除root之外的网络命名空间名称，常用于多租户网络隔离的场景",
+		jsonTag:     "CAPTURE_BPF",
+		labelName:   basic_configuration_params_label,
+	}
+}
+
+func ProxyControllerPortFun() *ConfigBase {
+	rules := Rules{
+		RealRules: []string{"ProxyControllerPort"},
+		IsNumber:  true,
+	}
+	return &ConfigBase{
+		Type:        "text",
+		Label:       "控制器通信端口",
+		Rules:       rules,
+		Placeholder: fmt.Sprintf("默认配置: %d，[1, 65535]", DefaultProxyControllerPort),
+		jsonTag:     "PROXY_CONTROLLER_PORT",
+		labelName:   basic_configuration_params_label,
+	}
+}
+
+func ProxyControllerIPFun() *ConfigBase {
+	rules := Rules{
+		RealRules: []string{"isAllIP"},
+	}
+	return &ConfigBase{
+		Type:        "text",
+		Label:       "控制器IP",
+		Rules:       rules,
+		Placeholder: "默认配置: 空",
+		jsonTag:     "PROXY_CONTROLLER_IP",
+		Help:        "固定使用此控制器IP",
+		labelName:   basic_configuration_params_label,
+	}
+}
+
+func AnalyzerPortFun() *ConfigBase {
+	rules := Rules{
+		RealRules: []string{"AnalyzerPort"},
+		IsNumber:  true,
+	}
+	return &ConfigBase{
+		Type:        "text",
+		Label:       "数据节点通信端口",
+		Rules:       rules,
+		Placeholder: fmt.Sprintf("默认配置: %d，值域[1, 65535]", DefaultAnalyzerPort),
+		jsonTag:     "ANALYZER_PORT",
+		labelName:   basic_configuration_params_label,
+	}
+}
+
+func AnalyzerIPFun() *ConfigBase {
+	rules := Rules{
+		RealRules: []string{"isAllIP"},
+	}
+	return &ConfigBase{
+		Type:        "text",
+		Label:       "数据节点IP",
+		Rules:       rules,
+		Placeholder: "默认配置: 空",
+		jsonTag:     "ANALYZER_IP",
+		Help:        "固定使用此数据节点IP",
 		labelName:   basic_configuration_params_label,
 	}
 }
@@ -663,7 +754,7 @@ func NatIpEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "否请求NAT IP",
 		Data:        whetherData,
-		Placeholder: "默认配置: 否",
+		Placeholder: fmt.Sprintf("默认配置: %s", whetherData.getLabelByValue(DefaultNatIPEnabled)),
 		jsonTag:     "NAT_IP_ENABLED",
 		labelName:   basic_configuration_params_label,
 	}
@@ -689,6 +780,7 @@ func CollectorSocketTypeFun() *ConfigBase {
 	data := []Data{
 		Data{Value: "TCP", Label: "TCP"},
 		Data{Value: "UDP", Label: "UDP"},
+		Data{Value: "FILE", Label: "FILE"},
 	}
 	return &ConfigBase{
 		Type:        "select",
@@ -786,7 +878,7 @@ func HttpLogXRequestIdFun() *ConfigBase {
 		Data:        data,
 		Placeholder: fmt.Sprintf("默认配置: %s", DefaultHTTPLogXRequestID),
 		Help:        "可编辑，关闭为保留字",
-		jsonTag:     "HttpLogXRequestIdFun",
+		jsonTag:     "HTTP_LOG_X_REQUEST_ID",
 		labelName:   statistics_configuration_params_label,
 	}
 }
@@ -842,7 +934,7 @@ func L7LogCollectNpsThresholdFun() *ConfigBase {
 
 func NpbSocketTypeFun() *ConfigBase {
 	data := []Data{
-		Data{Value: "TCP", Label: "TCP"},
+		Data{Value: "UDP", Label: "UDP"},
 		Data{Value: "RAW_UDP", Label: "裸UDP"},
 	}
 	return &ConfigBase{
@@ -875,7 +967,7 @@ func PlatformEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "同步资源信息",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "关闭"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultPlatformEnabled)),
 		jsonTag:     "PLATFORM_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -886,7 +978,7 @@ func RsyslogEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "日志发送",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultRsyslogEnabled)),
 		jsonTag:     "RSYSLOG_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -897,7 +989,7 @@ func NTPEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "时钟同步",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultNtpEnabled)),
 		Help:        "仅用于采集器进程内部时钟计算，开启后不会影响采集器所在操作系统的时钟",
 		jsonTag:     "NTP_ENABLED",
 		labelName:   basic_func_switch_label,
@@ -939,7 +1031,7 @@ func CollectorEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "指标数据",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultCollectorEnabled)),
 		jsonTag:     "COLLECTOR_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -950,7 +1042,7 @@ func InactiveServerPortEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "非活跃端口指标数据",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultInactiveServerPortEnabled)),
 		jsonTag:     "INACTIVE_SERVER_PORT_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -961,7 +1053,7 @@ func InactiveIPEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "非活跃IP指标数据",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultInactiveIPEnabled)),
 		jsonTag:     "INACTIVE_IP_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -972,19 +1064,19 @@ func L4PerformanceEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "网络性能指标数据",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultL4PerformanceEnabled)),
 		Help:        "关闭时，采集器仅计算最基本的网络层吞吐指标量",
 		jsonTag:     "L4_PERFORMANCE_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
 }
 
-func L7MetricsenabledFun() *ConfigBase {
+func L7MetricsEnabledFun() *ConfigBase {
 	return &ConfigBase{
 		Type:        "select",
 		Label:       "应用性能指标数据",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultL7MetricsEnabled)),
 		jsonTag:     "L7_METRICS_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -995,7 +1087,7 @@ func VtapFlow1SEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "秒粒度指标数据",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultVTapFlow1sEnabled)),
 		jsonTag:     "VTAP_FLOW_1S_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -1036,7 +1128,7 @@ func ExternalAgentHttpProxyEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "数据集成服务",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %s", "开启"),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultExternalAgentHTTPProxyEnabled)),
 		jsonTag:     "EXTERNAL_AGENT_HTTP_PROXY_ENABLED",
 		labelName:   basic_func_switch_label,
 	}
@@ -1062,7 +1154,7 @@ func NpbDedupEnabledFun() *ConfigBase {
 		Type:        "select",
 		Label:       "全局去重",
 		Data:        switchData,
-		Placeholder: fmt.Sprintf("默认配置: %d", DefaultNpbDedupEnabled),
+		Placeholder: fmt.Sprintf("默认配置: %s", switchData.getLabelByValue(DefaultNpbDedupEnabled)),
 		jsonTag:     "NPB_DEDUP_ENABLED",
 		labelName:   npb_func_switch_label,
 	}

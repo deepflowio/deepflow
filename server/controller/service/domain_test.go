@@ -434,18 +434,18 @@ func (t *SuiteTest) TestDeleteSoftDeletedResource() {
 	assert.Equal(t.T(), 0, len(azs))
 }
 
-func (t *SuiteTest) TestCheckAndAllocateDomainController() {
-	domainLcuuid := uuid.NewString()
-	regionLcuuid := "ffffffff-ffff-ffff-ffff-ffffffffffff"
-	normalControllerIP := "1.1.1.1"
-	unnormalControllerIP := "1.1.1.2"
-	t.db.Create(&mysql.AZControllerConnection{Region: regionLcuuid, ControllerIP: normalControllerIP, Lcuuid: uuid.NewString()})
-	t.db.Create(&mysql.AZControllerConnection{Region: regionLcuuid, ControllerIP: unnormalControllerIP, Lcuuid: uuid.NewString()})
-	t.db.Create(&mysql.Controller{IP: normalControllerIP, State: 2, Lcuuid: uuid.NewString()})
-	t.db.Create(&mysql.Controller{IP: unnormalControllerIP, State: 1, Lcuuid: uuid.NewString()})
-	t.db.Create(&mysql.Domain{Base: mysql.Base{Lcuuid: domainLcuuid}, ControllerIP: unnormalControllerIP, Config: `{"region_uuid": "ffffffff-ffff-ffff-ffff-ffffffffffff"}`})
-	CheckAndAllocateDomainController()
-	var domain mysql.Domain
-	t.db.Where("lcuuid = ?", domainLcuuid).Find(&domain)
-	assert.Equal(t.T(), normalControllerIP, domain.ControllerIP)
-}
+// func (t *SuiteTest) TestCheckAndAllocateDomainController() {
+// 	domainLcuuid := uuid.NewString()
+// 	regionLcuuid := "ffffffff-ffff-ffff-ffff-ffffffffffff"
+// 	normalControllerIP := "1.1.1.1"
+// 	unnormalControllerIP := "1.1.1.2"
+// 	t.db.Create(&mysql.AZControllerConnection{Region: regionLcuuid, ControllerIP: normalControllerIP, Lcuuid: uuid.NewString()})
+// 	t.db.Create(&mysql.AZControllerConnection{Region: regionLcuuid, ControllerIP: unnormalControllerIP, Lcuuid: uuid.NewString()})
+// 	t.db.Create(&mysql.Controller{IP: normalControllerIP, State: 2, Lcuuid: uuid.NewString()})
+// 	t.db.Create(&mysql.Controller{IP: unnormalControllerIP, State: 1, Lcuuid: uuid.NewString()})
+// 	t.db.Create(&mysql.Domain{Base: mysql.Base{Lcuuid: domainLcuuid}, ControllerIP: unnormalControllerIP, Config: `{"region_uuid": "ffffffff-ffff-ffff-ffff-ffffffffffff"}`})
+// 	CheckAndAllocateDomainController()
+// 	var domain mysql.Domain
+// 	t.db.Where("lcuuid = ?", domainLcuuid).Find(&domain)
+// 	assert.Equal(t.T(), normalControllerIP, domain.ControllerIP)
+// }
