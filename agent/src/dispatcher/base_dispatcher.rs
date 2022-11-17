@@ -119,6 +119,9 @@ pub(super) struct BaseDispatcher {
         DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>,
 
     pub(super) netns: NsFile,
+
+    // dispatcher id for easy debugging
+    pub log_id: String,
 }
 
 impl BaseDispatcher {
@@ -159,6 +162,7 @@ impl BaseDispatcher {
             handler_builders: self.handler_builder.clone(),
             netns: self.netns.clone(),
             npb_dedup_enabled: self.npb_dedup_enabled.clone(),
+            log_id: self.log_id.clone(),
         }
     }
 
@@ -624,6 +628,9 @@ pub(super) struct BaseDispatcherListener {
     proxy_controller_port: u16,
     analyzer_port: u16,
     pub netns: NsFile,
+
+    // dispatcher id for easy debugging
+    pub log_id: String,
 }
 
 impl BaseDispatcherListener {
@@ -716,7 +723,7 @@ impl BaseDispatcherListener {
             }
         });
         if deleted.len() > 0 {
-            info!("Removing VMs: {:?}", deleted);
+            info!("Dispatcher{} Removing VMs: {:?}", self.log_id, deleted);
         }
         if pipelines.len() == keys.len() {
             return;
@@ -749,7 +756,7 @@ impl BaseDispatcherListener {
             );
         }
         if added.len() > 0 {
-            info!("Adding VMs: {:?}", added);
+            info!("Dispatcher{} Adding VMs: {:?}", self.log_id, added);
         }
     }
 
