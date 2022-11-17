@@ -520,7 +520,7 @@ func ExtraNetnsRegexFun() *ConfigBase {
 		Label:       "采集NETNS",
 		Placeholder: "默认配置: ，长度范围[0, 65535]",
 		Help:        "正则表达式，除root之外的网络命名空间名称，常用于多租户网络隔离的场景",
-		jsonTag:     "CAPTURE_BPF",
+		jsonTag:     "EXTRA_NETNS_REGEX",
 		labelName:   basic_configuration_params_label,
 	}
 }
@@ -610,7 +610,7 @@ func CaptureSocketTypeFun() *ConfigBase {
 	}
 	return &ConfigBase{
 		Type:        "select",
-		Label:       "流量采集API",
+		Label:       "流量采集方式",
 		Data:        data,
 		Placeholder: "默认配置: 自适应",
 		Help:        "Linux环境中的流量采集方式",
@@ -859,7 +859,7 @@ func HttpLogSpanIdFun() *ConfigBase {
 		Data:        data,
 		Placeholder: fmt.Sprintf("默认配置: %s", DefaultHTTPLogSpanID),
 		Help:        "可编辑，支持输入自定义值或逗号分隔的多个值，关闭为保留字；支持HTTP、Dubbo",
-		jsonTag:     "HTTP_LOG_TRACE_ID",
+		jsonTag:     "HTTP_LOG_SPAN_ID",
 		labelName:   statistics_configuration_params_label,
 	}
 }
