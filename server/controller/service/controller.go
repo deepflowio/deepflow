@@ -18,9 +18,8 @@ package service
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/deckarep/golang-set"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/google/uuid"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
@@ -326,8 +325,6 @@ func UpdateController(
 				azCondition = append(azCondition, az.(string))
 			}
 		}
-		delAzsCondition := fmt.Sprintf("controller_ip = ?", controller.IP)
-		delAzsCondition += fmt.Sprintf(" AND az IN (?)", strings.Join(azCondition, ","))
 		mysql.Db.Where("controller_ip = ? AND az IN (?)", controller.IP, azCondition).Delete(mysql.AZControllerConnection{})
 
 		// 针对addAzs, 插入azControllerconn
