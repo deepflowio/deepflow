@@ -20,7 +20,10 @@ import (
 	"fmt"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
+	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
+	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowys/deepflow/server/libs/eventapi"
 )
 
@@ -223,7 +226,7 @@ func getPodServiceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagField
 }
 
 func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption, error) {
-	info, err := t.GetPodInfoeByID(id)
+	info, err := t.GetPodInfoByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -240,4 +243,103 @@ func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption,
 		eventapi.TagPodID(id),
 	}...)
 	return opts, nil
+}
+
+func findFromAllByID[MT constraint.MySQLSoftDeleteModel](id int) *MT {
+	var item *MT
+	res := mysql.Db.Unscoped().Where("id = ?", id).Find(&item)
+	if res.Error != nil {
+		log.Error(dbQueryFailed(res.Error))
+		return nil
+	}
+	if res.RowsAffected != 1 {
+		return nil
+	}
+	return item
+}
+
+func getDeviceNameFromAllByID(deviceType, deviceID int) string {
+	switch deviceType {
+	case common.VIF_DEVICE_TYPE_HOST:
+		device := findFromAllByID[mysql.Host](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_HOST_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_VM:
+		device := findFromAllByID[mysql.VM](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_VM_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_VROUTER:
+		device := findFromAllByID[mysql.VRouter](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_VROUTER_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_DHCP_PORT:
+		device := findFromAllByID[mysql.DHCPPort](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_DHCP_PORT_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_NAT_GATEWAY:
+		device := findFromAllByID[mysql.NATGateway](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_NAT_GATEWAY_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_LB:
+		device := findFromAllByID[mysql.LB](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_LB_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_RDS_INSTANCE:
+		device := findFromAllByID[mysql.RDSInstance](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_RDS_INSTANCE_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_REDIS_INSTANCE:
+		device := findFromAllByID[mysql.RedisInstance](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_REDIS_INSTANCE_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_POD_NODE:
+		device := findFromAllByID[mysql.PodNode](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_POD_NODE_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_POD_SERVICE:
+		device := findFromAllByID[mysql.PodService](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_POD_SERVICE_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	case common.VIF_DEVICE_TYPE_POD:
+		device := findFromAllByID[mysql.Pod](deviceID)
+		if device == nil {
+			log.Errorf(dbSoftDeletedResourceByIDNotFound(RESOURCE_TYPE_POD_EN, deviceID))
+		} else {
+			return device.Name
+		}
+	default:
+		log.Errorf("device type: %d is not supported", deviceType)
+		return ""
+	}
+	return ""
 }
