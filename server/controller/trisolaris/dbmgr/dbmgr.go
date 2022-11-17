@@ -133,6 +133,11 @@ func (obj *_DBMgr[M]) GetBatchFromControllerIP(controllerIP string) (result []*M
 	return
 }
 
+func (obj *_DBMgr[M]) GetBatchFromAnalyzerIP(analyzerIP string) (result []*M, err error) {
+	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`analyzer_ip` = ?", analyzerIP).Find(&result).Error
+	return
+}
+
 // GetBatchFromPodNodeIDs 通过podNodeID获取内容
 func (obj *_DBMgr[M]) GetBatchFromPodNodeIDs(podNodeIDs []int) (result []*M, err error) {
 	err = obj.DB.WithContext(obj.ctx).Model(obj.m).Where("`pod_node_id` IN (?)", podNodeIDs).Find(&result).Error
