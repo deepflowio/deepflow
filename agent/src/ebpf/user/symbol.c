@@ -387,9 +387,11 @@ invalid:
 
 char *get_elf_path_by_pid(int pid)
 {
-	int ret;
+#define PROC_PREFIX_LEN 32
+
+	int ret, len;
 	char bin_path[PATH_MAX], *path;
-	char proc_pid_exe[32];
+	char proc_pid_exe[PROC_PREFIX_LEN];
 	memset(bin_path, 0, sizeof(bin_path));
 	memset(proc_pid_exe, 0, sizeof(proc_pid_exe));
 
@@ -403,23 +405,23 @@ char *get_elf_path_by_pid(int pid)
 		return NULL;
 	}
 
-	path = calloc(1, PATH_MAX);
+	len = strlen(bin_path) + PROC_PREFIX_LEN;
+	path = calloc(1, len);
 	if (path == NULL)
 		return NULL;
-	if (snprintf(path, PATH_MAX, "/proc/%d/root%s", pid, bin_path)
-	    >= PATH_MAX) {
+	if (snprintf(path, len, "/proc/%d/root%s", pid, bin_path)
+	    >= len) {
 		ebpf_warning("snprintf /proc/%d/root%s failed", pid, bin_path);
 		free(path);
 		return NULL;
 	}
 
 	if (access(path, F_OK) != 0) {
-		memset(path, 0, PATH_MAX);
-		safe_buf_copy(path, PATH_MAX, bin_path, sizeof(bin_path));
+		memset(path, 0, len);
+		safe_buf_copy(path, len, bin_path, sizeof(bin_path));
 	}
 
 	return path;
-
 }
 
 #if defined(__x86_64__)
