@@ -289,13 +289,13 @@ impl FlowNode {
         trident_type == TridentType::TtHyperVCompute || trident_type == TridentType::TtHyperVNetwork
     }
 
-    // 微软ACS：
+    // Microsoft ACS：
     //   HyperVNetwork网关宿主机和HyperVCompute网关流量模型中，MAC地址不对称
-    //   在浦发环境中，IP地址不存在相同的场景，所以流聚合可直接忽略MAC地址
+    //   在部分微软ACS环境中，IP地址不存在相同的场景，所以流聚合可直接忽略MAC地址
     //   但注意：若K8s部署正在HyperV中流量为双层隧道，内部流量为K8s虚拟机的存在相同IP，流聚合不能忽略MAC
-    // 腾讯TCE：
+    // Tencent TCE：
     //   GRE隧道流量中的mac地址为伪造，流聚合忽略MAC地址
-    // IPIP隧道：
+    // IPIP Tunnel：
     //   在IPIP隧道封装场景下，外层MAC在腾讯TCE环境中存在不对称情况
     //   实际上IPIP没有隧道ID，因此可以肯定不存在IP冲突，忽略MAC也是合理的
     fn mac_match(

@@ -1110,7 +1110,7 @@ pub fn get_direction(
             TridentType::TtPublicCloud | TridentType::TtPhysicalMachine => {
                 // 该采集器类型中统计位置为客户端网关/服务端网关或存在VIP时，需要增加追踪数据
                 // VIP：
-                //     浦发云内SLB通信场景，在VM内采集的流量无隧道IP地址使用VIP,
+                //     微软ACS云内SLB通信场景，在VM内采集的流量无隧道IP地址使用VIP,
                 //     将对端的VIP替换为其mac对应的RIP，生成另一份doc
                 add_tracing_doc = is_vip;
                 if is_ep {
