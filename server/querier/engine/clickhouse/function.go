@@ -422,7 +422,7 @@ func (t *Time) Format(m *view.Model) {
 	m.AddTag(&view.Tag{Value: tagField, Alias: t.Alias, Flag: view.NODE_FLAG_METRICS_OUTER, Withs: withs})
 	m.AddGroup(&view.Group{Value: t.Alias, Flag: view.GROUP_FLAG_METRICS_OUTER})
 	if m.Time.Fill != "" && m.Time.Interval > 0 {
-		m.AddCallback(TimeFill([]interface{}{m}))
+		m.AddCallback("time", TimeFill([]interface{}{m}))
 	}
 }
 

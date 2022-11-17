@@ -35,7 +35,7 @@ var log = logging.MustGetLogger("clickhouse.client")
 
 type QueryParams struct {
 	Sql             string
-	Callbacks       []func(columns []interface{}, values []interface{}) []interface{}
+	Callbacks       map[string]func(columns []interface{}, values []interface{}) []interface{}
 	QueryUUID       string
 	ColumnSchemaMap map[string]*ColumnSchema
 }
