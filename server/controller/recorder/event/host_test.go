@@ -69,26 +69,34 @@ func TestHost_ProduceByDelete(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		dataSet  cache.ToolDataSet
+		cache    *cache.Cache
 		h        *Host
 		args     args
+		prepare  func(*cache.Cache)
 		wantID   uint32
 		wantName string
 	}{
 		{
 			name: "delete success",
-			dataSet: cache.ToolDataSet{
-				HostLcuuidToID: map[string]int{
-					"ff6f9b99-82ef-5507-b6b6-cbab28bda9cb": 1,
-				},
-				EventToolDataSet: cache.EventToolDataSet{
-					HostIDToName: map[int]string{
-						1: "host",
-					},
-				},
+			cache: &cache.Cache{
+				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
+				ToolDataSet:     cache.NewToolDataSet(),
 			},
 			args: args{
-				lcuuids: []string{"ff6f9b99-82ef-5507-b6b6-cbab28bda9cb"},
+				lcuuids: []string{"host_lcuuid"},
+			},
+			prepare: func(cache *cache.Cache) {
+				cache.AddRegion(&mysql.Region{Base: mysql.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&mysql.AZ{Base: mysql.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddHost(&mysql.Host{
+					Base: mysql.Base{
+						ID:     1,
+						Lcuuid: "host_lcuuid",
+					},
+					Name:   "host",
+					Region: "region_lcuuid",
+					AZ:     "az_lcuuid",
+				})
 			},
 			wantID:   1,
 			wantName: "host",
@@ -96,7 +104,8 @@ func TestHost_ProduceByDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.h = NewHost(&tt.dataSet, NewEventQueue())
+			tt.prepare(tt.cache)
+			tt.h = NewHost(&tt.cache.ToolDataSet, NewEventQueue())
 			tt.h.ProduceByDelete(tt.args.lcuuids)
 
 			e := tt.h.EventManager.Queue.Get().(*eventapi.ResourceEvent)

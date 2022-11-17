@@ -34,31 +34,60 @@ func TestVM_ProduceByAdd(t *testing.T) {
 	}
 	tests := []struct {
 		name      string
+		cache     *cache.Cache
 		v         *VM
 		args      args
+		prepare   func(*cache.Cache)
 		wantID    uint32
 		wantName  string
 		wantVPCID uint32
 	}{
 		{
 			name: "add success",
-			v:    NewVM(&cache.ToolDataSet{}, NewEventQueue()),
 			args: args{
 				items: []*mysql.VM{
 					{
 						Base:  mysql.Base{ID: 1},
-						Name:  "vm",
-						VPCID: 2,
+						Name:  "vm_name",
+						VPCID: 3,
 					},
 				},
 			},
+			prepare: func(cache *cache.Cache) {
+				cache.AddRegion(&mysql.Region{Base: mysql.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&mysql.AZ{Base: mysql.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*mysql.VPC{{Base: mysql.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&mysql.Host{
+					Base:   mysql.Base{ID: 4, Lcuuid: "host_lcuuid"},
+					IP:     "10.233.101.79",
+					Region: "region_lcuuid",
+					AZ:     "az_lcuuid",
+				})
+				cache.AddVM(&mysql.VM{
+					Base: mysql.Base{
+						ID:     1,
+						Lcuuid: "vm_lcuuid",
+					},
+					Name:         "vm_name",
+					Region:       "region_lcuuid",
+					AZ:           "az_lcuuid",
+					VPCID:        3,
+					LaunchServer: "10.233.101.79",
+				})
+			},
 			wantID:    1,
-			wantName:  "vm",
-			wantVPCID: 2,
+			wantName:  "vm_name",
+			wantVPCID: 3,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.cache = &cache.Cache{
+				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
+				ToolDataSet:     cache.NewToolDataSet(),
+			}
+			tt.prepare(tt.cache)
+			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByAdd(tt.args.items)
 
 			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
@@ -76,26 +105,43 @@ func TestVM_ProduceByDelete(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		dataSet  *cache.ToolDataSet
+		cache    *cache.Cache
 		v        *VM
 		args     args
+		prepare  func(*cache.Cache)
 		wantID   uint32
 		wantName string
 	}{
 		{
 			name: "delete success",
-			dataSet: &cache.ToolDataSet{
-				VMLcuuidToID: map[string]int{
-					"ff6f9b99-82ef-5507-b6b6-cbab28bda9cb": 1,
-				},
-				EventToolDataSet: cache.EventToolDataSet{
-					VMIDToName: map[int]string{
-						1: "vm_name",
-					},
-				},
+			cache: &cache.Cache{
+				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
+				ToolDataSet:     cache.NewToolDataSet(),
 			},
 			args: args{
-				lcuuids: []string{"ff6f9b99-82ef-5507-b6b6-cbab28bda9cb"},
+				lcuuids: []string{"vm_lcuuid"},
+			},
+			prepare: func(cache *cache.Cache) {
+				cache.AddRegion(&mysql.Region{Base: mysql.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&mysql.AZ{Base: mysql.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*mysql.VPC{{Base: mysql.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&mysql.Host{
+					Base:   mysql.Base{ID: 4, Lcuuid: "host_lcuuid"},
+					IP:     "10.233.101.79",
+					Region: "region_lcuuid",
+					AZ:     "az_lcuuid",
+				})
+				cache.AddVM(&mysql.VM{
+					Base: mysql.Base{
+						ID:     1,
+						Lcuuid: "vm_lcuuid",
+					},
+					Name:         "vm_name",
+					Region:       "region_lcuuid",
+					AZ:           "az_lcuuid",
+					VPCID:        3,
+					LaunchServer: "10.233.101.79",
+				})
 			},
 			wantID:   1,
 			wantName: "vm_name",
@@ -103,7 +149,8 @@ func TestVM_ProduceByDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.v = NewVM(tt.dataSet, NewEventQueue())
+			tt.prepare(tt.cache)
+			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByDelete(tt.args.lcuuids)
 
 			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
@@ -119,74 +166,105 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 		diffBase  *cache.VM
 	}
 	tests := []struct {
-		name            string
-		dataSet         cache.ToolDataSet
-		v               *VM
-		args            args
-		wantID          uint32
-		wantName        string
-		wantDescription string
+		name      string
+		cache     *cache.Cache
+		v         *VM
+		args      args
+		prepare   func(*cache.Cache)
+		assertion func(*testing.T, *eventapi.ResourceEvent)
 	}{
 		{
 			name: "migrate success",
-			dataSet: cache.ToolDataSet{
-				VMLcuuidToID: map[string]int{
-					"ff6f9b99-82ef-5507-b6b6-cbab28bda9cb": 1,
-				},
-				EventToolDataSet: cache.EventToolDataSet{
-					VMIDToName: map[int]string{
-						1: "vm_name",
-					},
-				},
-			},
 			args: args{
 				diffBase: &cache.VM{
 					LaunchServer: "10.50.1.13",
 				},
 				cloudItem: &cloudmodel.VM{
-					Lcuuid:       "ff6f9b99-82ef-5507-b6b6-cbab28bda9cb",
+					Lcuuid:       "vm_lcuuid",
 					LaunchServer: "10.50.1.14",
 				},
 			},
-			wantID:          1,
-			wantName:        "vm_name",
-			wantDescription: "10.50.1.13,10.50.1.14",
+			prepare: func(cache *cache.Cache) {
+				cache.AddRegion(&mysql.Region{Base: mysql.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&mysql.AZ{Base: mysql.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*mysql.VPC{{Base: mysql.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&mysql.Host{
+					Base:   mysql.Base{ID: 4, Lcuuid: "host_lcuuid"},
+					IP:     "10.233.101.79",
+					Region: "region_lcuuid",
+					AZ:     "az_lcuuid",
+				})
+				cache.AddVM(&mysql.VM{
+					Base: mysql.Base{
+						ID:     1,
+						Lcuuid: "vm_lcuuid",
+					},
+					Name:         "vm_name",
+					Region:       "region_lcuuid",
+					AZ:           "az_lcuuid",
+					VPCID:        3,
+					LaunchServer: "10.233.101.79",
+				})
+			},
+			assertion: func(t *testing.T, e *eventapi.ResourceEvent) {
+				assert.Equal(t, uint32(1), e.InstanceID)
+				assert.Equal(t, "vm_name", e.InstanceName)
+				assert.Equal(t, "10.50.1.13,10.50.1.14", e.Description)
+			},
 		},
 		{
 			name: "update state success",
-			dataSet: cache.ToolDataSet{
-				VMLcuuidToID: map[string]int{
-					"ff6f9b99-82ef-5507-b6b6-cbab28bda9cb": 1,
-				},
-				EventToolDataSet: cache.EventToolDataSet{
-					VMIDToName: map[int]string{
-						1: "vm_name",
-					},
-				},
-			},
 			args: args{
 				diffBase: &cache.VM{
 					State: common.VM_STATE_EXCEPTION,
 				},
 				cloudItem: &cloudmodel.VM{
-					Lcuuid: "ff6f9b99-82ef-5507-b6b6-cbab28bda9cb",
+					Lcuuid: "vm_lcuuid",
 					State:  common.VM_STATE_RUNNING,
 				},
 			},
-			wantID:          1,
-			wantName:        "vm_name",
-			wantDescription: fmt.Sprintf("%s,%s", VMStateToString[common.VM_STATE_EXCEPTION], VMStateToString[common.VM_STATE_RUNNING]),
+			prepare: func(cache *cache.Cache) {
+				cache.AddRegion(&mysql.Region{Base: mysql.Base{ID: 1, Lcuuid: "region_lcuuid"}})
+				cache.AddAZ(&mysql.AZ{Base: mysql.Base{ID: 2, Lcuuid: "az_lcuuid"}})
+				cache.AddVPCs([]*mysql.VPC{{Base: mysql.Base{ID: 3, Lcuuid: "vpc_lcuuid"}}})
+				cache.AddHost(&mysql.Host{
+					Base:   mysql.Base{ID: 4, Lcuuid: "host_lcuuid"},
+					IP:     "10.233.101.79",
+					Region: "region_lcuuid",
+					AZ:     "az_lcuuid",
+				})
+				cache.AddVM(&mysql.VM{
+					Base: mysql.Base{
+						ID:     1,
+						Lcuuid: "vm_lcuuid",
+					},
+					Name:         "vm_name",
+					Region:       "region_lcuuid",
+					AZ:           "az_lcuuid",
+					VPCID:        3,
+					LaunchServer: "10.233.101.79",
+				})
+			},
+			assertion: func(t *testing.T, e *eventapi.ResourceEvent) {
+				assert.Equal(t, uint32(1), e.InstanceID)
+				assert.Equal(t, "vm_name", e.InstanceName)
+				assert.Equal(t, fmt.Sprintf("%s,%s", VMStateToString[common.VM_STATE_EXCEPTION],
+					VMStateToString[common.VM_STATE_RUNNING]), e.Description)
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.v = NewVM(&tt.dataSet, NewEventQueue())
+			tt.cache = &cache.Cache{
+				DiffBaseDataSet: cache.NewDiffBaseDataSet(),
+				ToolDataSet:     cache.NewToolDataSet(),
+			}
+			tt.prepare(tt.cache)
+			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByUpdate(tt.args.cloudItem, tt.args.diffBase)
 
 			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
-			assert.Equal(t, tt.wantID, e.InstanceID)
-			assert.Equal(t, tt.wantName, e.InstanceName)
-			assert.Equal(t, tt.wantDescription, e.Description)
+			tt.assertion(t, e)
 		})
 	}
 }
