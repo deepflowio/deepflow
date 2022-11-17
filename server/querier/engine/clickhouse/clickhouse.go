@@ -220,6 +220,21 @@ func (e *CHEngine) Init() {
 }
 
 func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
+	tagSlice := []string{}
+	for _, tag := range tags {
+		item, ok := tag.(*sqlparser.AliasedExpr)
+		if ok {
+			colName, ok := item.Expr.(*sqlparser.ColName)
+			if ok {
+				tagSlice = append(tagSlice, sqlparser.String(colName))
+			}
+		}
+	}
+	// tap_port and tap_port_type must exist together in select
+	if common.IsValueInSliceString("tap_port", tagSlice) && !common.IsValueInSliceString("tap_port_type", tagSlice) {
+		return errors.New("tap_port and tap_port_type must exist together in select")
+	}
+
 	e.asTagMap = make(map[string]string)
 	for _, tag := range tags {
 		err := e.parseSelect(tag)
@@ -231,15 +246,44 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			as := chCommon.ParseAlias(item.As)
 			colName, ok := item.Expr.(*sqlparser.ColName)
 			if ok {
-				e.asTagMap[as] = chCommon.ParseAlias(colName)
+				// pod_ingress/lb_listener is not supported by select
+				// is_internet/resource_glx does not support as
+				if strings.HasPrefix(sqlparser.String(colName), "pod_ingress") || strings.HasPrefix(sqlparser.String(colName), "lb_listener") {
+					errStr := fmt.Sprintf("%s is not supported by select", sqlparser.String(colName))
+					return errors.New(errStr)
+				} else if strings.HasPrefix(sqlparser.String(colName), "is_internet") || strings.HasPrefix(sqlparser.String(colName), "`tags") || strings.HasPrefix(sqlparser.String(colName), "`metrics") || strings.HasPrefix(sqlparser.String(colName), "`attributes") || strings.HasPrefix(sqlparser.String(colName), "packet_batch") {
+					if as != "" {
+						errStr := fmt.Sprintf("%s does not support as", sqlparser.String(colName))
+						return errors.New(errStr)
+					}
+				} else {
+					for _, suffix := range []string{"", "_0", "_1"} {
+						for _, resourceName := range []string{"resource_gl0", "resource_gl1", "resource_gl2"} {
+							resourceNameSuffix := resourceName + suffix
+							if sqlparser.String(colName) == resourceNameSuffix {
+								if as != "" {
+									errStr := fmt.Sprintf("%s does not support as", sqlparser.String(colName))
+									return errors.New(errStr)
+								}
+							}
+						}
+					}
+				}
+				if as != "" {
+					e.asTagMap[as] = chCommon.ParseAlias(colName)
+				}
 			}
 			function, ok := item.Expr.(*sqlparser.FuncExpr)
 			if ok {
-				e.asTagMap[as] = strings.Trim(sqlparser.String(function.Name), "`")
+				if as != "" {
+					e.asTagMap[as] = strings.Trim(sqlparser.String(function.Name), "`")
+				}
 			}
 			binary, ok := item.Expr.(*sqlparser.BinaryExpr)
 			if ok {
-				e.asTagMap[as] = sqlparser.String(binary)
+				if as != "" {
+					e.asTagMap[as] = sqlparser.String(binary)
+				}
 			}
 		}
 	}
@@ -307,6 +351,23 @@ func (e *CHEngine) TransFrom(froms sqlparser.TableExprs) error {
 }
 
 func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
+	groupSlice := []string{}
+	for _, group := range groups {
+		colName, ok := group.(*sqlparser.ColName)
+		if ok {
+			groupTag := sqlparser.String(colName)
+			preAsGroup, ok := e.asTagMap[groupTag]
+			if ok {
+				groupSlice = append(groupSlice, preAsGroup)
+			} else {
+				groupSlice = append(groupSlice, groupTag)
+			}
+		}
+	}
+	// tap_port and tap_port_type must exist together in group
+	if common.IsValueInSliceString("tap_port", groupSlice) && !common.IsValueInSliceString("tap_port_type", groupSlice) {
+		return errors.New("tap_port and tap_port_type must exist together in group")
+	}
 	for _, group := range groups {
 		err := e.parseGroupBy(group)
 		if err != nil {
@@ -378,15 +439,26 @@ func (e *CHEngine) parseGroupBy(group sqlparser.Expr) error {
 	// 普通字符串
 	case *sqlparser.ColName, *sqlparser.SQLVal:
 		groupTag := chCommon.ParseAlias(expr)
+		// pod_ingress/lb_listener is not supported by group
+		if strings.HasPrefix(groupTag, "pod_ingress") || strings.HasPrefix(groupTag, "lb_listener") {
+			errStr := fmt.Sprintf("%s is not supported by group", groupTag)
+			return errors.New(errStr)
+		}
 		err := e.AddGroup(groupTag)
 		if err != nil {
 			return err
 		}
-		_, ok := e.asTagMap[groupTag]
+		preAsGroup, ok := e.asTagMap[groupTag]
 		if !ok {
 			err := e.AddTag(groupTag, "")
 			if err != nil {
 				return err
+			}
+		} else {
+			// pod_ingress/lb_listener is not supported by group
+			if strings.HasPrefix(preAsGroup, "pod_ingress") || strings.HasPrefix(preAsGroup, "lb_listener") {
+				errStr := fmt.Sprintf("%s is not supported by group", groupTag)
+				return errors.New(errStr)
 			}
 		}
 		// TODO: 特殊处理塞进group的fromat中

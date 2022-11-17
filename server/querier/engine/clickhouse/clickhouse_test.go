@@ -113,8 +113,8 @@ var (
 		input:  "select pod_service_0 from l7_flow_log where pod_service_0 !='xx' group by pod_service_0",
 		output: "SELECT dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0` FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE pod_service_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE pod_service_name = 'xx')))) AND (service_id_0!=0) GROUP BY dictGet(flow_tag.device_map, 'name', (toUInt64(11),toUInt64(service_id_0))) AS `pod_service_0`",
 	}, {
-		input:  "select pod_ingress_0 from l7_flow_log where pod_ingress_0 !='xx' group by pod_ingress_0",
-		output: "SELECT pod_ingress_0 FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')))) GROUP BY `pod_ingress_0`",
+		input:  "select region_id_0 from l7_flow_log where pod_ingress_0 !='xx' group by region_id_0",
+		output: "SELECT region_id_0 FROM flow_log.`l7_flow_log` PREWHERE (not(((if(is_ipv4=1,IPv4NumToString(ip4_0),IPv6NumToString(ip6_0)),toUInt64(l3_epc_id_0)) IN (SELECT ip,l3_epc_id from flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')) OR (toUInt64(service_id_0) IN (SELECT pod_service_id from flow_tag.ip_relation_map WHERE pod_ingress_name = 'xx')))) AND (region_id_0!=0) GROUP BY `region_id_0`",
 	}, {
 		input:  "select node_type(region_0) as 'node_type_0',mask(ip_0,33) as 'mask_ip_0' from l7_flow_log group by 'mask_ip_0','node_type_0'",
 		output: "WITH if(is_ipv4, IPv4NumToString(bitAnd(ip4_0, 4294967295)), IPv6NumToString(bitAnd(ip6_0, toFixedString(unhex('ffffffff800000000000000000000000'), 16)))) AS `mask_ip_0` SELECT 'region' AS `node_type_0`, `mask_ip_0` FROM flow_log.`l7_flow_log` GROUP BY `mask_ip_0`, `node_type_0`",
