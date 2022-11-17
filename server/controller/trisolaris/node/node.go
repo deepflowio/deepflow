@@ -427,7 +427,7 @@ func (n *NodeInfo) registerTSDBToDB(tsdb *models.Analyzer) {
 		case tsdbCount > 0:
 			localTSDB, err := tsdbMgr.GetFromCAMD5(tsdb.CAMD5)
 			if err == nil {
-				conns, err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).GetBatchFromControllerIP(localTSDB.IP)
+				conns, err := dbmgr.DBMgr[models.AZAnalyzerConnection](n.db).GetBatchFromAnalyzerIP(localTSDB.IP)
 				if err == nil {
 					for _, conn := range conns {
 						azConn := &models.AZAnalyzerConnection{
