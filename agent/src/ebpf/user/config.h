@@ -39,7 +39,7 @@
  *
  * 在socket map回收时，对每条socket信息超过10秒没有收发动作就回收掉
  */
-#define SOCKET_RECLAIM_TIMEOUT_DEF  10
+#define SOCKET_RECLAIM_TIMEOUT_DEF	10
 
 /*
  * When the trace map is recycled, each trace information is recycled without a matching
@@ -47,9 +47,14 @@
  *
  * 在trace map回收时，对每条trace信息超过10秒没有发生匹配动作就回收掉
  */
-#define TRACE_RECLAIM_TIMEOUT_DEF   10
+#define TRACE_RECLAIM_TIMEOUT_DEF	10
 
 // The maximum default amount of data passed to the agent by eBPF programe.
-#define SOCKET_DATA_LIMIT_MAX_DEF   4096
+#define SOCKET_DATA_LIMIT_MAX_DEF	4096
+
+#define MAP_PROC_INFO_MAP_NAME		"proc_info_map"
+
+// execute/exit events delayed processing time, unit: second
+#define PROC_EVENT_DELAY_HANDLE_DEF     60
 
 #endif /* DF_EBPF_CONFIG_H */
