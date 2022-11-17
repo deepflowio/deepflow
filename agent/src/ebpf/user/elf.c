@@ -39,7 +39,7 @@ int openelf(const char *path, Elf ** elf, int *fd)
 		goto failed;
 	}
 
-	if (!(*elf = elf_begin(*fd, ELF_C_READ, 0))) {
+	if (!(*elf = elf_begin(*fd, ELF_C_READ_MMAP, 0))) {
 		goto failed;
 	}
 

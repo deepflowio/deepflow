@@ -81,5 +81,9 @@ func CIDRToPreNetMask(cidr string) (string, string, error) {
 }
 
 func FormatIP(ip string) string {
-	return net.ParseIP(ip).String()
+	i := net.ParseIP(ip)
+	if i == nil {
+		return ""
+	}
+	return i.String()
 }

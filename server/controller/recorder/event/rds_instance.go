@@ -45,7 +45,30 @@ func NewRDSInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSIns
 
 func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
 	for _, item := range items {
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, r.deviceType, item.ID)
+		var opts []eventapi.TagFieldOption
+		info, err := r.ToolDataSet.GetRDSInstanceInfoByID(item.ID)
+		if err != nil {
+			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagAZID(info.AZID),
+				eventapi.TagRegionID(info.RegionID),
+			}...)
+		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(r.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		}...)
+
+		r.createAndPutEvent(
+			item.Lcuuid,
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			r.deviceType,
+			item.ID,
+			opts...,
+		)
 	}
 }
 
@@ -58,14 +81,15 @@ func (r *RDSInstance) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := r.ToolDataSet.GetRDSInstanceIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = r.ToolDataSet.GetRDSInstanceNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(r.resourceType, lcuuid))
+			var err error
+			name, err = r.ToolDataSet.GetRDSInstanceNameByID(id)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(r.resourceType, lcuuid), err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
 	}
 }

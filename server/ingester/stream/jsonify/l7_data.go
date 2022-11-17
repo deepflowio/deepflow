@@ -584,8 +584,14 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	// 网络层
 	if l.IsIpv6 == 1 {
 		b.IsIPv4 = false
-		b.IP60 = l.Ip6Src[:]
-		b.IP61 = l.Ip6Dst[:]
+		if len(b.IP60) > 0 {
+			b.IP60 = b.IP60[:0]
+		}
+		b.IP60 = append(b.IP60, l.Ip6Src...)
+		if len(b.IP61) > 0 {
+			b.IP61 = b.IP61[:0]
+		}
+		b.IP61 = append(b.IP61, l.Ip6Dst...)
 	} else {
 		b.IsIPv4 = true
 		b.IP40 = l.IpSrc
@@ -630,7 +636,7 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 	k.fill(
 		platformData,
 		l.IsIpv6 == 1, l.IsVipInterfaceSrc == 1, l.IsVipInterfaceDst == 1,
-		int16(l.L3EpcIdSrc), int16(l.L3EpcIdDst),
+		l.L3EpcIdSrc, l.L3EpcIdDst,
 		l.IpSrc, l.IpDst,
 		l.Ip6Src, l.Ip6Dst,
 		l.MacSrc, l.MacDst,

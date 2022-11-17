@@ -45,7 +45,30 @@ func NewNATGateway(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *NATGate
 
 func (n *NATGateway) ProduceByAdd(items []*mysql.NATGateway) {
 	for _, item := range items {
-		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, n.deviceType, item.ID)
+		var opts []eventapi.TagFieldOption
+		info, err := n.ToolDataSet.GetNATGatewayInfoByID(item.ID)
+		if err != nil {
+			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagAZID(info.AZID),
+				eventapi.TagRegionID(info.RegionID),
+			}...)
+		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(n.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		}...)
+
+		n.createAndPutEvent(
+			item.Lcuuid,
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			n.deviceType,
+			item.ID,
+			opts...,
+		)
 	}
 }
 
@@ -58,14 +81,15 @@ func (n *NATGateway) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := n.ToolDataSet.GetNATGatewayIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = n.ToolDataSet.GetNATGatewayNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(n.resourceType, lcuuid))
+			var err error
+			name, err = n.ToolDataSet.GetNATGatewayNameByID(id)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(n.resourceType, lcuuid), err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(n.resourceType, id))
 		}
 
-		n.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
+		n.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
 	}
 }

@@ -23,7 +23,7 @@ pod_ingress           , K8s Ingress                  ,
 pod_service           , K8s 容器服务                 ,
 pod_group             , K8s 工作负载                 , 例如 Deployment、StatefulSet、Daemonset 等。
 pod                   , K8s 容器 POD                 ,
-# service             , 服务                         , # temporarily disabled
+service               , 服务                         ,
 resource_gl0_type     , 类型-容器 POD 优先           ,
 resource_gl0          , 资源-容器 POD 优先           ,
 resource_gl1_type     , 类型-工作负载优先            ,
@@ -69,7 +69,6 @@ l7_protocol           , 应用协议                     ,
 flow_id               , 流日志 ID                    ,
 start_time            , 开始时间                     , 单位: 微秒。表示当前自然分钟内流的开始时间，对于新建流表示首包时间。
 end_time              , 结束时间                     , 单位: 微秒。表示当前自然分钟内流的结束时间，若流在该分钟内 close，则为尾包时间或流状态机超时的时间。
-duration              , 流持续时间                   , 单位: 微秒。表示流的首包到尾包（注意不是 end_time）的时长。
 close_type            , 流结束类型                   ,
 status                , 状态                         , 由 close_type（流结束类型）决定：正常结束/周期性上报=正常，客户端XX=客户端异常，服务端XX/连接超时=服务端异常，其他结束方式=未知。
 is_new_flow           , 新建流                       ,

@@ -207,6 +207,9 @@ impl FlowMap {
                 // 超时Flow将被删除然后把统计信息发送队列下游
                 time_set.remove(&time_key);
                 self.node_removed_aftercare(node, timeout, None);
+                if nodes.is_empty() {
+                    node_map.remove(&time_key.map_key);
+                }
                 continue;
             }
             // 未超时Flow的统计信息发送到队列下游
@@ -552,8 +555,22 @@ impl FlowMap {
     }
 
     fn l7_metrics_enabled(&self) -> bool {
-        let guard = self.config.load();
-        guard.l7_metrics_enabled || guard.app_proto_log_enabled
+        self.config.load().l7_metrics_enabled
+    }
+
+    fn l7_log_parse_enabled(&self, lookup_key: &LookupKey) -> bool {
+        if !self.config.load().app_proto_log_enabled ||
+            (lookup_key.proto != IpProtocol::Tcp && lookup_key.proto != IpProtocol::Udp) ||
+            //  server接口定义: 0(TAP_ANY)表示所有都需要
+             (!self.config.load().l7_log_tap_types[u16::from(TapType::Any) as usize]
+                && (lookup_key.tap_type > TapType::Max
+                    || !self.config.load().l7_log_tap_types
+                        [u16::from(lookup_key.tap_type) as usize]))
+        {
+            return false;
+        }
+
+        true
     }
 
     fn l4_metrics_enabled(&self) -> bool {
@@ -843,6 +860,7 @@ impl FlowMap {
                 flow_id,
                 self.l4_metrics_enabled(),
                 self.l7_metrics_enabled(),
+                self.l7_log_parse_enabled(&meta_packet.lookup_key),
                 &mut self.app_table,
             ) {
                 Ok(i) => {
@@ -856,11 +874,9 @@ impl FlowMap {
                 Err(e) => debug!("{}", e),
             }
         }
-        if self.config.load().app_proto_log_enabled && meta_packet.packet_len > 0 {
-            if let Some(info) = info {
-                for i in info.into_iter() {
-                    self.write_to_app_proto_log(node, &meta_packet, i);
-                }
+        if let Some((info, rrt)) = info {
+            for i in info.into_iter() {
+                self.write_to_app_proto_log(node, &meta_packet, i, rrt);
             }
         }
     }
@@ -1046,20 +1062,11 @@ impl FlowMap {
         node: &mut FlowNode,
         meta_packet: &MetaPacket,
         l7_info: L7ProtocolInfo,
+        rrt: u64,
     ) {
-        let lookup_key = &meta_packet.lookup_key; //  server接口定义: 0(TAP_ANY)表示所有都需要
-        if !self.config.load().l7_log_tap_types[u16::from(TapType::Any) as usize]
-            && (lookup_key.tap_type > TapType::Max
-                || !self.config.load().l7_log_tap_types[u16::from(lookup_key.tap_type) as usize])
-        {
-            return;
-        }
-
-        if lookup_key.proto != IpProtocol::Tcp && lookup_key.proto != IpProtocol::Udp {
-            return;
-        }
         // 考虑性能，最好是l7 perf解析后，满足需要的包生成log
-        if let Some(head) = l7_info.app_proto_head() {
+        if let Some(mut head) = l7_info.app_proto_head() {
+            head.rrt = rrt;
             node.tagged_flow.flow.set_tap_side(
                 self.config.load().trident_type,
                 self.config.load().cloud_gateway_traffic,

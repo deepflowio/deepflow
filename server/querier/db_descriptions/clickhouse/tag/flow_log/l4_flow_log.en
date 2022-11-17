@@ -23,7 +23,7 @@ pod_ingress           , K8s Ingress                       ,
 pod_service           , K8s Service                       ,
 pod_group             , K8s Workload                      , Such as Deployment, StatefulSet, Daemonset, etc.
 pod                   , K8s POD                           ,
-# service             , Service                           , # temporarily disabled
+service               , Service                           ,
 resource_gl0_type     , Type - K8s POD First              ,
 resource_gl0          , Instance - K8s POD First          ,
 resource_gl1_type     , Type - K8s Workload First         ,
@@ -69,7 +69,6 @@ l7_protocol           , Application Protocol              ,
 flow_id               , Flow ID                           ,
 start_time            , Start Time                        , Unit: microseconds. Indicates the start time of the flow within the current natural minute, and indicates the first packet time for a newly created flow.
 end_time              , End Time                          , Unit: microseconds. Indicates the end time of the flow within the current natural minute. If the flow is closed within this minute, it is the end packet time or the timeout time of the flow state machine.
-duration              , Duration                          , Unit: microseconds.
 close_type            , Flow Close Type                   ,
 status                , Status                            , Determined by the close_type: Normal/ForceReport = Normal, Client* = Client Error, Server*/Timeout = Server Error, others = Unknown.
 is_new_flow           , New Flow Flag                     ,

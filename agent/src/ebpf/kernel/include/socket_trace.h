@@ -144,11 +144,10 @@ struct process_data_extra {
 	bool vecs : 1;
 	enum process_data_extra_source source;
 	enum traffic_protocol protocol;
-	__u32 tcp_seq;
 	__u64 coroutine_id;
 	enum traffic_direction direction;
 	enum message_type message_type;
-};
+} __attribute__ ((packed));
 
 enum syscall_src_func {
 	SYSCALL_FUNC_UNKNOWN,
@@ -165,6 +164,15 @@ enum syscall_src_func {
 	SYSCALL_FUNC_WRITEV,
 	SYSCALL_FUNC_READV,
 	SYSCALL_FUNC_SENDFILE
+};
+
+/*
+ * BPF Tail Calls context
+ */
+struct tail_calls_context {
+	int max_size_limit;             // The maximum size of the socket data that can be transferred.
+	enum traffic_direction dir;     // Data flow direction.
+	bool vecs;                      // Whether a memory vector is used ? (for specific syscall)
 };
 
 struct data_args_t {
@@ -184,9 +192,8 @@ struct data_args_t {
 	};
 	// Timestamp for enter syscall function.
 	__u64 enter_ts;
-};
-
-#define TPPROG(F) SEC("tracepoint/syscalls/"__stringify(F)) int bpf_func_##F
+	__u32 tcp_seq; // Used to record the entry of syscalls
+} __attribute__ ((packed));
 
 struct syscall_comm_enter_ctx {
 	__u64 __pad_0;		/*     0     8 */

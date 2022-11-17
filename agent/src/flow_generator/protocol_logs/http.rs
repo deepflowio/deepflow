@@ -36,7 +36,7 @@ use crate::{
     },
     config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType},
     flow_generator::error::{Error, Result},
-    flow_generator::protocol_logs::L7ProtoRawDataType,
+    flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
     parse_common,
     utils::bytes::{read_u32_be, read_u32_le},
 };
@@ -66,7 +66,7 @@ pub struct HttpInfo {
     raw_data_type: L7ProtoRawDataType,
 
     #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
-    pub stream_id: u32,
+    pub stream_id: Option<u32>,
     #[serde(skip_serializing_if = "value_is_default")]
     pub version: String,
     #[serde(skip_serializing_if = "value_is_default")]
@@ -102,7 +102,7 @@ pub struct HttpInfo {
 
 impl L7ProtocolInfoInterface for HttpInfo {
     fn session_id(&self) -> Option<u32> {
-        Some(self.stream_id)
+        self.stream_id
     }
 
     fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
@@ -317,7 +317,7 @@ impl From<HttpInfo> for L7ProtocolSendLog {
             // server endpoint = req_type
             (
                 String::from("POST"), // grpc method always post, reference https://chromium.googlesource.com/external/github.com/grpc/grpc/+/HEAD/doc/PROTOCOL-HTTP2.md
-                service_name.unwrap_or_default(),
+                service_name.clone().unwrap_or_default(),
                 f.host,
                 f.path,
             )
@@ -346,11 +346,12 @@ impl From<HttpInfo> for L7ProtocolSendLog {
                 ..Default::default()
             }),
             ext_info: Some(ExtendedInfo {
-                request_id: Some(f.stream_id),
+                request_id: f.stream_id,
                 x_request_id: Some(f.x_request_id),
                 client_ip: Some(f.client_ip),
                 user_agent: f.user_agent,
                 referer: f.referer,
+                rpc_service: service_name,
                 ..Default::default()
             }),
             ..Default::default()
@@ -653,7 +654,7 @@ impl HttpLog {
         self.info.is_req_end = is_req_end.unwrap_or_default();
         self.info.is_resp_end = is_resp_end.unwrap_or_default();
         self.info.version = String::from("2");
-        self.info.stream_id = stream_id;
+        self.info.stream_id = Some(stream_id);
         return Ok(());
     }
 
@@ -700,15 +701,19 @@ impl HttpLog {
             if col_index + 1 >= body_line.len() {
                 continue;
             }
-            let key = str::from_utf8(&body_line[..col_index])?.to_lowercase();
-            let value = str::from_utf8(&body_line[col_index + 1..])?.trim();
-            self.on_header(
-                &(((&key).to_lowercase()).as_bytes().to_vec()),
-                &String::from(value).as_bytes().to_vec(),
-                direction,
-            );
-            if &key == "content-length" {
-                content_length = Some(value.parse::<u32>().unwrap_or_default());
+
+            if let (Ok(key), Ok(value)) = (
+                str::from_utf8(&body_line[..col_index]),
+                str::from_utf8(&body_line[col_index + 1..]),
+            ) {
+                self.on_header(
+                    &((&key).to_lowercase()).as_bytes().to_vec(),
+                    &String::from(value).trim().as_bytes().to_vec(),
+                    direction,
+                );
+                if key == "content-length" {
+                    content_length = Some(value.parse::<u32>().unwrap_or_default());
+                }
             }
         }
 
@@ -747,7 +752,7 @@ impl HttpLog {
             if httpv2_header.parse_headers_frame(frame_payload).is_err() {
                 // 当已经解析了Headers帧(该Headers帧未携带“Content-Length”)且发现该报文被截断时，无法进行后续解析，ContentLength为None
                 if header_frame_parsed {
-                    self.info.stream_id = httpv2_header.stream_id;
+                    self.info.stream_id = Some(httpv2_header.stream_id);
                     is_httpv2 = true
                 }
                 break;
@@ -858,7 +863,7 @@ impl HttpLog {
                 self.info.resp_content_length = content_length;
             }
             self.info.version = String::from("2");
-            self.info.stream_id = httpv2_header.stream_id;
+            self.info.stream_id = Some(httpv2_header.stream_id);
             return Ok(());
         }
         Err(Error::HttpHeaderParseFailed)
@@ -955,17 +960,6 @@ impl HttpLog {
         None
     }
 
-    fn decode_base64_to_string(value: &str) -> String {
-        let bytes = match base64::decode(value) {
-            Ok(v) => v,
-            Err(_) => return value.to_string(),
-        };
-        match str::from_utf8(&bytes) {
-            Ok(s) => s.to_string(),
-            Err(_) => value.to_string(),
-        }
-    }
-
     // sw6: 1-TRACEID-SEGMENTID-3-5-2-IPPORT-ENTRYURI-PARENTURI
     // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
     // sw6和sw8的value全部使用'-'分隔，TRACEID前为SAMPLE字段取值范围仅有0或1
@@ -975,14 +969,10 @@ impl HttpLog {
         let segs: Vec<&str> = value.split("-").collect();
 
         if id_type == Self::TRACE_ID && segs.len() > 2 {
-            return Some(Self::decode_base64_to_string(segs[1]));
+            return Some(decode_base64_to_string(segs[1]));
         }
         if id_type == Self::SPAN_ID && segs.len() > 4 {
-            return Some(format!(
-                "{}-{}",
-                Self::decode_base64_to_string(segs[2]),
-                segs[3]
-            ));
+            return Some(format!("{}-{}", decode_base64_to_string(segs[2]), segs[3]));
         }
 
         None

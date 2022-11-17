@@ -44,11 +44,16 @@ func NewLANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 
 func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 	for _, item := range items {
-		var deviceType int
-		var deviceID int
-		var deviceName string
-		var networkID int
-		var networkName string
+		var (
+			deviceType        int
+			deviceID          int
+			deviceName        string
+			networkID         int
+			networkName       string
+			opts              []eventapi.TagFieldOption
+			deviceRelatedOpts []eventapi.TagFieldOption
+		)
+
 		vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(item.VInterfaceID)
 		if ok {
 			deviceType, ok = i.ToolDataSet.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
@@ -59,9 +64,14 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			if !ok {
 				log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 			}
-			deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
-			if !ok {
-				log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+			var err error
+			deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+			if err != nil {
+				log.Errorf("device name for %s (lcuuid: %s) not found, %v", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
+			}
+			deviceRelatedOpts, err = GetDeviceOptionsByDeviceID(i.ToolDataSet, deviceType, deviceID)
+			if err != nil {
+				log.Errorf("releated options for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
 			}
 			networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 			if !ok {
@@ -75,15 +85,20 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 			log.Errorf("%s lcuuid (id: %d) for %s not found",
 				RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_LAN_IP_EN)
 		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, item.IP)),
+			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
+			eventapi.TagIPs([]string{item.IP}),
+		}...)
+		opts = append(opts, deviceRelatedOpts...)
 
 		i.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
 			deviceType,
 			deviceID,
-			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, item.IP)),
-			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
-			eventapi.TagIPs([]string{item.IP}),
+			opts...,
 		)
 	}
 }
@@ -98,6 +113,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 		var deviceName string
 		var networkID int
 		var networkName string
+		var err error
 		vifID, ok := i.ToolDataSet.GetVInterfaceIDByLANIPLcuuid(lcuuid)
 		if ok {
 			vifLcuuid, ok := i.ToolDataSet.GetVInterfaceLcuuidByID(vifID)
@@ -110,9 +126,10 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 				if !ok {
 					log.Errorf("device id for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
 				}
-				deviceName, ok = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
-				if !ok {
-					log.Errorf("device name for %s (lcuuid: %s) not found", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid)
+				deviceName, err = i.ToolDataSet.GetDeviceNameByDeviceID(deviceType, deviceID)
+				if err != nil {
+					log.Errorf("device name for %s (lcuuid: %s) not found, %v", RESOURCE_TYPE_VINTERFACE_EN, vifLcuuid, err)
+					deviceName = getDeviceNameFromAllByID(deviceType, deviceID)
 				}
 				networkID, ok = i.ToolDataSet.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 				if !ok {
@@ -137,7 +154,8 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 		}
 
 		i.createAndPutEvent(
-			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+			lcuuid,
+			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,
 			deviceType,
 			deviceID,

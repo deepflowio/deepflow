@@ -302,9 +302,17 @@ func GetBasicNetworkLcuuid(vpcLcuuid string) string {
 	return common.GenerateUUID(vpcLcuuid)
 }
 
-func GetBasicVPCAndNetworks(regions []model.Region, domainName, uuidGenerate string) ([]model.VPC, []model.Network) {
+func GetBasicVPCAndNetworks(regions []model.Region, regionLcuuid, domainName, uuidGenerate string) ([]model.VPC, []model.Network) {
 	var retVPCs []model.VPC
 	var retNetworks []model.Network
+
+	// 没有有效区域时, 根据 regionLcuuid 生成一个参考区域
+	if len(regions) == 0 && regionLcuuid != "" {
+		regions = append(regions, model.Region{
+			Name:   "",
+			Lcuuid: regionLcuuid,
+		})
+	}
 
 	for _, region := range regions {
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, region.Lcuuid)
@@ -371,7 +379,7 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 	for _, host := range hosts {
 		vinterfaces, ok := hostIPToVInterfaces[host.IP]
 		if !ok {
-			log.Debugf("no ip in host (%s) response", host.Name)
+			log.Debugf("no ip in host (%s) response", host.IP)
 			continue
 		}
 		vpcLcuuid := GetBasicVPCLcuuid(uuidGenerate, host.RegionLcuuid)
@@ -390,15 +398,19 @@ func GetHostNics(hosts []model.Host, domainName, uuidGenerate, portNameRegex str
 				continue
 			}
 
+			if vinterface.IPs == "" {
+				log.Debugf("vinterface name (%s) not found ips", vinterface.Name)
+				continue
+			}
+
 			vinterfaceLcuuid := common.GenerateUUID(host.Lcuuid + vinterface.Mac)
 			ips := strings.Split(vinterface.IPs, ",")
 			for _, ip := range ips {
-				if ip == host.IP {
-					includeHostIP = true
-				}
-
 				subnetLcuuid := ""
 				ipMasks := strings.Split(ip, "/")
+				if ipMasks[0] == host.IP {
+					includeHostIP = true
+				}
 				ipAddr := netaddr.IP{}
 				ipMask := strconv.Itoa(common.IPV4_MAX_MASK)
 				if strings.Contains(ip, ":") {

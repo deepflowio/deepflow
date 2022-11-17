@@ -56,8 +56,8 @@ use crate::{
     },
     common::{
         enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
-        FeatureFlags, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
-        NORMAL_EXIT_WITH_RESTART,
+        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
+        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -107,16 +107,11 @@ pub struct ChangedConfig {
     pub tap_types: Vec<trident::TapType>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, Copy, PartialEq, Eq, Debug)]
 pub enum RunningMode {
+    #[default]
     Managed,
     Standalone,
-}
-
-impl Default for RunningMode {
-    fn default() -> Self {
-        Self::Managed
-    }
 }
 
 pub enum State {
@@ -180,11 +175,6 @@ pub struct Trident {
     handle: Option<JoinHandle<()>>,
 }
 
-#[cfg(unix)]
-pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "/etc/trident.yaml";
-#[cfg(windows)]
-pub const DEFAULT_TRIDENT_CONF_FILE: &'static str = "C:\\DeepFlow\\trident\\trident-windows.yaml";
-
 impl Trident {
     pub fn start<P: AsRef<Path>>(
         config_path: P,
@@ -198,7 +188,7 @@ impl Trident {
                     Err(e) => {
                         if let ConfigError::YamlConfigInvalid(_) = e {
                             // try to load config file from trident.yaml to support upgrading from trident
-                            if let Ok(conf) = Config::load_from_file(DEFAULT_TRIDENT_CONF_FILE) {
+                            if let Ok(conf) = Config::load_from_file(DEFAULT_CONF_FILE) {
                                 conf
                             } else {
                                 // return the original error instead of loading trident conf
@@ -234,7 +224,7 @@ impl Trident {
         );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
-        let logger = Logger::try_with_str("info")
+        let logger = Logger::try_with_env_or_str("info")
             .unwrap()
             .format(colored_opt_format)
             .log_to_file_and_writer(
@@ -327,6 +317,7 @@ impl Trident {
             config.controller_cert_file_prefix.clone(),
             config.controller_ips.clone(),
             exception_handler.clone(),
+            &stats_collector,
         ));
 
         if matches!(config.agent_mode, RunningMode::Managed)
@@ -1645,12 +1636,18 @@ impl Components {
             stats_collector.clone(),
         );
 
-        let l4_flow_aggr = FlowAggrThread::new(
+        let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
             id,                          // id
             l4_log_receiver,             // input
             l4_flow_aggr_sender.clone(), // output
             config_handler.collector(),
             synchronizer.ntp_diff(),
+        );
+
+        stats_collector.register_countable(
+            "flow_aggr",
+            Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
+            Default::default(),
         );
 
         let (mut second_collector, mut minute_collector) = (None, None);

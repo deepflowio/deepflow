@@ -35,3 +35,27 @@ func idByLcuuidNotFound(resource, lcuuid string) string {
 func nameByIDNotFound(resource string, id int) string {
 	return fmt.Sprintf("%s (id: %d) name not found", resource, id)
 }
+
+func cacheRegionLcuuidByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s region (id: %d) not found", resource, id)
+}
+
+func cacheAZLcuuidByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s az (id: %d) not found", resource, id)
+}
+
+func cacheVPCIDByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s vpc id (id: %d) not found", resource, id)
+}
+
+func cacheLaunchServerByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("cache %s launch server (id: %d) not found", resource, id)
+}
+
+func dbQueryFailed(err error) string {
+	return fmt.Sprintf("db query failed: %v", err)
+}
+
+func dbSoftDeletedResourceByIDNotFound(resource string, id int) string {
+	return fmt.Sprintf("db soft deleted %s (id: %d) not found", resource, id)
+}

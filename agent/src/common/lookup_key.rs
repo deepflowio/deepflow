@@ -90,7 +90,7 @@ impl Default for LookupKey {
             l3_epc_id_1: 0,
             proto: Default::default(),
             tap_type: Default::default(),
-            feature_flag: FeatureFlags::DEDUP,
+            feature_flag: FeatureFlags::NONE,
             forward_matched: None,
             backward_matched: None,
             fast_index: 0,
@@ -154,14 +154,6 @@ impl LookupKey {
             self.dst_port,
             self.src_port,
         );
-    }
-
-    pub fn set_feature_flag(&mut self, feature_flag: FeatureFlags) {
-        self.feature_flag |= feature_flag;
-    }
-
-    pub fn has_feature_flag(&self, feature_flag: FeatureFlags) -> bool {
-        self.feature_flag & feature_flag == feature_flag
     }
 
     pub fn is_loopback_packet(&self) -> bool {

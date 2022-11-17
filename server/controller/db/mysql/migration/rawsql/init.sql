@@ -1333,6 +1333,7 @@ CREATE TABLE IF NOT EXISTS vtap_group_configuration(
     decap_type                TEXT COMMENT 'separate by ","',
     capture_socket_type       INTEGER,
     capture_bpf               VARCHAR(512),
+    tap_mode                  INTEGER COMMENT '0: local 1: virtual mirror 2: physical mirror',
     thread_threshold          INTEGER,
     process_threshold         INTEGER,
     ntp_enabled               TINYINT(1) COMMENT '0: disabled 1:enabled',

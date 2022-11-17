@@ -379,6 +379,7 @@ type VTapGroupConfiguration struct {
 	L7LogStoreTapTypes            []int         `json:"L7_LOG_STORE_TAP_TYPES" yaml:"l7_log_store_tap_types,omitempty"` // l7 log store tap types, separate by ","
 	CaptureSocketType             *int          `json:"CAPTURE_SOCKET_TYPE" yaml:"capture_socket_type,omitempty"`
 	CaptureBpf                    *string       `json:"CAPTURE_BPF" yaml:"capture_bpf,omitempty"`
+	TapMode                       *int          `json:"TAP_MODE" yaml:"tap_mode,omitempty"`
 	ThreadThreshold               *int          `json:"THREAD_THRESHOLD" yaml:"thread_threshold,omitempty"`
 	ProcessThreshold              *int          `json:"PROCESS_THRESHOLD" yaml:"process_threshold,omitempty"`
 	Lcuuid                        *string       `json:"LCUUID" yaml:"-"`
@@ -455,6 +456,7 @@ type VTapGroupConfigurationResponse struct {
 	L7LogStoreTapTypes            []*TypeInfo   `json:"L7_LOG_STORE_TAP_TYPES"` // l7 log store tap types, separate by ","
 	CaptureSocketType             *int          `json:"CAPTURE_SOCKET_TYPE"`
 	CaptureBpf                    *string       `json:"CAPTURE_BPF"`
+	TapMode                       *int          `json:"TAP_MODE"`
 	ThreadThreshold               *int          `json:"THREAD_THRESHOLD"`
 	ProcessThreshold              *int          `json:"PROCESS_THRESHOLD"`
 	Lcuuid                        *string       `json:"LCUUID"`

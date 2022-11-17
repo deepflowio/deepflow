@@ -45,7 +45,30 @@ func NewPodNode(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *PodNode {
 
 func (p *PodNode) ProduceByAdd(items []*mysql.PodNode) {
 	for _, item := range items {
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, p.deviceType, item.ID)
+		var opts []eventapi.TagFieldOption
+		info, err := p.ToolDataSet.GetPodNodeInfoByID(item.ID)
+		if err != nil {
+			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagAZID(info.AZID),
+				eventapi.TagRegionID(info.RegionID),
+			}...)
+		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagPodNodeID(item.ID),
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagPodClusterID(item.PodClusterID),
+		}...)
+
+		p.createAndPutEvent(
+			item.Lcuuid,
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			p.deviceType,
+			item.ID,
+			opts...,
+		)
 	}
 }
 
@@ -58,14 +81,15 @@ func (p *PodNode) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := p.ToolDataSet.GetPodNodeIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = p.ToolDataSet.GetPodNodeNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(p.resourceType, lcuuid))
+			var err error
+			name, err = p.ToolDataSet.GetPodNodeNameByID(id)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(p.resourceType, lcuuid), err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }

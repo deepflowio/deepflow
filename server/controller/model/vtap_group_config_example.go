@@ -16,380 +16,912 @@
 
 package model
 
-var YamlVTapGroupConfig = []byte(`## 采集器组ID
+var YamlVTapGroupConfig = []byte(`## Agent Group ID
 vtap_group_id: g-xxxxxx
-## 资源限制
-## CPU限制，单位：逻辑核，默认值: 1，值域[1, 100000]
+
+####################
+## Resource Limit ##
+####################
+## CPU Limit
+## Unit: number of logical cores. Default: 1. Range: [1, 100000]
+## Note: deepflow-agent uses cgroups to limit CPU usage.
+##   But please note that deepflow-agent running in K8s Pod
+##   cannot be limited by this value, please configure it
+##   through K8s Limit.
 #max_cpus: 1
-## 内存限制，单位：M字节，默认值: 768，值域[128, 100000]
+
+## Memory Limit
+## Unit: M bytes. Default: 768. Range: [128, 100000]
+## Note: deepflow-agent uses cgroups to limit memory usage.
+##   But please note that deepflow-agent running in K8s Pod
+##   cannot be limited by this value, please configure it
+##   through K8s Limit.
 #max_memory: 768
-## 系统空闲内存限制，单位：%，默认值: 10，值域[0, 100]
-## 说明：系统空闲内存的最低百分比，当比例低于该值的90%时采集器将重启
+
+## System Free Memory Limit
+## Unit: %. Default: 0. Range: [0, 100]
+## Note: The limit of the percentage of system free memory.
+##   When the free percentage is lower than 90% of this value,
+##   the agent will will automatically restart.
 #sys_free_memory_limit: 0
-## 采集包限速，单位：Kpps，默认值: 200，值域[1, 1000000]
+
+## Packet Capture Rate Limit
+## Unit: Kpps. Default: 200. Range: [1, 1000000]
 #max_collect_pps: 200
-## 分发流限速，单位：Mbps，默认值: 1000，值域[1, 10000]
+
+## NPB (Packet Broker) Traffic Limit
+## Unit: Mbps. Default: 1000. Range: [1, 10000]
 #max_npb_bps: 1000
-## 分发熔断阈值，单位：Mbps，默认值: 0，值域[0, 10000]
-## 说明：当分发接口出方向达到或超过阈值时将停止分发，当连续5个监控间隔低于(阈值-分发流量限制)*90%时恢复分发。注意：配置此值必须大于分发流限速，输入0表示关闭此功能。
+
+## NPB (Packet Broker) Circuit Breaker Threshold
+## Unit: Mbps. Default: 0. Range: [0, 10000]
+## Note: When the outbound direction of the NPB interface
+##   reaches or exceeds the threshold, the distribution will be
+##   stopped, and then the distribution will be resumed if the
+##   value is lower than (max_tx_bandwidth - max_npb_bps)*90%
+##   within 5 consecutive monitoring intervals.
+## Attention: When configuring this value, it must be greater
+##   than max_npb_bps. 0 means disable this feature.
 #max_tx_bandwidth: 0
-## 分发熔断监控间隔，单位：秒，默认值: 10，值域[1, 60]
-## 说明：分发接口出方向流量速率的监控间隔
+
+## NPB Circuit Breaker Monitoring Interval
+## Unit: second. Default: 10. Range: [1, 60]
+## Note: monitoring interval for outbound traffic rate of NPB interface
 #bandwidth_probe_interval: 10
-## 日志发送速率，单位：条/小时，默认值: 300，值域[0, 10000]
-## 说明：设置为0表示不限速
+
+## Remote Log Rate
+## Unit: lines/hour. Default: 300. Range: [0, 10000]
+## Note: deepflow-agent will send logs to deepflow-server, 0 means no limit.
 #log_threshold: 300
-## 日志打印等级，默认值: INFO，可选值有：DEBUG/INFO/WARNING/ERROR
+
+## Log Level
+## Default: INFO. options: DEBUG, INFO, WARNING, ERROR
 #log_level: INFO
-## 日志文件大小，单位：M字节，默认值：1000，值域[10, 10000]
+
+## Log File Size
+## Unit: M bytes. Default: 1000. Range: [10, 10000]
 #log_file_size: 1000
-## 线程数限制，单位：个，默认值：500，值域[1， 1000]
+
+## Thread Limit
+## Default: 500. Range: [1, 1000]
+## Note: Maximum number of threads that deepflow-agent is allowed to launch.
 #thread_threshold: 500
-## 进程数限制，单位：个，默认值：10，值域[1， 100]
+
+## Process Limit
+## Default: 10. Range: [1, 100]
+## Note: Maximum number of processes that deepflow-agent is allowed to launch.
 #process_threshold: 10
-#
-## 基础配置参数
-## 采集网口，默认值：^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$，长度范围[0, 65535]
-## qemu: tap.*
-## localhost: lo
-## common nic: eth|en[ospx].*
-## flannel: veth.*
-## calico: cali.*
-## cilium: lxc.*
-## kube-ovn: [0-9a-f]+_h$#
+
+#########################
+## Basic Configuration ##
+#########################
+## Regular Expression for TAP (Traffic Access Point)
+## Length: [0, 65535]
+## Default:
+##   Localhost:   lo
+##   Common NIC:  eth.*|en[ospx].*
+##   QEMU VM NIC: tap.*
+##   Flannel:     veth.*
+##   Calico:      cali.*
+##   Cilium:      lxc.*
+##   Kube-OVN:    [0-9a-f]+_h$
+## Note: Regular expression of NIC name for collecting traffic
 #tap_interface_regex: ^(tap.*|cali.*|veth.*|eth.*|en[ospx].*|lxc.*|lo|[0-9a-f]+_h)$
-## 流量过滤，默认值：空，表示全采集，长度范围[1, 512]
-## 请参考BPF语法：https://biot.com/capstats/bpf.html
+
+## Traffic Capture Filter
+## Length: [1, 512]
+## Note: If not configured, all traffic will be collected. Please
+##   refer to BPF syntax: https://biot.com/capstats/bpf.html
 #capture_bpf:
-## 采集包长，单位：字节，默认值：65535，值域[128, 65535]
-## 说明：DPDK环境目前不支持此参数
+
+## Maximum Packet Capture Length
+## Unit: bytes. Default: 65535. Range: [128, 65535]
+## Note: DPDK environment does not support this configuration.
 #capture_packet_size: 65535
-## 流量采集方式，默认值：0，表示自适应，可选值：0表示自适应/2表示AF_PACKET V2/3表示AF_PACKET V3
-## 说明：Linux环境中的流量采集方式
+
+## Traffic Capture API
+## Default: 0, means adaptive. Options: 0, 2 (AF_PACKET V2), 3 (AF_PACKET V3)
+## Description: Traffic capture API in Linux environment
 #capture_socket_type: 0
-## 解封装隧道类型，默认值：[1,3]，表示VXLAN+IPIP，可选值：0表示无/1表示VXLAN/2表示GRE/3表示IPIP
+
+## Traffic Tap Mode
+## Default: 0, means local.
+## Options: 0, 1 (virtual mirror), 2 (physical mirror, aka. analyzer mode)
+## Note: Mirror mode is used when deepflow-agent cannot directly capture the
+##   traffic from the source. For example:
+##   - in the K8s macvlan environment, capture the Pod traffic through the Node NIC
+##   - in the Hyper-V environment, capture the VM traffic through the Hypervisor NIC
+##   - in the ESXi environment, capture traffic through VDS/VSS local SPAN
+##   - in the DPDK environment, capture traffic through DPDK ring buffer
+##   Use Analyzer mode when deepflow-agent captures traffic through physical switch
+##   mirroring.
+#tap_mode: 0
+
+## Decapsulation Tunnel Protocols
+## Default: [1, 3], means VXLAN and IPIP. Options: 1 (VXLAN), 2 (GRE), 3 (IPIP)
 #decap_type:
 #- 1
 #- 3
-## 虚拟机MAC解析，默认值: 0，表示接口MAC，可选值：0表示接口MAC/1表示接口名称/2表示虚拟机XML
-## 说明：KVM类型采集器获取虚拟机真实MAC地址的方式
-#if_mac_source: 0
-## 虚拟机XML文件夹，默认值: /etc/libvirt/qemu/，长度范围[0, 100]
-#vm_xml_path: /etc/libvirt/qemu/
-## 最长同步间隔，单位：秒，默认值：60，值域[10， 3600]
-#sync_interval: 60
-## 最长逃逸时间，单位：秒，默认值：3600，值域[600, 2592000]
-#max_escape_seconds: 3600
-## UDP最大MTU，单位：字节，默认值: 1500，值域[500, 10000]
-#mtu: 1500
-## 裸UDP外层VLAN，默认值: 0，表示不带任何VLAN标签，值域[0, 4095]
-#output_vlan: 0
-## 是否请求NAT IP，默认值：0，表示否，可选值：0表示否/1表示是
-#nat_ip_enabled: 0
-## 日志存储时长，单位：天，默认值：30，值域[7, 365]
-#log_retention: 300
-## 控制器通信端口，默认值：30035，可选值：1-65535
-#proxy_controller_port: 30035
-## 数据节点通信端口，默认值：30033，可选值：1-65535
-#analyzer_port: 30033
-##控制器IP：默认为空，固定使用此控制器IP
-#proxy_controller_ip:
-##数据节点IP：默认为空，固定使用此数据节点IP
-#analyzer_ip:
-#
-## 全景图配置参数
-## 数据套接字，默认值: TCP，可选值：TCP/UDP/FILE
-#collector_socket_type: TCP
-## PCAP套接字，默认值: TCP，可选值：TCP/UDP/RAW_UDP
-#compressor_socket_type: TCP
-## HTTP日志代理客户端，默认值: X-Forwarded-For，可选值：关闭/X-Forwarded-For
-#http_log_proxy_client: X-Forwarded-For
-## HTTP日志XRequestID，默认值: 关闭，可选值：关闭/X-Request-ID
-#http_log_x_request_id: X-Request-ID
-## 应用流日志TraceID，默认值: traceparent,sw8，可选值：关闭/traceparent/X-B3-TraceId/uber-trace-id/sw6/sw8
-## 支持输入自定义值，支持输入逗号分隔的多个值（除关闭外）
-#http_log_trace_id: traceparent, sw8
-## 应用流日志SpanID，默认值：traceparent,sw8，可选值：关闭/traceparent/X-B3-SpanId/uber-trace-id/sw6/sw8
-## 支持输入自定义值，支持输入逗号分隔的多个值（除关闭外）
-#http_log_span_id: traceparent, sw8
-## 应用日志解析包长，默认值: 1024，值域[256, 1500]
-## 说明：采集HTTP、DNS日志时的解析的包长，注意不要超过采集包长参数
-#l7_log_packet_size: 1024
-## 流日志采集速率，默认值: 10000，值域[100, 1000000]
-## 说明：每秒采集的流日志条数，超过以后采样
-#l4_log_collect_nps_threshold: 10000
-## 应用日志采集速率，默认值: 10000，值域[100, 1000000]
-## 每秒采集的HTTP和DNS日志条数，超过时采样
-#l7_log_collect_nps_threshold: 10000
-#
-## 包分发配置参数
-## 分发套接字，默认值: RAW_UDP，可选值：UDP/RAW_UDP
-#npb_socket_type: RAW_UDP
-## 内层附加头，默认值: 0，表示无，可选值：0表示无/1表示802.1Q
-#npb_vlan_mode: 0
-#
-## 基础功能开关
-## 同步资源信息，默认值: 0，表示关闭，可选值：0表示关闭/1表示开启
-#platform_enabled: 0
-## 日志发送，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#rsyslog_enabled: 1
-## 时钟同步，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#ntp_enabled: 1
-## 云平台资源信息下发，默认值：0，表示全部，可选值（多选）：0表示全部/全部云平台的lcuuid（可通过命令deepflow-ctl get domain获取）
-#domains:
-#  - 0
-## 容器集群内部IP下发，默认值：0，表示所有集群，可选值：0表示所有集群/1表示采集器所在集群
-#pod_cluster_internal_ip: 1
-#
-## 全景图功能开关
-## 指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#collector_enabled: 1
-## 非活跃端口指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#inactive_server_port_enabled: 1
-## 非活跃IP指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#inactive_ip_enabled: 1
-## 网络性能指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-## 说明：关闭时，采集器仅计算最基本的网络层吞吐指标量
-#l4_performance_enabled: 1
-## 应用性能指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#l7_metrics_enabled: 1
-## 秒粒度指标数据，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#vtap_flow_1s_enabled: 1
-## 流日志开启采集点，默认值：0，表示全部，可选值：-1表示无/0表示全部/所有采集器点的数据标记值
-#l4_log_tap_types:
-#  - 0
-## 应用日志开启采集点，默认值：0，表示全部，可选值：-1表示无/0表示全部/所有采集器点的数据标记值
-#l7_log_store_tap_types:
-#  - 0
-## 数据集成HTTP代理，默认值：0，表示关闭，可选址：0表示关闭/1表示开启
-#external_agent_http_proxy_enabled: 0
-## 数据集成HTTP代理端口，默认值：38086，可选值：1-65535
-#external_agent_http_proxy_port: 38086
-#
-## 包分发功能开关
-## 全局去重，默认值：1，表示开启，可选值：0表示关闭/1表示开启
-#npb_dedup_enabled: 1
-#
-## 采集器静态配置
-#static_config:
-  ## kubernetes-namespace，当只有一个K8s命名空间权限时，填写此值
-  #kubernetes-namespace:
-  ## ingress的类型，填写为kubernetes or openshift，默认kubernetes
-  #ingress-flavour: kubernetes
-  ## 配置后会使用配置文件中的analyzer-ip分别替换控制器下发的analyzer-ip
-  #analyzer-ip: ""
-  ## loglevel: "debug/info/warn/error"
-  #log-level: info
-  ## profiler
-  #profiler: false
-  ## tap—mode不是2时，afpacket-blocks是默认无效的，具体大小根据配置的MaxMemory自动适应
-  ## 如果afpacket-blocks-enabled为true，afpacket-blocks有效
-  #afpacket-blocks-enabled: false
-  ## afpacket收包内存大小，单位是M，当ANALYZER模式或该值大于0时，使用该值
-  #afpacket-blocks: 0
-  ## trident-ctl listen port
-  #debug-listen-port: 0
-  ## packet collector and sniffer stats
-  #enable-debug-stats: false
-  ## analyzer模式下tap-type=3采集流量去重开关
-  #analyzer-dedup-disabled: false
-  ## where packet is considered to come by default if packet has no qinq with outer vlan pcp == 7
-  ## ISP: 1-2,4-255, TOR: 3, default value is 3
-  #default-tap-type: 3
-  ## if enabled, sender can be accelerated, but
-  ## only available for kernel with version >= 3.14
-  ## packets sent in this mode won't able to be captured by tcpdump and trident-dump
-  #enable-qos-bypass: false
-  ## fastPath的map大小，设置为0时根据配置的MaxMemory自动适应
-  #fast-path-map-size: 0
-  ## firstPath配置值越大性能越差内存使用越小，取值范围为[1,16]，其他非法值时使用默认值8
-  #first-path-level: 0
-  ## receive from internal source interfaces
-  ## src-interfaces will only be used with mirror-mode
-  ## make sure internal interfaces have been created before running trident
 
-  ## example:
-  #src-interfaces:
-  # - dummy0
-  # - dummy1
-  ## Tap mode
-  ## LOCAL:0, MIRROR/OVS-DPDK:1, ANALYZER:2
-  #tap-mode: 0
-  ## 是否为云网关镜像流量
-  #cloud-gateway-traffic: false
-  ## mirror-traffic-pcp will only be used with analyzer-mode
+## VM MAC Address Extraction
+## Default: 0
+## Options:
+##   0: extracted from tap interface MAC address
+##   1: extracted from tap interface name
+##   2: extracted from the XML file of the virtual machine
+## Note: How to extract the real MAC address of the virtual machine when the
+##   agent runs on the KVM host
+#if_mac_source: 0
+
+## VM XML File Directory
+## Default: /etc/libvirt/qemu/
+## Length: [0, 100]
+#vm_xml_path: /etc/libvirt/qemu/
+
+## Active Sync Interval
+## Unit: second. Default: 60. Range: [10, 3600]
+## Note: The interval at which deepflow-agent actively requests configuration and
+##   tag information from deepflow-server.
+#sync_interval: 60
+
+## Maximum Escape Time
+## Unit: seconds. Default: 3600. Range: [600, 2592000]
+## Note: The maximum time that the agent is allowed to work normally when it
+##   cannot connect to the server. After the timeout, the agent automatically
+##   enters the disabled state.
+#max_escape_seconds: 3600
+
+## UDP maximum MTU, unit: bytes, default value: 1500, value range [500, 10000]
+## Note: Maximum MTU allowed when using UDP to transfer data.
+## Attention: Public cloud service providers may modify the content of the
+##   tail of the UDP packet whose packet length is close to 1500 bytes. When
+##   using UDP transmission, it is recommended to set a slightly smaller value.
+#mtu: 1500
+
+## Raw UDP VLAN Tag
+## Default: 0, means no VLAN tag. Range: [0, 4095]
+## Note: When using Raw Socket to transmit UDP data, this value can be used to
+##   set the VLAN tag
+#output_vlan: 0
+
+## Request NAT IP
+## Default: 0. Options: 0, 1
+## Note: Used when deepflow-agent uses an external IP address to access
+##   deepflow-server. For example, when deepflow-server is behind a NAT gateway,
+##   or the host where deepflow-server is located has multiple node IP addresses
+##   and different deepflow-agents need to access different node IPs, you can
+##   set an additional NAT IP for each deepflow-server address, and modify this
+##   value to 1.
+#nat_ip_enabled: 0
+
+## Log Retention Time
+## Unit: days. Default: 30. Range: [7, 365]
+#log_retention: 300
+
+## Control Plane Server Port
+## Default: 30035. Range: 1-65535
+## Note: The control plane port used by deepflow-agent to access deepflow-server.
+##   The default port within the same K8s cluster is 20035, and the default port
+##   of deepflow-agent outside the cluster is 30035.
+#proxy_controller_port: 30035
+
+## Data Plane Server Port
+## Default: 30033. Range: 1-65535
+## Note: The data plane port used by deepflow-agent to access deepflow-server.
+##   The default port within the same K8s cluster is 20033, and the default port
+##   of deepflow-agent outside the cluster is 30033.
+#analyzer_port: 30033
+
+## Fixed Control Plane Server IP
+## Note: When this value is set, deepflow-agent will use this IP to access the
+##   control plane port of deepflow-server, which is usually used when
+##   deepflow-server uses an external load balancer.
+#proxy_controller_ip:
+
+## Fixed Data Plane Server IP
+## Note: When this value is set, deepflow-agent will use this IP to access the
+##   data plane port of deepflow-server, which is usually used when
+##   deepflow-server uses an external load balancer.
+#analyzer_ip:
+
+#############################
+## Collector Configuration ##
+#############################
+## Data Socket Type
+## Default: TCP. Options: TCP, UDP, FILE
+## Note: It can only be set to FILE in standalone mode, in which case
+##   l4_flow_log and l7_flow_log will be written to local files.
+#collector_socket_type: TCP
+
+## PCAP Socket Type
+## Default: TCP. Options: TCP, UDP, RAW_UDP
+## Note: RAW_UDP uses RawSocket to send UDP packets, which has the highest
+##   performance, but there may be compatibility issues in some environments.
+#compressor_socket_type: TCP
+
+## HTTP Real Client Key
+## Default: X-Forwarded-For.
+## Note: It is used to extract the real client IP field in the HTTP header,
+##   such as X-Forwarded-For, etc. Leave it empty to disable this feature.
+#http_log_proxy_client: X-Forwarded-For
+
+## HTTP X-Request-ID Key
+## Default: X-Request-ID
+## Note: It is used to extract the fields in the HTTP header that are used
+##   to uniquely identify the same request before and after the gateway,
+##   such as X-Request-ID, etc. This feature can be turned off by setting
+##   it to empty.
+#http_log_x_request_id: X-Request-ID
+
+## TraceID Keys
+## Default: traceparent, sw8.
+## Note: Used to extract the TraceID field in HTTP and RPC headers, supports filling
+##   in multiple values separated by commas. This feature can be turned off by
+##   setting it to empty.
+#http_log_trace_id: traceparent, sw8
+
+## SpanID Keys
+## Default: traceparent, sw8.
+## Note: Used to extract the SpanID field in HTTP and RPC headers, supports filling
+##   in multiple values separated by commas. This feature can be turned off by
+##   setting it to empty.
+#http_log_span_id: traceparent, sw8
+
+## Protocol Identification Maximun Packet Length
+## Default: 1024. Range: [256, 1500]
+## Note: The maximum data length used for application protocol identification,
+##   note that the effective value is less than or equal to the value of
+##   capture_packet_size.
+#l7_log_packet_size: 1024
+
+## Maximum Sending Rate for l4_flow_log
+## Default: 10000. Range: [100, [1000000]
+## Note: The maximum number of rows of l4_flow_log sent per second, when the actual
+##   number of rows exceeds this value, sampling is triggered.
+#l4_log_collect_nps_threshold: 10000
+
+## Maximum Sending Rate for l7_flow_log
+## Default: 10000. Range: [100, [1000000]
+## Note: The maximum number of rows of l7_flow_log sent per second, when the actual
+##   number of rows exceeds this value, sampling is triggered.
+#l7_log_collect_nps_threshold: 10000
+
+#######################
+## NPB Configuration ##
+#######################
+## NPB Socket Type
+## Default: RAW_UDP. Options: UDP, RAW_UDP
+## Note: RAW_UDP uses RawSocket to send UDP packets, which has the highest
+##   performance, but there may be compatibility issues in some environments.
+#npb_socket_type: RAW_UDP
+
+## Inner Additional Header
+## Default: 0, means none. Options: 0, 1 (Additional 802.1Q Header)
+## Note: Whether to add an extra 802.1Q header to NPB traffic, when this value is
+##   set, deepflow-agent will insert a VLAN Tag into the NPB traffic header, and
+##   the value is the lower 12 bits of TunnelID in the VXLAN header.
+#npb_vlan_mode: 0
+
+##############################
+## Management Configuration ##
+##############################
+## KVM/Host Metadata Collection
+## Default: 0, means disabled. Options: 0 (disabled), 1 (enabled).
+## Node: When enabled, deepflow-agent will automatically synchronize virtual
+##   machine and network information on the KVM (or Host) to deepflow-server.
+#platform_enabled: 0
+
+## Self Log Sending
+## Default: 1, means enabled. Options: 0 (disabled), 1 (enabled).
+## Note: When enabled, deepflow-agent will send its own logs to deepflow-server.
+#rsyslog_enabled: 1
+
+## NTP Synchronization
+## Default: 1, means enabled. Options: 0 (disabled), 1 (enabled).
+## Note: Whether to synchronize the clock to the deepflow-server, this behavior
+##   will not change the time of the deepflow-agent running environment.
+#ntp_enabled: 1
+
+## Resource MAC/IP Address Delivery
+## Default: 0, which means all domains, or can be set to a list of lcuuid of a
+##   series of domains, you can get lcuuid through 'deepflow-ctl domain list'.
+## Note: The list of MAC and IP addresses is used by deepflow-agent to inject tags
+##   into data. This configuration can reduce the number and frequency of MAC and
+##   IP addresses delivered by deepflow-server to deepflow-agent. When there is no
+##   cross-domain service request, deepflow-server can be configured to only deliver
+##   the information in the local domain to deepflow-agent.
+#domains:
+#- 0
+
+## Pod MAC/IP Address Delivery
+## Default: 0, which means all K8s cluster.
+## Options: 0 (all K8s cluster), 1 (local K8s cluster).
+## Note: The list of MAC and IP addresses is used by deepflow-agent to inject tags
+##   into data. This configuration can reduce the number and frequency of MAC and IP
+##   addresses delivered by deepflow-server to deepflow-agent. When the Pod IP is not
+##   used for direct communication between the K8s cluster and the outside world,
+##   deepflow-server can be configured to only deliver the information in the local
+##   K8s cluster to deepflow-agent.
+#pod_cluster_internal_ip: 0
+
+########################
+## Collector Switches ##
+########################
+## AutoMetrics & AutoLogging
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When disabled, deepflow-agent will not send metrics and logging data
+##   collected using eBPF and cBPF.
+#collector_enabled: 1
+
+## Detailed Metrics for Inactive Port
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent will not generate detailed metrics for each
+##   inactive port (ports that only receive data, not send data), and the data of
+##   all inactive ports will be aggregated into the metrics with a tag
+##   'server_port = 0'.
+#inactive_server_port_enabled: 1
+
+## Detailed Metrics for Inactive IP Address
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent will not generate detailed metrics for each
+##   inactive IP address (IP addresses that only receive data, not send data), and
+##   the data of all inactive IP addresses will be aggregated into the metrics with
+##   a tag 'ip = 0'.
+#inactive_ip_enabled: 1
+
+## NPM Metrics
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent only collects some basic throughput metrics.
+#l4_performance_enabled: 1
+
+## APM Metrics
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: When closed, deepflow-agent will not collect RED (request/error/delay) metrics.
+#l7_metrics_enabled: 1
+
+## Second Granularity Metrics
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+#vtap_flow_1s_enabled: 1
+
+## TAPs Collect l4_flow_log
+## Default: 0, which means all TAPs. Options: -1 (disabled), 0 (all TAPs)
+## Note: The list of TAPs to collect l4_flow_log, you can also set a list of TAPs to
+##   be collected.
+#l4_log_tap_types:
+#- 0
+
+## TAPs Collect l7_flow_log
+## Default: 0, which means all TAPs. Options: -1 (disabled), 0 (all TAPs)
+## Note: The list of TAPs to collect l7_flow_log, you can also set a list of TAPs to
+##   be collected.
+#l7_log_store_tap_types:
+#- 0
+
+## Data Integration Socket
+## Default: 0. Options: 0 (disabled), 1 (enabled).
+## Note: Whether to enable receiving external data sources such as Prometheus,
+##   Telegraf, OpenTelemetry, and SkyWalking.
+#external_agent_http_proxy_enabled: 0
+
+## Listen Port of the Data Integration Socket
+## Default: 38086. Options: [1, 65535]
+#external_agent_http_proxy_port: 38086
+
+##################
+## NPB Switches ##
+##################
+## Global Deduplication
+## Default: 1. Options: 0 (disabled), 1 (enabled).
+## Note: Whether to enable global (distributed) traffic deduplication for the
+##   NPB feature.
+#npb_dedup_enabled: 1
+
+############################
+## Advanced Configuration ##
+############################
+#static_config:
+
+  ###################
+  ## K8s apiserver ##
+  ###################
+  ## K8s Namespace
+  ## Note: Used when deepflow-agent has only one k8s namespace query permission.
+  #kubernetes-namespace:
+
+  ## Type of Ingress
+  ## Default: kubernetes. Options: kubernetes, openshift
+  ## Note: When deepflow-agent runs in the openshift environment, this value needs
+  ##   to be modified so that the correct API is used to query Ingress information.
+  #ingress-flavour: kubernetes
+
+  ## Pod MAC/IP Address Query Method
+  ## Default: adaptive. Options: adaptive, active, passive.
+  ## Note: In active mode, deepflow-agent enters the netns of other Pods through
+  ##   setns syscall to query the MAC and IP addresses. In this mode, the setns
+  ##   operation requires the SYS_ADMIN permission. In passive mode deepflow-agent
+  ##   calculates the MAC and IP addresses used by Pods by capturing ARP/ND traffic.
+  ##   When set to adaptive, active mode will be used first.
+  #kubernetes-poller-type: adaptive
+
+  #########################
+  ## Debug Configuration ##
+  #########################
+  ## Golang Profiler
+  ## Note: Only available for Trident (Golang version of Agent).
+  #profiler: false
+
+  ## Client Port for deepflow-agent-ctl
+  ## Default: 0, which means use a random client port number.
+  ## Note: Only available for Trident (Golang version of Agent).
+  #debug-listen-port: 0
+
+  ## StatsD Counters For Sniffer
+  ## Note: Only available for Trident (Golang version of Agent).
+  #enable-debug-stats: false
+
+  ###############
+  ## AF_PACKET ##
+  ###############
+  ## AF_PACKET Blocks Switch
+  ## Note: When tap_mode != 2, you need to explicitly turn on this switch to
+  ##   configure 'afpacket-blocks'.
+  #afpacket-blocks-enabled: false
+
+  ## AF_PACKET Blocks
+  ## Note: deepflow-agent will automatically calculate the number of blocks
+  ##   used by AF_PACKET according to max_memory, which can also be specified
+  ##   using this configuration item. The size of each block is fixed at 1MB.
+  #afpacket-blocks: 0
+
+  ###################
+  ## Analyzer Mode ##
+  ###################
+  ## Mirror Traffic Dedup
+  ## Note: Whether to enable mirror traffic deduplication when tap_mode = 2.
+  #analyzer-dedup-disabled: false
+
+  ## Default TAP for Mirror Traffic
+  ## Default: 3, means Cloud Network
+  ## Options: 1-2,4-255 (IDC Network), 3 (Cloud Network)
+  ## Note: deepflow-agent will mark the TAP (Traffic Access Point) location
+  ##   according to the outer vlan tag in the mirrored traffic of the physical
+  ##   switch. When the vlan tag has no corresponding TAP value, or the vlan
+  ##   pcp does not match the 'mirror-traffic-pcp', it will assign the TAP value.
+  ##   This configuration item.
+  #default-tap-type: 3
+
+  ## Mirror Traffic PCP
+  ## Note: Calculate TAP value from vlan tag only if vlan pcp matches this value.
   #mirror-traffic-pcp: 0
-  ## the size of queue linking flow generator and quadruple generator, minimum 65536:
-  ##    - 1-tagged-flow-to-quadruple-generator
-  ##    - 1-tagged-flow-to-app-protocol-logs
-  ##    - 0-{flow_type}-{port}-packet-to-tagged-flow   ## flow_type: sflow, netflow
+
+  ## NFVGW Traffic
+  ## Note: Whether it is the mirrored traffic of NFVGW (cloud gateway).
+  #cloud-gateway-traffic: false
+
+  ############
+  ## Sender ##
+  ############
+  ## RAW_UDP Sender Performance Optimization
+  ## Note: When sender uses RAW_UDP to send data, this feature can be enabled to
+  ##   improve performance. Linux Kernel >= 3.14 is required. Note that the data
+  ##   sent when this feature is enabled cannot be captured by tcpdump.
+  #enable-qos-bypass: false
+
+  #####################
+  ## NPB/PCAP Policy ##
+  #####################
+  ## Fast Path Map Size
+  ## Note: When set to 0, deepflow-agent will automatically adjust the map size
+  ##   according to max_memory.
+  #fast-path-map-size: 0
+
+  ## Fast Path Level
+  ## Default: 8. Range: [1, 16]
+  ## Note: When this value is larger, the memory overhead is smaller, but the
+  ##   performance of policy matching is worse.
+  #first-path-level: 8
+
+  ################
+  ## Dispatcher ##
+  ################
+  ## TAP NICs when tap_mode != 0
+  ## Note: The list of capture NICs when tap_mode is not equal to 0, in which
+  ##   case tap_interface_regex is invalid.
+  #src-interfaces:
+  #- dummy0
+  #- dummy1
+
+  ####################
+  ## InMemory Queue ##
+  ####################
+  ## Queue Size of FlowGenerator Output
+  ## Default: 65536. Range: [65536, +oo)
+  ## Note: the length of the following queues:
+  ##   - 1-tagged-flow-to-quadruple-generator
+  ##   - 1-tagged-flow-to-app-protocol-logs
+  ##   - 0-{flow_type}-{port}-packet-to-tagged-flow, flow_type: sflow, netflow
   #flow-queue-size: 65536
-  ## the size of queue linking quadruple generator and collector, minimum 262144:
-  ##    - 2-flow-with-meter-to-second-collector
-  ##    - 2-flow-with-meter-to-minute-collector
+
+  ## Queue Size of QuadrupleGenerator Output
+  ## Default: 262144. Range: [262144, +oo)
+  ## Note: the length of the following queues:
+  ##   - 2-flow-with-meter-to-second-collector
+  ##   - 2-flow-with-meter-to-minute-collector
   #quadruple-queue-size: 262144
-  ## the size of queue linking collector and collector-sender, minimum 65536:
-  ##    - 2-doc-to-collector-sender
+
+  ## Queue Size of Collector Output
+  ## Default: 65536. Range: [65536, +oo)
+  ## Note: the length of the following queues:
+  ##   - 2-doc-to-collector-sender
   #collector-sender-queue-size: 65536
-  ## the number of encoders for doc sender
+
+  ## Queue Count of Collector Output
+  ## Default: 1. Range: [1, +oo)
+  ## Note: The number of replicas for each output queue of the collector.
   #collector-sender-queue-count: 1
-  ## the size of queue linking flow-aggr and collector-sender, minimum 65536:
-  ##    - 3-flow-to-collector-sender
-  ##    - 3-protolog-to-collector-sender
+
+  ## Queue Size of FlowAggregator/SessionAggregator Output
+  ## Default: 65536. Range: [65536, +oo)
+  ## Note: the length of the following queues:
+  ##   - 3-flow-to-collector-sender
+  ##   - 3-protolog-to-collector-sender
   #flow-sender-queue-size: 65536
-  ## the number of encoders for raw flow sender
+
+  ## Queue Count of FlowAggregator/SessionAggregator Output
+  ## Default: 1. Range: [1, +oo)
+  ## Note: The number of replicas for each output queue of the
+  ##   FlowAggregator/SessionAggregator.
   #flow-sender-queue-count: 1
-  ## 该队列在ANALYZER模式下使用:
-  ##    - 0.1-bytes-to-parse
-  ##    - 0.2-packet-to-flowgenerator
-  ##    - 0.3-packet-to-pipeline
+
+  ## Queue Size for Analyzer Mode
+  ## Default: 131072. Range: [65536, +oo)
+  ## Note: the length of the following queues (only for tap_mode = 2):
+  ##   - 0.1-bytes-to-parse
+  ##   - 0.2-packet-to-flowgenerator
+  ##   - 0.3-packet-to-pipeline
   #analyzer-queue-size: 131072
-  ## extra delay for second flow output
-  #second-flow-extra-delay-second: 0
+
+  ###########################
+  ## Time Window Tolerance ##
+  ###########################
+  ## Extra Tolerance for QuadrupleGenerator Receiving 1s-FlowLog
+  ## Format: ${number}${time_unit}
+  ## Example: 1s, 2m, 10h
+  #second-flow-extra-delay-second: 0s
+
+  ## Maximum Tolerable Packet Delay
+  ## Default: 1s
+  ## Format: $number$time_unit
+  ## Example: 1s, 2m, 10h
+  ## Note: The timestamp carried by the packet captured by AF_PACKET may be delayed
+  ##   from the current clock, especially in heavy traffic scenarios, which may be
+  ##   as high as nearly 10s.
+  #packet-delay: 1s
+
+  ## l7_flow_log Aggregate Window
+  ## Default: 120s. Range: [20s, 300s]
+  ## Format: $number$time_unit
+  ## Example: 1s, 2m, 10h
+  #l7-log-session-aggr-timeout: 120s
+
+  ##########
+  ## PCAP ##
+  ##########
   #pcap:
     #enabled: false
-    ## 缓冲队列长度，最小65536:
-    ##    - 1-mini-meta-packet-to-pcap
+
+    ## Queue Size to PCAP Generator
+    ## Default: 65536. Range: [65536, +oo)
+    ## Note: the length of the following queues:
+    ##   - 1-mini-meta-packet-to-pcap
     #queue-size: 65536
-    ## 缓冲队列数量，[1, 16]
+
+    ## Queue Count to PCAP Generator
+    ## Default: 1. Range: [1, 16]
+    ## Note: The number of replicas for each output queue to the PCAP generator.
     #queue-count: 1
-    ## 计算TCP/IP checksum，默认不计算
+
+    ## TCP/IP Checksum Calculate
+    ## Note: TCP/IP checksum is not recalculated by default.
     #tcpip-checksum: false
+
     ## 单次写入文件的块大小，默认64KB
     #block-size-kb: 64
+
     ## 同时在写的最大pcap文件数，默认5000
     #max-concurrent-files: 5000
+
     ## 每个pcap文件的最大大小，默认250MB，但是1秒内即使超过该值也不会切分文件
     #max-file-size-mb: 250
+
     ## 所有pcap文件的最大总大小，默认100GB
     #max-directory-size-gb: 100
+
     ## 磁盘剩余空间不足该数值时进行删除，默认10GB
     #disk-free-space-margin-gb: 10
+
     ## 每个pcap文件的最大时间，默认300秒
     #max-file-period-second: 300
+
     ## pcap文件存储的文件夹
     #file-directory: /var/lib/pcap
+
     ## pcap服务器端口
     #server-port: 20205
+
+  #############################
+  ## FlowMap (FlowGenerator) ##
+  #############################
   #flow:
-    ## flow hash solts大小
-    ## 由于Flow是计算的第一步，这个值也广泛用于遥测数据统计的字典哈希桶大小
-    ## 包括：QuadrupleGenerator、Collector、PacketCollector
+    ## HashSlot Size of FlowMap
+    ## Default: 131072
+    ## Note: Since FlowAggregator is the first step in all processing, this value
+    ##   is also widely used in other hash tables such as QuadrupleGenerator,
+    ##   Collector, etc.
     #flow-slots-size: 131072
-    ## 当前最大flow数
+
+    ## Maximum Flow
+    ## Default: 1048576
+    ## Note: Maximum number of flows that can be stored in FlowMap.
     #flow-count-limit: 1048576
-    ## 限制每秒发送到stream的flow的最大数量，超出的随机丢弃
-    #flow-sender-throttle: 1024
-    ## 设置flow分钟聚合队列的长度:
-    ##    - 2-second-flow-to-minute-aggrer
+
+    ## Queue Size of FlowAggregator (1s->1m)
+    ## Default: 65536. Range: [65536, +oo)
+    ## Note: the length of the following queues:
+    ##   - 2-second-flow-to-minute-aggrer
     #flow-aggr-queue-size: 65535
-    ## 发送到collector的queue的最大flush间隔，单位为秒，可配置[1, 10]，默认为1
+
+    ## Flush Interval of FlowMap Output Queue
+    ## Format: $number$time_unit
+    ## Example: 1s, 2m, 10h
+    ## Note: Flush interval of the queue connected to the collector.
     #flush-interval: 1s
-    ## 设置为true, 对于inport为0x30000的包,流计算不考虑mac
+
+    ## Ignore MAC when Generate Flow
+    ## Note: When the MAC addresses of the two-way traffic collected at the same
+    ##   location are asymmetrical, the traffic cannot be aggregated into a Flow.
+    ##   You can set this value at this time. Only valid for Cloud (not IDC) traffic.
     #ignore-tor-mac: false
-    ## 设置为true, 对于inport大于0x30000并且l2end为fasle的包,流计算不考虑mac
+
+    ## Ignore L2End when Generate Flow
+    ## Note: For Cloud traffic, only the MAC address corresponding to the side with
+    ##   L2End = true is matched when generating the flow. Set this value to true to
+    ##   force a double-sided MAC address match and only aggregate traffic with
+    ##   exactly equal MAC addresses.
     #ignore-l2-end: false
-    ## tcp连接状态对应的flow超时时间
+
+    ## Timeouts for TCP State Machine
+    ## Format: $number$time_unit
+    ## Example: 1s, 2m, 10h
     #established-timeout: 300s
     #closing-rst-timeout: 35s
     #others-timeout: 5s
-  ## configuration for capture ovs-dpdk traffic
-  ## use limits refer to https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
+
+  #####################
+  ## DPDK RecvEngine ##
+  #####################
+  ## Enable for DPDK RecvEngine
+  ## Note: The DPDK RecvEngine is only started when this configuration item is turned on.
+  ##   Note that you also need to set tap_mode to 1. Please refer to
+  ##   https://dpdk-docs.readthedocs.io/en/latest/prog_guide/multi_proc_support.html
   #ovs-dpdk-enable: false
-  ## use different core with primary process
-  ## 0 <= dpdk-pmd-core-id <= 63
+
+  ## Dedicated Core for DPDK RecvEngine
+  ## Default: 0, means disabled. Range: [1, 63]
+  ## Note: Setting this value makes deepflow-agent use dedicated CPU cores to capture traffic.
   #dpdk-pmd-core-id: 0
+
+  ## DPDK Ring Port
+  ## Note: Mirror port to capture DPDK traffic.
   #dpdk-ring-port: "dpdkr0"
-  ## sflow, netflow server ports
+
+  #################################
+  ## sFlow / NetFlow / NetStream ##
+  #################################
+  ## sFlow & NetFlow Server Ports
   #xflow-collector:
     #sflow-ports:
-      #- 6343
+    #- 6343
     #netflow-ports:
-      #- 2055
-  ## NPB VXLAN目的端口
+    #- 2055
+
+  #########
+  ## NPB ##
+  #########
+  ## Server Port for VXLAN
   #vxlan-port: 4789
-  ## NPB VXLAN的Flags第一个字节, 默认为0xff不支持设置为0x08, 实际的值会加上VNI的标记
+
+  ## Reserve Flags for VXLAN
+  ## Default: 0xff. Range: [0x00, 0xff], except 0x8.
+  ## Note: NPB uses the first byte of the VXLAN Flag to identify the sending traffic to
+  ##   prevent the traffic sent by NPB from being collected by deepflow-agent. To ensure
+  ##   that the VNI bit is set, the value configured here will be used after |= 0x8.
   #vxlan-flags: 0xff
-  ## 网包时间与当前时间相比的最大delay，单位为秒，可配置[1, 10]，默认为1
-  ## 大流量下该delay可能高达近10秒
-  #packet-delay: 1s
-  ## 二元表配置
-  #triple:
-    #hash-slots-size: 65536
-    #capacity: 1048576
-  ## kubernetes poller类型，可选adaptive/active/passive，active表示使用setns和ip命令获取网卡，passive表示通过抓包的方式获取，adaptive表示尽可能用active
-  #kubernetes-poller-type: adaptive
-  ## 是否剥离ERSPAN或TEB(Transport Ethernet Bridging目前仅Vmware中使用了该协议)
+
+  ############
+  ## Tunnel ##
+  ############
+  ## Remove ERSPAN Header
+  ## Note: Whether to remove the ERSPAN header in mirrored traffic. It is applicable to
+  ##   the ERSPAN protocol used by physical switch traffic mirroring and the TEB
+  ##   (Transport Ethernet Bridging) protocol used by VMware remote mirroring.
   #decap-erspan: false
-  ## GRPC接收缓冲大小，单位为M，默认5M
+
+  ##########
+  ## gRPC ##
+  ##########
+  ## gRPC Socket Buffer Size
+  ## Default: 5. Unit: MB
   #grpc-buffer-size: 5
-  ## l7日志会话聚合的时间窗口应不小于20秒，不大于300秒. 单位为s，默认120s
-  #l7-log-session-aggr-timeout: 120s
-  ## 通过该脚本获取采集接口对应的MAC地址，该选项需要如下条件才能生效：
-  ## 1. 采集器页面配置虚拟机MAC解析项为虚拟机XML
-  ## 2. tap-mode为0
-  ## 3. 接口名称和XML配置不冲突
-  ## 脚本输出格式如下：
+
+  #############################
+  ## TAP MAC Address Mapping ##
+  #############################
+  ## TAP MAC Mapping Script
+  ## Note: The MAC address mapping relationship of TAP NIC in complex environment can be
+  ##   constructed by writing a script. The following conditions must be met to use this
+  ##   script:
+  ##   1. if_mac_source = 2
+  ##   2. tap_mode = 0
+  ##   3. The name of the TAP NIC is the same as in the virtual machine XML file
+  ##   4. The format of the script output is as follows:
   ## tap2d283dfe,11:22:33:44:55:66
   ## tap2d283223,aa:bb:cc:dd:ee:ff
   #tap-mac-script: ""
-  ## 开启后不会使用bpf过滤包
+
+  #########
+  ## BPF ##
+  #########
+  ## BPF Filter
+  ## Note: It is found that there may be bugs in BPF traffic filtering under some
+  ##   versions of Linux Kernel. After this configuration is enabled, deepflow-agent
+  ##   will not use the filtering capabilities of BPF, and will filter by itself after
+  ##   capturing full traffic. Note that this may significantly increase the resource
+  ##   overhead of deepflow-agent.
   #bpf-disabled: false
-  ## 推断一个服务（vpc + ip + protocol + port）的应用层协议类型时，允许的最大连续失败次数
-  ## 失败次数超过此阈值时，此服务的协议推断结果将会被记为未知，在随后的有效期内不会再进行推断
+
+  #################
+  ## L7 Protocol ##
+  #################
+  ## Maximum Fail Count
+  ## Note: deepflow-agent will mark the application protocol for each
+  ##   <vpc, ip, protocol, port> tuple, when the traffic corresponding to a tuple fails
+  ##   to be identified for many times (for multiple packets, Socket Data, Function Data),
+  ##   the tuple will be marked as an unknown type to avoid deepflow-agent continuing to
+  ##   try (incurring significant computational overhead) until the duration exceeds
+  ##   l7-protocol-inference-ttl.
   #l7-protocol-inference-max-fail-count: 5
-  ## 一个服务的应用层协议类型推断结果的有效期，单位为秒，超过有效期后会触发下一次推断
+
+  ## TTL of Protocol Identification
+  ## Unit: second
+  ## Note: deepflow-agent will mark the application protocol for each
+  ##   <vpc, ip, protocol, port> tuple. In order to avoid misidentification caused by IP
+  ##   changes, the validity period after successfully identifying the protocol will be
+  ##   limited to this value.
   #l7-protocol-inference-ttl: 60
-  ## 流日志时序数据单个流flush最大数据长度，超过这个长度就发送到sender，单位为B，默认64B
-  #packet-sequence-block-size: 64
-  ## the size of queue linking packet-sequence-block and uniform-collect-sender, minimum 65536
-  ## - 1-packet-sequence-block-to-uniform-collect-sender
-  #packet-sequence-queue-size: 65536
-  ## the number of encoders for uniform collect sender
-  #packet-sequence-queue-count: 1
-  ## packet-sequence-flag determines which fields need to be reported, the default value is 0, which means the feature is disabled, and 255, which means all fields need to be reported
-  ## all fields corresponding to each bit:
-  ## | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
-  ## 8      7     6     5              4             3         2        1          0
-  #packet-sequence-flag: 255
-  ## 是否开启ebpf
-  #ebpf-disabled: false
-  ## eBPF uprobe 开启 Golang 符号表解析，默认为 false## 作用于裁剪了标准符号表的 Golang 进程（例如 K8s 自身进程一般属于此类）。
-  ## 当关闭此开关时，无法采集此类进程的 uprobe 数据。
-  ## 当开启此开关时，对于 Golang >= 1.13 且 < 1.18 的 Golang 进程，
-  ## 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
-  #ebpf-uprobe-golang-symbol-enabled: false
-  ## 用于开启集成采集器压缩数据开关，现在仅支持 opentelemetry trace 数据压缩
-  #external-agent-http-proxy-compressed: false
-  ## eBPF、AF_PACKET、WINPCAP 开启的应用协议解析列表，默认包括支持的所有应用协议。
+
+  ## List of Application Protocols
+  ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
   #l7-protocol-enabled:
-    #- HTTP ## for both HTTP and HTTP_TLS
-    #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
-    #- Dubbo
-    #- MySQL
-    #- PostgreSQL
-    #- Redis
-    #- Kafka
-    #- MQTT
-    #- DNS
-  ## eBPF uprobe 各项子功能生效的进程名，以正则表达式的方式配置
+  #- HTTP: true ## for both HTTP and HTTP_TLS
+  #- HTTP2: true ## for HTTP2, HTTP2_TLS and gRPC
+  #- Dubbo: true
+  #- MySQL: true
+  #- PostgreSQL: true
+  #- Redis: true
+  #- Kafka: true
+  #- MQTT: true
+  #- DNS: true
+
+  ## Application Protocol Port Numbers
+  ## Default: 53 for DNS, 1-65535 for other Protocols.
+  ## Format: map<protocol-name, port-list>
+  ## Example: "HTTP": 80,1000-2000
+  #l7-protocol-ports:
+    #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
+    #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
+    #"Dubbo": "1-65535"
+    #"MySQL": "1-65535"
+    #"PostgreSQL": "1-65535"
+    #"Redis": "1-65535"
+    #"Kafka": "1-65535"
+    #"MQTT": "1-65535"
+    #"DNS": "53"
+
+  ########################
+  ## L4 Packet Sequence ##
+  ########################
+  ## Block Size
+  ## Default: 64. Unit: Byte.
+  ## Note: When generating TCP header data, each flow uses one block to compress and
+  ##   store multiple TCP headers, and the block size can be set here.
+  #packet-sequence-block-size: 64
+
+  ## Queue Size of PacketSequence Output
+  ## Default: 65536. Range: [65536, +oo)
+  ## Note: the length of the following queues (to UniformCollectSender):
+  ##   - 1-packet-sequence-block-to-uniform-collect-sender
+  #packet-sequence-queue-size: 65536
+
+  ## Queue Count of PacketSequence Output
+  ## Default: 1. Range: [1, +oo)
+  ## Note: The number of replicas for each output queue of the PacketSequence.
+  #packet-sequence-queue-count: 1
+
+  ## Reported Header Fields
+  ## Default: 0, means to disable this feature.
+  ## Note: packet-sequence-flag determines which fields need to be reported, the default
+  ##   value is 0, which means the feature is disabled, and 255, which means all fields
+  ##   need to be reported all fields corresponding to each bit:
+  ##   | FLAG | SEQ | ACK | PAYLOAD_SIZE | WINDOW_SIZE | OPT_MSS | OPT_WS | OPT_SACK |
+  ##   8      7     6     5              4             3         2        1          0
+  #packet-sequence-flag: 0
+
+  #################
+  ## Integration ##
+  #################
+  ## Compress Integration Data
+  ## Note: Whether to compress the integrated data received by deepflow-agent. Currently,
+  ##   only opentelemetry data is supported, and the compression ratio is about 5:1~10:1.
+  ##   Turning on this feature will result in higher CPU consumption of deepflow-agent.
+  #external-agent-http-proxy-compressed: false
+
+  ##########
+  ## eBPF ##
+  ##########
+  ## eBPF Switch
+  ## Default: false
+  #ebpf-disabled: false
+
+  ## Regex for Process Name
+  ## Note: The name of the process where each feature of ebpf uprobe takes effect,
+  ##   which is configured using regular expressions
   #ebpf-uprobe-process-name-regexs:
-    ## eBPF uprobe 开启 Golang 符号表解析的进程，默认为空表示不对任何进程开启。
-    ## 作用于裁剪了标准符号表的 Golang 进程，例如 K8s 自身进程一般属于此类。
-    ## 当关闭此开关时，无法采集此类进程的 uprobe 数据。
-    ## 当开启此开关时，对于 Golang >= 1.13 且 < 1.18 的 Golang 进程，
-    ## 将会使用 Golang 特有符号表进行解析以完成 uprobe 数据采集，但可能导致 eBPF 初始化耗时达十分钟。
+
+    ## Note: Process name to enable Golang-specific symbol table parsing. The default
+    ##   value is empty, which means that this feature is not enabled for any process.
+    ##   This feature acts on Golang processes that have trimmed the standard symbol
+    ##   table. For example, the management process of K8s generally belongs to this
+    ##   category. When this feature is enabled, for processes with Golang
+    ##   version >= 1.13 and < 1.18, when the standard symbol table is missing, the
+    ##   Golang-specific symbol table will be parsed to complete uprobe data collection.
+    ##   Note that enabling this feature may cause the eBPF initialization process to
+    ##   take ten minutes.
     #golang-symbol: ""
-    ## eBPF uprobe 开启应用协议数据采集的 Golang 进程，默认为 .* 表示对所有 Golang 进程开启。
+
+    ## Note: The name of the Golang process that enables HTTP2/HTTPS protocol data collection.
+    ##   The default value is .*, which means it is enabled for all Golang processes.
     #golang: ".*"
-    ## eBPF uprobe 开启应用协议数据采集的使用 openssl 库的进程，默认为 .* 表示对所有使用了 openssl 库的进程开启。
+
+    ## Note: The name of the process that uses the openssl library to enable HTTPS
+    ##   protocol data collection. The default is .*, which means that it is enabled for
+    ##   all processes that use the openssl library.
     #openssl: ".*"
-  ## 写入单个数据文件的最大大小，单位MB
+
+  ######################################
+  ## Agent Running in Standalone Mode ##
+  ######################################
+  ## Data File Size
+  ## Default: 200. Unit: MB.
+  ## Note: When deepflow-agent runs in standalone mode, it will not be controlled by
+  ##   deepflow-server, and the collected data will only be written to the local file.
+  ##   Currently supported data types for writing are l4_flow_log and l7_flow_log. Each
+  ##   type of data is written to a separate file. This configuration can be used to
+  ##   specify the maximum size of the data file, and rotate when it exceeds this size.
+  ##   A maximum of two files are kept for each type of data.
   #standalone-data-file-size: 200
-  ## 写入数据文件的路径
+
+  ## Directory of Data File
+  ## Note: Directory where data files are written to.
   #standalone-data-file-dir: /var/log/deepflow-agent/
-  ## 日志文件路径
+
+  ## Log File Path
+  ## Note: Note that this configuration is only used in standalone mode.
   #log-file: /var/log/deepflow-agent/deepflow-agent.log
-  ## 开发过程中的功能控制开关，支持多个
+
+  #################
+  ## FeatureFlag ##
+  #################
+  ## Note: Unreleased deepflow-agent features can be turned on by setting this switch.
   #feature-flags:
 `)

@@ -23,7 +23,7 @@ pod_ingress         , pod_ingress_0        , pod_ingress_1         , resource   
 pod_service         , pod_service_0        , pod_service_1         , resource     ,                      , Universal Tag        , 111
 pod_group           , pod_group_0          , pod_group_1           , resource     ,                      , Universal Tag        , 111
 pod                 , pod_0                , pod_1                 , resource     ,                      , Universal Tag        , 111
-# service           , service_0            , service_1             , resource     ,                      , Universal Tag        , 111 # temporarily disabled
+service             , service_0            , service_1             , resource     ,                      , Universal Tag        , 111
 resource_gl0_type   , resource_gl0_type_0  , resource_gl0_type_1   , int_enum     , resource_gl0_type    , Universal Tag        , 111
 resource_gl0        , resource_gl0_0       , resource_gl0_1        , resource     ,                      , Universal Tag        , 111
 resource_gl1_type   , resource_gl1_type_0  , resource_gl1_type_1   , int_enum     , resource_gl1_type    , Universal Tag        , 111
@@ -69,7 +69,6 @@ l7_protocol         , l7_protocol          , l7_protocol           , int_enum   
 flow_id             , flow_id              , flow_id               , int          ,                      , Flow Info            , 111
 start_time          , start_time           , start_time            , int          ,                      , Flow Info            , 111
 end_time            , end_time             , end_time              , int          ,                      , Flow Info            , 111
-duration            , duration             , duration              , int          ,                      , Flow Info            , 111
 close_type          , close_type           , close_type            , int_enum     , close_type           , Flow Info            , 111
 status              , status               , status                , int_enum     , status               , Flow Info            , 111
 is_new_flow         , is_new_flow          , is_new_flow           , bool         ,                      , Flow Info            , 111

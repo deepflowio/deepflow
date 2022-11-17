@@ -16,33 +16,35 @@
 
 package cache
 
-import "github.com/deepflowys/deepflow/server/controller/common"
+import (
+	"github.com/deepflowys/deepflow/server/controller/common"
+)
 
 type EventToolDataSet struct {
-	HostIDToName map[int]string
-	HostIPToID   map[string]int
+	hostIPToID   map[string]int
+	hostIDtoInfo map[int]*hostInfo
 
-	VMIDToName           map[int]string
-	VMIDToIPNetworkIDMap map[int]map[string]uint32
+	vmIDToInfo           map[int]*vmInfo
+	VMIDToIPNetworkIDMap map[int]map[IPKey]int
 
-	VRouterIDToName map[int]string
+	vrouterIDToInfo map[int]*vrouterInfo
 
-	DHCPPortIDToName map[int]string
+	dhcpPortIDToInfo map[int]*dhcpPortInfo
 
-	NATGatewayIDToName map[int]string
+	natGatewayIDToInfo map[int]*natGatewayInfo
 
-	LBIDToName map[int]string
+	lbIDToInfo map[int]*lbInfo
 
-	RDSInstanceIDToName map[int]string
+	rdsInstanceIDToInfo map[int]*rdsInstanceInfo
 
-	RedisInstanceIDToName map[int]string
+	redisInstanceIDToInfo map[int]*redisInstanceInfo
 
-	PodNodeIDToName map[int]string
+	podNodeIDToInfo map[int]*podNodeInfo
 
-	PodServiceIDToName map[int]string
+	podServiceIDToInfo map[int]*podServiceInfo
 
-	PodIDToName           map[int]string
-	PodIDToIPNetworkIDMap map[int]map[string]uint32
+	podIDToInfo           map[int]*podInfo
+	PodIDToIPNetworkIDMap map[int]map[IPKey]int
 
 	NetworkIDToName           map[int]string
 	VInterfaceIDToLcuuid      map[int]string
@@ -52,32 +54,119 @@ type EventToolDataSet struct {
 	LANIPLcuuidToIP           map[string]string
 }
 
+type IPKey struct {
+	IP     string
+	Lcuuid string
+}
+
+type hostInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+}
+
+type vmInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+	HostID   int
+}
+
+type vrouterInfo struct {
+	Name     string
+	RegionID int
+	VPCID    int
+}
+
+type dhcpPortInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type natGatewayInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type lbInfo struct {
+	Name     string
+	RegionID int
+	VPCID    int
+}
+
+type rdsInstanceInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type redisInstanceInfo struct {
+	Name     string
+	RegionID int
+	AZID     int
+	VPCID    int
+}
+
+type podNodeInfo struct {
+	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
+	PodClusterID int
+}
+
+type podServiceInfo struct {
+	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
+	PodClusterID int
+	PodNSID      int
+}
+
+type podInfo struct {
+	Name         string
+	RegionID     int
+	AZID         int
+	VPCID        int
+	PodClusterID int
+	PodNSID      int
+	PodGroupID   int
+	PodNodeID    int
+}
+
 func NewEventToolDataSet() EventToolDataSet {
 	return EventToolDataSet{
-		HostIDToName: make(map[int]string),
-		HostIPToID:   make(map[string]int),
+		hostIPToID:   make(map[string]int),
+		hostIDtoInfo: make(map[int]*hostInfo),
 
-		VMIDToName:           make(map[int]string),
-		VMIDToIPNetworkIDMap: make(map[int]map[string]uint32),
+		vmIDToInfo:           make(map[int]*vmInfo),
+		VMIDToIPNetworkIDMap: make(map[int]map[IPKey]int),
 
-		VRouterIDToName: make(map[int]string),
+		vrouterIDToInfo: make(map[int]*vrouterInfo),
 
-		DHCPPortIDToName: make(map[int]string),
+		dhcpPortIDToInfo: make(map[int]*dhcpPortInfo),
 
-		NATGatewayIDToName: make(map[int]string),
+		natGatewayIDToInfo: make(map[int]*natGatewayInfo),
 
-		LBIDToName: make(map[int]string),
+		lbIDToInfo: make(map[int]*lbInfo),
 
-		RDSInstanceIDToName: make(map[int]string),
+		rdsInstanceIDToInfo: make(map[int]*rdsInstanceInfo),
 
-		RedisInstanceIDToName: make(map[int]string),
+		redisInstanceIDToInfo: make(map[int]*redisInstanceInfo),
 
-		PodNodeIDToName: make(map[int]string),
+		podNodeIDToInfo: make(map[int]*podNodeInfo),
 
-		PodServiceIDToName: make(map[int]string),
+		podServiceIDToInfo: make(map[int]*podServiceInfo),
 
-		PodIDToName:           make(map[int]string),
-		PodIDToIPNetworkIDMap: make(map[int]map[string]uint32),
+		podIDToInfo:           make(map[int]*podInfo),
+		PodIDToIPNetworkIDMap: make(map[int]map[IPKey]int),
 
 		NetworkIDToName:           make(map[int]string),
 		VInterfaceIDToLcuuid:      make(map[int]string),
@@ -88,21 +177,21 @@ func NewEventToolDataSet() EventToolDataSet {
 	}
 }
 
-func (t *EventToolDataSet) setDeviceToIPNetworkMap(deviceType, deviceID, networkID int, ip string) {
+func (t *EventToolDataSet) setDeviceToIPNetworkMap(deviceType, deviceID, networkID int, ip IPKey) {
 	if deviceType == common.VIF_DEVICE_TYPE_VM {
 		if t.VMIDToIPNetworkIDMap[deviceID] == nil {
-			t.VMIDToIPNetworkIDMap[deviceID] = make(map[string]uint32)
+			t.VMIDToIPNetworkIDMap[deviceID] = make(map[IPKey]int)
 		}
-		t.VMIDToIPNetworkIDMap[deviceID][ip] = uint32(networkID)
+		t.VMIDToIPNetworkIDMap[deviceID][ip] = networkID
 	} else if deviceType == common.VIF_DEVICE_TYPE_POD {
 		if t.PodIDToIPNetworkIDMap[deviceID] == nil {
-			t.PodIDToIPNetworkIDMap[deviceID] = make(map[string]uint32)
+			t.PodIDToIPNetworkIDMap[deviceID] = make(map[IPKey]int)
 		}
-		t.PodIDToIPNetworkIDMap[deviceID][ip] = uint32(networkID)
+		t.PodIDToIPNetworkIDMap[deviceID][ip] = networkID
 	}
 }
 
-func (t *EventToolDataSet) deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID int, ip string) {
+func (t *EventToolDataSet) deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID int, ip IPKey) {
 	if deviceType == common.VIF_DEVICE_TYPE_VM {
 		m, _ := t.VMIDToIPNetworkIDMap[deviceID]
 		if m != nil {
@@ -116,18 +205,18 @@ func (t *EventToolDataSet) deleteDeviceToIPNetworkMapIP(deviceType, deviceID, ne
 	}
 }
 
-func (t *EventToolDataSet) GetVMIPNetworkMapByID(id int) (map[string]uint32, bool) {
+func (t *EventToolDataSet) GetVMIPNetworkMapByID(id int) (map[IPKey]int, bool) {
 	m, exists := t.VMIDToIPNetworkIDMap[id]
 	if !exists {
-		return make(map[string]uint32), false
+		return make(map[IPKey]int), false
 	}
 	return m, true
 }
 
-func (t *EventToolDataSet) GetPodIPNetworkMapByID(id int) (map[string]uint32, bool) {
+func (t *EventToolDataSet) GetPodIPNetworkMapByID(id int) (map[IPKey]int, bool) {
 	m, exists := t.PodIDToIPNetworkIDMap[id]
 	if !exists {
-		return make(map[string]uint32), false
+		return make(map[IPKey]int), false
 	}
 	return m, true
 }

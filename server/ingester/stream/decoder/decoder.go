@@ -21,12 +21,14 @@ import (
 	"compress/zlib"
 	"io/ioutil"
 	"strconv"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
 	logging "github.com/op/go-logging"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
+	"github.com/deepflowys/deepflow/server/ingester/common"
 	"github.com/deepflowys/deepflow/server/ingester/flow_tag"
 	"github.com/deepflowys/deepflow/server/ingester/stream/jsonify"
 	"github.com/deepflowys/deepflow/server/ingester/stream/throttler"
@@ -48,28 +50,25 @@ const (
 )
 
 type Counter struct {
-	RawCount          int64 `statsd:"raw-count"`
-	L4Count           int64 `statsd:"l4-count"`
-	L4DropCount       int64 `statsd:"l4-drop-count"`
-	L7Count           int64 `statsd:"l7-count"`
-	L7DropCount       int64 `statsd:"l7-drop-count"`
-	L7HTTPCount       int64 `statsd:"l7-http-count"`
-	L7HTTPDropCount   int64 `statsd:"l7-http-drop-count"`
-	L7DNSCount        int64 `statsd:"l7-dns-count"`
-	L7DNSDropCount    int64 `statsd:"l7-dns-drop-count"`
-	L7SQLCount        int64 `statsd:"l7-sql-count"`
-	L7SQLDropCount    int64 `statsd:"l7-sql-drop-count"`
-	L7NoSQLCount      int64 `statsd:"l7-nosql-count"`
-	L7NoSQLDropCount  int64 `statsd:"l7-nosql-drop-count"`
-	L7RPCCount        int64 `statsd:"l7-rpc-count"`
-	L7RPCDropCount    int64 `statsd:"l7-rpc-drop-count"`
-	L7MQCount         int64 `statsd:"l7-mq-count"`
-	L7MQDropCount     int64 `statsd:"l7-mq-drop-count"`
-	OTelCount         int64 `statsd:"otel-count"`
-	OTelDropCount     int64 `statsd:"otel-drop-count"`
-	L4PacketCount     int64 `statsd:"l4-packet-count"`
-	L4PacketDropCount int64 `statsd:"l4-packet-drop-count"`
-	ErrorCount        int64 `statsd:"err-count"`
+	RawCount         int64 `statsd:"raw-count"`
+	L7HTTPCount      int64 `statsd:"l7-http-count"`
+	L7HTTPDropCount  int64 `statsd:"l7-http-drop-count"`
+	L7DNSCount       int64 `statsd:"l7-dns-count"`
+	L7DNSDropCount   int64 `statsd:"l7-dns-drop-count"`
+	L7SQLCount       int64 `statsd:"l7-sql-count"`
+	L7SQLDropCount   int64 `statsd:"l7-sql-drop-count"`
+	L7NoSQLCount     int64 `statsd:"l7-nosql-count"`
+	L7NoSQLDropCount int64 `statsd:"l7-nosql-drop-count"`
+	L7RPCCount       int64 `statsd:"l7-rpc-count"`
+	L7RPCDropCount   int64 `statsd:"l7-rpc-drop-count"`
+	L7MQCount        int64 `statsd:"l7-mq-count"`
+	L7MQDropCount    int64 `statsd:"l7-mq-drop-count"`
+	ErrorCount       int64 `statsd:"err-count"`
+	Count            int64 `statsd:"count"`
+	DropCount        int64 `statsd:"drop-count"`
+
+	TotalTime int64 `statsd:"total-time"`
+	AvgTime   int64 `statsd:"avg-time"`
 }
 
 type Decoder struct {
@@ -107,11 +106,14 @@ func NewDecoder(
 func (d *Decoder) GetCounter() interface{} {
 	var counter *Counter
 	counter, d.counter = d.counter, &Counter{}
+	if counter.Count > 0 {
+		counter.AvgTime = counter.TotalTime / counter.Count
+	}
 	return counter
 }
 
 func (d *Decoder) Run() {
-	stats.RegisterCountable("decoder", d, stats.OptionStatTags{
+	common.RegisterCountableForIngester("decoder", d, stats.OptionStatTags{
 		"thread":   strconv.Itoa(d.index),
 		"msg_type": d.msgType.String()})
 	buffer := make([]interface{}, BUFFER_SIZE)
@@ -120,6 +122,7 @@ func (d *Decoder) Run() {
 	pbTracesData := &v1.TracesData{}
 	for {
 		n := d.inQueue.Gets(buffer)
+		start := time.Now()
 		for i := 0; i < n; i++ {
 			if buffer[i] == nil {
 				d.flush()
@@ -149,6 +152,7 @@ func (d *Decoder) Run() {
 			}
 			receiver.ReleaseRecvBuffer(recvBytes)
 		}
+		d.counter.TotalTime += int64(time.Since(start))
 	}
 }
 
@@ -223,12 +227,12 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
 	}
-	d.counter.OTelCount++
+	d.counter.Count++
 	ls := jsonify.OTelTracesDataToL7Loggers(vtapID, tracesData, d.platformData)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.Send(l) {
-			d.counter.OTelDropCount++
+			d.counter.DropCount++
 		} else {
 			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7LoggerToFlowTagInterfaces(l))
 			l.Release()
@@ -238,10 +242,10 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 
 func (d *Decoder) handleL4Packet(vtapID uint16, decoder *codec.SimpleDecoder) {
 	for !decoder.IsEnd() {
-		l4Packet := jsonify.DecodePacketSequence(decoder, vtapID)
-		if decoder.Failed() {
+		l4Packet, err := jsonify.DecodePacketSequence(decoder, vtapID)
+		if decoder.Failed() || err != nil {
 			if d.counter.ErrorCount == 0 {
-				log.Errorf("packet sequence decode failed, offset=%d len=%d", decoder.Offset(), len(decoder.Bytes()))
+				log.Errorf("packet sequence decode failed, offset=%d len=%d, err: %s", decoder.Offset(), len(decoder.Bytes()), err)
 			}
 			l4Packet.Release()
 			d.counter.ErrorCount++
@@ -251,7 +255,7 @@ func (d *Decoder) handleL4Packet(vtapID uint16, decoder *codec.SimpleDecoder) {
 		if d.debugEnabled {
 			log.Debugf("decoder %d vtap %d recv l4 packet: %s", d.index, vtapID, l4Packet)
 		}
-		d.counter.L4PacketCount++
+		d.counter.Count++
 		d.throttler.SendWithoutThrottling(l4Packet)
 	}
 }
@@ -260,10 +264,10 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 	if d.debugEnabled {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
-	d.counter.L4Count++
+	d.counter.Count++
 	l := jsonify.TaggedFlowToLogger(flow, d.platformData)
 	if !d.throttler.Send(l) {
-		d.counter.L4DropCount++
+		d.counter.Count++
 	}
 }
 
@@ -272,12 +276,12 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		log.Debugf("decoder %d recv proto: %s", d.index, proto)
 	}
 
-	d.counter.L7Count++
+	d.counter.Count++
 	drop := int64(0)
 	l := jsonify.ProtoLogToL7Logger(proto, d.platformData)
 	l.AddReferenceCount()
 	if !d.throttler.Send(l) {
-		d.counter.L7DropCount++
+		d.counter.DropCount++
 		drop = 1
 	} else {
 		d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7LoggerToFlowTagInterfaces(l))

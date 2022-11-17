@@ -45,6 +45,8 @@ struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 // eBPF protocol filter.
 int ebpf_config_protocol_filter[PROTO_NUM];
 
+struct allow_port_bitmap allow_port_bitmap;
+
 /*
  * tracers
  */
@@ -211,8 +213,8 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 	obj = ebpf_open_buffer(tracer->buffer_ptr,
 			       tracer->buffer_sz, tracer->bpf_load_name);
 	if (IS_NULL(obj)) {
-		ebpf_info("ebpf_open_buffer() \"%s\" failed, error:%s\n",
-			  tracer->bpf_load_name, strerror(errno));
+		ebpf_warning("ebpf_open_buffer() \"%s\" failed, error:%s\n",
+			     tracer->bpf_load_name, strerror(errno));
 		return ETR_INVAL;
 	}
 
@@ -224,8 +226,8 @@ int tracer_bpf_load(struct bpf_tracer *tracer)
 
 	ret = ebpf_obj_load(obj);
 	if (ret != 0) {
-		ebpf_info("bpf load \"%s\" failed, error:%s\n",
-			  tracer->bpf_load_name, strerror(errno));
+		ebpf_warning("bpf load \"%s\" failed, error:%s (%d)\n",
+			     tracer->bpf_load_name, strerror(errno), errno);
 		return ret;
 	}
 
@@ -1109,6 +1111,7 @@ static int tracer_sockopt_get(sockoptid_t opt, const void *conf, size_t size,
 		btp->probes_count = t->probes_count;
 		btp->state = t->state;
 		btp->adapt_success = t->adapt_success;
+		btp->data_limit_max = t->data_limit_max;
 
 		for (j = 0; j < PROTO_NUM; j++) {
 			btp->proto_status[j] =
@@ -1152,6 +1155,12 @@ int enable_ebpf_protocol(int protocol)
 		return 0;
 	}
 	return ETR_INVAL;
+}
+
+int set_allow_port_bitmap(void *bitmap)
+{
+	memcpy(&allow_port_bitmap, bitmap, sizeof(allow_port_bitmap));
+	return 0;
 }
 
 int set_feature_regex(int feature, const char *pattern)

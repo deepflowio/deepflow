@@ -56,26 +56,30 @@ func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
 
 func (v *VM) ProduceByAdd(items []*mysql.VM) {
 	for _, item := range items {
-		hostID, ok := v.ToolDataSet.GetHostIDByIP(item.LaunchServer)
-		if !ok {
-			log.Errorf("host id for %s (ip: %s) not found", RESOURCE_TYPE_HOST_EN, item.LaunchServer)
-		}
-		regionID, azID, err := v.ToolDataSet.GetRegionIDAndAZIDByLcuuid(item.Region, item.AZ)
+		var opts []eventapi.TagFieldOption
+		info, err := v.ToolDataSet.GetVMInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagAZID(info.AZID),
+				eventapi.TagRegionID(info.RegionID),
+				eventapi.TagHostID(info.HostID),
+			}...)
 		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagL3DeviceType(v.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+			eventapi.TagVPCID(item.VPCID),
+		}...)
 
 		v.createAndPutEvent(
+			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
 			v.deviceType,
 			item.ID,
-			eventapi.TagHostID(hostID),
-			eventapi.TagL3DeviceType(v.deviceType),
-			eventapi.TagL3DeviceID(item.ID),
-			eventapi.TagVPCID(item.VPCID),
-			eventapi.TagAZID(azID),
-			eventapi.TagRegionID(regionID),
+			opts...,
 		)
 	}
 }
@@ -98,6 +102,7 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 
 	nIDs, ips := v.getIPNetworksByID(id)
 	v.createAndPutEvent(
+		cloudItem.Lcuuid,
 		eType,
 		name,
 		common.VIF_DEVICE_TYPE_VM,
@@ -112,18 +117,18 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 	for _, lcuuid := range lcuuids {
 		id, name, err := v.getVMIDAndNameByLcuuid(lcuuid)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err)
 		}
 
-		v.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
+		v.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
 	}
 }
 
 func (v *VM) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
 	ipNetworkMap, _ := v.ToolDataSet.EventToolDataSet.GetVMIPNetworkMapByID(id)
 	for ip, nID := range ipNetworkMap {
-		networkIDs = append(networkIDs, nID)
-		ips = append(ips, ip)
+		networkIDs = append(networkIDs, uint32(nID))
+		ips = append(ips, ip.IP)
 	}
 	return
 }
@@ -133,9 +138,9 @@ func (v *VM) getVMIDAndNameByLcuuid(lcuuid string) (int, string, error) {
 	if !ok {
 		return 0, "", errors.New(nameByIDNotFound(v.resourceType, id))
 	}
-	name, ok := v.ToolDataSet.GetVMNameByID(id)
+	name, err := v.ToolDataSet.GetVMNameByID(id)
 	if !ok {
-		return 0, "", errors.New(idByLcuuidNotFound(v.resourceType, lcuuid))
+		return 0, "", err
 	}
 
 	return id, name, nil

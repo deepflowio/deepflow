@@ -23,13 +23,13 @@ pod_ingress               , K8s Ingress                   ,
 pod_service               , K8s Service                   ,
 pod_group                 , K8s Workload                  , Such as Deployment, StatefulSet, Daemonset, etc.
 pod                       , K8s POD                       ,
-# service                 , Service                       , # temporarily disabled
-resource_gl0_type         , Type - K8s POD First          ,
-resource_gl0              , Instance - K8s POD First      ,
-resource_gl1_type         , Type - K8s Workload First     ,
-resource_gl1              , Instance - K8s Workload First ,
-resource_gl2_type         , Type - K8s Service First      ,
-resource_gl2              , Instance - K8s Service First  ,
+service                   , Service                       , 
+resource_gl0_type         , Type - K8s POD First          , The type of 'resource_gl0'.
+resource_gl0              , Instance - K8s POD First      , The instance of IP.
+resource_gl1_type         , Type - K8s Workload First     , The type of 'resource_gl1'.
+resource_gl1              , Instance - K8s Workload First , On the basis of 'resource_gl0', aggregate the POD into a workload.
+resource_gl2_type         , Type - K8s Service First      , The type of 'resource_gl2'.
+resource_gl2              , Instance - K8s Service First  , On the basis of 'resource_gl1', aggregate K8s service ClusterIP and workload into service.
 
 labels                    , K8s Labels                    ,
 attributes                , Attributes                    ,

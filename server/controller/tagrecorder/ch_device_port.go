@@ -44,17 +44,17 @@ func (d *ChDevicePort) generateNewData() (map[PortDeviceKey]mysql.ChDevicePort, 
 	var lbs []mysql.LB
 	var lbListeners []mysql.LBListener
 	var lbTargetServers []mysql.LBTargetServer
-	err := mysql.Db.Find(&lbs).Error
+	err := mysql.Db.Unscoped().Find(&lbs).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Find(&lbListeners).Error
+	err = mysql.Db.Unscoped().Find(&lbListeners).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return nil, false
 	}
-	err = mysql.Db.Find(&lbTargetServers).Error
+	err = mysql.Db.Unscoped().Find(&lbTargetServers).Error
 	if err != nil {
 		log.Errorf(dbQueryResourceFailed(d.resourceTypeName, err))
 		return nil, false

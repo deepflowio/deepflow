@@ -22,7 +22,9 @@ The following protocols are currently probed:
 - HTTP1
 - HTTP2
 - DUBBO
+- GRPC
 - MYSQL
+- POSTGRESQL
 - REDIS
 - KAFKA
 - MQTT
@@ -41,7 +43,7 @@ Trace to the Golang program is implemented by the following method:
 - Create probes and attach based on the parsed datas.
 - Capture process execute/exit events by tracking two tracepoints(`tracepoint/sched/sched_process_fork` and `tracepoint/sched/sched_process_exit`). Update probes based on captured events.
 
-Note: In order to avoid attaching/detaching the golang program repeatedly, it is necessary to confirm that the golang application has been running stably before DeepFlow-agent starts the attach operation. After DeepFlow-agent detects that the golang application is loaded, it delays the attach operation for 120 seconds. Openssl only supports kernel 4.17 and above.
+Note: In order to avoid attaching/detaching the golang program repeatedly, it is necessary to confirm that the golang application has been running stably before DeepFlow-agent starts the attach operation. After DeepFlow-agent detects that the golang application is loaded, it delays the attach operation for 60 seconds. Openssl only supports kernel 4.17 and above.
 
 # Implement logic
 
@@ -134,7 +136,7 @@ end
     running_socket_tracer --> running_socket_tracer-13(4.13 tracer_hooks_attach) -.-running_socket_tracer-13-i([attach all probes])
     running_socket_tracer --> running_socket_tracer-14(4.14 perf_map_init) -.- running_socket_tracer-14-i([set perf buffer reader share memory])
     running_socket_tracer --> running_socket_tracer-15(4.15 set trace uid) -.- running_socket_tracer-15-i([use for socketID,traceID,capSeq])
-    running_socket_tracer-15 -.-> |Prepare various UIDs to map|trace_uid_map[(trace_uid_map)]
+    running_socket_tracer-15 -.-> |Prepare various UIDs to map|trace_conf_map[(trace_conf_map)]
     running_socket_tracer --> running_socket_tracer-16(4.16 dispatch_worker) -.- running_socket_tracer-16-i([userspace receive and distribute eBPF data to work queue initialization])
     running_socket_tracer --> running_socket_tracer-17(4.17 register_extra_waiting_op server/client for getting kernel struct member offset)
     running_socket_tracer --> running_socket_tracer-18(4.18 register_period_event_op kick kernel for getting kernel struct member offset)
@@ -201,7 +203,7 @@ end
     get_tcp_read_seq_from_fd(6.1 get_tcp_read_seq_from_fd)
     get_tcp_write_seq_from_fd(6.2 get_tcp_write_seq_from_fd)
     socket_id(6.3 Confirm socketID)
-    trace_uid_map[(trace_uid_map)]
+    trace_conf_map[(trace_conf_map)]
     trace_process(6.4 trace_process)
     eBPF_start --> syscall_entry-.->|store args to map| args_map
     args_map -.->|fetch args | syscall_exit
@@ -227,7 +229,7 @@ end
     if_direction_trace-->|Yes|trace_map__update(6.4.1 Add new trace info)
     if_direction_trace-->|No|trace_map__delete(6.4.2 Determine the traceID, delete the trace_map entry)
     end
-    trace_uid_map -.->|get uid for traceID| trace_map__update-.->|Add new traceID|trace_map[(trace_map)]
+    trace_conf_map -.->|get uid for traceID| trace_map__update-.->|Add new traceID|trace_map[(trace_map)]
     data_submit-->if_socket_info{is socket_info exists?}
     if_socket_info-->|Yes|set_data_from_socket_info(6.6 set data from socketinfo)
     if_socket_info-->|No|create_socket_info(6.5 create socket info)-->set_data_from_socket_info

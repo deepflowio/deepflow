@@ -22,7 +22,7 @@ use tokio::runtime::{Builder, Runtime};
 
 use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::{self, SyncResponse};
+use crate::proto::trident::SyncResponse;
 use crate::rpc::{RunningConfig, Session, StaticConfig, Status, Synchronizer};
 use public::debug::{Error, Result};
 
@@ -84,15 +84,7 @@ impl RpcDebugger {
             0,
             &exception_handler,
         );
-        self.session.update_current_server().await;
-
-        let client = self
-            .session
-            .get_client()
-            .ok_or(tonic::Status::not_found("rpc client not connected"))?;
-
-        let mut client = trident::synchronizer_client::SynchronizerClient::new(client);
-        let resp = client.sync(req).await?;
+        let resp = self.session.grpc_sync(req).await?;
         Ok(resp)
     }
 

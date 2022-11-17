@@ -974,7 +974,7 @@ func (i *Internet) Fill(f *pb.Flow) {
 func (k *KnowledgeGraph) fill(
 	platformData *grpc.PlatformInfoTable,
 	isIPv6, isVipInterface0, isVipInterface1 bool,
-	l3EpcID0, l3EpcID1 int16,
+	l3EpcID0, l3EpcID1 int32,
 	ip40, ip41 uint32,
 	ip60, ip61 net.IP,
 	mac0, mac1 uint64,
@@ -1030,7 +1030,7 @@ func (k *KnowledgeGraph) fill(
 	} else if isIPv6 {
 		info0, info1 = platformData.QueryIPV6InfosPair(l3EpcID0, ip60, l3EpcID1, ip61)
 	} else {
-		info0, info1 = platformData.QueryIPV4InfosPair(l3EpcID0, ip40, int16(l3EpcID1), ip41)
+		info0, info1 = platformData.QueryIPV4InfosPair(l3EpcID0, ip40, l3EpcID1, ip41)
 	}
 
 	var l2Info0, l2Info1 *grpc.Info
@@ -1068,12 +1068,12 @@ func (k *KnowledgeGraph) fill(
 		k.PodClusterID1 = uint16(info1.PodClusterID)
 		k.SubnetID1 = uint16(info1.SubnetID)
 	}
-	k.L3EpcID0, k.L3EpcID1 = int32(l3EpcID0), int32(l3EpcID1)
+	k.L3EpcID0, k.L3EpcID1 = l3EpcID0, l3EpcID1
 	if l2Info0 != nil {
-		k.EpcID0 = parseUint32EpcID(l2Info0.L2EpcID)
+		k.EpcID0 = l2Info0.L2EpcID
 	}
 	if l2Info1 != nil {
-		k.EpcID1 = parseUint32EpcID(l2Info1.L2EpcID)
+		k.EpcID1 = l2Info1.L2EpcID
 	}
 
 	if isIPv6 {
@@ -1102,19 +1102,20 @@ func (k *KnowledgeGraph) fill(
 		}
 	}
 
-	k.ResourceGl0ID0, k.ResourceGl0Type0 = common.GetResourceGl0(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, int16(k.L3EpcID0))
-	k.ResourceGl1ID0, k.ResourceGl1Type0 = common.GetResourceGl1(k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, int16(k.L3EpcID0))
-	k.ResourceGl2ID0, k.ResourceGl2Type0 = common.GetResourceGl2(k.ServiceID0, k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, int16(k.L3EpcID0))
+	k.ResourceGl0ID0, k.ResourceGl0Type0 = common.GetResourceGl0(k.PodID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
+	k.ResourceGl1ID0, k.ResourceGl1Type0 = common.GetResourceGl1(k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
+	k.ResourceGl2ID0, k.ResourceGl2Type0 = common.GetResourceGl2(k.ServiceID0, k.PodGroupID0, k.PodNodeID0, k.L3DeviceID0, k.L3DeviceType0, k.L3EpcID0)
 
-	k.ResourceGl0ID1, k.ResourceGl0Type1 = common.GetResourceGl0(k.PodID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, int16(k.L3EpcID1))
-	k.ResourceGl1ID1, k.ResourceGl1Type1 = common.GetResourceGl1(k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, int16(k.L3EpcID1))
-	k.ResourceGl2ID1, k.ResourceGl2Type1 = common.GetResourceGl2(k.ServiceID1, k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, int16(k.L3EpcID1))
+	k.ResourceGl0ID1, k.ResourceGl0Type1 = common.GetResourceGl0(k.PodID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
+	k.ResourceGl1ID1, k.ResourceGl1Type1 = common.GetResourceGl1(k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
+	k.ResourceGl2ID1, k.ResourceGl2Type1 = common.GetResourceGl2(k.ServiceID1, k.PodGroupID1, k.PodNodeID1, k.L3DeviceID1, k.L3DeviceType1, k.L3EpcID1)
 }
 
 func (k *KnowledgeGraph) FillL4(f *pb.Flow, isIPv6 bool, platformData *grpc.PlatformInfoTable) {
 	k.fill(platformData,
 		isIPv6, f.MetricsPeerSrc.IsVipInterface == 1, f.MetricsPeerDst.IsVipInterface == 1,
-		int16(f.MetricsPeerSrc.L3EpcId), int16(f.MetricsPeerDst.L3EpcId),
+		// The range of EPC ID is [-2,65533], if EPC ID < -2 needs to be transformed into the range.
+		zerodoc.MarshalInt32WithSpecialID(f.MetricsPeerSrc.L3EpcId), zerodoc.MarshalInt32WithSpecialID(f.MetricsPeerDst.L3EpcId),
 		f.FlowKey.IpSrc, f.FlowKey.IpDst,
 		f.FlowKey.Ip6Src, f.FlowKey.Ip6Dst,
 		f.FlowKey.MacSrc, f.FlowKey.MacDst,

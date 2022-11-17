@@ -29,22 +29,11 @@
 #include "ssl_tracer.h"
 #include "load.h"
 #include "btf_vmlinux.h"
+#include "config.h"
 
 #include "socket_trace_bpf_common.c"
 #include "socket_trace_bpf_5_2.c"
 
-// eBPF Map Name
-#define MAP_MEMBERS_OFFSET_NAME		"__members_offset"
-#define MAP_SOCKET_INFO_NAME		"__socket_info_map"
-#define MAP_TRACE_NAME			"__trace_map"
-#define MAP_PERF_SOCKET_DATA_NAME	"__socket_data"
-#define MAP_TRACE_UID_NAME		"__trace_uid_map"
-#define MAP_TRACE_STATS_NAME		"__trace_stats_map"
-
-// 在socket map回收时，对每条socket信息超过10秒没有收发动作就回收掉
-#define SOCKET_RECLAIM_TIMEOUT_DEF  10
-// 在trace map回收时，对每条trace信息超过10秒没有发生匹配动作就回收掉
-#define TRACE_RECLAIM_TIMEOUT_DEF   10
 static uint64_t socket_map_reclaim_count;	// socket map回收数量统计
 static uint64_t trace_map_reclaim_count;	// trace map回收数量统计
 
@@ -58,6 +47,12 @@ extern bool *cpu_online;
 static int infer_socktrace_fd;
 static uint32_t conf_max_socket_entries;
 static uint32_t conf_max_trace_entries;
+
+/*
+ * The maximum amount of data passed to the agent by eBPF programe.
+ * Set by set_data_limit_max()
+ */
+static uint32_t socket_data_limit_max;
 
 // socket map 进行回收的最大阈值，超过这个值进行map回收。
 static uint32_t conf_socket_map_max_reclaim;
@@ -810,6 +805,118 @@ static void update_protocol_filter_array(struct bpf_tracer *tracer)
 	}
 }
 
+static void update_allow_port_bitmap(struct bpf_tracer *tracer)
+{
+	bpf_table_set_value(tracer, "__allow_port_bitmap", 0,
+			    &allow_port_bitmap);
+}
+
+static inline int __set_data_limit_max(int limit_size)
+{
+	if (limit_size < 0) {
+		ebpf_warning("limit_size cannot be negative\n");
+		return ETR_INVAL;
+	} else if (limit_size == 0) {
+		socket_data_limit_max = SOCKET_DATA_LIMIT_MAX_DEF;
+	} else {
+		if (limit_size > BURST_DATA_BUF_SIZE)
+			socket_data_limit_max = BURST_DATA_BUF_SIZE;
+		else
+			socket_data_limit_max = limit_size;
+	}
+
+	ebpf_info("Received limit_size (%d), the final value is set to '%d'\n",
+		  limit_size, socket_data_limit_max);
+
+	return socket_data_limit_max;
+}
+
+/**
+ * Set maximum amount of data passed to the agent by eBPF programe.
+ * @limit_size : The maximum length of data. If @limit_size exceeds 8192,
+ *               it will automatically adjust to 8192 bytes.
+ *               If limit_size is 0, Use the default values 4096.
+ *
+ * @return the set maximum buffer size value on success, < 0 on failure.
+ */
+int set_data_limit_max(int limit_size)
+{
+	int set_val = __set_data_limit_max(limit_size);
+	if (set_val <= 0)
+		return set_val;
+
+	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
+	if (tracer == NULL) {
+		/*
+		 * Called before running_socket_tracer(),
+		 * no need to update config map
+		 */
+		return set_val;
+	}
+
+	int cpu;
+	int nr_cpus = get_num_possible_cpus();
+	struct trace_conf_t values[nr_cpus];
+	memset(values, 0, sizeof(values));
+
+	if (!bpf_table_get_value(tracer, MAP_TRACE_CONF_NAME, 0, values)) {
+		ebpf_warning("Get map '%s' failed.\n", MAP_TRACE_CONF_NAME);
+		return ETR_NOTEXIST;
+	}
+
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		values[cpu].data_limit_max = set_val;
+	}
+
+	if (!bpf_table_set_value
+	    (tracer, MAP_TRACE_CONF_NAME, 0, (void *)&values)) {
+		ebpf_warning("Set '%s' failed\n", MAP_TRACE_CONF_NAME);
+		return ETR_UPDATE_MAP_FAILD;
+	}
+
+	tracer->data_limit_max = set_val;
+
+	return set_val;
+}
+
+static void __insert_output_prog_to_map(struct bpf_tracer *tracer,
+					const char *map_name,
+					const char *prog_name,
+					int key)
+{
+	struct ebpf_prog *prog;
+	prog = ebpf_obj__get_prog_by_name(tracer->obj, prog_name);
+	if (prog == NULL) {
+		ebpf_error("bpf_obj__get_prog_by_name() not find \"%s\"\n",
+			   prog_name);
+	}
+
+	if (!bpf_table_set_value(tracer, map_name, key, &prog->prog_fd)) {
+		ebpf_error("bpf_table_set_value() failed, prog fd:%d\n", prog->prog_fd);
+	}
+
+	ebpf_info("Insert into map('%s'), key %d, program name %s\n",
+		  map_name, key, prog_name);
+}
+
+/*
+ * Using an eBPF program specifically designed to send data, the goal is to solve the
+ * problem of instructions exceeding the maximum limit.
+ *
+ * Insert eBPF program into the tail calls map.
+ */
+static void insert_output_prog_to_map(struct bpf_tracer *tracer)
+{
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_TP_NAME,
+				    PROG_OUTPUT_DATA_NAME_FOR_TP,
+				    0);
+	__insert_output_prog_to_map(tracer,
+				    MAP_PROGS_JMP_KP_NAME,
+				    PROG_OUTPUT_DATA_NAME_FOR_KP,
+				    0);
+}
+
 /**
  * Start socket tracer
  *
@@ -932,17 +1039,12 @@ int running_socket_tracer(l7_handle_fn handle,
 		ebpf_info("Set offsets map from btf_vmlinux, success.\n");
 	}
 
-	// Update go offsets to eBPF "proc_info_map" 
-	update_proc_info_to_map(tracer);
-
-	// Update protocol filter array
-	update_protocol_filter_array(tracer);
-
-	if (tracer_hooks_attach(tracer))
-		return -EINVAL;
-
 	if (perf_map_init(tracer, MAP_PERF_SOCKET_DATA_NAME))
 		return -EINVAL;
+
+	// Set default maximum amount of data passed to the agent by eBPF.
+	if (socket_data_limit_max == 0)
+		__set_data_limit_max(0);
 
 	uint64_t uid_base = (gettime(CLOCK_REALTIME, TIME_TYPE_NAN) / 100) &
 	    0xffffffffffffffULL;
@@ -950,14 +1052,31 @@ int running_socket_tracer(l7_handle_fn handle,
 		return -EINVAL;
 
 	uint16_t cpu;
-	struct trace_uid_t t_uid[MAX_CPU_NR];
+	struct trace_conf_t t_conf[MAX_CPU_NR];
 	for (cpu = 0; cpu < MAX_CPU_NR; cpu++) {
-		t_uid[cpu].socket_id = (uint64_t) cpu << 56 | uid_base;
-		t_uid[cpu].coroutine_trace_id = t_uid[cpu].socket_id;
-		t_uid[cpu].thread_trace_id = t_uid[cpu].socket_id;
+		t_conf[cpu].socket_id = (uint64_t) cpu << 56 | uid_base;
+		t_conf[cpu].coroutine_trace_id = t_conf[cpu].socket_id;
+		t_conf[cpu].thread_trace_id = t_conf[cpu].socket_id;
+		t_conf[cpu].data_limit_max = socket_data_limit_max;
 	}
 
-	if (!bpf_table_set_value(tracer, MAP_TRACE_UID_NAME, 0, (void *)&t_uid))
+	if (!bpf_table_set_value(tracer, MAP_TRACE_CONF_NAME, 0, (void *)&t_conf))
+		return -EINVAL;
+
+	tracer->data_limit_max = socket_data_limit_max;
+
+	// Update go offsets to eBPF "proc_info_map"
+	update_proc_info_to_map(tracer);
+
+	// Insert prog of output data into map for using BPF Tail Calls.
+	insert_output_prog_to_map(tracer);
+
+	// Update protocol filter array
+	update_protocol_filter_array(tracer);
+
+	update_allow_port_bitmap(tracer);
+
+	if (tracer_hooks_attach(tracer))
 		return -EINVAL;
 
 	if ((ret = dispatch_worker(tracer, queue_size)))
@@ -1169,6 +1288,7 @@ struct socket_trace_stats socket_tracer_stats(void)
 	stats.kern_trace_map_max = conf_max_trace_entries;
 	stats.socket_map_max_reclaim = conf_socket_map_max_reclaim;
 	stats.probes_count = t->probes_count;
+	stats.data_limit_max = socket_data_limit_max;
 
 	struct trace_stats stats_total;
 

@@ -53,10 +53,11 @@ use base_dispatcher::{BaseDispatcher, TapTypeHandler};
 use error::{Error, Result};
 use local_mode_dispatcher::{LocalModeDispatcher, LocalModeDispatcherListener};
 use mirror_mode_dispatcher::{MirrorModeDispatcher, MirrorModeDispatcherListener};
+pub use recv_engine::RecvEngine;
 #[cfg(target_os = "linux")]
 pub use recv_engine::{
     af_packet::{self, bpf::*, BpfSyntax, OptTpacketVersion, RawInstruction, Tpacket},
-    RecvEngine, DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
+    DEFAULT_BLOCK_SIZE, FRAME_SIZE_MAX, FRAME_SIZE_MIN, POLL_TIMEOUT,
 };
 
 #[cfg(target_os = "linux")]
@@ -708,6 +709,11 @@ impl DispatcherBuilder {
         let collector = self
             .stats_collector
             .ok_or(Error::StatsCollector("no stats collector"))?;
+        let src_interface = if tap_mode == TapMode::Local {
+            "".to_string()
+        } else {
+            self.src_interface.unwrap_or("".to_string())
+        };
 
         #[cfg(target_os = "linux")]
         let platform_poller = self
@@ -715,16 +721,20 @@ impl DispatcherBuilder {
             .take()
             .ok_or(Error::ConfigIncomplete("no platform poller".into()))?;
 
-        let src_interface = self.src_interface.unwrap_or("".to_string());
         let base = BaseDispatcher {
+            log_id: {
+                let mut lid = vec![id.to_string()];
+                if &src_interface != "" {
+                    lid.push(src_interface.clone());
+                } else if netns != NsFile::Root {
+                    lid.push(netns.to_string());
+                }
+                format!("({})", lid.join(", "))
+            },
             engine,
 
             id,
-            src_interface: if tap_mode == TapMode::Local {
-                "".to_string()
-            } else {
-                src_interface.clone()
-            },
+            src_interface: src_interface.clone(),
             src_interface_index: 0,
             ctrl_mac: self
                 .ctrl_mac
@@ -802,6 +812,7 @@ impl DispatcherBuilder {
                 .take()
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
             netns,
+            npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
         };
         collector.register_countable(
             "dispatcher",

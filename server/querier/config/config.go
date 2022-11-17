@@ -19,9 +19,12 @@ package config
 import (
 	"io/ioutil"
 	"os"
+	"reflect"
+	"regexp"
 
 	"github.com/op/go-logging"
 	"gopkg.in/yaml.v2"
+	"strings"
 )
 
 var log = logging.MustGetLogger("clickhouse")
@@ -37,7 +40,7 @@ type QuerierConfig struct {
 	ListenPort   int        `default:"20416" yaml:"listen-port"`
 	Clickhouse   Clickhouse `yaml:clickhouse`
 	Language     string     `default:"en" yaml:"language"`
-	OtelEndpoint string     `yaml:"otel-endpoint"`
+	OtelEndpoint string     `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
 }
 
 type Clickhouse struct {
@@ -47,6 +50,25 @@ type Clickhouse struct {
 	Port           int    `default:"9000" yaml:"port"`
 	Timeout        int    `default:"60" yaml:"timeout"`
 	ConnectTimeout int    `default:"2" yaml:"connect-timeout"`
+}
+
+func (c *Config) expendEnv() {
+	reConfig := reflect.ValueOf(&c.QuerierConfig)
+	reConfig = reConfig.Elem()
+	for i := 0; i < reConfig.NumField(); i++ {
+		field := reConfig.Field(i)
+		switch field.Type().String() {
+		case "string":
+			fieldStr := field.String()
+			pattern := regexp.MustCompile(`\$\{(.+?)\}`)
+			p := pattern.FindAllSubmatch([]byte(fieldStr), -1)
+			for _, i := range p {
+				str := string(i[1])
+				fieldStr = strings.Replace(fieldStr, string(i[0]), os.Getenv(str), 1)
+			}
+			field.SetString(fieldStr)
+		}
+	}
 }
 
 func (c *Config) Validate() error {
@@ -69,6 +91,7 @@ func (c *Config) Load(path string) {
 		log.Error(err)
 		os.Exit(1)
 	}
+	c.expendEnv()
 }
 
 func DefaultConfig() *Config {

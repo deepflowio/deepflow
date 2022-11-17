@@ -145,7 +145,9 @@ fn process_name_safe(sd: *mut SK_BPF_DATA) -> String {
 extern "C" fn socket_trace_callback(sd: *mut SK_BPF_DATA) {
     unsafe {
         let mut proto_tag = String::from("");
-        if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
+        if sk_proto_safe(sd) == SOCK_DATA_OTHER {
+            proto_tag.push_str("ORTHER");
+        } else if sk_proto_safe(sd) == SOCK_DATA_HTTP1 {
             proto_tag.push_str("HTTP1");
         } else if sk_proto_safe(sd) == SOCK_DATA_HTTP2 {
             proto_tag.push_str("HTTP2");
@@ -271,6 +273,11 @@ fn main() {
             CString::new(".*".as_bytes()).unwrap().as_c_str().as_ptr(),
         );
 
+        let allow_port = 443;
+        let mut allow_port_bitmap:[u8;65536/8] = [0;65536/8];
+        allow_port_bitmap[allow_port/8] |= 1<<(allow_port%8);
+        set_allow_port_bitmap(allow_port_bitmap.as_ptr());
+
         // The first parameter passed by a null pointer can be
         // filled with std::ptr::null()
         if bpf_tracer_init(log_file_c.as_ptr(), true) != 0 {
@@ -300,6 +307,9 @@ fn main() {
             println!("running_socket_tracer() error.");
             ::std::process::exit(1);
         }
+
+	// test data limit max
+	set_data_limit_max(10000);
 
         bpf_tracer_finish();
 

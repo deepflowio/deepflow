@@ -61,7 +61,7 @@ pub(super) struct LocalModeDispatcher {
 impl LocalModeDispatcher {
     pub(super) fn run(&mut self) {
         let base = &mut self.base;
-        info!("Start dispatcher {}", base.id);
+        info!("Start dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
@@ -248,7 +248,13 @@ impl LocalModeDispatcher {
                 base.tunnel_info.tunnel_type,
                 u64::from(pipeline.vm_mac) as u32,
             );
-            BaseDispatcher::prepare_flow(&mut meta_packet, TapType::Cloud, false, base.id as u8);
+            BaseDispatcher::prepare_flow(
+                &mut meta_packet,
+                TapType::Cloud,
+                false,
+                base.id as u8,
+                base.npb_dedup_enabled.load(Ordering::Relaxed),
+            );
             flow_map.inject_meta_packet(&mut meta_packet);
             let mini_packet = MiniPacket::new(overlay_packet, &meta_packet);
             for h in pipeline.handlers.iter_mut() {
@@ -271,7 +277,7 @@ impl LocalModeDispatcher {
         }
 
         base.terminate_handler();
-        info!("Stopped dispatcher {}", base.id);
+        info!("Stopped dispatcher {}", base.log_id);
     }
 
     pub(super) fn listener(&self) -> LocalModeDispatcherListener {
@@ -337,7 +343,10 @@ impl LocalModeDispatcherListener {
                 }
             });
             if !rejected.is_empty() {
-                debug!("Tap interfaces {:?} rejected by blacklist", rejected);
+                debug!(
+                    "Dispatcher{} Tap interfaces {:?} rejected by blacklist",
+                    self.base.log_id, rejected
+                );
             }
         }
         // interfaces为实际TAP口的集合，macs为TAP口对应主机的MAC地址集合
@@ -394,8 +403,8 @@ impl LocalModeDispatcherListener {
                     let new_mac = self.rewriter.regenerate_mac(iface);
                     if log_enabled!(log::Level::Debug) && new_mac != iface.mac_addr {
                         debug!(
-                            "interface {} rewrite mac {} -> {}",
-                            iface.name, iface.mac_addr, new_mac
+                            "Dispatcher{} interface {} rewrite mac {} -> {}",
+                            self.base.log_id, iface.name, iface.mac_addr, new_mac
                         );
                     }
                     new_mac

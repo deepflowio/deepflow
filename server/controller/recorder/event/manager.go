@@ -32,15 +32,15 @@ type EventManager[CT constraint.CloudModel, MT constraint.MySQLModel, BT constra
 	EventProducer[CT, MT, BT]
 }
 
-func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType, resourceName string, resourceType, resourceID int,
+func (e *EventManager[CT, MT, BT]) createAndPutEvent(resourceLcuuid, eventType, instanceName string, instanceType, instanceID int,
 	options ...eventapi.TagFieldOption) {
 	// create
 	event := eventapi.AcquireResourceEvent()
 	event.Time = time.Now().Unix()
 	event.Type = eventType
-	event.InstanceType = uint32(resourceType)
-	event.InstanceID = uint32(resourceID)
-	event.InstanceName = resourceName
+	event.InstanceType = uint32(instanceType)
+	event.InstanceID = uint32(instanceID)
+	event.InstanceName = instanceName
 	event.IfNeedTagged = true
 	if eventType == eventapi.RESOURCE_EVENT_TYPE_CREATE || eventType == eventapi.RESOURCE_EVENT_TYPE_ADD_IP {
 		event.IfNeedTagged = false
@@ -50,11 +50,11 @@ func (e *EventManager[CT, MT, BT]) createAndPutEvent(eventType, resourceName str
 	}
 
 	// put
+	log.Infof("put %s (lcuuid: %s) event: %+v into shared queue", e.resourceType, resourceLcuuid, event)
 	err := e.Queue.Put(event)
 	if err != nil {
 		log.Error(putEventIntoQueueFailed(e.resourceType, err))
 	}
-	log.Infof("put %s event: %+v into shared queue", e.resourceType, event)
 }
 
 type EventProducer[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] interface {

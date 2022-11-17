@@ -33,8 +33,9 @@ use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
 use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::{
-    ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo,
+use crate::flow_generator::protocol_logs::{
+    decode_base64_to_string,
+    pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
 };
 use crate::log_info_merge;
 use crate::parse_common;
@@ -240,14 +241,18 @@ impl DubboLog {
     }
 
     fn decode_field(payload: &Cow<'_, str>, mut start: usize, end: usize) -> Option<String> {
-        if start + 3 >= payload.len() {
+        if start >= payload.len() {
             return None;
         }
 
         let bytes = payload.as_bytes();
         match bytes[start] {
             BC_STRING_SHORT..=BC_STRING_SHORT_MAX => {
-                let field_len = (((bytes[start]-BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
+                if start + 2 >= payload.len() {
+                    return None;
+                }
+                let field_len =
+                    (((bytes[start] - BC_STRING_SHORT) as usize) << 8) + bytes[start + 1] as usize;
                 start += 2;
                 if start + field_len < end {
                     return Some(payload[start..start + field_len].to_string());
@@ -261,7 +266,10 @@ impl DubboLog {
                 }
             }
             b'S' => {
-                let field_len = ((bytes[start+1] as usize) << 8) + bytes[start+2] as usize;
+                if start + 3 >= payload.len() {
+                    return None;
+                }
+                let field_len = ((bytes[start + 1] as usize) << 8) + bytes[start + 2] as usize;
                 start += 3;
                 if start + field_len < end {
                     return Some(payload[start..start + field_len].to_string());
@@ -316,6 +324,7 @@ impl DubboLog {
                         info.trace_id = info.trace_id[2..2 + index].to_string();
                     }
                 }
+                info.trace_id = decode_base64_to_string(&info.trace_id);
             }
             _ => return,
         };
@@ -359,26 +368,18 @@ impl DubboLog {
 
         match trace_type {
             TraceType::Sw8 => {
-                // Format: 
+                // Format:
                 // sw8: 1-TRACEID-SEGMENTID-3-PARENT_SERVICE-PARENT_INSTANCE-PARENT_ENDPOINT-IPPORT
+                let mut skip = false;
                 if info.span_id.len() > 2 {
-                    if let Some(start) = info.span_id[2..].find("-") {
-                        let start = 2+start+1;
-                        if info.span_id.len() <= start {
-                            return;
-                        }
-                        let segment_id_offset = info.span_id[start..].find("-");
-                        if segment_id_offset.is_none() {
-                            return;
-                        }
-                        let segment_id_offset = start + segment_id_offset.unwrap() + 1;
-                        if info.span_id.len() <= segment_id_offset {
-                            return;
-                        }
-                        if let Some(end) = info.span_id[segment_id_offset..].find("-") {
-                            info.span_id = info.span_id[start..segment_id_offset+end].to_string();
-                        }
+                    let segs: Vec<&str> = info.span_id.split("-").collect();
+                    if segs.len() > 4 {
+                        info.span_id = format!("{}-{}", decode_base64_to_string(segs[2]), segs[3]);
+                        skip = true;
                     }
+                }
+                if !skip {
+                    info.span_id = decode_base64_to_string(&info.span_id);
                 }
             }
             _ => return,

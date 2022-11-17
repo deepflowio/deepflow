@@ -45,7 +45,29 @@ func NewLB(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LB {
 
 func (l *LB) ProduceByAdd(items []*mysql.LB) {
 	for _, item := range items {
-		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_CREATE, item.Name, l.deviceType, item.ID)
+		var opts []eventapi.TagFieldOption
+		info, err := l.ToolDataSet.GetLBInfoByID(item.ID)
+		if err != nil {
+			log.Error(err)
+		} else {
+			opts = append(opts, []eventapi.TagFieldOption{
+				eventapi.TagRegionID(info.RegionID),
+			}...)
+		}
+		opts = append(opts, []eventapi.TagFieldOption{
+			eventapi.TagVPCID(item.VPCID),
+			eventapi.TagL3DeviceType(l.deviceType),
+			eventapi.TagL3DeviceID(item.ID),
+		}...)
+
+		l.createAndPutEvent(
+			item.Lcuuid,
+			eventapi.RESOURCE_EVENT_TYPE_CREATE,
+			item.Name,
+			l.deviceType,
+			item.ID,
+			opts...,
+		)
 	}
 }
 
@@ -58,14 +80,15 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 		var name string
 		id, ok := l.ToolDataSet.GetLBIDByLcuuid(lcuuid)
 		if ok {
-			name, ok = l.ToolDataSet.GetLBNameByID(id)
-			if !ok {
-				log.Error(idByLcuuidNotFound(l.resourceType, lcuuid))
+			var err error
+			name, err = l.ToolDataSet.GetLBNameByID(id)
+			if err != nil {
+				log.Errorf("%v, %v", idByLcuuidNotFound(l.resourceType, lcuuid), err)
 			}
 		} else {
 			log.Error(nameByIDNotFound(l.resourceType, id))
 		}
 
-		l.createAndPutEvent(eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
+		l.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
 	}
 }
