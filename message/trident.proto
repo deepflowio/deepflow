@@ -579,9 +579,13 @@ message KubernetesClusterIDResponse {
 
 message Pcap {
     optional uint64 flow_id = 1;
-    optional bytes  packet_records = 2;
+    optional uint64 start_time = 2; // ns
+    optional uint64 end_time = 3;   // ns
+    optional uint32 packet_count  = 4;
+    optional bytes  packet_records = 5;
 }
 
 message PcapBatch {
-    repeated Pcap batches = 1;
+    optional uint32 magic = 1;
+    repeated Pcap batches = 2;
 }
