@@ -500,7 +500,7 @@ func (t *ToolDataSet) addWANIP(item *mysql.WANIP) {
 	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, item.IP)
+	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Lcuuid: item.Lcuuid})
 	log.Info(addToToolMap(RESOURCE_TYPE_WAN_IP_EN, item.Lcuuid))
 }
 
@@ -511,7 +511,7 @@ func (t *ToolDataSet) deleteWANIP(lcuuid string) {
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 	ip, _ := t.GetWANIPByLcuuid(lcuuid)
-	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, ip)
+	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Lcuuid: lcuuid})
 	delete(t.WANIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.WANIPLcuuidToIP, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_WAN_IP_EN, lcuuid))
@@ -524,7 +524,7 @@ func (t *ToolDataSet) addLANIP(item *mysql.LANIP) {
 	deviceType, _ := t.GetDeviceTypeByVInterfaceLcuuid(vifLcuuid)
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
-	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, item.IP)
+	t.setDeviceToIPNetworkMap(deviceType, deviceID, networkID, IPKey{IP: item.IP, Lcuuid: item.Lcuuid})
 	log.Info(addToToolMap(RESOURCE_TYPE_LAN_IP_EN, item.Lcuuid))
 }
 
@@ -535,7 +535,7 @@ func (t *ToolDataSet) deleteLANIP(lcuuid string) {
 	deviceID, _ := t.GetDeviceIDByVInterfaceLcuuid(vifLcuuid)
 	networkID, _ := t.GetNetworkIDByVInterfaceLcuuid(vifLcuuid)
 	ip, _ := t.GetLANIPByLcuuid(lcuuid)
-	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, ip)
+	t.deleteDeviceToIPNetworkMapIP(deviceType, deviceID, networkID, IPKey{IP: ip, Lcuuid: lcuuid})
 	delete(t.LANIPLcuuidToVInterfaceID, lcuuid)
 	delete(t.LANIPLcuuidToIP, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_LAN_IP_EN, lcuuid))
@@ -908,7 +908,7 @@ func (t *ToolDataSet) addPod(item *mysql.Pod) {
 func (t *ToolDataSet) updatePod(cloudItem *cloudmodel.Pod) {
 	defer log.Info(updateToolMap(RESOURCE_TYPE_POD_EN, cloudItem.Lcuuid))
 	id, _ := t.GetPodIDByLcuuid(cloudItem.Lcuuid)
-	info, err := t.GetPodInfoeByID(id)
+	info, err := t.GetPodInfoByID(id)
 	if err != nil {
 		log.Error(err)
 		return
@@ -1842,7 +1842,7 @@ func (t *ToolDataSet) GetPodServiceNameByID(id int) (string, error) {
 	return info.Name, nil
 }
 
-func (t *ToolDataSet) GetPodInfoeByID(id int) (*podInfo, error) {
+func (t *ToolDataSet) GetPodInfoByID(id int) (*podInfo, error) {
 	info, exists := t.podIDToInfo[id]
 	if exists {
 		return info, nil
@@ -1859,7 +1859,7 @@ func (t *ToolDataSet) GetPodInfoeByID(id int) (*podInfo, error) {
 }
 
 func (t *ToolDataSet) GetPodNameByID(id int) (string, error) {
-	info, err := t.GetPodInfoeByID(id)
+	info, err := t.GetPodInfoByID(id)
 	if err != nil {
 		return "", err
 	}

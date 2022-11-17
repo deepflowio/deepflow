@@ -48,7 +48,7 @@ func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
-		info, err := p.ToolDataSet.GetPodInfoeByID(item.ID)
+		info, err := p.ToolDataSet.GetPodInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -155,7 +155,7 @@ func (p *Pod) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
 	ipNetworkMap, _ := p.ToolDataSet.EventToolDataSet.GetPodIPNetworkMapByID(id)
 	for ip, nID := range ipNetworkMap {
 		networkIDs = append(networkIDs, uint32(nID))
-		ips = append(ips, ip)
+		ips = append(ips, ip.IP)
 	}
 	return
 }
