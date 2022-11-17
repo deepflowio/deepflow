@@ -116,10 +116,13 @@ impl MirrorModeDispatcherListener {
             return;
         }
         if new_macs.len() > 0 {
-            info!("Add vm macs: {:?}", new_macs);
+            info!("Dispatcher{} Add vm macs: {:?}", self.base.log_id, new_macs);
         }
         if delete_macs.len() > 0 {
-            info!("Delete vm macs: {:?}", delete_macs);
+            info!(
+                "Dispatcher{} Delete vm macs: {:?}",
+                self.base.log_id, delete_macs
+            );
         }
         *old_vm_mac_set = new_vm_mac_set;
         self.updated.store(true, Ordering::Relaxed);
@@ -143,17 +146,23 @@ impl MirrorModeDispatcherListener {
 impl MirrorModeDispatcherListener {
     fn tap_bridge_inner_macs(&self, if_index: usize) -> Vec<MacAddr> {
         if self.poller.is_none() {
-            debug!("Poller is none.");
+            debug!("Dispatcher{} Poller is none.", self.base.log_id);
             return vec![];
         }
         if if_index == 0 {
-            debug!("Mirror mode tap-bridge src-interface ifindex == 0");
+            debug!(
+                "Dispatcher{} Mirror mode tap-bridge src-interface ifindex == 0",
+                self.base.log_id
+            );
             return vec![];
         }
         let mut macs = vec![];
         let ifaces = self.poller.as_ref().unwrap().get_interface_info();
         if ifaces.len() == 0 {
-            debug!("Mirror mode tap-bridge macs is nill.");
+            debug!(
+                "Dispatcher{} Mirror mode tap-bridge macs is nill.",
+                self.base.log_id
+            );
             return macs;
         }
         for iface in ifaces {
@@ -161,7 +170,10 @@ impl MirrorModeDispatcherListener {
                 macs.push(iface.mac);
             }
         }
-        debug!("TapBridge: Src-IfIndex {} MAC {:?}", if_index, macs);
+        debug!(
+            "Dispatcher{} TapBridge: Src-IfIndex {} MAC {:?}",
+            self.base.log_id, if_index, macs
+        );
         return macs;
     }
 }
@@ -354,7 +366,7 @@ impl MirrorModeDispatcher {
     }
 
     pub(super) fn run(&mut self) {
-        info!("Start mirror dispatcher {}", self.base.id);
+        info!("Start mirror dispatcher {}", self.base.log_id);
         let time_diff = self.base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
@@ -510,7 +522,7 @@ impl MirrorModeDispatcher {
 
         self.pipelines.clear();
         self.base.terminate_handler();
-        info!("Stopped dispatcher {}", self.base.id);
+        info!("Stopped dispatcher {}", self.base.log_id);
     }
 
     pub(super) fn prepare_flow(

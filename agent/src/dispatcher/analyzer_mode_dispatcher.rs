@@ -108,7 +108,7 @@ impl AnalyzerModeDispatcher {
 
     pub(super) fn run(&mut self) {
         let base = &mut self.base;
-        info!("Start analyzer dispatcher {}", base.id);
+        info!("Start analyzer dispatcher {}", base.log_id);
         let time_diff = base.ntp_diff.load(Ordering::Relaxed);
         let mut prev_timestamp = get_timestamp(time_diff);
 
@@ -339,7 +339,7 @@ impl AnalyzerModeDispatcher {
 
         self.tap_pipelines.clear();
         base.terminate_handler();
-        info!("Stopped dispatcher {}", base.id);
+        info!("Stopped dispatcher {}", base.log_id);
     }
 
     pub(super) fn decap_tunnel(
