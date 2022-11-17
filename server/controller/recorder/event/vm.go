@@ -128,7 +128,7 @@ func (v *VM) getIPNetworksByID(id int) (networkIDs []uint32, ips []string) {
 	ipNetworkMap, _ := v.ToolDataSet.EventToolDataSet.GetVMIPNetworkMapByID(id)
 	for ip, nID := range ipNetworkMap {
 		networkIDs = append(networkIDs, uint32(nID))
-		ips = append(ips, ip)
+		ips = append(ips, ip.IP)
 	}
 	return
 }
