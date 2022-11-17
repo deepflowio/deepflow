@@ -43,7 +43,7 @@ Trace to the Golang program is implemented by the following method:
 - Create probes and attach based on the parsed datas.
 - Capture process execute/exit events by tracking two tracepoints(`tracepoint/sched/sched_process_fork` and `tracepoint/sched/sched_process_exit`). Update probes based on captured events.
 
-Note: In order to avoid attaching/detaching the golang program repeatedly, it is necessary to confirm that the golang application has been running stably before DeepFlow-agent starts the attach operation. After DeepFlow-agent detects that the golang application is loaded, it delays the attach operation for 120 seconds. Openssl only supports kernel 4.17 and above.
+Note: In order to avoid attaching/detaching the golang program repeatedly, it is necessary to confirm that the golang application has been running stably before DeepFlow-agent starts the attach operation. After DeepFlow-agent detects that the golang application is loaded, it delays the attach operation for 60 seconds. Openssl only supports kernel 4.17 and above.
 
 # Implement logic
 

@@ -38,6 +38,7 @@
 #include <bcc/bcc_proc.h>
 #include <bcc/bcc_elf.h>
 #include <bcc/bcc_syms.h>
+#include "config.h"
 #include "log.h"
 #include "symbol.h"
 #include "tracer.h"
@@ -58,16 +59,9 @@ struct process_event {
 	uint32_t expire_time;           // Expiration Date, the number of seconds since the system started.
 };
 
-#define MAP_PROC_INFO_MAP_NAME	"proc_info_map"
-#define PROCFS_CHECK_PERIOD  60	// 60 seconds
-static uint64_t procfs_check_count;
-
 static char build_info_magic[] = "\xff Go buildinf:";
-
 static struct list_head proc_info_head;	// For pid-offsets correspondence lists.
-
 static struct list_head proc_events_head;     // For process execute/exit events list.
-#define PROC_EVENT_DELAY_HANDLE_DEF	120 // execute/exit events delayed processing time, unit: second
 static pthread_mutex_t mutex_proc_events_lock;
 
 /* *INDENT-OFF* */
@@ -715,14 +709,14 @@ static bool pid_exist_in_procfs(int pid, unsigned long long starttime)
 	return false;
 }
 
-static bool probe_exist_in_procfs(struct probe *p)
+static bool __attribute__ ((unused)) probe_exist_in_procfs(struct probe *p)
 {
 	struct symbol_uprobe *sym_uprobe;
 	sym_uprobe = p->private_data;
 	return pid_exist_in_procfs(sym_uprobe->pid, sym_uprobe->starttime);
 }
 
-static bool pid_exist_in_probes(struct bpf_tracer *tracer, int pid,
+static bool __attribute__ ((unused)) pid_exist_in_probes(struct bpf_tracer *tracer, int pid,
 				unsigned long long starttime)
 {
 	struct probe *p;
@@ -807,95 +801,6 @@ static void clear_probes_by_pid(struct bpf_tracer *tracer, int pid,
 			free_probe_from_tracer(probe);
 		}
 	}
-}
-
-/**
- * period_update_procfs - Managing all golang processes
- * @tracer: struct bpf_tracer
- */
-static int __attribute__ ((unused)) period_update_procfs(void)
-{
-	procfs_check_count++;
-	if (procfs_check_count % PROCFS_CHECK_PERIOD != 0)
-		return ETR_INVAL;
-
-	struct bpf_tracer *tracer = find_bpf_tracer(SK_TRACER_NAME);
-	if (tracer == NULL)
-		return ETR_INVAL;
-
-	if (tracer->state != TRACER_RUNNING)
-		return ETR_INVAL;
-
-	struct tracer_probes_conf *conf = tracer->tps;
-	struct probe *probe;
-	struct list_head *p, *n;
-	unsigned long long stime;	// The time the process started after system boot.
-
-	/*
-	 * Walk through the existing probes to find the probes that 
-	 * have been installed but the process does not exist.
-	 */
-	list_for_each_safe(p, n, &tracer->probes_head) {
-		probe = container_of(p, struct probe, list);
-		if (!(probe->type == UPROBE && probe->private_data != NULL))
-			continue;
-
-		if (probe_exist_in_procfs(probe))
-			continue;
-
-		/*
-		 *  The process does not exist.
-		 *  1. detach probe
-		 *  2. remove probe from tracer->probes_head list and free probe
-		 *  3. free symbol
-		 */
-		struct symbol_uprobe *sym_uprobe = probe->private_data;
-		if (probe_detach(probe) != 0)
-			ebpf_warning
-			    ("path:%s, symbol name:%s address:0x%x probe_detach() failed.\n",
-			     sym_uprobe->binary_path, sym_uprobe->name,
-			     sym_uprobe->entry);
-		else
-			ebpf_info
-			    ("%s path:%s, symbol name:%s address:0x%x probe_detach() success.\n",
-			     __func__, sym_uprobe->binary_path,
-			     sym_uprobe->name, sym_uprobe->entry);
-
-		free_probe_from_tracer(probe);
-	}
-
-	struct dirent *entry = NULL;
-	DIR *fddir = NULL;
-	int pid;
-
-	fddir = opendir("/proc/");
-	if (fddir == NULL) {
-		ebpf_warning("Failed opendir() /proc/ errno %d\n", errno);
-		return ETR_PROC_FAIL;
-	}
-
-	/*
-	 * Walk through procfs to find the process that not in
-	 * tracer->probes_head list.
-	 */
-	while ((entry = readdir(fddir)) != NULL) {
-		pid = atoi(entry->d_name);
-		if (entry->d_type == DT_DIR && pid > 1 && is_process(pid)) {
-			stime = get_process_starttime(pid);
-			if (pid_exist_in_probes(tracer, pid, stime))
-				continue;
-			// clear probe->pid == pid
-			clear_probes_by_pid(tracer, pid, conf);
-			// Resolve bin file and add new uprobe symbol
-			proc_parse_and_register(pid, conf);
-		}
-	}
-
-	closedir(fddir);
-	tracer_uprobes_update(tracer);
-	tracer_hooks_process(tracer, HOOK_ATTACH, NULL);
-	update_proc_info_to_map(tracer);
-	return ETR_OK;
 }
 
 void update_proc_info_to_map(struct bpf_tracer *tracer)
