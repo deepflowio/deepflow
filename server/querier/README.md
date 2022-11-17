@@ -334,5 +334,4 @@ clickhouse指标量及算子特殊处理：
 - is_internet, metrics, tags, attributes, packet_batch不支持AS
 - 自动分组相关限制
   - 不支持AS
-  - select和group时，不能同时select和group ip和subnet_id
   - select自动分组的node_type或icon_id时，group需有自动分组名称，不能只有自动分组ID

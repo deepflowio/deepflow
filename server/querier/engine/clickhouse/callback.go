@@ -30,10 +30,11 @@ import (
 type Callback struct {
 	Args     []interface{}
 	Function func([]interface{}) func(columns []interface{}, values []interface{}) []interface{}
+	Column   string
 }
 
 func (c *Callback) Format(m *view.Model) {
-	m.AddCallback(c.Function(c.Args))
+	m.AddCallback(c.Column, c.Function(c.Args))
 }
 
 func TimeFill(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {

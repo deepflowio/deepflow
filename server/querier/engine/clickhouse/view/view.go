@@ -47,7 +47,7 @@ type Model struct {
 	Havings   *Filters
 	Orders    *Orders
 	Limit     *Limit
-	Callbacks []func(columns []interface{}, values []interface{}) []interface{}
+	Callbacks map[string]func(columns []interface{}, values []interface{}) []interface{}
 	//Havings Havings
 	MetricsLevelFlag int //Metrics是否需要拆层的标识
 	HasAggFunc       bool
@@ -63,13 +63,16 @@ func NewModel() *Model {
 		Havings:    &Filters{},
 		Orders:     &Orders{},
 		Limit:      &Limit{},
-		Callbacks:  []func(columns []interface{}, values []interface{}) []interface{}{},
+		Callbacks:  map[string]func(columns []interface{}, values []interface{}) []interface{}{},
 		HasAggFunc: false,
 	}
 }
 
-func (m *Model) AddCallback(f func(columns []interface{}, values []interface{}) []interface{}) {
-	m.Callbacks = append(m.Callbacks, f)
+func (m *Model) AddCallback(col string, f func(columns []interface{}, values []interface{}) []interface{}) {
+	_, ok := m.Callbacks[col]
+	if !ok {
+		m.Callbacks[col] = f
+	}
 }
 
 func (m *Model) AddTag(n Node) {
@@ -162,7 +165,7 @@ func (v *View) ToString() string {
 	return buf.String()
 }
 
-func (v *View) GetCallbacks() (callbacks []func(columns []interface{}, values []interface{}) []interface{}) {
+func (v *View) GetCallbacks() (callbacks map[string]func(columns []interface{}, values []interface{}) []interface{}) {
 	return v.Model.Callbacks
 }
 
