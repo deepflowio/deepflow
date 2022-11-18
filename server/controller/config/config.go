@@ -58,19 +58,20 @@ type DFWebService struct {
 }
 
 type ControllerConfig struct {
-	LogFile              string `default:"/var/log/controller.log" yaml:"log-file"`
-	LogLevel             string `default:"info" yaml:"log-level"`
-	ListenPort           int    `default:"20417" yaml:"listen-port"`
-	ListenNodePort       int    `default:"30417" yaml:"listen-node-port"` // TODO union port data type
-	MasterControllerName string `default:"" yaml:"master-controller-name"`
-	GrpcMaxMessageLength int    `default:"104857600" yaml:"grpc-max-message-length"`
-	GrpcPort             string `default:"20035" yaml:"grpc-port"`
-	IngesterPort         string `default:"20033" yaml:"ingester-port"`
-	GrpcNodePort         string `default:"30035" yaml:"grpc-node-port"`
-	Kubeconfig           string `yaml:"kubeconfig"`
-	ElectionName         string `default:"deepflow-server" yaml:"election-name"`
-	ReportingDisabled    bool   `default:"false" yaml:"reporting-disabled"`
-	BillingMethod        string `default:"license" yaml:"billing-method"`
+	LogFile                        string `default:"/var/log/controller.log" yaml:"log-file"`
+	LogLevel                       string `default:"info" yaml:"log-level"`
+	ListenPort                     int    `default:"20417" yaml:"listen-port"`
+	ListenNodePort                 int    `default:"30417" yaml:"listen-node-port"` // TODO union port data type
+	MasterControllerName           string `default:"" yaml:"master-controller-name"`
+	GrpcMaxMessageLength           int    `default:"104857600" yaml:"grpc-max-message-length"`
+	GrpcPort                       string `default:"20035" yaml:"grpc-port"`
+	IngesterPort                   string `default:"20033" yaml:"ingester-port"`
+	GrpcNodePort                   string `default:"30035" yaml:"grpc-node-port"`
+	Kubeconfig                     string `yaml:"kubeconfig"`
+	ElectionName                   string `default:"deepflow-server" yaml:"election-name"`
+	ReportingDisabled              bool   `default:"false" yaml:"reporting-disabled"`
+	BillingMethod                  string `default:"license" yaml:"billing-method"`
+	PodClusterInternalIPToIngester int    `default:"0" yaml:"pod-cluster-internal-ip-to-ingester"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`
 
@@ -115,6 +116,7 @@ func (c *Config) Load(path string) {
 	}
 	c.ControllerConfig.TrisolarisCfg.SetLogLevel(c.ControllerConfig.LogLevel)
 	c.ControllerConfig.TrisolarisCfg.SetBillingMethod(c.ControllerConfig.BillingMethod)
+	c.ControllerConfig.TrisolarisCfg.SetPodClusterInternalIPToIngester(c.ControllerConfig.PodClusterInternalIPToIngester)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)
