@@ -70,6 +70,7 @@ type ControllerConfig struct {
 	Kubeconfig           string `yaml:"kubeconfig"`
 	ElectionName         string `default:"deepflow-server" yaml:"election-name"`
 	ReportingDisabled    bool   `default:"false" yaml:"reporting-disabled"`
+	BillingMethod        string `default:"license" yaml:"billing-method"`
 
 	DFWebService DFWebService `yaml:"df-web-service"`
 
@@ -113,6 +114,7 @@ func (c *Config) Load(path string) {
 		os.Exit(1)
 	}
 	c.ControllerConfig.TrisolarisCfg.SetLogLevel(c.ControllerConfig.LogLevel)
+	c.ControllerConfig.TrisolarisCfg.SetBillingMethod(c.ControllerConfig.BillingMethod)
 	grpcPort, err := strconv.Atoi(c.ControllerConfig.GrpcPort)
 	if err == nil {
 		c.ControllerConfig.TrisolarisCfg.SetGrpcPort(grpcPort)

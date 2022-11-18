@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/config"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql/migrator"
 	"github.com/deepflowys/deepflow/server/controller/election"
@@ -131,7 +132,9 @@ func checkAndStartMasterFunctions(
 				vtapRebalanceCheck.Start()
 
 				// license分配和检查
-				vtapLicenseAllocation.Start()
+				if cfg.BillingMethod == common.BILLING_METHOD_LICENSE {
+					vtapLicenseAllocation.Start()
+				}
 
 				// 资源数据清理
 				resourceCleaner.Start()
