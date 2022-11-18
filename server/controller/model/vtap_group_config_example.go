@@ -803,15 +803,15 @@ vtap_group_id: g-xxxxxx
   ## List of Application Protocols
   ## Note: Turning off some protocol identification can reduce deepflow-agent resource consumption.
   #l7-protocol-enabled:
-  #- HTTP: true ## for both HTTP and HTTP_TLS
-  #- HTTP2: true ## for HTTP2, HTTP2_TLS and gRPC
-  #- Dubbo: true
-  #- MySQL: true
-  #- PostgreSQL: true
-  #- Redis: true
-  #- Kafka: true
-  #- MQTT: true
-  #- DNS: true
+  #- HTTP ## for both HTTP and HTTP_TLS
+  #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
+  #- Dubbo
+  #- MySQL
+  #- PostgreSQL
+  #- Redis
+  #- Kafka
+  #- MQTT
+  #- DNS
 
   ## Application Protocol Port Numbers
   ## Default: 53 for DNS, 1-65535 for other Protocols.
