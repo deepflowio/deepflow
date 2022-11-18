@@ -140,7 +140,6 @@ type Rules struct {
 	RealRules []string `json:"realRules,omitempty"`
 	IsNumber  bool     `json:"isNumber,omitempty"`
 	Multiple  bool     `json:"multiple,omitempty"`
-	Required  bool     `json:"required,omitempty"`
 }
 
 type Data struct {
@@ -277,15 +276,12 @@ var sectionNameMap = map[string]string{
 }
 
 func GroupConfigFun() *ConfigBase {
-	rules := Rules{
-		Required: true,
-	}
 	return &ConfigBase{
 		Type:      "select",
 		Label:     "采集器组",
 		Value:     "",
 		Data:      nil,
-		Rules:     rules,
+		Rules:     Rules{RealRules: []string{"required"}},
 		jsonTag:   "VTAP_GROUP_LCUUID",
 		labelName: group_label,
 	}
@@ -610,7 +606,7 @@ func CaptureSocketTypeFun() *ConfigBase {
 	}
 	return &ConfigBase{
 		Type:        "select",
-		Label:       "流量采集方式",
+		Label:       "流量采集API",
 		Data:        data,
 		Placeholder: "默认配置: 自适应",
 		Help:        "Linux环境中的流量采集方式",
@@ -627,7 +623,7 @@ func TapModeFun() *ConfigBase {
 	}
 	return &ConfigBase{
 		Type:        "select",
-		Label:       "流量采集方式",
+		Label:       "流量采集模式",
 		Data:        data,
 		Placeholder: "默认配置: 本地 (0)",
 		Help:        "ESXi 采集器选择虚拟镜像，专属采集器选择物理镜像",
@@ -1212,6 +1208,7 @@ func (m *GroupConfigMananger) initLabel() {
 		}
 		// The vtap group cannot be modified without creating a new configuration
 		if configFun.jsonTag == "VTAP_GROUP_LCUUID" && m.newConfigFlag == false {
+			configFun = deepcopy.Copy(configFun).(*ConfigBase)
 			configFun.setDisabled()
 		}
 		configLabel.addConfig(configFun.jsonTag, configFun)
