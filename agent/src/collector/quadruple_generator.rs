@@ -884,7 +884,7 @@ impl QuadrupleGenerator {
         }
 
         if minute_inject {
-            for i in 0..2 {
+            for i in 0..2 { // policy_ids are only used for the calculation of vtap_acl metrics
                 for action in tagged_flow.tag.policy_data[i].npb_actions.iter() {
                     for gid in action.acl_gids().iter() {
                         self.policy_ids[i].add(*gid);
