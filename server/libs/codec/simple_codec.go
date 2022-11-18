@@ -71,6 +71,12 @@ func (e *SimpleEncoder) WriteU16(v uint16) {
 	e.buf = append(e.buf, s[:]...)
 }
 
+func (e *SimpleEncoder) WriteBigEndianU16(v uint16) {
+	s := [2]byte{}
+	binary.BigEndian.PutUint16(s[:], v)
+	e.buf = append(e.buf, s[:]...)
+}
+
 func (e *SimpleEncoder) WriteU16Slice(vs []uint16) {
 	e.WriteU32(uint32(len(vs)))
 	s := [2]byte{}
@@ -83,6 +89,12 @@ func (e *SimpleEncoder) WriteU16Slice(vs []uint16) {
 func (e *SimpleEncoder) WriteU32(v uint32) {
 	s := [4]byte{}
 	binary.LittleEndian.PutUint32(s[:], v)
+	e.buf = append(e.buf, s[:]...)
+}
+
+func (e *SimpleEncoder) WriteBigEndianU32(v uint32) {
+	s := [4]byte{}
+	binary.BigEndian.PutUint32(s[:], v)
 	e.buf = append(e.buf, s[:]...)
 }
 

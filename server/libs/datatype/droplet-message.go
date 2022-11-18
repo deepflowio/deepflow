@@ -51,7 +51,7 @@ const (
 )
 
 var MessageTypeString = [MESSAGE_TYPE_MAX]string{
-	MESSAGE_TYPE_COMPRESS: "pcap",
+	MESSAGE_TYPE_COMPRESS: "compressed_pcap",
 	MESSAGE_TYPE_SYSLOG:   "syslog",
 	MESSAGE_TYPE_STATSD:   "statsd",
 
