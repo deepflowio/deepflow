@@ -795,7 +795,7 @@ func (op *PolicyDataOP) checkNewPolicies(vtapIDToPolicy map[int]*Policy,
 			vtapPolicy.toSerializeString()
 		}
 		allVTapSharePolicy.initVersion(version + ALL_VTAP_SHARE_POLICY_VERSION_OFFSET)
-		dropletPolicy.initVersion(version + DROPLET_POLICY_VERSION_OFFSET)
+		dropletPolicy.initVersion(version + INGESTER_POLICY_VERSION_OFFSET)
 		op.updateVTapIDToPolicy(vtapIDToPolicy)
 		op.updateAllVTapSharePolicy(allVTapSharePolicy)
 		op.updateDropletPolicy(dropletPolicy)

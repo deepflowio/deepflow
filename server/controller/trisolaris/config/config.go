@@ -34,26 +34,27 @@ type Chrony struct {
 }
 
 type Config struct {
-	ListenPort               string   `default:"20014" yaml:"listen-port"`
-	LogLevel                 string   `default:"info"`
-	TsdbIP                   string   `yaml:"tsdb-ip"`
-	Chrony                   Chrony   `yaml:"chrony"`
-	SelfUpdateUrl            string   `default:"grpc" yaml:"self-update-url"`
-	RemoteApiTimeout         uint16   `default:"30" yaml:"remote-api-timeout"`
-	TridentTypeForUnkonwVtap uint16   `default:"0" yaml:"trident-type-for-unkonw-vtap"`
-	PlatformVips             []string `yaml:"platform-vips"`
-	NodeType                 string   `default:"master" yaml:"node-type"`
-	RegionDomainPrefix       string   `yaml:"region-domain-prefix"`
-	ClearKubernetesTime      int      `default:"600" yaml:"clear-kubernetes-time"`
-	NodeIP                   string
-	VTapCacheRefreshInterval int  `default:"300" yaml:"vtapcache-refresh-interval"`
-	MetaDataRefreshInterval  int  `default:"60" yaml:"metadata-refresh-interval"`
-	NodeRefreshInterval      int  `default:"60" yaml:"node-refresh-interval"`
-	VTapAutoRegister         bool `default:"true" yaml:"vtap-auto-register"`
-	DefaultTapMode           int  `yaml:"default-tap-mode"`
-	BillingMethod            string
-	GrpcPort                 int
-	IngesterPort             int
+	ListenPort                     string   `default:"20014" yaml:"listen-port"`
+	LogLevel                       string   `default:"info"`
+	TsdbIP                         string   `yaml:"tsdb-ip"`
+	Chrony                         Chrony   `yaml:"chrony"`
+	SelfUpdateUrl                  string   `default:"grpc" yaml:"self-update-url"`
+	RemoteApiTimeout               uint16   `default:"30" yaml:"remote-api-timeout"`
+	TridentTypeForUnkonwVtap       uint16   `default:"0" yaml:"trident-type-for-unkonw-vtap"`
+	PlatformVips                   []string `yaml:"platform-vips"`
+	NodeType                       string   `default:"master" yaml:"node-type"`
+	RegionDomainPrefix             string   `yaml:"region-domain-prefix"`
+	ClearKubernetesTime            int      `default:"600" yaml:"clear-kubernetes-time"`
+	NodeIP                         string
+	VTapCacheRefreshInterval       int  `default:"300" yaml:"vtapcache-refresh-interval"`
+	MetaDataRefreshInterval        int  `default:"60" yaml:"metadata-refresh-interval"`
+	NodeRefreshInterval            int  `default:"60" yaml:"node-refresh-interval"`
+	VTapAutoRegister               bool `default:"true" yaml:"vtap-auto-register"`
+	DefaultTapMode                 int  `yaml:"default-tap-mode"`
+	BillingMethod                  string
+	GrpcPort                       int
+	IngesterPort                   int
+	PodClusterInternalIPToIngester int
 }
 
 func (c *Config) Convert() {
@@ -98,4 +99,8 @@ func (c *Config) SetLogLevel(logLevel string) {
 
 func (c *Config) SetBillingMethod(billingMethod string) {
 	c.BillingMethod = billingMethod
+}
+
+func (c *Config) SetPodClusterInternalIPToIngester(value int) {
+	c.PodClusterInternalIPToIngester = value
 }

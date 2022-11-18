@@ -49,6 +49,9 @@ type NodeInfo struct {
 	controllerToNATIP       map[string]string
 	controllerToPodIP       map[string]string
 	localServers            *atomic.Value // []*trident.DeepFlowServerInstanceInfo
+	platformData            *atomic.Value // *metaData.PlatformData
+	localRegion             *string
+	localAZs                []string
 	sysConfigurationToValue map[string]string
 	pcapDataRetention       uint32
 	metaData                *metadata.MetaData
@@ -63,6 +66,8 @@ type NodeInfo struct {
 func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *NodeInfo {
 	localServers := &atomic.Value{}
 	localServers.Store([]*trident.DeepFlowServerInstanceInfo{})
+	platformData := &atomic.Value{}
+	platformData.Store(metadata.NewPlatformData("", "", 0, 0))
 	return &NodeInfo{
 		tsdbCaches:              newTSDBCacheMap(),
 		tsdbRegion:              make(map[string]uint32),
@@ -71,6 +76,7 @@ func NewNodeInfo(db *gorm.DB, metaData *metadata.MetaData, cfg *config.Config) *
 		controllerToNATIP:       make(map[string]string),
 		controllerToPodIP:       make(map[string]string),
 		localServers:            localServers,
+		platformData:            platformData,
 		sysConfigurationToValue: make(map[string]string),
 		metaData:                metaData,
 		tsdbRegister:            newTSDBDiscovery(),
@@ -87,11 +93,11 @@ func (n *NodeInfo) GetTSDBCache(key string) *TSDBCache {
 }
 
 func (n *NodeInfo) GetPlatformDataVersion() uint64 {
-	return n.metaData.GetPlatformDataOP().GetDropletPlatforDataVersion()
+	return n.getPlatformData().GetPlatformDataVersion()
 }
 
 func (n *NodeInfo) GetPlatformDataStr() []byte {
-	return n.metaData.GetPlatformDataOP().GetDropletPlatforDataStr()
+	return n.getPlatformData().GetPlatformDataStr()
 }
 
 func (n *NodeInfo) GetPodIPs() []*trident.PodIp {
@@ -199,6 +205,25 @@ func (n *NodeInfo) DeleteTSDBCache(key string) {
 	n.tsdbCaches.Delete(key)
 }
 
+func (n *NodeInfo) updateLocalRegion(region string) {
+	n.localRegion = &region
+}
+
+func (n *NodeInfo) getLocalRegion() string {
+	if n.localRegion == nil {
+		return ""
+	}
+	return *n.localRegion
+}
+
+func (n *NodeInfo) updateLocalAZs(azs []string) {
+	n.localAZs = azs
+}
+
+func (n *NodeInfo) getLocalAZs() []string {
+	return n.localAZs
+}
+
 func (n *NodeInfo) generateControllerInfo() {
 	dbControllers, err := dbmgr.DBMgr[models.Controller](n.db).Gets()
 	if err != nil {
@@ -213,6 +238,7 @@ func (n *NodeInfo) generateControllerInfo() {
 	if err != nil {
 		log.Errorf("find local controller(%s) region failed, err:%s", n.config.NodeIP, err)
 	} else {
+		n.updateLocalRegion(localConn.Region)
 		azControllerconns, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetBatchFromRegion(localConn.Region)
 		if err == nil {
 			for _, conn := range azControllerconns {
@@ -244,6 +270,19 @@ func (n *NodeInfo) generateControllerInfo() {
 	n.controllerToNATIP = controllerToNATIP
 	n.controllerToPodIP = controllerToPodIP
 	n.updateLocalServers(localServers)
+
+	localConns, err := dbmgr.DBMgr[models.AZControllerConnection](n.db).GetBatchFromControllerIP(n.config.NodeIP)
+	if err == nil {
+		localAZs := make([]string, 0, len(localConns))
+		for _, localConn := range localConns {
+			if IsValueInSliceString(localConn.AZ, localAZs) == false {
+				localAZs = append(localAZs, localConn.AZ)
+			}
+		}
+		n.updateLocalAZs(localAZs)
+	} else {
+		log.Error(err)
+	}
 }
 
 func (n *NodeInfo) initTSDBInfo() {
@@ -621,6 +660,77 @@ func (n *NodeInfo) registerControllerToDB(data *models.Controller) {
 	}
 }
 
+func (n *NodeInfo) getPlatformData() *metadata.PlatformData {
+	return n.platformData.Load().(*metadata.PlatformData)
+}
+
+func (n *NodeInfo) updatePlatformData(data *metadata.PlatformData) {
+	n.platformData.Store(data)
+}
+
+func (n *NodeInfo) getPodClusterInternalIPToIngester() int {
+	return n.config.PodClusterInternalIPToIngester
+}
+
+func (n *NodeInfo) generatePlatformData() {
+	podClusterInternalIPToIngester := n.getPodClusterInternalIPToIngester()
+	localRegion := n.getLocalRegion()
+	localAZs := n.getLocalAZs()
+	log.Infof("generate ingester platform data (region=%s azs=%s podClusterInternalIPToIngester=%d)", n.getLocalRegion(), n.getLocalAZs(), podClusterInternalIPToIngester)
+	switch podClusterInternalIPToIngester {
+	case ALL_K8S_CLUSTER:
+		n.updatePlatformData(n.metaData.GetPlatformDataOP().GetAllPlatformDataForIngester())
+	case K8S_CLUSTER_IN_LOCAL_REGION:
+		allCompletePlatformDataExceptPod := n.metaData.GetPlatformDataOP().GetAllCompletePlatformDataExceptPod()
+		if localRegion == "" {
+			n.updatePlatformData(allCompletePlatformDataExceptPod)
+		} else {
+			regionToPlatformDataOnlyPod := n.metaData.GetPlatformDataOP().GetRegionToPlatformDataOnlyPod()
+			if regionPlatformData, ok := regionToPlatformDataOnlyPod[localRegion]; ok {
+				platformData := metadata.NewPlatformData("platformData", "", 0, PLATFORM_DATA_FOR_INGESTER_1)
+				platformData.Merge(allCompletePlatformDataExceptPod)
+				platformData.MergeInterfaces(regionPlatformData)
+				platformData.GeneratePlatformDataResult()
+				n.updatePlatformData(platformData)
+			} else {
+				n.updatePlatformData(allCompletePlatformDataExceptPod)
+			}
+
+		}
+	case K8S_CLUSTER_IN_LOCAL_AZS:
+		allCompletePlatformDataExceptPod := n.metaData.GetPlatformDataOP().GetAllCompletePlatformDataExceptPod()
+		if len(localAZs) == 0 {
+			n.updatePlatformData(allCompletePlatformDataExceptPod)
+		} else {
+			if IsValueInSliceString(CONN_DEFAULT_AZ, localAZs) {
+				regionToPlatformDataOnlyPod := n.metaData.GetPlatformDataOP().GetRegionToPlatformDataOnlyPod()
+				if regionPlatformData, ok := regionToPlatformDataOnlyPod[localRegion]; ok {
+					platformData := metadata.NewPlatformData("platformData", "", 0, PLATFORM_DATA_FOR_INGESTER_2)
+					platformData.Merge(allCompletePlatformDataExceptPod)
+					platformData.MergeInterfaces(regionPlatformData)
+					platformData.GeneratePlatformDataResult()
+					n.updatePlatformData(platformData)
+				} else {
+					n.updatePlatformData(allCompletePlatformDataExceptPod)
+				}
+			} else {
+				platformData := metadata.NewPlatformData("platformData", "", 0, PLATFORM_DATA_FOR_INGESTER_2)
+				azToPlatformDataOnlyPod := n.metaData.GetPlatformDataOP().GetAZToPlatformDataOnlyPod()
+				for _, az := range localAZs {
+					if azPlatformData, ok := azToPlatformDataOnlyPod[az]; ok {
+						platformData.MergeInterfaces(azPlatformData)
+					}
+				}
+				platformData.Merge(allCompletePlatformDataExceptPod)
+				platformData.GeneratePlatformDataResult()
+				n.updatePlatformData(platformData)
+			}
+		}
+	default:
+		n.updatePlatformData(n.metaData.GetPlatformDataOP().GetAllPlatformDataForIngester())
+	}
+}
+
 func (n *NodeInfo) registerTSDB() {
 	log.Info("start register rsdb")
 	data := n.tsdbRegister.getRegisterData()
@@ -650,6 +760,7 @@ func (n *NodeInfo) TimedRefreshNodeCache() {
 	n.initTSDBInfo()
 	n.generateControllerInfo()
 	n.isRegisterController()
+	n.generatePlatformData()
 	go n.startMonitoRegister()
 	interval := time.Duration(n.config.NodeRefreshInterval)
 	ticker := time.NewTicker(interval * time.Second).C
@@ -659,10 +770,12 @@ func (n *NodeInfo) TimedRefreshNodeCache() {
 			log.Info("start generate node cache data from timed")
 			n.isRegisterController()
 			n.generateNodeCache()
+			n.generatePlatformData()
 			log.Info("end generate node cache data from timed")
 		case <-n.chNodeInfo:
 			log.Info("start generate node cache data from rpc")
 			n.generateNodeCache()
+			n.generatePlatformData()
 			pushmanager.Broadcast()
 			log.Info("end generate node cache data from rpc")
 		}
