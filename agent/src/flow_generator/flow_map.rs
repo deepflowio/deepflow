@@ -23,8 +23,8 @@ use std::{
     rc::Rc,
     str::FromStr,
     sync::{
-        atomic::{AtomicI64, Ordering},
-        Arc,
+        atomic::{AtomicI64, AtomicU64, Ordering},
+        Arc, Weak,
     },
     time::{Duration, SystemTime},
 };
@@ -70,10 +70,12 @@ use crate::{
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
     rpc::get_timestamp,
+    utils::stats::{self, Countable, StatsOption},
 };
 use npb_pcap_policy::PolicyData;
 use public::{
     bitmap::Bitmap,
+    counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
     queue::{self, DebugSender, Receiver},
     utils::net::MacAddr,
@@ -100,10 +102,11 @@ pub struct FlowMap {
     config: FlowAccess,
     parse_config: LogParserAccess,
     rrt_cache: Rc<RefCell<L7RrtCache>>,
-    counter: Arc<FlowPerfCounter>,
+    flow_perf_counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
     packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
     l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
+    stats_counter: Arc<FlowMapCounter>,
 }
 
 impl FlowMap {
@@ -116,48 +119,62 @@ impl FlowMap {
         config: FlowAccess,
         parse_config: LogParserAccess,
         packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
-    ) -> (Self, Arc<FlowPerfCounter>) {
-        let counter = Arc::new(FlowPerfCounter::default());
+        stats_collector: &stats::Collector,
+    ) -> Self {
+        let flow_perf_counter = Arc::new(FlowPerfCounter::default());
+        let stats_counter = Arc::new(FlowMapCounter::default());
         let l7_protocol_parse_port_bitmap = (&config.load()).l7_protocol_parse_port_bitmap.clone();
-        (
-            Self {
-                node_map: Some(HashMap::new()),
-                time_set: Some(BTreeSet::new()),
-                id,
-                state_machine_master: StateMachine::new_master(&config.load().flow_timeout),
-                state_machine_slave: StateMachine::new_slave(&config.load().flow_timeout),
-                service_table: ServiceTable::new(
-                    SERVICE_TABLE_IPV4_CAPACITY,
-                    SERVICE_TABLE_IPV6_CAPACITY,
-                ),
-                app_table: AppTable::new(
-                    config.load().l7_protocol_inference_max_fail_count,
-                    config.load().l7_protocol_inference_ttl,
-                ),
-                policy_getter,
-                start_time: Duration::ZERO,
-                start_time_in_unit: 0,
-                total_flow: 0,
-                output_queue,
-                out_log_queue: app_proto_log_queue,
-                output_buffer: vec![],
-                last_queue_flush: Duration::ZERO,
-                config,
-                parse_config,
-                rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
-                counter: counter.clone(),
-                ntp_diff,
-                packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
-                l7_protocol_parse_port_bitmap,
-            },
-            counter,
-        )
+        stats_collector.register_countable(
+            "flow-map",
+            Countable::Ref(Arc::downgrade(&stats_counter) as Weak<dyn RefCountable>),
+            vec![StatsOption::Tag("id", id.to_string())],
+        );
+
+        stats_collector.register_countable(
+            "flow-perf",
+            Countable::Ref(Arc::downgrade(&flow_perf_counter) as Weak<dyn RefCountable>),
+            vec![StatsOption::Tag("id", format!("{}", id))],
+        );
+        Self {
+            node_map: Some(HashMap::new()),
+            time_set: Some(BTreeSet::new()),
+            id,
+            state_machine_master: StateMachine::new_master(&config.load().flow_timeout),
+            state_machine_slave: StateMachine::new_slave(&config.load().flow_timeout),
+            service_table: ServiceTable::new(
+                SERVICE_TABLE_IPV4_CAPACITY,
+                SERVICE_TABLE_IPV6_CAPACITY,
+            ),
+            app_table: AppTable::new(
+                config.load().l7_protocol_inference_max_fail_count,
+                config.load().l7_protocol_inference_ttl,
+            ),
+            policy_getter,
+            start_time: Duration::ZERO,
+            start_time_in_unit: 0,
+            total_flow: 0,
+            output_queue,
+            out_log_queue: app_proto_log_queue,
+            output_buffer: vec![],
+            last_queue_flush: Duration::ZERO,
+            config,
+            parse_config,
+            rrt_cache: Rc::new(RefCell::new(L7RrtCache::new(L7_RRT_CACHE_CAPACITY))),
+            flow_perf_counter,
+            ntp_diff,
+            packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
+            l7_protocol_parse_port_bitmap,
+            stats_counter,
+        }
     }
 
     pub fn inject_flush_ticker(&mut self, mut timestamp: Duration) -> bool {
         if timestamp.is_zero() {
             timestamp = get_timestamp(self.ntp_diff.load(Ordering::Relaxed));
         } else if timestamp < self.start_time {
+            self.stats_counter
+                .drop_by_window
+                .fetch_add(1, Ordering::Relaxed);
             return false;
         }
 
@@ -207,6 +224,8 @@ impl FlowMap {
                 // 超时Flow将被删除然后把统计信息发送队列下游
                 time_set.remove(&time_key);
                 self.node_removed_aftercare(node, timeout, None);
+                self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
+
                 if nodes.is_empty() {
                     node_map.remove(&time_key.map_key);
                 }
@@ -268,16 +287,17 @@ impl FlowMap {
         match node_map.get_mut(&pkt_key) {
             // 找到Flow,更新
             Some(nodes) => {
-                let (config_ignore, trident_type) = {
+                let (ignore_l2_end, ignore_tor_mac, trident_type) = {
                     let guard = self.config.load();
                     (
-                        (guard.ignore_l2_end, guard.ignore_tor_mac),
+                        guard.ignore_l2_end,
+                        guard.ignore_tor_mac,
                         guard.trident_type,
                     )
                 };
-                let index = nodes
-                    .iter()
-                    .position(|node| node.match_node(meta_packet, config_ignore, trident_type));
+                let index = nodes.iter().position(|node| {
+                    node.match_node(meta_packet, ignore_l2_end, ignore_tor_mac, trident_type)
+                });
                 if index.is_none() {
                     let node = Box::new(self.new_flow_node(meta_packet));
                     let time_key = FlowTimeKey::new(pkt_timestamp, pkt_key);
@@ -383,6 +403,7 @@ impl FlowMap {
         if flow_closed {
             time_set.remove(&time_key);
             self.node_removed_aftercare(node, timestamp, Some(meta_packet));
+            self.stats_counter.closed.fetch_add(1, Ordering::Relaxed);
         } else {
             slot_nodes.push(node);
         }
@@ -705,7 +726,7 @@ impl FlowMap {
                 } else {
                     None
                 },
-                self.counter.clone(),
+                self.flow_perf_counter.clone(),
                 conf.l7_protocol_enabled_bitmap,
                 self.parse_config.clone(),
                 self.l7_protocol_parse_port_bitmap.clone(),
@@ -867,7 +888,7 @@ impl FlowMap {
                     info = Some(i);
                 }
                 Err(Error::L7ReqNotFound(c)) => {
-                    self.counter
+                    self.flow_perf_counter
                         .mismatched_response
                         .fetch_add(c, Ordering::Relaxed);
                 }
@@ -903,6 +924,7 @@ impl FlowMap {
     }
 
     fn new_flow_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
+        self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
         match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(meta_packet),
             IpProtocol::Udp => self.new_udp_node(meta_packet),
@@ -1246,6 +1268,35 @@ impl FlowMap {
     }
 }
 
+#[derive(Default)]
+pub struct FlowMapCounter {
+    new: AtomicU64,
+    closed: AtomicU64,
+    drop_by_window: AtomicU64,
+}
+
+impl RefCountable for FlowMapCounter {
+    fn get_counters(&self) -> Vec<Counter> {
+        vec![
+            (
+                "new",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.new.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "closed",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.closed.swap(0, Ordering::Relaxed)),
+            ),
+            (
+                "drop_by_window",
+                CounterType::Gauged,
+                CounterValue::Unsigned(self.drop_by_window.swap(0, Ordering::Relaxed)),
+            ),
+        ]
+    }
+}
+
 pub fn _reverse_meta_packet(packet: &mut MetaPacket) {
     let lookup_key = &mut packet.lookup_key;
     mem::swap(&mut lookup_key.src_ip, &mut lookup_key.dst_ip);
@@ -1291,7 +1342,7 @@ pub fn _new_flow_map_and_receiver(
     config.flow.l7_log_tap_types[0] = true;
     config.flow.trident_type = trident_type;
     let current_config = Arc::new(ArcSwap::from_pointee(config));
-    let (flow_map, _counter) = FlowMap::new(
+    let flow_map = FlowMap::new(
         0,
         output_queue_sender,
         policy_getter,
@@ -1304,6 +1355,7 @@ pub fn _new_flow_map_and_receiver(
             &config.log_parser
         }),
         packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
+        &stats::Collector::new(&vec!["127.0.0.1".to_string()]),
     );
 
     (flow_map, output_queue_receiver)
