@@ -134,6 +134,7 @@ func (p *PlatformDataOP) generateVInterfaces() {
 	rawData := p.GetRawData()
 	dipData := NewDomainInterfaceProto()
 	vifPubIps := []string{}
+	platformVips := p.metaData.GetPlatformVips()
 	for index, _ := range vifs {
 		vif := vifs[index]
 		typeIDKey := TypeIDKey{
@@ -147,7 +148,7 @@ func (p *PlatformDataOP) generateVInterfaces() {
 			continue
 		}
 		var ipResourceData *IpResourceData
-		ipResourceData, vifPubIps = rawData.generateIpResoureceData(vif, vifPubIps)
+		ipResourceData, vifPubIps = rawData.generateIpResoureceData(vif, vifPubIps, platformVips)
 		interfaceProto, err := rawData.vInterfaceToProto(vif, device, ipResourceData)
 		if err != nil {
 			log.Error(err)
@@ -165,7 +166,7 @@ func (p *PlatformDataOP) generateVInterfaces() {
 	for _, fip := range rawData.floatingIPs {
 		if !Find[string](vifPubIps, fip.IP) {
 			maskLen := GetDefaultMaskLen(fip.IP)
-			isVipInterface := rawData.checkIsVip(fip.IP, nil)
+			isVipInterface := rawData.checkIsVip(fip.IP, nil, platformVips)
 			data := &trident.Interface{
 				IfType:         proto.Uint32(uint32(VIF_TYPE_WAN)),
 				EpcId:          proto.Uint32(uint32(fip.VPCID)),
@@ -181,7 +182,7 @@ func (p *PlatformDataOP) generateVInterfaces() {
 	ips := make([]*trident.IpResource, 0, len(rawData.noVInterfaceIDIPs))
 	wanIsVipInterface := false
 	for _, ip := range rawData.noVInterfaceIDIPs {
-		wanIsVipInterface = rawData.checkIsVip(ip.IP, nil)
+		wanIsVipInterface = rawData.checkIsVip(ip.IP, nil, platformVips)
 		ipResource := generateProtoIpResource(ip.IP, 0, 0)
 		ips = append(ips, ipResource)
 		data := &trident.Interface{
