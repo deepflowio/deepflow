@@ -249,7 +249,7 @@ impl FlowMap {
 
     pub fn inject_meta_packet(&mut self, meta_packet: &mut MetaPacket) {
         if !self.inject_flush_ticker(meta_packet.lookup_key.timestamp) {
-            // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储）
+            // 补充由于超时导致未查询策略，用于其它流程（如PCAP存储），所有超时流量的flow id为u64最大值。
             (self.policy_getter).lookup(meta_packet, self.id as usize);
             return;
         }
@@ -314,6 +314,7 @@ impl FlowMap {
                 node_map.insert(pkt_key, vec![node]);
             }
         }
+
 
         self.node_map.replace(node_map);
         self.time_set.replace(time_set);
@@ -675,6 +676,7 @@ impl FlowMap {
         };
         // 标签
         (self.policy_getter).lookup(meta_packet, self.id as usize);
+        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
         let l7_proto = self.app_table.get_protocol(meta_packet);
@@ -786,6 +788,7 @@ impl FlowMap {
         if meta_packet.is_ndp_response() {
             (self.policy_getter).lookup(meta_packet, self.id as usize);
         }
+        meta_packet.flow_id = node.tagged_flow.flow.flow_id;
     }
 
     fn new_tcp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {

@@ -58,6 +58,8 @@ pub struct MiniPacket<'a> {
     // IPV6
     ipv6_last_option_offset: usize,
     ipv6_fragment_option_offset: usize,
+
+    flow_id: u64,
 }
 
 impl<'a> MiniPacket<'a> {
@@ -75,6 +77,7 @@ impl<'a> MiniPacket<'a> {
             } else {
                 meta_packet.packet_len
             },
+            flow_id: meta_packet.flow_id,
             ipv6_last_option_offset: meta_packet.offset_ipv6_last_option,
             ipv6_fragment_option_offset: meta_packet.offset_ipv6_fragment_option,
         }
