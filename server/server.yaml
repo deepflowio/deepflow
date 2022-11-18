@@ -300,6 +300,20 @@ ingester:
   ## event database data retention time(unit: day)
   #event-ttl: 30
 
+  ## pcap data write config
+  #pcap-ck-writer
+  #  queue-count: 1      # 每个表并行写数量
+  #  queue-size: 50000  # 数据队列长度
+  #  batch-size: 25600   # 多少行数据同时写入
+  #  flush-timeout: 5   # 超时写入时间
+
+  ## pcap database data retention time(unit: day)
+  #pcap-ttl: 3
+
+  ## pcap decoder queue count/size
+  #pcap-queue-count: 2
+  #pcap-queue-size: 10000
+
   ## 默认读超时，修改数据保留时长时使用
   #ck-read-timeout: 300
 

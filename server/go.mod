@@ -29,7 +29,7 @@ require (
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowys/deepflow/message v0.0.0-20221017080743-043a7a66ab01
+	github.com/deepflowys/deepflow/message v0.0.0-20221119044309-e5178626b9ec
 	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
@@ -86,7 +86,9 @@ require (
 
 require (
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
+	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
+	github.com/ionos-cloud/sdk-go/v6 v6.1.0 // indirect
 	github.com/signalfx/splunk-otel-go v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/internal v1.1.0 // indirect
@@ -115,7 +117,6 @@ require (
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
-	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
