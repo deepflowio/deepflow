@@ -263,6 +263,8 @@ func exampleDomainConfig(cmd *cobra.Command, args []string) {
 		fmt.Printf(string(example.YamlDomainBaiduBce))
 	case common.DOMAIN_TYPE_AGENT_SYNC:
 		fmt.Printf(string(example.YamlDomainGenesis))
+	case common.DOMAIN_TYPE_FILEREADER:
+		fmt.Printf(string(example.YamlDomainFileReader))
 	default:
 		err := fmt.Sprintf("domain_type %s not supported\n", args[0])
 		fmt.Fprintln(os.Stderr, err)

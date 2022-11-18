@@ -39,6 +39,7 @@ const (
 	// attention: following line comments are used by `stringer`
 	DOMAIN_TYPE_UNKNOWN    DomainType = -1
 	DOMAIN_TYPE_TENCENT    DomainType = 4  // tencent
+	DOMAIN_TYPE_FILEREADER DomainType = 5  // filereader
 	DOMAIN_TYPE_AWS        DomainType = 6  // aws
 	DOMAIN_TYPE_ALIYUN     DomainType = 9  // aliyun
 	DOMAIN_TYPE_KUBERNETES DomainType = 11 // kubernetes
@@ -50,6 +51,7 @@ const (
 
 var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_TENCENT,
+	DOMAIN_TYPE_FILEREADER,
 	DOMAIN_TYPE_AWS,
 	DOMAIN_TYPE_ALIYUN,
 	DOMAIN_TYPE_KUBERNETES,
