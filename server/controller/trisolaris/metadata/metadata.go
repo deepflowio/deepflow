@@ -150,6 +150,10 @@ func (m *MetaData) GetVTapPolicyString(vtapID int, functions mapset.Set) []byte 
 	return m.policyDataOP.getVTapPolicyString(vtapID, functions)
 }
 
+func (m *MetaData) GetPlatformVips() []string {
+	return m.config.PlatformVips
+}
+
 func (m *MetaData) InitData() {
 	m.generateDbDataCache()
 	m.platformDataOP.initData()

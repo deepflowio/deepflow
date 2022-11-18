@@ -1036,12 +1036,14 @@ func (r *PlatformRawData) ConvertDBCache(dbDataCache *DBDataCache) {
 	r.ConvertSkipVTapVIfIDs(dbDataCache)
 }
 
-func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface) bool {
-	//TODO Check config
+func (r *PlatformRawData) checkIsVip(ip string, vif *models.VInterface, platformVips []string) bool {
+	if IsValueInSliceString(ip, platformVips) == true {
+		return true
+	}
+
 	if vif == nil {
 		return false
 	}
-
 	switch vif.DeviceType {
 	case VIF_DEVICE_TYPE_LB, VIF_DEVICE_TYPE_NAT_GATEWAY:
 		if r.vipDomainLcuuids.Contains(vif.Domain) {
@@ -1165,7 +1167,7 @@ func (r *PlatformRawData) modifyInterfaceProto(
 }
 
 func (r *PlatformRawData) generateIpResoureceData(
-	vif *models.VInterface, vifPubIps []string) (*IpResourceData, []string) {
+	vif *models.VInterface, vifPubIps []string, platformVips []string) (*IpResourceData, []string) {
 
 	ipResources := []*trident.IpResource{}
 	simpleIpResources := []*trident.IpResource{}
@@ -1175,7 +1177,7 @@ func (r *PlatformRawData) generateIpResoureceData(
 	if vif.Name == "" || strings.HasPrefix(strings.ToLower(vif.Name), "hostnic") {
 		if ips, ok := r.vInterfaceIDToIP[vif.ID]; ok {
 			for _, ipResource := range ips {
-				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif)
+				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif, platformVips)
 				if ipResource.GetSubnetId() == 0 {
 					ipResource.SubnetId = proto.Uint32(uint32(vif.NetworkID))
 				}
@@ -1187,7 +1189,7 @@ func (r *PlatformRawData) generateIpResoureceData(
 		}
 		if ips, ok := r.vInterfaceIDToSimpleIP[vif.ID]; ok {
 			for _, ipResource := range ips {
-				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif)
+				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif, platformVips)
 				simpleIpResources = append(simpleIpResources, ipResource)
 			}
 		}

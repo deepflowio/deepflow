@@ -36,12 +36,13 @@ import (
 )
 
 type ParamData struct {
-	CtrlIP  string
-	CtrlMac string
-	GroupID string
-	RpcIP   string
-	RpcPort string
-	Type    string
+	CtrlIP    string
+	CtrlMac   string
+	GroupID   string
+	ClusterID string
+	RpcIP     string
+	RpcPort   string
+	Type      string
 }
 
 type SortedAcls []*trident.FlowAcl
@@ -136,6 +137,7 @@ func RegisterTrisolarisCommand() *cobra.Command {
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlIP, "cip", "", "", "vtap ctrl ip")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.CtrlMac, "cmac", "", "", "vtap ctrl mac")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.GroupID, "gid", "", "", "vtap group ID")
+	trisolarisCmd.PersistentFlags().StringVarP(&paramData.ClusterID, "cid", "", "", "vtap k8s cluster ID")
 	trisolarisCmd.PersistentFlags().StringVarP(&paramData.Type, "type", "", "trident", "request type trdient/analyzer")
 	cmds := regiterCommand()
 	for _, handler := range cmds {
@@ -156,11 +158,12 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 		return
 	}
 	defer conn.Close()
-	var name, groupID string
+	var name, groupID, clusterID string
 	switch paramData.Type {
 	case "trident":
 		name = paramData.Type
 		groupID = paramData.GroupID
+		clusterID = paramData.ClusterID
 	case "analyzer":
 		name = paramData.Type
 	default:
@@ -170,10 +173,11 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	fmt.Printf("request trisolaris(%s), params(%+v)\n", addr, paramData)
 	c := trident.NewSynchronizerClient(conn)
 	reqData := &trident.SyncRequest{
-		CtrlIp:             &paramData.CtrlIP,
-		CtrlMac:            &paramData.CtrlMac,
-		VtapGroupIdRequest: &groupID,
-		ProcessName:        &name,
+		CtrlIp:              &paramData.CtrlIP,
+		CtrlMac:             &paramData.CtrlMac,
+		VtapGroupIdRequest:  &groupID,
+		KubernetesClusterId: &clusterID,
+		ProcessName:         &name,
 	}
 	var response *trident.SyncResponse
 	if paramData.Type == "trident" {
@@ -252,12 +256,13 @@ func Uint64ToMac(v uint64) net.HardwareAddr {
 func formatString(data *trident.Interface) string {
 	buffer := bytes.Buffer{}
 	format := "Mac: %s EpcId: %d DeviceType: %d DeviceId: %d IfType: %d" +
-		" LaunchServer: %s LaunchServerId: %d RegionId: %d AzId: %d, PodGroupId: %d, PodNsId: %d, PodId: %d PodClusterId: %d "
+		" LaunchServer: %s LaunchServerId: %d RegionId: %d AzId: %d, PodGroupId: %d, " +
+		"PodNsId: %d, PodId: %d PodClusterId: %d IsVipInterface: %t "
 	buffer.WriteString(fmt.Sprintf(format, Uint64ToMac(data.GetMac()), data.GetEpcId(),
 		data.GetDeviceType(), data.GetDeviceId(), data.GetIfType(),
 		data.GetLaunchServer(), data.GetLaunchServerId(), data.GetRegionId(),
 		data.GetAzId(), data.GetPodGroupId(), data.GetPodNsId(), data.GetPodId(),
-		data.GetPodClusterId()))
+		data.GetPodClusterId(), data.GetIsVipInterface()))
 	if data.GetPodNodeId() > 0 {
 		buffer.WriteString(fmt.Sprintf("PodNodeId: %d ", data.GetPodNodeId()))
 	}
