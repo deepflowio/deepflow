@@ -38,8 +38,8 @@ type PlatformDataOP struct {
 	domainInterfaceProto *atomic.Value // *DomainInterfaceProto
 	domainPeerConnProto  *atomic.Value // *DomainPeerConnProto
 	domainCIDRProto      *atomic.Value // *DomainCIDRProto
-	// droplet使用的数据
-	dropletPlatformData *atomic.Value //*PlatformData
+	// ingester used platform data
+	allPlatformDataForIngester *atomic.Value //*PlatformData
 
 	// 生成的平台数据
 	*DomainToPlatformData
@@ -68,21 +68,21 @@ func newPlatformDataOP(db *gorm.DB, metaData *MetaData) *PlatformDataOP {
 	domainCIDRProto := &atomic.Value{}
 	domainCIDRProto.Store(newDomainCIDRProto(0))
 
-	dropletPlatformData := &atomic.Value{}
-	dropletPlatformData.Store(NewPlatformData("", "", 0, DROPLET_PLATFORM_DATA))
+	allPlatformDataForIngester := &atomic.Value{}
+	allPlatformDataForIngester.Store(NewPlatformData("", "", 0, INGESTER_ALL_PLATFORM_DATA))
 
 	return &PlatformDataOP{
-		rawData:              rawData,
-		domainInterfaceProto: domainInterfaceProto,
-		domainPeerConnProto:  domainPeerConnProto,
-		domainCIDRProto:      domainCIDRProto,
-		dropletPlatformData:  dropletPlatformData,
-		DomainToPlatformData: newDomainToPlatformData(),
-		db:                   db,
-		chDataChanged:        make(chan struct{}, 1),
-		Segment:              newSegment(),
-		metaData:             metaData,
-		podIPs:               &atomic.Value{},
+		rawData:                    rawData,
+		domainInterfaceProto:       domainInterfaceProto,
+		domainPeerConnProto:        domainPeerConnProto,
+		domainCIDRProto:            domainCIDRProto,
+		allPlatformDataForIngester: allPlatformDataForIngester,
+		DomainToPlatformData:       newDomainToPlatformData(),
+		db:                         db,
+		chDataChanged:              make(chan struct{}, 1),
+		Segment:                    newSegment(),
+		metaData:                   metaData,
+		podIPs:                     &atomic.Value{},
 	}
 }
 
@@ -160,7 +160,7 @@ func (p *PlatformDataOP) generateVInterfaces() {
 		}
 		sInterfaces = append(sInterfaces, interfaceProto.sInterface)
 		aInterfaces = append(aInterfaces, interfaceProto.aInterface)
-		dipData.addInterfaceProto(vif, interfaceProto)
+		dipData.addInterfaceProto(vif, interfaceProto, rawData)
 	}
 
 	for _, fip := range rawData.floatingIPs {
@@ -201,12 +201,11 @@ func (p *PlatformDataOP) generateVInterfaces() {
 		}
 		aInterfaces = append(aInterfaces, data)
 		sInterfaces = append(sInterfaces, data)
-		dipData.allSimpleInterfacesExceptPod = append(
-			dipData.allSimpleInterfacesExceptPod, data)
+		dipData.addWanIPsProto(data)
 	}
 
-	dipData.allSimpleInterfaces = sInterfaces
-	dipData.allCompleteInterfaces = aInterfaces
+	dipData.updateAllSimpleInterfaces(sInterfaces)
+	dipData.updateAllCompleteInterfaces(aInterfaces)
 	p.updateDomainInterfaceProto(dipData)
 }
 
@@ -304,25 +303,66 @@ func (p *PlatformDataOP) generateCIDRs() {
 	p.updateDomainCIDRProto(dcProto)
 }
 
-func (p *PlatformDataOP) generateDropletPlatformData() {
+func (p *PlatformDataOP) generateIngesterPlatformData() {
 	domainInterfaceProto := p.getDomainInterfaceProto()
 	domainPeerConnProto := p.getDomainPeerConnProto()
 	domainCIDRProto := p.getDomainCIDRProto()
 
-	// 生成droplet数据
-	newDropletPlatformData := NewPlatformData("", "", 0, DROPLET_PLATFORM_DATA)
-	newDropletPlatformData.setPlatformData(domainInterfaceProto.allCompleteInterfaces,
+	// AllPlatformDataForIngester
+	newIngesterPlatformData := NewPlatformData("", "", 0, INGESTER_ALL_PLATFORM_DATA)
+	newIngesterPlatformData.setPlatformData(domainInterfaceProto.allCompleteInterfaces,
 		domainPeerConnProto.peerConns, domainCIDRProto.cidrs)
-	oldDropletPlatformData := p.getDropletPlatformData()
-	if oldDropletPlatformData.GetVersion() == 0 {
-		newDropletPlatformData.setVersion(uint64(time.Now().Unix()))
-		p.updateDropletPlatformData(newDropletPlatformData)
-	} else if !newDropletPlatformData.equal(oldDropletPlatformData) {
-		newDropletPlatformData.setVersion(oldDropletPlatformData.GetVersion() + 1)
-		p.updateDropletPlatformData(newDropletPlatformData)
+	oldIngesterPlatformData := p.GetAllPlatformDataForIngester()
+	if oldIngesterPlatformData.GetVersion() == 0 {
+		newIngesterPlatformData.setVersion(uint64(time.Now().Unix()))
+		p.updateAllPlatformDataForIngester(newIngesterPlatformData)
+	} else if !newIngesterPlatformData.equal(oldIngesterPlatformData) {
+		newIngesterPlatformData.setVersion(oldIngesterPlatformData.GetVersion() + 1)
+		p.updateAllPlatformDataForIngester(newIngesterPlatformData)
 	}
 
-	log.Info(p.getDropletPlatformData())
+	//生成所有完整数据
+	newACPData := NewPlatformData("", "", 0, ALL_COMPLETE_PLATFORM_DATA_EXCEPT_POD)
+	newACPData.setPlatformData(
+		domainInterfaceProto.allCompleteInterfacesExceptPod,
+		domainPeerConnProto.peerConns,
+		domainCIDRProto.simplecidrs)
+	oldACPData := p.GetAllCompletePlatformDataExceptPod()
+	if oldACPData == nil {
+		newACPData.initVersion()
+		p.updateAllCompletePlatformDataExceptPod(newACPData)
+	} else if !oldACPData.equal(newACPData) {
+		newACPData.setVersion(oldACPData.GetVersion() + 1)
+		p.updateAllCompletePlatformDataExceptPod(newACPData)
+	}
+
+	regionToData := make(DomainPlatformData)
+	regions := p.metaData.GetDBDataCache().GetRegions()
+	for _, region := range regions {
+		interfaces := domainInterfaceProto.regionToInterfacesOnlyPod[region.Lcuuid]
+		regionData := NewPlatformData(region.Name, region.Lcuuid, 0, REGION_TO_PLATFORM_DATA_ONLY_POD)
+		regionData.setPlatformData(interfaces, nil, nil)
+		regionToData[region.Lcuuid] = regionData
+	}
+	if !p.GetRegionToPlatformDataOnlyPod().checkVersion(regionToData) {
+		p.updateRegionToPlatformDataOnlyPod(regionToData)
+	}
+
+	azToData := make(DomainPlatformData)
+	azs := p.metaData.GetDBDataCache().GetAZs()
+	for _, az := range azs {
+		interfaces := domainInterfaceProto.azToInterfacesOnlyPod[az.Lcuuid]
+		azData := NewPlatformData(az.Name, az.Lcuuid, 0, AZ_TO_PLATFORM_DATA_ONLY_POD)
+		azData.setPlatformData(interfaces, nil, nil)
+		azToData[az.Lcuuid] = azData
+	}
+	if !p.GetAZToPlatformDataOnlyPod().checkVersion(azToData) {
+		p.updateAZToPlatformDataOnlyPod(azToData)
+	}
+
+	log.Info(p.GetRegionToPlatformDataOnlyPod())
+	log.Info(p.GetAllPlatformDataForIngester())
+	log.Info(p.GetAZToPlatformDataOnlyPod())
 }
 
 func (p *PlatformDataOP) generateAllSimplePlatformData() {
@@ -494,20 +534,12 @@ func (p *PlatformDataOP) updateDomainCIDRProto(c *DomainCIDRProto) {
 	p.domainCIDRProto.Store(c)
 }
 
-func (p *PlatformDataOP) getDropletPlatformData() *PlatformData {
-	return p.dropletPlatformData.Load().(*PlatformData)
+func (p *PlatformDataOP) GetAllPlatformDataForIngester() *PlatformData {
+	return p.allPlatformDataForIngester.Load().(*PlatformData)
 }
 
-func (p *PlatformDataOP) updateDropletPlatformData(d *PlatformData) {
-	p.dropletPlatformData.Store(d)
-}
-
-func (p *PlatformDataOP) GetDropletPlatforDataVersion() uint64 {
-	return p.getDropletPlatformData().GetPlatformDataVersion()
-}
-
-func (p *PlatformDataOP) GetDropletPlatforDataStr() []byte {
-	return p.getDropletPlatformData().GetPlatformDataStr()
+func (p *PlatformDataOP) updateAllPlatformDataForIngester(d *PlatformData) {
+	p.allPlatformDataForIngester.Store(d)
 }
 
 func (p *PlatformDataOP) GetSegment() *Segment {
@@ -520,7 +552,7 @@ func (p *PlatformDataOP) generateBasePlatformData() {
 	p.generateVInterfaces()
 	p.generatePeerConnections()
 	p.generateCIDRs()
-	p.generateDropletPlatformData()
+	p.generateIngesterPlatformData()
 	p.generateAllSimplePlatformData()
 	p.generateDomainPlatformData()
 	p.generatePodIPS()

@@ -29,6 +29,14 @@ type DomainToPlatformData struct {
 	allSimplePlatformData *PlatformData
 	// 所有简化vinterface数据vtap使用，不包含POD/容器服务接口
 	allSimplePlatformDataExceptPod *PlatformData
+
+	// droplet data
+	// 所有完整vinterface数据除了pod， droplet使用
+	allCompletePlatformDataExceptPod *PlatformData
+	// region内所有数据只有pod数据 完整vinterface
+	regionToPlatformDataOnlyPod DomainPlatformData
+	// az内所有数据只有pod数据 完整vinterface
+	azToPlatformDataOnlyPod DomainPlatformData
 }
 
 func newDomainToPlatformData() *DomainToPlatformData {
@@ -36,6 +44,8 @@ func newDomainToPlatformData() *DomainToPlatformData {
 		domainToAllPlatformData:       make(DomainPlatformData),
 		domainToPlatformDataExceptPod: make(DomainPlatformData),
 		domainToPlatformDataOnlyPod:   make(DomainPlatformData),
+		regionToPlatformDataOnlyPod:   make(DomainPlatformData),
+		azToPlatformDataOnlyPod:       make(DomainPlatformData),
 	}
 }
 
@@ -99,4 +109,28 @@ func (d *DomainToPlatformData) GetDomainToPlatformDataExceptPod() DomainPlatform
 
 func (d *DomainToPlatformData) GetDomainToPlatformDataOnlyPod() DomainPlatformData {
 	return d.domainToPlatformDataOnlyPod
+}
+
+func (d *DomainToPlatformData) GetRegionToPlatformDataOnlyPod() DomainPlatformData {
+	return d.regionToPlatformDataOnlyPod
+}
+
+func (d *DomainToPlatformData) updateRegionToPlatformDataOnlyPod(data DomainPlatformData) {
+	d.regionToPlatformDataOnlyPod = data
+}
+
+func (d *DomainToPlatformData) GetAllCompletePlatformDataExceptPod() *PlatformData {
+	return d.allCompletePlatformDataExceptPod
+}
+
+func (d *DomainToPlatformData) updateAllCompletePlatformDataExceptPod(data *PlatformData) {
+	d.allCompletePlatformDataExceptPod = data
+}
+
+func (d *DomainToPlatformData) GetAZToPlatformDataOnlyPod() DomainPlatformData {
+	return d.azToPlatformDataOnlyPod
+}
+
+func (d *DomainToPlatformData) updateAZToPlatformDataOnlyPod(data DomainPlatformData) {
+	d.azToPlatformDataOnlyPod = data
 }
