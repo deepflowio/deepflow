@@ -496,3 +496,8 @@ const (
 	TAP_TYPE_CHANGED      = "tap_type"
 	SERVICE_CHANGED       = "service"
 )
+
+const (
+	BILLING_METHOD_LICENSE = "license"
+	BILLING_METHOD_VOUCHER = "voucher"
+)

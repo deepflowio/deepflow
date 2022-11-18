@@ -22,6 +22,8 @@ controller:
   # No data from user databases is ever transmitted.
   # Change this option to true to disable reporting.
   reporting-disabled: false
+  # Deepflow billing mode  license/voucher
+  billing-method: license
 
   # deepflow web service config
   df-web-service:
