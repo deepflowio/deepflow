@@ -1,6 +1,6 @@
 # 1. Data Collection
 
-## 1.1. overview
+## 1.1. Overview
 
 ```mermaid
 flowchart LR
@@ -45,9 +45,9 @@ subgraph deepflow-server.ingester
 end
 
 Kernel -->|cBPF/AF_PACKET| Dispatcher
-Dispatcher --> agent.queue.1 -->|Document| UniformSender.1 -->|"tcp(pb)"| roze.decoder -->|Document| ingester.queue.1 --> roze.dbwriter
-Dispatcher --> agent.queue.2 -->|TaggedFlow| UniformSender.2 -->|"tcp(pb)"| stream.decoder.1 -->|FlowLogger| ingester.queue.2 --> stream.dbwriter
-Dispatcher --> agent.queue.3 -->|AppProtoLogsData| UniformSender.3 -->|"tcp(pb)"| stream.decoder.2 -->|L7Logger| ingester.queue.2
+Dispatcher --> agent.queue.1 -->|Metrics| UniformSender.1 -->|"tcp(pb)"| roze.decoder -->|Document| ingester.queue.1 --> roze.dbwriter
+Dispatcher --> agent.queue.2 -->|L4FlowLog| UniformSender.2 -->|"tcp(pb)"| stream.decoder.1 -->|FlowLogger| ingester.queue.2 --> stream.dbwriter
+Dispatcher --> agent.queue.3 -->|L7FlowLog| UniformSender.3 -->|"tcp(pb)"| stream.decoder.2 -->|L7Logger| ingester.queue.2
 
 Kernel -->|eBPF| EbpfCollector
 EbpfCollector --> agent.queue.3
@@ -80,20 +80,20 @@ FlowGenerator -->|"TaggedFlow (1s)"| queue.1([queue])
 queue.1 --> QuadrupleGenerator
 QuadrupleGenerator --> SubQuadGen.1["SubQuadGen (1s)"]
 SubQuadGen.1 -->|"AccumulatedFlow (1s)"| QuadrupleStash.1[("QuadrupleStash (1s)")]
-SubQuadGen.1 -->|"AccumulatedFlow (1s)"| ConcurrentConnection.1[("ConcurrentConnection (1s)")]
-SubQuadGen.1 -->|"AccumulatedFlow (1s)"| queue.2([queue]) --> Collector.1[Collector] -->|Document| queue.3([queue]) --> UniformSender.1[UniformSender]
+SubQuadGen.1 -->|QuadrupleConnections| ConcurrentConnection.1[("ConcurrentConnection (1s)")]
+SubQuadGen.1 -->|"AccumulatedFlow (1s)"| queue.2([queue]) --> Collector.1[Collector] -->|"Metrics(Document)"| queue.3([queue]) --> UniformSender.1[UniformSender]
 QuadrupleGenerator --> SubQuadGen.2["SubQuadGen (1m)"]
 SubQuadGen.2 -->|"AccumulatedFlow (1s)"| QuadrupleStash.2[("QuadrupleStash (1m)")]
-SubQuadGen.2 -->|"AccumulatedFlow (1s)"| ConcurrentConnection.2[("ConcurrentConnection (1m)")]
-SubQuadGen.2 -->|"AccumulatedFlow (1m)"| queue.4([queue]) --> Collector.2[Collector] -->|Document| queue.5([queue]) --> UniformSender.1
-QuadrupleGenerator --> queue.6([queue]) --> FlowAggr -->|"TaggedFlow (1m)"| throttler --> queue.7([queue]) --> UniformSender.2[UniformSender]
+SubQuadGen.2 -->|QuadrupleConnections| ConcurrentConnection.2[("ConcurrentConnection (1m)")]
+SubQuadGen.2 -->|"AccumulatedFlow (1m)"| queue.4([queue]) --> Collector.2[Collector] -->|"Metrics(Document)"| queue.5([queue]) --> UniformSender.1
+QuadrupleGenerator --> queue.6([queue]) --> FlowAggr -->|"TaggedFlow (1m)"| throttler -->|"L4FlowLog(TaggedFlow)"| queue.7([queue]) --> UniformSender.2[UniformSender]
 
-FlowGenerator -->|MetaAppProto| queue.8([queue]) --> AppProtoLogsParser -->|AppProtoLogsData| throttler.1[throttler] --> queue.9([queue]) --> UniformSender.3[UniformSender]
+FlowGenerator -->|MetaAppProto| queue.8([queue]) --> AppProtoLogsParser -->|AppProtoLogsData| throttler.1[throttler] -->|"L7FlowLog(AppProtoLogsData)"| queue.9([queue]) --> UniformSender.3[UniformSender]
 
-EbpfCollector -->|MetaPacket| queue.10([queue]) --> EbpfRunner -->|AppProtoLogsData| SessionAggr -->|AppProtoLogsData| throttler.2[throttler] --> queue.9
+EbpfCollector -->|MetaPacket| queue.10([queue]) --> EbpfRunner -->|AppProtoLogsData| SessionAggr --> throttler.2[throttler] -->|"L7FlowLog(AppProtoLogsData)"| queue.9
 ```
 
-## 1.3. In deepflow-server.ingester.xxx.decoder
+## 1.3. Decoders In deepflow-server.ingester
 
 ```mermaid
 flowchart TD
