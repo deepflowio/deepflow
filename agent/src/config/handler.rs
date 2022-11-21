@@ -1583,15 +1583,6 @@ impl ConfigHandler {
                     new_config.platform.kubernetes_api_enabled
                 );
             }
-            if candidate_config.platform.kubernetes_cluster_id
-                != new_config.platform.kubernetes_cluster_id
-            {
-                info!(
-                    "kubernetes_cluster_id set to {}",
-                    new_config.platform.kubernetes_cluster_id
-                );
-            }
-
             info!(
                 "platform config change from {:#?} to {:#?}",
                 candidate_config.platform, new_config.platform

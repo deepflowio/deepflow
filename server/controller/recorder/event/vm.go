@@ -93,11 +93,12 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 	var description string
 	if diffBase.LaunchServer != cloudItem.LaunchServer {
 		eType = eventapi.RESOURCE_EVENT_TYPE_MIGRATE
-		description = fmt.Sprintf("%s,%s", diffBase.LaunchServer, cloudItem.LaunchServer)
+		description = fmt.Sprintf(DESCMigrateFormat, cloudItem.Name, diffBase.LaunchServer, cloudItem.LaunchServer)
 	}
 	if diffBase.State != cloudItem.State {
 		eType = eventapi.RESOURCE_EVENT_TYPE_UPDATE_STATE
-		description = fmt.Sprintf("%s,%s", VMStateToString[diffBase.State], VMStateToString[cloudItem.State])
+		description = fmt.Sprintf(DESCStateChangeFormat, cloudItem.Name,
+			VMStateToString[diffBase.State], VMStateToString[cloudItem.State])
 	}
 
 	nIDs, ips := v.getIPNetworksByID(id)
