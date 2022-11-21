@@ -18,6 +18,7 @@ package common
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,6 +28,15 @@ import (
 
 	"github.com/bitly/go-simplejson"
 )
+
+func GetUnverifyHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+}
 
 func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
 	log.Infof("url: %s", url)
@@ -41,7 +51,7 @@ func RequestGet(url, token string) (jsonResp *simplejson.Json, err error) {
 	req.Header.Set("Accept", "application/json, text/plain")
 
 	// TODO: 通过配置文件获取API超时时间
-	client := &http.Client{Timeout: time.Second * 60}
+	client := GetUnverifyHTTPClient(time.Second * 60)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Errorf("request failed: %s", err.Error())
@@ -79,7 +89,7 @@ func RequestPost(url string, body map[string]interface{}) (jsonResp *simplejson.
 	req.Header.Set("content-type", "application/json")
 
 	// TODO: 通过配置文件获取API超时时间
-	client := &http.Client{Timeout: time.Second * 60}
+	client := GetUnverifyHTTPClient(time.Second * 60)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Errorf("request failed: %s", err.Error())
