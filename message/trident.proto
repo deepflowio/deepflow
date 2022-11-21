@@ -90,6 +90,7 @@ message SyncRequest {
     optional TsdbReportInfo tsdb_report_info = 43; // 仅对数据节点有意义
 
     optional string kubernetes_cluster_id = 45; // 仅对容器类型的采集器有意义
+    optional string kubernetes_cluster_name = 46; // 仅对容器类型的采集器有意义
 }
 
 enum Status {
@@ -570,6 +571,7 @@ message KubernetesAPISyncResponse {
 
 message KubernetesClusterIDRequest {
     optional string ca_md5 = 1; // md5 of /run/secrets/[kubernetes.io/serviceaccount/ca.crt
+    optional string kubernetes_cluster_name = 46; // get that from deepflow-agent.yaml 
 }
 
 message KubernetesClusterIDResponse {

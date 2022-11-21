@@ -48,7 +48,7 @@ use crate::common::policy::Acl;
 use crate::common::policy::{Cidr, IpGroupData, PeerConnection};
 use crate::common::NORMAL_EXIT_WITH_RESTART;
 use crate::common::{FlowAclListener, PlatformData as VInterface, DEFAULT_CONTROLLER_PORT};
-use crate::config::{Config, RuntimeConfig};
+use crate::config::RuntimeConfig;
 use crate::exception::ExceptionHandler;
 use crate::proto::common::TridentType;
 use crate::proto::trident::{self as tp, Exception, TapMode};
@@ -74,6 +74,8 @@ pub struct StaticConfig {
     pub controller_ip: String,
 
     pub env: RuntimeEnvironment,
+    pub kubernetes_cluster_id: String,
+    pub kubernetes_cluster_name: Option<String>,
 }
 
 const EMPTY_VERSION_INFO: &'static trident::VersionInfo = &trident::VersionInfo {
@@ -95,6 +97,8 @@ impl Default for StaticConfig {
             vtap_group_id_request: Default::default(),
             controller_ip: Default::default(),
             env: Default::default(),
+            kubernetes_cluster_id: Default::default(),
+            kubernetes_cluster_name: Default::default(),
         }
     }
 }
@@ -102,7 +106,6 @@ impl Default for StaticConfig {
 pub struct RunningConfig {
     pub ctrl_mac: String,
     pub ctrl_ip: String,
-    pub kubernetes_cluster_id: String,
 }
 
 impl Default for RunningConfig {
@@ -110,7 +113,6 @@ impl Default for RunningConfig {
         Self {
             ctrl_ip: Default::default(),
             ctrl_mac: Default::default(),
-            kubernetes_cluster_id: Default::default(),
         }
     }
 }
@@ -415,6 +417,7 @@ impl Synchronizer {
         controller_ip: String,
         vtap_group_id_request: String,
         kubernetes_cluster_id: String,
+        kubernetes_cluster_name: Option<String>,
         exception_handler: ExceptionHandler,
         agent_mode: RunningMode,
         standalone_runtime_config: Option<PathBuf>,
@@ -427,12 +430,10 @@ impl Synchronizer {
                 vtap_group_id_request,
                 controller_ip,
                 env: RuntimeEnvironment::new(),
-            }),
-            running_config: Arc::new(RwLock::new(RunningConfig {
-                ctrl_mac,
-                ctrl_ip,
                 kubernetes_cluster_id,
-            })),
+                kubernetes_cluster_name,
+            }),
+            running_config: Arc::new(RwLock::new(RunningConfig { ctrl_mac, ctrl_ip })),
             trident_state,
             status: Default::default(),
             session,
@@ -550,7 +551,8 @@ impl Synchronizer {
             os: Some(static_config.env.os.clone()),
             kernel_version: Some(static_config.env.kernel_version.clone()),
             vtap_group_id_request: Some(static_config.vtap_group_id_request.clone()),
-            kubernetes_cluster_id: Some(running_config.kubernetes_cluster_id.clone()),
+            kubernetes_cluster_id: Some(static_config.kubernetes_cluster_id.clone()),
+            kubernetes_cluster_name: static_config.kubernetes_cluster_name.clone(),
 
             ..Default::default()
         }
@@ -618,7 +620,7 @@ impl Synchronizer {
         return (segments, macs);
     }
 
-    async fn on_response(
+    fn on_response(
         remote: &IpAddr,
         mut resp: tp::SyncResponse,
         trident_state: &TridentState,
@@ -628,12 +630,9 @@ impl Synchronizer {
         max_memory: &Arc<AtomicU64>,
         exception_handler: &ExceptionHandler,
         escape_tx: &UnboundedSender<Duration>,
-        running_config: &Arc<RwLock<RunningConfig>>,
-        session: &Session,
     ) {
         Self::parse_upgrade(&resp, static_config, status);
 
-        let mut kubernetes_cluster_id = None;
         match resp.status() {
             tp::Status::Failed => warn!(
                 "server (ip: {}) responded with {:?}",
@@ -641,13 +640,6 @@ impl Synchronizer {
                 tp::Status::Failed
             ),
             tp::Status::Heartbeat => return,
-            tp::Status::ClusterIdNotFound => {
-                let k8s_cluster_id = Config::async_get_k8s_cluster_id(session).await;
-                warn!("get latest kubernetes_cluster_id={}, because the old kubernetes_cluster_id {} is no longer valid",
-                    k8s_cluster_id, running_config.read().kubernetes_cluster_id);
-                kubernetes_cluster_id.replace(k8s_cluster_id.clone());
-                running_config.write().kubernetes_cluster_id = k8s_cluster_id;
-            }
             _ => (),
         }
 
@@ -733,7 +725,6 @@ impl Synchronizer {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs: macs,
-                kubernetes_cluster_id,
                 tap_types: resp.tap_types,
             });
         }
@@ -830,10 +821,7 @@ impl Synchronizer {
                         &max_memory,
                         &exception_handler,
                         &escape_tx,
-                        &running_config,
-                        &session,
-                    )
-                    .await;
+                    );
                 }
             }
         }));
@@ -1224,9 +1212,7 @@ impl Synchronizer {
                     &max_memory,
                     &exception_handler,
                     &escape_tx,
-                    &running_config,
-                    &session,
-                ).await;
+                );
                 let (new_revision, proxy_ip, proxy_port, new_sync_interval) = {
                     let status = status.read();
                     (

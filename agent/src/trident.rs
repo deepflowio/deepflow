@@ -103,7 +103,6 @@ pub struct ChangedConfig {
     pub runtime_config: RuntimeConfig,
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
-    pub kubernetes_cluster_id: Option<String>,
     pub tap_types: Vec<trident::TapType>,
 }
 
@@ -324,7 +323,8 @@ impl Trident {
             && running_in_container()
             && config.kubernetes_cluster_id.is_empty()
         {
-            config.kubernetes_cluster_id = Config::get_k8s_cluster_id(&session);
+            config.kubernetes_cluster_id =
+                Config::get_k8s_cluster_id(&session, config.kubernetes_cluster_name.as_ref());
             warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
 
@@ -345,6 +345,7 @@ impl Trident {
             config_handler.static_config.controller_ips[0].clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
+            config_handler.static_config.kubernetes_cluster_name.clone(),
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
@@ -404,7 +405,6 @@ impl Trident {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs,
-                kubernetes_cluster_id,
                 tap_types,
             } = new_state.unwrap_config();
             if let Some(old_yaml) = yaml_conf {
@@ -420,9 +420,6 @@ impl Trident {
                 }
             }
             yaml_conf = Some(runtime_config.yaml_config.clone());
-            if let Some(id) = kubernetes_cluster_id {
-                config_handler.static_config.kubernetes_cluster_id = id;
-            }
             let callbacks =
                 config_handler.on_config(runtime_config, &exception_handler, components.as_mut());
             match components.as_mut() {

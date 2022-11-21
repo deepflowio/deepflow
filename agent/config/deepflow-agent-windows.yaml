@@ -21,8 +21,14 @@ controller-ips:
 ## logfile path
 #log-file: "C:\\DeepFlow\\deepflow-agent\\log\\deepflow-agent.log"
 
-## kubernetes-cluster-id，在对接kubernetes/openshift时需要配置
-# kubernetes-cluster-id:
+## When running in the K8s environment, if this value is empty, 
+## deepflow-agent requests deepflow-server through the MD5 of the CA file of the K8s cluster to get k8s-cluster-id. 
+## You can also manually fill in an existing k8s-cluster-id in deepflow-server.
+#kubernetes-cluster-id:
+
+## When running in the K8s environment, if this is configured, deepflow-agent will carry this name when
+## requesting to get k8s-cluster-id, and deepflow-server will use this name to mark the K8s cluster.
+#kubernetes-cluster-name:
 
 ## 支持采集器自动加入组
 #vtap-group-id-request: ""
