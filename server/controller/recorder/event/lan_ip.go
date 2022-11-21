@@ -86,7 +86,7 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 				RESOURCE_TYPE_VINTERFACE_EN, item.VInterfaceID, RESOURCE_TYPE_LAN_IP_EN)
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
-			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, item.IP)),
+			eventapi.TagDescription(fmt.Sprintf(DESCAddIPFormat, deviceName, item.IP, networkName)),
 			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
 			eventapi.TagIPs([]string{item.IP}),
 		}...)
@@ -159,7 +159,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 			deviceName,
 			deviceType,
 			deviceID,
-			eventapi.TagDescription(fmt.Sprintf("%s-%s", networkName, ip)),
+			eventapi.TagDescription(fmt.Sprintf(DESCRemoveIPFormat, deviceName, ip, networkName)),
 			eventapi.TagSubnetIDs([]uint32{uint32(networkID)}),
 			eventapi.TagIPs([]string{ip}),
 		)
