@@ -88,8 +88,9 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				label = "daemonset" + namespace + ":" + name
 			case 3:
 				replicas = 0
-				if metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString() != "serverless" {
-					log.Debugf("sci pod (%s) abstract pod group not found provicer cluster type,", name)
+				providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
+				if providerType != "serverless" && providerType != "proprietary" {
+					log.Debugf("sci pod (%s) type (%s) not support", name, providerType)
 					continue
 				}
 				abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
@@ -115,6 +116,7 @@ func (k *KubernetesGather) getPodGroups() (podGroups []model.PodGroup, err error
 				typeName := strings.ToLower(abstractPGType)
 				serviceType = pgNameToTypeID[typeName]
 				label = typeName + ":" + namespace + ":" + abstractPGName
+				name = abstractPGName
 			}
 
 			_, ok = k.nsLabelToGroupLcuuids[namespace+label]
