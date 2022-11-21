@@ -48,6 +48,8 @@ use crate::pcap::WorkerManager;
 use crate::platform::ApiWatcher;
 #[cfg(target_os = "linux")]
 use crate::utils::cgroups::Cgroups;
+#[cfg(target_os = "linux")]
+use crate::utils::environment::core_file_check;
 use crate::{
     collector::Collector,
     collector::{
@@ -859,6 +861,8 @@ impl Components {
         stats_sender.start();
 
         trident_process_check();
+        #[cfg(target_os = "linux")]
+        core_file_check();
         controller_ip_check(&static_config.controller_ips);
         check(free_space_checker(
             &static_config.log_file,
