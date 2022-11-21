@@ -16,7 +16,6 @@
 
 use std::{
     collections::HashMap,
-    ops::Add,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -24,9 +23,7 @@ use std::{
     time::Duration,
 };
 
-#[cfg(windows)]
-use log::warn;
-use log::{debug, info};
+use log::{debug, info, warn};
 
 #[cfg(windows)]
 use super::TapTypeHandler;
@@ -57,6 +54,8 @@ use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
 use public::packet::Packet;
 use public::utils::net::{Link, MacAddr};
+
+const IF_INDEX_MAX_SIZE: usize = 1000;
 
 #[derive(Clone)]
 pub struct MirrorModeDispatcherListener {
@@ -177,7 +176,11 @@ impl MirrorModeDispatcherListener {
 
 pub(super) struct MirrorPipeline {
     handlers: Vec<PacketHandler>,
-    timestamp: Duration,
+}
+
+pub(super) struct LastTimestamps {
+    if_index: isize,
+    last_timestamp: Duration,
 }
 
 pub(super) struct MirrorModeDispatcher {
@@ -192,6 +195,7 @@ pub(super) struct MirrorModeDispatcher {
     pub(super) updated: Arc<AtomicBool>,
     pub(super) trident_type: Arc<Mutex<TridentType>>,
     pub(super) mac: u32,
+    pub(super) last_timestamp_array: Vec<LastTimestamps>,
 }
 
 impl MirrorModeDispatcher {
@@ -244,7 +248,6 @@ impl MirrorModeDispatcher {
         key: u32,
         id: usize,
         handler_builder: &Arc<Mutex<Vec<PacketHandlerBuilder>>>,
-        timestamp: Duration,
     ) -> &'a mut MirrorPipeline {
         if updated.load(Ordering::Relaxed) {
             pipelines.clear();
@@ -260,10 +263,7 @@ impl MirrorModeDispatcher {
                     .iter()
                     .map(|b| b.build_with(id, 0, MacAddr::try_from(key as u64).unwrap()))
                     .collect();
-                let value = MirrorPipeline {
-                    handlers,
-                    timestamp,
-                };
+                let value = MirrorPipeline { handlers };
                 pipelines.insert(key, value);
 
                 pipelines.get_mut(&key).unwrap()
@@ -306,7 +306,7 @@ impl MirrorModeDispatcher {
         src_local: bool,
         dst_local: bool,
         overlay_packet: &[u8],
-        mut timestamp: Duration,
+        timestamp: Duration,
         original_length: usize,
         updated: &Arc<AtomicBool>,
         pipelines: &mut HashMap<u32, MirrorPipeline>,
@@ -318,20 +318,7 @@ impl MirrorModeDispatcher {
         mac: u32,
         npb_dedup: bool,
     ) -> Result<()> {
-        let pipeline = Self::get_pipeline(updated, pipelines, key, id, handler_builder, timestamp);
-        if timestamp
-            .add(Duration::from_millis(1))
-            .lt(&pipeline.timestamp)
-        {
-            // FIXME: just in case
-            counter.retired.fetch_add(1, Ordering::Relaxed);
-            return Err(Error::PacketInvalid(
-                "packet timestamp lt pipeline timestamp".to_string(),
-            ));
-        } else if timestamp.lt(&pipeline.timestamp) {
-            timestamp = pipeline.timestamp;
-        }
-        pipeline.timestamp = timestamp;
+        let pipeline = Self::get_pipeline(updated, pipelines, key, id, handler_builder);
 
         let mut meta_packet = Self::get_meta_packet(
             timestamp,
@@ -400,9 +387,19 @@ impl MirrorModeDispatcher {
                 continue;
             }
             #[cfg(target_os = "linux")]
-            let (packet, timestamp) = recved.unwrap();
+            let (packet, mut timestamp) = recved.unwrap();
             #[cfg(target_os = "windows")]
-            let (mut packet, timestamp) = recved.unwrap();
+            let (mut packet, mut timestamp) = recved.unwrap();
+
+            match Self::swap_last_timestamp(
+                &mut self.last_timestamp_array,
+                &self.base.counter,
+                packet.if_index,
+                timestamp,
+            ) {
+                Ok(last_timestamp) => timestamp = last_timestamp,
+                Err(_) => continue,
+            }
 
             self.base.counter.rx.fetch_add(1, Ordering::Relaxed);
             self.base
@@ -514,6 +511,7 @@ impl MirrorModeDispatcher {
 
         self.pipelines.clear();
         self.base.terminate_handler();
+        self.last_timestamp_array.clear();
         info!("Stopped dispatcher {}", self.base.log_id);
     }
 
@@ -533,6 +531,36 @@ impl MirrorModeDispatcher {
         }
 
         BaseDispatcher::prepare_flow(meta_packet, TapType::Cloud, false, queue_hash, npb_dedup)
+    }
+
+    // Ensure that the packets' timestamp obtained by each if_index are incremented in chronological order, otherwise correct them
+    fn swap_last_timestamp(
+        last_timestamp_array: &mut Vec<LastTimestamps>,
+        counter: &Arc<PacketCounter>,
+        if_index: isize,
+        timestamp: Duration,
+    ) -> Result<Duration> {
+        for i in last_timestamp_array.iter_mut() {
+            if if_index == i.if_index {
+                if timestamp + Duration::from_millis(1) < i.last_timestamp {
+                    // FIXME: just in case
+                    counter.retired.fetch_add(1, Ordering::Relaxed);
+                    return Err(Error::PacketInvalid("invalid timestamp".to_string()));
+                } else if i.last_timestamp < timestamp {
+                    i.last_timestamp = timestamp;
+                }
+                return Ok(i.last_timestamp);
+            }
+        }
+        if last_timestamp_array.len() > IF_INDEX_MAX_SIZE {
+            last_timestamp_array.clear();
+            warn!("too many if_indexes");
+        }
+        last_timestamp_array.push(LastTimestamps {
+            if_index,
+            last_timestamp: timestamp,
+        });
+        Ok(timestamp)
     }
 }
 
