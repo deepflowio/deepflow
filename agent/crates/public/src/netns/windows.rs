@@ -14,10 +14,20 @@
  * limitations under the License.
  */
 
+use std::fmt;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum NsFile {
     #[default]
     Root,
+}
+
+impl fmt::Display for NsFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Root => write!(f, ""),
+        }
+    }
 }
 
 #[derive(Default)]
