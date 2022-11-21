@@ -69,6 +69,7 @@ pub struct Config {
     pub controller_cert_file_prefix: String,
     pub log_file: String,
     pub kubernetes_cluster_id: String,
+    pub kubernetes_cluster_name: Option<String>,
     pub vtap_group_id_request: String,
     pub controller_domain_name: Vec<String>,
     #[serde(skip)]
@@ -108,7 +109,10 @@ impl Config {
         }
     }
 
-    pub async fn async_get_k8s_cluster_id(session: &Session) -> String {
+    pub async fn async_get_k8s_cluster_id(
+        session: &Session,
+        kubernetes_cluster_name: Option<&String>,
+    ) -> String {
         let ca_md5 = loop {
             match fs::read_to_string(K8S_CA_CRT_PATH) {
                 Ok(c) => {
@@ -131,6 +135,7 @@ impl Config {
         loop {
             let request = KubernetesClusterIdRequest {
                 ca_md5: ca_md5.clone(),
+                kubernetes_cluster_name: kubernetes_cluster_name.map(Clone::clone),
             };
 
             match session
@@ -180,9 +185,15 @@ impl Config {
     // If agent is running in container and the kubernetes-cluster-id in the
     // ConfigMap is empty, Call GetKubernetesClusterID RPC to get the cluster-id, if the RPC call fails, call it again
     // after 1 minute of sleep until it succeeds
-    pub fn get_k8s_cluster_id(session: &Session) -> String {
+    pub fn get_k8s_cluster_id(
+        session: &Session,
+        kubernetes_cluster_name: Option<&String>,
+    ) -> String {
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
-        runtime.block_on(Self::async_get_k8s_cluster_id(session))
+        runtime.block_on(Self::async_get_k8s_cluster_id(
+            session,
+            kubernetes_cluster_name,
+        ))
     }
 }
 
@@ -195,6 +206,7 @@ impl Default for Config {
             controller_cert_file_prefix: "".into(),
             log_file: DEFAULT_LOG_FILE.into(),
             kubernetes_cluster_id: "".into(),
+            kubernetes_cluster_name: Default::default(),
             vtap_group_id_request: "".into(),
             controller_domain_name: vec![],
             agent_mode: Default::default(),
