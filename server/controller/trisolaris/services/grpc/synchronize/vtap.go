@@ -257,10 +257,7 @@ func getRealRevision(revision string) string {
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	if in.GetKubernetesClusterId() != "" {
 		gKubernetesInfo := trisolaris.GetGKubernetesInfo()
-		if !gKubernetesInfo.CheckDomainSubDomainByClusterID(in.GetKubernetesClusterId()) {
-			log.Warningf("domain (kubernetes_cluster_id: %s) not found in cache", in.GetKubernetesClusterId())
-			return &api.SyncResponse{Status: &CLUSTER_ID_NOT_FOUND}, nil
-		}
+		gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
 	}
 
 	gVTapInfo := trisolaris.GetGVTapInfo()

@@ -17,6 +17,8 @@
 package kubernetes
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -24,6 +26,7 @@ import (
 	"gorm.io/gorm"
 
 	. "github.com/deepflowys/deepflow/server/controller/common"
+	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	models "github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/model"
 	"github.com/deepflowys/deepflow/server/controller/service"
@@ -78,7 +81,19 @@ func (k *KubernetesInfo) refresh() {
 	return
 }
 
-func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool {
+func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(clusterID, clusterName string) {
+	ok, err := k.CheckClusterID(clusterID)
+	if err != nil {
+		log.Errorf("check cluster_id failed: %s", err)
+		return
+	}
+	if !ok {
+		k.CacheClusterID(clusterID, clusterName)
+	}
+	return
+}
+
+func (k *KubernetesInfo) CheckClusterID(clusterID string) (bool, error) {
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 	_, dok := k.clusterIDToDomain[clusterID]
@@ -86,29 +101,31 @@ func (k *KubernetesInfo) CheckDomainSubDomainByClusterID(clusterID string) bool 
 	ok := dok || sdok
 	if !ok {
 		log.Warningf("cluster_id: %s not found in cache, domain map: %v, sub_domain map: %v", clusterID, k.clusterIDToDomain, k.clusterIDToSubDomain)
-		var count int64
-		dResult := k.db.Model(&models.Domain{}).Where("cluster_id = ?", clusterID).Count(&count)
+		var domain mysql.Domain
+		dResult := k.db.Where("cluster_id = ?", clusterID).Find(&domain)
+		if dResult.RowsAffected > 0 {
+			k.clusterIDToDomain[clusterID] = domain.Lcuuid
+			return true, nil
+		}
 		if dResult.Error != nil {
-			log.Errorf("query domain from db failed: %s", dResult.Error.Error())
-			return true
+			return false, errors.New(fmt.Sprintf("query domain from db failed: %s", dResult.Error.Error()))
 		}
-		if count > 0 {
-			return true
+
+		var subDomain mysql.SubDomain
+		sdResult := k.db.Where("cluster_id = ?", clusterID).Find(&subDomain)
+		if sdResult.RowsAffected > 0 {
+			k.clusterIDToSubDomain[clusterID] = subDomain.Lcuuid
+			return true, nil
 		}
-		sdResult := k.db.Model(&models.SubDomain{}).Where("cluster_id = ?", clusterID).Count(&count)
 		if sdResult.Error != nil {
-			log.Errorf("query sub_domain from db failed: %s", sdResult.Error.Error())
-			return true
-		}
-		if count > 0 {
-			return true
+			return false, errors.New(fmt.Sprintf("query sub_domain from db failed: %s", sdResult.Error.Error()))
 		}
 		log.Warningf("cluster_id: %s not found in db", clusterID)
 	}
-	return ok
+	return ok, nil
 }
 
-func (k *KubernetesInfo) CacheClusterID(clusterID string) {
+func (k *KubernetesInfo) CacheClusterID(clusterID, clusterName string) {
 	log.Infof("start cache cluster_id: %s", clusterID)
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
@@ -118,7 +135,7 @@ func (k *KubernetesInfo) CacheClusterID(clusterID string) {
 		log.Infof("cache cluster_id (%s)", clusterID)
 		go func() {
 			for k.clusterIDToDomain[clusterID] == "" {
-				domainLcuuid, err := k.createDomain(clusterID)
+				domainLcuuid, err := k.createDomain(clusterID, clusterName)
 				if err != nil {
 					log.Errorf("auto create domain failed: %s, try again after 3s", err.Error())
 					time.Sleep(time.Second * 3)
@@ -131,7 +148,7 @@ func (k *KubernetesInfo) CacheClusterID(clusterID string) {
 	return
 }
 
-func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, err error) {
+func (k *KubernetesInfo) createDomain(clusterID, clusterName string) (domainLcuuid string, err error) {
 	log.Infof("auto create domain (cluster_id: %s)", clusterID)
 	azConMgr := dbmgr.DBMgr[models.AZControllerConnection](k.db)
 	azConn, err := azConMgr.GetFromControllerIP(k.cfg.NodeIP)
@@ -147,8 +164,14 @@ func (k *KubernetesInfo) createDomain(clusterID string) (domainLcuuid string, er
 		"region_uuid":                azConn.Region,
 		"vtap_id":                    "",
 	}
+	var name string
+	if clusterName != "" {
+		name = clusterName
+	} else {
+		name = "k8s-" + clusterID
+	}
 	domainCreate := model.DomainCreate{
-		Name:                "k8s-" + clusterID,
+		Name:                name,
 		Type:                KUBERNETES,
 		KubernetesClusterID: clusterID,
 		ControllerIP:        k.cfg.NodeIP,
