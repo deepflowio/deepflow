@@ -841,6 +841,7 @@ impl DispatcherBuilder {
                         .ok_or(Error::ConfigIncomplete("no trident_type".into()))?,
                 )),
                 mac: get_mac_by_name(src_interface),
+                last_timestamp_array: vec![],
             }),
             TapMode::Analyzer => {
                 #[cfg(target_os = "linux")]

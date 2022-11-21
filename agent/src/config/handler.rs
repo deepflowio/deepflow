@@ -1145,8 +1145,10 @@ impl ConfigHandler {
                 }
             }
 
+            // TODO should support tap-interface-regex on linux
             #[cfg(target_os = "windows")]
-            if candidate_config.tap_mode == TapMode::Local
+            if (candidate_config.tap_mode == TapMode::Local
+                || candidate_config.tap_mode == TapMode::Mirror)
                 && candidate_config.dispatcher.tap_interface_regex
                     != new_config.dispatcher.tap_interface_regex
             {
