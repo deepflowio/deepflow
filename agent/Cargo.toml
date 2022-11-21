@@ -20,6 +20,7 @@ chrono = "0.4"
 clap = { version = "3.2.8", features = ["derive"] }
 dashmap = "5.3.3"
 dns-lookup = "1.0.8"
+elf = "0.4.0"
 enum_dispatch = "0.3.7"
 flate2 = "1.0.23"
 # the feature flag fixes the following problem:
