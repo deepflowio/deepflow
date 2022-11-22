@@ -146,6 +146,7 @@ type PlatformInfoTable struct {
 	versionGroups        uint64
 	serviceLabeler       *GroupLabeler
 	serviceLabelerLogger *logger.PrefixLogger
+	serviceLabelerLruCap int
 	services             []api.GroupIDMap
 
 	podNameInfos map[string][]*PodInfo
@@ -279,7 +280,7 @@ func (t *PlatformInfoTable) QueryIPV6InfosPair(epcID0 int32, ipv60 net.IP, epcID
 	return
 }
 
-func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize int, moduleName, pcapDataPath, nodeIP string, receiver *receiver.Receiver) *PlatformInfoTable {
+func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize, serviceLabelerLruCap int, moduleName, pcapDataPath, nodeIP string, receiver *receiver.Receiver) *PlatformInfoTable {
 	table := &PlatformInfoTable{
 		receiver:             receiver,
 		bootTime:             uint32(time.Now().Unix()),
@@ -298,6 +299,7 @@ func NewPlatformInfoTable(ips []net.IP, port, rpcMaxMsgSize int, moduleName, pca
 		runtimeEnv:           utils.GetRuntimeEnv(),
 		pcapDataMountPath:    utils.Mountpoint(pcapDataPath),
 		serviceLabelerLogger: logger.WrapWithPrefixLogger("serviceLabeler", log),
+		serviceLabelerLruCap: serviceLabelerLruCap,
 
 		podNameInfos:    make(map[string][]*PodInfo),
 		vtapIdInfos:     make(map[uint32]*VtapInfo),
@@ -814,7 +816,7 @@ func (t *PlatformInfoTable) QueryIsKeyServiceAndID(l3EpcID int32, ipv4 uint32, p
 		protocol = 0
 	}
 	// l3EpcID is in range [-2, 65533], change to int16 is safty
-	serviceIdxs := t.serviceLabeler.QueryServer(int16(l3EpcID), ipv4, 0, protocol, serverPort)
+	serviceIdxs := t.serviceLabeler.QueryService(int16(l3EpcID), ipv4, 0, protocol, serverPort)
 	for _, i := range serviceIdxs {
 		if t.services[i].ServiceID > 0 {
 			return true, t.services[i].ServiceID
@@ -832,7 +834,7 @@ func (t *PlatformInfoTable) QueryIPv6IsKeyServiceAndID(l3EpcID int32, ipv6 net.I
 		protocol = 0
 	}
 	// l3EpcID is in range [-2, 65533], change to int16 is safty
-	serviceIdxs := t.serviceLabeler.QueryServerIPv6(int16(l3EpcID), ipv6, 0, protocol, serverPort)
+	serviceIdxs := t.serviceLabeler.QueryServiceIPv6(int16(l3EpcID), ipv6, 0, protocol, serverPort)
 	for _, i := range serviceIdxs {
 		if t.services[i].ServiceID > 0 {
 			return true, t.services[i].ServiceID
@@ -886,7 +888,7 @@ func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool 
 			log.Debugf("svc protocol ignore: %+v", groupIDMapProtoIgnore)
 		}
 	}
-	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services)
+	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services, t.serviceLabelerLruCap)
 	t.services = services
 
 	return true
@@ -1468,7 +1470,7 @@ func RegisterPlatformDataCommand(ips []net.IP, port int) *cobra.Command {
 		Use:   "platformData",
 		Short: "get platformData from controller",
 		Run: func(cmd *cobra.Command, args []string) {
-			table := NewPlatformInfoTable(ips, port, 41943040, "debug", "", "", nil)
+			table := NewPlatformInfoTable(ips, port, 41943040, 1<<10, "debug", "", "", nil)
 			table.Reload()
 			fmt.Println(table)
 		},
