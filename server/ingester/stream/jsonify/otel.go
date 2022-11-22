@@ -33,8 +33,8 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
-func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable) []*L7Logger {
-	ret := []*L7Logger{}
+func OTelTracesDataToL7FlowLogs(vtapID uint16, l *v1.TracesData, platformData *grpc.PlatformInfoTable) []*L7FlowLog {
+	ret := []*L7FlowLog{}
 	for _, resourceSpan := range l.GetResourceSpans() {
 		var resAttributes []*v11.KeyValue
 		resource := resourceSpan.GetResource()
@@ -43,16 +43,16 @@ func OTelTracesDataToL7Loggers(vtapID uint16, l *v1.TracesData, platformData *gr
 		}
 		for _, scopeSpan := range resourceSpan.GetScopeSpans() {
 			for _, span := range scopeSpan.GetSpans() {
-				ret = append(ret, spanToL7Logger(vtapID, span, resAttributes, platformData))
+				ret = append(ret, spanToL7FlowLog(vtapID, span, resAttributes, platformData))
 			}
 		}
 	}
 	return ret
 }
 
-func spanToL7Logger(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) *L7Logger {
-	h := AcquireL7Logger()
-	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7LogCounter, vtapID)
+func spanToL7FlowLog(vtapID uint16, span *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) *L7FlowLog {
+	h := AcquireL7FlowLog()
+	h._id = genID(uint32(span.EndTimeUnixNano/uint64(time.Second)), &L7FlowLogCounter, vtapID)
 	h.VtapID = vtapID
 	h.FillOTel(span, resAttributes, platformData)
 	return h
@@ -141,7 +141,7 @@ func skywalkingGetParentSpanIdFromLinks(links []*v1.Span_Link) string {
 	return ""
 }
 
-func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link) {
+func (h *L7FlowLog) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue, links []*v1.Span_Link) {
 	h.IsIPv4 = true
 	sw8SegmentId := ""
 	attributeNames, attributeValues := []string{}, []string{}
@@ -301,7 +301,7 @@ func (h *L7Logger) fillAttributes(spanAttributes, resAttributes []*v11.KeyValue,
 	h.MetricsValues = metricsValues
 }
 
-func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) {
+func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformData *grpc.PlatformInfoTable) {
 	// OTel data net protocol always set to TCP
 	h.Protocol = uint8(layers.IPProtocolTCP)
 	h.Type = uint8(datatype.MSG_T_SESSION)
@@ -343,7 +343,7 @@ func (h *L7Logger) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platformD
 	h.L7Base.KnowledgeGraph.FillOTel(h, platformData)
 }
 
-func (k *KnowledgeGraph) FillOTel(l *L7Logger, platformData *grpc.PlatformInfoTable) {
+func (k *KnowledgeGraph) FillOTel(l *L7FlowLog, platformData *grpc.PlatformInfoTable) {
 	k.L3EpcID0 = platformData.QueryVtapEpc0(uint32(l.VtapID))
 	k.L3EpcID1 = platformData.QueryVtapEpc1(uint32(l.VtapID), l.IsIPv4, l.IP41, l.IP61)
 	k.fill(

@@ -239,7 +239,7 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-type L7Logger struct {
+type L7FlowLog struct {
 	pool.ReferenceCount
 	_id uint64
 
@@ -290,7 +290,7 @@ type L7Logger struct {
 	MetricsValues []float64
 }
 
-func L7LoggerColumns() []*ckdb.Column {
+func L7FlowLogColumns() []*ckdb.Column {
 	l7Columns := []*ckdb.Column{}
 	l7Columns = append(l7Columns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
 	l7Columns = append(l7Columns, L7BaseColumns()...)
@@ -332,7 +332,7 @@ func L7LoggerColumns() []*ckdb.Column {
 	return l7Columns
 }
 
-func (h *L7Logger) WriteBlock(block *ckdb.Block) error {
+func (h *L7FlowLog) WriteBlock(block *ckdb.Block) error {
 	index := 0
 	err := block.WriteUInt64(h._id)
 	if err != nil {
@@ -451,7 +451,7 @@ func base64ToHexString(str string) string {
 	return str
 }
 
-func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
+func (h *L7FlowLog) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
 	h.L7Base.Fill(l, platformData)
 
 	h.Type = uint8(l.Base.Head.MsgType)
@@ -461,11 +461,11 @@ func (h *L7Logger) Fill(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	h.ResponseStatus = datatype.STATUS_NOT_EXIST
 	h.ResponseDuration = l.Base.Head.Rrt / uint64(time.Microsecond)
 	// 协议结构统一, 不再为每个协议定义单独结构
-	h.fillL7Log(l)
+	h.fillL7FlowLog(l)
 }
 
 // requestLength,responseLength 等于 -1 会认为是没有值. responseCode=-32768 会认为没有值
-func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
+func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 	h.Version = l.Version
 	h.requestLength = int64(l.ReqLen)
 	h.responseLength = int64(l.RespLen)
@@ -539,7 +539,7 @@ func (h *L7Logger) fillL7Log(l *pb.AppProtoLogsData) {
 	}
 }
 
-func (h *L7Logger) fillExceptionDesc(l *pb.AppProtoLogsData) {
+func (h *L7FlowLog) fillExceptionDesc(l *pb.AppProtoLogsData) {
 	if h.ResponseStatus != datatype.STATUS_SERVER_ERROR && h.ResponseStatus != datatype.STATUS_CLIENT_ERROR {
 		return
 	}
@@ -567,16 +567,16 @@ func (h *L7Logger) fillExceptionDesc(l *pb.AppProtoLogsData) {
 	}
 }
 
-func (h *L7Logger) Release() {
-	ReleaseL7Logger(h)
+func (h *L7FlowLog) Release() {
+	ReleaseL7FlowLog(h)
 }
 
-func (h *L7Logger) EndTime() time.Duration {
+func (h *L7FlowLog) EndTime() time.Duration {
 	return time.Duration(h.L7Base.EndTime) * time.Microsecond
 }
 
-func (h *L7Logger) String() string {
-	return fmt.Sprintf("L7Log: %+v\n", *h)
+func (h *L7FlowLog) String() string {
+	return fmt.Sprintf("L7FlowLog: %+v\n", *h)
 }
 
 func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) {
@@ -646,37 +646,37 @@ func (k *KnowledgeGraph) FillL7(l *pb.AppProtoLogsBaseInfo, platformData *grpc.P
 	)
 }
 
-var poolL7Logger = pool.NewLockFreePool(func() interface{} {
-	return new(L7Logger)
+var poolL7FlowLog = pool.NewLockFreePool(func() interface{} {
+	return new(L7FlowLog)
 })
 
-func AcquireL7Logger() *L7Logger {
-	l := poolL7Logger.Get().(*L7Logger)
+func AcquireL7FlowLog() *L7FlowLog {
+	l := poolL7FlowLog.Get().(*L7FlowLog)
 	l.ReferenceCount.Reset()
 	return l
 }
 
-func ReleaseL7Logger(l *L7Logger) {
+func ReleaseL7FlowLog(l *L7FlowLog) {
 	if l == nil {
 		return
 	}
 	if l.SubReferenceCount() {
 		return
 	}
-	*l = L7Logger{}
-	poolL7Logger.Put(l)
+	*l = L7FlowLog{}
+	poolL7FlowLog.Put(l)
 }
 
-var L7LogCounter uint32
+var L7FlowLogCounter uint32
 
-func ProtoLogToL7Logger(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) *L7Logger {
-	h := AcquireL7Logger()
-	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7LogCounter, uint16(l.Base.VtapId))
+func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfoTable) *L7FlowLog {
+	h := AcquireL7FlowLog()
+	h._id = genID(uint32(l.Base.EndTime/uint64(time.Second)), &L7FlowLogCounter, uint16(l.Base.VtapId))
 	h.Fill(l, platformData)
 	return h
 }
 
-func L7LoggerToFlowTagInterfaces(l *L7Logger) ([]interface{}, []interface{}) {
+func L7FlowLogToFlowTagInterfaces(l *L7FlowLog) ([]interface{}, []interface{}) {
 	fields := make([]interface{}, 0, 2*len(l.AttributeNames))
 	fieldValues := make([]interface{}, 0, 2*len(l.AttributeValues))
 	time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
