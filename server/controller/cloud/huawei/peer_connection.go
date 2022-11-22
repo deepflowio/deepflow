@@ -40,21 +40,22 @@ func (h *HuaWei) getPeerConnections() ([]model.PeerConnection, error) {
 				continue
 			}
 			id := jpn.Get("id").MustString()
+			name := jpn.Get("name").MustString()
 			localTenant := jpn.Get("request_vpc_info").Get("tenant_id").MustString()
 			if localTenant == "" {
-				log.Debugf("peer_connection: %s has no local region", id)
+				log.Infof("exclude peer_connection: %s, missing local region", name)
 				continue
 			}
 			remoteTenant := jpn.Get("accept_vpc_info").Get("tenant_id").MustString()
 			if localTenant == "" {
-				log.Debugf("peer_connection: %s has no remote region", id)
+				log.Infof("exclude peer_connection: %s, missing remote region", name)
 				continue
 			}
 			pns = append(
 				pns,
 				model.PeerConnection{
 					Lcuuid:             id,
-					Name:               jpn.Get("name").MustString(),
+					Name:               name,
 					Label:              id,
 					LocalVPCLcuuid:     jpn.Get("request_vpc_info").Get("vpc_id").MustString(),
 					RemoteVPCLcuuid:    jpn.Get("accept_vpc_info").Get("vpc_id").MustString(),
