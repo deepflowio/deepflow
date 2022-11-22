@@ -54,7 +54,8 @@ func (h *HuaWei) getVMs() ([]model.VM, []model.VMSecurityGroup, []model.VInterfa
 			id := jVM.Get("id").MustString()
 			addrs := jVM.Get("addresses").MustMap()
 			if len(addrs) == 0 {
-				log.Infof("exclude vm: %s", id) // vpc info is in addresses
+				log.Infof("exclude vm: %s, missing vpc info", id) // vpc info is in addresses
+				continue
 			}
 			name := jVM.Get("name").MustString()
 			azLcuuid := h.toolDataSet.azNameToAZLcuuid[jVM.Get("OS-EXT-AZ:availability_zone").MustString()]
@@ -139,7 +140,7 @@ func (h *HuaWei) formatVInterfacesAndIPs(addrs *simplejson.Json, regionLcuuid, v
 				continue
 			}
 			if jV["OS-EXT-IPS:type"].(string) != "floating" {
-				log.Infof("exclude vinterface, not floating: %s", jV["OS-EXT-IPS:type"].(string))
+				log.Infof("exclude vinterface, not floating type: %s", jV["OS-EXT-IPS:type"].(string))
 				continue
 			}
 			mac := jV["OS-EXT-IPS-MAC:mac_addr"].(string)

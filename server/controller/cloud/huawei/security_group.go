@@ -42,11 +42,12 @@ func (h *HuaWei) getSecurityGroups() ([]model.SecurityGroup, []model.SecurityGro
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jSecurityGroups {
 			jSG := jSecurityGroups[i]
-			if !cloudcommon.CheckJsonAttributes(jSG, []string{"id", "name"}) {
-				continue
-			}
 			id := jSG.Get("id").MustString()
 			name := jSG.Get("name").MustString()
+			if !cloudcommon.CheckJsonAttributes(jSG, []string{"id", "name"}) {
+				log.Infof("exclude security_group: %s, missing attr", name)
+				continue
+			}
 			securityGroups = append(
 				securityGroups,
 				model.SecurityGroup{
@@ -73,10 +74,11 @@ func (h *HuaWei) formatSecurityGroupRules(jRules *simplejson.Json, sgLcuuid stri
 	requiredAttrs := []string{"id", "direction", "ethertype", "protocol", "port_range_max", "port_range_max", "port_range_min", "remote_group_id", "remote_ip_prefix"}
 	for i := range jRules.MustArray() {
 		jRule := jRules.GetIndex(i)
+		id := jRule.Get("id").MustString()
 		if !cloudcommon.CheckJsonAttributes(jRule, requiredAttrs) {
+			log.Infof("exclude security_group_rule: %s, missing attr", id)
 			continue
 		}
-		id := jRule.Get("id").MustString()
 		rule := model.SecurityGroupRule{
 			Lcuuid:              id,
 			SecurityGroupLcuuid: sgLcuuid,
