@@ -41,7 +41,7 @@ vtap_group_id: g-xxxxxx
 ## System Free Memory Limit
 ## Unit: %. Default: 0. Range: [0, 100]
 ## Note: The limit of the percentage of system free memory.
-##   When the free percentage is lower than 90% of this value,
+##   When the free percentage is lower than 90% \of this value,
 ##   the agent will will automatically restart.
 #sys_free_memory_limit: 0
 
