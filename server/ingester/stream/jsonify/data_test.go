@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/deepflowys/deepflow/server/ingester/stream/geo"
 	"github.com/deepflowys/deepflow/server/libs/datatype"
@@ -30,7 +29,7 @@ import (
 
 func TestJsonify(t *testing.T) {
 	geo.NewGeoTree()
-	info := FlowLogger{
+	info := L4FlowLog{
 		DataLinkLayer: DataLinkLayer{
 			VLAN: 123,
 		},
@@ -39,7 +38,7 @@ func TestJsonify(t *testing.T) {
 		},
 	}
 	b, _ := json.Marshal(info)
-	var newInfo FlowLogger
+	var newInfo L4FlowLog
 	json.Unmarshal(b, &newInfo)
 	if info.VLAN != newInfo.VLAN {
 		t.Error("string jsonify failed")
@@ -50,7 +49,7 @@ func TestJsonify(t *testing.T) {
 }
 
 func TestZeroToNull(t *testing.T) {
-	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
+	pf := grpc.NewPlatformInfoTable(nil, 0, 0, "", "", "", nil)
 	taggedFlow := pb.TaggedFlow{
 		Flow: &pb.Flow{
 			FlowKey:        &pb.FlowKey{},
@@ -60,7 +59,7 @@ func TestZeroToNull(t *testing.T) {
 		},
 	}
 
-	flow := TaggedFlowToLogger(&taggedFlow, 0, pf)
+	flow := TaggedFlowToL4FlowLog(&taggedFlow, pf)
 
 	flowByte, _ := json.Marshal(flow)
 
@@ -95,50 +94,4 @@ func TestParseUint32EpcID(t *testing.T) {
 	if r := parseUint32EpcID(uint32(id)); r != datatype.EPC_FROM_INTERNET {
 		t.Errorf("expect %v, result %v", datatype.EPC_FROM_INTERNET, r)
 	}
-}
-
-func TestProtoLogToHTTPLogger(t *testing.T) {
-	appData := &pb.AppProtoLogsData{
-		Base: &pb.AppProtoLogsBaseInfo{
-			Head: &pb.AppProtoHead{},
-		},
-	}
-	appData.Base.VtapId = 123
-	appData.Base.EndTime = uint64(10 * time.Microsecond)
-	appData.Base.Head.Proto = uint32(datatype.L7_PROTOCOL_HTTP_1)
-	appData.Http = &pb.HttpInfo{}
-
-	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
-	httpData := ProtoLogToL7Logger(appData, 0, pf).(*L7Logger)
-	if httpData.VtapID != 123 {
-		t.Errorf("expect 123, result %v", httpData.VtapID)
-	}
-	if httpData.EndTime() != 10*time.Microsecond {
-		t.Errorf("expect 10000000, result %v", httpData.EndTime())
-	}
-	httpData.String()
-	httpData.Release()
-}
-
-func TestProtoLogToDNSLogger(t *testing.T) {
-	appData := &pb.AppProtoLogsData{
-		Base: &pb.AppProtoLogsBaseInfo{
-			Head: &pb.AppProtoHead{},
-		},
-	}
-	appData.Base.TapType = 3
-	appData.Base.EndTime = uint64(10 * time.Microsecond)
-	appData.Base.Head.Proto = uint32(datatype.L7_PROTOCOL_DNS)
-	appData.Dns = &pb.DnsInfo{}
-
-	pf := grpc.NewPlatformInfoTable(nil, 0, "", "", "", nil)
-	dnsData := ProtoLogToL7Logger(appData, 0, pf).(*L7Logger)
-	if dnsData.TapType != 3 {
-		t.Errorf("expect 3, result %v", dnsData.TapType)
-	}
-	if dnsData.EndTime() != 10*time.Microsecond {
-		t.Errorf("expect 10000000, result %v", dnsData.EndTime())
-	}
-	dnsData.String()
-	dnsData.Release()
 }

@@ -228,13 +228,13 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 		log.Debugf("decoder %d vtap %d recv otel: %s", d.index, vtapID, tracesData)
 	}
 	d.counter.Count++
-	ls := jsonify.OTelTracesDataToL7Loggers(vtapID, tracesData, d.platformData)
+	ls := jsonify.OTelTracesDataToL7FlowLogs(vtapID, tracesData, d.platformData)
 	for _, l := range ls {
 		l.AddReferenceCount()
 		if !d.throttler.Send(l) {
 			d.counter.DropCount++
 		} else {
-			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7LoggerToFlowTagInterfaces(l))
+			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l))
 			l.Release()
 		}
 	}
@@ -265,7 +265,7 @@ func (d *Decoder) sendFlow(flow *pb.TaggedFlow) {
 		log.Debugf("decoder %d recv flow: %s", d.index, flow)
 	}
 	d.counter.Count++
-	l := jsonify.TaggedFlowToLogger(flow, d.platformData)
+	l := jsonify.TaggedFlowToL4FlowLog(flow, d.platformData)
 	if !d.throttler.Send(l) {
 		d.counter.Count++
 	}
@@ -278,13 +278,13 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 
 	d.counter.Count++
 	drop := int64(0)
-	l := jsonify.ProtoLogToL7Logger(proto, d.platformData)
+	l := jsonify.ProtoLogToL7FlowLog(proto, d.platformData)
 	l.AddReferenceCount()
 	if !d.throttler.Send(l) {
 		d.counter.DropCount++
 		drop = 1
 	} else {
-		d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7LoggerToFlowTagInterfaces(l))
+		d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l))
 		l.Release()
 	}
 	proto.Release()
