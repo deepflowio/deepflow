@@ -40,7 +40,7 @@ const (
 	US_TO_S_DEVISOR = 1000000 // 微秒转化为秒的除数
 )
 
-type FlowLogger struct {
+type L4FlowLog struct {
 	pool.ReferenceCount
 	_id uint64 // 用来标记全局(多节点)唯一的记录
 
@@ -1230,11 +1230,11 @@ func (m *Metrics) Fill(f *pb.Flow) {
 	}
 }
 
-func (f *FlowLogger) Release() {
-	ReleaseFlowLogger(f)
+func (f *L4FlowLog) Release() {
+	ReleaseL4FlowLog(f)
 }
 
-func FlowLoggerColumns() []*ckdb.Column {
+func L4FlowLogColumns() []*ckdb.Column {
 	columns := []*ckdb.Column{}
 	columns = append(columns, ckdb.NewColumn("_id", ckdb.UInt64).SetCodec(ckdb.CodecDoubleDelta))
 	columns = append(columns, DataLinkLayerColumns...)
@@ -1248,7 +1248,7 @@ func FlowLoggerColumns() []*ckdb.Column {
 	return columns
 }
 
-func (f *FlowLogger) WriteBlock(block *ckdb.Block) error {
+func (f *L4FlowLog) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt64(f._id); err != nil {
 		return err
 	}
@@ -1288,34 +1288,34 @@ func (f *FlowLogger) WriteBlock(block *ckdb.Block) error {
 	return nil
 }
 
-func (f *FlowLogger) EndTime() time.Duration {
+func (f *L4FlowLog) EndTime() time.Duration {
 	return time.Duration(f.FlowInfo.EndTime) * time.Second
 }
 
-func (f *FlowLogger) String() string {
+func (f *L4FlowLog) String() string {
 	return fmt.Sprintf("flow: %+v\n", *f)
 }
 
-var poolFlowLogger = pool.NewLockFreePool(func() interface{} {
-	l := new(FlowLogger)
+var poolL4FlowLog = pool.NewLockFreePool(func() interface{} {
+	l := new(L4FlowLog)
 	return l
 })
 
-func AcquireFlowLogger() *FlowLogger {
-	l := poolFlowLogger.Get().(*FlowLogger)
+func AcquireL4FlowLog() *L4FlowLog {
+	l := poolL4FlowLog.Get().(*L4FlowLog)
 	l.ReferenceCount.Reset()
 	return l
 }
 
-func ReleaseFlowLogger(l *FlowLogger) {
+func ReleaseL4FlowLog(l *L4FlowLog) {
 	if l == nil {
 		return
 	}
 	if l.SubReferenceCount() {
 		return
 	}
-	*l = FlowLogger{}
-	poolFlowLogger.Put(l)
+	*l = L4FlowLog{}
+	poolL4FlowLog.Put(l)
 }
 
 var L4FlowCounter uint32
@@ -1326,10 +1326,10 @@ func genID(time uint32, counter *uint32, vtapID uint16) uint64 {
 	return uint64(time)<<32 | ((uint64(vtapID) & 0x3fff) << 18) | (uint64(count) & 0x03ffff)
 }
 
-func TaggedFlowToLogger(f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *FlowLogger {
+func TaggedFlowToL4FlowLog(f *pb.TaggedFlow, platformData *grpc.PlatformInfoTable) *L4FlowLog {
 	isIPV6 := f.Flow.EthType == uint32(layers.EthernetTypeIPv6)
 
-	s := AcquireFlowLogger()
+	s := AcquireL4FlowLog()
 	s._id = genID(uint32(f.Flow.EndTime/uint64(time.Second)), &L4FlowCounter, uint16(f.Flow.FlowKey.VtapId))
 	s.DataLinkLayer.Fill(f.Flow)
 	s.NetworkLayer.Fill(f.Flow, isIPV6)
