@@ -38,10 +38,11 @@ func (h *HuaWei) getAZs() ([]model.AZ, error) {
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jAZs {
 			ja := jAZs[i]
+			zname := ja.Get("zoneName").MustString()
 			if !cloudcommon.CheckJsonAttributes(ja, []string{"zoneName"}) {
+				log.Infof("exclude az: %s, missing attr", zname)
 				continue
 			}
-			zname := ja.Get("zoneName").MustString()
 			lcuuid := common.GenerateUUID(zname + "_" + h.lcuuidGenerate)
 			azs = append(
 				azs,

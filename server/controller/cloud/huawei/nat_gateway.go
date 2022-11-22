@@ -201,7 +201,7 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 		}
 		fixedIP, ok := h.toolDataSet.networkLcuuidToCIDR[networkID.MustString()]
 		if !ok {
-			log.Infof("exclude nat_gateway: %s, no fixed ip", id)
+			log.Infof("exclude nat_gateway: %s, missing fixed ip", id)
 			continue
 		}
 		natGatewayID := jRule.Get("nat_gateway_id").MustString()

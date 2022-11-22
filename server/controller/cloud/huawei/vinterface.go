@@ -55,14 +55,16 @@ func (h *HuaWei) getVInterfaces() ([]model.DHCPPort, []model.VInterface, []model
 		regionLcuuid := h.projectNameToRegionLcuuid(project.name)
 		for i := range jPorts {
 			jPort := jPorts[i]
+			mac := jPort.Get("mac_address").MustString()
 			if !cloudcommon.CheckJsonAttributes(jPort, vifRequiredAttrs) {
+				log.Infof("exclude vinterface: %s, missing attr", mac)
 				continue
 			}
 			id := jPort.Get("id").MustString()
-			mac := jPort.Get("mac_address").MustString()
 			network := h.toolDataSet.lcuuidToNetwork[jPort.Get("network_id").MustString()]
 			if network.Lcuuid == "" {
-				log.Infof("exclude vinterface: %s", mac)
+				log.Infof("exclude vinterface: %s, missing network info", mac)
+				continue
 			}
 			var deviceID string
 			deviceID = jPort.Get("device_id").MustString()
