@@ -478,13 +478,18 @@ impl L7ProtocolParserInterface for HttpLog {
     }
 }
 
-fn parse_lines(payload: &[u8], limit: usize) -> Vec<&[u8]> {
+fn parse_http1_header(payload: &[u8], limit: Option<usize>) -> Vec<&[u8]> {
     let mut lines = Vec::new();
     let mut p = payload;
-    while lines.len() < limit {
+    let l = limit.unwrap_or(usize::MAX);
+    while lines.len() < l {
         let mut next_index = None;
         for (i, c) in p.iter().enumerate() {
-            if i > 2 && *c == b'\n' && p[i - 1] == b'\r' {
+            if i > 0 && *c == b'\n' && p[i - 1] == b'\r' {
+                if i == 1 {
+                    // the case of \r\n\r\n
+                    return lines;
+                }
                 lines.push(&p[0..i - 1]);
                 next_index = Some(i + 1);
                 break;
@@ -546,7 +551,7 @@ impl HttpLog {
             return false;
         }
 
-        let lines = parse_lines(payload, 1);
+        let lines = parse_http1_header(payload, Some(1));
         if lines.len() == 0 {
             // 没有/r/n认为一定不是HTTPv1
             return false;
@@ -662,7 +667,7 @@ impl HttpLog {
         if !is_http_v1_payload(payload) {
             return Err(Error::HttpHeaderParseFailed);
         }
-        let lines = parse_lines(payload, 20);
+        let lines = parse_http1_header(payload, None);
         if lines.len() == 0 {
             return Err(Error::HttpHeaderParseFailed);
         }
