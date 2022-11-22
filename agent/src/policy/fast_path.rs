@@ -22,7 +22,6 @@ use ipnet::{IpNet, Ipv4Net};
 use log::{info, warn};
 use lru::LruCache;
 
-use super::UnsafeWrapper;
 use crate::common::endpoint::{EndpointData, EndpointStore};
 use crate::common::lookup_key::LookupKey;
 use crate::common::platform_data::PlatformData as Interface;
@@ -42,10 +41,8 @@ struct PolicyTableItem {
     protocol_table: [Option<Arc<PolicyData>>; MAX_ACL_PROTOCOL + 1],
 }
 
-type InterestTable = UnsafeWrapper<Vec<PortRange>>;
-
 pub struct FastPath {
-    interest_table: InterestTable,
+    interest_table: Vec<PortRange>,
     policy_table: Vec<Option<TableLruCache>>,
 
     netmask_table: Vec<u32>,
@@ -235,11 +232,11 @@ impl FastPath {
             }
         }
 
-        self.interest_table.set(interest_table);
+        self.interest_table = interest_table;
     }
 
     fn interest_table_map(&self, key: &mut LookupKey) {
-        let table = self.interest_table.get();
+        let table = &self.interest_table;
         key.src_port = table[key.src_port as usize].min();
         key.dst_port = table[key.dst_port as usize].min();
     }
@@ -395,11 +392,9 @@ impl FastPath {
 
             netmask_table: std::iter::repeat(0).take(u16::MAX as usize + 1).collect(),
 
-            interest_table: InterestTable::from(
-                std::iter::repeat(PortRange::new(0, 0))
-                    .take(u16::MAX as usize + 1)
-                    .collect::<Vec<PortRange>>(),
-            ),
+            interest_table: std::iter::repeat(PortRange::new(0, 0))
+                .take(u16::MAX as usize + 1)
+                .collect::<Vec<PortRange>>(),
             policy_table: {
                 let mut table = Vec::new();
                 for _i in 0..MAX_FAST_PATH {
