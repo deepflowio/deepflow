@@ -282,10 +282,12 @@ func (m *U64LRU) find(key uint64, isAdd bool) (*u64LRUNode, int32) {
 					atomic.StoreUint32(&m.debugChainRead, 0)
 				}
 			}
+			m.counter.Hit++
 			return node, hashListNext
 		}
 		hashListNext = node.hashListNext
 	}
+	m.counter.Miss++
 	m.counter.totalScan += width
 	if isAdd {
 		width++
