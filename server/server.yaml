@@ -334,6 +334,9 @@ ingester:
   ## Rpc synchronization recv/send msg buffer(unit: Byte)
   #grpc-buffer-size: 41943040
 
+  ## query platformData service, port filter fastmap LRU capacity(unit: count)
+  #service-labber-lru-cap: 4194304
+
   ## ########################## droplet config ##########################################
   ## Rpc synchronization timeout default 8s
   #rpc-timeout: 8

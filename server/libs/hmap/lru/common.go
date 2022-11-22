@@ -41,6 +41,8 @@ type Counter struct {
 	Max     int `statsd:"max-bucket"` // 统计Get扫描到的最大值
 	Size    int `statsd:"size"`
 	AvgScan int `statsd:"avg-scan"` // 平均扫描次数
+	Hit     int `statsd:"hit"`
+	Miss    int `statsd:"miss"`
 
 	totalScan, scanTimes int
 }
@@ -51,6 +53,8 @@ type DoubleKeyLRUCounter struct {
 	Size           int `statsd:"size"`
 	MaxLongBucket  int `statsd:"max-long-bucket"` // 目前通过shortKey删除的含有最多的成员数值
 	AvgScan        int `statsd:"avg-scan"`        // 平均扫描次数
+	Hit            int `statsd:"hit"`
+	Miss           int `statsd:"miss"`
 
 	totalScan, scanTimes int
 }

@@ -52,6 +52,7 @@ const (
 	DefaultCKDBServicePort         = 9000
 	DefaultListenPort              = 20033
 	DefaultGrpcBufferSize          = 41943040
+	DefaultServiceLabelerLruCap    = 1 << 22
 	DefaultCKDBEndpointTCPPortName = "tcp-port"
 )
 
@@ -125,6 +126,7 @@ type Config struct {
 	Influxdb              HostPort `yaml:"influxdb"`
 	NodeIP                string   `yaml:"node-ip"`
 	GrpcBufferSize        int      `yaml:"grpc-buffer-size"`
+	ServiceLabelerLruCap  int      `yaml:"service-labeler-lru-cap"`
 	LogFile               string
 	LogLevel              string
 }
@@ -256,6 +258,10 @@ func (c *Config) Validate() error {
 		c.GrpcBufferSize = DefaultGrpcBufferSize
 	}
 
+	if c.ServiceLabelerLruCap <= 0 {
+		c.ServiceLabelerLruCap = DefaultServiceLabelerLruCap
+	}
+
 	return c.ValidateAndSetckdbColdStorages()
 }
 
@@ -316,16 +322,17 @@ func Load(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		Base: Config{
-			ControllerIPs:     []string{DefaultContrallerIP},
-			ControllerPort:    DefaultControllerPort,
-			CKDBAuth:          Auth{"default", ""},
-			StreamRozeEnabled: true,
-			UDPReadBuffer:     64 << 20,
-			TCPReadBuffer:     4 << 20,
-			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace, DefaultDFDiskPrefix},
-			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
-			ListenPort:        DefaultListenPort,
-			GrpcBufferSize:    DefaultGrpcBufferSize,
+			ControllerIPs:        []string{DefaultContrallerIP},
+			ControllerPort:       DefaultControllerPort,
+			CKDBAuth:             Auth{"default", ""},
+			StreamRozeEnabled:    true,
+			UDPReadBuffer:        64 << 20,
+			TCPReadBuffer:        4 << 20,
+			CKDiskMonitor:        CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace, DefaultDFDiskPrefix},
+			Influxdb:             HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
+			ListenPort:           DefaultListenPort,
+			GrpcBufferSize:       DefaultGrpcBufferSize,
+			ServiceLabelerLruCap: DefaultServiceLabelerLruCap,
 		},
 	}
 	if err != nil {

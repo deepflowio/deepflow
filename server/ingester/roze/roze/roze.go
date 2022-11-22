@@ -82,10 +82,10 @@ func NewRoze(cfg *config.Config, recv *receiver.Receiver) (*Roze, error) {
 	for i := 0; i < unmarshallQueueCount; i++ {
 		if i == 0 {
 			// 只第一个上报数据节点信息
-			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), cfg.Base.GrpcBufferSize, "roze", cfg.Pcap.FileDirectory, cfg.Base.NodeIP, recv)
+			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), cfg.Base.GrpcBufferSize, cfg.Base.ServiceLabelerLruCap, "roze", cfg.Pcap.FileDirectory, cfg.Base.NodeIP, recv)
 			debug.ServerRegisterSimple(CMD_PLATFORMDATA, roze.platformDatas[i])
 		} else {
-			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), cfg.Base.GrpcBufferSize, "roze-"+strconv.Itoa(i), "", cfg.Base.NodeIP, nil)
+			roze.platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(cfg.Base.ControllerPort), cfg.Base.GrpcBufferSize, cfg.Base.ServiceLabelerLruCap, "roze-"+strconv.Itoa(i), "", cfg.Base.NodeIP, nil)
 		}
 		roze.unmarshallers[i] = unmarshaller.NewUnmarshaller(i, roze.platformDatas[i], cfg.DisableSecondWrite, libqueue.QueueReader(unmarshallQueues.FixedMultiQueue[i]), roze.dbwriter)
 	}
