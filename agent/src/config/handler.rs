@@ -566,7 +566,7 @@ impl TraceType {
             TraceType::Sw6 => context == TRACE_TYPE_SW6,
             TraceType::Sw8 => context == TRACE_TYPE_SW8,
             TraceType::TraceParent => context == TRACE_TYPE_TRACE_PARENT,
-            TraceType::Customize(tag) => context == tag.as_str(),
+            TraceType::Customize(tag) => context.to_lowercase() == tag.to_lowercase(),
             _ => false,
         }
     }
