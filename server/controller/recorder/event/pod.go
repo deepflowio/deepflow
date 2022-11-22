@@ -123,7 +123,7 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 			name,
 			p.deviceType,
 			id,
-			eventapi.TagDescription(fmt.Sprintf("%s,%s", oldPodNodeName, newPodNodeName)),
+			eventapi.TagDescription(fmt.Sprintf(DESCRecreateFormat, cloudItem.Name, oldPodNodeName, newPodNodeName)),
 			eventapi.TagSubnetIDs(nIDs),
 			eventapi.TagIPs(ips),
 		)
