@@ -25,7 +25,6 @@ use log::debug;
 use lru::LruCache;
 use pnet::datalink::NetworkInterface;
 
-use super::UnsafeWrapper;
 use crate::common::decapsulate::TunnelType;
 use crate::common::enums::TapType;
 use crate::common::lookup_key::LookupKey;
@@ -109,11 +108,10 @@ impl fmt::Display for L3Item {
 }
 
 type TableLruCache = LruCache<L3Key, L3Item>;
-type VipDeviceTables = UnsafeWrapper<HashMap<u64, bool>>;
 
 pub struct Forward {
     mac_ip_tables: RwLock<TableLruCache>,
-    vip_device_tables: VipDeviceTables,
+    vip_device_tables: RwLock<HashMap<u64, bool>>,
 
     queue_count: usize,
 }
@@ -124,7 +122,7 @@ impl Forward {
         assert!(queue_count < super::MAX_QUEUE_COUNT && queue_count > 0);
         Self {
             mac_ip_tables: RwLock::new(TableLruCache::new(Self::TABLE_SIZE)),
-            vip_device_tables: VipDeviceTables::from(HashMap::new()),
+            vip_device_tables: RwLock::new(HashMap::new()),
             queue_count,
         }
     }
@@ -265,12 +263,12 @@ impl Forward {
 
         let mut vip_device_table = HashMap::new();
         self.update_vip_from_platforms(&mut vip_device_table, platforms);
-        self.vip_device_tables.set(vip_device_table);
+        *self.vip_device_tables.write().unwrap() = vip_device_table
     }
 
     fn query_vip(&self, mac: MacAddr) -> bool {
         let mac = u64::from(mac);
-        return self.vip_device_tables.get().get(&mac).is_some();
+        return self.vip_device_tables.read().unwrap().get(&mac).is_some();
     }
 
     pub fn query(&mut self, _index: usize, mac: MacAddr, ip: IpAddr, l2_end: bool) -> bool {

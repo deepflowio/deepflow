@@ -323,6 +323,9 @@ impl FlowMap {
 
                     _ => self.update_other_node(node, meta_packet, nodes),
                 };
+                if nodes.is_empty() {
+                    node_map.remove(&pkt_key);
+                }
             }
             // 未找到Flow，需要插入新的节点
             None => {
