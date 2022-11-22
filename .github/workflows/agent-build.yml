@@ -35,6 +35,9 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        
       # - name: install docker
       #   run: |
       #     sudo systemctl stop unattended-upgrades
