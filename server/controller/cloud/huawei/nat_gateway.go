@@ -197,10 +197,12 @@ func (h *HuaWei) formatSNATRules(project Project, token string) (natRules []mode
 		networkID, ok := jRule.CheckGet("network_id")
 		if !ok {
 			log.Infof("exclude nat_gateway: %s, missing network info", id)
+			continue
 		}
 		fixedIP, ok := h.toolDataSet.networkLcuuidToCIDR[networkID.MustString()]
 		if !ok {
 			log.Infof("exclude nat_gateway: %s, no fixed ip", id)
+			continue
 		}
 		natGatewayID := jRule.Get("nat_gateway_id").MustString()
 		floatingIP := jRule.Get("floating_ip_address").MustString()
