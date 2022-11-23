@@ -21,6 +21,7 @@
 #include <sys/prctl.h>
 #include <bcc/libbpf.h>
 #include <bcc/perf_reader.h>
+#include "config.h"
 #include "probe.h"
 #include "table.h"
 #include "common.h"
@@ -33,9 +34,6 @@
 
 int major, minor;		// Linux kernel主版本，次版本
 
-#define EV_NAME_SIZE  1024
-
-#define BOOT_TIME_UPDATE_PERIOD	60	// 系统启动时间更新周期, 单位：秒
 volatile uint64_t sys_boot_time_ns;	// 当前系统启动时间，单位：纳秒
 volatile uint64_t prev_sys_boot_time_ns;	// 上一次更新的系统启动时间，单位：纳秒
 uint64_t boot_time_update_count;	// 用于记录boot_time_update()调用次数。
@@ -46,6 +44,8 @@ struct cfg_feature_regex cfg_feature_regex_array[FEATURE_MAX];
 int ebpf_config_protocol_filter[PROTO_NUM];
 
 struct allow_port_bitmap allow_port_bitmap;
+
+uint64_t adapt_kern_uid; // Indicates the identifier of the adaptation kernel
 
 /*
  * tracers
@@ -952,6 +952,10 @@ static int boot_time_update(void)
 static void period_process_main(__unused void *arg)
 {
 	prctl(PR_SET_NAME, "period-process");
+
+	// Only this unique identifier can be adapted to the kernel
+	adapt_kern_uid = (uint64_t)getpid() << 32 | (uint32_t)syscall(__NR_gettid);
+
 	// 确保所有tracer都运行了，之后触发kick内核操作
 	while (all_probes_ready == 0)
 		usleep(LOOP_DELAY_US);
