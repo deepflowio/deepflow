@@ -35,7 +35,7 @@ func TestAddRegion(t *testing.T) {
 	assert.Equal(t, len(cache.Regions), 0)
 	cache.AddRegion(mysqlItem)
 	assert.Equal(t, len(cache.Regions), 1)
-	assert.Equal(t, cache.RegionLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.regionLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddAZ(t *testing.T) {
@@ -60,27 +60,27 @@ func TestAddHost(t *testing.T) {
 	assert.Equal(t, len(cache.Hosts), 0)
 	cache.AddHost(mysqlItem)
 	assert.Equal(t, len(cache.Hosts), 1)
-	assert.Equal(t, cache.HostLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.hostLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddVM(t *testing.T) {
 	mysqlItem := &mysql.VM{Base: mysql.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
 	assert.Equal(t, len(cache.VMs), 0)
-	cache.VPCIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
+	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
 	cache.AddVM(mysqlItem)
 	assert.Equal(t, len(cache.VMs), 1)
-	assert.Equal(t, cache.VMLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.vmLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddNetwork(t *testing.T) {
 	mysqlItem := &mysql.Network{Base: mysql.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
-	cache.VPCIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
+	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
 	assert.Equal(t, len(cache.Networks), 0)
 	cache.AddNetwork(mysqlItem)
 	assert.Equal(t, len(cache.Networks), 1)
-	assert.Equal(t, cache.NetworkLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.networkLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddSubnets(t *testing.T) {
@@ -94,11 +94,11 @@ func TestAddSubnets(t *testing.T) {
 func TestAddVRouter(t *testing.T) {
 	mysqlItem := &mysql.VRouter{Base: mysql.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
-	cache.VPCIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
+	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
 	assert.Equal(t, len(cache.VRouters), 0)
 	cache.AddVRouter(mysqlItem)
 	assert.Equal(t, len(cache.VRouters), 1)
-	assert.Equal(t, cache.VRouterLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.vrouterLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddRoutingTables(t *testing.T) {
@@ -115,18 +115,18 @@ func TestAddDHCPPorts(t *testing.T) {
 	assert.Equal(t, len(cache.DHCPPorts), 0)
 	cache.AddDHCPPorts([]*mysql.DHCPPort{mysqlItem})
 	assert.Equal(t, len(cache.DHCPPorts), 1)
-	assert.Equal(t, cache.DHCPPortLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.dhcpPortLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddVInterfaces(t *testing.T) {
 	mysqlItem := &mysql.VInterface{Base: mysql.Base{ID: 1, Lcuuid: uuid.New().String()}, NetworkID: 9}
 	networkLcuuid := uuid.New().String()
 	cache := NewCache(DOMAIN_LCUUID)
-	cache.NetworkIDToLcuuid[mysqlItem.NetworkID] = networkLcuuid
+	cache.networkIDToLcuuid[mysqlItem.NetworkID] = networkLcuuid
 	assert.Equal(t, len(cache.VInterfaces), 0)
 	cache.AddVInterfaces([]*mysql.VInterface{mysqlItem})
 	assert.Equal(t, len(cache.VInterfaces), 1)
-	assert.Equal(t, cache.VInterfaceLcuuidToNetworkID[mysqlItem.Lcuuid], 9)
+	assert.Equal(t, cache.vinterfaceLcuuidToNetworkID[mysqlItem.Lcuuid], 9)
 }
 
 func TestAddWANIPs(t *testing.T) {
@@ -159,7 +159,7 @@ func TestAddSecurityGroup(t *testing.T) {
 	assert.Equal(t, len(cache.SecurityGroups), 0)
 	cache.AddSecurityGroup(mysqlItem)
 	assert.Equal(t, len(cache.SecurityGroups), 1)
-	assert.Equal(t, cache.SecurityGroupLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.securityGroupLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddSecurityGroupRules(t *testing.T) {
@@ -184,7 +184,7 @@ func TestAddNATGateways(t *testing.T) {
 	assert.Equal(t, len(cache.NATGateways), 0)
 	cache.AddNATGateways([]*mysql.NATGateway{mysqlItem})
 	assert.Equal(t, len(cache.NATGateways), 1)
-	assert.Equal(t, cache.NATGatewayLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.natGatewayLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddNATRules(t *testing.T) {
@@ -209,7 +209,7 @@ func TestAddLBs(t *testing.T) {
 	assert.Equal(t, len(cache.LBs), 0)
 	cache.AddLBs([]*mysql.LB{mysqlItem})
 	assert.Equal(t, len(cache.LBs), 1)
-	assert.Equal(t, cache.LBLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.lbLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddLBListeners(t *testing.T) {
@@ -239,8 +239,8 @@ func TestAddLBVMConnections(t *testing.T) {
 func TestAddPeerConnections(t *testing.T) {
 	mysqlItem := &mysql.PeerConnection{Base: mysql.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
-	cache.RegionIDToLcuuid[mysqlItem.RemoteRegionID] = uuid.New().String()
-	cache.RegionIDToLcuuid[mysqlItem.LocalRegionID] = uuid.New().String()
+	cache.regionIDToLcuuid[mysqlItem.RemoteRegionID] = uuid.New().String()
+	cache.regionIDToLcuuid[mysqlItem.LocalRegionID] = uuid.New().String()
 	assert.Equal(t, len(cache.PeerConnections), 0)
 	cache.AddPeerConnections([]*mysql.PeerConnection{mysqlItem})
 	assert.Equal(t, len(cache.PeerConnections), 1)
@@ -260,7 +260,7 @@ func TestAddRDSInstances(t *testing.T) {
 	assert.Equal(t, len(cache.RDSInstances), 0)
 	cache.AddRDSInstances([]*mysql.RDSInstance{mysqlItem})
 	assert.Equal(t, len(cache.RDSInstances), 1)
-	assert.Equal(t, cache.RDSInstanceLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.rdsInstanceLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddRedisInstances(t *testing.T) {
@@ -269,7 +269,7 @@ func TestAddRedisInstances(t *testing.T) {
 	assert.Equal(t, len(cache.RedisInstances), 0)
 	cache.AddRedisInstances([]*mysql.RedisInstance{mysqlItem})
 	assert.Equal(t, len(cache.RedisInstances), 1)
-	assert.Equal(t, cache.RedisInstanceLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.redisInstanceLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddPodClusters(t *testing.T) {
@@ -278,7 +278,7 @@ func TestAddPodClusters(t *testing.T) {
 	assert.Equal(t, len(cache.PodClusters), 0)
 	cache.AddPodClusters([]*mysql.PodCluster{mysqlItem})
 	assert.Equal(t, len(cache.PodClusters), 1)
-	assert.Equal(t, cache.PodClusterLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.podClusterLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddPodNodes(t *testing.T) {
@@ -287,7 +287,7 @@ func TestAddPodNodes(t *testing.T) {
 	assert.Equal(t, len(cache.PodNodes), 0)
 	cache.AddPodNodes([]*mysql.PodNode{mysqlItem})
 	assert.Equal(t, len(cache.PodNodes), 1)
-	assert.Equal(t, cache.PodNodeIDToLcuuid[mysqlItem.ID], mysqlItem.Lcuuid)
+	assert.Equal(t, cache.podNodeIDToLcuuid[mysqlItem.ID], mysqlItem.Lcuuid)
 }
 
 func TestAddPodNamespaces(t *testing.T) {
@@ -312,7 +312,7 @@ func TestAddPodIngressRules(t *testing.T) {
 	assert.Equal(t, len(cache.PodIngressRules), 0)
 	cache.AddPodIngressRules([]*mysql.PodIngressRule{mysqlItem})
 	assert.Equal(t, len(cache.PodIngressRules), 1)
-	assert.Equal(t, cache.PodIngressRuleLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
+	assert.Equal(t, cache.podIngressRuleLcuuidToID[mysqlItem.Lcuuid], mysqlItem.ID)
 }
 
 func TestAddPodIngressRuleBackends(t *testing.T) {
@@ -366,9 +366,9 @@ func TestAddPodReplicaSets(t *testing.T) {
 func TestAddPods(t *testing.T) {
 	mysqlItem := &mysql.Pod{Base: mysql.Base{ID: 1, Lcuuid: uuid.New().String()}}
 	cache := NewCache(DOMAIN_LCUUID)
-	cache.VPCIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
-	cache.PodNodeIDToLcuuid[mysqlItem.PodNodeID] = uuid.New().String()
-	cache.PodReplicaSetIDToLcuuid[mysqlItem.PodReplicaSetID] = uuid.New().String()
+	cache.vpcIDToLcuuid[mysqlItem.VPCID] = uuid.New().String()
+	cache.podNodeIDToLcuuid[mysqlItem.PodNodeID] = uuid.New().String()
+	cache.podReplicaSetIDToLcuuid[mysqlItem.PodReplicaSetID] = uuid.New().String()
 	assert.Equal(t, len(cache.Pods), 0)
 	cache.AddPods([]*mysql.Pod{mysqlItem})
 	assert.Equal(t, len(cache.Pods), 1)
@@ -408,7 +408,7 @@ func (t *SuiteTest) TestRefreshHosts() {
 
 func (t *SuiteTest) TestRefreshVMs() {
 	cache := NewCache(DOMAIN_LCUUID)
-	cache.VPCIDToLcuuid[2] = uuid.New().String()
+	cache.vpcIDToLcuuid[2] = uuid.New().String()
 	cache.refreshVMs()
 	assert.Equal(t.T(), len(cache.VMs), 53)
 }

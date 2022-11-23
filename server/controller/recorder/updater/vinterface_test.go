@@ -50,7 +50,6 @@ func (t *SuiteTest) getVInterfaceMock(mockDB bool) (*cache.Cache, cloudmodel.VIn
 		vifID := 100
 		t.db.Create(&mysql.VInterface{Name: cloudItem.Name, Base: mysql.Base{ID: vifID, Lcuuid: cloudItem.Lcuuid}, Domain: domainLcuuid})
 		cache_.VInterfaces[cloudItem.Lcuuid] = &cache.VInterface{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}, Name: cloudItem.Name}
-		cache_.VInterfaceLcuuidToType[cloudItem.Lcuuid] = cloudItem.Type
 
 		t.db.Create(&mysql.LANIP{Base: mysql.Base{Lcuuid: cloudIP.Lcuuid}, Domain: domainLcuuid, VInterfaceID: vifID})
 		cache_.LANIPs[cloudIP.Lcuuid] = &cache.LANIP{DiffBase: cache.DiffBase{Lcuuid: cloudItem.Lcuuid}}

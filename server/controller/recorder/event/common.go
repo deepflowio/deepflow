@@ -227,7 +227,7 @@ func getPodServiceOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagField
 		eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_POD_SERVICE),
 		eventapi.TagL3DeviceID(id),
 		eventapi.TagPodClusterID(info.PodClusterID),
-		eventapi.TagPodNSID(info.PodNSID),
+		eventapi.TagPodNSID(info.PodNamespaceID),
 		eventapi.TagPodServiceID(id),
 	}...)
 	return opts, nil
@@ -245,7 +245,7 @@ func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption,
 		eventapi.TagAZID(info.AZID),
 		eventapi.TagVPCID(info.VPCID),
 		eventapi.TagPodClusterID(info.PodClusterID),
-		eventapi.TagPodNSID(info.PodNSID),
+		eventapi.TagPodNSID(info.PodNamespaceID),
 		eventapi.TagPodGroupID(info.PodGroupID),
 		eventapi.TagPodNodeID(info.PodNodeID),
 		eventapi.TagPodID(id),

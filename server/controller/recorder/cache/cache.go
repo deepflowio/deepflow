@@ -462,7 +462,7 @@ func (c *Cache) refreshNetworks() []int {
 		log.Error(dbQueryResourceFailed(RESOURCE_TYPE_NETWORK_EN, err))
 		return networkIDs
 	}
-	c.ToolDataSet.PublicNetworkID = publicNetwork.ID
+	c.ToolDataSet.publicNetworkID = publicNetwork.ID
 
 	return networkIDs
 }
