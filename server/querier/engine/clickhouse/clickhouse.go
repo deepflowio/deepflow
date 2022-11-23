@@ -228,10 +228,14 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 			if ok {
 				tagSlice = append(tagSlice, sqlparser.String(colName))
 			}
+			funcName, ok := item.Expr.(*sqlparser.FuncExpr)
+			if ok {
+				tagSlice = append(tagSlice, sqlparser.String(funcName))
+			}
 		}
 	}
 	// tap_port and tap_port_type must exist together in select
-	if common.IsValueInSliceString("tap_port", tagSlice) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("Enum(tap_port_type)", tagSlice) {
+	if common.IsValueInSliceString("tap_port", tagSlice) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("enum(tap_port_type)", tagSlice) {
 		return errors.New("tap_port and tap_port_type must exist together in select")
 	}
 
@@ -363,9 +367,19 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 				groupSlice = append(groupSlice, groupTag)
 			}
 		}
+		funcName, ok := group.(*sqlparser.FuncExpr)
+		if ok {
+			groupTag := sqlparser.String(funcName)
+			preAsGroup, ok := e.asTagMap[groupTag]
+			if ok {
+				groupSlice = append(groupSlice, preAsGroup)
+			} else {
+				groupSlice = append(groupSlice, groupTag)
+			}
+		}
 	}
 	// tap_port and tap_port_type must exist together in group
-	if common.IsValueInSliceString("tap_port", groupSlice) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("Enum(tap_port_type)", groupSlice) {
+	if common.IsValueInSliceString("tap_port", groupSlice) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("enum(tap_port_type)", groupSlice) {
 		return errors.New("tap_port and tap_port_type must exist together in group")
 	}
 	for _, group := range groups {
