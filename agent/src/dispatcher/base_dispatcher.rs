@@ -214,9 +214,7 @@ impl BaseDispatcher {
     }
 
     pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
-        self.engine = if (self.options.tap_mode == TapMode::Local
-            || self.options.tap_mode == TapMode::Mirror)
-        {
+        self.engine = if self.options.tap_mode == TapMode::Local {
             if pcap_interfaces.is_empty() {
                 return Err(Error::WinPcap(
                     "windows pcap capture must give interface to capture packet".into(),

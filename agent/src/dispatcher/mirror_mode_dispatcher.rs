@@ -448,7 +448,7 @@ impl MirrorModeDispatcher {
             if !src_local && !dst_local {
                 let _ = Self::handler(
                     self.base.id,
-                    da_key,
+                    self.mac, // In order for two-way traffic to be handled by the same pipeline, self.mac is used as the key here
                     src_local,
                     dst_local,
                     overlay_packet,
@@ -588,9 +588,5 @@ impl MirrorModeDispatcher {
         };
 
         return decap_length;
-    }
-
-    pub(super) fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
-        self.base.switch_recv_engine(pcap_interfaces)
     }
 }
