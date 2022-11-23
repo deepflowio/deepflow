@@ -231,7 +231,7 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in select
-	if common.IsValueInSliceString("tap_port", tagSlice) && !common.IsValueInSliceString("tap_port_type", tagSlice) {
+	if common.IsValueInSliceString("tap_port", tagSlice) && !common.IsValueInSliceString("tap_port_type", tagSlice) && !common.IsValueInSliceString("Enum(tap_port_type)", tagSlice) {
 		return errors.New("tap_port and tap_port_type must exist together in select")
 	}
 
@@ -365,7 +365,7 @@ func (e *CHEngine) TransGroupBy(groups sqlparser.GroupBy) error {
 		}
 	}
 	// tap_port and tap_port_type must exist together in group
-	if common.IsValueInSliceString("tap_port", groupSlice) && !common.IsValueInSliceString("tap_port_type", groupSlice) {
+	if common.IsValueInSliceString("tap_port", groupSlice) && !common.IsValueInSliceString("tap_port_type", groupSlice) && !common.IsValueInSliceString("Enum(tap_port_type)", groupSlice) {
 		return errors.New("tap_port and tap_port_type must exist together in group")
 	}
 	for _, group := range groups {
