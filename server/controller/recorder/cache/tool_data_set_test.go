@@ -41,67 +41,35 @@ func RandName() string {
 	return uuid.NewString()[:7]
 }
 
-func (t *SuiteTest) TestAddVMInTDS() {
-	id := RandID()
-	name := RandName()
-	dbItem := &mysql.VM{Base: mysql.Base{ID: id, Lcuuid: RandLcuuid()}, Name: name}
-	ds := NewToolDataSet()
-	ds.addVM(dbItem)
-	assert.Equal(t.T(), name, ds.VMIDToName[id])
-}
-
-func (t *SuiteTest) TestUpdateVMInTDS() {
-	id := RandID()
-	lcuuid := RandLcuuid()
-	ds := NewToolDataSet()
-	ds.VMIDToName[id] = RandName()
-	ds.VMLcuuidToID[lcuuid] = id
-	newName := RandName()
-	cloudItem := &cloudmodel.VM{Name: newName, Lcuuid: lcuuid}
-	ds.updateVM(cloudItem)
-	assert.Equal(t.T(), newName, ds.VMIDToName[id])
-}
-
-func (t *SuiteTest) TestDeleteVMInTDS() {
-	id := RandID()
-	lcuuid := RandLcuuid()
-	ds := NewToolDataSet()
-	ds.VMIDToName[id] = RandName()
-	ds.VMLcuuidToID[lcuuid] = id
-	ds.deleteVM(lcuuid)
-	_, ok := ds.VMIDToName[id]
-	assert.Equal(t.T(), false, ok)
-}
-
 func (t *SuiteTest) TestAddNetworkInTDS() {
 	id := RandID()
 	name := RandName()
 	dbItem := &mysql.Network{Base: mysql.Base{ID: id, Lcuuid: RandLcuuid()}, Name: name}
 	ds := NewToolDataSet()
 	ds.addNetwork(dbItem)
-	assert.Equal(t.T(), name, ds.NetworkIDToName[id])
+	assert.Equal(t.T(), name, ds.networkIDToName[id])
 }
 
 func (t *SuiteTest) TestUpdateNetworkInTDS() {
 	id := RandID()
 	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
-	ds.NetworkIDToName[id] = RandName()
-	ds.NetworkLcuuidToID[lcuuid] = id
+	ds.networkIDToName[id] = RandName()
+	ds.networkLcuuidToID[lcuuid] = id
 	newName := RandName()
 	cloudItem := &cloudmodel.Network{Name: newName, Lcuuid: lcuuid}
 	ds.updateNetwork(cloudItem)
-	assert.Equal(t.T(), newName, ds.NetworkIDToName[id])
+	assert.Equal(t.T(), newName, ds.networkIDToName[id])
 }
 
 func (t *SuiteTest) TestDeleteNetworkInTDS() {
 	id := RandID()
 	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
-	ds.NetworkIDToName[id] = RandName()
-	ds.NetworkLcuuidToID[lcuuid] = id
+	ds.networkIDToName[id] = RandName()
+	ds.networkLcuuidToID[lcuuid] = id
 	ds.deleteNetwork(lcuuid)
-	_, ok := ds.NetworkIDToName[id]
+	_, ok := ds.networkIDToName[id]
 	assert.Equal(t.T(), false, ok)
 }
 
@@ -112,43 +80,27 @@ func (t *SuiteTest) TestAddWANIPInTDS() {
 	dbItem := &mysql.WANIP{Base: mysql.Base{ID: RandID(), Lcuuid: lcuuid}, VInterfaceID: vifID, IP: ip}
 	ds := NewToolDataSet()
 	ds.addWANIP(dbItem)
-	assert.Equal(t.T(), ip, ds.WANIPLcuuidToIP[lcuuid])
-	assert.Equal(t.T(), vifID, ds.WANIPLcuuidToVInterfaceID[lcuuid])
+	assert.Equal(t.T(), ip, ds.wanIPLcuuidToIP[lcuuid])
+	assert.Equal(t.T(), vifID, ds.wanIPLcuuidToVInterfaceID[lcuuid])
 }
 
 func (t *SuiteTest) TestDeleteWANIPInTDS() {
 	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
-	ds.WANIPLcuuidToIP[lcuuid] = faker.IPv4()
-	ds.WANIPLcuuidToVInterfaceID[lcuuid] = RandID()
+	ds.wanIPLcuuidToIP[lcuuid] = faker.IPv4()
+	ds.wanIPLcuuidToVInterfaceID[lcuuid] = RandID()
 	ds.deleteWANIP(lcuuid)
-	_, ok := ds.WANIPLcuuidToIP[lcuuid]
+	_, ok := ds.wanIPLcuuidToIP[lcuuid]
 	assert.Equal(t.T(), false, ok)
-	_, ok = ds.WANIPLcuuidToVInterfaceID[lcuuid]
+	_, ok = ds.wanIPLcuuidToVInterfaceID[lcuuid]
 	assert.Equal(t.T(), false, ok)
-}
-
-func (t *SuiteTest) TestGetVMNameByID() {
-	id := RandID()
-	name := RandName()
-	ds := NewToolDataSet()
-	ds.VMIDToName[id] = name
-	rname, _ := ds.GetVMNameByID(id)
-	assert.Equal(t.T(), name, rname)
-
-	id2 := RandID()
-	name2 := RandName()
-	dbItem := &mysql.VM{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
-	mysql.Db.Create(&dbItem)
-	rname2, _ := ds.GetVMNameByID(id2)
-	assert.Equal(t.T(), name2, rname2)
 }
 
 func (t *SuiteTest) TestGetNetworkNameByID() {
 	id := RandID()
 	name := RandName()
 	ds := NewToolDataSet()
-	ds.NetworkIDToName[id] = name
+	ds.networkIDToName[id] = name
 	rname, _ := ds.GetNetworkNameByID(id)
 	assert.Equal(t.T(), name, rname)
 
@@ -160,59 +112,11 @@ func (t *SuiteTest) TestGetNetworkNameByID() {
 	assert.Equal(t.T(), name2, rname2)
 }
 
-func (t *SuiteTest) TestGetPodNodeNameByID() {
-	id := RandID()
-	name := RandName()
-	ds := NewToolDataSet()
-	ds.PodNodeIDToName[id] = name
-	rname, _ := ds.GetPodNodeNameByID(id)
-	assert.Equal(t.T(), name, rname)
-
-	id2 := RandID()
-	name2 := RandName()
-	dbItem := &mysql.PodNode{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
-	mysql.Db.Create(&dbItem)
-	rname2, _ := ds.GetPodNodeNameByID(id2)
-	assert.Equal(t.T(), name2, rname2)
-}
-
-func (t *SuiteTest) TestGetPodServiceNameByID() {
-	id := RandID()
-	name := RandName()
-	ds := NewToolDataSet()
-	ds.PodServiceIDToName[id] = name
-	rname, _ := ds.GetPodServiceNameByID(id)
-	assert.Equal(t.T(), name, rname)
-
-	id2 := RandID()
-	name2 := RandName()
-	dbItem := &mysql.PodService{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
-	mysql.Db.Create(&dbItem)
-	rname2, _ := ds.GetPodServiceNameByID(id2)
-	assert.Equal(t.T(), name2, rname2)
-}
-
-func (t *SuiteTest) TestGetPodNameByID() {
-	id := RandID()
-	name := RandName()
-	ds := NewToolDataSet()
-	ds.PodIDToName[id] = name
-	rname, _ := ds.GetPodNameByID(id)
-	assert.Equal(t.T(), name, rname)
-
-	id2 := RandID()
-	name2 := RandName()
-	dbItem := &mysql.Pod{Base: mysql.Base{ID: id2, Lcuuid: RandLcuuid()}, Name: name2}
-	mysql.Db.Create(&dbItem)
-	rname2, _ := ds.GetPodNameByID(id2)
-	assert.Equal(t.T(), name2, rname2)
-}
-
 func (t *SuiteTest) TestGetVInterfaceLcuuidByID() {
 	id := RandID()
 	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
-	ds.VInterfaceIDToLcuuid[id] = lcuuid
+	ds.vinterfaceIDToLcuuid[id] = lcuuid
 	rlcuuid, _ := ds.GetVInterfaceLcuuidByID(id)
 	assert.Equal(t.T(), lcuuid, rlcuuid)
 
@@ -228,7 +132,7 @@ func (t *SuiteTest) TestGetVInterfaceIDByWANIPLcuuid() {
 	lcuuid := RandLcuuid()
 	vifID := RandID()
 	ds := NewToolDataSet()
-	ds.WANIPLcuuidToVInterfaceID[lcuuid] = vifID
+	ds.wanIPLcuuidToVInterfaceID[lcuuid] = vifID
 	rvifID, _ := ds.GetVInterfaceIDByWANIPLcuuid(lcuuid)
 	assert.Equal(t.T(), vifID, rvifID)
 
@@ -244,7 +148,7 @@ func (t *SuiteTest) TestGetWANIPByLcuuid() {
 	ip := faker.IPv4()
 	lcuuid := RandLcuuid()
 	ds := NewToolDataSet()
-	ds.WANIPLcuuidToIP[lcuuid] = ip
+	ds.wanIPLcuuidToIP[lcuuid] = ip
 	rip, _ := ds.GetWANIPByLcuuid(lcuuid)
 	assert.Equal(t.T(), ip, rip)
 
