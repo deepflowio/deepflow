@@ -15,13 +15,12 @@
  */
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use log::warn;
 
 use super::fast_path::FastPath;
 use super::Result as PResult;
-use super::UnsafeWrapper;
 use crate::common::endpoint::{EndpointData, FeatureFlags};
 use crate::common::feature;
 use crate::common::lookup_key::LookupKey;
@@ -184,15 +183,11 @@ impl<const N: usize> Vector<N> {
     }
 }
 
-type Table4 = UnsafeWrapper<Vec<Vec<Table4Item>>>;
-
 #[derive(Clone, Debug)]
 struct Table4Item {
     field: Arc<Fieldv4>,
     policy: PolicyData,
 }
-
-type Table6 = UnsafeWrapper<Vec<Vec<Table6Item>>>;
 
 #[derive(Clone, Debug)]
 struct Table6Item {
@@ -204,9 +199,9 @@ pub struct FirstPath {
     group_ip_map: Option<HashMap<u16, Vec<IpSegment>>>,
 
     vector_4: Vector4,
-    table_4: Table4,
+    table_4: RwLock<Vec<Vec<Table4Item>>>,
     vector_6: Vector6,
-    table_6: Table6,
+    table_6: RwLock<Vec<Vec<Table6Item>>>,
 
     level: usize,
 
@@ -235,13 +230,13 @@ impl FirstPath {
         FirstPath {
             group_ip_map: Some(HashMap::new()),
             vector_4: Vector4::default(),
-            table_4: Table4::from(
+            table_4: RwLock::new(
                 std::iter::repeat(Vec::new())
                     .take(Self::TABLE_SIZE)
                     .collect::<Vec<Vec<Table4Item>>>(),
             ),
             vector_6: Vector6::default(),
-            table_6: Table6::from(
+            table_6: RwLock::new(
                 std::iter::repeat(Vec::new())
                     .take(Self::TABLE_SIZE)
                     .collect::<Vec<Vec<Table6Item>>>(),
@@ -416,7 +411,7 @@ impl FirstPath {
             }
         }
 
-        self.table_4.set(table_4);
+        *self.table_4.write().unwrap() = table_4;
 
         Ok(())
     }
@@ -443,7 +438,7 @@ impl FirstPath {
             }
         }
 
-        self.table_6.set(table_6);
+        *self.table_6.write().unwrap() = table_6;
 
         Ok(())
     }
@@ -497,7 +492,7 @@ impl FirstPath {
             self.vector_4.min_bit,
             self.vector_4.max_bit,
         ) as usize;
-        for item in &self.table_4.get()[index] {
+        for item in &self.table_4.read().unwrap()[index] {
             if field & &item.field.mask == item.field.field {
                 policy.merge_npb_action(
                     &item.policy.npb_actions,
@@ -519,7 +514,7 @@ impl FirstPath {
             self.vector_6.min_bit,
             self.vector_6.max_bit,
         ) as usize;
-        for item in &self.table_6.get()[index] {
+        for item in &self.table_6.read().unwrap()[index] {
             if field & &item.field.mask == item.field.field {
                 policy.merge_npb_action(
                     &item.policy.npb_actions,
@@ -696,19 +691,18 @@ mod tests {
             tap_type: TapType::Cloud,
             ..Default::default()
         };
-        let (_policy, _) = first.first_get(&mut key, endpotins).unwrap();
-        // assert_eq!(policy.npb_actions.len(), 0);
-        // assert_eq!(policy.acl_id, 0);
+        let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
+        assert_eq!(policy.npb_actions.len(), 1);
+        assert_eq!(policy.acl_id, 1);
 
         key.l2_end_0 = true;
         key.l3_end_0 = true;
         let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
         assert_eq!(policy.npb_actions.len(), 1);
-        // assert_eq!(policy.acl_id, 1);
+        assert_eq!(policy.acl_id, 1);
 
         let (policy, _) = first.fast_get(&mut key).unwrap();
-        // assert_eq!(policy.npb_actions.len(), 1);
-        assert_eq!(policy.npb_actions.len(), 2);
+        assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
         key.reverse();
@@ -721,15 +715,11 @@ mod tests {
         key.l2_end_1 = false;
         key.l3_end_1 = false;
         let (policy, _) = first.first_get(&mut key, endpotins).unwrap();
-        // assert_eq!(policy.npb_actions.len(), 0);
-        // assert_eq!(policy.acl_id, 0);
         assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
 
         let (policy, _) = first.fast_get(&mut key).unwrap();
-        // assert_eq!(policy.npb_actions.len(), 0);
-        // assert_eq!(policy.acl_id, 0);
-        assert_eq!(policy.npb_actions.len(), 2);
+        assert_eq!(policy.npb_actions.len(), 1);
         assert_eq!(policy.acl_id, 1);
     }
 }

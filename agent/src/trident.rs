@@ -55,9 +55,9 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
-        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
-        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FeatureFlags,
+        DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
+        NORMAL_EXIT_WITH_RESTART,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -74,7 +74,7 @@ use crate::{
     policy::Policy,
     proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{uniform_sender::UniformSenderThread, SendItem},
+    sender::{uniform_sender::UniformSenderThread, SendItem, SendMessageType},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -219,7 +219,7 @@ impl Trident {
             &config.controller_ips,
             DEFAULT_INGESTER_PORT,
             base_name,
-            vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
+            vec![0, 0, 0, 0, SendMessageType::Syslog as u8],
         );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
