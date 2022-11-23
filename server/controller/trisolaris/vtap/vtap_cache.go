@@ -770,6 +770,14 @@ func (c *VTapCache) updateVTapConfigFromDB(v *VTapInfo) {
 	c.updateVTapConfig(&newConfig)
 }
 
+func (c *VTapCache) GetConfigTapMode() int {
+	config := c.GetVTapConfig()
+	if config == nil {
+		return -1
+	}
+	return config.TapMode
+}
+
 func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 	c.updateCtrlMacFromDB(vtap.CtrlMac)
 	c.state = vtap.State
@@ -828,6 +836,9 @@ func (c *VTapCache) updateVTapCacheFromDB(vtap *models.VTap, v *VTapInfo) {
 	if !SliceEqual[string](newPodDomains, oldPodDomains) {
 		c.updatePodDomains(newPodDomains)
 		v.setVTapChangedForPD()
+	}
+	if c.GetConfigTapMode() != c.GetTapMode() {
+		log.Warningf("config tap_mode(%d) is not equal to vtap(%s) tap_mode(%d)", c.GetConfigTapMode(), c.GetKey(), c.GetTapMode())
 	}
 }
 
