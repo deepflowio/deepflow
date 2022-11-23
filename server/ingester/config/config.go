@@ -131,6 +131,7 @@ type Config struct {
 	StatsInterval         int      `yaml:"stats-interval"`
 	LogFile               string
 	LogLevel              string
+	MyNodeName            string
 }
 
 type BaseConfig struct {
@@ -170,6 +171,7 @@ func (c *Config) Validate() error {
 		log.Errorf("Can't get node name env %s", EnvK8sNodeName)
 		sleepAndExit()
 	}
+	c.MyNodeName = myNodeName
 	myPodName, exist := os.LookupEnv(EnvK8sPodName)
 	if !exist {
 		log.Errorf("Can't get pod name env %s", EnvK8sPodName)
