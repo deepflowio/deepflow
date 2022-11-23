@@ -96,6 +96,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		}
 		common.RegisterCountableForIngester("pool", counter, tags)
 	})
+	stats.SetHostname(cfg.MyNodeName)
 	stats.RegisterGcMonitor()
 	stats.SetMinInterval(time.Duration(cfg.StatsInterval) * time.Second)
 	stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD)
