@@ -97,7 +97,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 		common.RegisterCountableForIngester("pool", counter, tags)
 	})
 	stats.RegisterGcMonitor()
-	stats.SetMinInterval(10 * time.Second)
+	stats.SetMinInterval(time.Duration(cfg.StatsInterval) * time.Second)
 	stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD)
 	if cfg.InfluxdbWriterEnabled {
 		stats.SetRemoteType(stats.REMOTE_TYPE_DFSTATSD | stats.REMOTE_TYPE_INFLUXDB)
