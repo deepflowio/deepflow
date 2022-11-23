@@ -58,7 +58,7 @@ type GroupLabeler struct {
 	indexToGroupID []uint16
 }
 
-func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap, portFilterLruCap int) *GroupLabeler {
+func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap, portFilterLruCap int, moduleName string) *GroupLabeler {
 	ipGroupData := make([]*policy.IpGroupData, 0, len(idMaps))
 	internetGroups := make([]uint16, 0, 1)
 	podGroup := make(map[uint16]uint32)
@@ -97,15 +97,15 @@ func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap, portFilt
 	ipGroup.Update(ipGroupData)
 	return &GroupLabeler{
 		ipCacheLocation:         make(map[uint64]int),
-		ipv6CacheLocation:       idmap.NewU160IDMap("", GROUP_CACHE_SIZE).NoStats(),
+		ipv6CacheLocation:       idmap.NewU160IDMap(moduleName, GROUP_CACHE_SIZE).NoStats(),
 		cache:                   make([][]uint16, 0, GROUP_CACHE_SIZE),
-		serverIpCacheLocation:   idmap.NewU128IDMap("", GROUP_CACHE_SIZE).NoStats(),
-		serverIpv6CacheLocation: idmap.NewU192IDMap("", GROUP_CACHE_SIZE).NoStats(),
+		serverIpCacheLocation:   idmap.NewU128IDMap(moduleName, GROUP_CACHE_SIZE).NoStats(),
+		serverIpv6CacheLocation: idmap.NewU192IDMap(moduleName, GROUP_CACHE_SIZE).NoStats(),
 		serverCache:             make([][]uint16, 0, GROUP_CACHE_SIZE),
 		ipGroup:                 ipGroup,
 		internetGroups:          internetGroups,
 		podGroup:                podGroup,
-		portFilter:              newPortFilter(log, idMaps, portFilterLruCap),
+		portFilter:              newPortFilter(log, idMaps, portFilterLruCap, moduleName),
 		indexToGroupID:          indexToGroupID,
 	}
 }
@@ -250,7 +250,7 @@ type portFilter struct {
 	hasAnyProtocol bool
 }
 
-func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap, lruCap int) *portFilter {
+func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap, lruCap int, moduleName string) *portFilter {
 	hasAnyProtocol := false
 	groupProtocolMap := make(map[uint32][]datatype.PortRange)
 	for i, entry := range groupIDMaps {
@@ -267,7 +267,7 @@ func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap, lruCa
 		}
 		groupProtocolMap[key] = append(groupProtocolMap[key], ports...)
 	}
-	return &portFilter{fastMap: lru.NewU64LRU("PortFilter", lruCap>>3, lruCap), portRanges: groupProtocolMap, hasAnyProtocol: hasAnyProtocol}
+	return &portFilter{fastMap: lru.NewU64LRU(moduleName+"_port_filter", lruCap>>3, lruCap), portRanges: groupProtocolMap, hasAnyProtocol: hasAnyProtocol}
 }
 
 func (l *portFilter) check(group int16, protocol layers.IPProtocol, serverPort uint16) bool {
