@@ -122,7 +122,6 @@ impl DispatcherFlavor {
     fn switch_recv_engine(&mut self, pcap_interfaces: Vec<Link>) -> Result<()> {
         match self {
             DispatcherFlavor::Local(d) => d.switch_recv_engine(pcap_interfaces),
-            DispatcherFlavor::Mirror(d) => d.switch_recv_engine(pcap_interfaces),
             _ => todo!(),
         }
     }
