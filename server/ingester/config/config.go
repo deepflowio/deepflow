@@ -54,6 +54,7 @@ const (
 	DefaultGrpcBufferSize          = 41943040
 	DefaultServiceLabelerLruCap    = 1 << 22
 	DefaultCKDBEndpointTCPPortName = "tcp-port"
+	DefaultStatsInterval           = 10 // s
 )
 
 type CKDiskMonitor struct {
@@ -127,6 +128,7 @@ type Config struct {
 	NodeIP                string   `yaml:"node-ip"`
 	GrpcBufferSize        int      `yaml:"grpc-buffer-size"`
 	ServiceLabelerLruCap  int      `yaml:"service-labeler-lru-cap"`
+	StatsInterval         int      `yaml:"stats-interval"`
 	LogFile               string
 	LogLevel              string
 }
@@ -262,6 +264,10 @@ func (c *Config) Validate() error {
 		c.ServiceLabelerLruCap = DefaultServiceLabelerLruCap
 	}
 
+	if c.StatsInterval <= 0 {
+		c.StatsInterval = DefaultStatsInterval
+	}
+
 	return c.ValidateAndSetckdbColdStorages()
 }
 
@@ -333,6 +339,7 @@ func Load(path string) *Config {
 			ListenPort:           DefaultListenPort,
 			GrpcBufferSize:       DefaultGrpcBufferSize,
 			ServiceLabelerLruCap: DefaultServiceLabelerLruCap,
+			StatsInterval:        DefaultStatsInterval,
 		},
 	}
 	if err != nil {
