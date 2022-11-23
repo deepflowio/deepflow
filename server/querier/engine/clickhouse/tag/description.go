@@ -71,6 +71,7 @@ var TAG_RESOURCE_TYPE_DEVICE_MAP = map[string]int{
 	"lb":          VIF_DEVICE_TYPE_LB,
 	"natgw":       VIF_DEVICE_TYPE_NAT_GATEWAY,
 	"host":        VIF_DEVICE_TYPE_HOST,
+	"service":     VIF_DEVICE_TYPE_SERVICE,
 }
 
 type TagDescription struct {
