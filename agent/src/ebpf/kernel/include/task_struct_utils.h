@@ -24,6 +24,31 @@
 #define NSEC_PER_SEC	1000000000L
 #define USER_HZ		100
 
+static __inline void *
+get_socket_file_addr_with_check(struct task_struct *task,
+				int fd_num,
+				int files_off)
+{
+	void *file = NULL;
+	void *files, *files_ptr = (void *)task + files_off;
+	bpf_probe_read(&files, sizeof(files), files_ptr);
+
+	if (files == NULL)
+		return NULL;
+
+	struct fdtable *fdt, __fdt;
+	bpf_probe_read(&fdt, sizeof(fdt),
+		       files + STRUCT_FILES_STRUCT_FDT_OFFSET);
+	bpf_probe_read(&__fdt, sizeof(__fdt), (void *)fdt);
+
+	if (fd_num >= (int)__fdt.max_fds)
+		return NULL;
+
+	bpf_probe_read(&file, sizeof(file), __fdt.fd + fd_num);
+
+	return file;
+}
+
 static __inline void *retry_get_socket_file_addr(struct task_struct *task,
 						 int fd_num, int files_off)
 {
@@ -140,8 +165,8 @@ static __inline void *get_socket_from_fd(int fd_num,
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	void *file = NULL;
 	file =
-	    retry_get_socket_file_addr(task, fd_num,
-				       offset->task__files_offset);
+	    get_socket_file_addr_with_check(task, fd_num,
+					    offset->task__files_offset);
 	if (file == NULL)
 		return NULL;
 	void *private_data = NULL;
