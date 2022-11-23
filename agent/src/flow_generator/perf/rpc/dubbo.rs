@@ -26,11 +26,11 @@ use crate::{
         meta_packet::MetaPacket,
     },
     flow_generator::{
-        error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{consts::*, AppProtoHead, DubboHeader, L7ResponseStatus, LogMessageType},
+        {Error, Result},
     },
 };
 

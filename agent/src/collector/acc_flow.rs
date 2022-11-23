@@ -21,9 +21,8 @@ use std::time::Duration;
 
 use super::quadruple_generator::QgKey;
 
-use crate::common::flow::L7Protocol;
-use crate::common::tagged_flow::TaggedFlow;
 use crate::metric::meter::{AppMeter, FlowMeter};
+use public::common::{l7_protocol::L7Protocol, tagged_flow::TaggedFlow};
 
 pub struct AccumulatedFlow {
     pub tagged_flow: Arc<TaggedFlow>,

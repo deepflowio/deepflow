@@ -43,6 +43,10 @@ impl PacketSequenceBlock {
     pub fn encode(self, _: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         unimplemented!();
     }
+
+    pub fn assemble(&mut self) -> Vec<u8> {
+        vec![]
+    }
 }
 
 pub struct MiniMetaPacket<'a> {

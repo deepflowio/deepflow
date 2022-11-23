@@ -16,12 +16,9 @@
 
 mod consts;
 pub mod decapsulate;
-pub mod ebpf;
 pub mod endpoint;
 mod error;
 pub mod feature;
-pub mod flow;
-pub mod l7_protocol_info;
 pub mod l7_protocol_log;
 pub mod lookup_key;
 pub mod matched_field;
@@ -29,16 +26,18 @@ pub mod meta_packet;
 pub mod platform_data;
 pub mod policy;
 pub mod port_range;
-mod tag;
-pub mod tagged_flow;
-pub mod tap_port;
 pub mod tap_types;
 
 pub use consts::*;
 pub use feature::FeatureFlags;
 pub use meta_packet::MetaPacket;
 pub use platform_data::PlatformData;
-pub use public::enums;
+pub use public::common::ebpf;
+pub use public::common::enums;
+pub use public::common::flow;
+pub use public::common::tag;
+pub use public::common::tagged_flow;
+pub use public::common::tap_port;
 pub use tagged_flow::TaggedFlow;
 pub use tap_port::TapPort;
 pub use tap_types::TapTyper;
@@ -51,9 +50,8 @@ use std::{
 };
 
 use crate::common::policy::Acl;
-use crate::proto::common::TridentType;
-
 use policy::{Cidr, IpGroupData, PeerConnection};
+use public::proto::common::TridentType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct XflowKey {

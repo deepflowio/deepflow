@@ -17,5 +17,5 @@
 mod kafka;
 pub mod mqtt;
 
-pub use kafka::{KafkaInfo, KafkaLog};
-pub use mqtt::{MqttInfo, MqttLog};
+pub use kafka::KafkaLog;
+pub use mqtt::MqttLog;

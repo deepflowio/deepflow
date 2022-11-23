@@ -17,38 +17,67 @@
 mod krpc;
 mod protobuf_rpc;
 
+use self::krpc::KrpcLog;
 pub use protobuf_rpc::*;
 
 use enum_dispatch::enum_dispatch;
-use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
 use serde::Serialize;
 
 use crate::{
     common::{
         flow::FlowPerfStats,
-        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
         MetaPacket,
     },
     config::handler::LogParserAccess,
     flow_generator::{
-        perf::L7FlowPerf, protocol_logs::pb_adapter::L7ProtocolSendLog, AppProtoHead, Result,
+        perf::L7FlowPerf, protocol_logs::L7ProtocolInfoInterface, AppProtoHead, Result,
     },
 };
 
-use self::krpc::{KrpcInfo, KrpcLog};
+use public::common::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
+use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
+use public::protocol_logs::ProtobufRpcInfo;
 
-// all protobuf rpc info
-#[derive(Serialize, Clone, Debug)]
-#[enum_dispatch(L7ProtocolInfoInterface)]
-pub enum ProtobufRpcInfo {
-    KrpcInfo(KrpcInfo),
-}
-
-impl Into<L7ProtocolSendLog> for ProtobufRpcInfo {
-    fn into(self) -> L7ProtocolSendLog {
+impl L7ProtocolInfoInterface for ProtobufRpcInfo {
+    fn session_id(&self) -> Option<u32> {
         match self {
-            ProtobufRpcInfo::KrpcInfo(k) => k.into(),
+            ProtobufRpcInfo::KrpcInfo(info) => info.session_id(),
+        }
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        match self {
+            ProtobufRpcInfo::KrpcInfo(info) => info.merge_log(other),
+        }
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        match self {
+            ProtobufRpcInfo::KrpcInfo(info) => info.app_proto_head(),
+        }
+    }
+
+    fn is_req_resp_end(&self) -> (bool, bool) {
+        match self {
+            ProtobufRpcInfo::KrpcInfo(info) => info.is_req_resp_end(),
+        }
+    }
+    fn is_tls(&self) -> bool {
+        match self {
+            ProtobufRpcInfo::KrpcInfo(info) => info.is_tls(),
+        }
+    }
+
+    fn need_merge(&self) -> bool {
+        match self {
+            ProtobufRpcInfo::KrpcInfo(info) => info.need_merge(),
+        }
+    }
+
+    fn skip_send(&self) -> bool {
+        match self {
+            ProtobufRpcInfo::KrpcInfo(info) => info.skip_send(),
         }
     }
 }
@@ -60,7 +89,6 @@ pub fn get_protobuf_rpc_parser(proto: ProtobufRpcProtocol) -> L7ProtocolParser {
     }
     L7ProtocolParser::ProtobufRpcParser(p)
 }
-
 // all protobuf rpc parser
 #[derive(Debug, Clone, Serialize)]
 #[enum_dispatch(L7ProtocolParserInterface, L7FlowPerf)]

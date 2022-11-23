@@ -26,8 +26,9 @@ use log::{info, warn};
 
 // Enterprise Edition Feature: packet-sequence
 use crate::flow_generator::packet_sequence::consts;
-use crate::sender::SendItem;
+
 use public::queue::{DebugSender, Error, Receiver};
+use public::sender::SendItem;
 
 pub struct PacketSequenceParser {
     input_queue: Arc<Receiver<Box<packet_sequence_block::PacketSequenceBlock>>>,
@@ -67,7 +68,7 @@ impl PacketSequenceParser {
                     Ok(packet_sequence_blocks) => {
                         let v = packet_sequence_blocks
                             .into_iter()
-                            .map(|item| SendItem::PacketSequenceBlock(item))
+                            .map(|mut item| SendItem::PacketSequenceBlock(item.assemble()))
                             .collect();
                         if let Err(_) = output_queue.send_all(v) {
                             warn!(

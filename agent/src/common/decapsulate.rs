@@ -17,53 +17,12 @@
 use std::fmt;
 use std::net::Ipv4Addr;
 
-use num_enum::TryFromPrimitive;
-
 use super::consts::*;
 use super::enums::{EthernetType, IpProtocol};
 
-use crate::proto::trident::DecapType;
 use crate::utils::bytes;
-use serde::Serialize;
 
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
-#[repr(u8)]
-pub enum TunnelType {
-    None = DecapType::None as u8,
-    Vxlan = DecapType::Vxlan as u8,
-    Ipip = DecapType::Ipip as u8,
-    TencentGre = DecapType::Tencent as u8,
-    ErspanOrTeb = TunnelType::TencentGre as u8 + 1,
-}
-
-impl From<DecapType> for TunnelType {
-    fn from(t: DecapType) -> Self {
-        match t {
-            DecapType::None => TunnelType::None,
-            DecapType::Vxlan => TunnelType::Vxlan,
-            DecapType::Ipip => TunnelType::Ipip,
-            DecapType::Tencent => TunnelType::TencentGre,
-        }
-    }
-}
-
-impl fmt::Display for TunnelType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TunnelType::None => write!(f, "none"),
-            TunnelType::Vxlan => write!(f, "VXLAN"),
-            TunnelType::Ipip => write!(f, "IPIP"),
-            TunnelType::TencentGre => write!(f, "GRE"),
-            TunnelType::ErspanOrTeb => write!(f, "ERSPAN_TEB"),
-        }
-    }
-}
-
-impl Default for TunnelType {
-    fn default() -> Self {
-        TunnelType::None
-    }
-}
+pub use public::common::decapsulate::TunnelType;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct TunnelTypeBitmap(u16);

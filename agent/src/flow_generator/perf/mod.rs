@@ -32,14 +32,12 @@ use std::time::Duration;
 use arc_swap::access::Access;
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
-use public::l7_protocol::L7ProtocolEnum;
 
 use super::app_table::AppTable;
-use super::error::{Error, Result};
 use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog};
+use super::{Error, Result};
 
-use crate::common::flow::{PacketDirection, SignalSource};
-use crate::common::l7_protocol_info::L7ProtocolInfo;
+use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_log::{
     get_all_protocol, get_parse_bitmap, L7ProtocolBitmap, L7ProtocolParser,
     L7ProtocolParserInterface, ParseParam,
@@ -51,6 +49,9 @@ use crate::common::{
 };
 use crate::config::handler::LogParserAccess;
 use crate::config::FlowAccess;
+use public::common::flow::SignalSource;
+use public::common::l7_protocol::L7ProtocolEnum;
+use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
 
 use {
     self::http::HttpPerfData,

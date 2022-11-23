@@ -14,65 +14,24 @@
  * limitations under the License.
  */
 
-use serde::{Serialize, Serializer};
+use std::str;
 
-use std::{fmt, str};
+use serde::Serialize;
 
-use super::super::{value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use super::super::{
+    AppProtoHead, AppProtoInfoImpl, L7ProtocolInfoInterface, L7ResponseStatus, LogMessageType,
+};
 
 use crate::common::enums::IpProtocol;
-use crate::common::flow::L7Protocol;
-use crate::common::flow::PacketDirection;
-use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
+use crate::common::flow::{L7Protocol, PacketDirection};
 use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
-use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response};
+use crate::flow_generator::{Error, Result};
 use crate::parse_common;
 
+use public::protocol_logs::{l7_protocol_info::L7ProtocolInfo, RedisInfo};
+
 const SEPARATOR_SIZE: usize = 2;
-
-#[derive(Serialize, Debug, Default, Clone)]
-pub struct RedisInfo {
-    msg_type: LogMessageType,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    #[serde(skip)]
-    is_tls: bool,
-
-    #[serde(
-        rename = "request_resource",
-        skip_serializing_if = "value_is_default",
-        serialize_with = "vec_u8_to_string"
-    )]
-    pub request: Vec<u8>, // 命令字段包括参数例如："set key value"
-    #[serde(
-        skip_serializing_if = "value_is_default",
-        serialize_with = "vec_u8_to_string"
-    )]
-    pub request_type: Vec<u8>, // 命令类型不包括参数例如：命令为"set key value"，命令类型为："set"
-    #[serde(
-        rename = "response_result",
-        skip_serializing_if = "value_is_default",
-        serialize_with = "vec_u8_to_string"
-    )]
-    pub response: Vec<u8>, // 整数回复 + 批量回复 + 多条批量回复
-    #[serde(skip)]
-    pub status: Vec<u8>, // '+'
-    #[serde(
-        rename = "response_expection",
-        skip_serializing_if = "value_is_default",
-        serialize_with = "vec_u8_to_string"
-    )]
-    pub error: Vec<u8>, // '-'
-    #[serde(rename = "response_status")]
-    pub resp_status: L7ResponseStatus,
-
-    cap_seq: Option<u64>,
-}
 
 impl L7ProtocolInfoInterface for RedisInfo {
     fn session_id(&self) -> Option<u32> {
@@ -109,15 +68,8 @@ impl L7ProtocolInfoInterface for RedisInfo {
     }
 }
 
-pub fn vec_u8_to_string<S>(v: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&String::from_utf8_lossy(v))
-}
-
-impl RedisInfo {
-    pub fn merge(&mut self, other: Self) -> Result<()> {
+impl AppProtoInfoImpl for RedisInfo {
+    fn merge(&mut self, other: Self) -> Result<()> {
         if !self.can_merge(&other) {
             return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::RedisInfo(
                 other,
@@ -130,67 +82,17 @@ impl RedisInfo {
         Ok(())
     }
 
-    pub fn set_packet_seq(&mut self, param: &ParseParam) {
+    fn set_packet_seq(&mut self, param: &ParseParam) {
         if let Some(p) = param.ebpf_param {
             self.cap_seq = Some(p.cap_seq);
         }
     }
 
-    pub fn can_merge(&self, resp: &Self) -> bool {
+    fn can_merge(&self, resp: &Self) -> bool {
         if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
             return resp_seq > req_seq && resp_seq - req_seq == 1;
         }
         true
-    }
-}
-
-impl fmt::Display for RedisInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "RedisInfo {{ request: {:?}, ",
-            str::from_utf8(&self.request).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "request_type: {:?}, ",
-            str::from_utf8(&self.request_type).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "response: {:?}, ",
-            str::from_utf8(&self.response).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "status: {:?}, ",
-            str::from_utf8(&self.status).unwrap_or_default()
-        )?;
-        write!(
-            f,
-            "error: {:?} }}",
-            str::from_utf8(&self.error).unwrap_or_default()
-        )
-    }
-}
-
-impl From<RedisInfo> for L7ProtocolSendLog {
-    fn from(f: RedisInfo) -> Self {
-        let log = L7ProtocolSendLog {
-            req: L7Request {
-                req_type: String::from_utf8_lossy(f.request_type.as_slice()).to_string(),
-                resource: String::from_utf8_lossy(f.request.as_slice()).to_string(),
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: f.resp_status,
-                exception: String::from_utf8_lossy(f.error.as_slice()).to_string(),
-                result: String::from_utf8_lossy(f.response.as_slice()).to_string(),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        return log;
     }
 }
 

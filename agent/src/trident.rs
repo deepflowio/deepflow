@@ -43,7 +43,6 @@ use regex::Regex;
 use crate::ebpf_dispatcher::EbpfCollector;
 use crate::handler::{NpbBuilder, PacketHandlerBuilder};
 use crate::integration_collector::MetricServer;
-use crate::pcap::WorkerManager;
 #[cfg(target_os = "linux")]
 use crate::platform::ApiWatcher;
 #[cfg(target_os = "linux")]
@@ -74,9 +73,8 @@ use crate::{
     monitor::Monitor,
     platform::{LibvirtXmlExtractor, PlatformSynchronizer},
     policy::Policy,
-    proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{uniform_sender::UniformSenderThread, SendItem, SendMessageType},
+    sender::{uniform_sender::UniformSenderThread, SendMessageType},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -94,10 +92,14 @@ use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
+    proto::trident::{self, IfMacSource, TapMode},
     queue,
+    sender::SendItem,
     utils::net::{get_route_src_ip, links_by_name_regex, MacAddr},
     LeakyBucket,
 };
+
+use pcap_assembler::PcapAssembler;
 
 const MINUTE: Duration = Duration::from_secs(60);
 const COMMON_DELAY: u32 = 5;
@@ -734,7 +736,6 @@ pub struct Components {
     #[cfg(target_os = "linux")]
     pub api_watcher: Arc<ApiWatcher>,
     pub debugger: Debugger,
-    pub pcap_manager: WorkerManager,
     #[cfg(target_os = "linux")]
     pub ebpf_collector: Option<Box<EbpfCollector>>,
     pub running: AtomicBool,
@@ -752,6 +753,8 @@ pub struct Components {
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread,
+    pub pcap_assemblers: Vec<PcapAssembler>,
+    pub pcap_batch_uniform_sender: UniformSenderThread,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -764,7 +767,6 @@ impl Components {
         }
         info!("Staring components.");
         self.libvirt_xml_extractor.start();
-        self.pcap_manager.start();
         if matches!(self.agent_mode, RunningMode::Managed) {
             self.platform_synchronizer.start();
             #[cfg(target_os = "linux")]
@@ -822,6 +824,7 @@ impl Components {
             if self.config.metric_server.enabled {
                 self.external_metrics_server.start();
             }
+            self.pcap_batch_uniform_sender.start();
         }
         self.domain_name_listener.start();
         self.handler_builders.iter().for_each(|x| {
@@ -829,6 +832,9 @@ impl Components {
                 y.start();
             })
         });
+        for p in self.pcap_assemblers.iter() {
+            p.start();
+        }
         info!("Started components.");
     }
 
@@ -939,19 +945,6 @@ impl Components {
         };
         let debugger = Debugger::new(context);
         let queue_debugger = debugger.clone_queue();
-
-        let (pcap_sender, pcap_receiver, _) = queue::bounded_with_debug(
-            config_handler.candidate_config.pcap.queue_size as usize,
-            "1-mini-meta-packet-to-pcap",
-            &queue_debugger,
-        );
-
-        let pcap_manager = WorkerManager::new(
-            config_handler.pcap(),
-            vec![pcap_receiver],
-            stats_collector.clone(),
-            synchronizer.ntp_diff(),
-        );
 
         let rx_leaky_bucket = Arc::new(LeakyBucket::new(match candidate_config.tap_mode {
             TapMode::Analyzer => None,
@@ -1159,6 +1152,32 @@ impl Components {
             }
         }
 
+        let mut pcap_assemblers = vec![];
+        let sender_id = 7;
+        let pcap_batch_queue = "2-pcap-batch-to-sender";
+        let (pcap_batch_sender, pcap_batch_receiver, pcap_batch_counter) =
+            queue::bounded_with_debug(
+                yaml_config.packet_sequence_queue_size,
+                pcap_batch_queue,
+                &queue_debugger,
+            );
+        stats_collector.register_countable(
+            "queue",
+            Countable::Owned(Box::new(pcap_batch_counter)),
+            vec![
+                StatsOption::Tag("module", pcap_batch_queue.to_string()),
+                StatsOption::Tag("index", sender_id.to_string()),
+            ],
+        );
+        let pcap_batch_uniform_sender = UniformSenderThread::new(
+            sender_id,
+            pcap_batch_queue,
+            Arc::new(pcap_batch_receiver),
+            config_handler.sender(),
+            stats_collector.clone(),
+            exception_handler.clone(),
+        );
+
         for (i, (src_interface, netns)) in src_interfaces_and_namespaces.into_iter().enumerate() {
             let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
                 yaml_config.flow_queue_size,
@@ -1230,8 +1249,40 @@ impl Components {
             );
             packet_sequence_parsers.push(packet_sequence_parser);
 
+            let mini_packet_queue = "1-mini-meta-packet-to-pcap";
+            let (mini_packet_sender, mini_packet_receiver, mini_packet_counter) =
+                queue::bounded_with_debug(
+                    yaml_config.pcap.queue_size as usize,
+                    mini_packet_queue,
+                    &queue_debugger,
+                );
+            let pcap_assembler = PcapAssembler::new(
+                i as u32,
+                yaml_config.pcap.enabled,
+                yaml_config.pcap.buffer_size,
+                yaml_config.pcap.flow_buffer_size,
+                yaml_config.pcap.flush_interval,
+                pcap_batch_sender.clone(),
+                mini_packet_receiver,
+                synchronizer.ntp_diff(),
+            );
+            stats_collector.register_countable(
+                "pcap_assembler",
+                Countable::Ref(Arc::downgrade(&pcap_assembler.counter) as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("id", i.to_string())],
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(mini_packet_counter)),
+                vec![
+                    StatsOption::Tag("module", mini_packet_queue.to_string()),
+                    StatsOption::Tag("index", i.to_string()),
+                ],
+            );
+            pcap_assemblers.push(pcap_assembler);
+
             let handler_builder = Arc::new(Mutex::new(vec![
-                PacketHandlerBuilder::Pcap(pcap_sender.clone()),
+                PacketHandlerBuilder::Pcap(mini_packet_sender.clone()),
                 PacketHandlerBuilder::Npb(NpbBuilder::new(
                     i,
                     &config_handler.candidate_config.npb,
@@ -1317,7 +1368,8 @@ impl Components {
                 .ntp_diff(synchronizer.ntp_diff())
                 .src_interface(src_interface.clone())
                 .netns(netns)
-                .trident_type(candidate_config.dispatcher.trident_type);
+                .trident_type(candidate_config.dispatcher.trident_type)
+                .pcap_assembler_sender(mini_packet_sender);
 
             #[cfg(target_os = "linux")]
             let dispatcher = dispatcher_builder
@@ -1427,6 +1479,38 @@ impl Components {
             );
             log_parsers.push(app_proto_log_parser);
             collectors.push(collector);
+            let mini_packet_queue = "1-mini-meta-packet-to-pcap";
+            let (mini_packet_sender, mini_packet_receiver, mini_packet_counter) =
+                queue::bounded_with_debug(
+                    yaml_config.pcap.queue_size as usize,
+                    mini_packet_queue,
+                    &queue_debugger,
+                );
+            let pcap_assembler = PcapAssembler::new(
+                pcap_assemblers.len() as u32,
+                yaml_config.pcap.enabled,
+                yaml_config.pcap.buffer_size,
+                yaml_config.pcap.flow_buffer_size,
+                yaml_config.pcap.flush_interval,
+                pcap_batch_sender.clone(),
+                mini_packet_receiver,
+                synchronizer.ntp_diff(),
+            );
+            stats_collector.register_countable(
+                "pcap_assembler",
+                Countable::Ref(Arc::downgrade(&pcap_assembler.counter) as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("id", pcap_assemblers.len().to_string())],
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(mini_packet_counter)),
+                vec![
+                    StatsOption::Tag("module", mini_packet_queue.to_string()),
+                    StatsOption::Tag("index", pcap_assemblers.len().to_string()),
+                ],
+            );
+            pcap_assemblers.push(pcap_assembler);
+
             ebpf_collector = EbpfCollector::new(
                 ebpf_dispatcher_id,
                 synchronizer.ntp_diff(),
@@ -1438,6 +1522,7 @@ impl Components {
                 flow_sender,
                 &queue_debugger,
                 stats_collector.clone(),
+                mini_packet_sender,
             )
             .ok();
             if let Some(collector) = &ebpf_collector {
@@ -1594,7 +1679,6 @@ impl Components {
             #[cfg(target_os = "linux")]
             api_watcher,
             debugger,
-            pcap_manager,
             log_parsers,
             #[cfg(target_os = "linux")]
             ebpf_collector,
@@ -1616,6 +1700,8 @@ impl Components {
             handler_builders,
             compressed_otel_uniform_sender,
             agent_mode,
+            pcap_assemblers,
+            pcap_batch_uniform_sender,
         })
     }
 
@@ -1770,6 +1856,9 @@ impl Components {
         for d in self.dispatchers.iter_mut() {
             d.stop();
         }
+        for p in self.pcap_assemblers.iter() {
+            p.stop();
+        }
         self.platform_synchronizer.stop();
 
         #[cfg(target_os = "linux")]
@@ -1810,12 +1899,12 @@ impl Components {
         self.telegraf_uniform_sender.stop();
         self.packet_sequence_uniform_sender.stop(); // Enterprise Edition Feature: packet-sequence
         self.domain_name_listener.stop();
+        self.packet_sequence_uniform_sender.stop();
         self.handler_builders.iter().for_each(|x| {
             x.lock().unwrap().iter_mut().for_each(|y| {
                 y.stop();
             })
         });
-        self.pcap_manager.stop();
         info!("Stopped components.")
     }
 }

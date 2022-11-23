@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
 
 use log::{debug, warn};
 use nom::{
@@ -24,124 +24,24 @@ use nom::{
     multi::{many1, many1_count},
     number, sequence, IResult, Parser,
 };
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use super::super::{
-    value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+    AppProtoHead, AppProtoInfoImpl, L7ProtocolInfoInterface, L7ResponseStatus, LogMessageType,
 };
 
 use crate::common::l7_protocol_log::ParseParam;
-use crate::common::{
-    flow::L7Protocol,
-    l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-    l7_protocol_log::L7ProtocolParserInterface,
-};
+use crate::common::{flow::L7Protocol, l7_protocol_log::L7ProtocolParserInterface};
 use crate::{
     common::enums::IpProtocol,
     common::flow::PacketDirection,
-    flow_generator::{
-        error::{Error, Result},
-        protocol_logs::pb_adapter::{L7ProtocolSendLog, L7Request, L7Response},
-    },
-    proto::flow_log::MqttTopic,
+    flow_generator::{Error, Result},
 };
+use public::proto::flow_log::MqttTopic;
+use public::protocol_logs::{L7ProtocolInfo, MqttInfo, PacketKind, QualityOfService};
 
-#[derive(Serialize, Clone, Debug)]
-pub struct MqttInfo {
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    msg_type: LogMessageType,
-
-    #[serde(rename = "request_domain", skip_serializing_if = "Option::is_none")]
-    pub client_id: Option<String>,
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub version: u8,
-    #[serde(rename = "request_type")]
-    pub pkt_type: PacketKind,
-    #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
-    pub req_msg_size: Option<u32>,
-    #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
-    pub res_msg_size: Option<u32>,
-    #[serde(
-        rename = "request_resource",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "topics_format"
-    )]
-    pub subscribe_topics: Option<Vec<MqttTopic>>,
-    #[serde(skip)]
-    pub publish_topic: Option<String>,
-    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    pub code: Option<i32>, // connect_ack packet return code
-    pub status: L7ResponseStatus,
-}
-
-impl L7ProtocolInfoInterface for MqttInfo {
-    fn session_id(&self) -> Option<u32> {
-        None
-    }
-
-    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
-        if let L7ProtocolInfo::MqttInfo(mqtt) = other {
-            if mqtt.start_time < self.start_time {
-                self.start_time = mqtt.start_time;
-            }
-            if mqtt.end_time > self.end_time {
-                self.end_time = mqtt.end_time;
-            }
-            self.merge(mqtt);
-        }
-        Ok(())
-    }
-
-    fn app_proto_head(&self) -> Option<AppProtoHead> {
-        Some(AppProtoHead {
-            proto: L7Protocol::MQTT,
-            msg_type: self.msg_type,
-            rrt: self.end_time - self.start_time,
-        })
-    }
-
-    fn is_tls(&self) -> bool {
-        false
-    }
-
-    fn skip_send(&self) -> bool {
-        false
-    }
-}
-
-pub fn topics_format<S>(t: &Option<Vec<MqttTopic>>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let ts = t.as_ref().unwrap();
-    let names = ts.iter().map(|c| c.name.clone()).collect::<Vec<_>>();
-    serializer.serialize_str(&names.join(","))
-}
-
-impl Default for MqttInfo {
-    fn default() -> Self {
-        Self {
-            client_id: None,
-            version: 0,
-            pkt_type: Default::default(),
-            req_msg_size: None,
-            res_msg_size: None,
-            subscribe_topics: None,
-            publish_topic: None,
-            code: None,
-            status: L7ResponseStatus::Ok,
-            start_time: 0,
-            end_time: 0,
-            msg_type: LogMessageType::Other,
-        }
-    }
-}
-
-impl MqttInfo {
-    pub fn merge(&mut self, other: Self) {
+impl AppProtoInfoImpl for MqttInfo {
+    fn merge(&mut self, other: Self) -> Result<()> {
         if self.res_msg_size.is_none() {
             self.res_msg_size = other.res_msg_size;
         }
@@ -160,58 +60,42 @@ impl MqttInfo {
             }
             _ => (),
         }
-    }
-
-    pub fn get_version_str(&self) -> &'static str {
-        match self.version {
-            3 => "3.1",
-            4 => "3.1.1",
-            5 => "5.0",
-            _ => "",
-        }
+        Ok(())
     }
 }
 
-impl From<MqttInfo> for L7ProtocolSendLog {
-    fn from(f: MqttInfo) -> Self {
-        let version = Some(String::from(f.get_version_str()));
-        let mut topic_str = String::new();
-        match f.pkt_type {
-            PacketKind::Publish { .. } => {
-                if let Some(t) = f.publish_topic {
-                    topic_str.push_str(t.as_str());
-                }
+impl L7ProtocolInfoInterface for MqttInfo {
+    fn session_id(&self) -> Option<u32> {
+        None
+    }
+
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
+        if let L7ProtocolInfo::MqttInfo(mqtt) = other {
+            if mqtt.start_time < self.start_time {
+                self.start_time = mqtt.start_time;
             }
-            PacketKind::Unsubscribe | PacketKind::Subscribe => {
-                if let Some(s) = f.subscribe_topics {
-                    for i in s {
-                        topic_str.push_str(format!("{},", i.name).as_str());
-                    }
-                    if !topic_str.is_empty() {
-                        topic_str.pop();
-                    }
-                }
+            if mqtt.end_time > self.end_time {
+                self.end_time = mqtt.end_time;
             }
-            _ => {}
-        };
-        let log = L7ProtocolSendLog {
-            version: version,
-            req_len: f.req_msg_size,
-            resp_len: f.res_msg_size,
-            req: L7Request {
-                req_type: f.pkt_type.to_string(),
-                domain: f.client_id.unwrap_or_default(),
-                resource: topic_str,
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: f.status,
-                code: f.code,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        return log;
+            self.merge(mqtt)?;
+        }
+        Ok(())
+    }
+
+    fn app_proto_head(&self) -> Option<AppProtoHead> {
+        Some(AppProtoHead {
+            proto: L7Protocol::MQTT,
+            msg_type: self.msg_type,
+            rrt: self.end_time - self.start_time,
+        })
+    }
+
+    fn is_tls(&self) -> bool {
+        false
+    }
+
+    fn skip_send(&self) -> bool {
+        false
     }
 }
 
@@ -455,68 +339,6 @@ impl MqttLog {
 pub struct PacketHeader {
     pub kind: PacketKind,
     pub remaining_length: i32,
-}
-
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PacketKind {
-    Connect,
-    Connack,
-    Publish {
-        dup: bool,
-        qos: QualityOfService,
-        retain: bool,
-    },
-    Puback,
-    Pubrec,
-    Pubrel,
-    Pubcomp,
-    Subscribe,
-    Suback,
-    Unsubscribe,
-    Unsuback,
-    Pingreq,
-    Pingresp,
-    Disconnect,
-}
-
-impl fmt::Display for PacketKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::Connect => write!(f, "CONNECT"),
-            Self::Connack => write!(f, "CONNACK"),
-            Self::Publish { .. } => write!(f, "PUBLISH"),
-            Self::Puback => write!(f, "PUBACK"),
-            Self::Pubrec => write!(f, "PUBREC"),
-            Self::Pubrel => write!(f, "PUBREL"),
-            Self::Pubcomp => write!(f, "PUBCOMP"),
-            Self::Subscribe => write!(f, "SUBSCRIBE"),
-            Self::Suback => write!(f, "SUBACK"),
-            Self::Unsubscribe => write!(f, "UNSUBSCRIBE"),
-            Self::Unsuback => write!(f, "UNSUBACK"),
-            Self::Pingreq => write!(f, "PINGREQ"),
-            Self::Pingresp => write!(f, "PINGRESP"),
-            Self::Disconnect => write!(f, "DISCONNECT"),
-        }
-    }
-}
-
-impl Default for PacketKind {
-    fn default() -> Self {
-        Self::Disconnect
-    }
-}
-
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QualityOfService {
-    AtMostOnce = 0,
-    AtLeastOnce = 1,
-    ExactlyOnce = 2,
-}
-
-impl Default for QualityOfService {
-    fn default() -> Self {
-        Self::AtMostOnce
-    }
 }
 
 fn mqtt_packet_kind(input: &[u8]) -> IResult<&[u8], PacketKind> {

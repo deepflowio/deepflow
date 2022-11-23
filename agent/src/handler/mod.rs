@@ -22,10 +22,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::common::meta_packet::MetaPacket;
-use crate::pcap::PcapPacket;
 use npb_handler::{NpbHandler, NpbMode};
 use npb_pcap_policy::PolicyData;
-use public::{queue::DebugSender, utils::net::MacAddr};
+use public::{packet::MiniPacketEnum, queue::DebugSender, utils::net::MacAddr};
 
 pub struct IpInfo {
     pub mac: MacAddr,
@@ -82,7 +81,7 @@ impl<'a> MiniPacket<'a> {
 }
 
 pub enum PacketHandler {
-    Pcap(DebugSender<PcapPacket>),
+    Pcap(DebugSender<MiniPacketEnum>),
     Npb(NpbHandler),
 }
 
@@ -107,7 +106,7 @@ impl PacketHandler {
 }
 
 pub enum PacketHandlerBuilder {
-    Pcap(DebugSender<PcapPacket>),
+    Pcap(DebugSender<MiniPacketEnum>),
     Npb(Box<NpbBuilder>),
 }
 
@@ -122,7 +121,7 @@ impl PacketHandlerBuilder {
     pub fn stop(&mut self) {
         match self {
             PacketHandlerBuilder::Pcap(s) => {
-                let _ = s.send(PcapPacket::Terminated);
+                let _ = s.send(MiniPacketEnum::Terminated);
             }
             PacketHandlerBuilder::Npb(b) => {
                 b.stop();

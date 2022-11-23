@@ -39,14 +39,14 @@ use crate::{
     flow_generator::FlowMap,
     handler::MiniPacket,
     platform::LibvirtXmlExtractor,
-    proto::{common::TridentType, trident::IfMacSource},
-    rpc::get_timestamp,
     utils::bytes::read_u16_be,
 };
 #[cfg(target_os = "linux")]
 use public::netns::link_list_in_netns;
 use public::{
     netns::NsFile,
+    proto::{common::TridentType, trident::IfMacSource},
+    rpc::get_timestamp,
     utils::net::{link_list, Link, MacAddr},
 };
 
@@ -73,6 +73,7 @@ impl LocalModeDispatcher {
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &base.stats,
             false, // !from_ebpf
+            base.pcap_assembler_sender.clone(),
         );
 
         while !base.terminated.load(Ordering::Relaxed) {

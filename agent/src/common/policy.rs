@@ -30,7 +30,7 @@ use super::port_range::{PortRange, PortRangeList};
 use super::{IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN, MIN_MASK_LEN};
 use npb_pcap_policy::{NpbAction, NpbTunnelType, PolicyData, TapSide};
 
-use crate::proto::trident;
+use public::proto::trident;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum GroupType {

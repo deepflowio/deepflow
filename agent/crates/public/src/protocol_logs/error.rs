@@ -18,9 +18,7 @@ use std::str::Utf8Error;
 
 use thiserror::Error;
 
-use super::AppProtoLogsData;
-
-use crate::common::l7_protocol_info::L7ProtocolInfo;
+use super::{AppProtoLogsData, L7ProtocolInfo};
 
 #[derive(Debug, Error)]
 pub enum Error {

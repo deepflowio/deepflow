@@ -39,9 +39,9 @@ use crate::{
     },
     flow_generator::FlowMap,
     handler::{MiniPacket, PacketHandler},
-    proto::trident::IfMacSource,
-    rpc::get_timestamp,
 };
+use public::proto::trident::IfMacSource;
+use public::rpc::get_timestamp;
 use public::utils::net::{Link, MacAddr};
 
 // BILD to reduce the processing flow of Trident tunnel traffic, the tunnel traffic will be marked
@@ -122,6 +122,7 @@ impl AnalyzerModeDispatcher {
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &base.stats,
             false, // !from_ebpf
+            base.pcap_assembler_sender.clone(),
         );
 
         while !base.terminated.load(Ordering::Relaxed) {

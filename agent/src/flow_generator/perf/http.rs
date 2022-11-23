@@ -23,7 +23,6 @@ use crate::{
         meta_packet::MetaPacket,
     },
     flow_generator::{
-        error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
@@ -31,6 +30,7 @@ use crate::{
             check_http_method, consts::*, get_http_request_version, get_http_resp_info,
             is_http_v1_payload, AppProtoHead, Httpv2Headers, L7ResponseStatus, LogMessageType,
         },
+        {Error, Result},
     },
 };
 use public::utils::net::h2pack;

@@ -29,14 +29,15 @@ use arc_swap::access::Access;
 use log::{debug, error, info, warn};
 use thread::JoinHandle;
 
-use super::{SendItem, SendMessageType, PRE_FILE_SUFFIX};
+use super::{SendItemImpl, SendMessageType, PRE_FILE_SUFFIX};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::{Exception, SocketType};
 use crate::utils::stats::{
     Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
 };
+use public::proto::trident::{Exception, SocketType};
 use public::queue::{Error, Receiver};
+use public::sender::SendItem;
 
 #[derive(Debug, Default)]
 pub struct SenderCounter {

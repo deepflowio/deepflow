@@ -15,83 +15,30 @@
  */
 
 use prost::Message;
-use public::{
-    bytes::read_u16_be,
-    l7_protocol::{L7Protocol, ProtobufRpcProtocol},
-};
 use serde::Serialize;
 
 use crate::{
     common::{
         flow::{FlowPerfStats, L7PerfStats},
-        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         MetaPacket,
     },
     flow_generator::{
         perf::{L7FlowPerf, PerfStats},
-        protocol_logs::{
-            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-            L7ResponseStatus,
-        },
+        protocol_logs::L7ProtocolInfoInterface,
         AppProtoHead, Error, LogMessageType, Result,
     },
-    proto::protobuf_rpc::KrpcMeta,
 };
 
-use super::ProtobufRpcInfo;
+use public::proto::protobuf_rpc::KrpcMeta;
+use public::protocol_logs::{KrpcInfo, ProtobufRpcInfo};
+use public::{
+    bytes::read_u16_be,
+    common::l7_protocol::{L7Protocol, ProtobufRpcProtocol},
+    protocol_logs::l7_protocol_info::L7ProtocolInfo,
+};
 
 const KRPC_FIX_HDR_LEN: usize = 8;
-const KRPC_DIR_REQ: i32 = 1;
-const KRPC_DIR_RESP: i32 = 2;
-
-#[derive(Debug, Default, Clone, Serialize)]
-pub struct KrpcInfo {
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-
-    msg_type: LogMessageType,
-    msg_id: i32,
-    serv_id: i32,
-    sequence: i32,
-    // 0 success, negative indicate error, no positive number.
-    ret_code: i32,
-
-    //trace info
-    trace_id: String,
-    span_id: String,
-
-    status: L7ResponseStatus,
-}
-
-impl KrpcInfo {
-    fn fill_from_pb(&mut self, k: KrpcMeta) -> Result<()> {
-        self.msg_type = match k.direction {
-            KRPC_DIR_REQ => LogMessageType::Request,
-            KRPC_DIR_RESP => LogMessageType::Response,
-            _ => return Err(Error::L7ProtocolUnknown),
-        };
-        self.msg_id = k.msg_id;
-        self.serv_id = k.service_id;
-        self.sequence = k.sequence;
-        self.ret_code = k.ret_code;
-
-        if let Some(t) = k.trace {
-            self.trace_id = t.trace_id;
-            self.span_id = t.span_id;
-        }
-
-        if self.ret_code == 0 {
-            self.status = L7ResponseStatus::Ok;
-        } else {
-            self.status = L7ResponseStatus::ServerError;
-        }
-
-        Ok(())
-    }
-}
 
 impl L7ProtocolInfoInterface for KrpcInfo {
     fn session_id(&self) -> Option<u32> {
@@ -142,6 +89,7 @@ impl L7ProtocolInfoInterface for KrpcInfo {
     }
 }
 
+/*
 impl From<KrpcInfo> for L7ProtocolSendLog {
     fn from(k: KrpcInfo) -> Self {
         let req_id = k.session_id();
@@ -170,7 +118,7 @@ impl From<KrpcInfo> for L7ProtocolSendLog {
             ..Default::default()
         }
     }
-}
+}*/
 
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct KrpcLog {
@@ -343,10 +291,10 @@ impl KrpcLog {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use std::path::Path;
 
     use crate::common::flow::PacketDirection;
-    use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
     use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
 
     use crate::flow_generator::protocol_logs::{L7ResponseStatus, ProtobufRpcInfo};

@@ -16,9 +16,9 @@
 
 use std::net::{IpAddr, Ipv4Addr};
 
-use crate::proto::trident;
-
 use super::{endpoint::EPC_FROM_DEEPFLOW, error::Error, IPV4_MAX_MASK_LEN, IPV6_MAX_MASK_LEN};
+
+use public::proto::trident;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IpSubnet {

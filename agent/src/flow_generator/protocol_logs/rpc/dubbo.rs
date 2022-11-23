@@ -21,73 +21,26 @@ use log::debug;
 use serde::Serialize;
 
 use super::super::{
-    consts::*, value_is_default, value_is_negative, AppProtoHead, L7ResponseStatus, LogMessageType,
+    consts::*, decode_base64_to_string, AppProtoHead, AppProtoInfoImpl, Error,
+    L7ProtocolInfoInterface, L7ResponseStatus, LogMessageType, Result,
 };
 
 use crate::common::enums::IpProtocol;
-use crate::common::flow::L7Protocol;
-use crate::common::flow::PacketDirection;
-use crate::common::l7_protocol_info::L7ProtocolInfo;
-use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
 use crate::common::l7_protocol_log::L7ProtocolParserInterface;
 use crate::common::l7_protocol_log::ParseParam;
 use crate::config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType};
-use crate::flow_generator::error::{Error, Result};
-use crate::flow_generator::protocol_logs::{
-    decode_base64_to_string,
-    pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo},
-};
-use crate::log_info_merge;
 use crate::parse_common;
 use crate::utils::bytes::{read_u32_be, read_u64_be};
+use public::common::flow::PacketDirection;
+use public::common::l7_protocol::L7Protocol;
+use public::log_info_merge;
+use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
+use public::protocol_logs::DubboInfo;
 
 const TRACE_ID_MAX_LEN: usize = 1024;
 
-#[derive(Serialize, Debug, Default, Clone)]
-pub struct DubboInfo {
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    msg_type: LogMessageType,
-    #[serde(skip)]
-    is_tls: bool,
-
-    // header
-    #[serde(skip)]
-    pub serial_id: u8,
-    #[serde(skip)]
-    pub data_type: u8,
-    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
-    pub request_id: i64,
-
-    // req
-    #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
-    pub req_msg_size: Option<u32>,
-    #[serde(rename = "version", skip_serializing_if = "value_is_default")]
-    pub dubbo_version: String,
-    #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
-    pub service_name: String,
-    #[serde(skip)]
-    pub service_version: String,
-    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
-    pub method_name: String,
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub span_id: String,
-
-    // resp
-    #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
-    pub resp_msg_size: Option<u32>,
-    #[serde(rename = "response_status")]
-    pub resp_status: L7ResponseStatus,
-    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    pub status_code: Option<i32>,
-}
-
-impl DubboInfo {
-    pub fn merge(&mut self, other: Self) {
+impl AppProtoInfoImpl for DubboInfo {
+    fn merge(&mut self, other: Self) -> Result<()> {
         if self.resp_msg_size.is_none() {
             self.resp_msg_size = other.resp_msg_size;
         }
@@ -97,6 +50,7 @@ impl DubboInfo {
         if self.status_code.is_none() {
             self.status_code = other.status_code;
         }
+        Ok(())
     }
 }
 
@@ -105,7 +59,7 @@ impl L7ProtocolInfoInterface for DubboInfo {
         Some(self.request_id as u32)
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         log_info_merge!(self, DubboInfo, other);
         Ok(())
     }
@@ -124,39 +78,6 @@ impl L7ProtocolInfoInterface for DubboInfo {
 
     fn skip_send(&self) -> bool {
         false
-    }
-}
-
-impl From<DubboInfo> for L7ProtocolSendLog {
-    fn from(f: DubboInfo) -> Self {
-        let endpoint = format!("{}/{}", f.service_name, f.method_name);
-        L7ProtocolSendLog {
-            req_len: f.req_msg_size,
-            resp_len: f.resp_msg_size,
-            version: Some(f.dubbo_version),
-            req: L7Request {
-                resource: f.service_name.clone(),
-                req_type: f.method_name.clone(),
-                endpoint,
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: f.resp_status,
-                code: f.status_code,
-                ..Default::default()
-            },
-            trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
-                span_id: Some(f.span_id),
-                ..Default::default()
-            }),
-            ext_info: Some(ExtendedInfo {
-                rpc_service: Some(f.service_name),
-                request_id: Some(f.request_id as u32),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
     }
 }
 

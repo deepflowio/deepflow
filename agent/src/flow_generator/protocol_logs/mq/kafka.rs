@@ -16,69 +16,32 @@
 use serde::Serialize;
 
 use super::super::{
-    consts::KAFKA_REQ_HEADER_LEN, value_is_default, value_is_negative, AppProtoHead,
+    consts::KAFKA_REQ_HEADER_LEN, AppProtoHead, AppProtoInfoImpl, L7ProtocolInfoInterface,
     L7ResponseStatus, LogMessageType,
 };
 
-use crate::common::flow::L7Protocol;
-use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
-use crate::flow_generator::protocol_logs::pb_adapter::{
-    ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
-};
+use crate::parse_common;
 use crate::{
     common::enums::IpProtocol,
-    common::flow::PacketDirection,
-    flow_generator::error::{Error, Result},
+    common::flow::{L7Protocol, PacketDirection},
+    flow_generator::{Error, Result},
     utils::bytes::{read_u16_be, read_u32_be},
 };
-use crate::{log_info_merge, parse_common};
+
+use public::log_info_merge;
+use public::protocol_logs::{l7_protocol_info::L7ProtocolInfo, KafkaInfo};
 
 const KAFKA_FETCH: u16 = 1;
-
-#[derive(Serialize, Debug, Default, Clone)]
-pub struct KafkaInfo {
-    msg_type: LogMessageType,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    #[serde(skip)]
-    is_tls: bool,
-
-    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
-    pub correlation_id: u32,
-
-    // request
-    #[serde(rename = "request_length", skip_serializing_if = "value_is_negative")]
-    pub req_msg_size: Option<u32>,
-    #[serde(skip)]
-    pub api_version: u16,
-    #[serde(rename = "request_type")]
-    pub api_key: u16,
-    #[serde(skip)]
-    pub client_id: String,
-
-    // reponse
-    #[serde(rename = "response_length", skip_serializing_if = "value_is_negative")]
-    pub resp_msg_size: Option<u32>,
-    #[serde(rename = "response_status")]
-    pub status: L7ResponseStatus,
-    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    pub status_code: Option<i32>,
-
-    // the first 14 byte of resp_data, use to parse error code
-    // only fetch and api version > 7 can get the correct err code
-    #[serde(skip)]
-    pub resp_data: Option<[u8; 14]>,
-}
+// https://kafka.apache.org/protocol.html
+const API_KEY_MAX: u16 = 67;
 
 impl L7ProtocolInfoInterface for KafkaInfo {
     fn session_id(&self) -> Option<u32> {
         Some(self.correlation_id)
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         log_info_merge!(self, KafkaInfo, other);
         Ok(())
     }
@@ -100,10 +63,8 @@ impl L7ProtocolInfoInterface for KafkaInfo {
     }
 }
 
-impl KafkaInfo {
-    // https://kafka.apache.org/protocol.html
-    const API_KEY_MAX: u16 = 67;
-    pub fn merge(&mut self, other: Self) {
+impl AppProtoInfoImpl for KafkaInfo {
+    fn merge(&mut self, other: Self) -> Result<()> {
         if self.resp_msg_size.is_none() {
             self.resp_msg_size = other.resp_msg_size;
         }
@@ -117,133 +78,35 @@ impl KafkaInfo {
                 error_code => INT16
                 ...
         */
+        fn set_status_code(info: &mut KafkaInfo, code: i32) {
+            info.status_code = Some(code);
+            if code == 0 {
+                info.status = L7ResponseStatus::Ok;
+            } else {
+                info.status = L7ResponseStatus::ServerError;
+            }
+        }
         match other.msg_type {
             LogMessageType::Response if self.api_key == KAFKA_FETCH && self.api_version >= 7 => {
                 if let Some(d) = other.resp_data {
-                    self.set_status_code(read_u16_be(&d[12..]) as i32)
+                    set_status_code(self, read_u16_be(&d[12..]) as i32)
                 }
             }
             LogMessageType::Request if other.api_key == KAFKA_FETCH && other.api_version >= 7 => {
                 if let Some(d) = self.resp_data {
-                    self.set_status_code(read_u16_be(&d[12..]) as i32)
+                    set_status_code(self, read_u16_be(&d[12..]) as i32)
                 }
             }
             _ => {}
         }
+        Ok(())
     }
 
-    pub fn set_status_code(&mut self, code: i32) {
-        self.status_code = Some(code);
-        if code == 0 {
-            self.status = L7ResponseStatus::Ok;
-        } else {
-            self.status = L7ResponseStatus::ServerError;
-        }
-    }
-
-    pub fn check(&self) -> bool {
-        if self.api_key > Self::API_KEY_MAX {
+    fn check(&self) -> bool {
+        if self.api_key > API_KEY_MAX {
             return false;
         }
         return self.client_id.len() > 0 && self.client_id.is_ascii();
-    }
-
-    pub fn get_command(&self) -> &'static str {
-        let command_str = [
-            "Produce",
-            "Fetch",
-            "ListOffsets",
-            "Metadata",
-            "LeaderAndIsr",
-            "StopReplica",
-            "UpdateMetadata",
-            "ControlledShutdown",
-            "OffsetCommit",
-            "OffsetFetch",
-            // 10
-            "FindCoordinator",
-            "JoinGroup",
-            "Heartbeat",
-            "LeaveGroup",
-            "SyncGroup",
-            "DescribeGroups",
-            "ListGroups",
-            "SaslHandshake",
-            "ApiVersions",
-            "CreateTopics",
-            // 20
-            "DeleteTopics",
-            "DeleteRecords",
-            "InitProducerId",
-            "OffsetForLeaderEpoch",
-            "AddPartitionsToTxn",
-            "AddOffsetsToTxn",
-            "EndTxn",
-            "WriteTxnMarkers",
-            "TxnOffsetCommit",
-            "DescribeAcls",
-            // 30
-            "CreateAcls",
-            "DeleteAcls",
-            "DescribeConfigs",
-            "AlterConfigs",
-            "AlterReplicaLogDirs",
-            "DescribeLogDirs",
-            "SaslAuthenticate",
-            "CreatePartitions",
-            "CreateDelegationToken",
-            "RenewDelegationToken",
-            // 40
-            "ExpireDelegationToken",
-            "DescribeDelegationToken",
-            "DeleteGroups",
-            "ElectLeaders",
-            "IncrementalAlterConfigs",
-            "AlterPartitionReassignments",
-            "ListPartitionReassignments",
-            "OffsetDelete",
-            "DescribeClientQuotas",
-            "AlterClientQuotas",
-            //50
-            "DescribeUserScramCredentials",
-            "AlterUserScramCredentials",
-            "AlterIsr",
-            "UpdateFeatures",
-            "DescribeCluster",
-            "DescribeProducers",
-            "DescribeTransactions",
-            "ListTransactions",
-            "AllocateProducerIds",
-        ];
-        match self.api_key {
-            0..=58 => command_str[self.api_key as usize],
-            _ => "",
-        }
-    }
-}
-
-impl From<KafkaInfo> for L7ProtocolSendLog {
-    fn from(f: KafkaInfo) -> Self {
-        let command_str = f.get_command();
-        let log = L7ProtocolSendLog {
-            req_len: f.req_msg_size,
-            resp_len: f.resp_msg_size,
-            req: L7Request {
-                req_type: String::from(command_str),
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: f.status,
-                code: f.status_code,
-                ..Default::default()
-            },
-            ext_info: Some(ExtendedInfo {
-                request_id: Some(f.correlation_id),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        return log;
     }
 }
 

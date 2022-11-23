@@ -22,29 +22,7 @@ use super::FlowTimeout;
 
 use crate::common::enums::TcpFlags;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlowState {
-    Raw,
-    Opening1,
-    Opening2,
-    Established,
-    ClosingTx1,
-    ClosingTx2,
-    ClosingRx1,
-    ClosingRx2,
-    Closed,
-    Reset,
-    Exception,
-
-    ServerReset,
-    ServerCandidateQueueLack,
-    ClientL4PortReuse,
-    Syn1,
-    SynAck1,
-    EstablishReset,
-
-    Max,
-}
+pub use public::flow_generator::FlowState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StateValue {
@@ -700,9 +678,9 @@ mod tests {
     use crate::flow_generator::flow_node::FlowNode;
     use crate::flow_generator::{FlowTimeout, TcpTimeout};
     use crate::flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, TIME_UNIT};
-    use crate::proto::common::TridentType;
-    use crate::rpc::get_timestamp;
     use crate::utils::test::Capture;
+    use public::proto::common::TridentType;
+    use public::rpc::get_timestamp;
 
     const FILE_DIR: &'static str = "resources/test/flow_generator";
 

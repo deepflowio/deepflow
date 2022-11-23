@@ -17,17 +17,16 @@
 use std::net::{IpAddr, Ipv4Addr};
 
 use bitflags::bitflags;
-use prost::Message;
-use serde::Serialize;
 
 use super::meter::Meter;
 
 use crate::common::{
     enums::{IpProtocol, TapType},
-    flow::L7Protocol,
     tap_port::TapPort,
 };
-use crate::proto::metric;
+use public::common::enums::{Direction, TapSide};
+use public::common::l7_protocol::L7Protocol;
+use public::proto::metric;
 use public::utils::net::MacAddr;
 
 #[derive(Debug)]
@@ -54,11 +53,6 @@ impl Document {
 
     pub fn reverse(&mut self) {
         self.meter.reverse()
-    }
-
-    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        let pb_doc: metric::Document = self.into();
-        pb_doc.encode(buf).map(|_| pb_doc.encoded_len())
     }
 }
 
@@ -122,102 +116,6 @@ impl Code {
 impl Default for Code {
     fn default() -> Self {
         Code::NONE
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Direction {
-    None,
-    ClientToServer = 1 << 0,
-    ServerToClient = 1 << 1,
-    LocalToLocal = 1 << 2,
-
-    // 以下类型为转换TapSide而增加
-    ClientNodeToServer = Direction::ClientToServer as u8 | SIDE_NODE, // 客户端容器节点，路由、SNAT、隧道
-    ServerNodeToClient = Direction::ServerToClient as u8 | SIDE_NODE, // 服务端容器节点，路由、SNAT、隧道
-    ClientHypervisorToServer = Direction::ClientToServer as u8 | SIDE_HYPERVISOR, // 客户端宿主机，隧道
-    ServerHypervisorToClient = Direction::ServerToClient as u8 | SIDE_HYPERVISOR, // 服务端宿主机，隧道
-    ClientGatewayHypervisorToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY_HYPERVISOR, // 客户端网关宿主机
-    ServerGatewayHypervisorToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY_HYPERVISOR, // 服务端网关宿主机
-    ClientGatewayToServer = Direction::ClientToServer as u8 | SIDE_GATEWAY, // 客户端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
-    ServerGatewayToClient = Direction::ServerToClient as u8 | SIDE_GATEWAY, // 服务端网关（特指VIP机制的SLB，例如微软云MUX等）, Mac地址对应的接口为vip设备
-    ClientProcessToServer = Direction::ClientToServer as u8 | SIDE_PROCESS, // 客户端进程
-    ServerProcessToClient = Direction::ServerToClient as u8 | SIDE_PROCESS, // 服务端进程
-}
-
-impl Default for Direction {
-    fn default() -> Self {
-        Direction::ClientToServer
-    }
-}
-
-const SIDE_NODE: u8 = 1 << 3;
-const SIDE_HYPERVISOR: u8 = 2 << 3;
-const SIDE_GATEWAY_HYPERVISOR: u8 = 3 << 3;
-const SIDE_GATEWAY: u8 = 4 << 3;
-const SIDE_PROCESS: u8 = 5 << 3;
-
-const MASK_CLIENT_SERVER: u8 = 0x7;
-const MASK_SIDE: u8 = 0xf8;
-
-impl Direction {
-    pub fn is_client_to_server(self) -> bool {
-        self as u8 & MASK_CLIENT_SERVER == Direction::ClientToServer as u8
-    }
-
-    pub fn is_server_to_client(self) -> bool {
-        self as u8 & MASK_CLIENT_SERVER == Direction::ServerToClient as u8
-    }
-
-    pub fn is_gateway(self) -> bool {
-        (self as u8 & MASK_SIDE) & (SIDE_GATEWAY | SIDE_GATEWAY_HYPERVISOR) != 0
-    }
-}
-
-#[derive(Serialize, Debug, PartialEq, Eq, Clone, Copy)]
-#[repr(u8)]
-pub enum TapSide {
-    Rest = 0,
-    Client = 1 << 0,
-    Server = 1 << 1,
-    Local = 1 << 2,
-    ClientNode = TapSide::Client as u8 | SIDE_NODE,
-    ServerNode = TapSide::Server as u8 | SIDE_NODE,
-    ClientHypervisor = TapSide::Client as u8 | SIDE_HYPERVISOR,
-    ServerHypervisor = TapSide::Server as u8 | SIDE_HYPERVISOR,
-    ClientGatewayHypervisor = TapSide::Client as u8 | SIDE_GATEWAY_HYPERVISOR,
-    ServerGatewayHypervisor = TapSide::Server as u8 | SIDE_GATEWAY_HYPERVISOR,
-    ClientGateway = TapSide::Client as u8 | SIDE_GATEWAY,
-    ServerGateway = TapSide::Server as u8 | SIDE_GATEWAY,
-    ClientProcess = TapSide::Client as u8 | SIDE_PROCESS,
-    ServerProcess = TapSide::Server as u8 | SIDE_PROCESS,
-}
-
-impl Default for TapSide {
-    fn default() -> Self {
-        TapSide::Rest
-    }
-}
-
-impl From<Direction> for TapSide {
-    fn from(direction: Direction) -> Self {
-        match direction {
-            Direction::ClientToServer => TapSide::Client,
-            Direction::ServerToClient => TapSide::Server,
-            Direction::LocalToLocal => TapSide::Local,
-            Direction::ClientNodeToServer => TapSide::ClientNode,
-            Direction::ServerNodeToClient => TapSide::ServerNode,
-            Direction::ClientHypervisorToServer => TapSide::ClientHypervisor,
-            Direction::ServerHypervisorToClient => TapSide::ServerHypervisor,
-            Direction::ClientGatewayHypervisorToServer => TapSide::ClientGatewayHypervisor,
-            Direction::ServerGatewayHypervisorToClient => TapSide::ServerGatewayHypervisor,
-            Direction::ClientGatewayToServer => TapSide::ClientGateway,
-            Direction::ServerGatewayToClient => TapSide::ServerGateway,
-            Direction::ClientProcessToServer => TapSide::ClientProcess,
-            Direction::ServerProcessToClient => TapSide::ServerProcess,
-            Direction::None => TapSide::Rest,
-        }
     }
 }
 
@@ -348,6 +246,7 @@ impl From<Tagger> for metric::MiniTag {
 mod tests {
     use super::*;
     use prost::Message;
+    use public::proto::metric::Document as PbDocument;
 
     #[test]
     fn merge_reverse() {
@@ -381,7 +280,9 @@ mod tests {
         }
 
         let mut buf: Vec<u8> = vec![];
-        let encode_len = doc.encode(&mut buf).unwrap();
+        let pb_doc: PbDocument = doc.into();
+        let _ = pb_doc.encode(&mut buf).unwrap();
+        let encode_len = pb_doc.encoded_len();
 
         let rlt: Result<metric::Document, prost::DecodeError> =
             Message::decode(buf.as_slice().get(..encode_len).unwrap());

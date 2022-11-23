@@ -28,6 +28,7 @@ use std::thread;
 use std::time::Duration;
 
 use log::{error, info, warn};
+use public::packet::MiniPacketEnum;
 
 #[cfg(target_os = "windows")]
 use super::error::Error;
@@ -56,15 +57,15 @@ use crate::{
     flow_generator::MetaAppProto,
     handler::PacketHandlerBuilder,
     policy::PolicyGetter,
-    proto::trident::{Exception, IfMacSource, TapMode},
-    rpc::get_timestamp,
     utils::{bytes::read_u16_be, stats::Collector},
 };
 
 use public::{
     netns::NsFile,
     packet::Packet,
+    proto::trident::{Exception, IfMacSource, TapMode},
     queue::DebugSender,
+    rpc::get_timestamp,
     utils::net::{self, get_route_src_ip, Link, MacAddr},
     LeakyBucket,
 };
@@ -122,6 +123,9 @@ pub(super) struct BaseDispatcher {
 
     // dispatcher id for easy debugging
     pub log_id: String,
+
+    // pcap_assembler sender, use for send mini packet to assemble
+    pub pcap_assembler_sender: DebugSender<MiniPacketEnum>,
 }
 
 impl BaseDispatcher {

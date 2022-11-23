@@ -31,29 +31,25 @@ use arc_swap::access::Access;
 use log::{info, warn};
 
 use super::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, KafkaLog,
-    LogMessageType, MqttLog, MysqlLog, RedisLog,
+    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsImpl, DnsLog, DubboLog,
+    KafkaLog, L7ProtocolInfoInterface, LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
 
 use crate::{
-    common::{
-        ebpf::EbpfType,
-        enums::EthernetType,
-        flow::{get_uniq_flow_id_in_one_minute, PacketDirection, SignalSource},
-        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-        MetaPacket, TaggedFlow,
-    },
+    common::flow::get_uniq_flow_id_in_one_minute,
+    common::{enums::EthernetType, MetaPacket},
     config::handler::LogParserAccess,
-    flow_generator::{
-        protocol_logs::HttpLog, Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST,
-        FLOW_METRICS_PEER_SRC,
-    },
-    metric::document::TapSide,
-    sender::SendItem,
+    flow_generator::{protocol_logs::HttpLog, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
 };
 use public::{
+    common::ebpf::EbpfType,
+    common::enums::TapSide,
+    common::flow::{PacketDirection, SignalSource},
+    common::tagged_flow::TaggedFlow,
+    protocol_logs::{error, l7_protocol_info::L7ProtocolInfo},
     queue::{DebugSender, Error, Receiver},
+    sender::SendItem,
     utils::net::MacAddr,
     LeakyBucket,
 };
@@ -330,9 +326,10 @@ impl SessionQueue {
         key: u64,
     ) {
         if let Some(mut p) = map.remove(&key) {
-            if item.need_protocol_merge() {
-                let _ = p.session_merge(item);
-                if p.special_info.is_session_end() {
+            if item.special_info.need_merge() {
+                let _ = p.merge(item);
+                let (req_end, resp_end) = p.special_info.is_req_resp_end();
+                if req_end && resp_end {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.send(p);
                 } else {
@@ -344,7 +341,7 @@ impl SessionQueue {
                 if p.is_response() {
                     // if can not merge, send req and resp directly.
                     // generally use for ebpf disorder.
-                    if let Err(L7LogCanNotMerge(p)) = item.session_merge(p) {
+                    if let Err(error::Error::L7LogCanNotMerge(p)) = item.merge(p) {
                         self.send(p);
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
@@ -357,7 +354,7 @@ impl SessionQueue {
                 }
             }
         } else {
-            if item.need_protocol_merge() {
+            if item.special_info.need_merge() {
                 let (req_end, resp_end) = item.special_info.is_req_resp_end();
                 // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
                 if req_end || resp_end {
@@ -384,10 +381,10 @@ impl SessionQueue {
     ) {
         // response, 需要找到request并merge
         if let Some(mut request) = map.remove(&key) {
-            if item.need_protocol_merge() {
-                let _ = request.session_merge(item);
-
-                if request.special_info.is_session_end() {
+            if item.special_info.need_merge() {
+                let _ = request.merge(item);
+                let (req_end, resp_end) = request.special_info.is_req_resp_end();
+                if req_end && resp_end {
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.send(request);
                 } else {
@@ -402,7 +399,7 @@ impl SessionQueue {
                 } else {
                     // if can not merge, send req and resp directly.
                     // generally use for ebpf disorder.
-                    if let Err(L7LogCanNotMerge(item)) = request.session_merge(item) {
+                    if let Err(error::Error::L7LogCanNotMerge(item)) = request.merge(item) {
                         self.send(item);
                     }
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
@@ -411,7 +408,7 @@ impl SessionQueue {
                 }
             }
         } else {
-            if item.need_protocol_merge() {
+            if item.special_info.need_merge() {
                 let (req_end, resp_end) = item.special_info.is_req_resp_end();
                 // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
                 // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
@@ -442,7 +439,7 @@ impl SessionQueue {
                 .fetch_sub(map.len() as u64, Ordering::Relaxed);
             let v = map
                 .into_values()
-                .map(|item| SendItem::L7FlowLog(Box::new(item)))
+                .map(|item| SendItem::L7FlowLog(Box::new(item.into())))
                 .collect();
             if let Err(Error::Terminated(..)) = self.output_queue.send_all(v) {
                 warn!("output queue terminated");
@@ -491,8 +488,9 @@ impl SessionQueue {
             return;
         }
 
-        if let Err(Error::Terminated(..)) =
-            self.output_queue.send(SendItem::L7FlowLog(Box::new(item)))
+        if let Err(Error::Terminated(..)) = self
+            .output_queue
+            .send(SendItem::L7FlowLog(Box::new(item.into())))
         {
             warn!("output queue terminated");
         }

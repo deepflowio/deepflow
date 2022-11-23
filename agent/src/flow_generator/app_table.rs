@@ -17,11 +17,12 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use lru::LruCache;
-use public::l7_protocol::{L7Protocol, L7ProtocolEnum};
 
 use crate::common::flow::PacketDirection;
 use crate::common::meta_packet::MetaPacket;
 use crate::common::{L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL};
+
+use public::common::l7_protocol::{L7Protocol, L7ProtocolEnum};
 
 #[derive(Eq, Hash, PartialEq)]
 struct AppTable4Key {

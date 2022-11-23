@@ -15,60 +15,33 @@
  */
 use serde::Serialize;
 
-use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response};
-use super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use super::{
+    consts::*, AppProtoHead, AppProtoInfoImpl, L7ProtocolInfoInterface, L7ResponseStatus,
+    LogMessageType,
+};
 use crate::{
     common::{
         enums::IpProtocol,
         flow::PacketDirection,
-        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         IPV4_ADDR_LEN, IPV6_ADDR_LEN,
     },
-    flow_generator::error::{Error, Result},
-    log_info_merge, parse_common,
+    flow_generator::{Error, Result},
+    parse_common,
     utils::bytes::read_u16_be,
 };
-use public::{l7_protocol::L7Protocol, utils::net::parse_ip_slice};
-
-#[derive(Serialize, Default, Debug, Clone, PartialEq, Eq)]
-pub struct DnsInfo {
-    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
-    pub trans_id: u16,
-    #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
-    pub query_type: u8,
-    #[serde(skip)]
-    pub domain_type: u16,
-
-    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
-    pub query_name: String,
-    // 根据查询类型的不同而不同，如：
-    // A: ipv4/ipv6地址
-    // NS: name server
-    // SOA: primary name server
-    #[serde(rename = "response_result", skip_serializing_if = "value_is_default")]
-    pub answers: String,
-
-    #[serde(rename = "response_status")]
-    pub status: L7ResponseStatus,
-    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    pub status_code: Option<i32>,
-
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    msg_type: LogMessageType,
-    #[serde(skip)]
-    is_tls: bool,
-}
+use public::{
+    common::l7_protocol::L7Protocol, log_info_merge,
+    protocol_logs::l7_protocol_info::L7ProtocolInfo, protocol_logs::DnsInfo,
+    utils::net::parse_ip_slice,
+};
 
 impl L7ProtocolInfoInterface for DnsInfo {
     fn session_id(&self) -> Option<u32> {
         Some(self.trans_id as u32)
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         log_info_merge!(self, DnsInfo, other);
         Ok(())
     }
@@ -90,8 +63,8 @@ impl L7ProtocolInfoInterface for DnsInfo {
     }
 }
 
-impl DnsInfo {
-    pub fn merge(&mut self, other: Self) {
+impl AppProtoInfoImpl for DnsInfo {
+    fn merge(&mut self, other: Self) -> Result<()> {
         self.answers = other.answers;
         if other.status != L7ResponseStatus::default() {
             self.status = other.status;
@@ -102,49 +75,7 @@ impl DnsInfo {
                 self.status_code = Some(code);
             }
         }
-    }
-
-    pub fn get_domain_str(&self) -> &'static str {
-        let typ = [
-            "", "A", "NS", "MD", "MF", "CNAME", "SOA", "MB", "MG", "MR", "NULL", "WKS", "PTR",
-            "HINFO", "MINFO", "MX", "TXT",
-        ];
-
-        match self.domain_type {
-            1..=16 => typ[self.domain_type as usize],
-            28 => "AAAA",
-            252 => "AXFR",
-            253 => "MAILB",
-            254 => "MAILA",
-            255 => "ANY",
-            _ => "",
-        }
-    }
-}
-
-impl From<DnsInfo> for L7ProtocolSendLog {
-    fn from(f: DnsInfo) -> Self {
-        let req_type = String::from(f.get_domain_str());
-        let log = L7ProtocolSendLog {
-            req: L7Request {
-                req_type,
-                resource: f.query_name,
-                ..Default::default()
-            },
-            resp: L7Response {
-                result: f.answers,
-                code: f.status_code,
-                status: f.status,
-                ..Default::default()
-            },
-            ext_info: Some(ExtendedInfo {
-                request_id: Some(f.trans_id as u32),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        return log;
+        Ok(())
     }
 }
 

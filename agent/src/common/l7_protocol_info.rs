@@ -25,6 +25,8 @@ use crate::flow_generator::{
     AppProtoHead, Result,
 };
 
+pub use public::protocol_logs::L7ProtocolInfo;
+
 #[macro_export]
 macro_rules! log_info_merge {
     ($self:ident,$log_type:ident,$other:ident) => {
@@ -40,30 +42,10 @@ macro_rules! log_info_merge {
     };
 }
 
-macro_rules! all_protocol_info {
-    ($($name:ident($info_struct:ident)),+$(,)?) => {
-        #[derive(Serialize, Debug, Clone)]
-        #[enum_dispatch]
-        #[serde(untagged)]
-        pub enum L7ProtocolInfo {
-            $(
-                $name($info_struct),
-            )+
-        }
-
-        impl From<L7ProtocolInfo> for L7ProtocolSendLog{
-            fn from(f:L7ProtocolInfo)->L7ProtocolSendLog{
-                match f{
-                    $(
-                        L7ProtocolInfo::$name(info)=>info.into(),
-                    )+
-                }
-            }
-        }
-    };
-}
-
-all_protocol_info!(
+#[derive(Serialize, Debug, Clone)]
+#[enum_dispatch]
+#[serde(untagged)]
+pub enum L7ProtocolInfo {
     DnsInfo(DnsInfo),
     HttpInfo(HttpInfo),
     MysqlInfo(MysqlInfo),
@@ -75,7 +57,23 @@ all_protocol_info!(
     // add new protocol info below
     PostgreInfo(PostgreInfo),
     ProtobufRpcInfo(ProtobufRpcInfo),
-);
+}
+
+impl From<L7ProtocolInfo> for L7ProtocolSendLog {
+    fn from(f: L7ProtocolInfo) -> L7ProtocolSendLog {
+        match f {
+            L7ProtocolInfo::DnsInfo(info) => info.into(),
+            L7ProtocolInfo::HttpInfo(info) => info.into(),
+            L7ProtocolInfo::MysqlInfo(info) => info.into(),
+            L7ProtocolInfo::RedisInfo(info) => info.into(),
+            L7ProtocolInfo::DubboInfo(info) => info.into(),
+            L7ProtocolInfo::KafkaInfo(info) => info.into(),
+            L7ProtocolInfo::MqttInfo(info) => info.into(),
+            L7ProtocolInfo::PostgreInfo(info) => info.into(),
+            L7ProtocolInfo::ProtobufRpcInfo(info) => info.into(),
+        }
+    }
+}
 
 #[enum_dispatch(L7ProtocolInfo)]
 pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
@@ -107,12 +105,5 @@ pub trait L7ProtocolInfoInterface: Into<L7ProtocolSendLog> {
     // when need merge more than once, use to determine if the stream has ended.
     fn is_req_resp_end(&self) -> (bool, bool) {
         (false, false)
-    }
-}
-
-impl L7ProtocolInfo {
-    pub fn is_session_end(&self) -> bool {
-        let (req_end, resp_end) = self.is_req_resp_end();
-        req_end && resp_end
     }
 }

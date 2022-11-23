@@ -17,5 +17,5 @@
 mod dubbo;
 mod protobuf_rpc;
 
-pub use dubbo::{DubboHeader, DubboInfo, DubboLog};
-pub use protobuf_rpc::{get_protobuf_rpc_parser, ProtobufRpcInfo, ProtobufRpcWrapLog};
+pub use dubbo::{DubboHeader, DubboLog};
+pub use protobuf_rpc::{get_protobuf_rpc_parser, ProtobufRpcWrapLog};

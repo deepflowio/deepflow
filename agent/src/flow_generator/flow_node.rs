@@ -17,20 +17,17 @@
 use std::{net::IpAddr, time::Duration};
 
 use super::{perf::FlowPerf, FlowState, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC};
-use crate::{
-    common::{
-        decapsulate::TunnelType,
-        endpoint::EndpointData,
-        enums::{EthernetType, TapType, TcpFlags},
-        flow::{FlowMetricsPeer, PacketDirection},
-        lookup_key::LookupKey,
-        meta_packet::MetaPacket,
-        tagged_flow::TaggedFlow,
-        TapPort,
-    },
-    proto::common::TridentType,
+use crate::common::{
+    endpoint::EndpointData,
+    enums::{EthernetType, TapType, TcpFlags},
+    flow::{FlowMetricsPeer, PacketDirection},
+    lookup_key::LookupKey,
+    meta_packet::MetaPacket,
+    TapPort,
 };
 use npb_pcap_policy::PolicyData;
+use public::common::{decapsulate::TunnelType, tagged_flow::TaggedFlow};
+use public::proto::common::TridentType;
 use public::utils::net::MacAddr;
 
 #[repr(u8)]

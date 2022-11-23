@@ -18,9 +18,6 @@ use std::net::IpAddr;
 
 use enum_dispatch::enum_dispatch;
 
-use super::ebpf::EbpfType;
-use super::flow::PacketDirection;
-use super::l7_protocol_info::L7ProtocolInfo;
 use super::MetaPacket;
 
 use crate::config::handler::LogParserAccess;
@@ -31,8 +28,13 @@ use crate::flow_generator::protocol_logs::{
 use crate::flow_generator::Result;
 
 use public::bitmap::Bitmap;
-use public::enums::IpProtocol;
-use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
+use public::common::{
+    ebpf::EbpfType,
+    enums::IpProtocol,
+    flow::PacketDirection,
+    l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol},
+};
+use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.

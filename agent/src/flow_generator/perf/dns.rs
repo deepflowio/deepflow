@@ -28,7 +28,7 @@ use crate::{
         flow::{FlowPerfStats, L7PerfStats, L7Protocol},
         meta_packet::MetaPacket,
     },
-    flow_generator::error::{Error, Result},
+    flow_generator::{Error, Result},
     utils::bytes::{read_u16_be, read_u16_le},
 };
 

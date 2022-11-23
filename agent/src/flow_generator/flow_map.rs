@@ -37,15 +37,14 @@ use log::{debug, warn};
 
 use super::{
     app_table::AppTable,
-    error::Error,
     flow_state::{StateMachine, StateValue},
     perf::{FlowPerf, FlowPerfCounter, L7RrtCache},
-    protocol_logs::MetaAppProto,
+    protocol_logs::{L7ProtocolInfoInterface, MetaAppProto},
     service_table::{ServiceKey, ServiceTable},
-    FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK, FLOW_METRICS_PEER_DST,
-    FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY, QUEUE_BATCH_SIZE,
-    SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
-    THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
+    Error, FlowMapKey, FlowNode, FlowState, FlowTimeKey, COUNTER_FLOW_ID_MASK,
+    FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC, L7_PROTOCOL_UNKNOWN_LIMIT, L7_RRT_CACHE_CAPACITY,
+    QUEUE_BATCH_SIZE, SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY,
+    STATISTICAL_INTERVAL, THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
 };
 
 use crate::{
@@ -56,11 +55,9 @@ use crate::{
             CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, PacketDirection,
             SignalSource, TunnelField,
         },
-        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{get_parser, L7ProtocolParserInterface},
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
-        tagged_flow::TaggedFlow,
         tap_port::TapPort,
         FeatureFlags,
     },
@@ -69,16 +66,19 @@ use crate::{
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
     policy::{Policy, PolicyGetter},
-    proto::common::TridentType,
-    rpc::get_timestamp,
     utils::stats::{self, Countable, StatsOption},
 };
 use npb_pcap_policy::PolicyData;
 use public::{
     bitmap::Bitmap,
+    common::tagged_flow::TaggedFlow,
     counter::{Counter, CounterType, CounterValue, RefCountable},
     debug::QueueDebugger,
+    packet::{MiniPacket, MiniPacketEnum},
+    proto::common::TridentType,
+    protocol_logs::l7_protocol_info::L7ProtocolInfo,
     queue::{self, DebugSender, Receiver},
+    rpc::get_timestamp,
     utils::net::MacAddr,
 };
 
@@ -109,6 +109,7 @@ pub struct FlowMap {
     packet_sequence_enabled: bool,
     l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     stats_counter: Arc<FlowMapCounter>,
+    pcap_assembler_sender: DebugSender<MiniPacketEnum>,
 }
 
 impl FlowMap {
@@ -123,6 +124,7 @@ impl FlowMap {
         packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
         stats_collector: &stats::Collector,
         from_ebpf: bool,
+        pcap_assembler_sender: DebugSender<MiniPacketEnum>,
     ) -> Self {
         let flow_perf_counter = Arc::new(FlowPerfCounter::default());
         let stats_counter = Arc::new(FlowMapCounter::default());
@@ -170,6 +172,7 @@ impl FlowMap {
             packet_sequence_enabled,
             l7_protocol_parse_port_bitmap,
             stats_counter,
+            pcap_assembler_sender,
         }
     }
 
@@ -322,6 +325,11 @@ impl FlowMap {
                 // 2. 更新Flow状态，判断是否已结束
                 // 设置timestamp_key为流的相同，time_set根据key来删除
                 let time_key = FlowTimeKey::new(Duration::from_nanos(node.timestamp_key), pkt_key);
+                Self::send_packet_to_assembler(
+                    &self.pcap_assembler_sender,
+                    meta_packet,
+                    node.tagged_flow.flow.flow_id,
+                );
                 match meta_packet.lookup_key.proto {
                     IpProtocol::Tcp => {
                         self.update_tcp_node(node, meta_packet, time_key, &mut time_set, nodes)
@@ -349,6 +357,34 @@ impl FlowMap {
         self.time_set.replace(time_set);
         // go实现只有插入node的时候，插入的节点数目大于ring buffer 的capacity 才会执行policy_getter,
         // rust 版本用了std的hashmap自动处理扩容，所以无需执行policy_gettelr
+    }
+
+    // send packet to pcap-assembler
+    fn send_packet_to_assembler(
+        sender: &DebugSender<MiniPacketEnum>,
+        meta_packet: &MetaPacket,
+        flow_id: u64,
+    ) {
+        if (meta_packet.raw.is_some() && meta_packet.raw.unwrap().len() != 0)
+            || meta_packet.raw_from_ebpf.len() != 0
+        {
+            let mini_packet = MiniPacket {
+                packet: 'P: {
+                    if let Some(e) = meta_packet.raw {
+                        if e.len() != 0 {
+                            break 'P e.to_vec();
+                        }
+                    }
+                    meta_packet.raw_from_ebpf.clone()
+                },
+                timestamp: meta_packet.lookup_key.timestamp,
+                flow_id,
+            };
+
+            if let Err(e) = sender.send(MiniPacketEnum::Packet(mini_packet)) {
+                debug!("send mini packet to pcap assembler error: {e:?}");
+            }
+        }
     }
 
     fn update_tcp_node(
@@ -973,11 +1009,17 @@ impl FlowMap {
 
     fn new_flow_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         self.stats_counter.new.fetch_add(1, Ordering::Relaxed);
-        match meta_packet.lookup_key.proto {
+        let node = match meta_packet.lookup_key.proto {
             IpProtocol::Tcp => self.new_tcp_node(meta_packet),
             IpProtocol::Udp => self.new_udp_node(meta_packet),
             _ => self.new_other_node(meta_packet),
-        }
+        };
+        Self::send_packet_to_assembler(
+            &self.pcap_assembler_sender,
+            meta_packet,
+            node.tagged_flow.flow.flow_id,
+        );
+        node
     }
 
     fn flush_queue(&mut self, now: Duration) {
@@ -1383,6 +1425,7 @@ pub fn _new_flow_map_and_receiver(
         queue::bounded_with_debug(256, "", &queue_debugger);
     let (app_proto_log_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
     let (packet_sequence_queue, _, _) = queue::bounded_with_debug(256, "", &queue_debugger); // Enterprise Edition Feature: packet-sequence
+    let (pcap_assembler_sender, _, _) = queue::bounded_with_debug(256, "", &queue_debugger);
     let mut config = ModuleConfig {
         flow: FlowConfig {
             trident_type,
@@ -1418,6 +1461,7 @@ pub fn _new_flow_map_and_receiver(
         Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
         &stats::Collector::new(&vec!["127.0.0.1".to_string()]),
         false,
+        pcap_assembler_sender,
     );
 
     (flow_map, output_queue_receiver)

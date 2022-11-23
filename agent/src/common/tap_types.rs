@@ -24,9 +24,9 @@ use std::{
 
 use log::warn;
 
-use crate::proto::trident;
-
 use super::{enums::TapType, XflowKey};
+
+use public::proto::trident;
 
 const VLAN_MAX: u16 = 4096;
 

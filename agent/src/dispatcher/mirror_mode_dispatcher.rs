@@ -46,13 +46,13 @@ use crate::{
     flow_generator::FlowMap,
     handler::PacketHandlerBuilder,
     handler::{MiniPacket, PacketHandler},
-    proto::{common::TridentType, trident::IfMacSource},
-    rpc::get_timestamp,
     utils::environment::is_tt_hyper_v_compute,
 };
 use packet_dedup::PacketDedupMap;
 #[cfg(windows)]
 use public::packet::Packet;
+use public::proto::{common::TridentType, trident::IfMacSource};
+use public::rpc::get_timestamp;
 use public::utils::net::{Link, MacAddr};
 
 const IF_INDEX_MAX_SIZE: usize = 1000;
@@ -369,6 +369,7 @@ impl MirrorModeDispatcher {
             Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &self.base.stats,
             false, // !from_ebpf
+            self.base.pcap_assembler_sender.clone(),
         );
 
         while !self.base.terminated.load(Ordering::Relaxed) {

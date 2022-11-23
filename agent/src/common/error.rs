@@ -24,4 +24,6 @@ pub enum Error {
     ParseIpGroupData(String),
     #[error("{0}")]
     ParsePlatformData(String),
+    #[error("{0}")]
+    ParseFlow(String),
 }

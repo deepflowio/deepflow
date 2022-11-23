@@ -21,7 +21,7 @@ use crate::common::{
     flow::{FlowPerfStats, L4Protocol, PacketDirection},
     meta_packet::MetaPacket,
 };
-use crate::flow_generator::error::{Error, Result};
+use crate::flow_generator::{Error, Result};
 
 use super::{L4FlowPerf, ART_MAX};
 

@@ -31,27 +31,20 @@ use pnet::packet::{
 use super::ebpf::EbpfType;
 #[cfg(target_os = "linux")]
 use super::enums::TapType;
-use super::{
-    consts::*,
-    decapsulate::TunnelInfo,
-    endpoint::EndpointData,
-    enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
-    flow::{L7Protocol, PacketDirection, SignalSource},
-    lookup_key::LookupKey,
-    tap_port::TapPort,
-};
+use super::{consts::*, decapsulate::TunnelInfo, endpoint::EndpointData, lookup_key::LookupKey};
 
-use crate::error;
 #[cfg(target_os = "linux")]
-use crate::{
-    common::ebpf::GO_HTTP2_UPROBE,
-    ebpf::{
-        MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
-        SOCK_DIR_RCV, SOCK_DIR_SND,
-    },
+use crate::ebpf::{
+    MSG_REQUEST_END, MSG_RESPONSE_END, SK_BPF_DATA, SOCK_DATA_HTTP2, SOCK_DATA_TLS_HTTP2,
+    SOCK_DIR_RCV, SOCK_DIR_SND,
 };
+use crate::error;
 use npb_handler::NpbMode;
 use npb_pcap_policy::PolicyData;
+use public::common::ebpf::GO_HTTP2_UPROBE;
+use public::common::enums::{EthernetType, HeaderType, IpProtocol, TcpFlags};
+use public::common::flow::{L7Protocol, PacketDirection, SignalSource};
+use public::common::tap_port::TapPort;
 use public::utils::net::{is_unicast_link_local, MacAddr};
 
 #[derive(Clone, Debug, Default)]

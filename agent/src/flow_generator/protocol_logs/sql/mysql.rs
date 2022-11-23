@@ -16,66 +16,31 @@
 
 use serde::Serialize;
 
-use super::super::{consts::*, value_is_default, AppProtoHead, L7ResponseStatus, LogMessageType};
+use super::super::{
+    consts::*, AppProtoHead, AppProtoInfoImpl, L7ProtocolInfoInterface, L7ResponseStatus,
+    LogMessageType,
+};
 use super::sql_check::is_mysql;
 
-use crate::common::l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface};
 use crate::common::l7_protocol_log::{L7ProtocolParserInterface, ParseParam};
-use crate::flow_generator::protocol_logs::pb_adapter::{
-    ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response,
-};
 use crate::{
     common::enums::IpProtocol,
-    common::flow::L7Protocol,
-    common::flow::PacketDirection,
-    flow_generator::error::{Error, Result},
+    flow_generator::{Error, Result},
+    parse_common,
     utils::bytes,
 };
-use crate::{log_info_merge, parse_common};
-
-#[derive(Serialize, Debug, Default, Clone)]
-pub struct MysqlInfo {
-    msg_type: LogMessageType,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    #[serde(skip)]
-    is_tls: bool,
-
-    // Server Greeting
-    #[serde(rename = "version", skip_serializing_if = "value_is_default")]
-    pub protocol_version: u8,
-    #[serde(skip)]
-    pub server_version: String,
-    #[serde(skip)]
-    pub server_thread_id: u32,
-    // request
-    #[serde(rename = "request_type")]
-    pub command: u8,
-    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
-    pub context: String,
-    // response
-    pub response_code: u8,
-    #[serde(skip)]
-    pub error_code: Option<i32>,
-    #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
-    pub affected_rows: u64,
-    #[serde(
-        rename = "response_execption",
-        skip_serializing_if = "value_is_default"
-    )]
-    pub error_message: String,
-    #[serde(rename = "response_status")]
-    pub status: L7ResponseStatus,
-}
+use public::common::flow::PacketDirection;
+use public::common::l7_protocol::L7Protocol;
+use public::log_info_merge;
+use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
+use public::protocol_logs::MysqlInfo;
 
 impl L7ProtocolInfoInterface for MysqlInfo {
     fn session_id(&self) -> Option<u32> {
         None
     }
 
-    fn merge_log(&mut self, other: crate::common::l7_protocol_info::L7ProtocolInfo) -> Result<()> {
+    fn merge_log(&mut self, other: L7ProtocolInfo) -> Result<()> {
         log_info_merge!(self, MysqlInfo, other);
         Ok(())
     }
@@ -101,8 +66,8 @@ impl L7ProtocolInfoInterface for MysqlInfo {
     }
 }
 
-impl MysqlInfo {
-    pub fn merge(&mut self, other: Self) {
+impl AppProtoInfoImpl for MysqlInfo {
+    fn merge(&mut self, other: Self) -> Result<()> {
         if self.protocol_version == 0 {
             self.protocol_version = other.protocol_version
         }
@@ -128,76 +93,7 @@ impl MysqlInfo {
             }
             _ => {}
         }
-    }
-
-    pub fn get_command_str(&self) -> &'static str {
-        let command = [
-            "COM_SLEEP",
-            "COM_QUIT",
-            "COM_INIT_DB",
-            "COM_QUERY",
-            "COM_FIELD_LIST",
-            "COM_CREATE_DB",
-            "COM_DROP_DB",
-            "COM_REFRESH",
-            "COM_SHUTDOWN",
-            "COM_STATISTICS",
-            "COM_PROCESS_INFO",
-            "COM_CONNECT",
-            "COM_PROCESS_KILL",
-            "COM_DEBUG",
-            "COM_PING",
-            "COM_TIME",
-            "COM_DELAYED_INSERT",
-            "COM_CHANGE_USER",
-            "COM_BINLOG_DUMP",
-            "COM_TABLE_DUMP",
-            "COM_CONNECT_OUT",
-            "COM_REGISTER_SLAVE",
-            "COM_STMT_PREPARE",
-            "COM_STMT_EXECUTE",
-            "COM_STMT_SEND_LONG_DATA",
-            "COM_STMT_CLOSE",
-            "COM_STMT_RESET",
-            "COM_SET_OPTION",
-            "COM_STMT_FETCH",
-            "COM_DAEMON",
-            "COM_BINLOG_DUMP_GTID",
-            "COM_RESET_CONNECTION",
-        ];
-        match self.command {
-            0x00..=0x1f => command[self.command as usize],
-            _ => "",
-        }
-    }
-}
-
-impl From<MysqlInfo> for L7ProtocolSendLog {
-    fn from(f: MysqlInfo) -> Self {
-        let log = L7ProtocolSendLog {
-            version: if f.protocol_version == 0 {
-                None
-            } else {
-                Some(f.protocol_version.to_string())
-            },
-            row_effect: f.affected_rows as u32,
-            req: L7Request {
-                req_type: String::from(f.get_command_str()),
-                resource: f.context,
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: f.status,
-                code: f.error_code,
-                exception: f.error_message,
-                ..Default::default()
-            },
-            ext_info: Some(ExtendedInfo {
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        return log;
+        Ok(())
     }
 }
 

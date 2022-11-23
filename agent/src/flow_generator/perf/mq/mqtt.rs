@@ -29,19 +29,20 @@ use crate::{
         meta_packet::MetaPacket,
     },
     flow_generator::{
-        error::{Error, Result},
         perf::l7_rrt::L7RrtCache,
         perf::stats::PerfStats,
         perf::L7FlowPerf,
         protocol_logs::{
             mqtt::{
                 mqtt_fixed_header, parse_connack_packet, parse_connect_packet, parse_status_code,
-                PacketKind, QualityOfService,
             },
             AppProtoHead, L7ResponseStatus, LogMessageType,
         },
+        {Error, Result},
     },
 };
+
+use public::protocol_logs::{PacketKind, QualityOfService};
 
 pub const PORT: u16 = 1883;
 

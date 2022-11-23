@@ -594,6 +594,7 @@ dependencies = [
  "pcap 0.10.1",
  "pcap 0.9.2",
  "pcap-sys",
+ "pcap_assembler",
  "pnet",
  "prost",
  "public",
@@ -1761,6 +1762,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pcap_assembler"
+version = "0.1.0"
+dependencies = [
+ "public",
+]
+
+[[package]]
 name = "pem"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2060,14 +2068,18 @@ dependencies = [
  "bincode",
  "bitflags",
  "cadence",
+ "enum_dispatch",
  "hpack",
  "log 0.4.17",
  "neli",
  "nix 0.23.1",
+ "nom",
+ "npb_pcap_policy",
  "num_enum",
  "parking_lot 0.11.2",
  "pcap 0.10.1",
  "pnet",
+ "prost",
  "regex",
  "serde",
  "serde_json",
@@ -2075,6 +2087,7 @@ dependencies = [
  "socket2",
  "thiserror",
  "tonic",
+ "tonic-build",
  "windows",
 ]
 

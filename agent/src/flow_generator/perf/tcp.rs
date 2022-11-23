@@ -30,7 +30,7 @@ use crate::{
         lookup_key::LookupKey,
         meta_packet::{MetaPacket, MetaPacketTcpHeader},
     },
-    flow_generator::error::{Error, Result},
+    flow_generator::{Error, Result},
 };
 
 const SRT_MAX: Duration = Duration::from_secs(10);

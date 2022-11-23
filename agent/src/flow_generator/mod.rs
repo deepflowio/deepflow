@@ -15,7 +15,6 @@
  */
 
 mod app_table;
-mod error;
 mod flow_config;
 pub mod flow_map;
 mod flow_node;
@@ -26,7 +25,6 @@ pub mod protocol_logs;
 mod service_table;
 
 pub use app_table::AppTable;
-pub use error::{Error, Result};
 pub use flow_config::{FlowMapConfig, FlowMapRuntimeConfig, FlowTimeout, TcpTimeout};
 pub use flow_map::FlowMap;
 use flow_node::{FlowMapKey, FlowNode, FlowTimeKey};
@@ -35,6 +33,7 @@ pub use packet_sequence::PacketSequenceParser; // Enterprise Edition Feature: pa
 pub use perf::L7RrtCache;
 pub use protocol_logs::L7ProtoRawDataType;
 pub use protocol_logs::{
+    error::{Error, Result},
     AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, AppProtoLogsParser, DnsLog, DubboLog,
     HttpLog, KafkaLog, LogMessageType, MetaAppProto, MqttLog, MysqlLog, RedisLog,
 };

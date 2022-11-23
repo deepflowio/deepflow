@@ -1,2 +1,8 @@
 Cargo.lock
 /target
+
+# generated protobuf files
+
+!src/proto/mod.rs  
+src/proto/*.rs
+src/proto/integration/open*.rs

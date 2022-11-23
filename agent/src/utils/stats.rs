@@ -28,13 +28,13 @@ use cadence::{
     Counted, Metric, MetricBuilder, MetricError, MetricResult, MetricSink, StatsdClient,
 };
 use log::{debug, info, warn};
-use prost::Message;
 pub use public::counter::*;
 
 use crate::common::DEFAULT_INGESTER_PORT;
-use crate::proto::stats;
-use crate::sender::SendItem;
+
+use public::proto::stats;
 use public::queue::{bounded, Receiver, Sender};
+use public::sender::SendItem;
 
 const STATS_PREFIX: &'static str = "deepflow_agent";
 const TICK_CYCLE: Duration = Duration::from_secs(60);
@@ -78,11 +78,6 @@ pub struct Batch {
 }
 
 impl Batch {
-    pub fn encode(&self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        let pb_stats: stats::Stats = self.to_stats();
-        pb_stats.encode(buf).map(|_| pb_stats.encoded_len())
-    }
-
     fn to_stats(&self) -> stats::Stats {
         let mut tag_names = vec![];
         let mut tag_values = vec![];
@@ -338,7 +333,8 @@ impl Collector {
                                     points,
                                     timestamp: now,
                                 });
-                                if let Err(_) = sender.send(SendItem::DeepflowStats(batch.clone()))
+                                if let Err(_) =
+                                    sender.send(SendItem::DeepflowStats(Box::new(batch.to_stats())))
                                 {
                                     debug!(
                                         "stats to send queue failed because queue have terminated"

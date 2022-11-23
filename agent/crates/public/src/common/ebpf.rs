@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 use serde::Serialize;
 
 //ebpf 上报的数据类型
@@ -18,6 +34,18 @@ const EBPF_TYPE_TRACEPOINT: u8 = 0;
 const EBPF_TYPE_TLS_UPROBE: u8 = 1;
 const EBPF_TYPE_GO_HTTP2_UPROBE: u8 = 2;
 const EBPF_TYPE_NONE: u8 = 255;
+
+// 消息类型
+// 目前除了 source=EBPF_TYPE_GO_HTTP2_UPROBE 以外,都不能保证这个方向的正确性.
+// go http2 uprobe 目前 只用了MSG_RESPONSE_END, 用于判断流结束.
+#[allow(dead_code)]
+pub const MSG_REQUEST: u8 = 1;
+#[allow(dead_code)]
+pub const MSG_RESPONSE: u8 = 2;
+#[allow(dead_code)]
+pub const MSG_REQUEST_END: u8 = 3;
+#[allow(dead_code)]
+pub const MSG_RESPONSE_END: u8 = 4;
 
 // ebpf的类型,由ebpf程序传入,对应 SK_BPF_DATA 的 source 字段
 #[derive(Serialize, Debug, PartialEq, Copy, Clone)]

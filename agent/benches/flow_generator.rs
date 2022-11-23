@@ -22,12 +22,13 @@ use criterion::*;
 
 use deepflow_agent::{
     _FlowPerfCounter as FlowPerfCounter, _TcpFlags as TcpFlags, _TcpPerf as TcpPerf,
-    _TridentType as TridentType, _benchmark_report as benchmark_report,
+    _benchmark_report as benchmark_report,
     _benchmark_session_peer_seq_no_assert as benchmark_session_peer_seq_no_assert,
     _meta_flow_perf_update as meta_flow_perf_update,
     _new_flow_map_and_receiver as new_flow_map_and_receiver, _new_meta_packet as new_meta_packet,
     _reverse_meta_packet as reverse_meta_packet,
 };
+use public::proto::common::TridentType;
 
 fn bench_flow_map(c: &mut Criterion) {
     c.bench_function("flow_map_syn_flood", |b| {

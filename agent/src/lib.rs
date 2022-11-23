@@ -32,10 +32,8 @@ mod handler;
 mod integration_collector;
 mod metric;
 mod monitor;
-mod pcap;
 mod platform;
 mod policy;
-mod proto;
 mod rpc;
 mod sender;
 pub mod trident;
@@ -67,5 +65,4 @@ pub use {
     },
     policy::first_path::FirstPath as _FirstPath,
     policy::labeler::Labeler as _Labeler,
-    proto::common::TridentType as _TridentType,
 };

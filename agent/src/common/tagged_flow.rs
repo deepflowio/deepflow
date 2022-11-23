@@ -22,15 +22,8 @@ use serde::Serialize;
 use super::flow::Flow;
 use super::tag::Tag;
 
-use crate::proto::flow_log;
-
-#[derive(Serialize, Default, Clone, Debug)]
-pub struct TaggedFlow {
-    #[serde(flatten)]
-    pub flow: Flow,
-    #[serde(skip)]
-    pub tag: Tag,
-}
+pub use public::common::tagged_flow::TaggedFlow;
+use public::proto::flow_log;
 
 impl TaggedFlow {
     pub fn sequential_merge(&mut self, other: &TaggedFlow) {
@@ -39,15 +32,6 @@ impl TaggedFlow {
     pub fn reverse(&mut self) {
         self.flow.reverse(false);
         self.tag.reverse();
-    }
-
-    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
-        let pb_tagged_flow = flow_log::TaggedFlow {
-            flow: Some(self.flow.into()),
-        };
-        pb_tagged_flow
-            .encode(buf)
-            .map(|_| pb_tagged_flow.encoded_len())
     }
 
     pub fn to_kv_string(&self, dst: &mut String) {
@@ -60,6 +44,23 @@ impl TaggedFlow {
 impl fmt::Display for TaggedFlow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "flow:{}\n\t tag:{:?}", self.flow, self.tag)
+    }
+}
+
+impl From<TaggedFlow> for flow_log::TaggedFlow {
+    fn from(t: TaggedFlow) -> Self {
+        flow_log::TaggedFlow {
+            flow: Some(t.flow.into()),
+        }
+    }
+}
+
+impl From<flow_log::TaggedFlow> for TaggedFlow {
+    fn from(tagged_flow: flow_log::TaggedFlow) -> Self {
+        Self {
+            flow: tagged_flow.flow.into(),
+            tag: Default::default(),
+        }
     }
 }
 

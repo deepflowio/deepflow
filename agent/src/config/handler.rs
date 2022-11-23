@@ -55,11 +55,6 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
-    proto::trident::{self, CaptureSocketType},
-    proto::{
-        common::TridentType,
-        trident::{Exception, IfMacSource, SocketType, TapMode},
-    },
     trident::{Components, RunningMode},
     utils::{
         environment::{free_memory_check, get_ctrl_ip_and_mac},
@@ -68,6 +63,10 @@ use crate::{
 };
 
 use public::bitmap::Bitmap;
+use public::proto::{
+    common::TridentType,
+    trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
+};
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;
@@ -312,6 +311,10 @@ pub struct FlowConfig {
 
     // vec<protocolName, port bitmap>
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
+
+    // pcap assembler enabled
+    // CE-agent always be disabled, only EE-agent maybe enabled
+    pub pcap_assembler_enabled: bool,
 }
 
 impl From<&RuntimeConfig> for FlowConfig {
@@ -358,6 +361,7 @@ impl From<&RuntimeConfig> for FlowConfig {
             l7_protocol_parse_port_bitmap: Arc::new(
                 (&conf.yaml_config).get_protocol_port_parse_bitmap(),
             ),
+            pcap_assembler_enabled: conf.yaml_config.pcap.enabled,
         }
     }
 }

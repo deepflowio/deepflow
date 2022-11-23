@@ -14,21 +14,21 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::{L7Protocol, ProtobufRpcProtocol};
 use serde::Serialize;
+
+use super::{all_protobuf_rpc_parser, ProtobufRpcLog};
 
 use crate::{
     common::{
         flow::FlowPerfStats,
-        l7_protocol_info::L7ProtocolInfo,
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         MetaPacket,
     },
     flow_generator::{perf::L7FlowPerf, AppProtoHead, Error, Result},
 };
 
-use super::{all_protobuf_rpc_parser, ProtobufRpcLog};
-
+use public::common::l7_protocol::{L7Protocol, ProtobufRpcProtocol};
+use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
 // this is the wrap for ProtobufRpcLog
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct ProtobufRpcWrapLog {

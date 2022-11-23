@@ -14,10 +14,26 @@
  * limitations under the License.
  */
 
-pub(crate) mod common;
-pub(crate) mod flow_log;
-pub(crate) mod integration;
-pub(crate) mod metric;
-pub(crate) mod protobuf_rpc;
-pub(crate) mod stats;
-pub(crate) mod trident;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowState {
+    Raw,
+    Opening1,
+    Opening2,
+    Established,
+    ClosingTx1,
+    ClosingTx2,
+    ClosingRx1,
+    ClosingRx2,
+    Closed,
+    Reset,
+    Exception,
+
+    ServerReset,
+    ServerCandidateQueueLack,
+    ClientL4PortReuse,
+    Syn1,
+    SynAck1,
+    EstablishReset,
+
+    Max,
+}

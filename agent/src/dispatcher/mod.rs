@@ -44,7 +44,8 @@ use pcap_sys::bpf_insn;
 #[cfg(target_os = "linux")]
 use pcap_sys::{bpf_program, pcap_compile_nopcap};
 #[cfg(target_os = "linux")]
-use public::enums::LinuxSllPacketType::Outgoing;
+use public::common::enums::LinuxSllPacketType::Outgoing;
+use public::packet::MiniPacketEnum;
 #[cfg(target_os = "windows")]
 use windows_recv_engine::WinPacket;
 
@@ -74,13 +75,13 @@ use crate::{
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::LibvirtXmlExtractor,
     policy::PolicyGetter,
-    proto::{common::TridentType, trident::IfMacSource, trident::TapMode},
     utils::stats::{self, Collector},
 };
 #[cfg(target_os = "linux")]
 use public::netns::NetNs;
 use public::{
     netns::NsFile,
+    proto::{common::TridentType, trident::IfMacSource, trident::TapMode},
     queue::DebugSender,
     utils::net::{Link, MacAddr},
     LeakyBucket,
@@ -555,6 +556,7 @@ pub struct DispatcherBuilder {
     pcap_interfaces: Option<Vec<Link>>,
     netns: Option<NsFile>,
     trident_type: Option<TridentType>,
+    pcap_assembler_sender: Option<DebugSender<MiniPacketEnum>>,
 }
 
 impl DispatcherBuilder {
@@ -678,6 +680,11 @@ impl DispatcherBuilder {
 
     pub fn trident_type(mut self, v: TridentType) -> Self {
         self.trident_type = Some(v);
+        self
+    }
+
+    pub fn pcap_assembler_sender(mut self, v: DebugSender<MiniPacketEnum>) -> Self {
+        self.pcap_assembler_sender = Some(v);
         self
     }
 
@@ -812,6 +819,9 @@ impl DispatcherBuilder {
                 .ok_or(Error::ConfigIncomplete("no packet_sequence_block".into()))?,
             netns,
             npb_dedup_enabled: Arc::new(AtomicBool::new(false)),
+            pcap_assembler_sender: self
+                .pcap_assembler_sender
+                .ok_or(Error::ConfigIncomplete("no pcap assembler sender".into()))?,
         };
         collector.register_countable(
             "dispatcher",

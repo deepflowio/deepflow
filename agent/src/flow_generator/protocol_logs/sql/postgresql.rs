@@ -14,86 +14,32 @@
  * limitations under the License.
  */
 
-use public::{
-    bytes::{read_u32_be, read_u64_be},
-    l7_protocol::L7Protocol,
-};
 use serde::Serialize;
 
 use crate::{
     common::{
-        flow::{FlowPerfStats, L7PerfStats, PacketDirection},
-        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
         MetaPacket,
     },
     flow_generator::{
         perf::{L7FlowPerf, PerfStats},
-        protocol_logs::{
-            pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response},
-            L7ResponseStatus,
-        },
         AppProtoHead, Error, LogMessageType, Result,
     },
 };
 
 use super::{
-    super::value_is_default,
-    postgre_convert::{get_code_desc, get_request_str},
-    sql_check::is_postgresql,
+    super::L7ProtocolInfoInterface, postgre_convert::get_code_desc, sql_check::is_postgresql,
+};
+
+use public::{
+    bytes::{read_u32_be, read_u64_be},
+    common::flow::{FlowPerfStats, L7PerfStats, PacketDirection},
+    common::l7_protocol::L7Protocol,
+    protocol_logs::l7_protocol_info::L7ProtocolInfo,
+    protocol_logs::{L7ResponseStatus, PostgreInfo},
 };
 
 const SSL_REQ: u64 = 34440615471; // 00000008(len) 04d2162f(const 80877103)
-
-#[derive(Debug, Default, Clone, Serialize)]
-pub struct PostgreInfo {
-    msg_type: LogMessageType,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    #[serde(skip)]
-    is_tls: bool,
-    /*
-        ignore return this info, default is true.
-
-        with request, parse:
-            simple query ('Q')
-            prepare statment ('P')
-
-        with response parse
-            command complete('C')
-            error return ('E')
-
-        when frame not all of these block, it will ignore.
-
-        it use for skip some prepare statement execute and param bind, let the session aggregate match the query and result.
-
-    */
-    #[serde(skip)]
-    ignore: bool,
-
-    // request
-    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
-    pub context: String,
-    #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
-    pub req_type: char,
-
-    // response
-    #[serde(skip)]
-    pub resp_type: char,
-
-    #[serde(rename = "response_result", skip_serializing_if = "value_is_default")]
-    pub result: String,
-    #[serde(rename = "sql_affected_rows", skip_serializing_if = "value_is_default")]
-    pub affected_rows: u64,
-    #[serde(
-        rename = "response_execption",
-        skip_serializing_if = "value_is_default"
-    )]
-    pub error_message: String,
-    pub status: L7ResponseStatus,
-}
 
 impl L7ProtocolInfoInterface for PostgreInfo {
     fn session_id(&self) -> Option<u32> {
@@ -141,31 +87,6 @@ impl L7ProtocolInfoInterface for PostgreInfo {
     fn skip_send(&self) -> bool {
         // if sql check fail and have no error response, very likely is protocol miscalculate.
         self.status == L7ResponseStatus::default() && !is_postgresql(&self.context)
-    }
-}
-
-impl From<PostgreInfo> for L7ProtocolSendLog {
-    fn from(p: PostgreInfo) -> L7ProtocolSendLog {
-        L7ProtocolSendLog {
-            req_len: None,
-            resp_len: None,
-            row_effect: p.affected_rows as u32,
-            req: L7Request {
-                req_type: String::from(get_request_str(p.req_type)),
-                resource: p.context,
-                ..Default::default()
-            },
-            resp: L7Response {
-                status: p.status,
-                result: p.result,
-                exception: p.error_message,
-                ..Default::default()
-            },
-            ext_info: Some(ExtendedInfo {
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
     }
 }
 
@@ -489,15 +410,15 @@ mod test {
 
     use crate::{
         common::{
-            flow::PacketDirection,
-            l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-            l7_protocol_log::L7ProtocolParserInterface,
+            flow::PacketDirection, l7_protocol_log::L7ProtocolParserInterface,
             l7_protocol_log::ParseParam,
         },
         flow_generator::protocol_logs::PostgreInfo,
-        flow_generator::protocol_logs::PostgresqlLog,
+        flow_generator::protocol_logs::{L7ProtocolInfoInterface, PostgresqlLog},
         utils::test::Capture,
     };
+
+    use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
 
     const FILE_DIR: &str = "resources/test/flow_generator/postgre";
     #[test]

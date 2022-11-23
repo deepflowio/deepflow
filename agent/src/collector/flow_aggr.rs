@@ -32,12 +32,14 @@ use super::consts::*;
 use super::round_to_minute;
 
 use crate::collector::acc_flow::U16Set;
-use crate::common::{enums::TapType, flow::CloseType, tagged_flow::TaggedFlow};
+use crate::common::{enums::TapType, flow::CloseType};
 use crate::config::handler::CollectorAccess;
-use crate::rpc::get_timestamp;
-use crate::sender::SendItem;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
+
+use public::common::tagged_flow::TaggedFlow;
 use public::queue::{DebugSender, Error, Receiver};
+use public::rpc::get_timestamp;
+use public::sender::SendItem;
 
 const MINUTE_SLOTS: usize = 2;
 const FLUSH_TIMEOUT: Duration = Duration::from_secs(2 * SECONDS_IN_MINUTE);
@@ -368,12 +370,12 @@ impl ThrottlingQueue {
 
         self.period_count += 1;
         if self.stashs.len() < self.throttle as usize {
-            self.stashs.push(SendItem::L4FlowLog(Box::new(f)));
+            self.stashs.push(SendItem::L4FlowLog(Box::new(f.into())));
             true
         } else {
             let r = self.small_rng.gen_range(0..self.period_count);
             if r < self.throttle as usize {
-                self.stashs[r] = SendItem::L4FlowLog(Box::new(f));
+                self.stashs[r] = SendItem::L4FlowLog(Box::new(f.into()));
             }
             false
         }

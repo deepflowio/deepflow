@@ -20,18 +20,13 @@ mod tcp_packet;
 pub(crate) mod uniform_sender;
 
 use num_enum::IntoPrimitive;
+use prost::Message;
 
 use std::fmt;
-use std::sync::Arc;
 use std::time::Duration;
 
-use crate::common::tagged_flow::TaggedFlow;
-use crate::flow_generator::AppProtoLogsData;
-use crate::integration_collector::{
-    OpenTelemetry, OpenTelemetryCompressed, PrometheusMetric, TelegrafMetric,
-};
-use crate::metric::document::Document;
-use crate::utils::stats::Batch;
+use public::proto::flow_log;
+pub use public::sender::SendItem;
 
 const SEQUENCE_OFFSET: usize = 8;
 const RCV_TIMEOUT: Duration = Duration::from_secs(1);
@@ -43,45 +38,57 @@ const OPEN_TELEMETRY_COMPRESSED: u32 = 20221024;
 const PROMETHEUS: u32 = 20220613;
 const TELEGRAF: u32 = 20220613;
 const PACKET_SEQUENCE_BLOCK: u32 = 20220712; // Enterprise Edition Feature: packet-sequence
+const RAW_PCAP: u32 = 20221123; // Enterprise Edition Feature: pcap
 
 const PRE_FILE_SUFFIX: &str = ".pre";
 
-pub enum SendItem {
-    L4FlowLog(Box<TaggedFlow>),
-    L7FlowLog(Box<AppProtoLogsData>),
-    Metrics(Box<Document>),
-    ExternalOtel(OpenTelemetry),
-    ExternalProm(PrometheusMetric),
-    ExternalTelegraf(TelegrafMetric),
-    PacketSequenceBlock(Box<packet_sequence_block::PacketSequenceBlock>), // Enterprise Edition Feature: packet-sequence
-    DeepflowStats(Arc<Batch>),
-    ExternalOtelCompressed(OpenTelemetryCompressed),
+pub trait SendItemImpl {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError>;
+    fn file_name(&self) -> &str;
+    fn message_type(&self) -> SendMessageType;
+    fn version(&self) -> u32;
+    fn to_kv_string(&self, kv_string: &mut String);
 }
 
-impl SendItem {
-    pub fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
+// You can only define an inherent implementation for a type in the same crate
+// where the type was defined. For example, an `impl` block as above is not allowed
+// since `Vec` is defined in the standard library.
+// define a trait that has the desired associated functions/types/constants and
+// implement the trait for the type in question
+// rustc --explain E0116
+// rustc --explain E0412
+impl SendItemImpl for SendItem {
+    fn encode(self, buf: &mut Vec<u8>) -> Result<usize, prost::EncodeError> {
         match self {
-            Self::L4FlowLog(l4) => l4.encode(buf),
-            Self::L7FlowLog(l7) => l7.encode(buf),
-            Self::Metrics(m) => m.encode(buf),
-            Self::ExternalOtel(o) => o.encode(buf),
-            Self::ExternalProm(p) => p.encode(buf),
-            Self::ExternalTelegraf(p) => p.encode(buf),
-            Self::PacketSequenceBlock(p) => p.encode(buf), // Enterprise Edition Feature: packet-sequence
-            Self::DeepflowStats(b) => b.encode(buf),
-            Self::ExternalOtelCompressed(o) => o.encode(buf),
+            Self::RawPcap(item) => item.encode(buf).map(|_| item.encoded_len()),
+            Self::L4FlowLog(item) => {
+                let pb_tagged_flow = flow_log::TaggedFlow {
+                    flow: Some(item.flow.into()),
+                };
+                pb_tagged_flow
+                    .encode(buf)
+                    .map(|_| pb_tagged_flow.encoded_len())
+            }
+            Self::L7FlowLog(item) => item.encode(buf),
+            Self::Metrics(item) => item.encode(buf).map(|_| item.encoded_len()),
+            Self::DeepflowStats(item) => item.encode(buf).map(|_| item.encoded_len()),
+            Self::ExternalOtel(mut bytes)
+            | Self::ExternalOtelCompressed(mut bytes)
+            | Self::ExternalProm(mut bytes)
+            | Self::ExternalTelegraf(mut bytes) => {
+                let length = bytes.len();
+                buf.append(&mut bytes);
+                Ok(length)
+            }
+            Self::PacketSequenceBlock(mut p) => {
+                let length = p.len();
+                buf.append(&mut p);
+                Ok(length)
+            } // Enterprise Edition Feature: packet-sequence
         }
     }
 
-    pub fn to_kv_string(&self, kv_string: &mut String) {
-        match self {
-            Self::L4FlowLog(l4) => l4.to_kv_string(kv_string),
-            Self::L7FlowLog(l7) => l7.to_kv_string(kv_string),
-            _ => return,
-        }
-    }
-
-    pub fn file_name(&self) -> &str {
+    fn file_name(&self) -> &str {
         match self {
             Self::L4FlowLog(_) => "l4_flow_log",
             Self::L7FlowLog(_) => "l7_flow_log",
@@ -89,8 +96,17 @@ impl SendItem {
         }
     }
 
-    pub fn message_type(&self) -> SendMessageType {
+    fn to_kv_string(&self, kv_string: &mut String) {
         match self {
+            Self::L4FlowLog(l4) => l4.to_kv_string(kv_string),
+            Self::L7FlowLog(l7) => l7.to_kv_string(kv_string),
+            _ => return,
+        }
+    }
+
+    fn message_type(&self) -> SendMessageType {
+        match self {
+            Self::RawPcap(_) => SendMessageType::RawPcap, // Enterprise Edition Feature: pcap
             Self::L4FlowLog(_) => SendMessageType::TaggedFlow,
             Self::L7FlowLog(_) => SendMessageType::ProtocolLog,
             Self::Metrics(_) => SendMessageType::Metrics,
@@ -103,8 +119,9 @@ impl SendItem {
         }
     }
 
-    pub fn version(&self) -> u32 {
+    fn version(&self) -> u32 {
         match self {
+            Self::RawPcap(_) => RAW_PCAP, // Enterprise Edition Feature: pcap
             Self::L4FlowLog(_) => FLOW_LOG_VERSION,
             Self::L7FlowLog(_) => FLOW_LOG_VERSION,
             Self::Metrics(_) => METRICS_VERSION,
@@ -114,38 +131,6 @@ impl SendItem {
             Self::PacketSequenceBlock(_) => PACKET_SEQUENCE_BLOCK, // Enterprise Edition Feature: packet-sequence
             Self::ExternalOtelCompressed(_) => OPEN_TELEMETRY_COMPRESSED,
             _ => 0,
-        }
-    }
-}
-
-impl fmt::Display for SendItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::L4FlowLog(l) => write!(f, "l4: {}", l),
-            Self::L7FlowLog(l) => write!(f, "l7: {}", l),
-            Self::Metrics(l) => write!(f, "metric: {:?}", l),
-            Self::ExternalOtel(o) => write!(f, "open_telemetry: {:?}", o),
-            Self::ExternalProm(p) => write!(f, "prometheus: {:?}", p),
-            Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
-            Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
-            Self::DeepflowStats(s) => write!(f, "deepflow_stats: {:?}", s),
-            Self::ExternalOtelCompressed(o) => write!(f, "open_telemetry compressed: {:?}", o),
-        }
-    }
-}
-
-impl fmt::Debug for SendItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::L4FlowLog(l) => write!(f, "l4: {}", l),
-            Self::L7FlowLog(l) => write!(f, "l7: {}", l),
-            Self::Metrics(l) => write!(f, "metric: {:?}", l),
-            Self::ExternalOtel(o) => write!(f, "open_telemetry: {:?}", o),
-            Self::ExternalProm(p) => write!(f, "prometheus: {:?}", p),
-            Self::ExternalTelegraf(p) => write!(f, "telegraf: {:?}", p),
-            Self::PacketSequenceBlock(p) => write!(f, "packet_sequence_block: {:?}", p), // Enterprise Edition Feature: packet-sequence
-            Self::DeepflowStats(s) => write!(f, "deepflow_stats: {:?}", s),
-            Self::ExternalOtelCompressed(o) => write!(f, "open_telemetry compressed: {:?}", o),
         }
     }
 }

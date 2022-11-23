@@ -36,23 +36,24 @@ use super::{
 };
 use crate::{
     common::{
-        enums::{EthernetType, IpProtocol, TapType},
-        flow::{get_direction, Flow, L7Protocol, SignalSource},
+        enums::{Direction, EthernetType, IpProtocol, TapSide, TapType},
+        flow::{get_direction, Flow, SignalSource},
     },
     config::handler::CollectorAccess,
     metric::{
-        document::{Code, Direction, Document, DocumentFlag, TagType, Tagger, TapSide},
+        document::{Code, Document, DocumentFlag, TagType, Tagger},
         meter::{FlowMeter, Meter, UsageMeter},
     },
-    proto::common::TridentType,
-    rpc::get_timestamp,
-    sender::SendItem,
     utils::stats::{
         self, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
     },
 };
 use public::{
+    common::l7_protocol::L7Protocol,
+    proto::common::TridentType,
     queue::{DebugSender, Error, Receiver},
+    rpc::get_timestamp,
+    sender::SendItem,
     utils::net::MacAddr,
 };
 
@@ -821,7 +822,7 @@ impl Stash {
             .map(|(_, mut doc)| {
                 doc.timestamp = self.start_time.as_secs() as u32;
                 doc.flags |= self.doc_flag;
-                SendItem::Metrics(Box::new(doc))
+                SendItem::Metrics(Box::new(doc.into()))
             })
             .collect::<Vec<_>>();
         let mut index = 0;

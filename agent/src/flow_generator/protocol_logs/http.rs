@@ -20,85 +20,27 @@ use arc_swap::access::Access;
 use log::debug;
 use serde::Serialize;
 
-use super::pb_adapter::{ExtendedInfo, L7ProtocolSendLog, L7Request, L7Response, TraceInfo};
-use super::value_is_default;
-use super::LogMessageType;
-use super::{consts::*, AppProtoHead, L7ResponseStatus};
+use super::{
+    consts::*, AppProtoHead, AppProtoInfoImpl, L7ProtocolInfoInterface, L7ResponseStatus,
+    LogMessageType,
+};
 
 use crate::{
     common::{
-        ebpf::EbpfType,
         enums::IpProtocol,
-        flow::L7Protocol,
-        flow::PacketDirection,
-        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{L7ProtocolParserInterface, ParseParam},
     },
     config::handler::{L7LogDynamicConfig, LogParserAccess, TraceType},
-    flow_generator::error::{Error, Result},
     flow_generator::protocol_logs::{decode_base64_to_string, L7ProtoRawDataType},
+    flow_generator::{Error, Result},
     parse_common,
     utils::bytes::{read_u32_be, read_u32_le},
 };
+use public::common::ebpf::EbpfType;
+use public::common::flow::{L7Protocol, PacketDirection};
+use public::protocol_logs::l7_protocol_info::L7ProtocolInfo;
+use public::protocol_logs::HttpInfo;
 use public::utils::net::h2pack;
-#[derive(Serialize, Debug, Default, Clone)]
-pub struct HttpInfo {
-    // 流是否结束，用于 http2 ebpf uprobe 处理.
-    // 由于ebpf有可能响应会比请求先到，所以需要 is_req_end 和 is_resp_end 同时为true才认为结束
-    #[serde(skip)]
-    is_req_end: bool,
-    #[serde(skip)]
-    is_resp_end: bool,
-    // from MetaPacket::cap_seq
-    cap_seq: Option<u64>,
-
-    #[serde(skip)]
-    proto: L7Protocol,
-    #[serde(skip)]
-    start_time: u64,
-    #[serde(skip)]
-    end_time: u64,
-    #[serde(skip)]
-    is_tls: bool,
-    msg_type: LogMessageType,
-    // 数据原始类型，标准的协议格式或者是ebpf上报的自定义格式
-    #[serde(skip)]
-    raw_data_type: L7ProtoRawDataType,
-
-    #[serde(rename = "request_id", skip_serializing_if = "value_is_default")]
-    pub stream_id: Option<u32>,
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub version: String,
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub trace_id: String,
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub span_id: String,
-
-    #[serde(rename = "request_type", skip_serializing_if = "value_is_default")]
-    pub method: String,
-    #[serde(rename = "request_resource", skip_serializing_if = "value_is_default")]
-    pub path: String,
-    #[serde(rename = "request_domain", skip_serializing_if = "value_is_default")]
-    pub host: String,
-    #[serde(rename = "user_agent", skip_serializing_if = "Option::is_none")]
-    pub user_agent: Option<String>,
-    #[serde(rename = "referer", skip_serializing_if = "Option::is_none")]
-    pub referer: Option<String>,
-    #[serde(rename = "http_proxy_client", skip_serializing_if = "value_is_default")]
-    pub client_ip: String,
-    #[serde(skip_serializing_if = "value_is_default")]
-    pub x_request_id: String,
-
-    #[serde(rename = "request_length", skip_serializing_if = "Option::is_none")]
-    pub req_content_length: Option<u32>,
-    #[serde(rename = "response_length", skip_serializing_if = "Option::is_none")]
-    pub resp_content_length: Option<u32>,
-
-    #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    status_code: Option<i32>,
-    #[serde(rename = "response_status")]
-    status: L7ResponseStatus,
-}
 
 impl L7ProtocolInfoInterface for HttpInfo {
     fn session_id(&self) -> Option<u32> {
@@ -120,7 +62,27 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn app_proto_head(&self) -> Option<AppProtoHead> {
         Some(AppProtoHead {
-            proto: self.get_l7_protocol_with_tls(),
+            proto: {
+                match self.proto {
+                    L7Protocol::Http1 => {
+                        if self.is_tls {
+                            L7Protocol::Http1TLS
+                        } else {
+                            L7Protocol::Http1
+                        }
+                    }
+                    L7Protocol::Http2 => {
+                        if self.is_tls {
+                            L7Protocol::Http2TLS
+                        } else {
+                            L7Protocol::Http2
+                        }
+                    }
+
+                    L7Protocol::Grpc => L7Protocol::Grpc,
+                    _ => unreachable!(),
+                }
+            },
             msg_type: self.msg_type,
             rrt: self.end_time - self.start_time,
         })
@@ -132,7 +94,10 @@ impl L7ProtocolInfoInterface for HttpInfo {
 
     fn skip_send(&self) -> bool {
         // filter the empty data from go http uprobe.
-        self.raw_data_type == L7ProtoRawDataType::GoHttp2Uprobe && self.is_empty()
+        self.raw_data_type == L7ProtoRawDataType::GoHttp2Uprobe
+            && self.host.is_empty()
+            && self.method.is_empty()
+            && self.path.is_empty()
     }
 
     fn need_merge(&self) -> bool {
@@ -147,9 +112,9 @@ impl L7ProtocolInfoInterface for HttpInfo {
     }
 }
 
-impl HttpInfo {
-    pub fn merge(&mut self, other: Self) -> Result<()> {
-        let other_is_grpc = other.is_grpc();
+impl AppProtoInfoImpl for HttpInfo {
+    fn merge(&mut self, other: Self) -> Result<()> {
+        let other_is_grpc = other.proto == L7Protocol::Grpc;
 
         match other.msg_type {
             // merge with request
@@ -224,7 +189,7 @@ impl HttpInfo {
         Ok(())
     }
 
-    pub fn set_packet_seq(&mut self, param: &ParseParam) {
+    fn set_packet_seq(&mut self, param: &ParseParam) {
         if let Some(p) = param.ebpf_param {
             self.cap_seq = Some(p.cap_seq);
         }
@@ -235,127 +200,13 @@ impl HttpInfo {
         need to check the packet sequence when from ebpf and protocol is http1
         self must req and other must resp.
     */
-    pub fn can_merge(&self, resp: &Self) -> bool {
+    fn can_merge(&self, resp: &Self) -> bool {
         if self.proto == L7Protocol::Http1 || self.proto == L7Protocol::Http1TLS {
             if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
                 return resp_seq > req_seq && resp_seq - req_seq == 1;
             }
         }
         true
-    }
-
-    pub fn is_empty(&self) -> bool {
-        return self.host.is_empty() && self.method.is_empty() && self.path.is_empty();
-    }
-
-    // return (is_req_end, is_resp_end)
-    pub fn is_req_resp_end(&self) -> (bool, bool) {
-        (self.is_req_end, self.is_resp_end)
-    }
-
-    fn get_l7_protocol_with_tls(&self) -> L7Protocol {
-        match self.proto {
-            L7Protocol::Http1 => {
-                if self.is_tls {
-                    L7Protocol::Http1TLS
-                } else {
-                    L7Protocol::Http1
-                }
-            }
-            L7Protocol::Http2 => {
-                if self.is_tls {
-                    L7Protocol::Http2TLS
-                } else {
-                    L7Protocol::Http2
-                }
-            }
-
-            L7Protocol::Grpc => L7Protocol::Grpc,
-            _ => unreachable!(),
-        }
-    }
-
-    fn is_grpc(&self) -> bool {
-        self.proto == L7Protocol::Grpc
-    }
-    // grpc path: /packageName.Servicename/rcpMethodName
-    // return packetName, ServiceName
-    fn grpc_package_service_name(&self) -> Option<(String, String)> {
-        if !self.is_grpc() || self.path.len() < 6 {
-            return None;
-        }
-
-        let idx: Vec<_> = self.path.match_indices("/").collect();
-        if idx.len() != 2 {
-            return None;
-        }
-        let (start, end) = (idx[0].0, idx[1].0);
-        if let Some((p, _)) = self.path.match_indices(".").next() {
-            if p > start && p < end {
-                return Some((
-                    String::from(&self.path[start + 1..p]),
-                    String::from(&self.path[p + 1..end]),
-                ));
-            }
-        }
-        None
-    }
-}
-
-impl From<HttpInfo> for L7ProtocolSendLog {
-    fn from(f: HttpInfo) -> Self {
-        let is_grpc = f.is_grpc();
-        let service_name = if let Some((package, service)) = f.grpc_package_service_name() {
-            let svc_name = format!("{}.{}", package, service);
-            Some(svc_name)
-        } else {
-            None
-        };
-
-        // grpc protocol special treatment
-        let (req_type, resource, domain, endpoint) = if is_grpc {
-            // server endpoint = req_type
-            (
-                String::from("POST"), // grpc method always post, reference https://chromium.googlesource.com/external/github.com/grpc/grpc/+/HEAD/doc/PROTOCOL-HTTP2.md
-                service_name.clone().unwrap_or_default(),
-                f.host,
-                f.path,
-            )
-        } else {
-            (f.method, f.path, f.host, String::new())
-        };
-
-        L7ProtocolSendLog {
-            req_len: f.req_content_length,
-            resp_len: f.resp_content_length,
-            version: Some(f.version),
-            req: L7Request {
-                req_type,
-                resource,
-                domain,
-                endpoint,
-            },
-            resp: L7Response {
-                status: f.status,
-                code: f.status_code,
-                ..Default::default()
-            },
-            trace_info: Some(TraceInfo {
-                trace_id: Some(f.trace_id),
-                span_id: Some(f.span_id),
-                ..Default::default()
-            }),
-            ext_info: Some(ExtendedInfo {
-                request_id: f.stream_id,
-                x_request_id: Some(f.x_request_id),
-                client_ip: Some(f.client_ip),
-                user_agent: f.user_agent,
-                referer: f.referer,
-                rpc_service: service_name,
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
     }
 }
 

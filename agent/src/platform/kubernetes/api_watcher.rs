@@ -44,13 +44,13 @@ use crate::{
     error::{Error, Result},
     exception::ExceptionHandler,
     platform::kubernetes::resource_watcher::ResourceWatcherFactory,
-    proto::{
-        common::KubernetesApiInfo,
-        trident::{Exception, KubernetesApiSyncRequest},
-    },
     rpc::Session,
 };
 
+use public::proto::{
+    common::KubernetesApiInfo,
+    trident::{Exception, KubernetesApiSyncRequest},
+};
 /*
  * K8s API同步功能
  *     启动时首先为不同的k8s API分别创建一个Watcher进行查询，

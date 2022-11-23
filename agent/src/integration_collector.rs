@@ -41,15 +41,15 @@ use tokio::{
 };
 
 use crate::exception::ExceptionHandler;
-use crate::proto::integration::opentelemetry::proto::{
+use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
+use public::proto::integration::opentelemetry::proto::{
     common::v1::any_value::Value,
     common::v1::{AnyValue, KeyValue},
     trace::v1::TracesData,
 };
-use crate::proto::trident::Exception;
-use crate::sender::SendItem;
-use public::counter::{Counter, CounterType, CounterValue, OwnedCountable};
+use public::proto::trident::Exception;
 use public::queue::{DebugSender, Error};
+use public::sender::SendItem;
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -240,14 +240,14 @@ async fn handler(
                 counter
                     .compressed
                     .fetch_add(compressed_data.len() as u64, Ordering::Relaxed);
-                if let Err(Error::Terminated(..)) = compressed_otel_sender.send(
-                    SendItem::ExternalOtelCompressed(OpenTelemetryCompressed(compressed_data)),
-                ) {
+                if let Err(Error::Terminated(..)) =
+                    compressed_otel_sender.send(SendItem::ExternalOtelCompressed(compressed_data))
+                {
                     warn!("sender queue has terminated");
                 }
             } else {
                 if let Err(Error::Terminated(..)) =
-                    otel_sender.send(SendItem::ExternalOtel(OpenTelemetry(decode_data)))
+                    otel_sender.send(SendItem::ExternalOtel(decode_data))
                 {
                     warn!("sender queue has terminated");
                 }
@@ -267,7 +267,7 @@ async fn handler(
             let mut metric = vec![0u8; whole_body.remaining()];
             whole_body.copy_to_slice(metric.as_mut_slice());
             if let Err(Error::Terminated(..)) =
-                prometheus_sender.send(SendItem::ExternalProm(PrometheusMetric(metric)))
+                prometheus_sender.send(SendItem::ExternalProm(metric))
             {
                 warn!("sender queue has terminated");
             }
@@ -290,7 +290,7 @@ async fn handler(
                 }
             }
             if let Err(Error::Terminated(..)) =
-                telegraf_sender.send(SendItem::ExternalTelegraf(TelegrafMetric(metric)))
+                telegraf_sender.send(SendItem::ExternalTelegraf(metric))
             {
                 warn!("sender queue has terminated");
             }

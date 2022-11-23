@@ -1,11 +1,5 @@
 /target
-
-# generated protobuf files
-!src/proto/mod.rs
-!src/integration/
-!src/integration/mod.rs
-src/proto/*.rs
-src/proto/integration/*.rs
+Cargo.lock
 
 .cargo
 src/ebpf/data

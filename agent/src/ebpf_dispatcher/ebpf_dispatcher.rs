@@ -22,6 +22,7 @@ use std::time::Duration;
 
 use libc::c_int;
 use log::{debug, error, info, warn};
+use public::packet::MiniPacketEnum;
 
 use super::{Error, Result};
 use crate::common::l7_protocol_log::{
@@ -189,6 +190,7 @@ struct EbpfDispatcher {
     output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
     flow_output: DebugSender<Box<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
+    pcap_assembler_sender: DebugSender<MiniPacketEnum>,
 }
 
 impl EbpfDispatcher {
@@ -214,6 +216,7 @@ impl EbpfDispatcher {
             None, // Enterprise Edition Feature: packet-sequence
             &self.stats_collector,
             true, // from_ebpf
+            self.pcap_assembler_sender.clone(),
         );
         while unsafe { SWITCH } {
             let mut packet = self.receiver.recv(Some(Duration::from_millis(1)));
@@ -433,6 +436,7 @@ impl EbpfCollector {
         flow_output: DebugSender<Box<TaggedFlow>>,
         queue_debugger: &QueueDebugger,
         stats_collector: Arc<stats::Collector>,
+        pcap_assembler_sender: DebugSender<MiniPacketEnum>,
     ) -> Result<Box<Self>> {
         if config.ebpf_disabled {
             info!("ebpf collector disabled.");
@@ -464,6 +468,7 @@ impl EbpfCollector {
                 flow_output,
                 flow_map_config,
                 stats_collector,
+                pcap_assembler_sender,
             },
             thread_handle: None,
             counter: EbpfCounter { rx: 0 },
