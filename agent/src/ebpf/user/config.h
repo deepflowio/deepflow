@@ -17,6 +17,10 @@
 #ifndef DF_EBPF_CONFIG_H
 #define DF_EBPF_CONFIG_H
 
+#define EV_NAME_SIZE			1024
+
+#define BOOT_TIME_UPDATE_PERIOD		60      // 系统启动时间更新周期, 单位：秒
+
 // eBPF Map Name
 #define MAP_MEMBERS_OFFSET_NAME         "__members_offset"
 #define MAP_SOCKET_INFO_NAME            "__socket_info_map"
@@ -24,6 +28,9 @@
 #define MAP_PERF_SOCKET_DATA_NAME       "__socket_data"
 #define MAP_TRACE_CONF_NAME             "__trace_conf_map"
 #define MAP_TRACE_STATS_NAME            "__trace_stats_map"
+#define MAP_PROTO_FILTER_NAME		"__protocol_filter"
+#define MAP_ALLOW_PORT_BITMAP_NAME	"__allow_port_bitmap"
+#define MAP_ADAPT_KERN_UID_NAME		"__adapt_kern_uid_map"
 
 //Program jmp tables
 #define MAP_PROGS_JMP_KP_NAME		"__progs_jmp_kp_map"

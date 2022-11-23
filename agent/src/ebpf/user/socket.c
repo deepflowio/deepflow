@@ -62,6 +62,8 @@ extern int major, minor;
 extern uint64_t sys_boot_time_ns;
 extern uint64_t prev_sys_boot_time_ns;
 
+extern uint64_t adapt_kern_uid;
+
 static bool bpf_stats_map_collect(struct bpf_tracer *tracer,
 				  struct trace_stats *stats_total);
 static bool is_adapt_success(struct bpf_tracer *t);
@@ -800,15 +802,24 @@ static int update_offset_map_from_btf_vmlinux(struct bpf_tracer *t)
 static void update_protocol_filter_array(struct bpf_tracer *tracer)
 {
 	for (int idx = 0; idx < PROTO_NUM; ++idx) {
-		bpf_table_set_value(tracer, "__protocol_filter", idx,
+		bpf_table_set_value(tracer, MAP_PROTO_FILTER_NAME, idx,
 				    &ebpf_config_protocol_filter[idx]);
 	}
 }
 
 static void update_allow_port_bitmap(struct bpf_tracer *tracer)
 {
-	bpf_table_set_value(tracer, "__allow_port_bitmap", 0,
+	bpf_table_set_value(tracer, MAP_ALLOW_PORT_BITMAP_NAME, 0,
 			    &allow_port_bitmap);
+}
+
+static void insert_adapt_kern_uid_to_map(struct bpf_tracer *tracer)
+{
+	bpf_table_set_value(tracer, MAP_ADAPT_KERN_UID_NAME, 0,
+			    &adapt_kern_uid);
+
+	ebpf_info("Insert adapt kern uid : %d , %d\n",
+		  adapt_kern_uid >> 32, (uint32_t)adapt_kern_uid);
 }
 
 static inline int __set_data_limit_max(int limit_size)
@@ -1070,6 +1081,9 @@ int running_socket_tracer(l7_handle_fn handle,
 
 	// Insert prog of output data into map for using BPF Tail Calls.
 	insert_output_prog_to_map(tracer);
+
+	// Insert the unique identifier of the adaptation kernel into the map
+	insert_adapt_kern_uid_to_map(tracer);
 
 	// Update protocol filter array
 	update_protocol_filter_array(tracer);
