@@ -399,8 +399,16 @@ func (l *VTapLKData) getWanIPVIFIDs(db *gorm.DB) ([]int, map[int]string) {
 }
 
 func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
-	vifIDs, _ := l.getWanIPVIFIDs(db)
-	if vifIDs == nil {
+	lanVifIDs, _ := l.getLanIPVIFIDs(db)
+	wanVifIDs, _ := l.getWanIPVIFIDs(db)
+	vifIDs := make([]int, 0, len(lanVifIDs)+len(wanVifIDs))
+	if len(lanVifIDs) > 0 {
+		vifIDs = append(vifIDs, lanVifIDs...)
+	}
+	if len(wanVifIDs) > 0 {
+		vifIDs = append(vifIDs, wanVifIDs...)
+	}
+	if len(vifIDs) == 0 {
 		return nil
 	}
 
