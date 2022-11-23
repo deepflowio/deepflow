@@ -19,6 +19,7 @@ pod_node              , K8s Node                     ,
 pod_service           , K8s Service                  ,
 pod_group             , K8s Workload                 ,
 pod                   , K8s POD                      ,
+service               , Service                      ,
 
 labels                , K8s Labels                   ,
 
