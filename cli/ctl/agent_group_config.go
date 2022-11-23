@@ -103,7 +103,7 @@ func exampleAgentGroupConfig(cmd *cobra.Command, args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	fmt.Printf(response.Get("DATA").MustString())
+	fmt.Println(response.Get("DATA").MustString())
 }
 
 func listAgentGroupConfig(cmd *cobra.Command, args []string, output string) {

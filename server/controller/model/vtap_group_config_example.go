@@ -41,7 +41,7 @@ vtap_group_id: g-xxxxxx
 ## System Free Memory Limit
 ## Unit: %. Default: 0. Range: [0, 100]
 ## Note: The limit of the percentage of system free memory.
-##   When the free percentage is lower than 90\% of this value,
+##   When the free percentage is lower than 90% of this value,
 ##   the agent will will automatically restart.
 #sys_free_memory_limit: 0
 
@@ -58,7 +58,7 @@ vtap_group_id: g-xxxxxx
 ## Note: When the outbound direction of the NPB interface
 ##   reaches or exceeds the threshold, the distribution will be
 ##   stopped, and then the distribution will be resumed if the
-##   value is lower than (max_tx_bandwidth - max_npb_bps)*90\%
+##   value is lower than (max_tx_bandwidth - max_npb_bps)*90%
 ##   within 5 consecutive monitoring intervals.
 ## Attention: When configuring this value, it must be greater
 ##   than max_npb_bps. 0 means disable this feature.
