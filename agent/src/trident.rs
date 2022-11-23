@@ -89,6 +89,8 @@ use crate::{
 };
 #[cfg(target_os = "linux")]
 use public::netns::{links_by_name_regex_in_netns, NetNs};
+#[cfg(target_os = "windows")]
+use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
@@ -1313,7 +1315,7 @@ impl Components {
                 .policy_getter(policy_getter)
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
-                .src_interface(src_interface)
+                .src_interface(src_interface.clone())
                 .netns(netns)
                 .trident_type(candidate_config.dispatcher.trident_type);
 
@@ -1323,8 +1325,20 @@ impl Components {
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
+            let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
+                tap_interfaces.clone()
+            } else {
+                match link_by_name(&src_interface) {
+                    Ok(link) => vec![link],
+                    Err(e) => {
+                        warn!("link_by_name: {}, error: {}", src_interface, e);
+                        vec![]
+                    }
+                }
+            };
+            #[cfg(target_os = "windows")]
             let dispatcher = dispatcher_builder
-                .pcap_interfaces(tap_interfaces.clone())
+                .pcap_interfaces(pcap_interfaces)
                 .build()
                 .unwrap();
 
