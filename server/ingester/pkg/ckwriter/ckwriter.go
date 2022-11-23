@@ -154,7 +154,7 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 		}
 	}
 
-	name := fmt.Sprintf("%s-%s", table.Database, table.LocalName)
+	name := fmt.Sprintf("ckwriter-%s", counterName)
 	dataQueues := queue.NewOverwriteQueues(
 		name, queue.HashKey(queueCount), queueSize,
 		queue.OptionFlushIndicator(time.Second),

@@ -888,7 +888,7 @@ func (t *PlatformInfoTable) updateServices(response *trident.SyncResponse) bool 
 			log.Debugf("svc protocol ignore: %+v", groupIDMapProtoIgnore)
 		}
 	}
-	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services, t.serviceLabelerLruCap)
+	t.serviceLabeler = NewGroupLabeler(t.serviceLabelerLogger, services, t.serviceLabelerLruCap, t.moduleName)
 	t.services = services
 
 	return true
