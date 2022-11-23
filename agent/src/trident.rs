@@ -1644,7 +1644,7 @@ impl Components {
         stats_collector.register_countable(
             "flow_aggr",
             Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
-            Default::default(),
+            vec![StatsOption::Tag("index", id.to_string())],
         );
 
         let (mut second_collector, mut minute_collector) = (None, None);
