@@ -46,7 +46,7 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 
 	// cache clusterID & create kubernetes domain
 	kubernetesInfo := trisolaris.GetGKubernetesInfo()
-	kubernetesInfo.CacheClusterID(clusterID)
+	kubernetesInfo.CacheClusterID(clusterID, in.GetKubernetesClusterName())
 
 	log.Infof("response kubernetes cluster_id to ip: %s, ca_md5: %s, cluster_id: %s", remote, in.GetCaMd5, clusterID)
 	return &api.KubernetesClusterIDResponse{ClusterId: &clusterID}, nil

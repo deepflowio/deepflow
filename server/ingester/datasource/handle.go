@@ -359,7 +359,7 @@ CREATE VIEW IF NOT EXISTS %s
 AS SELECT
 %s
 FROM %s
-GROUP BY (%s)`,
+GROUP BY %s`,
 		tableLocal,
 		strings.Join(columns, ",\n"),
 		tableAgg,

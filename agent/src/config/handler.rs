@@ -566,7 +566,7 @@ impl TraceType {
             TraceType::Sw6 => context == TRACE_TYPE_SW6,
             TraceType::Sw8 => context == TRACE_TYPE_SW8,
             TraceType::TraceParent => context == TRACE_TYPE_TRACE_PARENT,
-            TraceType::Customize(tag) => context == tag.as_str(),
+            TraceType::Customize(tag) => context.to_lowercase() == tag.to_lowercase(),
             _ => false,
         }
     }
@@ -1145,8 +1145,10 @@ impl ConfigHandler {
                 }
             }
 
+            // TODO should support tap-interface-regex on linux
             #[cfg(target_os = "windows")]
-            if candidate_config.tap_mode == TapMode::Local
+            if (candidate_config.tap_mode == TapMode::Local
+                || candidate_config.tap_mode == TapMode::Mirror)
                 && candidate_config.dispatcher.tap_interface_regex
                     != new_config.dispatcher.tap_interface_regex
             {
@@ -1583,15 +1585,6 @@ impl ConfigHandler {
                     new_config.platform.kubernetes_api_enabled
                 );
             }
-            if candidate_config.platform.kubernetes_cluster_id
-                != new_config.platform.kubernetes_cluster_id
-            {
-                info!(
-                    "kubernetes_cluster_id set to {}",
-                    new_config.platform.kubernetes_cluster_id
-                );
-            }
-
             info!(
                 "platform config change from {:#?} to {:#?}",
                 candidate_config.platform, new_config.platform

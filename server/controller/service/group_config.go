@@ -619,7 +619,7 @@ func TapModeFun() *ConfigBase {
 	data := []Data{
 		Data{Value: 0, Label: "本地 (0)"},
 		Data{Value: 1, Label: "虚拟镜像 (1)"},
-		Data{Value: 2, Label: "物理物理 (2)"},
+		Data{Value: 2, Label: "物理镜像 (2)"},
 	}
 	return &ConfigBase{
 		Type:        "select",
@@ -1208,7 +1208,9 @@ func (m *GroupConfigMananger) initLabel() {
 		}
 		// The vtap group cannot be modified without creating a new configuration
 		if configFun.jsonTag == "VTAP_GROUP_LCUUID" && m.newConfigFlag == false {
+			tempJsonTag, tempLabelName := configFun.jsonTag, configFun.labelName
 			configFun = deepcopy.Copy(configFun).(*ConfigBase)
+			configFun.jsonTag, configFun.labelName = tempJsonTag, tempLabelName
 			configFun.setDisabled()
 		}
 		configLabel.addConfig(configFun.jsonTag, configFun)
@@ -1286,6 +1288,10 @@ func (m *GroupConfigMananger) setConfigValue(config *mysql.VTapGroupConfiguratio
 					}
 					configValue = tDomains
 				}
+			}
+		case "VTAP_GROUP_LCUUID":
+			if realValue, ok := configValue.(*string); ok && realValue != nil {
+				configValue = *realValue
 			}
 		}
 		config.setValue(configValue)

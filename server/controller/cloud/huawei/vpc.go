@@ -135,7 +135,7 @@ func (h *HuaWei) getPartialRoutingTables(projectName, token string) (routingTabl
 		}
 		rType := jR.Get("type").MustString()
 		if rType != "peering" {
-			log.Infof("exclude routing_table: %s, not support type: %s", id, rType)
+			log.Infof("exclude routing_table: %s, missing support type: %s", id, rType)
 			continue
 		}
 		routingTables = append(

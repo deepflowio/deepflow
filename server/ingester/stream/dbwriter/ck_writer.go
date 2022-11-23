@@ -74,8 +74,8 @@ func newFlowLogTable(id common.FlowLogID, columns []*ckdb.Column, engine ckdb.En
 
 func GetFlowLogTables(engine ckdb.EngineType, cluster, storagePolicy string, l4LogTtl, l7LogTtl, l4PacketTtl int, coldStorages map[string]*ckdb.ColdStorage) []*ckdb.Table {
 	return []*ckdb.Table{
-		newFlowLogTable(common.L4_FLOW_ID, jsonify.FlowLoggerColumns(), engine, cluster, storagePolicy, l4LogTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L4_FLOW_ID.String())),
-		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7LoggerColumns(), engine, cluster, storagePolicy, l7LogTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L7_FLOW_ID.String())),
+		newFlowLogTable(common.L4_FLOW_ID, jsonify.L4FlowLogColumns(), engine, cluster, storagePolicy, l4LogTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L4_FLOW_ID.String())),
+		newFlowLogTable(common.L7_FLOW_ID, jsonify.L7FlowLogColumns(), engine, cluster, storagePolicy, l7LogTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L7_FLOW_ID.String())),
 		newFlowLogTable(common.L4_PACKET_ID, jsonify.L4PacketColumns(), engine, cluster, storagePolicy, l4PacketTtl, ckdb.GetColdStorage(coldStorages, common.FLOW_LOG_DB, common.L4_PACKET_ID.String())),
 	}
 }

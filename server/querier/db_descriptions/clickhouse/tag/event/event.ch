@@ -19,6 +19,7 @@ pod_node                   , K8s 容器节点               ,
 pod_service                , K8s 容器服务               ,
 pod_group                  , K8s 工作负载               ,
 pod                        , K8s 容器 POD               ,
+service                    , 服务                       ,
 
 labels                     , K8s Labels                 ,
 

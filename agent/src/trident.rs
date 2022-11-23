@@ -57,9 +57,9 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
-        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
-        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FeatureFlags,
+        DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
+        NORMAL_EXIT_WITH_RESTART,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -76,7 +76,7 @@ use crate::{
     policy::Policy,
     proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{uniform_sender::UniformSenderThread, SendItem},
+    sender::{uniform_sender::UniformSenderThread, SendItem, SendMessageType},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -105,7 +105,6 @@ pub struct ChangedConfig {
     pub runtime_config: RuntimeConfig,
     pub blacklist: Vec<u64>,
     pub vm_mac_addrs: Vec<MacAddr>,
-    pub kubernetes_cluster_id: Option<String>,
     pub tap_types: Vec<trident::TapType>,
 }
 
@@ -222,7 +221,7 @@ impl Trident {
             &config.controller_ips,
             DEFAULT_INGESTER_PORT,
             base_name,
-            vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
+            vec![0, 0, 0, 0, SendMessageType::Syslog as u8],
         );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
@@ -326,7 +325,8 @@ impl Trident {
             && running_in_container()
             && config.kubernetes_cluster_id.is_empty()
         {
-            config.kubernetes_cluster_id = Config::get_k8s_cluster_id(&session);
+            config.kubernetes_cluster_id =
+                Config::get_k8s_cluster_id(&session, config.kubernetes_cluster_name.as_ref());
             warn!("When running in a K8s pod, the cpu and memory limits notified by deepflow-server will be ignored, please make sure to use K8s for resource limits.");
         }
 
@@ -347,6 +347,7 @@ impl Trident {
             config_handler.static_config.controller_ips[0].clone(),
             config_handler.static_config.vtap_group_id_request.clone(),
             config_handler.static_config.kubernetes_cluster_id.clone(),
+            config_handler.static_config.kubernetes_cluster_name.clone(),
             exception_handler.clone(),
             config_handler.static_config.agent_mode,
             config_path,
@@ -406,7 +407,6 @@ impl Trident {
                 runtime_config,
                 blacklist,
                 vm_mac_addrs,
-                kubernetes_cluster_id,
                 tap_types,
             } = new_state.unwrap_config();
             if let Some(old_yaml) = yaml_conf {
@@ -422,9 +422,6 @@ impl Trident {
                 }
             }
             yaml_conf = Some(runtime_config.yaml_config.clone());
-            if let Some(id) = kubernetes_cluster_id {
-                config_handler.static_config.kubernetes_cluster_id = id;
-            }
             let callbacks =
                 config_handler.on_config(runtime_config, &exception_handler, components.as_mut());
             match components.as_mut() {
@@ -1651,7 +1648,7 @@ impl Components {
         stats_collector.register_countable(
             "flow_aggr",
             Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
-            Default::default(),
+            vec![StatsOption::Tag("index", id.to_string())],
         );
 
         let (mut second_collector, mut minute_collector) = (None, None);

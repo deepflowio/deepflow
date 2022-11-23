@@ -30,7 +30,7 @@ import (
 
 func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, err error) {
 	log.Debug("get pods starting")
-	podTypes := [4]string{"StatefulSet", "ReplicaSet", "ReplicationController", "Deployment"}
+	podTypes := [5]string{"StatefulSet", "ReplicaSet", "ReplicationController", "Deployment", "DaemonSet"}
 	abstractNodes := map[string]int{}
 	for _, p := range k.k8sInfo["*v1.Pod"] {
 		pData, pErr := simplejson.NewJson([]byte(p))
@@ -63,8 +63,9 @@ func (k *KubernetesGather) getPods() (pods []model.Pod, nodes []model.PodNode, e
 
 		podGroups := metaData.Get("ownerReferences")
 		if len(podGroups.MustArray()) == 0 {
-			if metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString() != "serverless" {
-				log.Debugf("pod (%s) ownerReferences not found or sci cluster type not is serverless", name)
+			providerType := metaData.Get("labels").Get("virtual-kubelet.io/provider-cluster-type").MustString()
+			if providerType != "serverless" && providerType != "proprietary" {
+				log.Debugf("pod (%s) type (%s) ownerReferences not found or sci cluster type not support", name, providerType)
 				continue
 			}
 			abstractPGType := metaData.Get("labels").Get("virtual-kubelet.io/provider-workload-type").MustString()
