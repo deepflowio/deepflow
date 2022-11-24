@@ -187,8 +187,14 @@ func UpdateAnalyzer(
 			updateVTapLcuuids := []string{}
 			mysql.Db.Where("analyzer_ip = ?", analyzer.IP).Find(&vtaps)
 			if len(vtaps) > vtapMax {
-				for i := vtapMax; i < len(vtaps)-1; i++ {
-					updateVTapLcuuids = append(updateVTapLcuuids, vtaps[i].Lcuuid)
+				if vtapMax == 0 {
+					for _, vtap := range vtaps {
+						updateVTapLcuuids = append(updateVTapLcuuids, vtap.Lcuuid)
+					}
+				} else {
+					for i := vtapMax; i < len(vtaps)-1; i++ {
+						updateVTapLcuuids = append(updateVTapLcuuids, vtaps[i].Lcuuid)
+					}
 				}
 				vtapDb := mysql.Db.Model(&mysql.VTap{})
 				vtapDb = vtapDb.Where("lcuuid IN (?)", updateVTapLcuuids)
