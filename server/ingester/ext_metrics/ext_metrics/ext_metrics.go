@@ -105,7 +105,7 @@ func NewMetricsor(msgType datatype.MessageType, db string, config *config.Config
 	platformDatas := make([]*grpc.PlatformInfoTable, queueCount)
 	for i := 0; i < queueCount; i++ {
 		if platformDataEnabled {
-			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
+			platformDatas[i] = grpc.NewPlatformInfoTable(controllers, int(config.Base.ControllerPort), config.Base.GrpcBufferSize, config.Base.ServiceLabelerLruCap, "ext-metrics-"+msgType.String()+"-"+strconv.Itoa(i), "", config.Base.NodeIP, nil)
 			if i == 0 {
 				debug.ServerRegisterSimple(CMD_PLATFORMDATA_EXT_METRICS, platformDatas[i])
 			}

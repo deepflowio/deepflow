@@ -100,6 +100,9 @@ BPF_HASH(socket_info_map, __u64, struct socket_info_t)
 // Key is {tgid, pid}. value is trace_info_t
 BPF_HASH(trace_map, __u64, struct trace_info_t)
 
+// Stores the identity used to fit the kernel, key: 0, vlaue:{tgid, pid}
+MAP_ARRAY(adapt_kern_uid_map, __u32, __u64, 1)
+
 static __inline bool is_protocol_enabled(int protocol)
 {
 	int *enabled = protocol_filter__lookup(&protocol);
@@ -535,6 +538,14 @@ static __inline int infer_offset_retry(int fd)
 		return OFFSET_NO_READY;
 
 	if (unlikely(!offset->ready)) {
+		__u64 *adapt_uid = adapt_kern_uid_map__lookup(&k0);
+		if (!adapt_uid)
+			return OFFSET_NO_READY;
+
+		// Only a preset uid can be adapted to the kernel
+		if (*adapt_uid != bpf_get_current_pid_tgid())
+			return OFFSET_NO_READY;
+
 		void *infer_sk =
 		    infer_and_get_socket_from_fd(fd, offset, false);
 		if (infer_sk) {
@@ -1421,12 +1432,16 @@ TPPROG(sys_exit_readv) (struct syscall_comm_exit_ctx *ctx) {
 // /sys/kernel/debug/tracing/events/syscalls/sys_enter_close/format
 // 为什么不用tcp_fin? 主要原因要考虑UDP场景。
 TPPROG(sys_enter_close) (struct syscall_comm_enter_ctx *ctx) {
+	int fd = ctx->fd;
+	//Ignore stdin, stdout and stderr
+	if (fd <= 2)
+		return 0;
+
 	__u32 k0 = 0;
 	struct member_fields_offset *offset = members_offset__lookup(&k0);
 	if (!offset)
 		return 0;
 
-	int fd = ctx->fd;
 	CHECK_OFFSET_READY(fd);
 
 	__u64 sock_addr = (__u64)get_socket_from_fd(fd, offset);

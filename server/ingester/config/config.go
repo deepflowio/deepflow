@@ -52,7 +52,9 @@ const (
 	DefaultCKDBServicePort         = 9000
 	DefaultListenPort              = 20033
 	DefaultGrpcBufferSize          = 41943040
+	DefaultServiceLabelerLruCap    = 1 << 22
 	DefaultCKDBEndpointTCPPortName = "tcp-port"
+	DefaultStatsInterval           = 10 // s
 )
 
 type CKDiskMonitor struct {
@@ -125,8 +127,11 @@ type Config struct {
 	Influxdb              HostPort `yaml:"influxdb"`
 	NodeIP                string   `yaml:"node-ip"`
 	GrpcBufferSize        int      `yaml:"grpc-buffer-size"`
+	ServiceLabelerLruCap  int      `yaml:"service-labeler-lru-cap"`
+	StatsInterval         int      `yaml:"stats-interval"`
 	LogFile               string
 	LogLevel              string
+	MyNodeName            string
 }
 
 type BaseConfig struct {
@@ -166,6 +171,7 @@ func (c *Config) Validate() error {
 		log.Errorf("Can't get node name env %s", EnvK8sNodeName)
 		sleepAndExit()
 	}
+	c.MyNodeName = myNodeName
 	myPodName, exist := os.LookupEnv(EnvK8sPodName)
 	if !exist {
 		log.Errorf("Can't get pod name env %s", EnvK8sPodName)
@@ -256,6 +262,14 @@ func (c *Config) Validate() error {
 		c.GrpcBufferSize = DefaultGrpcBufferSize
 	}
 
+	if c.ServiceLabelerLruCap <= 0 {
+		c.ServiceLabelerLruCap = DefaultServiceLabelerLruCap
+	}
+
+	if c.StatsInterval <= 0 {
+		c.StatsInterval = DefaultStatsInterval
+	}
+
 	return c.ValidateAndSetckdbColdStorages()
 }
 
@@ -316,16 +330,18 @@ func Load(path string) *Config {
 		LogFile:  "/var/log/deepflow/server.log",
 		LogLevel: "info",
 		Base: Config{
-			ControllerIPs:     []string{DefaultContrallerIP},
-			ControllerPort:    DefaultControllerPort,
-			CKDBAuth:          Auth{"default", ""},
-			StreamRozeEnabled: true,
-			UDPReadBuffer:     64 << 20,
-			TCPReadBuffer:     4 << 20,
-			CKDiskMonitor:     CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace, DefaultDFDiskPrefix},
-			Influxdb:          HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
-			ListenPort:        DefaultListenPort,
-			GrpcBufferSize:    DefaultGrpcBufferSize,
+			ControllerIPs:        []string{DefaultContrallerIP},
+			ControllerPort:       DefaultControllerPort,
+			CKDBAuth:             Auth{"default", ""},
+			StreamRozeEnabled:    true,
+			UDPReadBuffer:        64 << 20,
+			TCPReadBuffer:        4 << 20,
+			CKDiskMonitor:        CKDiskMonitor{DefaultCheckInterval, DefaultDiskUsedPercent, DefaultDiskFreeSpace, DefaultDFDiskPrefix},
+			Influxdb:             HostPort{DefaultInfluxdbHost, DefaultInfluxdbPort},
+			ListenPort:           DefaultListenPort,
+			GrpcBufferSize:       DefaultGrpcBufferSize,
+			ServiceLabelerLruCap: DefaultServiceLabelerLruCap,
+			StatsInterval:        DefaultStatsInterval,
 		},
 	}
 	if err != nil {

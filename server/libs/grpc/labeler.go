@@ -26,6 +26,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/libs/datatype"
 	"github.com/deepflowys/deepflow/server/libs/hmap/idmap"
+	"github.com/deepflowys/deepflow/server/libs/hmap/lru"
 	"github.com/deepflowys/deepflow/server/libs/logger"
 	"github.com/deepflowys/deepflow/server/libs/policy"
 	api "github.com/deepflowys/deepflow/server/libs/reciter-api"
@@ -57,7 +58,7 @@ type GroupLabeler struct {
 	indexToGroupID []uint16
 }
 
-func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap) *GroupLabeler {
+func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap, portFilterLruCap int, moduleName string) *GroupLabeler {
 	ipGroupData := make([]*policy.IpGroupData, 0, len(idMaps))
 	internetGroups := make([]uint16, 0, 1)
 	podGroup := make(map[uint16]uint32)
@@ -96,15 +97,15 @@ func NewGroupLabeler(log *logger.PrefixLogger, idMaps []api.GroupIDMap) *GroupLa
 	ipGroup.Update(ipGroupData)
 	return &GroupLabeler{
 		ipCacheLocation:         make(map[uint64]int),
-		ipv6CacheLocation:       idmap.NewU160IDMap("", GROUP_CACHE_SIZE).NoStats(),
+		ipv6CacheLocation:       idmap.NewU160IDMap(moduleName, GROUP_CACHE_SIZE).NoStats(),
 		cache:                   make([][]uint16, 0, GROUP_CACHE_SIZE),
-		serverIpCacheLocation:   idmap.NewU128IDMap("", GROUP_CACHE_SIZE).NoStats(),
-		serverIpv6CacheLocation: idmap.NewU192IDMap("", GROUP_CACHE_SIZE).NoStats(),
+		serverIpCacheLocation:   idmap.NewU128IDMap(moduleName, GROUP_CACHE_SIZE).NoStats(),
+		serverIpv6CacheLocation: idmap.NewU192IDMap(moduleName, GROUP_CACHE_SIZE).NoStats(),
 		serverCache:             make([][]uint16, 0, GROUP_CACHE_SIZE),
 		ipGroup:                 ipGroup,
 		internetGroups:          internetGroups,
 		podGroup:                podGroup,
-		portFilter:              newPortFilter(log, idMaps),
+		portFilter:              newPortFilter(log, idMaps, portFilterLruCap, moduleName),
 		indexToGroupID:          indexToGroupID,
 	}
 }
@@ -160,7 +161,7 @@ func (l *GroupLabeler) Query(l3EpcID int16, ip uint32, podGroupID uint16) []uint
 	return l.backMapAndDedup(l.innerQuery(l3EpcID, ip, podGroupID))
 }
 
-func (l *GroupLabeler) QueryServer(l3EpcID int16, ip uint32, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint16 {
+func (l *GroupLabeler) QueryService(l3EpcID int16, ip uint32, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint16 {
 	if l3EpcID == datatype.EPC_FROM_INTERNET {
 		return l.internetGroups
 	}
@@ -207,7 +208,7 @@ func (l *GroupLabeler) QueryIPv6(l3EpcID int16, ip net.IP, podGroupID uint16) []
 	return l.backMapAndDedup(l.innerQueryIPv6(key[:], hash, l3EpcID, ip, podGroupID))
 }
 
-func (l *GroupLabeler) QueryServerIPv6(l3EpcID int16, ip net.IP, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint16 {
+func (l *GroupLabeler) QueryServiceIPv6(l3EpcID int16, ip net.IP, podGroupID uint16, protocol layers.IPProtocol, serverPort uint16) []uint16 {
 	if l3EpcID == datatype.EPC_FROM_INTERNET {
 		return l.internetGroups
 	}
@@ -241,7 +242,7 @@ func (l *GroupLabeler) QueryServerIPv6(l3EpcID int16, ip net.IP, podGroupID uint
 
 type portFilter struct {
 	// key = group 16 bit + protocol 8bit + server_port 16bit
-	fastMap map[uint64]bool
+	fastMap *lru.U64LRU
 
 	// key = group 16 bit + protocol 9bit
 	portRanges map[uint32][]datatype.PortRange
@@ -249,7 +250,7 @@ type portFilter struct {
 	hasAnyProtocol bool
 }
 
-func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap) *portFilter {
+func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap, lruCap int, moduleName string) *portFilter {
 	hasAnyProtocol := false
 	groupProtocolMap := make(map[uint32][]datatype.PortRange)
 	for i, entry := range groupIDMaps {
@@ -266,26 +267,26 @@ func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap) *port
 		}
 		groupProtocolMap[key] = append(groupProtocolMap[key], ports...)
 	}
-	return &portFilter{fastMap: make(map[uint64]bool), portRanges: groupProtocolMap, hasAnyProtocol: hasAnyProtocol}
+	return &portFilter{fastMap: lru.NewU64LRU(moduleName+"_port_filter", lruCap>>3, lruCap), portRanges: groupProtocolMap, hasAnyProtocol: hasAnyProtocol}
 }
 
 func (l *portFilter) check(group int16, protocol layers.IPProtocol, serverPort uint16) bool {
 	// key = group 16bit + protocol 8bit + server_port 16bit
 	fastKey := ((uint64(group) & 0xFFFF) << 24) | ((uint64(protocol) & 0xFF) << 16) | (uint64(serverPort) & 0xFFFF)
-	if ok, in := l.fastMap[fastKey]; in {
-		return ok
+	if lruValue, in := l.fastMap.Get(fastKey, true); in {
+		return lruValue.(bool)
 	}
 	if result := l.rawCheck(group, uint16(protocol), serverPort); result {
-		l.fastMap[fastKey] = true
+		l.fastMap.Add(fastKey, true)
 		return true
 	}
 	if l.hasAnyProtocol {
 		if result := l.rawCheck(group, policy.PROTO_ALL, serverPort); result {
-			l.fastMap[fastKey] = true
+			l.fastMap.Add(fastKey, true)
 			return true
 		}
 	}
-	l.fastMap[fastKey] = false
+	l.fastMap.Add(fastKey, false)
 	return false
 }
 

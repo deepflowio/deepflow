@@ -51,6 +51,7 @@ impl L4FlowPerf for UdpPerf {
         if header.direction == PacketDirection::ClientToServer {
             self.req_timestamp = pkt_timestamp;
         } else if self.req_timestamp != Duration::ZERO
+            && self.req_timestamp <= pkt_timestamp
             && header.direction != self.last_pkt_direction
         {
             let art = pkt_timestamp - self.req_timestamp;

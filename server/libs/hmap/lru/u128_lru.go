@@ -288,9 +288,11 @@ func (m *U128LRU) find(key0, key1 uint64, isAdd bool) (*u128LRUNode, int32) {
 					atomic.StoreUint32(&m.debugChainRead, 0)
 				}
 			}
+			m.counter.Hit++
 			return node, slot
 		}
 	}
+	m.counter.Miss++
 	m.counter.totalScan += width
 	if isAdd {
 		width++

@@ -14,4 +14,13 @@
  * limitations under the License.
  */
 
-pub use public::consts::*;
+// Package configuration is only provided for enterprise edition.
+package configuration
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+func ConfigurationRouter(e *gin.Engine) {
+	vTapGroupConfigRouter(e)
+}

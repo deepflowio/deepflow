@@ -16,10 +16,9 @@
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use super::bit::count_trailing_zeros32;
-use super::UnsafeWrapper;
 use crate::common::decapsulate::TunnelInfo;
 use crate::common::endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET};
 use crate::common::lookup_key::LookupKey;
@@ -36,38 +35,30 @@ struct EpcIpKey {
     epc_id: i32,
 }
 
-type MacTable = UnsafeWrapper<HashMap<u64, Arc<PlatformData>>>;
-type EpcIpTable = UnsafeWrapper<HashMap<EpcIpKey, Arc<PlatformData>>>;
-type PeerTable = UnsafeWrapper<HashMap<i32, Vec<i32>>>;
-type EpcCidrTable = UnsafeWrapper<HashMap<i32, Vec<Arc<Cidr>>>>;
-type TunnelCidrTable = UnsafeWrapper<HashMap<u32, Vec<Arc<Cidr>>>>;
-type IpNetmaskTable = UnsafeWrapper<HashMap<u16, u32>>;
-type IpTable = UnsafeWrapper<HashMap<u128, Arc<PlatformData>>>;
-
 pub struct Labeler {
     // Interface表
-    mac_table: MacTable,
-    epc_ip_table: EpcIpTable,
+    mac_table: RwLock<HashMap<u64, Arc<PlatformData>>>,
+    epc_ip_table: RwLock<HashMap<EpcIpKey, Arc<PlatformData>>>,
     // Interface WAN IP表
-    ip_netmask_table: IpNetmaskTable, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
-    ip_table: IpTable,
+    ip_netmask_table: RwLock<HashMap<u16, u32>>, // 仅用于IPv4, IPv6的掩码目前仅支持128不用计算
+    ip_table: RwLock<HashMap<u128, Arc<PlatformData>>>,
     // 对等连接表
-    peer_table: PeerTable,
+    peer_table: RwLock<HashMap<i32, Vec<i32>>>,
     // CIDR表
-    epc_cidr_table: EpcCidrTable,
-    tunnel_cidr_table: TunnelCidrTable,
+    epc_cidr_table: RwLock<HashMap<i32, Vec<Arc<Cidr>>>>,
+    tunnel_cidr_table: RwLock<HashMap<u32, Vec<Arc<Cidr>>>>,
 }
 
 impl Default for Labeler {
     fn default() -> Self {
         Self {
-            mac_table: MacTable::from(HashMap::new()),
-            epc_ip_table: EpcIpTable::from(HashMap::new()),
-            ip_netmask_table: IpNetmaskTable::from(HashMap::new()),
-            ip_table: IpTable::from(HashMap::new()),
-            peer_table: PeerTable::from(HashMap::new()),
-            epc_cidr_table: EpcCidrTable::from(HashMap::new()),
-            tunnel_cidr_table: TunnelCidrTable::from(HashMap::new()),
+            mac_table: RwLock::new(HashMap::new()),
+            epc_ip_table: RwLock::new(HashMap::new()),
+            ip_netmask_table: RwLock::new(HashMap::new()),
+            ip_table: RwLock::new(HashMap::new()),
+            peer_table: RwLock::new(HashMap::new()),
+            epc_cidr_table: RwLock::new(HashMap::new()),
+            tunnel_cidr_table: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -101,11 +92,11 @@ impl Labeler {
             }
         }
 
-        self.mac_table.set(mac_table);
+        *self.mac_table.write().unwrap() = mac_table;
     }
 
     fn get_real_ip_by_mac(&self, mac: u64, is_ipv6: bool) -> IpAddr {
-        if let Some(interface) = self.mac_table.get().get(&mac) {
+        if let Some(interface) = self.mac_table.read().unwrap().get(&mac) {
             for ip in &(interface.ips) {
                 if ip.raw_ip.is_ipv6() == is_ipv6 {
                     return ip.raw_ip;
@@ -115,8 +106,11 @@ impl Labeler {
         return Ipv4Addr::UNSPECIFIED.into();
     }
 
-    fn get_interface_by_mac(&self, mac: u64) -> Option<&Arc<PlatformData>> {
-        self.mac_table.get().get(&mac)
+    fn get_interface_by_mac(&self, mac: u64) -> Option<PlatformData> {
+        if let Some(platform) = self.mac_table.read().unwrap().get(&mac) {
+            return Some(platform.as_ref().clone());
+        }
+        return None;
     }
 
     fn update_epc_ip_table(&mut self, interfaces: &Vec<Arc<PlatformData>>) {
@@ -142,19 +136,31 @@ impl Labeler {
             }
         }
 
-        self.epc_ip_table.set(epc_ip_table);
+        *self.epc_ip_table.write().unwrap() = epc_ip_table;
     }
 
-    fn get_interface_by_epc_ip(&self, ip: IpAddr, epc_id: i32) -> Option<&Arc<PlatformData>> {
+    fn get_interface_by_epc_ip(&self, ip: IpAddr, epc_id: i32) -> Option<PlatformData> {
         match ip {
-            IpAddr::V4(ip) => self.epc_ip_table.get().get(&EpcIpKey {
-                ip: u32::from_be_bytes(ip.octets()) as u128,
-                epc_id,
-            }),
-            IpAddr::V6(ip) => self.epc_ip_table.get().get(&EpcIpKey {
-                ip: u128::from_be_bytes(ip.octets()),
-                epc_id,
-            }),
+            IpAddr::V4(ip) => {
+                if let Some(platform) = self.epc_ip_table.read().unwrap().get(&EpcIpKey {
+                    ip: u32::from_be_bytes(ip.octets()) as u128,
+                    epc_id,
+                }) {
+                    Some(platform.as_ref().clone())
+                } else {
+                    None
+                }
+            }
+            IpAddr::V6(ip) => {
+                if let Some(platform) = self.epc_ip_table.read().unwrap().get(&EpcIpKey {
+                    ip: u128::from_be_bytes(ip.octets()),
+                    epc_id,
+                }) {
+                    Some(platform.as_ref().clone())
+                } else {
+                    None
+                }
+            }
         }
     }
 
@@ -171,14 +177,14 @@ impl Labeler {
                 .push(peer.local_epc);
         }
 
-        self.peer_table.set(peer_table);
+        *self.peer_table.write().unwrap() = peer_table;
     }
 
     fn get_epc_by_peer(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) {
-        if let Some(list) = self.peer_table.get().get(&epc_id) {
+        if let Some(list) = self.peer_table.read().unwrap().get(&epc_id) {
             for peer_epc in list {
                 if let Some(interface) = self.get_interface_by_epc_ip(ip, *peer_epc) {
-                    endpoint.set_l3_data(interface);
+                    endpoint.set_l3_data(&interface);
                     return;
                 }
             }
@@ -225,14 +231,14 @@ impl Labeler {
             });
         }
 
-        self.tunnel_cidr_table.set(tunnel_table);
-        self.epc_cidr_table.set(epc_table);
+        *self.tunnel_cidr_table.write().unwrap() = tunnel_table;
+        *self.epc_cidr_table.write().unwrap() = epc_table;
     }
 
     // 函数通过EPC+IP查询对应的CIDR，获取EPC标记
     // 注意当查询外网时必须给epc参数传递EPC_FROM_DEEPFLOW值，表示在所有WAN CIDR范围内搜索，并返回该CIDR的真实EPC
     fn set_epc_by_cidr(&self, ip: IpAddr, epc_id: i32, endpoint: &mut EndpointInfo) -> bool {
-        if let Some(list) = self.epc_cidr_table.get().get(&epc_id) {
+        if let Some(list) = self.epc_cidr_table.read().unwrap().get(&epc_id) {
             for cidr in list {
                 if cidr.ip.contains(&ip) {
                     endpoint.l3_epc_id = cidr.epc_id;
@@ -252,7 +258,7 @@ impl Labeler {
         tunnel_id: u32,
         endpoint: &mut EndpointInfo,
     ) -> bool {
-        if let Some(list) = self.tunnel_cidr_table.get().get(&tunnel_id) {
+        if let Some(list) = self.tunnel_cidr_table.read().unwrap().get(&tunnel_id) {
             for cidr in list.iter() {
                 if cidr.ip.contains(&ip) {
                     endpoint.l3_epc_id = cidr.epc_id;
@@ -276,7 +282,7 @@ impl Labeler {
     }
 
     fn set_vip_by_cidr(&self, ip: IpAddr, epc: i32, info: &mut EndpointInfo) -> bool {
-        if let Some(list) = self.epc_cidr_table.get().get(&epc) {
+        if let Some(list) = self.epc_cidr_table.read().unwrap().get(&epc) {
             for cidr in list {
                 if cidr.ip.contains(&ip) {
                     info.is_vip = cidr.is_vip;
@@ -327,22 +333,32 @@ impl Labeler {
             }
         }
 
-        self.ip_netmask_table.set(ip_netmask_table);
-        self.ip_table.set(ip_table);
+        *self.ip_netmask_table.write().unwrap() = ip_netmask_table;
+        *self.ip_table.write().unwrap() = ip_table;
     }
 
-    fn get_interface_by_ip(&self, ip: IpAddr) -> Option<&Arc<PlatformData>> {
+    fn get_interface_by_ip(&self, ip: IpAddr) -> Option<PlatformData> {
         match ip {
             IpAddr::V4(ipv4) => {
                 let ip_int = u32::from_be_bytes(ipv4.octets());
-                if let Some(netmask) = self.ip_netmask_table.get().get(&((ip_int >> 16) as u16)) {
+                if let Some(netmask) = self
+                    .ip_netmask_table
+                    .read()
+                    .unwrap()
+                    .get(&((ip_int >> 16) as u16))
+                {
                     let mut netmask_temp = *netmask;
                     while netmask_temp > 0 {
                         let count = count_trailing_zeros32(netmask_temp);
                         netmask_temp ^= 1 << count;
                         let net_addr = (ip_int & (0xffff_ffff << count)) as u128;
-                        if let Some(v) = self.ip_table.get().get(&(net_addr | 0xffff_0000_0000)) {
-                            return Some(v);
+                        if let Some(v) = self
+                            .ip_table
+                            .read()
+                            .unwrap()
+                            .get(&(net_addr | 0xffff_0000_0000))
+                        {
+                            return Some(v.as_ref().clone());
                         }
                     }
                 }
@@ -350,7 +366,11 @@ impl Labeler {
             }
             IpAddr::V6(ipv6) => {
                 let net_addr = u128::from_be_bytes(ipv6.octets());
-                return self.ip_table.get().get(&net_addr);
+                if let Some(v) = self.ip_table.read().unwrap().get(&net_addr) {
+                    Some(v.as_ref().clone())
+                } else {
+                    None
+                }
             }
         }
     }
@@ -389,7 +409,7 @@ impl Labeler {
                 if info.l3_epc_id == 0 {
                     // step 2: 查询平台数据WAN接口
                     if let Some(interface) = self.get_interface_by_ip(ip) {
-                        info.set_l3_data(interface);
+                        info.set_l3_data(&interface);
                         is_wan = interface.if_type == IfType::WAN;
                     } else {
                         // step 3: 查询DEEPFLOW添加的WAN监控网段(cidr)
@@ -403,11 +423,11 @@ impl Labeler {
         }
         // step 1: 使用mac查询L2
         if let Some(interface) = self.get_interface_by_mac(mac) {
-            info.set_l2_data(interface);
+            info.set_l2_data(&interface);
             info.is_vip_interface = interface.is_vip_interface;
             // IP为0，则取MAC对应的二层数据作为三层数据
             if l3_end || ip.is_unspecified() || ip.is_loopback() || is_link_local(ip) {
-                info.set_l3_data(interface);
+                info.set_l3_data(&interface);
                 is_wan = interface.if_type == IfType::WAN;
                 return (info, is_wan);
             }
@@ -415,7 +435,7 @@ impl Labeler {
 
         // step 2: 使用L2EpcId + IP查询L3，如果L2EpcId为0，会查询到DEEPFLOW添加的监控IP
         if let Some(interface) = self.get_interface_by_epc_ip(ip, info.l2_epc_id) {
-            info.set_l3_data(interface);
+            info.set_l3_data(&interface);
             is_wan = interface.if_type == IfType::WAN;
         }
         return (info, is_wan);
@@ -437,7 +457,7 @@ impl Labeler {
                 self.get_interface_by_epc_ip(key.dst_ip, src_data.l3_epc_id)
             {
                 // 本端IP + 对端EPC查询EPC-IP表
-                dst_data.set_l3_data(interface);
+                dst_data.set_l3_data(&interface);
             } else {
                 // 本端IP + 对端EPC查询CIDR表
                 self.set_epc_by_cidr(key.dst_ip, src_data.l3_epc_id, &mut dst_data);
@@ -452,7 +472,7 @@ impl Labeler {
                 self.get_interface_by_epc_ip(key.src_ip, dst_data.l3_epc_id)
             {
                 // 本端IP + 对端EPC查询EPC-IP表
-                src_data.set_l3_data(interface);
+                src_data.set_l3_data(&interface);
             } else {
                 // 本端IP + 对端EPC查询CIDR表
                 self.set_epc_by_cidr(key.src_ip, dst_data.l3_epc_id, &mut src_data);
@@ -480,7 +500,7 @@ impl Labeler {
         if src_data.l3_epc_id == 0 {
             // step 1: 查询平台接口数据WAN IP
             if let Some(interface) = self.get_interface_by_ip(src) {
-                src_data.set_l3_data(interface);
+                src_data.set_l3_data(&interface);
                 found_src = true;
             } else {
                 // step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)
@@ -490,7 +510,7 @@ impl Labeler {
         if dst_data.l3_epc_id == 0 {
             // step 1: 查询平台接口数据WAN IP
             if let Some(interface) = self.get_interface_by_ip(dst) {
-                dst_data.set_l3_data(interface);
+                dst_data.set_l3_data(&interface);
                 fount_dst = true;
             } else {
                 // step 2: 查询DEEPFLOW添加的WAN监控网段(cidr)

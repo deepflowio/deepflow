@@ -48,6 +48,8 @@ use crate::pcap::WorkerManager;
 use crate::platform::ApiWatcher;
 #[cfg(target_os = "linux")]
 use crate::utils::cgroups::Cgroups;
+#[cfg(target_os = "linux")]
+use crate::utils::environment::core_file_check;
 use crate::{
     collector::Collector,
     collector::{
@@ -55,9 +57,9 @@ use crate::{
         MetricsType,
     },
     common::{
-        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, DropletMessageType,
-        FeatureFlags, DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION,
-        FREE_SPACE_REQUIREMENT, NORMAL_EXIT_WITH_RESTART,
+        enums::TapType, tagged_flow::TaggedFlow, tap_types::TapTyper, FeatureFlags,
+        DEFAULT_CONF_FILE, DEFAULT_INGESTER_PORT, DEFAULT_LOG_RETENTION, FREE_SPACE_REQUIREMENT,
+        NORMAL_EXIT_WITH_RESTART,
     },
     config::{
         handler::{ConfigHandler, DispatcherConfig, ModuleConfig, PortAccess},
@@ -74,7 +76,7 @@ use crate::{
     policy::Policy,
     proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
-    sender::{uniform_sender::UniformSenderThread, SendItem},
+    sender::{uniform_sender::UniformSenderThread, SendItem, SendMessageType},
     utils::{
         environment::{
             check, controller_ip_check, free_memory_check, free_space_checker, get_ctrl_ip_and_mac,
@@ -87,6 +89,8 @@ use crate::{
 };
 #[cfg(target_os = "linux")]
 use public::netns::{links_by_name_regex_in_netns, NetNs};
+#[cfg(target_os = "windows")]
+use public::utils::net::link_by_name;
 use public::{
     debug::QueueDebugger,
     netns::NsFile,
@@ -219,7 +223,7 @@ impl Trident {
             &config.controller_ips,
             DEFAULT_INGESTER_PORT,
             base_name,
-            vec![0, 0, 0, 0, DropletMessageType::Syslog as u8],
+            vec![0, 0, 0, 0, SendMessageType::Syslog as u8],
         );
 
         let (log_level_writer, log_level_counter) = LogLevelWriter::new();
@@ -856,6 +860,8 @@ impl Components {
         stats_sender.start();
 
         trident_process_check();
+        #[cfg(target_os = "linux")]
+        core_file_check();
         controller_ip_check(&static_config.controller_ips);
         check(free_space_checker(
             &static_config.log_file,
@@ -1309,7 +1315,7 @@ impl Components {
                 .policy_getter(policy_getter)
                 .exception_handler(exception_handler.clone())
                 .ntp_diff(synchronizer.ntp_diff())
-                .src_interface(src_interface)
+                .src_interface(src_interface.clone())
                 .netns(netns)
                 .trident_type(candidate_config.dispatcher.trident_type);
 
@@ -1319,8 +1325,20 @@ impl Components {
                 .build()
                 .unwrap();
             #[cfg(target_os = "windows")]
+            let pcap_interfaces = if candidate_config.tap_mode == TapMode::Local {
+                tap_interfaces.clone()
+            } else {
+                match link_by_name(&src_interface) {
+                    Ok(link) => vec![link],
+                    Err(e) => {
+                        warn!("link_by_name: {}, error: {}", src_interface, e);
+                        vec![]
+                    }
+                }
+            };
+            #[cfg(target_os = "windows")]
             let dispatcher = dispatcher_builder
-                .pcap_interfaces(tap_interfaces.clone())
+                .pcap_interfaces(pcap_interfaces)
                 .build()
                 .unwrap();
 
@@ -1644,7 +1662,7 @@ impl Components {
         stats_collector.register_countable(
             "flow_aggr",
             Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
-            Default::default(),
+            vec![StatsOption::Tag("index", id.to_string())],
         );
 
         let (mut second_collector, mut minute_collector) = (None, None);

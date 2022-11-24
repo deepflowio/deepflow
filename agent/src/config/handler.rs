@@ -1101,6 +1101,10 @@ impl ConfigHandler {
             info!("src_interfaces set to {:?}", yaml_config.src_interfaces);
         }
 
+        if candidate_config.tap_mode != TapMode::Local && yaml_config.src_interfaces.is_empty() {
+            warn!("src_interfaces should be set in Analyzer mode or Mirror mode");
+        }
+
         if yaml_config.analyzer_dedup_disabled != new_config.yaml_config.analyzer_dedup_disabled {
             yaml_config.analyzer_dedup_disabled = new_config.yaml_config.analyzer_dedup_disabled;
             info!(

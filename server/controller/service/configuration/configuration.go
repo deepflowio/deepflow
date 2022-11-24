@@ -14,4 +14,10 @@
  * limitations under the License.
  */
 
-pub use public::consts::*;
+// Package configuration is only provided for enterprise edition.
+package configuration
+
+import "github.com/gin-gonic/gin"
+
+// GetVTapGroupconfiguration will be replaced in enterprise edition
+func GetVTapGroupconfiguration(c *gin.Context) {}

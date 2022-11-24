@@ -154,7 +154,7 @@ func NewCKWriter(primaryAddr, secondaryAddr, user, password, counterName string,
 		}
 	}
 
-	name := fmt.Sprintf("%s-%s", table.Database, table.LocalName)
+	name := fmt.Sprintf("%s-%s-%s", table.Database, table.LocalName, counterName)
 	dataQueues := queue.NewOverwriteQueues(
 		name, queue.HashKey(queueCount), queueSize,
 		queue.OptionFlushIndicator(time.Second),
@@ -345,6 +345,10 @@ func (w *CKWriter) Close() {
 	}
 	for _, c := range w.counters {
 		c.Close()
+	}
+
+	for _, q := range w.dataQueues {
+		q.Close()
 	}
 
 	log.Infof("ckwriter %s closed", w.name)

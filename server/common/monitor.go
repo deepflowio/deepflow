@@ -45,7 +45,9 @@ func (m *Monitor) GetDiskIO() (uint64, uint64) {
 }
 
 type Monitor struct {
-	process *process.Process
+	process             *process.Process
+	lastRecv, lastSend  uint64
+	lastRead, lastWrite uint64
 
 	utils.Closable
 }
@@ -76,15 +78,18 @@ func NewMonitor() (*Monitor, error) {
 func (m *Monitor) GetCounter() interface{} {
 	bytesSend, bytesRecv := GetNetIO()
 	bytesRead, bytesWrite := m.GetDiskIO()
-	return &Counter{
+	c := &Counter{
 		CpuPercent: m.GetCpuPercent(),
 		MemRSS:     m.GetMemRSS(),
 		MemInuse:   GetMemInuse(),
-		BytesSend:  bytesSend,
-		BytesRecv:  bytesRecv,
-		BytesRead:  bytesRead,
-		BytesWrite: bytesWrite,
+		BytesSend:  bytesSend - m.lastSend,
+		BytesRecv:  bytesRecv - m.lastRecv,
+		BytesRead:  bytesRead - m.lastRead,
+		BytesWrite: bytesWrite - m.lastWrite,
 	}
+	m.lastSend, m.lastRecv = bytesSend, bytesRecv
+	m.lastRead, m.lastWrite = bytesRead, bytesWrite
+	return c
 }
 
 func (m *Monitor) Stop() {
