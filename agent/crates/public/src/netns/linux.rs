@@ -19,11 +19,12 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt::{self, Debug};
 use std::fs::{self, File};
+use std::hash::{Hash, Hasher};
 use std::io::{self, Cursor, Write};
 use std::os::unix::{fs::MetadataExt, io::AsRawFd};
 use std::path::{Path, PathBuf};
 
-use log::warn;
+use log::{debug, trace, warn};
 use neli::{
     attr::Attribute,
     consts::{genl::*, nl::*, rtnl::*, socket::*},
@@ -52,7 +53,7 @@ pub enum Netnsa {
     CurrentNsid = 5,
 }
 
-#[derive(Clone, Debug, Default, Hash)]
+#[derive(Clone, Debug, Default)]
 pub enum NsFile {
     #[default]
     Root,
@@ -79,6 +80,15 @@ impl fmt::Display for NsFile {
             Self::Root => write!(f, ""),
             Self::Named(s) => write!(f, "{:?}", s),
             Self::Proc(p) => write!(f, "net:[{}]", p),
+        }
+    }
+}
+
+impl Hash for NsFile {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self.get_inode() {
+            Ok(ino) => ino.hash(state),
+            _ => self.to_string().hash(state),
         }
     }
 }
@@ -125,7 +135,15 @@ impl TryFrom<&Path> for NsFile {
     type Error = Error;
 
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        Ok(NsFile::Proc(fs::metadata(path)?.ino()))
+        if path == Path::new(NetNs::ROOT_NS_PATH) {
+            return Ok(NsFile::Root);
+        }
+        match (path.parent(), path.file_name()) {
+            (Some(p), Some(name)) if p == Path::new(NetNs::NAMED_PATH) => {
+                Ok(NsFile::Named(name.to_owned()))
+            }
+            _ => Ok(NsFile::Proc(fs::metadata(path)?.ino())),
+        }
     }
 }
 
@@ -139,7 +157,141 @@ impl NetNs {
     const ROOT_NS_PATH: &'static str = "/proc/1/ns/net";
     const PROC_PATH: &'static str = "/proc";
 
+    pub fn interfaces_linked_with(ns: &Vec<NsFile>) -> Result<HashMap<NsFile, Vec<InterfaceInfo>>> {
+        // find all net namespaces
+        let mut all_ns = HashMap::new();
+        for path in Self::get_named_file_paths().into_iter() {
+            if let Ok(m) = fs::metadata(&path) {
+                all_ns.entry(m.ino()).or_insert(vec![]).push(path);
+            }
+        }
+        match Self::get_proc_cache() {
+            Ok(proc_cache) => {
+                for (ino, pids) in proc_cache {
+                    if all_ns.contains_key(&ino) {
+                        continue;
+                    }
+                    all_ns.insert(
+                        ino,
+                        pids.iter()
+                            .map(|pid| {
+                                [Self::PROC_PATH, &pid.to_string(), "ns", "net"]
+                                    .iter()
+                                    .collect()
+                            })
+                            .collect(),
+                    );
+                }
+            }
+            Err(e) => warn!("get proc cache failed: {:?}", e),
+        }
+        debug!(
+            "query namespaces: {:?}",
+            all_ns.iter().map(|(k, v)| (k, &v[0])).collect::<Vec<_>>()
+        );
+
+        let interested_files = ns
+            .iter()
+            .filter_map(|f| match Self::open_root_or_named_ns_file(f) {
+                Ok(fp) => Some((f, fp)),
+                Err(e) => {
+                    warn!("open netns file {:?} failed: {:?}", f, e);
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // for restore
+        let current_ns = NetNs::open_current_ns()?;
+
+        let mut result = HashMap::new();
+        // query net namespaces
+        'outer: for (ino, paths) in all_ns.iter() {
+            debug!("query namespace ino {}", ino);
+            for path in paths {
+                let fp = match File::open(path) {
+                    Ok(fp) => fp,
+                    Err(e) => {
+                        debug!("open {} failed: {:?}", path.display(), e);
+                        continue;
+                    }
+                };
+                if let Err(_) = Self::setns(&fp) {
+                    debug!("setns failed for file {}", path.display());
+                    continue;
+                }
+
+                let Ok(links) = link_list() else {
+                    debug!("link_list() failed for file {}", path.display());
+                    continue;
+                };
+                let Ok(addrs) = addr_list() else {
+                    debug!("addr_list() failed for file {}", path.display());
+                    continue;
+                };
+
+                let Ok(mut socket) = WrappedSocket::new() else {
+                    debug!("WrappedSocket::new() failed for file {}", path.display());
+                    continue;
+                };
+
+                for link in links {
+                    if link.link_netnsid.is_none() {
+                        trace!("{:?} has no link-netnsid", link);
+                        continue;
+                    }
+                    let mut tap_ns = None;
+                    for (ns, nsfp) in interested_files.iter() {
+                        match socket.get_nsid_by_file(nsfp) {
+                            Ok(id) if id == link.link_netnsid.unwrap() as i32 => {
+                                tap_ns = Some(ns);
+                                break;
+                            }
+                            Err(e) => {
+                                debug!("get_nsid_by_file() failed for ns {:?}: {:?}", ns, e);
+                            }
+                            _ => (),
+                        }
+                    }
+                    if tap_ns.is_none() {
+                        trace!("no tap_ns found for link {:?}", link);
+                        continue;
+                    }
+                    let info = InterfaceInfo {
+                        tap_ns: (*tap_ns.unwrap()).clone(),
+                        // no peer index means same index
+                        tap_idx: link.peer_index.unwrap_or(link.if_index),
+                        mac: link.mac_addr,
+                        ips: addrs
+                            .iter()
+                            .filter_map(|addr| {
+                                if addr.if_index == link.if_index {
+                                    Some(addr.ip_addr)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect(),
+                        name: link.name,
+                        device_id: format!("{}", NsFile::try_from(path.as_ref()).unwrap()),
+                    };
+                    trace!("found {:?}", info);
+                    result
+                        .entry(info.tap_ns.clone())
+                        .or_insert(vec![])
+                        .push(info);
+                }
+                continue 'outer;
+            }
+            debug!("query namespace ino {} failed", ino);
+        }
+
+        NetNs::setns(&current_ns)?;
+        Ok(result)
+    }
+
     // interface info in this net namespace
+    #[deprecated]
     pub fn get_ns_interfaces(&mut self, ns: &NsFile) -> Result<Vec<InterfaceInfo>> {
         self.open_and_setns(ns)?;
 
@@ -198,7 +350,7 @@ impl NetNs {
                                 mac: peer_link.mac_addr,
                                 ips,
                                 name: peer_link.name,
-                                device_id: format!("{}", link_netns),
+                                device_id: link_netns.to_string(),
                             });
                             break;
                         }
@@ -267,7 +419,7 @@ impl NetNs {
         }
     }
 
-    fn get_named_files() -> Vec<NsFile> {
+    fn get_named_file_paths() -> Vec<PathBuf> {
         if let Ok(entries) = fs::read_dir(Self::NAMED_PATH) {
             entries
                 .into_iter()
@@ -278,12 +430,19 @@ impl NetNs {
                             Ok(t) if t.is_file() || t.is_symlink() => true,
                             _ => false,
                         })
-                        .map(|e| NsFile::Named(e.file_name()))
+                        .map(|e| e.path())
                 })
                 .collect()
         } else {
             vec![]
         }
+    }
+
+    fn get_named_files() -> Vec<NsFile> {
+        Self::get_named_file_paths()
+            .into_iter()
+            .map(|e| NsFile::Named(e.file_name().unwrap().to_owned()))
+            .collect()
     }
 
     fn load_named_ns_map(&mut self, socket: &mut WrappedSocket) -> HashMap<u32, NsFile> {
@@ -318,7 +477,7 @@ impl NetNs {
         for file in files {
             match self.open_ns_file(&file) {
                 Ok(fp) => {
-                    if let Ok(id) = socket.get_nsid_by_file(fp) {
+                    if let Ok(id) = socket.get_nsid_by_file(&fp) {
                         // negative id (-1) is ns not related to current ns
                         if id >= 0 {
                             map.insert(id as u32, file);
@@ -331,10 +490,17 @@ impl NetNs {
         map
     }
 
-    fn open_ns_file(&mut self, ns: &NsFile) -> Result<File> {
+    fn open_root_or_named_ns_file(ns: &NsFile) -> Result<File> {
         match ns {
             NsFile::Root => Ok(File::open(Self::ROOT_NS_PATH)?),
             NsFile::Named(name) => Ok(File::open(Path::new(NetNs::NAMED_PATH).join(name))?),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn open_ns_file(&mut self, ns: &NsFile) -> Result<File> {
+        match ns {
+            NsFile::Root | NsFile::Named(_) => Self::open_root_or_named_ns_file(ns),
             NsFile::Proc(inode) => {
                 if self.proc_cache.is_empty() || !self.proc_cache.contains_key(inode) {
                     let _ = self.update_proc_cache();
@@ -358,7 +524,7 @@ impl NetNs {
         }
     }
 
-    fn update_proc_cache(&mut self) -> Result<()> {
+    fn get_proc_cache() -> Result<HashMap<u64, Vec<u32>>> {
         let mut cache = HashMap::new();
         for proc in fs::read_dir(Self::PROC_PATH)? {
             let proc = proc?;
@@ -381,7 +547,13 @@ impl NetNs {
                 cache.entry(fp.ino()).or_insert(vec![]).push(pid);
             }
         }
-        self.proc_cache = cache;
+        Ok(cache)
+    }
+
+    fn update_proc_cache(&mut self) -> Result<()> {
+        if let Ok(cache) = Self::get_proc_cache() {
+            self.proc_cache = cache;
+        }
         Ok(())
     }
 }
@@ -393,7 +565,7 @@ impl WrappedSocket {
         Ok(Self(NlSocketHandle::connect(NlFamily::Route, None, &[])?))
     }
 
-    fn get_nsid_by_file(&mut self, fp: File) -> Result<i32> {
+    fn get_nsid_by_file(&mut self, fp: &File) -> Result<i32> {
         let mut payload = Cursor::new(Vec::new());
         Rtgenmsg {
             rtgen_family: RtAddrFamily::Unspecified,

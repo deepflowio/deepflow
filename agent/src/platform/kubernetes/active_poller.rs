@@ -59,35 +59,22 @@ impl ActivePoller {
     }
 
     fn query(ns: &Vec<NsFile>) -> HashMap<NsFile, Vec<InterfaceInfo>> {
-        let mut net_ns = NetNs::default();
-        let mut map = HashMap::new();
-
         // always query root ns (/proc/1/ns/net)
-        let mut ns_files = vec![&NsFile::Root];
-        ns_files.extend(ns);
+        let mut ns_files = vec![NsFile::Root];
+        ns_files.extend(ns.clone());
 
-        // for restore
-        let current_ns = NetNs::open_current_ns();
-        if let Err(e) = current_ns {
-            warn!("get self net namespace failed: {:?}", e);
-            return map;
-        }
-        let current_ns = current_ns.unwrap();
-
-        for ns in ns_files {
-            match net_ns.get_ns_interfaces(ns) {
-                Ok(mut ifs) => {
-                    ifs.sort_unstable();
-                    map.insert(ns.clone(), ifs);
+        match NetNs::interfaces_linked_with(&ns_files) {
+            Ok(mut map) => {
+                for (_, v) in map.iter_mut() {
+                    v.sort_unstable();
                 }
-                Err(e) => warn!("get interfaces failed for {:?}: {:?}", ns, e),
+                map
+            }
+            Err(e) => {
+                warn!("query namespace interfaces failed: {:?}", e);
+                HashMap::new()
             }
         }
-
-        if let Err(e) = NetNs::setns(&current_ns) {
-            warn!("restore net namespace failed: {}", e);
-        }
-        map
     }
 
     fn process(

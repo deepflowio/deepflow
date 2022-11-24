@@ -200,7 +200,10 @@ pub(super) struct MirrorModeDispatcher {
 
 impl MirrorModeDispatcher {
     pub(super) fn init(&mut self) {
-        info!("Mirror mode dispatcher {} init with 0x{:x}.", self.base.id, self.mac);
+        info!(
+            "Mirror mode dispatcher {} init with 0x{:x}.",
+            self.base.id, self.mac
+        );
         self.base.init();
     }
 
