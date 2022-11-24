@@ -29,6 +29,7 @@ fn generate_protobuf() -> Result<(), Box<dyn Error>> {
                 "../message/metric.proto",
                 "../message/flow_log.proto",
                 "../message/stats.proto",
+                "../message/protobuf_rpcs.proto",
             ],
             &["../message"],
         )?;
