@@ -399,8 +399,8 @@ func (l *VTapLKData) getWanIPVIFIDs(db *gorm.DB) ([]int, map[int]string) {
 }
 
 func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
-	lanVifIDs, _ := l.getLanIPVIFIDs(db)
-	wanVifIDs, _ := l.getWanIPVIFIDs(db)
+	lanVifIDs, lanVifIDToIP := l.getLanIPVIFIDs(db)
+	wanVifIDs, wanVifIDToIP := l.getWanIPVIFIDs(db)
 	vifIDs := make([]int, 0, len(lanVifIDs)+len(wanVifIDs))
 	if len(lanVifIDs) > 0 {
 		vifIDs = append(vifIDs, lanVifIDs...)
@@ -442,6 +442,7 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 	}
 
 	vmLaunchServers := make([]string, 0, len(vms))
+	launchServerToVM := make(map[string]*models.VM)
 	for _, vm := range vms {
 		if vm.LaunchServer == "" {
 			log.Errorf("vtap(%s), vm(id=%d) not launch server", l.getKey(), vm.ID)
@@ -449,6 +450,7 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 		}
 		if !Find[string](vmLaunchServers, vm.LaunchServer) {
 			vmLaunchServers = append(vmLaunchServers, vm.LaunchServer)
+			launchServerToVM[vm.LaunchServer] = vm
 		}
 	}
 	if len(vmLaunchServers) == 0 {
@@ -459,15 +461,49 @@ func (l *VTapLKData) LookUpMirrorVTapByIP(db *gorm.DB) *VTapLKResult {
 		log.Error("vtap(%s) host(%s) not found", l.getKey(), vmLaunchServers)
 		return nil
 	}
-	vTapName := fmt.Sprintf("%s-H%d", host.Name, host.ID)
+
+	var vTapName, launchServer, az, region, lcuuid string
+	var vTapType, launchServerID int
+	if host.HType == HOST_HTYPE_ESXI {
+		vTapName = fmt.Sprintf("%s-H%d", host.Name, host.ID)
+		vTapType = VTAP_TYPE_ESXI
+		launchServer = host.IP
+		launchServerID = host.ID
+		az = host.AZ
+		region = host.Region
+		lcuuid = uuid.NewString()
+	} else {
+		vm, ok := launchServerToVM[host.IP]
+		if ok == false {
+			log.Errorf("host_device(ip=%s) not found vm", host.IP)
+			return nil
+		}
+		if isVMofBMHtype(vm.HType) == true {
+			vTapType = VTAP_TYPE_WORKLOAD_P
+		} else {
+			vTapType = VTAP_TYPE_WORKLOAD_V
+		}
+		if vifID, ok := deviceIDToVifID[vm.ID]; ok {
+			launchServer = lanVifIDToIP[vifID]
+			if launchServer == "" {
+				launchServer = wanVifIDToIP[vifID]
+			}
+		}
+
+		vTapName = fmt.Sprintf("%s-W%d", vm.Name, vm.ID)
+		launchServerID = vm.ID
+		az = vm.AZ
+		region = vm.Region
+		lcuuid = vm.Lcuuid
+	}
 	return &VTapLKResult{
-		VTapType:       VTAP_TYPE_ESXI,
-		LaunchServer:   host.IP,
-		LaunchServerID: host.ID,
+		VTapType:       vTapType,
+		LaunchServer:   launchServer,
+		LaunchServerID: launchServerID,
 		VTapName:       vTapName,
-		AZ:             host.AZ,
-		Region:         host.Region,
-		Lcuuid:         uuid.NewString(),
+		AZ:             az,
+		Region:         region,
+		Lcuuid:         lcuuid,
 	}
 }
 
