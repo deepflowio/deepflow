@@ -4,19 +4,18 @@ package common;
 option go_package = "github.com/deepflowys/deepflow/message/common";
 
 enum TridentType {
-    // 1: process 2: vm 3: public cloud 4: analyzer 5: physical machine 6: dedicated physical machine 7: host pod 8: vm pod
     TT_UNKNOWN = 0;
-    TT_PROCESS = 1;
-    TT_VM = 2;
-    TT_PUBLIC_CLOUD = 3;
-    TT_ANALYZER = 4;
-    TT_PHYSICAL_MACHINE = 5;
-    TT_DEDICATED_PHYSICAL_MACHINE = 6;
-    TT_HOST_POD = 7;
-    TT_VM_POD = 8;
-    TT_TUNNEL_DECAPSULATION = 9;
-    TT_HYPER_V_COMPUTE = 10;
-    TT_HYPER_V_NETWORK = 11;
+    TT_PROCESS = 1;                        // Agent in KVM
+    TT_VM = 2;                             // Agent in a dedicated VM on ESXi
+    TT_PUBLIC_CLOUD = 3;                   // Agent in Cloud host (VM)
+    // _ = 4;                              // --deprecated--
+    TT_PHYSICAL_MACHINE = 5;               // Agent in Cloud host (BM), or legacy host
+    TT_DEDICATED_PHYSICAL_MACHINE = 6;     // Agent in a dedicated host to receive mirror traffic
+    TT_HOST_POD = 7;                       // Agent in K8s Node (Cloud BM, or legacy host)
+    TT_VM_POD = 8;                         // Agent in K8s Node (Cloud VM)
+    TT_TUNNEL_DECAPSULATION = 9;           // Agent in a dedicated host to decap tunnel traffic
+    TT_HYPER_V_COMPUTE = 10;               // Agent in Hyper-V Compute Node
+    TT_HYPER_V_NETWORK = 11;               // Agent in Hyper-V Network Node
 }
 
 message KubernetesAPIInfo {
