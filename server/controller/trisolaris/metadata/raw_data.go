@@ -1174,7 +1174,7 @@ func (r *PlatformRawData) generateIpResoureceData(
 	isVipInterface := false
 
 	// 云私有云中虚拟机上用于容器的hostnic网卡也会返回IP，在此将其忽略避免一个IP对应两块网卡
-	if vif.Name == "" || strings.HasPrefix(strings.ToLower(vif.Name), "hostnic") {
+	if vif.Name == "" || strings.HasPrefix(strings.ToLower(vif.Name), "hostnic") == false {
 		if ips, ok := r.vInterfaceIDToIP[vif.ID]; ok {
 			for _, ipResource := range ips {
 				isVipInterface = r.checkIsVip(ipResource.GetIp(), vif, platformVips)
