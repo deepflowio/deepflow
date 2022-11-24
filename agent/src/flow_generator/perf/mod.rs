@@ -35,7 +35,7 @@ use public::bitmap::Bitmap;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
-use super::protocol_logs::{AppProtoHead, PostgresqlLog};
+use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcParser};
 
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
@@ -100,6 +100,7 @@ pub enum L7FlowPerfTable {
     MysqlPerfData,
     HttpPerfData,
     PostgresqlLog,
+    ProtobufRpcParser,
 }
 
 pub struct FlowPerf {
@@ -131,6 +132,7 @@ impl FlowPerf {
     fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<L7RrtCache>>) -> Option<L7FlowPerfTable> {
         match protocol {
             L7Protocol::DNS => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
+            L7Protocol::ProtobufRPC => Some(L7FlowPerfTable::from(ProtobufRpcParser::new())),
             L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
             L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
             L7Protocol::MQTT => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),

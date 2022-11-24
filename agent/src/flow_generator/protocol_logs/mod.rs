@@ -30,7 +30,9 @@ use self::pb_adapter::L7ProtocolSendLog;
 pub use dns::{DnsInfo, DnsLog};
 pub use mq::{mqtt, KafkaInfo, KafkaLog, MqttInfo, MqttLog};
 pub use parser::{AppProtoLogsParser, MetaAppProto};
-pub use rpc::{DubboHeader, DubboInfo, DubboLog};
+pub use rpc::{
+    get_protobuf_rpc_parser, DubboHeader, DubboInfo, DubboLog, ProtobufRpcInfo, ProtobufRpcParser,
+};
 pub use sql::{
     decode, MysqlHeader, MysqlInfo, MysqlLog, PostgreInfo, PostgresqlLog, RedisInfo, RedisLog,
 };

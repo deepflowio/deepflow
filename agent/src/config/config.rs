@@ -24,6 +24,7 @@ use std::time::Duration;
 use log::{error, info, warn};
 use md5::{Digest, Md5};
 use public::bitmap::Bitmap;
+use public::utils::bitmap::parse_port_string_to_bitmap;
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer,
@@ -231,6 +232,13 @@ impl Default for UprobeProcRegExp {
         }
     }
 }
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Default)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct EbpfKprobeWhitelist {
+    pub port_list: String,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct YamlConfig {
@@ -302,6 +310,7 @@ pub struct YamlConfig {
     #[serde(rename = "l7-protocol-ports")]
     // hashmap<protocolName, portRange>
     pub l7_protocol_ports: HashMap<String, String>,
+    pub ebpf_kprobe_whitelist: EbpfKprobeWhitelist,
 }
 
 impl YamlConfig {
@@ -438,29 +447,10 @@ impl YamlConfig {
         */
         let mut port_bitmap = Vec::new();
         for (protocol_name, port_range) in self.l7_protocol_ports.iter() {
-            let mut bitmap = Bitmap::new(u16::MAX as usize, false);
-            let mut ports = port_range.split(",");
-
-            while let Some(mut p) = ports.next() {
-                p = p.trim();
-                if let Ok(port) = p.parse::<u16>() {
-                    let _ = bitmap.set(port as usize, true);
-                } else {
-                    let range = p.split("-").collect::<Vec<&str>>();
-                    if range.len() != 2 {
-                        continue;
-                    }
-
-                    if let (Some(start_str), Some(end_str)) = (range.get(0), range.get(1)) {
-                        if let (Ok(start), Ok(end)) =
-                            (start_str.parse::<u16>(), end_str.parse::<u16>())
-                        {
-                            let _ = bitmap.set_range(start as usize..=end as usize, true);
-                        }
-                    }
-                }
-            }
-            port_bitmap.push((protocol_name.clone(), bitmap));
+            port_bitmap.push((
+                protocol_name.clone(),
+                parse_port_string_to_bitmap(port_range, false).unwrap(),
+            ));
         }
         port_bitmap
     }
@@ -541,6 +531,7 @@ impl Default for YamlConfig {
 
             log_file: DEFAULT_LOG_FILE.into(),
             l7_protocol_ports: HashMap::from([(String::from("DNS"), String::from("53"))]),
+            ebpf_kprobe_whitelist: EbpfKprobeWhitelist::default(),
         }
     }
 }

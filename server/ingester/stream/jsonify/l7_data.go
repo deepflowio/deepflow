@@ -536,6 +536,9 @@ func (h *L7FlowLog) fillL7FlowLog(l *pb.AppProtoLogsData) {
 			}
 			h.RequestId = &h.requestId
 		}
+	case datatype.L7_PROTOCOL_PROTOBUF_RPC:
+		// assume protobuf rpc Always have request_id and maybe equal to 0
+		h.RequestId = &h.requestId
 	}
 }
 
