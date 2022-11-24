@@ -7,6 +7,7 @@ replace (
 	github.com/deepflowys/deepflow/server/controller/cloud/platform => ./controller/cloud/platform
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator => ./controller/db/mysql/migrator
 	github.com/deepflowys/deepflow/server/controller/monitor/license => ./controller/monitor/license
+	github.com/deepflowys/deepflow/server/controller/service/configuration => ./controller/service/configuration
 	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch => ./querier/engine/clickhouse/packet_batch
 	github.com/ionos-cloud/sdk-go/v6 => github.com/ionos-cloud/sdk-go/v6 v6.1.0
 )
@@ -33,6 +34,7 @@ require (
 	github.com/deepflowys/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/controller/monitor/license v0.0.0-00010101000000-000000000000
+	github.com/deepflowys/deepflow/server/controller/service/configuration v0.0.0-00010101000000-000000000000
 	github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch v0.0.0-00010101000000-000000000000
 	github.com/docker/go-units v0.4.0
 	github.com/gin-gonic/gin v1.8.1
@@ -87,6 +89,7 @@ require (
 require (
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.10.2 // indirect
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/signalfx/splunk-otel-go v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/database/sql/splunksql v1.1.0 // indirect
 	github.com/signalfx/splunk-otel-go/instrumentation/internal v1.1.0 // indirect
@@ -158,7 +161,6 @@ require (
 	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.19.0 // indirect
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
 	github.com/paulmach/orb v0.7.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect

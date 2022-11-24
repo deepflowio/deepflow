@@ -41,6 +41,7 @@ import (
 	recorderdb "github.com/deepflowys/deepflow/server/controller/recorder/db"
 	"github.com/deepflowys/deepflow/server/controller/report"
 	"github.com/deepflowys/deepflow/server/controller/router"
+	"github.com/deepflowys/deepflow/server/controller/router/configuration"
 	"github.com/deepflowys/deepflow/server/controller/statsd"
 	"github.com/deepflowys/deepflow/server/controller/tagrecorder"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
@@ -168,6 +169,7 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	router.VTapInterface(r, cfg)
 	router.VPCRouter(r)
 	trouter.RegistRouter(r)
+	configuration.ConfigurationRouter(r)
 
 	grpcStart(ctx, cfg)
 
