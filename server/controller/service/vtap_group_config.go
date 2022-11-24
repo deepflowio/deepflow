@@ -697,23 +697,3 @@ func DeleteVTapGroupConfigByFilter(args map[string]string) (string, error) {
 func GetVTapGroupExampleConfig() (string, error) {
 	return string(model.YamlVTapGroupConfig), nil
 }
-
-func GetVTapGroupConfiguration(lcuuid string) ([]*ConfigLabel, error) {
-	var response []*ConfigLabel
-	if lcuuid == "" {
-		configManager := getNewConfigManager()
-		configManager.getDefaultValue()
-		response = configManager.getLabels()
-	} else {
-		dbConfig := &mysql.VTapGroupConfiguration{}
-		ret := mysql.Db.Where("lcuuid = ?", lcuuid).First(dbConfig)
-		if ret.Error != nil {
-			return nil, fmt.Errorf("vtap group configuration(%s) not found", lcuuid)
-		}
-		configManager := getDetailConfigManager()
-		configManager.setConfigValue(dbConfig)
-		response = configManager.getLabels()
-	}
-
-	return response, nil
-}
