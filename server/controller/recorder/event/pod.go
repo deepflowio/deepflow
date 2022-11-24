@@ -29,13 +29,13 @@ import (
 )
 
 type Pod struct {
-	EventManager[cloudmodel.Pod, mysql.Pod, *cache.Pod]
+	EventManagerBase
 	deviceType int
 }
 
 func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 	mng := &Pod{
-		EventManager[cloudmodel.Pod, mysql.Pod, *cache.Pod]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_POD_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -48,6 +48,7 @@ func NewPod(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Pod {
 func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 	for _, item := range items {
 		var opts []eventapi.TagFieldOption
+		var domainLcuuid string
 		info, err := p.ToolDataSet.GetPodInfoByID(item.ID)
 		if err != nil {
 			log.Error(err)
@@ -56,6 +57,7 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 				eventapi.TagAZID(info.AZID),
 				eventapi.TagRegionID(info.RegionID),
 			}...)
+			domainLcuuid = info.DomainLcuuid
 		}
 		opts = append(opts, []eventapi.TagFieldOption{
 			eventapi.TagPodID(item.ID),
@@ -66,14 +68,28 @@ func (p *Pod) ProduceByAdd(items []*mysql.Pod) {
 			eventapi.TagPodNSID(item.PodNamespaceID),
 		}...)
 
-		p.createAndPutEvent(
-			item.Lcuuid,
-			eventapi.RESOURCE_EVENT_TYPE_CREATE,
-			item.Name,
-			p.deviceType,
-			item.ID,
-			opts...,
-		)
+		l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(p.ToolDataSet, item.PodNodeID)
+		if ok {
+			opts = append(opts, l3DeviceOpts...)
+			p.createAndEnqueue(
+				item.Lcuuid,
+				eventapi.RESOURCE_EVENT_TYPE_CREATE,
+				item.Name,
+				p.deviceType,
+				item.ID,
+				opts...,
+			)
+		} else {
+			p.enqueueIfInsertIntoMySQLFailed(
+				item.Lcuuid,
+				domainLcuuid,
+				eventapi.RESOURCE_EVENT_TYPE_CREATE,
+				item.Name,
+				p.deviceType,
+				item.ID,
+				opts...,
+			)
+		}
 	}
 }
 
@@ -117,8 +133,16 @@ func (p *Pod) ProduceByUpdate(cloudItem *cloudmodel.Pod, diffBase *cache.Pod) {
 		}
 
 		nIDs, ips := p.getIPNetworksByID(id)
-		p.createAndPutEvent(
+		var domainLcuuid string
+		info, err := p.ToolDataSet.GetPodInfoByID(id)
+		if err != nil {
+			log.Error(err)
+		} else {
+			domainLcuuid = info.DomainLcuuid
+		}
+		p.enqueueIfInsertIntoMySQLFailed(
 			cloudItem.Lcuuid,
+			domainLcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_RECREATE,
 			name,
 			p.deviceType,
@@ -147,7 +171,7 @@ func (p *Pod) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(p.resourceType, id))
 		}
 
-		p.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
+		p.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, p.deviceType, id)
 	}
 }
 

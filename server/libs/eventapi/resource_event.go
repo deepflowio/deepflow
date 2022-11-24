@@ -30,6 +30,7 @@ const (
 
 type ResourceEvent struct {
 	Time         int64
+	TimeMilli    int64 // record millisecond time for debug
 	Type         string
 	InstanceType uint32 // the value is the same as l3_device_type
 	InstanceID   uint32

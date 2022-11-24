@@ -27,13 +27,13 @@ import (
 )
 
 type RedisInstance struct {
-	EventManager[cloudmodel.RedisInstance, mysql.RedisInstance, *cache.RedisInstance]
+	EventManagerBase
 	deviceType int
 }
 
 func NewRedisInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RedisInstance {
 	mng := &RedisInstance{
-		EventManager[cloudmodel.RedisInstance, mysql.RedisInstance, *cache.RedisInstance]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_REDIS_INSTANCE_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -61,7 +61,7 @@ func (r *RedisInstance) ProduceByAdd(items []*mysql.RedisInstance) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		r.createAndPutEvent(
+		r.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -90,6 +90,6 @@ func (r *RedisInstance) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
 	}
 }

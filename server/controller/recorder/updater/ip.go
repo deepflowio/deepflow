@@ -61,7 +61,7 @@ func (i *IP) splitToWANAndLAN(cloudData []cloudmodel.IP) ([]cloudmodel.IP, []clo
 		if !exists {
 			log.Error(resourceAForResourceBNotFound(
 				rcommon.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
-				rcommon.RESOURCE_TYPE_LAN_IP_EN, cloudItem.Lcuuid,
+				"cloud ip", cloudItem.Lcuuid,
 			))
 			continue
 		}

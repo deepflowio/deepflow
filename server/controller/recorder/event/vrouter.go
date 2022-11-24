@@ -27,13 +27,13 @@ import (
 )
 
 type VRouter struct {
-	EventManager[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]
+	EventManagerBase
 	deviceType int
 }
 
 func NewVRouter(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VRouter {
 	mng := &VRouter{
-		EventManager[cloudmodel.VRouter, mysql.VRouter, *cache.VRouter]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_VROUTER_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -60,7 +60,7 @@ func (r *VRouter) ProduceByAdd(items []*mysql.VRouter) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		r.createAndPutEvent(
+		r.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -89,6 +89,6 @@ func (r *VRouter) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		r.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
 	}
 }
