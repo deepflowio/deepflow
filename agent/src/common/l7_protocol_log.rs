@@ -25,13 +25,14 @@ use super::MetaPacket;
 
 use crate::config::handler::LogParserAccess;
 use crate::flow_generator::protocol_logs::{
-    DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog, RedisLog,
+    get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
+    ProtobufRpcParser, RedisLog,
 };
 use crate::flow_generator::Result;
 
 use public::bitmap::Bitmap;
 use public::enums::IpProtocol;
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{is_protobuf_rpc, L7Protocol};
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.
@@ -203,6 +204,9 @@ macro_rules! all_protocol {
         }
 
         pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
+            if is_protobuf_rpc(p) {
+                return Some(get_protobuf_rpc_parser(p));
+            }
             match p {
                 L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
                 L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(false))),
@@ -274,6 +278,7 @@ pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
 all_protocol!(
     // http have two version but one parser, can not place in macro param.
     DNS,DnsParser,DnsLog::default;
+    ProtobufRPC,ProtobufRpcParser,ProtobufRpcParser::new;
     MySQL,MysqlParser,MysqlLog::default;
     Kafka,KafkaParser,KafkaLog::new;
     Redis,RedisParser,RedisLog::default;
