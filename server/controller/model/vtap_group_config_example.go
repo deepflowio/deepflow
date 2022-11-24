@@ -787,6 +787,7 @@ vtap_group_id: g-xxxxxx
   #l7-protocol-enabled:
   #- HTTP ## for both HTTP and HTTP_TLS
   #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
+  #- ProtobufRPC ## for krpc .. 
   #- Dubbo
   #- MySQL
   #- PostgreSQL
@@ -802,6 +803,7 @@ vtap_group_id: g-xxxxxx
   #l7-protocol-ports:
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
+    #"ProtobufRPC": "1-65535"
     #"Dubbo": "1-65535"
     #"MySQL": "1-65535"
     #"PostgreSQL": "1-65535"
@@ -809,6 +811,8 @@ vtap_group_id: g-xxxxxx
     #"Kafka": "1-65535"
     #"MQTT": "1-65535"
     #"DNS": "53"
+  #ebpf-kprobe-whitelist:
+    port-list:         # x-y,z 格式，默认为空
 
   ########################
   ## L4 Packet Sequence ##

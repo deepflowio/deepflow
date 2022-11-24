@@ -38,7 +38,7 @@ use crate::common::l7_protocol_log::{
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::config::UprobeProcRegExp;
-use crate::ebpf;
+use crate::ebpf::{self, set_allow_port_bitmap};
 use crate::flow_generator::{
     AppProtoLogsBaseInfo, AppProtoLogsData, AppTable, Error as LogError, Result as LogResult,
 };
@@ -938,6 +938,7 @@ impl EbpfCollector {
         sender: DebugSender<Box<MetaPacket<'static>>>,
         uprobe_proc_regexp: &UprobeProcRegExp,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
+        kprobe_port_whitelist: Option<Bitmap>,
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
@@ -1004,6 +1005,10 @@ impl EbpfCollector {
                     info!("l7 protocol {:?} parse enabled", i.protocol());
                     ebpf::enable_ebpf_protocol(i.protocol() as ebpf::c_int);
                 }
+            }
+
+            if let Some(b) = kprobe_port_whitelist {
+                set_allow_port_bitmap(b.get_raw_ptr());
             }
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
@@ -1100,6 +1105,7 @@ impl EbpfCollector {
             sender,
             &config.ebpf_uprobe_proc_regexp,
             config.l7_protocol_enabled_bitmap,
+            config.ebpf_kprobe_whitelist_port.clone(),
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 

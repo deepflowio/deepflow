@@ -24,6 +24,9 @@ pub enum L7Protocol {
     Unknown = 0,
     Other = 1,
 
+    // the follow is belong to ProtobufRPC, only use for l7ProtocolParser, not use for l7ProtocolInfo
+    Krpc = 11,
+
     // HTTP
     Http1 = 20,
     Http2 = 21,
@@ -33,6 +36,7 @@ pub enum L7Protocol {
     // RPC
     Dubbo = 40,
     Grpc = 41,
+    ProtobufRPC = 42,
 
     // SQL
     MySQL = 60,
@@ -49,4 +53,11 @@ pub enum L7Protocol {
     DNS = 120,
 
     Max = 255,
+}
+
+pub fn is_protobuf_rpc(p: L7Protocol) -> bool {
+    match p {
+        L7Protocol::Krpc => true,
+        _ => false,
+    }
 }

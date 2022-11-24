@@ -20,7 +20,7 @@ use serde::Serialize;
 use crate::flow_generator::{
     protocol_logs::{
         pb_adapter::L7ProtocolSendLog, DnsInfo, DubboInfo, HttpInfo, KafkaInfo, MqttInfo,
-        MysqlInfo, PostgreInfo, RedisInfo,
+        MysqlInfo, PostgreInfo, ProtobufRpcInfo, RedisInfo,
     },
     AppProtoHead, Result,
 };
@@ -74,6 +74,7 @@ all_protocol_info!(
     //
     // add new protocol info below
     PostgreInfo(PostgreInfo),
+    ProtobufRpcInfo(ProtobufRpcInfo),
 );
 
 #[enum_dispatch(L7ProtocolInfo)]

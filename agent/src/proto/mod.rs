@@ -18,5 +18,6 @@ pub(crate) mod common;
 pub(crate) mod flow_log;
 pub(crate) mod integration;
 pub(crate) mod metric;
+pub(crate) mod protobuf_rpc;
 pub(crate) mod stats;
 pub(crate) mod trident;

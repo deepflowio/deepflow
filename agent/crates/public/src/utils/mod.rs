@@ -1,3 +1,4 @@
+pub mod bitmap;
 pub mod net;
 
 #[cfg(windows)]

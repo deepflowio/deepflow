@@ -25,7 +25,7 @@ pub struct Capture(Vec<(PacketHeader, Vec<u8>)>);
 
 impl Capture {
     pub fn load_pcap<P: AsRef<Path>>(path: P, parse_len: Option<usize>) -> Self {
-        let parse_len = parse_len.unwrap_or(128);
+        let parse_len = parse_len.unwrap_or(1500);
         let mut packets = vec![];
         let mut capture = pcap::Capture::from_file(path).unwrap();
         #[cfg(target_os = "linux")]
