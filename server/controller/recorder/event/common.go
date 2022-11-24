@@ -253,6 +253,20 @@ func getPodOptionsByID(t *cache.ToolDataSet, id int) ([]eventapi.TagFieldOption,
 	return opts, nil
 }
 
+func getL3DeviceOptionsByPodNodeID(t *cache.ToolDataSet, id int) (opts []eventapi.TagFieldOption, ok bool) {
+	vmID, ok := t.GetVMIDByPodNodeID(id)
+	if ok {
+		opts = append(opts, []eventapi.TagFieldOption{eventapi.TagL3DeviceType(common.VIF_DEVICE_TYPE_VM), eventapi.TagL3DeviceID(vmID)}...)
+		vmInfo, err := t.GetVMInfoByID(vmID)
+		if err != nil {
+			log.Error(err)
+		} else {
+			opts = append(opts, eventapi.TagHostID(vmInfo.HostID))
+		}
+	}
+	return
+}
+
 func findFromAllByID[MT constraint.MySQLSoftDeleteModel](id int) *MT {
 	var item *MT
 	res := mysql.Db.Unscoped().Where("id = ?", id).Find(&item)

@@ -27,13 +27,13 @@ import (
 )
 
 type Host struct {
-	EventManager[cloudmodel.Host, mysql.Host, *cache.Host]
+	EventManagerBase
 	deviceType int
 }
 
 func NewHost(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *Host {
 	mng := &Host{
-		EventManager[cloudmodel.Host, mysql.Host, *cache.Host]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_HOST_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -57,7 +57,7 @@ func (h *Host) ProduceByAdd(items []*mysql.Host) {
 		}
 		opts = append(opts, eventapi.TagHostID(item.ID))
 
-		h.createAndPutEvent(
+		h.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -85,6 +85,6 @@ func (h *Host) ProduceByDelete(lcuuids []string) {
 			}
 		}
 
-		h.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, h.deviceType, id)
+		h.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, h.deviceType, id)
 	}
 }

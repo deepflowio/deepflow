@@ -16,6 +16,10 @@
 
 package common
 
+import (
+	"github.com/deepflowys/deepflow/server/controller/common"
+)
+
 const (
 	RESOURCE_TYPE_REGION_EN                   = "region"
 	RESOURCE_TYPE_AZ_EN                       = "az"
@@ -75,3 +79,17 @@ const (
 	WAN_IP_ISP            = 7
 	PUBLIC_NETWORK_LCUUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 )
+
+var DEVICE_TYPE_INT_TO_STR = map[int]string{
+	common.VIF_DEVICE_TYPE_HOST:           RESOURCE_TYPE_HOST_EN,
+	common.VIF_DEVICE_TYPE_VM:             RESOURCE_TYPE_VM_EN,
+	common.VIF_DEVICE_TYPE_VROUTER:        RESOURCE_TYPE_VROUTER_EN,
+	common.VIF_DEVICE_TYPE_DHCP_PORT:      RESOURCE_TYPE_DHCP_PORT_EN,
+	common.VIF_DEVICE_TYPE_NAT_GATEWAY:    RESOURCE_TYPE_NAT_GATEWAY_EN,
+	common.VIF_DEVICE_TYPE_LB:             RESOURCE_TYPE_LB_EN,
+	common.VIF_DEVICE_TYPE_RDS_INSTANCE:   RESOURCE_TYPE_RDS_INSTANCE_EN,
+	common.VIF_DEVICE_TYPE_REDIS_INSTANCE: RESOURCE_TYPE_REDIS_INSTANCE_EN,
+	common.VIF_DEVICE_TYPE_POD_NODE:       RESOURCE_TYPE_POD_NODE_EN,
+	common.VIF_DEVICE_TYPE_POD_SERVICE:    RESOURCE_TYPE_POD_SERVICE_EN,
+	common.VIF_DEVICE_TYPE_POD:            RESOURCE_TYPE_POD_EN,
+}

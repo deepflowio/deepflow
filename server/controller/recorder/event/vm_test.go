@@ -90,7 +90,7 @@ func TestVM_ProduceByAdd(t *testing.T) {
 			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByAdd(tt.args.items)
 
-			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
 			assert.Equal(t, tt.wantID, e.InstanceID)
 			assert.Equal(t, tt.wantName, e.InstanceName)
 			assert.Equal(t, tt.wantVPCID, e.VPCID)
@@ -153,7 +153,7 @@ func TestVM_ProduceByDelete(t *testing.T) {
 			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByDelete(tt.args.lcuuids)
 
-			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
 			assert.Equal(t, tt.wantID, e.InstanceID)
 			assert.Equal(t, tt.wantName, e.InstanceName)
 		})
@@ -263,7 +263,7 @@ func TestVM_ProduceByUpdate(t *testing.T) {
 			tt.v = NewVM(&tt.cache.ToolDataSet, NewEventQueue())
 			tt.v.ProduceByUpdate(tt.args.cloudItem, tt.args.diffBase)
 
-			e := tt.v.EventManager.Queue.Get().(*eventapi.ResourceEvent)
+			e := tt.v.EventManagerBase.Queue.Get().(*eventapi.ResourceEvent)
 			tt.assertion(t, e)
 		})
 	}

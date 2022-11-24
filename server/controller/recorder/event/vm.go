@@ -38,13 +38,13 @@ var (
 )
 
 type VM struct {
-	EventManager[cloudmodel.VM, mysql.VM, *cache.VM]
+	EventManagerBase
 	deviceType int
 }
 
 func NewVM(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *VM {
 	mng := &VM{
-		EventManager[cloudmodel.VM, mysql.VM, *cache.VM]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_VM_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -73,7 +73,7 @@ func (v *VM) ProduceByAdd(items []*mysql.VM) {
 			eventapi.TagVPCID(item.VPCID),
 		}...)
 
-		v.createAndPutEvent(
+		v.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -102,7 +102,7 @@ func (v *VM) ProduceByUpdate(cloudItem *cloudmodel.VM, diffBase *cache.VM) {
 	}
 
 	nIDs, ips := v.getIPNetworksByID(id)
-	v.createAndPutEvent(
+	v.createAndEnqueue(
 		cloudItem.Lcuuid,
 		eType,
 		name,
@@ -121,7 +121,7 @@ func (v *VM) ProduceByDelete(lcuuids []string) {
 			log.Errorf("%v, %v", idByLcuuidNotFound(v.resourceType, lcuuid), err)
 		}
 
-		v.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
+		v.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, v.deviceType, id)
 	}
 }
 

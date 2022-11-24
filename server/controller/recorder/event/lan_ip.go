@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
@@ -28,12 +29,12 @@ import (
 )
 
 type LANIP struct {
-	EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]
+	EventManagerBase
 }
 
 func NewLANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LANIP {
 	mng := &LANIP{
-		EventManager[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_LAN_IP_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -92,7 +93,51 @@ func (i *LANIP) ProduceByAdd(items []*mysql.LANIP) {
 		}...)
 		opts = append(opts, deviceRelatedOpts...)
 
-		i.createAndPutEvent(
+		if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+			podNodeInfo, err := i.ToolDataSet.GetPodNodeInfoByID(deviceID)
+			if err != nil {
+				log.Error(err)
+			} else {
+				l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(i.ToolDataSet, deviceID)
+				if ok {
+					opts = append(opts, l3DeviceOpts...)
+				} else {
+					i.enqueueIfInsertIntoMySQLFailed(
+						item.Lcuuid,
+						podNodeInfo.DomainLcuuid,
+						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						deviceName,
+						deviceType,
+						deviceID,
+						opts...,
+					)
+					continue
+				}
+			}
+		} else if deviceType == common.VIF_DEVICE_TYPE_POD {
+			podInfo, err := i.ToolDataSet.GetPodInfoByID(deviceID)
+			if err != nil {
+				log.Error(err)
+			} else {
+				l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(i.ToolDataSet, podInfo.PodNodeID)
+				if ok {
+					opts = append(opts, l3DeviceOpts...)
+				} else {
+					i.enqueueIfInsertIntoMySQLFailed(
+						item.Lcuuid,
+						podInfo.DomainLcuuid,
+						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						deviceName,
+						deviceType,
+						deviceID,
+						opts...,
+					)
+					continue
+				}
+			}
+		}
+
+		i.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
@@ -153,7 +198,7 @@ func (i *LANIP) ProduceByDelete(lcuuids []string) {
 			log.Error("%s (lcuuid: %s) ip not found", RESOURCE_TYPE_LAN_IP_EN, lcuuid)
 		}
 
-		i.createAndPutEvent(
+		i.createAndEnqueue(
 			lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,

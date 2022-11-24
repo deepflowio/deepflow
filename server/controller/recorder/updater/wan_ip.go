@@ -24,7 +24,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
@@ -43,7 +42,6 @@ func NewWANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *qu
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewWANIP(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

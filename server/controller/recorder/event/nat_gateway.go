@@ -27,13 +27,13 @@ import (
 )
 
 type NATGateway struct {
-	EventManager[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]
+	EventManagerBase
 	deviceType int
 }
 
 func NewNATGateway(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *NATGateway {
 	mng := &NATGateway{
-		EventManager[cloudmodel.NATGateway, mysql.NATGateway, *cache.NATGateway]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_NAT_GATEWAY_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -61,7 +61,7 @@ func (n *NATGateway) ProduceByAdd(items []*mysql.NATGateway) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		n.createAndPutEvent(
+		n.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -90,6 +90,6 @@ func (n *NATGateway) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(n.resourceType, id))
 		}
 
-		n.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
+		n.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, n.deviceType, id)
 	}
 }

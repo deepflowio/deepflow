@@ -117,6 +117,7 @@ type redisInstanceInfo struct {
 }
 
 type podNodeInfo struct {
+	DomainLcuuid string
 	Name         string
 	RegionID     int
 	AZID         int
@@ -134,6 +135,7 @@ type podServiceInfo struct {
 }
 
 type podInfo struct {
+	DomainLcuuid   string
 	Name           string
 	RegionID       int
 	AZID           int
