@@ -50,6 +50,15 @@ type SoftDeleteBase struct {
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;type:datetime;default:null" json:"DELETED_AT"`
 }
 
+type ResourceEvent struct {
+	ID             int       `gorm:"primaryKey;autoIncrement;unique;column:id;type:int;not null" json:"ID"`
+	Content        string    `gorm:"column:content;type:text" json:"CONTENT"`
+	Domain         string    `gorm:"column:domain;type:char(64);default:''" json:"DOMAIN"`
+	SubDomain      string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	ResourceLcuuid string    `gorm:"column:resource_lcuuid;type:char(64);default:''" json:"RESOURCE_LCUUID"`
+	CreatedAt      time.Time `gorm:"autoCreateTime;column:created_at;type:datetime" json:"CREATED_AT"`
+}
+
 type Domain struct {
 	Base         `gorm:"embedded"`
 	OperatedTime `gorm:"embedded"`

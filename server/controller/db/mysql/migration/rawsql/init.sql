@@ -5,6 +5,16 @@ CREATE TABLE IF NOT EXISTS db_version (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE db_version;
 
+CREATE TABLE IF NOT EXISTS resource_event (
+    id                  INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    content             TEXT,
+    resource_lcuuid     CHAR(64) DEFAULT '',
+    domain              CHAR(64) DEFAULT '',
+    sub_domain          CHAR(64) DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+TRUNCATE TABLE resource_event;
+
 CREATE TABLE IF NOT EXISTS host_device (
     id                  INTEGER NOT NULL AUTO_INCREMENT,
     type                INTEGER COMMENT '1.Server 3.Gateway 4.DFI',

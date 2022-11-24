@@ -20,7 +20,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/constraint"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
 )
 
 // ResourceUpdater 实现资源进行新旧数据比对，并根据比对结果增删改资源
@@ -52,14 +51,21 @@ type CacheHandler[CT constraint.CloudModel, MT constraint.MySQLModel, BT constra
 	deleteCache([]string)
 }
 
+type Callbacks[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
+	onAdded   func(addedDBItems []*MT)
+	onUpdated func(cloudItem *CT, diffBaseItem BT)
+	onDeleted func(lcuuids []string)
+}
+
 type UpdaterBase[CT constraint.CloudModel, MT constraint.MySQLModel, BT constraint.DiffBase[MT]] struct {
 	cache         *cache.Cache
-	dbOperator    db.Operator[MT]                 // 数据库操作对象
-	diffBaseData  map[string]BT                   // 用于比对的旧资源数据
-	cloudData     []CT                            // 定时获取的新资源数据
-	dataGenerator DataGenerator[CT, MT, BT]       // 提供各类数据生成的方法
-	cacheHandler  CacheHandler[CT, MT, BT]        // 提供处理cache中特定资源的方法
-	eventProducer event.EventProducer[CT, MT, BT] // 提供资源变更事件管理接口
+	dbOperator    db.Operator[MT]           // 数据库操作对象
+	diffBaseData  map[string]BT             // 用于比对的旧资源数据
+	cloudData     []CT                      // 定时获取的新资源数据
+	dataGenerator DataGenerator[CT, MT, BT] // 提供各类数据生成的方法
+	// TODO 移出updater
+	cacheHandler CacheHandler[CT, MT, BT] // 提供处理cache中特定资源的方法
+	callbacks    Callbacks[CT, MT, BT]
 }
 
 func (u *UpdaterBase[CT, MT, BT]) HandleAddAndUpdate() {
@@ -99,6 +105,12 @@ func (u *UpdaterBase[CT, MT, BT]) HandleDelete() {
 	}
 }
 
+func (u *UpdaterBase[CT, MT, BT]) RegisterCallbacks(onAdded func(addedDBItems []*MT), onUpdated func(cloudItem *CT, diffBaseItem BT), onDeleted func(lcuuids []string)) {
+	u.callbacks.onAdded = onAdded
+	u.callbacks.onUpdated = onUpdated
+	u.callbacks.onDeleted = onDeleted
+}
+
 // 创建资源，按序操作DB、cache、资源变更事件
 func (u *UpdaterBase[CT, MT, BT]) add(dbItemsToAdd []*MT) {
 	count := len(dbItemsToAdd)
@@ -121,9 +133,7 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 	addedDBItems, ok := u.dbOperator.AddBatch(dbItemsToAdd)
 	if ok {
 		u.cacheHandler.addCache(addedDBItems)
-		if u.eventProducer != nil {
-			u.eventProducer.ProduceByAdd(addedDBItems)
-		}
+		u.callbacks.onAdded(addedDBItems)
 	}
 }
 
@@ -131,9 +141,7 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 func (u *UpdaterBase[CT, MT, BT]) update(cloudItem *CT, diffBase BT, updateInfo map[string]interface{}) {
 	_, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo)
 	if ok {
-		if u.eventProducer != nil {
-			u.eventProducer.ProduceByUpdate(cloudItem, diffBase)
-		}
+		u.callbacks.onUpdated(cloudItem, diffBase)
 		u.cacheHandler.updateCache(cloudItem, diffBase)
 	}
 }
@@ -158,9 +166,7 @@ func (u *UpdaterBase[CT, MT, BT]) delete(lcuuids []string) {
 
 func (u *UpdaterBase[CT, MT, BT]) deletePage(lcuuids []string) {
 	if u.dbOperator.DeleteBatch(lcuuids) {
-		if u.eventProducer != nil {
-			u.eventProducer.ProduceByDelete(lcuuids)
-		}
+		u.callbacks.onDeleted(lcuuids)
 		u.cacheHandler.deleteCache(lcuuids)
 	}
 }

@@ -17,7 +17,6 @@
 package event
 
 import (
-	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
@@ -27,20 +26,19 @@ import (
 )
 
 type RDSInstance struct {
-	EventManager[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]
+	EventManagerBase
 	deviceType int
 }
 
 func NewRDSInstance(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *RDSInstance {
-	mng := &RDSInstance{
-		EventManager[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]{
+	return &RDSInstance{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_RDS_INSTANCE_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
 		},
 		common.VIF_DEVICE_TYPE_RDS_INSTANCE,
 	}
-	return mng
 }
 
 func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
@@ -61,7 +59,7 @@ func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		r.createAndPutEvent(
+		r.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -70,9 +68,6 @@ func (r *RDSInstance) ProduceByAdd(items []*mysql.RDSInstance) {
 			opts...,
 		)
 	}
-}
-
-func (r *RDSInstance) ProduceByUpdate(cloudItem *cloudmodel.RDSInstance, diffBase *cache.RDSInstance) {
 }
 
 func (r *RDSInstance) ProduceByDelete(lcuuids []string) {
@@ -90,6 +85,6 @@ func (r *RDSInstance) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(r.resourceType, id))
 		}
 
-		r.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
+		r.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, r.deviceType, id)
 	}
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/controller/recorder/event"
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
@@ -41,7 +40,6 @@ func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB, eventQueue *queue
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
-	updater.eventProducer = event.NewLB(&wholeCache.ToolDataSet, eventQueue)
 	return updater
 }
 

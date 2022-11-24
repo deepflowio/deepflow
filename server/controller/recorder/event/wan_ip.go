@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	cloudmodel "github.com/deepflowys/deepflow/server/controller/cloud/model"
+	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	. "github.com/deepflowys/deepflow/server/controller/recorder/common"
@@ -28,12 +29,12 @@ import (
 )
 
 type WANIP struct {
-	EventManager[cloudmodel.IP, mysql.WANIP, *cache.WANIP]
+	EventManagerBase
 }
 
 func NewWANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *WANIP {
 	mng := &WANIP{
-		EventManager[cloudmodel.IP, mysql.WANIP, *cache.WANIP]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_WAN_IP_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -42,7 +43,7 @@ func NewWANIP(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *WANIP {
 	return mng
 }
 
-func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
+func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) { // TODO 同 lan ip 合并 common 逻辑
 	for _, item := range items {
 		var (
 			deviceType        int
@@ -91,7 +92,51 @@ func (i *WANIP) ProduceByAdd(items []*mysql.WANIP) {
 		}...)
 		opts = append(opts, deviceRelatedOpts...)
 
-		i.createAndPutEvent(
+		if deviceType == common.VIF_DEVICE_TYPE_POD_NODE {
+			podNodeInfo, err := i.ToolDataSet.GetPodNodeInfoByID(deviceID)
+			if err != nil {
+				log.Error(err)
+			} else {
+				l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(i.ToolDataSet, deviceID)
+				if ok {
+					opts = append(opts, l3DeviceOpts...)
+				} else {
+					i.enqueueIfInsertIntoMySQLFailed(
+						item.Lcuuid,
+						podNodeInfo.DomainLcuuid,
+						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						deviceName,
+						deviceType,
+						deviceID,
+						opts...,
+					)
+					continue
+				}
+			}
+		} else if deviceType == common.VIF_DEVICE_TYPE_POD {
+			podInfo, err := i.ToolDataSet.GetPodInfoByID(deviceID)
+			if err != nil {
+				log.Error(err)
+			} else {
+				l3DeviceOpts, ok := getL3DeviceOptionsByPodNodeID(i.ToolDataSet, podInfo.PodNodeID)
+				if ok {
+					opts = append(opts, l3DeviceOpts...)
+				} else {
+					i.enqueueIfInsertIntoMySQLFailed(
+						item.Lcuuid,
+						podInfo.DomainLcuuid,
+						eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
+						deviceName,
+						deviceType,
+						deviceID,
+						opts...,
+					)
+					continue
+				}
+			}
+		}
+
+		i.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_ADD_IP,
 			deviceName,
@@ -153,7 +198,7 @@ func (i *WANIP) ProduceByDelete(lcuuids []string) {
 			log.Errorf("%s (lcuuid: %s) ip not found", RESOURCE_TYPE_WAN_IP_EN, lcuuid)
 		}
 
-		i.createAndPutEvent(
+		i.createAndEnqueue(
 			lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_REMOVE_IP,
 			deviceName,
