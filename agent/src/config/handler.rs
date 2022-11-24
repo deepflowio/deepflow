@@ -1712,10 +1712,6 @@ impl ConfigHandler {
                     for log_parser in components.log_parsers.iter().as_ref() {
                         log_parser.l7_log_dynamic_config_updated();
                     }
-                    #[cfg(target_os = "linux")]
-                    if let Some(ebpf_collector) = components.ebpf_collector.as_mut() {
-                        ebpf_collector.l7_log_dynamic_config_updated();
-                    }
                 }
                 callbacks.push(l7_log_dynamic_callback);
             }

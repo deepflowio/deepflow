@@ -35,19 +35,19 @@ use super::{
     LogMessageType, MqttLog, MysqlLog, RedisLog,
 };
 
-use crate::common::{
-    ebpf::EbpfType,
-    l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
-};
-
 use crate::{
     common::{
+        ebpf::EbpfType,
         enums::EthernetType,
         flow::{get_uniq_flow_id_in_one_minute, PacketDirection},
+        l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
-    flow_generator::{protocol_logs::HttpLog, FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
+    flow_generator::{
+        protocol_logs::HttpLog, Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST,
+        FLOW_METRICS_PEER_SRC,
+    },
     metric::document::TapSide,
     sender::SendItem,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
@@ -305,42 +305,124 @@ impl SessionQueue {
         let key = Self::calc_key(&item);
         match item.base_info.head.msg_type {
             LogMessageType::Request => {
-                // request，放入map
-                if let Some(p) = map.remove(&key) {
-                    // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
-                    self.send(p);
-                    map.insert(key, item);
-                } else if self.counter.cached.load(Ordering::Relaxed)
-                    >= self.window_size as u64 * SLOT_CACHED_COUNT
-                {
-                    // 防止缓存过多的log
-                    self.send(item);
-                } else {
-                    map.insert(key, item);
-                    self.counter.cached.fetch_add(1, Ordering::Relaxed);
-                }
+                self.on_request_log(map, item, key);
             }
             LogMessageType::Response => {
-                // response, 需要找到request并merge
-                if let Some(mut request) = map.remove(&key) {
-                    if request.base_info.head.proto == item.base_info.head.proto {
-                        self.counter.cached.fetch_sub(1, Ordering::Relaxed);
-                        self.counter.merge.fetch_add(1, Ordering::Relaxed);
-                        let _ = request.session_merge(item);
-                        self.send(request);
-                    } else {
-                        map.insert(key, request);
-                        self.send(item);
-                    }
-                } else {
-                    self.send(item);
-                }
+                self.on_response_log(map, item, key);
             }
             LogMessageType::Session => self.send(item),
             _ => (),
         }
 
         self.time_window.replace(time_window);
+    }
+
+    fn on_request_log(
+        &mut self,
+        map: &mut HashMap<u64, AppProtoLogsData>,
+        mut item: AppProtoLogsData,
+        key: u64,
+    ) {
+        if let Some(mut p) = map.remove(&key) {
+            if item.need_protocol_merge() {
+                let _ = p.session_merge(item);
+                if p.special_info.is_session_end() {
+                    self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+                    self.send(p);
+                } else {
+                    map.insert(key, p);
+                }
+            } else {
+                // 若乱序，已存在响应，则可以匹配为会话，则聚合响应发送
+                // If the order is out of order and there is a response, it can be matched as a session, and the aggregated response is sent
+                if p.is_response() {
+                    // if can not merge, send req and resp directly.
+                    // generally use for ebpf disorder.
+                    if let Err(L7LogCanNotMerge(p)) = item.session_merge(p) {
+                        self.send(p);
+                    }
+                    self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+                    self.counter.merge.fetch_add(1, Ordering::Relaxed);
+                    self.send(item);
+                } else {
+                    // 对于HTTPV1, requestID总为0, 连续出现多个request时，response匹配最后一个request为session
+                    self.send(p);
+                    map.insert(key, item);
+                }
+            }
+        } else {
+            if item.need_protocol_merge() {
+                let (req_end, resp_end) = item.special_info.is_req_resp_end();
+                // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
+                if req_end || resp_end {
+                    return;
+                }
+            }
+
+            if self.counter.cached.load(Ordering::Relaxed)
+                >= self.window_size as u64 * SLOT_CACHED_COUNT
+            {
+                self.send(item); // Prevent too many logs from being cached
+            } else {
+                map.insert(key, item);
+                self.counter.cached.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn on_response_log(
+        &mut self,
+        map: &mut HashMap<u64, AppProtoLogsData>,
+        item: AppProtoLogsData,
+        key: u64,
+    ) {
+        // response, 需要找到request并merge
+        if let Some(mut request) = map.remove(&key) {
+            if item.need_protocol_merge() {
+                let _ = request.session_merge(item);
+
+                if request.special_info.is_session_end() {
+                    self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+                    self.send(request);
+                } else {
+                    map.insert(key, request);
+                }
+            } else {
+                // 若乱序导致map中的也是响应, 则发送响应,继续缓存新的响应
+                // If the out-of-order causes the response in the map, the response is sent and the new response continues to be cached
+                if request.is_response() {
+                    map.insert(key, item);
+                    self.send(request);
+                } else {
+                    // if can not merge, send req and resp directly.
+                    // generally use for ebpf disorder.
+                    if let Err(L7LogCanNotMerge(item)) = request.session_merge(item) {
+                        self.send(item);
+                    }
+                    self.counter.cached.fetch_sub(1, Ordering::Relaxed);
+                    self.counter.merge.fetch_add(1, Ordering::Relaxed);
+                    self.send(request);
+                }
+            }
+        } else {
+            if item.need_protocol_merge() {
+                let (req_end, resp_end) = item.special_info.is_req_resp_end();
+                // http2 uprobe 有可能会重复收到resp_end, 直接忽略，防止堆积
+                // http2 uprobe may receive resp_end repeatedly, ignore it directly to prevent accumulation
+                if req_end || resp_end {
+                    return;
+                }
+            }
+
+            if self.counter.cached.load(Ordering::Relaxed)
+                >= self.window_size as u64 * SLOT_CACHED_COUNT
+            {
+                self.send(item); // Prevent too many logs from being cached
+            } else {
+                map.insert(key, item);
+                self.counter.cached.fetch_add(1, Ordering::Relaxed);
+            }
+        }
     }
 
     fn clear(&mut self) {
