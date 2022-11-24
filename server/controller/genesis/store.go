@@ -207,6 +207,14 @@ func (s *SyncStorage) refreshDatabase(ageTime time.Duration) {
 	for {
 		time.Sleep(ageTime)
 		s.dirty = true
+		// clean genesis storage invalid data
+		var vTaps []model.Vtap
+		mysql.Db.Find(&vTaps)
+		var vTapIDs []int
+		for _, v := range vTaps {
+			vTapIDs = append(vTapIDs, v.ID)
+		}
+		mysql.Db.Where("vtap_id NOT IN ?", vTapIDs).Delete(&model.GenesisStorage{})
 	}
 }
 
