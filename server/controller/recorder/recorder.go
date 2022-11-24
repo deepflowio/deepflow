@@ -29,6 +29,7 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/config"
+	"github.com/deepflowys/deepflow/server/controller/recorder/listener"
 	"github.com/deepflowys/deepflow/server/controller/recorder/updater"
 	"github.com/deepflowys/deepflow/server/libs/queue"
 )
@@ -162,8 +163,10 @@ func (r *Recorder) refreshDomain(cloudData cloudmodel.Resource) {
 
 	// 指定创建及更新操作的资源顺序
 	// 基本原则：无依赖资源优先；实时性需求高资源优先
+	listener := listener.NewDomain(r.domainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 	domainUpdatersInUpdateOrder := r.getDomainUpdatersInOrder(cloudData)
 	r.executeUpdators(domainUpdatersInUpdateOrder)
+	listener.OnUpdatersCompeleted()
 	log.Infof("domain (lcuuid: %s, name: %s) refresh completed", r.domainLcuuid, r.domainName)
 }
 
@@ -236,8 +239,10 @@ func (r *Recorder) refreshSubDomains(cloudSubDomainResourceMap map[string]cloudm
 
 		r.updateSubDomainSyncedAt(subDomainLcuuid)
 
+		listener := listener.NewSubDomain(r.domainLcuuid, subDomainLcuuid, r.cacheMng.DomainCache, r.eventQueue)
 		subDomainUpdatersInUpdateOrder := r.getSubDomainUpdatersInOrder(subDomainLcuuid, subDomainResource, nil)
 		r.executeUpdators(subDomainUpdatersInUpdateOrder)
+		listener.OnUpdatersCompeleted()
 
 		log.Infof("sub_domain (lcuuid: %s) sync refresh completed", subDomainLcuuid)
 	}
@@ -258,6 +263,10 @@ func (r *Recorder) getSubDomainUpdatersInOrder(subDomainLcuuid string, cloudData
 	if subDomainCache == nil {
 		subDomainCache = r.cacheMng.CreateSubDomainCacheIfNotExists(subDomainLcuuid)
 	}
+	pod := updater.NewPod(subDomainCache, cloudData.Pods, r.eventQueue) // TODO 删除queue参数
+	podListener := listener.NewPod(subDomainCache, r.eventQueue)
+	pod.RegisterCallbacks(podListener.OnUpdaterAdded, podListener.OnUpdaterUpdated, podListener.OnUpdaterDeleted)
+
 	return []updater.ResourceUpdater{
 		updater.NewPodCluster(subDomainCache, cloudData.PodClusters),
 		updater.NewPodNode(subDomainCache, cloudData.PodNodes, r.eventQueue),

@@ -27,13 +27,13 @@ import (
 )
 
 type LB struct {
-	EventManager[cloudmodel.LB, mysql.LB, *cache.LB]
+	EventManagerBase
 	deviceType int
 }
 
 func NewLB(toolDS *cache.ToolDataSet, eq *queue.OverwriteQueue) *LB {
 	mng := &LB{
-		EventManager[cloudmodel.LB, mysql.LB, *cache.LB]{
+		EventManagerBase{
 			resourceType: RESOURCE_TYPE_LB_EN,
 			ToolDataSet:  toolDS,
 			Queue:        eq,
@@ -60,7 +60,7 @@ func (l *LB) ProduceByAdd(items []*mysql.LB) {
 			eventapi.TagL3DeviceID(item.ID),
 		}...)
 
-		l.createAndPutEvent(
+		l.createAndEnqueue(
 			item.Lcuuid,
 			eventapi.RESOURCE_EVENT_TYPE_CREATE,
 			item.Name,
@@ -89,6 +89,6 @@ func (l *LB) ProduceByDelete(lcuuids []string) {
 			log.Error(nameByIDNotFound(l.resourceType, id))
 		}
 
-		l.createAndPutEvent(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
+		l.createAndEnqueue(lcuuid, eventapi.RESOURCE_EVENT_TYPE_DELETE, name, l.deviceType, id)
 	}
 }
