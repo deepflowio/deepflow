@@ -51,7 +51,7 @@ func (h *HuaWei) getRegions() ([]model.Region, error) {
 			Lcuuid: common.GenerateUUID(id + "_" + h.lcuuidGenerate),
 		}
 		cn, ok := jr.Get("locales").CheckGet("zh-cn")
-		if ok {
+		if ok && cn.MustString() != "" {
 			region.Name = cn.MustString()
 		} else {
 			region.Name = id
