@@ -147,6 +147,7 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		localVersion = g.vtapIDToVersion[vtapID]
 	}
 	if version == localVersion || platformData == nil {
+		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID)
 		g.genesisSyncQueue.Put(
 			VIFRPCMessage{
 				peer:         remote,
