@@ -40,8 +40,6 @@ func VTapGroupConfigRouter(e *gin.Engine) {
 
 	e.GET("/v1/vtap-group-configuration/filter/", getVTapGroupConfigByFilter)
 	e.DELETE("/v1/vtap-group-configuration/filter/", deleteVTapGroupConfigByFilter)
-
-	e.GET("/v1/vtap/configuration/", getVTapGroupconfiguration)
 }
 
 func createVTapGroupConfig(c *gin.Context) {
@@ -142,11 +140,5 @@ func getVTapGroupExampleConfig(c *gin.Context) {
 
 func getVTapGroupAdvancedConfigs(c *gin.Context) {
 	data, err := service.GetVTapGroupAdvancedConfigs()
-	JsonResponse(c, data, err)
-}
-
-func getVTapGroupconfiguration(c *gin.Context) {
-	lcuuid, _ := c.GetQuery("lcuuid")
-	data, err := service.GetVTapGroupConfiguration(lcuuid)
 	JsonResponse(c, data, err)
 }
