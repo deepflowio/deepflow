@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-pub mod ebpf_collector;
+pub mod ebpf_dispatcher;
 
 use thiserror::Error;
 
@@ -34,7 +34,7 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub use ebpf_collector::EbpfCollector;
+pub use ebpf_dispatcher::EbpfCollector;
 
 /* example
 

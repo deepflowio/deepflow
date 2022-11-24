@@ -40,7 +40,7 @@ use log::{info, warn};
 use regex::Regex;
 
 #[cfg(target_os = "linux")]
-use crate::ebpf_collector::EbpfCollector;
+use crate::ebpf_dispatcher::EbpfCollector;
 use crate::handler::{NpbBuilder, PacketHandlerBuilder};
 use crate::integration_collector::MetricServer;
 use crate::pcap::WorkerManager;
@@ -1306,8 +1306,8 @@ impl Components {
                 .tap_typer(tap_typer.clone())
                 .analyzer_dedup_disabled(yaml_config.analyzer_dedup_disabled)
                 .libvirt_xml_extractor(libvirt_xml_extractor.clone())
-                .flow_output_queue(flow_sender)
-                .log_output_queue(log_sender)
+                .flow_output_queue(flow_sender.clone())
+                .log_output_queue(log_sender.clone())
                 .packet_sequence_output_queue(packet_sequence_sender) // Enterprise Edition Feature: packet-sequence
                 .stats_collector(stats_collector.clone())
                 .flow_map_config(config_handler.flow())
@@ -1360,7 +1360,7 @@ impl Components {
                 i,
                 stats_collector.clone(),
                 flow_receiver,
-                l4_flow_aggr_sender.clone(),
+                Some(l4_flow_aggr_sender.clone()),
                 metrics_sender.clone(),
                 MetricsType::SECOND | MetricsType::MINUTE,
                 config_handler,
@@ -1371,23 +1371,82 @@ impl Components {
         }
 
         #[cfg(target_os = "linux")]
-        let ebpf_collector = EbpfCollector::new(
-            synchronizer.ntp_diff(),
-            &config_handler.candidate_config.ebpf,
-            config_handler.log_parser(),
-            policy_getter,
-            l7_log_rate.clone(),
-            proto_log_sender,
-            &queue_debugger,
-        )
-        .ok();
+        #[allow(unused)]
+        let mut ebpf_collector = None;
         #[cfg(target_os = "linux")]
-        if let Some(collector) = &ebpf_collector {
-            stats_collector.register_countable(
-                "ebpf-collector",
-                Countable::Owned(Box::new(collector.get_sync_counter())),
-                vec![],
+        {
+            let ebpf_dispatcher_id = dispatchers.len();
+            let (flow_sender, flow_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow_queue_size,
+                "1-tagged-flow-to-quadruple-generator",
+                &queue_debugger,
             );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "1-tagged-flow-to-quadruple-generator".to_string()),
+                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
+                ],
+            );
+            let collector = Self::new_collector(
+                ebpf_dispatcher_id,
+                stats_collector.clone(),
+                flow_receiver,
+                None,
+                metrics_sender.clone(),
+                MetricsType::SECOND | MetricsType::MINUTE,
+                config_handler,
+                &queue_debugger,
+                &synchronizer,
+            );
+            let (log_sender, log_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow_queue_size,
+                "1-tagged-flow-to-app-protocol-logs",
+                &queue_debugger,
+            );
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "1-tagged-flow-to-app-protocol-logs".to_string()),
+                    StatsOption::Tag("index", ebpf_dispatcher_id.to_string()),
+                ],
+            );
+            let (app_proto_log_parser, counter) = AppProtoLogsParser::new(
+                log_receiver,
+                proto_log_sender.clone(),
+                ebpf_dispatcher_id as u32,
+                config_handler.log_parser(),
+                l7_log_rate.clone(),
+            );
+            stats_collector.register_countable(
+                "l7_session_aggr",
+                Countable::Ref(Arc::downgrade(&counter) as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("index", ebpf_dispatcher_id.to_string())],
+            );
+            log_parsers.push(app_proto_log_parser);
+            collectors.push(collector);
+            ebpf_collector = EbpfCollector::new(
+                ebpf_dispatcher_id,
+                synchronizer.ntp_diff(),
+                &config_handler.candidate_config.ebpf,
+                config_handler.log_parser(),
+                config_handler.flow(),
+                policy_getter,
+                log_sender,
+                flow_sender,
+                &queue_debugger,
+                stats_collector.clone(),
+            )
+            .ok();
+            if let Some(collector) = &ebpf_collector {
+                stats_collector.register_countable(
+                    "ebpf-collector",
+                    Countable::Owned(Box::new(collector.get_sync_counter())),
+                    vec![],
+                );
+            }
         }
         #[cfg(target_os = "linux")]
         let cgroups_controller: Arc<Cgroups> = Arc::new(Cgroups { cgroup: None });
@@ -1564,7 +1623,7 @@ impl Components {
         id: usize,
         stats_collector: Arc<stats::Collector>,
         flow_receiver: queue::Receiver<Box<TaggedFlow>>,
-        l4_flow_aggr_sender: queue::DebugSender<SendItem>,
+        l4_flow_aggr_sender: Option<queue::DebugSender<SendItem>>,
         metrics_sender: queue::DebugSender<SendItem>,
         metrics_type: MetricsType,
         config_handler: &ConfigHandler,
@@ -1572,6 +1631,38 @@ impl Components {
         synchronizer: &Arc<Synchronizer>,
     ) -> CollectorThread {
         let yaml_config = &config_handler.candidate_config.yaml_config;
+        let mut l4_flow_aggr_outer = None;
+        let mut l4_log_sender_outer = None;
+        if l4_flow_aggr_sender.is_some() {
+            let (l4_log_sender, l4_log_receiver, counter) = queue::bounded_with_debug(
+                yaml_config.flow.aggr_queue_size as usize,
+                "2-second-flow-to-minute-aggrer",
+                queue_debugger,
+            );
+            l4_log_sender_outer = Some(l4_log_sender);
+            stats_collector.register_countable(
+                "queue",
+                Countable::Owned(Box::new(counter)),
+                vec![
+                    StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
+                    StatsOption::Tag("index", id.to_string()),
+                ],
+            );
+            let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
+                id,                                   // id
+                l4_log_receiver,                      // input
+                l4_flow_aggr_sender.unwrap().clone(), // output
+                config_handler.collector(),
+                synchronizer.ntp_diff(),
+            );
+            l4_flow_aggr_outer = Some(l4_flow_aggr);
+            stats_collector.register_countable(
+                "flow_aggr",
+                Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
+                vec![StatsOption::Tag("index", id.to_string())],
+            );
+        }
+
         let (second_sender, second_receiver, counter) = queue::bounded_with_debug(
             yaml_config.quadruple_queue_size,
             "2-flow-with-meter-to-second-collector",
@@ -1605,20 +1696,6 @@ impl Components {
             ],
         );
 
-        let (l4_log_sender, l4_log_receiver, counter) = queue::bounded_with_debug(
-            yaml_config.flow.aggr_queue_size as usize,
-            "2-second-flow-to-minute-aggrer",
-            queue_debugger,
-        );
-        stats_collector.register_countable(
-            "queue",
-            Countable::Owned(Box::new(counter)),
-            vec![
-                StatsOption::Tag("module", "2-second-flow-to-minute-aggrer".to_string()),
-                StatsOption::Tag("index", id.to_string()),
-            ],
-        );
-
         // FIXME: 应该让flowgenerator和dispatcher解耦，并提供Delay函数用于此处
         // QuadrupleGenerator的Delay组成部分：
         //   FlowGen中流统计数据固有的Delay：_FLOW_STAT_INTERVAL + packetDelay
@@ -1640,7 +1717,7 @@ impl Components {
             flow_receiver,
             second_sender,
             minute_sender,
-            l4_log_sender,
+            l4_log_sender_outer,
             (yaml_config.flow.hash_slots << 3) as usize, // connection_lru_capacity
             metrics_type,
             second_quadruple_tolerable_delay,
@@ -1649,20 +1726,6 @@ impl Components {
             config_handler.collector(),
             synchronizer.ntp_diff(),
             stats_collector.clone(),
-        );
-
-        let (l4_flow_aggr, flow_aggr_counter) = FlowAggrThread::new(
-            id,                          // id
-            l4_log_receiver,             // input
-            l4_flow_aggr_sender.clone(), // output
-            config_handler.collector(),
-            synchronizer.ntp_diff(),
-        );
-
-        stats_collector.register_countable(
-            "flow_aggr",
-            Countable::Ref(Arc::downgrade(&flow_aggr_counter) as Weak<dyn RefCountable>),
-            vec![StatsOption::Tag("index", id.to_string())],
         );
 
         let (mut second_collector, mut minute_collector) = (None, None);
@@ -1693,7 +1756,7 @@ impl Components {
 
         CollectorThread::new(
             quadruple_generator,
-            Some(l4_flow_aggr),
+            l4_flow_aggr_outer,
             second_collector,
             minute_collector,
         )
