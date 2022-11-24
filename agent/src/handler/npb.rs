@@ -226,21 +226,24 @@ impl NpbBuilder {
     }
 
     pub fn build_with(&self, id: usize, if_index: u32, mac: MacAddr) -> NpbHandler {
-        info!(
-            "Build with npb packet handler with id: {} if_index: {} mac: {}",
-            id, if_index, mac
-        );
-
         let counter = Arc::new(NpbHandlerCounter::default());
-        self.stats_collector.register_countable(
-            "fragmenter",
-            Countable::Owned(Box::new(StatsNpbHandlerCounter(Arc::downgrade(&counter)))),
-            vec![
-                StatsOption::Tag("index", id.to_string()),
-                StatsOption::Tag("mac", mac.to_string()),
-                StatsOption::Tag("ifIndex", if_index.to_string()),
-            ],
-        );
+
+        if !NpbHandler::DISABLE {
+            info!(
+                "Build with npb packet handler with id: {} if_index: {} mac: {}",
+                id, if_index, mac
+            );
+
+            self.stats_collector.register_countable(
+                "fragmenter",
+                Countable::Owned(Box::new(StatsNpbHandlerCounter(Arc::downgrade(&counter)))),
+                vec![
+                    StatsOption::Tag("index", id.to_string()),
+                    StatsOption::Tag("mac", mac.to_string()),
+                    StatsOption::Tag("ifIndex", if_index.to_string()),
+                ],
+            );
+        }
 
         let mut underlay_vlan_header_size = 0;
         if self.underlay_has_vlan {

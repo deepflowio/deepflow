@@ -974,7 +974,7 @@ impl DispatcherBuilder {
                     num_blocks: options.af_packet_blocks as u32,
                     poll_timeout: POLL_TIMEOUT.as_nanos() as isize,
                     version: options.af_packet_version,
-                    iface: src_interface.take().unwrap_or("".to_string()),
+                    iface: src_interface.as_ref().unwrap_or(&"".to_string()).clone(),
                     ..Default::default()
                 };
                 info!("Afpacket init with {:?}", afp);
