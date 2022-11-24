@@ -1829,8 +1829,9 @@ impl ConfigHandler {
                     }
                 }
             }
-            callbacks.push(dispatcher_callback);
-
+            if components.is_some() {
+                callbacks.push(dispatcher_callback);
+            }
             info!(
                 "npb config change from {:#?} to {:#?}",
                 candidate_config.npb, new_config.npb
