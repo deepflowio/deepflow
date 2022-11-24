@@ -93,6 +93,7 @@ impl OwnedCountable for StatsNpbHandlerCounter {
 pub struct NpbHandler;
 
 impl NpbHandler {
+    pub const DISABLE: bool = true;
     pub fn new(
         _id: usize,
         _mtu: usize,
