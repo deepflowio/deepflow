@@ -69,6 +69,7 @@ pub struct FlowPerfCounter {
 
     // L7 stats
     pub mismatched_response: AtomicU64,
+    pub unknown_l7_protocol: AtomicU64,
 }
 
 impl RefCountable for FlowPerfCounter {
@@ -76,6 +77,7 @@ impl RefCountable for FlowPerfCounter {
         let ignored = self.ignored_packet_count.swap(0, Ordering::Relaxed);
         let invalid = self.invalid_packet_count.swap(0, Ordering::Relaxed);
         let mismatched = self.mismatched_response.swap(0, Ordering::Relaxed);
+        let unknown_l7_protocol = self.unknown_l7_protocol.swap(0, Ordering::Relaxed);
 
         vec![
             (
@@ -92,6 +94,11 @@ impl RefCountable for FlowPerfCounter {
                 "l7_mismatch_response",
                 CounterType::Counted,
                 CounterValue::Unsigned(mismatched),
+            ),
+            (
+                "unknown_l7_protocol",
+                CounterType::Counted,
+                CounterValue::Unsigned(unknown_l7_protocol),
             ),
         ]
     }

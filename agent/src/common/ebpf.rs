@@ -64,6 +64,10 @@ impl EbpfType {
             _ => true,
         }
     }
+
+    pub fn is_none(&self) -> bool {
+        *self == Self::None
+    }
 }
 
 impl Default for EbpfType {

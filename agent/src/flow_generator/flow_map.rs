@@ -47,6 +47,7 @@ use super::{
     SERVICE_TABLE_IPV4_CAPACITY, SERVICE_TABLE_IPV6_CAPACITY, STATISTICAL_INTERVAL,
     THREAD_FLOW_ID_MASK, TIMER_FLOW_ID_MASK, TIME_MAX_INTERVAL, TIME_UNIT,
 };
+
 use crate::{
     common::{
         endpoint::{EndpointData, EndpointInfo, EPC_FROM_DEEPFLOW, EPC_FROM_INTERNET},
@@ -67,6 +68,7 @@ use crate::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
+    flow_generator::flow_config::TIMEOUT_ESTABLISHED,
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
     rpc::get_timestamp,
@@ -104,7 +106,8 @@ pub struct FlowMap {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
     flow_perf_counter: Arc<FlowPerfCounter>,
     ntp_diff: Arc<AtomicI64>,
-    packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
+    packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
+    packet_sequence_enabled: bool,
     l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     stats_counter: Arc<FlowMapCounter>,
 }
@@ -118,12 +121,14 @@ impl FlowMap {
         ntp_diff: Arc<AtomicI64>,
         config: FlowAccess,
         parse_config: LogParserAccess,
-        packet_sequence_queue: DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>, // Enterprise Edition Feature: packet-sequence
+        packet_sequence_queue: Option<DebugSender<Box<packet_sequence_block::PacketSequenceBlock>>>, // Enterprise Edition Feature: packet-sequence
         stats_collector: &stats::Collector,
+        from_ebpf: bool,
     ) -> Self {
         let flow_perf_counter = Arc::new(FlowPerfCounter::default());
         let stats_counter = Arc::new(FlowMapCounter::default());
         let l7_protocol_parse_port_bitmap = (&config.load()).l7_protocol_parse_port_bitmap.clone();
+        let packet_sequence_enabled = config.load().packet_sequence_flag > 0 && !from_ebpf;
         stats_collector.register_countable(
             "flow-map",
             Countable::Ref(Arc::downgrade(&stats_counter) as Weak<dyn RefCountable>),
@@ -163,6 +168,7 @@ impl FlowMap {
             flow_perf_counter,
             ntp_diff,
             packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
+            packet_sequence_enabled,
             l7_protocol_parse_port_bitmap,
             stats_counter,
         }
@@ -234,10 +240,12 @@ impl FlowMap {
             // 未超时Flow的统计信息发送到队列下游
             self.node_updated_aftercare(&mut node, timeout, None);
             // Enterprise Edition Feature: packet-sequence
-            if self.config.load().packet_sequence_flag > 0 && node.packet_sequence_block.is_some() {
+            if self.packet_sequence_enabled && node.packet_sequence_block.is_some() {
                 // flush the packet_sequence_block at the regular time
                 if let Err(_) = self
                     .packet_sequence_queue
+                    .as_ref()
+                    .unwrap()
                     .send(Box::new(node.packet_sequence_block.take().unwrap()))
                 {
                     warn!("packet sequence block to queue failed maybe queue have terminated");
@@ -356,11 +364,11 @@ impl FlowMap {
         let flow_closed = self.update_tcp_flow(meta_packet, &mut node);
         if self.config.load().collector_enabled {
             let direction = meta_packet.direction == PacketDirection::ClientToServer;
-            self.collect_metric(&mut node, &meta_packet, direction);
+            self.collect_metric(&mut node, meta_packet, direction);
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.config.load().packet_sequence_flag > 0 {
+        if self.packet_sequence_enabled {
             if node.packet_sequence_block.is_some() {
                 if !node
                     .packet_sequence_block
@@ -371,6 +379,8 @@ impl FlowMap {
                     // if the packet_sequence_block is no enough to push one more packet, then send it to the queue
                     if let Err(_) = self
                         .packet_sequence_queue
+                        .as_ref()
+                        .unwrap()
                         .send(Box::new(node.packet_sequence_block.take().unwrap()))
                     {
                         warn!("packet sequence block to queue failed maybe queue have terminated");
@@ -429,7 +439,7 @@ impl FlowMap {
         if self.config.load().collector_enabled {
             self.collect_metric(
                 &mut node,
-                &meta_packet,
+                meta_packet,
                 meta_packet.direction == PacketDirection::ClientToServer,
             );
         }
@@ -462,6 +472,10 @@ impl FlowMap {
     }
 
     fn update_tcp_flow(&mut self, meta_packet: &mut MetaPacket, node: &mut FlowNode) -> bool {
+        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            // because ebpf doesn't know when the stream ends, we use TIMEOUT_ESTABLISHED as the timeout, if the flow is timeout, it is closed
+            return meta_packet.lookup_key.timestamp > node.recent_time + TIMEOUT_ESTABLISHED;
+        }
         let direction = meta_packet.direction;
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
@@ -829,23 +843,30 @@ impl FlowMap {
 
     fn new_tcp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(meta_packet);
-        let reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
-        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
+        let mut reverse = false;
+        // the data from ebpf has not l4 info
+        if !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
+            meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
-        let pkt_tcp_flags = meta_packet.tcp_data.flags;
-        if pkt_tcp_flags.is_invalid() {
-            // exception timeout
-            node.timeout = self.config.load().flow_timeout.exception;
-            node.flow_state = FlowState::Exception;
+            let pkt_tcp_flags = meta_packet.tcp_data.flags;
+            if pkt_tcp_flags.is_invalid() {
+                // exception timeout
+                node.timeout = self.config.load().flow_timeout.exception;
+                node.flow_state = FlowState::Exception;
+            }
+            self.update_flow_state_machine(&mut node, pkt_tcp_flags, meta_packet.direction);
+            self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
+        } else {
+            meta_packet.is_active_service = true; // packet which is from ebpf is active service
         }
-        self.update_flow_state_machine(&mut node, pkt_tcp_flags, meta_packet.direction);
-        self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
 
         if self.config.load().collector_enabled {
             self.collect_metric(&mut node, meta_packet, !reverse);
         }
+
         // Enterprise Edition Feature: packet-sequence
-        if self.config.load().packet_sequence_flag > 0 {
+        if self.packet_sequence_enabled {
             node.packet_sequence_block =
                 Some(packet_sequence_block::PacketSequenceBlock::default());
             let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
@@ -873,17 +894,22 @@ impl FlowMap {
     fn collect_metric(
         &mut self,
         node: &mut FlowNode,
-        meta_packet: &MetaPacket,
+        meta_packet: &mut MetaPacket,
         is_first_packet_direction: bool,
     ) {
         let mut info = None;
         if let Some(perf) = node.meta_flow_perf.as_mut() {
             let flow_id = node.tagged_flow.flow.flow_id;
             match perf.parse(
-                &meta_packet,
+                meta_packet,
                 is_first_packet_direction,
                 flow_id,
-                self.l4_metrics_enabled(),
+                if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+                    // the data from ebpf has not l4 info
+                    false
+                } else {
+                    self.l4_metrics_enabled()
+                },
                 self.l7_metrics_enabled(),
                 self.l7_log_parse_enabled(&meta_packet.lookup_key),
                 &mut self.app_table,
@@ -909,10 +935,16 @@ impl FlowMap {
     fn new_udp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(meta_packet);
         node.flow_state = FlowState::Established;
-        // opening timeout
-        node.timeout = self.config.load().flow_timeout.opening;
-        let reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
-        meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
+        let mut reverse = false;
+        // the data from ebpf has not l4 info
+        if !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            // opening timeout
+            node.timeout = self.config.load().flow_timeout.opening;
+            reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
+            meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
+        } else {
+            meta_packet.is_active_service = true; // packet which is from ebpf is active service
+        }
         if self.config.load().collector_enabled {
             self.collect_metric(&mut node, meta_packet, !reverse);
         }
@@ -1009,7 +1041,12 @@ impl FlowMap {
         self.update_flow_direction(&mut node, meta_packet);
 
         let flow = &mut node.tagged_flow.flow;
-        flow.update_close_type(node.flow_state);
+        if !flow.flow_key.tap_port.is_from_ebpf() {
+            // the flow which from ebpf, it's close_type should be CloseType::Timeout
+            flow.update_close_type(node.flow_state);
+        } else {
+            flow.close_type = CloseType::Timeout;
+        }
         flow.end_time = timeout;
         flow.flow_stat_time = Duration::from_nanos(
             (timeout.as_nanos() / STATISTICAL_INTERVAL.as_nanos() * STATISTICAL_INTERVAL.as_nanos())
@@ -1028,19 +1065,26 @@ impl FlowMap {
                 perf.copy_and_reset_perf_data(
                     flow.reversed,
                     l7_timeout_count as u32,
-                    self.l4_metrics_enabled(),
+                    if flow.flow_key.tap_port.is_from_ebpf() {
+                        // the data from ebpf has not l4 info
+                        false
+                    } else {
+                        self.l4_metrics_enabled()
+                    },
                     self.l7_metrics_enabled(),
                 )
             });
         }
 
         // Enterprise Edition Feature: packet-sequence
-        if self.config.load().packet_sequence_flag > 0
-            && flow.flow_key.proto == IpProtocol::Tcp
+        if self.packet_sequence_enabled
             && node.packet_sequence_block.is_some()
+            && flow.flow_key.proto == IpProtocol::Tcp
         {
             if let Err(_) = self
                 .packet_sequence_queue
+                .as_ref()
+                .unwrap()
                 .send(Box::new(node.packet_sequence_block.take().unwrap()))
             {
                 warn!("packet sequence block to queue failed maybe queue have terminated");
@@ -1073,7 +1117,12 @@ impl FlowMap {
                     perf.copy_and_reset_perf_data(
                         flow.reversed,
                         0,
-                        self.l4_metrics_enabled(),
+                        if flow.flow_key.tap_port.is_from_ebpf() {
+                            // the data from ebpf has not l4 info
+                            false
+                        } else {
+                            self.l4_metrics_enabled()
+                        },
                         self.l7_metrics_enabled(),
                     )
                 });
@@ -1159,6 +1208,10 @@ impl FlowMap {
     }
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
+        // the data from ebpf doesn't need to update_flow_direction, because it update it's direction in FlowPerf::l7_parse
+        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            return;
+        }
         let flow_key = &node.tagged_flow.flow.flow_key;
         let src_epc_id = node.tagged_flow.flow.flow_metrics_peers[0].l3_epc_id as i16;
         let dst_epc_id = node.tagged_flow.flow.flow_metrics_peers[1].l3_epc_id as i16;
@@ -1358,8 +1411,9 @@ pub fn _new_flow_map_and_receiver(
         Map::new(current_config.clone(), |config| -> &LogParserConfig {
             &config.log_parser
         }),
-        packet_sequence_queue, // Enterprise Edition Feature: packet-sequence
+        Some(packet_sequence_queue), // Enterprise Edition Feature: packet-sequence
         &stats::Collector::new(&vec!["127.0.0.1".to_string()]),
+        false,
     );
 
     (flow_map, output_queue_receiver)

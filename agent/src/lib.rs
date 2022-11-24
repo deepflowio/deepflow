@@ -24,7 +24,7 @@ pub mod dispatcher;
 #[cfg(target_os = "linux")]
 mod ebpf;
 #[cfg(target_os = "linux")]
-mod ebpf_collector;
+mod ebpf_dispatcher;
 mod error;
 mod exception;
 mod flow_generator;
