@@ -21,7 +21,7 @@ pub enum Error {
     IndexOutOfBound,
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Bitmap(Vec<u8>);
 
 impl Bitmap {

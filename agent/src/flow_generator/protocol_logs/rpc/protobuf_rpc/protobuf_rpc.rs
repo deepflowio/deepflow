@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, ProtobufRpcProtocol};
 use serde::Serialize;
 
 use crate::{
@@ -31,11 +31,11 @@ use super::{all_protobuf_rpc_parser, ProtobufRpcLog};
 
 // this is the wrap for ProtobufRpcLog
 #[derive(Default, Debug, Clone, Serialize)]
-pub struct ProtobufRpcParser {
+pub struct ProtobufRpcWrapLog {
     parser: Option<ProtobufRpcLog>,
 }
 
-impl ProtobufRpcParser {
+impl ProtobufRpcWrapLog {
     pub fn new() -> Self {
         Self::default()
     }
@@ -45,7 +45,7 @@ impl ProtobufRpcParser {
     }
 }
 
-impl L7ProtocolParserInterface for ProtobufRpcParser {
+impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
         for mut p in all_protobuf_rpc_parser().into_iter() {
             if p.check_payload(payload, param) {
@@ -61,11 +61,11 @@ impl L7ProtocolParserInterface for ProtobufRpcParser {
     }
 
     fn protocol(&self) -> L7Protocol {
-        if let Some(p) = self.parser.as_ref() {
-            p.protocol()
-        } else {
-            L7Protocol::ProtobufRPC
-        }
+        L7Protocol::ProtobufRPC
+    }
+
+    fn protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
+        self.parser.as_ref().unwrap().protobuf_rpc_protocol()
     }
 
     fn reset(&mut self) {
@@ -77,7 +77,7 @@ impl L7ProtocolParserInterface for ProtobufRpcParser {
     }
 }
 
-impl L7FlowPerf for ProtobufRpcParser {
+impl L7FlowPerf for ProtobufRpcWrapLog {
     fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
         if self.parser.is_none() {
             if let Some(payload) = packet.get_l4_payload() {
@@ -97,7 +97,7 @@ impl L7FlowPerf for ProtobufRpcParser {
     }
 
     fn data_updated(&self) -> bool {
-        return self.parser.as_ref().unwrap().data_updated();
+        return self.parser.is_some() && self.parser.as_ref().unwrap().data_updated();
     }
 
     fn copy_and_reset_data(&mut self, l7_timeout_count: u32) -> FlowPerfStats {
