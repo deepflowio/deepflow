@@ -608,13 +608,9 @@ func (p L7Protocol) String() string {
 	case L7_PROTOCOL_DUBBO:
 		formatted = "Dubbo"
 	case L7_PROTOCOL_GRPC:
-<<<<<<< HEAD
 		formatted = "gRPC"
-=======
-		formatted = "grpc"
 	case L7_PROTOCOL_PROTOBUF_RPC:
-		formatted = "protobuf_rpc"
->>>>>>> f96f12bc ([Agent] support krpc)
+		formatted = "ProtobufRPC"
 	case L7_PROTOCOL_KAFKA:
 		formatted = "Kafka"
 	case L7_PROTOCOL_MQTT:

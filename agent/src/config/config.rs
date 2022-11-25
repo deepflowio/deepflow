@@ -24,7 +24,7 @@ use std::time::Duration;
 use log::{error, info, warn};
 use md5::{Digest, Md5};
 use public::bitmap::Bitmap;
-use public::utils::bitmap::parse_port_string_to_bitmap;
+use public::utils::bitmap::parse_u16_range_list_to_bitmap;
 use serde::{
     de::{self, Unexpected},
     Deserialize, Deserializer,
@@ -449,7 +449,7 @@ impl YamlConfig {
         for (protocol_name, port_range) in self.l7_protocol_ports.iter() {
             port_bitmap.push((
                 protocol_name.clone(),
-                parse_port_string_to_bitmap(port_range, false).unwrap(),
+                parse_u16_range_list_to_bitmap(port_range, false).unwrap(),
             ));
         }
         port_bitmap

@@ -35,6 +35,7 @@ pub struct PerfStats {
 }
 
 impl PerfStats {
+    // TODO use for perf parse, will move to log parser when perf parse abstruct to log parse.
     pub fn update_perf(
         &mut self,
         req_count: u32,

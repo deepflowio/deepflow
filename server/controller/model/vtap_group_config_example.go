@@ -811,8 +811,6 @@ vtap_group_id: g-xxxxxx
     #"Kafka": "1-65535"
     #"MQTT": "1-65535"
     #"DNS": "53"
-  #ebpf-kprobe-whitelist:
-    port-list:         # x-y,z 格式，默认为空
 
   ########################
   ## L4 Packet Sequence ##
@@ -858,6 +856,12 @@ vtap_group_id: g-xxxxxx
   ## eBPF Switch
   ## Default: false
   #ebpf-disabled: false
+
+  #ebpf-kprobe-whitelist:
+    ## Server Port Whitelist
+    ## Default: null, means no port
+    ## Format: x-y, z
+    #port-list:
 
   ## Regex for Process Name
   ## Note: The name of the process where each feature of ebpf uprobe takes effect,

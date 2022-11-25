@@ -1,10 +1,26 @@
+/*
+ * Copyright (c) 2022 Yunshan Networks
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 mod krpc;
 mod protobuf_rpc;
 
 pub use protobuf_rpc::*;
 
 use enum_dispatch::enum_dispatch;
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
 use serde::Serialize;
 
 use crate::{
@@ -37,11 +53,10 @@ impl Into<L7ProtocolSendLog> for ProtobufRpcInfo {
     }
 }
 
-pub fn get_protobuf_rpc_parser(proto: L7Protocol) -> L7ProtocolParser {
-    let mut p = ProtobufRpcParser::default();
+pub fn get_protobuf_rpc_parser(proto: ProtobufRpcProtocol) -> L7ProtocolParser {
+    let mut p = ProtobufRpcWrapLog::default();
     match proto {
-        L7Protocol::Krpc => p.set_rpc_parser(ProtobufRpcLog::KrpcLog(KrpcLog::default())),
-        _ => unreachable!(),
+        ProtobufRpcProtocol::Krpc => p.set_rpc_parser(ProtobufRpcLog::KrpcLog(KrpcLog::default())),
     }
     L7ProtocolParser::ProtobufRpcParser(p)
 }
@@ -49,7 +64,7 @@ pub fn get_protobuf_rpc_parser(proto: L7Protocol) -> L7ProtocolParser {
 // all protobuf rpc parser
 #[derive(Debug, Clone, Serialize)]
 #[enum_dispatch(L7ProtocolParserInterface, L7FlowPerf)]
-pub(crate) enum ProtobufRpcLog {
+pub enum ProtobufRpcLog {
     KrpcLog(KrpcLog),
 }
 

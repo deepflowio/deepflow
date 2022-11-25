@@ -31,7 +31,7 @@ use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
-use public::utils::bitmap::parse_port_string_to_bitmap;
+use public::utils::bitmap::parse_u16_range_list_to_bitmap;
 use sysinfo::SystemExt;
 
 #[cfg(target_os = "linux")]
@@ -916,7 +916,7 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     if whitelist.port_list.is_empty() {
                         None
                     } else {
-                        parse_port_string_to_bitmap(&whitelist.port_list, false)
+                        parse_u16_range_list_to_bitmap(&whitelist.port_list, false)
                     }
                 },
             },

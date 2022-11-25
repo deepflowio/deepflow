@@ -15,7 +15,10 @@
  */
 
 use prost::Message;
-use public::{bytes::read_u16_be, l7_protocol::L7Protocol};
+use public::{
+    bytes::read_u16_be,
+    l7_protocol::{L7Protocol, ProtobufRpcProtocol},
+};
 use serde::Serialize;
 
 use crate::{
@@ -196,8 +199,9 @@ impl L7ProtocolParserInterface for KrpcLog {
     }
 
     /*
-        krpc hdr
-        0.......8........16........24.........32
+        krpc hdr reference https://github.com/bruceran/krpc/blob/master/doc/develop.md#krpc%E7%BD%91%E7%BB%9C%E5%8C%85%E5%8D%8F%E8%AE%AE
+
+        0  .......8........16........24.........32
         1  |-----KR---------|----- headLen--------|
         2  |---------------packetLen--------------|
     */
@@ -244,7 +248,11 @@ impl L7ProtocolParserInterface for KrpcLog {
     }
 
     fn protocol(&self) -> L7Protocol {
-        L7Protocol::Krpc
+        L7Protocol::ProtobufRPC
+    }
+
+    fn protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
+        Some(ProtobufRpcProtocol::Krpc)
     }
 
     fn reset(&mut self) {
