@@ -676,11 +676,29 @@ func ProtoLogToL7FlowLog(l *pb.AppProtoLogsData, platformData *grpc.PlatformInfo
 	return h
 }
 
+func addExtraFields(names, values []string, name, value string) ([]string, []string) {
+	if value != "" {
+		return append(names, name), append(values, value)
+	}
+	return names, values
+}
+
 func L7FlowLogToFlowTagInterfaces(l *L7FlowLog) ([]interface{}, []interface{}) {
 	fields := make([]interface{}, 0, 2*len(l.AttributeNames))
 	fieldValues := make([]interface{}, 0, 2*len(l.AttributeValues))
 	time := uint32(l.L7Base.EndTime / US_TO_S_DEVISOR)
 	db, table := common.FLOW_LOG_DB, common.L7_FLOW_ID.String()
+
+	extraFieldNames := make([]string, 0, 3)
+	extraFieldValues := make([]string, 0, 3)
+	extraFieldNames, extraFieldValues = addExtraFields(extraFieldNames, extraFieldValues, "service_name", l.ServiceName)
+	extraFieldNames, extraFieldValues = addExtraFields(extraFieldNames, extraFieldValues, "endpoint", l.Endpoint)
+	extraFieldNames, extraFieldValues = addExtraFields(extraFieldNames, extraFieldValues, "service_instance_id", l.ServiceInstanceId)
+	for i, name := range extraFieldNames {
+		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name, extraFieldValues[i]))
+		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID1, l.PodNSID1, flow_tag.FieldTag, name, extraFieldValues[i]))
+	}
+
 	for i, name := range l.AttributeNames {
 		fields = append(fields, flow_tag.NewTagField(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name))
 		fieldValues = append(fieldValues, flow_tag.NewTagFieldValue(time, db, table, l.L3EpcID0, l.PodNSID0, flow_tag.FieldTag, name, l.AttributeValues[i]))
