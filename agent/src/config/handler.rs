@@ -1615,8 +1615,7 @@ impl ConfigHandler {
                         if is_tt_pod(conf.trident_type) {
                             components.platform_synchronizer.start_kubernetes_poller();
                         } else {
-                            components.platform_synchronizer.stop();
-                            info!("PlatformSynchronizer is not enabled");
+                            components.platform_synchronizer.stop_kubernetes_poller();
                         }
                         if conf.kubernetes_api_enabled {
                             components.api_watcher.start();
