@@ -26,8 +26,10 @@ type FlowTagWriter struct {
 	ckdbPassword string
 	writerConfig *config.CKWriterConfig
 
-	ckwriters   [TagTypeMax]*ckwriter.CKWriter
-	valueWriter *ckwriter.CKWriter
+	ckwriters        [TagTypeMax]*ckwriter.CKWriter
+	valueWriter      *ckwriter.CKWriter
+	fieldsCache      [][]*FlowTag
+	fieldValuesCache [][]*FlowTag
 
 	counter *Counter
 	utils.Closable

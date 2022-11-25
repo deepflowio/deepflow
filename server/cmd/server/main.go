@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"io/ioutil"
 
@@ -86,6 +87,10 @@ func main() {
 			"CompileTime: "+CompileTime,
 		)
 		os.Exit(0)
+	}
+	for {
+		time.Sleep(time.Minute)
+		fmt.Println("lizf testing")
 	}
 
 	cfg := loadConfig(*configPath)
