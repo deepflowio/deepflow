@@ -17,8 +17,9 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use lru::LruCache;
+use public::l7_protocol::{L7Protocol, L7ProtocolEnum};
 
-use crate::common::flow::{L7Protocol, PacketDirection};
+use crate::common::flow::PacketDirection;
 use crate::common::meta_packet::MetaPacket;
 use crate::common::{L7_PROTOCOL_INFERENCE_MAX_FAIL_COUNT, L7_PROTOCOL_INFERENCE_TTL};
 
@@ -38,7 +39,7 @@ struct AppTable6Key {
 
 struct AppTableValue {
     unknown_count: usize,
-    l7_protocol: L7Protocol,
+    l7_protocol_enum: L7ProtocolEnum,
     last: u64, // 单位秒
 }
 
@@ -104,7 +105,7 @@ impl AppTable {
         ip: Ipv4Addr,
         epc: i32,
         port: u16,
-    ) -> Option<L7Protocol> {
+    ) -> Option<L7ProtocolEnum> {
         let key = AppTable4Key { ip, epc, port };
         if let Some(v) = self.ipv4.get_mut(&key) {
             if v.last + self.l7_protocol_inference_ttl < time_in_sec {
@@ -115,12 +116,12 @@ impl AppTable {
             // 如果第一次check就失败会设置为unknown，所以需要加上count判断
             // ====================================================
             // if first check fail will set to unknown, need to add count determine
-            if v.l7_protocol == L7Protocol::Unknown
+            if v.l7_protocol_enum.get_l7_protocol() == L7Protocol::Unknown
                 && v.unknown_count < self.l7_protocol_inference_max_fail_count
             {
                 return None;
             } else {
-                return Some(v.l7_protocol);
+                return Some(v.l7_protocol_enum);
             }
         }
         None
@@ -132,7 +133,7 @@ impl AppTable {
         ip: Ipv6Addr,
         epc: i32,
         port: u16,
-    ) -> Option<L7Protocol> {
+    ) -> Option<L7ProtocolEnum> {
         let key = AppTable6Key { ip, epc, port };
         if let Some(v) = self.ipv6.get_mut(&key) {
             if v.last + self.l7_protocol_inference_ttl < time_in_sec {
@@ -143,18 +144,18 @@ impl AppTable {
             // 如果第一次check就失败会设置为unknown，所以需要加上count判断
             // ====================================================
             // if first check fail will set to unknown, need to add count determine
-            if v.l7_protocol == L7Protocol::Unknown
+            if v.l7_protocol_enum.get_l7_protocol() == L7Protocol::Unknown
                 && v.unknown_count < self.l7_protocol_inference_max_fail_count
             {
                 return None;
             } else {
-                return Some(v.l7_protocol);
+                return Some(v.l7_protocol_enum);
             }
         }
         None
     }
 
-    pub fn get_protocol(&mut self, packet: &MetaPacket) -> Option<L7Protocol> {
+    pub fn get_protocol(&mut self, packet: &MetaPacket) -> Option<L7ProtocolEnum> {
         let (ip, epc, port) =
             Self::get_ip_epc_port(packet, packet.direction == PacketDirection::ClientToServer);
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
@@ -170,7 +171,7 @@ impl AppTable {
         packet: &MetaPacket,
         local_epc: i32,
         remote_epc: i32,
-    ) -> Option<(L7Protocol, u16)> {
+    ) -> Option<(L7ProtocolEnum, u16)> {
         if packet.lookup_key.is_loopback_packet() {
             return None;
         }
@@ -185,7 +186,8 @@ impl AppTable {
             IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, port),
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, port),
         };
-        if dst_protocol.is_some() && dst_protocol.unwrap() != L7Protocol::Unknown {
+        if dst_protocol.is_some() && dst_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
+        {
             return Some((dst_protocol.unwrap(), packet.lookup_key.dst_port));
         }
 
@@ -199,7 +201,8 @@ impl AppTable {
             IpAddr::V4(i) => self.get_ipv4_protocol(time_in_sec, i, epc, port),
             IpAddr::V6(i) => self.get_ipv6_protocol(time_in_sec, i, epc, port),
         };
-        if src_protocol.is_some() && src_protocol.unwrap() != L7Protocol::Unknown {
+        if src_protocol.is_some() && src_protocol.unwrap().get_l7_protocol() != L7Protocol::Unknown
+        {
             return Some((src_protocol.unwrap(), packet.lookup_key.src_port));
         }
         if src_protocol.is_none() && dst_protocol.is_none() {
@@ -216,28 +219,28 @@ impl AppTable {
         ip: Ipv4Addr,
         epc: i32,
         port: u16,
-        protocol: L7Protocol,
+        l7_protocol_enum: L7ProtocolEnum,
     ) -> bool {
         let key = AppTable4Key { ip, epc, port };
         let value = self.ipv4.get_mut(&key);
         if let Some(value) = value {
             value.last = time_in_sec;
-            if protocol == L7Protocol::Unknown {
+            if l7_protocol_enum.get_l7_protocol() == L7Protocol::Unknown {
                 value.unknown_count += 1;
                 if value.unknown_count > self.l7_protocol_inference_max_fail_count {
-                    value.l7_protocol = protocol;
+                    value.l7_protocol_enum = l7_protocol_enum;
                     return true;
                 }
             } else {
                 value.unknown_count = 0;
-                value.l7_protocol = protocol;
+                value.l7_protocol_enum = l7_protocol_enum;
             }
         } else {
             self.ipv4.put(
                 key,
                 AppTableValue {
                     unknown_count: 0,
-                    l7_protocol: protocol,
+                    l7_protocol_enum,
                     last: time_in_sec,
                 },
             );
@@ -251,28 +254,28 @@ impl AppTable {
         ip: Ipv6Addr,
         epc: i32,
         port: u16,
-        protocol: L7Protocol,
+        l7_protocol_enum: L7ProtocolEnum,
     ) -> bool {
         let key = AppTable6Key { ip, epc, port };
         let value = self.ipv6.get_mut(&key);
         if let Some(value) = value {
             value.last = time_in_sec;
-            if protocol == L7Protocol::Unknown {
+            if l7_protocol_enum.get_l7_protocol() == L7Protocol::Unknown {
                 value.unknown_count += 1;
                 if value.unknown_count > self.l7_protocol_inference_max_fail_count {
-                    value.l7_protocol = protocol;
+                    value.l7_protocol_enum = l7_protocol_enum;
                     return true;
                 }
             } else {
                 value.unknown_count = 0;
-                value.l7_protocol = protocol;
+                value.l7_protocol_enum = l7_protocol_enum;
             }
         } else {
             self.ipv6.put(
                 key,
                 AppTableValue {
                     unknown_count: 0,
-                    l7_protocol: protocol,
+                    l7_protocol_enum,
                     last: time_in_sec,
                 },
             );
@@ -280,7 +283,7 @@ impl AppTable {
         return false;
     }
 
-    pub fn set_protocol(&mut self, packet: &MetaPacket, protocol: L7Protocol) -> bool {
+    pub fn set_protocol(&mut self, packet: &MetaPacket, protocol: L7ProtocolEnum) -> bool {
         let (ip, epc, port) =
             Self::get_ip_epc_port(packet, packet.direction == PacketDirection::ClientToServer);
         let time_in_sec = packet.lookup_key.timestamp.as_secs();
@@ -293,7 +296,7 @@ impl AppTable {
     pub fn set_protocol_from_ebpf(
         &mut self,
         packet: &MetaPacket,
-        protocol: L7Protocol,
+        protocol: L7ProtocolEnum,
         local_epc: i32,
         remote_epc: i32,
     ) -> bool {

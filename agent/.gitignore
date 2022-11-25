@@ -1,14 +1,12 @@
 /target
 
 # generated protobuf files
-src/proto/common.rs
-src/proto/flow_log.rs
-src/proto/metric.rs
-src/proto/trident.rs
-src/proto/flow_log.rs
-src/proto/metric.rs
-src/proto/stats.rs
-src/proto/integration/opentelemetry*.rs
+!src/proto/mod.rs
+!src/integration/
+!src/integration/mod.rs
+src/proto/*.rs
+src/proto/integration/*.rs
+
 .cargo
 src/ebpf/data
 src/ebpf/.data_done
