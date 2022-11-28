@@ -466,11 +466,6 @@ func (f *TagFunction) Check() error {
 				return err
 			}
 		}
-	case TAG_FUNCTION_NODE_TYPE:
-		_, ok := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
-		if !ok {
-			return errors.New(fmt.Sprintf("function %s not support %s", f.Name, f.Args[0]))
-		}
 	case TAG_FUNCTION_ICON_ID:
 		_, ok := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
 		if !ok {
@@ -509,8 +504,13 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 		f.Withs = []view.Node{&view.With{Value: value, Alias: f.Alias}}
 		return f.getViewNode()
 	case TAG_FUNCTION_NODE_TYPE:
-		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
-		f.Value = tagDes.TagTranslator
+		tagDes, ok := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
+		if ok {
+			f.Value = tagDes.TagTranslator
+
+		} else {
+			f.Value = f.Args[0]
+		}
 		return f.getViewNode()
 	case TAG_FUNCTION_ICON_ID:
 		tagDes, _ := tag.GetTag(f.Args[0], f.DB, f.Table, f.Name)
