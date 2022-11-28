@@ -170,7 +170,7 @@ func (h *HuaWei) formatListenersAndTargetServers(projectName, token string) (lbL
 		)
 
 		poolID, ok := jL.CheckGet("default_pool_id")
-		if ok {
+		if ok && poolID.MustString() != "" {
 			jTSs, err := h.getRawData(
 				fmt.Sprintf("https://vpc.%s.%s/v2.0/lbaas/pools/%s/members", projectName, h.config.URLDomain, poolID.MustString()), token, "members",
 			)
