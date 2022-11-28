@@ -35,12 +35,18 @@ type Config struct {
 }
 
 type QuerierConfig struct {
-	LogFile      string     `default:"/var/log/querier.log" yaml:"log-file"`
-	LogLevel     string     `default:"info" yaml:"log-level"`
-	ListenPort   int        `default:"20416" yaml:"listen-port"`
-	Clickhouse   Clickhouse `yaml:clickhouse`
-	Language     string     `default:"en" yaml:"language"`
-	OtelEndpoint string     `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
+	LogFile      string      `default:"/var/log/querier.log" yaml:"log-file"`
+	LogLevel     string      `default:"info" yaml:"log-level"`
+	ListenPort   int         `default:"20416" yaml:"listen-port"`
+	Clickhouse   Clickhouse  `yaml:clickhouse`
+	DeepflowApp  DeepflowApp `yaml:deepflow-app`
+	Language     string      `default:"en" yaml:"language"`
+	OtelEndpoint string      `default:"http://${K8S_NODE_IP_FOR_DEEPFLOW}:38086/api/v1/otel/trace" yaml:"otel-endpoint"`
+}
+
+type DeepflowApp struct {
+	Host string `default:"deepflow-app" yaml:"host"`
+	Port string `default:"20418" yaml:"port"`
 }
 
 type Clickhouse struct {
