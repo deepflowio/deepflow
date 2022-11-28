@@ -25,7 +25,7 @@ controller:
   # Deepflow billing mode  license/voucher
   billing-method: license
 
-  # ingester plaform data default: 0
+  # ingester plaform data, default: 0
   # 0 (All K8s Cluster)
   # 1 (K8s Cluster in local Region)
   # 2 (K8s Cluster in local AZs)

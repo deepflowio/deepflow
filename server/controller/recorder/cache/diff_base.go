@@ -779,6 +779,7 @@ func (b *DiffBaseDataSet) deletePodIngressRuleBackend(lcuuid string) {
 }
 
 func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolDataSet *ToolDataSet) {
+	podIngressLcuuid, _ := toolDataSet.GetPodIngressLcuuidByID(dbItem.PodIngressID)
 	b.PodServices[dbItem.Lcuuid] = &PodService{
 		DiffBase: DiffBase{
 			Sequence: seq,
@@ -787,7 +788,7 @@ func (b *DiffBaseDataSet) addPodService(dbItem *mysql.PodService, seq int, toolD
 		Name:             dbItem.Name,
 		Selector:         dbItem.Selector,
 		ServiceClusterIP: dbItem.ServiceClusterIP,
-		PodIngressLcuuid: toolDataSet.PodIngressIDToLcuuid[dbItem.PodIngressID],
+		PodIngressLcuuid: podIngressLcuuid,
 		RegionLcuuid:     dbItem.Region,
 		AZLcuuid:         dbItem.AZ,
 		SubDomainLcuuid:  dbItem.SubDomain,
@@ -889,6 +890,7 @@ func (b *DiffBaseDataSet) addPod(dbItem *mysql.Pod, seq int, toolDataSet *ToolDa
 			Lcuuid:   dbItem.Lcuuid,
 		},
 		Name:                dbItem.Name,
+		Label:               dbItem.Label,
 		State:               dbItem.State,
 		CreatedAt:           dbItem.CreatedAt,
 		PodNodeLcuuid:       podNodeLcuuid,
