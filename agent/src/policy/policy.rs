@@ -263,6 +263,10 @@ impl Policy {
     pub fn get_hits(&self) -> (usize, usize) {
         (self.first_hit, self.fast_hit)
     }
+
+    pub fn set_memory_limit(&self, limit: u64) {
+        self.table.set_memory_limit(limit);
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -341,14 +345,17 @@ impl FlowAclListener for PolicySetter {
         peers: &Vec<Arc<PeerConnection>>,
         cidrs: &Vec<Arc<Cidr>>,
         acls: &Vec<Arc<Acl>>,
-    ) {
+    ) -> Result<(), String> {
         self.update_interfaces(trident_type, platform_data);
         self.update_ip_group(ip_groups);
         self.update_peer_connections(peers);
         self.update_cidr(cidrs);
-        let _ = self.update_acl(acls, true);
+        if let Err(e) = self.update_acl(acls, true) {
+            return Err(format!("{}", e));
+        }
 
         self.flush();
+        Ok(())
     }
 
     // TODO: 用于区别于不同的FlowAclListener
@@ -410,6 +417,10 @@ impl PolicySetter {
 
     pub fn get_hits(&self) -> (usize, usize) {
         return self.policy().get_hits();
+    }
+
+    pub fn set_memory_limit(&self, limit: u64) {
+        self.policy().set_memory_limit(limit)
     }
 }
 

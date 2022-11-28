@@ -435,7 +435,7 @@ impl MirrorModeDispatcher {
             }
 
             let original_length = packet.data.len() - decap_length;
-            let overlay_packet = &mut packet.data[decap_length..packet.capture_length as usize];
+            let overlay_packet = &mut packet.data[decap_length..decap_length + original_length];
 
             // Only virtual network traffic goes to remove duplicates
             #[cfg(target_os = "linux")]

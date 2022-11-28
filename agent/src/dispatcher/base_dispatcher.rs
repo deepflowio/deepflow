@@ -732,7 +732,7 @@ impl BaseDispatcherListener {
         let mut added = Vec::new();
         for (i, key) in keys.iter().enumerate() {
             if pipelines.contains_key(key)
-                && pipelines.get(key).unwrap().lock().unwrap().vm_mac != vm_macs[i]
+                && pipelines.get(key).unwrap().lock().unwrap().vm_mac == vm_macs[i]
             {
                 // vm mac already checked
                 continue;

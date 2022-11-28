@@ -1387,6 +1387,12 @@ impl ConfigHandler {
             candidate_config.diagnose = new_config.diagnose;
         }
 
+        if candidate_config.environment.max_memory != new_config.environment.max_memory {
+            if let Some(ref components) = components {
+                components.policy_setter.set_memory_limit(new_config.environment.max_memory);
+            }
+        }
+
         if candidate_config.tap_mode != TapMode::Analyzer
             && static_config.kubernetes_cluster_id.is_empty()
         {
@@ -1472,7 +1478,6 @@ impl ConfigHandler {
             }
 
             if candidate_config.environment.max_memory != new_config.environment.max_memory {
-                // TODO policy.SetMemoryLimit(cfg.MaxMemory)
                 info!(
                     "memory limit set to {}",
                     ByteSize::b(new_config.environment.max_memory).to_string_as(true)

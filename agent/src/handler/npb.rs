@@ -36,7 +36,7 @@ use crate::config::NpbConfig;
 use crate::proto::trident::VlanMode;
 use crate::sender::npb_sender::NpbPacketSender;
 use crate::utils::stats::{self, StatsOption};
-use npb_handler::{NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter};
+use npb_handler::{NOT_SUPPORT, NpbHandler, NpbHandlerCounter, StatsNpbHandlerCounter};
 use public::{
     counter::Countable,
     debug::QueueDebugger,
@@ -233,7 +233,7 @@ impl NpbBuilder {
     pub fn build_with(&self, id: usize, if_index: u32, mac: MacAddr) -> NpbHandler {
         let counter = Arc::new(NpbHandlerCounter::default());
 
-        if !NpbHandler::DISABLE {
+        if !NOT_SUPPORT {
             info!(
                 "Build with npb packet handler with id: {} if_index: {} mac: {}",
                 id, if_index, mac

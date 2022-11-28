@@ -82,6 +82,10 @@ use thiserror::Error;
 pub enum Error {
     #[error("{0}")]
     CustomError(String),
+    #[error(
+        "DDBS memory limit will be exceed, please enlarge total memory limit or optimize policy."
+    )]
+    ExceedMemoryLimit,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

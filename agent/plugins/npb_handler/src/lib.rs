@@ -24,6 +24,8 @@ use public::{
     queue::DebugSender,
 };
 
+pub const NOT_SUPPORT: bool = true;
+
 #[derive(Debug)]
 pub enum NpbMode {
     L2,
@@ -93,7 +95,6 @@ impl OwnedCountable for StatsNpbHandlerCounter {
 pub struct NpbHandler;
 
 impl NpbHandler {
-    pub const DISABLE: bool = true;
     pub fn new(
         _id: usize,
         _mtu: usize,
