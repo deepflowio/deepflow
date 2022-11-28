@@ -382,7 +382,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, er
 	}
 	// K8s Labels是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "label.") {
-		return GetTagResourceValues(sql)
+		return GetTagResourceValues(db, table, sql)
 	}
 	// 外部字段是动态的,不需要去tag_description里确认
 	if strings.HasPrefix(tag, "tag.") || strings.HasPrefix(tag, "attribute.") {
@@ -405,7 +405,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, er
 	// 根据tagEnumFile获取values
 	_, isEnumOK := TAG_ENUMS[tagDescription.EnumFile]
 	if !isEnumOK {
-		return GetTagResourceValues(sql)
+		return GetTagResourceValues(db, table, sql)
 	}
 
 	_, isStringEnumOK := TAG_STRING_ENUMS[tagDescription.EnumFile]
@@ -450,7 +450,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, er
 
 }
 
-func GetTagResourceValues(rawSql string) (map[string][]interface{}, []string, error) {
+func GetTagResourceValues(db, table, rawSql string) (map[string][]interface{}, []string, error) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -585,7 +585,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, []string, er
 				}
 				sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 			} else {
-				return map[string][]interface{}{}, sqlList, nil
+				return GetExternalTagValues(db, table, rawSql)
 			}
 		}
 		sql = strings.ReplaceAll(sql, " like ", " ilike ")
@@ -651,7 +651,7 @@ func GetTagResourceValues(rawSql string) (map[string][]interface{}, []string, er
 			sql = fmt.Sprintf("SELECT value, value AS display_name FROM k8s_label_map %s GROUP BY value, display_name ORDER BY %s ASC %s", whereSql, orderBy, limitSql)
 		}
 		if sql == "" {
-			return map[string][]interface{}{}, sqlList, nil
+			return GetExternalTagValues(db, table, rawSql)
 		}
 		log.Debug(sql)
 		sqlList = append(sqlList, sql)
