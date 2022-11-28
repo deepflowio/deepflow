@@ -119,8 +119,8 @@ func (m *ExtMetrics) GenCKTable(cluster, storagePolicy string, ttl int, coldStor
 }
 
 func (m *ExtMetrics) ToFlowTags() ([]interface{}, []interface{}) {
-	fields := make([]interface{}, len(m.TagNames)+len(m.MetricsFloatNames))
-	fieldValues := make([]interface{}, len(m.TagNames))
+	fields := make([]interface{}, 0, len(m.TagNames)+len(m.MetricsFloatNames))
+	fieldValues := make([]interface{}, 0, len(m.TagNames))
 	tableName := m.TableName
 	if m.VirtualTableName != "" {
 		tableName = m.VirtualTableName
