@@ -28,8 +28,8 @@ import (
 var log = logging.MustGetLogger("pcap.dbwriter")
 
 const (
-	PCAP_DB    = "pcap"
-	PCAP_TABLE = "pcap"
+	PCAP_DB    = "flow_log"
+	PCAP_TABLE = "l7_packet"
 )
 
 type PcapWriter struct {

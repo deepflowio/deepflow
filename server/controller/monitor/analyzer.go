@@ -308,6 +308,8 @@ func (c *AnalyzerCheck) vtapAnalyzerAlloc(excludeIP string) {
 func (c *AnalyzerCheck) azConnectionCheck() {
 	var azs []mysql.AZ
 	var azAnalyzerConns []mysql.AZAnalyzerConnection
+	var analyzers []mysql.Analyzer
+	var regions []mysql.Region
 
 	log.Info("az connection check start")
 
@@ -317,8 +319,10 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 		azLcuuidToName[az.Lcuuid] = az.Name
 	}
 
+	analyzerIPToConn := make(map[string]mysql.AZAnalyzerConnection)
 	mysql.Db.Find(&azAnalyzerConns)
 	for _, conn := range azAnalyzerConns {
+		analyzerIPToConn[conn.AnalyzerIP] = conn
 		if conn.AZ == "ALL" {
 			continue
 		}
@@ -327,5 +331,21 @@ func (c *AnalyzerCheck) azConnectionCheck() {
 			log.Infof("delete analyzer (%s) az (%s) connection", conn.AnalyzerIP, name)
 		}
 	}
+
+	mysql.Db.Find(&regions)
+	if len(regions) == 1 {
+		var deleteAnalyzers []mysql.Analyzer
+		mysql.Db.Find(&analyzers)
+		for _, analyzer := range analyzers {
+			if _, ok := analyzerIPToConn[analyzer.IP]; ok == false {
+				deleteAnalyzers = append(deleteAnalyzers, analyzer)
+			}
+		}
+		for _, deleteAnalyzer := range deleteAnalyzers {
+			mysql.Db.Delete(&deleteAnalyzer)
+			log.Infof("delete analyzer (%s) because no az_analyzer_conn", deleteAnalyzer.IP)
+		}
+	}
+
 	log.Info("az connection check end")
 }

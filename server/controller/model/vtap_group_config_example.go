@@ -616,38 +616,20 @@ vtap_group_id: g-xxxxxx
     ##   - 1-mini-meta-packet-to-pcap
     #queue-size: 65536
 
-    ## Queue Count to PCAP Generator
-    ## Default: 1. Range: [1, 16]
-    ## Note: The number of replicas for each output queue to the PCAP generator.
-    #queue-count: 1
+    ## Pcap buffer size for each flow
+    ## Default: 1M
+    ## Note: buffer flushes when one of the flows reach this limit
+    #flow-buffer-size: 1048576
 
-    ## TCP/IP Checksum Calculate
-    ## Note: TCP/IP checksum is not recalculated by default.
-    #tcpip-checksum: false
+    ## Total pcap buffer size
+    ## Default: 1M
+    ## Note: buffer flushes when total data size reach this limit
+    #buffer-size: 1048576
 
-    ## 单次写入文件的块大小，默认64KB
-    #block-size-kb: 64
-
-    ## 同时在写的最大pcap文件数，默认5000
-    #max-concurrent-files: 5000
-
-    ## 每个pcap文件的最大大小，默认250MB，但是1秒内即使超过该值也不会切分文件
-    #max-file-size-mb: 250
-
-    ## 所有pcap文件的最大总大小，默认100GB
-    #max-directory-size-gb: 100
-
-    ## 磁盘剩余空间不足该数值时进行删除，默认10GB
-    #disk-free-space-margin-gb: 10
-
-    ## 每个pcap文件的最大时间，默认300秒
-    #max-file-period-second: 300
-
-    ## pcap文件存储的文件夹
-    #file-directory: /var/lib/pcap
-
-    ## pcap服务器端口
-    #server-port: 20205
+    ## Flow flush interval
+    ## Default: 5m
+    ## Note: flushes a flow if its first packet were older then this interval
+    #flush-interval: 5m
 
   #############################
   ## FlowMap (FlowGenerator) ##
