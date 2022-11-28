@@ -589,33 +589,33 @@ func (p L7Protocol) String() string {
 	formatted := ""
 	switch p {
 	case L7_PROTOCOL_HTTP_1:
-		formatted = "httpv1"
+		formatted = "HTTP"
 	case L7_PROTOCOL_HTTP_2:
-		formatted = "httpv2"
+		formatted = "HTTP2"
 	case L7_PROTOCOL_HTTP_1_TLS:
-		formatted = "httpv1_tls"
+		formatted = "HTTP1_TLS"
 	case L7_PROTOCOL_HTTP_2_TLS:
-		formatted = "httpv2_tls"
+		formatted = "HTTP2_TLS"
 	case L7_PROTOCOL_DNS:
-		formatted = "dns"
+		formatted = "DNS"
 	case L7_PROTOCOL_MYSQL:
-		formatted = "mysql"
+		formatted = "MySQL"
 	case L7_PROTOCOL_POSTGRE:
-		formatted = "postgresql"
+		formatted = "PostgreSQL"
 	case L7_PROTOCOL_REDIS:
-		formatted = "redis"
+		formatted = "Redis"
 	case L7_PROTOCOL_DUBBO:
-		formatted = "dubbo"
+		formatted = "Dubbo"
 	case L7_PROTOCOL_GRPC:
-		formatted = "grpc"
+		formatted = "gRPC"
 	case L7_PROTOCOL_KAFKA:
-		formatted = "kafka"
+		formatted = "Kafka"
 	case L7_PROTOCOL_MQTT:
-		formatted = "mqtt"
+		formatted = "MQTT"
 	case L7_PROTOCOL_OTHER:
-		formatted = "other"
+		formatted = "Others"
 	default:
-		formatted = "unknown"
+		formatted = "N/A"
 	}
 	return formatted
 }
