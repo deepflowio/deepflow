@@ -41,7 +41,6 @@ use super::{
     tap_port::TapPort,
 };
 
-use crate::common::IPV4_FRAG_MORE_FRAGMENT;
 use crate::error;
 #[cfg(target_os = "linux")]
 use crate::{
@@ -597,7 +596,7 @@ impl<'a> MetaPacket<'a> {
                 self.lookup_key.proto = ip_protocol;
 
                 let frag = read_u16_be(&packet[FIELD_OFFSET_FRAG + vlan_tag_size..]);
-                if frag & 0xFFF != 0 || frag & IPV4_FRAG_MORE_FRAGMENT != 0 {
+                if frag & 0xFFF != 0 {
                     // fragment
                     self.header_type = HeaderType::Ipv4;
                     self.npb_ignore_l4 = true;

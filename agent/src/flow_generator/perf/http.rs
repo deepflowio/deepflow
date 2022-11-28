@@ -557,7 +557,7 @@ mod tests {
                         rrt_sum: Duration::from_nanos(2023000),
                     }),
                     session_data: HttpSessionData {
-                        l7_proto: L7Protocol::Http2,
+                        l7_proto: L7Protocol::Grpc,
                         status_code: 200,
                         status: L7ResponseStatus::Ok,
                         has_log_data: true,
