@@ -163,14 +163,14 @@ impl NpbBuilder {
 
     pub fn on_config_change(&mut self, config: &NpbConfig, queue_debugger: &QueueDebugger) {
         if self.npb_packet_sender.is_none() {
-            return
+            return;
         }
         let is_running = self.npb_packet_sender.as_ref().unwrap().is_running();
         self.stop();
         self.npb_packet_sender = None;
 
         let (sender, receiver, _) =
-        bounded_with_debug(4096, "2-packet-to-npb-sender", queue_debugger);
+            bounded_with_debug(4096, "2-packet-to-npb-sender", queue_debugger);
         let npb_packet_sender = Arc::new(NpbPacketSender::new(
             self.id,
             receiver,
@@ -268,7 +268,8 @@ impl NpbBuilder {
     }
 
     pub fn start(&mut self) {
-        if self.npb_packet_sender.is_some() && self.npb_packet_sender.as_ref().unwrap().is_running() {
+        if self.npb_packet_sender.is_some() && self.npb_packet_sender.as_ref().unwrap().is_running()
+        {
             return;
         }
         info!("Start npb packet sender {}.", self.id);
@@ -279,7 +280,9 @@ impl NpbBuilder {
     }
 
     pub fn stop(&self) {
-        if self.npb_packet_sender.is_none() || !self.npb_packet_sender.as_ref().unwrap().is_running() {
+        if self.npb_packet_sender.is_none()
+            || !self.npb_packet_sender.as_ref().unwrap().is_running()
+        {
             return;
         }
         self.npb_packet_sender.as_ref().unwrap().stop();
