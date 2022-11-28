@@ -1,4 +1,3 @@
-USE deepflow;
 
 ALTER TABLE vtap MODIFY COLUMN revision VARCHAR(256);
 
