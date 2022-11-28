@@ -514,8 +514,9 @@ pub enum TraceType {
     Customize(String),
 }
 
-const TRACE_TYPE_XB3: &str = "X-B3-TraceId";
-const TRACE_TYPE_XB3SPAN: &str = "X-B3-SpanId";
+// The value here must be lower case
+const TRACE_TYPE_XB3: &str = "x-b3-traceid";
+const TRACE_TYPE_XB3SPAN: &str = "x-b3-spanid";
 const TRACE_TYPE_UBER: &str = "uber-trace-id";
 const TRACE_TYPE_SW6: &str = "sw6";
 const TRACE_TYPE_SW8: &str = "sw8";
@@ -530,15 +531,15 @@ impl From<&str> for TraceType {
     // Example 1: "sw8"
     // Example 2: " sw8"
     fn from(t: &str) -> TraceType {
-        let t = Self::format_str(t);
-        match t {
+        let format_t = Self::format_str(t);
+        match format_t.to_lowercase().as_str() {
             TRACE_TYPE_XB3 => TraceType::XB3,
             TRACE_TYPE_XB3SPAN => TraceType::XB3Span,
             TRACE_TYPE_UBER => TraceType::Uber,
             TRACE_TYPE_SW6 => TraceType::Sw6,
             TRACE_TYPE_SW8 => TraceType::Sw8,
             TRACE_TYPE_TRACE_PARENT => TraceType::TraceParent,
-            _ if t.len() > 0 => TraceType::Customize(t.to_string()),
+            _ if t.len() > 0 => TraceType::Customize(format_t.to_string()),
             _ => TraceType::Disabled,
         }
     }
@@ -560,12 +561,12 @@ impl TraceType {
 
     fn check(&self, context: &str) -> bool {
         match &*self {
-            TraceType::XB3 => context.to_lowercase() == TRACE_TYPE_XB3.to_lowercase(),
-            TraceType::XB3Span => context.to_lowercase() == TRACE_TYPE_XB3SPAN.to_lowercase(),
-            TraceType::Uber => context == TRACE_TYPE_UBER,
-            TraceType::Sw6 => context == TRACE_TYPE_SW6,
-            TraceType::Sw8 => context == TRACE_TYPE_SW8,
-            TraceType::TraceParent => context == TRACE_TYPE_TRACE_PARENT,
+            TraceType::XB3 => context.to_lowercase() == TRACE_TYPE_XB3,
+            TraceType::XB3Span => context.to_lowercase() == TRACE_TYPE_XB3SPAN,
+            TraceType::Uber => context.to_lowercase() == TRACE_TYPE_UBER,
+            TraceType::Sw6 => context.to_lowercase() == TRACE_TYPE_SW6,
+            TraceType::Sw8 => context.to_lowercase() == TRACE_TYPE_SW8,
+            TraceType::TraceParent => context.to_lowercase() == TRACE_TYPE_TRACE_PARENT,
             TraceType::Customize(tag) => context.to_lowercase() == tag.to_lowercase(),
             _ => false,
         }

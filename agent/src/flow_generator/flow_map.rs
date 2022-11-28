@@ -1838,9 +1838,10 @@ mod tests {
             flow_map.inject_meta_packet(&mut packet);
         }
 
-        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(120)));
-
+        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(2)));
         let flow_1 = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
+
+        flow_map.inject_flush_ticker(timestamp.add(Duration::from_secs(10)));
         let flow_2 = output_queue_receiver.recv(Some(TIME_UNIT)).unwrap();
 
         let l3_payload = flow_1.flow.flow_metrics_peers[0].l3_byte_count

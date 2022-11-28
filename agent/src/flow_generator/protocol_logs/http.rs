@@ -716,8 +716,8 @@ impl HttpLog {
                     &String::from(value).trim().as_bytes().to_vec(),
                     direction,
                 );
-                if key == "content-length" {
-                    content_length = Some(value.parse::<u32>().unwrap_or_default());
+                if key.to_lowercase() == "content-length" {
+                    content_length = Some(value.trim_start().parse::<u32>().unwrap_or_default());
                 }
             }
         }
