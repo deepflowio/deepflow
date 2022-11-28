@@ -80,7 +80,9 @@ type Decoder struct {
 	flowTagWriter *flow_tag.FlowTagWriter
 	debugEnabled  bool
 
-	counter *Counter
+	fieldsBuf      []interface{}
+	fieldValuesBuf []interface{}
+	counter        *Counter
 	utils.Closable
 }
 
@@ -92,14 +94,16 @@ func NewDecoder(
 	flowTagWriter *flow_tag.FlowTagWriter,
 ) *Decoder {
 	return &Decoder{
-		index:         index,
-		msgType:       msgType,
-		platformData:  platformData,
-		inQueue:       inQueue,
-		throttler:     throttler,
-		flowTagWriter: flowTagWriter,
-		debugEnabled:  log.IsEnabledFor(logging.DEBUG),
-		counter:       &Counter{},
+		index:          index,
+		msgType:        msgType,
+		platformData:   platformData,
+		inQueue:        inQueue,
+		throttler:      throttler,
+		flowTagWriter:  flowTagWriter,
+		debugEnabled:   log.IsEnabledFor(logging.DEBUG),
+		fieldsBuf:      make([]interface{}, 0, 64),
+		fieldValuesBuf: make([]interface{}, 0, 64),
+		counter:        &Counter{},
 	}
 }
 
@@ -234,7 +238,8 @@ func (d *Decoder) sendOpenMetetry(vtapID uint16, tracesData *v1.TracesData) {
 		if !d.throttler.Send(l) {
 			d.counter.DropCount++
 		} else {
-			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l))
+			d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
+			d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
 			l.Release()
 		}
 	}
@@ -284,7 +289,8 @@ func (d *Decoder) sendProto(proto *pb.AppProtoLogsData) {
 		d.counter.DropCount++
 		drop = 1
 	} else {
-		d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l))
+		d.fieldsBuf, d.fieldValuesBuf = d.fieldsBuf[:0], d.fieldValuesBuf[:0]
+		d.flowTagWriter.WriteFieldsAndFieldValues(jsonify.L7FlowLogToFlowTagInterfaces(l, &d.fieldsBuf, &d.fieldValuesBuf))
 		l.Release()
 	}
 	proto.Release()
