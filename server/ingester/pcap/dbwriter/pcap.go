@@ -43,7 +43,7 @@ func PcapStoreColumns() []*ckdb.Column {
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("packet_batch", ckdb.ArrayUInt8).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("packet_batch", ckdb.ArrayUInt8).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
 	}
 }
 
