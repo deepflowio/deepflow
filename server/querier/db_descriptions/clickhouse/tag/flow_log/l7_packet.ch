@@ -5,6 +5,6 @@ flow_id                   , 流日志 ID              ,
 start_time                , 开始时间               , 单位：微秒。packet_batch 中的最小时间。
 end_time                  , 结束时间               , 单位：微秒。packet_batch 中的最大时间。
 
-packet_batch              , 压缩包头               ,
+packet_batch              , PCAP 文件              ,
 
 vtap                      , 采集器                 ,
