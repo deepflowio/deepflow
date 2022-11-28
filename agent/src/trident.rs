@@ -73,7 +73,7 @@ use crate::{
     flow_generator::{AppProtoLogsParser, PacketSequenceParser},
     monitor::Monitor,
     platform::{LibvirtXmlExtractor, PlatformSynchronizer},
-    policy::Policy,
+    policy::{Policy, PolicySetter},
     proto::trident::{self, IfMacSource, TapMode},
     rpc::{Session, Synchronizer, DEFAULT_TIMEOUT},
     sender::{uniform_sender::UniformSenderThread, SendItem, SendMessageType},
@@ -752,6 +752,7 @@ pub struct Components {
     pub npb_bps_limit: Arc<LeakyBucket>,
     pub handler_builders: Vec<Arc<Mutex<Vec<PacketHandlerBuilder>>>>,
     pub compressed_otel_uniform_sender: UniformSenderThread,
+    pub policy_setter: PolicySetter,
     max_memory: u64,
     tap_mode: TapMode,
     agent_mode: RunningMode,
@@ -899,6 +900,8 @@ impl Components {
             FeatureFlags::from(&yaml_config.feature_flags),
         );
         synchronizer.add_flow_acl_listener(Box::new(policy_setter));
+        policy_setter.set_memory_limit(max_memory);
+
         // TODO: collector enabled
         // TODO: packet handler builders
 
@@ -1616,6 +1619,7 @@ impl Components {
             handler_builders,
             compressed_otel_uniform_sender,
             agent_mode,
+            policy_setter,
         })
     }
 
