@@ -84,18 +84,12 @@ type XflowCollectorConfig struct {
 }
 
 type PCapConfig struct {
-	Enabled               *bool   `yaml:"enabled,omitempty"`
-	QueueSize             *int    `yaml:"queue-size,omitempty"`
-	QueueCount            *int    `yaml:"queue-count,omitempty"`
-	TCPIPChecksum         *bool   `yaml:"tcpip-checksum,omitempty"`
-	BlockSizeKB           *int    `yaml:"block-size-kb,omitempty"`
-	MaxConcurrentFiles    *int    `yaml:"max-concurrent-files,omitempty"`
-	MaxFileSizeMB         *int    `yaml:"max-file-size-mb,omitempty"`
-	MaxDirectorySizeGb    *int    `yaml:"max-directory-size-gb,omitempty"`
-	DiskFreeSpaceMarginGb *int    `yaml:"disk-free-space-margin-gb,omitempty"`
-	MaxFilePeriodSecond   *int    `yaml:"max-file-period-second,omitempty"`
-	FileDirectory         *string `yaml:"file-directory,omitempty"`
-	ServerPort            *int    `yaml:"server-port,omitempty"`
+	Enabled        *bool `yaml:"enabled,omitempty"`
+	QueueSize      *int  `yaml:"queue-size,omitempty"`
+	QueueCount     *int  `yaml:"queue-count,omitempty"`
+	FlowBufferSize *int  `yaml:"flow-buffer-size"`
+	BufferSize     *int  `yaml:"buffer-size"`
+	FlushInterval  *int  `yaml:"flush-interval"`
 }
 
 type TripleMapConfig struct {
