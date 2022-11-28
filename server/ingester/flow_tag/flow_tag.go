@@ -64,10 +64,7 @@ func (t FieldType) String() string {
 	}
 }
 
-type FlowTag struct {
-	Timestamp uint32 // s
-	TableName string
-
+type FlowTagInfo struct {
 	table          string
 	fieldType      FieldType
 	vpcId          int32
@@ -77,6 +74,15 @@ type FlowTag struct {
 
 	hasFieldValue bool
 	fieldValue    string
+}
+
+type FlowTag struct {
+	pool.ReferenceCount
+
+	Timestamp uint32 // s
+	TableName string
+	FlowTagInfo
+	fieldValueCount uint64
 }
 
 func NewTagField(time uint32, db, table string, epcId int32, podNsId uint16, fieldType FieldType, fieldName string) *FlowTag {
@@ -138,7 +144,7 @@ func (t *FlowTag) WriteBlock(block *ckdb.Block) error {
 		if err := block.WriteString(t.fieldValue); err != nil {
 			return err
 		}
-		if err := block.WriteUInt64(1); err != nil {
+		if err := block.WriteUInt64(t.fieldValueCount); err != nil {
 			return err
 		}
 	}
@@ -202,10 +208,15 @@ var flowTagPool = pool.NewLockFreePool(func() interface{} {
 })
 
 func AcquireFlowTag() *FlowTag {
-	return flowTagPool.Get().(*FlowTag)
+	f := flowTagPool.Get().(*FlowTag)
+	f.ReferenceCount.Reset()
+	return f
 }
 
 func ReleaseFlowTag(t *FlowTag) {
+	if t == nil || t.SubReferenceCount() {
+		return
+	}
 	*t = FlowTag{}
 	flowTagPool.Put(t)
 }
