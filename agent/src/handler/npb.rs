@@ -56,7 +56,7 @@ pub struct NpbBuilder {
 
     sender: DebugSender<(usize, Vec<u8>)>,
 
-    npb_packet_sender: Arc<NpbPacketSender>,
+    npb_packet_sender: Option<Arc<NpbPacketSender>>,
 
     pseudo_tunnel_header: [Vec<u8>; 2],
 
@@ -162,22 +162,27 @@ impl NpbBuilder {
     }
 
     pub fn on_config_change(&mut self, config: &NpbConfig, queue_debugger: &QueueDebugger) {
-        let is_running = self.npb_packet_sender.is_running();
+        if self.npb_packet_sender.is_none() {
+           return;
+        }
+        let is_running = self.npb_packet_sender.as_ref().unwrap().is_running();
         self.stop();
+        self.npb_packet_sender = None;
 
         let (sender, receiver, _) =
             bounded_with_debug(4096, "2-packet-to-npb-sender", queue_debugger);
-
-        self.mtu = config.mtu as usize;
-        self.underlay_is_ipv6 = config.underlay_is_ipv6;
-        self.underlay_has_vlan = config.output_vlan > 0;
-        self.overlay_vlan_mode = config.vlan_mode;
-        self.npb_packet_sender = Arc::new(NpbPacketSender::new(
+        let npb_packet_sender = Arc::new(NpbPacketSender::new(
             self.id,
             receiver,
             config,
             self.stats_collector.clone(),
         ));
+
+        self.mtu = config.mtu as usize;
+        self.underlay_is_ipv6 = config.underlay_is_ipv6;
+        self.underlay_has_vlan = config.output_vlan > 0;
+        self.overlay_vlan_mode = config.vlan_mode;
+        self.npb_packet_sender = Some(npb_packet_sender);
         self.sender = sender;
         self.pseudo_tunnel_header = [
             Self::create_pseudo_vxlan_packet(config),
@@ -207,12 +212,12 @@ impl NpbBuilder {
             underlay_has_vlan: config.output_vlan > 0,
             overlay_vlan_mode: config.vlan_mode,
             sender,
-            npb_packet_sender: Arc::new(NpbPacketSender::new(
+            npb_packet_sender: Some(Arc::new(NpbPacketSender::new(
                 id,
                 receiver,
                 &config,
                 stats_collector.clone(),
-            )),
+            ))),
             pseudo_tunnel_header: [
                 Self::create_pseudo_vxlan_packet(config),
                 Self::create_pseudo_erspan_packet(config),
@@ -260,21 +265,24 @@ impl NpbBuilder {
     }
 
     pub fn start(&mut self) {
-        if self.npb_packet_sender.is_running() {
+        if self.npb_packet_sender.is_some() && self.npb_packet_sender.as_ref().unwrap().is_running()
+        {
             return;
         }
         info!("Start npb packet sender {}.", self.id);
-        self.npb_packet_sender.start();
+        self.npb_packet_sender.as_ref().unwrap().start();
 
-        let sync_sender = self.npb_packet_sender.clone();
+        let sync_sender = self.npb_packet_sender.as_ref().unwrap().clone();
         *self.thread_handle.lock().unwrap() = Some(thread::spawn(move || sync_sender.run()));
     }
 
     pub fn stop(&self) {
-        if !self.npb_packet_sender.is_running() {
+        if self.npb_packet_sender.is_none()
+            || !self.npb_packet_sender.as_ref().unwrap().is_running()
+        {
             return;
         }
-        self.npb_packet_sender.stop();
+        self.npb_packet_sender.as_ref().unwrap().stop();
 
         if let Some(handler) = self.thread_handle.lock().unwrap().take() {
             let _ = handler.join();
