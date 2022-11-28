@@ -1,4 +1,3 @@
-USE deepflow;
 
 CREATE TABLE IF NOT EXISTS ch_int_enum (
     tag_name                VARCHAR(256) NOT NULL,

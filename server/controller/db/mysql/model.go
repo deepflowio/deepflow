@@ -308,20 +308,22 @@ func (DHCPPort) TableName() string {
 
 type VInterface struct {
 	Base         `gorm:"embedded"`
-	Name         string `gorm:"column:name;type:char(64);default:''" json:"NAME"`
-	Index        int    `gorm:"column:ifindex;type:int;not null" json:"IFINDEX"`
-	State        int    `gorm:"column:state;type:int;not null" json:"STATE"`                  // 1. Attached 2.Detached 3.Exception
-	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	Type         int    `gorm:"column:iftype;type:int;default:0" json:"IFTYPE"`               // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
-	Mac          string `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC"`
-	TapMac       string `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC"`
-	NetworkID    int    `gorm:"column:subnetid;type:int;default:0" json:"SUBNETID"` // vl2 id
-	VlanTag      int    `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
-	DeviceType   int    `gorm:"column:devicetype;type:int;default:null" json:"DEVICETYPE"` // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
-	DeviceID     int    `gorm:"column:deviceid;type:int;default:null" json:"DEVICEID"`     // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
-	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region       string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	Name         string    `gorm:"column:name;type:char(64);default:''" json:"NAME"`
+	Index        int       `gorm:"column:ifindex;type:int;not null" json:"IFINDEX"`
+	State        int       `gorm:"column:state;type:int;not null" json:"STATE"`                  // 1. Attached 2.Detached 3.Exception
+	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
+	Type         int       `gorm:"column:iftype;type:int;default:0" json:"IFTYPE"`               // 0.Unknown 1.Control 2.Service 3.WAN 4.LAN 5.Trunk 6.Tap 7.Tool
+	Mac          string    `gorm:"index:mac_index;column:mac;type:char(32);default:''" json:"MAC"`
+	TapMac       string    `gorm:"column:tap_mac;type:char(32);default:''" json:"TAP_MAC"`
+	NetworkID    int       `gorm:"column:subnetid;type:int;default:0" json:"SUBNETID"` // vl2 id
+	VlanTag      int       `gorm:"column:vlantag;type:int;default:0" json:"VLANTAG"`
+	DeviceType   int       `gorm:"column:devicetype;type:int;default:null" json:"DEVICETYPE"` // Type 0.unknown 1.vm 2.vgw 3.third-party-device 4.vmwaf 5.NSP-vgateway 6.host-device 7.network-device 9.DHCP-port 10.pod 11.pod_service 12. redis_instance 13. rds_instance 14. pod_node 15. load_balance 16. nat_gateway
+	DeviceID     int       `gorm:"column:deviceid;type:int;default:null" json:"DEVICEID"`     // unknown: Senseless ID, vm: vm ID, vgw/NSP-vgateway: vnet ID, third-party-device: third_party_device ID, vmwaf: vmwaf ID, host-device: host_device ID, network-device: network_device ID
+	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
 
 func (VInterface) TableName() string {
@@ -330,16 +332,18 @@ func (VInterface) TableName() string {
 
 type LANIP struct { // TODO 添加region字段
 	Base         `gorm:"embedded"`
-	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
-	Netmask      string `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK"`
-	Gateway      string `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
-	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	NetworkID    int    `gorm:"column:vl2id;type:int;default:null" json:"VL2ID"`
-	NetIndex     int    `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX"`
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
-	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	VInterfaceID int    `gorm:"column:vifid;type:int;default:null" json:"VIFID"`
-	ISP          int    `gorm:"column:isp;type:int;default:0" json:"ISP"` // Used for multi-ISP access
+	IP           string    `gorm:"column:ip;type:char(64);default:''" json:"IP"`
+	Netmask      string    `gorm:"column:netmask;type:char(64);default:''" json:"NETMASK"`
+	Gateway      string    `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
+	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
+	NetworkID    int       `gorm:"column:vl2id;type:int;default:null" json:"VL2ID"`
+	NetIndex     int       `gorm:"column:net_index;type:int;default:0" json:"NET_INDEX"`
+	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	VInterfaceID int       `gorm:"column:vifid;type:int;default:null" json:"VIFID"`
+	ISP          int       `gorm:"column:isp;type:int;default:0" json:"ISP"` // Used for multi-ISP access
+	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
 
 func (LANIP) TableName() string {
@@ -348,16 +352,18 @@ func (LANIP) TableName() string {
 
 type WANIP struct {
 	Base         `gorm:"embedded"`
-	IP           string `gorm:"column:ip;type:char(64);default:''" json:"IP"`
-	Alias        string `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
-	Netmask      int    `gorm:"column:netmask;type:int;default:null" json:"NETMASK"`
-	Gateway      string `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
-	CreateMethod int    `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
-	ISP          int    `gorm:"column:isp;type:int;default:null" json:"ISP"`
-	VInterfaceID int    `gorm:"column:vifid;type:int;default:0" json:"VIFID"`
-	SubDomain    string `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
-	Domain       string `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
-	Region       string `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	IP           string    `gorm:"column:ip;type:char(64);default:''" json:"IP"`
+	Alias        string    `gorm:"column:alias;type:char(64);default:''" json:"ALIAS"`
+	Netmask      int       `gorm:"column:netmask;type:int;default:null" json:"NETMASK"`
+	Gateway      string    `gorm:"column:gateway;type:char(64);default:''" json:"GATEWAY"`
+	CreateMethod int       `gorm:"column:create_method;type:int;default:0" json:"CREATE_METHOD"` // 0.learning 1.user_defined
+	ISP          int       `gorm:"column:isp;type:int;default:null" json:"ISP"`
+	VInterfaceID int       `gorm:"column:vifid;type:int;default:0" json:"VIFID"`
+	SubDomain    string    `gorm:"column:sub_domain;type:char(64);default:''" json:"SUB_DOMAIN"`
+	Domain       string    `gorm:"column:domain;type:char(64);not null" json:"DOMAIN"`
+	Region       string    `gorm:"column:region;type:char(64);default:''" json:"REGION"`
+	CreatedAt    time.Time `gorm:"column:created_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"CREATED_AT"`
+	UpdatedAt    time.Time `gorm:"column:updated_at;type:timestamp;not null;default:CURRENT_TIMESTAMP" json:"UPDATED_AT"`
 }
 
 func (WANIP) TableName() string {
