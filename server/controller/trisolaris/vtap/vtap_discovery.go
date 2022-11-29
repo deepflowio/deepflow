@@ -495,7 +495,7 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 }
 
 func (l *VTapLKData) LookUpLocalVTapByIP(db *gorm.DB) *VTapLKResult {
-	anVifIDs, lanVifIDToIP := l.getLanIPVIFIDs(db)
+	lanVifIDs, lanVifIDToIP := l.getLanIPVIFIDs(db)
 	wanVifIDs, wanVifIDToIP := l.getWanIPVIFIDs(db)
 	vifIDs := make([]int, 0, len(lanVifIDs)+len(wanVifIDs))
 	if len(lanVifIDs) > 0 {
