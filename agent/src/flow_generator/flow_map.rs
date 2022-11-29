@@ -478,7 +478,7 @@ impl FlowMap {
             // the arrival of the packet.
             // FIXME: We should check whether there are any remaining requests to be aggregated and
             // close the flow as soon as possible.
-            return false
+            return false;
         }
 
         let direction = meta_packet.direction;
@@ -856,7 +856,7 @@ impl FlowMap {
             // eBPF data currently does not have socket closing information, we uniformly use the
             // timeout parameter of session aggregation so that the aggregation will not be
             // affected.
-            node.timeout = self.config.load().l7_log_session_aggr_timeout.as_secs();
+            node.timeout = self.parse_config.load().l7_log_session_aggr_timeout;
         } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
             meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
@@ -915,7 +915,8 @@ impl FlowMap {
                 meta_packet,
                 is_first_packet_direction,
                 flow_id,
-                !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() && self.l4_metrics_enabled(),
+                !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf()
+                    && self.l4_metrics_enabled(),
                 self.l7_metrics_enabled(),
                 self.l7_log_parse_enabled(&meta_packet.lookup_key),
                 &mut self.app_table,
