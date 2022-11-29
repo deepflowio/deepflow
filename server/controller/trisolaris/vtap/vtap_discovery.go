@@ -531,13 +531,19 @@ func (r *VTapRegister) registerMirrorVTapByIP(db *gorm.DB) (*models.VTap, bool) 
 }
 
 func (l *VTapLKData) LookUpLocalVTapByIP(db *gorm.DB) *VTapLKResult {
-	vifIDs, vifIDToIP := l.getLanIPVIFIDs(db)
-	if vifIDs == nil {
-		vifIDs, vifIDToIP = l.getWanIPVIFIDs(db)
-		if vifIDs == nil {
-			return nil
-		}
+	lanVifIDs, lanVifIDToIP := l.getLanIPVIFIDs(db)
+	wanVifIDs, wanVifIDToIP := l.getWanIPVIFIDs(db)
+	vifIDs := make([]int, 0, len(lanVifIDs)+len(wanVifIDs))
+	if len(lanVifIDs) > 0 {
+		vifIDs = append(vifIDs, lanVifIDs...)
 	}
+	if len(wanVifIDs) > 0 {
+		vifIDs = append(vifIDs, wanVifIDs...)
+	}
+	if len(vifIDs) == 0 {
+		return nil
+	}
+
 	vifs, err := dbmgr.DBMgr[models.VInterface](db).GetBatchVInterfaceFromIDs(
 		l.ctrlMac,
 		l.region,
@@ -572,7 +578,10 @@ func (l *VTapLKData) LookUpLocalVTapByIP(db *gorm.DB) *VTapLKResult {
 		vTapType = VTAP_TYPE_WORKLOAD_V
 	}
 	if vifID, ok := deviceIDToVifID[vm.ID]; ok {
-		launchServer = vifIDToIP[vifID]
+		launchServer = lanVifIDToIP[vifID]
+		if launchServer == "" {
+			launchServer = wanVifIDToIP[vifID]
+		}
 	}
 	vTapName := fmt.Sprintf("%s-W%d", vm.Name, vm.ID)
 	return &VTapLKResult{
