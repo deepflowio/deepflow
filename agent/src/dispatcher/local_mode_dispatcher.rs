@@ -72,7 +72,7 @@ impl LocalModeDispatcher {
             base.log_parse_config.clone(),
             Some(base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &base.stats,
-            false, // $from_ebpf: false, packets aren't from ebpf, it needs to collect packet sequence data
+            false, // !from_ebpf
         );
 
         while !base.terminated.load(Ordering::Relaxed) {

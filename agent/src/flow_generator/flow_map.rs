@@ -68,7 +68,6 @@ use crate::{
         handler::{L7LogDynamicConfig, LogParserAccess, LogParserConfig},
         FlowAccess, FlowConfig, ModuleConfig, RuntimeConfig,
     },
-    flow_generator::flow_config::TIMEOUT_ESTABLISHED,
     policy::{Policy, PolicyGetter},
     proto::common::TridentType,
     rpc::get_timestamp,
@@ -369,6 +368,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
+            // FIXME: move this code block to a function
             if node.packet_sequence_block.is_some() {
                 if !node
                     .packet_sequence_block
@@ -473,9 +473,14 @@ impl FlowMap {
 
     fn update_tcp_flow(&mut self, meta_packet: &mut MetaPacket, node: &mut FlowNode) -> bool {
         if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
-            // because ebpf doesn't know when the stream ends, we use TIMEOUT_ESTABLISHED as the timeout, if the flow is timeout, it is closed
-            return meta_packet.lookup_key.timestamp > node.recent_time + TIMEOUT_ESTABLISHED;
+            // For eBPF data, since we don't know when the Flow will terminate at present, the
+            // fixed timeout parameter is used uniformly, and the Flow will not be closed due to
+            // the arrival of the packet.
+            // FIXME: We should check whether there are any remaining requests to be aggregated and
+            // close the flow as soon as possible.
+            return false
         }
+
         let direction = meta_packet.direction;
         let pkt_tcp_flags = meta_packet.tcp_data.flags;
         node.tagged_flow.flow.flow_metrics_peers[direction as usize].tcp_flags |= pkt_tcp_flags;
@@ -844,8 +849,15 @@ impl FlowMap {
     fn new_tcp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(meta_packet);
         let mut reverse = false;
-        // the data from ebpf has not l4 info
-        if !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            // eBPF data has no L4 info
+            // Data coming from eBPF means it must be an active service
+            meta_packet.is_active_service = true;
+            // eBPF data currently does not have socket closing information, we uniformly use the
+            // timeout parameter of session aggregation so that the aggregation will not be
+            // affected.
+            node.timeout = self.config.load().l7_log_session_aggr_timeout.as_secs();
+        } else {
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
             meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
 
@@ -857,8 +869,6 @@ impl FlowMap {
             }
             self.update_flow_state_machine(&mut node, pkt_tcp_flags, meta_packet.direction);
             self.update_syn_or_syn_ack_seq(&mut node, meta_packet);
-        } else {
-            meta_packet.is_active_service = true; // packet which is from ebpf is active service
         }
 
         if self.config.load().collector_enabled {
@@ -867,6 +877,7 @@ impl FlowMap {
 
         // Enterprise Edition Feature: packet-sequence
         if self.packet_sequence_enabled {
+            // FIXME: move this code block to a function
             node.packet_sequence_block =
                 Some(packet_sequence_block::PacketSequenceBlock::default());
             let mini_meta_packet = packet_sequence_block::MiniMetaPacket::new(
@@ -904,12 +915,7 @@ impl FlowMap {
                 meta_packet,
                 is_first_packet_direction,
                 flow_id,
-                if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
-                    // the data from ebpf has not l4 info
-                    false
-                } else {
-                    self.l4_metrics_enabled()
-                },
+                !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() && self.l4_metrics_enabled(),
                 self.l7_metrics_enabled(),
                 self.l7_log_parse_enabled(&meta_packet.lookup_key),
                 &mut self.app_table,
@@ -936,14 +942,18 @@ impl FlowMap {
         let mut node = self.init_flow(meta_packet);
         node.flow_state = FlowState::Established;
         let mut reverse = false;
-        // the data from ebpf has not l4 info
-        if !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            // eBPF data has no L4 info
+            // Data coming from eBPF means it must be an active service
+            meta_packet.is_active_service = true;
+            // eBPF data currently does not have socket closing information, we uniformly use the
+            // timeout parameter of active UDP flow so that the aggregation will not be affected.
+            node.timeout = self.config.load().flow_timeout.closing;
+        } else {
             // opening timeout
             node.timeout = self.config.load().flow_timeout.opening;
             reverse = self.update_l4_direction(meta_packet, &mut node, true, true);
             meta_packet.is_active_service = node.tagged_flow.flow.is_active_service;
-        } else {
-            meta_packet.is_active_service = true; // packet which is from ebpf is active service
         }
         if self.config.load().collector_enabled {
             self.collect_metric(&mut node, meta_packet, !reverse);
@@ -1041,11 +1051,11 @@ impl FlowMap {
         self.update_flow_direction(&mut node, meta_packet);
 
         let flow = &mut node.tagged_flow.flow;
-        if !flow.flow_key.tap_port.is_from_ebpf() {
-            // the flow which from ebpf, it's close_type should be CloseType::Timeout
-            flow.update_close_type(node.flow_state);
-        } else {
+        if flow.flow_key.tap_port.is_from_ebpf() {
+            // the flow which from eBPF, it's close_type always be CloseType::Timeout
             flow.close_type = CloseType::Timeout;
+        } else {
+            flow.update_close_type(node.flow_state);
         }
         flow.end_time = timeout;
         flow.flow_stat_time = Duration::from_nanos(
@@ -1065,12 +1075,7 @@ impl FlowMap {
                 perf.copy_and_reset_perf_data(
                     flow.reversed,
                     l7_timeout_count as u32,
-                    if flow.flow_key.tap_port.is_from_ebpf() {
-                        // the data from ebpf has not l4 info
-                        false
-                    } else {
-                        self.l4_metrics_enabled()
-                    },
+                    !flow.flow_key.tap_port.is_from_ebpf() && self.l4_metrics_enabled(),
                     self.l7_metrics_enabled(),
                 )
             });
@@ -1117,12 +1122,7 @@ impl FlowMap {
                     perf.copy_and_reset_perf_data(
                         flow.reversed,
                         0,
-                        if flow.flow_key.tap_port.is_from_ebpf() {
-                            // the data from ebpf has not l4 info
-                            false
-                        } else {
-                            self.l4_metrics_enabled()
-                        },
+                        !flow.flow_key.tap_port.is_from_ebpf() && self.l4_metrics_enabled(),
                         self.l7_metrics_enabled(),
                     )
                 });
@@ -1208,10 +1208,12 @@ impl FlowMap {
     }
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
-        // the data from ebpf doesn't need to update_flow_direction, because it update it's direction in FlowPerf::l7_parse
         if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            // the data from ebpf doesn't need to update_flow_direction, it only update it's direction in FlowPerf::l7_parse
+            // FIXME: when direction update in l7_parse, the underlay flow must also be reversed, so we can get the right metrics
             return;
         }
+
         let flow_key = &node.tagged_flow.flow.flow_key;
         let src_epc_id = node.tagged_flow.flow.flow_metrics_peers[0].l3_epc_id as i16;
         let dst_epc_id = node.tagged_flow.flow.flow_metrics_peers[1].l3_epc_id as i16;

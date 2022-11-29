@@ -186,8 +186,8 @@ struct EbpfDispatcher {
     flow_map_config: FlowAccess,
 
     config: EbpfConfig,
-    output: DebugSender<Box<MetaAppProto>>, // send the MetaAppProto to the AppProtoLogsParser
-    flow_output: DebugSender<Box<TaggedFlow>>, // send the TaggedFlow to the QuadrupleGenerator
+    output: DebugSender<Box<MetaAppProto>>, // Send MetaAppProtos to the AppProtoLogsParser
+    flow_output: DebugSender<Box<TaggedFlow>>, // Send TaggedFlows to the QuadrupleGenerator
     stats_collector: Arc<stats::Collector>,
 }
 
@@ -213,7 +213,7 @@ impl EbpfDispatcher {
             self.log_parser_config.clone(),
             None, // Enterprise Edition Feature: packet-sequence
             &self.stats_collector,
-            true, // $from_ebpf: true, packets are from ebpf, it needn't to collect packet sequence data
+            true, // from_ebpf
         );
         while unsafe { SWITCH } {
             let mut packet = self.receiver.recv(Some(Duration::from_millis(1)));

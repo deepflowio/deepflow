@@ -116,6 +116,12 @@ pub struct FlowPerf {
     protocol_bitmap: L7ProtocolBitmap,
     l7_protocol_enum: L7ProtocolEnum,
 
+    // Only for eBPF data, the server_port will be set in l7_check() method,
+    // it checks the first request packet's payload,
+    // and then set self.server_port = packet.lookup_key.dst_port,
+    // we use the server_port to judge packet's direction.
+    pub server_port: u16,
+
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
@@ -125,9 +131,6 @@ pub struct FlowPerf {
 
     // port bitmap max = 65535, indicate the l7 protocol in this port whether to parse
     l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
-
-    // just for ebpf, the server_port will be set in l7_check method(it checks the first request packet's payload, and then set self.server_port = packet.lookup_key.dst_port), we use the server_port to judge packet's direction
-    pub server_port: u16,
 }
 
 impl FlowPerf {
@@ -295,12 +298,14 @@ impl FlowPerf {
         is_parse_log: bool,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
         if !packet.ebpf_type.is_none() && self.server_port != 0 {
-            // if the packet from ebpf and it's server_port is not equal to 0, We can get the packet's direction by comparing self.server_port with packet.lookup_key.dst_port
+            // if the packet from eBPF and it's server_port is not equal to 0,
+            // We can get the packet's direction by comparing self.server_port with packet.lookup_key.dst_port
             packet.direction = if self.server_port == packet.lookup_key.dst_port {
                 PacketDirection::ClientToServer
             } else {
                 PacketDirection::ServerToClient
             };
+            // FIXME: Is it possible that the server_port of eBPF data is 0?
         }
 
         if self.l7.is_some() {

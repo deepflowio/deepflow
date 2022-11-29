@@ -367,9 +367,11 @@ impl SubQuadGen {
     ) {
         for acc_flow in flows.iter_mut() {
             if acc_flow.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
-                //  the data from ebpf has not l4 info, it needn't to set_connection
-                continue;
+                // eBPF data has no L4 info
+                // A SubQuadGen only process one type of data, so here we can break.
+                break;
             }
+
             acc_flow.is_active_host0 = Self::check_active_host(
                 possible_host,
                 &acc_flow.tagged_flow.flow.flow_metrics_peers[0],
@@ -546,7 +548,7 @@ pub struct QuadrupleGeneratorThread {
     input: Arc<Receiver<Box<TaggedFlow>>>,
     second_output: DebugSender<Box<AccumulatedFlow>>,
     minute_output: DebugSender<Box<AccumulatedFlow>>,
-    flow_output: Option<DebugSender<Arc<TaggedFlow>>>, // flow_output sends TaggedFlows to the FlowAggr, it will be None when the QuadrupleGeneratorThread is created by the ebpf_dispatcher
+    flow_output: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
     connection_lru_capacity: usize,
     metrics_type: MetricsType,
     second_delay_seconds: u64,
@@ -690,7 +692,7 @@ pub struct QuadrupleGenerator {
 
     key: QgKey,
     policy_ids: [U16Set; 2],
-    output_flow: Option<DebugSender<Arc<TaggedFlow>>>, // it will be None when the QuadrupleGeneratorThread is created by the ebpf_dispatcher
+    output_flow: Option<DebugSender<Arc<TaggedFlow>>>, // Send TaggedFlows to FlowAggr, equal to None when processing eBPF data.
 
     l7_metrics_enabled: Arc<AtomicBool>,
     vtap_flow_1s_enabled: Arc<AtomicBool>,
@@ -1114,7 +1116,7 @@ impl QuadrupleGenerator {
                     if self.output_flow.is_some() {
                         if let Err(_) = self.output_flow.as_mut().unwrap().send(tagged_flow.clone())
                         {
-                            debug!("qg push tagged flows to l4_flow queue failed maybe queue have terminated");
+                            debug!("qg push TaggedFlow to l4_flow queue failed, maybe queue have terminated");
                         }
                     }
                     if self.collector_enabled.load(Ordering::Relaxed) {

@@ -368,7 +368,7 @@ impl MirrorModeDispatcher {
             self.base.log_parse_config.clone(),
             Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &self.base.stats,
-            false, // $from_ebpf: false, packets aren't from ebpf, it needs to collect packet sequence data
+            false, // !from_ebpf
         );
 
         while !self.base.terminated.load(Ordering::Relaxed) {
