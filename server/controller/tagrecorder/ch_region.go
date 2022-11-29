@@ -60,22 +60,30 @@ func (r *ChRegion) generateNewData() (map[IDKey]mysql.ChRegion, bool) {
 		return nil, false
 	}
 
-	regionLcuuidToDomainLcuuids := make(map[string][]string)
+	regionLcuuidToDomainLcuuids := make(map[string]map[string]bool)
 	for _, az := range azs {
+		_, ok := regionLcuuidToDomainLcuuids[az.Region]
+		if !ok {
+			regionLcuuidToDomainLcuuids[az.Region] = map[string]bool{}
+		}
 		if az.Domain != "" && az.Domain != common.DEFAULT_REGION && az.Region != "" {
-			regionLcuuidToDomainLcuuids[az.Region] = append(regionLcuuidToDomainLcuuids[az.Region], az.Domain)
+			regionLcuuidToDomainLcuuids[az.Region][az.Domain] = true
 		}
 	}
 	for _, vpc := range vpcs {
+		_, ok := regionLcuuidToDomainLcuuids[vpc.Region]
+		if !ok {
+			regionLcuuidToDomainLcuuids[vpc.Region] = map[string]bool{}
+		}
 		if vpc.Domain != "" && vpc.Domain != common.DEFAULT_REGION && vpc.Region != "" {
-			regionLcuuidToDomainLcuuids[vpc.Region] = append(regionLcuuidToDomainLcuuids[vpc.Region], vpc.Domain)
+			regionLcuuidToDomainLcuuids[vpc.Region][vpc.Domain] = true
 		}
 	}
 	keyToItem := make(map[IDKey]mysql.ChRegion)
 	for _, region := range regions {
-		domainLcuuids := regionLcuuidToDomainLcuuids[region.Lcuuid]
+		domainLcuuids, _ := regionLcuuidToDomainLcuuids[region.Lcuuid]
 		domainIconIDs := []int{}
-		for _, domainLcuuid := range domainLcuuids {
+		for domainLcuuid, _ := range domainLcuuids {
 			domainIconId := r.domainLcuuidToIconID[domainLcuuid]
 			if domainIconId != 0 {
 				domainIconIDs = append(domainIconIDs, domainIconId)
