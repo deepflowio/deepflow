@@ -360,9 +360,9 @@ func (p *PlatformDataOP) generateIngesterPlatformData() {
 		p.updateAZToPlatformDataOnlyPod(azToData)
 	}
 
-	log.Info(p.GetRegionToPlatformDataOnlyPod())
-	log.Info(p.GetAllPlatformDataForIngester())
-	log.Info(p.GetAZToPlatformDataOnlyPod())
+	log.Debug(p.GetRegionToPlatformDataOnlyPod())
+	log.Debug(p.GetAllPlatformDataForIngester())
+	log.Debug(p.GetAZToPlatformDataOnlyPod())
 }
 
 func (p *PlatformDataOP) generateAllSimplePlatformData() {
