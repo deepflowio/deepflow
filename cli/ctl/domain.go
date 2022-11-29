@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
@@ -125,33 +126,33 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		yData, _ := yaml.JSONToYAML(jData)
 		fmt.Printf(string(yData))
 	} else {
-		nameMaxSize, controllerNameMaxSize := len("NAME"), len("CONTROLLER_NAME")
+		table := tablewriter.NewWriter(os.Stdout)
+		table.SetAutoWrapText(false)
+		table.SetAutoFormatHeaders(false)
+		table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+		table.SetAlignment(tablewriter.ALIGN_LEFT)
+		table.SetCenterSeparator("")
+		table.SetColumnSeparator("")
+		table.SetRowSeparator("")
+		table.SetHeaderLine(false)
+		table.SetBorder(false)
+		table.SetTablePadding("  ")
+		table.SetNoWhiteSpace(true)
+
+		table.SetHeader([]string{"NAME", "ID", "LCUUID", "TYPE", "CONTROLLER_IP", "CREATED_AT", "SYNCED_AT", "ENABLED", "STATE"})
+		tableItems := [][]string{}
 		for i := range response.Get("DATA").MustArray() {
-			d := response.Get("DATA").GetIndex(i)
-			nameSize := len(d.Get("NAME").MustString())
-			if nameSize > nameMaxSize {
-				nameMaxSize = nameSize
+			data := response.Get("DATA").GetIndex(i)
+			tableItem := []string{
+				data.Get("NAME").MustString(), data.Get("CLUSTER_ID").MustString(), data.Get("LCUUID").MustString(),
+				common.DomainType(data.Get("TYPE").MustInt()).String(), data.Get("CONTROLLER_IP").MustString(),
+				data.Get("CREATED_AT").MustString(), data.Get("SYNCED_AT").MustString(),
+				strconv.Itoa(data.Get("ENABLED").MustInt()), strconv.Itoa(data.Get("STATE").MustInt()),
 			}
-			controllerNameSize := len(d.Get("CONTROLLER_NAME").MustString())
-			if controllerNameSize > controllerNameMaxSize {
-				controllerNameMaxSize = controllerNameSize
-			}
+			tableItems = append(tableItems, tableItem)
 		}
-		format := "%-*s %-14s %-14s %-*s %-22s %-22s %-8s %-8s %s\n"
-		fmt.Printf(
-			format, nameMaxSize, "NAME", "ID", "TYPE", controllerNameMaxSize, "CONTROLLER_NAME",
-			"CREATED_AT", "SYNCED_AT", "ENABLED", "STATE", "AGENT_WATCH_K8S",
-		)
-		for i := range response.Get("DATA").MustArray() {
-			d := response.Get("DATA").GetIndex(i)
-			fmt.Printf(
-				format, nameMaxSize, d.Get("NAME").MustString(), d.Get("CLUSTER_ID").MustString(),
-				common.DomainType(d.Get("TYPE").MustInt()), controllerNameMaxSize, d.Get("CONTROLLER_NAME").MustString(),
-				d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
-				strconv.Itoa(d.Get("ENABLED").MustInt()), strconv.Itoa(d.Get("STATE").MustInt()),
-				d.Get("VTAP_NAME").MustString(),
-			)
-		}
+		table.AppendBulk(tableItems)
+		table.Render()
 	}
 }
 
