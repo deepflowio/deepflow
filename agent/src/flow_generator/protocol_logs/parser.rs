@@ -302,7 +302,12 @@ impl SessionQueue {
 
         // 因为数组提前分配hashmap, slot < self.window_size 所以必然存在
         let map = time_window.get_mut(slot).unwrap();
-        let key = Self::calc_key(&item);
+        let key = if item.base_info.tap_port.is_from_ebpf() {
+            // if the l7 log from ebpf, use AppProtoLogsData::ebpf_flow_session_id()
+            item.ebpf_flow_session_id()
+        } else {
+            Self::calc_key(&item)
+        };
         match item.base_info.head.msg_type {
             LogMessageType::Request => {
                 self.on_request_log(map, item, key);
