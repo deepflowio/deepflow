@@ -25,10 +25,11 @@ use libc::c_int;
 use log::{debug, error, info, warn};
 use lru::LruCache;
 use public::bitmap::Bitmap;
+use public::l7_protocol::L7ProtocolEnum;
 
 use super::{Error, Result};
 use crate::common::enums::IpProtocol;
-use crate::common::flow::{L7Protocol, PacketDirection};
+use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_info::L7ProtocolInfoInterface;
 use crate::common::l7_protocol_log::{
@@ -38,7 +39,7 @@ use crate::common::l7_protocol_log::{
 use crate::common::meta_packet::MetaPacket;
 use crate::config::handler::{EbpfConfig, LogParserAccess};
 use crate::config::UprobeProcRegExp;
-use crate::ebpf;
+use crate::ebpf::{self, set_allow_port_bitmap};
 use crate::flow_generator::{
     AppProtoLogsBaseInfo, AppProtoLogsData, AppTable, Error as LogError, Result as LogResult,
 };
@@ -370,7 +371,7 @@ struct FlowItem {
     protocol_bitmap_image: L7ProtocolBitmap,
     protocol_bitmap: L7ProtocolBitmap,
     l4_protocol: IpProtocol,
-    l7_protocol: L7Protocol,
+    l7_protocol_enum: L7ProtocolEnum,
 
     server_port: u16,
 
@@ -392,10 +393,10 @@ impl FlowItem {
     const FLOW_ITEM_TIMEOUT: u64 = 60;
 
     fn get_parser(
-        protocol: L7Protocol,
+        l7_protocol_enum: L7ProtocolEnum,
         log_parser_config: &LogParserAccess,
     ) -> Option<L7ProtocolParser> {
-        let mut parser = get_parser(protocol);
+        let mut parser = get_parser(l7_protocol_enum);
         if let Some(p) = &mut parser {
             p.set_parse_config(log_parser_config);
         }
@@ -415,21 +416,21 @@ impl FlowItem {
         let l4_protocol = packet.lookup_key.proto;
         let l7_protocol = app_table.get_protocol_from_ebpf(packet, local_epc, remote_epc);
         let is_from_app = l7_protocol.is_some();
-        let (l7_protocol, server_port) = l7_protocol.unwrap_or((L7Protocol::Unknown, 0));
+        let (l7_protocol_enum, server_port) = l7_protocol.unwrap_or((L7ProtocolEnum::default(), 0));
         let protocol_bitmap = get_parse_bitmap(l4_protocol, l7_enable_from_config);
         FlowItem {
             last_policy: time_in_sec,
             last_packet: time_in_sec,
             remote_epc,
             l4_protocol,
-            l7_protocol,
+            l7_protocol_enum,
             is_success: false,
             is_from_app,
             is_skip: false,
             server_port,
             protocol_bitmap,
             protocol_bitmap_image: protocol_bitmap,
-            parser: Self::get_parser(l7_protocol, log_parser_config),
+            parser: Self::get_parser(l7_protocol_enum, log_parser_config),
             l7_enable_from_config,
             l7_protocol_parse_port_bitmap,
         }
@@ -467,7 +468,8 @@ impl FlowItem {
 
             protocol_log.set_parse_config(log_parser_config);
             if protocol_log.check_payload(&packet.raw_from_ebpf.as_ref(), &param) {
-                self.l7_protocol = protocol_log.protocol();
+                self.l7_protocol_enum = protocol_log.l7_protocl_enum();
+
                 self.server_port = packet.lookup_key.dst_port;
                 self.parser = Some(protocol_log);
                 return self._parse(packet, local_epc, app_table);
@@ -475,7 +477,7 @@ impl FlowItem {
         }
         self.is_skip = app_table.set_protocol_from_ebpf(
             packet,
-            L7Protocol::Unknown,
+            L7ProtocolEnum::default(),
             local_epc,
             self.remote_epc,
         );
@@ -511,7 +513,7 @@ impl FlowItem {
             if ret.is_ok() {
                 app_table.set_protocol_from_ebpf(
                     packet,
-                    self.l7_protocol,
+                    self.l7_protocol_enum,
                     local_epc,
                     self.remote_epc,
                 );
@@ -519,7 +521,7 @@ impl FlowItem {
             } else {
                 self.is_skip = app_table.set_protocol_from_ebpf(
                     packet,
-                    L7Protocol::Unknown,
+                    L7ProtocolEnum::default(),
                     local_epc,
                     self.remote_epc,
                 );
@@ -531,7 +533,7 @@ impl FlowItem {
     fn reset(&mut self, l4_protocol: IpProtocol) {
         self.last_packet = 0;
         self.last_policy = 0;
-        self.l7_protocol = L7Protocol::Unknown;
+        self.l7_protocol_enum = L7ProtocolEnum::default();
         self.is_skip = false;
         self.is_success = false;
         self.is_from_app = false;
@@ -938,6 +940,7 @@ impl EbpfCollector {
         sender: DebugSender<Box<MetaPacket<'static>>>,
         uprobe_proc_regexp: &UprobeProcRegExp,
         l7_protocol_enabled_bitmap: L7ProtocolBitmap,
+        kprobe_port_whitelist: Option<Bitmap>,
     ) -> Result<()> {
         // ebpf内核模块初始化
         unsafe {
@@ -1004,6 +1007,10 @@ impl EbpfCollector {
                     info!("l7 protocol {:?} parse enabled", i.protocol());
                     ebpf::enable_ebpf_protocol(i.protocol() as ebpf::c_int);
                 }
+            }
+
+            if let Some(b) = kprobe_port_whitelist {
+                set_allow_port_bitmap(b.get_raw_ptr());
             }
 
             if ebpf::bpf_tracer_init(log_file, true) != 0 {
@@ -1100,6 +1107,7 @@ impl EbpfCollector {
             sender,
             &config.ebpf_uprobe_proc_regexp,
             config.l7_protocol_enabled_bitmap,
+            config.ebpf_kprobe_whitelist_port.clone(),
         )?;
         Self::ebpf_on_config_change(ebpf::CAP_LEN_MAX);
 

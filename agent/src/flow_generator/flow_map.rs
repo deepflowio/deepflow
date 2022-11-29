@@ -715,15 +715,15 @@ impl FlowMap {
         (self.policy_getter).lookup(meta_packet, self.id as usize);
         self.update_endpoint_and_policy_data(&mut node, meta_packet);
 
-        let l7_proto = self.app_table.get_protocol(meta_packet);
+        let l7_proto_enum = self.app_table.get_protocol(meta_packet);
 
         let conf = self.config.load();
         if conf.collector_enabled {
             node.meta_flow_perf = FlowPerf::new(
                 self.rrt_cache.clone(),
                 L4Protocol::from(meta_packet.lookup_key.proto),
-                l7_proto,
-                if let Some(mut parser) = get_parser(l7_proto.unwrap_or_default()) {
+                l7_proto_enum,
+                if let Some(mut parser) = get_parser(l7_proto_enum.unwrap_or_default()) {
                     parser.set_parse_config(&self.parse_config);
                     Some(parser)
                 } else {
@@ -732,6 +732,7 @@ impl FlowMap {
                 self.flow_perf_counter.clone(),
                 conf.l7_protocol_enabled_bitmap,
                 self.parse_config.clone(),
+                self.config.clone(),
                 self.l7_protocol_parse_port_bitmap.clone(),
             )
         }

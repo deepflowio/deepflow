@@ -25,13 +25,14 @@ use super::MetaPacket;
 
 use crate::config::handler::LogParserAccess;
 use crate::flow_generator::protocol_logs::{
-    DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog, RedisLog,
+    get_protobuf_rpc_parser, DnsLog, DubboLog, HttpLog, KafkaLog, MqttLog, MysqlLog, PostgresqlLog,
+    ProtobufRpcWrapLog, RedisLog,
 };
 use crate::flow_generator::Result;
 
 use public::bitmap::Bitmap;
 use public::enums::IpProtocol;
-use public::l7_protocol::L7Protocol;
+use public::l7_protocol::{L7Protocol, L7ProtocolEnum, ProtobufRpcProtocol};
 
 /*
  所有协议都需要实现L7ProtocolLogInterface这个接口.
@@ -202,18 +203,21 @@ macro_rules! all_protocol {
             }
         }
 
-        pub fn get_parser(p: L7Protocol) -> Option<L7ProtocolParser> {
+        pub fn get_parser(p: L7ProtocolEnum) -> Option<L7ProtocolParser> {
             match p {
-                L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
-                L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(false))),
-                L7Protocol::Grpc => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(true))),
+                L7ProtocolEnum::L7Protocol(p) => match p {
+                    L7Protocol::Http1 | L7Protocol::Http1TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v1())),
+                    L7Protocol::Http2 | L7Protocol::Http2TLS => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(false))),
+                    L7Protocol::Grpc => Some(L7ProtocolParser::HttpParser(HttpLog::new_v2(true))),
 
-                $(
-                    L7Protocol::$l7_proto=>Some(L7ProtocolParser::$parser($log::$new_func())),
-                )+
-                _=>None,
+                    $(
+                        L7Protocol::$l7_proto => Some(L7ProtocolParser::$parser($log::$new_func())),
+                    )+
+                    _=>None,
+                },
+
+                L7ProtocolEnum::ProtobufRpc(p) => Some(get_protobuf_rpc_parser(p)),
             }
-
         }
 
         pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
@@ -274,6 +278,7 @@ pub fn get_all_protocol() -> Vec<L7ProtocolParser> {
 all_protocol!(
     // http have two version but one parser, can not place in macro param.
     DNS,DnsParser,DnsLog::default;
+    ProtobufRPC,ProtobufRpcParser,ProtobufRpcWrapLog::new;
     MySQL,MysqlParser,MysqlLog::default;
     Kafka,KafkaParser,KafkaLog::new;
     Redis,RedisParser,RedisLog::default;
@@ -311,6 +316,20 @@ pub trait L7ProtocolParserInterface {
     // return protocol number and protocol string. because of bitmap use u128, so the max protocol number can not exceed 128
     // crates/public/src/l7_protocol.rs, pub const L7_PROTOCOL_xxx is the implemented protocol.
     fn protocol(&self) -> L7Protocol;
+    // return protobuf protocol, only when L7Protocol is ProtobufRPC will not None
+    fn protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
+        None
+    }
+
+    fn l7_protocl_enum(&self) -> L7ProtocolEnum {
+        let proto = self.protocol();
+        match proto {
+            L7Protocol::ProtobufRPC => {
+                L7ProtocolEnum::ProtobufRpc(self.protobuf_rpc_protocol().unwrap())
+            }
+            _ => L7ProtocolEnum::L7Protocol(proto),
+        }
+    }
     // 仅http和dubbo协议会有log_parser_config，其他协议可以忽略。
     // ================================================================
     // only http and dubbo use config. other protocol should do nothing.

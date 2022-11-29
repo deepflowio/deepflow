@@ -31,6 +31,7 @@ use cgroups_rs::{CpuResources, MemoryResources, Resources};
 use flexi_logger::writers::FileLogWriter;
 use flexi_logger::{Age, Cleanup, Criterion, FileSpec, LoggerHandle, Naming};
 use log::{info, warn, Level};
+use public::utils::bitmap::parse_u16_range_list_to_bitmap;
 use sysinfo::SystemExt;
 
 #[cfg(target_os = "linux")]
@@ -455,6 +456,8 @@ pub struct EbpfConfig {
     pub l7_protocol_enabled_bitmap: L7ProtocolBitmap,
     pub ebpf_uprobe_proc_regexp: UprobeProcRegExp,
     pub l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
+    // the port which ebpf kprobe not check l7 protocol, submit to agent directly
+    pub ebpf_kprobe_whitelist_port: Option<Bitmap>,
 }
 
 #[cfg(target_os = "linux")]
@@ -908,6 +911,14 @@ impl TryFrom<(Config, RuntimeConfig)> for ModuleConfig {
                     &conf.yaml_config.l7_protocol_enabled,
                 ),
                 l7_protocol_parse_port_bitmap,
+                ebpf_kprobe_whitelist_port: {
+                    let whitelist = &conf.yaml_config.ebpf_kprobe_whitelist;
+                    if whitelist.port_list.is_empty() {
+                        None
+                    } else {
+                        parse_u16_range_list_to_bitmap(&whitelist.port_list, false)
+                    }
+                },
             },
             metric_server: MetricServerConfig {
                 enabled: conf.external_agent_http_proxy_enabled,

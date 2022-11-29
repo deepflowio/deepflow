@@ -29,12 +29,14 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use arc_swap::access::Access;
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
+use public::l7_protocol::L7ProtocolEnum;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
-use super::protocol_logs::{AppProtoHead, PostgresqlLog};
+use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog};
 
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
@@ -48,6 +50,7 @@ use crate::common::{
     meta_packet::MetaPacket,
 };
 use crate::config::handler::LogParserAccess;
+use crate::config::FlowAccess;
 
 use {
     self::http::HttpPerfData,
@@ -98,6 +101,7 @@ pub enum L7FlowPerfTable {
     MysqlPerfData,
     HttpPerfData,
     PostgresqlLog,
+    ProtobufRpcWrapLog,
 }
 
 pub struct FlowPerf {
@@ -110,13 +114,14 @@ pub struct FlowPerf {
     rrt_cache: Rc<RefCell<L7RrtCache>>,
 
     protocol_bitmap: L7ProtocolBitmap,
-    l7_protocol: L7Protocol,
+    l7_protocol_enum: L7ProtocolEnum,
 
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
 
     parse_config: LogParserAccess,
+    flow_config: FlowAccess,
 
     // port bitmap max = 65535, indicate the l7 protocol in this port whether to parse
     l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
@@ -128,6 +133,7 @@ impl FlowPerf {
     fn l7_new(protocol: L7Protocol, rrt_cache: Rc<RefCell<L7RrtCache>>) -> Option<L7FlowPerfTable> {
         match protocol {
             L7Protocol::DNS => Some(L7FlowPerfTable::from(DnsPerfData::new(rrt_cache.clone()))),
+            L7Protocol::ProtobufRPC => Some(L7FlowPerfTable::from(ProtobufRpcWrapLog::new())),
             L7Protocol::Dubbo => Some(L7FlowPerfTable::from(DubboPerfData::new(rrt_cache.clone()))),
             L7Protocol::Kafka => Some(L7FlowPerfTable::from(KafkaPerfData::new(rrt_cache.clone()))),
             L7Protocol::MQTT => Some(L7FlowPerfTable::from(MqttPerfData::new(rrt_cache.clone()))),
@@ -170,10 +176,10 @@ impl FlowPerf {
         let ret = self.l7.as_mut().unwrap().parse(packet, flow_id);
         if !self.is_success {
             if ret.is_ok() {
-                app_table.set_protocol(packet, self.l7_protocol);
+                app_table.set_protocol(packet, self.l7_protocol_enum);
                 self.is_success = true;
             } else {
-                self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+                self.is_skip = app_table.set_protocol(packet, L7ProtocolEnum::default());
             }
         }
         return ret;
@@ -192,15 +198,26 @@ impl FlowPerf {
         if let Some(payload) = packet.get_l4_payload() {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
             parser.set_parse_config(&self.parse_config);
-            let ret = parser.parse_payload(payload, parse_param);
+
+            let ret = parser.parse_payload(
+                {
+                    let pkt_size = self.flow_config.load().l7_log_packet_size as usize;
+                    if pkt_size > payload.len() {
+                        payload
+                    } else {
+                        &payload[..pkt_size]
+                    }
+                },
+                parse_param,
+            );
             parser.reset();
 
             if !self.is_success {
                 if ret.is_ok() {
-                    app_table.set_protocol(packet, self.l7_protocol);
+                    app_table.set_protocol(packet, self.l7_protocol_enum);
                     self.is_success = true;
                 } else {
-                    self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+                    self.is_skip = app_table.set_protocol(packet, L7ProtocolEnum::default());
                 }
             }
             return ret;
@@ -235,7 +252,7 @@ impl FlowPerf {
                 }
                 i.set_parse_config(&self.parse_config);
                 if i.check_payload(payload, &param) {
-                    self.l7_protocol = i.protocol();
+                    self.l7_protocol_enum = i.l7_protocl_enum();
 
                     if is_parse_perf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
@@ -253,7 +270,7 @@ impl FlowPerf {
                 }
             }
 
-            self.is_skip = app_table.set_protocol(packet, L7Protocol::Unknown);
+            self.is_skip = app_table.set_protocol(packet, L7ProtocolEnum::default());
         }
 
         return Err(Error::L7ProtocolUnknown);
@@ -299,11 +316,12 @@ impl FlowPerf {
     pub fn new(
         rrt_cache: Rc<RefCell<L7RrtCache>>,
         l4_proto: L4Protocol,
-        l7_proto: Option<L7Protocol>,
+        l7_proto: Option<L7ProtocolEnum>,
         l7_parser: Option<L7ProtocolParser>,
         counter: Arc<FlowPerfCounter>,
         l7_prorocol_enable_bitmap: L7ProtocolBitmap,
         parse_config: LogParserAccess,
+        flow_config: FlowAccess,
         l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
@@ -314,11 +332,11 @@ impl FlowPerf {
             }
         };
 
-        let l7_protocol = l7_proto.unwrap_or(L7Protocol::Unknown);
+        let l7_protocol_enum = l7_proto.unwrap_or(L7ProtocolEnum::default());
 
         Some(Self {
             l4,
-            l7: Self::l7_new(l7_protocol, rrt_cache.clone()),
+            l7: Self::l7_new(l7_protocol_enum.get_l7_protocol(), rrt_cache.clone()),
             protocol_bitmap: {
                 match l4_proto {
                     L4Protocol::Tcp => get_parse_bitmap(IpProtocol::Tcp, l7_prorocol_enable_bitmap),
@@ -327,11 +345,12 @@ impl FlowPerf {
             },
             l7_protocol_log_parser: l7_parser,
             rrt_cache,
-            l7_protocol,
+            l7_protocol_enum,
             is_from_app: l7_proto.is_some(),
             is_success: false,
             is_skip: false,
             parse_config,
+            flow_config,
             l7_protocol_parse_port_bitmap,
         })
     }

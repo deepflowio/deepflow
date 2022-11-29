@@ -33,6 +33,7 @@ pub enum L7Protocol {
     // RPC
     Dubbo = 40,
     Grpc = 41,
+    ProtobufRPC = 42,
 
     // SQL
     MySQL = 60,
@@ -49,4 +50,39 @@ pub enum L7Protocol {
     DNS = 120,
 
     Max = 255,
+}
+
+// the actually rpc protocol when l7 protocol is ProtobufRPC
+#[derive(Serialize, Debug, Clone, Copy, PartialEq, Hash, Eq)]
+#[repr(u64)]
+pub enum ProtobufRpcProtocol {
+    Krpc = 1,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum L7ProtocolEnum {
+    L7Protocol(L7Protocol),
+    ProtobufRpc(ProtobufRpcProtocol),
+}
+
+impl Default for L7ProtocolEnum {
+    fn default() -> Self {
+        L7ProtocolEnum::L7Protocol(L7Protocol::Unknown)
+    }
+}
+
+impl L7ProtocolEnum {
+    pub fn get_l7_protocol(&self) -> L7Protocol {
+        match self {
+            L7ProtocolEnum::L7Protocol(p) => *p,
+            L7ProtocolEnum::ProtobufRpc(_) => L7Protocol::ProtobufRPC,
+        }
+    }
+
+    pub fn get_protobuf_rpc_protocol(&self) -> Option<ProtobufRpcProtocol> {
+        match self {
+            L7ProtocolEnum::L7Protocol(_) => None,
+            L7ProtocolEnum::ProtobufRpc(p) => Some(*p),
+        }
+    }
 }

@@ -787,6 +787,7 @@ vtap_group_id: g-xxxxxx
   #l7-protocol-enabled:
   #- HTTP ## for both HTTP and HTTP_TLS
   #- HTTP2 ## for HTTP2, HTTP2_TLS and gRPC
+  #- ProtobufRPC ## for krpc .. 
   #- Dubbo
   #- MySQL
   #- PostgreSQL
@@ -802,6 +803,7 @@ vtap_group_id: g-xxxxxx
   #l7-protocol-ports:
     #"HTTP": "1-65535" # for both HTTP and HTTP_TLS
     #"HTTP2": "1-65535" # for HTTP2, HTTP2_TLS and gRPC
+    #"ProtobufRPC": "1-65535"
     #"Dubbo": "1-65535"
     #"MySQL": "1-65535"
     #"PostgreSQL": "1-65535"
@@ -854,6 +856,12 @@ vtap_group_id: g-xxxxxx
   ## eBPF Switch
   ## Default: false
   #ebpf-disabled: false
+
+  #ebpf-kprobe-whitelist:
+    ## Server Port Whitelist
+    ## Default: null, means no port
+    ## Format: x-y, z
+    #port-list:
 
   ## Regex for Process Name
   ## Note: The name of the process where each feature of ebpf uprobe takes effect,
