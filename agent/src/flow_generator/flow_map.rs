@@ -732,6 +732,7 @@ impl FlowMap {
                 self.flow_perf_counter.clone(),
                 conf.l7_protocol_enabled_bitmap,
                 self.parse_config.clone(),
+                self.config.clone(),
                 self.l7_protocol_parse_port_bitmap.clone(),
             )
         }

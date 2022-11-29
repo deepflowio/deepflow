@@ -1123,9 +1123,9 @@ pub fn is_http_req_line(line: String) -> bool {
     // consider use prefix tree in future
     for i in HTTP_METHODS.iter() {
         if line.starts_with(i) {
-            let end = &line.as_str()[line.len() - 8..];
+            let end = &line.as_bytes()[line.len() - 8..];
             match end {
-                "HTTP/0.9" | "HTTP/1.0" | "HTTP/1.1" => return true,
+                b"HTTP/0.9" | b"HTTP/1.0" | b"HTTP/1.1" => return true,
                 _ => return false,
             }
         }
