@@ -29,6 +29,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use arc_swap::access::Access;
 use enum_dispatch::enum_dispatch;
 use public::bitmap::Bitmap;
 use public::l7_protocol::L7ProtocolEnum;
@@ -49,6 +50,7 @@ use crate::common::{
     meta_packet::MetaPacket,
 };
 use crate::config::handler::LogParserAccess;
+use crate::config::FlowAccess;
 
 use {
     self::http::HttpPerfData,
@@ -119,6 +121,7 @@ pub struct FlowPerf {
     is_skip: bool,
 
     parse_config: LogParserAccess,
+    flow_config: FlowAccess,
 
     // port bitmap max = 65535, indicate the l7 protocol in this port whether to parse
     l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
@@ -195,7 +198,18 @@ impl FlowPerf {
         if let Some(payload) = packet.get_l4_payload() {
             let parser = self.l7_protocol_log_parser.as_mut().unwrap();
             parser.set_parse_config(&self.parse_config);
-            let ret = parser.parse_payload(payload, parse_param);
+
+            let ret = parser.parse_payload(
+                {
+                    let pkt_size = self.flow_config.load().l7_log_packet_size as usize;
+                    if pkt_size > payload.len() {
+                        payload
+                    } else {
+                        &payload[..pkt_size]
+                    }
+                },
+                parse_param,
+            );
             parser.reset();
 
             if !self.is_success {
@@ -307,6 +321,7 @@ impl FlowPerf {
         counter: Arc<FlowPerfCounter>,
         l7_prorocol_enable_bitmap: L7ProtocolBitmap,
         parse_config: LogParserAccess,
+        flow_config: FlowAccess,
         l7_protocol_parse_port_bitmap: Arc<Vec<(String, Bitmap)>>,
     ) -> Option<Self> {
         let l4 = match l4_proto {
@@ -335,6 +350,7 @@ impl FlowPerf {
             is_success: false,
             is_skip: false,
             parse_config,
+            flow_config,
             l7_protocol_parse_port_bitmap,
         })
     }
