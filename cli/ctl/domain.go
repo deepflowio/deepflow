@@ -125,16 +125,31 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		yData, _ := yaml.JSONToYAML(jData)
 		fmt.Printf(string(yData))
 	} else {
-		format := "%-46s %-14s %-14s %-40s %-22s %-22s %-8s %s\n"
+		nameMaxSize, controllerNameMaxSize := len("NAME"), len("CONTROLLER_NAME")
+		for i := range response.Get("DATA").MustArray() {
+			d := response.Get("DATA").GetIndex(i)
+			nameSize := len(d.Get("NAME").MustString())
+			if nameSize > nameMaxSize {
+				nameMaxSize = nameSize
+			}
+			controllerNameSize := len(d.Get("CONTROLLER_NAME").MustString())
+			if controllerNameSize > controllerNameMaxSize {
+				controllerNameMaxSize = controllerNameSize
+			}
+		}
+		format := "%-*s %-14s %-14s %-*s %-22s %-22s %-8s %-8s %s\n"
 		fmt.Printf(
-			format, "NAME", "ID", "TYPE", "CONTROLLER_NAME", "CREATED_AT", "SYNCED_AT", "ENABLED", "STATE",
+			format, nameMaxSize, "NAME", "ID", "TYPE", controllerNameMaxSize, "CONTROLLER_NAME",
+			"CREATED_AT", "SYNCED_AT", "ENABLED", "STATE", "AGENT_WATCH_K8S",
 		)
 		for i := range response.Get("DATA").MustArray() {
 			d := response.Get("DATA").GetIndex(i)
 			fmt.Printf(
-				format, d.Get("NAME").MustString(), d.Get("CLUSTER_ID").MustString(), common.DomainType(d.Get("TYPE").MustInt()),
-				d.Get("CONTROLLER_NAME").MustString(), d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
+				format, nameMaxSize, d.Get("NAME").MustString(), d.Get("CLUSTER_ID").MustString(),
+				common.DomainType(d.Get("TYPE").MustInt()), controllerNameMaxSize, d.Get("CONTROLLER_NAME").MustString(),
+				d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
 				strconv.Itoa(d.Get("ENABLED").MustInt()), strconv.Itoa(d.Get("STATE").MustInt()),
+				d.Get("VTAP_NAME").MustString(),
 			)
 		}
 	}
