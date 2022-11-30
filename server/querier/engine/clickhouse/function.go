@@ -528,7 +528,7 @@ func (f *TagFunction) Trans(m *view.Model) view.Node {
 			f.Alias = fmt.Sprintf("new_tag_%s", f.Args[0])
 		}
 		node := f.getViewNode()
-		node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_TOP
+		// node.(*view.Tag).Flag = view.NODE_FLAG_METRICS_TOP
 		return node
 	case TAG_FUNCTION_ENUM:
 		var tagFilter string
