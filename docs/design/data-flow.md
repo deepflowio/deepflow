@@ -214,10 +214,87 @@ ingester.event.1 -->|event| ClickHouse.1
 ingester.event.2 -->|event| ClickHouse.2
 ```
 
-# 3. AutoTagging
+# 3. Agent Registration
+
+## 3.1. Agent on K8s Node
+
+```mermaid
+sequenceDiagram
+    participant apiserver
+    participant agent
+    participant server.controller.trisolaris
+    participant server.controller.genesis
+    participant server.controller.cloud
+    participant server.controller.recorder
+    participant mysql
+
+    Note right of agent: 1. get kubernetes-cluster-id
+    activate agent
+    agent ->> agent: load k8s-cluster-id from agent.yaml
+    opt k8s-cluster-id is None
+        agent ->> server.controller.trisolaris: gRPC.GetKubernetesClusterID(ca-md5)
+        server.controller.trisolaris ->> server.controller.trisolaris: lookup k8s-cluster-id by ca-md5 in cache
+        opt k8s-cluster-id is None
+            server.controller.trisolaris ->> mysql: lookup k8s-cluster-id by ca-md5, if it does not exist, generate it.
+        end
+        server.controller.trisolaris ->> agent: k8s-cluster-id
+    end
+    deactivate agent
+
+    Note right of agent: 2. sync K8s resources
+    activate agent
+    agent ->> server.controller.trisolaris: gRPC.Sync(k8s-cluster-id, node-ip, node-mac)
+    server.controller.trisolaris ->> server.controller.trisolaris: Elect one K8s watcher agent for each K8s cluster
+    alt is the K8s watcher
+        server.controller.trisolaris ->> agent: kubernetes_api_enabled=true
+
+        agent ->> apiserver: watch resource
+
+        agent ->> server.controller.genesis: gRPC.KubernetesAPISync(k8s-cluster-id, k8s-resource-list)
+        server.controller.genesis ->> server.controller.cloud: Node Info
+        server.controller.cloud ->> server.controller.recorder: Node Info
+        server.controller.recorder ->> mysql: insert pod_node table
+    else is not the K8s watcher
+        server.controller.trisolaris ->> agent: kubernetes_api_enabled=false
+    end
+    deactivate agent
+
+    Note right of agent: 3. sync MAC addresses
+    activate agent
+    agent ->> server.controller.genesis: gRPC.GenesisSync(k8s-cluster-id, local-ip/mac-list)
+    server.controller.genesis ->> server.controller.cloud: Node IP/MAC
+    server.controller.cloud ->> server.controller.recorder: Node IP/MAC
+    server.controller.recorder ->> mysql: insert node mac into vinterface table
+    server.controller.recorder ->> mysql: insert node ip into vinterface_ip table (LAN IP)
+    server.controller.recorder ->> mysql: insert node ip into ip_resource table (WAN IP)
+    deactivate agent
+
+    Note right of agent: 4. agent (vtap) registration
+    activate agent
+    agent ->> server.controller.trisolaris: gRPC.Sync(k8s-cluster-id, node-ip, node-mac)
+    server.controller.trisolaris ->> mysql: lookup node-mac in vinterface table
+    server.controller.trisolaris ->> mysql: lookup node-ip in vinterface_ip/ip_resource table
+    server.controller.trisolaris ->> server.controller.trisolaris: match vtap and k8s-node
+    server.controller.trisolaris ->> mysql: inesrt vtap table, return vtap_id
+    server.controller.trisolaris ->> mysql: lookup agent_config by vtap-group-id
+    server.controller.trisolaris ->> agent: vtap_id, agent_config
+    deactivate agent
+
+    Note right of agent: 5. subsequent agent requests
+    activate agent
+    agent ->> server.controller.trisolaris: gRPC.Sync(vtap_id)
+    server.controller.trisolaris ->> agent: agent_config
+    deactivate agent
+```
+
+## 3.2. Agent on Legacy Host
+
+## 3.3. Agent on Cloud Host
+
+# 4. AutoTagging
 
 TODO
 
-# 4. Agent Management
+# 5. Agent Management
 
 TODO
