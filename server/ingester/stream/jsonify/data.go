@@ -539,30 +539,30 @@ func (k *KnowledgeGraph) WriteBlock(block *ckdb.Block) error {
 }
 
 type FlowInfo struct {
-	CloseType   uint16 `json:"close_type"`
-	FlowSource  uint16 `json:"flow_source"`
-	FlowID      uint64 `json:"flow_id"`
-	TapType     uint16 `json:"tap_type"`
-	TapPortType uint8  `json:"tap_port_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
-	TapPort     uint32 `json:"tap_port"`
-	TapSide     string `json:"tap_side"`
-	VtapID      uint16 `json:"vtap_id"`
-	L2End0      bool   `json:"l2_end_0"`
-	L2End1      bool   `json:"l2_end_1"`
-	L3End0      bool   `json:"l3_end_0"`
-	L3End1      bool   `json:"l3_end_1"`
-	StartTime   int64  `json:"start_time"` // us
-	EndTime     int64  `json:"end_time"`   // us
-	Duration    uint64 `json:"duration"`   // us
-	IsNewFlow   uint8  `json:"is_new_flow"`
-	Status      uint8  `json:"status"`
-	AclGids     []uint16
+	CloseType    uint16 `json:"close_type"`
+	SignalSource uint16 `json:"signal_source"`
+	FlowID       uint64 `json:"flow_id"`
+	TapType      uint16 `json:"tap_type"`
+	TapPortType  uint8  `json:"tap_port_type"` // 0: MAC, 1: IPv4, 2:IPv6, 3: ID
+	TapPort      uint32 `json:"tap_port"`
+	TapSide      string `json:"tap_side"`
+	VtapID       uint16 `json:"vtap_id"`
+	L2End0       bool   `json:"l2_end_0"`
+	L2End1       bool   `json:"l2_end_1"`
+	L3End0       bool   `json:"l3_end_0"`
+	L3End1       bool   `json:"l3_end_1"`
+	StartTime    int64  `json:"start_time"` // us
+	EndTime      int64  `json:"end_time"`   // us
+	Duration     uint64 `json:"duration"`   // us
+	IsNewFlow    uint8  `json:"is_new_flow"`
+	Status       uint8  `json:"status"`
+	AclGids      []uint16
 }
 
 var FlowInfoColumns = []*ckdb.Column{
 	// 流信息
 	ckdb.NewColumn("close_type", ckdb.UInt16).SetIndex(ckdb.IndexSet),
-	ckdb.NewColumn("flow_source", ckdb.UInt16),
+	ckdb.NewColumn("signal_source", ckdb.UInt16),
 	ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 	ckdb.NewColumn("tap_type", ckdb.UInt16),
 	ckdb.NewColumn("tap_port_type", ckdb.UInt8),
@@ -586,7 +586,7 @@ func (f *FlowInfo) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(f.CloseType); err != nil {
 		return err
 	}
-	if err := block.WriteUInt16(f.FlowSource); err != nil {
+	if err := block.WriteUInt16(f.SignalSource); err != nil {
 		return err
 	}
 	if err := block.WriteUInt64(f.FlowID); err != nil {
@@ -1138,7 +1138,7 @@ func getStatus(t datatype.CloseType) uint8 {
 
 func (i *FlowInfo) Fill(f *pb.Flow) {
 	i.CloseType = uint16(f.CloseType)
-	i.FlowSource = uint16(f.FlowSource)
+	i.SignalSource = uint16(f.SignalSource)
 	i.FlowID = f.FlowId
 	i.TapType = uint16(f.FlowKey.TapType)
 	i.TapPort, i.TapPortType, _ = datatype.TapPort(f.FlowKey.TapPort).SplitToPortTypeTunnel()
