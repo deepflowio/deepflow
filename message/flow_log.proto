@@ -35,7 +35,7 @@ message Flow {
     FlowPerfStats perf_stats = 13;
 
     uint32 close_type = 14;
-    uint32 flow_source = 15;
+    uint32 signal_source = 15;
 
     uint32 is_active_service = 16;
     uint32 queue_hash = 17;
