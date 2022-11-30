@@ -259,7 +259,7 @@ sequenceDiagram
     end
     deactivate agent
 
-    Note right of agent: 3. sync MAC addresses
+    Note right of agent: 3. sync IP/MAC addresses
     activate agent
     agent ->> server.controller.genesis: gRPC.GenesisSync(k8s-cluster-id, local-ip/mac-list)
     server.controller.genesis ->> server.controller.cloud: Node IP/MAC
@@ -288,6 +288,53 @@ sequenceDiagram
 ```
 
 ## 3.2. Agent on Legacy Host
+
+```mermaid
+sequenceDiagram
+    participant agent
+    participant server.controller.trisolaris
+    participant server.controller.genesis
+    participant server.controller.cloud
+    participant server.controller.recorder
+    participant mysql
+
+    Note right of agent: 1. agent (vtap) first request
+    activate agent
+    agent ->> server.controller.trisolaris: gRPC.Sync(host-ip, host-mac)
+    server.controller.trisolaris ->> mysql: lookup host-mac in vinterface table
+    server.controller.trisolaris ->> mysql: lookup host-ip in vinterface_ip/ip_resource table
+    server.controller.trisolaris ->> server.controller.trisolaris: unknown agent, without k8s-cluster-id
+    server.controller.trisolaris ->> agent: platform_enabled=true
+    deactivate agent
+
+    Note right of agent: 2. sync IP/MAC addresses
+    activate agent
+    agent ->> server.controller.genesis: gRPC.GenesisSync(hostname, local-ip/mac-list)
+    server.controller.genesis ->> server.controller.cloud: Host Info
+    server.controller.cloud ->> server.controller.recorder: Host Info
+    server.controller.recorder ->> mysql: insert host into vm table
+    server.controller.recorder ->> mysql: insert host mac into vinterface table
+    server.controller.recorder ->> mysql: insert host ip into vinterface_ip table (LAN IP)
+    server.controller.recorder ->> mysql: insert host ip into ip_resource table (WAN IP)
+    deactivate agent
+
+    Note right of agent: 3. agent registration
+    activate agent
+    agent ->> server.controller.trisolaris: gRPC.Sync(host-ip, host-mac)
+    server.controller.trisolaris ->> mysql: lookup host-mac in vinterface table
+    server.controller.trisolaris ->> mysql: lookup host-ip in vinterface_ip/ip_resource table
+    server.controller.trisolaris ->> server.controller.trisolaris: match vtap and host (vm)
+    server.controller.trisolaris ->> mysql: inesrt vtap table, return vtap_id
+    server.controller.trisolaris ->> mysql: lookup agent_config by vtap-group-id
+    server.controller.trisolaris ->> agent: vtap_id, agent_config
+    deactivate agent
+
+    Note right of agent: 4. subsequent agent requests
+    activate agent
+    agent ->> server.controller.trisolaris: gRPC.Sync(vtap_id)
+    server.controller.trisolaris ->> agent: agent_config
+    deactivate agent
+```
 
 ## 3.3. Agent on Cloud Host
 

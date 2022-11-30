@@ -112,11 +112,6 @@ impl TapPort {
     pub fn set_reserved_bytes(&self, tap_type: u32) -> TapPort {
         TapPort(self.0 | ((tap_type & Self::RESERVED_MASK) as u64) << Self::RESERVED_OFFSET)
     }
-
-    pub fn is_from_ebpf(&self) -> bool {
-        let (_, t, _) = self.split_fields();
-        t == Self::FROM_EBPF
-    }
 }
 
 impl fmt::Display for TapPort {
