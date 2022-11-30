@@ -290,6 +290,9 @@ impl DubboLog {
 
         let mut start = 0;
         while start < payload.len() {
+            if !payload.is_char_boundary(start) {
+                break;
+            }
             let index = payload[start..].find(tag.as_str());
             if index.is_none() {
                 break;
@@ -339,6 +342,9 @@ impl DubboLog {
 
         let mut start = 0;
         while start < payload.len() {
+            if !payload.is_char_boundary(start) {
+                break;
+            }
             let index = payload[start..].find(tag.as_str());
             if index.is_none() {
                 break;

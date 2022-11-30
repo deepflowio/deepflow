@@ -143,9 +143,15 @@ fn trim_head_comment_and_first_upper(mut sql: &str, first_word_max_len: usize) -
     sql = sql.trim_start();
     // if start with /*, strip all comment block before sql string.
     while sql.starts_with("/*") {
+        if !sql.is_char_boundary(2) {
+            return None;
+        }
         (_, sql) = sql.split_at(2);
 
         if let Some(idx) = sql.find("*/") {
+            if !sql.is_char_boundary(idx + 2) {
+                return None;
+            }
             (_, sql) = sql.split_at(idx + 2);
             sql = sql.trim_start();
         } else {
