@@ -340,10 +340,29 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 	localK8sDatas := g.GetKubernetesData()
 	k8sInfo, ok := localK8sDatas[clusterID]
 	if !ok {
+
 		var controllers []mysql.Controller
-		mysql.Db.Where("ip <> ?", os.Getenv(common.NODE_IP_KEY)).Find(&controllers)
+		var azControllerConns []mysql.AZControllerConnection
+		var currentRegion string
+
+		nodeIP := os.Getenv(common.NODE_IP_KEY)
+		mysql.Db.Find(&azControllerConns)
+		mysql.Db.Where("ip <> ?", nodeIP).Find(&controllers)
+
+		controllerIPToRegion := make(map[string]string)
+		for _, conn := range azControllerConns {
+			if nodeIP == conn.ControllerIP {
+				currentRegion = conn.Region
+			}
+			controllerIPToRegion[conn.ControllerIP] = conn.Region
+		}
+
 		retFlag := false
 		for _, controller := range controllers {
+			// skip other region controller
+			if region, ok := controllerIPToRegion[controller.IP]; !ok || region != currentRegion {
+				continue
+			}
 
 			// use pod ip communication in internal region
 			serverIP := controller.PodIP
@@ -365,7 +384,6 @@ func (g *Genesis) GetKubernetesResponse(clusterID string) (map[string][]string, 
 			ret, err := client.GenesisSharingK8S(context.Background(), req)
 			if err != nil {
 				log.Warningf("get genesis sharing k8s faild (%s)", err.Error())
-				continue
 			} else {
 				retFlag = true
 				epochStr := ret.GetEpoch()
