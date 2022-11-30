@@ -61,7 +61,7 @@ func (t *SuiteTest) TestHandleAddDHCPPortSucess() {
 	defer monkey.Reset()
 	assert.Equal(t.T(), len(cache_.DHCPPorts), 0)
 
-	updater := NewDHCPPort(cache_, []cloudmodel.DHCPPort{cloudItem}, nil)
+	updater := NewDHCPPort(cache_, []cloudmodel.DHCPPort{cloudItem})
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.DHCPPort
@@ -76,7 +76,7 @@ func (t *SuiteTest) TestHandleUpdateDHCPPortSucess() {
 	cache, cloudItem := t.getDHCPPortMock(true)
 	cloudItem.Name = cloudItem.Name + "new"
 
-	updater := NewDHCPPort(cache, []cloudmodel.DHCPPort{cloudItem}, nil)
+	updater := NewDHCPPort(cache, []cloudmodel.DHCPPort{cloudItem})
 	updater.HandleAddAndUpdate()
 
 	var addedItem *mysql.DHCPPort
@@ -91,7 +91,7 @@ func (t *SuiteTest) TestHandleUpdateDHCPPortSucess() {
 func (t *SuiteTest) TestHandleDeleteDHCPPortSucess() {
 	cache, cloudItem := t.getDHCPPortMock(true)
 
-	updater := NewDHCPPort(cache, []cloudmodel.DHCPPort{cloudItem}, nil)
+	updater := NewDHCPPort(cache, []cloudmodel.DHCPPort{cloudItem})
 	updater.HandleDelete()
 
 	var addedItem *mysql.DHCPPort

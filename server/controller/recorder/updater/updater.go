@@ -133,7 +133,9 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 	addedDBItems, ok := u.dbOperator.AddBatch(dbItemsToAdd)
 	if ok {
 		u.cacheHandler.addCache(addedDBItems)
-		u.callbacks.onAdded(addedDBItems)
+		if u.callbacks.onAdded != nil {
+			u.callbacks.onAdded(addedDBItems)
+		}
 	}
 }
 
@@ -141,7 +143,9 @@ func (u *UpdaterBase[CT, MT, BT]) addPage(dbItemsToAdd []*MT) {
 func (u *UpdaterBase[CT, MT, BT]) update(cloudItem *CT, diffBase BT, updateInfo map[string]interface{}) {
 	_, ok := u.dbOperator.Update(diffBase.GetLcuuid(), updateInfo)
 	if ok {
-		u.callbacks.onUpdated(cloudItem, diffBase)
+		if u.callbacks.onUpdated != nil {
+			u.callbacks.onUpdated(cloudItem, diffBase)
+		}
 		u.cacheHandler.updateCache(cloudItem, diffBase)
 	}
 }
@@ -166,7 +170,9 @@ func (u *UpdaterBase[CT, MT, BT]) delete(lcuuids []string) {
 
 func (u *UpdaterBase[CT, MT, BT]) deletePage(lcuuids []string) {
 	if u.dbOperator.DeleteBatch(lcuuids) {
-		u.callbacks.onDeleted(lcuuids)
+		if u.callbacks.onDeleted != nil {
+			u.callbacks.onDeleted(lcuuids)
+		}
 		u.cacheHandler.deleteCache(lcuuids)
 	}
 }

@@ -22,14 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type Pod struct {
 	UpdaterBase[cloudmodel.Pod, mysql.Pod, *cache.Pod]
 }
 
-func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod, eventQueue *queue.OverwriteQueue) *Pod {
+func NewPod(wholeCache *cache.Cache, cloudData []cloudmodel.Pod) *Pod {
 	updater := &Pod{
 		UpdaterBase[cloudmodel.Pod, mysql.Pod, *cache.Pod]{
 			cache:        wholeCache,

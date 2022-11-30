@@ -22,20 +22,18 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type LANIP struct {
 	UpdaterBase[cloudmodel.IP, mysql.LANIP, *cache.LANIP]
 }
 
-func NewLANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *queue.OverwriteQueue) *LANIP {
+func NewLANIP(wholeCache *cache.Cache) *LANIP {
 	updater := &LANIP{
 		UpdaterBase[cloudmodel.IP, mysql.LANIP, *cache.LANIP]{
 			cache:        wholeCache,
 			dbOperator:   db.NewLANIP(),
 			diffBaseData: wholeCache.LANIPs,
-			cloudData:    cloudData,
 		},
 	}
 	updater.dataGenerator = updater
@@ -43,13 +41,17 @@ func NewLANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *qu
 	return updater
 }
 
-func (l *LANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *cache.LANIP, exists bool) {
-	diffBase, exists = l.diffBaseData[cloudItem.Lcuuid]
+func (i *LANIP) SetCloudData(cloudData []cloudmodel.IP) {
+	i.cloudData = cloudData
+}
+
+func (i *LANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *cache.LANIP, exists bool) {
+	diffBase, exists = i.diffBaseData[cloudItem.Lcuuid]
 	return
 }
 
-func (l *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, bool) {
-	vinterfaceID, exists := l.cache.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
+func (i *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, bool) {
+	vinterfaceID, exists := i.cache.GetVInterfaceIDByLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
@@ -57,7 +59,7 @@ func (l *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 		))
 		return nil, false
 	}
-	networkID, exists := l.cache.GetNetworkIDByVInterfaceLcuuid(cloudItem.VInterfaceLcuuid)
+	networkID, exists := i.cache.GetNetworkIDByVInterfaceLcuuid(cloudItem.VInterfaceLcuuid)
 	if !exists {
 		log.Error(resourceAForResourceBNotFound(
 			common.RESOURCE_TYPE_VINTERFACE_EN, cloudItem.VInterfaceLcuuid,
@@ -74,7 +76,7 @@ func (l *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 	}
 	dbItem := &mysql.LANIP{
 		IP:           ip,
-		Domain:       l.cache.DomainLcuuid,
+		Domain:       i.cache.DomainLcuuid,
 		SubDomain:    cloudItem.SubDomainLcuuid,
 		NetworkID:    networkID,
 		VInterfaceID: vinterfaceID,
@@ -84,18 +86,18 @@ func (l *LANIP) generateDBItemToAdd(cloudItem *cloudmodel.IP) (*mysql.LANIP, boo
 }
 
 // 保留接口
-func (l *LANIP) generateUpdateInfo(diffBase *cache.LANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
+func (i *LANIP) generateUpdateInfo(diffBase *cache.LANIP, cloudItem *cloudmodel.IP) (map[string]interface{}, bool) {
 	return nil, false
 }
 
-func (l *LANIP) addCache(dbItems []*mysql.LANIP) {
-	l.cache.AddLANIPs(dbItems)
+func (i *LANIP) addCache(dbItems []*mysql.LANIP) {
+	i.cache.AddLANIPs(dbItems)
 }
 
 // 保留接口
-func (l *LANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
+func (i *LANIP) updateCache(cloudItem *cloudmodel.IP, diffBase *cache.LANIP) {
 }
 
-func (l *LANIP) deleteCache(lcuuids []string) {
-	l.cache.DeleteLANIPs(lcuuids)
+func (i *LANIP) deleteCache(lcuuids []string) {
+	i.cache.DeleteLANIPs(lcuuids)
 }
