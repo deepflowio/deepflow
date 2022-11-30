@@ -72,6 +72,6 @@ func Run(ctx context.Context, cfg *config.ControllerConfig) {
 	wg.Add(1)
 	defer wg.Done()
 	<-ctx.Done()
+	server.Stop()
 	log.Info("grpc server shutdown")
-	server.GracefulStop()
 }
