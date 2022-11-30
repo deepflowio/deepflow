@@ -53,7 +53,7 @@ use crate::{
     common::{
         ebpf::EbpfType,
         enums::{IpProtocol, TapType},
-        flow::{L7Protocol, PacketDirection},
+        flow::{L7Protocol, PacketDirection, SignalSource},
         meta_packet::MetaPacket,
         tap_port::TapPort,
     },
@@ -161,6 +161,7 @@ pub struct AppProtoLogsBaseInfo {
     pub flow_id: u64,
     #[serde(serialize_with = "to_string_format")]
     pub tap_port: TapPort,
+    pub signal_source: SignalSource,
     pub vtap_id: u16,
     pub tap_type: TapType,
     #[serde(skip)]
@@ -317,6 +318,7 @@ impl AppProtoLogsBaseInfo {
             end_time: packet.lookup_key.timestamp,
             flow_id: packet.socket_id,
             tap_port: packet.tap_port,
+            signal_source: packet.signal_source,
             tap_type: TapType::Cloud,
             is_ipv6: packet.lookup_key.dst_ip.is_ipv6(),
             tap_side: if is_src {
