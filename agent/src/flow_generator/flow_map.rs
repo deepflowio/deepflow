@@ -54,7 +54,7 @@ use crate::{
         enums::{EthernetType, HeaderType, IpProtocol, TapType, TcpFlags},
         flow::{
             CloseType, Flow, FlowKey, FlowMetricsPeer, L4Protocol, L7Protocol, PacketDirection,
-            TunnelField,
+            SignalSource, TunnelField,
         },
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         l7_protocol_log::{get_parser, L7ProtocolParserInterface},
@@ -472,7 +472,7 @@ impl FlowMap {
     }
 
     fn update_tcp_flow(&mut self, meta_packet: &mut MetaPacket, node: &mut FlowNode) -> bool {
-        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // For eBPF data, since we don't know when the Flow will terminate at present, the
             // fixed timeout parameter is used uniformly, and the Flow will not be closed due to
             // the arrival of the packet.
@@ -679,6 +679,7 @@ impl FlowMap {
                 },
                 FlowMetricsPeer::default(),
             ],
+            signal_source: meta_packet.signal_source,
             ..Default::default()
         };
         tagged_flow.flow = flow;
@@ -849,7 +850,7 @@ impl FlowMap {
     fn new_tcp_node(&mut self, meta_packet: &mut MetaPacket) -> FlowNode {
         let mut node = self.init_flow(meta_packet);
         let mut reverse = false;
-        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // eBPF data has no L4 info
             // Data coming from eBPF means it must be an active service
             meta_packet.is_active_service = true;
@@ -915,7 +916,7 @@ impl FlowMap {
                 meta_packet,
                 is_first_packet_direction,
                 flow_id,
-                !node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf()
+                node.tagged_flow.flow.signal_source != SignalSource::EBPF
                     && self.l4_metrics_enabled(),
                 self.l7_metrics_enabled(),
                 self.l7_log_parse_enabled(&meta_packet.lookup_key),
@@ -943,7 +944,7 @@ impl FlowMap {
         let mut node = self.init_flow(meta_packet);
         node.flow_state = FlowState::Established;
         let mut reverse = false;
-        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // eBPF data has no L4 info
             // Data coming from eBPF means it must be an active service
             meta_packet.is_active_service = true;
@@ -1052,7 +1053,7 @@ impl FlowMap {
         self.update_flow_direction(&mut node, meta_packet);
 
         let flow = &mut node.tagged_flow.flow;
-        if flow.flow_key.tap_port.is_from_ebpf() {
+        if flow.signal_source == SignalSource::EBPF {
             // the flow which from eBPF, it's close_type always be CloseType::Timeout
             flow.close_type = CloseType::Timeout;
         } else {
@@ -1076,7 +1077,7 @@ impl FlowMap {
                 perf.copy_and_reset_perf_data(
                     flow.reversed,
                     l7_timeout_count as u32,
-                    !flow.flow_key.tap_port.is_from_ebpf() && self.l4_metrics_enabled(),
+                    flow.signal_source != SignalSource::EBPF && self.l4_metrics_enabled(),
                     self.l7_metrics_enabled(),
                 )
             });
@@ -1123,7 +1124,7 @@ impl FlowMap {
                     perf.copy_and_reset_perf_data(
                         flow.reversed,
                         0,
-                        !flow.flow_key.tap_port.is_from_ebpf() && self.l4_metrics_enabled(),
+                        flow.signal_source != SignalSource::EBPF && self.l4_metrics_enabled(),
                         self.l7_metrics_enabled(),
                     )
                 });
@@ -1209,7 +1210,7 @@ impl FlowMap {
     }
 
     fn update_flow_direction(&mut self, node: &mut FlowNode, meta_packet: Option<&mut MetaPacket>) {
-        if node.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+        if node.tagged_flow.flow.signal_source == SignalSource::EBPF {
             // the data from ebpf doesn't need to update_flow_direction, it only update it's direction in FlowPerf::l7_parse
             // FIXME: when direction update in l7_parse, the underlay flow must also be reversed, so we can get the right metrics
             return;

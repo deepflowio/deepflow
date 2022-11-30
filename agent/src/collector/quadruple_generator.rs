@@ -35,7 +35,7 @@ use super::MetricsType;
 use crate::common::{
     endpoint::EPC_FROM_INTERNET,
     enums::{EthernetType, IpProtocol, TapType},
-    flow::{CloseType, FlowMetricsPeer, FlowSource, L7Protocol},
+    flow::{CloseType, FlowMetricsPeer, L7Protocol, SignalSource},
     tagged_flow::TaggedFlow,
 };
 use crate::config::handler::CollectorAccess;
@@ -366,7 +366,7 @@ impl SubQuadGen {
         possible_host: &mut PossibleHost,
     ) {
         for acc_flow in flows.iter_mut() {
-            if acc_flow.tagged_flow.flow.flow_key.tap_port.is_from_ebpf() {
+            if acc_flow.tagged_flow.flow.signal_source == SignalSource::EBPF {
                 // eBPF data has no L4 info
                 // A SubQuadGen only process one type of data, so here we can break.
                 break;
@@ -1069,7 +1069,8 @@ impl QuadrupleGenerator {
         key[OFFSET_TAP_PORT + 7] = tagged_flow.flow.tap_side as u8;
         key[OFFSET_PROTOCOL] = tagged_flow.flow.flow_key.proto as u8;
         // 对于sflow, netflow流量，仅当确定目的IP是服务端时，将目的端口作为查询key
-        if tagged_flow.flow.flow_source == FlowSource::Normal || tagged_flow.flow.is_active_service
+        if tagged_flow.flow.signal_source == SignalSource::Packet
+            || tagged_flow.flow.is_active_service
         {
             key[OFFSET_PORT] = (tagged_flow.flow.flow_key.port_dst >> 8) as u8;
             key[OFFSET_PORT + 1] = tagged_flow.flow.flow_key.port_dst as u8;

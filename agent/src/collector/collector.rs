@@ -37,7 +37,7 @@ use super::{
 use crate::{
     common::{
         enums::{EthernetType, IpProtocol, TapType},
-        flow::{get_direction, Flow, FlowSource, L7Protocol},
+        flow::{get_direction, Flow, L7Protocol, SignalSource},
     },
     config::handler::CollectorAccess,
     metric::{
@@ -528,7 +528,7 @@ impl Stash {
     // 非TCP/UDP的流量时，忽略服务端
     fn ignore_server_port(flow: &Flow, inactive_server_port_enabled: bool) -> bool {
         if (!flow.is_active_service
-            && (!inactive_server_port_enabled || flow.flow_source != FlowSource::Normal))
+            && (!inactive_server_port_enabled || flow.signal_source != SignalSource::Packet))
             || (flow.flow_key.proto != IpProtocol::Tcp && flow.flow_key.proto != IpProtocol::Udp)
         {
             return true;
@@ -766,7 +766,7 @@ impl Stash {
 
         // network metrics (vtap_flow_edge_port)
         // eBPF data has no L4 info
-        if !flow_key.tap_port.is_from_ebpf() {
+        if flow.signal_source != SignalSource::EBPF {
             let key = StashKey::new(&tagger, src_ip, Some(dst_ip));
             self.add(
                 key,

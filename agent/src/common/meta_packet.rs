@@ -36,7 +36,7 @@ use super::{
     decapsulate::TunnelInfo,
     endpoint::EndpointData,
     enums::{EthernetType, HeaderType, IpProtocol, TcpFlags},
-    flow::{L7Protocol, PacketDirection},
+    flow::{L7Protocol, PacketDirection, SignalSource},
     lookup_key::LookupKey,
     tap_port::TapPort,
 };
@@ -98,6 +98,7 @@ pub struct MetaPacket<'a> {
 
     pub tcp_data: MetaPacketTcpHeader,
     pub tap_port: TapPort, // packet与xflow复用
+    pub signal_source: SignalSource,
     pub payload_len: u16,
     pub vlan: u16,
     pub direction: PacketDirection,
@@ -851,6 +852,7 @@ impl<'a> MetaPacket<'a> {
         packet.payload_len = data.cap_len as u16;
         packet.l4_payload_len = data.cap_len as usize;
         packet.tap_port = TapPort::from_ebpf(data.process_id);
+        packet.signal_source = SignalSource::EBPF;
         packet.cap_seq = data.cap_seq;
         packet.process_id = data.process_id;
         packet.thread_id = data.thread_id;
