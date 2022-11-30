@@ -133,16 +133,6 @@ func InitTables(db *gorm.DB) error {
 		log.Errorf("init db tables failed: %v", err)
 		return err
 	}
-	err = db.Exec(migration.DROP_PROCEDURE).Error
-	if err != nil {
-		log.Errorf("drop procedure failed: %v", err)
-		return err
-	}
-	err = db.Exec(migration.CREATE_PROCDURE).Error
-	if err != nil {
-		log.Errorf("create procedure failed: %v", err)
-		return err
-	}
 	err = db.Exec(fmt.Sprintf("INSERT INTO db_version (version) VALUE ('%s')", migration.DB_VERSION_EXPECTED)).Error
 	if err != nil {
 		log.Errorf("init db version failed: %v", err)
