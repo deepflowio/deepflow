@@ -974,7 +974,7 @@ impl From<Flow> for flow_log::Flow {
                 }
             },
             close_type: f.close_type as u32,
-            flow_source: f.flow_source as u32,
+            signal_source: f.flow_source as u32,
             is_active_service: f.is_active_service as u32,
             queue_hash: f.queue_hash as u32,
             is_new_flow: f.is_new_flow as u32,
