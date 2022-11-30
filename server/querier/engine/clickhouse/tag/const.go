@@ -74,5 +74,5 @@ var AutoServiceMap = map[string]int{
 
 var NoLanguageTag = []string{
 	"ip_type", "l7_ip_protocol", "server_port", "span_kind", "tcp_flags_bit",
-	"tunnel_tier", "l7_protocol", "eth_type", "flow_source", "protocol", "tunnel_type",
+	"tunnel_tier", "l7_protocol", "eth_type", "signal_source", "protocol", "tunnel_type",
 }

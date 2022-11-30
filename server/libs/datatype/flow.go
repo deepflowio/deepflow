@@ -96,12 +96,14 @@ const (
 	FloatingIP
 )
 
-type FlowSource uint8
+type SignalSource uint8
 
 const (
-	FLOW_SOURCE_NORMAL FlowSource = iota
-	FLOW_SOURCE_SFLOW
-	FLOW_SOURCE_NETFLOW
+	SIGNAL_SOURCE_PACKET SignalSource = iota
+	SIGNAL_SOURCE_XFLOW
+	_
+	SIGNAL_SOURCE_EBPF
+	SIGNAL_SOURCE_OTEL
 )
 
 type TcpPerfCountsPeer struct {
@@ -300,7 +302,7 @@ type Flow struct {
 	*FlowPerfStats
 
 	CloseType
-	FlowSource
+	SignalSource
 	IsActiveService bool
 	QueueHash       uint8
 	IsNewFlow       bool
@@ -310,14 +312,16 @@ type Flow struct {
 	AclGids []uint16
 }
 
-func (t FlowSource) String() string {
+func (t SignalSource) String() string {
 	switch t {
-	case FLOW_SOURCE_NORMAL:
-		return "normal"
-	case FLOW_SOURCE_SFLOW:
-		return "sflow"
-	case FLOW_SOURCE_NETFLOW:
-		return "netflow"
+	case SIGNAL_SOURCE_PACKET:
+		return "Packet"
+	case SIGNAL_SOURCE_XFLOW:
+		return "xFlow"
+	case SIGNAL_SOURCE_EBPF:
+		return "eBPF"
+	case SIGNAL_SOURCE_OTEL:
+		return "OTel"
 	default:
 		return "unknown"
 	}
@@ -558,7 +562,7 @@ func (f *Flow) WriteToPB(p *pb.Flow) {
 	}
 
 	p.CloseType = uint32(f.CloseType)
-	p.FlowSource = uint32(f.FlowSource)
+	p.SignalSource = uint32(f.SignalSource)
 	p.IsActiveService = Bool2UInt32(f.IsActiveService)
 	p.IsNewFlow = Bool2UInt32(f.IsNewFlow)
 	p.TapSide = uint32(f.TapSide)
@@ -738,7 +742,7 @@ func (f *FlowMetricsPeer) String() string {
 
 func (f *Flow) String() string {
 	formatted := fmt.Sprintf("FlowID: %d ", f.FlowID)
-	formatted += fmt.Sprintf("FlowSource: %s ", f.FlowSource.String())
+	formatted += fmt.Sprintf("SignalSource: %s ", f.SignalSource.String())
 	formatted += fmt.Sprintf("Tunnel: %s ", f.Tunnel.String())
 	formatted += fmt.Sprintf("CloseType: %d ", f.CloseType)
 	formatted += fmt.Sprintf("IsActiveService: %v ", f.IsActiveService)

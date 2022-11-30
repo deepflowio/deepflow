@@ -82,6 +82,7 @@ flow_id                   , Flow ID                       ,
 start_time                , Start Time                    , Unit: microseconds. Start time of request.
 end_time                  , End Time                      , Unit: microseconds. Start time of response, or end time of response for OpenTelemetry span.
 
+signal_source             , Signal Source                 ,
 tap                       , Traffic Access Point          , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
 vtap                      , DeepFlow Agent                ,
 tap_port                  , TAP Port Identifier           , When the value of tap_port_type is 'Local NIC', tap_port indicates the MAC address suffix (the last four bytes) of the tap interface.

@@ -55,17 +55,18 @@ type L7Base struct {
 	ServerPort uint16 `json:"server_port"`
 
 	// 流信息
-	FlowID      uint64 `json:"flow_id"`
-	TapType     uint8  `json:"tap_type"`
-	TapPortType uint8  `json:"tap_port_type"`
-	TunnelType  uint8  `json:"tunnel_type"`
-	TapPort     uint32 `json:"tap_port"`
-	TapSide     string `json:"tap_side"`
-	VtapID      uint16 `json:"vtap_id"`
-	ReqTcpSeq   uint32 `json:"req_tcp_seq"`
-	RespTcpSeq  uint32 `json:"resp_tcp_seq"`
-	StartTime   int64  `json:"start_time"` // us
-	EndTime     int64  `json:"end_time"`   // us
+	FlowID       uint64 `json:"flow_id"`
+	TapType      uint8  `json:"tap_type"`
+	TapPortType  uint8  `json:"tap_port_type"`
+	SignalSource uint16 `json:"signal_source"`
+	TunnelType   uint8  `json:"tunnel_type"`
+	TapPort      uint32 `json:"tap_port"`
+	TapSide      string `json:"tap_side"`
+	VtapID       uint16 `json:"vtap_id"`
+	ReqTcpSeq    uint32 `json:"req_tcp_seq"`
+	RespTcpSeq   uint32 `json:"resp_tcp_seq"`
+	StartTime    int64  `json:"start_time"` // us
+	EndTime      int64  `json:"end_time"`   // us
 
 	ProcessID0             uint32
 	ProcessID1             uint32
@@ -100,6 +101,7 @@ func L7BaseColumns() []*ckdb.Column {
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("tap_type", ckdb.UInt8).SetIndex(ckdb.IndexSet),
 		ckdb.NewColumn("tap_port_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("signal_source", ckdb.UInt16).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tunnel_type", ckdb.UInt8).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_port", ckdb.UInt32).SetIndex(ckdb.IndexNone),
 		ckdb.NewColumn("tap_side", ckdb.LowCardinalityString),
@@ -172,6 +174,9 @@ func (f *L7Base) WriteBlock(block *ckdb.Block) error {
 		return err
 	}
 	if err := block.WriteUInt8(f.TapPortType); err != nil {
+		return err
+	}
+	if err := block.WriteUInt16(f.SignalSource); err != nil {
 		return err
 	}
 	if err := block.WriteUInt8(f.TunnelType); err != nil {
@@ -614,6 +619,12 @@ func (b *L7Base) Fill(log *pb.AppProtoLogsData, platformData *grpc.PlatformInfoT
 	b.TapType = uint8(l.TapType)
 	tunnelType := datatype.TunnelType(0)
 	b.TapPort, b.TapPortType, tunnelType = datatype.TapPort(l.TapPort).SplitToPortTypeTunnel()
+	b.SignalSource = uint16(datatype.SIGNAL_SOURCE_PACKET)
+	if b.TapPortType == datatype.TAPPORT_FROM_OTEL {
+		b.SignalSource = uint16(datatype.SIGNAL_SOURCE_OTEL)
+	} else if b.TapPortType == datatype.TAPPORT_FROM_EBPF {
+		b.SignalSource = uint16(datatype.SIGNAL_SOURCE_EBPF)
+	}
 	b.TunnelType = uint8(tunnelType)
 	b.TapSide = zerodoc.TAPSideEnum(l.TapSide).String()
 	b.VtapID = uint16(l.VtapId)
