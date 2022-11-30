@@ -627,9 +627,9 @@ vtap_group_id: g-xxxxxx
     #buffer-size: 1048576
 
     ## Flow flush interval
-    ## Default: 5m
+    ## Default: 1m
     ## Note: flushes a flow if its first packet were older then this interval
-    #flush-interval: 5m
+    #flush-interval: 1m
 
   #############################
   ## FlowMap (FlowGenerator) ##

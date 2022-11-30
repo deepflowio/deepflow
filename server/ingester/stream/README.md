@@ -109,7 +109,7 @@ Flow：预处理模块（DFI）通过采集网包生成双向网流（连接）�
 |          |                      |                 |          |      |      | 17. server-queue-lack：服务端队列不足            |
 |          |                      |                 |          |      |      | 18. client-establish-other-rst：客户端建连其他重置 |
 |          |                      |                 |          |      |      | 19. server-establish-other-rst：服务端建连其他重置 |
-|          | 流数据来源           | flow_source     | integer  |      |      | 0 原始流量, 1 sFlow, 2 NetFlow/NetStream v5      |
+|          | 信号源               | signal_source   | integer  |      |      | 0 Packet, 1,2 :xFlow(NetFlow/NetStream v5)      |
 |          | 流日志ID             | flow_id_str     | string   |      |      | flow_id的字符串形式，避免Elasticsearch的精度损失问题 |
 |          | 采集点               | tap_type        | integer  | 有   |      | 3: 虚拟网络, 其他: 非虚拟网络                    |
 |          | 采集网口标识         | tap_port        | string   |      |      | 显示为八个字符的16进制如`01234567`               |

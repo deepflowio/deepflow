@@ -1,4 +1,4 @@
 # Value , DisplayName
 0      , Packet
-1      , sFlow
-2      , NetFlow
+3      , eBPF
+4      , OTel
