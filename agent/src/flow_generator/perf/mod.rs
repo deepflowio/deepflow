@@ -116,6 +116,12 @@ pub struct FlowPerf {
     protocol_bitmap: L7ProtocolBitmap,
     l7_protocol_enum: L7ProtocolEnum,
 
+    // Only for eBPF data, the server_port will be set in l7_check() method,
+    // it checks the first request packet's payload,
+    // and then set self.server_port = packet.lookup_key.dst_port,
+    // we use the server_port to judge packet's direction.
+    pub server_port: u16,
+
     is_from_app: bool,
     is_success: bool,
     is_skip: bool,
@@ -140,9 +146,11 @@ impl FlowPerf {
             L7Protocol::MySQL => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
             L7Protocol::PostgreSQL => Some(L7FlowPerfTable::from(PostgresqlLog::new())),
             L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Http1 | L7Protocol::Http2 | L7Protocol::Grpc => {
-                Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone())))
-            }
+            L7Protocol::Http1
+            | L7Protocol::Http1TLS
+            | L7Protocol::Http2
+            | L7Protocol::Http2TLS
+            | L7Protocol::Grpc => Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()))),
             _ => None,
         }
     }
@@ -187,7 +195,7 @@ impl FlowPerf {
 
     fn l7_parse_log(
         &mut self,
-        packet: &MetaPacket,
+        packet: &mut MetaPacket,
         app_table: &mut AppTable,
         parse_param: &ParseParam,
     ) -> Result<Vec<L7ProtocolInfo>> {
@@ -228,7 +236,7 @@ impl FlowPerf {
 
     fn l7_check(
         &mut self,
-        packet: &MetaPacket,
+        packet: &mut MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
         is_parse_perf: bool,
@@ -239,7 +247,7 @@ impl FlowPerf {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let param = ParseParam::from(packet);
+            let param = ParseParam::from(&*packet);
             for mut i in get_all_protocol() {
                 if self.is_skip_l7_protocol_parse(
                     &i,
@@ -253,6 +261,7 @@ impl FlowPerf {
                 i.set_parse_config(&self.parse_config);
                 if i.check_payload(payload, &param) {
                     self.l7_protocol_enum = i.l7_protocl_enum();
+                    self.server_port = packet.lookup_key.dst_port;
 
                     if is_parse_perf {
                         // perf 没有抽象出来,这里可能返回None，对于返回None即不解析perf，只解析log
@@ -282,19 +291,30 @@ impl FlowPerf {
     // when log parse implement perf parse, rrt will calculate from log parse.
     fn l7_parse(
         &mut self,
-        packet: &MetaPacket,
+        packet: &mut MetaPacket,
         flow_id: u64,
         app_table: &mut AppTable,
         is_parse_perf: bool,
         is_parse_log: bool,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
+        if !packet.ebpf_type.is_none() && self.server_port != 0 {
+            // if the packet from eBPF and it's server_port is not equal to 0,
+            // We can get the packet's direction by comparing self.server_port with packet.lookup_key.dst_port
+            packet.direction = if self.server_port == packet.lookup_key.dst_port {
+                PacketDirection::ClientToServer
+            } else {
+                PacketDirection::ServerToClient
+            };
+            // FIXME: Is it possible that the server_port of eBPF data is 0?
+        }
+
         if self.l7.is_some() {
             self.l7_parse_perf(packet, flow_id, app_table)?;
         }
 
         if self.l7_protocol_log_parser.is_some() {
             return Ok((
-                self.l7_parse_log(packet, app_table, &ParseParam::from(packet))?,
+                self.l7_parse_log(packet, app_table, &ParseParam::from(&*packet))?,
                 self.get_rrt(),
             ));
         }
@@ -352,6 +372,7 @@ impl FlowPerf {
             parse_config,
             flow_config,
             l7_protocol_parse_port_bitmap,
+            server_port: 0,
         })
     }
 
@@ -365,7 +386,7 @@ impl FlowPerf {
 
     pub fn parse(
         &mut self,
-        packet: &MetaPacket,
+        packet: &mut MetaPacket,
         is_first_packet_direction: bool,
         flow_id: u64,
         l4_performance_enabled: bool,

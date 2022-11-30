@@ -764,13 +764,18 @@ impl Stash {
             ..Default::default()
         };
 
-        // 双端统计量不要对Meter反向
-        let key = StashKey::new(&tagger, src_ip, Some(dst_ip));
-        self.add(
-            key,
-            tagger.clone(),
-            Meter::Flow(acc_flow.flow_meter.clone()),
-        );
+        // network metrics (vtap_flow_edge_port)
+        // eBPF data has no L4 info
+        if !flow_key.tap_port.is_from_ebpf() {
+            let key = StashKey::new(&tagger, src_ip, Some(dst_ip));
+            self.add(
+                key,
+                tagger.clone(),
+                Meter::Flow(acc_flow.flow_meter.clone()),
+            );
+        }
+
+        // application metrics (vtap_app_edge_port)
         if tagger.l7_protocol != L7Protocol::Unknown
             && self.context.config.load().l7_metrics_enabled
         {

@@ -366,8 +366,9 @@ impl MirrorModeDispatcher {
             self.base.ntp_diff.clone(),
             self.base.flow_map_config.clone(),
             self.base.log_parse_config.clone(),
-            self.base.packet_sequence_output_queue.clone(), // Enterprise Edition Feature: packet-sequence
+            Some(self.base.packet_sequence_output_queue.clone()), // Enterprise Edition Feature: packet-sequence
             &self.base.stats,
+            false, // !from_ebpf
         );
 
         while !self.base.terminated.load(Ordering::Relaxed) {
