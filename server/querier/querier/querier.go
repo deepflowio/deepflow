@@ -41,7 +41,7 @@ func Start(configPath string) {
 	config.Cfg = &ServerCfg.QuerierConfig
 	cfg := ServerCfg.QuerierConfig
 	bytes, _ := yaml.Marshal(cfg)
-	log.Info("============================== Launching YUNSHAN DeepFlow Querier ==============================")
+	log.Info("==================== Launching DeepFlow-Server-Querier ====================")
 	log.Infof("querier config:\n%s", string(bytes))
 
 	// engine加载数据库tag/metric等信息
