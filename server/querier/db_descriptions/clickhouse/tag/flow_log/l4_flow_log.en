@@ -72,8 +72,8 @@ end_time              , End Time                          , Unit: microseconds. 
 close_type            , Flow Close Type                   ,
 status                , Status                            , Determined by the close_type: Normal/ForceReport = Normal, Client* = Client Error, Server*/Timeout = Server Error, others = Unknown.
 is_new_flow           , New Flow Flag                     ,
-flow_source           , Flow Source                       ,
 
+signal_source         , Signal Source                     ,
 tap                   , Traffic Access Point              , Traffic Access Point. Use a fixed value (virtual network) to represent cloud traffic, and other values to represent traditional IDC traffic (support up to 254 custom values to represent the location of traffic mirror).
 vtap                  , DeepFlow Agent                    ,
 tap_port              , TAP Port Identifier               , When the value of tap_port_type is 'Local NIC', tap_port indicates the MAC address suffix (the last four bytes) of the tap interface.

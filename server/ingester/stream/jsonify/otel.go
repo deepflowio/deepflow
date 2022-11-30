@@ -306,6 +306,7 @@ func (h *L7FlowLog) FillOTel(l *v1.Span, resAttributes []*v11.KeyValue, platform
 	h.Protocol = uint8(layers.IPProtocolTCP)
 	h.Type = uint8(datatype.MSG_T_SESSION)
 	h.TapPortType = datatype.TAPPORT_FROM_OTEL
+	h.SignalSource = uint16(datatype.SIGNAL_SOURCE_OTEL)
 	h.TraceId = hex.EncodeToString(l.TraceId)
 	h.SpanId = hex.EncodeToString(l.SpanId)
 	h.ParentSpanId = hex.EncodeToString(l.ParentSpanId)
