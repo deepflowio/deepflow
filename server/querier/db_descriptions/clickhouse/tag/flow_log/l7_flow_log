@@ -82,6 +82,7 @@ flow_id                   , flow_id                   , flow_id                 
 start_time                , start_time                , start_time                 , int            ,                       , Flow Info         , 111
 end_time                  , end_time                  , end_time                   , int            ,                       , Flow Info         , 111
 
+signal_source             , signal_source             , signal_source              , int_enum       , l7_signal_source      , Capture Info      , 111
 tap                       , tap                       , tap                        , resource       ,                       , Capture Info      , 110
 vtap                      , vtap                      , vtap                       , resource       ,                       , Capture Info      , 111
 tap_port                  , tap_port                  , tap_port                   , mac            ,                       , Capture Info      , 111
