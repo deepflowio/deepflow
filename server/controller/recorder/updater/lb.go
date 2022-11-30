@@ -22,14 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type LB struct {
 	UpdaterBase[cloudmodel.LB, mysql.LB, *cache.LB]
 }
 
-func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB, eventQueue *queue.OverwriteQueue) *LB {
+func NewLB(wholeCache *cache.Cache, cloudData []cloudmodel.LB) *LB {
 	updater := &LB{
 		UpdaterBase[cloudmodel.LB, mysql.LB, *cache.LB]{
 			cache:        wholeCache,

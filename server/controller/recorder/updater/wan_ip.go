@@ -24,25 +24,27 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type WANIP struct {
 	UpdaterBase[cloudmodel.IP, mysql.WANIP, *cache.WANIP]
 }
 
-func NewWANIP(wholeCache *cache.Cache, cloudData []cloudmodel.IP, eventQueue *queue.OverwriteQueue) *WANIP {
+func NewWANIP(wholeCache *cache.Cache) *WANIP {
 	updater := &WANIP{
 		UpdaterBase[cloudmodel.IP, mysql.WANIP, *cache.WANIP]{
 			cache:        wholeCache,
 			dbOperator:   db.NewWANIP(),
 			diffBaseData: wholeCache.WANIPs,
-			cloudData:    cloudData,
 		},
 	}
 	updater.dataGenerator = updater
 	updater.cacheHandler = updater
 	return updater
+}
+
+func (i *WANIP) SetCloudData(cloudData []cloudmodel.IP) {
+	i.cloudData = cloudData
 }
 
 func (i *WANIP) getDiffBaseByCloudItem(cloudItem *cloudmodel.IP) (diffBase *cache.WANIP, exists bool) {

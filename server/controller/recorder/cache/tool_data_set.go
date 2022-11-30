@@ -785,6 +785,7 @@ func (t *ToolDataSet) addVMPodNodeConnection(item *mysql.VMPodNodeConnection) {
 func (t *ToolDataSet) deleteVMPodNodeConnection(lcuuid string) {
 	podNodeID, _ := t.GetPodNodeIDByVMPodNodeConnectionLcuuid(lcuuid)
 	delete(t.podNodeIDToVMID, podNodeID)
+	delete(t.vmPodNodeConnectionLcuuidToPodNodeID, lcuuid)
 	log.Info(deleteFromToolMap(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid))
 }
 
