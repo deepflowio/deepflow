@@ -35,6 +35,7 @@ use crate::{
         },
         AppProtoHead, Error, LogMessageType, Result,
     },
+    perf_impl,
 };
 
 use super::{
@@ -172,9 +173,12 @@ impl From<PostgreInfo> for L7ProtocolSendLog {
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct PostgresqlLog {
     info: PostgreInfo,
-    perf_stats: Option<PerfStats>,
     parsed: bool,
+
+    previous_log_info: (LogMessageType, u64),
+    perf_stats: Option<PerfStats>,
 }
+perf_impl!(PostgresqlLog);
 
 impl L7ProtocolParserInterface for PostgresqlLog {
     fn check_payload(&mut self, payload: &[u8], param: &ParseParam) -> bool {
@@ -186,7 +190,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
             return true;
         }
 
-        if self.parse(payload).is_ok() {
+        if self.parse(payload, param).is_ok() {
             self.parsed = true;
             return true;
         } else {
@@ -211,7 +215,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
         self.info.start_time = param.time;
         self.info.end_time = param.time;
         self.set_msg_type(param.direction);
-        self.parse(payload)?;
+        self.parse(payload, param)?;
 
         Ok(if self.info.ignore {
             vec![]
@@ -225,7 +229,12 @@ impl L7ProtocolParserInterface for PostgresqlLog {
     }
 
     fn reset(&mut self) {
-        *self = Self::new();
+        if !self.info.ignore {
+            self.previous_log_info.0 = self.info.msg_type;
+            self.previous_log_info.1 = self.info.start_time;
+        }
+        self.info = PostgreInfo::default();
+        self.parsed = false;
     }
 
     fn parsable_on_udp(&self) -> bool {
@@ -236,7 +245,7 @@ impl L7ProtocolParserInterface for PostgresqlLog {
 impl L7FlowPerf for PostgresqlLog {
     fn parse(&mut self, packet: &MetaPacket, _flow_id: u64) -> Result<()> {
         if let Some(payload) = packet.get_l4_payload() {
-            self.parse_payload(payload, &ParseParam::from(packet))?;
+            self.parse_payload(payload, &ParseParam::new_for_perf(packet))?;
         }
         Ok(())
     }
@@ -279,17 +288,6 @@ impl PostgresqlLog {
         s
     }
 
-    fn update_perf(&mut self, req_count: u32, resp_count: u32, req_err: u32, resp_err: u32) {
-        if self.perf_stats.is_none() {
-            self.perf_stats = Some(PerfStats::default());
-        }
-        let perf = self.perf_stats.as_mut().unwrap();
-        perf.req_count += req_count;
-        perf.resp_count += resp_count;
-        perf.req_err_count += req_err;
-        perf.resp_err_count += resp_err;
-    }
-
     fn set_msg_type(&mut self, direction: PacketDirection) {
         match direction {
             PacketDirection::ClientToServer => self.info.msg_type = LogMessageType::Request,
@@ -297,7 +295,7 @@ impl PostgresqlLog {
         }
     }
 
-    fn parse(&mut self, payload: &[u8]) -> Result<()> {
+    fn parse(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
         let mut offset = 0;
         // is at lease one validate block in payload, prevent miscalculate to other protocol
         let mut at_lease_one_block = false;
@@ -311,7 +309,7 @@ impl PostgresqlLog {
                 match self.info.msg_type {
                     LogMessageType::Request => self.on_req_block(tag, &sub_payload[5..5 + len])?,
                     LogMessageType::Response => {
-                        self.on_resp_block(tag, &sub_payload[5..5 + len])?
+                        self.on_resp_block(tag, &sub_payload[5..5 + len], param.time)?
                     }
 
                     _ => {}
@@ -337,12 +335,12 @@ impl PostgresqlLog {
     }
 
     fn on_req_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
-        self.update_perf(1, 0, 0, 0);
         match tag {
             'Q' => {
                 self.info.req_type = tag;
                 self.info.context = strip_string_end_with_zero(data)?;
                 self.info.ignore = false;
+                self.perf_inc_req();
                 Ok(())
             }
             'P' => {
@@ -360,6 +358,7 @@ impl PostgresqlLog {
                     if let Some(idx) = data.iter().position(|x| *x == 0x0) {
                         self.info.context = String::from_utf8_lossy(&data[..idx]).to_string();
                         if is_postgresql(&self.info.context) {
+                            self.perf_inc_req();
                             return Ok(());
                         }
                     }
@@ -371,9 +370,8 @@ impl PostgresqlLog {
         }
     }
 
-    fn on_resp_block(&mut self, tag: char, data: &[u8]) -> Result<()> {
+    fn on_resp_block(&mut self, tag: char, data: &[u8], time: u64) -> Result<()> {
         let mut data = data;
-        self.update_perf(0, 1, 0, 0);
         match tag {
             'C' => {
                 self.info.status = L7ResponseStatus::Ok;
@@ -407,7 +405,7 @@ impl PostgresqlLog {
                     let row_eff = String::from_utf8_lossy(&data[..idx]).to_string();
                     self.info.affected_rows = row_eff.parse().unwrap_or(0);
                 }
-
+                self.perf_inc_resp(time);
                 Ok(())
             }
             'E' => {
@@ -439,10 +437,11 @@ impl PostgresqlLog {
                     self.info.error_message = String::from(err_desc);
                     self.info.status = status;
                     match self.info.status {
-                        L7ResponseStatus::ClientError => self.update_perf(0, 0, 1, 0),
-                        L7ResponseStatus::ServerError => self.update_perf(0, 0, 0, 1),
+                        L7ResponseStatus::ClientError => self.perf_inc_req_err(),
+                        L7ResponseStatus::ServerError => self.perf_inc_resp_err(),
                         _ => {}
                     }
+                    self.perf_inc_resp(time);
                     return Ok(());
                 }
 
@@ -540,7 +539,7 @@ mod test {
         p[1].direction = PacketDirection::ServerToClient;
 
         let mut parser = PostgresqlLog::new();
-        let req_param = &mut ParseParam::from(&p[0]);
+        let req_param = &mut ParseParam::new_for_full_parse(&p[0]);
         let req_payload = p[0].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(req_payload, req_param), true);
         let mut info = (&mut parser).parse_payload(req_payload, req_param).unwrap();
@@ -548,7 +547,7 @@ mod test {
 
         (&mut parser).reset();
 
-        let resp_param = &ParseParam::from(&p[1]);
+        let resp_param = &ParseParam::new_for_full_parse(&p[1]);
         let resp_payload = p[1].get_l4_payload().unwrap();
         assert_eq!((&mut parser).check_payload(resp_payload, resp_param), true);
         let resp = (&mut parser)

@@ -70,8 +70,6 @@ pub struct RedisInfo {
     pub error: Vec<u8>, // '-'
     #[serde(rename = "response_status")]
     pub resp_status: L7ResponseStatus,
-
-    cap_seq: Option<u64>,
 }
 
 impl L7ProtocolInfoInterface for RedisInfo {
@@ -118,29 +116,11 @@ where
 
 impl RedisInfo {
     pub fn merge(&mut self, other: Self) -> Result<()> {
-        if !self.can_merge(&other) {
-            return Err(Error::L7ProtocolCanNotMerge(L7ProtocolInfo::RedisInfo(
-                other,
-            )));
-        }
         self.response = other.response;
         self.status = other.status;
         self.error = other.error;
         self.resp_status = other.resp_status;
         Ok(())
-    }
-
-    pub fn set_packet_seq(&mut self, param: &ParseParam) {
-        if let Some(p) = param.ebpf_param {
-            self.cap_seq = Some(p.cap_seq);
-        }
-    }
-
-    pub fn can_merge(&self, resp: &Self) -> bool {
-        if let (Some(req_seq), Some(resp_seq)) = (self.cap_seq, resp.cap_seq) {
-            return resp_seq > req_seq && resp_seq - req_seq == 1;
-        }
-        true
     }
 }
 
@@ -205,14 +185,12 @@ impl L7ProtocolParserInterface for RedisLog {
             return false;
         }
         self.info.is_tls = param.is_tls();
-        self.info.set_packet_seq(param);
         Self::redis_check_protocol(payload, param)
     }
 
     fn parse_payload(&mut self, payload: &[u8], param: &ParseParam) -> Result<Vec<L7ProtocolInfo>> {
         parse_common!(self, param);
         self.info.is_tls = param.is_tls();
-        self.info.set_packet_seq(param);
         self.parse(payload, param.l4_protocol, param.direction, None, None)?;
         Ok(vec![L7ProtocolInfo::RedisInfo(self.info.clone())])
     }
@@ -489,8 +467,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_redis =
-                RedisLog::redis_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_redis = RedisLog::redis_check_protocol(
+                payload,
+                &ParseParam::new_for_full_parse(packet as &MetaPacket),
+            );
             output.push_str(&format!("{} is_redis: {}\r\n", redis.info, is_redis));
         }
         output

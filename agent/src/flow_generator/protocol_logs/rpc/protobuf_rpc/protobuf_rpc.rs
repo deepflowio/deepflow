@@ -69,7 +69,9 @@ impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
     }
 
     fn reset(&mut self) {
-        self.parser.as_mut().unwrap().reset();
+        if let Some(p) = self.parser.as_mut() {
+            p.reset();
+        }
     }
 
     fn parsable_on_udp(&self) -> bool {
@@ -78,21 +80,27 @@ impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
 }
 
 impl L7FlowPerf for ProtobufRpcWrapLog {
-    fn parse(&mut self, packet: &MetaPacket, flow_id: u64) -> Result<()> {
-        if self.parser.is_none() {
-            if let Some(payload) = packet.get_l4_payload() {
+    fn parse(&mut self, packet: &MetaPacket, _flow_id: u64) -> Result<()> {
+        if let Some(payload) = packet.get_l4_payload() {
+            if self.parser.is_none() {
                 for mut p in all_protobuf_rpc_parser().into_iter() {
-                    if p.parse_payload(payload, &ParseParam::from(packet)).is_ok() {
+                    if p.parse_payload(payload, &ParseParam::new_for_perf(packet))
+                        .is_ok()
+                    {
                         self.parser = Some(p);
                         return Ok(());
                     }
                 }
                 return Err(Error::L7ProtocolUnknown);
             } else {
-                return Err(Error::L7ProtocolUnknown);
+                self.parser
+                    .as_mut()
+                    .unwrap()
+                    .parse_payload(payload, &ParseParam::new_for_perf(packet))?;
+                return Ok(());
             }
         } else {
-            self.parser.as_mut().unwrap().parse(packet, flow_id)
+            return Err(Error::L7ProtocolUnknown);
         }
     }
 

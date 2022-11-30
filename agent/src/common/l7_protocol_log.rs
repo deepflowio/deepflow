@@ -159,6 +159,103 @@ macro_rules! parse_common {
     };
 }
 
+/*
+    common log perf update macro. if must define the log and info struct like:
+
+    struct xxxInfo{
+        // .. some field
+
+        // the current msg type
+        msg_type: LogMessageType,
+        // the current msg time
+        start_time: u64,
+
+    }
+
+    struct xxxLog{
+        // ... some field
+
+        // the log info
+        info: xxxInfo,
+
+        // (log_type, timestamp), record the previous log info,
+        previous_log_info: (LogMessageType, u64),
+        perf_stats: Option<PerfStats>,
+    }
+
+    also need to add the code like:
+
+    impl L7ProtocolParserInterface for xxxLog {
+        // ... other fn
+
+        fn reset(&mut self) {
+            // ... reset other field
+
+            self.previous_log_info.0 = self.info.msg_type;
+            self.previous_log_info.1 = self.info.start_time;
+        }
+    }
+*/
+#[macro_export]
+macro_rules! perf_impl {
+    ($log_struct:ident) => {
+        impl $log_struct {
+            fn update_perf(
+                &mut self,
+                req_count: u32,
+                resp_count: u32,
+                req_err: u32,
+                resp_err: u32,
+                time: u64,
+            ) {
+                if self.perf_stats.is_none() {
+                    self.perf_stats = Some(PerfStats::default());
+                }
+                let perf = self.perf_stats.as_mut().unwrap();
+                perf.update_perf(req_count, resp_count, req_err, resp_err, {
+                    if time != 0 {
+                        // if previous is req and current is resp, calculate the round trip time.
+                        if self.previous_log_info.0 == LogMessageType::Request
+                            && self.info.msg_type == LogMessageType::Response
+                            && time > self.previous_log_info.1
+                        {
+                            time - self.previous_log_info.1
+
+                        // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
+                        // calculate the round trip time.
+                        } else if self.previous_log_info.0 == LogMessageType::Response
+                            && self.info.msg_type == LogMessageType::Request
+                            && self.previous_log_info.1 > time
+                        {
+                            self.previous_log_info.1 - time
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                });
+            }
+
+            fn perf_inc_req(&mut self) {
+                self.update_perf(1, 0, 0, 0, 0);
+            }
+
+            fn perf_inc_resp(&mut self, time: u64) {
+                self.update_perf(0, 1, 0, 0, time);
+            }
+
+            fn perf_inc_req_err(&mut self) {
+                self.update_perf(0, 0, 1, 0, 0);
+            }
+
+            fn perf_inc_resp_err(&mut self) {
+                self.update_perf(0, 0, 0, 1, 0);
+            }
+        }
+    };
+}
+
 macro_rules! all_protocol {
     ($( $l7_proto:ident , $parser:ident , $log:ident::$new_func:ident);+$(;)?) => {
         #[enum_dispatch]
@@ -357,23 +454,12 @@ pub struct EbpfParam {
     // now only http2 uprobe uses
     pub is_req_end: bool,
     pub is_resp_end: bool,
+}
 
-    /*
-        eBPF 程序为每一个 socket 维护一个 cap_seq 序列号，每次 read/write syscall 调用会自增 1。
-        目前仅用于处理ebpf乱序问题，并且仅能用于没有 request_id 并且是请求响应串行的模型。
-        当响应的 cap_seq 减去请求的 cap_seq 不等于1，就认为乱序无法聚合，直接发送请求和响应。
-        其中，mysql 和 postgresql 由于 预编译请求 和 执行结果之间有数个报文的间隔，所以不能通过序号差判断是否乱序。
-        所以现在只有 http1，redis 能使用这个方法处理乱序。
-        FIXME: http1 在 pipeline 模型下依然会有乱序的情况，目前不解决。
-        ====================================================================
-        The eBPF program maintains a cap_seq sequence number for each socket, which is incremented by 1 for each read/write syscall call.
-        Currently only used to deal with ebpf out-of-order problems, and can only be used for protocol without request_id and request-response serialization.
-        When the cap_seq of the response subtract the cap_seq of the request is not equal to 1, it is considered that the out-of-order cannot be aggregated, and the request and response are sent directly without merge.
-        MySQL and postgreSQL cannot judge whether the order is out of order due to the interval of several messages between the precompiled request and the execution result.
-        So now only http1, redis can use this method to deal with out-of-order.
-        FIXME: http1 will still be out of order under the pipeline model, which is not resolved at present.
-    */
-    pub cap_seq: u64,
+#[derive(Clone, Copy)]
+pub enum LogParseLevel {
+    Perf,
+    Full,
 }
 
 #[derive(Clone, Copy)]
@@ -392,6 +478,21 @@ pub struct ParseParam {
     // not None when payload from ebpf
     pub ebpf_param: Option<EbpfParam>,
     pub time: u64,
+    pub parse_level: LogParseLevel,
+}
+
+impl ParseParam {
+    pub fn new_for_perf(packet: &MetaPacket) -> Self {
+        let mut p = Self::from(packet);
+        p.parse_level = LogParseLevel::Perf;
+        p
+    }
+
+    pub fn new_for_full_parse(packet: &MetaPacket) -> Self {
+        let mut p = Self::from(packet);
+        p.parse_level = LogParseLevel::Full;
+        p
+    }
 }
 
 impl From<&MetaPacket<'_>> for ParseParam {
@@ -406,7 +507,8 @@ impl From<&MetaPacket<'_>> for ParseParam {
             direction: packet.direction,
             ebpf_type: packet.ebpf_type,
             ebpf_param: None,
-            time: packet.start_time.as_micros() as u64,
+            time: packet.lookup_key.timestamp.as_micros() as u64,
+            parse_level: LogParseLevel::Full,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {
@@ -420,7 +522,6 @@ impl From<&MetaPacket<'_>> for ParseParam {
                 is_tls,
                 is_req_end: packet.is_request_end,
                 is_resp_end: packet.is_response_end,
-                cap_seq: packet.cap_seq,
             });
         }
 
@@ -434,6 +535,14 @@ impl ParseParam {
             return ebpf_param.is_tls;
         }
         false
+    }
+
+    pub fn perf_only(&self) -> bool {
+        if let LogParseLevel::Perf = self.parse_level {
+            true
+        } else {
+            false
+        }
     }
 }
 

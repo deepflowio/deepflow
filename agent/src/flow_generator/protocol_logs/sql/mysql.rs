@@ -548,8 +548,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_mysql =
-                MysqlLog::mysql_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_mysql = MysqlLog::mysql_check_protocol(
+                payload,
+                &ParseParam::new_for_full_parse(packet as &MetaPacket),
+            );
             output.push_str(&format!("{:?} is_mysql: {}\r\n", mysql.info, is_mysql));
         }
         output

@@ -822,8 +822,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_mqtt =
-                MqttLog::mqtt_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_mqtt = MqttLog::mqtt_check_protocol(
+                payload,
+                &ParseParam::new_for_full_parse(packet as &MetaPacket),
+            );
             for i in mqtt.info.iter() {
                 output.push_str(&format!("{:?} is_mqtt: {}\r\n", i, is_mqtt));
             }

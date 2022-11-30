@@ -505,7 +505,10 @@ mod tests {
                 None,
                 None,
             );
-            let is_dns = dns.dns_check_protocol(payload, &ParseParam::from(packet as &MetaPacket));
+            let is_dns = dns.dns_check_protocol(
+                payload,
+                &ParseParam::new_for_full_parse(packet as &MetaPacket),
+            );
             output.push_str(&format!("{:?} is_dns: {}\r\n", dns.info, is_dns));
         }
         output

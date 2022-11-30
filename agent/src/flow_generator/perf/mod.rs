@@ -15,7 +15,6 @@
  */
 
 mod dns;
-mod http;
 pub mod l7_rrt;
 mod mq;
 mod rpc;
@@ -36,13 +35,13 @@ use public::l7_protocol::L7ProtocolEnum;
 
 use super::app_table::AppTable;
 use super::error::{Error, Result};
-use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog};
+use super::protocol_logs::{AppProtoHead, HttpLog, PostgresqlLog, ProtobufRpcWrapLog};
 
 use crate::common::flow::PacketDirection;
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
     get_all_protocol, get_parse_bitmap, L7ProtocolBitmap, L7ProtocolParser,
-    L7ProtocolParserInterface, ParseParam,
+    L7ProtocolParserInterface, LogParseLevel, ParseParam,
 };
 use crate::common::{
     enums::IpProtocol,
@@ -53,7 +52,6 @@ use crate::config::handler::LogParserAccess;
 use crate::config::FlowAccess;
 
 use {
-    self::http::HttpPerfData,
     dns::DnsPerfData,
     mq::{KafkaPerfData, MqttPerfData},
     rpc::DubboPerfData,
@@ -99,9 +97,21 @@ pub enum L7FlowPerfTable {
     RedisPerfData,
     DubboPerfData,
     MysqlPerfData,
-    HttpPerfData,
+    HttpLog,
     PostgresqlLog,
     ProtobufRpcWrapLog,
+}
+
+impl L7FlowPerfTable {
+    // TODO will remove when perf abstruct to log parse
+    pub fn reset(&mut self) {
+        match self {
+            L7FlowPerfTable::ProtobufRpcWrapLog(p) => p.reset(),
+            L7FlowPerfTable::PostgresqlLog(p) => p.reset(),
+            L7FlowPerfTable::HttpLog(p) => p.reset(),
+            _ => {}
+        }
+    }
 }
 
 pub struct FlowPerf {
@@ -146,11 +156,8 @@ impl FlowPerf {
             L7Protocol::MySQL => Some(L7FlowPerfTable::from(MysqlPerfData::new(rrt_cache.clone()))),
             L7Protocol::PostgreSQL => Some(L7FlowPerfTable::from(PostgresqlLog::new())),
             L7Protocol::Redis => Some(L7FlowPerfTable::from(RedisPerfData::new(rrt_cache.clone()))),
-            L7Protocol::Http1
-            | L7Protocol::Http1TLS
-            | L7Protocol::Http2
-            | L7Protocol::Http2TLS
-            | L7Protocol::Grpc => Some(L7FlowPerfTable::from(HttpPerfData::new(rrt_cache.clone()))),
+            L7Protocol::Http1 => Some(L7FlowPerfTable::from(HttpLog::new_v1())),
+            L7Protocol::Http2 => Some(L7FlowPerfTable::from(HttpLog::new_v2(false))),
             _ => None,
         }
     }
@@ -180,8 +187,12 @@ impl FlowPerf {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
         }
+        let perf_parser = self.l7.as_mut().unwrap();
+        let ret = perf_parser.parse(packet, flow_id);
+        if ret.is_ok() {
+            perf_parser.reset();
+        }
 
-        let ret = self.l7.as_mut().unwrap().parse(packet, flow_id);
         if !self.is_success {
             if ret.is_ok() {
                 app_table.set_protocol(packet, self.l7_protocol_enum);
@@ -247,7 +258,12 @@ impl FlowPerf {
         }
 
         if let Some(payload) = packet.get_l4_payload() {
-            let param = ParseParam::from(&*packet);
+            let mut param = if is_parse_log {
+                ParseParam::new_for_full_parse(&*packet)
+            } else {
+                ParseParam::new_for_perf(&*packet)
+            };
+
             for mut i in get_all_protocol() {
                 if self.is_skip_l7_protocol_parse(
                     &i,
@@ -273,6 +289,7 @@ impl FlowPerf {
 
                     if is_parse_log {
                         self.l7_protocol_log_parser = Some(i);
+                        param.parse_level = LogParseLevel::Full;
                         return self.l7_parse_log(packet, app_table, &param);
                     }
                     return Ok(vec![]);
@@ -308,13 +325,16 @@ impl FlowPerf {
             // FIXME: Is it possible that the server_port of eBPF data is 0?
         }
 
-        if self.l7.is_some() {
+        if self.l7.is_some() && is_parse_perf {
             self.l7_parse_perf(packet, flow_id, app_table)?;
+            if !is_parse_log {
+                return Ok((vec![], 0));
+            }
         }
 
-        if self.l7_protocol_log_parser.is_some() {
+        if self.l7_protocol_log_parser.is_some() && is_parse_log {
             return Ok((
-                self.l7_parse_log(packet, app_table, &ParseParam::from(&*packet))?,
+                self.l7_parse_log(packet, app_table, &ParseParam::new_for_full_parse(&*packet))?,
                 self.get_rrt(),
             ));
         }

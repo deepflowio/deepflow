@@ -30,24 +30,17 @@ use std::{
 use arc_swap::access::Access;
 use log::{info, warn};
 
-use super::{
-    AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, DnsLog, DubboLog, KafkaLog,
-    LogMessageType, MqttLog, MysqlLog, RedisLog,
-};
+use super::{AppProtoHead, AppProtoLogsBaseInfo, AppProtoLogsData, LogMessageType};
 
 use crate::{
     common::{
-        ebpf::EbpfType,
         enums::EthernetType,
         flow::{get_uniq_flow_id_in_one_minute, PacketDirection},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         MetaPacket, TaggedFlow,
     },
     config::handler::LogParserAccess,
-    flow_generator::{
-        protocol_logs::HttpLog, Error::L7LogCanNotMerge, FLOW_METRICS_PEER_DST,
-        FLOW_METRICS_PEER_SRC,
-    },
+    flow_generator::{FLOW_METRICS_PEER_DST, FLOW_METRICS_PEER_SRC},
     metric::document::TapSide,
     sender::SendItem,
     utils::stats::{Counter, CounterType, CounterValue, RefCountable},
@@ -81,6 +74,8 @@ impl MetaAppProto {
         l7_info: L7ProtocolInfo,
         head: AppProtoHead,
     ) -> Option<Self> {
+        let is_src = meta_packet.lookup_key.l2_end_0;
+        let direction = meta_packet.direction;
         let mut base_info = AppProtoLogsBaseInfo {
             start_time: meta_packet.lookup_key.timestamp,
             end_time: meta_packet.lookup_key.timestamp,
@@ -106,17 +101,41 @@ impl MetaAppProto {
             l3_epc_id_dst: 0,
             req_tcp_seq: 0,
             resp_tcp_seq: 0,
-            process_id_0: 0,
-            process_id_1: 0,
+            process_id_0: if is_src { meta_packet.process_id } else { 0 },
+            process_id_1: if !is_src { meta_packet.process_id } else { 0 },
             process_kname_0: "".to_string(),
             process_kname_1: "".to_string(),
-            syscall_trace_id_request: 0,
-            syscall_trace_id_response: 0,
-            syscall_trace_id_thread_0: 0,
-            syscall_trace_id_thread_1: 0,
-            syscall_cap_seq_0: 0,
-            syscall_cap_seq_1: 0,
-            ebpf_type: EbpfType::None,
+            syscall_trace_id_request: if direction == PacketDirection::ClientToServer {
+                meta_packet.syscall_trace_id
+            } else {
+                0
+            },
+            syscall_trace_id_response: if direction == PacketDirection::ServerToClient {
+                meta_packet.syscall_trace_id
+            } else {
+                0
+            },
+            syscall_trace_id_thread_0: if direction == PacketDirection::ClientToServer {
+                meta_packet.thread_id
+            } else {
+                0
+            },
+            syscall_trace_id_thread_1: if direction == PacketDirection::ServerToClient {
+                meta_packet.thread_id
+            } else {
+                0
+            },
+            syscall_cap_seq_0: if direction == PacketDirection::ClientToServer {
+                meta_packet.cap_seq
+            } else {
+                0
+            },
+            syscall_cap_seq_1: if direction == PacketDirection::ServerToClient {
+                meta_packet.cap_seq
+            } else {
+                0
+            },
+            ebpf_type: meta_packet.ebpf_type,
         };
         if flow.flow.tap_side == TapSide::Local {
             base_info.mac_src = flow.flow.flow_key.mac_src;
@@ -267,7 +286,8 @@ impl SessionQueue {
             // request = response - RRT
             (item.base_info.start_time - Duration::from_micros(item.base_info.head.rrt)).as_secs()
         } else {
-            item.base_info.start_time.as_secs()
+            // if req and rrt not 0, maybe ebpf disorder, the slot time is resp time and req should add the rrt.
+            (item.base_info.start_time + Duration::from_micros(item.base_info.head.rrt)).as_secs()
         };
         if slot_time < self.aggregate_start_time.as_secs() {
             if self
@@ -343,9 +363,7 @@ impl SessionQueue {
                 if p.is_response() {
                     // if can not merge, send req and resp directly.
                     // generally use for ebpf disorder.
-                    if let Err(L7LogCanNotMerge(p)) = item.session_merge(p) {
-                        self.send(p);
-                    }
+                    let _ = item.session_merge(p);
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
                     self.send(item);
@@ -399,11 +417,7 @@ impl SessionQueue {
                     map.insert(key, item);
                     self.send(request);
                 } else {
-                    // if can not merge, send req and resp directly.
-                    // generally use for ebpf disorder.
-                    if let Err(L7LogCanNotMerge(item)) = request.session_merge(item) {
-                        self.send(item);
-                    }
+                    let _ = request.session_merge(item);
                     self.counter.cached.fetch_sub(1, Ordering::Relaxed);
                     self.counter.merge.fetch_add(1, Ordering::Relaxed);
                     self.send(request);
@@ -504,30 +518,6 @@ impl SessionQueue {
     }
 }
 
-#[derive(Default)]
-struct AppLogs {
-    dns: DnsLog,
-    http: HttpLog,
-    mysql: MysqlLog,
-    redis: RedisLog,
-    dubbo: DubboLog,
-    kafka: KafkaLog,
-    mqtt: MqttLog,
-}
-
-impl AppLogs {
-    pub fn new(config: &LogParserAccess) -> Self {
-        let mut dubbo = DubboLog::new();
-        dubbo.update_config(config);
-
-        Self {
-            http: HttpLog::new(config),
-            dubbo: dubbo,
-            ..Default::default()
-        }
-    }
-}
-
 pub struct AppProtoLogsParser {
     input_queue: Arc<Receiver<Box<MetaAppProto>>>,
     output_queue: DebugSender<SendItem>,
@@ -571,17 +561,6 @@ impl AppProtoLogsParser {
             .store(true, Ordering::Relaxed);
     }
 
-    fn update_l7_log_dynamic_config(
-        l7_log_dynamic_is_updated: Arc<AtomicBool>,
-        config: &LogParserAccess,
-        app_logs: &mut AppLogs,
-    ) {
-        if l7_log_dynamic_is_updated.swap(false, Ordering::Relaxed) {
-            app_logs.http.update_config(config);
-            app_logs.dubbo.update_config(config);
-        }
-    }
-
     pub fn start(&self) {
         if self.running.swap(true, Ordering::Relaxed) {
             return;
@@ -593,22 +572,15 @@ impl AppProtoLogsParser {
         let output_queue = self.output_queue.clone();
 
         let config = self.config.clone();
-        let l7_log_dynamic_is_updated = self.l7_log_dynamic_is_updated.clone();
         let log_rate = self.log_rate.clone();
 
         let thread = thread::spawn(move || {
             let mut session_queue =
                 SessionQueue::new(counter, output_queue, config.clone(), log_rate);
-            let mut app_logs = AppLogs::new(&config);
 
             while running.load(Ordering::Relaxed) {
                 match input_queue.recv_n(QUEUE_BATCH_SIZE, Some(RCV_TIMEOUT)) {
                     Ok(app_protos) => {
-                        Self::update_l7_log_dynamic_config(
-                            l7_log_dynamic_is_updated.clone(),
-                            &config,
-                            &mut app_logs,
-                        );
                         for app_proto in app_protos {
                             session_queue.aggregate_session_and_send(AppProtoLogsData {
                                 base_info: (*app_proto).base_info.clone(),
