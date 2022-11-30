@@ -72,7 +72,7 @@ func Start(configPath string, shared *servercommon.ControllerIngesterShared) []i
 	logLevel, _ := logging.LogLevel(cfg.LogLevel)
 	logging.SetLevel(logLevel, "")
 
-	log.Info("============================== Launching YUNSHAN DeepFlow Ingester ==============================")
+	log.Info("==================== Launching DeepFlow-Server-Ingester ====================")
 	log.Infof("ingester base config:\n%s", string(bytes))
 
 	debug.SetIpAndPort(ingesterctl.DEBUG_LISTEN_IP, ingesterctl.DEBUG_LISTEN_PORT)

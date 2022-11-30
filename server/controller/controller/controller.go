@@ -65,7 +65,7 @@ func Start(ctx context.Context, configPath string, shared *servercommon.Controll
 	serverCfg.Load(configPath)
 	cfg := &serverCfg.ControllerConfig
 	bytes, _ := yaml.Marshal(cfg)
-	log.Info("============================== Launching YUNSHAN DeepFlow Controller ==============================")
+	log.Info("==================== Launching DeepFlow-Server-Controller ====================")
 	log.Infof("controller config:\n%s", string(bytes))
 	setGlobalConfig(cfg)
 
