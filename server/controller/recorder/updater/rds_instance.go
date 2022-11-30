@@ -22,14 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type RDSInstance struct {
 	UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]
 }
 
-func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance, eventQueue *queue.OverwriteQueue) *RDSInstance {
+func NewRDSInstance(wholeCache *cache.Cache, cloudData []cloudmodel.RDSInstance) *RDSInstance {
 	updater := &RDSInstance{
 		UpdaterBase[cloudmodel.RDSInstance, mysql.RDSInstance, *cache.RDSInstance]{
 			cache:        wholeCache,
