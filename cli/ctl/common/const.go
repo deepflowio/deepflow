@@ -40,12 +40,9 @@ const (
 	DOMAIN_TYPE_UNKNOWN           DomainType = -1
 	DOMAIN_TYPE_OPENSTACK         DomainType = 1  // openstack
 	DOMAIN_TYPE_VSPHERE           DomainType = 2  // vsphere
-	DOMAIN_TYPE_NSP               DomainType = 3  // nsp
 	DOMAIN_TYPE_TENCENT           DomainType = 4  // tencent
 	DOMAIN_TYPE_FILEREADER        DomainType = 5  // filereader
 	DOMAIN_TYPE_AWS               DomainType = 6  // aws
-	DOMAIN_TYPE_PINGAN            DomainType = 7  // pingan
-	DOMAIN_TYPE_ZSTACK            DomainType = 8  // zstack
 	DOMAIN_TYPE_ALIYUN            DomainType = 9  // aliyun
 	DOMAIN_TYPE_HUAWEI_PRIVATE    DomainType = 10 // huawei_private
 	DOMAIN_TYPE_KUBERNETES        DomainType = 11 // kubernetes
@@ -53,12 +50,9 @@ const (
 	DOMAIN_TYPE_HUAWEI            DomainType = 13 // huawei
 	DOMAIN_TYPE_QINGCLOUD         DomainType = 14 // qingcloud
 	DOMAIN_TYPE_QINGCLOUD_PRIVATE DomainType = 15 // qingcloud_private
-	DOMAIN_TYPE_F5                DomainType = 16 // f5
-	DOMAIN_TYPE_CMB_CMDB          DomainType = 17 // cmb_cmdb
 	DOMAIN_TYPE_AZURE             DomainType = 18 // azure
 	DOMAIN_TYPE_APSARA_STACK      DomainType = 19 // apsara_stack
 	DOMAIN_TYPE_TENCENT_TCE       DomainType = 20 // tencent_tce
-	DOMAIN_TYPE_KINGSOFT_PRIVATE  DomainType = 22 // kingsoft_private
 	DOMAIN_TYPE_AGENT_SYNC        DomainType = 23 // agent_sync
 	DOMAIN_TYPE_MICROSOFT_ACS     DomainType = 24 // microsoft_acs
 	DOMAIN_TYPE_BAIDU_BCE         DomainType = 25 // baidu_bce
@@ -67,12 +61,9 @@ const (
 var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_OPENSTACK,
 	DOMAIN_TYPE_VSPHERE,
-	DOMAIN_TYPE_NSP,
 	DOMAIN_TYPE_TENCENT,
 	DOMAIN_TYPE_FILEREADER,
 	DOMAIN_TYPE_AWS,
-	DOMAIN_TYPE_PINGAN,
-	DOMAIN_TYPE_ZSTACK,
 	DOMAIN_TYPE_ALIYUN,
 	DOMAIN_TYPE_HUAWEI_PRIVATE,
 	DOMAIN_TYPE_KUBERNETES,
@@ -80,12 +71,9 @@ var DomainTypes []DomainType = []DomainType{
 	DOMAIN_TYPE_HUAWEI,
 	DOMAIN_TYPE_QINGCLOUD,
 	DOMAIN_TYPE_QINGCLOUD_PRIVATE,
-	DOMAIN_TYPE_F5,
-	DOMAIN_TYPE_CMB_CMDB,
 	DOMAIN_TYPE_AZURE,
 	DOMAIN_TYPE_APSARA_STACK,
 	DOMAIN_TYPE_TENCENT_TCE,
-	DOMAIN_TYPE_KINGSOFT_PRIVATE,
 	DOMAIN_TYPE_AGENT_SYNC,
 	DOMAIN_TYPE_MICROSOFT_ACS,
 	DOMAIN_TYPE_BAIDU_BCE,

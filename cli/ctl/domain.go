@@ -23,9 +23,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/ghodss/yaml"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 
 	"github.com/deepflowys/deepflow/cli/ctl/common"
@@ -126,39 +126,38 @@ func listDomain(cmd *cobra.Command, args []string, output string) {
 		yData, _ := yaml.JSONToYAML(jData)
 		fmt.Printf(string(yData))
 	} else {
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetAutoWrapText(false)
-		table.SetAutoFormatHeaders(false)
-		table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-		table.SetAlignment(tablewriter.ALIGN_LEFT)
-		table.SetCenterSeparator("")
-		table.SetColumnSeparator("")
-		table.SetRowSeparator("")
-		table.SetHeaderLine(false)
-		table.SetBorder(false)
-		table.SetTablePadding("  ")
-		table.SetNoWhiteSpace(true)
+		nameMaxSize := len("NAME")
 
-		tableItems := [][]string{}
-
-		table.SetHeader([]string{"NAME", "ID", "LCUUID", "TYPE", "CONTROLLER_IP", "CREATED_AT", "SYNCED_AT", "ENABLED", "STATE"})
 		for i := range response.Get("DATA").MustArray() {
-			data := response.Get("DATA").GetIndex(i)
-			tableItem := []string{}
-			tableItem = append(tableItem, data.Get("NAME").MustString())
-			tableItem = append(tableItem, data.Get("CLUSTER_ID").MustString())
-			tableItem = append(tableItem, data.Get("LCUUID").MustString())
-			tableItem = append(tableItem, common.DomainType(data.Get("TYPE").MustInt()).String())
-			tableItem = append(tableItem, data.Get("CONTROLLER_IP").MustString())
-			tableItem = append(tableItem, data.Get("CREATED_AT").MustString())
-			tableItem = append(tableItem, data.Get("SYNCED_AT").MustString())
-			tableItem = append(tableItem, strconv.Itoa(data.Get("ENABLED").MustInt()))
-			tableItem = append(tableItem, strconv.Itoa(data.Get("STATE").MustInt()))
-			tableItems = append(tableItems, tableItem)
+			d := response.Get("DATA").GetIndex(i)
+			nameSize := len(d.Get("NAME").MustString())
+			if nameSize > nameMaxSize {
+				nameMaxSize = nameSize
+			}
 		}
-
-		table.AppendBulk(tableItems)
-		table.Render()
+		format := "%-*s %-14s %-37s %-14s %-15s %-22s %-22s %-8s %-8s %s\n"
+		header := fmt.Sprintf(
+			format, nameMaxSize, "NAME", "ID", "LCUUID", "TYPE", "CONTROLLER_IP",
+			"CREATED_AT", "SYNCED_AT", "ENABLED", "STATE", "AGENT_WATCH_K8S",
+		)
+		fmt.Fprint(os.Stderr, header)
+		for i := range response.Get("DATA").MustArray() {
+			d := response.Get("DATA").GetIndex(i)
+			name := d.Get("NAME").MustString()
+			var nameChineseCount int
+			for _, b := range name {
+				if unicode.Is(unicode.Han, b) {
+					nameChineseCount += 1
+				}
+			}
+			fmt.Printf(
+				format, nameMaxSize-nameChineseCount, name, d.Get("CLUSTER_ID").MustString(), d.Get("LCUUID").MustString(),
+				common.DomainType(d.Get("TYPE").MustInt()), d.Get("CONTROLLER_IP").MustString(),
+				d.Get("CREATED_AT").MustString(), d.Get("SYNCED_AT").MustString(),
+				strconv.Itoa(d.Get("ENABLED").MustInt()), strconv.Itoa(d.Get("STATE").MustInt()),
+				d.Get("VTAP_NAME").MustString(),
+			)
+		}
 	}
 }
 
