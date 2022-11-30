@@ -25,6 +25,7 @@ use thread::JoinHandle;
 
 use arc_swap::access::Access;
 use log::{debug, info, warn};
+use npb_pcap_policy::NpbTunnelType;
 use rand::prelude::{Rng, SeedableRng, SmallRng};
 
 use super::consts::*;
@@ -205,10 +206,17 @@ impl FlowAggr {
     }
 
     fn send_flow(&mut self, mut f: TaggedFlow) {
-        // fill acl_gids
+        // We use acl_gid to mark which flows are configured with PCAP storage policies.
+        // Since acl_gid is used for both PCAP and NPB functions, only the acl_gid used by PCAP is sent here.
         let mut acl_gids = U16Set::new();
         for policy_data in f.tag.policy_data.iter() {
+            if !policy_data.contain_pcap() {
+                continue;
+            }
             for action in policy_data.npb_actions.iter() {
+                if action.tunnel_type() != NpbTunnelType::Pcap {
+                    continue;
+                }
                 for gid in action.acl_gids().iter() {
                     acl_gids.add(*gid);
                 }
