@@ -45,7 +45,12 @@ type KubernetesInfo struct {
 }
 
 func NewKubernetesInfo(db *gorm.DB, cfg *config.Config) *KubernetesInfo {
-	return &KubernetesInfo{cfg: cfg, db: db}
+	return &KubernetesInfo{
+		cfg:                  cfg,
+		db:                   db,
+		clusterIDToDomain:    make(map[string]string),
+		clusterIDToSubDomain: make(map[string]string),
+	}
 }
 
 func (k *KubernetesInfo) TimedRefreshClusterID() {
@@ -65,17 +70,19 @@ func (k *KubernetesInfo) refresh() {
 	defer k.mutex.Unlock()
 	domainMgr := dbmgr.DBMgr[models.Domain](k.db)
 	dbDomains, _ := domainMgr.GetBatchFromTypes([]int{KUBERNETES})
-	k.clusterIDToDomain = make(map[string]string)
+	clusterIDToDomain := make(map[string]string)
 	for _, dbDomain := range dbDomains {
-		k.clusterIDToDomain[dbDomain.ClusterID] = dbDomain.Lcuuid
+		clusterIDToDomain[dbDomain.ClusterID] = dbDomain.Lcuuid
 	}
+	k.clusterIDToDomain = clusterIDToDomain
 
 	subDomainMgr := dbmgr.DBMgr[models.SubDomain](k.db)
 	subDomains, _ := subDomainMgr.Gets()
-	k.clusterIDToSubDomain = make(map[string]string)
+	clusterIDToSubDomain := make(map[string]string)
 	for _, sd := range subDomains {
-		k.clusterIDToSubDomain[sd.ClusterID] = sd.Lcuuid
+		clusterIDToSubDomain[sd.ClusterID] = sd.Lcuuid
 	}
+	k.clusterIDToSubDomain = clusterIDToSubDomain
 	log.Infof("refresh cache cluster_id completed")
 	log.Debugf("cluster_id domain map: %v, sub_domain map: %v", k.clusterIDToDomain, k.clusterIDToSubDomain)
 	return
