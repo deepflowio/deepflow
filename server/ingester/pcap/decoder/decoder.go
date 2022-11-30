@@ -169,8 +169,8 @@ func pcapToStore(vtapID uint16, pcapHeader []byte, pcap *trident.Pcap) *dbwriter
 	s.EndTime = int64(pcap.GetEndTime() / uint64(time.Microsecond))
 	s.VtapID = vtapID
 	s.FlowID = pcap.GetFlowId()
-	s.PacketCount = pcap.GetPacketCount()
-	s.PacketBatch = append(s.PacketBatch[:0], pcapHeader...)
-	s.PacketBatch = append(s.PacketBatch, pcap.GetPacketRecords()...)
+	s.PcapCount = pcap.GetPacketCount()
+	s.PcapBatch = append(s.PcapBatch[:0], pcapHeader...)
+	s.PcapBatch = append(s.PcapBatch, pcap.GetPacketRecords()...)
 	return s
 }

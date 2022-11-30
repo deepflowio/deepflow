@@ -1,2 +1,2 @@
 # Field              , DisplayName             , Unit   , Description
-packet_count         , 包数量                  , Packet ,
+pcap_count           , 包数量                  , Packet ,
