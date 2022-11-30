@@ -298,7 +298,7 @@ impl Trident {
         stats_collector: Arc<stats::Collector>,
         config_path: Option<PathBuf>,
     ) -> Result<()> {
-        info!("========== DeepFlow Agent start! ==========");
+        info!("==================== Launching DeepFlow-Agent ====================");
 
         let (ctrl_ip, ctrl_mac) = get_ctrl_ip_and_mac(config.controller_ips[0].parse()?);
         if running_in_container() {
