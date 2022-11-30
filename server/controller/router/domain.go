@@ -39,6 +39,8 @@ func DomainRouter(e *gin.Engine, cfg *config.ControllerConfig) {
 	e.POST("/v2/sub-domains/", createSubDomain)
 	e.PATCH("/v2/sub-domains/:lcuuid/", updateSubDomain)
 	e.DELETE("/v2/sub-domains/:lcuuid/", deleteSubDomain)
+
+	e.PUT("/v1/domain-additional-resources/", applyDomainAddtionalResource)
 }
 
 func getDomain(c *gin.Context) {
@@ -165,4 +167,19 @@ func updateSubDomain(c *gin.Context) {
 	lcuuid := c.Param("lcuuid")
 	data, err := service.UpdateSubDomain(lcuuid, patchMap)
 	JsonResponse(c, data, err)
+}
+
+func applyDomainAddtionalResource(c *gin.Context) {
+	var err error
+	var data map[string][]model.AdditionalResourceDomain
+
+	// invalidate request body
+	err = c.ShouldBindBodyWith(&data, binding.JSON)
+	if err != nil {
+		BadRequestResponse(c, common.INVALID_PARAMETERS, err.Error())
+		return
+	}
+
+	err = service.ApplyDomainAddtionalResource(data)
+	JsonResponse(c, map[string]interface{}{}, err)
 }
