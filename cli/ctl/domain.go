@@ -37,7 +37,7 @@ func RegisterDomainCommand() *cobra.Command {
 		Use:   "domain",
 		Short: "domain operation commands",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("please run with 'list | create | update | delete | example'.\n")
+			fmt.Printf("please run with 'list | create | update | delete | example | additional-resource'.\n")
 		},
 	}
 
@@ -100,6 +100,7 @@ func RegisterDomainCommand() *cobra.Command {
 	Domain.AddCommand(update)
 	Domain.AddCommand(delete)
 	Domain.AddCommand(exampleCmd)
+	Domain.AddCommand(RegisterDomainAdditionalResourceCommand())
 	return Domain
 }
 
