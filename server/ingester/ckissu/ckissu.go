@@ -58,6 +58,7 @@ type ColumnRename struct {
 	Table         string
 	OldColumnName string
 	NewColumnName string
+	DropIndex     bool
 }
 
 type ColumnMod struct {
@@ -468,6 +469,7 @@ var ColumnRename618 = []*ColumnRename{
 		Table:         "l4_flow_log_local",
 		OldColumnName: "flow_source",
 		NewColumnName: "signal_source",
+		DropIndex:     true,
 	},
 	&ColumnRename{
 		Db:            "flow_log",
@@ -795,6 +797,21 @@ func (i *Issu) addColumn(connect *sql.DB, c *ColumnAdd) error {
 }
 
 func (i *Issu) renameColumn(connect *sql.DB, cr *ColumnRename) error {
+	if cr.DropIndex {
+		sql := fmt.Sprintf("ALTER TABLE %s.`%s` DROP INDEX %s_idx",
+			cr.Db, cr.Table, cr.OldColumnName)
+		log.Info("drop index: ", sql)
+		_, err := connect.Exec(sql)
+		if err != nil {
+			if strings.Contains(err.Error(), "Cannot find index") {
+				log.Infof("db: %s, table: %s error: %s", cr.Db, cr.Table, err)
+			} else {
+				log.Error(err)
+				return err
+			}
+		}
+	}
+
 	// ALTER TABLE flow_log.l4_flow_log  RENAME COLUMN retan_tx TO retran_tx
 	sql := fmt.Sprintf("ALTER TABLE %s.`%s` RENAME COLUMN %s to %s",
 		cr.Db, cr.Table, cr.OldColumnName, cr.NewColumnName)
