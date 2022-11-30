@@ -22,14 +22,13 @@ import (
 	"github.com/deepflowys/deepflow/server/controller/recorder/cache"
 	"github.com/deepflowys/deepflow/server/controller/recorder/common"
 	"github.com/deepflowys/deepflow/server/controller/recorder/db"
-	"github.com/deepflowys/deepflow/server/libs/queue"
 )
 
 type DHCPPort struct {
 	UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]
 }
 
-func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort, eventQueue *queue.OverwriteQueue) *DHCPPort {
+func NewDHCPPort(wholeCache *cache.Cache, cloudData []cloudmodel.DHCPPort) *DHCPPort {
 	updater := &DHCPPort{
 		UpdaterBase[cloudmodel.DHCPPort, mysql.DHCPPort, *cache.DHCPPort]{
 			cache:        wholeCache,

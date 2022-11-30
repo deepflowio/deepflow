@@ -180,7 +180,8 @@ func NewEventToolDataSet() EventToolDataSet {
 		lanIPLcuuidToVInterfaceID: make(map[string]int),
 		lanIPLcuuidToIP:           make(map[string]string),
 
-		podNodeIDToVMID: make(map[int]int),
+		vmPodNodeConnectionLcuuidToPodNodeID: make(map[string]int),
+		podNodeIDToVMID:                      make(map[int]int),
 	}
 }
 
