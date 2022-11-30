@@ -28,12 +28,12 @@ const (
 )
 
 type PcapStore struct {
-	Time        uint32
-	EndTime     int64
-	FlowID      uint64
-	VtapID      uint16
-	PacketCount uint32
-	PacketBatch []byte
+	Time      uint32
+	EndTime   int64
+	FlowID    uint64
+	VtapID    uint16
+	PcapCount uint32
+	PcapBatch []byte
 }
 
 func PcapStoreColumns() []*ckdb.Column {
@@ -42,8 +42,8 @@ func PcapStoreColumns() []*ckdb.Column {
 		ckdb.NewColumn("end_time", ckdb.DateTime64us).SetComment("精度: 微秒"),
 		ckdb.NewColumn("flow_id", ckdb.UInt64).SetIndex(ckdb.IndexMinmax),
 		ckdb.NewColumn("vtap_id", ckdb.UInt16).SetIndex(ckdb.IndexSet),
-		ckdb.NewColumn("packet_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
-		ckdb.NewColumn("packet_batch", ckdb.ArrayUInt8).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
+		ckdb.NewColumn("pcap_count", ckdb.UInt32).SetIndex(ckdb.IndexNone),
+		ckdb.NewColumn("pcap_batch", ckdb.ArrayUInt8).SetIndex(ckdb.IndexNone).SetComment("data format reference: https://www.ietf.org/archive/id/draft-gharris-opsawg-pcap-01.html"),
 	}
 }
 
@@ -60,10 +60,10 @@ func (s *PcapStore) WriteBlock(block *ckdb.Block) error {
 	if err := block.WriteUInt16(s.VtapID); err != nil {
 		return err
 	}
-	if err := block.WriteUInt32(s.PacketCount); err != nil {
+	if err := block.WriteUInt32(s.PcapCount); err != nil {
 		return err
 	}
-	if err := block.WriteArrayByte(s.PacketBatch); err != nil {
+	if err := block.WriteArrayByte(s.PcapBatch); err != nil {
 
 		return err
 	}
@@ -92,9 +92,9 @@ func ReleasePcapStore(l *PcapStore) {
 	if l == nil {
 		return
 	}
-	t := l.PacketBatch[:0]
+	t := l.PcapBatch[:0]
 	*l = PcapStore{}
-	l.PacketBatch = t
+	l.PcapBatch = t
 	poolPcapStore.Put(l)
 }
 

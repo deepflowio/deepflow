@@ -2,9 +2,9 @@
 time                      , Time                     , Round end_time to seconds.
 
 flow_id                   , Flow ID                  ,
-start_time                , Start Time               , Unit: microseconds. Minimal time in packet_batch.
-end_time                  , End Time                 , Unit: microseconds. Maximal time in packet_batch.
+start_time                , Start Time               , Unit: microseconds. Minimal time in pcap_batch.
+end_time                  , End Time                 , Unit: microseconds. Maximal time in pcap_batch.
 
-packet_batch              , PCAP File                ,
+pcap_batch                , PCAP File                ,
 
 vtap                      , Agent Name               ,
