@@ -19,6 +19,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/db/mysql"
@@ -81,11 +82,44 @@ func ApplyDomainAddtionalResource(reqData map[string][]model.AdditionalResourceD
 
 func formatData(data map[string][]model.AdditionalResourceDomain) ([]model.AdditionalResourceDomain, error) {
 	for _, domain := range data["domains"] {
+		azLcuuids, err := getDomainAZLcuuidsIncludingDBData(domain)
+		if err != nil {
+			return nil, err
+		}
+		vpcLcuuids, err := getDomainVPCLcuuidsIncludingDBData(domain)
+		if err != nil {
+			return nil, err
+		}
 		networkLcuuidToNetType := make(map[string]int)
 		subnetLcuuidToNetworkLcuuid := make(map[string]string)
 		for _, network := range domain.Networks {
+			if network.AZLcuuid != "" && !common.Contains(azLcuuids, network.AZLcuuid) {
+				return nil, NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("domain (lcuuid: %s) network (lcuuid: %s) az lcuuid: %s not found",
+						domain.Lcuuid, network.Lcuuid, network.AZLcuuid,
+					),
+				)
+			}
+			if !common.Contains(vpcLcuuids, network.VPCLcuuid) {
+				return nil, NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("domain (lcuuid: %s) network (lcuuid: %s) vpc lcuuid: %s not found",
+						domain.Lcuuid, network.Lcuuid, network.VPCLcuuid,
+					),
+				)
+			}
 			networkLcuuidToNetType[network.Lcuuid] = network.NetType
 			for i := range network.Subnets {
+				formattedCIDR := formatCIDR(network.Subnets[i].CIDR)
+				if formattedCIDR == "" {
+					return nil, NewError(
+						common.INVALID_PARAMETERS,
+						fmt.Sprintf("domain (lcuuid: %s) network (lcuuid: %s) subnet (lcuuid: %s) cidr: %s is invalid",
+							domain.Lcuuid, network.Lcuuid, network.Subnets[i].Lcuuid, network.Subnets[i].CIDR,
+						),
+					)
+				}
 				network.Subnets[i].NetworkLcuuid = network.Lcuuid
 				network.Subnets[i].VPCLcuuid = network.VPCLcuuid
 				subnetLcuuidToNetworkLcuuid[network.Subnets[i].Lcuuid] = network.Subnets[i].NetworkLcuuid
@@ -93,6 +127,14 @@ func formatData(data map[string][]model.AdditionalResourceDomain) ([]model.Addit
 		}
 
 		for _, host := range domain.Hosts {
+			if !common.Contains(azLcuuids, host.AZLcuuid) {
+				return nil, NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("domain (lcuuid: %s) host (lcuuid: %s) az lcuuid: %s not found",
+						domain.Lcuuid, host.Lcuuid, host.AZLcuuid,
+					),
+				)
+			}
 			host.Type = common.HOST_TYPE_VM
 			if host.HType == 0 {
 				host.HType = common.HOST_HTYPE_KVM
@@ -110,6 +152,16 @@ func formatData(data map[string][]model.AdditionalResourceDomain) ([]model.Addit
 				host.VInterfaces[vifIndex].Lcuuid = common.GenerateUUID(domain.Lcuuid + host.VInterfaces[vifIndex].Mac)
 				var networkLcuuid string
 				for ipIndex := range host.VInterfaces[vifIndex].IPs {
+					formattedIP := formatIP(host.VInterfaces[vifIndex].IPs[ipIndex].IP)
+					if formattedIP == "" {
+						return nil, NewError(
+							common.INVALID_PARAMETERS,
+							fmt.Sprintf("domain (lcuuid: %s) host (lcuuid: %s) vinterface (mac: %s) ip: %s is invalid",
+								domain.Lcuuid, host.Lcuuid, host.VInterfaces[vifIndex].Mac, host.VInterfaces[vifIndex].IPs[ipIndex].IP,
+							),
+						)
+					}
+					host.VInterfaces[vifIndex].IPs[ipIndex].IP = formattedIP
 					networkLcuuidTmp, ok := subnetLcuuidToNetworkLcuuid[host.VInterfaces[vifIndex].IPs[ipIndex].SubnetLcuuid]
 					if !ok {
 						return nil, NewError(
@@ -151,6 +203,22 @@ func formatData(data map[string][]model.AdditionalResourceDomain) ([]model.Addit
 		}
 
 		for _, vm := range domain.VMs {
+			if !common.Contains(azLcuuids, vm.AZLcuuid) {
+				return nil, NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) az lcuuid: %s not found",
+						domain.Lcuuid, vm.Lcuuid, vm.AZLcuuid,
+					),
+				)
+			}
+			if !common.Contains(vpcLcuuids, vm.VPCLcuuid) {
+				return nil, NewError(
+					common.INVALID_POST_DATA,
+					fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) vpc lcuuid: %s not found",
+						domain.Lcuuid, vm.Lcuuid, vm.VPCLcuuid,
+					),
+				)
+			}
 			vm.State = common.VM_STATE_RUNNING
 			if vm.HType == 0 {
 				vm.HType = common.VM_HTYPE_VM_C
@@ -169,6 +237,16 @@ func formatData(data map[string][]model.AdditionalResourceDomain) ([]model.Addit
 				vm.VInterfaces[vifIndex].Lcuuid = common.GenerateUUID(domain.Lcuuid + vm.VInterfaces[vifIndex].Mac)
 				var networkLcuuid string
 				for ipIndex := range vm.VInterfaces[vifIndex].IPs {
+					formattedIP := formatIP(vm.VInterfaces[vifIndex].IPs[ipIndex].IP)
+					if formattedIP == "" {
+						return nil, NewError(
+							common.INVALID_PARAMETERS,
+							fmt.Sprintf("domain (lcuuid: %s) vm (lcuuid: %s) vinterface (mac: %s) ip: %s is invalid",
+								domain.Lcuuid, vm.Lcuuid, vm.VInterfaces[vifIndex].Mac, vm.VInterfaces[vifIndex].IPs[ipIndex].IP,
+							),
+						)
+					}
+					vm.VInterfaces[vifIndex].IPs[ipIndex].IP = formattedIP
 					networkLcuuidTmp, ok := subnetLcuuidToNetworkLcuuid[vm.VInterfaces[vifIndex].IPs[ipIndex].SubnetLcuuid]
 					if !ok {
 						return nil, NewError(
@@ -210,4 +288,58 @@ func formatData(data map[string][]model.AdditionalResourceDomain) ([]model.Addit
 		}
 	}
 	return data["domains"], nil
+}
+
+func formatIP(ip string) string {
+	i := net.ParseIP(ip)
+	if i == nil {
+		return ""
+	}
+	return i.String()
+}
+
+func formatCIDR(cidr string) string {
+	_, c, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return ""
+	}
+	return c.String()
+}
+
+func getDomainAZLcuuidsIncludingDBData(domain model.AdditionalResourceDomain) ([]string, error) {
+	var azLcuuids []string
+	var dbAZs []mysql.AZ
+	err := mysql.Db.Where("domain = ?", domain.Lcuuid).Find(&dbAZs).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("check domain (lcuuid: %s) failed: %s", domain.Lcuuid, err.Error()),
+		)
+	}
+	for _, a := range dbAZs {
+		azLcuuids = append(azLcuuids, a.Lcuuid)
+	}
+	for _, a := range domain.AZs {
+		azLcuuids = append(azLcuuids, a.Lcuuid)
+	}
+	return azLcuuids, nil
+}
+
+func getDomainVPCLcuuidsIncludingDBData(domain model.AdditionalResourceDomain) ([]string, error) {
+	var vpcLcuuids []string
+	var dbVPCs []mysql.VPC
+	err := mysql.Db.Where("domain = ?", domain.Lcuuid).Find(&dbVPCs).Error
+	if err != nil {
+		return nil, NewError(
+			common.SERVER_ERROR,
+			fmt.Sprintf("check domain (lcuuid: %s) failed: %s", domain.Lcuuid, err.Error()),
+		)
+	}
+	for _, v := range dbVPCs {
+		vpcLcuuids = append(vpcLcuuids, v.Lcuuid)
+	}
+	for _, v := range domain.VPCs {
+		vpcLcuuids = append(vpcLcuuids, v.Lcuuid)
+	}
+	return vpcLcuuids, nil
 }

@@ -375,7 +375,7 @@ type AdditionalResourceHost struct {
 	IP           string                         `json:"ip" yaml:"ip" binding:"required"`
 	Type         int                            `json:"type" yaml:"type"`
 	HType        int                            `json:"htype" yaml:"htype"`
-	AZLcuuid     string                         `json:"az_lcuuid" yaml:"az_lcuuid"`
+	AZLcuuid     string                         `json:"az_lcuuid" yaml:"az_lcuuid" binding:"required"`
 	RegionLcuuid string                         `json:"region_lcuuid" yaml:"region_lcuuid" binding:"required"`
 	VInterfaces  []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
 }
@@ -387,7 +387,7 @@ type AdditionalResourceVM struct {
 	HType        int                            `json:"htype" yaml:"htype"`
 	State        int                            `json:"state" yaml:"state"`
 	VPCLcuuid    string                         `json:"vpc_lcuuid" yaml:"vpc_lcuuid" binding:"required"`
-	AZLcuuid     string                         `json:"az_lcuuid" yaml:"az_lcuuid"`
+	AZLcuuid     string                         `json:"az_lcuuid" yaml:"az_lcuuid" binding:"required"`
 	RegionLcuuid string                         `json:"region_lcuuid" yaml:"region_lcuuid" binding:"required"`
 	VInterfaces  []AdditionalResourceVInterface `json:"vinterfaces" yaml:"vinterfaces"`
 }
