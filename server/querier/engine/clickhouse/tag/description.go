@@ -131,7 +131,7 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 			continue
 		}
 		for table, tableTagData := range dbTagData.(map[string]interface{}) {
-			// 遍历文件内容进行赋值
+			// common.Result
 			for i, tag := range tableTagData.([][]interface{}) {
 				if strings.Contains(table, ".") {
 					continue
@@ -218,15 +218,15 @@ func LoadTagDescriptions(tagData map[string]interface{}) error {
 	return nil
 }
 
-func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[string][]interface{}, error) {
+func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (response *common.Result, err error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
-	response := map[string][]interface{}{
-		"columns": []interface{}{
+	response = &common.Result{
+		Columns: []interface{}{
 			"name", "client_name", "server_name", "display_name", "type", "category",
 			"operators", "permissions", "description", "related_tag",
 		},
-		"values": []interface{}{},
+		Values: []interface{}{},
 	}
 
 	for _, key := range TAG_DESCRIPTION_KEYS {
@@ -234,8 +234,8 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 			continue
 		}
 		tag, _ := TAG_DESCRIPTIONS[key]
-		response["values"] = append(
-			response["values"],
+		response.Values = append(
+			response.Values,
 			[]interface{}{
 				tag.Name, tag.ClientName, tag.ServerName, tag.DisplayName, tag.Type,
 				tag.Category, tag.Operators, tag.Permissions, tag.Description, tag.RelatedTag,
@@ -257,16 +257,16 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	for _, _key := range rst["values"] {
+	for _, _key := range rst.Values {
 		key := _key.([]interface{})[0]
 		labelKey := "label." + key.(string)
 		if db == "ext_metrics" || db == "event" || table == "vtap_flow_port" || table == "vtap_app_port" {
-			response["values"] = append(response["values"], []interface{}{
+			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey, labelKey, labelKey, "label",
 				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
 		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
-			response["values"] = append(response["values"], []interface{}{
+			response.Values = append(response.Values, []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
 				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
@@ -300,24 +300,24 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	for _, _tagName := range externalRst["values"] {
+	for _, _tagName := range externalRst.Values {
 		tagName := _tagName.([]interface{})[0]
 		if db == "ext_metrics" || db == "deepflow_system" {
 			externalTag := "tag." + tagName.(string)
-			response["values"] = append(response["values"], []interface{}{
+			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "tag",
 				"Tag", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		} else {
 			externalTag := "attribute." + tagName.(string)
-			response["values"] = append(response["values"], []interface{}{
+			response.Values = append(response.Values, []interface{}{
 				externalTag, externalTag, externalTag, externalTag, "attribute",
 				"Attributes", tagTypeToOperators["string"], []bool{true, true, true}, externalTag, "",
 			})
 		}
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
-		response["values"] = append(response["values"], []interface{}{
+		response.Values = append(response.Values, []interface{}{
 			"tags", "tags", "tags", "tags", "map",
 			"Tag", []string{}, []bool{true, true, true}, "tags", "",
 		})
@@ -354,7 +354,7 @@ func GetEnumTagValues(db, table, sql string) (map[string][]interface{}, error) {
 	return response, nil
 }
 
-func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, error) {
+func GetTagValues(db, table, sql string) (*common.Result, []string, error) {
 	// 把`1m`的反引号去掉
 	table = strings.Trim(table, "`")
 	// 获取tagEnumFile
@@ -362,11 +362,10 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, er
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
 	var sqlList []string
-	response := map[string][]interface{}{}
 	var rgx = regexp.MustCompile(`(?i)show|SHOW +tag +\S+ +values +from|FROM +\S+( +(where|WHERE \S+ like|LIKE \S+))?`)
 	sqlOk := rgx.MatchString(sql)
 	if !sqlOk {
-		return response, sqlList, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
+		return nil, sqlList, errors.New(fmt.Sprintf("sql synax error: %s ", sql))
 	}
 	showSqlList := strings.Split(sql, "WHERE")
 	if len(showSqlList) == 1 {
@@ -397,7 +396,7 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, er
 		DB: db, Table: table, TagName: tag,
 	}]
 	if !ok {
-		return response, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
+		return nil, sqlList, errors.New(fmt.Sprintf("no tag %s in %s.%s", tag, db, table))
 	}
 	if db == "event" {
 		sql = strings.ReplaceAll(sql, "subnets", "subnet")
@@ -446,11 +445,11 @@ func GetTagValues(db, table, sql string) (map[string][]interface{}, []string, er
 	sql = fmt.Sprintf("SELECT value,name AS display_name FROM %s WHERE tag_name='%s' %s GROUP BY value, display_name ORDER BY %s ASC %s", table, tag, whereSql, orderBy, limitSql)
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
-	return response, sqlList, nil
+	return nil, sqlList, nil
 
 }
 
-func GetTagResourceValues(db, table, rawSql string) (map[string][]interface{}, []string, error) {
+func GetTagResourceValues(db, table, rawSql string) (*common.Result, []string, error) {
 	chClient := client.Client{
 		Host:     config.Cfg.Clickhouse.Host,
 		Port:     config.Cfg.Clickhouse.Port,
@@ -502,7 +501,7 @@ func GetTagResourceValues(db, table, rawSql string) (map[string][]interface{}, [
 	if !isAdminFlag {
 		switch tag {
 		case "resource_gl0", "resource_gl1", "resource_gl2":
-			results := map[string][]interface{}{}
+			results := &common.Result{}
 			for resourceKey, resourceType := range AutoMap {
 				// 增加资源ID
 				resourceId := resourceKey + "_id"
@@ -513,12 +512,9 @@ func GetTagResourceValues(db, table, rawSql string) (map[string][]interface{}, [
 				log.Debug(sql)
 				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 				if err != nil {
-					return map[string][]interface{}{}, sqlList, err
+					return results, sqlList, err
 				}
-
-				for _, value := range rst["values"] {
-					results["values"] = append(results["values"], value)
-				}
+				results.Values = append(results.Values, rst.Values...)
 			}
 			autoMap := map[string]map[string]int{
 				"resource_gl0": AutoPodMap,
@@ -538,12 +534,10 @@ func GetTagResourceValues(db, table, rawSql string) (map[string][]interface{}, [
 				log.Debug(sql)
 				rst, err := chClient.DoQuery(&client.QueryParams{Sql: sql})
 				if err != nil {
-					return map[string][]interface{}{}, sqlList, err
+					return results, sqlList, err
 				}
-				for _, value := range rst["values"] {
-					results["values"] = append(results["values"], value)
-				}
-				results["columns"] = rst["columns"]
+				results.Values = append(results.Values, rst.Values...)
+				results.Columns = rst.Columns
 			}
 			return results, sqlList, nil
 		}
@@ -655,11 +649,11 @@ func GetTagResourceValues(db, table, rawSql string) (map[string][]interface{}, [
 		}
 		log.Debug(sql)
 		sqlList = append(sqlList, sql)
-		return map[string][]interface{}{}, sqlList, nil
+		return nil, sqlList, nil
 	}
 }
 
-func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, []string, error) {
+func GetExternalTagValues(db, table, rawSql string) (*common.Result, []string, error) {
 	sqlSplit := strings.Split(rawSql, " ")
 	tag := sqlSplit[2]
 	tag = strings.Trim(tag, "'")
@@ -702,5 +696,5 @@ func GetExternalTagValues(db, table, rawSql string) (map[string][]interface{}, [
 	}
 	log.Debug(sql)
 	sqlList = append(sqlList, sql)
-	return map[string][]interface{}{}, sqlList, nil
+	return nil, sqlList, nil
 }

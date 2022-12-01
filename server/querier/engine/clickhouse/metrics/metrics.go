@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/config"
 	ckcommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 
@@ -228,7 +229,7 @@ func GetMetricsDescriptionsByDBTable(db string, table string, where string, ctx 
 	return values, nil
 }
 
-func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (map[string][]interface{}, error) {
+func GetMetricsDescriptions(db string, table string, where string, ctx context.Context) (*common.Result, error) {
 	var values []interface{}
 	if table == "" {
 		var tables []interface{}
@@ -264,9 +265,9 @@ func GetMetricsDescriptions(db string, table string, where string, ctx context.C
 	columns := []interface{}{
 		"name", "is_agg", "display_name", "unit", "type", "category", "operators", "permissions", "table",
 	}
-	return map[string][]interface{}{
-		"columns": columns,
-		"values":  values,
+	return &common.Result{
+		Columns: columns,
+		Values:  values,
 	}, nil
 }
 

@@ -18,42 +18,43 @@ package clickhouse
 
 import (
 	"context"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
+	"github.com/deepflowys/deepflow/server/querier/common"
+	chCommon "github.com/deepflowys/deepflow/server/querier/engine/clickhouse/common"
 )
 
-func GetDatabases() map[string][]interface{} {
+func GetDatabases() *common.Result {
 	var values []interface{}
-	for db := range common.DB_TABLE_MAP {
+	for db := range chCommon.DB_TABLE_MAP {
 		values = append(values, []string{db})
 	}
-	return map[string][]interface{}{
-		"columns": []interface{}{"name"},
-		"values":  values,
+	return &common.Result{
+		Columns: []interface{}{"name"},
+		Values:  values,
 	}
 }
 
-func GetTables(db string, ctx context.Context) map[string][]interface{} {
+func GetTables(db string, ctx context.Context) *common.Result {
 	var values []interface{}
-	tables, ok := common.DB_TABLE_MAP[db]
+	tables, ok := chCommon.DB_TABLE_MAP[db]
 	if !ok {
 		return nil
 	}
 	if db == "ext_metrics" || db == "deepflow_system" {
-		values = append(values, common.GetExtTables(db, ctx)...)
+		values = append(values, chCommon.GetExtTables(db, ctx)...)
 	} else {
 		for _, table := range tables {
 			if table == "vtap_acl" {
 				continue
 			}
-			datasource, err := common.GetDatasources(db, table)
+			datasource, err := chCommon.GetDatasources(db, table)
 			if err != nil {
 				log.Error(err)
 			}
 			values = append(values, []interface{}{table, datasource})
 		}
 	}
-	return map[string][]interface{}{
-		"columns": []interface{}{"name", "datasources"},
-		"values":  values,
+	return &common.Result{
+		Columns: []interface{}{"name", "datasources"},
+		Values:  values,
 	}
 }

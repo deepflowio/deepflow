@@ -213,7 +213,7 @@ func GetExtTables(db string, ctx context.Context) (values []interface{}) {
 		log.Error(err)
 		return nil
 	}
-	for _, _table := range rst["values"] {
+	for _, _table := range rst.Values {
 		table := _table.([]interface{})[0].(string)
 		if !strings.HasSuffix(table, "_local") {
 			datasources, _ := GetDatasources(db, table)

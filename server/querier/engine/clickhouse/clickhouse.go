@@ -45,12 +45,12 @@ type CHEngine struct {
 	Table         string
 	DataSource    string
 	asTagMap      map[string]string
-	ColumnSchemas []*client.ColumnSchema
+	ColumnSchemas []*common.ColumnSchema
 	View          *view.View
 	Context       context.Context
 }
 
-func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interface{}, map[string]interface{}, error) {
+func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map[string]interface{}, error) {
 	// 解析show开头的sql
 	// show metrics/tags from <table_name> 例：show metrics/tags from l4_flow_log
 	var sqlList []string
@@ -75,7 +75,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interf
 	parser := parse.Parser{Engine: e}
 	if len(sqlList) > 0 {
 		e.DB = "flow_tag"
-		results := map[string][]interface{}{}
+		results := &common.Result{}
 		chClient := client.Client{
 			Host:     config.Cfg.Clickhouse.Host,
 			Port:     config.Cfg.Clickhouse.Port,
@@ -85,7 +85,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interf
 			Debug:    debug,
 			Context:  e.Context,
 		}
-		ColumnSchemaMap := make(map[string]*client.ColumnSchema)
+		ColumnSchemaMap := make(map[string]*common.ColumnSchema)
 		for _, ColumnSchema := range e.ColumnSchemas {
 			ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 		}
@@ -116,8 +116,8 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interf
 				return nil, nil, err
 			}
 			if result != nil {
-				results["values"] = append(results["values"], result["values"]...)
-				results["columns"] = result["columns"]
+				results.Values = append(results.Values, result.Values...)
+				results.Columns = result.Columns
 			}
 		}
 		return results, debug.Get(), nil
@@ -145,7 +145,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interf
 		Debug:    debug,
 		Context:  e.Context,
 	}
-	ColumnSchemaMap := make(map[string]*client.ColumnSchema)
+	ColumnSchemaMap := make(map[string]*common.ColumnSchema)
 	for _, ColumnSchema := range e.ColumnSchemas {
 		ColumnSchemaMap[ColumnSchema.Name] = ColumnSchema
 	}
@@ -162,15 +162,15 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (map[string][]interf
 	return rst, debug.Get(), err
 }
 
-func (e *CHEngine) ParseShowSql(sql string) (map[string][]interface{}, []string, bool, error) {
+func (e *CHEngine) ParseShowSql(sql string) (*common.Result, []string, bool, error) {
 	sqlSplit := strings.Split(sql, " ")
 	if strings.ToLower(sqlSplit[0]) != "show" {
 		return nil, []string{}, false, nil
 	}
 	if strings.ToLower(sqlSplit[1]) == "language" {
-		result := make(map[string][]interface{})
-		result["columns"] = []interface{}{"language"}
-		result["values"] = []interface{}{[]string{config.Cfg.Language}}
+		result := &common.Result{}
+		result.Columns = []interface{}{"language"}
+		result.Values = []interface{}{[]string{config.Cfg.Language}}
 		return result, []string{}, true, nil
 	}
 	var table string
@@ -527,9 +527,9 @@ func (e *CHEngine) parseSelect(tag sqlparser.SelectExpr) error {
 func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	as := chCommon.ParseAlias(item.As)
 	if as != "" {
-		e.ColumnSchemas = append(e.ColumnSchemas, client.NewColumnSchema(as))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as))
 	} else {
-		e.ColumnSchemas = append(e.ColumnSchemas, client.NewColumnSchema(chCommon.ParseAlias(item.Expr)))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(chCommon.ParseAlias(item.Expr)))
 	}
 	//var args []string
 	switch expr := item.Expr.(type) {
@@ -573,7 +573,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 			// 通过metric判断view是否拆层
 			e.SetLevelFlag(levelFlag)
 			e.Statements = append(e.Statements, function)
-			e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = client.COLUMN_SCHEMA_TYPE_METRICS
+			e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = common.COLUMN_SCHEMA_TYPE_METRICS
 			if unit != "" {
 				e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit = unit
 			}
@@ -662,7 +662,7 @@ func (e *CHEngine) parseSelectBinaryExpr(node sqlparser.Expr) (binary Function, 
 		if aggfunction != nil {
 			// 通过metric判断view是否拆层
 			e.SetLevelFlag(levelFlag)
-			e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = client.COLUMN_SCHEMA_TYPE_METRICS
+			e.ColumnSchemas[len(e.ColumnSchemas)-1].Type = common.COLUMN_SCHEMA_TYPE_METRICS
 			if unit != "" && e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit == "" {
 				e.ColumnSchemas[len(e.ColumnSchemas)-1].Unit = unit
 			}
