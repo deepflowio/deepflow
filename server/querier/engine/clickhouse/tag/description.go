@@ -265,7 +265,7 @@ func GetTagDescriptions(db, table, rawSql string, ctx context.Context) (map[stri
 				labelKey, labelKey, labelKey, labelKey, "label",
 				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
 			})
-		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" {
+		} else if db != "deepflow_system" && table != "vtap_acl" && table != "l4_packet" && table != "l7_packet" {
 			response["values"] = append(response["values"], []interface{}{
 				labelKey, labelKey + "_0", labelKey + "_1", labelKey, "label",
 				"K8s Labels", tagTypeToOperators["string"], []bool{true, true, true}, "", "",
