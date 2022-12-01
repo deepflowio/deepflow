@@ -17,6 +17,7 @@
 package ctl
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -35,15 +36,23 @@ func RegisterCloudCommand() *cobra.Command {
 		},
 	}
 
+	var domainLcuuid string
+	var domainName string
 	var infoResource string
 	info := &cobra.Command{
-		Use:     "info domain-lcuuid",
-		Short:   "get cloud info of one domain by lcuuid",
-		Example: "deepflow-ctl cloud info bcb21453-0833-5d94-b4cf-adb3879400c9 -r VMs,VPCs",
+		Use:     "info",
+		Short:   "get cloud info of one domain, must specify one of domain-lcuuid, domain-name",
+		Example: "deepflow-ctl cloud info --domain-lcuuid bcb21453-0833-5d94-b4cf-adb3879400c9 -r VMs,VPCs",
 		Run: func(cmd *cobra.Command, args []string) {
-			getInfo(cmd, args, infoResource)
+			getInfo(cmd, domainLcuuid, domainName, infoResource)
 		},
 	}
+	info.Flags().StringVarP(
+		&domainLcuuid, "domain-lcuuid", "l", "", fmt.Sprintf("specify domain lcuuid to get resources info"),
+	)
+	info.Flags().StringVarP(
+		&domainName, "domain-name", "n", "", fmt.Sprintf("specify domain name to get resources info"),
+	)
 	info.Flags().StringVarP(
 		&infoResource, "resource-type", "r", "", fmt.Sprintf("only get specified resources info, split by comma.Supported choices: %v", common.RESOURCE_TYPES),
 	)
@@ -62,14 +71,28 @@ func RegisterCloudCommand() *cobra.Command {
 	return cloud
 }
 
-func getInfo(cmd *cobra.Command, args []string, resource string) {
-	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "must specify domain lcuuid.\nExample: %s\n", cmd.Example)
+func getInfo(cmd *cobra.Command, domainLcuuid, domainName, resource string) {
+	if domainLcuuid == "" && domainName == "" {
+		fmt.Fprintf(os.Stderr, "must specify one of domain-lcuuid, domain-name.\nExample: %s\n", cmd.Example)
 		return
 	}
 
-	lcuuid := args[0]
 	server := common.GetServerInfo(cmd)
+	lcuuid := domainLcuuid
+	if lcuuid == "" {
+		url := fmt.Sprintf("http://%s:%d/v2/domains/?name=%s", server.IP, server.Port, domainName)
+		resp, err := common.CURLResponseRawJson("GET", url)
+		if err != nil {
+			fmt.Println("get domain info by name failed.")
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		if len(resp.Get("DATA").MustArray()) == 0 {
+			fmt.Fprintln(os.Stderr, errors.New(fmt.Sprintf("domain name: %s not found", domainName)))
+			return
+		}
+		lcuuid = resp.Get("DATA").GetIndex(0).Get("LCUUID").MustString()
+	}
 	url := fmt.Sprintf("http://%s:%d/v1/info/%s/", server.IP, server.Port, lcuuid)
 
 	resp, err := common.CURLResponseRawJson("GET", url)

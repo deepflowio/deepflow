@@ -39,23 +39,23 @@ type Host struct {
 	IP           string `json:"ip" binding:"required"`
 	Type         int    `json:"type" binding:"required"`
 	HType        int    `json:"htype" binding:"required"`
-	VCPUNum      int    `json:"vcpu_num" binding:"required"`
-	MemTotal     int    `json:"mem_total" binding:"required"`
+	VCPUNum      int    `json:"vcpu_num"`
+	MemTotal     int    `json:"mem_total"`
 	ExtraInfo    string `json:"extra_info"`
-	AZLcuuid     string `json:"az_lcuuid" binding:"required"`
+	AZLcuuid     string `json:"az_lcuuid"`
 	RegionLcuuid string `json:"region_lcuuid" binding:"required"`
 }
 
 type VM struct {
 	Lcuuid       string    `json:"lcuuid" binding:"required"`
 	Name         string    `json:"name" binding:"required"`
-	Label        string    `json:"label" binding:"required"`
+	Label        string    `json:"label"`
 	HType        int       `json:"htype" binding:"required"`
 	State        int       `json:"state" binding:"required"`
 	LaunchServer string    `json:"launch_server" binding:"required"`
 	CreatedAt    time.Time `json:"created_at"`
 	VPCLcuuid    string    `json:"vpc_lcuuid" binding:"required"`
-	AZLcuuid     string    `json:"az_lcuuid" binding:"required"`
+	AZLcuuid     string    `json:"az_lcuuid"`
 	RegionLcuuid string    `json:"region_lcuuid" binding:"required"`
 }
 
@@ -79,10 +79,11 @@ type Network struct {
 	Lcuuid          string `json:"lcuuid" binding:"required"`
 	Name            string `json:"name" binding:"required"`
 	Label           string `json:"label"`
-	SegmentationID  int    `json:"segmentation_id" binding:"required"`
+	SegmentationID  int    `json:"segmentation_id"`
 	TunnelID        int    `json:"tunnel_id"`
-	Shared          bool   `json:"shared" binding:"required"`
-	External        bool   `json:"external" binding:"required"`
+	Shared          bool   `json:"shared"`
+	External        bool   `json:"external"`
+	IsVIP           bool   `json:"is_vip"`
 	NetType         int    `json:"net_type" binding:"required"`
 	VPCLcuuid       string `json:"vpc_lcuuid" binding:"required"`
 	AZLcuuid        string `json:"az_lcuuid"`
@@ -94,7 +95,7 @@ type Subnet struct {
 	Lcuuid          string `json:"lcuuid" binding:"required"`
 	Name            string `json:"name" binding:"required"`
 	Label           string `json:"label"`
-	CIDR            string `json:"cidr"`
+	CIDR            string `json:"cidr" binding:"required"`
 	GatewayIP       string `json:"gateway_ip"`
 	NetworkLcuuid   string `json:"network_lcuuid" binding:"required"`
 	VPCLcuuid       string `json:"vpc_lcuuid" binding:"required"`
@@ -136,14 +137,14 @@ type DHCPPort struct {
 
 type VInterface struct {
 	Lcuuid          string `json:"lcuuid" binding:"required"`
-	Name            string `json:"name" binding:"required"`
+	Name            string `json:"name"`
 	Type            int    `json:"type" binding:"required"`
 	Mac             string `json:"mac" binding:"required"`
 	TapMac          string `json:"tap_mac"`
 	DeviceLcuuid    string `json:"device_lcuuid" binding:"required"`
 	DeviceType      int    `json:"device_type" binding:"required"`
 	NetworkLcuuid   string `json:"network_lcuuid" binding:"required"`
-	VPCLcuuid       string `json:"vpc_lcuuid" binding:"required"` // TODO not used
+	VPCLcuuid       string `json:"vpc_lcuuid"` // TODO not used
 	RegionLcuuid    string `json:"region_lcuuid" binding:"required"`
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }

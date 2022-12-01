@@ -104,6 +104,17 @@ pub enum L7FlowPerfTable {
     ProtobufRpcWrapLog,
 }
 
+impl L7FlowPerfTable {
+    // TODO will remove when perf abstruct to log parse
+    pub fn reset(&mut self) {
+        match self {
+            L7FlowPerfTable::ProtobufRpcWrapLog(p) => p.reset(),
+            L7FlowPerfTable::PostgresqlLog(p) => p.reset(),
+            _ => {}
+        }
+    }
+}
+
 pub struct FlowPerf {
     l4: L4FlowPerfTable,
     l7: Option<L7FlowPerfTable>,
@@ -180,8 +191,15 @@ impl FlowPerf {
         if self.is_skip {
             return Err(Error::L7ProtocolParseLimit);
         }
+        if packet.get_l4_payload().is_none() {
+            return Err(Error::ZeroPayloadLen);
+        }
+        let perf_parser = self.l7.as_mut().unwrap();
+        let ret = perf_parser.parse(packet, flow_id);
+        if ret.is_ok() {
+            perf_parser.reset();
+        }
 
-        let ret = self.l7.as_mut().unwrap().parse(packet, flow_id);
         if !self.is_success {
             if ret.is_ok() {
                 app_table.set_protocol(packet, self.l7_protocol_enum);
@@ -231,7 +249,7 @@ impl FlowPerf {
             return ret;
         }
 
-        return Err(Error::L7ProtocolUnknown);
+        return Err(Error::ZeroPayloadLen);
     }
 
     fn l7_check(
@@ -308,11 +326,14 @@ impl FlowPerf {
             // FIXME: Is it possible that the server_port of eBPF data is 0?
         }
 
-        if self.l7.is_some() {
+        if self.l7.is_some() && is_parse_perf {
             self.l7_parse_perf(packet, flow_id, app_table)?;
+            if !is_parse_log {
+                return Ok((vec![], 0));
+            }
         }
 
-        if self.l7_protocol_log_parser.is_some() {
+        if self.l7_protocol_log_parser.is_some() && is_parse_log {
             return Ok((
                 self.l7_parse_log(packet, app_table, &ParseParam::from(&*packet))?,
                 self.get_rrt(),
