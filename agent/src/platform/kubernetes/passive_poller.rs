@@ -389,7 +389,7 @@ impl Poller for PassivePoller {
     }
 
     fn get_interface_info_in(&self, _: &NsFile) -> Option<Vec<InterfaceInfo>> {
-        None
+        Some(self.get_interface_info())
     }
 
     fn get_interface_info(&self) -> Vec<InterfaceInfo> {

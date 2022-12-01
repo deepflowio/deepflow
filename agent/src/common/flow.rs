@@ -189,17 +189,19 @@ impl From<FlowKey> for flow_log::FlowKey {
     }
 }
 
-#[derive(Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Debug, Clone, Copy, PartialOrd, PartialEq, Eq, Ord)]
 #[repr(u8)]
-pub enum FlowSource {
-    Normal = 0,
-    Sflow = 1,
-    NetFlow = 2,
+pub enum SignalSource {
+    Packet = 0, // Packet data from AF_PACKET/Winpcap
+    XFlow = 1,  // Flow data from NetFlow/sFlow/NetStream
+    // 2 reserved
+    EBPF = 3, // Function call data from eBPF
+    OTel = 4, // Tracing data received using the OTLP protocol, such as otel-collector data
 }
 
-impl Default for FlowSource {
+impl Default for SignalSource {
     fn default() -> Self {
-        FlowSource::Normal
+        SignalSource::Packet
     }
 }
 
@@ -792,7 +794,7 @@ pub struct Flow {
     pub flow_perf_stats: Option<FlowPerfStats>,
 
     pub close_type: CloseType,
-    pub flow_source: FlowSource,
+    pub signal_source: SignalSource,
     #[serde(skip)]
     pub is_active_service: bool,
     #[serde(skip)]
@@ -928,14 +930,14 @@ impl fmt::Display for Flow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "flow_id:{} flow_source:{:?} tunnel:{} close_type:{:?} is_active_service:{} is_new_flow:{} queue_hash:{} \
+            "flow_id:{} signal_source:{:?} tunnel:{} close_type:{:?} is_active_service:{} is_new_flow:{} queue_hash:{} \
         syn_seq:{} synack_seq:{} last_keepalive_seq:{} last_keepalive_ack:{} flow_stat_time:{:?} \
         \t start_time:{:?} end_time:{:?} duration:{:?} \
         \t vlan:{} eth_type:{:?} reversed:{} flow_key:{} \
         \n\t flow_metrics_peers_src:{:?} \
         \n\t flow_metrics_peers_dst:{:?} \
         \n\t flow_perf_stats:{:?}",
-            self.flow_id, self.flow_source, self.tunnel, self.close_type, self.is_active_service, self.is_new_flow, self.queue_hash,
+            self.flow_id, self.signal_source, self.tunnel, self.close_type, self.is_active_service, self.is_new_flow, self.queue_hash,
             self.syn_seq, self.synack_seq, self.last_keepalive_seq, self.last_keepalive_ack, self.flow_stat_time,
             self.start_time, self.end_time, self.duration,
             self.vlan, self.eth_type, self.reversed, self.flow_key,
@@ -974,7 +976,7 @@ impl From<Flow> for flow_log::Flow {
                 }
             },
             close_type: f.close_type as u32,
-            flow_source: f.flow_source as u32,
+            signal_source: f.signal_source as u32,
             is_active_service: f.is_active_service as u32,
             queue_hash: f.queue_hash as u32,
             is_new_flow: f.is_new_flow as u32,

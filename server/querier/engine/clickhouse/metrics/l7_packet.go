@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package migration
+package metrics
 
-const (
-	CREATE_TABLE_DB_VERSION = `CREATE TABLE IF NOT EXISTS db_version (
-		version             CHAR(64),
-		created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	)ENGINE=innodb DEFAULT CHARSET=utf8;`
-)
+var L7_PACKET_METRICS = map[string]*Metrics{}
+
+var L7_PACKET_METRICS_REPLACE = map[string]*Metrics{}
+
+func GetL7PacketMetrics() map[string]*Metrics {
+	// TODO: 特殊指标量修改
+	return L7_PACKET_METRICS
+}

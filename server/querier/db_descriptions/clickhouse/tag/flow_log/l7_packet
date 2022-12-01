@@ -5,6 +5,6 @@ flow_id                   , flow_id                   , flow_id                 
 start_time                , start_time                , start_time                , int           ,                      , Flow Info     , 111
 end_time                  , end_time                  , end_time                  , int           ,                      , Flow Info     , 111
 
-packet_batch              , packet_batch              , packet_batch              , map           ,                      , Packet Info   , 111
+pcap_batch                , pcap_batch                , pcap_batch                , pcap          ,                      , Packet Info   , 111
 
 vtap                      , vtap                      , vtap                      , resource      ,                      , Capture Info  , 111

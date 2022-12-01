@@ -38,7 +38,7 @@ use super::app_table::AppTable;
 use super::error::{Error, Result};
 use super::protocol_logs::{AppProtoHead, PostgresqlLog, ProtobufRpcWrapLog};
 
-use crate::common::flow::PacketDirection;
+use crate::common::flow::{PacketDirection, SignalSource};
 use crate::common::l7_protocol_info::L7ProtocolInfo;
 use crate::common::l7_protocol_log::{
     get_all_protocol, get_parse_bitmap, L7ProtocolBitmap, L7ProtocolParser,
@@ -315,7 +315,7 @@ impl FlowPerf {
         is_parse_perf: bool,
         is_parse_log: bool,
     ) -> Result<(Vec<L7ProtocolInfo>, u64)> {
-        if !packet.ebpf_type.is_none() && self.server_port != 0 {
+        if packet.signal_source == SignalSource::EBPF && self.server_port != 0 {
             // if the packet from eBPF and it's server_port is not equal to 0,
             // We can get the packet's direction by comparing self.server_port with packet.lookup_key.dst_port
             packet.direction = if self.server_port == packet.lookup_key.dst_port {

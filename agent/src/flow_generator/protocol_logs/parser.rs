@@ -38,7 +38,7 @@ use super::{
 use crate::{
     common::{
         enums::EthernetType,
-        flow::{get_uniq_flow_id_in_one_minute, PacketDirection},
+        flow::{get_uniq_flow_id_in_one_minute, PacketDirection, SignalSource},
         l7_protocol_info::{L7ProtocolInfo, L7ProtocolInfoInterface},
         MetaPacket, TaggedFlow,
     },
@@ -88,6 +88,7 @@ impl MetaAppProto {
             vtap_id: flow.flow.flow_key.vtap_id,
             tap_type: flow.flow.flow_key.tap_type,
             tap_port: flow.flow.flow_key.tap_port,
+            signal_source: flow.flow.signal_source,
             tap_side: flow.flow.tap_side,
             head,
             protocol: meta_packet.lookup_key.proto,
@@ -322,7 +323,7 @@ impl SessionQueue {
 
         // 因为数组提前分配hashmap, slot < self.window_size 所以必然存在
         let map = time_window.get_mut(slot).unwrap();
-        let key = if item.base_info.tap_port.is_from_ebpf() {
+        let key = if item.base_info.signal_source == SignalSource::EBPF {
             // if the l7 log from ebpf, use AppProtoLogsData::ebpf_flow_session_id()
             item.ebpf_flow_session_id()
         } else {
