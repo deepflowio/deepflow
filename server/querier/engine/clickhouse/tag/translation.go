@@ -786,5 +786,13 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			),
 		}
 	}
+	// Pcap
+	tagResourceMap["has_pcap"] = map[string]*Tag{
+		"toString": NewTag(
+			"notEmpty(acl_gids)",
+			"",
+			"notEmpty(acl_gids) %s %s",
+			"",
+		)}
 	return tagResourceMap
 }
