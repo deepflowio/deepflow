@@ -17,6 +17,7 @@
 package metrics
 
 import (
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -64,7 +65,7 @@ var METRICS_FUNCTIONS_MAP = map[string]*Function{
 	view.FUCNTION_HISTOGRAM:  NewFunction(view.FUCNTION_HISTOGRAM, FUNCTION_TYPE_MATH, nil, "", 1),
 }
 
-func GetFunctionDescriptions() (map[string][]interface{}, error) {
+func GetFunctionDescriptions() (*common.Result, error) {
 	columns := []interface{}{
 		"name", "type", "support_metric_types", "unit_overwrite", "additional_param_count",
 	}
@@ -75,8 +76,8 @@ func GetFunctionDescriptions() (map[string][]interface{}, error) {
 			f.Name, f.Type, f.SupportMetricsTypes, f.UnitOverwrite, f.AdditionnalParamCount,
 		})
 	}
-	return map[string][]interface{}{
-		"columns": columns,
-		"values":  values,
+	return &common.Result{
+		Columns: columns,
+		Values:  values,
 	}, nil
 }

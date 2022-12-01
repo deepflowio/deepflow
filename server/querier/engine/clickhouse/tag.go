@@ -23,7 +23,7 @@ import (
 
 	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/metrics"
-	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch"
+	//"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_batch"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
@@ -133,6 +133,6 @@ func (t *SelectTag) Format(m *view.Model) {
 	if t.Alias == "tags" || t.Alias == "attributes" || t.Alias == "metrics" {
 		m.AddCallback(t.Alias, ExternalTagsFormat([]interface{}{t.Alias}))
 	} else if t.Value == "packet_batch" {
-		m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
+		// m.AddCallback(t.Value, packet_batch.PacketBatchFormat([]interface{}{}))
 	}
 }

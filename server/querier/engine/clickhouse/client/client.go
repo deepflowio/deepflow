@@ -23,6 +23,7 @@ import (
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/jmoiron/sqlx"
 	//"github.com/k0kubun/pp"
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/statsd"
 	"github.com/google/uuid"
 	logging "github.com/op/go-logging"
@@ -35,9 +36,9 @@ var log = logging.MustGetLogger("clickhouse.client")
 
 type QueryParams struct {
 	Sql             string
-	Callbacks       map[string]func(columns []interface{}, values []interface{}) []interface{}
+	Callbacks       map[string]func(result *common.Result) error
 	QueryUUID       string
-	ColumnSchemaMap map[string]*ColumnSchema
+	ColumnSchemaMap map[string]*common.ColumnSchema
 }
 
 type Client struct {
@@ -77,9 +78,9 @@ func (c *Client) Close() error {
 	return c.connection.Close()
 }
 
-func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) {
+func (c *Client) DoQuery(params *QueryParams) (result *common.Result, err error) {
 	sqlstr, callbacks, query_uuid, columnSchemaMap := params.Sql, params.Callbacks, params.QueryUUID, params.ColumnSchemaMap
-	err := c.init(query_uuid)
+	err = c.init(query_uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -105,22 +106,19 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 		c.Debug.Error = fmt.Sprintf("%s", err)
 		return nil, err
 	}
-	result := make(map[string][]interface{})
 	var columnNames []interface{}
 	var columnTypes []string
-	var columnSchemas []interface{}
+	var columnSchemas common.ColumnSchemas
 	// 获取列名和列类型
 	for _, column := range columns {
 		columnNames = append(columnNames, column.Name())
 		columnTypes = append(columnTypes, column.DatabaseTypeName())
 		if schema, ok := columnSchemaMap[column.Name()]; ok {
-			columnSchemas = append(columnSchemas, schema.ToMap())
+			columnSchemas = append(columnSchemas, schema)
 		} else {
-			columnSchemas = append(columnSchemas, NewColumnSchema(column.Name()).ToMap())
+			columnSchemas = append(columnSchemas, common.NewColumnSchema(column.Name()))
 		}
 	}
-	result["columns"] = columnNames
-	result["schemas"] = columnSchemas
 	var values []interface{}
 	resSize := 0
 	for rows.Next() {
@@ -133,13 +131,14 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 		}
 		var record []interface{}
 		for i, rawValue := range row {
-			value, err := TransType(columnTypes[i], rawValue)
+			value, valueType, err := TransType(columnTypes[i], rawValue)
 			if err != nil {
 				c.Debug.Error = fmt.Sprintf("%s", err)
 				return nil, err
 			}
 			resSize += int(unsafe.Sizeof(value))
 			record = append(record, value)
+			columnSchemas[i].ValueType = valueType
 		}
 		values = append(values, record)
 	}
@@ -153,10 +152,17 @@ func (c *Client) DoQuery(params *QueryParams) (map[string][]interface{}, error) 
 		},
 	)
 	c.Debug.QueryTime = int64(queryTime)
-	for _, callback := range callbacks {
-		values = callback(columnNames, values)
+	result = &common.Result{
+		Columns: columnNames,
+		Values:  values,
+		Schemas: columnSchemas,
 	}
-	result["values"] = values
+	for _, callback := range callbacks {
+		err := callback(result)
+		if err != nil {
+			log.Error("Execute Callback %v Error: %v", callback, err)
+		}
+	}
 	log.Debugf("sql: %s, query_uuid: %s", sqlstr, c.Debug.QueryUUID)
 	log.Infof("res_rows: %v, res_columns: %v, res_size: %v", resRows, resColumns, resSize)
 	return result, nil
