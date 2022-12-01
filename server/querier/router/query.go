@@ -46,7 +46,7 @@ func executeQuery() gin.HandlerFunc {
 		}
 		args.DB = c.PostForm("db")
 		args.Sql = c.PostForm("sql")
-		args.DataSource = c.PostForm("datasource")
+		args.DataSource = c.PostForm("data_precision")
 		if args.Sql == "" && args.DB == "" {
 			json := make(map[string]interface{})
 			c.BindJSON(&json)
