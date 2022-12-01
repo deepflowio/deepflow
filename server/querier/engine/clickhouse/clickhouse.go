@@ -289,6 +289,13 @@ func (e *CHEngine) TransSelect(tags sqlparser.SelectExprs) error {
 					e.asTagMap[as] = sqlparser.String(binary)
 				}
 			}
+			// Integer tag
+			val, ok := item.Expr.(*sqlparser.SQLVal)
+			if ok {
+				if as != "" {
+					e.asTagMap[as] = sqlparser.String(val)
+				}
+			}
 		}
 	}
 	return nil
