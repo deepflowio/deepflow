@@ -62,7 +62,7 @@ pub fn get_protobuf_rpc_parser(proto: ProtobufRpcProtocol) -> L7ProtocolParser {
 }
 
 // all protobuf rpc parser
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Serialize)]
 #[enum_dispatch(L7ProtocolParserInterface, L7FlowPerf)]
 pub enum ProtobufRpcLog {
     KrpcLog(KrpcLog),

@@ -159,6 +159,109 @@ macro_rules! parse_common {
     };
 }
 
+/*
+    common log perf update macro. if must define the log and info struct like:
+
+    struct xxxInfo{
+        // .. some field
+
+        // the current msg type
+        msg_type: LogMessageType,
+        // the current msg time
+        start_time: u64,
+
+    }
+
+    struct xxxLog{
+        // ... some field
+
+        // the log info
+        info: xxxInfo,
+
+        // (log_type, timestamp), record the previous log info,
+        previous_log_info: LruCache<u32, (LogMessageType, u64)>,
+        perf_stats: Option<PerfStats>,
+    }
+
+    also need to add the code like:
+
+    impl L7ProtocolParserInterface for xxxLog {
+        // ... other fn
+
+        fn reset(&mut self) {
+            // ... reset other field
+            self.previous_log_info.put(
+                self.info.session_id().unwrap_or_default(),
+                (self.info.msg_type, self.info.start_time),
+            );
+        }
+    }
+*/
+#[macro_export]
+macro_rules! perf_impl {
+    ($log_struct:ident) => {
+        impl $log_struct {
+            fn update_perf(
+                &mut self,
+                req_count: u32,
+                resp_count: u32,
+                req_err: u32,
+                resp_err: u32,
+                time: u64,
+            ) {
+                if self.perf_stats.is_none() {
+                    self.perf_stats = Some(PerfStats::default());
+                }
+                let perf = self.perf_stats.as_mut().unwrap();
+                perf.update_perf(req_count, resp_count, req_err, resp_err, {
+                    let previous_log_info = self
+                        .previous_log_info
+                        .get(&self.info.session_id().unwrap_or_default());
+
+                    if time != 0 && previous_log_info.is_some() {
+                        let previous_log_info = previous_log_info.unwrap();
+                        // if previous is req and current is resp, calculate the round trip time.
+                        if previous_log_info.0 == LogMessageType::Request
+                            && self.info.msg_type == LogMessageType::Response
+                            && time > previous_log_info.1
+                        {
+                            time - previous_log_info.1
+
+                        // if previous is resp and current is req and previous time gt current time, likely ebpf disorder,
+                        // calculate the round trip time.
+                        } else if previous_log_info.0 == LogMessageType::Response
+                            && self.info.msg_type == LogMessageType::Request
+                            && previous_log_info.1 > time
+                        {
+                            previous_log_info.1 - time
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
+                });
+            }
+
+            fn perf_inc_req(&mut self) {
+                self.update_perf(1, 0, 0, 0, 0);
+            }
+
+            fn perf_inc_resp(&mut self, time: u64) {
+                self.update_perf(0, 1, 0, 0, time);
+            }
+
+            fn perf_inc_req_err(&mut self) {
+                self.update_perf(0, 0, 1, 0, 0);
+            }
+
+            fn perf_inc_resp_err(&mut self) {
+                self.update_perf(0, 0, 0, 1, 0);
+            }
+        }
+    };
+}
+
 macro_rules! all_protocol {
     ($( $l7_proto:ident , $parser:ident , $log:ident::$new_func:ident);+$(;)?) => {
         #[enum_dispatch]
@@ -406,7 +509,7 @@ impl From<&MetaPacket<'_>> for ParseParam {
             direction: packet.direction,
             ebpf_type: packet.ebpf_type,
             ebpf_param: None,
-            time: packet.start_time.as_micros() as u64,
+            time: packet.lookup_key.timestamp.as_micros() as u64,
         };
         if packet.ebpf_type != EbpfType::None {
             let is_tls = match packet.ebpf_type {

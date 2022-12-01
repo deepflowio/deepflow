@@ -18,8 +18,11 @@ use std::{cell::RefCell, fmt, rc::Rc, str, time::Duration};
 
 use crate::{
     common::{
+        ebpf::EbpfType,
         enums::IpProtocol,
         flow::{FlowPerfStats, L7PerfStats, L7Protocol, PacketDirection},
+        l7_protocol_info::L7ProtocolInfo,
+        l7_protocol_log::{L7ProtocolParser, L7ProtocolParserInterface, ParseParam},
         meta_packet::MetaPacket,
     },
     flow_generator::{
@@ -31,6 +34,7 @@ use crate::{
             check_http_method, consts::*, get_http_request_version, get_http_resp_info,
             is_http_v1_payload, AppProtoHead, Httpv2Headers, L7ResponseStatus, LogMessageType,
         },
+        HttpLog,
     },
 };
 use public::utils::net::h2pack;
@@ -100,6 +104,11 @@ impl L7FlowPerf for HttpPerfData {
         }
 
         let payload = meta.get_l4_payload().ok_or(Error::ZeroPayloadLen)?;
+
+        let param = ParseParam::from(meta);
+        if ParseParam::from(meta).ebpf_type == EbpfType::GoHttp2Uprobe {
+            return self.parse_go_http2_uprobe(payload, &param);
+        }
 
         if self
             .parse_http_v1(payload, meta.lookup_key.timestamp, meta.direction, flow_id)
@@ -479,6 +488,34 @@ impl HttpPerfData {
                 Some(self.session_data.httpv2_headers.stream_id),
                 timestamp,
             );
+        }
+        Ok(())
+    }
+
+    fn parse_go_http2_uprobe(&mut self, payload: &[u8], param: &ParseParam) -> Result<()> {
+        let mut log = L7ProtocolParser::HttpParser(HttpLog::new_v2(false));
+        let perf_stats = self.perf_stats.get_or_insert(PerfStats::default());
+        if let L7ProtocolInfo::HttpInfo(h) = log.parse_payload(payload, param)?.get(0).unwrap() {
+            self.session_data.httpv2_headers.stream_id = h.stream_id.unwrap_or_default();
+            self.session_data.l7_proto = h.proto;
+            if let Some(code) = h.status_code {
+                match code as u16 {
+                    HTTP_STATUS_CLIENT_ERROR_MIN..=HTTP_STATUS_CLIENT_ERROR_MAX => {
+                        perf_stats.req_err_count += 1;
+                    }
+                    HTTP_STATUS_SERVER_ERROR_MIN..=HTTP_STATUS_SERVER_ERROR_MAX => {
+                        perf_stats.resp_err_count += 1;
+                    }
+                    _ => {}
+                }
+            }
+
+            let ebpf_param = param.ebpf_param.unwrap();
+            if ebpf_param.is_req_end {
+                perf_stats.req_count += 1;
+            } else if ebpf_param.is_resp_end {
+                perf_stats.resp_count += 1;
+            }
         }
         Ok(())
     }
