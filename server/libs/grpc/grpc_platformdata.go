@@ -981,9 +981,9 @@ func (t *PlatformInfoTable) Reload() error {
 	newGroupsVersion := response.GetVersionGroups()
 	if newGroupsVersion != t.versionGroups {
 		log.Infof("Update rpc groups version %d -> %d ", t.versionGroups, newGroupsVersion)
-		if t.updateServices(response) {
-			t.versionGroups = newGroupsVersion
-		}
+		//if t.updateServices(response) {
+		//	t.versionGroups = newGroupsVersion
+		//}
 	}
 	updateServiceTime := int64(time.Since(start)) - grpcRequestTime
 	t.counter.UpdateServiceTime += updateServiceTime
