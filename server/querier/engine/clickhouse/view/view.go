@@ -217,10 +217,9 @@ func (v *View) trans() {
 			}
 		}
 	}
+	// 存在类似histogram三层算子时，将newTag这种必须返回的Tag加入最外层
 	if len(metricsLevelTop) > 0 {
 		metricsLevelTop = append(metricsLevelTop, tagsLevelTop...)
-	} else {
-		metricsLevelMetrics = append(metricsLevelMetrics, tagsLevelTop...)
 	}
 	// 计算层拆层的情况下，默认类型的group中with只放在最里层
 	for _, node := range v.Model.Groups.groups {

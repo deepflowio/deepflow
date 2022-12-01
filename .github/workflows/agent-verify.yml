@@ -35,7 +35,7 @@ jobs:
 
       - name: verify agent
         run: |
-          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.15 "-c" "\
+          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.16 "-c" "\
           source /opt/rh/devtoolset-8/enable && \
           cp agent/docker/rust-proxy-config /usr/local/cargo/config && \
           cd  agent/src/ebpf && \
@@ -75,7 +75,7 @@ jobs:
 
       - name: verify agent
         run: |
-          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.15-arm64 "-c" "\
+          docker run --rm  -t  --privileged --workdir /deepflow/  -v $(pwd):"/deepflow/"  --entrypoint "bash" ghcr.io/deepflowys/rust-build:1.16-arm64 "-c" "\
           source /opt/rh/devtoolset-8/enable && \
           cd  agent/src/ebpf && \
           CC=musl-gcc CLANG=musl-clang make clean && \

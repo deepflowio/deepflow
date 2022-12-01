@@ -82,3 +82,4 @@ tap_port_type       , tap_port_type        , tap_port_type         , int_enum   
 tap_side            , tap_side             , tap_side              , string_enum  , tap_side             , Capture Info         , 111
 l2_end              , l2_end_0             , l2_end_1              , bool         ,                      , Capture Info         , 111
 l3_end              , l3_end_0             , l3_end_1              , bool         ,                      , Capture Info         , 111
+has_pcap            , has_pcap             , has_pcap              , bool         ,                      , Capture Info         , 111
