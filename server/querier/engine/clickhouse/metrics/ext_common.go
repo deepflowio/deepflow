@@ -59,7 +59,7 @@ func GetExtMetrics(db, table, where string, ctx context.Context) (map[string]*Me
 			log.Error(err)
 			return nil, err
 		}
-		for i, value := range externalMetricFloatRst["values"] {
+		for i, value := range externalMetricFloatRst.Values {
 			tagName := value.([]interface{})[0]
 			tableName := value.([]interface{})[1].(string)
 			externalTag := tagName.(string)

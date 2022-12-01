@@ -18,18 +18,20 @@ package clickhouse
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/deepflowys/deepflow/server/libs/utils"
-
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/tag"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
 type Callback struct {
 	Args     []interface{}
-	Function func([]interface{}) func(columns []interface{}, values []interface{}) []interface{}
+	Function func([]interface{}) func(*common.Result) error
 	Column   string
 }
 
@@ -37,13 +39,13 @@ func (c *Callback) Format(m *view.Model) {
 	m.AddCallback(c.Column, c.Function(c.Args))
 }
 
-func TimeFill(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+func TimeFill(args []interface{}) func(result *common.Result) error {
 	// group by time时的补点
-	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+	return func(result *common.Result) error {
 		m := args[0].(*view.Model)
 		var timeFieldIndex int
 		// 取出time字段对应的下标
-		for i, column := range columns {
+		for i, column := range result.Columns {
 			if column.(string) == strings.Trim(m.Time.Alias, "`") {
 				timeFieldIndex = i
 				break
@@ -66,11 +68,11 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 		intervalLength := (end-start)/m.Time.Interval + 1
 		if intervalLength < 1 {
 			log.Errorf("Callback Time Fill Error: intervalLength(%d) < 1", intervalLength)
-			return []interface{}{}
+			return errors.New(fmt.Sprintf("Callback Time Fill Error: intervalLength(%d) < 1", intervalLength))
 		}
-		newValues = make([]interface{}, intervalLength)
+		newValues := make([]interface{}, intervalLength)
 		// 将查询数据结果写入newValues切片
-		for _, value := range values {
+		for _, value := range result.Values {
 			record := value.([]interface{})
 			// 获取record在补点切片中的位置
 			var timeIndex int
@@ -88,7 +90,7 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 		// 针对newValues中缺少的时间点进行补点
 		for i, value := range newValues {
 			if value == nil {
-				newValue := make([]interface{}, len(columns))
+				newValue := make([]interface{}, len(result.Columns))
 				if m.Time.Fill != "null" {
 					for i := range newValue {
 						if intField, err := strconv.Atoi(m.Time.Fill); err == nil {
@@ -107,29 +109,30 @@ func TimeFill(args []interface{}) func(columns []interface{}, values []interface
 				newValues[i] = newValue
 			}
 		}
-		return newValues
+		result.Values = newValues
+		return nil
 	}
 }
 
-func MacTranslate(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-		newValues = make([]interface{}, len(values))
+func MacTranslate(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		newValues := make([]interface{}, len(result.Values))
 		var macIndex int
 		var macTypeIndex int
 		macTypeIndex = -1
-		for i, column := range columns {
+		for i, column := range result.Columns {
 			if column.(string) == args[1].(string) {
 				macIndex = i
 				break
 			}
 		}
-		for i, column := range columns {
+		for i, column := range result.Columns {
 			if column.(string) == "tap_port_type" {
 				macTypeIndex = i
 				break
 			}
 		}
-		for i, value := range values {
+		for i, value := range result.Values {
 			newValues[i] = value
 		}
 		for i, newValue := range newValues {
@@ -154,20 +157,22 @@ func MacTranslate(args []interface{}) func(columns []interface{}, values []inter
 				}
 			}
 		}
-		return newValues
+		result.Values = newValues
+		return nil
 	}
 }
 
-func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-	return func(columns []interface{}, values []interface{}) (newValues []interface{}) {
+func ExternalTagsFormat(args []interface{}) func(result *common.Result) error {
+	return func(result *common.Result) error {
+		newValues := []interface{}{}
 		var tagsIndex int
-		for i, column := range columns {
+		for i, column := range result.Columns {
 			if column.(string) == args[0].(string) {
 				tagsIndex = i
 				break
 			}
 		}
-		for _, newValue := range values {
+		for _, newValue := range result.Values {
 			newValueSlice := newValue.([]interface{})
 			tagsMap := make(map[string]interface{})
 			for _, tagValue := range newValueSlice[tagsIndex].([][]interface{}) {
@@ -178,11 +183,13 @@ func ExternalTagsFormat(args []interface{}) func(columns []interface{}, values [
 			tagsStr, err := json.Marshal(tagsMap)
 			if err != nil {
 				log.Error(err)
-				return newValues
+				result.Values = newValues
+				return err
 			}
 			newValueSlice[tagsIndex] = string(tagsStr)
 			newValues = append(newValues, newValueSlice)
 		}
-		return newValues
+		result.Values = newValues
+		return nil
 	}
 }

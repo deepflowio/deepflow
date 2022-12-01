@@ -16,8 +16,12 @@
 
 package packet_batch
 
-func PacketBatchFormat(args []interface{}) func(columns []interface{}, values []interface{}) (newValues []interface{}) {
-	return func(columns []interface{}, values []interface{}) ([]interface{}) {
-		return values
+import (
+	"github.com/deepflowys/deepflow/server/querier/common"
+)
+
+func PacketBatchFormat(args []interface{}) func(*common.Result) error {
+	return func(*common.Result) error {
+		return nil
 	}
 }

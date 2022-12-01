@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/deepflowys/deepflow/server/querier/engine/clickhouse/view"
 )
 
@@ -74,8 +75,12 @@ func TestTimeFill(t *testing.T) {
 			0,
 		},
 	}
-	newValues := callback(columns, values)
-	if !reflect.DeepEqual(newValues, want) {
-		t.Errorf("Callback: TimeFill, columns: %v, values: %v, newValues: %v, want: %v", columns, values, newValues, want)
+	result := &common.Result{
+		Columns: columns,
+		Values:  values,
+	}
+	callback(result)
+	if !reflect.DeepEqual(result.Values, want) {
+		t.Errorf("Callback: TimeFill, columns: %v, values: %v, newValues: %v, want: %v", columns, values, result.Values, want)
 	}
 }

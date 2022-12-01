@@ -25,7 +25,7 @@ import (
 	"github.com/prometheus/prometheus/prompb"
 )
 
-func Execute(args *common.QuerierParams) (result map[string][]interface{}, debug map[string]interface{}, err error) {
+func Execute(args *common.QuerierParams) (jsonData map[string]interface{}, debug map[string]interface{}, err error) {
 	db := getDbBy()
 	var engine engine.Engine
 	switch db {
@@ -33,9 +33,11 @@ func Execute(args *common.QuerierParams) (result map[string][]interface{}, debug
 		engine = &clickhouse.CHEngine{DB: args.DB, DataSource: args.DataSource, Context: args.Context}
 		engine.Init()
 	}
-	result, debug, err = engine.ExecuteQuery(args)
-
-	return result, debug, err
+	result, debug, err := engine.ExecuteQuery(args)
+	if result != nil {
+		jsonData = result.ToJson()
+	}
+	return jsonData, debug, err
 }
 
 func getDbBy() string {

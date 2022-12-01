@@ -3,6 +3,7 @@ package prometheus
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/deepflowys/deepflow/server/querier/common"
 	"github.com/prometheus/prometheus/prompb"
 	"strings"
 )
@@ -56,11 +57,11 @@ func PromReaderTransToSQL(req *prompb.ReadRequest) (sql string, err error) {
 	return sql, nil
 }
 
-func RespTransToProm(result map[string][]interface{}) (resp *prompb.ReadResponse, err error) {
+func RespTransToProm(result *common.Result) (resp *prompb.ReadResponse, err error) {
 	resp = &prompb.ReadResponse{
 		Results: []*prompb.QueryResult{{}},
 	}
-	tags := result["columns"]
+	tags := result.Columns
 	tagIndex := -1
 	metricsIndex := -1
 	timeIndex := -1
@@ -79,7 +80,7 @@ func RespTransToProm(result map[string][]interface{}) (resp *prompb.ReadResponse
 		return nil, fmt.Errorf("tagIndex(%d), metricsIndex(%d), timeIndex(%d) get failed", tagIndex, metricsIndex, timeIndex)
 	}
 	tagSeriesMap := map[string]*prompb.TimeSeries{}
-	for _, v := range result["values"] {
+	for _, v := range result.Values {
 		values := v.([]interface{})
 		tagsJsonStr := values[tagIndex].(string)
 		if _, ok := tagSeriesMap[tagsJsonStr]; !ok {
