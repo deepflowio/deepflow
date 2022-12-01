@@ -42,7 +42,7 @@ type Host struct {
 	VCPUNum      int    `json:"vcpu_num"`
 	MemTotal     int    `json:"mem_total"`
 	ExtraInfo    string `json:"extra_info"`
-	AZLcuuid     string `json:"az_lcuuid"`
+	AZLcuuid     string `json:"az_lcuuid" binding:"required"`
 	RegionLcuuid string `json:"region_lcuuid" binding:"required"`
 }
 
@@ -55,7 +55,7 @@ type VM struct {
 	LaunchServer string    `json:"launch_server" binding:"required"`
 	CreatedAt    time.Time `json:"created_at"`
 	VPCLcuuid    string    `json:"vpc_lcuuid" binding:"required"`
-	AZLcuuid     string    `json:"az_lcuuid"`
+	AZLcuuid     string    `json:"az_lcuuid" binding:"required"`
 	RegionLcuuid string    `json:"region_lcuuid" binding:"required"`
 }
 
