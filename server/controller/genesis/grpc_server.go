@@ -44,12 +44,14 @@ func isInterestedHost(tType tridentcommon.TridentType) bool {
 
 type TridentStats struct {
 	VtapID                   uint32
-	Version                  uint64
 	IP                       string
 	Proxy                    string
-	ClusterID                string
-	LastSeen                 time.Time
-	TridentType              tridentcommon.TridentType
+	K8sVersion               uint64
+	SyncVersion              uint64
+	K8sLastSeen              time.Time
+	SyncLastSeen             time.Time
+	K8sClusterID             string
+	SyncTridentType          tridentcommon.TridentType
 	GenesisSyncDataOperation *trident.GenesisPlatformData
 }
 
@@ -57,10 +59,10 @@ type SynchronizerServer struct {
 	cfg                 config.GenesisConfig
 	k8sQueue            queue.QueueWriter
 	genesisSyncQueue    queue.QueueWriter
-	vtapIDToVersion     map[uint32]uint64
-	clusterIDToVersion  map[string]uint64
-	vtapIDToLastSeen    map[uint32]time.Time
-	clusterIDToLastSeen map[string]time.Time
+	vtapIDToVersion     sync.Map
+	clusterIDToVersion  sync.Map
+	vtapIDToLastSeen    sync.Map
+	clusterIDToLastSeen sync.Map
 	tridentStatsMap     sync.Map
 }
 
@@ -69,10 +71,10 @@ func NewGenesisSynchronizerServer(cfg config.GenesisConfig, genesisSyncQueue, k8
 		cfg:                 cfg,
 		k8sQueue:            k8sQueue,
 		genesisSyncQueue:    genesisSyncQueue,
-		vtapIDToVersion:     map[uint32]uint64{},
-		clusterIDToVersion:  map[string]uint64{},
-		vtapIDToLastSeen:    map[uint32]time.Time{},
-		clusterIDToLastSeen: map[string]time.Time{},
+		vtapIDToVersion:     sync.Map{},
+		clusterIDToVersion:  sync.Map{},
+		vtapIDToLastSeen:    sync.Map{},
+		clusterIDToLastSeen: sync.Map{},
 		tridentStatsMap:     sync.Map{},
 	}
 }
@@ -89,13 +91,11 @@ func (g *SynchronizerServer) GetAgentStats(ip string) []TridentStats {
 }
 
 func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.GenesisSyncRequest) (*trident.GenesisSyncResponse, error) {
-	stats := TridentStats{}
 	remote := ""
 	peerIP, _ := peer.FromContext(ctx)
 	sourceIP := request.GetSourceIp()
 	if sourceIP != "" {
 		remote = sourceIP
-		stats.Proxy = peerIP.Addr.String()
 	} else {
 		remote = peerIP.Addr.String()
 	}
@@ -110,11 +110,19 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		log.Warningf("genesis sync received message with vtap_id 0 from %s", remote)
 	}
 	tType := request.GetTridentType()
+
+	var stats TridentStats
+	if s, ok := g.tridentStatsMap.Load(vtapID); ok {
+		stats = s.(TridentStats)
+	}
+	if sourceIP != "" {
+		stats.Proxy = peerIP.Addr.String()
+	}
 	stats.IP = remote
 	stats.VtapID = vtapID
-	stats.Version = version
-	stats.TridentType = tType
-	stats.LastSeen = time.Now()
+	stats.SyncVersion = version
+	stats.SyncTridentType = tType
+	stats.SyncLastSeen = time.Now()
 	platformData := request.GetPlatformData()
 	if vtapID != 0 {
 		if tStats, ok := g.tridentStatsMap.Load(vtapID); ok && platformData == nil {
@@ -128,11 +136,11 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		log.Debugf("genesis sync ignore message from %s trident %s vtap_id %v", tType, remote, vtapID)
 		return &trident.GenesisSyncResponse{Version: &version}, nil
 	}
-	var localVersion uint64
+	var localVersion uint64 = 0
 	if vtapID != 0 {
 		now := time.Now()
-		if lTime, ok := g.vtapIDToLastSeen[vtapID]; ok {
-			lastTime := lTime
+		if lTime, ok := g.vtapIDToLastSeen.Load(vtapID); ok {
+			lastTime := lTime.(time.Time)
 			var agingTime float64 = 0
 			if g.cfg.AgingTime < g.cfg.VinterfaceAgingTime {
 				agingTime = g.cfg.AgingTime
@@ -140,11 +148,14 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 				agingTime = g.cfg.VinterfaceAgingTime
 			}
 			if now.Sub(lastTime).Seconds() >= agingTime {
-				g.vtapIDToVersion[vtapID] = 0
+				g.vtapIDToVersion.Store(vtapID, uint64(0))
 			}
 		}
-		g.vtapIDToLastSeen[vtapID] = now
-		localVersion = g.vtapIDToVersion[vtapID]
+		g.vtapIDToLastSeen.Store(vtapID, now)
+		lVersion, ok := g.vtapIDToVersion.Load(vtapID)
+		if ok {
+			localVersion = lVersion.(uint64)
+		}
 	}
 	if version == localVersion || platformData == nil {
 		log.Debugf("genesis sync renew version %v from ip %s vtap_id %v", version, remote, vtapID)
@@ -170,27 +181,24 @@ func (g *SynchronizerServer) GenesisSync(ctx context.Context, request *trident.G
 		},
 	)
 	if vtapID != 0 {
-		g.vtapIDToVersion[vtapID] = version
+		g.vtapIDToVersion.Store(vtapID, version)
 	}
 	return &trident.GenesisSyncResponse{Version: &version}, nil
 }
 
 func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *trident.KubernetesAPISyncRequest) (*trident.KubernetesAPISyncResponse, error) {
-	stats := TridentStats{}
+
 	remote := ""
 	peerIP, _ := peer.FromContext(ctx)
 	sourceIP := request.GetSourceIp()
 	if sourceIP != "" {
 		remote = sourceIP
-		stats.Proxy = peerIP.Addr.String()
 	} else {
 		remote = peerIP.Addr.String()
 	}
 	vtapID := request.GetVtapId()
 	if vtapID == 0 {
 		log.Warningf("kubernetes api sync received message with vtap_id 0 from %s", remote)
-	} else {
-		vtapID = request.GetVtapId()
 	}
 	version := request.GetVersion()
 	if version == 0 {
@@ -204,20 +212,31 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 	}
 	entries := request.GetEntries()
 
+	var stats TridentStats
+	if s, ok := g.tridentStatsMap.Load(vtapID); ok {
+		stats = s.(TridentStats)
+	}
+	if sourceIP != "" {
+		stats.Proxy = peerIP.Addr.String()
+	}
 	stats.IP = remote
 	stats.VtapID = vtapID
-	stats.ClusterID = clusterID
-	stats.LastSeen = time.Now()
-	stats.Version = version
+	stats.K8sClusterID = clusterID
+	stats.K8sLastSeen = time.Now()
+	stats.K8sVersion = version
 	g.tridentStatsMap.Store(vtapID, stats)
 	now := time.Now()
 	if vtapID != 0 {
-		if lastTime, ok := g.clusterIDToLastSeen[clusterID]; ok {
-			if now.Sub(lastTime).Seconds() >= g.cfg.AgingTime {
-				g.clusterIDToVersion[clusterID] = 0
+		if lastTime, ok := g.clusterIDToLastSeen.Load(clusterID); ok {
+			if now.Sub(lastTime.(time.Time)).Seconds() >= g.cfg.AgingTime {
+				g.clusterIDToVersion.Store(clusterID, uint64(0))
 			}
 		}
-		localVersion := g.clusterIDToVersion[clusterID]
+		var localVersion uint64 = 0
+		lVersion, ok := g.clusterIDToVersion.Load(clusterID)
+		if ok {
+			localVersion = lVersion.(uint64)
+		}
 		log.Infof("kubernetes api sync received version %v -> %v from ip %s vtap_id %v len %v", localVersion, version, remote, vtapID, len(entries))
 
 		// 如果version有更新，但消息中没有任何kubernetes数据，触发trident重新上报数据
@@ -234,8 +253,8 @@ func (g *SynchronizerServer) KubernetesAPISync(ctx context.Context, request *tri
 		})
 
 		// 更新内存中的last_seen和version
-		g.clusterIDToLastSeen[clusterID] = now
-		g.clusterIDToVersion[clusterID] = version
+		g.clusterIDToLastSeen.Store(clusterID, now)
+		g.clusterIDToVersion.Store(clusterID, version)
 		return &trident.KubernetesAPISyncResponse{Version: &version}, nil
 	} else {
 		log.Infof("kubernetes api sync received version %v from ip %s no vtap_id", version, remote)

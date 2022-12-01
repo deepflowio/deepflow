@@ -82,3 +82,4 @@ tap_port_type         , TAP Port Type                     , Indicates the type o
 tap_side              , TAP Side                          , The logical location of the collection location in the traffic path, such as Cient NIC, Client Node, Server Node, Server NIC, etc.
 l2_end                , Boundary of L2 Network            , Indicates whether the traffic is collected on the client NIC or the server NIC.
 l3_end                , Boundary of L3 Network            , Indicates whether the traffic is collected in the Layer 2 network where the client or server is located.
+has_pcap              , PCAP File                         , Whether the PCAP file is stored
