@@ -4,8 +4,8 @@ go 1.18
 
 require (
 	github.com/bitly/go-simplejson v0.5.0
-	github.com/deepflowys/deepflow/message v0.0.0-20221020105945-747c3947b786
-	github.com/deepflowys/deepflow/server v0.0.0-20221020105945-747c3947b786
+	github.com/deepflowys/deepflow/message v0.0.0-20221130050757-dee9feae06bf
+	github.com/deepflowys/deepflow/server v0.0.0-20221130114106-821324d9609b
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.5.2
 	github.com/olekukonko/tablewriter v0.0.5
@@ -38,8 +38,8 @@ require (
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
-	go.opentelemetry.io/otel v1.9.0 // indirect
-	go.opentelemetry.io/otel/trace v1.9.0 // indirect
+	go.opentelemetry.io/otel v1.11.0 // indirect
+	go.opentelemetry.io/otel/trace v1.11.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
