@@ -88,16 +88,17 @@ func (k *KubernetesInfo) refresh() {
 	return
 }
 
-func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(clusterID, clusterName string) {
+func (k *KubernetesInfo) CreateDomainIfClusterIDNotExists(clusterID, clusterName string) (exists bool) {
 	ok, err := k.CheckClusterID(clusterID)
 	if err != nil {
-		log.Errorf("check cluster_id failed: %s", err)
-		return
+		log.Errorf("check cluster_id: %s failed: %s", clusterID, err)
+		return true
 	}
 	if !ok {
 		k.CacheClusterID(clusterID, clusterName)
+		return false
 	}
-	return
+	return true
 }
 
 func (k *KubernetesInfo) CheckClusterID(clusterID string) (bool, error) {
@@ -133,13 +134,13 @@ func (k *KubernetesInfo) CheckClusterID(clusterID string) (bool, error) {
 }
 
 func (k *KubernetesInfo) CacheClusterID(clusterID, clusterName string) {
-	log.Infof("start cache cluster_id: %s", clusterID)
+	log.Infof("start cache cluster_id: %s, cluster_name: %s", clusterID, clusterName)
 	k.mutex.Lock()
 	defer k.mutex.Unlock()
 	_, ok := k.clusterIDToDomain[clusterID]
 	if !ok {
 		k.clusterIDToDomain[clusterID] = ""
-		log.Infof("cache cluster_id (%s)", clusterID)
+		log.Infof("cache cluster_id: %s, cluster_name: %s", clusterID, clusterName)
 		go func() {
 			for k.clusterIDToDomain[clusterID] == "" {
 				domainLcuuid, err := k.createDomain(clusterID, clusterName)
@@ -156,7 +157,7 @@ func (k *KubernetesInfo) CacheClusterID(clusterID, clusterName string) {
 }
 
 func (k *KubernetesInfo) createDomain(clusterID, clusterName string) (domainLcuuid string, err error) {
-	log.Infof("auto create domain (cluster_id: %s)", clusterID)
+	log.Infof("auto create domain with cluster_id: %s, cluster_name: %s", clusterID, clusterName)
 	azConMgr := dbmgr.DBMgr[models.AZControllerConnection](k.db)
 	azConn, err := azConMgr.GetFromControllerIP(k.cfg.NodeIP)
 	if err != nil {

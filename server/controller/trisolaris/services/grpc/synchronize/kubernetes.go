@@ -19,7 +19,6 @@ package synchronize
 import (
 	api "github.com/deepflowys/deepflow/message/trident"
 	context "golang.org/x/net/context"
-	"google.golang.org/grpc/peer"
 
 	"github.com/deepflowys/deepflow/server/controller/common"
 	"github.com/deepflowys/deepflow/server/controller/trisolaris"
@@ -33,10 +32,9 @@ func NewKubernetesClusterIDEvent() *KubernetesClusterIDEvent {
 }
 
 func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, in *api.KubernetesClusterIDRequest) (*api.KubernetesClusterIDResponse, error) {
-	remote := ""
-	peerIP, _ := peer.FromContext(ctx)
-	remote = peerIP.Addr.String()
-	log.Infof("get kubernetes cluster_id from ip: %s, ca_md5: %s", remote, in.GetCaMd5())
+	remote := getRemote(ctx)
+	log.Infof("call me from ip: %s to get kubernetes cluster_id", remote)
+	log.Debugf("ca_md5: %#v", in.GetCaMd5())
 
 	clusterID, err := common.GenerateKuberneteClusterIDByMD5(in.GetCaMd5())
 	if err != nil {
@@ -48,6 +46,7 @@ func (k *KubernetesClusterIDEvent) GetKubernetesClusterID(ctx context.Context, i
 	kubernetesInfo := trisolaris.GetGKubernetesInfo()
 	kubernetesInfo.CacheClusterID(clusterID, in.GetKubernetesClusterName())
 
-	log.Infof("response kubernetes cluster_id to ip: %s, ca_md5: %s, cluster_id: %s", remote, in.GetCaMd5, clusterID)
+	log.Infof("response kubernetes cluster_id: %s to ip: %s", clusterID, remote)
+	log.Debugf("ca_md5: %#v", in.GetCaMd5())
 	return &api.KubernetesClusterIDResponse{ClusterId: &clusterID}, nil
 }

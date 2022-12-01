@@ -257,7 +257,10 @@ func getRealRevision(revision string) string {
 func (e *VTapEvent) Sync(ctx context.Context, in *api.SyncRequest) (*api.SyncResponse, error) {
 	if in.GetKubernetesClusterId() != "" {
 		gKubernetesInfo := trisolaris.GetGKubernetesInfo()
-		gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+		exists := gKubernetesInfo.CreateDomainIfClusterIDNotExists(in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+		if !exists {
+			log.Infof("call me from ip: %s with cluster_id: %s, cluster_name: %s", getRemote(ctx), in.GetKubernetesClusterId(), in.GetKubernetesClusterName())
+		}
 	}
 
 	gVTapInfo := trisolaris.GetGVTapInfo()
