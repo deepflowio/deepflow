@@ -53,7 +53,7 @@ pub struct HttpInfo {
     cap_seq: Option<u64>,
 
     #[serde(skip)]
-    proto: L7Protocol,
+    pub proto: L7Protocol,
     #[serde(skip)]
     start_time: u64,
     #[serde(skip)]
@@ -95,7 +95,7 @@ pub struct HttpInfo {
     pub resp_content_length: Option<u32>,
 
     #[serde(rename = "response_code", skip_serializing_if = "Option::is_none")]
-    status_code: Option<i32>,
+    pub status_code: Option<i32>,
     #[serde(rename = "response_status")]
     status: L7ResponseStatus,
 }
