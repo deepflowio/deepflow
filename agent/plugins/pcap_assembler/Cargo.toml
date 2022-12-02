@@ -1,5 +1,5 @@
 [package]
-name = "packet_sequence_block"
+name = "pcap_assembler"
 version = "0.1.0"
 edition = "2021"
 

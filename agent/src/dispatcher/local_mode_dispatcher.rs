@@ -39,7 +39,6 @@ use crate::{
     flow_generator::FlowMap,
     handler::MiniPacket,
     platform::LibvirtXmlExtractor,
-    proto::{common::TridentType, trident::IfMacSource},
     rpc::get_timestamp,
     utils::bytes::read_u16_be,
 };
@@ -47,6 +46,7 @@ use crate::{
 use public::netns::link_list_in_netns;
 use public::{
     netns::NsFile,
+    proto::{common::TridentType, trident::IfMacSource},
     utils::net::{link_list, Link, MacAddr},
 };
 

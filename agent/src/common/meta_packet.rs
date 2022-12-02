@@ -127,6 +127,8 @@ pub struct MetaPacket<'a> {
     pub thread_id: u32,
     pub syscall_trace_id: u64,
     pub process_name: String,
+    // for PcapAssembler
+    pub flow_id: u64,
 }
 
 impl<'a> MetaPacket<'a> {

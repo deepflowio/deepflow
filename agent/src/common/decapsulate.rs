@@ -22,9 +22,10 @@ use num_enum::TryFromPrimitive;
 use super::consts::*;
 use super::enums::{EthernetType, IpProtocol};
 
-use crate::proto::trident::DecapType;
 use crate::utils::bytes;
 use serde::Serialize;
+
+use public::proto::trident::DecapType;
 
 #[derive(Serialize, Debug, Clone, Copy, PartialEq, PartialOrd, TryFromPrimitive)]
 #[repr(u8)]
