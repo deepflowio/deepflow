@@ -188,6 +188,8 @@ querier:
     # user-password:
   
   otel-endpoint: otel-agent.open-telemetry:4317
+  limit: 10000
+  time-fill-limit: 20
 
 ingester:
   #ckdb:
