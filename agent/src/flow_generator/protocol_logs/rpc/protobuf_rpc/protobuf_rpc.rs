@@ -77,6 +77,10 @@ impl L7ProtocolParserInterface for ProtobufRpcWrapLog {
     fn parsable_on_udp(&self) -> bool {
         false
     }
+
+    fn parse_default(&self) -> bool {
+        false
+    }
 }
 
 impl L7FlowPerf for ProtobufRpcWrapLog {
