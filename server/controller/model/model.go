@@ -51,6 +51,7 @@ type Controller struct {
 	OsType             int            `json:"OS_TYPE"`
 	KernelVersion      string         `json:"KERNEL_VERSION"`
 	VtapCount          int            `json:"VTAP_COUNT"`
+	CurVtapCount       int            `json:"CUR_VTAP_COUNT"`
 	VTapMax            int            `json:"VTAP_MAX"`
 	RegionDomainPrefix string         `json:"REGION_DOMAIN_PREFIX"`
 	SyncedAt           time.Time      `json:"SYNCED_AT"`
@@ -93,6 +94,7 @@ type Analyzer struct {
 	OsType            int          `json:"OS_TYPE"`
 	KernelVersion     string       `json:"KERNEL_VERSION"`
 	VtapCount         int          `json:"VTAP_COUNT"`
+	CurVtapCount      int          `json:"CUR_VTAP_COUNT"`
 	VTapMax           int          `json:"VTAP_MAX"`
 	PcapDataMountPath string       `json:"PCAP_DATA_MOUNT_PATH"`
 	SyncedAt          time.Time    `json:"SYNCED_AT"`

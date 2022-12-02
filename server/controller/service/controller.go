@@ -124,8 +124,10 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 	}
 
 	controllerIPToVtapCount := make(map[string]int)
+	controllerIPToCurVtapCount := make(map[string]int)
 	for _, vtap := range vtaps {
 		controllerIPToVtapCount[vtap.ControllerIP]++
+		controllerIPToCurVtapCount[vtap.CurControllerIP]++
 	}
 
 	for _, controller := range controllers {
@@ -160,6 +162,10 @@ func GetControllers(filter map[string]string) (resp []model.Controller, err erro
 		// vtap_count
 		if vtapCount, ok := controllerIPToVtapCount[controller.IP]; ok {
 			controllerResp.VtapCount = vtapCount
+		}
+		// cur_vtap_count
+		if vtapCount, ok := controllerIPToCurVtapCount[controller.IP]; ok {
+			controllerResp.CurVtapCount = vtapCount
 		}
 		// region
 		var azConns []*mysql.AZControllerConnection
