@@ -38,6 +38,8 @@ import (
 
 var log = logging.MustGetLogger("clickhouse")
 
+var DEFAULT_LIMIT = "10000"
+
 type CHEngine struct {
 	Model         *view.Model
 	Statements    []Statement
@@ -98,7 +100,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 			for _, stmt := range e.Statements {
 				stmt.Format(e.Model)
 			}
-			FormatInnerTime(e.Model)
+			FormatLimit(e.Model)
 			// 使用Model生成View
 			e.View = view.NewView(e.Model)
 			chSql := e.ToSQLString()
@@ -130,7 +132,7 @@ func (e *CHEngine) ExecuteQuery(args *common.QuerierParams) (*common.Result, map
 	for _, stmt := range e.Statements {
 		stmt.Format(e.Model)
 	}
-	FormatInnerTime(e.Model)
+	FormatModel(e.Model)
 	// 使用Model生成View
 	e.View = view.NewView(e.Model)
 	chSql := e.ToSQLString()
@@ -422,7 +424,7 @@ func (e *CHEngine) ToSQLString() string {
 		for _, stmt := range e.Statements {
 			stmt.Format(e.Model)
 		}
-		FormatInnerTime(e.Model)
+		FormatLimit(e.Model)
 		// 使用Model生成View
 		e.View = view.NewView(e.Model)
 	}
@@ -529,7 +531,7 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	if as != "" {
 		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(as))
 	} else {
-		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(chCommon.ParseAlias(item.Expr)))
+		e.ColumnSchemas = append(e.ColumnSchemas, common.NewColumnSchema(strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")))
 	}
 	//var args []string
 	switch expr := item.Expr.(type) {
@@ -551,6 +553,9 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 	// func(field/tag)
 	case *sqlparser.FuncExpr:
 		// 二级运算符
+		if as == "" {
+			as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+		}
 		if common.IsValueInSliceString(sqlparser.String(expr.Name), view.MATH_FUNCTIONS) {
 			binFunction, err := e.parseSelectBinaryExpr(expr)
 			if err != nil {
@@ -597,6 +602,9 @@ func (e *CHEngine) parseSelectAlias(item *sqlparser.AliasedExpr) error {
 		return errors.New(fmt.Sprintf("function: %s not support", sqlparser.String(expr)))
 	// field +=*/ field 运算符
 	case *sqlparser.BinaryExpr:
+		if as == "" {
+			as = strings.ReplaceAll(chCommon.ParseAlias(item.Expr), "`", "")
+		}
 		binFunction, err := e.parseSelectBinaryExpr(expr)
 		if err != nil {
 			return err
@@ -866,4 +874,19 @@ func LoadDbDescriptions(dbDescriptions map[string]interface{}) error {
 		return errors.New("clickhouse not has tag")
 	}
 	return nil
+}
+
+func FormatModel(m *view.Model) {
+	FormatInnerTime(m)
+	FormatLimit(m)
+}
+
+func FormatLimit(m *view.Model) {
+	if m.Limit.Limit == "" {
+		defaultLimit := DEFAULT_LIMIT
+		if config.Cfg != nil {
+			defaultLimit = config.Cfg.Limit
+		}
+		m.Limit.Limit = defaultLimit
+	}
 }
