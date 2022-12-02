@@ -152,7 +152,7 @@ func initCmd(cmd *cobra.Command, cmds []CmdExecute) {
 	paramData.RpcIP = server.IP
 	paramData.RpcPort = strconv.Itoa(int(server.RpcPort))
 	addr := net.JoinHostPort(paramData.RpcIP, paramData.RpcPort)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithMaxMsgSize(1024*1024*200))
 	if err != nil {
 		fmt.Println(err)
 		return
