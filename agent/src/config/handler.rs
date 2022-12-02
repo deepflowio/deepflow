@@ -55,11 +55,6 @@ use crate::{
     exception::ExceptionHandler,
     flow_generator::{FlowTimeout, TcpTimeout},
     handler::PacketHandlerBuilder,
-    proto::trident::{self, CaptureSocketType},
-    proto::{
-        common::TridentType,
-        trident::{Exception, IfMacSource, SocketType, TapMode},
-    },
     trident::{Components, RunningMode},
     utils::{
         environment::{free_memory_check, get_ctrl_ip_and_mac},
@@ -68,6 +63,11 @@ use crate::{
 };
 
 use public::bitmap::Bitmap;
+use public::proto::{
+    common::TridentType,
+    trident::{self, CaptureSocketType, Exception, IfMacSource, SocketType, TapMode},
+};
+
 #[cfg(target_os = "windows")]
 use public::utils::net::links_by_name_regex;
 use public::utils::net::MacAddr;

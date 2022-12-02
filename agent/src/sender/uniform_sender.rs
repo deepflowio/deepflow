@@ -16,6 +16,7 @@
 
 use std::fs::{create_dir_all, rename, File, OpenOptions};
 use std::io::{BufWriter, ErrorKind, Write};
+use std::marker::PhantomData;
 use std::net::{IpAddr, Shutdown, TcpStream};
 use std::path::Path;
 use std::sync::{
@@ -27,16 +28,18 @@ use std::time::Duration;
 
 use arc_swap::access::Access;
 use log::{debug, error, info, warn};
+use public::sender::{SendMessageType, Sendable};
 use thread::JoinHandle;
 
-use super::{SendItem, SendMessageType, PRE_FILE_SUFFIX};
 use crate::config::handler::SenderAccess;
 use crate::exception::ExceptionHandler;
-use crate::proto::trident::{Exception, SocketType};
 use crate::utils::stats::{
     Collector, Countable, Counter, CounterType, CounterValue, RefCountable, StatsOption,
 };
+use public::proto::trident::{Exception, SocketType};
 use public::queue::{Error, Receiver};
+
+const PRE_FILE_SUFFIX: &str = ".pre";
 
 #[derive(Debug, Default)]
 pub struct SenderCounter {
@@ -93,14 +96,15 @@ impl Header {
     }
 }
 
-struct Encoder {
+struct Encoder<T> {
     id: usize,
     header: Header,
 
     buffer: Vec<u8>,
+    _marker: PhantomData<T>,
 }
 
-impl Encoder {
+impl<T: Sendable> Encoder<T> {
     const BUFFER_LEN: usize = 8192;
     pub fn new(id: usize, msg_type: SendMessageType, vtap_id: u16) -> Self {
         Self {
@@ -113,10 +117,11 @@ impl Encoder {
                 sequence: 0,
                 vtap_id,
             },
+            _marker: PhantomData,
         }
     }
 
-    fn set_msg_type_and_version(&mut self, s: &SendItem) {
+    fn set_msg_type_and_version(&mut self, s: &T) {
         if self.header.version != 0 {
             return;
         }
@@ -124,7 +129,7 @@ impl Encoder {
         self.header.version = s.version();
     }
 
-    pub fn cache_to_sender(&mut self, s: SendItem) {
+    pub fn cache_to_sender(&mut self, s: T) {
         if self.buffer.is_empty() {
             self.set_msg_type_and_version(&s);
             self.add_header();
@@ -163,10 +168,10 @@ impl Encoder {
     }
 }
 
-pub struct UniformSenderThread {
+pub struct UniformSenderThread<T> {
     id: usize,
     name: &'static str,
-    input: Arc<Receiver<SendItem>>,
+    input: Arc<Receiver<T>>,
     config: SenderAccess,
 
     thread_handle: Option<JoinHandle<()>>,
@@ -176,11 +181,11 @@ pub struct UniformSenderThread {
     exception_handler: ExceptionHandler,
 }
 
-impl UniformSenderThread {
+impl<T: Sendable> UniformSenderThread<T> {
     pub fn new(
         id: usize,
         name: &'static str,
-        input: Arc<Receiver<SendItem>>,
+        input: Arc<Receiver<T>>,
         config: SenderAccess,
         stats: Arc<Collector>,
         exception_handler: ExceptionHandler,
@@ -234,15 +239,15 @@ impl UniformSenderThread {
     }
 }
 
-pub struct UniformSender {
+pub struct UniformSender<T> {
     id: usize,
     name: &'static str,
 
-    input: Arc<Receiver<SendItem>>,
+    input: Arc<Receiver<T>>,
     counter: Arc<SenderCounter>,
 
     tcp_stream: Option<TcpStream>,
-    encoder: Encoder,
+    encoder: Encoder<T>,
     last_flush: Duration,
 
     dst_ip: IpAddr,
@@ -260,14 +265,14 @@ pub struct UniformSender {
     written_size: u64,
 }
 
-impl UniformSender {
+impl<T: Sendable> UniformSender<T> {
     const TCP_WRITE_TIMEOUT: u64 = 3; // s
     const QUEUE_READ_TIMEOUT: u64 = 3; // s
 
     pub fn new(
         id: usize,
         name: &'static str,
-        input: Arc<Receiver<SendItem>>,
+        input: Arc<Receiver<T>>,
         config: SenderAccess,
         running: Arc<AtomicBool>,
         stats: Arc<Collector>,
@@ -421,7 +426,7 @@ impl UniformSender {
                     let message_type = send_item.message_type();
                     self.counter.rx.fetch_add(1, Ordering::Relaxed);
                     debug!(
-                        "{} sender send item {}: {}",
+                        "{} sender send item {}: {:?}",
                         self.name, message_type, send_item
                     );
                     let result = match socket_type {
@@ -466,7 +471,7 @@ impl UniformSender {
 
     pub fn handle_target_file(
         &mut self,
-        send_item: SendItem,
+        send_item: T,
         kv_string: &mut String,
     ) -> std::io::Result<()> {
         send_item.to_kv_string(kv_string);
@@ -509,9 +514,9 @@ impl UniformSender {
         Ok(())
     }
 
-    pub fn handle_target_server(&mut self, send_item: SendItem) -> std::io::Result<()> {
+    pub fn handle_target_server(&mut self, send_item: T) -> std::io::Result<()> {
         self.encoder.cache_to_sender(send_item);
-        if self.encoder.buffer_len() > Encoder::BUFFER_LEN {
+        if self.encoder.buffer_len() > Encoder::<T>::BUFFER_LEN {
             self.check_or_register_counterable(self.encoder.header.msg_type);
             self.update_dst_ip_and_port();
             self.encoder

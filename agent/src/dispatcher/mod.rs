@@ -74,13 +74,16 @@ use crate::{
     handler::{PacketHandler, PacketHandlerBuilder},
     platform::LibvirtXmlExtractor,
     policy::PolicyGetter,
-    proto::{common::TridentType, trident::IfMacSource, trident::TapMode},
     utils::stats::{self, Collector},
 };
 #[cfg(target_os = "linux")]
 use public::netns::NetNs;
 use public::{
     netns::NsFile,
+    proto::{
+        common::TridentType,
+        trident::{IfMacSource, TapMode},
+    },
     queue::DebugSender,
     utils::net::{Link, MacAddr},
     LeakyBucket,

@@ -36,7 +36,7 @@ use sysinfo::{DiskExt, System, SystemExt};
 use crate::common::{PROCESS_NAME, TRIDENT_PROCESS_LIMIT};
 use crate::error::{Error, Result};
 use crate::exception::ExceptionHandler;
-use crate::proto::{common::TridentType, trident::Exception};
+use public::proto::{common::TridentType, trident::Exception};
 
 use super::process::{get_memory_rss, get_process_num_by_name};
 #[cfg(target_os = "linux")]

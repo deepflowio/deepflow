@@ -29,10 +29,9 @@ use crate::common::platform_data::PlatformData;
 use crate::common::policy::{Acl, Cidr, IpGroupData, PeerConnection};
 use crate::common::FlowAclListener;
 use crate::exception::ExceptionHandler;
-use crate::proto::common::TridentType;
-use crate::proto::trident::Exception;
 use crate::utils::stats::{Counter, CounterType, CounterValue, RefCountable};
 use npb_pcap_policy::NpbTunnelType;
+use public::proto::{common::TridentType, trident::Exception};
 use public::utils::net::get_route_src_ip_interface_name;
 use public::LeakyBucket;
 
