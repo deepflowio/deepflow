@@ -257,15 +257,16 @@ func newPortFilter(log *logger.PrefixLogger, groupIDMaps []api.GroupIDMap, lruCa
 		if entry.Protocol == policy.PROTO_ALL {
 			hasAnyProtocol = true
 		}
-		key := (uint32(i&0xFFFF) << 9) | uint32(entry.Protocol)&0x1FF
-		if _, in := groupProtocolMap[key]; !in {
-			groupProtocolMap[key] = make([]datatype.PortRange, 0)
-		}
 		ports := []datatype.PortRange{datatype.NewPortRange(0, 65535)}
 		if entry.ServerPorts != "" {
 			ports = datatype.SplitPort2Int(entry.ServerPorts)
 		}
-		groupProtocolMap[key] = append(groupProtocolMap[key], ports...)
+		key := (uint32(i&0xFFFF) << 9) | uint32(entry.Protocol)&0x1FF
+		if _, in := groupProtocolMap[key]; !in {
+			groupProtocolMap[key] = ports
+		} else {
+			groupProtocolMap[key] = append(groupProtocolMap[key], ports...)
+		}
 	}
 	return &portFilter{fastMap: lru.NewU64LRU(moduleName+"_port_filter", lruCap>>3, lruCap), portRanges: groupProtocolMap, hasAnyProtocol: hasAnyProtocol}
 }
@@ -294,7 +295,8 @@ func (l *portFilter) rawCheck(group int16, protocol uint16, serverPort uint16) b
 	// key = group 16 bit + protocol 9bit
 	key := ((uint32(group) & 0xFFFF) << 9) | (uint32(protocol) & 0x1FF)
 	for _, portRange := range l.portRanges[key] {
-		if serverPort >= portRange.Min() && serverPort <= portRange.Max() {
+		// 使用serverPort为0 查询时可匹配任意端口，即支持利用 VPC + IP 匹配任意端口的服务
+		if serverPort == 0 || serverPort >= portRange.Min() && serverPort <= portRange.Max() {
 			return true
 		}
 	}
