@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -202,4 +203,15 @@ func GetByFilter(url string, body, filters map[string]interface{}) (*simplejson.
 		i++
 	}
 	return CURLPerform("GET", url, body, "")
+}
+
+var chinesePunctuationRegex = regexp.MustCompile("[(\u4e00-\u9fa5)(\u3002|\uff1f|\uff01|\uff0c|\u3001|\uff1b|\uff1a|\u201c|\u201d|\u2018|\u2019|\uff08|\uff09|\u300a|\u300b|\u3010|\u3011|\u007e)]+")
+
+func IsChineseChar(str string) bool {
+	for _, r := range str {
+		if chinesePunctuationRegex.MatchString(string(r)) {
+			return true
+		}
+	}
+	return false
 }
