@@ -570,7 +570,7 @@ func vtapControllerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalance
 	ipToController := make(map[string]*mysql.Controller)
 	for i, controller := range controllers {
 		ipToController[controller.IP] = &controllers[i]
-		if controller.State == common.HOST_STATE_COMPLETE {
+		if controller.State == common.HOST_STATE_COMPLETE && controller.VTapMax > 0 {
 			normalControllerNum += 1
 		}
 	}
@@ -667,7 +667,7 @@ func vtapAnalyzerRebalance(azs []mysql.AZ, ifCheck bool) (*model.VTapRebalanceRe
 	ipToAnalyzer := make(map[string]*mysql.Analyzer)
 	for i, analyzer := range analyzers {
 		ipToAnalyzer[analyzer.IP] = &analyzers[i]
-		if analyzer.State == common.HOST_STATE_COMPLETE {
+		if analyzer.State == common.HOST_STATE_COMPLETE && analyzer.VTapMax > 0 {
 			normalAnalyzerNum += 1
 		}
 	}
