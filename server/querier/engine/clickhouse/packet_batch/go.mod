@@ -2,4 +2,4 @@ module github.com/deepflowys/deepflow/server/querier/engine/clickhouse/packet_ba
 
 go 1.18
 
-require github.com/deepflowys/deepflow/server v0.0.0-20221201083908-e8544afb12db
+require github.com/deepflowys/deepflow/server v0.0.0-20221202020932-2abfc598aaba
