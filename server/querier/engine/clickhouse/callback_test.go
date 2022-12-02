@@ -44,40 +44,91 @@ func TestTimeFill(t *testing.T) {
 	values := []interface{}{
 		[]interface{}{
 			1645092000,
-			1,
+			"1",
 			2,
+		},
+		[]interface{}{
+			1645092000,
+			"0",
+			3,
+		},
+		[]interface{}{
+			1645113600,
+			"1",
+			1,
+		},
+		[]interface{}{
+			1645113600,
+			"0",
+			4,
 		},
 	}
 	want := []interface{}{
 		[]interface{}{
 			1645070400,
-			0,
+			"0",
 			0,
 		},
 		[]interface{}{
 			1645092000,
-			1,
-			2,
+			"0",
+			3,
 		},
 		[]interface{}{
 			1645113600,
-			0,
-			0,
+			"0",
+			4,
 		},
 		[]interface{}{
 			1645135200,
-			0,
+			"0",
 			0,
 		},
 		[]interface{}{
 			1645156800,
+			"0",
 			0,
+		},
+		[]interface{}{
+			1645070400,
+			"1",
+			0,
+		},
+		[]interface{}{
+			1645092000,
+			"1",
+			2,
+		},
+		[]interface{}{
+			1645113600,
+			"1",
+			1,
+		},
+		[]interface{}{
+			1645135200,
+			"1",
+			0,
+		},
+		[]interface{}{
+			1645156800,
+			"1",
 			0,
 		},
 	}
 	result := &common.Result{
 		Columns: columns,
 		Values:  values,
+		Schemas: common.ColumnSchemas{&common.ColumnSchema{
+			Type:      common.COLUMN_SCHEMA_TYPE_TAG,
+			ValueType: "int",
+		}, &common.ColumnSchema{
+			Type:      common.COLUMN_SCHEMA_TYPE_TAG,
+			ValueType: "string",
+		}, &common.ColumnSchema{
+			Type:      common.COLUMN_SCHEMA_TYPE_METRICS,
+			ValueType: "int",
+		},
+		},
 	}
 	callback(result)
 	if !reflect.DeepEqual(result.Values, want) {
