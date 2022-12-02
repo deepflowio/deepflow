@@ -21,6 +21,7 @@ bitflags! {
         const NONE = 0;
         const POLICY = 1<<0;
         const OPENSSL = 1<<1;
+        const CORE = 1<<2;
    }
 }
 
@@ -31,6 +32,7 @@ impl From<&Vec<String>> for FeatureFlags {
             match flag.to_lowercase().as_str() {
                 "policy" => features.set(FeatureFlags::POLICY, true),
                 "openssl" => features.set(FeatureFlags::OPENSSL, true),
+                "core" => features.set(FeatureFlags::CORE, true),
                 _ => {}
             }
         }
